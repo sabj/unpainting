@@ -1,0 +1,261 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "sol",
+  "name": "Codex Sol",
+  "id": "gpt-6.1-sol",
+  "effort": "xhigh",
+  "runner": "codex"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true
+ },
+ "session": {
+  "minutes": 62.6,
+  "tokens": 10802944,
+  "costUSD": null,
+  "estCostUSD": 2.577,
+  "usage": {
+   "input": 291295,
+   "cachedInput": 10416384,
+   "output": 95265
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 1585,
+   "minutes": 15.5,
+   "smallShare": 0.921,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": -0.0078,
+   "images": {
+    "final": "hills.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.34,
+    "pm": 0.12,
+    "complete": true,
+    "classic": 7.02,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3,
+     "marks_texture": 2.67,
+     "classic_value": 4.5,
+     "classic_edge": 7.54,
+     "classic_landmark": null,
+     "classic_marks": 9.01
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 4,
+     "50": 3,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 4,
+    "mean": 3.6,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "f": 1,
+     "c": 3,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Broadly human order — pale ground wash laid first, dark canopy masses blocked in progressively with brushy blob edges — but the grass stays a flat even slab until the road, bright green strokes and tree texture all land together in the final step."
+    }
+   },
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 224,
+   "minutes": 21.3,
+   "smallShare": 0.509,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0486,
+   "images": {
+    "final": "sargent.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.67,
+    "pm": 0.2,
+    "complete": true,
+    "classic": 6.68,
+    "criteria": {
+     "composition_values": 5.67,
+     "edges_detail": 3.67,
+     "marks_texture": 4.67,
+     "classic_value": 4.56,
+     "classic_edge": 6.17,
+     "classic_landmark": null,
+     "classic_marks": 9.31
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 6
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 5,
+     "50": 5,
+     "75": 5,
+     "100": 5
+    },
+    "earlyMean": 4.5,
+    "mean": 4.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Classic watercolor build-up: broad pale washes block the hull and ground first, mid-tone modeling and mast strokes follow, and darks plus fine rigging/chain details arrive last, with only the slightly flat even hull slab at 10% as a minor tell."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 1918,
+   "minutes": 25.8,
+   "smallShare": 0.97,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0315,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 6.24,
+    "pm": 0.12,
+    "complete": true,
+    "classic": 7.48,
+    "criteria": {
+     "composition_values": 5.67,
+     "edges_detail": 4.33,
+     "marks_texture": 4.33,
+     "classic_value": 4.06,
+     "classic_edge": 8.82,
+     "classic_landmark": null,
+     "classic_marks": 9.57
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 6
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 2,
+     "50": 2,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 1.5,
+    "mean": 2.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "e": 1,
+     "c": 2,
+     "f": 3,
+     "k": 1,
+     "j": 2,
+     "b": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The strip reads as the finished scene fading up and saturating uniformly rather than a painter's build-up: every form is already faintly present at 10%, darks and one resolved building cluster arrive while neighbours stay untouched, and texture sharpens in a late dump."
+    }
+   },
+   "painterNote": null
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 5.75,
+  "partialComposite": null,
+  "pm": null,
+  "cropsScored": 3,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.75,
+   "level": "high",
+   "basis": "highest crop"
+  },
+  "progressionRisk": {
+   "score": 0.75,
+   "level": "high"
+  },
+  "review": {
+   "status": "cleared",
+   "finding": "weak technique, not cheating"
+  }
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

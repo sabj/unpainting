@@ -1,0 +1,24 @@
+{
+  "subject": "SF",
+  "name": "South France — sunlit village, pen and light wash",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Warm stone houses are set among olive crowns and tall cypresses. Fine pen states rooflines, corners and branching; transparent local-color washes and restrained connected shadow glazes leave the sunlit planes open.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"SF.terraces","bounds":[0,0,0.36,0.45],"baseMove":"wet on dry","referenceCue":"Pale yellow ochre terraces and retaining walls recede diagonally behind small olives. Connected watery flat wash on dry paper; the pale sunlit paths stay open; a few wall and gate junctions belong to pen."},
+    {"id":"SF.upper-village","bounds":[0.39,0,0.8,0.27],"baseMove":"wet on dry","referenceCue":"Small cream houses, warm roofs, and cooler side walls in the upper village. Broad pale wall planes on dry paper, muted distant shadows, and sparse connected roof and corner pen gestures."},
+    {"id":"SF.focal-houses","bounds":[0.665,0.335,0.96,0.81],"baseMove":"wet on dry","referenceCue":"The lower-right ochre houses are the focal point: terracotta roof slopes, pale lit walls, violet-grey side planes, long eave junctions and small dark windows. Pale connected facade washes on fully dry paper; dry cross-plane shadow glaze; narrow recesses and roof joints carried by selective black pen."},
+    {"id":"SF.olive-masses","bounds":[0,0.14,0.69,0.9],"baseMove":"wet on dry","referenceCue":"Olive foliage makes connected irregular yellow-green and grey-green crowns, with darker cool interiors and pale gaps between trees. Watery wet-on-dry crown wash, dry completely, then a restrained connected shadow glaze across adjacent crowns and ground. No equal leaf disks, stippling, or outlines around every crown."},
+    {"id":"SF.foreground-tree","bounds":[0.13,0.57,0.44,1],"baseMove":"wet on dry","referenceCue":"The foreground tree has a pale yellow-green crown and an angular dark trunk with tapering upward branches. Broad pale crown wash on dry paper, reserve natural gaps, dry, then pen follows only the principal forks. Individual leaves are below brush resolution."},
+    {"id":"SF.right-garden","bounds":[0.63,0.73,1,1],"baseMove":"wet on dry","referenceCue":"Broken sunlit paths and grey-green olives surround the foot of the houses. One pale local-color wash, then dry connected shadow shapes crossing foliage and earth; a few branches and path junctions in pen, no isolated texture flecks."},
+    {"id":"SF.distant-hills","bounds":[0.81,0,1,0.16],"baseMove":"wet on dry","referenceCue":"A small muted blue-green distant hillside at upper right, without open sky. Thin pale wash on dry paper; subdued lost interior edges and no close leaf or branch detail."}
+  ],
+  "reserves": [
+    {"reason":"small paper glint on upper roof ridge","bounds":[0.43092,0.04016,0.4375,0.04819]},
+    {"reason":"small paper glint on focal tower roof ridge","bounds":[0.875,0.35341,0.88158,0.36145]},
+    {"reason":"tiny sunlit terrace break, negative gap","bounds":[0.19079,0.12048,0.20066,0.12851]},
+    {"reason":"tiny pale path break beside the front house","bounds":[0.72368,0.80723,0.73355,0.81526]}
+  ]
+}

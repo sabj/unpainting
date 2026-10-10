@@ -1,0 +1,56 @@
+{
+  "subject": "SARGENT",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent's white boats are carried by transparent warm lights, broad cool hull planes, and selective hard painted accents. Pure watercolor: no opening or closing drawing.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SARGENT.shadow-bow",
+      "bounds": [0.23, 0.0, 0.65, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "The large curved bow has a continuous pale blue-grey local wash, a darker navy left rim, and a connected deep lower shadow. Paint broad turning planes; preserve the pale oblique streaks as painted light planes, not white holes. Soften turning edges selectively."
+    },
+    {
+      "id": "SARGENT.sunlit-hull",
+      "bounds": [0.64, 0.0, 1.0, 0.72],
+      "baseMove": "wet on dry",
+      "referenceCue": "The right ship is warm cream paper with sparse pale blue horizontal and diagonal shadows. Keep the lit hull broad and luminous. The two high portholes are separate dark painted shapes on fully dry paper; no enclosing ink contour."
+    },
+    {
+      "id": "SARGENT.left-rigging",
+      "bounds": [0.0, 0.0, 0.28, 0.58],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left upright spars and the oblique crossing stay grey olive, cream and muted ochre. Pale local color first, dry, then the few narrow structural shapes on dry paper. Preserve open light intervals; fitted geometry supplies the angles."
+    },
+    {
+      "id": "SARGENT.left-boat",
+      "bounds": [0.0, 0.48, 0.30, 0.91],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cropped blue boat at left is a connected middle-value plane with pale slanting reflected streaks, darker bottom edge, and lost edges toward the water. Broad wash before selective darker shapes; avoid a mosaic of little dabs."
+    },
+    {
+      "id": "SARGENT.warm-gear",
+      "bounds": [0.09, 0.43, 0.31, 0.95],
+      "baseMove": "wet on dry",
+      "referenceCue": "The ochre anchor, rope and reddish brown diagonal hardware interrupt the blue boats. Light ochre body before burnt-sienna creases and grey-brown recesses, all on dry paper. The anchor stays pale and connected with tapered ends. The warm rope at right is another expression of this pigment family."
+    },
+    {
+      "id": "SARGENT.water",
+      "bounds": [0.0, 0.81, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The water is muted turquoise and ochre at right and deep blue-grey beneath the left bow. Lay connected transparent local planes first, fully dry, then connected reflection shadows crossing boat and water color families. Preserve irregular pale reflection gaps, with paper tooth on the dark finishing contacts. No regular rows of ripples or separate painted dots."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Small bare-paper core in the broad warm light of the right hull, below the portholes; surrounding light remains a pale painted plane.",
+      "bounds": [0.728, 0.351, 0.740, 0.366]
+    },
+    {
+      "reason": "Small bare-paper core on the lower sunlit hull, clear of the diagonal blue reflection and the warm rope.",
+      "bounds": [0.715, 0.555, 0.727, 0.570]
+    }
+  ]
+}

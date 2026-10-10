@@ -1,0 +1,6 @@
+{"subject":"hills","name":"HILLS",
+ "styleSelection":{"style":"ink-and-wash","reason":"loose gestural landscape with soft edges and flowing paths",
+   "regions":{}},
+ "families":[{"id":"hills.main","bounds":[0,0,1,1],"baseMove":"wet on dry","referenceCue":"rolling hills with dark forest and pale paths"}],
+ "reserves":[{"reason":"brightest path, left-center","bounds":[0.25,0.35,0.45,0.5]},
+             {"reason":"brightest path top-right","bounds":[0.6,0.15,0.8,0.3]}]}

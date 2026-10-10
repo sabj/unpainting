@@ -1,0 +1,48 @@
+{
+  "name": "unpainting",
+  "private": true,
+  "type": "module",
+  "description": "A Node.js watercolor and ink simulator that paints images one brushstroke at a time.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=25"
+  },
+  "scripts": {
+    "test": "node --test --test-timeout=300000 \"src/**/*.test.mjs\" \"tools/**/*.test.mjs\"",
+    "example": "node tools/run-plan.mjs examples/plans/graded-wash.json",
+    "example:portrait": "node tools/paint-plate.mjs --image examples/targets/sargent-a-tramp.jpg --width 360 --mode fast --out work/sargent-a-tramp",
+    "example:drawing": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-sweets.jpg --width 360 --mode fast --out work/tiepolo-punchinello-sweets",
+    "example:animal": "node tools/paint-plate.mjs --image examples/targets/tiepolo-punchinello-camel.jpg --width 360 --mode fast --out work/tiepolo-punchinello-camel",
+    "example:architecture": "node tools/paint-plate.mjs --image examples/targets/trumbull.jpg --width 360 --mode fast --sheetmm 381 --valueplan examples/plans/trumbull-values.json --out work/trumbull",
+    "example:plan": "node tools/run-plan.mjs examples/plans/graded-wash.json",
+    "bench:run": "node bench/scripts/run.mjs",
+    "bench:score": "node bench/scripts/score.mjs",
+    "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",
+    "bench:test": "node --test bench/scripts/lib.test.mjs bench/scripts/kit-log.test.mjs bench/scripts/rounds.test.mjs bench/scripts/overview-picks.test.mjs bench/scripts/rounds-table.test.mjs",
+    "quick-start": "npm run example:plan"
+  },
+  "dependencies": {
+    "sharp": "^0.35.4",
+    "webgpu": "^0.6.1"
+  },
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sabj/unpainting.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sabj/unpainting/issues"
+  },
+  "homepage": "https://github.com/sabj/unpainting#readme",
+  "author": "Sam Jackson",
+  "keywords": [
+    "watercolor",
+    "ink",
+    "painting",
+    "simulation",
+    "webgpu"
+  ],
+  "devDependencies": {
+    "playwright": "^1.55.1"
+  }
+}

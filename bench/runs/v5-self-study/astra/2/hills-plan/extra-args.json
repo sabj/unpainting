@@ -1,0 +1,20 @@
+[
+  "--paints",
+  "hansa,sapgreen,ochre,ultramarine,cerulean,sepia",
+  "--paperrel",
+  "0",
+  "--paperlights",
+  "0",
+  "--paperbase",
+  "white",
+  "--paperrgb",
+  "252,251,248",
+  "--openingpressure",
+  "0.25",
+  "--closingpressure",
+  "0.45",
+  "--touchgain",
+  "0.55",
+  "--loadfeather",
+  "1.5"
+]

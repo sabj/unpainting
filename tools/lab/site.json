@@ -1,0 +1,5 @@
+{
+  "note": "What the GitHub Pages site may carry. examples: Paint Lab example ids whose target pictures are public domain. films: ids whose painter films may ship; a film ships only after it passes the gate in docs/examples.md. Sam Jackson's photos never ship.",
+  "examples": ["tiepolo-punchinello-sweets", "tiepolo-punchinello-camel"],
+  "films": []
+}

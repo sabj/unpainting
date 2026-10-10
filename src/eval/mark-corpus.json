@@ -1,0 +1,183 @@
+{
+  "sheets": 18,
+  "width": 1086,
+  "marks": {
+    "p25": 297,
+    "median": 610,
+    "p75": 2376
+  },
+  "medianLength": {
+    "p25": 1.4142135623730951,
+    "median": 2,
+    "p75": 2
+  },
+  "longShare": {
+    "p25": 0,
+    "median": 0,
+    "p75": 0.04772707098461411
+  },
+  "rows": [
+    {
+      "sheet": "met-335240-poussin-bacchanal-pen-brown-ink-wash.jpg",
+      "marks": 3133,
+      "median": 2,
+      "p75": 4.414213562373095,
+      "p90": 8.82842712474619,
+      "longest": 54.24264068711928,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-336315-bellange-raising-of-lazarus-pen-brown-ink-wash.jpg",
+      "marks": 313,
+      "median": 1.4142135623730951,
+      "p75": 3.414213562373095,
+      "p90": 9.242640687119284,
+      "longest": 46.72792206135785,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-336489-claude-lorrain-queen-esther-pen-brown-ink-wash.jpg",
+      "marks": 457,
+      "median": 2.414213562373095,
+      "p75": 4.82842712474619,
+      "p90": 8.65685424949238,
+      "longest": 75,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-337491-rembrandt-cottage-among-trees-pen-brown-ink-wash.jpg",
+      "marks": 3462,
+      "median": 2,
+      "p75": 4,
+      "p90": 7.414213562373095,
+      "longest": 41.071067811865476,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-337632-ostade-weavers-cottage-pen-ink-watercolour-graphite.jpg",
+      "marks": 2376,
+      "median": 2,
+      "p75": 5,
+      "p90": 10.82842712474619,
+      "longest": 122.82842712474618,
+      "longShare": 0.04772707098461411
+    },
+    {
+      "sheet": "met-339000-guercino-endymion-pen-brown-ink-light-wash.jpg",
+      "marks": 1117,
+      "median": 1,
+      "p75": 2.414213562373095,
+      "p90": 7.242640687119285,
+      "longest": 123.62741699796949,
+      "longShare": 0.09608074030843848
+    },
+    {
+      "sheet": "met-340638-salvator-rosa-witches-sabbath-pen-brown-ink-wash.jpg",
+      "marks": 5008,
+      "median": 1,
+      "p75": 3.414213562373095,
+      "p90": 7.82842712474619,
+      "longest": 41.79898987322333,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-343628-rembrandt-elsje-christiaens-pen-brown-ink-wash.jpg",
+      "marks": 610,
+      "median": 1.4142135623730951,
+      "p75": 3,
+      "p90": 6.414213562373095,
+      "longest": 34.65685424949238,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-347891-rembrandt-woman-reading-pen-brown-ink-wash.jpg",
+      "marks": 325,
+      "median": 1.4142135623730951,
+      "p75": 5,
+      "p90": 11.414213562373096,
+      "longest": 169.48528137423858,
+      "longShare": 0.09635336352735012
+    },
+    {
+      "sheet": "met-334357-cross-study-cork-oaks-watercolour-graphite.jpg",
+      "marks": 297,
+      "median": 1.4142135623730951,
+      "p75": 2.414213562373095,
+      "p90": 5,
+      "longest": 20.82842712474619,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-337499-turner-lake-of-zug-watercolour-reductive-graphite.jpg",
+      "marks": 26,
+      "median": 1,
+      "p75": 2,
+      "p90": 3.8284271247461903,
+      "longest": 4.414213562373095,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-337632-ostade-weavers-cottage-pen-ink-watercolour-graphite.jpg",
+      "marks": 2376,
+      "median": 2,
+      "p75": 5,
+      "p90": 10.82842712474619,
+      "longest": 122.82842712474618,
+      "longShare": 0.04772707098461411
+    },
+    {
+      "sheet": "met-337841-savery-study-of-a-tree-grey-wash-chalk-graphite.jpg",
+      "marks": 655,
+      "median": 2.414213562373095,
+      "p75": 5.82842712474619,
+      "p90": 12,
+      "longest": 180.07106781186548,
+      "longShare": 0.12880198447353927
+    },
+    {
+      "sheet": "met-340847-bonington-the-proposal-unfinished-watercolour-graphite.jpg",
+      "marks": 145,
+      "median": 2,
+      "p75": 3.414213562373095,
+      "p90": 5.82842712474619,
+      "longest": 19.48528137423857,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-340868-brabazon-venetian-street-watercolour-graphite.jpg",
+      "marks": 56,
+      "median": 2.414213562373095,
+      "p75": 6.414213562373095,
+      "p90": 8.414213562373096,
+      "longest": 29.485281374238575,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-342383-ruskin-loggia-ducal-palace-unfinished-watercolour-graphite.jpg",
+      "marks": 530,
+      "median": 2.414213562373095,
+      "p75": 5,
+      "p90": 10,
+      "longest": 72.07106781186546,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-343295-anon-british-study-of-a-rock-watercolour-graphite.jpg",
+      "marks": 759,
+      "median": 2,
+      "p75": 3,
+      "p90": 4.82842712474619,
+      "longest": 12.242640687119286,
+      "longShare": 0
+    },
+    {
+      "sheet": "met-359577-turner-of-oxford-salisbury-plain-watercolour-graphite.jpg",
+      "marks": 36,
+      "median": 2,
+      "p75": 4.82842712474619,
+      "p90": 8.414213562373096,
+      "longest": 10,
+      "longShare": 0
+    }
+  ]
+}

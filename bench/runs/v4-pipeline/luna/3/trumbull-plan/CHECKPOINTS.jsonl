@@ -1,0 +1,14 @@
+{"t": "2026-10-09 20:38:17 PDT", "kind": "start", "modelMinutes": 9.87, "variant": "region_w13_dwg120", "renderKey": "2f97941fb80e692a4ee05095dfa58d01bfb215c5b97f8475a90d0eced555765b"}
+{"t": "2026-10-09 20:40:40 PDT", "kind": "look", "modelMinutes": 10.05, "n": 1, "boundary": "0", "strokes": 0, "penLines": 34, "passesDone": 0, "passesPlanned": 81}
+{"t": "2026-10-09 20:40:59 PDT", "kind": "continue", "modelMinutes": 10.36, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 20:41:36 PDT", "kind": "look", "modelMinutes": 10.38, "n": 2, "boundary": "1", "strokes": 8, "penLines": 34, "passesDone": 1, "passesPlanned": 81}
+{"t": "2026-10-09 20:41:53 PDT", "kind": "continue", "modelMinutes": 10.66, "boundary": "1", "stopAt": 16, "strokes": 8}
+{"t": "2026-10-09 20:46:50 PDT", "kind": "look", "modelMinutes": 10.97, "n": 3, "boundary": "16", "strokes": 919, "penLines": 34, "passesDone": 16, "passesPlanned": 81}
+{"t": "2026-10-09 20:47:04 PDT", "kind": "continue", "modelMinutes": 11.21, "boundary": "16", "stopAt": 17, "strokes": 919}
+{"t": "2026-10-09 20:47:54 PDT", "kind": "look", "modelMinutes": 11.24, "n": 4, "boundary": "17", "strokes": 950, "penLines": 34, "passesDone": 17, "passesPlanned": 81}
+{"t": "2026-10-09 20:48:03 PDT", "kind": "continue", "modelMinutes": 11.39, "boundary": "17", "stopAt": 62, "strokes": 950}
+{"t": "2026-10-09 21:01:26 PDT", "kind": "look", "modelMinutes": 11.81, "n": 5, "boundary": "62", "strokes": 3127, "penLines": 34, "passesDone": 62, "passesPlanned": 81}
+{"t": "2026-10-09 21:01:47 PDT", "kind": "continue", "modelMinutes": 12.16, "boundary": "62", "stopAt": "end", "strokes": 3127}
+{"t": "2026-10-09 21:33:37 PDT", "kind": "finished", "modelMinutes": 13.06, "strokes": 14350}
+{"t": "2026-10-09 21:33:40 PDT", "kind": "look", "modelMinutes": 13.11, "n": 6, "boundary": "final"}
+{"t": "2026-10-09 21:33:57 PDT", "kind": "session-end", "modelMinutes": 13.39, "why": "you ended the session", "looks": 6, "revisions": 0}

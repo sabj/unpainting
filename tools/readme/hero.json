@@ -1,0 +1,7 @@
+{
+  "note": "The hero subject. Set film to a folder of saved frames (f000.webp onward and final.webp) and target to its target image, both relative to the repository root. Leave them null until a painting passes the gate in docs/examples.md.",
+  "film": null,
+  "target": null,
+  "first": "f001.webp",
+  "steps": null
+}

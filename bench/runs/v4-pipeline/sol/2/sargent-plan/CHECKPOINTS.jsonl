@@ -1,0 +1,13 @@
+{"t": "2026-10-09 17:18:43 PDT", "kind": "start", "modelMinutes": 6.33, "variant": "region_w15_lay2_cg10_dk12_acc3_dp85_noslane", "renderKey": "c42bcbb5faba10293c6cc83f7dd70978e6a048568bd70760e5987dec36825dbf"}
+{"t": "2026-10-09 17:22:33 PDT", "kind": "look", "modelMinutes": 6.81, "n": 1, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 75}
+{"t": "2026-10-09 17:22:40 PDT", "kind": "continue", "modelMinutes": 6.91, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 17:23:57 PDT", "kind": "look", "modelMinutes": 6.96, "n": 2, "boundary": "1", "strokes": 72, "penLines": 0, "passesDone": 1, "passesPlanned": 75}
+{"t": "2026-10-09 17:24:10 PDT", "kind": "continue", "modelMinutes": 7.19, "boundary": "1", "stopAt": 20, "strokes": 72}
+{"t": "2026-10-09 17:33:19 PDT", "kind": "look", "modelMinutes": 7.97, "n": 3, "boundary": "20", "strokes": 1371, "penLines": 0, "passesDone": 20, "passesPlanned": 75}
+{"t": "2026-10-09 17:57:57 PDT", "kind": "revise", "modelMinutes": 10.77, "boundary": "20", "revision": 1, "strokes": 1371, "passesDone": 20, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w15_lay2_cg10_dk12_acc3_dp85_noslane_softs"}
+{"t": "2026-10-09 18:26:05 PDT", "kind": "look", "modelMinutes": 13.1, "n": 4, "boundary": "60", "strokes": 8881, "penLines": 0, "passesDone": 60, "passesPlanned": 75}
+{"t": "2026-10-09 18:27:33 PDT", "kind": "continue", "modelMinutes": 14.56, "boundary": "60", "stopAt": "closing", "strokes": 8881}
+{"t": "2026-10-09 18:42:22 PDT", "kind": "look", "modelMinutes": 15.83, "n": 5, "boundary": "closing", "strokes": 14082, "penLines": 0, "passesDone": 90, "passesPlanned": 90}
+{"t": "2026-10-09 18:44:09 PDT", "kind": "continue", "modelMinutes": 17.62, "boundary": "closing", "stopAt": "end", "strokes": 14082}
+{"t": "2026-10-09 18:45:56 PDT", "kind": "finished", "modelMinutes": 17.78, "strokes": 14082}
+{"t": "2026-10-09 18:46:11 PDT", "kind": "session-end", "modelMinutes": 18.02, "why": "you ended the session", "looks": 5, "revisions": 1}

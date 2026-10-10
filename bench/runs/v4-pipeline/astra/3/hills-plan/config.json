@@ -1,0 +1,99 @@
+{
+  "subject": "HILLS",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose landscape: two connected value washes carry luminous yellow-green ridges and cool oak masses, with sparse dry sepia branches and path turns.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "HILLS.upper-groves",
+      "bounds": [
+        0,
+        0,
+        0.59,
+        0.21
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Distant subdued blue-grey oak belt. Connected light wash, dry, cool shadow groups; few internal pen lines."
+    },
+    {
+      "id": "HILLS.upper-ridge",
+      "bounds": [
+        0.48,
+        0,
+        1,
+        0.3
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit yellow-green upper right ridge and cream descending track. Light field wash with crisp irregular tree silhouettes."
+    },
+    {
+      "id": "HILLS.left-ridge",
+      "bounds": [
+        0.11,
+        0.14,
+        0.42,
+        0.53
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Narrow luminous left ridge and winding cream path. Continuous light corridor between dark groves."
+    },
+    {
+      "id": "HILLS.ravine",
+      "bounds": [
+        0.4,
+        0.16,
+        1,
+        0.71
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad interlocking blue-grey and olive canopies. Connected pale foundation, fully dry, then cool shadow glazes across neighboring trees."
+    },
+    {
+      "id": "HILLS.focal-oak",
+      "bounds": [
+        0.23,
+        0.39,
+        0.46,
+        0.73
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Spreading central oak at the path bend. Olive-grey crown, deep cool trunk-side shadow and selective tapering sepia forks against light gaps."
+    },
+    {
+      "id": "HILLS.foreground-grove",
+      "bounds": [
+        0,
+        0.54,
+        0.35,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Near left woodland forms the strongest connected dark. Cool base, dry shadow glaze, a few directional branches; no leaf stipple."
+    },
+    {
+      "id": "HILLS.foreground-meadow",
+      "bounds": [
+        0.3,
+        0.58,
+        0.93,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad lower yellow-green slope. Continuous light field wash, paper tooth, subdued olive terrain turns and dry tree shadows."
+    },
+    {
+      "id": "HILLS.path",
+      "bounds": [
+        0.425,
+        0.575,
+        0.54,
+        0.955
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cream winding track. Near-paper core held by target light mask, pale ochre margins and broken shaded edges."
+    }
+  ],
+  "reserves": []
+}

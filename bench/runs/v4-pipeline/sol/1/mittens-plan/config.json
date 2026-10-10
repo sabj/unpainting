@@ -1,0 +1,93 @@
+{
+  "subject": "mittens",
+  "name": "Mittens — fine sepia portrait sketch",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is a high-key portrait sketch: fitted pale planes, dry focal eyes, ochre markings, a connected mixed-dark hair mass and sparse fine sepia lines.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat-head",
+      "bounds": [
+        0,
+        0,
+        0.51,
+        0.59
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cream and ochre tabby head, pointed ears, pale green-gold irises, dark upper lids; broad local-value planes before selective growth-direction lines."
+    },
+    {
+      "id": "mittens.cat-chest",
+      "bounds": [
+        0,
+        0.46,
+        0.55,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "White muzzle and chest remain paper; pale ochre flank underwash, then connected darker tabby bands with broken natural edges."
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [
+        0.51,
+        0.4,
+        0.94,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Nearly white forehead and nose ridge, warm grey eye sockets, ochre cheek turn and smile; dry shaped planes, no under-eye ink creases."
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [
+        0.48,
+        0.19,
+        1,
+        0.71
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark neutral-brown hair as connected translucent mass with irregular paper gaps; form and shadow are paint, with very few line accents."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Cat left eye catchlight: bare paper glint",
+      "bounds": [
+        0.08600000000000001,
+        0.24247104247104245,
+        0.091,
+        0.24826254826254826
+      ]
+    },
+    {
+      "reason": "Cat right eye catchlight: bare paper glint",
+      "bounds": [
+        0.266,
+        0.21428571428571427,
+        0.27099999999999996,
+        0.22007722007722008
+      ]
+    },
+    {
+      "reason": "Portrait left eye catchlight: pale glint preserved at this small scale",
+      "bounds": [
+        0.5993333333333334,
+        0.7162162162162162,
+        0.6043333333333334,
+        0.722007722007722
+      ]
+    },
+    {
+      "reason": "Portrait right eye catchlight: small pale reflected glint",
+      "bounds": [
+        0.8075,
+        0.6772200772200773,
+        0.8125,
+        0.683011583011583
+      ]
+    }
+  ]
+}

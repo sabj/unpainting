@@ -1,0 +1,30 @@
+{
+  "subject": "SF",
+  "name": "South France V4 try 2",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "The reference is a painted village and olive hillside with readable dark roof and opening lines. A restrained pen drawing should carry the small architecture while a single light wash family keeps the foliage and walls broad.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SF.stone.east-village",
+      "bounds": [0.58, 0.29, 1.0, 0.75],
+      "baseMove": "wet on dry",
+      "referenceCue": "The prominent right-center cluster of ochre tile roofs, pale sunlit facades, cool side planes and dark window recesses. Read roof direction and wall planes before adding small accents."
+    },
+    {
+      "id": "SF.stone.upper-ridge",
+      "bounds": [0.08, 0.0, 0.68, 0.43],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small pale stone houses and roof fragments along the upper ridge, separated by cypress and olive canopy; keep the warm planes light and their edges interrupted by foliage."
+    },
+    {
+      "id": "SF.olive-canopy",
+      "bounds": [0.0, 0.24, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected yellow-olive and cool-green tree masses fill the lower half and thread between houses. Treat them as broad value shapes; the individual leaf marks are below this wash's resolution."
+    }
+  ],
+  "reserves": []
+}

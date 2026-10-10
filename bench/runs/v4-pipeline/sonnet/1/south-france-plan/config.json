@@ -1,0 +1,21 @@
+{
+ "subject": "SF",
+ "name": "South France",
+ "styleSelection": {
+  "style": "urban-sketch",
+  "reason": "Requested urban sketch, pen plus light wash: the pen carries the buildings, cypress and the pine; the wash is pale and flat, wall by wall and clump by clump, with paper left in the lights.",
+  "regions": {}
+ },
+ "families": [
+  {"id": "SF.village", "bounds": [0.645, 0.33, 0.96, 0.82], "baseMove": "wet on dry", "referenceCue": "terracotta roofs, tan sunlit walls, lilac shadow sides; the focal group"},
+  {"id": "SF.village-top", "bounds": [0.39, 0.0, 0.78, 0.235], "baseMove": "wet on dry", "referenceCue": "small pale houses, purple shadow wall, ochre roofs among trees"},
+  {"id": "SF.terrace", "bounds": [0.0, 0.03, 0.36, 0.40], "baseMove": "wet on dry", "referenceCue": "ochre terrace walls and path, hut with dark opening, olive heads"},
+  {"id": "SF.cypress", "bounds": [0.27, 0.0, 0.42, 0.37], "baseMove": "wet on dry", "referenceCue": "dark blue-green flame shapes, the darkest darks"},
+  {"id": "SF.hills", "bounds": [0.83, 0.0, 1.0, 0.18], "baseMove": "wet in wet", "referenceCue": "distant blue-green hills, soft and pale"},
+  {"id": "SF.foliage-centre", "bounds": [0.35, 0.22, 0.76, 0.80], "baseMove": "wet on dry", "referenceCue": "grey-green olive crowns with a light yellow-green mass and dark cypress behind"},
+  {"id": "SF.foliage-left", "bounds": [0.0, 0.38, 0.36, 0.78], "baseMove": "wet on dry", "referenceCue": "olive trees, small trunks, ochre ground between"},
+  {"id": "SF.pine", "bounds": [0.10, 0.55, 0.50, 1.0], "baseMove": "wet on dry", "referenceCue": "bright yellow-green pine crown, dark trunk and limbs"},
+  {"id": "SF.foliage-low", "bounds": [0.50, 0.80, 1.0, 1.0], "baseMove": "wet on dry", "referenceCue": "mid green clumps along the bottom edge"}
+ ],
+ "reserves": []
+}

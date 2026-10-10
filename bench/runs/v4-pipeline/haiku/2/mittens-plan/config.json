@@ -1,0 +1,82 @@
+{
+  "subject": "Mittens",
+  "name": "Mittens portrait with cat",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "light to dark layering with fine lines and light washes for portrait sketch",
+    "regions": {
+      "person.face": {
+        "style": "precise-watercolor",
+        "reason": "skin planes and facial features require dry paper with controlled edges"
+      },
+      "person.hair": {
+        "style": "ink-and-wash",
+        "reason": "dark mass rendered with mixed darks and directional strokes"
+      },
+      "cat.head": {
+        "style": "ink-and-wash",
+        "reason": "tabby fur as value wash with directional strokes following growth"
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "person.face",
+      "bounds": [0.45, 0.15, 1.0, 0.95],
+      "baseMove": "wet on dry",
+      "referenceCue": "person's face and neck with catchlights in both eyes, pale skin wash, mid-value planes for structure"
+    },
+    {
+      "id": "person.hair",
+      "bounds": [0.45, 0.0, 1.0, 0.45],
+      "baseMove": "wet on dry",
+      "referenceCue": "dark hair mass on left side, rendered with mixed darks and directional strokes"
+    },
+    {
+      "id": "cat.head",
+      "bounds": [0.0, 0.15, 0.65, 0.95],
+      "baseMove": "wet on dry",
+      "referenceCue": "tabby cat looking upward, orange and brown fur with blue-grey muzzle sheen, alert eyes"
+    },
+    {
+      "id": "background",
+      "bounds": [0.6, 0.0, 1.0, 0.2],
+      "baseMove": "wet on dry",
+      "referenceCue": "light background, mostly white paper with pale wash"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "person's left eye catchlight (focal point)",
+      "bounds": [0.56, 0.32, 0.62, 0.38]
+    },
+    {
+      "reason": "person's right eye catchlight (focal point)",
+      "bounds": [0.74, 0.34, 0.80, 0.40]
+    },
+    {
+      "reason": "cat's left eye catchlight",
+      "bounds": [0.16, 0.35, 0.21, 0.40]
+    },
+    {
+      "reason": "cat's right eye catchlight",
+      "bounds": [0.27, 0.36, 0.32, 0.41]
+    },
+    {
+      "reason": "person's nose ridge highlight",
+      "bounds": [0.64, 0.48, 0.67, 0.53]
+    },
+    {
+      "reason": "person's lip highlight",
+      "bounds": [0.63, 0.62, 0.69, 0.66]
+    },
+    {
+      "reason": "cat's muzzle blue-grey sheen and whisker area",
+      "bounds": [0.28, 0.55, 0.40, 0.70]
+    },
+    {
+      "reason": "white paper background vignette",
+      "bounds": [0.65, 0.0, 1.0, 0.15]
+    }
+  ]
+}

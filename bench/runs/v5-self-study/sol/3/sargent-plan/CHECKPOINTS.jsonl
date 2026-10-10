@@ -1,0 +1,11 @@
+{"t": "2026-10-09 17:46:00 PDT", "kind": "start", "modelMinutes": 13.73, "variant": "region_w15_lay1_hue_cg12_mg12_dk12_acc3_dp70_noslane_softs_tp1", "renderKey": "91bbf1e447a86fccf4b9063b840753644bf6e8f711ad4ce23e3606ff2dbb19f2"}
+{"t": "2026-10-09 18:19:33 PDT", "kind": "continue", "modelMinutes": 24.62, "boundary": null, "stopAt": 5, "strokes": null}
+{"t": "2026-10-09 18:31:03 PDT", "kind": "continue", "modelMinutes": 28.59, "boundary": null, "stopAt": "end", "strokes": null}
+{"t": "2026-10-09 18:49:43 PDT", "kind": "continue", "modelMinutes": 36.71, "boundary": null, "stopAt": 20, "strokes": null}
+{"t": "2026-10-09 18:56:19 PDT", "kind": "look", "modelMinutes": 40.02, "n": 1, "boundary": "20", "strokes": 3245, "penLines": 0, "passesDone": 20, "passesPlanned": 31}
+{"t": "2026-10-09 18:57:35 PDT", "kind": "continue", "modelMinutes": 41.28, "boundary": "20", "stopAt": 30, "strokes": 3245}
+{"t": "2026-10-09 19:02:09 PDT", "kind": "look", "modelMinutes": 41.35, "n": 2, "boundary": "30", "strokes": 5022, "penLines": 0, "passesDone": 30, "passesPlanned": 31}
+{"t": "2026-10-09 19:02:27 PDT", "kind": "continue", "modelMinutes": 41.66, "boundary": "30", "stopAt": "closing", "strokes": 5022}
+{"t": "2026-10-09 19:04:59 PDT", "kind": "finished", "modelMinutes": 41.69, "strokes": 5927}
+{"t": "2026-10-09 19:05:03 PDT", "kind": "look", "modelMinutes": 41.77, "n": 3, "boundary": "final"}
+{"t": "2026-10-09 19:05:18 PDT", "kind": "session-end", "modelMinutes": 42.01, "why": "you ended the session", "looks": 3, "revisions": 0}

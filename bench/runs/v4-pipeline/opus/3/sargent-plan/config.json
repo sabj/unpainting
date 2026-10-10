@@ -1,0 +1,13 @@
+{"subject":"sargent","name":"White Ships (Sargent)",
+ "styleSelection":{"style":"precise-watercolor","reason":"Sargent states the bow, poles, rigging and anchor as wet-on-dry shapes with hard, irregular edges over reserved paper; pure watercolour, structure from paint, not ink",
+   "regions":{}},
+ "families":[
+   {"id":"sargent.bow","bounds":[0.23,0.0,0.66,0.9],"baseMove":"wet on dry","referenceCue":"pale blue-violet hull, lit left plane with paper streaks, darker cobalt along the right edge, orange rivet line, dark hawse hole"},
+   {"id":"sargent.background","bounds":[0.64,0.0,1.0,0.68],"baseMove":"wet on dry","referenceCue":"cream paper air with soft diagonal blue rigging, grey-blue masses and two dark pulley blocks at the top"},
+   {"id":"sargent.sea","bounds":[0.65,0.68,1.0,1.0],"baseMove":"wet on dry","referenceCue":"teal-green water under a crisp horizon, broken pale streaks"},
+   {"id":"sargent.leftships","bounds":[0.0,0.0,0.24,0.78],"baseMove":"wet on dry","referenceCue":"pale blue air behind orange masts, blue hull of the near boat with white flecks"},
+   {"id":"sargent.foreground","bounds":[0.0,0.78,0.65,1.0],"baseMove":"wet on dry","referenceCue":"ochre anchor flukes, navy and umber shadow at the waterline"}
+ ],
+ "reserves":[
+   {"reason":"brightest cream air right of the bow, left of the dashed rope","bounds":[0.685,0.525,0.745,0.6]}
+ ]}

@@ -1,0 +1,193 @@
+{
+ "subject": "HILLS",
+ "name": "HILLS",
+ "styleSelection": {
+  "style": "ink-and-wash",
+  "reason": "Requested loose ink and wash: a sparse sepia pen sketch (woods silhouettes against the meadows, path banks) goes down first, crisp closing ink on the crown edges against the meadows goes last; the washes between follow the target, whose woods carry three value steps.",
+  "regions": {
+   "HILLS.meadow-top": {
+    "style": "precise-watercolor",
+    "reason": "Lit yellow-green slope is a wash question: one connected pale field wash on dry paper, then a single glaze where the slope turns; no dry-brush scratching."
+   },
+   "HILLS.meadow-right": {
+    "style": "precise-watercolor",
+    "reason": "Diagonal lit grass band on the right: pale connected wash, hard edge only against the trees."
+   },
+   "HILLS.meadow-left": {
+    "style": "precise-watercolor",
+    "reason": "Upper-left lit strip between path and woods: connected pale wash, graded toward the woods."
+   },
+   "HILLS.meadow-low": {
+    "style": "precise-watercolor",
+    "reason": "Foreground lit meadow around the lower path: largest light plane, pale graded wash, one shadow glaze at the tree feet."
+   },
+   "HILLS.woods-top-left": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-left": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-centre": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-ravine": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-top-right": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-right": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-bottom-left": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   },
+   "HILLS.woods-bottom-right": {
+    "style": "precise-watercolor",
+    "reason": "Oak woods need value steps the two-band ink-and-wash ladder lacks: pale blue-green base, lit grey-green crowns, teal canopy body, deep blue-black undersides. Wet on dry crown masses, mids on dry paper, shadow glazes last."
+   }
+  }
+ },
+ "families": [
+  {
+   "id": "HILLS.meadow-top",
+   "bounds": [
+    0.47,
+    0,
+    0.99,
+    0.17
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "top lit yellow-green slope with the upper path end"
+  },
+  {
+   "id": "HILLS.meadow-right",
+   "bounds": [
+    0.78,
+    0.15,
+    1,
+    0.46
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "diagonal lit grass band down the right ridge"
+  },
+  {
+   "id": "HILLS.meadow-left",
+   "bounds": [
+    0.19,
+    0.15,
+    0.47,
+    0.42
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "lit grass strip right of the left path, pale against the dark woods"
+  },
+  {
+   "id": "HILLS.meadow-low",
+   "bounds": [
+    0.45,
+    0.58,
+    0.88,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "foreground lit meadow with the winding lower path"
+  },
+  {
+   "id": "HILLS.woods-top-left",
+   "bounds": [
+    0,
+    0,
+    0.47,
+    0.17
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "top band of oaks above the left meadow, lit grey-green crowns over blue shadow"
+  },
+  {
+   "id": "HILLS.woods-left",
+   "bounds": [
+    0,
+    0.15,
+    0.2,
+    0.62
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "left oak column beside the left path, dark blue-green"
+  },
+  {
+   "id": "HILLS.woods-centre",
+   "bounds": [
+    0.19,
+    0.4,
+    0.47,
+    0.62
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "the big centre oak and its cluster above the S-path, the focal crown"
+  },
+  {
+   "id": "HILLS.woods-ravine",
+   "bounds": [
+    0.47,
+    0.15,
+    0.8,
+    0.58
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "central ravine, the deepest indigo shadow on the sheet"
+  },
+  {
+   "id": "HILLS.woods-top-right",
+   "bounds": [
+    0.8,
+    0,
+    1,
+    0.16
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "scattered oaks on the top-right slope"
+  },
+  {
+   "id": "HILLS.woods-right",
+   "bounds": [
+    0.86,
+    0.44,
+    1,
+    0.88
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "right oak mass beside the lower meadow"
+  },
+  {
+   "id": "HILLS.woods-bottom-left",
+   "bounds": [
+    0,
+    0.62,
+    0.45,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "lower-left woods, dark masses with lit sage crowns"
+  },
+  {
+   "id": "HILLS.woods-bottom-right",
+   "bounds": [
+    0.6,
+    0.86,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "low oaks along the bottom edge right"
+  }
+ ],
+ "reserves": []
+}

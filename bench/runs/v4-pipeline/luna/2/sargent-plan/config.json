@@ -1,0 +1,51 @@
+{
+  "subject": "sargent",
+  "name": "White Ships (Sargent), V4 try 2",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The plate is built from transparent blue-gray and warm washes, pale boat planes, and a few decisive painted darks. Keep structure in the shaped value edges and reserve paper; the requested medium is pure watercolor, so both drawing files are empty.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.main-hull",
+      "bounds": [0.14, 0.03, 0.72, 0.99],
+      "baseMove": "wet on dry",
+      "referenceCue": "The large, curved blue-gray foreground hull runs from the high center-left down to the deep keel shadow near the bottom; preserve its pale broken sheen inside one coherent body."
+    },
+    {
+      "id": "sargent.left-rigging-and-boat-edge",
+      "bounds": [0.0, 0.0, 0.38, 0.77],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm upright boat edge and fine angled rigging cross the left margin; keep them narrow, interrupted and subordinate to the hull."
+    },
+    {
+      "id": "sargent.pale-upper-boats",
+      "bounds": [0.48, 0.0, 1.0, 0.72],
+      "baseMove": "wet on dry",
+      "referenceCue": "Overlapping cream and pale blue boat planes sit above the turquoise horizon; lose some edges into neighboring wash and retain the light gaps between forms."
+    },
+    {
+      "id": "sargent.right-mast",
+      "bounds": [0.74, 0.0, 0.94, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "A narrow rusty mast descends at the right, broken by pale light and small dark joints; keep it tapered and visibly painted, not a ruled contour."
+    },
+    {
+      "id": "sargent.harbor-water",
+      "bounds": [0.0, 0.67, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The low turquoise water band is varied and broken, with ochre and blue reflections and short pale glints; avoid a flat horizontal fill."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Keep a small bare-paper water glint within the broken reflection field; neighboring blue-green light remains pale painted wash.",
+      "bounds": [0.75, 0.86, 0.765, 0.866]
+    },
+    {
+      "reason": "Preserve one short bright wake glint below the foreground hull; do not turn the larger pale hull sheen into a blank hole.",
+      "bounds": [0.43, 0.91, 0.445, 0.916]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "subject": "BENCHSARGENT",
+  "name": "White Ships — transparent hull planes and warm rigging",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor: reserved paper and pale blue-grey hull planes, with warm ropes and dark painted fittings. No opening or closing drawing.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"BENCHSARGENT.left-rigging","bounds":[0,0,0.30,0.98],"baseMove":"wet on dry","referenceCue":"Warm ochre ropes and narrow cool structure at left: pale foundation, dry, connected tapered painted shapes and small light gaps."},
+    {"id":"BENCHSARGENT.rounded-hull","bounds":[0.22,0,0.66,0.91],"baseMove":"wet on dry","referenceCue":"Rounded blue-grey central bow: pale continuous wash, dry, two middle planes, selected softened turning edges and irregular light facets. Crisp dark oval fitting last."},
+    {"id":"BENCHSARGENT.white-hull","bounds":[0.61,0,1,0.73],"baseMove":"wet on dry","referenceCue":"Right white hull: cream paper lights and pale blue shadow planes, lost internal light edges, firm upper rigging and oval fittings. Preserve the white shape."},
+    {"id":"BENCHSARGENT.water-reflection","bounds":[0,0.69,1,1],"baseMove":"wet on dry","referenceCue":"Dark blue-green reflection below central bow, lighter green water at right, broken cream glints. Pale underwash, dry middle planes, final connected shadow glazes across hull and reflection."},
+    {"id":"BENCHSARGENT.right-rope","bounds":[0.79,0.21,0.95,1],"baseMove":"wet on dry","referenceCue":"Slanted warm rope crosses pale hull and green water: dry-paper ochre and burnt-sienna shape, fitted taper and interrupted light side, no ink contour."}
+  ],
+  "reserves": []
+}

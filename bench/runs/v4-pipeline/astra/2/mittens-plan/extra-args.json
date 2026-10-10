@@ -1,0 +1,14 @@
+[
+  "--paints",
+  "ochre,rawsienna,sienna,sepia,ultramarine",
+  "--inkprofile",
+  "sepia-ink",
+  "--openingpressure",
+  "0.32",
+  "--closingpressure",
+  "0.5",
+  "--openingminmm",
+  "1.5",
+  "--minshapecells",
+  "64"
+]

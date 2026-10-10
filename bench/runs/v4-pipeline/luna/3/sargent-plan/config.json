@@ -1,0 +1,48 @@
+{
+  "subject": "Sargent",
+  "name": "White Ships (Sargent), pure watercolor",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The sail, hull and rigging are carried by fitted watercolor value shapes with mixed edges; all drawing files are empty, so structure stays in paint.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.main-sail",
+      "bounds": [0.12, 0.0, 0.72, 0.94],
+      "baseMove": "wet on dry",
+      "referenceCue": "The dominant bowed pale blue-white sail; keep its light interior broad, with cool broken turning planes and a curved outer edge."
+    },
+    {
+      "id": "sargent.lower-hull",
+      "bounds": [0.0, 0.52, 0.72, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The dark blue-grey hull and reflected base, one connected mass with a few irregular pale breaks rather than a black outline."
+    },
+    {
+      "id": "sargent.right-water",
+      "bounds": [0.55, 0.63, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Turquoise water below the right-hand horizon, broad and soft, with thin broken light streaks left open."
+    },
+    {
+      "id": "sargent.upper-right-air",
+      "bounds": [0.54, 0.0, 1.0, 0.7],
+      "baseMove": "wet on dry",
+      "referenceCue": "Quiet warm-white air and the pale secondary sail; preserve the open paper and soften only the distant transitions."
+    },
+    {
+      "id": "sargent.left-rigging",
+      "bounds": [0.0, 0.08, 0.46, 0.8],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm ochre and sienna rigging crossing the left sail; narrow, intermittent painted strokes, never a ruled contour."
+    },
+    {
+      "id": "sargent.right-mast",
+      "bounds": [0.81, 0.24, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The slender warm mast at the right edge, broken with cool notes and allowed to lose itself near the water."
+    }
+  ],
+  "reserves": []
+}

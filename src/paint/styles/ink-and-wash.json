@@ -1,0 +1,79 @@
+{
+  "structure": "ink",
+  "order": [
+    "reserve",
+    "opening ink",
+    "light wash",
+    "dry",
+    "shadow glaze",
+    "dry",
+    "directional closing ink"
+  ],
+  "weights": [
+    0.42,
+    0,
+    0,
+    0.58,
+    0
+  ],
+  "water": [
+    0.55,
+    0.55,
+    0.55,
+    0.4,
+    0.4
+  ],
+  "brushes": [
+    "mop",
+    "round12",
+    "brush-pen"
+  ],
+  "moves": [
+    "wet on dry",
+    "glazed",
+    "directional ink"
+  ],
+  "edge": "broken silhouettes; dry directional lines; connected value masses",
+  "ink": 0.75,
+  "graphite": 0.08,
+  "textures": {
+    "fur": "ink",
+    "hair": "ink",
+    "foliage": "ink",
+    "grass": "dry brush",
+    "skin": "wash",
+    "architecture": "ink",
+    "sky": "wash",
+    "water": "wash",
+    "fabric": "wash"
+  },
+  "reserve": [
+    "eye catchlights",
+    "nose glint",
+    "lit crown",
+    "ear tops",
+    "muzzle sheen",
+    "white paper"
+  ],
+  "refs": [
+    "Directional ink for fine curls over connected value washes."
+  ],
+  "emphasis": [
+    "head likeness",
+    "directional lock character",
+    "connected mixed-dark washes",
+    "sheen preserved"
+  ],
+  "pigment": "sepia",
+  "name": "ink-and-wash",
+  "version": 1,
+  "washCount": 2,
+  "waterLevel": "per-layer calibrated load",
+  "detailThresholdCells": 4,
+  "wetMix": 0.3,
+  "bridge": 0.82,
+  "bridgeSoft": 2.4,
+  "closingContrast": 0.06,
+  "openingMinLength": 0.012,
+  "paintStrength": 1
+}

@@ -1,0 +1,32 @@
+{
+  "subject": "HILLS",
+  "name": "Hills",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "loose ink and wash: connected value masses for the woodland, sparse pen for path edges, ridges and trunks",
+    "regions": {
+      "HILLS.meadow-lower-right": {"style": "precise-watercolor", "reason": "sunlit slope is a pale connected wash with a few mid planes; no ink fill"},
+      "HILLS.meadow-top-right": {"style": "precise-watercolor", "reason": "sunlit upper meadow, pale olive-yellow wash with soft mottling"},
+      "HILLS.meadow-left-wedge": {"style": "precise-watercolor", "reason": "lit green wedge between path and trees"},
+      "HILLS.path-left": {"style": "precise-watercolor", "reason": "pale ochre-peach dirt path, one clean wash, edges left to the pen"},
+      "HILLS.path-centre": {"style": "precise-watercolor", "reason": "pale ochre-peach dirt path, one clean wash, edges left to the pen"}
+    }
+  },
+  "families": [
+    {"id": "HILLS.woodland-all", "bounds": [0, 0, 1, 1], "baseMove": "wet on dry", "referenceCue": "fallback: dark blue-green oak canopy mottled with olive and teal"},
+    {"id": "HILLS.woodland-dark-right", "bounds": [0.5, 0.2, 1, 0.62], "baseMove": "wet on dry", "referenceCue": "deepest navy-black tree masses, clustered, with olive-grey lighter crowns between"},
+    {"id": "HILLS.woodland-left", "bounds": [0, 0.2, 0.4, 1], "baseMove": "wet on dry", "referenceCue": "blue-green and olive crowns, mid-dark, some lighter yellow-green clearings"},
+    {"id": "HILLS.woodland-top", "bounds": [0, 0, 0.5, 0.22], "baseMove": "wet on dry", "referenceCue": "dark blue canopy cluster along the top edge, ochre-brown accents"},
+    {"id": "HILLS.oak-centre", "bounds": [0.22, 0.33, 0.5, 0.75], "baseMove": "wet on dry", "referenceCue": "large central oak crown, grey-green with dark trunk and branch ink"},
+    {"id": "HILLS.oak-lower-right", "bounds": [0.82, 0.66, 1, 0.92], "baseMove": "wet on dry", "referenceCue": "blue-green oak at the right edge, trunk and branches visible"},
+    {"id": "HILLS.meadow-lower-right", "bounds": [0.45, 0.53, 1, 0.98], "baseMove": "wet on dry", "referenceCue": "sunlit yellow-green slope, mottled, pale to the upper right"},
+    {"id": "HILLS.meadow-top-right", "bounds": [0.47, 0, 1, 0.27], "baseMove": "wet on dry", "referenceCue": "sunlit upper meadow strip, yellow-green with olive patches"},
+    {"id": "HILLS.meadow-left-wedge", "bounds": [0.19, 0.14, 0.47, 0.44], "baseMove": "wet on dry", "referenceCue": "bright yellow-green wedge, lightest at its top edge"},
+    {"id": "HILLS.path-left", "bounds": [0.17, 0.17, 0.27, 0.52], "baseMove": "wet on dry", "referenceCue": "pale peach-ochre dirt path winding down, near paper white"},
+    {"id": "HILLS.path-centre", "bounds": [0.4, 0.56, 0.55, 0.96], "baseMove": "wet on dry", "referenceCue": "pale peach-ochre dirt path, lightest on its crown"}
+  ],
+  "reserves": [
+    {"reason": "pale dirt path crown, left path", "bounds": [0.205, 0.31, 0.235, 0.37]},
+    {"reason": "pale dirt path crown, centre path", "bounds": [0.45, 0.68, 0.48, 0.74]}
+  ]
+}

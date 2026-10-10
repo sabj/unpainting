@@ -1,0 +1,683 @@
+{
+ "note": "files the model left or changed in bench/ and the region dir (seeded files omitted)",
+ "files": {
+  "bench/variant.txt": {
+   "sha256": "d15e5343a25bde752cc491986d36f2f3edf5e0a613a213fae2e7e66e016a1abd",
+   "bytes": 37,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/PLAN.md": {
+   "sha256": "224c6d13f66c20d9f317e4d33aabca8cf53f6e3003d5e4d1d0f1c31809cbf106",
+   "bytes": 18685,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-11.json": {
+   "sha256": "e5329aaba1c4ed8527e00934f95eefddd5b2e82e302b1ee20ea06b83468ceebe",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-46.json": {
+   "sha256": "b0fbf68a7d5d7cfc47bb00e7c5e0948227ed029bb9925b124b9fba7e42a8d6f4",
+   "bytes": 230,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-41.json": {
+   "sha256": "d726cc0dcab2c2a37b1d417d7812a1a9848971228ef76b37aa6ff6ea14105666",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-16.json": {
+   "sha256": "8f6b3c34e003afa00be366b6f32c5f613f496a315b9e3f25d245c93ea09568fb",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-20.json": {
+   "sha256": "f224ee3ca7a6f47972fe40120ce5f045db4b3787a762e35b302926a7c6875e8e",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-6.json": {
+   "sha256": "766127f5f4767307a42524e122818c9634f91abe1394b709eab6e4d429d5cf57",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-36.json": {
+   "sha256": "8cd583c27ba5cd41d0b6b5229f7a8da87fc11ae462faba51a0522b9ccd1685c6",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-27.json": {
+   "sha256": "db6e168c019f0aaca8af45063c6f4cfc8fd0b1178feb44d2ed3d2a845651b01b",
+   "bytes": 182,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-31.json": {
+   "sha256": "d4ba0d59def8ae282d73928953736a06465e23e7cb16346d60d55d949bf26825",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-7.json": {
+   "sha256": "1f372c15b9fc949e2904443c1ce8e2cb072bb73a70337726dd100a4145ae65f6",
+   "bytes": 63,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-6.json": {
+   "sha256": "297841084418a198a9be82c2c8ff2b9a16d3f3e41f518d63ecd9a55be4f97f0e",
+   "bytes": 63,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-30.json": {
+   "sha256": "047f248484264cc0e527b5687ebec2436a4300012b46e5873ef1ca1c3ea49ecc",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-26.json": {
+   "sha256": "f17dc1d4cfdcdd48edbca7d3e20f5b2b2a7fccb1e36a4eca781a9348605feacf",
+   "bytes": 181,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-37.json": {
+   "sha256": "88a33471b9d7850d0ae872b834367687d73035d0bebab45ff5d5df08f4d26241",
+   "bytes": 88,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-7.json": {
+   "sha256": "2debe3ff387d2afdab357d772193a889d6e724fb4484cfea4902820de71ff156",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-21.json": {
+   "sha256": "12359ced19c195bd0f338ca07dfce996d4d940d1494f8db53683ecc8cc5f3fd5",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-17.json": {
+   "sha256": "08ce79d82425dfe6465303653f3a9102a3ccb033f667856fc58b107290ed3458",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-40.json": {
+   "sha256": "2a9ae789ab53d36186ca81a1f74c8e429a9a3f32c80a2f7df7c510c69d90676b",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-47.json": {
+   "sha256": "d6ffae31e29e2e17751f7f37ab490992eb4f0ad4790db7c9438ae392a80f2ca6",
+   "bytes": 307,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-10.json": {
+   "sha256": "b75b5e568cafaad788acd8ab5cfb8895bb627676fef368ba4e0a3f0cf4a78ca4",
+   "bytes": 190,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-26.json": {
+   "sha256": "f66e9c06424d70e047f12572aef9ea6e84e1637953356c23c5708a956d7ecb24",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-30.json": {
+   "sha256": "e28979b187331b3640a28133a0e4c6418c3bebccf0c499d9b703b76e7b2e6691",
+   "bytes": 67,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-21.json": {
+   "sha256": "29ff5b77ca309fabaf62ade81d3af1fcad2d1c701cf1599d70109ce3fc124a8c",
+   "bytes": 304,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/seq": {
+   "sha256": "98010bd9270f9b100b6214a21754fd33bdc8d41b2bc9f9dd16ff54d3c34ffd71",
+   "bytes": 2,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-37.json": {
+   "sha256": "d144360448527930e2e1313d473da3599bfa74ba1717c02d41ad539dc172abca",
+   "bytes": 275,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-1.json": {
+   "sha256": "ab8990e3e009e26c097c55ad670f8a08f49e9257878c84c95707253eca1cac77",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-17.json": {
+   "sha256": "f16af7b80974c4e090a50ac89029b0aae5aeeb47ea9b47cb9c9fd67fd3d79158",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-40.json": {
+   "sha256": "b1485dcc0e4abde4d3bcce77312bbd1d92bd7a88ceb8cbfe45b7a027305dd900",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-47.json": {
+   "sha256": "b6ef89b9ef1297eb6f7cf562bf02a86637572d933fb1c530a60bf14445ee4fbe",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-10.json": {
+   "sha256": "6e0fffab0c56f804a8c27981d0c0bda9ae099dafc4f55c5d726076131b24eaa0",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-11.json": {
+   "sha256": "32902cff59120647c36c4cfd95aff2801e7222d533bd2a670233aa50a8c2dfee",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-46.json": {
+   "sha256": "fb968031a02bdb296b0afc5082993e8f4f20f13408e172af85a3b4a61a7e3680",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-41.json": {
+   "sha256": "0c66bcd7146c7f8b55a1ad6d8a3dd8697bbcc7eb47f627f59c67cc965922fc1a",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-16.json": {
+   "sha256": "b310050555d2d3ad3c01a8d49d928bf063d9d8978ac1dc44e38063f3761f06cf",
+   "bytes": 190,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-36.json": {
+   "sha256": "34f2833247bfc13eb55b36dc3b0334cb09901892190eeb9aeab202a8792170ca",
+   "bytes": 213,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-20.json": {
+   "sha256": "75342d9591d6cd9b261ab7ff6a9c5ae4cd9c35444bce83b83351ac51b7db51bd",
+   "bytes": 2876,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-31.json": {
+   "sha256": "9ab81054a5456e596c34a6eeb1f88bd6cd21c2e723c494f55bf5eb5ab4011d87",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-1.json": {
+   "sha256": "766127f5f4767307a42524e122818c9634f91abe1394b709eab6e4d429d5cf57",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-27.json": {
+   "sha256": "2996f4d4b087b26ed387d782803b84a2eaa1616e06546c85e33977515a0986aa",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-3.json": {
+   "sha256": "3c070c1d2fe962d86493ecafaaf350b24bae5ef731c831c54cd85670a43e0069",
+   "bytes": 65,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-35.json": {
+   "sha256": "adae5e348ad266bb5e11929b2db015c35359ea3ffa768e6770744f12dd8cd15c",
+   "bytes": 1276,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-23.json": {
+   "sha256": "7de4595e60f9414219e929dfbd69485410bf33f916969c3e27d5560004524d8d",
+   "bytes": 213,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-32.json": {
+   "sha256": "c2f30a93ebc9301100c69dc64caf7ce1ecab38cb0518e1f4b24f050407096f81",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-2.json": {
+   "sha256": "766127f5f4767307a42524e122818c9634f91abe1394b709eab6e4d429d5cf57",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-19.json": {
+   "sha256": "68d96796419fd11391a942098aaf97119f40f3e5d45421ea2383df9ba4b4abe6",
+   "bytes": 215,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-24.json": {
+   "sha256": "477ac4c591ec5c24aff161df6352fd3c324ce7efb06dc6ffb5328adfe0092c5c",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-39.json": {
+   "sha256": "1163591d1a1a9a8361fa64ca8cd4f7637d235f6ca7601c52dbec4b8b68a0d82f",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-12.json": {
+   "sha256": "428bb04a3b3c8e523100f38ca2a539643b21c71f7c303d717d6927c05a3b0b12",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-45.json": {
+   "sha256": "708927a981eb079affb22d6f4ede0ea167ec7dd2f42a29072a2e25fea8a43cce",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-42.json": {
+   "sha256": "cb6d01301e5578549bde70ffd85693b5c739ec27c2231f347a95dd38ef87aaed",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-28.json": {
+   "sha256": "d5fe998c0f7e9c3d882e504c832cb76a77f6763b6c1ac52677fd12412db232db",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-15.json": {
+   "sha256": "bb407423a45482191b0d2376c08e0eb33e47be2b73b85cfbb3ee4674aec000ce",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-14.json": {
+   "sha256": "688e116f784ed3ed5f15bc5fd95f81fcca004b178739868c24d545e23fdada7a",
+   "bytes": 190,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-29.json": {
+   "sha256": "a2706f9b617efadf6f10d85d2e9f6df01c42289520cff22d885172319a729b9a",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-43.json": {
+   "sha256": "ddcb73bf37e6179751c465df78f5a2bfde5ff905c326384ba7584051ebf585be",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-44.json": {
+   "sha256": "edbcfc1e6ef2671e6c9d97fe263aeda979fc0b6f4d46766a31189f3ee6cee8c0",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-13.json": {
+   "sha256": "f97fb543dd8039ab0b6fd8919838c45114c41bcd2618f2bddb37f1300ef1a8cd",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-38.json": {
+   "sha256": "1163591d1a1a9a8361fa64ca8cd4f7637d235f6ca7601c52dbec4b8b68a0d82f",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-25.json": {
+   "sha256": "04838f36543584d959e5f2cfe5f76be951a2c3cd3388f6f2f5e6680c95f4b503",
+   "bytes": 67,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-18.json": {
+   "sha256": "f16af7b80974c4e090a50ac89029b0aae5aeeb47ea9b47cb9c9fd67fd3d79158",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-3.json": {
+   "sha256": "0b922b95f5a25bd0ac3c4a31b65899d5294ae5da67541e4886d0e852f5fa9fcb",
+   "bytes": 286,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-33.json": {
+   "sha256": "8847c650801d38a3cba1509f95b0bd199950db6aeee6ef1614e59cbe703fbeef",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-48.json": {
+   "sha256": "6347793b014b626701eb4b0482d48ed3b6bd04b73bdf042fd23dd8b470799fe5",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-22.json": {
+   "sha256": "22379987f66dc8b6e94c198ce37a59ea0906110ef2f7f417c3a51258baabf38f",
+   "bytes": 182,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-34.json": {
+   "sha256": "7ee77db98d6c9c687b2e5a617378826107ff452dfc79dc491777432bcadd5fbe",
+   "bytes": 218,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-2.json": {
+   "sha256": "a74ff25548f1fde0bf697c36afb4009c14ad500331ebf91ce9b25134a3afb4f6",
+   "bytes": 63,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-9.json": {
+   "sha256": "539521cab4b4e1704e257a6406ff083407a8b580caf77e723411f75b2136d432",
+   "bytes": 63,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-14.json": {
+   "sha256": "c5191bbf215bd85eca281cee74557ee66dede7ef3717b37c9c8987f2fe450708",
+   "bytes": 66,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-29.json": {
+   "sha256": "4d07ce14386b79cae2c103d4c670edfadb1bc0d8e616c0bd57a05d8c497c9fa7",
+   "bytes": 2696,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-43.json": {
+   "sha256": "0926b4b827bf908680c2d584946cd5f9991bb841dcf8c86c6f19ae65f56546f4",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-8.json": {
+   "sha256": "3b67a47fa44a418024d6c946cbc4c405c7d121ae6b77cade3db99b78bec7cc58",
+   "bytes": 190,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-38.json": {
+   "sha256": "7e5871ad4b687a84b4f68882ad7f461b2535145213459be59e5c15b40078484e",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-44.json": {
+   "sha256": "13928cb01f3597458da88b8065dc5ca685a2205f4876e7687df067a9a5b624b4",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-13.json": {
+   "sha256": "08e78267530023d4c8a5543f0a60dc43505e3740e78f2b57e3c4c0b1ee8b9eeb",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-5.json": {
+   "sha256": "7fd5cef2ba6a496e982c07d63c3c375057320ce00b52c29991a03c696014e54a",
+   "bytes": 65,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-33.json": {
+   "sha256": "8f1a0cba33ebdcbd2cce16a032c362abb7b536d46f3548a2e7ce540a7b1d2c8a",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-25.json": {
+   "sha256": "ee0fe5908066f9adada2086bfc834230f85519f3a06ca118e3d4f53d32f34438",
+   "bytes": 181,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-18.json": {
+   "sha256": "f67feee981276d176d77371cbc109fa64005c604ecbb1bbf7d791a9df5307ae3",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-34.json": {
+   "sha256": "98fc3a3691a8c190c312905ea9f46ce4b39e8406957420f09b8232dec2ad4b53",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-4.json": {
+   "sha256": "766127f5f4767307a42524e122818c9634f91abe1394b709eab6e4d429d5cf57",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-48.json": {
+   "sha256": "4d03e54c96bdae69abedd251ff3d5e39f428ab634191c19f38772442c6b869e3",
+   "bytes": 128,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-22.json": {
+   "sha256": "b83a565a17b809e63499565cf94c823ac8a795b990e60ad68b93c9f8ccc8aa0f",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-23.json": {
+   "sha256": "94c31c7466cf9cb75e152c3ed7dcc3284251f1ea0f4af62a650d797c5246f2ab",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-5.json": {
+   "sha256": "b92c857a88f046864d68f088c87aba66ba4c449f0adff9dd0441c20c79bce52a",
+   "bytes": 286,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-35.json": {
+   "sha256": "0d8a82a37126d32acb7d24ce9330636700dab0d07d863a395a7d81b5b4dfa612",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-19.json": {
+   "sha256": "145c3cc35debb02562bd31676926900980ebc35da5dfa9f99b108de4f1d2c1da",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-24.json": {
+   "sha256": "747ab07d386a435adaf518e28156c0ea806da0a2daf1f15b38c762a1a766a6f1",
+   "bytes": 4228,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-32.json": {
+   "sha256": "25ff85de694c4e7f51b4ecf45ebcae2b66fbf412ae702f2ec96f50ed53fcb5e4",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-4.json": {
+   "sha256": "9218701b6c63c9bba5eff4782db7578896d1c1538505e2a9a0a6a9866dc3a3d6",
+   "bytes": 63,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-12.json": {
+   "sha256": "a2e8de8bd21db3d909830e8b5861f74049273a860e3e2d67f3eb7d89af2965c3",
+   "bytes": 190,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-45.json": {
+   "sha256": "71b93880746c2fd06d88238cdc1c5611f395c56a21d93b0615d3db91e304d1da",
+   "bytes": 184,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-39.json": {
+   "sha256": "db2762db5c903cb77913fbe33d555a0d79f963d5c3254e8071e1d50a616e9587",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-9.json": {
+   "sha256": "35191cbb034ff9b7127a8f6b4373a66f8e8e9afba967669d95b8ae6354d6aac1",
+   "bytes": 127,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-42.json": {
+   "sha256": "1ebb33ab3a13b7b513311bc699200757ed1ab0973d26ca11e2d093c4b70bfaed",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-28.json": {
+   "sha256": "0b4b9ac57ca421c7f103a2919e73415e6e7f02b26148abcedf672eefbffb477c",
+   "bytes": 216,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-15.json": {
+   "sha256": "a242acc53f9aaf9f9f1dbe3064a18c6115990e33ef64c077598d6663abcb391e",
+   "bytes": 64,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-8.json": {
+   "sha256": "0ef1189f7fb547d1aec754e147cc36fb1637463acfa169ad00712929ef60fb75",
+   "bytes": 65,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/02-compare.jpg": {
+   "sha256": "99b261042d4283084d046118ebf778608bda3e0964b179e1a12476c27b97ea01",
+   "bytes": 245552,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/01-sheet.jpg": {
+   "sha256": "56adc2830139dca19e1d8ef34e53b86f463ac030f6710ecf96dc7b356d8e88c2",
+   "bytes": 64542,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/04-compare.jpg": {
+   "sha256": "3896a9b51ef9afe2728bf07a5a166de8a03bd25b00067c17c4384684eff9060e",
+   "bytes": 319231,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/01-compare.jpg": {
+   "sha256": "882e78e437581fc245260f2314d4c12dead13246c72af06631cc6d3441496a87",
+   "bytes": 219673,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/05-sheet.jpg": {
+   "sha256": "dfad5316874dbb6cf101f6c91cf5675ce5833c347d49647b2effdfd312b9dba2",
+   "bytes": 422919,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/03-compare.jpg": {
+   "sha256": "c40d047f5f0526e68c955e8d4f3438e7452c8a01b915d8a09252939e924a7c54",
+   "bytes": 299641,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/03-sheet.jpg": {
+   "sha256": "79362839148262068be6a4256ea9df617ac4fb9b0d86bd88c9fc3f5d2923c060",
+   "bytes": 234396,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/04-sheet.jpg": {
+   "sha256": "cd0b8e197aaf89ef43585c0ba5486be1c418511f4385de5b8114f1e8e94a292b",
+   "bytes": 275157,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/05-compare.jpg": {
+   "sha256": "e089956ce9e88d08c327cc1bdfdaf964bee6316649b18ff66d3e12bb55409b84",
+   "bytes": 394029,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/looks/02-sheet.jpg": {
+   "sha256": "afe84b61bdfb0bc18803a689365c38aac7137ef119952a125382add1df922249",
+   "bytes": 117195,
+   "seeded": false,
+   "changed": false
+  },
+  "region/config.json": {
+   "sha256": "20a20259b65cf5ab881f4296c68196ff2e9f52280a0b74c97ac1a759ed39cec4",
+   "bytes": 4775,
+   "seeded": false,
+   "changed": false
+  },
+  "region/closing-lines.json": {
+   "sha256": "e2299874a6b849917c19dbde4bad4015ced607d243e3fd941ebd3bc1deb578f2",
+   "bytes": 58643,
+   "seeded": false,
+   "changed": false
+  },
+  "region/extra-args.json": {
+   "sha256": "1e3ab49b401e0afe1ded8ef38c1f0b6cacc024f2e5b6833718df19ee60982f61",
+   "bytes": 185,
+   "seeded": false,
+   "changed": false
+  },
+  "region/opening-lines.json": {
+   "sha256": "77f302f95cd26a44b4da125b6a199d5270b3843385ebbdecceb45701a5c40d9b",
+   "bytes": 4994,
+   "seeded": false,
+   "changed": false
+  }
+ }
+}

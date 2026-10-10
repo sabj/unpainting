@@ -1,0 +1,35 @@
+{
+ "note": "files the model left or changed in bench/ and the region dir (seeded files omitted)",
+ "files": {
+  "bench/variant.txt": {
+   "sha256": "8d0398aa09df3a09725f263c30a8325c5cb7d80a33b03d0384f13303a8012e21",
+   "bytes": 11,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/PLAN.md": {
+   "sha256": "2b7370967df648df721f219047e1a8ce8b74e7cd1cfea1e604bfe62234d72ed0",
+   "bytes": 3415,
+   "seeded": false,
+   "changed": false
+  },
+  "region/config.json": {
+   "sha256": "943ba0fdc8e385dd9ca7d12f7044f409c9e9ce9bc751d9ab430e83d7e3a9350c",
+   "bytes": 3084,
+   "seeded": false,
+   "changed": false
+  },
+  "region/closing-lines.json": {
+   "sha256": "5d02fd8cf374fa379c54fd481e4ef5df8ad69e51940c46ab3a574851ce93cb86",
+   "bytes": 14770,
+   "seeded": false,
+   "changed": false
+  },
+  "region/opening-lines.json": {
+   "sha256": "87526eac948c303f51e1facdb4486aeb568ccefeaecd9fb2a219f8cfccaf017d",
+   "bytes": 7944,
+   "seeded": false,
+   "changed": false
+  }
+ }
+}

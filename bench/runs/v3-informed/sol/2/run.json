@@ -1,0 +1,255 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "sol",
+  "name": "Codex Sol",
+  "id": "gpt-6.1-sol",
+  "effort": "xhigh",
+  "runner": "codex"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true
+ },
+ "session": {
+  "minutes": 72.2,
+  "tokens": 23152126,
+  "costUSD": null,
+  "estCostUSD": 5.303,
+  "usage": {
+   "input": 540515,
+   "cachedInput": 22413568,
+   "output": 198043
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 1631,
+   "minutes": 22.9,
+   "smallShare": 0.908,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0058,
+   "images": {
+    "final": "hills.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.04,
+    "pm": 0.1,
+    "complete": true,
+    "classic": 7.07,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 2.33,
+     "marks_texture": 2,
+     "classic_value": 4.51,
+     "classic_edge": 7.54,
+     "classic_landmark": null,
+     "classic_marks": 9.16
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 3
+    },
+    "earlyMean": 2,
+    "mean": 2.2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "a": 3,
+     "c": 4,
+     "f": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Tree masses grow by speckled dab-fill and the grass stays a flat untouched slab until the last step dumps the path and all texture at once, reading as a procedural region fill rather than brushwork."
+    }
+   },
+   "painterNote": "Remove the yellow undercoat beneath woodland, use cooler blue-grey canopy layers with stronger reserved lights and larger branch gestures, and merge the grass washes to replace attempt 1's olive trees and separate ribbon-shaped grass marks."
+  },
+  "sargent": {
+   "strokes": 214,
+   "minutes": 23.8,
+   "smallShare": 0.621,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0432,
+   "images": {
+    "final": "sargent.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.71,
+    "pm": 0.15,
+    "complete": true,
+    "classic": 6.74,
+    "criteria": {
+     "composition_values": 6,
+     "edges_detail": 4,
+     "marks_texture": 4.33,
+     "classic_value": 4.71,
+     "classic_edge": 6.2,
+     "classic_landmark": null,
+     "classic_marks": 9.32
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 5,
+     "50": 5,
+     "75": 5,
+     "100": 5
+    },
+    "earlyMean": 5,
+    "mean": 5,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {},
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A credible watercolour sequence: broad pale washes block in hull, water and background first, then crisp rust-coloured rigging and anchor lines arrive over the washes, with darks and small accents added last, light-to-dark in proper human order."
+    }
+   },
+   "painterNote": "Replace the separate hull facets with one connected cooler wash, add form-following broken brushwork and deeper water/foot shadows, and paint irregular filled fittings because attempt 1 was too smooth, pale, and geometric."
+  },
+  "south-france": {
+   "strokes": 2368,
+   "minutes": 25.5,
+   "smallShare": 0.979,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0245,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.51,
+    "pm": 0.2,
+    "complete": true,
+    "classic": 7.35,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3,
+     "marks_texture": 3,
+     "classic_value": 4.22,
+     "classic_edge": 8.78,
+     "classic_landmark": null,
+     "classic_marks": 9.05
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 5,
+     "50": 4,
+     "75": 5,
+     "100": 5
+    },
+    "earlyMean": 5,
+    "mean": 4.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A credible watercolour build-up — pale washes and reserved white buildings first, then mid-tone foliage masses, darks, and finally the foreground tree's trunk and fine detail — with the only small tell being the buildings arriving fairly finished at 50% while neighbouring foliage is still loose blobs."
+    }
+   },
+   "painterNote": "Attempt 2: replace repeated dark round canopies and broad cream gaps with connected lighter sage/olive masses and irregular leaf groups, brighten and widen the foreground crown, and correct the villa planes and thin windows to match the dense sunlit target."
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 5.42,
+  "partialComposite": null,
+  "pm": null,
+  "cropsScored": 3,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.62,
+   "level": "high",
+   "basis": "highest crop"
+  },
+  "progressionRisk": {
+   "score": 0.62,
+   "level": "high"
+  },
+  "review": {
+   "status": "cleared",
+   "finding": "weak technique, not cheating"
+  }
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

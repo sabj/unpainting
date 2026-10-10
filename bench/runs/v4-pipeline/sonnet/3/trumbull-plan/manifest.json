@@ -1,0 +1,53 @@
+{
+ "note": "files the model left or changed in bench/ and the region dir (seeded files omitted)",
+ "files": {
+  "bench/variant.txt": {
+   "sha256": "aa0c51243019020d35b03218f22f8ce2af4e9b47851f4915d27cb5a3d8d419f5",
+   "bytes": 15,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/PLAN.md": {
+   "sha256": "9ed6cf5353f891774d4374ef68f54b85b3eca78cd3a39bb180afddb19f366bb5",
+   "bytes": 6627,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/seq": {
+   "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+   "bytes": 1,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/req-1.json": {
+   "sha256": "5cafd92e0e8e2cb837ac0f764ddd4e442914147b8a7cd1e89bac090b9559eefb",
+   "bytes": 65,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/paint-io/res-1.json": {
+   "sha256": "78d9604e1223e0ddaa0cd299ceceb526754c95fae75487634c76733f045d77f3",
+   "bytes": 178,
+   "seeded": false,
+   "changed": false
+  },
+  "region/config.json": {
+   "sha256": "dcf334326db66ff181e86185f902ec4f82ca768b8f77cc6572f942b2534d38ab",
+   "bytes": 2049,
+   "seeded": false,
+   "changed": false
+  },
+  "region/closing-lines.json": {
+   "sha256": "be6ec8a4ebf21891d17ee7d17ede6621714f6c6d777079b9cdc00a939156be17",
+   "bytes": 84111,
+   "seeded": false,
+   "changed": false
+  },
+  "region/opening-lines.json": {
+   "sha256": "08de353934b107314b2345efc30098f4cbd2c9feceee29d0d5ec9f9cf682c32b",
+   "bytes": 64777,
+   "seeded": false,
+   "changed": false
+  }
+ }
+}

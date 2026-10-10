@@ -1,0 +1,10 @@
+[
+  "--paints",
+  "ochre,hansa,sapgreen,ultramarine,cerulean,sepia",
+  "--openingpressure",
+  "0.28",
+  "--closingpressure",
+  "0.55",
+  "--openingminmm",
+  "3"
+]

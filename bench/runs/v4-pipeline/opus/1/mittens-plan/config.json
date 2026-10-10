@@ -1,0 +1,16 @@
+{"subject":"MITTENS","name":"Mittens (orange tabby beside a curly-haired man)",
+ "styleSelection":{"style":"precise-watercolor","reason":"Watercolour portrait sketch: light value washes carry the cat's patches and the face planes; fine pen lines carry eyes, whiskers and contours; paper stays white around both heads.",
+   "regions":{
+     "MIT.human-hair":{"style":"ink-and-wash","reason":"Curls are below four cells as separate locks: one blue-grey value mass with paper flecks, a darker glaze on the shadow side, directional pen curls by value."},
+     "MIT.human-hair-side":{"style":"ink-and-wash","reason":"Same curly mass running down behind the ear: grey wash, shadow glaze, a few curl lines."}}},
+ "families":[
+   {"id":"MIT.cat-head","bounds":[0,0,0.5,0.5],"baseMove":"wet on dry","referenceCue":"Orange tabby head looking up: cream and white ground, burnt-sienna patches on the brow and cheek, white muzzle with fine whiskers, pale green eyes with dark rims."},
+   {"id":"MIT.cat-body","bounds":[0,0.5,0.5,1],"baseMove":"wet on dry","referenceCue":"Cat chest mostly white paper; raw and burnt sienna stripes down the left edge and in the fur behind the man's cheek, laid as a few broken strokes."},
+   {"id":"MIT.human-hair","bounds":[0.5,0.2,0.97,0.5],"baseMove":"wet on dry","referenceCue":"Dark curly hair: blue-grey wash with soft wet edges into paper, darkest under the curls and over the forehead line, white flecks between curls."},
+   {"id":"MIT.human-hair-side","bounds":[0.85,0.4,1,0.75],"baseMove":"wet on dry","referenceCue":"Hair falling behind the right ear, grey with broken edge into white paper."},
+   {"id":"MIT.face","bounds":[0.5,0.48,0.92,1],"baseMove":"wet on dry","referenceCue":"Light warm skin: forehead and cheeks almost paper, warm sepia shadow down the left cheek against the cat, brows and lids in brown, stubble a broken pale tone round the mouth."}],
+ "reserves":[
+   {"reason":"catchlight, cat's near (right) eye","bounds":[0.2633,0.2124,0.2733,0.2317]},
+   {"reason":"catchlight, cat's far (left) eye","bounds":[0.0767,0.2394,0.0933,0.2471]},
+   {"reason":"catchlight, man's left eye","bounds":[0.5983,0.7143,0.6067,0.7239]},
+   {"reason":"catchlight, man's right eye","bounds":[0.8083,0.6776,0.8150,0.6873]}]}

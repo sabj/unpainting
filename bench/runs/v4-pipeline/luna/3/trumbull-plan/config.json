@@ -1,0 +1,18 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull V4 independent try 3",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Warm stone planes, hard architectural junctions, and small dark openings carry the likeness; use transparent value planes first and selective sepia structure last.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.whole-elevation",
+      "bounds": [0, 0, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "One full-frame family leaves the target-fitted color and value segmentation intact across the connected sandstone elevation, slate roofs, sky wedges, and lower foliage; no rectangular family edge cuts the painting."
+    }
+  ],
+  "reserves": []
+}

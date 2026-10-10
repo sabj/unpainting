@@ -1,0 +1,96 @@
+{
+  "subject": "SF",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Urban sketch with selective black pen and light transparent color: use a pale foundation, simplified middle planes, then connected dry shadows so the trees develop as masses instead of a two-stage image fade. The precise-watercolor scheduler supplies these value stages; authored pen and restrained pigment gains supply the requested sketch character.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SF.distant-village",
+      "bounds": [
+        0,
+        0,
+        0.8,
+        0.25
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small warm hillside buildings and tall narrow cypresses at the top. Pale ochre wall wash on dry paper; roof and window junctions in fine pen, less contrast than the right foreground houses."
+    },
+    {
+      "id": "SF.far-blue-hill",
+      "bounds": [
+        0.79,
+        0,
+        1,
+        0.15
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small cool blue-green hillside at upper right, no open sky. One pale connected blue-green wash, little ink, quieter edges and values than the foreground."
+    },
+    {
+      "id": "SF.olive-slope",
+      "bounds": [
+        0,
+        0.16,
+        0.66,
+        0.68
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected olive-green and yellow-green canopy groups separated by warm winding paths. Watery pale wash on dry paper, dry fully, then one connected muted-green shadow glaze; no leaf dots or outlines around every crown."
+    },
+    {
+      "id": "SF.focal-houses",
+      "bounds": [
+        0.655,
+        0.33,
+        0.967,
+        0.805
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ochre sunlit right-hand houses with terracotta roofs, violet-brown left side planes, dark eaves and small rectangular openings. Fine pen junctions, pale ochre wash, then connected dry shadow across adjoining shaded walls and eaves; dark openings last."
+    },
+    {
+      "id": "SF.foreground-tree",
+      "bounds": [
+        0.115,
+        0.58,
+        0.425,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large yellow-green tree left of centre has a visible branching dark trunk against lit canopy. Broad pale warm-green mass; connected dark lower groups over dry wash; slender tapering branch gestures in black pen, clear light gaps retained."
+    },
+    {
+      "id": "SF.lower-garden",
+      "bounds": [
+        0.405,
+        0.6,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broken warm paths weave between rounded olive-green shrubs under the houses. Wash planes remain connected; spare dark branch gestures and a cross-crown shadow glaze unify depth, leaving pale warm ground and foliage gaps."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Small bare-paper sun glint within the left terrace wall; surrounding wall is pale painted ochre.",
+      "bounds": [
+        0.048,
+        0.166,
+        0.067,
+        0.176
+      ]
+    },
+    {
+      "reason": "Small light on the roof ridge of the foremost right house; surrounding tile roof remains pale terracotta.",
+      "bounds": [
+        0.867,
+        0.543,
+        0.887,
+        0.551
+      ]
+    }
+  ]
+}

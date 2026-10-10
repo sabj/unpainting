@@ -1,0 +1,100 @@
+{
+  "subject": "SF",
+  "name": "South France — village in pen and light wash",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Requested pen plus light wash: selective black structural drawing, transparent local colors, one dry shadow glaze, open stone lights.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SF.upper-village",
+      "bounds": [
+        0.39144736842105265,
+        0,
+        0.7894736842105263,
+        0.24096385542168675
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale warm stone and ochre roofs above olive trees; fine junctions in ink."
+    },
+    {
+      "id": "SF.near-village",
+      "bounds": [
+        0.6611842105263158,
+        0.3333333333333333,
+        0.9671052631578947,
+        0.7871485943775101
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Focal cluster of ochre pitched roofs, cream lit facades, violet-grey side walls, small dark windows."
+    },
+    {
+      "id": "SF.terraces",
+      "bounds": [
+        0,
+        0.07228915662650602,
+        0.3684210526315789,
+        0.5140562248995983
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad pale yellow stone terraces and small retaining walls, with irregular foliage interruptions."
+    },
+    {
+      "id": "SF.cypresses",
+      "bounds": [
+        0.24342105263157895,
+        0,
+        0.4144736842105263,
+        0.3855421686746988
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall dark green vertical forms contrast with broad pale terraces; edges crisp but broken."
+    },
+    {
+      "id": "SF.middle-canopies",
+      "bounds": [
+        0.006578947368421052,
+        0.24899598393574296,
+        0.6644736842105263,
+        0.7550200803212851
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected olive and sap-green crowns, warm lit tops and cool shadow groups."
+    },
+    {
+      "id": "SF.foreground-pine",
+      "bounds": [
+        0.13157894736842105,
+        0.5140562248995983,
+        0.4276315789473684,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Open yellow-green pine crown, narrow dark trunk and spreading irregular branches."
+    },
+    {
+      "id": "SF.lower-garden",
+      "bounds": [
+        0.3881578947368421,
+        0.6626506024096386,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale winding paths and loosely linked olive shrubs, darker only under the crowns."
+    },
+    {
+      "id": "SF.distant-hillside",
+      "bounds": [
+        0.7927631578947368,
+        0,
+        1,
+        0.3413654618473896
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small cool subdued hillside planes behind the village; no separate leaf details."
+    }
+  ],
+  "reserves": []
+}

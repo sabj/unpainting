@@ -1,0 +1,17 @@
+# Mittens V5 try 3: independent review of try 2
+
+Written after viewing the target, previous painting and progress board, before opening FEEDBACK.md.
+
+The silhouette, ear set, upward gaze, large white bib and placement of the smiling portrait remain recognizable. The background is sensibly left as paper. The progression begins pale and becomes darker, and there is less excessive texture than a heavily hatched drawing would have.
+
+The painting is nevertheless much too pale and nearly monochrome. Warm tabby orange, green-gold cat eyes and charcoal hair collapse into the same grey-beige range. The cat's large eye has no convincing dark lid or slit pupil; the human eyes and smile are weak. Sparse angular lines draw across important masses but do not supply the fine whiskers, fur direction and curved curls in the reference. Large diagonal stripes through the cat/portrait contact and forehead look mechanical. Angular, uniformly hard wash islands already occupy the faces before final accents. Hair ends as an evenly flecked pale mass rather than connected charcoal locks. Paper lights are preserved but some feel like holes in a stencil, rather than gently modeled lit planes.
+
+The earliest failure is in the foundation: by 25% of strokes, the grey neutral wash has overtaken the warm undercolour and the diagonal contact stripes are visible. The later shadow stage repeats the same islands and never establishes a separate, decisive darkest value. At 75–100% strokes, extra hair texture changes surface character more than form. The final drawing does too little at the actual eyes and whiskers. This is primarily a colour/value allocation and executed-drawing problem, with coarse shape edges; simply adding more uniform layers would reinforce the defect.
+
+My finished-painting score is **3.5/10**. My process-plausibility score is **2.5/5**: there is a light-to-dark start, but the strong early stencil edges, diagonal bands and uniform late flecking do not resemble economical human watercolor portrait work.
+
+Changes to investigate: retain reference-fitted landmarks and large reserves; establish orange-versus-charcoal colour separation; give the hair its dark value using paint; keep skin delicate; audit actual executed lid, pupil, mouth and whisker paths; choose smoother connected foundations rather than texture or diagonal lane marks. Judge the opening and foundation before continuing, so an early defect is not mistaken for missing finishing detail.
+
+## After reading the external critique
+
+I agree with the low detail/mark scores, flat evenly toned slabs, uniformly faint beginning and late flecking. The stage mean of 2.4/5 is close to my 2.5/5. The high classic edge score does not persuade me: correctly placed hard boundaries are not sufficient when the painting lacks soft turning edges and fine focal lines. I also reject the literal claim that the painting is a static image revealed by opacity: the frames show separate physical pigment work, although its nearly uniform values create that impression. The dark-before-light note is partly fair about the grey hair foundation arriving before convincing face colour; it is not a reason to remove the transparent pale underwash. The principal fix must be local-colour separation and stronger selective late darks, with real drawing at the eyes. A general increase in ink texture or a wholesale early dark wash would worsen the defect.

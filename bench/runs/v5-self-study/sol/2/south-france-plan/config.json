@@ -1,0 +1,108 @@
+{
+  "subject": "SF",
+  "name": "South France \u2014 clear pen, pale olive and terracotta wash, V5 try 2",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Urban sketch with neutral structural pen, pale connected local-color washes on measured dry paper, then a thin connected cross-family shadow glaze and selective closing ink. The attempted separate foliage mid bands created scalloped cluster rims; the fresh final sheet omits them. Bright stone and crown lights are pale painted planes.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SF.terraces",
+      "bounds": [
+        0,
+        0,
+        0.36,
+        0.45
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale yellow ochre terraces and retaining walls recede diagonally behind small olives. Connected watery flat wash on dry paper; the pale sunlit paths stay open; a few wall and gate junctions belong to pen."
+    },
+    {
+      "id": "SF.upper-village",
+      "bounds": [
+        0.39,
+        0,
+        0.8,
+        0.27
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small cream houses, warm roofs, and cooler side walls in the upper village. Broad pale wall planes on dry paper, muted distant shadows, and sparse connected roof and corner pen gestures."
+    },
+    {
+      "id": "SF.focal-houses",
+      "bounds": [
+        0.665,
+        0.335,
+        0.96,
+        0.81
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The lower-right ochre houses are the focal point: terracotta roof slopes, pale lit walls, violet-grey side planes, long eave junctions and small dark windows. Pale connected facade washes on fully dry paper; dry cross-plane shadow glaze; narrow recesses and roof joints carried by selective black pen."
+    },
+    {
+      "id": "SF.olive-masses",
+      "bounds": [
+        0,
+        0.14,
+        0.69,
+        0.9
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Crowded touching olive crowns and narrow dark vertical cypresses. Several-mm bodies are wash planes; sub-four-cell leaflets are omitted. Pale connected olive wet-on-dry foundation at actual urban water 0.5, measured full dry, then a connected target-shadow glaze at water 0.5 and shadow gain 0.7 crossing adjacent crowns and ground. No separate middle coats, leaf stipple or ink crown outlines."
+    },
+    {
+      "id": "SF.foreground-tree",
+      "bounds": [
+        0.13,
+        0.57,
+        0.44,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale yellow-green foreground crown around principal tapering ink forks. Broad crown planes receive a watery pale wet-on-dry foundation at actual urban water 0.5; dry fully before connected canopy/ground shadow at water 0.5 and gain 0.7. Fine branches are ink, individual leaves below wash resolution are omitted. Preserve pale painted lights; selective closing branches only."
+    },
+    {
+      "id": "SF.right-garden",
+      "bounds": [
+        0.63,
+        0.73,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broken sunlit paths and grey-green olives surround the foot of the houses. One pale local-color wash, then dry connected shadow shapes crossing foliage and earth; a few branches and path junctions in pen, no isolated texture flecks."
+    },
+    {
+      "id": "SF.distant-hills",
+      "bounds": [
+        0.81,
+        0,
+        1,
+        0.16
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "A small muted blue-green distant hillside at upper right, without open sky. Thin pale wash on dry paper; subdued lost interior edges and no close leaf or branch detail."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "small paper glint on upper roof ridge",
+      "bounds": [
+        0.43092,
+        0.04016,
+        0.4375,
+        0.04819
+      ]
+    },
+    {
+      "reason": "small paper glint on focal tower roof ridge",
+      "bounds": [
+        0.875,
+        0.35341,
+        0.88158,
+        0.36145
+      ]
+    }
+  ]
+}

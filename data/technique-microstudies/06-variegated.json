@@ -1,0 +1,213 @@
+{
+ "version": 1,
+ "id": "06-variegated",
+ "title": "Two purposeful connected warm/cool wash gestures",
+ "source": {
+  "url": "https://www.youtube.com/watch?v=pn5C1SSxucs",
+  "author": "Oliver Pyle",
+  "guideSection": "broad warm horizon joined to cooler upper paint",
+  "timestampOrNull": "04:50–06:36",
+  "referenceImage": "pyle-sky-wet-base.jpg",
+  "sha256": "af17fec522292c92b00ba9bb1308465dc2113dbfecd2d7b3d70473e265abad54",
+  "expectedVisibleEffect": "Warm ochre body joined to distinct cool blue charges with soft connected transitions",
+  "hardSoftRole": "explicit in recipe",
+  "referenceImageProvenance": "Existing actual primary-source plate/frame sheet; instructional SVG separately labeled",
+  "instructionalGestureGuideSHA256": "f5f0557afc818fdfd28ca225ed5c47b206e329278b194cb67608b8daa92415ed",
+  "additionalApplicationEvidence": {
+   "url": "https://www.youtube.com/watch?v=ihx1gvqRrXY",
+   "author": "Erika Lancaster",
+   "timestamp": "15:30–16:20",
+   "scope": "root inspected continuous broad upper/lower hue sweeps, not separated dabs; adaptation uses ochre/blue rather than the demonstrated purple/magenta"
+  }
+ },
+ "grid": {
+  "w": 384,
+  "h": 160,
+  "mmPerCell": 0.125
+ },
+ "paperRGB": [
+  246,
+  245,
+  239
+ ],
+ "paper": {
+  "fibres": 0.32,
+  "tooth": 0.3,
+  "coldPress": {
+   "bumpMm": [
+    0.5,
+    1.6
+   ],
+   "cover": 2.2,
+   "swell": 0.15
+  }
+ },
+ "paperSeed": 17,
+ "palette": [
+  "ultramarine",
+  "ochre",
+  "lampblack"
+ ],
+ "budget": {
+  "maxWallSeconds": 52,
+  "maxNativeSteps": 90000,
+  "maxGestures": 10
+ },
+ "commands": [
+  {
+   "id": "prepare-connected-field",
+   "operation": "stroke",
+   "requiredPaper": "dry",
+   "role": "clean-water",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 18,
+    "orientation": "sweep",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 600,
+    "waterQuantityMm3": 450,
+    "concentration": {}
+   },
+   "paths": [
+    [
+     {
+      "x": 0.12,
+      "y": 0.5,
+      "p": 1,
+      "rMm": 9
+     },
+     {
+      "x": 0.88,
+      "y": 0.5,
+      "p": 1,
+      "rMm": 9
+     }
+    ]
+   ],
+   "caption": "One loaded broad clean preparation; measured subsequent contacts, not a wet label"
+  },
+  {
+   "id": "warm-base",
+   "operation": "stroke",
+   "requiredPaper": "wet",
+   "role": "paint",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 8,
+    "orientation": "follow",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 160,
+    "waterQuantityMm3": 112,
+    "concentration": {
+     "ochre": 0.4
+    }
+   },
+   "paths": [
+    [
+     {
+      "x": 0.15,
+      "y": 0.6,
+      "p": 0.85,
+      "rMm": 4
+     },
+     {
+      "x": 0.85,
+      "y": 0.6,
+      "p": 0.85,
+      "rMm": 4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "cool-connected-upper",
+   "operation": "stroke",
+   "requiredPaper": "wet",
+   "role": "paint",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 8,
+    "orientation": "follow",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 160,
+    "waterQuantityMm3": 112,
+    "concentration": {
+     "ultramarine": 0.5
+    }
+   },
+   "paths": [
+    [
+     {
+      "x": 0.15,
+      "y": 0.38,
+      "p": 0.85,
+      "rMm": 4
+     },
+     {
+      "x": 0.85,
+      "y": 0.38,
+      "p": 0.85,
+      "rMm": 4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "finish-dry",
+   "operation": "dry"
+  }
+ ],
+ "criteria": {
+  "pass": [
+   "warm center and cool sides remain readable",
+   "charges join wet base without hard isolated disks",
+   "no repeated stirring"
+  ],
+  "fail": [
+   "pale backrun blooms",
+   "uniform neutral muddy field",
+   "detached round stamps"
+  ],
+  "numericChecks": [
+   "record actual paper water and saturation before each charge",
+   "compare warm center/cool sides color after ordinary drying"
+  ]
+ },
+ "measurements": {
+  "untouchedWarmControl": [
+   0.4,
+   0.7,
+   0.6,
+   0.75
+  ],
+  "colorSeam": [
+   0.3,
+   0.44,
+   0.7,
+   0.54
+  ],
+  "coolUpper": [
+   0.3,
+   0.25,
+   0.7,
+   0.35
+  ],
+  "requiredEvidence": "actual source-like full-length color gestures joined while whole upcoming blue contact is wet; inspect immediate/dry hue separation and bloom-free seam"
+ },
+ "revision": "v2"
+}

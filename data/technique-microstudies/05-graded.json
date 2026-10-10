@@ -1,0 +1,320 @@
+{
+ "version": 1,
+ "id": "05-graded",
+ "title": "Four-pass connected graded wash",
+ "source": {
+  "url": "https://www.youtube.com/watch?v=CSxPKY3UPQg",
+  "author": "Draw Paint",
+  "guideSection": "graded wash demonstration",
+  "timestampOrNull": "00:18",
+  "referenceImage": "clark-cloud-lift.jpg",
+  "sha256": "ba490f3769a508f40445ff1ec44d840e139fef129ba54eb463a626fa381e90a4",
+  "expectedVisibleEffect": "Connected top-dark to bottom-light blue gradient; no hard stripes or dry gaps",
+  "hardSoftRole": "explicit in recipe",
+  "referenceImageProvenance": "Existing actual primary-source plate/frame sheet; instructional SVG separately labeled",
+  "instructionalGestureGuideSHA256": "469075bc2c574de82e2d1e856cde4d27db43dbd58bbabaed8789a6918c8eb3eb",
+  "comparisonSource": {
+   "url": "https://www.youtube.com/watch?v=ZDnlFOgd6Fk",
+   "author": "Paul Clark",
+   "timestamp": "01:28–03:23",
+   "scope": "Actual broad graded sky/lift sequence; compares connected gradient only, not procedure replication or cloud copying"
+  },
+  "procedureLimits": "V2 now deliberately prewets connected field, inspired by observed Clark sky base; no modeled board tilt claim."
+ },
+ "grid": {
+  "w": 384,
+  "h": 160,
+  "mmPerCell": 0.125
+ },
+ "paperRGB": [
+  246,
+  245,
+  239
+ ],
+ "paper": {
+  "fibres": 0.32,
+  "tooth": 0.3,
+  "coldPress": {
+   "bumpMm": [
+    0.5,
+    1.6
+   ],
+   "cover": 2.2,
+   "swell": 0.15
+  }
+ },
+ "paperSeed": 17,
+ "palette": [
+  "ultramarine",
+  "ochre",
+  "lampblack"
+ ],
+ "budget": {
+  "maxWallSeconds": 52,
+  "maxNativeSteps": 90000,
+  "maxGestures": 10
+ },
+ "commands": [
+  {
+   "id": "prepare-connected-field",
+   "operation": "stroke",
+   "requiredPaper": "dry",
+   "role": "clean-water",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 18,
+    "orientation": "sweep",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 600,
+    "waterQuantityMm3": 450,
+    "concentration": {}
+   },
+   "paths": [
+    [
+     {
+      "x": 0.12,
+      "y": 0.5,
+      "p": 1,
+      "rMm": 9
+     },
+     {
+      "x": 0.88,
+      "y": 0.5,
+      "p": 1,
+      "rMm": 9
+     }
+    ]
+   ],
+   "caption": "One loaded broad clean preparation; measured subsequent contacts, not a wet label"
+  },
+  {
+   "id": "grade-1",
+   "operation": "stroke",
+   "requiredPaper": "wet",
+   "role": "paint",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 8,
+    "orientation": "follow",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 160,
+    "waterQuantityMm3": 112,
+    "concentration": {
+     "ultramarine": 0.65
+    }
+   },
+   "paths": [
+    [
+     {
+      "x": 0.15,
+      "y": 0.25,
+      "p": 0.85,
+      "rMm": 4
+     },
+     {
+      "x": 0.85,
+      "y": 0.25,
+      "p": 0.85,
+      "rMm": 4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "grade-2",
+   "operation": "stroke",
+   "requiredPaper": "wet",
+   "role": "paint",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 8,
+    "orientation": "follow",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 160,
+    "waterQuantityMm3": 112,
+    "concentration": {
+     "ultramarine": 0.43
+    }
+   },
+   "paths": [
+    [
+     {
+      "x": 0.15,
+      "y": 0.4,
+      "p": 0.85,
+      "rMm": 4
+     },
+     {
+      "x": 0.85,
+      "y": 0.4,
+      "p": 0.85,
+      "rMm": 4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "grade-3",
+   "operation": "stroke",
+   "requiredPaper": "wet",
+   "role": "paint",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 8,
+    "orientation": "follow",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 160,
+    "waterQuantityMm3": 112,
+    "concentration": {
+     "ultramarine": 0.26
+    }
+   },
+   "paths": [
+    [
+     {
+      "x": 0.15,
+      "y": 0.55,
+      "p": 0.85,
+      "rMm": 4
+     },
+     {
+      "x": 0.85,
+      "y": 0.55,
+      "p": 0.85,
+      "rMm": 4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "grade-4",
+   "operation": "stroke",
+   "requiredPaper": "wet",
+   "role": "paint",
+   "brush": {
+    "kind": "flat",
+    "widthMm": 8,
+    "orientation": "follow",
+    "free": 0.4,
+    "feed": 0.4,
+    "film": 0.25,
+    "wetMix": 0.85
+   },
+   "load": {
+    "capacityMm3": 160,
+    "waterQuantityMm3": 112,
+    "concentration": {
+     "ultramarine": 0.12
+    }
+   },
+   "paths": [
+    [
+     {
+      "x": 0.15,
+      "y": 0.7,
+      "p": 0.85,
+      "rMm": 4
+     },
+     {
+      "x": 0.85,
+      "y": 0.7,
+      "p": 0.85,
+      "rMm": 4
+     }
+    ]
+   ]
+  },
+  {
+   "id": "finish-dry",
+   "operation": "dry"
+  }
+ ],
+ "criteria": {
+  "pass": [
+   "one coherent wash across overlap",
+   "dry value decreases top to bottom",
+   "paper margin retained"
+  ],
+  "fail": [
+   "white interior stripes",
+   "dark transverse tide lines",
+   "exhausted separated hair streaks",
+   "prepared wet field still dries into four separate value stripes"
+  ],
+  "numericChecks": [
+   "compare dried median luminance in four interior horizontal bands; strictly increasing expected",
+   "pigment occupancy in each overlap band; numerical result does not replace image judgment"
+  ]
+ },
+ "measurements": {
+  "wetEdgeOverlapWindows": [
+   [
+    0.3,
+    0.25,
+    0.7,
+    0.4
+   ],
+   [
+    0.3,
+    0.4,
+    0.7,
+    0.55
+   ],
+   [
+    0.3,
+    0.55,
+    0.7,
+    0.7
+   ]
+  ],
+  "requiredEvidence": "actual water/saturation of overlapping prior bead immediately before next contact, brush before/after separately; replenishing brush alone does not prove connected bead",
+  "dryValueWindows": [
+   [
+    0.3,
+    0.18,
+    0.7,
+    0.25
+   ],
+   [
+    0.3,
+    0.4,
+    0.7,
+    0.45
+   ],
+   [
+    0.3,
+    0.58,
+    0.7,
+    0.63
+   ],
+   [
+    0.3,
+    0.75,
+    0.7,
+    0.8
+   ]
+  ],
+  "judgment": "smooth overall grade, not four visibly distinct bands; inspect transverse dark or white seams"
+ },
+ "revision": "v2"
+}

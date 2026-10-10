@@ -1,0 +1,58 @@
+{
+  "subject": "hills",
+  "name": "hills-v5-try3",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose landscape with ink lines describing paths and forest edge, watercolor washes layered light-to-dark",
+    "regions": {
+      "hills.sky": {
+        "style": "atmospheric-wet",
+        "reason": "Soft pale blue sky, minimal detail, blended top"
+      },
+      "hills.paths": {
+        "style": "precise-watercolor",
+        "reason": "Pale tan paths are lit planes with defined edges where they meet forest"
+      },
+      "hills.green-hills": {
+        "style": "precise-watercolor",
+        "reason": "Rolling green hillsides with organic value planes"
+      },
+      "hills.forest": {
+        "style": "precise-watercolor",
+        "reason": "Dark forest mass with hard edge against lit hills, soft atmospheric recession"
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "hills.sky",
+      "bounds": [0.0, 0.0, 1.0, 0.25],
+      "baseMove": "wet in wet",
+      "referenceCue": "Pale blue sky, subtle atmospheric top, tiny visible sliver"
+    },
+    {
+      "id": "hills.green-hills",
+      "bounds": [0.0, 0.25, 1.0, 0.65],
+      "baseMove": "wet on dry",
+      "referenceCue": "Rolling green hills, yellow-green and medium green hillsides lit from above"
+    },
+    {
+      "id": "hills.paths",
+      "bounds": [0.25, 0.30, 0.65, 0.60],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale warm tan paths winding through, lit planes not pure white, warm golden tone"
+    },
+    {
+      "id": "hills.forest",
+      "bounds": [0.0, 0.55, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Very dark forest mass (navy, blue-green, cool), provides depth and contrast, hard edge at tree line"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Brightest path highlight at top-right path curve intersection",
+      "bounds": [0.45, 0.35, 0.55, 0.42]
+    }
+  ]
+}

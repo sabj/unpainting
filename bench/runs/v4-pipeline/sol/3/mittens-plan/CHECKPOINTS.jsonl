@@ -1,0 +1,12 @@
+{"t": "2026-10-09 19:48:41 PDT", "kind": "start", "modelMinutes": 10.18, "variant": "region_w13_lay2_dk11_sep4_rg0_opp28", "renderKey": "d9ca87772d7953ac95e807ae3392b5bf7bdeb33184ec2b2b107c2328b6b2c49e"}
+{"t": "2026-10-09 19:51:05 PDT", "kind": "look", "modelMinutes": 10.49, "n": 1, "boundary": "0", "strokes": 0, "penLines": 25, "passesDone": 0, "passesPlanned": 32}
+{"t": "2026-10-09 19:51:34 PDT", "kind": "continue", "modelMinutes": 10.96, "boundary": "0", "stopAt": 7, "strokes": 0}
+{"t": "2026-10-09 19:53:44 PDT", "kind": "look", "modelMinutes": 11.08, "n": 2, "boundary": "7", "strokes": 62, "penLines": 25, "passesDone": 7, "passesPlanned": 32}
+{"t": "2026-10-09 19:54:16 PDT", "kind": "continue", "modelMinutes": 11.61, "boundary": "7", "stopAt": 19, "strokes": 62}
+{"t": "2026-10-09 19:57:36 PDT", "kind": "look", "modelMinutes": 11.71, "n": 3, "boundary": "19", "strokes": 285, "penLines": 25, "passesDone": 19, "passesPlanned": 32}
+{"t": "2026-10-09 20:09:15 PDT", "kind": "revise", "modelMinutes": 14.36, "boundary": "19", "revision": 1, "strokes": 285, "passesDone": 19, "changed": ["closing-lines.json", "variant.txt"], "variant": "region_w13_lay2_dk11_sep4_rg0_opp28_dp80"}
+{"t": "2026-10-09 20:17:30 PDT", "kind": "look", "modelMinutes": 15.51, "n": 4, "boundary": "closing", "strokes": 3876, "penLines": 25, "passesDone": 47, "passesPlanned": 47}
+{"t": "2026-10-09 20:33:33 PDT", "kind": "revise", "modelMinutes": 20.06, "boundary": "closing", "revision": 2, "strokes": 3876, "passesDone": 47, "changed": ["closing-lines.json"], "variant": "region_w13_lay2_dk11_sep4_rg0_opp28_dp80"}
+{"t": "2026-10-09 20:37:36 PDT", "kind": "finished", "modelMinutes": 20.67, "strokes": 3876}
+{"t": "2026-10-09 20:38:10 PDT", "kind": "look", "modelMinutes": 21.25, "n": 5, "boundary": "final"}
+{"t": "2026-10-09 20:38:41 PDT", "kind": "session-end", "modelMinutes": 21.76, "why": "you ended the session", "looks": 5, "revisions": 2}

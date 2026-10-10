@@ -1,0 +1,18 @@
+[
+  "--closingpressure",
+  "0.42",
+  "--prewetinset",
+  "2",
+  "--prewetwater",
+  "0.55",
+  "--paperrel",
+  "0",
+  "--paperlights",
+  "0",
+  "--litl",
+  "80",
+  "--litlift",
+  "0.08",
+  "--washstreak",
+  "0.12"
+]

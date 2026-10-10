@@ -1,0 +1,4 @@
+{"t": "2026-10-09 15:57:36 PDT", "kind": "adopted", "modelMinutes": 7.0, "unanswered": []}
+{"t": "2026-10-09 16:11:15 PDT", "kind": "start", "modelMinutes": 15.66, "variant": "region_w13_lay3_sep6_ink2", "renderKey": "ce81812d50862339e40c13ab307c50f1055b32df2e8cc0f0250a35180955f87c"}
+{"t": "2026-10-09 16:11:16 PDT", "kind": "session-end", "modelMinutes": 15.68, "why": "you ended the session", "looks": 0, "revisions": 0}
+{"t": "2026-10-09 19:05:09 PDT", "kind": "machine-lost", "modelMinutes": 189.55, "n": 1, "why": "never ran: box ended while the job waited"}

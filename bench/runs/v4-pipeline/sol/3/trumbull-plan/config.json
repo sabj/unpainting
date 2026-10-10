@@ -1,0 +1,119 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull — sunlit stone, precise architectural watercolor",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The central gable, paired Gothic arches and chimney junctions need dry, fitted edges. Transparent warm wall planes and connected cool shadow glazes carry the building; selective fine sepia carries sub-brush mullions.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.32
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale cerulean sky with irregular cloud lights between the roofs. One flowing graded wash on a measured dry base, watery transparent pigment and merging own-stroke overlap; reserve cloud lights and protect sharp roof silhouettes. Do not require an initially moist whole footprint, because the sky color family also contains cool roof and glass shapes."
+    },
+    {
+      "id": "Y1.masonry",
+      "bounds": [
+        0,
+        0.1,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected ochre and raw-sienna masonry planes across the building. Broad transparent washes, then dry mid planes and cross-boundary blue-brown shadow glazes; ashlar is a few pale irregular hints, not a grid."
+    },
+    {
+      "id": "Y1.central-gable",
+      "bounds": [
+        0.4,
+        0,
+        0.68,
+        0.99
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit central gable and paired pointed arches are the focus. Keep the front pale and warm, the narrow slits and arches cool and dark on dry paper; pale rims and window divisions survive."
+    },
+    {
+      "id": "Y1.left-shadow",
+      "bounds": [
+        0.15,
+        0,
+        0.42,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall left chimney, slate roof and receding wall form the major connected shadow side. Dry glazes cross stone, eaves, window surrounds and the lower wall; retain the narrow lit chimney face."
+    },
+    {
+      "id": "Y1.right-wing",
+      "bounds": [
+        0.68,
+        0.1,
+        1,
+        0.7
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right chimney and repeated windows are secondary architecture. Paint fitted wall and roof planes, then dry recesses; window frames are fine lines rather than thick painted bands."
+    },
+    {
+      "id": "Y1.annex",
+      "bounds": [
+        0.72,
+        0.63,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Low annex has a pale slate roof, bright upper cornice and warm front against dark rectangular windows. Preserve its light roof edge; shadow glazes connect eave and openings."
+    },
+    {
+      "id": "Y1.foliage",
+      "bounds": [
+        0.6,
+        0.61,
+        0.81,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Yellow-green tree overlaps the central wall and annex. Keep the fitted irregular canopy and sky/wall gaps; connected olive shadow groups after drying, with only a few crisp leaf edges. No pen filling the canopy."
+    },
+    {
+      "id": "Y1.street",
+      "bounds": [
+        0,
+        0.945,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Thin light pavement strip and tiny figures anchor the building. Pale connected ground, a restrained dry grounding glaze, and only target-sized dark accents; do not invent grass texture."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Small near-paper glint on the annex slate roof, following its real bright edge",
+      "bounds": [
+        0.83,
+        0.6578,
+        0.8367,
+        0.6654
+      ]
+    },
+    {
+      "reason": "Small cream highlight on the central left arch rim; the rest of the rim stays a pale painted plane",
+      "bounds": [
+        0.4533,
+        0.5133,
+        0.46,
+        0.5209
+      ]
+    }
+  ]
+}

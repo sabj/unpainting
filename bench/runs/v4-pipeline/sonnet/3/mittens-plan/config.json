@@ -1,0 +1,17 @@
+{"subject":"mittens","name":"Mittens and friend (watercolor portrait sketch)",
+ "styleSelection":{"style":"precise-watercolor","reason":"light washes on dry paper; fine pen lines carry whiskers, lids and brows; focal details stay dry and crisp",
+   "regions":{}},
+ "families":[
+  {"id":"mittens.cat","bounds":[0,0,0.52,1],"baseMove":"wet on dry",
+   "referenceCue":"ginger and white cat looking up: orange-sienna patches with pale paper gaps on forehead, cheek and chest; pale warm-grey shadow washes; white muzzle and chest left as paper; whiskers are pen lines, not paint"},
+  {"id":"mittens.hair","bounds":[0.49,0.2,1,0.78],"baseMove":"wet on dry",
+   "referenceCue":"one connected charcoal blue-grey wash mass with broken dry-brush edges and a few paper flecks; darker at the left and under the crown, lighter grey on top; no stippling"},
+  {"id":"mittens.face","bounds":[0.5,0.5,0.94,1],"baseMove":"wet on dry",
+   "referenceCue":"pale warm skin wash, forehead and cheek lights left near paper; sepia-umber shadow down the left cheek and under the lip; dark brown brows and irises on dry paper with catchlights kept"}
+ ],
+ "reserves":[
+  {"reason":"cat big eye catchlight","bounds":[0.2667,0.2075,0.2767,0.219]},
+  {"reason":"cat small eye catchlight","bounds":[0.0858,0.2394,0.0942,0.249]},
+  {"reason":"man left eye catchlight","bounds":[0.5992,0.7162,0.6092,0.7278]},
+  {"reason":"man right eye catchlight","bounds":[0.81,0.6766,0.82,0.6882]}
+ ]}

@@ -1,0 +1,11 @@
+{"subject":"BENCHSARGENT","name":"White Ships (Sargent)",
+ "styleSelection":{"style":"precise-watercolor","reason":"Sargent builds the ship from confident wet-on-dry value planes over a soft first wash; pure watercolour, structure from shaped paint, dark paint accents and reserved paper, no ink",
+   "regions":{}},
+ "families":[
+  {"id":"SARGENT.hull","bounds":[0.23,0.0,0.66,0.93],"baseMove":"wet on dry","referenceCue":"white bow in cool blue-grey; pale foundation on dry paper, greys variegated by the painter's own soft merges; cream light streaks left as paper; hard dark-blue left edge, crisp right edge, orange rivet dots and dark hawse hole on dry paper"},
+  {"id":"SARGENT.haze","bounds":[0.62,0.0,1.0,0.69],"baseMove":"wet on dry","referenceCue":"cream paper with loose pale cobalt strokes; tan and grey rigging diagonals, dark round blocks and the orange spar painted crisp on dry paper"},
+  {"id":"SARGENT.sea","bounds":[0.64,0.68,1.0,1.0],"baseMove":"wet on dry","referenceCue":"sea under a firm horizon: yellow-green near the horizon grading to teal, broken lighter ripples"},
+  {"id":"SARGENT.masts","bounds":[0.0,0.0,0.24,0.47],"baseMove":"wet on dry","referenceCue":"vertical orange and grey masts and a diagonal spar against pale blue; crisp narrow strokes"},
+  {"id":"SARGENT.anchor","bounds":[0.0,0.46,0.33,0.9],"baseMove":"wet on dry","referenceCue":"blue hull of the boat behind with white streaks; ochre anchor with orange shank, hard edges against the blue"},
+  {"id":"SARGENT.foot","bounds":[0.0,0.88,0.66,1.0],"baseMove":"wet on dry","referenceCue":"dark mixed foreground of browns and blues under the bow; darkest shadow at the hull foot"}],
+ "reserves":[]}

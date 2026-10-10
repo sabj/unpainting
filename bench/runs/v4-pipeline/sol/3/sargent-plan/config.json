@@ -1,0 +1,23 @@
+{
+  "subject": "BENCHSARGENT",
+  "name": "White Ships — transparent hull planes and warm tackle",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor: luminous cool value planes, reserved cream paper and selective dark painted fittings. Broad connected washes, dry shaped middle planes and cross-region shadow glazes; no drawing medium.",
+    "regions": {
+      "ships.central-hull": {"style": "precise-watercolor", "reason": "The curved blue-gray bow has broad transparent planes and a firm left contour; soften selected turning edges with clean water while keeping the dark waterline sharp."},
+      "ships.right-hull": {"style": "precise-watercolor", "reason": "The right hull is mostly warm paper and pale gray-blue facets, with crisp dark oval fittings; paint around the light plane and add fittings after full drying."},
+      "ships.tackle": {"style": "precise-watercolor", "reason": "Ochre ropes, the anchor and slender upright supports have connected shaped strokes and broken warm highlights; paint on dry paper without ink or uniform hatching."},
+      "ships.water": {"style": "precise-watercolor", "reason": "Green-blue water and reflected hull shadows are connected transparent planes; retain broken horizontal cream lights and finish the deepest contact shadows on dry paper."},
+      "ships.background": {"style": "precise-watercolor", "reason": "The narrow upper-left background is a pale blue-gray wash behind crisp tackle; a dry-start wash preserves the adjacent structural edges and selective clean-water softening loses distant edges."}
+    }
+  },
+  "families": [
+    {"id": "ships.central-hull", "bounds": [0.20, 0.0, 0.68, 0.98], "baseMove": "wet on dry", "referenceCue": "Large cool concave bow: broad pale blue-gray wash first, two transparent shaped middle layers on dry paper, darkest curved left edge and keel shadow last; preserve scattered pale reflections."},
+    {"id": "ships.right-hull", "bounds": [0.63, 0.0, 1.0, 0.72], "baseMove": "wet on dry", "referenceCue": "Cream-white right ship: luminous hull face, pale cool angular reflections, two dark oval fittings near the top; reserve the connected near-paper plane and keep the fittings crisp."},
+    {"id": "ships.tackle", "bounds": [0.0, 0.12, 0.31, 0.95], "baseMove": "wet on dry", "referenceCue": "Left foreground anchor and ochre ropes have warm connected bodies with tapered irregular edges; ochre uprights cross the cool hulls and should stay legible as paint."},
+    {"id": "ships.water", "bounds": [0.0, 0.70, 1.0, 1.0], "baseMove": "wet on dry", "referenceCue": "Green-blue water under the white ships, a darker continuous contact shadow at the central keel and broken pale horizontal reflection strokes; broad underwash then dry glazes crossing hull and water."},
+    {"id": "ships.background", "bounds": [0.0, 0.0, 0.22, 0.49], "baseMove": "wet on dry", "referenceCue": "Pale gray-blue open slivers behind the left upright tackle; one connected light wash with only selected distant edges softened, no tiled sky or outlines."}
+  ],
+  "reserves": []
+}

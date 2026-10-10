@@ -1,0 +1,49 @@
+{
+  "subject": "BENCHMITTENS",
+  "name": "Mittens portrait crop",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is a fine-line portrait sketch whose cat and human face are carried by pale value planes, dry facial landmarks, and a few selective sepia lines.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat",
+      "bounds": [0.0, 0.0, 0.53, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cropped cat on the left: ginger tabby planes, white blaze and muzzle, upright ears, and a narrow edge where it overlaps the person."
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [0.51, 0.02, 1.0, 0.43],
+      "baseMove": "wet on dry",
+      "referenceCue": "The person's dark irregular curls and broken hairline; keep one connected charcoal-violet mass with a few dry directional curls."
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [0.53, 0.22, 1.0, 0.79],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale face with sharply placed brows and eyes, a softly turning nose and cheek, and a lightly indicated mouth."
+    },
+    {
+      "id": "mittens.paper",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Open white sheet around the portrait and the near-white fur and skin planes; let the crop vignette into paper."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Bare-paper catchlight in the cat's bright right eye.",
+      "bounds": [0.273, 0.228, 0.283, 0.24]
+    },
+    {
+      "reason": "Bare-paper catchlight at the person's left pupil.",
+      "bounds": [0.69, 0.649, 0.7, 0.661]
+    },
+    {
+      "reason": "Bare-paper catchlight at the person's right pupil.",
+      "bounds": [0.897, 0.672, 0.907, 0.684]
+    }
+  ]
+}

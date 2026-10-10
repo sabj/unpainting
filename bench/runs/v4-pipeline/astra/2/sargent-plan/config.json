@@ -1,0 +1,48 @@
+{
+  "subject": "BENCHSARGENT",
+  "name": "White Ships — transparent hull planes and warm rigging",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor: connected pale foundations, shaped dry-paper middle planes, and transparent cross-region shadow glazes. The reference has firm brush-shaped hull edges and rigging against luminous cream lights; no ink.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "BENCHSARGENT.central-hull",
+      "bounds": [0.22, 0.0, 0.66, 0.94],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large curving blue-grey bow: a connected pale wash, two transparent shaped middle washes on dry paper, then a unifying lower-hull shadow. Keep the lighter curved facets and broken reflections; soften only turning edges. Wash question, not texture dots."
+    },
+    {
+      "id": "BENCHSARGENT.right-white-hull",
+      "bounds": [0.62, 0.0, 1.0, 0.69],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit cream-white ship at right, interrupted by diagonal blue-grey cast shadows and two dark oval openings. Reserve actual paper lights, tint the other white planes very lightly, and place the shadow planes on dry paint. Preserve hard diagonal junctions and soften selected shadow turns."
+    },
+    {
+      "id": "BENCHSARGENT.left-rigging",
+      "bounds": [0.0, 0.0, 0.29, 0.90],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left masts, warm ropes, and angular overlapping blue boat shapes: pale base first, then long narrow ochre/sienna brush shapes on dry paper. Keep pale gaps between ropes. Small dry painted accents carry intersections without drawing or hatching."
+    },
+    {
+      "id": "BENCHSARGENT.foreground-water",
+      "bounds": [0.0, 0.69, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Bottom water connects deep blue-green hull reflections to the sage-turquoise water at right. Transparent underwash, dry, shaped darker reflection washes, dry, joined shadow glaze across the hull-water junction. Keep horizontal light fragments; let cold-press tooth supply broken edges."
+    },
+    {
+      "id": "BENCHSARGENT.warm-right-rope",
+      "bounds": [0.79, 0.22, 0.94, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Long ochre and sienna diagonal rope in front of the pale right hull and green water. A narrow connected painted shape on dry paper, with uneven warm dark accents and its light side preserved."
+    },
+    {
+      "id": "BENCHSARGENT.focal-openings",
+      "bounds": [0.42, 0.20, 0.52, 0.46],
+      "baseMove": "wet on dry",
+      "referenceCue": "Central irregular dark oval and descending warm attachments are the focal accents. Restate fitted dark shapes late on fully dry hull paint with a pointed brush and medium-to-thick pigment; preserve their interior lighter notches."
+    }
+  ],
+  "reserves": []
+}

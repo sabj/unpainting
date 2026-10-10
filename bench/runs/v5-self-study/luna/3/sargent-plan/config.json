@@ -1,0 +1,36 @@
+{
+  "subject": "sargent",
+  "name": "White Ships (Sargent), broad connected planes",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is pure watercolor: broad transparent washes and selected painted edges carry the ship; no ink structure is present.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.central-hull",
+      "bounds": [0.1, 0.0, 0.76, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The large blue-grey vessel curves from the upper centre into a deep lower contact; preserve one rounded body and let its value planes turn with the hull."
+    },
+    {
+      "id": "sargent.pale-sail-and-sheet",
+      "bounds": [0.34, 0.0, 1.0, 0.76],
+      "baseMove": "wet on wet",
+      "referenceCue": "Pale warm sail and sheet shapes remain open behind the hull, with only a few firm overlaps and dark fittings at upper right."
+    },
+    {
+      "id": "sargent.left-overlap",
+      "bounds": [0.0, 0.2, 0.42, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "A cropped cool vessel and a few ochre spars cross at the left; join the dark overlap and reserve the warm spars for sparse accents."
+    },
+    {
+      "id": "sargent.right-water",
+      "bounds": [0.58, 0.52, 1.0, 1.0],
+      "baseMove": "wet in wet",
+      "referenceCue": "A turquoise water band opens to the right and deepens along the lower edge; keep it one broad field with broken, non-repeating lights."
+    }
+  ],
+  "reserves": []
+}

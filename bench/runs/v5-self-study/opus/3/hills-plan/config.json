@@ -1,0 +1,39 @@
+{
+ "subject": "HILLS",
+ "name": "HILLS",
+ "styleSelection": {
+  "style": "ink-and-wash",
+  "reason": "Requested loose ink and wash. The lit meadows and tan paths are flat light planes: one connected full-strength wash each, a shadow glaze only where trees cast shade, and the pen carries their edges. Sepia pen sketch first, selective closing ink last.",
+  "regions": {
+   "HILLS.woods": {
+    "style": "precise-watercolor",
+    "reason": "The oak woods are the dark mass that the meadows cut through. They need three value steps the two-band ink-and-wash ladder lacks: a pale teal-grey base, mid crown bodies on dry paper, then blue-black shadow glazes under the crowns and in the ravine. Separate from the meadows, so their washes never average with the meadow colour."
+   }
+  }
+ },
+ "families": [
+  {
+   "id": "HILLS.meadows",
+   "bounds": [
+    0.4,
+    0.56,
+    0.88,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "lit acid yellow-green grass slopes on diagonals and the tan dirt paths; the lower meadow is the anchor box, so the bright meadow, light meadow and khaki path colour clusters label as meadow wherever they lie"
+  },
+  {
+   "id": "HILLS.woods",
+   "bounds": [
+    0,
+    0,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "dense oak woodland: rounded crowns, lit grey-green tops, teal bodies, blue-black undersides and ravine shadow; the grey-green, teal and dark colour clusters label as woods, so the woods mid layers and glazes run as one connected mass without paper specks"
+  }
+ ],
+ "reserves": []
+}

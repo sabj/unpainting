@@ -1,0 +1,13 @@
+{
+ "note": "Models the harness knows how to run. runner: claude (Claude Code CLI), codex (Codex CLI) or together (bench/v2/runners/oss_loop.py on Together). effort is the reasoning setting sent, or n/a.",
+ "models": [
+  { "key": "opus", "name": "Opus 5.5", "id": "claude-opus-5-5", "effort": "xhigh", "runner": "claude" },
+  { "key": "sonnet", "name": "Sonnet 5.5", "id": "claude-sonnet-5-5", "effort": "xhigh", "runner": "claude" },
+  { "key": "haiku", "name": "Haiku 4.5", "id": "claude-haiku-4-5-20251001", "effort": "n/a", "runner": "claude" },
+  { "key": "astra", "name": "Codex Astra", "id": "gpt-6-astra", "effort": "xhigh", "runner": "codex" },
+  { "key": "sol", "name": "Codex Sol", "id": "gpt-6.1-sol", "effort": "xhigh", "runner": "codex" },
+  { "key": "luna", "name": "Codex Luna", "id": "gpt-6-luna", "effort": "xhigh", "runner": "codex" },
+  { "key": "dsflash", "name": "DeepSeek V4.1 Flash", "id": "deepseek-ai/DeepSeek-V4.1-Flash", "effort": "n/a", "runner": "together" },
+  { "key": "minimax", "name": "MiniMax M3", "id": "MiniMaxAI/MiniMax-M3", "effort": "n/a", "runner": "together" }
+ ]
+}

@@ -1,0 +1,17 @@
+{
+  "subject": "BENCHSARGENT",
+  "name": "White Ships — connected cream and blue hulls, early structural shadows",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor. Broad transparent hull planes on warm cream paper; dry, controlled painted fittings. Pale foundation, dry, establish connected structural darks, dry, one middle-value wash. No ink or graphite.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"BENCHSARGENT.central-bow","bounds":[0.21,0,0.68,0.93],"baseMove":"wet on dry","referenceCue":"Large curved blue-grey bow with cream oblique facets. Wash question: broad connected pale wash on dry paper, own wet overlap; dry, establish upper dark rim and lower shadow; dry, one connected middle wash. Small central fitting painted with a pointed round; soften only low-contrast turning edges."},
+    {"id":"BENCHSARGENT.cream-hull","bounds":[0.62,0,1,0.73],"baseMove":"wet on dry","referenceCue":"Right hull is warm cream light, not brilliant white. Reserve irregular near-paper light planes; lightly tint adjacent planes. Blue diagonal and curved cast-shadow planes painted on dry paper; dark oval fittings use controlled round contacts. Keep internal light edges lost and structural edges firm."},
+    {"id":"BENCHSARGENT.left-rigging-anchor","bounds":[0,0,0.31,1],"baseMove":"wet on dry","referenceCue":"Ochre and sienna rigging, golden anchor and slender cool supports. Pale foundation, dry, dark anchor junctions, dry, connected warm painted bodies. Wash question for each narrow body: round or rigger following fitted direction, with tapered ends and unpainted light side; no ink outlines."},
+    {"id":"BENCHSARGENT.water-reflection","bounds":[0,0.68,1,1],"baseMove":"wet on dry","referenceCue":"Deep cool reflection joins the lower bow; green-turquoise water at right carries pale broken horizontal glints. Connected pale underwash, dry, two restrained structural glazes across bow and reflected wedge, dry, one middle water wash. No horizontal ground-deferral cutoff. Sparkle comes from reserved gaps and paper tooth, not added dots."},
+    {"id":"BENCHSARGENT.right-rope","bounds":[0.78,0.21,0.97,1],"baseMove":"wet on dry","referenceCue":"Rusty ochre rope crosses the pale right hull and green water diagonally. Dry-paper painted narrow warm shape, controlled medium load, continuous fitted body with target-supported interruptions. Dark junctions established before its final middle color; light flank preserved."}
+  ],
+  "reserves": []
+}

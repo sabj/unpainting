@@ -1,0 +1,97 @@
+{
+  "structure": "paint",
+  "order": [
+    "reserve",
+    "sparse graphite",
+    "light wash",
+    "dry",
+    "shaped mid planes",
+    "dry",
+    "cross-region shadow glazes",
+    "dry",
+    "selective closing ink"
+  ],
+  "weights": [
+    0.16,
+    0.44,
+    0.12,
+    0.182,
+    0.098
+  ],
+  "water": [
+    0.62,
+    0.48,
+    0.22,
+    0.45,
+    0.45
+  ],
+  "brushes": [
+    "flat",
+    "round12",
+    "pointed round",
+    "liner"
+  ],
+  "moves": [
+    "wet on dry",
+    "dry on dry",
+    "glazed"
+  ],
+  "edge": "crisp focal detail; soften one turning edge; lost nonfocal edges",
+  "ink": 0.18,
+  "graphite": 0.12,
+  "textures": {
+    "fur": "ink",
+    "hair": "ink",
+    "foliage": "wash",
+    "grass": "dry brush",
+    "skin": "wash",
+    "architecture": "raise density",
+    "sky": "wash",
+    "water": "wash",
+    "fabric": "wash"
+  },
+  "reserve": [
+    "both eye catchlights",
+    "nose ridge",
+    "lip highlight",
+    "trim",
+    "lit planes",
+    "paper vignette"
+  ],
+  "refs": [
+    "Reference studies of portraits and architecture; fine-detail sharpness remains limited."
+  ],
+  "emphasis": [
+    "light-to-dark progression",
+    "reserved lights",
+    "dry focal edges",
+    "fitted landmarks",
+    "cross-boundary glaze"
+  ],
+  "pigment": "sepia",
+  "name": "precise-watercolor",
+  "version": 1,
+  "washCount": 5,
+  "waterLevel": "per-layer calibrated load",
+  "detailThresholdCells": 4,
+  "wetMix": 0.3,
+  "bridge": 0.82,
+  "bridgeSoft": 2.4,
+  "closingContrast": 0.06,
+  "openingMinLength": 0.035,
+  "paintStrength": 1,
+  "darkRecessMaxRGB": 105,
+  "textureRules": [
+    {
+      "subject": "Y1",
+      "cue": "warm stone",
+      "band": 3
+    },
+    {
+      "subject": "subject-c",
+      "minY": 0.48,
+      "maxY": 0.9,
+      "band": 3
+    }
+  ]
+}

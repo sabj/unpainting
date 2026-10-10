@@ -1,0 +1,22 @@
+[
+  "--paints",
+  "ochre,sienna,hansa,ultramarine,sepia,sapgreen",
+  "--inkprofile",
+  "black-ink",
+  "--openingpressure",
+  "0.85",
+  "--closingpressure",
+  "0.95",
+  "--openingminmm",
+  "3",
+  "--shapedmarks",
+  "0",
+  "--washbrush",
+  "round12",
+  "--cover",
+  "1",
+  "--touchgain",
+  "0.2",
+  "--paperlights",
+  "0"
+]

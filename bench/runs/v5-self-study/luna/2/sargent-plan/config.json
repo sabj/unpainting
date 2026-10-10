@@ -1,0 +1,36 @@
+{
+  "subject": "sargent",
+  "name": "White Ships (Sargent), connected washes",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor: broad transparent value planes carry the ship, with soft selected turns and dry, compact paint accents. The reference has no ink structure.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.main-hull",
+      "bounds": [0.12, 0.0, 0.78, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The large cool sail and vessel plane curves down the centre into the dark lower hull; keep it broad, chromatic and continuous, with only its turning edge softened."
+    },
+    {
+      "id": "sargent.pale-sail",
+      "bounds": [0.48, 0.0, 1.0, 0.72],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale overlapping sail and warm paper shapes sit behind the blue plane; preserve their near-paper value and lose selected edges into the sheet."
+    },
+    {
+      "id": "sargent.left-overlap",
+      "bounds": [0.0, 0.18, 0.38, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cropped boat, ochre spars and rigging cluster at the left; group the dark overlap as one connected mass and keep warm marks sparse."
+    },
+    {
+      "id": "sargent.water",
+      "bounds": [0.63, 0.48, 1.0, 0.84],
+      "baseMove": "wet on wet",
+      "referenceCue": "A soft turquoise water band opens at the right; make one connected light passage, then add only a few broken reflections after drying."
+    }
+  ],
+  "reserves": []
+}

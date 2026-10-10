@@ -1,0 +1,81 @@
+{
+ "note": "Benchmark crops. One sheet cell per crop pixel at 0.259 mm a cell. Image credits: NOTICE at the repository root.",
+ "mmPerCell": 0.259,
+ "crops": [
+  {
+   "task": "hills",
+   "width": 306,
+   "height": 242,
+   "coarse": {
+    "cols": 24,
+    "rows": 19
+   },
+   "style": "very loose ink and wash: oak masses on green hills with a dirt trail",
+   "source": "original photograph, photo by Sam Jackson",
+   "distributed": true,
+   "file": "targets/hills.png",
+   "coarseFile": "targets/hills-coarse.json",
+   "licence": "noncommercial project use; see NOTICE"
+  },
+  {
+   "task": "south-france",
+   "width": 304,
+   "height": 249,
+   "coarse": {
+    "cols": 24,
+    "rows": 20
+   },
+   "style": "urban sketch, pen plus light wash: Provence trees, cypresses and a few stone houses",
+   "source": "original photograph, photo by Sam Jackson",
+   "distributed": true,
+   "file": "targets/south-france.png",
+   "coarseFile": "targets/south-france-coarse.json",
+   "licence": "noncommercial project use; see NOTICE"
+  },
+  {
+   "task": "sargent",
+   "width": 300,
+   "height": 244,
+   "coarse": {
+    "cols": 24,
+    "rows": 20
+   },
+   "style": "pure watercolor, no ink: a white ship's hull against water, with rigging (after Sargent)",
+   "source": "crop of John Singer Sargent, White Ships, 1908, Brooklyn Museum (09.846); public-domain source work, Wikimedia Commons reproduction marked Public Domain Mark 1.0 / PD-Art (PD-old-70)",
+   "distributed": true,
+   "file": "targets/sargent.png",
+   "coarseFile": "targets/sargent-coarse.json",
+   "licence": "public domain"
+  },
+  {
+   "task": "mittens",
+   "width": 300,
+   "height": 259,
+   "coarse": {
+    "cols": 24,
+    "rows": 21
+   },
+   "style": "watercolor portrait sketch, fine lines and light washes",
+   "source": "original photograph, photo by Sam Jackson",
+   "distributed": true,
+   "file": "targets/mittens.png",
+   "coarseFile": "targets/mittens-coarse.json",
+   "licence": "noncommercial project use; see NOTICE"
+  },
+  {
+   "task": "trumbull",
+   "width": 300,
+   "height": 263,
+   "coarse": {
+    "cols": 24,
+    "rows": 21
+   },
+   "style": "precise architectural watercolor: a stone college facade with windows",
+   "source": "crop of an original photograph of Trumbull College, Yale",
+   "distributed": true,
+   "file": "targets/trumbull.png",
+   "coarseFile": "targets/trumbull-coarse.json",
+   "licence": "noncommercial project use; see NOTICE"
+  }
+ ]
+}

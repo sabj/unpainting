@@ -1,0 +1,122 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull — golden masonry and cool Gothic recesses",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is carried by luminous golden wall planes, connected cool cast shadows, and precise Gothic openings; fine structural lines supplement transparent paint.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.25
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale blue sky and soft cloud whites between irregular roof silhouettes: connected flowing pale wash starting on dry paper, own wet overlap allowed, with cloud lights reserved and firm roof boundaries. The confined sky shapes must not be pre-wetted into a pooled wet footprint."
+    },
+    {
+      "id": "Y1.front-gable",
+      "bounds": [
+        0.408,
+        0.025,
+        0.683,
+        0.987
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit ochre gable, four narrow upper lancets, paired large Gothic arches and lower doorways; connected pale stone wash, dry middle planes, then shadow glaze across masonry and recesses. Preserve light arch rims and the narrow left arris."
+    },
+    {
+      "id": "Y1.left-wing",
+      "bounds": [
+        0,
+        0.15,
+        0.414,
+        0.987
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left wing and side wall are cooler and darker than the front gable. Broad stone wash, fully dry mid planes, a connected blue and raw-sienna shadow across wall, window bays and base; avoid isolated stone flecks."
+    },
+    {
+      "id": "Y1.left-chimney",
+      "bounds": [
+        0.158,
+        0,
+        0.291,
+        0.81
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall cropped chimney has a warm narrow right face and cool left face. Keep vertical arrises and cap ledges; wash each value plane broadly and carry the shadow through the courses."
+    },
+    {
+      "id": "Y1.right-wing",
+      "bounds": [
+        0.693,
+        0.195,
+        1,
+        0.99
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Receding right wing: warm wall and cool roof, quiet rectangular window groups. Use dry-edged connected planes and subordinate window detail to the central arches."
+    },
+    {
+      "id": "Y1.right-chimney",
+      "bounds": [
+        0.788,
+        0.092,
+        0.914,
+        0.62
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Second chimney has a dark slotted crown, broad golden shaft and cool side edge. Preserve its silhouette and model the shaft before adding the crown accents."
+    },
+    {
+      "id": "Y1.forecourt-building",
+      "bounds": [
+        0.713,
+        0.613,
+        0.96,
+        0.986
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Lower right projecting building: pale sloping roof and golden wall, narrow cool windows and a cast eave shadow. Keep roof glints, use one dry shadow through eave and openings."
+    },
+    {
+      "id": "Y1.foreground-tree",
+      "bounds": [
+        0.624,
+        0.597,
+        0.79,
+        0.985
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Yellow-green foreground crown is an irregular connected mass, with light holes and darker olive groups toward its base. Pale flowing wash first; dry and add connected shadow groups, then only a few focal leaf edges."
+    },
+    {
+      "id": "Y1.left-vegetation",
+      "bounds": [
+        0,
+        0.609,
+        0.24,
+        0.99
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Lower-left foliage is a subdued olive mass against the wall, not individually outlined leaves; dry shadow groups link it to the ground."
+    },
+    {
+      "id": "Y1.ground-and-figures",
+      "bounds": [
+        0,
+        0.936,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "A narrow pale pavement strip, cool cast shadows and tiny figures establish scale. Wash the ground lightly; retain bright shirts and use a few late dark accents, without outlining every figure."
+    }
+  ],
+  "reserves": []
+}

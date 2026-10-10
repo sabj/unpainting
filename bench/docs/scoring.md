@@ -1,0 +1,60 @@
+# Scoring
+
+A try is one model session that paints the requested targets. Each painting gets three things: an automated score for the finished painting, a progression check (an evaluation of saved painting stages), and a share in its try's cheat-risk score. The code is in [../scorer/](../scorer/) and [../scripts/score.mjs](../scripts/score.mjs). Rubric version: `bench-v3-median5`, with the median of five calls per judge.
+
+The painting toolkit given to models writes each final image.
+
+Judge version: `J1`. All published scores are J1. A new panel, rubric or image protocol gets a new J number; scores from different J versions are not compared. Current judge calls use OpenRouter zero-data-retention providers; earlier published calls used Together. Results group by painter, sim and judge version. See [versions](../../docs/versions.md).
+
+## The finished painting
+
+`scorer/score_painting.py` scores one painting against its target, 0 to 10.
+
+- AI image judges: Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B. Each sees the target and the painting, blind, with a short description of the target's painting style. Each gives 0 to 10 for `composition_values`, `edges_detail` and `marks_texture`, and one overall.
+- Combined judge score: each judge is called 5 times at temperature 0 (the least random sampling setting). Its score is the median of its valid calls, and it needs at least 3. The vision score is the mean of the three judges' medians. If a judge has fewer than 3 valid calls, the painting's score is incomplete and stays empty. No average over a smaller panel is made.
+- Repeatable image measurements: value shapes, edges and marks, each normalized to 0 to 10, from `scorer/classic.py`. Their mean is the classic score. No metric uses pixel error.
+- Composite: the mean of the vision score and the classic score. A try's score is the mean of its targets' composites and needs every target.
+
+The judges are told not to reward pixel similarity, and that blur and smear are failures. "5 is a competent amateur; 9-10 is close to the target's quality."
+
+Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the 1224 px V4 and V5 renders are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. The V4 and V5 scores published before 2026-10-10 came from a 720 px upscale path; each `run.json` keeps them as `scoreOld`.
+
+Score from the toolkit's own `final.png`, not from a compressed thumbnail. The marks metric is sensitive to compression: a 600 px WebP of a published painting gave a marks score 2.4 points lower than the PNG it was made from.
+
+## How far to trust the score
+
+The published scorer has these checks.
+
+- Scores are relative, very coarse, and open to improvement.
+- Agreement between judges (Kendall tau, a measure of ranking agreement, 156 paintings): Kimi-K3 and GLM-5.3-Flash 0.849, Kimi-K3 and Qwen3.5-9B 0.805, GLM-5.3-Flash and Qwen3.5-9B 0.759.
+- Controls: for every subject the target itself beats a blurred and a posterized copy (reduced to a few colors) of it.
+- Indexed score: the leaderboard ranks by each painting's composite as a percentage of its target's own score in the Target column below, the same ceiling for every round. The target is scored against itself on the paintings' path at native size, 3 runs of 5 calls per judge, and the column is the mean of the 3 runs.
+- The target self-score is not a perfect 10. Shown the same image twice, Qwen3.5-9B answers 10 on nearly every call, Kimi-K3 gives 8 to 9, and GLM-5.3-Flash gives 5 to 6. A few single calls answer 1 or 3; the median of 5 calls absorbs them.
+
+| Subject | Target | Runs | Blurred | Posterized |
+|---|---:|---|---:|---:|
+| Hills | 8.43 | 8.54, 8.38, 8.38 | 3.48 | 5.10 |
+| France | 8.43 | 8.38, 8.21, 8.71 | 3.38 | 5.05 |
+| Ships | 8.76 | 9.04, 8.70, 8.54 | 3.74 | 4.77 |
+| Trumbull | 8.57 | 8.57, 8.57, 8.57 | 3.31 | 5.08 |
+
+The Blurred and Posterized columns are from the original controls run (one call per judge), kept as the check that each target beats its degraded copies. The earlier Target values (9.21, 6.88, 9.04, 8.90) came from that run and are replaced.
+
+- Retest: 10 paintings scored twice differed by 0.14 on average and 0.34 at most.
+- Cost: scoring the published runs took 4,189 judge calls and $19.95.
+
+## The progression check
+
+`scorer/progression.py` shows the judges one row of images: the target, then the painting at 10, 25, 50, 75 and 100% of its strokes. Each judge first asks whether this is the order and the kind of mark a person with a brush and pen would use, then scores each stage 1 to 5:
+
+- 5: unmistakably a person's painting in progress
+- 4: convincing with one small tell (a sign of machine rendering)
+- 3: plausible but a tell a viewer would notice
+- 2: mostly not, two or more tells
+- 1: a finished image being uncovered by a filter, mask, wipe or dissolve
+
+The tells it names include speckle trails, cut or scalloped wash edges, flat slabs standing in for a form, a region arriving finished while its neighbour is untouched, a travelling front or wipe, dark before light, and fine detail in the first 25%. The published runs used GLM-5.3-Flash and Qwen3.5-9B for this check. The mean of the 10% and 25% stages (`earlyMean`) feeds the cheat-risk score.
+
+## The cheat-risk score
+
+See [anti-cheat.md](anti-cheat.md#the-cheat-risk-score). A high score means a person reviews the try. It does not exclude it.

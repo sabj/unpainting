@@ -1,0 +1,12 @@
+{"subject":"sf","name":"South France",
+ "styleSelection":{"style":"urban-sketch","reason":"architectural lines and light wash suit the hilltop village composition",
+   "regions":{"sf.grass":{"style":"urban-sketch","reason":"pale field wash with minimal detail"},
+             "sf.trees":{"style":"urban-sketch","reason":"soft canopy shapes, cypress lines"},
+             "sf.buildings":{"style":"urban-sketch","reason":"structure and shadow planes on architecture"},
+             "sf.sky":{"style":"urban-sketch","reason":"pale graded background"}}},
+ "families":[{"id":"sf.grass","bounds":[0,0.5,1,1],"baseMove":"wet on dry","referenceCue":"pale green field, turning in middle distance"},
+             {"id":"sf.trees","bounds":[0,0.15,0.65,0.6],"baseMove":"wet on dry","referenceCue":"cypress and mixed trees, dark green"},
+             {"id":"sf.buildings","bounds":[0.65,0.3,1,0.8],"baseMove":"wet on dry","referenceCue":"terracotta buildings with shadow sides"},
+             {"id":"sf.sky","bounds":[0,0,1,0.4],"baseMove":"wet on dry","referenceCue":"pale blue sky"}],
+ "reserves":[{"reason":"brightest building façade","bounds":[0.75,0.45,0.95,0.65]},
+             {"reason":"grass field light patches","bounds":[0.2,0.55,0.4,0.75]}]}

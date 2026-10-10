@@ -1,0 +1,136 @@
+/* Shared frame for the Deconstructing Paint pages: the sub-navigation row,
+   the page header, the circled "i" details control and the control-row look.
+   The selectors here are class-scoped, so they win over a page's own
+   element styles for buttons and selects in a control row.
+
+   The nav row sits level with the floating return control (two 36px round
+   buttons at top/left 8px, injected into every experiment page) and starts
+   16px to its right. On narrow screens it drops below the control. */
+@font-face{font-family:'EB Garamond';font-style:normal;font-weight:400;font-display:block;src:url(fonts/eb-garamond-normal.woff2) format('woff2')}
+@font-face{font-family:'EB Garamond';font-style:italic;font-weight:400;font-display:block;src:url(fonts/eb-garamond-italic.woff2) format('woff2')}
+
+:root{
+  --paint-face:'EB Garamond',Georgia,serif;
+  --paint-ink:#39362f;
+  --paint-muted:#7b7166;
+  --paint-line:#39362f30;
+  --paint-accent:#99543a;
+  --paint-paper:#f6f3eb
+}
+
+/* Navigation */
+.paint-nav{
+  flex:none;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  column-gap:20px;
+  box-sizing:border-box;
+  width:100%;
+  min-height:52px;
+  margin:0;
+  padding:env(safe-area-inset-top) max(16px,env(safe-area-inset-right)) 0 max(104px,calc(env(safe-area-inset-left) + 96px));
+  font:400 16px/1.2 var(--paint-face);
+  letter-spacing:normal;
+  text-transform:none
+}
+.paint-nav a{
+  display:inline-flex;
+  align-items:center;
+  min-height:44px;
+  color:var(--paint-muted);
+  text-decoration:none;
+  text-underline-offset:.2em;
+  text-decoration-thickness:1px
+}
+.paint-nav a:hover{color:var(--paint-accent);text-decoration:underline}
+.paint-nav a:focus-visible{outline:2px solid var(--paint-accent);outline-offset:2px}
+.paint-nav a[aria-current=page]{color:var(--paint-ink);text-decoration:underline}
+@media(max-width:640px){
+  .paint-nav{
+    column-gap:14px;
+    min-height:40px;
+    padding-top:calc(max(8px,env(safe-area-inset-top)) + 44px);
+    padding-left:max(16px,env(safe-area-inset-left));
+    font-size:15px
+  }
+  .paint-nav a{min-height:40px}
+  .paint-lede{font-size:16.5px}
+}
+
+/* Page header: kicker, title with an optional details control, lede. The
+   hub uses the same header for each section, with an h2 in place of the h1. */
+.paint-head{margin:0 0 clamp(20px,3vw,28px);font-family:var(--paint-face);color:var(--paint-ink)}
+.paint-kicker{
+  margin:0 0 .35rem;
+  font:400 15px/1.3 var(--paint-face);
+  font-variant-caps:all-small-caps;
+  letter-spacing:.08em;
+  color:var(--paint-muted)
+}
+.paint-title{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px}
+.paint-head h1,.paint-head h2{margin:0;color:var(--paint-ink);font-family:var(--paint-face);font-weight:400;letter-spacing:normal;text-transform:none}
+.paint-head h1{font-size:clamp(2rem,4.4vw,2.8rem);line-height:1.1}
+.paint-head h2{font-size:clamp(1.5rem,3vw,1.9rem);line-height:1.15}
+.paint-lede{margin:.5rem 0 0;max-width:62ch;font:400 18px/1.45 var(--paint-face);color:var(--paint-muted)}
+.paint-lede a{color:inherit;text-underline-offset:.18em}
+
+/* The circled "i": a small details control that opens a short panel. */
+.paint-info{position:static;font:400 15px/1.45 var(--paint-face);color:var(--paint-ink)}
+.paint-info>summary{
+  display:grid;
+  place-items:center;
+  width:24px;
+  height:24px;
+  border:1px solid var(--paint-muted);
+  border-radius:50%;
+  color:var(--paint-muted);
+  font:italic 400 16px/1 var(--paint-face);
+  cursor:pointer;
+  list-style:none;
+  user-select:none;
+  position:relative
+}
+.paint-info>summary::-webkit-details-marker{display:none}
+.paint-info>summary::after{content:'';position:absolute;inset:-10px}
+.paint-info>summary:hover,.paint-info[open]>summary{border-color:var(--paint-accent);color:var(--paint-accent)}
+.paint-info>summary:focus-visible{outline:2px solid var(--paint-accent);outline-offset:2px}
+.paint-info-panel{
+  position:absolute;
+  z-index:20;
+  top:calc(100% + 8px);
+  left:0;
+  width:min(400px,calc(100vw - 32px));
+  padding:12px 14px;
+  border:1px solid var(--paint-line);
+  border-radius:3px;
+  background:#fbf9f4;
+  box-shadow:0 5px 18px #42372e18
+}
+.paint-info-panel p,.paint-info-panel ul{margin:0 0 .5rem}
+.paint-info-panel ul{padding-left:1.1rem}
+.paint-info-panel>:last-child{margin-bottom:0}
+.paint-info-panel a{color:inherit;text-underline-offset:.18em}
+
+/* One control-row look for every page: add class "paint-controls" to the
+   row. Buttons, selects and links share type, height and shape. */
+.paint-controls{font:400 16px/1.2 var(--paint-face);color:var(--paint-ink)}
+.paint-controls :is(button,select){
+  font:400 16px/1.2 var(--paint-face);
+  min-height:36px;
+  padding:4px 10px;
+  border:1px solid var(--paint-line);
+  border-radius:3px;
+  background:transparent;
+  color:var(--paint-ink);
+  letter-spacing:normal;
+  text-transform:none;
+  cursor:pointer
+}
+.paint-controls select{padding-right:26px;background:#fbf9f4}
+.paint-controls button:hover,.paint-controls select:hover{border-color:var(--paint-accent)}
+.paint-controls :is(button,select,a,summary):focus-visible{outline:2px solid var(--paint-accent);outline-offset:2px}
+.paint-controls button[aria-pressed=true]{background:var(--paint-ink);border-color:var(--paint-ink);color:var(--paint-paper)}
+.paint-controls label{font:400 16px/1.2 var(--paint-face);color:var(--paint-muted)}
+.paint-controls a{color:var(--paint-muted);font-size:15px;text-underline-offset:.18em}
+.paint-controls a:hover{color:var(--paint-accent)}

@@ -1,0 +1,6 @@
+{"subject":"EXAMPLE","name":"EXAMPLE",
+ "styleSelection":{"style":"precise-watercolor","reason":"value planes carry the form",
+   "regions":{"EXAMPLE.sky":{"style":"atmospheric-wet","reason":"soft graded sky"}}},
+ "families":[{"id":"EXAMPLE.sky","bounds":[0,0,1,0.45],"baseMove":"wet in wet","referenceCue":"pale graded sky"},
+             {"id":"EXAMPLE.sea","bounds":[0,0.45,1,1],"baseMove":"wet on dry","referenceCue":"darker sea, broken lights"}],
+ "reserves":[{"reason":"brightest cloud edge","bounds":[0.6,0.13,0.66,0.19]}]}

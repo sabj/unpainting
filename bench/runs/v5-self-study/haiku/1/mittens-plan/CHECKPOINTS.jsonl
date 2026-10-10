@@ -1,0 +1,9 @@
+{"t": "2026-10-09 15:42:25 PDT", "kind": "adopted", "modelMinutes": 3.79, "unanswered": []}
+{"t": "2026-10-09 15:44:11 PDT", "kind": "start", "modelMinutes": 3.74, "variant": "region_w13_lay2_ink3", "renderKey": "8776b15ece871dd90b557fadd2146ccc86591a79579d2e48aaea6f3efab83984"}
+{"t": "2026-10-09 15:46:22 PDT", "kind": "look", "modelMinutes": 3.95, "n": 1, "boundary": "0", "strokes": 0, "penLines": 35, "passesDone": 0, "passesPlanned": 16}
+{"t": "2026-10-09 15:46:34 PDT", "kind": "continue", "modelMinutes": 4.15, "boundary": "0", "stopAt": "closing", "strokes": 0}
+{"t": "2026-10-09 15:50:55 PDT", "kind": "look", "modelMinutes": 4.31, "n": 2, "boundary": "closing", "strokes": 2056, "penLines": 35, "passesDone": 23, "passesPlanned": 23}
+{"t": "2026-10-09 15:51:08 PDT", "kind": "continue", "modelMinutes": 4.53, "boundary": "closing", "stopAt": "end", "strokes": 2056}
+{"t": "2026-10-09 15:52:07 PDT", "kind": "finished", "modelMinutes": 4.53, "strokes": 2056}
+{"t": "2026-10-09 15:52:11 PDT", "kind": "look", "modelMinutes": 4.59, "n": 3, "boundary": "final"}
+{"t": "2026-10-09 15:52:31 PDT", "kind": "session-end", "modelMinutes": 4.93, "why": "you ended the session", "looks": 3, "revisions": 0}

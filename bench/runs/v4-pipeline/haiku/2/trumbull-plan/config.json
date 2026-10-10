@@ -1,0 +1,15 @@
+{
+  "subject": "trumbull",
+  "name": "Trumbull V4 try 2",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "sharp edges, light-to-dark layering carry the architectural form and material"
+  },
+  "families": [],
+  "reserves": [
+    {
+      "reason": "brightest cloud highlight area",
+      "bounds": [0.42, 0.03, 0.52, 0.07]
+    }
+  ]
+}

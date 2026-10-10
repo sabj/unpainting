@@ -1,0 +1,11 @@
+{
+  "subject": ["clothing", "head", "book", "hands"],
+  "parts": [
+    { "name": "clothing", "box": [0.4, 0.2, 0.86, 0.76] },
+    { "name": "chair", "box": [0.93, 0.3, 1.0, 0.72] },
+    { "name": "book", "box": [0.17, 0.48, 0.52, 0.7] },
+    { "name": "head", "box": [0.48, 0.05, 0.72, 0.42], "inPerson": true },
+    { "name": "hands", "box": [0.26, 0.6, 0.5, 0.74] },
+    { "name": "hands", "box": [0.5, 0.4, 0.6, 0.52] }
+  ]
+}

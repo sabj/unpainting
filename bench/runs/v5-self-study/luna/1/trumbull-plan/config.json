@@ -1,0 +1,42 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull V5 try 1",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Warm stone planes, crisp window and arch structure, and a blue sky with the form carried by transparent washes and selective sepia drawing.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0, 0, 1, 0.28],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected pale blue sky with broken white cloud flecks, bounded by the irregular roofline."
+    },
+    {
+      "id": "Y1.main-stone",
+      "bounds": [0.08, 0.02, 0.82, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit ochre central gable, tall left tower, arched openings, and broad pale facade planes."
+    },
+    {
+      "id": "Y1.receding-stone",
+      "bounds": [0.72, 0.18, 1, 0.95],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right-hand wing and side planes recede into cooler, darker stone and roof shadows."
+    },
+    {
+      "id": "Y1.foliage",
+      "bounds": [0.64, 0.55, 0.96, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "Irregular green tree crown in front of the right facade; connected leaf masses with light gaps."
+    },
+    {
+      "id": "Y1.street",
+      "bounds": [0, 0.72, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark signpost, traffic lights, cropped street edge, and small foreground stone details."
+    }
+  ],
+  "reserves": []
+}

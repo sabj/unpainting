@@ -1,0 +1,7 @@
+{"t": "2026-10-09 19:47:04 PDT", "kind": "start", "modelMinutes": 20.13, "variant": "region_w13_dk16_lw", "renderKey": "6a657a988aa4d2af1c29db5ee64b2456e5b43f35e19131ba142bd75adc5c74a1"}
+{"t": "2026-10-09 19:51:22 PDT", "kind": "look", "modelMinutes": 20.34, "n": 1, "boundary": "0", "strokes": 0, "penLines": 128, "passesDone": 0, "passesPlanned": 92}
+{"t": "2026-10-09 19:51:25 PDT", "kind": "look", "modelMinutes": 20.4, "n": 2, "boundary": "0", "strokes": 0, "penLines": 128, "passesDone": 0, "passesPlanned": 92}
+{"t": "2026-10-09 19:51:35 PDT", "kind": "continue", "modelMinutes": 20.56, "boundary": "0", "stopAt": 18, "strokes": 0}
+{"t": "2026-10-09 19:58:56 PDT", "kind": "look", "modelMinutes": 20.65, "n": 3, "boundary": "18", "strokes": 1338, "penLines": 128, "passesDone": 18, "passesPlanned": 92}
+{"t": "2026-10-09 19:59:07 PDT", "kind": "continue", "modelMinutes": 20.84, "boundary": "18", "stopAt": 60, "strokes": 1338}
+{"t": "2026-10-09 20:09:16 PDT", "kind": "session-end", "modelMinutes": 20.86, "why": "you ended the session", "looks": 3, "revisions": 0}

@@ -1,0 +1,19 @@
+{"t": "2026-10-09 13:59:41 PDT", "kind": "start", "modelMinutes": 9.6, "variant": "region_w13_lay2_cg10_dk12_noslane_acc3", "renderKey": "b24a949943b64b831dd12364339a6cfb62927e3cece4738b7eaa5588fba567ab"}
+{"t": "2026-10-09 14:01:04 PDT", "kind": "adopted", "modelMinutes": 10.95, "unanswered": []}
+{"t": "2026-10-09 14:06:06 PDT", "kind": "adopted", "modelMinutes": 11.45, "unanswered": []}
+{"t": "2026-10-09 14:09:37 PDT", "kind": "revise", "modelMinutes": 12.67, "boundary": "0", "revision": 1, "strokes": 0, "passesDone": 0, "changed": ["variant.txt"], "variant": "region_w13_lay2_cg10_dk12_noslane_acc3_hue"}
+{"t": "2026-10-09 14:11:01 PDT", "kind": "adopted", "modelMinutes": 13.65, "unanswered": []}
+{"t": "2026-10-09 14:13:03 PDT", "kind": "look", "modelMinutes": 13.39, "n": 1, "boundary": "6", "strokes": 24, "penLines": 0, "passesDone": 6, "passesPlanned": 55}
+{"t": "2026-10-09 14:17:34 PDT", "kind": "revise", "modelMinutes": 16.79, "boundary": "6", "revision": 2, "strokes": 24, "passesDone": 6, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w15_lay2_cg10_dk12_noslane_acc3_hue"}
+{"t": "2026-10-09 14:22:15 PDT", "kind": "adopted", "modelMinutes": 18.08, "unanswered": []}
+{"t": "2026-10-09 14:23:09 PDT", "kind": "adopted", "modelMinutes": 18.96, "unanswered": []}
+{"t": "2026-10-09 14:27:38 PDT", "kind": "look", "modelMinutes": 18.4, "n": 2, "boundary": "24", "strokes": 1580, "penLines": 0, "passesDone": 24, "passesPlanned": 55}
+{"t": "2026-10-09 14:29:00 PDT", "kind": "continue", "modelMinutes": 19.78, "boundary": "24", "stopAt": 42, "strokes": 1580}
+{"t": "2026-10-09 14:30:04 PDT", "kind": "adopted", "modelMinutes": 19.78, "unanswered": ["29"]}
+{"t": "2026-10-09 14:35:23 PDT", "kind": "look", "modelMinutes": 20.19, "n": 3, "boundary": "42", "strokes": 2978, "penLines": 0, "passesDone": 42, "passesPlanned": 55}
+{"t": "2026-10-09 14:37:18 PDT", "kind": "continue", "modelMinutes": 22.1, "boundary": "42", "stopAt": 54, "strokes": 2978}
+{"t": "2026-10-09 14:41:14 PDT", "kind": "look", "modelMinutes": 22.39, "n": 4, "boundary": "54", "strokes": 3830, "penLines": 0, "passesDone": 54, "passesPlanned": 55}
+{"t": "2026-10-09 14:49:52 PDT", "kind": "revise", "modelMinutes": 26.6, "boundary": "54", "revision": 3, "strokes": 3830, "passesDone": 54, "changed": ["extra-args.json"], "variant": "region_w15_lay2_cg10_dk12_noslane_acc3_hue"}
+{"t": "2026-10-09 14:58:18 PDT", "kind": "finished", "modelMinutes": 28.06, "strokes": 6026}
+{"t": "2026-10-09 14:58:22 PDT", "kind": "look", "modelMinutes": 28.13, "n": 5, "boundary": "final"}
+{"t": "2026-10-09 14:58:36 PDT", "kind": "session-end", "modelMinutes": 28.36, "why": "you ended the session", "looks": 5, "revisions": 3}

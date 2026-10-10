@@ -1,0 +1,14 @@
+{"subject":"hills","name":"Hills",
+ "styleSelection":{"style":"ink-and-wash","reason":"Loose ink and wash: dark oak crowns are connected mixed-dark washes with broken pen contours; the bright meadow is a soft pale wash with the paper kept for the track and light flecks.",
+   "regions":{}},
+ "families":[
+  {"id":"HILLS.meadow-low","bounds":[0.42,0.5,1,1],"baseMove":"wet on wet","referenceCue":"bright yellow-green meadow slope: one soft connected pale wash, mottled hansa and sap green, cream paper flecks at the tree edges"},
+  {"id":"HILLS.meadow-high","bounds":[0.45,0,1,0.28],"baseMove":"wet on wet","referenceCue":"upper meadow strips and the pale track at the top: soft yellow-green wash, lighter toward the top edge"},
+  {"id":"HILLS.meadow-left","bounds":[0.15,0.12,0.5,0.42],"baseMove":"wet on wet","referenceCue":"yellow-green strip of meadow beside the winding track, warm and light"},
+  {"id":"HILLS.wood-left","bounds":[0,0,0.4,1],"baseMove":"wet on wet","referenceCue":"grey-green and dark blue-green oak crowns, rounded and clustered; a soft pale underwash first, then darker crowns of ultramarine, sap green and sepia on dry paper with crisp upper edges"},
+  {"id":"HILLS.wood-right","bounds":[0.5,0.2,1,0.7],"baseMove":"wet on dry","referenceCue":"deep navy-green wooded gully and crowns; connected dark masses with paper-light gaps and sharp crown edges"}
+ ],
+ "reserves":[
+  {"reason":"cream core of the lower track, kept as bare paper","bounds":[0.475,0.66,0.515,0.8]},
+  {"reason":"pale track strip upper left, kept light","bounds":[0.2,0.2,0.235,0.3]}
+ ]}

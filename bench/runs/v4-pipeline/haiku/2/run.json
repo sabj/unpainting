@@ -1,0 +1,813 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V4",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "haiku",
+  "name": "Haiku 4.5",
+  "id": "claude-haiku-4-5-20251001",
+  "effort": "n/a",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "providers": [
+   "together",
+   "openrouter (zero data retention)"
+  ],
+  "note": null
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": null,
+  "minutesPerCrop": null,
+  "sessionCapMin": 85,
+  "modelMinutesCap": 85,
+  "lookBudget": null,
+  "selfView": "gentle",
+  "targetGuard": "gentle",
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false,
+  "paintWidth": {
+   "hills": 1224,
+   "south-france": 1216,
+   "sargent": 1200,
+   "trumbull": 1200,
+   "mittens": 1200
+  },
+  "painter": "tools/paint-plate.mjs",
+  "machine": "cloud GPU (NVIDIA L40S)"
+ },
+ "session": {
+  "minutes": 65.53,
+  "modelMinutes": 36.79,
+  "tokens": 17903147,
+  "costUSD": null,
+  "estCostUSD": 2.935,
+  "usage": {
+   "input": 2626,
+   "cacheWrite1h": 346719,
+   "cacheWrite5m": 0,
+   "cacheRead": 17455070,
+   "output": 98732
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 968,
+    "mmPerCell": 0.1291
+   },
+   "strokeLog": null,
+   "strokes": 4740,
+   "strokesBasis": "brush strokes plus pen lines",
+   "minutes": 12.99,
+   "smallShare": 0.003,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.97,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 7.62,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 1.67,
+     "marks_texture": 2.33,
+     "classic_value": 5.37,
+     "classic_edge": 8.21,
+     "classic_landmark": null,
+     "classic_marks": 9.29
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 1
+    },
+    "callsPerModel": 5,
+    "judgeProviders": {
+     "moonshotai/Kimi-K3": {
+      "openrouter:Wafer": 5
+     },
+     "zai-org/GLM-5.3-Flash": {
+      "openrouter:OpenInference": 5
+     },
+     "Qwen/Qwen3.5-9B": {
+      "openrouter:Parasail": 2,
+      "openrouter:SiliconFlow": 2,
+      "openrouter:Together": 1
+     }
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 306,
+     "h": 242,
+     "from": [
+      1224,
+      968
+     ],
+     "resize": "Lanczos to the target's native size"
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2.5,
+     "75": 2.5,
+     "100": 2
+    },
+    "earlyMean": 2,
+    "mean": 2.2,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "b": 6,
+     "c": 2,
+     "f": 1,
+     "h": 3,
+     "i": 1,
+     "l": 1,
+     "m": 1
+    },
+    "tellsText": {
+     "b": "cut or scalloped wash edges, round holes",
+     "c": "flat evenly-toned slabs standing in for a form",
+     "f": "a region arriving finished while its neighbour is untouched",
+     "h": "no change from the previous snapshot",
+     "i": "lines that do not describe the subject",
+     "l": "fine detail already present in the first 25%",
+     "m": "a pixel-grid or stair-step fill"
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence opens with unrelated pink splatter over a flat gray slab, dumps dense dark foliage texture early while lower regions stay flat, and a hard-edged rectangular white mask plus an unpainted bottom strip persist through every stage including 100%, reading as a stroke-optimization renderer rather than a painter's order.",
+     "Qwen/Qwen3.5-9B": "The sequence is not a painting in progress; the first panel is a color-mismatched mask, and the subsequent panels are identical static images."
+    },
+    "judgeErrors": {
+     "Qwen/Qwen3.5-9B": [
+      "TimeoutError('The read operation timed out')"
+     ]
+    },
+    "judgeProviders": {}
+   },
+   "cheatRisk": {
+    "score": 0.23,
+    "level": "low",
+    "parts": {
+     "progression": 0.5,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.457,
+    "hfCeiling": 0.645,
+    "flags": [
+     "darks first"
+    ],
+    "guardViolations": 0
+   },
+   "pipeline": {
+    "outcome": "painted",
+    "paintedBy": "harness (no painting started in the session): no stops",
+    "plan": "hills-plan",
+    "tokens": "region_w13_lay2_sg12",
+    "layering": null,
+    "starts": 0,
+    "looks": 0,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 5.04,
+    "cappedAtModelTime": false,
+    "sessionEnd": null,
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0
+     }
+    ],
+    "repairTurns": [],
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "foliagerefit"
+     ],
+     "template": [],
+     "label": [
+      "valueversion",
+      "valuevariant",
+      "inkcolour",
+      "inkfast",
+      "texvariety"
+     ],
+     "unknown": []
+    },
+    "droppedPassages": null,
+    "paintExit": 3,
+    "segments": 1,
+    "failure": null,
+    "renderRefusal": null,
+    "renderRefusalReopened": null,
+    "paintRestarts": 0,
+    "machineLost": 0,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "feedbackNote": null,
+    "linkedFrom": null
+   },
+   "scoreOld": {
+    "composite": 4.13,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 1.33,
+    "classic": 6.93,
+    "criteria": {
+     "composition_values": 2.33,
+     "edges_detail": 1.33,
+     "marks_texture": 1.33,
+     "classic_value": 5.38,
+     "classic_edge": 8.46,
+     "classic_landmark": null,
+     "classic_marks": 6.96
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 1
+    },
+    "callsPerModel": 5,
+    "judgeProviders": {},
+    "protocol": "720px"
+   }
+  },
+  "sargent": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 976,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": 6597,
+   "strokesBasis": "brush strokes plus pen lines",
+   "minutes": 14.61,
+   "smallShare": 0,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.19,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 7.05,
+    "criteria": {
+     "composition_values": 5.67,
+     "edges_detail": 3,
+     "marks_texture": 1.67,
+     "classic_value": 5.68,
+     "classic_edge": 8.69,
+     "classic_landmark": null,
+     "classic_marks": 6.78
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "judgeProviders": {
+     "moonshotai/Kimi-K3": {
+      "openrouter:Moonshot AI": 5
+     },
+     "zai-org/GLM-5.3-Flash": {
+      "openrouter:Phala": 5
+     },
+     "Qwen/Qwen3.5-9B": {
+      "openrouter:Venice": 2,
+      "openrouter:SiliconFlow": 3
+     }
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 244,
+     "from": [
+      1200,
+      976
+     ],
+     "resize": "Lanczos to the target's native size"
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2.5,
+     "25": 2.5,
+     "50": 3,
+     "75": 3.5,
+     "100": 4.5
+    },
+    "earlyMean": 2.5,
+    "mean": 3.2,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "a": 4,
+     "c": 3,
+     "e": 2,
+     "h": 1,
+     "j": 1,
+     "m": 1
+    },
+    "tellsText": {
+     "a": "speckle or dotted trails instead of drawn lines",
+     "c": "flat evenly-toned slabs standing in for a form",
+     "e": "the whole sheet at one faint value, as if faded in",
+     "h": "no change from the previous snapshot",
+     "j": "texture arriving as a dump, everything sharpening at once late",
+     "m": "a pixel-grid or stair-step fill"
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The light-to-dark sequence of pale block-in washes, then mid-tones, then darks and detail reads like a watercolorist's order, but the flat slabby gray hull at 25% and the granular speckle texture arriving in bulk from 50% onward are machine-like tells.",
+     "Qwen/Qwen3.5-9B": "The sequence mimics an AI upscaling or 'fade-in' effect, starting with a faint wash and resolving into blocky patches before sharpening to the final image, rather than a human brush process."
+    },
+    "judgeErrors": {
+     "Qwen/Qwen3.5-9B": [
+      "ValueError('no JSON object in the reply: \\'The user wants me to analyze a sequence of 6 images representing a painting process.\\\\nThe images are labeled \"Target\", \"1\\'')"
+     ]
+    },
+    "judgeProviders": {}
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.38,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   },
+   "pipeline": {
+    "outcome": "painted",
+    "paintedBy": "harness (no painting started in the session): no stops",
+    "plan": "sargent-plan",
+    "tokens": "region_w13_lay2_noslane",
+    "layering": null,
+    "starts": 0,
+    "looks": 0,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": null,
+    "cappedAtModelTime": false,
+    "sessionEnd": null,
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0
+     }
+    ],
+    "repairTurns": [],
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "foliagerefit"
+     ],
+     "template": [],
+     "label": [
+      "valueversion",
+      "valuevariant",
+      "inkcolour",
+      "inkfast",
+      "texvariety"
+     ],
+     "unknown": []
+    },
+    "droppedPassages": null,
+    "paintExit": 3,
+    "segments": 1,
+    "failure": null,
+    "renderRefusal": null,
+    "renderRefusalReopened": null,
+    "paintRestarts": 0,
+    "machineLost": 0,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "feedbackNote": null,
+    "linkedFrom": null
+   },
+   "scoreOld": {
+    "composite": 4.67,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 7,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 2.33,
+     "marks_texture": 1.33,
+     "classic_value": 5.68,
+     "classic_edge": 8.88,
+     "classic_landmark": null,
+     "classic_marks": 6.44
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "judgeProviders": {},
+    "protocol": "720px"
+   }
+  },
+  "mittens": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 1036,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": 2240,
+   "strokesBasis": "brush strokes plus pen lines",
+   "minutes": 5.18,
+   "smallShare": 0.001,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.53,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 8.06,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 2.67,
+     "marks_texture": 2.33,
+     "classic_value": 6.68,
+     "classic_edge": 8.27,
+     "classic_landmark": null,
+     "classic_marks": 9.22
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "judgeProviders": {
+     "moonshotai/Kimi-K3": {
+      "Wafer": 5
+     },
+     "zai-org/GLM-5.3-Flash": {
+      "OpenInference": 5
+     },
+     "Qwen/Qwen3.5-9B": {
+      "DeepInfra": 1,
+      "Parasail": 2,
+      "Together": 1,
+      "Venice": 1
+     }
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 259,
+     "from": [
+      1200,
+      1036
+     ],
+     "resize": "Lanczos to the target's native size"
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 1,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 2
+    },
+    "earlyMean": 1,
+    "mean": 1.4,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "b": 5,
+     "e": 8,
+     "j": 2,
+     "l": 2
+    },
+    "tellsText": {
+     "b": "cut or scalloped wash edges, round holes",
+     "e": "the whole sheet at one faint value, as if faded in",
+     "j": "texture arriving as a dump, everything sharpening at once late",
+     "l": "fine detail already present in the first 25%"
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Every stage shows the entire finished scene fading up in value together — facial detail already present at 10% and persistent white rectangular mask holes — a filter/dissolve reveal rather than a painter building forms locally.",
+     "Qwen/Qwen3.5-9B": "The sequence shows a single image fading in from low to high opacity rather than a painting process accumulating strokes."
+    },
+    "judgeErrors": null,
+    "judgeProviders": {}
+   },
+   "cheatRisk": {
+    "score": 0.23,
+    "level": "low",
+    "parts": {
+     "progression": 0.5,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.412,
+    "hfCeiling": 0.645,
+    "flags": [
+     "darks first"
+    ],
+    "guardViolations": 0
+   },
+   "pipeline": {
+    "outcome": "painted",
+    "paintedBy": "harness (no painting started in the session): no stops",
+    "plan": "mittens-plan",
+    "tokens": "region_w13_lay2_ink2",
+    "layering": null,
+    "starts": 0,
+    "looks": 0,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": null,
+    "cappedAtModelTime": false,
+    "sessionEnd": null,
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0
+     }
+    ],
+    "repairTurns": [],
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "foliagerefit",
+      "skyfloc"
+     ],
+     "template": [
+      "skylanemm"
+     ],
+     "label": [
+      "valueversion",
+      "valuevariant",
+      "inkcolour",
+      "inkfast",
+      "texvariety"
+     ],
+     "unknown": []
+    },
+    "droppedPassages": null,
+    "paintExit": 3,
+    "segments": 1,
+    "failure": null,
+    "renderRefusal": null,
+    "renderRefusalReopened": null,
+    "paintRestarts": 0,
+    "machineLost": 0,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "feedbackNote": null,
+    "linkedFrom": null
+   }
+  }
+ },
+ "unpainted": {
+  "south-france": {
+   "pipeline": {
+    "outcome": "render-failed",
+    "paintedBy": "harness (no painting started in the session): no stops",
+    "plan": "south-france-plan",
+    "tokens": "region_w13_lay3_ink4_rec2x_rcl_sky3_leaf_sep8_cg13_vio_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_dwg200_tp2_shs",
+    "layering": null,
+    "starts": 0,
+    "looks": 0,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 9.24,
+    "cappedAtModelTime": false,
+    "sessionEnd": null,
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0
+     },
+     {
+      "k": 2,
+      "repair": true,
+      "exit": 0
+     }
+    ],
+    "repairTurns": [
+     "plan refused"
+    ],
+    "optionCheck": {
+     "model": [
+      "foliagerefit"
+     ],
+     "base": [],
+     "template": [
+      "skylanemm"
+     ],
+     "label": [
+      "texvariety",
+      "valueversion",
+      "valuevariant",
+      "inkcolour",
+      "inkfast"
+     ],
+     "unknown": []
+    },
+    "droppedPassages": null,
+    "paintExit": 3,
+    "segments": 1,
+    "failure": {
+     "failures": [
+      {
+       "code": 4,
+       "reason": "options the plan chose were read by nothing: --foliagerefit"
+      }
+     ]
+    },
+    "renderRefusal": null,
+    "renderRefusalReopened": null,
+    "paintRestarts": 0,
+    "machineLost": 0,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "feedbackNote": null,
+    "linkedFrom": null
+   }
+  },
+  "trumbull": {
+   "pipeline": {
+    "outcome": "plan-refused",
+    "paintedBy": null,
+    "plan": "trumbull-plan",
+    "tokens": "region_w13_lay2",
+    "layering": null,
+    "starts": 0,
+    "looks": 0,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 22.51,
+    "cappedAtModelTime": false,
+    "sessionEnd": null,
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0
+     },
+     {
+      "k": 2,
+      "repair": true,
+      "exit": 0
+     }
+    ],
+    "repairTurns": [
+     "plan refused"
+    ],
+    "optionCheck": null,
+    "droppedPassages": null,
+    "paintExit": null,
+    "segments": 0,
+    "failure": {
+     "failures": [
+      {
+       "reason": "{\"preview\":\"failed\",\"exit\":1,\"error\":\"Error: compiled band-1 mask contains unsupported axis-aligned seams\"}"
+      },
+      {
+       "reason": "straight edges with no target edge under them (value-plan cells): [{\"pass\":\"light/b1/p0/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p1/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p2/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p3/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p4/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p5/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p6/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105},{\"pass\":\"light/b1/p7/r4/s9\",\"axis\":\"horizontal\",\"at\":31,\"start\":504,\"length\":105}]"
+      },
+      {
+       "reason": "REFUSED (value-plan preview failed; full log: work/w4/BENCHTRUMBULL-region/compile-preview.log)"
+      }
+     ]
+    },
+    "renderRefusal": null,
+    "renderRefusalReopened": null,
+    "paintRestarts": 0,
+    "machineLost": 0,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "feedbackNote": null,
+    "linkedFrom": null
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": null,
+  "partialComposite": 5.23,
+  "cropsScored": 3,
+  "complete": false,
+  "compositeOld": null,
+  "partialCompositeOld": 4.4,
+  "note": "Rescored 2026-10-10 at the target's native size: the 1224 px render Lanczos-downscaled to the target crop's pixels, scored by bench-v3-median5 as V1-V3 paintings are. scoreOld is the earlier score of a 720 px upscale-path input."
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.23,
+   "level": "low",
+   "basis": "highest painting (hills), from the painter's cheat-risk record",
+   "parts": {
+    "progression": 0.5,
+    "copy": 0,
+    "small": 0,
+    "pixelFit": 0
+   }
+  },
+  "progressionRisk": {
+   "score": 0.5,
+   "level": "medium",
+   "basis": "highest progression part of any painting"
+  },
+  "review": null
+ },
+ "complete": false,
+ "judgeVersion": "J1"
+}

@@ -1,0 +1,22 @@
+{"t": "2026-10-09 19:59:30 PDT", "kind": "start-refused", "modelMinutes": 8.39, "reasons": ["{\"preview\":\"failed\",\"exit\":137,\"error\":\"\"}", "REFUSED (value-plan preview failed; full log: work/w4/BENCHTRUMBULL-region/compile-preview.log)"]}
+{"t": "2026-10-09 20:11:13 PDT", "kind": "start", "modelMinutes": 13.04, "variant": "region_w13_sk1_blk40_bka14_dwg140_lit12_lw", "renderKey": "9974f5a0d5b9134b7e9703288306e983e26088ec50872afd49d34e1156a56ba6"}
+{"t": "2026-10-09 20:14:12 PDT", "kind": "look", "modelMinutes": 13.88, "n": 1, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 81}
+{"t": "2026-10-09 20:14:38 PDT", "kind": "continue", "modelMinutes": 14.31, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 20:15:33 PDT", "kind": "look", "modelMinutes": 14.37, "n": 2, "boundary": "1", "strokes": 9, "penLines": 0, "passesDone": 1, "passesPlanned": 81}
+{"t": "2026-10-09 20:31:03 PDT", "kind": "revise", "modelMinutes": 18.85, "boundary": "1", "revision": 1, "strokes": 9, "passesDone": 1, "changed": ["variant.txt"], "variant": "region_w13_sk1_blk40_bka14_dwg140_lit12_lw_spl9_sml60"}
+{"t": "2026-10-09 20:35:03 PDT", "kind": "restart", "modelMinutes": 20.91, "n": 1}
+{"t": "2026-10-09 20:43:22 PDT", "kind": "start", "modelMinutes": 21.95, "variant": "region_w13_sk1_blk40_bka14_dwg140_lit12_lw_spl9_sml60", "renderKey": "60a897540fcd023057151bf8033ed4a64d3246d53b49d98ee3dae678fc4d05b7"}
+{"t": "2026-10-09 20:46:09 PDT", "kind": "continue", "modelMinutes": 22.63, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 20:47:09 PDT", "kind": "look", "modelMinutes": 22.96, "n": 3, "boundary": "1", "strokes": 306, "penLines": 0, "passesDone": 1, "passesPlanned": 81}
+{"t": "2026-10-09 20:48:09 PDT", "kind": "continue", "modelMinutes": 23.97, "boundary": "1", "stopAt": 16, "strokes": 306}
+{"t": "2026-10-09 20:55:28 PDT", "kind": "look", "modelMinutes": 24.48, "n": 4, "boundary": "16", "strokes": 3298, "penLines": 0, "passesDone": 16, "passesPlanned": 81}
+{"t": "2026-10-09 20:56:33 PDT", "kind": "continue", "modelMinutes": 25.57, "boundary": "16", "stopAt": 29, "strokes": 3298}
+{"t": "2026-10-09 21:00:06 PDT", "kind": "look", "modelMinutes": 25.93, "n": 5, "boundary": "29", "strokes": 3923, "penLines": 0, "passesDone": 29, "passesPlanned": 81}
+{"t": "2026-10-09 21:04:00 PDT", "kind": "revise", "modelMinutes": 28.01, "boundary": "29", "revision": 1, "strokes": 3923, "passesDone": 29, "changed": ["variant.txt"], "variant": "region_w13_sk1_blk40_bka14_dwg140_lit12_lw_spl5_sml90"}
+{"t": "2026-10-09 21:13:13 PDT", "kind": "look", "modelMinutes": 28.6, "n": 6, "boundary": "42", "strokes": 6270, "penLines": 0, "passesDone": 42, "passesPlanned": 81}
+{"t": "2026-10-09 21:15:08 PDT", "kind": "continue", "modelMinutes": 30.51, "boundary": "42", "stopAt": "closing", "strokes": 6270}
+{"t": "2026-10-09 21:45:15 PDT", "kind": "look", "modelMinutes": 32.82, "n": 7, "boundary": "closing", "strokes": 16116, "penLines": 0, "passesDone": 98, "passesPlanned": 98}
+{"t": "2026-10-09 21:45:52 PDT", "kind": "continue", "modelMinutes": 33.43, "boundary": "closing", "stopAt": "end", "strokes": 16116}
+{"t": "2026-10-09 21:48:25 PDT", "kind": "finished", "modelMinutes": 33.64, "strokes": 16116}
+{"t": "2026-10-09 21:48:35 PDT", "kind": "look", "modelMinutes": 33.81, "n": 8, "boundary": "final"}
+{"t": "2026-10-09 21:48:54 PDT", "kind": "session-end", "modelMinutes": 34.12, "why": "you ended the session", "looks": 8, "revisions": 1}

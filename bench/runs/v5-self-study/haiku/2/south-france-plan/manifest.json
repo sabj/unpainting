@@ -1,0 +1,47 @@
+{
+ "note": "files the model left or changed in bench/ and the region dir (seeded files omitted)",
+ "files": {
+  "bench/variant.txt": {
+   "sha256": "2862317027f7d5874d899f3d0a6f8ce93cc30692882fbe94cbcac8d7c06810f5",
+   "bytes": 20,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/PLAN.md": {
+   "sha256": "dc422d3f57d067c33e1f564a9231600b981065f28831d9c76f0beffd2500b078",
+   "bytes": 5866,
+   "seeded": false,
+   "changed": false
+  },
+  "bench/SELF-REVIEW.md": {
+   "sha256": "79f86b756a3f8afd12088a9ee2a7496980dffbf9fd1ce6484380c89b6a741ed7",
+   "bytes": 3101,
+   "seeded": false,
+   "changed": false
+  },
+  "region/config.json": {
+   "sha256": "8716f43d38ee6654f10a7edacde48fe6465b966a32598d90c5ddbafdf2720d1b",
+   "bytes": 1141,
+   "seeded": false,
+   "changed": false
+  },
+  "region/closing-lines.json": {
+   "sha256": "9a5d856c11314ca09a85c6942f21adfd88f1f70c4e50f2677108f0cdb92b4f07",
+   "bytes": 1138,
+   "seeded": false,
+   "changed": false
+  },
+  "region/opening-lines.json": {
+   "sha256": "81709996301753d538a6165e514b5003ed526e705dc4d92545e237610e1bf1a6",
+   "bytes": 68515,
+   "seeded": false,
+   "changed": false
+  },
+  "region/closingink-lines.json": {
+   "sha256": "d6013f1618bf781f7b33b89a2e7f51363e69c57877a42f798505c756f9175308",
+   "bytes": 1094,
+   "seeded": false,
+   "changed": false
+  }
+ }
+}

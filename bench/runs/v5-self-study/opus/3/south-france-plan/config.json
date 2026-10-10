@@ -1,0 +1,100 @@
+{
+ "subject": "SF",
+ "name": "South France hillside village",
+ "styleSelection": {
+  "style": "urban-sketch",
+  "reason": "Requested urban sketch: a readable black pen drawing (0.5-0.6 mm nib) carries the houses, cypresses, pine and tree masses; few pale local-colour washes in big connected shapes; paper left between masses and at the sheet edge",
+  "regions": {}
+ },
+ "families": [
+  {
+   "id": "SF.village-focal",
+   "bounds": [
+    0.66,
+    0.33,
+    0.975,
+    0.82
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "three stone tower houses, terracotta roofs, violet-grey shadow sides, dark eaves and windows; focal point"
+  },
+  {
+   "id": "SF.village-upper",
+   "bounds": [
+    0.36,
+    0,
+    0.79,
+    0.23
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "upper village houses and cypresses, paler and smaller"
+  },
+  {
+   "id": "SF.distant-hills",
+   "bounds": [
+    0.79,
+    0,
+    1,
+    0.14
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "blue-green distant hills, palest and coolest"
+  },
+  {
+   "id": "SF.terraces",
+   "bounds": [
+    0,
+    0,
+    0.36,
+    0.44
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "sunlit ochre terraces and walls, the lightest warm plane"
+  },
+  {
+   "id": "SF.olive-slope",
+   "bounds": [
+    0.35,
+    0.23,
+    0.66,
+    0.82
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "grey-green olive and oak masses, lit tops, darker shadow sides"
+  },
+  {
+   "id": "SF.pine-foreground",
+   "bounds": [
+    0.13,
+    0.5,
+    0.47,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "yellow-green foreground pine, dark trunk and rising branches"
+  },
+  {
+   "id": "SF.left-slope",
+   "bounds": [
+    0,
+    0.44,
+    0.13,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "olive trees on ochre ground, small red roof below"
+  },
+  {
+   "id": "SF.lower-right",
+   "bounds": [
+    0.47,
+    0.82,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "foreground shrubs and the pale path"
+  }
+ ],
+ "reserves": []
+}

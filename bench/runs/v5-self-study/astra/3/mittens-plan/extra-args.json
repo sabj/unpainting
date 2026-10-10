@@ -1,0 +1,22 @@
+[
+  "--paints",
+  "ochre,rawsienna,sienna,paynes",
+  "--shaperefit",
+  "2",
+  "--openingpressure",
+  "0.30",
+  "--closingpressure",
+  "0.34",
+  "--drawwant",
+  "0.75",
+  "--drawstroke",
+  "0.30",
+  "--touchgain",
+  "0.20",
+  "--softarcs",
+  "18",
+  "--softarclen",
+  "64",
+  "--softmm",
+  "0.45"
+]

@@ -1,0 +1,36 @@
+{
+  "subject": "mittens",
+  "name": "Mittens (cat and man, watercolor portrait sketch)",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Mostly bare paper with a few painted value planes; dry focal edges at the eyes, brows and nostrils; fine pen lines carry whiskers, lids and curls rather than ink filling any mass.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat-head",
+      "bounds": [0, 0, 0.52, 0.56],
+      "baseMove": "wet on dry",
+      "referenceCue": "orange tabby head tipped up: broken orange and brown patches over white fur, green eye under a dark upper lid, white muzzle, ears with brown inner tone; pale and mostly paper between the patches"
+    },
+    {
+      "id": "mittens.cat-body",
+      "bounds": [0, 0.5, 0.55, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "faded chest and shoulder: ragged vertical strips of pale orange on the left and brown patches against the man's cheek, large white paper gaps, soft lost edges"
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [0.49, 0.2, 1, 0.62],
+      "baseMove": "wet on dry",
+      "referenceCue": "dark blue-grey curly hair as one mottled mass: lighter grey in the lit tufts, darkest at the temple and the hairline, ragged dry-brush edge with white paper flecks"
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [0.5, 0.42, 0.95, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "pale warm skin that is mostly paper; sepia shadow along the left cheek and jaw, dark brown brows and upper lids, small eyes, nostril darks, stubble tone around the mouth"
+    }
+  ],
+  "reserves": []
+}

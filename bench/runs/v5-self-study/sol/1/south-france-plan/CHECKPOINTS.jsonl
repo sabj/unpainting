@@ -1,0 +1,18 @@
+{"t": "2026-10-09 15:50:23 PDT", "kind": "start-refused", "modelMinutes": 5.63, "reasons": ["{\"preview\":\"failed\",\"exit\":143,\"error\":\"\"}", "REFUSED (value-plan preview failed; full log: work/w4/BENCHSF-region/compile-preview.log)"]}
+{"t": "2026-10-09 15:54:38 PDT", "kind": "start", "modelMinutes": 6.54, "variant": "region_w13_dk10_sg8", "renderKey": "a6b06d1c50e4c31188e57febc957a0c555e3deb2c7becdf78705344f200f558e"}
+{"t": "2026-10-09 15:57:36 PDT", "kind": "adopted", "modelMinutes": 8.01, "unanswered": []}
+{"t": "2026-10-09 16:31:35 PDT", "kind": "look", "modelMinutes": 10.21, "n": 1, "boundary": "0", "strokes": 0, "penLines": 55, "passesDone": 0, "passesPlanned": 28}
+{"t": "2026-10-09 16:32:06 PDT", "kind": "continue", "modelMinutes": 10.72, "boundary": "0", "stopAt": 3, "strokes": 0}
+{"t": "2026-10-09 16:34:20 PDT", "kind": "look", "modelMinutes": 11.0, "n": 2, "boundary": "3", "strokes": 247, "penLines": 55, "passesDone": 3, "passesPlanned": 28}
+{"t": "2026-10-09 17:01:12 PDT", "kind": "revise", "modelMinutes": 16.19, "boundary": "3", "revision": 1, "strokes": 247, "passesDone": 3, "changed": ["variant.txt"], "variant": "region_w13_dk10_sg8_spl6_sml20_wre10"}
+{"t": "2026-10-09 17:07:17 PDT", "kind": "look", "modelMinutes": 17.47, "n": 3, "boundary": "6", "strokes": 1744, "penLines": 55, "passesDone": 6, "passesPlanned": 28}
+{"t": "2026-10-09 17:29:08 PDT", "kind": "revise", "modelMinutes": 24.33, "boundary": "6", "revision": 2, "strokes": 1744, "passesDone": 6, "changed": ["closing-lines.json", "extra-args.json", "variant.txt"], "variant": "region_w13_dk10_sg8"}
+{"t": "2026-10-09 17:44:15 PDT", "kind": "look", "modelMinutes": 26.49, "n": 4, "boundary": "9", "strokes": 7171, "penLines": 55, "passesDone": 9, "passesPlanned": 27}
+{"t": "2026-10-09 18:11:12 PDT", "kind": "revise", "modelMinutes": 30.1, "boundary": "9", "revision": 3, "strokes": 7171, "passesDone": 9, "changed": ["closing-lines.json"], "variant": "region_w13_dk10_sg8"}
+{"t": "2026-10-09 18:47:35 PDT", "kind": "look", "modelMinutes": 33.01, "n": 5, "boundary": "19", "strokes": 23598, "penLines": 55, "passesDone": 19, "passesPlanned": 27}
+{"t": "2026-10-09 19:14:10 PDT", "kind": "revise", "modelMinutes": 38.77, "boundary": "19", "revision": 4, "strokes": 23598, "passesDone": 19, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w13_dk3_sg8"}
+{"t": "2026-10-09 19:42:30 PDT", "kind": "look", "modelMinutes": 42.21, "n": 6, "boundary": "closing", "strokes": 38849, "penLines": 55, "passesDone": 42, "passesPlanned": 42}
+{"t": "2026-10-09 19:44:01 PDT", "kind": "continue", "modelMinutes": 43.74, "boundary": "closing", "stopAt": "end", "strokes": 38849}
+{"t": "2026-10-09 19:45:27 PDT", "kind": "finished", "modelMinutes": 43.73, "strokes": 38849}
+{"t": "2026-10-09 19:45:36 PDT", "kind": "look", "modelMinutes": 43.88, "n": 7, "boundary": "final"}
+{"t": "2026-10-09 19:46:02 PDT", "kind": "session-end", "modelMinutes": 44.32, "why": "you ended the session", "looks": 7, "revisions": 4}

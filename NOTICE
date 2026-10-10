@@ -1,0 +1,140 @@
+Notice on images and video
+
+Code: MIT (LICENSE). Images and video: below. Third-party code and
+credits: THIRD_PARTY_NOTICES.md.
+
+
+1. Sam Jackson's photos and paintings made from them: noncommercial use
+
+   Copyright (c) 2026 Sam Jackson. Free for noncommercial use related to
+   unpainting. Ask for commercial use. Credit: photo by Sam Jackson,
+   painted by unpainting.
+
+   docs/img/pipeline-map.png
+     Pipeline map, made from Sam Jackson's beach study and simulated
+     strokes. Card 2 shows a White Ships run (public-domain target).
+   docs/img/example-luce.webp
+   docs/img/progress-luce.webp
+     Luce Hall, Yale University: photograph, stylized target and saved
+     painting states.
+   bench/v2/targets/mittens.png
+   bench/crops/img/mittens.webp
+   bench/v2/targets/hills.png
+   bench/v2/targets/south-france.png
+   bench/crops/img/hills.webp
+   bench/crops/img/south-france.webp
+     Hills, France and Mittens: benchmark crops, photo by Sam Jackson.
+   bench/runs/*/*/*/{hills,south-france,mittens}*.webp
+     Benchmark paintings and saved-stage strips derived from original
+     photographs.
+   docs/img/benchmark-overview.webp
+     The Hills, France and Mittens tiles and target thumbnails.
+
+
+1a. Trumbull College photograph: third party, credited
+
+   Not Sam Jackson's photo. Posted by the Trumbull College Instagram account
+   (@trumbullcollegeyale, 24 August 2020, https://www.instagram.com/p/CESNBxYg0g8/),
+   credited there to Google; the photographer is unknown. Used with credit
+   for noncommercial research. If this is your photo, please get in touch.
+
+   examples/targets/trumbull.jpg
+   examples/output/trumbull-360.jpg
+   docs/img/hero-trumbull.webp
+   docs/img/example-trumbull.webp
+   docs/img/progress-trumbull.webp
+   docs/img/layers-thumb.webp
+   docs/layers/data/*
+   bench/v2/targets/trumbull.png
+   bench/crops/img/trumbull.webp
+   bench/runs/*/*/*/trumbull*.webp
+   docs/img/benchmark-overview.webp, Trumbull tiles and target thumbnail
+     The photograph, its stylized target, and paintings and stages made from it.
+
+
+2. Public-domain works
+
+   Public domain.
+
+   examples/targets/white-ships.jpg
+     John Singer Sargent, White Ships, 1908, Brooklyn Museum (09.846), public
+     domain, via Wikimedia Commons. The Commons reproduction is marked
+     Public Domain Mark 1.0 / PD-Art (PD-old-70), not CC0.
+     https://commons.wikimedia.org/wiki/File:Brooklyn_Museum_-_White_Ships_-_John_Singer_Sargent.jpg
+     Museum record: https://www.brooklynmuseum.org/objects/20397
+
+   examples/targets/sargent-a-tramp.jpg
+     John Singer Sargent, A Tramp, ca. 1904-1906, Brooklyn Museum (09.810),
+     public domain, via Wikimedia Commons. Downscaled to 960 px wide.
+     https://commons.wikimedia.org/wiki/File:Sargent_-_A_Tramp,_ca._1904-1906,_09.810.jpg
+
+   examples/targets/tiepolo-punchinello-sweets.jpg
+     Giovanni Domenico Tiepolo, Punchinello's Children Begging for Sweets,
+     No. 17 from Divertimento per li regazzi, circa 1800, Fine Arts Museums of
+     San Francisco. Public domain (artist died 1804), via Wikimedia Commons.
+     Downscaled to 960 px.
+     https://commons.wikimedia.org/wiki/File:Punchinello%E2%80%99s_Children_Begging_for_Sweets_by_Giovanni_Domenico_Tiepolo,_No._17.jpg
+
+   examples/targets/tiepolo-punchinello-camel.jpg
+     Domenico Tiepolo, Punchinello Riding a Camel, late 1790s, Getty Center.
+     Public domain (artist died 1804), via Wikimedia Commons.
+     https://commons.wikimedia.org/wiki/File:Punchinello_Riding_a_Camel_by_Domenico_Tiepolo.jpg
+
+   examples/targets/rembrandt-woman-reading.jpg
+     Rembrandt van Rijn, Woman Reading, The Metropolitan Museum of Art
+     (347891), public domain (Open Access). Downscaled to 1600 px.
+     https://www.metmuseum.org/art/collection/search/347891
+
+   docs/img/ink.webp, target panels
+     Francesco Guardi, A Colonnade, Partly Ruined, with Figures, ca. 1780-90,
+     The Metropolitan Museum of Art (459623), and Giovanni Battista Tiepolo,
+     Bacchus and Ariadne, ca. 1740, The Metropolitan Museum of Art (459236),
+     Robert Lehman Collection, 1975. Public domain (Open Access). Cropped and
+     scaled down. The other panels are painter output (section 3).
+     https://www.metmuseum.org/art/collection/search/459623
+     https://www.metmuseum.org/art/collection/search/459236
+
+   docs/img/paper-texture.webp, left panel
+     Winslow Homer, After the Hurricane, Bahamas, 1899, Art Institute of
+     Chicago (1933.1235), Mr. and Mrs. Martin A. Ryerson Collection. Public
+     domain; the museum releases the image under CC0. A 29 x 34 mm detail,
+     scaled down. The other two panels are painter output (section 3).
+     https://www.artic.edu/artworks/16776
+
+   docs/img/future-oil-mona.webp, source
+     Leonardo da Vinci, Mona Lisa, ca. 1503-1519, Musee du Louvre. Public
+     domain. The paintings in the figure are painter output (section 3).
+
+   The Met's Open Access images are released under CC0:
+   https://www.metmuseum.org/hubs/open-access
+
+
+3. Painter output from public-domain and synthetic inputs: CC BY 4.0
+
+   Copyright (c) 2026 Sam Jackson. CC BY 4.0,
+   https://creativecommons.org/licenses/by/4.0/
+   Credit: "Painted by unpainting (Sam Jackson), CC BY 4.0".
+
+   - examples/output/white-ships-540-painting.jpg
+   - examples/output/white-ships-540.mp4
+   - examples/output/sargent-a-tramp-360.jpg
+   - examples/output/tiepolo-punchinello-sweets-360.jpg
+   - examples/output/tiepolo-punchinello-camel-360.jpg
+   - examples/output/graded-wash-result.png
+   - every image in docs/img/ except the files listed in section 1.
+     These are the painter's output from the
+     public-domain targets and the stroke plans in examples/plans/, and the
+     diagrams drawn for the docs. Where a figure shows a public-domain target
+     beside the painting, the target stays public domain.
+
+   Source images keep their own status (public domain or CC0).
+
+4. Yale gateway (h36-a), Paint Lab
+
+   docs/lab/examples/h36-a/h36.jpg: Carol M. Highsmith / Library of
+   Congress, public domain. Source SHA-256:
+   059a25da04a07b9f18fe343fe9007e16d5e2622d04f42f8001aa343f1a767418.
+   h36-a.png is a stylised target made with an image model; h36-a.json
+   is its generation record. The painter output, frames and stroke tapes
+   in that folder are CC BY 4.0, credit Sam Jackson / unpainting:
+   https://creativecommons.org/licenses/by/4.0/

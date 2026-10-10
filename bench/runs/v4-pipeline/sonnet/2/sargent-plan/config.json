@@ -1,0 +1,10 @@
+{"subject":"sargent","name":"White Ships (Sargent)",
+ "styleSelection":{"style":"precise-watercolor","reason":"hard-edged wet-on-dry blue hull and mast with dry dark accents; no ink, structure from washes and paper",
+   "regions":{}},
+ "families":[
+  {"id":"sargent.hull","bounds":[0.22,0,0.66,0.93],"baseMove":"wet on dry","referenceCue":"one big pale blue-grey hull plane, hard darker blue edge on its left, white streaks inside, dark accents last"},
+  {"id":"sargent.air","bounds":[0.62,0,1,0.68],"baseMove":"wet on dry","referenceCue":"warm cream paper, pale blue-grey streaks and rigging, mostly left bare"},
+  {"id":"sargent.water","bounds":[0.64,0.67,1,1],"baseMove":"wet on dry","referenceCue":"teal-green sea under a flat horizon, white ripples left as paper"},
+  {"id":"sargent.mast","bounds":[0.8,0.15,0.98,1],"baseMove":"wet on dry","referenceCue":"orange-brown mast with a dotted spine, drawn in one dry stroke"},
+  {"id":"sargent.left","bounds":[0,0,0.22,1],"baseMove":"wet on dry","referenceCue":"pale blue sky strip, grey rigging poles, orange mast, blue boat curve, tan anchor"}],
+ "reserves":[]}

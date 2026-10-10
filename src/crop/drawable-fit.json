@@ -1,0 +1,25 @@
+{
+ "features": [
+  "length",
+  "contrast",
+  "depth",
+  "straight",
+  "centre",
+  "dark"
+ ],
+ "weights": [
+  0.08483463831534797,
+  0.18208607144343578,
+  0.6896664273077537,
+  -0.011550523671959271,
+  -0.2329817946789304,
+  0.3581229883505362
+ ],
+ "bias": 1.2965476010286656,
+ "accuracy": 0.8596112311015118,
+ "pairs": [
+  "assets/beach-watercolor.webp,assets/beach-ink.webp"
+ ],
+ "width": 420,
+ "fitted": "2026-09-18"
+}

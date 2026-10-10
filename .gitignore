@@ -1,0 +1,16 @@
+work/
+bench/work/
+task/
+output/
+node_modules/
+.venv/
+*.pre-damp-runs
+__pycache__/
+*.pyc
+.env
+.env.*
+_site/
+.playwright-cli/
+.DS_Store
+*.log
+.claude/worktrees/

@@ -1,0 +1,19 @@
+# Independent review before reading the external feedback
+
+I inspected `feedback/compare.png`, `feedback/stages.jpg`, and the supplied target before opening FEEDBACK.md.
+
+The composition is recognizable. The central bow, diagonal rigging, dark upper gunwale, ochre anchor and rusty fittings occupy convincing positions. The cool-blue / warm-ochre relationship survives. The marks are paint rather than an ink tracing, and the stages do get darker gradually.
+
+The largest failure is the connected light and middle-value painting. The reference has a luminous, softly varied blue bow with narrow, intentional light strokes; the previous painting replaces it with angular islands, holes and conspicuous scalloped boundaries. The right white ship is warm, pale painted paper in the reference, but mostly glaring untoned paper in the result. A horizontal edge across the middle/lower bow reads as a stripe, and the very dark base is too separate and heavy. Rigging and hardware have broad, lumpy outlines. The sea loses its transparent turquoise shimmer. Small details do not compensate for these errors in the large value shapes.
+
+The first failure is already present at 10–25%: pale washes are subdivided and leave excessive unconnected white pockets. By 50%, the broad horizontal hull-shadow division is explicit, and later darkening reinforces the segmentation. At 75–100%, added small patches make the surface busier without recovering a unified hull plane. Thus the correction belongs in initial coverage, reserve thresholds, passage geometry and restrained dark loading, not extra finishing strokes.
+
+My finished-painting score: **4.5/10**. My painting-process plausibility score: **2.5/5**. There is a real light-to-dark sequence, but the repeated dispersed patch filling and late uniform saturation look less like a watercolorist connecting a wash and then choosing a few structural accents.
+
+## External feedback comparison
+
+The external finished composite was 5.27/10, with vision judgments around 3–4 and much higher automatic edge/mark scores. I agree with the low marks/texture and edge/detail assessments: the picture is recognizable but the internal geometry and strokes are coarse. I reject the automatic edge score of 9.25 as an artistic judgment. Many edges are present, but several are hard in the wrong place, scalloped or striped. Likewise I do not agree that the finished stage deserves 5/5 for human painting plausibility: its patchwork and regular bands remain visible.
+
+The process panel's mean 2.5/5 happens to equal my independent overall assessment, although its early scores are harsher. I agree that the broad faint image followed by near-simultaneous darkening is a noticeable tell. I disagree with the literal implication that this was an opacity dissolve: the record and the changes between shapes show physical paint accumulation. The useful critique is the insufficient change of emphasis between stages, not the accusation of a filter. I will use an early structural-shadow stage after the pale foundation, and only one middle wash rather than repeated global middle layers.
+
+The previous plan history confirms the early coverage fault: it began with an oversized W13 fitted gesture, added narrow lanes after pass 20, adapted them after pass 40, and introduced W15 only for the final shadows. That late change could not repair the first wash. It also retained the inherited ground-glaze rule, responsible for the horizontal break at 62% of the sheet. Both will be addressed before the first stroke in try 2. The brightest reference pixels are warm cream (the brightest 0.1% average approximately 232/225/210), whereas the automatic paper selection chose a bright white sheet because its estimated bright patch did not touch the border. A declared warm physical paper color will reduce this excessive contrast.

@@ -1,0 +1,98 @@
+{
+  "subject": "SF",
+  "name": "South France, V5 try 3: grouped green washes and structural pen",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Urban sketch: connected pen architecture and branches over light wall/path washes. The inspected pale foliage lacks canopy form, so foliage families alone receive one shaped middle-value wash before final dry glazes, with physical brush chosen per connected plane. No repeated nested coats or foliage texture net.",
+    "regions": {
+      "SF.olive-masses": {
+        "style": "precise-watercolor",
+        "reason": "Reference needs connected rounded green crown bodies and upright cypress planes. Pale foundation alone stayed flat, so one controlled middle-value wet-on-dry wash at measured full dry, then a connected cross-crown shadow glaze. No leaf stipple or repeated value rings."
+      },
+      "SF.foreground-tree": {
+        "style": "precise-watercolor",
+        "reason": "Reference has a substantial yellow-green crown around tapering black forks. One controlled connected middle-value wash restores its leafy body, full dry then selected shadow; subcell leaves omitted and fine forks stay ink."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "SF.terraces",
+      "bounds": [
+        0,
+        0,
+        0.36,
+        0.45
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale yellow ochre terraces and retaining walls recede diagonally behind small olives. Connected watery flat wash on dry paper; the pale sunlit paths stay open; a few wall and gate junctions belong to pen. Layer 1 watery transparent local-color wash using connected contour-following round-brush paths within connected supports, layer 2 fully dry then medium pigment transparent shade, layer 3 fully dry selective black pen. No stipple or contour-net filling."
+    },
+    {
+      "id": "SF.upper-village",
+      "bounds": [
+        0.39,
+        0,
+        0.8,
+        0.27
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small cream houses, warm roofs, and cooler side walls in the upper village. Broad pale wall planes on dry paper, muted distant shadows, and sparse connected roof and corner pen gestures. Layer 1 watery transparent local-color wash using connected contour-following round-brush paths within connected supports, layer 2 fully dry then medium pigment transparent shade, layer 3 fully dry selective black pen. No stipple or contour-net filling."
+    },
+    {
+      "id": "SF.focal-houses",
+      "bounds": [
+        0.665,
+        0.335,
+        0.96,
+        0.81
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The lower-right ochre houses are the focal point: terracotta roof slopes, pale lit walls, violet-grey side planes, long eave junctions and small dark windows. Pale connected facade washes on fully dry paper; dry cross-plane shadow glaze; narrow recesses and roof joints carried by selective black pen. Layer 1 watery transparent local-color wash using connected contour-following round-brush paths within connected supports, layer 2 fully dry then medium pigment transparent shade, layer 3 fully dry selective black pen. No stipple or contour-net filling."
+    },
+    {
+      "id": "SF.olive-masses",
+      "bounds": [
+        0,
+        0.14,
+        0.69,
+        0.9
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Reference: touching rounded olive crowns, deep connected central canopy and narrow dark cypress uprights. Wash question for several-mm connected planes, ink for sub-four-cell lines. Existing pale foundation remains. Next one medium transparent middle wash wet on fully dry paper (actual water 0.62); physical brush chosen per support, small round/liner for narrow shapes, broad brush for broad bodies. Fully dry then final coherent shade water 0.45 across adjacent crowns, cypress roots and ground. No stipple, repeated middle rings or dry leaf texture."
+    },
+    {
+      "id": "SF.foreground-tree",
+      "bounds": [
+        0.13,
+        0.57,
+        0.44,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Reference: substantial lit yellow-green foreground crown around tapered principal forks. Wash question for several-mm connected planes, ink for sub-four-cell lines. Existing pale foundation remains. Next one medium transparent middle wash wet on fully dry paper (actual water 0.62); physical brush chosen per support, small round/liner for narrow shapes, broad brush for broad bodies. Fully dry then final coherent shade water 0.45 across adjacent crowns, cypress roots and ground. No stipple, repeated middle rings or dry leaf texture."
+    },
+    {
+      "id": "SF.right-garden",
+      "bounds": [
+        0.63,
+        0.73,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broken sunlit paths and grey-green olives surround the foot of the houses. One pale local-color wash, then dry connected shadow shapes crossing foliage and earth; a few branches and path junctions in pen, no isolated texture flecks. Layer 1 watery transparent local-color wash using connected contour-following round-brush paths within connected supports, layer 2 fully dry then medium pigment transparent shade, layer 3 fully dry selective black pen. No stipple or contour-net filling."
+    },
+    {
+      "id": "SF.distant-hills",
+      "bounds": [
+        0.81,
+        0,
+        1,
+        0.16
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "A small muted blue-green distant hillside at upper right, without open sky. Thin pale wash on dry paper; subdued lost interior edges and no close leaf or branch detail. Layer 1 watery transparent local-color wash using connected contour-following round-brush paths within connected supports, layer 2 fully dry then medium pigment transparent shade, layer 3 fully dry selective black pen. No stipple or contour-net filling."
+    }
+  ],
+  "reserves": []
+}

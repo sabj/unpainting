@@ -1,0 +1,52 @@
+{
+  "subject": "BENCHMITTENS",
+  "name": "Mittens V4: cat and person portrait",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The high-key portrait is carried by light warm value planes and dry, fitted facial landmarks; line work stays selective.",
+    "regions": {
+      "mittens.hair": {
+        "style": "ink-and-wash",
+        "reason": "The dark, irregular curl silhouette needs connected mixed-dark paint and a few directional lines rather than a smooth dark fill."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "mittens.cat",
+      "bounds": [0.0, 0.0, 0.59, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cat's pale muzzle and soft orange cheek and ear markings fade into the white paper; reserve the eye, nose shine, and whisker gaps."
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [0.53, 0.13, 1.0, 0.53],
+      "baseMove": "wet on dry",
+      "referenceCue": "The person's dark loose curls make an irregular crown against the pale forehead and paper."
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [0.52, 0.39, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The face is a pale warm plane with crisp brows, eyes, nose and mouth, and only a light cheek and jaw turn."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Bare-paper catchlight in the cat's visible eye; keep the surrounding iris painted, not white.",
+      "bounds": [0.265, 0.205, 0.283, 0.226]
+    },
+    {
+      "reason": "Bare-paper catchlight in the person's left eye.",
+      "bounds": [0.638, 0.54, 0.66, 0.56]
+    },
+    {
+      "reason": "Bare-paper catchlight in the person's right eye.",
+      "bounds": [0.83, 0.53, 0.85, 0.55]
+    },
+    {
+      "reason": "A narrow pale plane on the bridge of the person's nose; leave the wash luminous, then tone any overly white edge with a light local glaze only if needed.",
+      "bounds": [0.72, 0.62, 0.74, 0.64]
+    }
+  ]
+}

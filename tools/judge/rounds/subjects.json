@@ -1,0 +1,93 @@
+{
+ "_note": "Subjects the stage judge knows. Stage targets are the live site sequence rendered as the site renders it (work/references, manifest.json there): every stage over 0 percent, each placed on the run at its percent; the finish is the painting the site shows. focal is in the artwork's pixels. Subjects are named by short codes (subject-a, subject-b, subject-c, subject-d); `manifest` is the id in the v3 manifest.",
+ "subject-b": {
+  "name": "the beach build",
+  "subject": "a man on a beach holding out a ball to a black dog, with sea, a shore and trees behind",
+  "art": "work/references/subject-b-art.png",
+  "manifest": "subject-b",
+  "artSize": [
+   1086,
+   1448
+  ],
+  "focal": [
+   {
+    "x": 540,
+    "y": 170,
+    "r": 220,
+    "what": "the man's head"
+   },
+   {
+    "x": 440,
+    "y": 770,
+    "r": 200,
+    "what": "the dog's head"
+   }
+  ]
+ },
+ "subject-a": {
+  "name": "the dog at the coast, walnut ink",
+  "subject": "a dog at the coast, walnut ink and wash",
+  "art": "work/references/subject-a-art.png",
+  "manifest": "subject-a",
+  "artSize": [
+   1536,
+   1024
+  ],
+  "focal": [
+   {
+    "x": 590,
+    "y": 340,
+    "r": 240,
+    "what": "the dog's head"
+   }
+  ]
+ },
+ "subject-c": {
+  "name": "the cat on the shoulder, tight watercolour (the sparse-wash painting)",
+  "subject": "a man with a ginger cat on his shoulder",
+  "art": "work/references/subject-c-art.png",
+  "manifest": "subject-c",
+  "artSize": [
+   1086,
+   1448
+  ],
+  "focal": [
+   {
+    "x": 270,
+    "y": 230,
+    "r": 200,
+    "what": "the cat's head"
+   },
+   {
+    "x": 680,
+    "y": 520,
+    "r": 220,
+    "what": "the man's face"
+   }
+  ]
+ },
+ "subject-d": {
+  "name": "the overlook",
+  "subject": "a man in a cap holding a black dog, an overlook behind",
+  "art": "work/references/subject-d-art.png",
+  "manifest": "subject-d",
+  "artSize": [
+   1086,
+   1448
+  ],
+  "focal": [
+   {
+    "x": 545,
+    "y": 440,
+    "r": 220,
+    "what": "the man's face"
+   },
+   {
+    "x": 600,
+    "y": 900,
+    "r": 220,
+    "what": "the dog's head"
+   }
+  ]
+ }
+}

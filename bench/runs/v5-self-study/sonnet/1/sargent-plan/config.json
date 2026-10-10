@@ -1,0 +1,95 @@
+{
+ "subject": "sargent",
+ "name": "White Ships (Sargent)",
+ "styleSelection": {
+  "style": "precise-watercolor",
+  "reason": "pure watercolor: wet-on-dry value planes with reserved paper carry the form; no ink, no fur or foliage to push into ink-and-wash",
+  "regions": {}
+ },
+ "families": [
+  {
+   "id": "sargent.hull",
+   "bounds": [
+    0.22,
+    0,
+    0.66,
+    0.95
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "tall blue-grey hull: one big mid-value wash, darker blue rim on the left edge, pale paper streaks swept across it"
+  },
+  {
+   "id": "sargent.sails",
+   "bounds": [
+    0.62,
+    0,
+    1,
+    0.68
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "mostly bare cream paper, a few pale blue strokes and a grey rope line, dark bollard top right"
+  },
+  {
+   "id": "sargent.sea",
+   "bounds": [
+    0.64,
+    0.68,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "turquoise and olive sea below a horizon at 0.69, broken paper glints, orange-brown mast crossing it"
+  },
+  {
+   "id": "sargent.rigging",
+   "bounds": [
+    0,
+    0,
+    0.22,
+    0.6
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "pale blue sky with orange-pink mast on the far left and grey diagonal spars"
+  },
+  {
+   "id": "sargent.foot",
+   "bounds": [
+    0,
+    0.6,
+    0.3,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "blue water and boat hull at left, sandy anchor, dark waterline across the bottom"
+  }
+ ],
+ "reserves": [
+  {
+   "reason": "paper streak swept across the hull below the black mooring blob",
+   "bounds": [
+    0.37,
+    0.33,
+    0.42,
+    0.375
+   ]
+  },
+  {
+   "reason": "pale swish on the lower hull",
+   "bounds": [
+    0.42,
+    0.56,
+    0.465,
+    0.595
+   ]
+  },
+  {
+   "reason": "sparkle on the sea below the horizon",
+   "bounds": [
+    0.87,
+    0.76,
+    0.915,
+    0.795
+   ]
+  }
+ ]
+}

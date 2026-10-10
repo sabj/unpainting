@@ -1,0 +1,11 @@
+{"subject":"sargent","name":"White Ships (Sargent)",
+ "styleSelection":{"style":"precise-watercolor","reason":"pure watercolour: a big blue hull plane with hard wet-on-dry edges, dark accents painted not inked; every region is laid on dry paper because the painter's wet-in-wet footprint gate refused a planned wet wash",
+   "regions":{}},
+ "families":[
+  {"id":"sargent.hull","bounds":[0.2,0.02,0.67,0.9],"baseMove":"wet on dry","referenceCue":"large blue-grey bow plane, soft internal gradation, hard right edge, white dry-brush streaks left in the paper"},
+  {"id":"sargent.rigging","bounds":[0,0,0.26,0.62],"baseMove":"wet on dry","referenceCue":"ochre mast and grey spars on pale blue-grey ground, narrow strokes with tapered ends"},
+  {"id":"sargent.sail","bounds":[0.64,0,1,0.7],"baseMove":"wet on dry","referenceCue":"cream paper with faint blue washes and grey rigging lines, mostly left bare; pale cool glazes with soft lost edges"},
+  {"id":"sargent.sea","bounds":[0.64,0.68,1,0.95],"baseMove":"wet on dry","referenceCue":"teal green sea, one pale connected wash with paper sparkles left"},
+  {"id":"sargent.mast","bounds":[0.8,0.18,0.96,1],"baseMove":"wet on dry","referenceCue":"warm ochre-sienna post with darker dabs, one hard edge"},
+  {"id":"sargent.foot","bounds":[0,0.66,0.67,1],"baseMove":"wet on dry","referenceCue":"anchor, boat rim and dark waterline accents: few dark shaped marks on dry paper"}],
+ "reserves":[]}

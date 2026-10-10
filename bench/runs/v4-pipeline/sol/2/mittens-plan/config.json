@@ -1,0 +1,92 @@
+{
+  "subject": "mittens",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "High key double portrait: transparent warm value planes with crisp eyes and a sparse sepia drawing. Fine fur and whiskers belong to the line layer; hair remains a painted dark mass.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.head",
+      "bounds": [
+        0,
+        0,
+        0.51,
+        0.62
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tabby head: ochre and sienna patches over near-white fur, upward gaze, asymmetrical eye size, triangular ears, white muzzle. Dry controlled wash; short growth strokes around the nose and swept locks at the cheek; retain long pale whisker gaps."
+    },
+    {
+      "id": "mittens.chest",
+      "bounds": [
+        0.035,
+        0.54,
+        0.54,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large unpainted white chest with a narrow warm left leg and darker right shoulder. Broad connected pale local washes, then one turning shadow from cheek through shoulder; sparse downward fur lines only in the warm shadow."
+    },
+    {
+      "id": "human.hair",
+      "bounds": [
+        0.49,
+        0.2,
+        1,
+        0.71
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark charcoal crown and temple locks against bare paper; broken silhouette, clear paper holes, deepest valleys inside the mass. Connected dilute mixed neutral base, dry shadow glazes, only a few curved closing lines."
+    },
+    {
+      "id": "human.face",
+      "bounds": [
+        0.51,
+        0.42,
+        0.94,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale warm face, nearly bare forehead and nose ridge; tilted eye line, two brown irises and light sclera, dark brows, small nostrils and a gentle smile. Dry local planes and focal details; cross-boundary shadow through left temple, cheek and lower jaw. No pen under-eye crease."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Mittens left eye catchlight",
+      "bounds": [
+        0.08416666666666667,
+        0.2415057915057915,
+        0.089,
+        0.2471042471042471
+      ]
+    },
+    {
+      "reason": "Mittens right eye catchlight",
+      "bounds": [
+        0.2675,
+        0.2137065637065637,
+        0.2723333333333333,
+        0.2193050193050193
+      ]
+    },
+    {
+      "reason": "Human left eye catchlight",
+      "bounds": [
+        0.6008333333333333,
+        0.7152509652509652,
+        0.6056666666666666,
+        0.7208494208494208
+      ]
+    },
+    {
+      "reason": "Human right eye catchlight",
+      "bounds": [
+        0.8075,
+        0.6766409266409267,
+        0.8123333333333332,
+        0.6822393822393822
+      ]
+    }
+  ]
+}

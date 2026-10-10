@@ -1,0 +1,22 @@
+[
+  "--paints",
+  "hansa,sapgreen,ultramarine,cerulean,rawsienna,sepia",
+  "--inkprofile",
+  "black-ink",
+  "--openingpressure",
+  "0.58",
+  "--closingpressure",
+  "0.85",
+  "--openingminmm",
+  "2.5",
+  "--drawinglastmin",
+  "0.15",
+  "--paperlights",
+  "0",
+  "--midgain",
+  "1",
+  "--touchpoints",
+  "1",
+  "--touchgain",
+  "0.4"
+]

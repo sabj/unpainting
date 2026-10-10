@@ -1,0 +1,416 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "astra",
+  "name": "Codex Astra",
+  "id": "gpt-6-astra",
+  "effort": "xhigh",
+  "runner": "codex"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 44.1,
+  "tokens": 6343635,
+  "costUSD": null,
+  "estCostUSD": 11.396,
+  "usage": {
+   "input": 147249,
+   "cachedInput": 6120320,
+   "output": 76066
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 1425,
+   "minutes": 1.1,
+   "smallShare": 0.667,
+   "shortStrokes": 1202,
+   "dotStrokes": 8,
+   "copyHF": 0.0076,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "score": {
+    "composite": 4.65,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 6.64,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 2,
+     "marks_texture": 1.67,
+     "classic_value": 4.65,
+     "classic_edge": 6.29,
+     "classic_landmark": null,
+     "classic_marks": 8.98
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 4
+    },
+    "earlyMean": 1.5,
+    "mean": 2.2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "e": 1,
+     "c": 3,
+     "b": 1,
+     "f": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence reads as a digital layer reveal rather than brush work: the whole scene fades in at one faint value, flat evenly-toned tree and shadow slabs populate the sheet all at once, the road stays untouched until it arrives fully formed at the end, and all texture sharpens in a single late dump."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 1101,
+   "minutes": 1.1,
+   "smallShare": 0.594,
+   "shortStrokes": 854,
+   "dotStrokes": 3,
+   "copyHF": -0.0085,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "score": {
+    "composite": 5.29,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 6.91,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3,
+     "marks_texture": 2.67,
+     "classic_value": 3.73,
+     "classic_edge": 7.66,
+     "classic_landmark": null,
+     "classic_marks": 9.33
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 4
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 2
+    },
+    "earlyMean": 1.5,
+    "mean": 1.6,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 5,
+     "a": 3,
+     "f": 1,
+     "j": 4,
+     "c": 4
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sheet fades in as a faint ghost of the finished scene, similar tree dabs are stamped everywhere before any pen lines or buildings exist, and all structure and detail resolve in one late dump — a filtered reveal rather than a pen-then-wash working order.",
+     "Qwen/Qwen3.5-9B": "The sequence displays AI-generated artifacts like texture dumping and flat slabs rather than organic brushwork, indicating it is not a human painting process."
+    }
+   },
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 113,
+   "minutes": 0.3,
+   "smallShare": 0.85,
+   "shortStrokes": 29,
+   "dotStrokes": 10,
+   "copyHF": 0.0152,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "score": {
+    "composite": 5.02,
+    "pm": 0.14,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 6.37,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3,
+     "marks_texture": 3,
+     "classic_value": 4.75,
+     "classic_edge": 5.07,
+     "classic_landmark": null,
+     "classic_marks": 9.29
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 4
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 3,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 2,
+    "mean": 2.8,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 5,
+     "c": 1,
+     "l": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The wash-to-line-to-dark sequence looks superficially human, but the hull arrives as a flat even slab with scalloped white-haloed cut edges and a dark anchor squiggle appears while the form is still bare, marking this as region-fill automation rather than brush work."
+    }
+   },
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 972,
+   "minutes": 0.8,
+   "smallShare": 0.899,
+   "shortStrokes": 522,
+   "dotStrokes": 26,
+   "copyHF": 0.0966,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "score": {
+    "composite": 5.24,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 6.81,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3,
+     "marks_texture": 3.67,
+     "classic_value": 4.59,
+     "classic_edge": 7.14,
+     "classic_landmark": null,
+     "classic_marks": 8.7
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 2,
+     "100": 2.5
+    },
+    "earlyMean": 1.5,
+    "mean": 1.8,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "c": 10,
+     "b": 4,
+     "h": 4,
+     "j": 1,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Flat scalloped colour slabs sit nearly unchanged through 50% with no drawing or value build, then windows, brick texture and greenery all arrive as one dump at 75% — a watercolor filter sharpening an image, not a painter's sequence.",
+     "Qwen/Qwen3.5-9B": "The sequence features identical frames for the first three stages and relies on flat color blocks rather than brushwork."
+    }
+   },
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 424,
+   "minutes": 0.2,
+   "smallShare": 0.86,
+   "shortStrokes": 61,
+   "dotStrokes": 0,
+   "copyHF": 0.0672,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "changes": null,
+   "score": {
+    "composite": 5.5,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 6.68,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3.33,
+     "marks_texture": 4.33,
+     "classic_value": 5.2,
+     "classic_edge": 5.57,
+     "classic_landmark": null,
+     "classic_marks": 9.27
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 4
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 4
+    },
+    "earlyMean": 2,
+    "mean": 2.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 1,
+     "c": 3,
+     "d": 3,
+     "k": 2,
+     "l": 2,
+     "f": 2,
+     "j": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The dark hair arrives fully finished at 10% over a flat featureless face slab, stripes read as stamped dabs, and facial features pop in late, which is a staged reveal rather than a brush-and-pen build from light to dark."
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ]
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 5.14,
+  "partialComposite": null,
+  "pm": 0.06,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.54,
+   "level": "medium",
+   "parts": {
+    "progression": 0.9,
+    "earlyStageMean": 1.7,
+    "copyHF": {
+     "hills": 0.0076,
+     "south-france": -0.0085,
+     "sargent": 0.0152,
+     "trumbull": 0.0966,
+     "mittens": 0.0672
+    },
+    "copy": 0.14,
+    "smallStrokeShare": 0.774,
+    "small": 0.95,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.69,
+   "level": "high"
+  },
+  "review": {
+   "status": "cleared",
+   "finding": "weak technique, not cheating; see review"
+  }
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

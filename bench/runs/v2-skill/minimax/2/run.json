@@ -1,0 +1,362 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "minimax",
+  "name": "MiniMax M3",
+  "id": "MiniMaxAI/MiniMax-M3",
+  "effort": "n/a",
+  "runner": "together"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 37.1,
+  "tokens": 4760253,
+  "costUSD": 1.488,
+  "estCostUSD": null,
+  "usage": null
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 6,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 64,
+   "minutes": 0,
+   "smallShare": 0.655,
+   "shortStrokes": 8,
+   "dotStrokes": 0,
+   "copyHF": -0.0217,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "score": {
+    "composite": 2.5,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 1.33,
+    "classic": 3.68,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 1,
+     "marks_texture": 3,
+     "classic_value": 2.93,
+     "classic_edge": 1.74,
+     "classic_landmark": null,
+     "classic_marks": 6.37
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 1,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 1.5
+    },
+    "earlyMean": 1,
+    "mean": 1.3,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 9,
+     "i": 2,
+     "h": 6,
+     "c": 3
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The composition is static across all five snapshots—flat scalloped green slabs, one orange stroke, and scattered gray dashes merely fade from faint to full—never building the target's trees, hills, or winding path the way a brush-and-pen painter would.",
+     "Qwen/Qwen3.5-9B": "The sequence shows a static abstract image fading in opacity rather than a painting process with accumulating strokes."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 40,
+   "minutes": 0,
+   "smallShare": 0.563,
+   "shortStrokes": 1,
+   "dotStrokes": 0,
+   "copyHF": -0.0073,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.21,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.41,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 1,
+     "marks_texture": 2.33,
+     "classic_value": 3.2,
+     "classic_edge": 1.19,
+     "classic_landmark": null,
+     "classic_marks": 5.83
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 29,
+   "minutes": 0,
+   "smallShare": 0.828,
+   "shortStrokes": 10,
+   "dotStrokes": 10,
+   "copyHF": -0.0202,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "score": {
+    "composite": 2.38,
+    "pm": 0.07,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.77,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.67,
+     "marks_texture": 2.67,
+     "classic_value": 3.14,
+     "classic_edge": 1.37,
+     "classic_landmark": null,
+     "classic_marks": 6.81
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1,
+     "75": 1,
+     "100": 1
+    },
+    "earlyMean": 1.5,
+    "mean": 1.2,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "c": 2,
+     "e": 7,
+     "i": 3,
+     "h": 8
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "All five snapshots show the same few flat horizontal slabs and one stroke at nearly identical faintness, darkening only uniformly and never accumulating toward the target boat, which reads as a static under-image faded in by a dissolve rather than a painter's stroke order.",
+     "Qwen/Qwen3.5-9B": "The sequence consists of identical, faint abstract images that fail to progress toward the detailed target figure, indicating a static generation rather than a painting process."
+    }
+   },
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 177,
+   "minutes": 0,
+   "smallShare": 0.356,
+   "shortStrokes": 14,
+   "dotStrokes": 14,
+   "copyHF": 0.0157,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "score": {
+    "composite": 2.37,
+    "pm": 0.07,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.73,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.33,
+     "marks_texture": 2,
+     "classic_value": 2.1,
+     "classic_edge": 2.47,
+     "classic_landmark": null,
+     "classic_marks": 6.62
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 1,
+     "75": 1,
+     "100": 1
+    },
+    "earlyMean": 2,
+    "mean": 1.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "a": 1,
+     "c": 1,
+     "d": 1,
+     "e": 5,
+     "i": 1,
+     "h": 3,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sheet sits at one uniform faint value throughout — a flat teal sky slab, a stray diagonal stroke, speckled arch ghosts and ruled lines that never develop into the building — reading as a faded-in ghost with trivial late additions rather than brush-and-pen progress."
+    }
+   },
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 39,
+   "minutes": null,
+   "smallShare": 0.091,
+   "shortStrokes": 1,
+   "dotStrokes": 0,
+   "copyHF": -0.0069,
+   "images": {
+    "final": "mittens.webp",
+    "stages": null
+   },
+   "changes": null,
+   "score": {
+    "composite": 2.69,
+    "pm": 0.07,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 4.38,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 1,
+     "marks_texture": 2.33,
+     "classic_value": 3.96,
+     "classic_edge": 1.58,
+     "classic_landmark": null,
+     "classic_marks": 7.61
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 2.43,
+  "partialComposite": null,
+  "pm": 0.04,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.46,
+   "level": "medium",
+   "parts": {
+    "progression": 1,
+    "earlyStageMean": 1.5,
+    "copyHF": {
+     "hills": -0.0217,
+     "south-france": -0.0073,
+     "sargent": -0.0202,
+     "trumbull": 0.0157,
+     "mittens": -0.0069
+    },
+    "copy": 0,
+    "smallStrokeShare": 0.499,
+    "small": 0.4,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.6,
+   "level": "high"
+  },
+  "review": {
+   "status": "cleared",
+   "finding": "weak technique, not cheating; see review"
+  }
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

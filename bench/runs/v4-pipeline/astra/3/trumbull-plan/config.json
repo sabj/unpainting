@@ -1,0 +1,89 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull: sunlit ashlar, cool recesses",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Warm stone planes and cool dry-edged openings carry the architecture; restrained sepia marks clarify the fine structure.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.27
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale blue clouded sky: connected loaded wash with wet-edge overlap, reserved cloud lights, no detached contour patches; cool planes stay separate from warm masonry."
+    },
+    {
+      "id": "Y1.sunlit-gable",
+      "bounds": [
+        0.4,
+        0.02,
+        0.68,
+        0.82
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ochre and raw-sienna front gable is the focal warm light plane; broad pale foundation, dry middle planes, cool connected shadow glazes, crisp pointed arches."
+    },
+    {
+      "id": "Y1.left-stone",
+      "bounds": [
+        0,
+        0,
+        0.4,
+        0.97
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The long left chimney and receding wall are darker and quieter than the lit gable: connected warm stone washes then a cool glaze crossing courses and openings."
+    },
+    {
+      "id": "Y1.right-stone",
+      "bounds": [
+        0.7,
+        0.1,
+        1,
+        0.98
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right chimney and wing use muted warm planes; extension has a bright sloping cap and crisp dark windows. Paint planes first; ink only structural lines."
+    },
+    {
+      "id": "Y1.front-tree",
+      "bounds": [
+        0.62,
+        0.61,
+        0.75,
+        0.99
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Yellow-green foreground tree has an irregular connected light canopy, then dry connected olive shadow groups with small sky and wall gaps; a few shaped crisp leaves."
+    },
+    {
+      "id": "Y1.left-planting",
+      "bounds": [
+        0,
+        0.59,
+        0.29,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left shrubs are darker muted olive groups against stone, with lost interior edges and only occasional crisp silhouettes; no leaf stippling."
+    },
+    {
+      "id": "Y1.street",
+      "bounds": [
+        0,
+        0.93,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Narrow ground strip and small figures: pale warm foundation, linked cool ground shadows, painted dark accents; tiny clothing lights stay paper."
+    }
+  ],
+  "reserves": []
+}
