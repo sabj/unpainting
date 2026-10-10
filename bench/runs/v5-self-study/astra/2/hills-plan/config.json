@@ -1,0 +1,77 @@
+{
+  "subject": "HILLS",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Loose ink-and-wash appearance with a pale foundation, distinct local-colour planes and dry shared shadows. The precise-watercolor value scheduler prevents the ink-and-wash two-band profile from depositing the entire sunlit meadow in one averaged olive foundation; sparse sepia drawing still supplies fine structure.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "HILLS.upper-slopes",
+      "bounds": [
+        0.45,
+        0,
+        1,
+        0.32
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The upper right hillside is a broad lemon-olive plane interrupted by dark tree groups and a pale rising footpath. One connected light local-color wash; preserve the path and lose detail with distance."
+    },
+    {
+      "id": "HILLS.left-slopes",
+      "bounds": [
+        0.13,
+        0.15,
+        0.48,
+        0.53
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "A narrow sunlit slope and warm winding path emerge between cool trees on the left. Pale wash, irregular dry boundary against woodland, no grass stippling."
+    },
+    {
+      "id": "HILLS.middle-woodland",
+      "bounds": [
+        0.32,
+        0.13,
+        1,
+        0.7
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cool blue-grey olive crowns form an interlocking diagonal woodland belt. Connected light underwash, fully dry, then a coherent mixed-dark glaze across adjacent crowns; selected trunk lines only."
+    },
+    {
+      "id": "HILLS.foreground-meadow",
+      "bounds": [
+        0.27,
+        0.55,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The large yellow-green foreground slope surrounds the pale central path. Broad luminous wash with restrained olive half-tones, broken lost edges in the grass, crisp edge only at the bend beneath the central tree."
+    },
+    {
+      "id": "HILLS.left-foreground-trees",
+      "bounds": [
+        0,
+        0.41,
+        0.44,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The strongest dark tree masses frame the left side of the central path. Dry connected shadow glaze across crowns and stems; a few branching sepia gestures restore the tree structure on dry paint."
+    },
+    {
+      "id": "HILLS.upper-left-trees",
+      "bounds": [
+        0,
+        0,
+        0.48,
+        0.42
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small cool grey-green crowns in the upper left stay grouped and simpler than the focal foreground tree. A light mass followed by a restrained connected dry glaze; no outline around every crown."
+    }
+  ],
+  "reserves": []
+}

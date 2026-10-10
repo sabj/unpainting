@@ -1,0 +1,5 @@
+{"subject":"hills","name":"HILLS",
+ "styleSelection":{"style":"ink-and-wash","reason":"loose atmospheric landscape with soft edges and flowing passages",
+   "regions":{}},
+ "families":[{"id":"hills.landscape","bounds":[0,0,1,1],"baseMove":"wet on dry","referenceCue":"rolling hills with forest and winding paths, atmospheric depth"}],
+ "reserves":[{"reason":"brightest path highlight, top-left area","bounds":[0.3,0.35,0.4,0.42]}]}

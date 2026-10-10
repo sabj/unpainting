@@ -1,0 +1,81 @@
+{
+  "sheets": 11,
+  "grainPerOD": {
+    "p25": 0.20449617826794392,
+    "median": 0.24734528330303437,
+    "p75": 0.3619584235265002
+  },
+  "mottlePerOD": {
+    "p25": 0.14496733321509073,
+    "median": 0.23467558208446695,
+    "p75": 0.34757255251656455
+  },
+  "rows": [
+    {
+      "sheet": "met-334357-cross-study-cork-oaks-watercolour-graphite.jpg",
+      "od": 0.06702925305877727,
+      "grain": 0.03514721146409794,
+      "mottle": 0.023297528578917957
+    },
+    {
+      "sheet": "met-337499-turner-lake-of-zug-watercolour-reductive-graphite.jpg",
+      "od": 0.08609473769763554,
+      "grain": 0.01760604482814755,
+      "mottle": 0.014235652909689051
+    },
+    {
+      "sheet": "met-337632-ostade-weavers-cottage-pen-ink-watercolour-graphite.jpg",
+      "od": 0.33049932109661384,
+      "grain": 0.0811935821939571,
+      "mottle": 0.077560120556869
+    },
+    {
+      "sheet": "met-340847-bonington-the-proposal-unfinished-watercolour-graphite.jpg",
+      "od": 0.25511606815047116,
+      "grain": 0.0322881100128707,
+      "mottle": 0.020870631810811394
+    },
+    {
+      "sheet": "met-340868-brabazon-venetian-street-watercolour-graphite.jpg",
+      "od": 0.1020669313749285,
+      "grain": 0.03107187836440582,
+      "mottle": 0.027106535612579974
+    },
+    {
+      "sheet": "met-342383-ruskin-loggia-ducal-palace-unfinished-watercolour-graphite.jpg",
+      "od": 0.31311247215643334,
+      "grain": 0.05137128042348421,
+      "mottle": 0.05961324736805873
+    },
+    {
+      "sheet": "met-343295-anon-british-study-of-a-rock-watercolour-graphite.jpg",
+      "od": 0.08175615703828143,
+      "grain": 0.030373238118817224,
+      "mottle": 0.028534248135071227
+    },
+    {
+      "sheet": "met-343383-turner-chatel-argent-val-daosta-watercolour-graphite.jpg",
+      "od": 0.05337939301073776,
+      "grain": 0.019321120942968124,
+      "mottle": 0.017408284953149132
+    },
+    {
+      "sheet": "met-359577-turner-of-oxford-salisbury-plain-watercolour-graphite.jpg",
+      "od": 0.1188099149837285,
+      "grain": 0.029387072080859757,
+      "mottle": 0.01722355653470277
+    },
+    {
+      "sheet": "met-727706-constable-cloud-study-watercolour-graphite.jpg",
+      "od": 0.05211550413312949,
+      "grain": 0.01843554056186185,
+      "mottle": 0.019853857598840837
+    },
+    {
+      "sheet": "met-843572-girtin-horses-and-pigs-windsor-watercolour-graphite.jpg",
+      "od": 0.06720170485805199,
+      "grain": 0.014642796912042138,
+      "mottle": 0.008287319523495058
+    }
+  ]
+}

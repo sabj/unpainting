@@ -1,0 +1,17 @@
+{"t": "2026-10-09 18:22:50 PDT", "kind": "start", "modelMinutes": 17.14, "variant": "region_w13_lay2_sep4_dk16", "renderKey": "2c4bd62da6c1a48585cf5ba36a95f2c179cb116100f31d1fa2f252b8667e07b8"}
+{"t": "2026-10-09 18:25:21 PDT", "kind": "look", "modelMinutes": 17.51, "n": 1, "boundary": "0", "strokes": 0, "penLines": 18, "passesDone": 0, "passesPlanned": 38}
+{"t": "2026-10-09 18:25:26 PDT", "kind": "look", "modelMinutes": 17.58, "n": 2, "boundary": "0", "strokes": 0, "penLines": 18, "passesDone": 0, "passesPlanned": 38}
+{"t": "2026-10-09 18:48:42 PDT", "kind": "revise-refused", "modelMinutes": 25.86, "boundary": "0", "strokes": 0, "changed": ["closing-lines.json", "extra-args.json"], "reasons": ["palette change"], "palette": {"now": {"palette": ["raw sienna", "burnt sienna", "yellow ochre", "sepia", "French ultramarine", "Payne's grey", "French ultramarine, granulating, for the sky"], "inks": ["graphite=graphite HB", "ink=sepia ink"]}, "revised": {"palette": ["raw sienna", "burnt sienna", "yellow ochre", "sepia", "French ultramarine", "Payne's grey"], "inks": ["graphite=graphite HB", "ink=sepia ink"]}}}
+{"t": "2026-10-09 19:10:22 PDT", "kind": "revise", "modelMinutes": 26.51, "boundary": "0", "revision": 1, "strokes": 0, "passesDone": 0, "changed": ["closing-lines.json"], "variant": "region_w13_lay2_sep4_dk16"}
+{"t": "2026-10-09 19:12:26 PDT", "kind": "continue", "modelMinutes": 26.68, "boundary": "1", "stopAt": 7, "strokes": 27}
+{"t": "2026-10-09 19:14:16 PDT", "kind": "look", "modelMinutes": 26.74, "n": 3, "boundary": "7", "strokes": 164, "penLines": 18, "passesDone": 7, "passesPlanned": 38}
+{"t": "2026-10-09 19:14:27 PDT", "kind": "continue", "modelMinutes": 26.92, "boundary": "7", "stopAt": 19, "strokes": 164}
+{"t": "2026-10-09 19:17:15 PDT", "kind": "look", "modelMinutes": 26.92, "n": 4, "boundary": "19", "strokes": 608, "penLines": 18, "passesDone": 19, "passesPlanned": 38}
+{"t": "2026-10-09 19:17:32 PDT", "kind": "continue", "modelMinutes": 27.2, "boundary": "19", "stopAt": 31, "strokes": 608}
+{"t": "2026-10-09 19:20:06 PDT", "kind": "look", "modelMinutes": 27.21, "n": 5, "boundary": "31", "strokes": 934, "penLines": 18, "passesDone": 31, "passesPlanned": 38}
+{"t": "2026-10-09 19:39:06 PDT", "kind": "revise", "modelMinutes": 27.51, "boundary": "31", "revision": 2, "strokes": 934, "passesDone": 31, "changed": ["variant.txt"], "variant": "region_w13_lay2_sep4_dk20"}
+{"t": "2026-10-09 19:46:48 PDT", "kind": "look", "modelMinutes": 27.62, "n": 6, "boundary": "closing", "strokes": 5009, "penLines": 18, "passesDone": 53, "passesPlanned": 53}
+{"t": "2026-10-09 19:46:58 PDT", "kind": "continue", "modelMinutes": 27.79, "boundary": "closing", "stopAt": "end", "strokes": 5009}
+{"t": "2026-10-09 19:48:33 PDT", "kind": "finished", "modelMinutes": 27.78, "strokes": 5009}
+{"t": "2026-10-09 19:48:34 PDT", "kind": "look", "modelMinutes": 27.8, "n": 7, "boundary": "final"}
+{"t": "2026-10-09 19:49:22 PDT", "kind": "session-end", "modelMinutes": 28.6, "why": "you ended the session", "looks": 7, "revisions": 2}

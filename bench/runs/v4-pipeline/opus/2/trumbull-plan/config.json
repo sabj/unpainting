@@ -1,0 +1,89 @@
+{
+ "subject": "Y1",
+ "name": "BENCHTRUMBULL",
+ "styleSelection": {
+  "style": "precise-watercolor",
+  "reason": "Precise architectural watercolor: sandstone planes, slate roofs and window recesses are value planes with hard edges on dry paper; ink only on the hard dark lines the target shows (mullions, recesses, signs).",
+  "regions": {}
+ },
+ "families": [
+  {
+   "id": "Y1.sky",
+   "bounds": [
+    0.45,
+    0,
+    1,
+    0.3
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Cool blues: pale cerulean-to-ultramarine sky, deeper at the top right and fading to near white above the rooflines, laid as one connected granulating wash; the same cool family holds the slate and glass, which stay on dry paper."
+  },
+  {
+   "id": "Y1.roofs",
+   "bounds": [
+    0.28,
+    0.02,
+    0.68,
+    0.21
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Blue-grey slate roof planes: one flat graded wash per plane, darker under the ridge, hard edge against the stone coping."
+  },
+  {
+   "id": "Y1.stone",
+   "bounds": [
+    0,
+    0.1,
+    1,
+    0.96
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Warm ochre and raw-sienna sandstone: broad pale lit planes on the central gable and right wing, block pattern as light dry brush over the connected wash, never as dark dots."
+  },
+  {
+   "id": "Y1.shade",
+   "bounds": [
+    0,
+    0.25,
+    0.45,
+    0.95
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Shaded stone of the left tower and left wing: greyer, cooler sandstone under one connected shadow glaze that crosses wall, windows and buttresses."
+  },
+  {
+   "id": "Y1.windows",
+   "bounds": [
+    0.05,
+    0.25,
+    0.98,
+    0.95
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Dark navy glass in lancet and mullioned windows: dark recess accents laid last on dry paper, lit stone mullions and sills left light."
+  },
+  {
+   "id": "Y1.tree",
+   "bounds": [
+    0.62,
+    0.63,
+    0.77,
+    0.97
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Young yellow-green street tree: one irregular canopy mass wet on dry, darker greens on its shadow side, thin trunk last."
+  },
+  {
+   "id": "Y1.street",
+   "bounds": [
+    0,
+    0.92,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Street level: light pavement, small figures and signal heads as small dark accents; white shirts kept light."
+  }
+ ],
+ "reserves": []
+}

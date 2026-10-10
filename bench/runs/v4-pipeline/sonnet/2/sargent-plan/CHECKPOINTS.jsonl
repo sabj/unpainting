@@ -1,0 +1,8 @@
+{"t": "2026-10-09 19:44:15 PDT", "kind": "start", "modelMinutes": 7.11, "variant": "region_w13_lay2_noslane", "renderKey": "4419294670e5bf85887d1936237212a99de9046f9ce1e7777f0298ba5b520f35"}
+{"t": "2026-10-09 19:47:30 PDT", "kind": "continue", "modelMinutes": 7.22, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 19:48:36 PDT", "kind": "look", "modelMinutes": 7.26, "n": 1, "boundary": "1", "strokes": 70, "penLines": 0, "passesDone": 1, "passesPlanned": 75}
+{"t": "2026-10-09 19:48:44 PDT", "kind": "look", "modelMinutes": 7.39, "n": 2, "boundary": "1", "strokes": 70, "penLines": 0, "passesDone": 1, "passesPlanned": 75}
+{"t": "2026-10-09 19:48:57 PDT", "kind": "continue", "modelMinutes": 7.61, "boundary": "1", "stopAt": 20, "strokes": 70}
+{"t": "2026-10-09 19:56:40 PDT", "kind": "look", "modelMinutes": 7.9, "n": 3, "boundary": "20", "strokes": 1152, "penLines": 0, "passesDone": 20, "passesPlanned": 75}
+{"t": "2026-10-09 20:06:01 PDT", "kind": "revise", "modelMinutes": 8.44, "boundary": "20", "revision": 1, "strokes": 1152, "passesDone": 20, "changed": ["config.json"], "variant": "region_w13_lay2_noslane"}
+{"t": "2026-10-09 20:07:08 PDT", "kind": "session-end", "modelMinutes": 8.63, "why": "you ended the session", "looks": 3, "revisions": 1}

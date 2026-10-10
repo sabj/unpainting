@@ -1,0 +1,16 @@
+{"subject":"MITTENS","name":"Mittens (orange tabby beside a curly-haired man)",
+ "styleSelection":{"style":"precise-watercolor","reason":"Watercolour portrait sketch: few light value washes carry the cat's sienna patches and the face planes, white paper carries the muzzle, chest, forehead and cheeks; fine sepia lines carry eyes, whiskers and contours.",
+   "regions":{
+     "MIT.human-hair":{"style":"ink-and-wash","reason":"Curls are below four cells as separate locks: one connected blue-grey value wash with paper flecks, one darker glaze under the curls, a few curl gestures in pen."},
+     "MIT.human-hair-side":{"style":"ink-and-wash","reason":"Same curly mass running down behind the ear: grey wash, one shadow glaze, broken edge into paper."}}},
+ "families":[
+   {"id":"MIT.cat-head","bounds":[0,0,0.5,0.5],"baseMove":"wet on dry","referenceCue":"Orange tabby head looking up: white ground with burnt-sienna patches on the brow, between the eyes and on the cheek; white muzzle; pale green-grey eyes with dark rims and slit pupils; fine whiskers."},
+   {"id":"MIT.cat-body","bounds":[0,0.5,0.5,1],"baseMove":"wet on dry","referenceCue":"Cat chest mostly white paper; raw and burnt sienna streaks down the left edge and a mid sienna-brown fur strip behind the man's cheek, laid as a few broken strokes, never a solid band."},
+   {"id":"MIT.human-hair","bounds":[0.5,0.2,0.97,0.5],"baseMove":"wet on dry","referenceCue":"Dark curly hair: blue-grey wash with broken edges into paper, darkest under the curls and along the hairline, white flecks between curls."},
+   {"id":"MIT.human-hair-side","bounds":[0.85,0.4,1,0.75],"baseMove":"wet on dry","referenceCue":"Hair falling behind the right ear, grey with a broken edge into white paper."},
+   {"id":"MIT.face","bounds":[0.5,0.48,0.92,1],"baseMove":"wet on dry","referenceCue":"Face mostly paper: forehead, nose bridge and cheeks white or a whisper of warm tint; a light sepia shadow down the left cheek against the cat and along the right jaw; brows and lids dark brown; stubble a broken pale grey-brown round the smile."}],
+ "reserves":[
+   {"reason":"catchlight, cat's near (right) eye, upper left of the slit pupil","bounds":[0.2687,0.2147,0.2734,0.2201]},
+   {"reason":"catchlight, cat's far (left) eye, beside the pupil","bounds":[0.0853,0.2409,0.0900,0.2463]},
+   {"reason":"catchlight, man's left eye, upper right of the iris","bounds":[0.6080,0.7139,0.6127,0.7193]},
+   {"reason":"catchlight, man's right eye, upper right of the iris","bounds":[0.8187,0.6803,0.8234,0.6857]}]}

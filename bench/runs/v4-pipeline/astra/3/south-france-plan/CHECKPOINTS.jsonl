@@ -1,0 +1,3 @@
+{"t": "2026-10-09 16:41:43 PDT", "kind": "start", "modelMinutes": 9.83, "variant": "region_w13_cur_sg8_dk10_dwg110", "renderKey": "ffca3bca7e00fd13d7bba931195ba5afed786a9b26f4ded114bcc171b03ec011"}
+{"t": "2026-10-09 17:09:23 PDT", "kind": "continue", "modelMinutes": 11.79, "boundary": null, "stopAt": "end", "strokes": null}
+{"t": "2026-10-09 17:37:47 PDT", "kind": "session-end", "modelMinutes": 14.56, "why": "you ended the session", "looks": 0, "revisions": 0}

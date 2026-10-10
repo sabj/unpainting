@@ -1,0 +1,14 @@
+{"subject":"HILLS","name":"Hills",
+ "styleSelection":{"style":"precise-watercolor","reason":"Requested loose ink and wash: oak crowns and road edges are below wash resolution and carried by pen over connected value washes; meadows stay broad pale washes.",
+   "regions":{}},
+ "families":[
+  {"id":"HILLS.meadow-upper","bounds":[0.46,0,1,0.3],"baseMove":"wet on dry","referenceCue":"sunlit yellow-green upper slope, graded paler to the top right"},
+  {"id":"HILLS.meadow-left","bounds":[0.05,0.12,0.5,0.42],"baseMove":"wet on dry","referenceCue":"light green wedge falling from the left road toward the centre"},
+  {"id":"HILLS.meadow-centre","bounds":[0.45,0.56,0.88,1],"baseMove":"wet on dry","referenceCue":"broad lit yellow-green meadow, lower centre, darker olive at its edges"},
+  {"id":"HILLS.woods-left","bounds":[0,0.3,0.4,1],"baseMove":"wet on dry","referenceCue":"dense blue-green oak canopy, deep indigo shadow pockets"},
+  {"id":"HILLS.woods-band","bounds":[0.35,0.25,1,0.62],"baseMove":"wet on dry","referenceCue":"diagonal band of oaks across the middle, darkest indigo right of centre"},
+  {"id":"HILLS.woods-right","bounds":[0.84,0.62,1,1],"baseMove":"wet on dry","referenceCue":"oak clump lower right, blue-green with dark trunks"},
+  {"id":"HILLS.road-left","bounds":[0.17,0.17,0.27,0.52],"baseMove":"wet on dry","referenceCue":"pale tan dirt road, near paper, dark speckled edges"},
+  {"id":"HILLS.road-centre","bounds":[0.4,0.56,0.55,0.95],"baseMove":"wet on dry","referenceCue":"pale tan road curving down from under the big oak"}
+ ],
+ "reserves":[]}

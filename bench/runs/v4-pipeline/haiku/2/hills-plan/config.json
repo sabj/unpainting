@@ -1,0 +1,23 @@
+{
+ "subject": "hills",
+ "name": "Hills",
+ "styleSelection": {
+  "style": "ink-and-wash",
+  "reason": "loose gestural rendering of landscape with path structures defined by ink lines and wash values",
+  "regions": {
+   "hills.sky": {"style": "ink-and-wash", "reason": "soft distant background with minimal detail"},
+   "hills.upper": {"style": "ink-and-wash", "reason": "forested slopes with directional tree marks"},
+   "hills.middle": {"style": "ink-and-wash", "reason": "green hills with value transitions and path edges"},
+   "hills.lower": {"style": "ink-and-wash", "reason": "foreground shadows and forest with dark gestural marks"}
+  }
+ },
+ "families": [
+  {"id": "hills.sky", "bounds": [0, 0, 1, 0.2], "baseMove": "wet on dry", "referenceCue": "pale distant sky and high forest"},
+  {"id": "hills.forest", "bounds": [0, 0.15, 1, 0.4], "baseMove": "wet on dry", "referenceCue": "forested slopes and mid-tone terrain"},
+  {"id": "hills.main", "bounds": [0.05, 0.35, 0.95, 0.75], "baseMove": "wet on dry", "referenceCue": "central green hills with lit planes and paths"},
+  {"id": "hills.foreground", "bounds": [0, 0.65, 1, 1], "baseMove": "wet on dry", "referenceCue": "foreground dark slopes and forest"}
+ ],
+ "reserves": [
+  {"reason": "bright path on central hill", "bounds": [0.35, 0.45, 0.7, 0.6]}
+ ]
+}

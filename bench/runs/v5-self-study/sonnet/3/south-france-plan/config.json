@@ -1,0 +1,128 @@
+{
+ "subject": "SF",
+ "name": "South France",
+ "styleSelection": {
+  "style": "urban-sketch",
+  "reason": "Requested urban sketch, pen plus light wash: the pen carries the buildings, cypress, pine limbs and the edges of the tree masses; the village, terraces and cypress stay pale flat urban-sketch washes.",
+  "regions": {
+   "SF.foliage-centre": {
+    "style": "precise-watercolor",
+    "reason": "large olive and pine masses: built light to dark in graded layers, so the lit yellow-green and the shaded greens separate instead of one flat olive wash"
+   },
+   "SF.foliage-left": {
+    "style": "precise-watercolor",
+    "reason": "olive crowns and ground: graded layers, one connected mass per crown"
+   },
+   "SF.foliage-low": {
+    "style": "precise-watercolor",
+    "reason": "mid green clumps along the bottom: graded layers"
+   },
+   "SF.pine": {
+    "style": "precise-watercolor",
+    "reason": "bright yellow-green pine crown must stay light against the darker olives; layers built light to dark"
+   }
+  }
+ },
+ "families": [
+  {
+   "id": "SF.village",
+   "bounds": [
+    0.645,
+    0.33,
+    0.96,
+    0.82
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "terracotta roofs, tan sunlit walls, lilac shadow sides; the focal group, pen carries the edges"
+  },
+  {
+   "id": "SF.village-top",
+   "bounds": [
+    0.39,
+    0,
+    0.78,
+    0.235
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "small pale houses, purple shadow wall, ochre roofs among trees"
+  },
+  {
+   "id": "SF.terrace",
+   "bounds": [
+    0,
+    0.03,
+    0.36,
+    0.4
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "ochre terrace walls and path, hut with dark opening, olive heads"
+  },
+  {
+   "id": "SF.cypress",
+   "bounds": [
+    0.27,
+    0,
+    0.42,
+    0.37
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "dark blue-green flame shapes, the darkest darks"
+  },
+  {
+   "id": "SF.hills",
+   "bounds": [
+    0.83,
+    0,
+    1,
+    0.18
+   ],
+   "baseMove": "wet in wet",
+   "referenceCue": "distant blue-green hills, soft and pale"
+  },
+  {
+   "id": "SF.foliage-centre",
+   "bounds": [
+    0.35,
+    0.22,
+    0.76,
+    0.8
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "grey-green olive crowns with a light yellow-green mass and dark cypress behind"
+  },
+  {
+   "id": "SF.foliage-left",
+   "bounds": [
+    0,
+    0.38,
+    0.36,
+    0.78
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "olive trees, small trunks, ochre ground between"
+  },
+  {
+   "id": "SF.pine",
+   "bounds": [
+    0.1,
+    0.55,
+    0.5,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "bright yellow-green pine crown, dark trunk and limbs"
+  },
+  {
+   "id": "SF.foliage-low",
+   "bounds": [
+    0.5,
+    0.8,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "mid green clumps along the bottom edge"
+  }
+ ],
+ "reserves": []
+}

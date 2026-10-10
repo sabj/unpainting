@@ -1,0 +1,18 @@
+{
+  "subject": "WS",
+  "name": "White Ships",
+  "drawing": {
+    "medium": "graphite",
+    "inkColor": "sepia",
+    "amount": 0.4,
+    "lines": "all",
+    "weight": 0.45,
+    "closingLines": 1
+  },
+  "drawingNote": "A graphite lay-in from the strongest 40% of the lineart candidate lines, so the hulls, masts and waterline are placed before any wash. The closing pen is sepia and modest: it draws only a subset of the same lines that keeps the masts and rigging (long, straight, steep lines) and the hull edges with a dark side, as a watercolorist would sharpen them at the end. Water, reflections and sky get no ink. closingLines is 1 because that subset is already the choice: a thin rigging line has no edge strength along its own centre, so an edge minimum would cut it away.",
+  "run": {
+    "lines": "made by tools/seg/lineart-drawing.py, since removed from the repository: tools/seg/lineart-drawing.py examples/targets/white-ships.jpg --rules {\"set_source\":\"lineart\",\"dark\":\"none\",\"setting\":\"all\",\"edge\":24} --out work/lines/white-ships-all",
+    "closingLines": "work/lines/white-ships-closing-lines.json: the lines of white-ships-all at least 30 px long, straight (chord over length 0.93 or more), 45 to 135 degrees from horizontal and centred above 80% of the height; or at least 25 px long with weight 0.64 or more",
+    "painter": "node tools/paint-plate.mjs --image examples/targets/white-ships.jpg --width 720 --mode full --threads 4 --valueplan examples/plans/white-ships.json --drawingfile white-ships-all --drawinglast white-ships-closing --drawinglastmin 0.4 --graphiteprofile graphite-2B --openingpressure 0.7 --openingminmm 4 --marks 1 --phaselabels 1 --frames 200 --video 0 --out work/white-ships"
+  }
+}

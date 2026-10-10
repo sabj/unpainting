@@ -1,0 +1,13 @@
+{"t": "2026-10-09 17:06:03 PDT", "kind": "start", "modelMinutes": 9.37, "variant": "region_w13_lay2_cg10_dk12_rg0_noslane_acc3", "renderKey": "627756b18495bb4ff5634967c95a7cd7bfba0a2618588d1b83e97bea5c8dbb25"}
+{"t": "2026-10-09 17:09:12 PDT", "kind": "look", "modelMinutes": 9.54, "n": 1, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 64}
+{"t": "2026-10-09 17:09:17 PDT", "kind": "continue", "modelMinutes": 9.63, "boundary": "0", "stopAt": 17, "strokes": 0}
+{"t": "2026-10-09 17:14:45 PDT", "kind": "look", "modelMinutes": 9.84, "n": 2, "boundary": "17", "strokes": 988, "penLines": 0, "passesDone": 17, "passesPlanned": 64}
+{"t": "2026-10-09 17:50:38 PDT", "kind": "revise", "modelMinutes": 14.17, "boundary": "17", "revision": 1, "strokes": 988, "passesDone": 17, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w13_lay2_cg10_dk12_rg0_acc3_spl12_sml45"}
+{"t": "2026-10-09 18:01:13 PDT", "kind": "look", "modelMinutes": 14.88, "n": 3, "boundary": "34", "strokes": 2504, "penLines": 0, "passesDone": 34, "passesPlanned": 64}
+{"t": "2026-10-09 18:23:58 PDT", "kind": "revise", "modelMinutes": 17.41, "boundary": "34", "revision": 2, "strokes": 2504, "passesDone": 34, "changed": ["variant.txt"], "variant": "region_w13_lay2_cg10_dk12_rg0_acc3_spl12_sml45_lad"}
+{"t": "2026-10-09 18:35:11 PDT", "kind": "look", "modelMinutes": 18.06, "n": 4, "boundary": "51", "strokes": 6484, "penLines": 0, "passesDone": 51, "passesPlanned": 64}
+{"t": "2026-10-09 18:36:10 PDT", "kind": "continue", "modelMinutes": 19.04, "boundary": "51", "stopAt": 63, "strokes": 6484}
+{"t": "2026-10-09 18:43:19 PDT", "kind": "look", "modelMinutes": 19.42, "n": 5, "boundary": "63", "strokes": 9065, "penLines": 0, "passesDone": 63, "passesPlanned": 64}
+{"t": "2026-10-09 18:43:55 PDT", "kind": "continue", "modelMinutes": 20.03, "boundary": "63", "stopAt": "end", "strokes": 9065}
+{"t": "2026-10-09 18:49:09 PDT", "kind": "finished", "modelMinutes": 20.6, "strokes": 12111}
+{"t": "2026-10-09 18:49:24 PDT", "kind": "session-end", "modelMinutes": 20.86, "why": "you ended the session", "looks": 5, "revisions": 2}

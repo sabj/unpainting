@@ -1,0 +1,6 @@
+{"t": "2026-10-09 16:30:13 PDT", "kind": "start", "modelMinutes": 11.48, "variant": "region_w13_dk10_cg10", "renderKey": "4460b4a2403d5978431c0beca63fc0ccb5dd6f383df6afc39a82e0848cf0e44b"}
+{"t": "2026-10-09 17:06:27 PDT", "kind": "continue", "modelMinutes": 21.68, "boundary": null, "stopAt": "end", "strokes": null}
+{"t": "2026-10-09 17:51:57 PDT", "kind": "continue", "modelMinutes": 38.52, "boundary": null, "stopAt": "closing", "strokes": null}
+{"t": "2026-10-09 19:26:12 PDT", "kind": "continue", "modelMinutes": 55.13, "boundary": null, "stopAt": "end", "strokes": null}
+{"t": "2026-10-09 19:28:28 PDT", "kind": "session-end", "modelMinutes": 55.89, "why": "you ended the session", "looks": 0, "revisions": 0}
+{"t": "2026-10-09 20:16:06 PDT", "kind": "machine-lost", "modelMinutes": 103.52, "n": 1, "why": "never ran: box ended while the job waited"}

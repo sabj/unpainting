@@ -1,0 +1,34 @@
+{
+  "subject": "HILLS",
+  "name": "Hills",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose ink and wash: dense oak canopies are below wash resolution and carry their structure in pen over mixed dark washes; sparse long pen lines open the sheet on path edges and grass boundaries.",
+    "regions": {
+      "HILLS.grass-top": {"style": "precise-watercolor", "reason": "Open sunlit grass is a value plane with a crisp edge against the canopy, not a texture; one connected pale wash, then cast-shadow glazes."},
+      "HILLS.grass-wedge": {"style": "precise-watercolor", "reason": "Open sunlit grass is a value plane with a crisp edge against the canopy."},
+      "HILLS.grass-band": {"style": "precise-watercolor", "reason": "Narrow sunlit band: a wash plane with one crisp lower edge."},
+      "HILLS.grass-lower": {"style": "precise-watercolor", "reason": "Largest light mass: one connected yellow-green wash, shadow glazes where oaks cast onto it."},
+      "HILLS.grass-lowleft": {"style": "precise-watercolor", "reason": "Grass between path and forest: wash plane."},
+      "HILLS.path-left": {"style": "precise-watercolor", "reason": "Pale dirt track kept as near-paper, crisp both sides."},
+      "HILLS.path-lower": {"style": "precise-watercolor", "reason": "Pale dirt track kept as near-paper, crisp both sides."},
+      "HILLS.path-top": {"style": "precise-watercolor", "reason": "Pale dirt track kept as near-paper, crisp both sides."}
+    }
+  },
+  "families": [
+    {"id": "HILLS.grass-top", "bounds": [0.48, 0.0, 1.0, 0.215], "baseMove": "wet on dry", "referenceCue": "bright yellow-green slope at the top right, thin track along its lower edge"},
+    {"id": "HILLS.grass-wedge", "bounds": [0.18, 0.15, 0.50, 0.446], "baseMove": "wet on dry", "referenceCue": "diagonal wedge of lit grass between two canopy masses, left of centre"},
+    {"id": "HILLS.grass-band", "bounds": [0.76, 0.165, 0.98, 0.37], "baseMove": "wet on dry", "referenceCue": "narrow lit grass band running down-right above the dark forest"},
+    {"id": "HILLS.grass-lower", "bounds": [0.48, 0.57, 1.0, 1.0], "baseMove": "wet on dry", "referenceCue": "large sunlit meadow, brightest yellow-green, mottled, oak shadows on it"},
+    {"id": "HILLS.grass-lowleft", "bounds": [0.31, 0.60, 0.49, 1.0], "baseMove": "wet on dry", "referenceCue": "grass strip beside the lower path, bounded by forest on the left"},
+    {"id": "HILLS.path-left", "bounds": [0.17, 0.17, 0.26, 0.41], "baseMove": "wet on dry", "referenceCue": "pale peach dirt track curving down, dark dashes along its edges"},
+    {"id": "HILLS.path-lower", "bounds": [0.40, 0.566, 0.536, 0.97], "baseMove": "wet on dry", "referenceCue": "pale peach dirt track, widest at the bend, near paper white"},
+    {"id": "HILLS.path-top", "bounds": [0.706, 0.0, 0.77, 0.09], "baseMove": "wet on dry", "referenceCue": "short pale track at the top edge"},
+    {"id": "HILLS.forest-left", "bounds": [0.0, 0.0, 0.2, 1.0], "baseMove": "wet on dry", "referenceCue": "dense dark blue-green canopy down the left edge, olive lights, white flecks"},
+    {"id": "HILLS.forest-lowleft", "bounds": [0.0, 0.62, 0.33, 1.0], "baseMove": "wet on dry", "referenceCue": "darkest indigo masses bottom left with olive-grey crowns"},
+    {"id": "HILLS.forest-centre", "bounds": [0.2, 0.2, 0.85, 0.56], "baseMove": "wet on dry", "referenceCue": "large dark indigo canopy mass, blue-black crowns over olive mid-tones"},
+    {"id": "HILLS.oak", "bounds": [0.28, 0.40, 0.46, 0.70], "baseMove": "wet on dry", "referenceCue": "big olive-grey oak with dark trunk and branches, focal point beside the path bend"},
+    {"id": "HILLS.forest-right", "bounds": [0.83, 0.68, 1.0, 0.96], "baseMove": "wet on dry", "referenceCue": "dark oak crown at lower right, lit edge towards the meadow"}
+  ],
+  "reserves": []
+}

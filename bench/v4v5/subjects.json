@@ -1,0 +1,40 @@
+{
+ "note": "V4 and V5 subjects. The target is the V2 crop (bench/v2/targets/). The painter paints it at width px on a sheet sheetmm wide. trumbull: stone-block and palette tokens apply.",
+ "subjects": {
+  "hills": {
+   "name": "Hills",
+   "taskStyle": "loose ink and wash",
+   "width": 1224,
+   "sheetmm": 158.04788213627992,
+   "trumbull": false
+  },
+  "south-france": {
+   "name": "France",
+   "taskStyle": "urban sketch, pen plus light wash",
+   "width": 1216,
+   "sheetmm": 280,
+   "trumbull": false
+  },
+  "sargent": {
+   "name": "Ships",
+   "taskStyle": "pure watercolor, no ink",
+   "width": 1200,
+   "sheetmm": 280,
+   "trumbull": false
+  },
+  "trumbull": {
+   "name": "Trumbull",
+   "taskStyle": "precise architectural watercolor",
+   "width": 1200,
+   "sheetmm": 280,
+   "trumbull": true
+  },
+  "mittens": {
+   "name": "Mittens",
+   "taskStyle": "watercolor portrait sketch, fine lines and light washes",
+   "width": 1200,
+   "sheetmm": 280,
+   "trumbull": false
+  }
+ }
+}

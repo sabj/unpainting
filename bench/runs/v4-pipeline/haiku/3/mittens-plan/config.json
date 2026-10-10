@@ -1,0 +1,15 @@
+{
+  "subject": "BENCHMITTENS",
+  "name": "Mittens portrait",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "fine lines and light washes require clean edges and transparent layering"
+  },
+  "families": [],
+  "reserves": [
+    {"reason": "cat left eye catchlight", "bounds": [0.09, 0.12, 0.135, 0.165]},
+    {"reason": "cat right eye catchlight", "bounds": [0.15, 0.12, 0.195, 0.165]},
+    {"reason": "person left eye highlight", "bounds": [0.58, 0.16, 0.62, 0.19]},
+    {"reason": "person right eye highlight", "bounds": [0.67, 0.16, 0.71, 0.19]}
+  ]
+}

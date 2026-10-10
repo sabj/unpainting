@@ -1,0 +1,25 @@
+{"t": "2026-10-09 13:55:29 PDT", "kind": "start", "modelMinutes": 8.77, "variant": "region_w13_lay2_dk11_cg10_sep3_dwg139", "renderKey": "4043bd3af6a63cc730942823c5f973b2bb90c3313563b2b4fb70837966d7ebf2"}
+{"t": "2026-10-09 14:01:04 PDT", "kind": "adopted", "modelMinutes": 9.8, "unanswered": []}
+{"t": "2026-10-09 14:03:50 PDT", "kind": "machine-lost", "modelMinutes": 9.53, "n": 1, "why": "infra: exit 1, queued 1 jobs on lease 1009133434-677; outputs land in <local path>"}
+{"t": "2026-10-09 14:06:06 PDT", "kind": "adopted", "modelMinutes": 11.79, "unanswered": []}
+{"t": "2026-10-09 14:07:29 PDT", "kind": "look", "modelMinutes": 9.97, "n": 1, "boundary": "0", "strokes": 0, "penLines": 20, "passesDone": 0, "passesPlanned": 27}
+{"t": "2026-10-09 14:08:05 PDT", "kind": "continue", "modelMinutes": 10.58, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 14:08:46 PDT", "kind": "look", "modelMinutes": 10.61, "n": 2, "boundary": "1", "strokes": 11, "penLines": 20, "passesDone": 1, "passesPlanned": 27}
+{"t": "2026-10-09 14:09:07 PDT", "kind": "continue", "modelMinutes": 10.97, "boundary": "1", "stopAt": 6, "strokes": 11}
+{"t": "2026-10-09 14:10:42 PDT", "kind": "look", "modelMinutes": 10.99, "n": 3, "boundary": "6", "strokes": 57, "penLines": 20, "passesDone": 6, "passesPlanned": 27}
+{"t": "2026-10-09 14:11:01 PDT", "kind": "adopted", "modelMinutes": 11.3, "unanswered": []}
+{"t": "2026-10-09 14:11:05 PDT", "kind": "continue", "modelMinutes": 11.37, "boundary": "6", "stopAt": 11, "strokes": 57}
+{"t": "2026-10-09 14:13:02 PDT", "kind": "look", "modelMinutes": 11.46, "n": 4, "boundary": "11", "strokes": 136, "penLines": 20, "passesDone": 11, "passesPlanned": 27}
+{"t": "2026-10-09 14:13:40 PDT", "kind": "continue", "modelMinutes": 12.08, "boundary": "11", "stopAt": 16, "strokes": 136}
+{"t": "2026-10-09 14:15:16 PDT", "kind": "look", "modelMinutes": 12.16, "n": 5, "boundary": "16", "strokes": 261, "penLines": 20, "passesDone": 16, "passesPlanned": 27}
+{"t": "2026-10-09 14:18:24 PDT", "kind": "revise", "modelMinutes": 14.44, "boundary": "16", "revision": 1, "strokes": 261, "passesDone": 16, "changed": ["closing-lines.json", "variant.txt"], "variant": "region_w13_lay2_dk13_cg10_sep3_dwg139_dp80_dg1"}
+{"t": "2026-10-09 14:21:56 PDT", "kind": "look", "modelMinutes": 14.66, "n": 6, "boundary": "21", "strokes": 502, "penLines": 20, "passesDone": 21, "passesPlanned": 27}
+{"t": "2026-10-09 14:22:15 PDT", "kind": "adopted", "modelMinutes": 14.99, "unanswered": []}
+{"t": "2026-10-09 14:22:46 PDT", "kind": "continue", "modelMinutes": 15.51, "boundary": "21", "stopAt": "closing", "strokes": 502}
+{"t": "2026-10-09 14:23:09 PDT", "kind": "adopted", "modelMinutes": 15.49, "unanswered": ["30"]}
+{"t": "2026-10-09 14:26:54 PDT", "kind": "look", "modelMinutes": 15.73, "n": 7, "boundary": "closing", "strokes": 3121, "penLines": 20, "passesDone": 40, "passesPlanned": 40}
+{"t": "2026-10-09 14:27:46 PDT", "kind": "continue", "modelMinutes": 16.6, "boundary": "closing", "stopAt": "end", "strokes": 3121}
+{"t": "2026-10-09 14:29:15 PDT", "kind": "finished", "modelMinutes": 16.59, "strokes": 3121}
+{"t": "2026-10-09 14:29:26 PDT", "kind": "look", "modelMinutes": 16.77, "n": 8, "boundary": "final"}
+{"t": "2026-10-09 14:30:04 PDT", "kind": "adopted", "modelMinutes": 17.4, "unanswered": []}
+{"t": "2026-10-09 14:30:07 PDT", "kind": "session-end", "modelMinutes": 17.45, "why": "you ended the session", "looks": 8, "revisions": 1}

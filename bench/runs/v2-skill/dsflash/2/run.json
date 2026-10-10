@@ -1,0 +1,70 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "dsflash",
+  "name": "DeepSeek V4.1 Flash",
+  "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+  "effort": "n/a",
+  "runner": "together"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [],
+  "progressionJudges": []
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 16,
+  "tokens": 7496719,
+  "costUSD": 2.402,
+  "estCostUSD": null,
+  "usage": null
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {},
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": null,
+  "partialComposite": null,
+  "pm": null,
+  "cropsScored": 0,
+  "complete": false,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": null,
+  "progressionRisk": null,
+  "review": null
+ },
+ "complete": false,
+ "judgeVersion": "J1"
+}

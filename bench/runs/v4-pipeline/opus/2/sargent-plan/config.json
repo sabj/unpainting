@@ -1,0 +1,15 @@
+{"subject":"BENCHSARGENT","name":"White Ships (Sargent)",
+ "styleSelection":{"style":"precise-watercolor","reason":"Sargent lays the hull, rigging and masts as separate confident wet-on-dry strokes with one hard edge; value planes and paper lights carry the form, no ink anywhere; the sea too is laid wet on dry (its atmospheric-wet charge puddled and stopped try 1 of this session)",
+   "regions":{}},
+ "families":[
+  {"id":"sargent.hull","bounds":[0.24,0.0,0.66,0.9],"baseMove":"wet on dry","referenceCue":"white ship's bow: pale blue-grey planes, paper streaks left on the lit side, orange rivet line and dark hawse pipe on dry paper last"},
+  {"id":"sargent.sky-left","bounds":[0.0,0.0,0.24,0.47],"baseMove":"wet on dry","referenceCue":"pale cerulean sky crossed by a salmon mast and grey diagonal spars"},
+  {"id":"sargent.sky-right","bounds":[0.66,0.0,1.0,0.68],"baseMove":"wet on dry","referenceCue":"warm paper-white sky and sail with loose blue strokes, two dark pulley blocks, rust pole with green dots"},
+  {"id":"sargent.boat-left","bounds":[0.0,0.47,0.24,0.8],"baseMove":"wet on dry","referenceCue":"blue boat with broken white hatching and an ochre anchor"},
+  {"id":"sargent.water","bounds":[0.66,0.68,1.0,1.0],"baseMove":"wet on dry","referenceCue":"teal-green water with ochre light, broad strokes laid side by side"},
+  {"id":"sargent.foreground","bounds":[0.0,0.8,0.66,1.0],"baseMove":"wet on dry","referenceCue":"darkest band: blue-black shadow at the hull's foot, ochre anchor, dark stays"}],
+ "reserves":[
+  {"reason":"brightest paper in the right sky, beside the pulley block","bounds":[0.71,0.135,0.75,0.184]},
+  {"reason":"brightest paper in the right sky, below the pulley block","bounds":[0.72,0.234,0.76,0.283]},
+  {"reason":"brightest paper at the top right, between the spars","bounds":[0.79,0.037,0.83,0.086]},
+  {"reason":"pale sail light above the horizon","bounds":[0.73,0.49,0.77,0.54]}]}

@@ -1,0 +1,11 @@
+{"subject":"mittens","name":"Mittens V5T3",
+ "styleSelection":{"style":"precise-watercolor","reason":"light washes, fine sketch lines, luminous portrait style",
+   "regions":{"mittens.cat":{"style":"ink-and-wash","reason":"warm fur with directional strokes"},
+              "mittens.hair":{"style":"ink-and-wash","reason":"dark hair with wave structure"}}},
+ "families":[{"id":"mittens.cat","bounds":[0,0.08,0.4,0.75],"baseMove":"wet on dry","referenceCue":"ginger cat head and neck, lit and shadow united"},
+             {"id":"mittens.face","bounds":[0.35,0.15,1,0.85],"baseMove":"wet on dry","referenceCue":"portrait face, warm lit side into cool shadow"},
+             {"id":"mittens.hair","bounds":[0.4,0,1,0.4],"baseMove":"wet on dry","referenceCue":"dark wavy hair with light breaks"}],
+ "reserves":[{"reason":"cat left eye catchlight","bounds":[0.14,0.2,0.18,0.24]},
+             {"reason":"cat right eye catchlight","bounds":[0.24,0.23,0.28,0.27]},
+             {"reason":"human left eye catchlight","bounds":[0.62,0.3,0.67,0.34]},
+             {"reason":"human right eye catchlight","bounds":[0.78,0.3,0.82,0.34]}]}

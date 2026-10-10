@@ -1,0 +1,7 @@
+{"t": "2026-10-09 16:23:47 PDT", "kind": "start", "modelMinutes": 6.64, "variant": "region_w13_noslane_dk11_cg10_sep4_dwg100_opp30", "renderKey": "83b0ff6918c54776b32d14e5c69b5a5cfc50a7fc99e601d2c5a868472e411105"}
+{"t": "2026-10-09 16:53:12 PDT", "kind": "continue", "modelMinutes": 8.1, "boundary": null, "stopAt": "closing", "strokes": null}
+{"t": "2026-10-09 16:58:26 PDT", "kind": "continue", "modelMinutes": 8.82, "boundary": null, "stopAt": 14, "strokes": null}
+{"t": "2026-10-09 17:03:51 PDT", "kind": "continue", "modelMinutes": 8.96, "boundary": null, "stopAt": "end", "strokes": null}
+{"t": "2026-10-09 18:39:14 PDT", "kind": "finished", "modelMinutes": 52.83, "strokes": 8242}
+{"t": "2026-10-09 18:39:19 PDT", "kind": "look", "modelMinutes": 52.93, "n": 1, "boundary": "final"}
+{"t": "2026-10-09 18:39:41 PDT", "kind": "session-end", "modelMinutes": 53.28, "why": "you ended the session", "looks": 1, "revisions": 0}

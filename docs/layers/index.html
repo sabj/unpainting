@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trumbull Layers</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2399543a' d='M12 2 2 7l10 5 10-5-10-5ZM2 11v3l10 5 10-5v-3l-10 5-10-5Zm0 7v2l10 4 10-4v-2l-10 4-10-4Z'/%3E%3C/svg%3E">
+<style>
+:root { --bg:#f6f2ea; --ink:#2b2a27; --muted:#746c60; --line:#d9d2c4; --accent:#99543a; }
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+body { margin:0; height:100dvh; display:flex; flex-direction:column; background:var(--bg); color:var(--ink); font:14px/1.45 -apple-system, Helvetica, Arial, sans-serif; }
+header { padding:12px 20px 4px; flex:none; }
+h1 { font:600 20px Georgia, serif; margin:0 0 2px; }
+header p { margin:0; color:var(--muted); max-width:1050px; font-size:13px; }
+main { display:grid; grid-template-columns:280px minmax(0,1fr); gap:16px; padding:10px 20px 14px; flex:1; min-height:0; }
+aside { display:flex; flex-direction:column; gap:10px; overflow:auto; min-height:0; padding-right:4px; }
+main > section { display:flex; flex-direction:column; min-width:0; min-height:0; }
+fieldset { border:1px solid var(--line); border-radius:6px; padding:6px 8px 8px; margin:0; background:#fbf8f2; min-width:0; }
+legend { font-weight:600; padding:0 4px; }
+label { display:flex; align-items:center; gap:6px; margin:3px 0; cursor:pointer; font-size:12px; }
+label small { color:var(--muted); margin-left:auto; font-size:10px; white-space:nowrap; }
+input[type=checkbox] { accent-color:var(--accent); flex:none; }
+.row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+button { font:inherit; padding:4px 8px; border:1px solid var(--line); border-radius:5px; color:var(--ink); background:#fbf8f2; cursor:pointer; }
+button:hover { background:#efe8da; }
+button.on { background:var(--ink); color:#fbf8f2; border-color:var(--ink); }
+button:focus-visible, input:focus-visible, .li:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.tabs { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-bottom:8px; flex:none; }
+.tabs button { font-size:12px; }
+.tabs .sep { flex:1; }
+.stage-wrap { position:relative; min-height:0; }
+canvas.sheet { width:100%; height:100%; object-fit:contain; display:block; border-radius:3px; }
+#vBuild, #vTruth, #vStack { flex:1; min-height:0; }
+#vTruth { display:flex; flex-direction:column; }
+#vTruth canvas { min-height:0; flex:1; }
+.sw { width:10px; height:10px; border-radius:2px; display:inline-block; flex:none; }
+input[type=range] { width:100%; accent-color:var(--accent); }
+.slider { display:grid; grid-template-columns:72px 1fr 30px; align-items:center; gap:6px; margin:2px 0; font-size:12px; }
+.slider span:last-child { color:var(--muted); text-align:right; }
+#stack { cursor:grab; touch-action:none; user-select:none; perspective:2200px; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+#stackInner { position:relative; transform-style:preserve-3d; width:760px; height:521px; flex:none; }
+#stackInner .plane { position:absolute; inset:0; transform-style:preserve-3d; transition:transform .25s ease, opacity .2s ease; }
+#stackInner canvas { width:100%; height:100%; display:block; border-radius:3px; backface-visibility:visible; }
+#stackInner .plane.paper canvas { box-shadow:0 2px 14px rgba(43,42,39,.15); }
+#stackInner .tag { position:absolute; left:100%; top:0; margin-left:14px; white-space:nowrap; font:italic 15px Georgia, serif; }
+#stackInner .plane.dim, #spread figure.dim { opacity:.12; }
+#stackInner .plane.hot canvas, #spread figure.hot { outline:2px solid var(--accent); }
+.note { color:var(--muted); font-size:12px; }
+#scrub { margin:8px 0 0; }
+#fams .subject-row { display:flex; align-items:center; gap:4px; }
+#fams .subject-row label { flex:1; min-width:0; }
+.subject-play { width:26px; height:26px; padding:5px; display:grid; place-items:center; flex:none; }
+button svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+#subjList { display:none; }
+#layerList { padding:8px; border:1px solid var(--line); border-radius:6px; background:#fbf8f2; }
+#layerList .li { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:4px; cursor:pointer; font-size:12px; }
+#layerList .li:hover { background:#efe8da; }
+#layerList .li.solo { background:var(--ink); color:#fbf8f2; }
+#lis .li canvas { width:40px; height:auto; border:1px solid var(--line); background:#fbf8f2; border-radius:2px; }
+#exitFull { display:none; }
+#spread { display:none; height:100%; padding:4px 0; gap:6px; align-content:center; justify-content:center; overflow:hidden; }
+body.spread #spread { display:grid; } body.spread #stack { display:none; }
+#spread figure { margin:0; min-width:0; background:#fbf8f2; border:1px solid var(--line); border-radius:3px; padding:3px; cursor:pointer; }
+#spread figure canvas { width:100%; display:block; }
+#spread figcaption { font:11px/16px Georgia, serif; padding-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#timeline { display:grid; grid-template-columns:auto auto 1fr; gap:4px 10px; align-items:center; margin:0 0 8px; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:#fbf8f2; flex:none; min-width:0; }
+#transport { display:flex; gap:4px; }
+#transport button { display:grid; place-items:center; width:30px; height:30px; padding:0; }
+#playLbl { justify-self:end; width:204px; min-width:0; line-height:16px; font-size:12px; }
+#stageName { display:block; white-space:normal; overflow-wrap:break-word; }
+#frameName { display:block; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+#tTrack { position:relative; grid-column:1 / -1; height:44px; min-width:0; }
+#tBands, #tTicks { position:absolute; left:9px; right:9px; }
+#tBands { top:9px; height:6px; border-radius:3px; overflow:hidden; pointer-events:none; }
+#tBands span { position:absolute; top:0; bottom:0; background:var(--band); }
+#tSlider { appearance:none; position:absolute; inset:0 0 auto; width:100%; height:24px; margin:0; background:transparent; cursor:pointer; }
+#tSlider::-webkit-slider-runnable-track { height:6px; background:transparent; }
+#tSlider::-webkit-slider-thumb { appearance:none; width:18px; height:18px; margin-top:-6px; border-radius:50%; border:2px solid #fbf8f2; background:var(--ink); box-shadow:0 0 0 1px var(--ink); }
+#tSlider::-moz-range-track { height:6px; background:transparent; }
+#tSlider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; border:2px solid #fbf8f2; background:var(--ink); box-shadow:0 0 0 1px var(--ink); }
+#tTicks { top:25px; height:18px; font-size:10px; color:var(--muted); }
+#tTicks .tick { position:absolute; height:18px; text-align:center; }
+#tTicks .tick-label { display:inline-block; white-space:nowrap; visibility:hidden; }
+#tTicks .tick-label.fits { visibility:visible; }
+#tTooltip { position:absolute; bottom:48px; max-width:100%; padding:4px 8px; border:1px solid var(--line); border-radius:4px; background:var(--bg); font-size:12px; pointer-events:none; z-index:30; }
+.kicker, .tl { font:600 10px -apple-system, Helvetica, Arial; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+.kicker { margin:2px 0 -4px 2px; }
+.tl { margin-right:2px; }
+body.full header, body.full aside { display:none; }
+body.full main { display:block; padding:0; }
+body.full .tabs { position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:20; width:max-content; max-width:calc(100% - 20px); background:#fbf8f2; padding:6px; border-radius:6px; }
+body.full #stack { position:fixed; inset:0; height:100dvh; }
+body.full #subjList, body.full #layerList { display:block; position:fixed; top:64px; z-index:20; max-height:calc(100dvh - 220px); overflow:auto; width:240px; background:#fbf8f2; border:1px solid var(--line); border-radius:6px; padding:8px; }
+body.full #subjList { left:10px; }
+body.full #layerList { right:10px; }
+#subjList .s { display:flex; align-items:center; gap:6px; padding:3px 0; font-size:12px; }
+body.full #exitFull { display:block; }
+body.full #spread { position:fixed; inset:0; padding:64px 260px 130px; }
+body.full #timeline { position:fixed; left:260px; right:260px; bottom:12px; z-index:25; margin:0; }
+@media (max-width:1100px) { #timeline { grid-template-columns:auto 1fr; } #playLbl { grid-column:2; grid-row:1; } #transport { grid-column:1 / -1; grid-row:2; justify-content:center; } }
+@media (max-width:820px) {
+  header { padding:10px 12px 2px; }
+  header p { font-size:12px; }
+  main { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) 160px; gap:8px; padding:8px 12px 10px; }
+  main > section { grid-row:1; }
+  aside { grid-row:2; border-top:1px solid var(--line); padding-top:8px; }
+  .tabs { gap:4px; margin-bottom:6px; }
+  .tabs button { padding:6px; }
+  .tabs .sep { display:none; }
+  #stackInner { width:330px; height:226px; }
+  #timeline { padding:6px 8px; gap:3px 6px; }
+  #transport button { width:44px; height:44px; }
+  body.full #timeline { left:10px; right:10px; }
+  body.full #subjList, body.full #layerList { top:100px; width:calc(50% - 15px); max-height:170px; }
+  body.full #spread { padding:280px 10px 170px; }
+  body.full .tabs { width:calc(100% - 20px); }
+}
+@media (prefers-reduced-motion:reduce) { #stackInner .plane { transition:none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trumbull, taken apart</h1>
+  <p>Trumbull College, split two ways: by stage (when the paint went on) and by subject (which part of the plan it was for). Pick any mix, or press Play to watch it paint. Every pixel comes from the painter's own saved frames.</p>
+</header>
+<main>
+  <aside>
+    <div class="kicker">Show</div>
+    <fieldset id="fams"><legend>Subjects</legend><div class="row"><button data-all="fams">All</button><button data-none="fams">None</button><label style="margin-left:auto"><input type="checkbox" id="outline"> outlines</label></div></fieldset>
+    <fieldset id="stages"><legend>Stages (layers)</legend><div class="row"><button data-all="stages">All</button><button data-none="stages">None</button></div></fieldset>
+    <div class="kicker">View settings</div>
+    <fieldset id="stackCtl"><legend>Layers in 3D</legend>
+      <div class="slider"><span>Tilt</span><input id="tilt" type="range" min="-180" max="180" value="55"><span></span></div>
+      <div class="slider"><span>Turn</span><input id="turn" type="range" min="-180" max="180" value="-28"><span></span></div>
+      <div class="slider"><span>Spin</span><input id="spin" type="range" min="-180" max="180" value="0"><span></span></div>
+      <div class="slider"><span>Spacing</span><input id="gap" type="range" min="0" max="160" value="70"><span></span></div>
+      <div class="slider"><span>Fan out</span><input id="fan" type="range" min="0" max="200" value="90"><span></span></div>
+      <div class="slider"><span>Zoom</span><input id="zoom" type="range" min="20" max="200" value="70"><span></span></div>
+      <div class="slider"><span>Ink weight</span><input id="inkw" type="range" min="1" max="6" step="0.5" value="2.5"><span></span></div>
+      <input type="radio" name="by" value="stage" checked hidden>      <label><input type="checkbox" id="showPaper" checked> finished sheet in front</label>
+      <label><input type="checkbox" id="tags" checked> labels</label>
+      <p class="note" style="margin:6px 0 0">Left-drag to spin and tilt. Right-drag (or Option-drag) to twist and tilt. Middle-drag or Shift-drag to move. Scroll to zoom; Shift-scroll to spread the layers apart. Shift-drag to move. Double-click to reset.</p>
+      <div class="row"><button id="copyView">Copy view settings</button></div>
+    </fieldset>
+    <div id="layerList"><b>Layers</b> <span class="note">Hover to find a layer. Click to isolate; click again to show all.</span><div id="lis"></div><div class="row"><button id="exitFull">Exit full page</button></div></div>
+    <p class="note">Subjects come from one fixed map of the target, so each subject runs through every stage.</p>
+  </aside>
+  <section>
+    <div class="tabs"><span class="tl">View</span><button data-view="build">Painting</button><button data-view="stack" data-mode="3d" class="on">Layers in 3D</button><button data-view="stack" data-mode="2d">Layers side by side</button><button data-view="truth">Real frames</button><span class="sep"></span><button id="fullBtn">Full page</button></div>
+    <div id="timeline"><span class="tl">When</span><div id="transport"><button id="tFirst" aria-label="Start" title="Start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4v16 M19 5l-9 7 9 7z"/></svg></button><button id="tBack" aria-label="Step back" title="Step back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5l-9 7 9 7z"/></svg></button><button id="playBtn" aria-label="Play" title="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l10 7-10 7z"/></svg></button><button id="tFwd" aria-label="Step forward" title="Step forward"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l9 7-9 7z"/></svg></button><button id="tLast" aria-label="End" title="End"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 4v16 M5 5l9 7-9 7z"/></svg></button></div>
+      <div id="playLbl"><span id="stageName">Finished</span><span id="frameName">frame 36 of 36</span></div>
+      <div id="tTrack"><div id="tBands" aria-hidden="true"></div><input id="tSlider" aria-label="Painting frame" type="range" min="0" max="36" value="36"><div id="tTicks"></div><div id="tTooltip" role="tooltip" hidden></div></div></div>
+        <div id="subjList"><div class="kicker">Show</div><b>Subjects</b><div class="note">Tick to show. ▶ plays one subject through every layer.</div><div id="subjs"></div><div class="row"><button id="playAll">▶ Play selected</button><button id="allSubj">All</button></div></div>
+
+    <div id="vBuild" class="stage-wrap" hidden><canvas class="sheet" id="cv"></canvas></div>
+    <div id="vStack"><div id="stack"><div id="stackInner"></div></div><div id="spread"></div></div>
+    <div id="vTruth" hidden><canvas class="sheet" id="tv"></canvas><input id="scrub" type="range" min="0" max="36" value="36"><div class="note" id="tlabel"></div></div>
+  </section>
+</main>
+<script>
+const STAGES = [
+  { key:'frisket', label:'Reserve lights', frames:[1,1] },
+  { key:'drawing', label:'Ink drawing', frames:[2,5], ink:true },
+  { key:'v1', label:'Value 1: lightest wash', frames:[6,10] },
+  { key:'v2', label:'Value 2', frames:[11,22] },
+  { key:'v3', label:'Value 3', frames:[23,23] },
+  { key:'v4', label:'Value 4', frames:[24,25] },
+  { key:'v5', label:'Value 5: darks', frames:[26,27] },
+  { key:'t1', label:'Look and correct 1', frames:[28,29] },
+  { key:'t2', label:'Look and correct 2', frames:[30,31] },
+  { key:'ink', label:'Closing ink', frames:[32,35], ink:true },
+];
+const FAM_NAMES = {};
+const FAM_COL = ['#999','#8fb3d9','#d9a441','#a0522d','#3b3b46','#5f7a3a','#9a9a8a','#b58fb5'];
+const W = 1086, H = 744, N = W*H;
+let upto = 36, playing = null, frames = [], labels = [], meta, sel = { stages:new Set(STAGES.map(s=>s.key)), fams:new Set() };
+
+const loadImg = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
+const pixels = (img, gray) => { const c = new OffscreenCanvas(W, H), x = c.getContext('2d'); x.drawImage(img, 0, 0, W, H); const d = x.getImageData(0, 0, W, H).data; if (!gray) return d; const o = new Uint8Array(N); for (let i = 0; i < N; i++) o[i] = d[i*4]; return o; };
+
+async function init() {
+  window.tilt = document.getElementById('tilt'); window.turn = document.getElementById('turn'); window.gap = document.getElementById('gap'); window.inkw = document.getElementById('inkw');
+  meta = await (await fetch('data/meta.json')).json();
+  const f = await Promise.all(Array.from({length:37}, (_, i) => loadImg(`data/f${String(i).padStart(4,'0')}.jpg`)));
+  frames = f.map(i => pixels(i));
+  const subj = pixels(await loadImg('data/subjects.png'), true);
+  labels = Array(36).fill(subj);
+  meta.families = meta.subjects;
+  meta.families.forEach((_, i) => sel.fams.add(i + 1));
+  buildControls();
+}
+
+function buildControls() {
+  const st = document.getElementById('stages');
+  STAGES.forEach(s => { const l = document.createElement('label'); l.innerHTML = `<input type="checkbox" data-st="${s.key}" checked> ${s.label} <small>frames ${s.frames[0]}${s.frames[1]!==s.frames[0]?'–'+s.frames[1]:''}</small>`; st.appendChild(l); });
+  const fm = document.getElementById('fams');
+  meta.families.map((n, i) => [i+1, n]).forEach(([v, n]) => { const row = document.createElement('div'); row.className = 'subject-row'; row.innerHTML = `<label><input type="checkbox" data-fam="${v}" checked> <span class="sw" style="background:${FAM_COL[v]}"></span> ${n}</label><button class="subject-play" aria-label="Play ${n}" title="Play ${n}">${playIcon(false)}</button>`; row.querySelector('button').onclick = () => playSubject(v); fm.appendChild(row); });
+  document.querySelectorAll('[data-st]').forEach(c => c.onchange = () => { c.checked ? sel.stages.add(c.dataset.st) : sel.stages.delete(c.dataset.st); redraw(); });
+  document.querySelectorAll('[data-fam]').forEach(c => c.onchange = () => { const v = +c.dataset.fam; c.checked ? sel.fams.add(v) : sel.fams.delete(v); buildSubjList(); redraw(); });
+  document.querySelectorAll('[data-all],[data-none]').forEach(b => b.onclick = () => { const g = b.dataset.all || b.dataset.none, on = !!b.dataset.all; document.querySelectorAll(g === 'stages' ? '[data-st]' : '[data-fam]').forEach(c => { c.checked = on; c.onchange(); }); });
+  document.getElementById('outline').onchange = redraw;
+  ['tilt','turn','spin','gap','inkw','fan','zoom'].forEach(id => document.getElementById(id).oninput = () => { updateStack(); });
+  ['showPaper','tags'].forEach(id => document.getElementById(id).onchange = buildStack);
+  document.querySelectorAll('input[name=by]').forEach(r => r.onchange = buildStack);
+  document.getElementById('inkw').onchange = buildStack;
+  document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { document.querySelectorAll('[data-view]').forEach(x => x.classList.toggle('on', x === b)); if (b.dataset.mode) setMode(b.dataset.mode); for (const v of ['Build','Stack','Truth']) document.getElementById('v'+v).hidden = b.dataset.view !== v.toLowerCase(); if (b.dataset.view === 'stack') buildStack(); if (b.dataset.view === 'truth') { document.getElementById('scrub').value = upto; truth(); } if (b.dataset.view === 'build') render(); });
+  document.getElementById('scrub').oninput = e => goTo(+e.target.value);
+}
+
+// Apply frame j's change (frame j over frame j-1) to buffer C where the pixel belongs to a selected subject.
+function applyFrame(C, j, famOk) {
+  if (j > upto) return;
+  const A = frames[j-1], B = frames[j], L = labels[j-1] ?? labels[0];
+  for (let p = 0, q = 0; p < N; p++, q += 4) {
+    if (!famOk(L[p])) continue;
+    for (let c = 0; c < 3; c++) { const a = A[q+c], b = B[q+c]; if (a === b) continue; const r = Math.min(1.6, (b + 1) / (a + 1)); C[q+c] = Math.max(0, Math.min(255, C[q+c] * r)); }
+  }
+}
+function famOkFn(set) { return v => set.has(v); }
+
+function render() {
+  const C = new Float32Array(frames[0]);
+  const ok = famOkFn(sel.fams);
+  for (const s of STAGES) if (sel.stages.has(s.key)) for (let j = s.frames[0]; j <= s.frames[1]; j++) applyFrame(C, j, ok);
+  const cv = document.getElementById('cv'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d'), im = x.createImageData(W, H);
+  for (let i = 0; i < N*4; i++) im.data[i] = i % 4 === 3 ? 255 : C[i];
+  if (document.getElementById('outline').checked) outline(im.data);
+  x.putImageData(im, 0, 0);
+}
+function outline(D) {
+  const L = labels.reduce((acc, l, k) => { if (k) for (let p = 0; p < N; p++) if (l[p]) acc[p] = l[p]; return acc; }, new Uint8Array(N));
+  for (let y = 1; y < H-1; y++) for (let x = 1; x < W-1; x++) { const p = y*W+x, v = L[p]; if (v && (L[p+1] !== v || L[p+W] !== v)) { const col = FAM_COL[v].match(/\w\w/g).map(h => parseInt(h, 16)); D[p*4] = col[0]; D[p*4+1] = col[1]; D[p*4+2] = col[2]; } }
+}
+
+// One stage alone, as paint on a transparent ground (alpha from how much it darkened the paper).
+function stageLayer(s, inkGain) {
+  const C = new Float32Array(N*4).fill(255), ok = famOkFn(sel.fams);
+  for (let j = s.frames[0]; j <= s.frames[1]; j++) applyFrame(C, j, ok);
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), im = x.createImageData(W, H);
+  for (let p = 0, q = 0; p < N; p++, q += 4) {
+    const m = Math.min(C[q], C[q+1], C[q+2]); let a = (255 - m) / 255;
+    if (s.ink) a = Math.min(1, a * inkGain);
+    if (a < 0.02) continue;
+    const k = 1 / Math.max(a, 1e-3);
+    for (let ch = 0; ch < 3; ch++) im.data[q+ch] = Math.max(0, Math.min(255, 255 - (255 - C[q+ch]) * k * (s.ink ? 1 : 1)));
+    im.data[q+3] = Math.round(Math.min(1, a * 1.15) * 255);
+  }
+  x.putImageData(im, 0, 0); return c;
+}
+let planes = [];
+function subjectLayer(v) {
+  const C = new Float32Array(N*4).fill(255), ok = x => x === v;
+  for (const st of STAGES) if (sel.stages.has(st.key)) for (let j = st.frames[0]; j <= st.frames[1]; j++) applyFrame(C, j, ok);
+  return toLayer(C, false, 1);
+}
+function toLayer(C, ink, inkGain) {
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'), im = x.createImageData(W, H);
+  for (let p = 0, q = 0; p < N; p++, q += 4) {
+    const m = Math.min(C[q], C[q+1], C[q+2]); let a = (255 - m) / 255;
+    if (ink) a = Math.min(1, a * inkGain);
+    if (a < 0.02) continue;
+    const k = 1 / Math.max(a, 1e-3);
+    for (let ch = 0; ch < 3; ch++) im.data[q+ch] = Math.max(0, Math.min(255, 255 - (255 - C[q+ch]) * k));
+    im.data[q+3] = Math.round(Math.min(1, a * 1.15) * 255);
+  }
+  x.putImageData(im, 0, 0); return c;
+}
+function buildStack() {
+  if (mode === '2d') { const g = document.getElementById('spread'); g.innerHTML = ''; planes = [];
+    const inkGain2 = +document.getElementById('inkw').value;
+    STAGES.filter(s => sel.stages.has(s.key)).forEach(s => { const f = document.createElement('figure'); const c = stageLayer(s, inkGain2); f.appendChild(c); const cap = document.createElement('figcaption'); cap.textContent = s.label; cap.title = s.label; f.appendChild(cap); g.appendChild(f); });
+    const f = document.createElement('figure'), c = document.createElement('canvas'); c.width = W; c.height = H; const C = new Float32Array(frames[0]); const ok = famOkFn(sel.fams); for (const st of STAGES) if (sel.stages.has(st.key)) for (let j = st.frames[0]; j <= st.frames[1]; j++) applyFrame(C, j, ok); const im = c.getContext('2d').createImageData(W, H); for (let i = 0; i < N*4; i++) im.data[i] = i % 4 === 3 ? 255 : C[i]; c.getContext('2d').putImageData(im, 0, 0); f.appendChild(c); const cap = document.createElement('figcaption'); cap.textContent = 'All together'; f.appendChild(cap); g.appendChild(f);
+    planes = [...g.children]; buildList(); fitSpread(); return; }
+  const box = document.getElementById('stackInner'); box.innerHTML = ''; planes = [];
+  const inkGain = +document.getElementById('inkw').value, tags = document.getElementById('tags').checked;
+  const by = document.querySelector('input[name=by]:checked').value;
+  const add = (canvas, label) => { const d = document.createElement('div'); d.className = 'plane'; d.dataset.label = label; d.appendChild(canvas); if (tags) { const t = document.createElement('div'); t.className = 'tag'; t.textContent = label; d.appendChild(t); } box.appendChild(d); planes.push(d); };
+  if (by === 'stage') STAGES.filter(s => sel.stages.has(s.key)).forEach(s => add(stageLayer(s, inkGain), s.label));
+  else [1, 5, 2, 3, 4, 6].filter(v => sel.fams.has(v)).forEach(v => add(subjectLayer(v), meta.families[v-1]));
+  if (document.getElementById('showPaper').checked) { const d = document.createElement('div'); d.className = 'plane paper'; const c = document.createElement('canvas'); c.width = W; c.height = H; render(); c.getContext('2d').drawImage(document.getElementById('cv'), 0, 0); d.appendChild(c); if (tags) { const t = document.createElement('div'); t.className = 'tag'; t.textContent = 'Finished'; d.appendChild(t); } box.appendChild(d); planes.push(d); }
+  buildList();
+  updateStack();
+}
+let mode = '3d';
+function fitSpread() {
+  const g = document.getElementById('spread'), n = g.children.length; if (!n || !g.clientHeight) return;
+  const cs = getComputedStyle(g), gap = parseFloat(cs.gap);
+  const aw = g.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const ah = g.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  let best = { w:0, cols:1 };
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const w = Math.min(230, (aw - (cols - 1) * gap) / cols, ((ah - (rows - 1) * gap) / rows - 26) * W / H + 8);
+    if (w > best.w) best = { w, cols };
+  }
+  g.style.gridTemplateColumns = `repeat(${best.cols}, ${Math.max(1, Math.floor(best.w))}px)`;
+}
+addEventListener('resize', () => { if (mode === '2d') fitSpread(); });
+function setMode(m) { mode = m; document.body.classList.toggle('spread', m === '2d'); }
+let solo = -1;
+function buildList() {
+  const lis = document.getElementById('lis'); lis.innerHTML = ''; solo = -1;
+  planes.forEach((d, i) => { const name = d.dataset.label ?? d.querySelector('figcaption')?.textContent ?? d.querySelector('.tag')?.textContent ?? (d.classList.contains('paper') ? 'Finished' : 'Layer ' + (i+1));
+    const li = document.createElement('div'); li.className = 'li'; li.tabIndex = 0; li.setAttribute('role', 'button'); li.setAttribute('aria-label', 'Isolate ' + name); li.setAttribute('aria-pressed', 'false'); const src = d.querySelector('canvas'); if (src) { const t = document.createElement('canvas'); t.width = 172; t.height = Math.round(172 * H / W); const tx = t.getContext('2d'); tx.fillStyle = '#fff'; tx.fillRect(0, 0, t.width, t.height); tx.drawImage(src, 0, 0, t.width, t.height); li.appendChild(t); } const sp = document.createElement('span'); sp.textContent = `${i+1}. ${name}`; li.appendChild(sp);
+    li.onmouseenter = () => { if (solo < 0) planes.forEach((p, k) => p.classList.toggle('hot', k === i)); };
+    li.onmouseleave = () => planes.forEach(p => p.classList.remove('hot'));
+    li.onclick = () => { solo = solo === i ? -1 : i; [...lis.children].forEach((c, k) => (c.classList.toggle('solo', k === solo), c.setAttribute('aria-pressed', String(k === solo)))); planes.forEach((p, k) => p.classList.toggle('dim', solo >= 0 && k !== solo)); };
+    li.onkeydown = e => { if (e.key === 'Enter') li.click(); };
+    if (mode === '2d') { d.onmouseenter = li.onmouseenter; d.onmouseleave = li.onmouseleave; d.onclick = li.onclick; }
+    lis.appendChild(li); });
+}
+function updateStack() {
+  const tilt = +document.getElementById('tilt').value, turn = +document.getElementById('turn').value, gap = +document.getElementById('gap').value;
+  for (const id of ['tilt','turn','spin','gap','inkw','fan','zoom']) document.getElementById(id).nextElementSibling.textContent = document.getElementById(id).value;
+  const fan = +document.getElementById('fan').value, zoom = +document.getElementById('zoom').value / 100, n = planes.length, mid = (n - 1) / 2;
+  document.getElementById('stackInner').style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotateY(${+document.getElementById('spin').value}deg) rotateX(${tilt}deg) rotateZ(${turn}deg)`;
+  planes.forEach((d, i) => d.style.transform = `translate3d(${(i - mid) * fan}px, ${(mid - i) * fan * 0.35}px, ${(i - mid) * gap}px)`);
+}
+function truth() {
+  const j = +document.getElementById('scrub').value, cv = document.getElementById('tv'); cv.width = W; cv.height = H;
+  cv.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frames[j]), W, H), 0, 0);
+  const s = STAGES.find(s => j >= s.frames[0] && j <= s.frames[1]);
+  document.getElementById('tlabel').textContent = `Frame ${j} of 36 · ${j === 0 ? 'Bare paper' : j === 36 ? 'Finished' : s?.label ?? ''}`;
+}
+let pan = { x: 0, y: 0 };
+const wrap = a => ((a + 540) % 360) - 180;
+function setVal(id, v) { const el = document.getElementById(id); el.value = Math.max(+el.min, Math.min(+el.max, v)); }
+function wireMouse() {
+  const st = document.getElementById('stack'); let drag = null;
+  st.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, tilt: +document.getElementById('tilt').value, turn: +document.getElementById('turn').value, spin: +document.getElementById('spin').value, pan: { ...pan }, shift: e.shiftKey || e.button === 1, right: e.button === 2 }; st.setPointerCapture(e.pointerId); st.style.cursor = 'grabbing'; });
+  st.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (drag.shift) { pan = { x: drag.pan.x + dx, y: drag.pan.y + dy }; } else if (drag.right || e.altKey) { setVal('turn', wrap(drag.turn + dx * 0.4)); setVal('tilt', wrap(drag.tilt - dy * 0.4)); } else { setVal('spin', wrap(drag.spin + dx * 0.4)); setVal('tilt', wrap(drag.tilt - dy * 0.4)); }
+    updateStack(); });
+  const end = () => { drag = null; st.style.cursor = 'grab'; };
+  st.addEventListener('contextmenu', e => e.preventDefault());
+  st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
+  st.addEventListener('wheel', e => { e.preventDefault(); if (e.shiftKey) { setVal('gap', +gap.value - (e.deltaY || e.deltaX) * 0.15); setVal('fan', +document.getElementById('fan').value - (e.deltaY || e.deltaX) * 0.15); } else setVal('zoom', +document.getElementById('zoom').value - e.deltaY * 0.08); updateStack(); }, { passive: false });
+  st.addEventListener('dblclick', () => { setVal('tilt', 55); setVal('turn', -28); setVal('spin', 0); setVal('gap', innerWidth <= 820 ? 30 : 70); setVal('fan', innerWidth <= 820 ? 20 : 90); setVal('zoom', Math.max(20, Math.min(70, Math.round(st.clientHeight / (innerWidth <= 820 ? 6.5 : 16)), Math.round(st.clientWidth / (innerWidth <= 820 ? 6.5 : 18))))); pan = { x: 0, y: 0 }; updateStack(); });
+  document.getElementById('copyView').onclick = () => { const v = { tilt: +tilt.value, turn: +turn.value, spin: +document.getElementById('spin').value, gap: +gap.value, fan: +document.getElementById('fan').value, zoom: +document.getElementById('zoom').value, inkw: +inkw.value, pan, by: document.querySelector('input[name=by]:checked').value, stages: [...sel.stages], subjects: [...sel.fams] }; navigator.clipboard?.writeText(JSON.stringify(v)); document.getElementById('copyView').textContent = 'Copied'; setTimeout(() => document.getElementById('copyView').textContent = 'Copy view settings', 1200); };
+}
+function curView() { return document.querySelector('[data-view].on')?.dataset.view; }
+function stageAt(j) { return j === 0 ? 'Bare paper' : j >= 36 ? 'Finished' : (STAGES.find(s => j >= s.frames[0] && j <= s.frames[1])?.label ?? ''); }
+function updateTimeline() {
+  const stage = stageAt(upto);
+  document.getElementById('tSlider').value = upto;
+  document.getElementById('tSlider').setAttribute('aria-valuetext', `${stage}, frame ${upto} of 36`);
+  document.getElementById('stageName').textContent = stage;
+  document.getElementById('frameName').textContent = `frame ${upto} of 36`;
+}
+function redraw() {
+  const v = curView();
+  if (v === 'stack') buildStack();
+  else if (v === 'truth') { document.getElementById('scrub').value = upto; truth(); }
+  else render();
+  updateTimeline();
+}
+function playIcon(paused) { return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paused ? 'M8 5v14 M16 5v14' : 'M8 5l10 7-10 7z'}"/></svg>`; }
+function setPlaying(on) {
+  const btn = document.getElementById('playBtn');
+  btn.innerHTML = playIcon(on); btn.setAttribute('aria-label', on ? 'Pause' : 'Play'); btn.title = on ? 'Pause' : 'Play';
+}
+function stopPlaying() { clearTimeout(playing); playing = null; setPlaying(false); }
+function goTo(j) { stopPlaying(); upto = Math.max(0, Math.min(36, j)); redraw(); }
+const BAND_COLORS = ['#d5c9ac','#9b8b71','#c7c39f','#b5b18a','#989773','#85886d','#69745e','#bbaa86','#a48b69','#776e62'];
+function buildTicks() {
+  const t = document.getElementById('tTicks'), bands = document.getElementById('tBands');
+  t.innerHTML = ''; bands.innerHTML = '';
+  STAGES.forEach((s, i) => {
+    const left = (s.frames[0] - .5) / 36 * 100, width = (s.frames[1] - s.frames[0] + 1) / 36 * 100;
+    const band = document.createElement('span'); band.style.cssText = `left:${left}%;width:${width}%;--band:${BAND_COLORS[i]}`; bands.appendChild(band);
+    const tick = document.createElement('span'); tick.className = 'tick'; tick.style.cssText = `left:${left}%;width:${width}%`; tick.title = s.label;
+    const label = document.createElement('span'); label.className = 'tick-label'; label.textContent = s.label.replace(/:.*/, '').replace('Look and correct', 'Correct'); tick.appendChild(label); t.appendChild(tick);
+  });
+  fitTicks();
+}
+function fitTicks() {
+  document.querySelectorAll('.tick').forEach(t => {
+    const label = t.querySelector('.tick-label'); label.classList.toggle('fits', label.getBoundingClientRect().width + 8 <= t.getBoundingClientRect().width);
+  });
+}
+function showStageTooltip(frame, x) {
+  const tip = document.getElementById('tTooltip'), track = document.getElementById('tTrack');
+  tip.textContent = stageAt(frame); tip.hidden = false;
+  tip.style.left = `${Math.max(0, Math.min(track.clientWidth - tip.offsetWidth, x - tip.offsetWidth / 2))}px`;
+}
+function play() {
+  if (playing !== null) { stopPlaying(); return; }
+  if (upto >= 36) upto = 0;
+  setPlaying(true);
+  const step = () => {
+    redraw();
+    if (upto >= 36) { stopPlaying(); return; }
+    playing = setTimeout(() => { upto++; step(); }, curView() === 'stack' ? 240 : 170);
+  };
+  step();
+}
+function playSubject(v) {
+  stopPlaying();
+  meta.families.forEach((_, k) => setFam(k + 1, k + 1 === v));
+  buildSubjList(); upto = 0; play();
+}
+function buildSubjList() {
+  const box = document.getElementById('subjs'); box.innerHTML = '';
+  meta.families.forEach((n, i) => { const v = i + 1, row = document.createElement('div'); row.className = 's';
+    row.innerHTML = `<input aria-label="Show ${n}" type="checkbox" ${sel.fams.has(v) ? 'checked' : ''}> <span class="sw" style="background:${FAM_COL[v]}"></span> <span style="flex:1">${n}</span> <button class="subject-play" aria-label="Play ${n}" title="Play ${n}">${playIcon(false)}</button>`;
+    const cb = row.querySelector('input'); cb.onchange = () => { setFam(v, cb.checked); redraw(); };
+    row.querySelector('button').onclick = () => playSubject(v);
+    box.appendChild(row); });
+}
+function setFam(v, on) { on ? sel.fams.add(v) : sel.fams.delete(v); const c = document.querySelector(`[data-fam="${v}"]`); if (c) c.checked = on; }
+init().then(() => { wireMouse(); buildSubjList(); buildTicks(); document.getElementById('playBtn').onclick = play;
+  document.getElementById('tFirst').onclick = () => goTo(0); document.getElementById('tLast').onclick = () => goTo(36);
+  document.getElementById('tBack').onclick = () => goTo(upto - 1); document.getElementById('tFwd').onclick = () => goTo(upto + 1);
+  document.getElementById('tSlider').oninput = e => goTo(+e.target.value);
+  addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return; if (e.key === ' ') { e.preventDefault(); play(); } if (e.key === 'ArrowRight') { e.preventDefault(); goTo(upto + 1); } if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(upto - 1); } });
+  const initialStack = document.getElementById('stack');
+  if (innerWidth <= 820) { setVal('gap', 30); setVal('fan', 20); }
+  const zoomDivisor = innerWidth <= 820 ? 6.5 : 16;
+  setVal('zoom', Math.max(20, Math.min(70, Math.round(initialStack.clientHeight / zoomDivisor), Math.round(initialStack.clientWidth / (innerWidth <= 820 ? 6.5 : 18)))));
+  redraw();
+  document.getElementById('playAll').onclick = () => { if (playing) play(); play(); };
+  document.getElementById('allSubj').onclick = () => { meta.families.forEach((_, k) => setFam(k + 1, true)); buildSubjList(); redraw(); };
+  const go = on => { document.body.classList.toggle('full', on); (on ? document.querySelector('main > section') : document.querySelector('aside')).appendChild(document.getElementById('layerList')); if (on) { document.querySelector('input[name=by][value=stage]').checked = true; buildSubjList(); } if (curView() === 'stack') buildStack(); fitTicks(); };
+  document.getElementById('fullBtn').onclick = () => go(!document.body.classList.contains('full'));
+  document.getElementById('exitFull').onclick = () => go(false);
+  
+  const track = document.getElementById('tTrack'), tip = document.getElementById('tTooltip');
+  track.onpointermove = e => { const x = e.clientX - track.getBoundingClientRect().left; showStageTooltip(Math.max(0, Math.min(36, Math.round((x - 9) / (track.clientWidth - 18) * 36))), x); };
+  track.onpointerleave = () => tip.hidden = true;
+  document.getElementById('tSlider').onfocus = () => showStageTooltip(upto, 9 + upto / 36 * (track.clientWidth - 18));
+  document.getElementById('tSlider').onblur = () => tip.hidden = true;
+  const observer = new ResizeObserver(() => { fitTicks(); if (mode === '2d') fitSpread(); });
+  observer.observe(track); observer.observe(document.getElementById('vStack'));
+  document.body.dataset.ready = 'true';
+  addEventListener('keydown', e => { if (e.key === 'Escape') go(false); if (e.key === 'f' && e.target.tagName !== 'INPUT') go(!document.body.classList.contains('full')); });
+});
+</script>
+</body>
+</html>

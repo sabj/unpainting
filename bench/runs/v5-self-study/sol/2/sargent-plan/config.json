@@ -1,0 +1,77 @@
+{
+  "subject": "SARGENT",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor. A connected pale underwash supports broad blue hull planes; the curved rim, portholes, spars and anchor are shaped paint on a measured dry base. No ink or graphite.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SARGENT.blue-bow",
+      "bounds": [
+        0.23,
+        0,
+        0.65,
+        0.96
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The blue bow reads as a connected luminous wash, not a tessellation. First a watery blue-grey foundation on measured dry paper, merging only its own wet contacts; fully dry; one broad middle wash; dry; connected lower shadow and crisp fittings. The pale oblique streaks are tinted planes, not white holes. Connected loaded contact is confined to the first light passage; dry before local planes."
+    },
+    {
+      "id": "SARGENT.white-hull",
+      "bounds": [
+        0.64,
+        0,
+        1,
+        0.72
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm cream hull lights remain paper or very pale tinted planes. Only the initial faint reflected wash flows over dry paper with same-passage wet overlap; the portholes and diagonal blue shadow are later dry painted shapes. Do not flood the luminous plane with a dark finishing wash."
+    },
+    {
+      "id": "SARGENT.spars",
+      "bounds": [
+        0,
+        0,
+        0.28,
+        0.58
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The first faint grey-ochre foundation connects behind the left spars. Dry completely before the upright and diagonal spars, crossings and rusty fittings; retain dry crisp angles and open cream gaps. The light wash makes no detailed spar strokes."
+    },
+    {
+      "id": "SARGENT.left-boat",
+      "bounds": [
+        0,
+        0.48,
+        0.3,
+        0.91
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cropped left blue boat has a merging pale foundation, then one connected cool middle plane on dry paper. Pale slanting reflected streaks stay blue-tinted. The lower dark edge joins the foreground reflection, with selective lost edges."
+    },
+    {
+      "id": "SARGENT.anchor-and-rope",
+      "bounds": [
+        0.09,
+        0.43,
+        0.31,
+        0.95
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale ochre gear is part of the quiet first foundation; its anchor arms, vertical shaft and ropes get connected warm planes only after drying. Final brown turns and crossings are dry accents. Keep the flukes light and tapered. The right diagonal rope uses the same ochre-sienna family."
+    },
+    {
+      "id": "SARGENT.water",
+      "bounds": [
+        0,
+        0.81,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "A merging pale turquoise/ochre water foundation precedes a fully dried local-color plane and a connected blue reflection glaze crossing the boat/water junction. Reflections have broken paper-tooth edges with connected bodies. No stipple, evenly spaced stripes or dark grey mound."
+    }
+  ],
+  "reserves": []
+}

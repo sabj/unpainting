@@ -1,0 +1,17 @@
+{"t": "2026-10-09 17:17:16 PDT", "kind": "start", "modelMinutes": 13.46, "variant": "region_w13_lay2_blk12_bka6_opp22_spl6_sml50_sk1_lw_sfa8", "renderKey": "0790c6ea2482a374a1f558a985f3c355739b8015429a4f03a1ef41c5fb3043ed"}
+{"t": "2026-10-09 17:21:54 PDT", "kind": "look", "modelMinutes": 14.31, "n": 1, "boundary": "0", "strokes": 0, "penLines": 34, "passesDone": 0, "passesPlanned": 62}
+{"t": "2026-10-09 17:38:53 PDT", "kind": "revise", "modelMinutes": 14.82, "boundary": "0", "revision": 1, "strokes": 0, "passesDone": 0, "changed": ["variant.txt"], "variant": "region_w13_lay2_blk12_bka6_opp22_spl3_sml50_sk1_lw_sfa8"}
+{"t": "2026-10-09 17:42:07 PDT", "kind": "machine-lost", "modelMinutes": 15.18, "n": 1, "why": "infra: exit 1, None"}
+{"t": "2026-10-09 17:42:38 PDT", "kind": "continue", "modelMinutes": 15.7, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 18:00:24 PDT", "kind": "continue", "modelMinutes": 16.89, "boundary": null, "stopAt": "closing", "strokes": null}
+{"t": "2026-10-09 18:16:47 PDT", "kind": "continue", "modelMinutes": 18.2, "boundary": null, "stopAt": "closing", "strokes": null}
+{"t": "2026-10-09 18:17:33 PDT", "kind": "continue", "modelMinutes": 18.19, "boundary": null, "stopAt": "end", "strokes": null}
+{"t": "2026-10-09 18:45:34 PDT", "kind": "machine-lost", "modelMinutes": 22.11, "n": 2, "why": "infra: exit 1, None"}
+{"t": "2026-10-09 19:36:33 PDT", "kind": "revise-refused", "modelMinutes": 33.96, "boundary": "0", "strokes": 0, "changed": ["extra-args.json", "variant.txt"], "reasons": ["{\"preview\":\"failed\",\"exit\":137,\"error\":\"\"}", "REFUSED (value-plan preview failed; full log: work/w4/BENCHTRUMBULL-region/compile-preview.log)"]}
+{"t": "2026-10-09 19:36:44 PDT", "kind": "machine-lost", "modelMinutes": 34.08, "n": 3, "why": "never ran: box ended while the job waited"}
+{"t": "2026-10-09 19:41:08 PDT", "kind": "look", "modelMinutes": 34.89, "n": 2, "boundary": "0", "strokes": 0, "penLines": 34, "passesDone": 0, "passesPlanned": 62}
+{"t": "2026-10-09 19:43:10 PDT", "kind": "continue", "modelMinutes": 36.92, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 19:43:42 PDT", "kind": "machine-lost", "modelMinutes": 36.91, "n": 4, "why": "infra: exit 1, None"}
+{"t": "2026-10-09 19:46:09 PDT", "kind": "continue", "modelMinutes": 38.95, "boundary": "0", "stopAt": "end", "strokes": 0}
+{"t": "2026-10-09 19:46:54 PDT", "kind": "machine-lost", "modelMinutes": 38.95, "n": 5, "why": "infra: exit 1, None"}
+{"t": "2026-10-09 19:50:50 PDT", "kind": "session-end", "modelMinutes": 42.86, "why": "you ended the session", "looks": 2, "revisions": 1}

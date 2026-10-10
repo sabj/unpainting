@@ -1,0 +1,8 @@
+{"subject":"Y1","name":"Trumbull",
+ "styleSelection":{"style":"precise-watercolor","reason":"Painted value planes carry the form of the stone masses; windows, arches and roof edges are drawn in dry pen on dry paper.","regions":{}},
+ "families":[
+  {"id":"trumbull.sky","bounds":[0,0,1,0.32],"baseMove":"wet on dry","referenceCue":"pale blue sky with soft white clouds, graded blue wash with the recipe's sky lanes, cloud whites held"},
+  {"id":"trumbull.stone","bounds":[0,0.1,1,1],"baseMove":"wet on dry","referenceCue":"sandstone walls: broad warm wash, shadow side greyer, block courses broken by paper"},
+  {"id":"trumbull.foliage","bounds":[0,0.58,1,1],"baseMove":"wet on dry","referenceCue":"yellow-green street tree and dark shrubs at the base, soft edged masses"}
+ ],
+ "reserves":[]}

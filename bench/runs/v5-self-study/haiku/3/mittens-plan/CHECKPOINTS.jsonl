@@ -1,0 +1,3 @@
+{"t": "2026-10-09 17:30:07 PDT", "kind": "start", "modelMinutes": 15.95, "variant": "region_w13_lay3", "renderKey": "5e2eb1aec839f6e7c20e848e92f9f3a66e3d68e76b72c9af6ef67ee489d8acbb"}
+{"t": "2026-10-09 17:30:08 PDT", "kind": "session-end", "modelMinutes": 15.97, "why": "you ended the session", "looks": 0, "revisions": 0}
+{"t": "2026-10-09 19:05:14 PDT", "kind": "machine-lost", "modelMinutes": 111.06, "n": 1, "why": "never ran: box ended while the job waited"}

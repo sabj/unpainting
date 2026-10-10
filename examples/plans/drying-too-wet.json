@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "id": "drying-too-wet",
+  "title": "No drying, flooded brush",
+  "source": {
+    "note": "The same two bands on flooded paper with no drying between. Pair with drying-dry-between.json."
+  },
+  "paperRGB": [
+    246,
+    245,
+    239
+  ],
+  "paper": {
+    "fibres": 0.32,
+    "tooth": 0.3,
+    "coldPress": {
+      "bumpMm": [
+        0.5,
+        1.6
+      ],
+      "cover": 2.2,
+      "swell": 0.15
+    }
+  },
+  "paperSeed": 17,
+  "grid": {
+    "w": 240,
+    "h": 200,
+    "mmPerCell": 0.125
+  },
+  "palette": [
+    "ultramarine",
+    "sienna"
+  ],
+  "commands": [
+    {
+      "id": "flood-0",
+      "operation": "stroke",
+      "requiredPaper": "any",
+      "role": "clean-water",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 18,
+        "orientation": "sweep"
+      },
+      "load": {
+        "capacityMm3": 600,
+        "waterQuantityMm3": 560,
+        "concentration": {}
+      },
+      "paths": [
+        [
+          {
+            "x": 0.08,
+            "y": 0.2,
+            "p": 0.9,
+            "rMm": 9
+          },
+          {
+            "x": 0.92,
+            "y": 0.2,
+            "p": 0.9,
+            "rMm": 9
+          }
+        ]
+      ]
+    },
+    {
+      "id": "flood-1",
+      "operation": "stroke",
+      "requiredPaper": "any",
+      "role": "clean-water",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 18,
+        "orientation": "sweep"
+      },
+      "load": {
+        "capacityMm3": 600,
+        "waterQuantityMm3": 560,
+        "concentration": {}
+      },
+      "paths": [
+        [
+          {
+            "x": 0.08,
+            "y": 0.45,
+            "p": 0.9,
+            "rMm": 9
+          },
+          {
+            "x": 0.92,
+            "y": 0.45,
+            "p": 0.9,
+            "rMm": 9
+          }
+        ]
+      ]
+    },
+    {
+      "id": "flood-2",
+      "operation": "stroke",
+      "requiredPaper": "any",
+      "role": "clean-water",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 18,
+        "orientation": "sweep"
+      },
+      "load": {
+        "capacityMm3": 600,
+        "waterQuantityMm3": 560,
+        "concentration": {}
+      },
+      "paths": [
+        [
+          {
+            "x": 0.08,
+            "y": 0.7,
+            "p": 0.9,
+            "rMm": 9
+          },
+          {
+            "x": 0.92,
+            "y": 0.7,
+            "p": 0.9,
+            "rMm": 9
+          }
+        ]
+      ]
+    },
+    {
+      "id": "flood-3",
+      "operation": "stroke",
+      "requiredPaper": "any",
+      "role": "clean-water",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 18,
+        "orientation": "sweep"
+      },
+      "load": {
+        "capacityMm3": 600,
+        "waterQuantityMm3": 560,
+        "concentration": {}
+      },
+      "paths": [
+        [
+          {
+            "x": 0.08,
+            "y": 0.9,
+            "p": 0.9,
+            "rMm": 9
+          },
+          {
+            "x": 0.92,
+            "y": 0.9,
+            "p": 0.9,
+            "rMm": 9
+          }
+        ]
+      ]
+    },
+    {
+      "id": "blue",
+      "operation": "stroke",
+      "requiredPaper": "any",
+      "role": "paint",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 8,
+        "orientation": "follow"
+      },
+      "load": {
+        "capacityMm3": 160,
+        "waterQuantityMm3": 158,
+        "concentration": {
+          "ultramarine": 0.5
+        }
+      },
+      "paths": [
+        [
+          {
+            "x": 0.12,
+            "y": 0.4,
+            "p": 0.85,
+            "rMm": 4.0
+          },
+          {
+            "x": 0.88,
+            "y": 0.4,
+            "p": 0.85,
+            "rMm": 4.0
+          }
+        ]
+      ]
+    },
+    {
+      "id": "sienna",
+      "operation": "stroke",
+      "requiredPaper": "any",
+      "role": "paint",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 8,
+        "orientation": "follow"
+      },
+      "load": {
+        "capacityMm3": 160,
+        "waterQuantityMm3": 158,
+        "concentration": {
+          "sienna": 0.5
+        }
+      },
+      "paths": [
+        [
+          {
+            "x": 0.5,
+            "y": 0.1,
+            "p": 0.85,
+            "rMm": 4.0
+          },
+          {
+            "x": 0.5,
+            "y": 0.9,
+            "p": 0.85,
+            "rMm": 4.0
+          }
+        ]
+      ]
+    },
+    {
+      "id": "dry-1",
+      "operation": "dry"
+    }
+  ]
+}

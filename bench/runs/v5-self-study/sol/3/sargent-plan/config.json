@@ -1,0 +1,99 @@
+{
+  "subject": "SARGENT",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor, no ink or graphite. Connected pale local washes, dry shaped boat planes, dry cross-region shadow glazes and selective paint accents carry the structure.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SARGENT.blue-bow",
+      "bounds": [
+        0.22,
+        0,
+        0.67,
+        0.96
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "A luminous curved blue ship bow, with pale slanting reflected planes inside one continuous blue body. Layer 1 is a flowing cool wash on measured dry paper, watery pigment and water .62; its own contacts merge. Dry before one connected local-color wash, then dry before the lower blue shadow. Hard silhouette, selected soft turning edges. No cream column through the bow."
+    },
+    {
+      "id": "SARGENT.white-hull",
+      "bounds": [
+        0.63,
+        0,
+        1,
+        0.72
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm sunlit cream ship at right: connected bare-paper light and very pale tinted planes. Dry-start watery reflected foundation only where demanded. Dry completely before the oblique blue shadow and elliptical portholes; medium shadow load .45, strong paint only in cores. Keep sharp opening rims and let the shadow lose one turning edge."
+    },
+    {
+      "id": "SARGENT.spars",
+      "bounds": [
+        0,
+        0,
+        0.28,
+        0.58
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left vertical and diagonal grey-olive spars, open cream gaps, small rust-orange fixtures. Watery local-color foundation on dry paper .62, then fully dry shaped mid planes with medium pigment. Long diagonal crossings and dark joints are selective dry accents, not an outline drawing."
+    },
+    {
+      "id": "SARGENT.left-boat",
+      "bounds": [
+        0,
+        0.48,
+        0.31,
+        0.87
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cropped blue boat has a coherent blue-grey plane and pale oblique reflections. Loaded pale wet-on-dry wash .62, dry, flowing medium local-color planes, dry before lower reflected shadow .45. Keep upper edge firm and selectively lose the lower water edge."
+    },
+    {
+      "id": "SARGENT.anchor",
+      "bounds": [
+        0.07,
+        0.38,
+        0.33,
+        0.94
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Light ochre anchor, tapered flukes, vertical shaft and curved dark-brown bar. Pale warm wet-on-dry plane .62, fully dry before medium ochre/sienna body. Dry-paper brown accents follow the curved bar and joints; preserve pale flukes and avoid one large dark brown gear patch."
+    },
+    {
+      "id": "SARGENT.right-rope",
+      "bounds": [
+        0.79,
+        0.29,
+        0.94,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Long slanted ochre-sienna rope at right, small green/brown interruptions and tapered light turns. Watery initial tint .62, dry before shaped warm mid plane, dry again before selective small accents .45. Connected rope body, hard focal edge, softened or lost lower end."
+    },
+    {
+      "id": "SARGENT.right-water",
+      "bounds": [
+        0.66,
+        0.69,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Fresh turquoise water to the right of the hull, thin cream sparkle and warm reflected gaps. Flowing pale cerulean/blue-shade-green underwash on dry paper .62, dry, connected medium blue-green local color, dry for a few darker reflection shapes .45. Wash question with existing cold-press tooth; no individual dots, repeated ruled ripple bands or olive-brown fill."
+    },
+    {
+      "id": "SARGENT.foreground",
+      "bounds": [
+        0,
+        0.8,
+        0.78,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Deep blue-grey hull shadow meeting foreground water crosses central bow and cropped left boat. Dry-start pale water base .62, dry for medium blue planes; fully dry before connected blue/sienna shadow glazes .45 across the boat-water junction. Shadow has a flowing body with irregular paper-tooth edges and stays subordinate to the luminous ships."
+    }
+  ],
+  "reserves": []
+}

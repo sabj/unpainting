@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {sampleReceiver} from './receiver-samples.mjs';
+export function createReceiverObserver(doc,{out,w,h,targetSHA,coherent,render}){
+ if(!doc||doc.version!==1||doc.targetSHA256!==targetSHA||JSON.stringify(doc.frame)!==JSON.stringify([w,h])||!/^major-command-\d{7}$/.test(doc.commandId)||!/^numeric-L\d+-S\d+$/.test(doc.shapeId)||!Number.isInteger(doc.pass)||doc.pass<1||!Array.isArray(doc.geometry)||!doc.geometry.length||!Array.isArray(doc.samples)||doc.samples.length!==2)throw Error('receiver declaration invalid');
+ let selected=null,contact=null,ownership=null,selectedClip=null,finished=false;const intervening=[];
+ const write=(stage,sheet,extra={})=>{coherent(sheet);const samples=sampleReceiver({...sheet,clip:selectedClip},doc.samples,{contact,ownership});const pixels=Buffer.from(render());fs.writeFileSync(path.join(out,'receiver-'+stage+'.ppm'),Buffer.concat([Buffer.from('P6\n'+w+' '+h+'\n255\n'),pixels]),{flag:'wx'});fs.writeFileSync(path.join(out,'receiver-'+stage+'.json'),JSON.stringify({stage,commandId:doc.commandId,shapeId:doc.shapeId,pass:doc.pass,samples,interveningOriginalCommandIds:intervening,observedSheetSteps:sheet.steps,meaning:'actual synchronized native receiver fields; selected-command clip frozen for requested contact classification, NOT fluid mask; no delivery/quality acceptance',...extra},null,2),{flag:'wx'});};
+ return {
+ before(args){if(args.commandId!==doc.commandId)return false;if(selected)throw Error('receiver duplicate selected command');if(args.technique?.shapeId!==doc.shapeId||JSON.stringify(args.points)!==JSON.stringify(doc.geometry))throw Error('receiver original command/geometry mismatch');if(args.record.clipAllowedPrimary<1||!args.record.brushBefore.pigmentMass.some(v=>v>0))throw Error('receiver selected contact has no eligible loaded primary');selected=args;contact=args.contact;ownership=args.ownership;selectedClip=args.sheet.clip?.slice()??null;write('before',args.sheet,{actualCommand:args.record,declaration:doc});
+ const rgb=new Uint8Array(w*h*3).fill(245),halos=new Set(contact.neighborIndices??[]);for(let i=0;i<w*h;i++){let c=null;if(halos.has(i))c=[205,235,205];if(contact.liftMask[i]&&args.sheet.M[i])c=[245,190,80];if(contact.primaryMask[i])c=(!args.sheet.clip||args.sheet.clip[i])?[30,100,220]:[150,150,150];if(args.sheet.resist?.[i]===1)c=[220,40,140];if(c)rgb.set(c,i*3);}fs.writeFileSync(path.join(out,'receiver-requested-contact-guide.ppm'),Buffer.concat([Buffer.from('P6\n'+w+' '+h+'\n255\n'),rgb]),{flag:'wx'});return true;},
+ executed(commandId,sheet){if(!selected)return;if(commandId===doc.commandId)write('immediate',sheet);else intervening.push(commandId);},
+ beforeDry(pass,sheet){if(selected&&pass===doc.pass)write('before-ordinary-dry',sheet,{scope:'after remaining original commands in selected pass, before existing idle flow/dry'});},
+ ordinaryDry(pass,sheet,options){if(pass!==doc.pass)return;if(!selected)throw Error('receiver selected command was not reached');if(!options.actualBoundary)throw Error('receiver no existing ordinary dry boundary');write('ordinary-dried',sheet,{ordinaryDry:options,scope:'after existing pass-level flow/dry; includes listed intervening original contacts'});finished=true;},
+ assertComplete(){if(!finished)throw Error('receiver bracket incomplete');}
+ };
+}

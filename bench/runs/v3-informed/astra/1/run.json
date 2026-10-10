@@ -1,0 +1,267 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "astra",
+  "name": "Codex Astra",
+  "id": "gpt-6-astra",
+  "effort": "xhigh",
+  "runner": "codex"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true
+ },
+ "session": {
+  "minutes": 50.8,
+  "tokens": 8662464,
+  "costUSD": null,
+  "estCostUSD": 14.188,
+  "usage": {
+   "input": 251596,
+   "cachedInput": 8344320,
+   "output": 66548
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 1856,
+   "minutes": 16.9,
+   "smallShare": 0.852,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0196,
+   "images": {
+    "final": "hills.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.17,
+    "pm": 0.12,
+    "complete": true,
+    "classic": 7.02,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 3,
+     "marks_texture": 2.67,
+     "classic_value": 4.88,
+     "classic_edge": 7.01,
+     "classic_landmark": null,
+     "classic_marks": 9.16
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 4
+    },
+    "earlyMean": 2,
+    "mean": 2.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 5,
+     "c": 4,
+     "k": 2,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Tree masses are built from stamped overlapping scalloped blobs sitting on flat grass slabs, with dark values arriving before any light pass and texture dumping in mid-sequence, and the 100% panel never reaches the target's tan path or colour variety."
+    }
+   },
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 190,
+   "minutes": 17.7,
+   "smallShare": 0.632,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0532,
+   "images": {
+    "final": "sargent.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.59,
+    "pm": 0.23,
+    "complete": true,
+    "classic": 7.18,
+    "criteria": {
+     "composition_values": 6.33,
+     "edges_detail": 4,
+     "marks_texture": 2.67,
+     "classic_value": 5.47,
+     "classic_edge": 7.02,
+     "classic_landmark": null,
+     "classic_marks": 9.06
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 5
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 4,
+     "50": 5,
+     "75": 5,
+     "100": 5
+    },
+    "earlyMean": 4.5,
+    "mean": 4.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "l": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable watercolor build-up from broad hull and water washes to dark accents, then rigging lines and final texture, with only the crisp porthole dark arriving a bit early as the sole tell."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 2152,
+   "minutes": 16.2,
+   "smallShare": 0.757,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0169,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.76,
+    "pm": 0.18,
+    "complete": true,
+    "classic": 7.19,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 3.33,
+     "marks_texture": 4,
+     "classic_value": 4.14,
+     "classic_edge": 8.32,
+     "classic_landmark": null,
+     "classic_marks": 9.12
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 3,
+     "100": 3.5
+    },
+    "earlyMean": 2,
+    "mean": 2.5,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 2,
+     "a": 4,
+     "d": 1,
+     "c": 3,
+     "b": 1,
+     "m": 1,
+     "f": 1,
+     "j": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Foliage arrives as uniform stamped dabs and buildings as flat translucent terracotta slabs with pen lines only at the very end, and the finish omits the target's upper-left wall and buildings, reading more like generated layer-stacking than a pen-first sketcher's process.",
+     "Qwen/Qwen3.5-9B": "The sequence mimics a digital reveal with stamped textures and uniform blocks rather than a natural brush-and-pen progression, evidenced by the faded-in start and scalloped edges."
+    }
+   },
+   "painterNote": null
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 5.51,
+  "partialComposite": null,
+  "pm": null,
+  "cropsScored": 3,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.62,
+   "level": "high",
+   "basis": "highest crop"
+  },
+  "progressionRisk": {
+   "score": 0.62,
+   "level": "high"
+  },
+  "review": {
+   "status": "cleared",
+   "finding": "weak technique, not cheating"
+  }
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

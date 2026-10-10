@@ -1,0 +1,148 @@
+{
+  "subject": "HILLS",
+  "name": "Hills — connected tree planes and selective ink, V5 try 3",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose ink and wash: the winding cream track and luminous yellow-green slopes are framed by layered cool woodland; sparse opening structure and selective closing tree gestures carry thin branches.",
+    "regions": {
+      "HILLS.foreground-meadow": {
+        "style": "precise-watercolor",
+        "reason": "Broad luminous grass and warm road are painted value planes with quiet interiors, broken edges and sparse neighboring ink."
+      },
+      "HILLS.upper-meadow": {
+        "style": "precise-watercolor",
+        "reason": "Broad luminous grass and warm road are painted value planes with quiet interiors, broken edges and sparse neighboring ink."
+      },
+      "HILLS.left-meadow": {
+        "style": "precise-watercolor",
+        "reason": "Broad luminous grass and warm road are painted value planes with quiet interiors, broken edges and sparse neighboring ink."
+      },
+      "HILLS.central-path": {
+        "style": "precise-watercolor",
+        "reason": "Broad luminous grass and warm road are painted value planes with quiet interiors, broken edges and sparse neighboring ink."
+      },
+      "HILLS.distant-wood": {
+        "style": "precise-watercolor",
+        "reason": "Crown tops, overlapping middle shadow sides and deep interiors need a gradual painted value ladder; narrow trunks and forks remain selective ink. The prior two-value woodland made isolated black islands."
+      },
+      "HILLS.central-wood": {
+        "style": "precise-watercolor",
+        "reason": "Crown tops, overlapping middle shadow sides and deep interiors need a gradual painted value ladder; narrow trunks and forks remain selective ink. The prior two-value woodland made isolated black islands."
+      },
+      "HILLS.left-foreground-wood": {
+        "style": "precise-watercolor",
+        "reason": "Crown tops, overlapping middle shadow sides and deep interiors need a gradual painted value ladder; narrow trunks and forks remain selective ink. The prior two-value woodland made isolated black islands."
+      },
+      "HILLS.right-foreground-wood": {
+        "style": "precise-watercolor",
+        "reason": "Crown tops, overlapping middle shadow sides and deep interiors need a gradual painted value ladder; narrow trunks and forks remain selective ink. The prior two-value woodland made isolated black islands."
+      },
+      "HILLS.bottom-wood": {
+        "style": "precise-watercolor",
+        "reason": "Crown tops, overlapping middle shadow sides and deep interiors need a gradual painted value ladder; narrow trunks and forks remain selective ink. The prior two-value woodland made isolated black islands."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "HILLS.distant-wood",
+      "bounds": [
+        0,
+        0,
+        0.6,
+        0.27
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Upper-left distant woodland: grey olive crown tops over a cool blue-grey connected foundation, quieter than the central trees. Wash first; dry shadow glaze; no individual distant leaves. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.upper-meadow",
+      "bounds": [
+        0.44,
+        0,
+        1,
+        0.33
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Upper-right sunlit yellow-green hillside and pale descending track. Broad transparent wash with lost internal grass edges; preserve the light track as a pale warm painted plane. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.left-meadow",
+      "bounds": [
+        0.16,
+        0.17,
+        0.47,
+        0.54
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Diagonal sunlit grass beside the upper-left path. A connected pale yellow-green wash; dry restrained olive terrain shadows; the road has irregular light edges. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.central-wood",
+      "bounds": [
+        0.31,
+        0.15,
+        0.91,
+        0.67
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Main belt of overlapping cool blue-green and olive trees. Connected underwash, full dry, then coherent shadow groups crossing crowns and trunks, retaining warm crown-top lights. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.left-foreground-wood",
+      "bounds": [
+        0,
+        0.46,
+        0.43,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark near trees along the left side, including the forked tree beside the central bend. Mixed-dark wash and dry shadow glaze; the few narrow trunks and forks belong to selective black ink. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.foreground-meadow",
+      "bounds": [
+        0.42,
+        0.58,
+        0.96,
+        0.96
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large luminous yellow-green slope to the right of the central path. One connected wash, gentle olive turning shadow on fully dry paint; grass stays a value plane with only broken edge texture. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.central-path",
+      "bounds": [
+        0.4,
+        0.55,
+        0.55,
+        0.96
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The warm cream track bends out of the central woodland and descends toward the lower edge. Pale ochre wash, held near-paper lights, tiny dry accents only where a tree shadow meets it; no continuous pen outline. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.right-foreground-wood",
+      "bounds": [
+        0.81,
+        0.63,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Near right-hand trees interrupting the meadow. Cool connected wash followed by dry dark interiors, broken lit crown rims and a few tapering trunk marks. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    },
+    {
+      "id": "HILLS.bottom-wood",
+      "bounds": [
+        0.32,
+        0.9,
+        0.83,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Foreground olive foliage across the foot of the pale track. Coherent mid-value wash with dry shadow pockets; leave small target-supported light interruptions. Broad overlapping washes and fully dried shaped middle planes precede connected shadow glazes; every stroke checks measured moisture across its footprint and neighboring cells. Thin branch structure belongs to selective ink, not leaf dots."
+    }
+  ],
+  "reserves": []
+}

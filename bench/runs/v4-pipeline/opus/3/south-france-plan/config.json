@@ -1,0 +1,15 @@
+{"subject":"SF","name":"South France",
+ "styleSelection":{"style":"urban-sketch","reason":"Requested urban sketch: sepia pen carries the village structure (roofs, walls, windows, cypresses, pine limbs); one pale wash per area, then one shadow glaze, so the paper still breathes through the lit walls and paths.",
+   "regions":{}},
+ "families":[
+  {"id":"SF.village-top","bounds":[0.33,0,0.82,0.26],"baseMove":"wet on dry","referenceCue":"upper village: pale ochre and violet-grey walls, terracotta roofs, small dark windows"},
+  {"id":"SF.distant-valley","bounds":[0.82,0,1,0.2],"baseMove":"wet on dry","referenceCue":"pale blue-green distant hills, lightest and coolest area"},
+  {"id":"SF.terraces-left","bounds":[0,0,0.33,0.46],"baseMove":"wet on dry","referenceCue":"ochre terraces and dry-stone walls, cypress columns, olive rows"},
+  {"id":"SF.focal-buildings","bounds":[0.66,0.33,0.96,0.82],"baseMove":"wet on dry","referenceCue":"stone houses: warm lit faces, violet shadow sides, burnt-sienna roofs; focal point"},
+  {"id":"SF.middle-foliage","bounds":[0.33,0.26,0.66,0.8],"baseMove":"wet on dry","referenceCue":"rounded olive and oak masses, yellow-green lit tops, blue-green shadow undersides"},
+  {"id":"SF.right-foliage","bounds":[0.82,0.2,1,0.33],"baseMove":"wet on dry","referenceCue":"dense dark green trees and cypresses behind the houses"},
+  {"id":"SF.left-slope","bounds":[0,0.46,0.12,0.8],"baseMove":"wet on dry","referenceCue":"ochre path and olive trees on the left slope"},
+  {"id":"SF.pine-foreground","bounds":[0.12,0.6,0.55,1],"baseMove":"wet on dry","referenceCue":"large foreground pine: yellow-green crown, dark branching trunk"},
+  {"id":"SF.lower-slope","bounds":[0.55,0.82,1,1],"baseMove":"wet on dry","referenceCue":"pale path and rocks, scattered shrubs, broken lights"}
+ ],
+ "reserves":[]}

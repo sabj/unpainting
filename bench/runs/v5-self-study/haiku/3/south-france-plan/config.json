@@ -1,0 +1,11 @@
+{"subject":"sf","name":"South France v3",
+ "styleSelection":{"style":"urban-sketch","reason":"pen structure first, light washes by region, progressive darkening",
+   "regions":{"sf.sky":{"style":"urban-sketch","reason":"pale graded wash, lightest pass first"},
+             "sf.grass":{"style":"urban-sketch","reason":"pale field base with subtle gradation"},
+             "sf.trees":{"style":"urban-sketch","reason":"cypress silhouettes and canopy masses"},
+             "sf.buildings":{"style":"urban-sketch","reason":"terracotta forms with roofline structure"}}},
+ "families":[{"id":"sf.sky","bounds":[0,0,1,0.4],"baseMove":"wet on dry","referenceCue":"pale blue-grey sky, lightest area"},
+             {"id":"sf.grass","bounds":[0,0.45,1,1],"baseMove":"wet on dry","referenceCue":"pale golden field, lit from left"},
+             {"id":"sf.trees","bounds":[0,0.15,0.65,0.7],"baseMove":"wet on dry","referenceCue":"dark cypress and tree masses"},
+             {"id":"sf.buildings","bounds":[0.55,0.25,1,0.8],"baseMove":"wet on dry","referenceCue":"warm building planes with defined structure"}],
+ "reserves":[]}

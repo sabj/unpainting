@@ -1,0 +1,49 @@
+{
+  "subject": "sargent",
+  "name": "White Ships (Sargent)",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The sheet is a loose watercolor already: broad value planes, soft lost edges, and a few deep pigment accents carry the ship forms. The requested treatment is pure watercolor with no drawn line layer.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.main-hull",
+      "bounds": [0.14, 0.02, 0.76, 0.99],
+      "baseMove": "wet on dry",
+      "referenceCue": "The large cool blue-grey vessel curves from the upper left through the centre to its dark lower hull; keep one broad turning plane and an irregular soft edge."
+    },
+    {
+      "id": "sargent.pale-sail",
+      "bounds": [0.52, 0.0, 1.0, 0.73],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale sail and open paper shapes overlap behind the blue vessel; retain their near-paper value and let selected edges disappear into the sheet."
+    },
+    {
+      "id": "sargent.left-overlap",
+      "bounds": [0.0, 0.24, 0.43, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "A cropped darker vessel and a few warm ochre spars cross at the left; use broken connected washes, with depth concentrated at the overlap."
+    },
+    {
+      "id": "sargent.water",
+      "bounds": [0.58, 0.63, 1.0, 1.0],
+      "baseMove": "wet on wet",
+      "referenceCue": "The lower-right water is a soft turquoise field with a few broken pale glints and cool reflection shapes; no repeated horizontal strips."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Bare-paper fleck in the cool hull sheen; keep it out of every wash.",
+      "bounds": [0.495, 0.325, 0.515, 0.34]
+    },
+    {
+      "reason": "Small paper glint at the pale sail edge; the surrounding sail remains a pale painted plane.",
+      "bounds": [0.8025, 0.1175, 0.8225, 0.1325]
+    },
+    {
+      "reason": "Broken bare-paper reflection in the turquoise water.",
+      "bounds": [0.885, 0.8575, 0.905, 0.8725]
+    }
+  ]
+}

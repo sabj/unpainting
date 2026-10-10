@@ -1,0 +1,14 @@
+{"t": "2026-10-09 17:19:52 PDT", "kind": "start", "modelMinutes": 12.22, "variant": "region_w13_lay2_dk11_sep4_dwg100", "renderKey": "88976d561b7acadbc5bcf6a347961593c66ae0b1570692db9b1feb2377d30ba3"}
+{"t": "2026-10-09 17:41:52 PDT", "kind": "look", "modelMinutes": 17.37, "n": 1, "boundary": "0", "strokes": 0, "penLines": 36, "passesDone": 0, "passesPlanned": 27}
+{"t": "2026-10-09 17:42:38 PDT", "kind": "continue", "modelMinutes": 18.13, "boundary": "0", "stopAt": 6, "strokes": 0}
+{"t": "2026-10-09 17:45:46 PDT", "kind": "look", "modelMinutes": 19.09, "n": 2, "boundary": "6", "strokes": 212, "penLines": 36, "passesDone": 6, "passesPlanned": 27}
+{"t": "2026-10-09 17:46:19 PDT", "kind": "continue", "modelMinutes": 19.65, "boundary": "6", "stopAt": 16, "strokes": 212}
+{"t": "2026-10-09 17:50:22 PDT", "kind": "look", "modelMinutes": 20.9, "n": 3, "boundary": "16", "strokes": 605, "penLines": 36, "passesDone": 16, "passesPlanned": 27}
+{"t": "2026-10-09 17:51:04 PDT", "kind": "continue", "modelMinutes": 21.6, "boundary": "16", "stopAt": 21, "strokes": 605}
+{"t": "2026-10-09 17:54:16 PDT", "kind": "look", "modelMinutes": 22.46, "n": 4, "boundary": "21", "strokes": 1066, "penLines": 36, "passesDone": 21, "passesPlanned": 27}
+{"t": "2026-10-09 18:16:37 PDT", "kind": "revise", "modelMinutes": 26.65, "boundary": "21", "revision": 1, "strokes": 1066, "passesDone": 21, "changed": ["variant.txt"], "variant": "region_w13_lay2_dk28_dp100_sep4_dwg100"}
+{"t": "2026-10-09 18:24:12 PDT", "kind": "look", "modelMinutes": 28.73, "n": 5, "boundary": "closing", "strokes": 2737, "penLines": 36, "passesDone": 40, "passesPlanned": 40}
+{"t": "2026-10-09 18:46:57 PDT", "kind": "revise", "modelMinutes": 33.14, "boundary": "closing", "revision": 2, "strokes": 2737, "passesDone": 40, "changed": ["closing-lines.json"], "variant": "region_w13_lay2_dk28_dp100_sep4_dwg100"}
+{"t": "2026-10-09 18:51:26 PDT", "kind": "finished", "modelMinutes": 34.26, "strokes": 2737}
+{"t": "2026-10-09 18:52:14 PDT", "kind": "look", "modelMinutes": 35.05, "n": 6, "boundary": "final"}
+{"t": "2026-10-09 18:52:26 PDT", "kind": "session-end", "modelMinutes": 35.25, "why": "you ended the session", "looks": 6, "revisions": 2}

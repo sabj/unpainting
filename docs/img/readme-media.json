@@ -1,0 +1,1207 @@
+{
+  "metric": "MAD(frame, blank paper) / MAD(painting.png, blank paper), native sRGB; clipped to [0, 1]",
+  "selection": "Nearest chronological saved frames to 30 evenly spaced progress goals and 20/40/60/80/100%; endpoints are paper and painting.png.",
+  "sharp": {
+    "aom": "3.15.1",
+    "archive": "3.8.9",
+    "cairo": "1.18.6",
+    "cgif": "0.5.4",
+    "exif": "0.6.26",
+    "expat": "2.8.5",
+    "ffi": "3.8.0",
+    "fontconfig": "2.18.3",
+    "freetype": "2.14.3",
+    "fribidi": "1.0.17",
+    "glib": "2.90.0",
+    "harfbuzz": "14.5.0",
+    "heif": "1.23.5",
+    "highway": "1.4.0",
+    "imagequant": "2.4.1",
+    "lcms": "2.19.1",
+    "mozjpeg": "0826579",
+    "pango": "1.58.2",
+    "pixman": "0.46.4",
+    "png": "1.6.58",
+    "proxy-libintl": "0.5",
+    "rsvg": "2.63.2",
+    "tiff": "4.7.2",
+    "uhdr": "2.0.2",
+    "vips": "8.18.7",
+    "webp": "1.6.0",
+    "xml2": "2.15.4",
+    "zlib-ng": "2.3.3",
+    "sharp": "0.35.5"
+  },
+  "subjects": {
+    "trumbull": {
+      "width": 1086,
+      "height": 744,
+      "paper": "f0000.jpg",
+      "finalChange": 68.298775,
+      "sources": {
+        "photo.png": "b725e72d964813b6574c0260df8ebeff7c235fc766c2d4ad71a560053a6b8927",
+        "source.jpg": "a1aa399065741f3e6943273fc0dbdb35d6c4aad5237bb849bf4c55ed6424fa92",
+        "painting.png": "0a099ee034f617c11c26c82553d2a4429ebb224f9dda33641873740528172eb2",
+        "frames.json": "619de561875b4f0d99aad85d958dae5449450299dbfcc0e95e946200b3a6132a",
+        "f0000.jpg": "ebb7ed7928b56ea590d3f6889bfdd587f85f98013c8defcebd3785a0f1cf30a2",
+        "f0001.jpg": "ebb7ed7928b56ea590d3f6889bfdd587f85f98013c8defcebd3785a0f1cf30a2",
+        "f0002.jpg": "419cd651c50605698c0ca10c9b7891a016a7558b43e9890af95c553e248bc908",
+        "f0003.jpg": "6fa821b34ac26c4953a88bc23a82d98d1db41a4a69e692e5c4222a5df710bda0",
+        "f0004.jpg": "6205eb736d8a076560cd1575a138ba7709bce34d53f2604a11d09d12be531d50",
+        "f0005.jpg": "52a3037c84c3ddeaa1d94cea1026f1d59e5b0f03e03f550c441e4d68e06080e8",
+        "f0006.jpg": "8f8eb0b13c9a89dfd1a228c57a34f81bd140f6a9c88ce5205fcf53bd227ff2f5",
+        "f0007.jpg": "0abb4e4bafb646fe35759d9ab938c291a167d9279cbabd26a8a82cd25d20ef33",
+        "f0008.jpg": "d303da64c06eadb381701e332540351d05c7fa6d1ca700ede16530b11b4801b7",
+        "f0009.jpg": "230275c5d7f06b673d602fe2b106604ee847a4aaf36f07e37d25aaf751ae6dd7",
+        "f0010.jpg": "c1111c52ed4d0e052d7e37f654feb341790df69e04af7c3ba88f1318744587a0",
+        "f0011.jpg": "40ec968706e10742a339852b211b958014a76a1cf305d77bf262cdd2b5165498",
+        "f0012.jpg": "b9fd9bf71bff92bcc4348f7141832eaa39df15f375883cd518fdb9d11b84dd1b",
+        "f0013.jpg": "cca5d86e5e0259ae35e842b568e996082f154a5738b7f7800ce0cf905e9a9cea",
+        "f0014.jpg": "f462c8fbd93196cae77a2598aeb0c11652afbb4140afa93ade331e9bbf0e9968",
+        "f0015.jpg": "cd662bf5f42cfe6c27b763be8c0ee633f3ef1570505ddaeca048749740d2d3d9",
+        "f0016.jpg": "27cee657e4c5929574ee82b32be2777ddd2da5d2d571eff18290eeccfa1bce67",
+        "f0017.jpg": "31b7d70f886fa4546ef88704801b0080c997335d405512bbf53be2acfb2d4aa8",
+        "f0018.jpg": "39187e7b6236c6de16daf82cf442c5ad489a1e79edef8bac030a4b83fd878355",
+        "f0019.jpg": "0670a9d5eb8e806768e1fda4933f05738a6899262c1182890496a8f973b2cb70",
+        "f0020.jpg": "dad872d5ab559664003f84362e750ee9d816a706d0a2e5d60e3b48591c7d46cb",
+        "f0021.jpg": "9a0036e2117aa080a3cab154824eb26f4c5f7820aa3e4392ad3b337e8f52f989",
+        "f0022.jpg": "33f669e862e03f6f34ae135f50b44d44a317bc9eeda625604f5b22fc9d2d6921",
+        "f0023.jpg": "63269a9ccf37ece303ba5538c63e7b53c18712ad2ef877b6bbf6ec28ea68561e",
+        "f0024.jpg": "af8e77732b21f80acdeeb7509a37a2377b35ad5ffeb7df58f76eb5f505d1e10f",
+        "f0025.jpg": "8270c46b1da3cbd9855e4ba0570e36abc60ec32887f3c1288c043a71da25f2ef",
+        "f0026.jpg": "e11fba71e6756fe16fd9f78da6d1b0bac3b60fa5aa683ad6bdc0bf0fefb424dd",
+        "f0027.jpg": "6d30f078c4208de1a28c4f64abad1b634ddc4dbdb3e6f6e4810a07da9ec25c73",
+        "f0028.jpg": "d7e281c80a5bb66073adce7e56e9c16205d14a0da582f3d748793f981c4f4134",
+        "f0029.jpg": "905f1674dfdd797c8d65aeeb9b4d12aac2379c167c25bea0d296ef0476e4bbd4",
+        "f0030.jpg": "f4081a8f553bba7e17d515c5ca9fd38e3bf3868232692fc1fa605e84a5ebde86",
+        "f0031.jpg": "9e9341fb92a05b61952aa6ab49f05084197957ab7569b2a0c3d59864c5a3a5f8",
+        "f0032.jpg": "19d01882a23d83b592b1d4feed435035664d712e1482b547ddad6880ab057e02",
+        "f0033.jpg": "fcaeba868f9877f504d4ea8272beb5d96c650737ed9ac32050353246bcffc1c2",
+        "f0034.jpg": "50b5eccd04d6d7fd2d7cf30fc0f9b8fd3d48a4d543ebdba4d599b6cb4d93b248",
+        "f0035.jpg": "f320bdbaf86af046a454f6023dc042f8948ee5af9cb91045a8201f16bb43c60b",
+        "f0036.jpg": "f320bdbaf86af046a454f6023dc042f8948ee5af9cb91045a8201f16bb43c60b"
+      },
+      "frames": [
+        {
+          "src": "f0000.jpg",
+          "stage": "paper",
+          "change": 0,
+          "progress": 0
+        },
+        {
+          "src": "f0001.jpg",
+          "stage": "frisket",
+          "change": 0,
+          "progress": 0
+        },
+        {
+          "src": "f0002.jpg",
+          "stage": "pen",
+          "change": 0.131019,
+          "progress": 0.001918
+        },
+        {
+          "src": "f0003.jpg",
+          "stage": "pen",
+          "change": 0.212541,
+          "progress": 0.003112
+        },
+        {
+          "src": "f0004.jpg",
+          "stage": "pen",
+          "change": 0.317933,
+          "progress": 0.004655
+        },
+        {
+          "src": "f0005.jpg",
+          "stage": "pen",
+          "change": 0.346584,
+          "progress": 0.005075
+        },
+        {
+          "src": "f0006.jpg",
+          "stage": "paint",
+          "change": 3.625536,
+          "progress": 0.053083
+        },
+        {
+          "src": "f0007.jpg",
+          "stage": "paint",
+          "change": 4.905348,
+          "progress": 0.071822
+        },
+        {
+          "src": "f0008.jpg",
+          "stage": "paint",
+          "change": 8.228563,
+          "progress": 0.120479
+        },
+        {
+          "src": "f0009.jpg",
+          "stage": "paint",
+          "change": 10.330899,
+          "progress": 0.15126
+        },
+        {
+          "src": "f0010.jpg",
+          "stage": "paint",
+          "change": 13.596148,
+          "progress": 0.199069
+        },
+        {
+          "src": "f0011.jpg",
+          "stage": "paint",
+          "change": 18.314054,
+          "progress": 0.268146
+        },
+        {
+          "src": "f0012.jpg",
+          "stage": "paint",
+          "change": 23.260041,
+          "progress": 0.340563
+        },
+        {
+          "src": "f0013.jpg",
+          "stage": "paint",
+          "change": 23.343865,
+          "progress": 0.34179
+        },
+        {
+          "src": "f0014.jpg",
+          "stage": "paint",
+          "change": 29.982602,
+          "progress": 0.438992
+        },
+        {
+          "src": "f0015.jpg",
+          "stage": "paint",
+          "change": 34.027785,
+          "progress": 0.49822
+        },
+        {
+          "src": "f0016.jpg",
+          "stage": "paint",
+          "change": 34.327425,
+          "progress": 0.502607
+        },
+        {
+          "src": "f0017.jpg",
+          "stage": "paint",
+          "change": 37.671548,
+          "progress": 0.55157
+        },
+        {
+          "src": "f0018.jpg",
+          "stage": "paint",
+          "change": 38.855463,
+          "progress": 0.568904
+        },
+        {
+          "src": "f0019.jpg",
+          "stage": "paint",
+          "change": 40.449464,
+          "progress": 0.592243
+        },
+        {
+          "src": "f0020.jpg",
+          "stage": "paint",
+          "change": 40.583575,
+          "progress": 0.594206
+        },
+        {
+          "src": "f0021.jpg",
+          "stage": "paint",
+          "change": 41.344659,
+          "progress": 0.60535
+        },
+        {
+          "src": "f0022.jpg",
+          "stage": "paint",
+          "change": 42.072862,
+          "progress": 0.616012
+        },
+        {
+          "src": "f0023.jpg",
+          "stage": "paint",
+          "change": 42.430462,
+          "progress": 0.621248
+        },
+        {
+          "src": "f0024.jpg",
+          "stage": "paint",
+          "change": 47.812164,
+          "progress": 0.700044
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 54.995845,
+          "progress": 0.805224
+        },
+        {
+          "src": "f0026.jpg",
+          "stage": "paint",
+          "change": 58.710283,
+          "progress": 0.85961
+        },
+        {
+          "src": "f0027.jpg",
+          "stage": "paint",
+          "change": 62.96588,
+          "progress": 0.921918
+        },
+        {
+          "src": "f0028.jpg",
+          "stage": "paint",
+          "change": 63.712976,
+          "progress": 0.932857
+        },
+        {
+          "src": "f0029.jpg",
+          "stage": "paint",
+          "change": 64.421339,
+          "progress": 0.943228
+        },
+        {
+          "src": "f0030.jpg",
+          "stage": "paint",
+          "change": 64.829852,
+          "progress": 0.94921
+        },
+        {
+          "src": "f0031.jpg",
+          "stage": "paint",
+          "change": 65.125934,
+          "progress": 0.953545
+        },
+        {
+          "src": "f0032.jpg",
+          "stage": "ink",
+          "change": 66.222764,
+          "progress": 0.969604
+        },
+        {
+          "src": "f0033.jpg",
+          "stage": "ink",
+          "change": 66.989421,
+          "progress": 0.980829
+        },
+        {
+          "src": "f0034.jpg",
+          "stage": "ink",
+          "change": 67.646757,
+          "progress": 0.990453
+        },
+        {
+          "src": "f0035.jpg",
+          "stage": "ink",
+          "change": 68.451598,
+          "progress": 1
+        },
+        {
+          "src": "f0036.jpg",
+          "stage": "finished",
+          "change": 68.451598,
+          "progress": 1
+        },
+        {
+          "src": "painting.png",
+          "stage": "final",
+          "change": 68.298775,
+          "progress": 1
+        }
+      ],
+      "animation": [
+        {
+          "src": "f0000.jpg",
+          "stage": "paper",
+          "change": 0,
+          "progress": 0,
+          "goal": 0
+        },
+        {
+          "src": "f0006.jpg",
+          "stage": "paint",
+          "change": 3.625536,
+          "progress": 0.053083,
+          "goal": 0.034483
+        },
+        {
+          "src": "f0007.jpg",
+          "stage": "paint",
+          "change": 4.905348,
+          "progress": 0.071822,
+          "goal": 0.068966
+        },
+        {
+          "src": "f0008.jpg",
+          "stage": "paint",
+          "change": 8.228563,
+          "progress": 0.120479,
+          "goal": 0.103448
+        },
+        {
+          "src": "f0009.jpg",
+          "stage": "paint",
+          "change": 10.330899,
+          "progress": 0.15126,
+          "goal": 0.137931
+        },
+        {
+          "src": "f0009.jpg",
+          "stage": "paint",
+          "change": 10.330899,
+          "progress": 0.15126,
+          "goal": 0.172414
+        },
+        {
+          "src": "f0010.jpg",
+          "stage": "paint",
+          "change": 13.596148,
+          "progress": 0.199069,
+          "goal": 0.206897
+        },
+        {
+          "src": "f0011.jpg",
+          "stage": "paint",
+          "change": 18.314054,
+          "progress": 0.268146,
+          "goal": 0.241379
+        },
+        {
+          "src": "f0011.jpg",
+          "stage": "paint",
+          "change": 18.314054,
+          "progress": 0.268146,
+          "goal": 0.275862
+        },
+        {
+          "src": "f0012.jpg",
+          "stage": "paint",
+          "change": 23.260041,
+          "progress": 0.340563,
+          "goal": 0.310345
+        },
+        {
+          "src": "f0013.jpg",
+          "stage": "paint",
+          "change": 23.343865,
+          "progress": 0.34179,
+          "goal": 0.344828
+        },
+        {
+          "src": "f0013.jpg",
+          "stage": "paint",
+          "change": 23.343865,
+          "progress": 0.34179,
+          "goal": 0.37931
+        },
+        {
+          "src": "f0014.jpg",
+          "stage": "paint",
+          "change": 29.982602,
+          "progress": 0.438992,
+          "goal": 0.413793
+        },
+        {
+          "src": "f0014.jpg",
+          "stage": "paint",
+          "change": 29.982602,
+          "progress": 0.438992,
+          "goal": 0.448276
+        },
+        {
+          "src": "f0015.jpg",
+          "stage": "paint",
+          "change": 34.027785,
+          "progress": 0.49822,
+          "goal": 0.482759
+        },
+        {
+          "src": "f0016.jpg",
+          "stage": "paint",
+          "change": 34.327425,
+          "progress": 0.502607,
+          "goal": 0.517241
+        },
+        {
+          "src": "f0017.jpg",
+          "stage": "paint",
+          "change": 37.671548,
+          "progress": 0.55157,
+          "goal": 0.551724
+        },
+        {
+          "src": "f0019.jpg",
+          "stage": "paint",
+          "change": 40.449464,
+          "progress": 0.592243,
+          "goal": 0.586207
+        },
+        {
+          "src": "f0023.jpg",
+          "stage": "paint",
+          "change": 42.430462,
+          "progress": 0.621248,
+          "goal": 0.62069
+        },
+        {
+          "src": "f0023.jpg",
+          "stage": "paint",
+          "change": 42.430462,
+          "progress": 0.621248,
+          "goal": 0.655172
+        },
+        {
+          "src": "f0024.jpg",
+          "stage": "paint",
+          "change": 47.812164,
+          "progress": 0.700044,
+          "goal": 0.689655
+        },
+        {
+          "src": "f0024.jpg",
+          "stage": "paint",
+          "change": 47.812164,
+          "progress": 0.700044,
+          "goal": 0.724138
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 54.995845,
+          "progress": 0.805224,
+          "goal": 0.758621
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 54.995845,
+          "progress": 0.805224,
+          "goal": 0.793103
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 54.995845,
+          "progress": 0.805224,
+          "goal": 0.827586
+        },
+        {
+          "src": "f0026.jpg",
+          "stage": "paint",
+          "change": 58.710283,
+          "progress": 0.85961,
+          "goal": 0.862069
+        },
+        {
+          "src": "f0027.jpg",
+          "stage": "paint",
+          "change": 62.96588,
+          "progress": 0.921918,
+          "goal": 0.896552
+        },
+        {
+          "src": "f0028.jpg",
+          "stage": "paint",
+          "change": 63.712976,
+          "progress": 0.932857,
+          "goal": 0.931034
+        },
+        {
+          "src": "f0032.jpg",
+          "stage": "ink",
+          "change": 66.222764,
+          "progress": 0.969604,
+          "goal": 0.965517
+        },
+        {
+          "src": "painting.png",
+          "stage": "final",
+          "change": 68.298775,
+          "progress": 1,
+          "goal": 1
+        }
+      ],
+      "checkpoints": [
+        {
+          "src": "f0010.jpg",
+          "stage": "paint",
+          "change": 13.596148,
+          "progress": 0.199069,
+          "goal": 0.2
+        },
+        {
+          "src": "f0014.jpg",
+          "stage": "paint",
+          "change": 29.982602,
+          "progress": 0.438992,
+          "goal": 0.4
+        },
+        {
+          "src": "f0021.jpg",
+          "stage": "paint",
+          "change": 41.344659,
+          "progress": 0.60535,
+          "goal": 0.6
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 54.995845,
+          "progress": 0.805224,
+          "goal": 0.8
+        },
+        {
+          "src": "painting.png",
+          "stage": "final",
+          "change": 68.298775,
+          "progress": 1,
+          "goal": 1
+        }
+      ]
+    },
+    "luce": {
+      "width": 540,
+      "height": 282,
+      "paper": "f0000.jpg",
+      "finalChange": 69.312567,
+      "sources": {
+        "photo.png": "d5922d296510810627df1d786f45fad18074216745d6a1055174029b65ef39cf",
+        "source.jpg": "807dd46c0660c3eb19dbb2f2ea832ce2db6b1eff5c61eddfd90f2b14176f475f",
+        "painting.png": "06a09e9a7513a6ad7224c515b5abc5f693d1663430076bdca1e19cf847f53b65",
+        "frames.json": "33b62fe643f9a7ba2eb4cacca403dcac33de81e1a8274db7657e59e9403aabad",
+        "f0000.jpg": "0b8f94c14e3b6843b8ea9b12622f1a6967b84007001b06736bdb36790aef1a25",
+        "f0001.jpg": "0b8f94c14e3b6843b8ea9b12622f1a6967b84007001b06736bdb36790aef1a25",
+        "f0002.jpg": "48a5e33330fe04edd5929593d5accefbf98fa434188a1940e60a167df9b8f515",
+        "f0003.jpg": "98ef83c256ecaa0398f60a6a29fa3d67a409e6390f6d05ad5cd28f7729eece7f",
+        "f0004.jpg": "01c635a17446017073d64d7a28bd06d2fe50c0b2facd1634b49fa8fda07ba493",
+        "f0005.jpg": "dfc442d1f9f8355ea20afbab18424ca8a37919f2df3035cb185f5e196c14837e",
+        "f0006.jpg": "9d11f90e08a953891006364db30bf5dde39a24f8803e823e48fe9ab6fea89d8d",
+        "f0007.jpg": "6ed597da5573121d1e6f4a97996f67ebd3cf40ecb95379dc8c27605c969fbdb0",
+        "f0008.jpg": "1b1f065579c0478d01785da37a2a27b1f10aadf116e1f79a9b5b0756a7bcdc1f",
+        "f0009.jpg": "feeb209d58f5784280df4dd92ef844c8b19af292aafab39f701cf185c1671255",
+        "f0010.jpg": "f109e5e0a1f9d73b04d213dd6e6d68c551a00f997e5f0cf4566b5c0bbbbddc42",
+        "f0011.jpg": "07192318fccbe54c69b4c2c0dd8d8054b938f49059080c869efacf269932bcaa",
+        "f0012.jpg": "6a64e95677a7d78bb9c1b3f03130b7dde2daefb577455f2563b98aa7e8ef1d1a",
+        "f0013.jpg": "8a36931c9a7a4942f178bada34b3bcaa47d4562600d79f3cf5a3c4ace248fe6c",
+        "f0014.jpg": "526fb5795a5526f12affc705083426c4b2f076799d8fcd17345a81ca3454e4bb",
+        "f0015.jpg": "9fb8f2ee8dcd332c0510c799423b0f6fb26e4d9df3b6d2e12a960256fe43f060",
+        "f0016.jpg": "5f10723d1e435a7a49e2db23d7e804ac9d52e5c8a7554012e30a445ab55ab2cf",
+        "f0017.jpg": "4a0cb902bfd1ff1cf7fa6e0df75611c89fcace337f50c1c0e3b71e522f74e17b",
+        "f0018.jpg": "104dd45c11e0bdbadeb01cdcb19e71a609d68d1ea557b41839b068435f947aac",
+        "f0019.jpg": "dde1165f96cb0059b965f55627cd08208addb7c9dc3fe778397c269b4a09264c",
+        "f0020.jpg": "c3b16b29620efc3414e92a9956d37a7eb6e253409469d7fd04f51feb6333a769",
+        "f0021.jpg": "77704bfb2bad58f162c90eae060dd0e35845f665bed6f9f90c054f8d1c7f1bba",
+        "f0022.jpg": "8908ec961c473c095c8e5629dc04fd53721f5e9094958e12f08cd8d9f4a9c79b",
+        "f0023.jpg": "20f0966fbeef4e4bb63cbb475514618132b5c4f9de32c12ad8c24742f576d5e8",
+        "f0024.jpg": "9a529ebec6dbe5af434f895c759c740ea6b601c3ab465cf0854ce97a0db9dd18",
+        "f0025.jpg": "4e756c351ecdcb82c8b1ebcf3f723416b27e2cd512acfb61f598258b5f72bc84",
+        "f0026.jpg": "45df2ac6bcd168331cf5421f57f1263118e783098ebcdf35da07f77ae299c7da",
+        "f0027.jpg": "89edd80da230c25f7d2435a2b929f8d3d4d73f0fd71c330937d8ec7257aeef04",
+        "f0028.jpg": "aaf9b8ddac0fa2c1a0f4c7b27fdeca0f13cdfabf0e75808783e615781d532390",
+        "f0029.jpg": "e7f1f7da700e45a34c4bdf4e30d87f9725ad4c674cac9fec05625d2c5cfa9f17",
+        "f0030.jpg": "844f8c587d26c6654a265530716382394c36e3998551c6273381c7fc2f41352d",
+        "f0031.jpg": "2cb85264c376e9e57ba0b1f765a8c4c325ac7c64d69658e67b1467d7a7596e9e",
+        "f0032.jpg": "a56431185eea78a92d9d295d5486b3f84878f20df9697b4674e1062c83c6e00a",
+        "f0033.jpg": "32713692d0ad5486526270a290f06672a1e0e4aca6e0e9756993c0a7dad27a99",
+        "f0034.jpg": "5e66a3664729686076832df003f973137d1fa999d9dc0c636b90f59395da6a95",
+        "f0035.jpg": "d720c24ed820e2716a3146634fc9dd821409434058b3819d0d64d5f018d67dfd",
+        "f0036.jpg": "99c40743a5feb07c0dfaff63b56842e1e940f0f8543f8ad471c499b89f6d6c93",
+        "f0037.jpg": "0bee3025d3a2aa7e39a826854c5a05745a05e97e8790e70c8fe32e2153562da0",
+        "f0038.jpg": "164b68622f9135b4d907b133b4651b52b139fdbe0e6ef34c6961b978f0aa7e55",
+        "f0039.jpg": "c68c745c7fb217981faa1057db48231967a1d87b2ae02a8c9c05746f27401110",
+        "f0040.jpg": "ac211e0cb1ad336c2943f11ff176889024ea5c45b9f7fa35fe726ff674223240",
+        "f0041.jpg": "6b0cfe153d92afa8c8bc4f3ca5589601f4e6755008fcf391ea75201b1b72b64e",
+        "f0042.jpg": "c6e42163cb323f4982f0c8405e8e19b2430f0bac0b0b1faea9513dd45ff96af4",
+        "f0043.jpg": "52f4af27e1e610ffee7776e9b454518cf75ef5018dbd7d5499a289984259aff4",
+        "f0044.jpg": "4e469933800d709fae87f5d2aa4f4b8053a7368ca074388a3e9d0ddcd9a13f73",
+        "f0045.jpg": "e74b316961c767c25d9b44a4d1cfce55b80ad499d33064db612c18fbd91625d7",
+        "f0046.jpg": "e74b316961c767c25d9b44a4d1cfce55b80ad499d33064db612c18fbd91625d7"
+      },
+      "frames": [
+        {
+          "src": "f0000.jpg",
+          "stage": "paper",
+          "change": 0,
+          "progress": 0
+        },
+        {
+          "src": "f0001.jpg",
+          "stage": "frisket",
+          "change": 0,
+          "progress": 0
+        },
+        {
+          "src": "f0002.jpg",
+          "stage": "pen",
+          "change": 0.264416,
+          "progress": 0.003815
+        },
+        {
+          "src": "f0003.jpg",
+          "stage": "pen",
+          "change": 0.536582,
+          "progress": 0.007741
+        },
+        {
+          "src": "f0004.jpg",
+          "stage": "pen",
+          "change": 0.791881,
+          "progress": 0.011425
+        },
+        {
+          "src": "f0005.jpg",
+          "stage": "pen",
+          "change": 0.958668,
+          "progress": 0.013831
+        },
+        {
+          "src": "f0006.jpg",
+          "stage": "paint",
+          "change": 3.982589,
+          "progress": 0.057458
+        },
+        {
+          "src": "f0007.jpg",
+          "stage": "paint",
+          "change": 5.847178,
+          "progress": 0.08436
+        },
+        {
+          "src": "f0008.jpg",
+          "stage": "paint",
+          "change": 6.63144,
+          "progress": 0.095674
+        },
+        {
+          "src": "f0009.jpg",
+          "stage": "paint",
+          "change": 10.633473,
+          "progress": 0.153413
+        },
+        {
+          "src": "f0010.jpg",
+          "stage": "paint",
+          "change": 13.967849,
+          "progress": 0.20152
+        },
+        {
+          "src": "f0011.jpg",
+          "stage": "paint",
+          "change": 14.841932,
+          "progress": 0.21413
+        },
+        {
+          "src": "f0012.jpg",
+          "stage": "paint",
+          "change": 14.919103,
+          "progress": 0.215244
+        },
+        {
+          "src": "f0013.jpg",
+          "stage": "paint",
+          "change": 20.561853,
+          "progress": 0.296654
+        },
+        {
+          "src": "f0014.jpg",
+          "stage": "paint",
+          "change": 22.385043,
+          "progress": 0.322958
+        },
+        {
+          "src": "f0015.jpg",
+          "stage": "paint",
+          "change": 23.430556,
+          "progress": 0.338042
+        },
+        {
+          "src": "f0016.jpg",
+          "stage": "paint",
+          "change": 31.584896,
+          "progress": 0.455688
+        },
+        {
+          "src": "f0017.jpg",
+          "stage": "paint",
+          "change": 32.358068,
+          "progress": 0.466843
+        },
+        {
+          "src": "f0018.jpg",
+          "stage": "paint",
+          "change": 36.023695,
+          "progress": 0.519728
+        },
+        {
+          "src": "f0019.jpg",
+          "stage": "paint",
+          "change": 37.263167,
+          "progress": 0.537611
+        },
+        {
+          "src": "f0020.jpg",
+          "stage": "paint",
+          "change": 37.887773,
+          "progress": 0.546622
+        },
+        {
+          "src": "f0021.jpg",
+          "stage": "paint",
+          "change": 43.298269,
+          "progress": 0.624681
+        },
+        {
+          "src": "f0022.jpg",
+          "stage": "paint",
+          "change": 43.500567,
+          "progress": 0.6276
+        },
+        {
+          "src": "f0023.jpg",
+          "stage": "paint",
+          "change": 44.287974,
+          "progress": 0.63896
+        },
+        {
+          "src": "f0024.jpg",
+          "stage": "paint",
+          "change": 44.880013,
+          "progress": 0.647502
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 45.142792,
+          "progress": 0.651293
+        },
+        {
+          "src": "f0026.jpg",
+          "stage": "paint",
+          "change": 46.960752,
+          "progress": 0.677521
+        },
+        {
+          "src": "f0027.jpg",
+          "stage": "paint",
+          "change": 47.01381,
+          "progress": 0.678287
+        },
+        {
+          "src": "f0028.jpg",
+          "stage": "paint",
+          "change": 47.114432,
+          "progress": 0.679739
+        },
+        {
+          "src": "f0029.jpg",
+          "stage": "paint",
+          "change": 47.246261,
+          "progress": 0.681641
+        },
+        {
+          "src": "f0030.jpg",
+          "stage": "paint",
+          "change": 47.457031,
+          "progress": 0.684681
+        },
+        {
+          "src": "f0031.jpg",
+          "stage": "paint",
+          "change": 47.658611,
+          "progress": 0.68759
+        },
+        {
+          "src": "f0032.jpg",
+          "stage": "paint",
+          "change": 48.443254,
+          "progress": 0.69891
+        },
+        {
+          "src": "f0033.jpg",
+          "stage": "paint",
+          "change": 54.94354,
+          "progress": 0.792692
+        },
+        {
+          "src": "f0034.jpg",
+          "stage": "paint",
+          "change": 56.078227,
+          "progress": 0.809063
+        },
+        {
+          "src": "f0035.jpg",
+          "stage": "paint",
+          "change": 59.658506,
+          "progress": 0.860717
+        },
+        {
+          "src": "f0036.jpg",
+          "stage": "paint",
+          "change": 60.52291,
+          "progress": 0.873188
+        },
+        {
+          "src": "f0037.jpg",
+          "stage": "paint",
+          "change": 61.500902,
+          "progress": 0.887298
+        },
+        {
+          "src": "f0038.jpg",
+          "stage": "paint",
+          "change": 62.967544,
+          "progress": 0.908458
+        },
+        {
+          "src": "f0039.jpg",
+          "stage": "paint",
+          "change": 63.661728,
+          "progress": 0.918473
+        },
+        {
+          "src": "f0040.jpg",
+          "stage": "paint",
+          "change": 64.051517,
+          "progress": 0.924097
+        },
+        {
+          "src": "f0041.jpg",
+          "stage": "paint",
+          "change": 64.483491,
+          "progress": 0.930329
+        },
+        {
+          "src": "f0042.jpg",
+          "stage": "ink",
+          "change": 65.646228,
+          "progress": 0.947104
+        },
+        {
+          "src": "f0043.jpg",
+          "stage": "ink",
+          "change": 67.09504,
+          "progress": 0.968007
+        },
+        {
+          "src": "f0044.jpg",
+          "stage": "ink",
+          "change": 68.482664,
+          "progress": 0.988027
+        },
+        {
+          "src": "f0045.jpg",
+          "stage": "ink",
+          "change": 69.668632,
+          "progress": 1
+        },
+        {
+          "src": "f0046.jpg",
+          "stage": "finished",
+          "change": 69.668632,
+          "progress": 1
+        },
+        {
+          "src": "painting.png",
+          "stage": "final",
+          "change": 69.312567,
+          "progress": 1
+        }
+      ],
+      "animation": [
+        {
+          "src": "f0000.jpg",
+          "stage": "paper",
+          "change": 0,
+          "progress": 0,
+          "goal": 0
+        },
+        {
+          "src": "f0005.jpg",
+          "stage": "pen",
+          "change": 0.958668,
+          "progress": 0.013831,
+          "goal": 0.034483
+        },
+        {
+          "src": "f0006.jpg",
+          "stage": "paint",
+          "change": 3.982589,
+          "progress": 0.057458,
+          "goal": 0.068966
+        },
+        {
+          "src": "f0008.jpg",
+          "stage": "paint",
+          "change": 6.63144,
+          "progress": 0.095674,
+          "goal": 0.103448
+        },
+        {
+          "src": "f0009.jpg",
+          "stage": "paint",
+          "change": 10.633473,
+          "progress": 0.153413,
+          "goal": 0.137931
+        },
+        {
+          "src": "f0009.jpg",
+          "stage": "paint",
+          "change": 10.633473,
+          "progress": 0.153413,
+          "goal": 0.172414
+        },
+        {
+          "src": "f0010.jpg",
+          "stage": "paint",
+          "change": 13.967849,
+          "progress": 0.20152,
+          "goal": 0.206897
+        },
+        {
+          "src": "f0012.jpg",
+          "stage": "paint",
+          "change": 14.919103,
+          "progress": 0.215244,
+          "goal": 0.241379
+        },
+        {
+          "src": "f0013.jpg",
+          "stage": "paint",
+          "change": 20.561853,
+          "progress": 0.296654,
+          "goal": 0.275862
+        },
+        {
+          "src": "f0014.jpg",
+          "stage": "paint",
+          "change": 22.385043,
+          "progress": 0.322958,
+          "goal": 0.310345
+        },
+        {
+          "src": "f0015.jpg",
+          "stage": "paint",
+          "change": 23.430556,
+          "progress": 0.338042,
+          "goal": 0.344828
+        },
+        {
+          "src": "f0015.jpg",
+          "stage": "paint",
+          "change": 23.430556,
+          "progress": 0.338042,
+          "goal": 0.37931
+        },
+        {
+          "src": "f0016.jpg",
+          "stage": "paint",
+          "change": 31.584896,
+          "progress": 0.455688,
+          "goal": 0.413793
+        },
+        {
+          "src": "f0016.jpg",
+          "stage": "paint",
+          "change": 31.584896,
+          "progress": 0.455688,
+          "goal": 0.448276
+        },
+        {
+          "src": "f0017.jpg",
+          "stage": "paint",
+          "change": 32.358068,
+          "progress": 0.466843,
+          "goal": 0.482759
+        },
+        {
+          "src": "f0018.jpg",
+          "stage": "paint",
+          "change": 36.023695,
+          "progress": 0.519728,
+          "goal": 0.517241
+        },
+        {
+          "src": "f0020.jpg",
+          "stage": "paint",
+          "change": 37.887773,
+          "progress": 0.546622,
+          "goal": 0.551724
+        },
+        {
+          "src": "f0021.jpg",
+          "stage": "paint",
+          "change": 43.298269,
+          "progress": 0.624681,
+          "goal": 0.586207
+        },
+        {
+          "src": "f0021.jpg",
+          "stage": "paint",
+          "change": 43.298269,
+          "progress": 0.624681,
+          "goal": 0.62069
+        },
+        {
+          "src": "f0025.jpg",
+          "stage": "paint",
+          "change": 45.142792,
+          "progress": 0.651293,
+          "goal": 0.655172
+        },
+        {
+          "src": "f0031.jpg",
+          "stage": "paint",
+          "change": 47.658611,
+          "progress": 0.68759,
+          "goal": 0.689655
+        },
+        {
+          "src": "f0032.jpg",
+          "stage": "paint",
+          "change": 48.443254,
+          "progress": 0.69891,
+          "goal": 0.724138
+        },
+        {
+          "src": "f0033.jpg",
+          "stage": "paint",
+          "change": 54.94354,
+          "progress": 0.792692,
+          "goal": 0.758621
+        },
+        {
+          "src": "f0033.jpg",
+          "stage": "paint",
+          "change": 54.94354,
+          "progress": 0.792692,
+          "goal": 0.793103
+        },
+        {
+          "src": "f0034.jpg",
+          "stage": "paint",
+          "change": 56.078227,
+          "progress": 0.809063,
+          "goal": 0.827586
+        },
+        {
+          "src": "f0035.jpg",
+          "stage": "paint",
+          "change": 59.658506,
+          "progress": 0.860717,
+          "goal": 0.862069
+        },
+        {
+          "src": "f0037.jpg",
+          "stage": "paint",
+          "change": 61.500902,
+          "progress": 0.887298,
+          "goal": 0.896552
+        },
+        {
+          "src": "f0041.jpg",
+          "stage": "paint",
+          "change": 64.483491,
+          "progress": 0.930329,
+          "goal": 0.931034
+        },
+        {
+          "src": "f0043.jpg",
+          "stage": "ink",
+          "change": 67.09504,
+          "progress": 0.968007,
+          "goal": 0.965517
+        },
+        {
+          "src": "painting.png",
+          "stage": "final",
+          "change": 69.312567,
+          "progress": 1,
+          "goal": 1
+        }
+      ],
+      "checkpoints": [
+        {
+          "src": "f0010.jpg",
+          "stage": "paint",
+          "change": 13.967849,
+          "progress": 0.20152,
+          "goal": 0.2
+        },
+        {
+          "src": "f0016.jpg",
+          "stage": "paint",
+          "change": 31.584896,
+          "progress": 0.455688,
+          "goal": 0.4
+        },
+        {
+          "src": "f0021.jpg",
+          "stage": "paint",
+          "change": 43.298269,
+          "progress": 0.624681,
+          "goal": 0.6
+        },
+        {
+          "src": "f0033.jpg",
+          "stage": "paint",
+          "change": 54.94354,
+          "progress": 0.792692,
+          "goal": 0.8
+        },
+        {
+          "src": "painting.png",
+          "stage": "final",
+          "change": 69.312567,
+          "progress": 1,
+          "goal": 1
+        }
+      ]
+    }
+  },
+  "outputs": [
+    {
+      "file": "hero-trumbull.webp",
+      "width": 2040,
+      "height": 504,
+      "bytes": 3944432,
+      "frames": 198,
+      "loop": 0,
+      "durationMs": 10540,
+      "inBetween": "true stroke order from marks.json"
+    },
+    {
+      "file": "example-trumbull.webp",
+      "width": 720,
+      "height": 186,
+      "bytes": 210670,
+      "frames": 30,
+      "loop": 0,
+      "durationMs": 7180
+    },
+    {
+      "file": "progress-trumbull.webp",
+      "width": 720,
+      "height": 123,
+      "bytes": 21498,
+      "frames": 1
+    },
+    {
+      "file": "example-luce.webp",
+      "width": 720,
+      "height": 149,
+      "bytes": 162886,
+      "frames": 30,
+      "loop": 0,
+      "durationMs": 7180
+    },
+    {
+      "file": "progress-luce.webp",
+      "width": 720,
+      "height": 101,
+      "bytes": 16662,
+      "frames": 1
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "subject": "HILLS",
+  "name": "Hills, round V4 try 3",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "The plate calls for loose ink and wash: connected yellow-green and blue-green value masses carry the rolling land, with a few broken sepia strokes for foliage structure.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "HILLS.landscape",
+      "bounds": [0, 0, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected rolling grass slopes, cool wooded hollows and a winding pale warm track. Keep the irregular canopy and hill edges; value shapes belong to the land, not to rectangular compartments."
+    }
+  ],
+  "reserves": []
+}

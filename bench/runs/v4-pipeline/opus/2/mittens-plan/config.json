@@ -1,0 +1,26 @@
+{
+ "subject": "3T",
+ "name": "Mittens (cat and man, watercolor portrait sketch)",
+ "styleSelection": {
+  "style": "precise-watercolor",
+  "reason": "Light value planes on white paper carry the cat's tabby patches and the man's skin; dry focal details; fine selective closing lines.",
+  "regions": {
+   "3T.human-hair": {"style": "ink-and-wash", "reason": "Curly hair locks are below brush resolution; one connected blue-grey mass, then directional strokes by value."},
+   "3T.hair-side": {"style": "ink-and-wash", "reason": "Same curly mass running down the right temple; broken edge into white paper."}
+  }
+ },
+ "families": [
+  {"id": "3T.cat-head", "bounds": [0, 0, 0.5, 0.44], "baseMove": "wet on dry", "referenceCue": "orange tabby patches on white paper, pale green eyes with slit pupils, dark rim on the right eye"},
+  {"id": "3T.cat-chest", "bounds": [0, 0.44, 0.5, 1], "baseMove": "wet on dry", "referenceCue": "white chest left as paper, orange stripe patches with broken edges down the right side and the leg"},
+  {"id": "3T.human-hair", "bounds": [0.49, 0.2, 1, 0.47], "baseMove": "wet on dry", "referenceCue": "curly blue-grey hair mass, flicked broken edge into white"},
+  {"id": "3T.hair-side", "bounds": [0.88, 0.45, 1, 0.76], "baseMove": "wet on dry", "referenceCue": "hair down the right temple, dark grey with paper flecks"},
+  {"id": "3T.face", "bounds": [0.5, 0.42, 0.94, 1], "baseMove": "wet on dry", "referenceCue": "pale warm sepia skin, near-white forehead, shadow down the left cheek and right jaw, stubble tone round the mouth"},
+  {"id": "3T.man-eyes", "bounds": [0.55, 0.62, 0.89, 0.78], "baseMove": "dry on dry", "referenceCue": "brows as dark brown bands, irises tucked under the upper lids, catchlights left white"}
+ ],
+ "reserves": [
+  {"reason": "catchlight, man's left eye (viewer's left)", "bounds": [0.5967, 0.7181, 0.6067, 0.7259]},
+  {"reason": "catchlight, man's right eye", "bounds": [0.8033, 0.6757, 0.8133, 0.6834]},
+  {"reason": "catchlight, cat's right eye", "bounds": [0.2667, 0.2124, 0.2767, 0.2239]},
+  {"reason": "catchlight, cat's left eye", "bounds": [0.0733, 0.2355, 0.0833, 0.2432]}
+ ]
+}

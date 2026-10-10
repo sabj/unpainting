@@ -1,0 +1,341 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V1",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "haiku",
+  "name": "Haiku 4.5",
+  "id": "claude-haiku-4-5-20251001",
+  "effort": "n/a",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 2.5,
+  "tokens": 620048,
+  "costUSD": null,
+  "estCostUSD": 0.199,
+  "usage": {
+   "input": 122,
+   "cacheWrite1h": 31988,
+   "cacheWrite5m": 0,
+   "cacheRead": 572394,
+   "output": 15544
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 14,
+   "minutes": 0,
+   "smallShare": 0.3,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0135,
+   "images": {
+    "final": "hills.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.12,
+    "pm": 0.14,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.24,
+    "criteria": {
+     "composition_values": 1.33,
+     "edges_detail": 1,
+     "marks_texture": 2.67,
+     "classic_value": 2.66,
+     "classic_edge": 1.03,
+     "classic_landmark": null,
+     "classic_marks": 6.02
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 17,
+   "minutes": 0,
+   "smallShare": 0.286,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0022,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.25,
+    "pm": 0.07,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.51,
+    "criteria": {
+     "composition_values": 1.33,
+     "edges_detail": 1,
+     "marks_texture": 2.67,
+     "classic_value": 3.34,
+     "classic_edge": 0.94,
+     "classic_landmark": null,
+     "classic_marks": 6.24
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 15,
+   "minutes": 0.1,
+   "smallShare": 0.667,
+   "shortStrokes": 1,
+   "dotStrokes": 0,
+   "copyHF": -0.0115,
+   "images": {
+    "final": "sargent.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.46,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.93,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 1,
+     "marks_texture": 3.33,
+     "classic_value": 2.81,
+     "classic_edge": 1.6,
+     "classic_landmark": null,
+     "classic_marks": 7.37
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 29,
+   "minutes": 0,
+   "smallShare": 0.727,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0067,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "score": {
+    "composite": 2.1,
+    "pm": 0.07,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.21,
+    "criteria": {
+     "composition_values": 1.33,
+     "edges_detail": 0.67,
+     "marks_texture": 2,
+     "classic_value": 2.08,
+     "classic_edge": 1.34,
+     "classic_landmark": null,
+     "classic_marks": 6.21
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 1.5
+    },
+    "earlyMean": 1.5,
+    "mean": 1.5,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "i": 5,
+     "d": 1,
+     "a": 1,
+     "h": 9,
+     "e": 5
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "All five snapshots are near-identical sparse sheets — one top wash, a faint pencil grid, stray grey flecks and speckled texture that never describe the Gothic facade — so no strokes accumulate toward the target and the sequence reads as a static placeholder repeated, not a human brush-and-pen progression.",
+     "Qwen/Qwen3.5-9B": "The sequence displays a static faint sketch that appears to be revealed via a dissolve or fade-in effect, lacking the progressive strokes and value changes of a human painting process."
+    }
+   },
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 26,
+   "minutes": 0,
+   "smallShare": 1,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": -0.0032,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "changes": null,
+   "score": {
+    "composite": 2.41,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.81,
+    "criteria": {
+     "composition_values": 1.67,
+     "edges_detail": 1,
+     "marks_texture": 2,
+     "classic_value": 3.38,
+     "classic_edge": 0.72,
+     "classic_landmark": null,
+     "classic_marks": 7.32
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 1,
+     "100": 1.5
+    },
+    "earlyMean": 1.75,
+    "mean": 1.5,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 8,
+     "h": 8,
+     "j": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Panels 2-5 are virtually identical faint contour sketches with only a single dark stroke dumped in at the end, reading as a slow fade-in of an underdrawing that never approaches the finished target rather than genuine brush-and-pen progress.",
+     "Qwen/Qwen3.5-9B": "The sequence displays a static faint sketch repeated across all panels, failing to build up to the detailed target image."
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ]
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 2.27,
+  "partialComposite": null,
+  "pm": 0.04,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.51,
+   "level": "medium",
+   "parts": {
+    "progression": 0.94,
+    "earlyStageMean": 1.63,
+    "copyHF": {
+     "hills": 0.0135,
+     "south-france": 0.0022,
+     "sargent": -0.0115,
+     "trumbull": 0.0067,
+     "mittens": -0.0032
+    },
+    "copy": 0.14,
+    "smallStrokeShare": 0.596,
+    "small": 0.59,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.62,
+   "level": "high"
+  },
+  "review": {
+   "status": "cleared",
+   "finding": "weak technique, not cheating; see review"
+  }
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

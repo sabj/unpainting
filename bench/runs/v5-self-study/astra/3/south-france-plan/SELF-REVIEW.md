@@ -1,0 +1,19 @@
+# Independent review, before reading FEEDBACK.md
+
+I viewed compare.png and stages.jpg first. The target is a sunlit hillside village: warm pale walls, terracotta roofs, violet shaded walls, narrow dark cypresses, silvery olive crowns and a distinctive branching pine in the foreground. The previous painting preserves the diagonal distribution of buildings and the warm/cool architectural planes. The right-hand cluster is recognisable. Some wall washes have useful transparency.
+
+The foliage is the chief failure. Nearly all trees become similarly muddy olive-brown islands with scalloped contours. The tall cypresses lose their clean narrow silhouettes and the foreground pine loses its bright crown and much of its dark branching structure. The whole sheet has too few clear lights and darks within the greenery, despite distracting unpainted gaps. The foreground building's roof and walls are oversimplified and rounded; window and eave accents are weak. Tiny rectangular reserves look artificial. This does not yet have the confident selective drawing or light coloured washes of an urban sketch.
+
+The error begins in the first foliage washes. The 25% and 50% images show horizontal swaths with straight endings, unrelated to individual crowns or the slope. Later additions thicken these areas and break them into value islands, without rebuilding coherent tree silhouettes. The opening drawing is structurally useful but much too pale to support a pen-and-wash painting. The late stage adds many small dark patches while the main tree and architecture accents remain weak. This is a planning and mark-distribution problem, not a reason to add more texture everywhere.
+
+My independent finished-painting score: **4.5/10**. My process-plausibility score: **2.5/5**. The light-to-dark sequence and drying are plausible, but the mechanically banded wash and uniform fragmented finishing are not convincing hand painting. These are my visual estimates, not calibrated external scores.
+
+Planned direction before external feedback: keep the fitted village geometry and warm/cool wall separation; make the first wash lighter and more coherent; avoid large horizontal wash lanes and rectangular paper reserves; strengthen a sparse architectural and tree drawing; recover narrow cypress darks and differentiated foliage colour; reduce repeated blanket layering and small dark islands.
+
+## Response after reading the external feedback
+
+I agree with the low visual marks/detail assessment and the named horizontal travelling fronts, flat slabs and weak early stages. These are visible in the independent review. The composite 4.76 is close to my 4.5, but its underlying classic edge score of 8.96 and classic mark score of 7.07 are much too generous: contour presence is not convincing brushwork. The final process score of 5 also overlooks the repeated scalloped patches.
+
+I disagree with the literal claim that every panel is simply the finished scene at rising opacity. Roofs, wall sides and shadow groups do appear at distinct stages. A light-to-dark sequence across several areas is a legitimate watercolor process; completing every area independently is not necessary. The useful criticism is the nearly uniform weak foundation and mechanically banded coverage, not a demand to abandon transparent layering. I will strengthen the initial selective pen, reduce paint to a local-colour passage and selective shadow, and use shorter independently loaded brush strokes so areas have meaningful local value earlier.
+
+I reject adding uniform foliage detail, more global corrective passes, or heavy outlines around every tree as a response to the low detail score. I retain the fitted target geometry and the earlier removal of automatic touch-ups. I remove the two unsupported-looking rectangular glints. I replace the sepia-containing wash palette with a green-capable complementary palette and raise black ink absorption while keeping the fine physical nib.

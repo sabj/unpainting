@@ -1,0 +1,100 @@
+{
+  "subject-a": {
+    "style": "ink-and-wash",
+    "reason": "Sub-cell curly locks carry structure in directional ink over few connected value washes.",
+    "regions": {}
+  },
+  "subject-b": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {
+      "subject-b.sky": {
+        "style": "atmospheric-wet",
+        "reason": "Soft cloud transitions require one connected graded wet passage."
+      },
+      "subject-b.dog": {
+        "style": "ink-and-wash",
+        "reason": "Directional fur locks are below wash resolution."
+      }
+    }
+  },
+  "subject-c": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {
+      "subject-c.human-hair": {
+        "style": "ink-and-wash",
+        "reason": "Hair strands are below four cells at 540; mixed-dark mass with directional ink."
+      }
+    }
+  },
+  "subject-d": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {
+      "subject-d.sky": {
+        "style": "atmospheric-wet",
+        "reason": "Soft cloud transitions require one connected graded wet passage."
+      },
+      "subject-d.dog": {
+        "style": "ink-and-wash",
+        "reason": "Directional fur locks are below wash resolution."
+      }
+    }
+  },
+  "Cape": {
+    "style": "atmospheric-wet",
+    "reason": "Continuous graded sky and sea with lifted cloud lights.",
+    "regions": {}
+  },
+  "SF": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "Jones": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "Y1": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "Y2": {
+    "style": "urban-sketch",
+    "reason": "Much more ink and a looser urban-sketch style.",
+    "regions": {}
+  },
+  "Y3": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "subject-e": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "G1": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "G2": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "G3": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  },
+  "G4": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing.",
+    "regions": {}
+  }
+}

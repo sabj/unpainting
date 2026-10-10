@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import zlib from 'node:zlib';
+import {pointOnPath} from '../../docs/lab/targets/film.js';
+const lab = new URL('../../docs/lab/', import.meta.url);
+const json = p => JSON.parse(fs.readFileSync(new URL(p, lab)));
+test('published paintings ship real live materials, dips, early strokes and saved recordings', () => {
+  for (const ex of json('examples/recorded.json').examples) {
+    for (const limit of [250,2500]) {
+      const t=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL(ex.live[limit],lab))));
+      assert.equal(t.marks.filter(m=>m.k==='s'||m.k==='P').length,limit);
+      assert.ok(t.pigments.length&&t.brushOpts.length);
+      assert.ok(t.marks.some(m=>m.k==='d'||m.k==='D'));
+    }
+    for(const f of [ex.target,ex.thumb,ex.film.final,...ex.film.frames])assert.ok(fs.existsSync(new URL(f,lab)),f);
+    assert.ok(!JSON.stringify(ex).toLowerCase().includes('trumbull'));
+  }
+});
+test('recorded brush travels by distance and reaches the last point', () => {
+  assert.deepEqual(pointOnPath([0,0,3,0,3,9], .5), [3,3]);
+  assert.deepEqual(pointOnPath([0,0,3,0,3,9], 1), [3,9]);
+  assert.deepEqual(pointOnPath([2,3,2,3], .5), [2,3]);
+});

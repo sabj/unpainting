@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {semanticReferenceLengths,semanticCalibrationGain} from './semantic-areas.mjs';
+test('legacy actual reference regimes byte-exact',()=>{assert.deepEqual(semanticReferenceLengths(),[.25,3.5,55.216613271938314]);assert.deepEqual(semanticReferenceLengths(null),semanticReferenceLengths());});
+test('explicit authored target gesture regimes preserve exact lengths and existing gain interpolation',()=>{const lengths=semanticReferenceLengths('25.31991684576344,50.885755870877015,106.33026121904494');assert.deepEqual(lengths,[25.31991684576344,50.885755870877015,106.33026121904494]);assert.equal(semanticCalibrationGain({samples:lengths.map(lengthMm=>({lengthMm,gain:2}))},[{x:0,y:0},{x:50,y:0}],1),2);});
+test('malformed or nonincreasing explicit lengths reject, no silent fallback',()=>{for(const x of ['', '1,2','1,2,3,4','0,1,2','1,1,2','3,2,1','1,NaN,3','1,Infinity,3','1, 2,3',[1,2,3]])assert.throws(()=>semanticReferenceLengths(x),/reference lengths/);});

@@ -1,0 +1,3 @@
+{"t": "2026-10-09 17:48:33 PDT", "kind": "start", "modelMinutes": 10.82, "variant": "region_w13_lay1_cg10_dk8_rg0_softs_spl8_lad_wre4", "renderKey": "74e16bf4dd8b80f3103783d6bd8405efac70bb030d22ab136de2c71233b97cc2"}
+{"t": "2026-10-09 17:48:35 PDT", "kind": "session-end", "modelMinutes": 10.84, "why": "you ended the session", "looks": 0, "revisions": 0}
+{"t": "2026-10-09 19:05:14 PDT", "kind": "machine-lost", "modelMinutes": 87.49, "n": 1, "why": "infra: exit 1, 47cef56785f6cefbee036ada PAINTER_TARGET_GUARD=gentle node tools/aware/segments.mjs V5ABENCHSARGENT28cbeb16 region_w13_lay1_cg10_dk8_rg0_softs_spl8_lad_wre4 1200"}

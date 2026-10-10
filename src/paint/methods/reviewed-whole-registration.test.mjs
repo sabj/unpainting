@@ -1,0 +1,6 @@
+import test from'node:test';import assert from'node:assert/strict';import{registerReviewedWholeDrawing as map}from'../../../src/paint/methods/reviewed-whole-registration.mjs';
+const gs=[{reviewedOrdinal:19,length:40,points:[{x:786,y:571,nw:2,s:.4},{x:817,y:595,nw:3,s:.7}]}];
+test('native identity retains original controls and object',()=>assert.equal(map(gs,{width:1086,height:1448},{w:1086,h:1448}),gs));
+test('whole540 geometry/contact widths preserve physical world and pressure',()=>{const r=map(gs,{width:1086,height:1448},{w:540,h:720});for(let i=0;i<2;i++){assert.equal(r[0].points[i].x/540,gs[0].points[i].x/1086);assert.equal(r[0].points[i].nw/540,gs[0].points[i].nw/1086);assert.equal(r[0].points[i].s,gs[0].points[i].s);}assert.equal(r[0].reviewedOrdinal,19);assert.equal(gs[0].points[0].x,786);});
+test('2172 source registration doubles controls without claiming instrument capacity',()=>{const r=map(gs,{width:1086,height:1448},{w:2172,h:2896});assert.equal(r[0].points[0].x,1572);assert.equal(r[0].points[0].nw,4);});
+test('anisotropic or malformed registered frame rejects',()=>{assert.throws(()=>map(gs,{width:1086,height:1448},{w:540,h:700}));assert.throws(()=>map(gs,{width:0,height:1448},{w:540,h:720}));});

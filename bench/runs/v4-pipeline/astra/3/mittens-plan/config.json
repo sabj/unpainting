@@ -1,0 +1,115 @@
+{
+  "subject": "Mittens",
+  "name": "Mittens — fine sepia lines and light earth washes",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Reference is a high-key two-subject portrait: paint carries ochre fur, facial planes and charcoal hair; sparse fine sepia lines carry sub-brush landmarks.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Mittens.cat-ears",
+      "bounds": [
+        0,
+        0,
+        0.5066666666666667,
+        0.2857142857142857
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale ear interiors, sharp tips and warm brown outer rims; wash on dry, fine interior hair in ink."
+    },
+    {
+      "id": "Mittens.cat-face",
+      "bounds": [
+        0,
+        0.11196911196911197,
+        0.48333333333333334,
+        0.5482625482625483
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ochre tabby planes radiate from nose to cheeks; dry eye details and white muzzle interrupt the warm wash."
+    },
+    {
+      "id": "Mittens.cat-bib",
+      "bounds": [
+        0.04,
+        0.47876447876447875,
+        0.36,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large white chest with a pale warm shadow beneath the chin; leave the paper connected."
+    },
+    {
+      "id": "Mittens.cat-shoulder",
+      "bounds": [
+        0.30333333333333334,
+        0.38996138996138996,
+        0.5166666666666667,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm stripes wrap diagonally around shoulder; connected local wash then dry shadow glaze, directional line only at selected edges."
+    },
+    {
+      "id": "Mittens.human-hair",
+      "bounds": [
+        0.49666666666666665,
+        0.1969111969111969,
+        1,
+        0.7413127413127413
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Neutral charcoal curls form a connected dark crown with irregular white gaps; broad pale wash, two dry middle glazes, dark valleys last."
+    },
+    {
+      "id": "Mittens.human-face",
+      "bounds": [
+        0.5166666666666667,
+        0.44787644787644787,
+        0.94,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "High-key face: white forehead and nose ridge, warm eye sockets and cheek turns, dry precise eyes and smiling mouth."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "cat left eye catchlight",
+      "bounds": [
+        0.08633333333333333,
+        0.24362934362934363,
+        0.09133333333333332,
+        0.2494208494208494
+      ]
+    },
+    {
+      "reason": "cat right eye catchlight",
+      "bounds": [
+        0.26733333333333337,
+        0.21544401544401542,
+        0.2723333333333333,
+        0.22123552123552123
+      ]
+    },
+    {
+      "reason": "human left eye catchlight",
+      "bounds": [
+        0.6013333333333334,
+        0.7162162162162162,
+        0.6063333333333334,
+        0.722007722007722
+      ]
+    },
+    {
+      "reason": "human right eye catchlight",
+      "bounds": [
+        0.81,
+        0.6783783783783783,
+        0.815,
+        0.6841698841698841
+      ]
+    }
+  ]
+}

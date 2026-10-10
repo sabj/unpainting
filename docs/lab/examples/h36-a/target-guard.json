@@ -1,0 +1,5635 @@
+{
+ "category": "painted",
+ "mode": "gentle",
+ "requestedMode": "strict",
+ "phase": "done",
+ "violations": 0,
+ "blockedAttempts": 0,
+ "elementReads": {},
+ "byName": {},
+ "records": [],
+ "looks": {
+  "count": 1605,
+  "cells": 8196448,
+  "refused": 0,
+  "overBudget": 0,
+  "byCheckpoint": {
+   "passage": {
+    "count": 1605,
+    "refused": 0,
+    "overBudget": 0
+   }
+  },
+  "entries": [
+   {
+    "checkpoint": "passage",
+    "label": "L1/s0",
+    "cells": 693183,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 693183,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L3/s0",
+    "cells": 693183,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 532608,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 358,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1411,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1565,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 361,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 178,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 239,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 262,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 762,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 496,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 2471,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 144,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1480,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 8489,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1946,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1370,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1697,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1689,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1884,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1030,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1833,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 4704,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 947,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 173,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 279,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 582,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 295,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 536,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 298,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 147,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 220,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 921,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1918,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 2698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 273,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 577,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 2149,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 3785,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 3252,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 294,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 780,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 207,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 18666,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 266,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 180,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 391,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 381,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 6814,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1648,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 5326,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 308,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 46408,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 384,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 429,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 1432,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 9933,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 157,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 222,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 179,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 606,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 531164,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 358,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 1408,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 1542,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 357,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 178,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 239,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 756,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 496,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 2459,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 144,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 1479,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 9651,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1945,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1370,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1934,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1951,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1030,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1833,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 4700,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 947,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 173,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 279,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 581,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 295,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 536,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 298,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 147,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 220,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 921,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1918,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 2698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 273,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 577,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 2148,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 3784,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 3251,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 294,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 780,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 207,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 18661,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 266,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 180,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 226,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 391,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 381,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 6814,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1648,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 5326,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 308,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 46376,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 384,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 429,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1432,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 9934,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 157,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 222,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 179,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 526057,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 358,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 1408,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 1547,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 360,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 178,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 239,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 735,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 496,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 2392,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 144,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 1478,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 9651,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1946,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1370,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1934,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1952,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1031,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1833,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 4697,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 947,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 173,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 279,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 582,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 295,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 536,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 298,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 147,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 220,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 921,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1918,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 2698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 273,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 577,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 2148,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 3784,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 3245,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 294,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 780,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 207,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 18659,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 266,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 180,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 227,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 391,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 381,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 6814,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1648,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 5326,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 308,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 46305,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 384,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 429,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 1432,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 9934,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 157,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 222,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 179,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L11/s0",
+    "cells": 606,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 346967,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 700,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 267,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 163,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1565,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 361,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 178,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 239,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1720,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 610,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 337,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 450,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 193,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 496,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 486,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1042,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 8489,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1946,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1366,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1697,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1617,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1884,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1030,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1833,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 4704,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 173,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 279,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 582,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 536,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 159,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 298,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 147,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 220,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 921,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1918,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 2698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 273,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 577,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 2149,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 3785,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 3252,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 294,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 780,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 207,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 17804,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 266,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 155,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 391,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 381,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 6814,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 5326,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 303,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 24027,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 636,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 344,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 384,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 429,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 5574,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1432,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 7715,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 157,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L14/s0",
+    "cells": 586,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 345821,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 700,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 267,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 1542,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 357,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 178,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 239,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 1709,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 605,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 334,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 447,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 193,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 496,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 486,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 1042,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 9651,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1945,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1366,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1862,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1951,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1030,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1833,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 4700,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 173,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 279,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 581,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 536,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 159,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 298,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 147,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 220,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 921,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1918,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 2698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 273,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 577,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 2148,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 3784,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 3251,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 294,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 780,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 207,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 17799,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 266,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 155,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 391,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 381,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 6814,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 5326,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 303,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 24007,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 636,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 344,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 384,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 429,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 5573,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 1432,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 7716,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 157,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 344641,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 700,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 267,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 1547,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 360,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 178,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 239,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 1675,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 600,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 327,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 435,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 193,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 496,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 486,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 1042,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 9651,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1946,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1366,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1862,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1952,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1031,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 225,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1833,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 4697,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 173,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 279,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 582,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 536,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 159,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 298,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 147,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 220,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 921,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1918,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 2698,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 273,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 577,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 2148,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 3784,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 3245,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 294,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 780,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 207,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 17797,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 266,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 155,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 391,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 381,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 6814,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 5326,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 303,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 23962,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 634,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 344,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 384,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 429,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 5573,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1432,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 7716,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 157,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 586,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 78280,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 7834,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 81397,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 1518,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 203,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 373,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 989,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 905,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 2011,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///root/sweepwork/fin1086-1010-050155.tip.finish.h36a/tools/paint-plate.mjs:2804:29"
+   }
+  ],
+  "budget": null,
+  "minCells": 64,
+  "checkpoints": [
+   "peek",
+   "review",
+   "passage",
+   "texture"
+  ]
+ },
+ "image": "local/h36a.png"
+}

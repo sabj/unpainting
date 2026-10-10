@@ -1,0 +1,4824 @@
+{
+ "schema": "unpaint-bench/results@1",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "builtFrom": "runs/*/*/*/run.json by scripts/build-results.mjs",
+ "painter": {
+  "versions": [
+   {
+    "painterVersion": "V096",
+    "simVersion": "100",
+    "judgeVersion": "J1",
+    "releases": [
+     "0.1.0"
+    ]
+   }
+  ],
+  "releases": [
+   "0.1.0"
+  ],
+  "tags": [
+   "v0.1.0"
+  ],
+  "note": "Every published result: painter V096 · sim 100 · judges J1 · release 0.1.0. V1-V3 used the models' own toolkit on this painter's simulator; V4/V5 used the V096 pipeline (unpublished benchmark build, same recipe)."
+ },
+ "budget": {
+  "strokes": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85
+ },
+ "scoring": {
+  "tries": "Best of 3: only tries 1–3; xhigh where reasoning effort is supported",
+  "composite": "mean of the vision-judge overall and the classic-metrics mean, 0 to 10",
+  "indexed": "composite as a percentage of the target scored against itself (crops[].selfScore); models rank by the mean indexed score, with its own bootstrap interval",
+  "visionPanel": [
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash",
+   "Qwen/Qwen3.5-9B"
+  ],
+  "callsPerJudge": 5,
+  "perJudge": "median of its valid calls",
+  "ci": "95% percentile bootstrap (2,000 resamples, seed 7) of the mean over all scored paintings of a model in a round",
+  "advisory": "Treat small differences as noise.",
+  "judgeProviders": "V1 to V3 judges ran on Together. In V4 and V5, later judge calls went through OpenRouter to zero-data-retention providers; each painting lists them under judgeProviders."
+ },
+ "roundCompare": {
+  "method": "Paired by model. Each model scores the mean of all its scored paintings in a round; the difference is skill minus naive per model, averaged with each model weighted equally. 95% CI: percentile bootstrap over models (10,000 resamples). Models need at least 5 scored paintings in both rounds.",
+  "models": [
+   "Codex Astra",
+   "Haiku 4.5",
+   "Codex Luna",
+   "MiniMax M3",
+   "Opus 5.5",
+   "Codex Sol",
+   "Sonnet 5.5"
+  ],
+  "excluded": [
+   "DeepSeek V4.1 Flash"
+  ],
+  "naiveMean": 4.19,
+  "skillMean": 4.13,
+  "diff": -0.06,
+  "ci95": [
+   -0.35,
+   0.25
+  ],
+  "perModel": {
+   "Sonnet 5.5": {
+    "naive": 4.35,
+    "skill": 5.06,
+    "diff": 0.7,
+    "nNaive": 10,
+    "nSkill": 9
+   },
+   "Opus 5.5": {
+    "naive": 4.94,
+    "skill": 5.08,
+    "diff": 0.14,
+    "nNaive": 10,
+    "nSkill": 8
+   },
+   "Codex Sol": {
+    "naive": 4.99,
+    "skill": 4.97,
+    "diff": -0.02,
+    "nNaive": 15,
+    "nSkill": 15
+   },
+   "Haiku 4.5": {
+    "naive": 2.21,
+    "skill": 2.16,
+    "diff": -0.05,
+    "nNaive": 10,
+    "nSkill": 10
+   },
+   "Codex Astra": {
+    "naive": 5.28,
+    "skill": 5.21,
+    "diff": -0.07,
+    "nNaive": 15,
+    "nSkill": 15
+   },
+   "Codex Luna": {
+    "naive": 4.22,
+    "skill": 3.76,
+    "diff": -0.45,
+    "nNaive": 15,
+    "nSkill": 15
+   },
+   "MiniMax M3": {
+    "naive": 3.33,
+    "skill": 2.64,
+    "diff": -0.69,
+    "nNaive": 15,
+    "nSkill": 15
+   }
+  }
+ },
+ "crops": [
+  {
+   "key": "hills",
+   "name": "Hills",
+   "selfScore": 8.43,
+   "w": 306,
+   "h": 242,
+   "style": "very loose ink and wash: oak masses on green hills with a dirt trail",
+   "distributed": true,
+   "file": "v2/targets/hills.png"
+  },
+  {
+   "key": "south-france",
+   "name": "France",
+   "selfScore": 8.43,
+   "w": 304,
+   "h": 249,
+   "style": "urban sketch, pen plus light wash: Provence trees, cypresses and a few stone houses",
+   "distributed": true,
+   "file": "v2/targets/south-france.png"
+  },
+  {
+   "key": "sargent",
+   "name": "Ships",
+   "selfScore": 8.76,
+   "w": 300,
+   "h": 244,
+   "style": "pure watercolor, no ink: a white ship's hull against water, with rigging (after Sargent)",
+   "distributed": true,
+   "file": "v2/targets/sargent.png"
+  },
+  {
+   "key": "mittens",
+   "name": "Mittens",
+   "selfScore": 8.76,
+   "w": 300,
+   "h": 259,
+   "style": "watercolor portrait sketch, fine lines and light washes",
+   "distributed": true,
+   "file": "v2/targets/mittens.png"
+  },
+  {
+   "key": "trumbull",
+   "name": "Trumbull",
+   "selfScore": 8.57,
+   "w": 300,
+   "h": 263,
+   "style": "precise architectural watercolor: a stone college facade with windows",
+   "distributed": true,
+   "file": "v2/targets/trumbull.png"
+  }
+ ],
+ "rounds": [
+  {
+   "id": "V1",
+   "label": "V1",
+   "key": "naive",
+   "dir": "v1-naive",
+   "title": "Tools only",
+   "painterVersion": "V096",
+   "simVersion": "100",
+   "judgeVersion": "J1",
+   "releases": [
+    "0.1.0"
+   ],
+   "harness": "Tools only",
+   "plannedTries": 3,
+   "learnsBetweenTries": false,
+   "explained": "Models paint with the brush and pen tools.",
+   "status": "published",
+   "crops": [
+    "hills",
+    "south-france",
+    "sargent",
+    "mittens",
+    "trumbull"
+   ],
+   "models": [
+    {
+     "model": "astra",
+     "name": "Codex Astra",
+     "id": "gpt-6-astra",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 61.44,
+      "ci95": [
+       59.13,
+       63.75
+      ],
+      "n": 15
+     },
+     "mean": 5.28,
+     "ci95": [
+      5.06,
+      5.48
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 5.37,
+      "indexed": 62.51,
+      "crops": 5,
+      "path": "runs/v1-naive/astra/1"
+     },
+     "perTry": {
+      "strokes": 5864,
+      "minutes": 39.5,
+      "tokens": 5520432,
+      "costUSD": null,
+      "estCostUSD": 9.67
+     },
+     "publicCrops": {
+      "mean": 5.28,
+      "ci95": [
+       5.06,
+       5.48
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.75,
+       "indexed": 56.31,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 4.88,
+        "indexed": 57.89,
+        "image": "runs/v1-naive/astra/2/hills.webp",
+        "stages": "runs/v1-naive/astra/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.33,
+       "indexed": 63.23,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.8,
+        "indexed": 68.8,
+        "image": "runs/v1-naive/astra/1/south-france.webp",
+        "stages": "runs/v1-naive/astra/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.11,
+       "indexed": 58.3,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.53,
+        "indexed": 63.13,
+        "image": "runs/v1-naive/astra/3/sargent.webp",
+        "stages": "runs/v1-naive/astra/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.58,
+       "indexed": 63.74,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.86,
+        "indexed": 66.89,
+        "image": "runs/v1-naive/astra/3/mittens.webp",
+        "stages": "runs/v1-naive/astra/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 5.62,
+       "indexed": 65.62,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.67,
+        "indexed": 66.16,
+        "image": "runs/v1-naive/astra/1/trumbull.webp",
+        "stages": "runs/v1-naive/astra/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 1
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.37,
+       "indexed": 62.51,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/astra/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.16,
+       "indexed": 60.09,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/astra/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.31,
+       "indexed": 61.71,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/astra/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sol",
+     "name": "Codex Sol",
+     "id": "gpt-6.1-sol",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 58.16,
+      "ci95": [
+       56,
+       60.42
+      ],
+      "n": 15
+     },
+     "mean": 4.99,
+     "ci95": [
+      4.8,
+      5.18
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.17,
+      "indexed": 60.2,
+      "crops": 5,
+      "path": "runs/v1-naive/sol/3"
+     },
+     "perTry": {
+      "strokes": 4361,
+      "minutes": 31.1,
+      "tokens": 5958164,
+      "costUSD": null,
+      "estCostUSD": 1.43
+     },
+     "publicCrops": {
+      "mean": 4.99,
+      "ci95": [
+       4.8,
+       5.17
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.63,
+       "indexed": 54.92,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 4.82,
+        "indexed": 57.18,
+        "image": "runs/v1-naive/sol/2/hills.webp",
+        "stages": "runs/v1-naive/sol/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.31,
+       "indexed": 63.03,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.67,
+        "indexed": 67.26,
+        "image": "runs/v1-naive/sol/3/south-france.webp",
+        "stages": "runs/v1-naive/sol/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 4.72,
+       "indexed": 53.88,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.09,
+        "indexed": 58.11,
+        "image": "runs/v1-naive/sol/3/sargent.webp",
+        "stages": "runs/v1-naive/sol/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.15,
+       "indexed": 58.79,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.46,
+        "indexed": 62.33,
+        "image": "runs/v1-naive/sol/2/mittens.webp",
+        "stages": "runs/v1-naive/sol/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 5.16,
+       "indexed": 60.17,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.42,
+        "indexed": 63.24,
+        "image": "runs/v1-naive/sol/3/trumbull.webp",
+        "stages": "runs/v1-naive/sol/3/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.92,
+       "indexed": 57.3,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/sol/1"
+      },
+      {
+       "try": 2,
+       "mean": 4.89,
+       "indexed": 56.97,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/sol/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.17,
+       "indexed": 60.2,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/sol/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "opus",
+     "name": "Opus 5.5",
+     "id": "claude-opus-5-5",
+     "effort": "xhigh",
+     "tries": 2,
+     "scoredTries": 2,
+     "paintings": 10,
+     "indexed": {
+      "mean": 57.58,
+      "ci95": [
+       54.77,
+       60.54
+      ],
+      "n": 10
+     },
+     "mean": 4.94,
+     "ci95": [
+      4.73,
+      5.16
+     ],
+     "fewerTriesReason": "third not run",
+     "best": {
+      "try": 1,
+      "score": 5.05,
+      "indexed": 58.89,
+      "crops": 5,
+      "path": "runs/v1-naive/opus/1"
+     },
+     "perTry": {
+      "strokes": 3926.5,
+      "minutes": 22.3,
+      "tokens": 4160791.5,
+      "costUSD": null,
+      "estCostUSD": 2.71
+     },
+     "publicCrops": {
+      "mean": 4.94,
+      "ci95": [
+       4.74,
+       5.16
+      ],
+      "n": 10
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.99,
+       "indexed": 59.19,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 5.15,
+        "indexed": 61.09,
+        "image": "runs/v1-naive/opus/1/hills.webp",
+        "stages": "runs/v1-naive/opus/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.42,
+       "indexed": 64.23,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 5.61,
+        "indexed": 66.55,
+        "image": "runs/v1-naive/opus/1/south-france.webp",
+        "stages": "runs/v1-naive/opus/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 4.66,
+       "indexed": 53.2,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 5.01,
+        "indexed": 57.19,
+        "image": "runs/v1-naive/opus/1/sargent.webp",
+        "stages": "runs/v1-naive/opus/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 4.95,
+       "indexed": 56.51,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 4.98,
+        "indexed": 56.85,
+        "image": "runs/v1-naive/opus/2/mittens.webp",
+        "stages": "runs/v1-naive/opus/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 4.7,
+       "indexed": 54.78,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 4.81,
+        "indexed": 56.13,
+        "image": "runs/v1-naive/opus/2/trumbull.webp",
+        "stages": "runs/v1-naive/opus/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.05,
+       "indexed": 58.89,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/opus/1"
+      },
+      {
+       "try": 2,
+       "mean": 4.83,
+       "indexed": 56.28,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v1-naive/opus/2"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sonnet",
+     "name": "Sonnet 5.5",
+     "id": "claude-sonnet-5-5",
+     "effort": "xhigh",
+     "tries": 2,
+     "scoredTries": 2,
+     "paintings": 10,
+     "indexed": {
+      "mean": 50.69,
+      "ci95": [
+       47.8,
+       53.71
+      ],
+      "n": 10
+     },
+     "mean": 4.35,
+     "ci95": [
+      4.1,
+      4.59
+     ],
+     "fewerTriesReason": "third not run",
+     "best": {
+      "try": 1,
+      "score": 4.63,
+      "indexed": 53.97,
+      "crops": 5,
+      "path": "runs/v1-naive/sonnet/1"
+     },
+     "perTry": {
+      "strokes": 2526.5,
+      "minutes": 31.15,
+      "tokens": 6262156,
+      "costUSD": null,
+      "estCostUSD": 1.84
+     },
+     "publicCrops": {
+      "mean": 4.35,
+      "ci95": [
+       4.12,
+       4.59
+      ],
+      "n": 10
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.64,
+       "indexed": 55.04,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 5.07,
+        "indexed": 60.14,
+        "image": "runs/v1-naive/sonnet/1/hills.webp",
+        "stages": "runs/v1-naive/sonnet/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 4.43,
+       "indexed": 52.49,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 4.62,
+        "indexed": 54.8,
+        "image": "runs/v1-naive/sonnet/1/south-france.webp",
+        "stages": "runs/v1-naive/sonnet/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 4.22,
+       "indexed": 48.23,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 4.4,
+        "indexed": 50.23,
+        "image": "runs/v1-naive/sonnet/1/sargent.webp",
+        "stages": "runs/v1-naive/sonnet/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 4.48,
+       "indexed": 51.14,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 4.67,
+        "indexed": 53.31,
+        "image": "runs/v1-naive/sonnet/1/mittens.webp",
+        "stages": "runs/v1-naive/sonnet/1/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 3.99,
+       "indexed": 46.56,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 4.4,
+        "indexed": 51.34,
+        "image": "runs/v1-naive/sonnet/1/trumbull.webp",
+        "stages": "runs/v1-naive/sonnet/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.63,
+       "indexed": 53.97,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/sonnet/1"
+      },
+      {
+       "try": 2,
+       "mean": 4.07,
+       "indexed": 47.42,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/sonnet/2"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "luna",
+     "name": "Codex Luna",
+     "id": "gpt-6-luna",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 49.14,
+      "ci95": [
+       46.53,
+       51.73
+      ],
+      "n": 15
+     },
+     "mean": 4.22,
+     "ci95": [
+      4.02,
+      4.41
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 4.35,
+      "indexed": 50.69,
+      "crops": 5,
+      "path": "runs/v1-naive/luna/1"
+     },
+     "perTry": {
+      "strokes": 1655,
+      "minutes": 11.9,
+      "tokens": 6530486,
+      "costUSD": null,
+      "estCostUSD": 0.1
+     },
+     "publicCrops": {
+      "mean": 4.22,
+      "ci95": [
+       4,
+       4.42
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.21,
+       "indexed": 49.94,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 4.48,
+        "indexed": 53.14,
+        "image": "runs/v1-naive/luna/3/hills.webp",
+        "stages": "runs/v1-naive/luna/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 4.56,
+       "indexed": 54.05,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 4.85,
+        "indexed": 57.53,
+        "image": "runs/v1-naive/luna/1/south-france.webp",
+        "stages": "runs/v1-naive/luna/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 3.73,
+       "indexed": 42.62,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 4.28,
+        "indexed": 48.86,
+        "image": "runs/v1-naive/luna/1/sargent.webp",
+        "stages": "runs/v1-naive/luna/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 4.04,
+       "indexed": 46.08,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 4.27,
+        "indexed": 48.74,
+        "image": "runs/v1-naive/luna/2/mittens.webp",
+        "stages": "runs/v1-naive/luna/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 4.54,
+       "indexed": 53.01,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 4.78,
+        "indexed": 55.78,
+        "image": "runs/v1-naive/luna/3/trumbull.webp",
+        "stages": "runs/v1-naive/luna/3/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 1
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.35,
+       "indexed": 50.69,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/luna/1"
+      },
+      {
+       "try": 2,
+       "mean": 4.04,
+       "indexed": 47.13,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/luna/2"
+      },
+      {
+       "try": 3,
+       "mean": 4.25,
+       "indexed": 49.6,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/luna/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "dsflash",
+     "name": "DeepSeek V4.1 Flash",
+     "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+     "effort": "n/a",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 10,
+     "indexed": {
+      "mean": 48.64,
+      "ci95": [
+       40.8,
+       54.86
+      ],
+      "n": 10
+     },
+     "mean": 4.15,
+     "ci95": [
+      3.49,
+      4.7
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 4.7,
+      "indexed": 54.78,
+      "crops": 5,
+      "path": "runs/v1-naive/dsflash/2"
+     },
+     "perTry": {
+      "strokes": 1428,
+      "minutes": 62.2,
+      "tokens": 7378349,
+      "costUSD": 2.4,
+      "estCostUSD": null
+     },
+     "publicCrops": {
+      "mean": 4.15,
+      "ci95": [
+       3.48,
+       4.69
+      ],
+      "n": 10
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.47,
+       "indexed": 52.99,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 4.72,
+        "indexed": 55.99,
+        "image": "runs/v1-naive/dsflash/2/hills.webp",
+        "stages": "runs/v1-naive/dsflash/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 4.32,
+       "indexed": 51.25,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.27,
+        "indexed": 62.51,
+        "image": "runs/v1-naive/dsflash/2/south-france.webp",
+        "stages": "runs/v1-naive/dsflash/2/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 3.33,
+       "indexed": 37.96,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 5.05,
+        "indexed": 57.65,
+        "image": "runs/v1-naive/dsflash/2/sargent.webp",
+        "stages": "runs/v1-naive/dsflash/2/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 4.73,
+       "indexed": 54,
+       "n": 1,
+       "best": {
+        "try": 2,
+        "score": 4.73,
+        "indexed": 54,
+        "image": "runs/v1-naive/dsflash/2/mittens.webp",
+        "stages": "runs/v1-naive/dsflash/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 3.75,
+       "indexed": 43.76,
+       "n": 1,
+       "best": {
+        "try": 2,
+        "score": 3.75,
+        "indexed": 43.76,
+        "image": "runs/v1-naive/dsflash/2/trumbull.webp",
+        "stages": "runs/v1-naive/dsflash/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "low",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.16,
+       "indexed": 49.29,
+       "crops": 2,
+       "complete": false,
+       "risk": "low",
+       "path": "runs/v1-naive/dsflash/1"
+      },
+      {
+       "try": 2,
+       "mean": 4.7,
+       "indexed": 54.78,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/dsflash/2"
+      },
+      {
+       "try": 3,
+       "mean": 3.22,
+       "indexed": 37.96,
+       "crops": 3,
+       "complete": false,
+       "risk": "medium",
+       "path": "runs/v1-naive/dsflash/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "minimax",
+     "name": "MiniMax M3",
+     "id": "MiniMaxAI/MiniMax-M3",
+     "effort": "n/a",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 38.78,
+      "ci95": [
+       36.6,
+       40.81
+      ],
+      "n": 15
+     },
+     "mean": 3.33,
+     "ci95": [
+      3.14,
+      3.52
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 3.71,
+      "indexed": 43.15,
+      "crops": 5,
+      "path": "runs/v1-naive/minimax/3"
+     },
+     "perTry": {
+      "strokes": 591,
+      "minutes": 36.2,
+      "tokens": 3278730,
+      "costUSD": 1.05,
+      "estCostUSD": null
+     },
+     "publicCrops": {
+      "mean": 3.33,
+      "ci95": [
+       3.14,
+       3.52
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 3.11,
+       "indexed": 36.89,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 3.68,
+        "indexed": 43.65,
+        "image": "runs/v1-naive/minimax/3/hills.webp",
+        "stages": "runs/v1-naive/minimax/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 3.25,
+       "indexed": 38.59,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 3.41,
+        "indexed": 40.45,
+        "image": "runs/v1-naive/minimax/3/south-france.webp",
+        "stages": "runs/v1-naive/minimax/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 3.45,
+       "indexed": 39.42,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 4.27,
+        "indexed": 48.74,
+        "image": "runs/v1-naive/minimax/3/sargent.webp",
+        "stages": "runs/v1-naive/minimax/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 3.37,
+       "indexed": 38.43,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 3.54,
+        "indexed": 40.41,
+        "image": "runs/v1-naive/minimax/3/mittens.webp",
+        "stages": "runs/v1-naive/minimax/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 3.48,
+       "indexed": 40.57,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 3.64,
+        "indexed": 42.47,
+        "image": "runs/v1-naive/minimax/3/trumbull.webp",
+        "stages": "runs/v1-naive/minimax/3/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 3.1,
+       "indexed": 36.12,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/minimax/1"
+      },
+      {
+       "try": 2,
+       "mean": 3.19,
+       "indexed": 37.08,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/minimax/2"
+      },
+      {
+       "try": 3,
+       "mean": 3.71,
+       "indexed": 43.15,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v1-naive/minimax/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "haiku",
+     "name": "Haiku 4.5",
+     "id": "claude-haiku-4-5-20251001",
+     "effort": "n/a",
+     "tries": 2,
+     "scoredTries": 2,
+     "paintings": 10,
+     "indexed": {
+      "mean": 25.67,
+      "ci95": [
+       24.77,
+       26.58
+      ],
+      "n": 10
+     },
+     "mean": 2.21,
+     "ci95": [
+      2.11,
+      2.3
+     ],
+     "fewerTriesReason": "third not run",
+     "best": {
+      "try": 2,
+      "score": 2.27,
+      "indexed": 26.39,
+      "crops": 5,
+      "path": "runs/v1-naive/haiku/2"
+     },
+     "perTry": {
+      "strokes": 86,
+      "minutes": 13.75,
+      "tokens": 2812413,
+      "costUSD": null,
+      "estCostUSD": 0.54
+     },
+     "publicCrops": {
+      "mean": 2.21,
+      "ci95": [
+       2.11,
+       2.3
+      ],
+      "n": 10
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 2.04,
+       "indexed": 24.14,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 2.12,
+        "indexed": 25.15,
+        "image": "runs/v1-naive/haiku/2/hills.webp",
+        "stages": null
+       }
+      },
+      "south-france": {
+       "mean": 2.17,
+       "indexed": 25.68,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 2.25,
+        "indexed": 26.69,
+        "image": "runs/v1-naive/haiku/2/south-france.webp",
+        "stages": null
+       }
+      },
+      "sargent": {
+       "mean": 2.38,
+       "indexed": 27.17,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 2.46,
+        "indexed": 28.08,
+        "image": "runs/v1-naive/haiku/2/sargent.webp",
+        "stages": null
+       }
+      },
+      "mittens": {
+       "mean": 2.33,
+       "indexed": 26.54,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 2.41,
+        "indexed": 27.51,
+        "image": "runs/v1-naive/haiku/2/mittens.webp",
+        "stages": "runs/v1-naive/haiku/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 2.13,
+       "indexed": 24.8,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 2.15,
+        "indexed": 25.09,
+        "image": "runs/v1-naive/haiku/1/trumbull.webp",
+        "stages": null
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "low",
+       "high"
+      ],
+      "high": 1,
+      "flagged": 0,
+      "cleared": 1
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 2.14,
+       "indexed": 24.94,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v1-naive/haiku/1"
+      },
+      {
+       "try": 2,
+       "mean": 2.27,
+       "indexed": 26.39,
+       "crops": 5,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v1-naive/haiku/2"
+      }
+     ],
+     "missing": {}
+    }
+   ]
+  },
+  {
+   "id": "V2",
+   "label": "V2",
+   "key": "skill",
+   "dir": "v2-skill",
+   "title": "Tools and technique guides",
+   "painterVersion": "V096",
+   "simVersion": "100",
+   "judgeVersion": "J1",
+   "releases": [
+    "0.1.0"
+   ],
+   "harness": "Tools and technique guides",
+   "plannedTries": 3,
+   "learnsBetweenTries": false,
+   "explained": "Models get the tools and guides to painting techniques.",
+   "status": "published",
+   "crops": [
+    "hills",
+    "south-france",
+    "sargent",
+    "mittens",
+    "trumbull"
+   ],
+   "models": [
+    {
+     "model": "astra",
+     "name": "Codex Astra",
+     "id": "gpt-6-astra",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 60.62,
+      "ci95": [
+       58.86,
+       62.41
+      ],
+      "n": 15
+     },
+     "mean": 5.21,
+     "ci95": [
+      5.06,
+      5.35
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 5.36,
+      "indexed": 62.46,
+      "crops": 5,
+      "path": "runs/v2-skill/astra/1"
+     },
+     "perTry": {
+      "strokes": 4035,
+      "minutes": 44.1,
+      "tokens": 6343635,
+      "costUSD": null,
+      "estCostUSD": 11.4
+     },
+     "publicCrops": {
+      "mean": 5.21,
+      "ci95": [
+       5.06,
+       5.36
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.88,
+       "indexed": 57.89,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.19,
+        "indexed": 61.57,
+        "image": "runs/v2-skill/astra/1/hills.webp",
+        "stages": "runs/v2-skill/astra/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.39,
+       "indexed": 63.9,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.73,
+        "indexed": 67.97,
+        "image": "runs/v2-skill/astra/1/south-france.webp",
+        "stages": "runs/v2-skill/astra/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.18,
+       "indexed": 59.17,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.57,
+        "indexed": 63.58,
+        "image": "runs/v2-skill/astra/1/sargent.webp",
+        "stages": "runs/v2-skill/astra/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.19,
+       "indexed": 59.25,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.5,
+        "indexed": 62.79,
+        "image": "runs/v2-skill/astra/3/mittens.webp",
+        "stages": "runs/v2-skill/astra/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 5.39,
+       "indexed": 62.89,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.48,
+        "indexed": 63.94,
+        "image": "runs/v2-skill/astra/2/trumbull.webp",
+        "stages": "runs/v2-skill/astra/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "high"
+      ],
+      "high": 1,
+      "flagged": 0,
+      "cleared": 2
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.36,
+       "indexed": 62.46,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/astra/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.12,
+       "indexed": 59.57,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/astra/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.14,
+       "indexed": 59.83,
+       "crops": 5,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v2-skill/astra/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "opus",
+     "name": "Opus 5.5",
+     "id": "claude-opus-5-5",
+     "effort": "xhigh",
+     "tries": 2,
+     "scoredTries": 2,
+     "paintings": 8,
+     "indexed": {
+      "mean": 59.44,
+      "ci95": [
+       54.11,
+       64.41
+      ],
+      "n": 8
+     },
+     "mean": 5.08,
+     "ci95": [
+      4.67,
+      5.46
+     ],
+     "fewerTriesReason": "third not run",
+     "best": {
+      "try": 2,
+      "score": 5.07,
+      "indexed": 59.06,
+      "crops": 5,
+      "path": "runs/v2-skill/opus/2"
+     },
+     "perTry": {
+      "strokes": 3343,
+      "minutes": 33.7,
+      "tokens": 7971255.5,
+      "costUSD": null,
+      "estCostUSD": 4.44
+     },
+     "publicCrops": {
+      "mean": 5.08,
+      "ci95": [
+       4.67,
+       5.46
+      ],
+      "n": 8
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.6,
+       "indexed": 66.43,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 5.74,
+        "indexed": 68.09,
+        "image": "runs/v2-skill/opus/1/hills.webp",
+        "stages": "runs/v2-skill/opus/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.49,
+       "indexed": 65.07,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 5.68,
+        "indexed": 67.38,
+        "image": "runs/v2-skill/opus/1/south-france.webp",
+        "stages": "runs/v2-skill/opus/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 4.36,
+       "indexed": 49.77,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 4.8,
+        "indexed": 54.79,
+        "image": "runs/v2-skill/opus/2/sargent.webp",
+        "stages": "runs/v2-skill/opus/2/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.02,
+       "indexed": 57.31,
+       "n": 1,
+       "best": {
+        "try": 2,
+        "score": 5.02,
+        "indexed": 57.31,
+        "image": "runs/v2-skill/opus/2/mittens.webp",
+        "stages": "runs/v2-skill/opus/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 4.77,
+       "indexed": 55.66,
+       "n": 1,
+       "best": {
+        "try": 2,
+        "score": 4.77,
+        "indexed": 55.66,
+        "image": "runs/v2-skill/opus/2/trumbull.webp",
+        "stages": "runs/v2-skill/opus/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "low",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.11,
+       "indexed": 60.07,
+       "crops": 3,
+       "complete": false,
+       "risk": "low",
+       "path": "runs/v2-skill/opus/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.07,
+       "indexed": 59.06,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v2-skill/opus/2"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sonnet",
+     "name": "Sonnet 5.5",
+     "id": "claude-sonnet-5-5",
+     "effort": "xhigh",
+     "tries": 2,
+     "scoredTries": 2,
+     "paintings": 9,
+     "indexed": {
+      "mean": 59.02,
+      "ci95": [
+       56.95,
+       61.33
+      ],
+      "n": 9
+     },
+     "mean": 5.06,
+     "ci95": [
+      4.89,
+      5.23
+     ],
+     "fewerTriesReason": "third not run",
+     "best": {
+      "try": 2,
+      "score": 5.2,
+      "indexed": 60.62,
+      "crops": 5,
+      "path": "runs/v2-skill/sonnet/2"
+     },
+     "perTry": {
+      "strokes": 2740.5,
+      "minutes": 33.55,
+      "tokens": 8496997,
+      "costUSD": null,
+      "estCostUSD": 2.41
+     },
+     "publicCrops": {
+      "mean": 5.06,
+      "ci95": [
+       4.89,
+       5.23
+      ],
+      "n": 9
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.02,
+       "indexed": 59.49,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 5.03,
+        "indexed": 59.67,
+        "image": "runs/v2-skill/sonnet/2/hills.webp",
+        "stages": "runs/v2-skill/sonnet/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.17,
+       "indexed": 61.33,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 5.58,
+        "indexed": 66.19,
+        "image": "runs/v2-skill/sonnet/2/south-france.webp",
+        "stages": "runs/v2-skill/sonnet/2/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 4.91,
+       "indexed": 55.99,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 4.98,
+        "indexed": 56.85,
+        "image": "runs/v2-skill/sonnet/1/sargent.webp",
+        "stages": "runs/v2-skill/sonnet/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.28,
+       "indexed": 60.27,
+       "n": 1,
+       "best": {
+        "try": 2,
+        "score": 5.28,
+        "indexed": 60.27,
+        "image": "runs/v2-skill/sonnet/2/mittens.webp",
+        "stages": "runs/v2-skill/sonnet/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 5.03,
+       "indexed": 58.63,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 5.3,
+        "indexed": 61.84,
+        "image": "runs/v2-skill/sonnet/2/trumbull.webp",
+        "stages": "runs/v2-skill/sonnet/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "low",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.87,
+       "indexed": 57.01,
+       "crops": 4,
+       "complete": false,
+       "risk": "low",
+       "path": "runs/v2-skill/sonnet/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.2,
+       "indexed": 60.62,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v2-skill/sonnet/2"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sol",
+     "name": "Codex Sol",
+     "id": "gpt-6.1-sol",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 57.9,
+      "ci95": [
+       56.09,
+       59.91
+      ],
+      "n": 15
+     },
+     "mean": 4.97,
+     "ci95": [
+      4.82,
+      5.14
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 5.06,
+      "indexed": 58.89,
+      "crops": 5,
+      "path": "runs/v2-skill/sol/2"
+     },
+     "perTry": {
+      "strokes": 2622,
+      "minutes": 36.7,
+      "tokens": 6109926,
+      "costUSD": null,
+      "estCostUSD": 1.59
+     },
+     "publicCrops": {
+      "mean": 4.97,
+      "ci95": [
+       4.82,
+       5.13
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.56,
+       "indexed": 54.09,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 4.57,
+        "indexed": 54.21,
+        "image": "runs/v2-skill/sol/1/hills.webp",
+        "stages": "runs/v2-skill/sol/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.31,
+       "indexed": 62.99,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.61,
+        "indexed": 66.55,
+        "image": "runs/v2-skill/sol/1/south-france.webp",
+        "stages": "runs/v2-skill/sol/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.02,
+       "indexed": 57.27,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.29,
+        "indexed": 60.39,
+        "image": "runs/v2-skill/sol/2/sargent.webp",
+        "stages": "runs/v2-skill/sol/2/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 4.92,
+       "indexed": 56.13,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.19,
+        "indexed": 59.25,
+        "image": "runs/v2-skill/sol/3/mittens.webp",
+        "stages": "runs/v2-skill/sol/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 5.06,
+       "indexed": 59.04,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.33,
+        "indexed": 62.19,
+        "image": "runs/v2-skill/sol/2/trumbull.webp",
+        "stages": "runs/v2-skill/sol/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.92,
+       "indexed": 57.32,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/sol/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.06,
+       "indexed": 58.89,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/sol/2"
+      },
+      {
+       "try": 3,
+       "mean": 4.94,
+       "indexed": 57.5,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/sol/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "luna",
+     "name": "Codex Luna",
+     "id": "gpt-6-luna",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 43.84,
+      "ci95": [
+       41.96,
+       46.01
+      ],
+      "n": 15
+     },
+     "mean": 3.76,
+     "ci95": [
+      3.62,
+      3.92
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 3.8,
+      "indexed": 44.28,
+      "crops": 5,
+      "path": "runs/v2-skill/luna/2"
+     },
+     "perTry": {
+      "strokes": 654,
+      "minutes": 31.8,
+      "tokens": 11026936,
+      "costUSD": null,
+      "estCostUSD": 0.17
+     },
+     "publicCrops": {
+      "mean": 3.76,
+      "ci95": [
+       3.62,
+       3.93
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 3.7,
+       "indexed": 43.85,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 3.98,
+        "indexed": 47.21,
+        "image": "runs/v2-skill/luna/3/hills.webp",
+        "stages": "runs/v2-skill/luna/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 4.26,
+       "indexed": 50.53,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 4.42,
+        "indexed": 52.43,
+        "image": "runs/v2-skill/luna/1/south-france.webp",
+        "stages": "runs/v2-skill/luna/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 3.59,
+       "indexed": 40.94,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 3.66,
+        "indexed": 41.78,
+        "image": "runs/v2-skill/luna/1/sargent.webp",
+        "stages": "runs/v2-skill/luna/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 3.72,
+       "indexed": 42.47,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 3.83,
+        "indexed": 43.72,
+        "image": "runs/v2-skill/luna/1/mittens.webp",
+        "stages": "runs/v2-skill/luna/1/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 3.55,
+       "indexed": 41.42,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 3.83,
+        "indexed": 44.69,
+        "image": "runs/v2-skill/luna/2/trumbull.webp",
+        "stages": "runs/v2-skill/luna/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 3.74,
+       "indexed": 43.61,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/luna/1"
+      },
+      {
+       "try": 2,
+       "mean": 3.8,
+       "indexed": 44.28,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v2-skill/luna/2"
+      },
+      {
+       "try": 3,
+       "mean": 3.74,
+       "indexed": 43.64,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/luna/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "minimax",
+     "name": "MiniMax M3",
+     "id": "MiniMaxAI/MiniMax-M3",
+     "effort": "n/a",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 30.78,
+      "ci95": [
+       26.73,
+       35.16
+      ],
+      "n": 15
+     },
+     "mean": 2.64,
+     "ci95": [
+      2.29,
+      3.02
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 3.38,
+      "indexed": 39.32,
+      "crops": 5,
+      "path": "runs/v2-skill/minimax/1"
+     },
+     "perTry": {
+      "strokes": 349,
+      "minutes": 73.4,
+      "tokens": 4824626,
+      "costUSD": 1.54,
+      "estCostUSD": null
+     },
+     "publicCrops": {
+      "mean": 2.64,
+      "ci95": [
+       2.29,
+       3.01
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 2.55,
+       "indexed": 30.25,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 3.49,
+        "indexed": 41.4,
+        "image": "runs/v2-skill/minimax/1/hills.webp",
+        "stages": "runs/v2-skill/minimax/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 2.59,
+       "indexed": 30.68,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 3.69,
+        "indexed": 43.77,
+        "image": "runs/v2-skill/minimax/1/south-france.webp",
+        "stages": "runs/v2-skill/minimax/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 2.61,
+       "indexed": 29.79,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 3.85,
+        "indexed": 43.95,
+        "image": "runs/v2-skill/minimax/1/sargent.webp",
+        "stages": null
+       }
+      },
+      "mittens": {
+       "mean": 2.6,
+       "indexed": 29.72,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 3.12,
+        "indexed": 35.62,
+        "image": "runs/v2-skill/minimax/1/mittens.webp",
+        "stages": null
+       }
+      },
+      "trumbull": {
+       "mean": 2.87,
+       "indexed": 33.45,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 3.5,
+        "indexed": 40.84,
+        "image": "runs/v2-skill/minimax/3/trumbull.webp",
+        "stages": "runs/v2-skill/minimax/3/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "low",
+       "high",
+       "medium"
+      ],
+      "high": 1,
+      "flagged": 0,
+      "cleared": 1
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 3.38,
+       "indexed": 39.32,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v2-skill/minimax/1"
+      },
+      {
+       "try": 2,
+       "mean": 2.43,
+       "indexed": 28.28,
+       "crops": 5,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v2-skill/minimax/2"
+      },
+      {
+       "try": 3,
+       "mean": 2.12,
+       "indexed": 24.74,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/minimax/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "haiku",
+     "name": "Haiku 4.5",
+     "id": "claude-haiku-4-5-20251001",
+     "effort": "n/a",
+     "tries": 2,
+     "scoredTries": 2,
+     "paintings": 10,
+     "indexed": {
+      "mean": 25.12,
+      "ci95": [
+       22.63,
+       27.2
+      ],
+      "n": 10
+     },
+     "mean": 2.16,
+     "ci95": [
+      1.94,
+      2.34
+     ],
+     "fewerTriesReason": "third not run",
+     "best": {
+      "try": 1,
+      "score": 2.39,
+      "indexed": 27.77,
+      "crops": 5,
+      "path": "runs/v2-skill/haiku/1"
+     },
+     "perTry": {
+      "strokes": 106,
+      "minutes": 4.05,
+      "tokens": 1382310.5,
+      "costUSD": null,
+      "estCostUSD": 0.36
+     },
+     "publicCrops": {
+      "mean": 2.16,
+      "ci95": [
+       1.95,
+       2.34
+      ],
+      "n": 10
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 2.14,
+       "indexed": 25.44,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 2.28,
+        "indexed": 27.05,
+        "image": "runs/v2-skill/haiku/1/hills.webp",
+        "stages": null
+       }
+      },
+      "south-france": {
+       "mean": 2.17,
+       "indexed": 25.8,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 2.35,
+        "indexed": 27.88,
+        "image": "runs/v2-skill/haiku/1/south-france.webp",
+        "stages": null
+       }
+      },
+      "sargent": {
+       "mean": 2.28,
+       "indexed": 25.97,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 2.62,
+        "indexed": 29.91,
+        "image": "runs/v2-skill/haiku/1/sargent.webp",
+        "stages": null
+       }
+      },
+      "mittens": {
+       "mean": 2.27,
+       "indexed": 25.91,
+       "n": 2,
+       "best": {
+        "try": 2,
+        "score": 2.29,
+        "indexed": 26.14,
+        "image": "runs/v2-skill/haiku/2/mittens.webp",
+        "stages": null
+       }
+      },
+      "trumbull": {
+       "mean": 1.93,
+       "indexed": 22.46,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 2.43,
+        "indexed": 28.35,
+        "image": "runs/v2-skill/haiku/1/trumbull.webp",
+        "stages": "runs/v2-skill/haiku/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 2.39,
+       "indexed": 27.77,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v2-skill/haiku/1"
+      },
+      {
+       "try": 2,
+       "mean": 1.93,
+       "indexed": 22.46,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v2-skill/haiku/2"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "dsflash",
+     "name": "DeepSeek V4.1 Flash",
+     "id": "deepseek-ai/DeepSeek-V4.1-Flash",
+     "effort": "n/a",
+     "tries": 2,
+     "scoredTries": 1,
+     "paintings": 1,
+     "indexed": {
+      "mean": 22.42,
+      "ci95": null,
+      "n": 1
+     },
+     "mean": 1.89,
+     "ci95": null,
+     "fewerTriesReason": "per-run cost cap and API errors",
+     "best": {
+      "try": 1,
+      "score": 1.89,
+      "indexed": 22.42,
+      "crops": 1,
+      "path": "runs/v2-skill/dsflash/1"
+     },
+     "perTry": {
+      "strokes": 146,
+      "minutes": 39.2,
+      "tokens": 7485779,
+      "costUSD": 2.4,
+      "estCostUSD": null
+     },
+     "publicCrops": {
+      "mean": 1.89,
+      "ci95": null,
+      "n": 1
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 1.89,
+       "indexed": 22.42,
+       "n": 1,
+       "best": {
+        "try": 1,
+        "score": 1.89,
+        "indexed": 22.42,
+        "image": "runs/v2-skill/dsflash/1/hills.webp",
+        "stages": "runs/v2-skill/dsflash/1/hills-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       null
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 1.89,
+       "indexed": 22.42,
+       "crops": 1,
+       "complete": false,
+       "risk": "medium",
+       "path": "runs/v2-skill/dsflash/1"
+      },
+      {
+       "try": 2,
+       "mean": null,
+       "indexed": null,
+       "crops": 0,
+       "complete": false,
+       "risk": null,
+       "path": "runs/v2-skill/dsflash/2"
+      }
+     ],
+     "missing": {
+      "south-france": "no painting",
+      "sargent": "no painting",
+      "mittens": "no painting",
+      "trumbull": "no painting"
+     }
+    }
+   ]
+  },
+  {
+   "id": "V3",
+   "label": "V3",
+   "key": "informed",
+   "dir": "v3-informed",
+   "title": "Technique guides and feedback between attempts",
+   "painterVersion": "V096",
+   "simVersion": "100",
+   "judgeVersion": "J1",
+   "releases": [
+    "0.1.0"
+   ],
+   "harness": "Tools and technique guides",
+   "plannedTries": 3,
+   "learnsBetweenTries": true,
+   "explained": "Models get the V2 tools and guides, plus their earlier paintings and notes.",
+   "status": "published",
+   "crops": [
+    "hills",
+    "south-france",
+    "sargent"
+   ],
+   "models": [
+    {
+     "model": "astra",
+     "name": "Codex Astra",
+     "id": "gpt-6-astra",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 9,
+     "indexed": {
+      "mean": 67.52,
+      "ci95": [
+       64.94,
+       69.91
+      ],
+      "n": 9
+     },
+     "mean": 5.77,
+     "ci95": [
+      5.53,
+      5.99
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.94,
+      "indexed": 69.58,
+      "crops": 3,
+      "path": "runs/v3-informed/astra/3"
+     },
+     "perTry": {
+      "strokes": 4198,
+      "minutes": 61.8,
+      "tokens": 20955276,
+      "costUSD": null,
+      "estCostUSD": 32.53
+     },
+     "publicCrops": {
+      "mean": 5.77,
+      "ci95": [
+       5.53,
+       5.99
+      ],
+      "n": 9
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.36,
+       "indexed": 63.58,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.51,
+        "indexed": 65.36,
+        "image": "runs/v3-informed/astra/2/hills.webp",
+        "stages": null
+       }
+      },
+      "south-france": {
+       "mean": 6,
+       "indexed": 71.13,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.24,
+        "indexed": 74.02,
+        "image": "runs/v3-informed/astra/3/south-france.webp",
+        "stages": null
+       }
+      },
+      "sargent": {
+       "mean": 5.94,
+       "indexed": 67.85,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.19,
+        "indexed": 70.66,
+        "image": "runs/v3-informed/astra/3/sargent.webp",
+        "stages": null
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "high",
+       "medium",
+       "high"
+      ],
+      "high": 2,
+      "flagged": 0,
+      "cleared": 2
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.51,
+       "indexed": 64.49,
+       "crops": 3,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v3-informed/astra/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.85,
+       "indexed": 68.49,
+       "crops": 3,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v3-informed/astra/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.94,
+       "indexed": 69.58,
+       "crops": 3,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v3-informed/astra/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sol",
+     "name": "Codex Sol",
+     "id": "gpt-6.1-sol",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 9,
+     "indexed": {
+      "mean": 65.89,
+      "ci95": [
+       63.21,
+       68.87
+      ],
+      "n": 9
+     },
+     "mean": 5.63,
+     "ci95": [
+      5.38,
+      5.87
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 5.75,
+      "indexed": 67.36,
+      "crops": 3,
+      "path": "runs/v3-informed/sol/1"
+     },
+     "perTry": {
+      "strokes": 4213,
+      "minutes": 67.1,
+      "tokens": 23152126,
+      "costUSD": null,
+      "estCostUSD": 5.3
+     },
+     "publicCrops": {
+      "mean": 5.63,
+      "ci95": [
+       5.38,
+       5.87
+      ],
+      "n": 9
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.2,
+       "indexed": 61.64,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.34,
+        "indexed": 63.35,
+        "image": "runs/v3-informed/sol/1/hills.webp",
+        "stages": null
+       }
+      },
+      "south-france": {
+       "mean": 5.93,
+       "indexed": 70.34,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.24,
+        "indexed": 74.02,
+        "image": "runs/v3-informed/sol/1/south-france.webp",
+        "stages": null
+       }
+      },
+      "sargent": {
+       "mean": 5.75,
+       "indexed": 65.68,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.88,
+        "indexed": 67.12,
+        "image": "runs/v3-informed/sol/3/sargent.webp",
+        "stages": null
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "high",
+       "high",
+       "high"
+      ],
+      "high": 3,
+      "flagged": 0,
+      "cleared": 3
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.75,
+       "indexed": 67.36,
+       "crops": 3,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v3-informed/sol/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.42,
+       "indexed": 63.44,
+       "crops": 3,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v3-informed/sol/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.71,
+       "indexed": 66.86,
+       "crops": 3,
+       "complete": true,
+       "risk": "high",
+       "path": "runs/v3-informed/sol/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "opus",
+     "name": "Opus 5.5",
+     "id": "claude-opus-5-5",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 9,
+     "indexed": {
+      "mean": 62.34,
+      "ci95": [
+       59.19,
+       65.61
+      ],
+      "n": 9
+     },
+     "mean": 5.32,
+     "ci95": [
+      5.05,
+      5.6
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 5.5,
+      "indexed": 64.52,
+      "crops": 3,
+      "path": "runs/v3-informed/opus/2"
+     },
+     "perTry": {
+      "strokes": 3172,
+      "minutes": 24,
+      "tokens": 4024706,
+      "costUSD": null,
+      "estCostUSD": 2.86
+     },
+     "publicCrops": {
+      "mean": 5.32,
+      "ci95": [
+       5.06,
+       5.61
+      ],
+      "n": 9
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.95,
+       "indexed": 58.68,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.27,
+        "indexed": 62.51,
+        "image": "runs/v3-informed/opus/2/hills.webp",
+        "stages": null
+       }
+      },
+      "south-france": {
+       "mean": 5.62,
+       "indexed": 66.71,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.12,
+        "indexed": 72.6,
+        "image": "runs/v3-informed/opus/2/south-france.webp",
+        "stages": null
+       }
+      },
+      "sargent": {
+       "mean": 5.4,
+       "indexed": 61.64,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.88,
+        "indexed": 67.12,
+        "image": "runs/v3-informed/opus/3/sargent.webp",
+        "stages": null
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.16,
+       "indexed": 60.47,
+       "crops": 3,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v3-informed/opus/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.5,
+       "indexed": 64.52,
+       "crops": 3,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v3-informed/opus/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.3,
+       "indexed": 62.03,
+       "crops": 3,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v3-informed/opus/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sonnet",
+     "name": "Sonnet 5.5",
+     "id": "claude-sonnet-5-5",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 9,
+     "indexed": {
+      "mean": 59.69,
+      "ci95": [
+       55.81,
+       62.94
+      ],
+      "n": 9
+     },
+     "mean": 5.1,
+     "ci95": [
+      4.78,
+      5.39
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.45,
+      "indexed": 63.73,
+      "crops": 3,
+      "path": "runs/v3-informed/sonnet/3"
+     },
+     "perTry": {
+      "strokes": 3467,
+      "minutes": 17.9,
+      "tokens": 4961720,
+      "costUSD": null,
+      "estCostUSD": 1.71
+     },
+     "publicCrops": {
+      "mean": 5.1,
+      "ci95": [
+       4.79,
+       5.38
+      ],
+      "n": 9
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.98,
+       "indexed": 59.07,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.31,
+        "indexed": 62.99,
+        "image": "runs/v3-informed/sonnet/2/hills.webp",
+        "stages": null
+       }
+      },
+      "south-france": {
+       "mean": 5.12,
+       "indexed": 60.78,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.21,
+        "indexed": 61.8,
+        "image": "runs/v3-informed/sonnet/3/south-france.webp",
+        "stages": null
+       }
+      },
+      "sargent": {
+       "mean": 5.19,
+       "indexed": 59.21,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.92,
+        "indexed": 67.58,
+        "image": "runs/v3-informed/sonnet/3/sargent.webp",
+        "stages": null
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 4.6,
+       "indexed": 53.93,
+       "crops": 3,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v3-informed/sonnet/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.24,
+       "indexed": 61.4,
+       "crops": 3,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v3-informed/sonnet/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.45,
+       "indexed": 63.73,
+       "crops": 3,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v3-informed/sonnet/3"
+      }
+     ],
+     "missing": {}
+    }
+   ]
+  },
+  {
+   "id": "V4",
+   "label": "V4",
+   "key": "pipeline",
+   "dir": "v4-pipeline",
+   "title": "Full painting pipeline",
+   "painterVersion": "V096",
+   "simVersion": "100",
+   "judgeVersion": "J1",
+   "releases": [
+    "0.1.0"
+   ],
+   "harness": "Tools, technique guides and full painting pipeline",
+   "plannedTries": 3,
+   "learnsBetweenTries": false,
+   "explained": "Models use the planner, painter presets and scoring tools.",
+   "status": "published",
+   "crops": [
+    "hills",
+    "south-france",
+    "sargent",
+    "mittens",
+    "trumbull"
+   ],
+   "models": [
+    {
+     "model": "opus",
+     "name": "Opus 5.5",
+     "id": "claude-opus-5-5",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 69.91,
+      "ci95": [
+       67.18,
+       72.17
+      ],
+      "n": 15
+     },
+     "mean": 6,
+     "ci95": [
+      5.77,
+      6.21
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 6.24,
+      "indexed": 72.58,
+      "crops": 5,
+      "path": "runs/v4-pipeline/opus/1"
+     },
+     "perTry": {
+      "strokes": 47102,
+      "minutes": 582.6,
+      "tokens": 42688267,
+      "costUSD": null,
+      "estCostUSD": 17.81
+     },
+     "publicCrops": {
+      "mean": 6,
+      "ci95": [
+       5.77,
+       6.21
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.9,
+       "indexed": 69.99,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.25,
+        "indexed": 74.14,
+        "image": "runs/v4-pipeline/opus/1/hills.webp",
+        "stages": "runs/v4-pipeline/opus/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.87,
+       "indexed": 69.59,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.97,
+        "indexed": 70.82,
+        "image": "runs/v4-pipeline/opus/2/south-france.webp",
+        "stages": "runs/v4-pipeline/opus/2/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.58,
+       "indexed": 63.7,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.32,
+        "indexed": 72.15,
+        "image": "runs/v4-pipeline/opus/1/sargent.webp",
+        "stages": "runs/v4-pipeline/opus/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.42,
+       "indexed": 73.25,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.54,
+        "indexed": 74.66,
+        "image": "runs/v4-pipeline/opus/1/mittens.webp",
+        "stages": "runs/v4-pipeline/opus/1/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.26,
+       "indexed": 73.05,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.36,
+        "indexed": 74.21,
+        "image": "runs/v4-pipeline/opus/1/trumbull.webp",
+        "stages": "runs/v4-pipeline/opus/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 6.24,
+       "indexed": 72.58,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/opus/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.89,
+       "indexed": 68.62,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/opus/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.88,
+       "indexed": 68.55,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/opus/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "astra",
+     "name": "Codex Astra",
+     "id": "gpt-6-astra",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 67.72,
+      "ci95": [
+       65.8,
+       69.57
+      ],
+      "n": 15
+     },
+     "mean": 5.82,
+     "ci95": [
+      5.62,
+      5.99
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.85,
+      "indexed": 68.05,
+      "crops": 5,
+      "path": "runs/v4-pipeline/astra/3"
+     },
+     "perTry": {
+      "strokes": 66867,
+      "minutes": 484.77,
+      "tokens": 167594932,
+      "costUSD": null,
+      "estCostUSD": 188.81
+     },
+     "publicCrops": {
+      "mean": 5.82,
+      "ci95": [
+       5.62,
+       5.99
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.34,
+       "indexed": 63.35,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.45,
+        "indexed": 64.65,
+        "image": "runs/v4-pipeline/astra/2/hills.webp",
+        "stages": "runs/v4-pipeline/astra/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.74,
+       "indexed": 68.05,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.12,
+        "indexed": 72.6,
+        "image": "runs/v4-pipeline/astra/1/south-france.webp",
+        "stages": "runs/v4-pipeline/astra/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.68,
+       "indexed": 64.88,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.82,
+        "indexed": 66.44,
+        "image": "runs/v4-pipeline/astra/3/sargent.webp",
+        "stages": "runs/v4-pipeline/astra/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.19,
+       "indexed": 70.7,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.33,
+        "indexed": 72.26,
+        "image": "runs/v4-pipeline/astra/3/mittens.webp",
+        "stages": "runs/v4-pipeline/astra/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.14,
+       "indexed": 71.61,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.2,
+        "indexed": 72.35,
+        "image": "runs/v4-pipeline/astra/2/trumbull.webp",
+        "stages": "runs/v4-pipeline/astra/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.83,
+       "indexed": 67.92,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/astra/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.77,
+       "indexed": 67.18,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/astra/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.85,
+       "indexed": 68.05,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/astra/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "luna",
+     "name": "Codex Luna",
+     "id": "gpt-6-luna",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 66.68,
+      "ci95": [
+       63.79,
+       69.16
+      ],
+      "n": 15
+     },
+     "mean": 5.73,
+     "ci95": [
+      5.47,
+      5.95
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.9,
+      "indexed": 68.61,
+      "crops": 5,
+      "path": "runs/v4-pipeline/luna/3"
+     },
+     "perTry": {
+      "strokes": 42635,
+      "minutes": 564.85,
+      "tokens": 294748684,
+      "costUSD": null,
+      "estCostUSD": 3.29
+     },
+     "publicCrops": {
+      "mean": 5.73,
+      "ci95": [
+       5.49,
+       5.95
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.28,
+       "indexed": 62.63,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.44,
+        "indexed": 64.53,
+        "image": "runs/v4-pipeline/luna/2/hills.webp",
+        "stages": "runs/v4-pipeline/luna/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.81,
+       "indexed": 68.88,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.92,
+        "indexed": 70.23,
+        "image": "runs/v4-pipeline/luna/3/south-france.webp",
+        "stages": "runs/v4-pipeline/luna/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.33,
+       "indexed": 60.84,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6,
+        "indexed": 68.49,
+        "image": "runs/v4-pipeline/luna/3/sargent.webp",
+        "stages": "runs/v4-pipeline/luna/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.23,
+       "indexed": 71.16,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.28,
+        "indexed": 71.69,
+        "image": "runs/v4-pipeline/luna/1/mittens.webp",
+        "stages": "runs/v4-pipeline/luna/1/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 5.99,
+       "indexed": 69.89,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.36,
+        "indexed": 74.21,
+        "image": "runs/v4-pipeline/luna/1/trumbull.webp",
+        "stages": "runs/v4-pipeline/luna/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.71,
+       "indexed": 66.45,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/luna/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.58,
+       "indexed": 64.98,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v4-pipeline/luna/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.9,
+       "indexed": 68.61,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/luna/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sol",
+     "name": "Codex Sol",
+     "id": "gpt-6.1-sol",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 66.32,
+      "ci95": [
+       61.97,
+       69.8
+      ],
+      "n": 15
+     },
+     "mean": 5.7,
+     "ci95": [
+      5.29,
+      6.03
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 5.78,
+      "indexed": 67.31,
+      "crops": 5,
+      "path": "runs/v4-pipeline/sol/2"
+     },
+     "perTry": {
+      "strokes": 66222,
+      "minutes": 568.43,
+      "tokens": 179946621,
+      "costUSD": null,
+      "estCostUSD": 24.93
+     },
+     "publicCrops": {
+      "mean": 5.7,
+      "ci95": [
+       5.31,
+       6.02
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.44,
+       "indexed": 64.57,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.81,
+        "indexed": 68.92,
+        "image": "runs/v4-pipeline/sol/1/hills.webp",
+        "stages": "runs/v4-pipeline/sol/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 4.8,
+       "indexed": 56.9,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.36,
+        "indexed": 63.58,
+        "image": "runs/v4-pipeline/sol/2/south-france.webp",
+        "stages": "runs/v4-pipeline/sol/2/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.9,
+       "indexed": 67.35,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.54,
+        "indexed": 74.66,
+        "image": "runs/v4-pipeline/sol/1/sargent.webp",
+        "stages": "runs/v4-pipeline/sol/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.28,
+       "indexed": 71.65,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.31,
+        "indexed": 72.03,
+        "image": "runs/v4-pipeline/sol/3/mittens.webp",
+        "stages": "runs/v4-pipeline/sol/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.1,
+       "indexed": 71.14,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.21,
+        "indexed": 72.46,
+        "image": "runs/v4-pipeline/sol/2/trumbull.webp",
+        "stages": "runs/v4-pipeline/sol/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.67,
+       "indexed": 65.9,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/sol/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.78,
+       "indexed": 67.31,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/sol/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.65,
+       "indexed": 65.76,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/sol/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sonnet",
+     "name": "Sonnet 5.5",
+     "id": "claude-sonnet-5-5",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 66.18,
+      "ci95": [
+       63.35,
+       68.81
+      ],
+      "n": 15
+     },
+     "mean": 5.68,
+     "ci95": [
+      5.44,
+      5.92
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 5.75,
+      "indexed": 67.03,
+      "crops": 5,
+      "path": "runs/v4-pipeline/sonnet/1"
+     },
+     "perTry": {
+      "strokes": 54883,
+      "minutes": 485.9,
+      "tokens": 42136058,
+      "costUSD": null,
+      "estCostUSD": 9.78
+     },
+     "publicCrops": {
+      "mean": 5.68,
+      "ci95": [
+       5.44,
+       5.92
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.54,
+       "indexed": 65.72,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.84,
+        "indexed": 69.28,
+        "image": "runs/v4-pipeline/sonnet/1/hills.webp",
+        "stages": "runs/v4-pipeline/sonnet/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.41,
+       "indexed": 64.14,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.75,
+        "indexed": 68.21,
+        "image": "runs/v4-pipeline/sonnet/1/south-france.webp",
+        "stages": "runs/v4-pipeline/sonnet/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.12,
+       "indexed": 58.41,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.46,
+        "indexed": 62.33,
+        "image": "runs/v4-pipeline/sonnet/3/sargent.webp",
+        "stages": "runs/v4-pipeline/sonnet/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.33,
+       "indexed": 72.22,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.4,
+        "indexed": 73.06,
+        "image": "runs/v4-pipeline/sonnet/2/mittens.webp",
+        "stages": "runs/v4-pipeline/sonnet/2/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.03,
+       "indexed": 70.4,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.04,
+        "indexed": 70.48,
+        "image": "runs/v4-pipeline/sonnet/2/trumbull.webp",
+        "stages": "runs/v4-pipeline/sonnet/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.75,
+       "indexed": 67.03,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/sonnet/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.64,
+       "indexed": 65.6,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/sonnet/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.66,
+       "indexed": 65.9,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/sonnet/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "haiku",
+     "name": "Haiku 4.5",
+     "id": "claude-haiku-4-5-20251001",
+     "effort": "n/a",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 13,
+     "indexed": {
+      "mean": 63.83,
+      "ci95": [
+       60.96,
+       66.7
+      ],
+      "n": 13
+     },
+     "mean": 5.49,
+     "ci95": [
+      5.24,
+      5.74
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.79,
+      "indexed": 67.35,
+      "crops": 5,
+      "path": "runs/v4-pipeline/haiku/3"
+     },
+     "perTry": {
+      "strokes": 36348,
+      "minutes": 85.82,
+      "tokens": 17903147,
+      "costUSD": null,
+      "estCostUSD": 2.94
+     },
+     "publicCrops": {
+      "mean": 5.49,
+      "ci95": [
+       5.24,
+       5.74
+      ],
+      "n": 13
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 4.95,
+       "indexed": 58.72,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.28,
+        "indexed": 62.63,
+        "image": "runs/v4-pipeline/haiku/3/hills.webp",
+        "stages": "runs/v4-pipeline/haiku/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.66,
+       "indexed": 67.14,
+       "n": 2,
+       "best": {
+        "try": 3,
+        "score": 5.74,
+        "indexed": 68.09,
+        "image": "runs/v4-pipeline/haiku/3/south-france.webp",
+        "stages": "runs/v4-pipeline/haiku/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.28,
+       "indexed": 60.31,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.47,
+        "indexed": 62.44,
+        "image": "runs/v4-pipeline/haiku/3/sargent.webp",
+        "stages": "runs/v4-pipeline/haiku/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.69,
+       "indexed": 64.99,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.26,
+        "indexed": 71.46,
+        "image": "runs/v4-pipeline/haiku/3/mittens.webp",
+        "stages": "runs/v4-pipeline/haiku/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.15,
+       "indexed": 71.7,
+       "n": 2,
+       "best": {
+        "try": 3,
+        "score": 6.18,
+        "indexed": 72.11,
+        "image": "runs/v4-pipeline/haiku/3/trumbull.webp",
+        "stages": "runs/v4-pipeline/haiku/3/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.35,
+       "indexed": 62.34,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/haiku/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.23,
+       "indexed": 60.44,
+       "crops": 3,
+       "complete": false,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/haiku/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.79,
+       "indexed": 67.35,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v4-pipeline/haiku/3"
+      }
+     ],
+     "missing": {}
+    }
+   ]
+  },
+  {
+   "id": "V5",
+   "label": "V5",
+   "key": "self-study",
+   "dir": "v5-self-study",
+   "title": "Full pipeline and feedback between attempts",
+   "painterVersion": "V096",
+   "simVersion": "100",
+   "judgeVersion": "J1",
+   "releases": [
+    "0.1.0"
+   ],
+   "harness": "Tools, technique guides and full painting pipeline",
+   "plannedTries": 3,
+   "learnsBetweenTries": true,
+   "explained": "Models use the full pipeline and can revise their plans using earlier attempts.",
+   "status": "published",
+   "crops": [
+    "hills",
+    "south-france",
+    "sargent",
+    "mittens",
+    "trumbull"
+   ],
+   "models": [
+    {
+     "model": "opus",
+     "name": "Opus 5.5",
+     "id": "claude-opus-5-5",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 70.95,
+      "ci95": [
+       69.19,
+       72.56
+      ],
+      "n": 15
+     },
+     "mean": 6.1,
+     "ci95": [
+      5.92,
+      6.25
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 1,
+      "score": 6.24,
+      "indexed": 72.58,
+      "crops": 5,
+      "path": "runs/v5-self-study/opus/1"
+     },
+     "perTry": {
+      "strokes": 47102,
+      "minutes": 426.92,
+      "tokens": 42688267,
+      "costUSD": null,
+      "estCostUSD": 17.81
+     },
+     "publicCrops": {
+      "mean": 6.1,
+      "ci95": [
+       5.92,
+       6.25
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 6.2,
+       "indexed": 73.51,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.25,
+        "indexed": 74.14,
+        "image": "runs/v5-self-study/opus/1/hills.webp",
+        "stages": "runs/v5-self-study/opus/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.62,
+       "indexed": 66.63,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.8,
+        "indexed": 68.8,
+        "image": "runs/v5-self-study/opus/3/south-france.webp",
+        "stages": "runs/v5-self-study/opus/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 6.1,
+       "indexed": 69.67,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.32,
+        "indexed": 72.15,
+        "image": "runs/v5-self-study/opus/1/sargent.webp",
+        "stages": "runs/v5-self-study/opus/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.4,
+       "indexed": 73.02,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.54,
+        "indexed": 74.66,
+        "image": "runs/v5-self-study/opus/1/mittens.webp",
+        "stages": "runs/v5-self-study/opus/1/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.16,
+       "indexed": 71.92,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.37,
+        "indexed": 74.33,
+        "image": "runs/v5-self-study/opus/2/trumbull.webp",
+        "stages": "runs/v5-self-study/opus/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 6.24,
+       "indexed": 72.58,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/opus/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.99,
+       "indexed": 69.73,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v5-self-study/opus/2"
+      },
+      {
+       "try": 3,
+       "mean": 6.06,
+       "indexed": 70.54,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/opus/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "astra",
+     "name": "Codex Astra",
+     "id": "gpt-6-astra",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 70.04,
+      "ci95": [
+       67.68,
+       72.6
+      ],
+      "n": 15
+     },
+     "mean": 6.02,
+     "ci95": [
+      5.8,
+      6.26
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 6.2,
+      "indexed": 72.08,
+      "crops": 5,
+      "path": "runs/v5-self-study/astra/3"
+     },
+     "perTry": {
+      "strokes": 66867,
+      "minutes": 425.27,
+      "tokens": 147561840,
+      "costUSD": null,
+      "estCostUSD": 168.62
+     },
+     "publicCrops": {
+      "mean": 6.02,
+      "ci95": [
+       5.81,
+       6.26
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.74,
+       "indexed": 68.05,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.17,
+        "indexed": 73.19,
+        "image": "runs/v5-self-study/astra/2/hills.webp",
+        "stages": "runs/v5-self-study/astra/2/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.76,
+       "indexed": 68.33,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.12,
+        "indexed": 72.6,
+        "image": "runs/v5-self-study/astra/1/south-france.webp",
+        "stages": "runs/v5-self-study/astra/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.96,
+       "indexed": 68.07,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.22,
+        "indexed": 71,
+        "image": "runs/v5-self-study/astra/3/sargent.webp",
+        "stages": "runs/v5-self-study/astra/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.61,
+       "indexed": 75.46,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 7.37,
+        "indexed": 84.13,
+        "image": "runs/v5-self-study/astra/3/mittens.webp",
+        "stages": "runs/v5-self-study/astra/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.02,
+       "indexed": 70.28,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.04,
+        "indexed": 70.48,
+        "image": "runs/v5-self-study/astra/2/trumbull.webp",
+        "stages": "runs/v5-self-study/astra/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.83,
+       "indexed": 67.92,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/astra/1"
+      },
+      {
+       "try": 2,
+       "mean": 6.02,
+       "indexed": 70.12,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v5-self-study/astra/2"
+      },
+      {
+       "try": 3,
+       "mean": 6.2,
+       "indexed": 72.08,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v5-self-study/astra/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sonnet",
+     "name": "Sonnet 5.5",
+     "id": "claude-sonnet-5-5",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 15,
+     "indexed": {
+      "mean": 69.79,
+      "ci95": [
+       66.77,
+       72.44
+      ],
+      "n": 15
+     },
+     "mean": 5.99,
+     "ci95": [
+      5.74,
+      6.21
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 6.17,
+      "indexed": 71.85,
+      "crops": 5,
+      "path": "runs/v5-self-study/sonnet/2"
+     },
+     "perTry": {
+      "strokes": 47299,
+      "minutes": 409.68,
+      "tokens": 42136058,
+      "costUSD": null,
+      "estCostUSD": 9.78
+     },
+     "publicCrops": {
+      "mean": 5.99,
+      "ci95": [
+       5.74,
+       6.21
+      ],
+      "n": 15
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 6.08,
+       "indexed": 72.16,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.52,
+        "indexed": 77.34,
+        "image": "runs/v5-self-study/sonnet/3/hills.webp",
+        "stages": "runs/v5-self-study/sonnet/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.88,
+       "indexed": 69.71,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.24,
+        "indexed": 74.02,
+        "image": "runs/v5-self-study/sonnet/2/south-france.webp",
+        "stages": "runs/v5-self-study/sonnet/2/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.39,
+       "indexed": 61.53,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.93,
+        "indexed": 67.69,
+        "image": "runs/v5-self-study/sonnet/2/sargent.webp",
+        "stages": "runs/v5-self-study/sonnet/2/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.39,
+       "indexed": 72.95,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.6,
+        "indexed": 75.34,
+        "image": "runs/v5-self-study/sonnet/3/mittens.webp",
+        "stages": "runs/v5-self-study/sonnet/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.22,
+       "indexed": 72.58,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 6.51,
+        "indexed": 75.96,
+        "image": "runs/v5-self-study/sonnet/2/trumbull.webp",
+        "stages": "runs/v5-self-study/sonnet/2/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.75,
+       "indexed": 67.03,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/sonnet/1"
+      },
+      {
+       "try": 2,
+       "mean": 6.17,
+       "indexed": 71.85,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/sonnet/2"
+      },
+      {
+       "try": 3,
+       "mean": 6.05,
+       "indexed": 70.48,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/sonnet/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "sol",
+     "name": "Codex Sol",
+     "id": "gpt-6.1-sol",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 14,
+     "indexed": {
+      "mean": 66.09,
+      "ci95": [
+       61.06,
+       70.24
+      ],
+      "n": 14
+     },
+     "mean": 5.69,
+     "ci95": [
+      5.23,
+      6.08
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 6.02,
+      "indexed": 70.01,
+      "crops": 5,
+      "path": "runs/v5-self-study/sol/3"
+     },
+     "perTry": {
+      "strokes": 79696,
+      "minutes": 577.93,
+      "tokens": 190658581,
+      "costUSD": null,
+      "estCostUSD": 26.37
+     },
+     "publicCrops": {
+      "mean": 5.69,
+      "ci95": [
+       5.23,
+       6.08
+      ],
+      "n": 14
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.62,
+       "indexed": 66.71,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.81,
+        "indexed": 68.92,
+        "image": "runs/v5-self-study/sol/1/hills.webp",
+        "stages": "runs/v5-self-study/sol/1/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 4.45,
+       "indexed": 52.83,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.15,
+        "indexed": 61.09,
+        "image": "runs/v5-self-study/sol/3/south-france.webp",
+        "stages": "runs/v5-self-study/sol/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 6.34,
+       "indexed": 72.41,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 6.54,
+        "indexed": 74.66,
+        "image": "runs/v5-self-study/sol/1/sargent.webp",
+        "stages": "runs/v5-self-study/sol/1/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.04,
+       "indexed": 68.91,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.76,
+        "indexed": 77.17,
+        "image": "runs/v5-self-study/sol/3/mittens.webp",
+        "stages": "runs/v5-self-study/sol/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.12,
+       "indexed": 71.35,
+       "n": 2,
+       "best": {
+        "try": 3,
+        "score": 6.19,
+        "indexed": 72.23,
+        "image": "runs/v5-self-study/sol/3/trumbull.webp",
+        "stages": "runs/v5-self-study/sol/3/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "low"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.67,
+       "indexed": 65.9,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/sol/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.29,
+       "indexed": 61.43,
+       "crops": 4,
+       "complete": false,
+       "risk": "medium",
+       "path": "runs/v5-self-study/sol/2"
+      },
+      {
+       "try": 3,
+       "mean": 6.02,
+       "indexed": 70.01,
+       "crops": 5,
+       "complete": true,
+       "risk": "low",
+       "path": "runs/v5-self-study/sol/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "luna",
+     "name": "Codex Luna",
+     "id": "gpt-6-luna",
+     "effort": "xhigh",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 14,
+     "indexed": {
+      "mean": 65.96,
+      "ci95": [
+       62.72,
+       69.02
+      ],
+      "n": 14
+     },
+     "mean": 5.67,
+     "ci95": [
+      5.38,
+      5.94
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 3,
+      "score": 5.76,
+      "indexed": 67.01,
+      "crops": 5,
+      "path": "runs/v5-self-study/luna/3"
+     },
+     "perTry": {
+      "strokes": 28179,
+      "minutes": 433.32,
+      "tokens": 204272422,
+      "costUSD": null,
+      "estCostUSD": 2.41
+     },
+     "publicCrops": {
+      "mean": 5.67,
+      "ci95": [
+       5.38,
+       5.94
+      ],
+      "n": 14
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.59,
+       "indexed": 66.27,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6,
+        "indexed": 71.17,
+        "image": "runs/v5-self-study/luna/3/hills.webp",
+        "stages": "runs/v5-self-study/luna/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.32,
+       "indexed": 63.15,
+       "n": 3,
+       "best": {
+        "try": 1,
+        "score": 5.75,
+        "indexed": 68.21,
+        "image": "runs/v5-self-study/luna/1/south-france.webp",
+        "stages": "runs/v5-self-study/luna/1/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.24,
+       "indexed": 59.78,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.65,
+        "indexed": 64.5,
+        "image": "runs/v5-self-study/luna/3/sargent.webp",
+        "stages": "runs/v5-self-study/luna/3/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 6.29,
+       "indexed": 71.84,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 6.66,
+        "indexed": 76.03,
+        "image": "runs/v5-self-study/luna/3/mittens.webp",
+        "stages": "runs/v5-self-study/luna/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.02,
+       "indexed": 70.19,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 6.36,
+        "indexed": 74.21,
+        "image": "runs/v5-self-study/luna/1/trumbull.webp",
+        "stages": "runs/v5-self-study/luna/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "low",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.71,
+       "indexed": 66.45,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/luna/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.5,
+       "indexed": 64.05,
+       "crops": 4,
+       "complete": false,
+       "risk": "low",
+       "path": "runs/v5-self-study/luna/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.76,
+       "indexed": 67.01,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/luna/3"
+      }
+     ],
+     "missing": {}
+    },
+    {
+     "model": "haiku",
+     "name": "Haiku 4.5",
+     "id": "claude-haiku-4-5-20251001",
+     "effort": "n/a",
+     "tries": 3,
+     "scoredTries": 3,
+     "paintings": 14,
+     "indexed": {
+      "mean": 64.21,
+      "ci95": [
+       61.68,
+       66.48
+      ],
+      "n": 14
+     },
+     "mean": 5.52,
+     "ci95": [
+      5.3,
+      5.71
+     ],
+     "fewerTriesReason": null,
+     "best": {
+      "try": 2,
+      "score": 5.58,
+      "indexed": 64.92,
+      "crops": 5,
+      "path": "runs/v5-self-study/haiku/2"
+     },
+     "perTry": {
+      "strokes": 36348,
+      "minutes": 85.82,
+      "tokens": 16044093,
+      "costUSD": null,
+      "estCostUSD": 2.64
+     },
+     "publicCrops": {
+      "mean": 5.52,
+      "ci95": [
+       5.31,
+       5.71
+      ],
+      "n": 14
+     },
+     "perCrop": {
+      "hills": {
+       "mean": 5.08,
+       "indexed": 60.22,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.53,
+        "indexed": 65.6,
+        "image": "runs/v5-self-study/haiku/3/hills.webp",
+        "stages": "runs/v5-self-study/haiku/3/hills-stages.webp"
+       }
+      },
+      "south-france": {
+       "mean": 5.64,
+       "indexed": 66.9,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.75,
+        "indexed": 68.21,
+        "image": "runs/v5-self-study/haiku/3/south-france.webp",
+        "stages": "runs/v5-self-study/haiku/3/south-france-stages.webp"
+       }
+      },
+      "sargent": {
+       "mean": 5.35,
+       "indexed": 61.04,
+       "n": 3,
+       "best": {
+        "try": 2,
+        "score": 5.43,
+        "indexed": 61.99,
+        "image": "runs/v5-self-study/haiku/2/sargent.webp",
+        "stages": "runs/v5-self-study/haiku/2/sargent-stages.webp"
+       }
+      },
+      "mittens": {
+       "mean": 5.61,
+       "indexed": 64.04,
+       "n": 3,
+       "best": {
+        "try": 3,
+        "score": 5.87,
+        "indexed": 67.01,
+        "image": "runs/v5-self-study/haiku/3/mittens.webp",
+        "stages": "runs/v5-self-study/haiku/3/mittens-stages.webp"
+       }
+      },
+      "trumbull": {
+       "mean": 6.1,
+       "indexed": 71.18,
+       "n": 2,
+       "best": {
+        "try": 1,
+        "score": 6.11,
+        "indexed": 71.3,
+        "image": "runs/v5-self-study/haiku/1/trumbull.webp",
+        "stages": "runs/v5-self-study/haiku/1/trumbull-stages.webp"
+       }
+      }
+     },
+     "cheat": {
+      "disqualified": 0,
+      "riskLevels": [
+       "medium",
+       "medium",
+       "medium"
+      ],
+      "high": 0,
+      "flagged": 0,
+      "cleared": 0
+     },
+     "tryList": [
+      {
+       "try": 1,
+       "mean": 5.35,
+       "indexed": 62.34,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/haiku/1"
+      },
+      {
+       "try": 2,
+       "mean": 5.58,
+       "indexed": 64.92,
+       "crops": 5,
+       "complete": true,
+       "risk": "medium",
+       "path": "runs/v5-self-study/haiku/2"
+      },
+      {
+       "try": 3,
+       "mean": 5.64,
+       "indexed": 65.67,
+       "crops": 4,
+       "complete": false,
+       "risk": "medium",
+       "path": "runs/v5-self-study/haiku/3"
+      }
+     ],
+     "missing": {}
+    }
+   ]
+  }
+ ],
+ "unscored": []
+}

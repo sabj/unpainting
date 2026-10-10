@@ -1,0 +1,20 @@
+{
+  "subject": "HILLS",
+  "name": "Hills — sunlit tracks and wooded ravines",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose connected yellow-green slope washes and blue-green tree shadows carry the landscape; restrained sepia gestures explain near trunks and path-side branches.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"HILLS.high-ridge","bounds":[0.47,0,1,0.28],"baseMove":"wet on dry","referenceCue":"The upper sunlit yellow-green ridge and its narrow pale track recede behind small muted tree masses. Broad transparent value planes; sparse distant detail."},
+    {"id":"HILLS.left-slope","bounds":[0.13,0.13,0.48,0.57],"baseMove":"wet on dry","referenceCue":"Pale warm path bends down the left grassy slope between dark trees; preserve its narrow connected ribbon and soften only selected hill turns."},
+    {"id":"HILLS.ravine","bounds":[0.38,0.2,1,0.72],"baseMove":"wet on dry","referenceCue":"Cool blue-green wooded diagonal joins several irregular tree groups; connected shadow glazing across crowns and trunks, leaving grey-green light crowns visible."},
+    {"id":"HILLS.foreground-trees","bounds":[0,0.45,0.43,1],"baseMove":"wet on dry","referenceCue":"The large tree at the foreground path bend has a branching dark trunk and connected irregular crown; fitted wash shapes followed by a few dry sepia branch gestures."},
+    {"id":"HILLS.foreground-meadow","bounds":[0.32,0.57,1,1],"baseMove":"wet on dry","referenceCue":"Broad luminous chartreuse meadow crossed by a cream S-shaped path; ground turns are broad value washes, with dark bordering trees and very sparse foreground texture."}
+  ],
+  "reserves": [
+    {"reason":"Bare paper glint inside the lower cream track; surrounding track is a pale warm painted plane","bounds":[0.4869281,0.8842975,0.495098,0.8966942]},
+    {"reason":"Small bare paper glint in the receding upper track","bounds":[0.7287582,0.0123967,0.7369281,0.0247934]}
+  ]
+}

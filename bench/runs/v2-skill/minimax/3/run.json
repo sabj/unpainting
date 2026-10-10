@@ -1,0 +1,384 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "minimax",
+  "name": "MiniMax M3",
+  "id": "MiniMaxAI/MiniMax-M3",
+  "effort": "n/a",
+  "runner": "together"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 84.1,
+  "tokens": 7440502,
+  "costUSD": 2.357,
+  "estCostUSD": null,
+  "usage": null
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 15,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 144,
+   "minutes": null,
+   "smallShare": 0.067,
+   "shortStrokes": 102,
+   "dotStrokes": 86,
+   "copyHF": -0.001,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "score": {
+    "composite": 1.66,
+    "pm": 0,
+    "complete": true,
+    "visionOverall": 0,
+    "classic": 3.31,
+    "criteria": {
+     "composition_values": 0,
+     "edges_detail": 0,
+     "marks_texture": 0.33,
+     "classic_value": 3.49,
+     "classic_edge": 0.14,
+     "classic_landmark": null,
+     "classic_marks": 6.3
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 0,
+     "zai-org/GLM-5.3-Flash": 0,
+     "Qwen/Qwen3.5-9B": 0
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 1,
+     "50": 1,
+     "75": 1,
+     "100": 1
+    },
+    "earlyMean": 1,
+    "mean": 1,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 10,
+     "h": 6,
+     "a": 8
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sheet stays essentially blank with only a few stray specks appearing, never building the landscape, so the sequence reads as a degenerate fade/speckle process rather than a brush-built painting.",
+     "Qwen/Qwen3.5-9B": "The sequence depicts a static, faint wash with random specks appearing, mimicking a fade-in effect rather than a progressive brush painting."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 77,
+   "minutes": 0,
+   "smallShare": 0.231,
+   "shortStrokes": 13,
+   "dotStrokes": 10,
+   "copyHF": -0.0015,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "score": {
+    "composite": 1.86,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 0.67,
+    "classic": 3.05,
+    "criteria": {
+     "composition_values": 0.67,
+     "edges_detail": 0,
+     "marks_texture": 0.67,
+     "classic_value": 3,
+     "classic_edge": 0.61,
+     "classic_landmark": null,
+     "classic_marks": 5.55
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 0
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 1
+    },
+    "earlyMean": 1.5,
+    "mean": 1.4,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "a": 5,
+     "c": 1,
+     "k": 1,
+     "h": 6,
+     "g": 1,
+     "i": 1,
+     "l": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The marks are speckle clusters and one flat dark slab that barely change between snapshots and never build toward the target hillside, reading as a mask or wipe reveal rather than pen-and-wash brushwork.",
+     "Qwen/Qwen3.5-9B": "The sequence is static; the ink layer is fully formed in the first panel and remains unchanged through the rest."
+    }
+   },
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 32,
+   "minutes": null,
+   "smallShare": 0.75,
+   "shortStrokes": 15,
+   "dotStrokes": 15,
+   "copyHF": 0.0063,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "score": {
+    "composite": 1.6,
+    "pm": 0,
+    "complete": true,
+    "visionOverall": 0,
+    "classic": 3.21,
+    "criteria": {
+     "composition_values": 0,
+     "edges_detail": 0,
+     "marks_texture": 0,
+     "classic_value": 3.53,
+     "classic_edge": 0.28,
+     "classic_landmark": null,
+     "classic_marks": 5.83
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 0,
+     "zai-org/GLM-5.3-Flash": 0,
+     "Qwen/Qwen3.5-9B": 0
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1,
+     "50": 1,
+     "75": 1,
+     "100": 1
+    },
+    "earlyMean": 1.25,
+    "mean": 1.1,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 4,
+     "h": 9
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Panels 2–6 are identical bare paper with no strokes at any stage, so the target never begins to appear — a mask/dissolve that never opens rather than a human painting order.",
+     "Qwen/Qwen3.5-9B": "The sequence displays the target image followed by five identical blank panels, indicating a complete failure to render the painting process."
+    }
+   },
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 85,
+   "minutes": 0.2,
+   "smallShare": 0.286,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0135,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "score": {
+    "composite": 3.5,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 1.33,
+    "classic": 5.67,
+    "criteria": {
+     "composition_values": 1.67,
+     "edges_detail": 1,
+     "marks_texture": 2,
+     "classic_value": 3.07,
+     "classic_edge": 5.28,
+     "classic_landmark": null,
+     "classic_marks": 8.65
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 2,
+    "mean": 2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "a": 5,
+     "c": 1,
+     "i": 4,
+     "h": 1,
+     "j": 2,
+     "d": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence never draws the building's form — sky bands, a flat tan slab, and scattered speckle dabs accumulate without converging on the target, and the 100% panel still does not resemble the finished watercolor, indicating procedural texture dumping rather than a painter's order."
+    }
+   },
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 1,
+   "minutes": 0,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": -0.0023,
+   "images": {
+    "final": "mittens.webp",
+    "stages": null
+   },
+   "changes": null,
+   "score": {
+    "composite": 2,
+    "pm": 0.07,
+    "complete": true,
+    "visionOverall": 0,
+    "classic": 3.99,
+    "criteria": {
+     "composition_values": 0,
+     "edges_detail": 0,
+     "marks_texture": 0.67,
+     "classic_value": 3.64,
+     "classic_edge": 0.74,
+     "classic_landmark": null,
+     "classic_marks": 7.59
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 0,
+     "zai-org/GLM-5.3-Flash": 0,
+     "Qwen/Qwen3.5-9B": 0
+    }
+   },
+   "progression": null
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 2.12,
+  "partialComposite": null,
+  "pm": 0.03,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.4,
+   "level": "medium",
+   "parts": {
+    "progression": 1,
+    "earlyStageMean": 1.44,
+    "copyHF": {
+     "hills": -0.001,
+     "south-france": -0.0015,
+     "sargent": 0.0063,
+     "trumbull": 0.0135,
+     "mittens": -0.0023
+    },
+    "copy": 0,
+    "smallStrokeShare": 0.267,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.5,
+   "level": "medium"
+  },
+  "review": null
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

@@ -1,0 +1,132 @@
+{
+  "subject": "Y1",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Precise architectural watercolor: luminous connected golden planes, dry cool recesses, soft pale sky, and selective fitted structure on the Gothic arches and chimney flues.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.32
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Soft pale blue clouded sky around intricate roof silhouettes. Wash question: continuous flowing light and single cool middle wash, loaded broad brush, with cloud lights pale painted instead of oversized paper holes. Soften only supported low-contrast cloud turns; roof junctions remain hard."
+    },
+    {
+      "id": "Y1.left-chimney",
+      "bounds": [
+        0.155,
+        0,
+        0.285,
+        0.8
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall left chimney: ochre lit right face and cooler shaded left face. Broad wall wash, dry mid planes, a connected shadow glaze crossing the chimney band and adjacent wall. Fine vertical flues belong to closing ink."
+    },
+    {
+      "id": "Y1.left-wing",
+      "bounds": [
+        0,
+        0.16,
+        0.415,
+        0.98
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Receding left wing is darker and greyer than the central sunlit gable. Connected warm stone planes on dry paper; cool window and door recesses are late controlled paint accents. Sparse mullions and cornice junctions are ink-and-wash detail."
+    },
+    {
+      "id": "Y1.central-gable",
+      "bounds": [
+        0.397,
+        0.008,
+        0.689,
+        0.995
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Focal sunlit golden gable: four lancets, circular crest, paired Gothic arches and lower portals. Broad luminous warm washes; dry connected mid planes; clean light corner and pale stone ribs as negative gaps; controlled cool recesses last. Arch ribs, mullions and crest are selective thin sepia structure, never a dark ink fill."
+    },
+    {
+      "id": "Y1.roofs",
+      "bounds": [
+        0.272,
+        0.01,
+        0.567,
+        0.235
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Blue-grey sloping slate roof behind the central gable. Connected cool value plane, hard fitted ridge and eave, a few late joints; no individual tile stipple."
+    },
+    {
+      "id": "Y1.right-chimney",
+      "bounds": [
+        0.795,
+        0.101,
+        0.903,
+        0.603
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right chimney has a cool shaded face and a narrow sunlit golden face. Light wash then dry side plane and cross-band shadow glaze; flues and cap junctions are selective ink detail."
+    },
+    {
+      "id": "Y1.right-wing",
+      "bounds": [
+        0.69,
+        0.207,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right background wing: warm walls with blue window groups beneath the diagonal slate roof. Wash question for walls and roof; ink-and-wash question for thin window divisions. Keep fitted openings crisp on measured dry paper."
+    },
+    {
+      "id": "Y1.foreground-annex",
+      "bounds": [
+        0.699,
+        0.636,
+        0.96,
+        0.993
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Low foreground annex: light roof and cornice over golden walls and narrow cool recesses. Pale planes first; roof cast shadow later crosses the cornice, wall and windows. Preserve light sill edges; close only the hard junctions."
+    },
+    {
+      "id": "Y1.central-tree",
+      "bounds": [
+        0.626,
+        0.597,
+        0.769,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Yellow-green tree interrupts the central facade at lower right. Connected irregular canopy wash with light sky and wall gaps; dry connected shadow groups, a few crisp shaped foliage edges and tapering trunk accents. No equal leaf disks or canopy stipple."
+    },
+    {
+      "id": "Y1.left-planting",
+      "bounds": [
+        0,
+        0.656,
+        0.237,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Muted green planting and tiny figures at the lower left: connected wash and shadow mass, subordinate to the central architecture. Small human silhouettes are late dry value accents; grass and leaf strands are below wash resolution."
+    },
+    {
+      "id": "Y1.street-furniture",
+      "bounds": [
+        0.246,
+        0.57,
+        0.438,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Blue sign, pale lamp shaft and dark traffic signal beside the gable. Dry connected local planes and late controlled darks. Sign letter strokes and lamp contours are selective thin drawing, not broad dark ink fills."
+    }
+  ],
+  "reserves": []
+}

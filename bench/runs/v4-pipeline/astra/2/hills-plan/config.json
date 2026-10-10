@@ -1,0 +1,99 @@
+{
+  "subject": "HILLS",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose landscape: connected luminous colour planes and cool tree shadows carry the masses; sparse sepia lines describe forks, path bends and canopy overlaps.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "HILLS.upper-wood",
+      "bounds": [
+        0,
+        0,
+        0.57,
+        0.25
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Upper-left cool olive tree belt: dark connected mass with lighter crown planes."
+    },
+    {
+      "id": "HILLS.far-ridge",
+      "bounds": [
+        0.46,
+        0,
+        1,
+        0.27
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "High diagonal yellow-green ridge and short cream path; small quiet distant tree groups."
+    },
+    {
+      "id": "HILLS.left-slope",
+      "bounds": [
+        0.16,
+        0.16,
+        0.49,
+        0.57
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit diagonal slope with winding warm cream path, bright grass between tree groups."
+    },
+    {
+      "id": "HILLS.valley-wood",
+      "bounds": [
+        0.42,
+        0.17,
+        1,
+        0.73
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Blue-grey and olive woodland descends diagonally; connected dark valleys below pale crowns."
+    },
+    {
+      "id": "HILLS.focal-tree",
+      "bounds": [
+        0.21,
+        0.4,
+        0.47,
+        0.78
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Spreading forked tree left of the central path bend; strong dark trunk and broken crown."
+    },
+    {
+      "id": "HILLS.near-meadow",
+      "bounds": [
+        0.33,
+        0.56,
+        0.9,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad luminous yellow-green hillside, warm pale descending path, sparse foreground grass."
+    },
+    {
+      "id": "HILLS.left-near-wood",
+      "bounds": [
+        0,
+        0.48,
+        0.34,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dense left foreground trees; connected cool shadows with irregular pale crown edges."
+    },
+    {
+      "id": "HILLS.right-near-wood",
+      "bounds": [
+        0.83,
+        0.65,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right foreground grove anchors meadow with dark bases and broken olive crowns."
+    }
+  ],
+  "reserves": []
+}

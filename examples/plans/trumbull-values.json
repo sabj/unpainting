@@ -1,0 +1,92 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull Hall",
+  "drawing": {
+    "medium": "ink",
+    "inkColor": "sepia",
+    "amount": 1,
+    "lines": "all",
+    "weight": 1,
+    "closingLines": 1
+  },
+  "families": [
+    {
+      "id": "Y1.sun-main-gable",
+      "bounds": [
+        0.415,
+        0.28901734104046245,
+        0.55,
+        0.789980732177264
+      ],
+      "referenceCue": "Looser v2 target: Broad warm ochre front gable interiors connect through stone variations; keep narrow sunlit trim.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.cool-main-return",
+      "bounds": [
+        0.3496042216358839,
+        0.34,
+        0.415,
+        0.789980732177264
+      ],
+      "referenceCue": "Looser v2 target: Cooler left-facing main wall separates from warm gable by value.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.main-chimney",
+      "bounds": [
+        0.3496042216358839,
+        0.28901734104046245,
+        0.36,
+        0.38
+      ],
+      "referenceCue": "Looser v2 target: Sunlit narrow chimney face beside cool return; roof-side cast shadow.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "bounds": [
+        0.35000000000000003,
+        0.28901734104046245,
+        0.5738786279683378,
+        0.48
+      ],
+      "referenceCue": "Looser v2 target: Connected cool slate roofs; restrained pale tile variations.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0.3496042216358839,
+        0.28901734104046245,
+        0.5738786279683378,
+        0.55
+      ],
+      "referenceCue": "Looser v2 target: Pale cloud corridors remain open between connected blue regions.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.opening-sidewalk",
+      "bounds": [
+        0.3496042216358839,
+        0.28901734104046245,
+        0.5738786279683378,
+        0.789980732177264
+      ],
+      "referenceCue": "Looser v2 target: Opening darkness belongs to paint; sidewalk lights, small people and signage stay subordinate.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.whole-physical-fringe",
+      "bounds": [
+        0.3496042216358839,
+        0.28901734104046245,
+        0.5738786279683378,
+        0.789980732177264
+      ],
+      "referenceCue": "Registered facade/sky/grounds surrounding actual on-sheet brush overhang; descriptive classification only, no ownership or geometry expansion.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": []
+}

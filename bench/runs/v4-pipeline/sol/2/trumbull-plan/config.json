@@ -1,0 +1,18 @@
+{
+  "subject": "Y1",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sunlit stone planes and cool connected shadows carry the Gothic building; fine sepia lines explain only roof junctions, arches and window divisions.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"Y1.sky","bounds":[0,0,1,0.31],"baseMove":"wet on dry","referenceCue":"Pale blue variegated sky and luminous cloud gaps: one connected light wash, overlapping while open, with no later nested sky patches; dry roof boundaries."},
+    {"id":"Y1.gable-stone","bounds":[0.41,0.02,0.7,0.98],"baseMove":"wet on dry","referenceCue":"Warm ochre and raw-sienna gable facing the light. Broad luminous stone foundation, dry shaped mid planes, sparse irregular ashlar hints; pale window surrounds survive."},
+    {"id":"Y1.left-shadow","bounds":[0,0.12,0.41,0.96],"baseMove":"wet on dry","referenceCue":"Left wing and tall chimney have cool muted stone shadow planes. Connected blue and raw-sienna dry glazes cross masonry, eaves and openings; keep the tall chimney silhouette."},
+    {"id":"Y1.right-wing","bounds":[0.7,0.1,1,1],"baseMove":"wet on dry","referenceCue":"Right chimney, receding wing and lower projecting bay: dry angular roof planes, broad pale walls, coherent cast shadows under cornices; dark window recesses last."},
+    {"id":"Y1.right-tree","bounds":[0.61,0.61,0.82,0.99],"baseMove":"wet on dry","referenceCue":"Yellow-green connected canopy against warm stone, light green foundation and darker connected groups on dry paper. Preserve irregular wall gaps; trunk and a few crisp leaf edges last."},
+    {"id":"Y1.left-greenery","bounds":[0,0.72,0.22,1],"baseMove":"wet on dry","referenceCue":"Muted ivy and small left trees merge into the shaded base: connected olive wash and dry shadow groups, very little line or leaf detail."},
+    {"id":"Y1.street","bounds":[0,0.93,1,1],"baseMove":"wet on dry","referenceCue":"Thin ground strip and small pedestrians establish scale. Pale pavement foundation, connected cool ground shadow, a few small dry dark accents; no grass-like stippling."}
+  ],
+  "reserves": []
+}

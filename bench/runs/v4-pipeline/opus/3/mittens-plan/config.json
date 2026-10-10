@@ -1,0 +1,16 @@
+{"subject":"MITTENS","name":"Mittens (cat and man), watercolor portrait sketch",
+ "styleSelection":{"style":"precise-watercolor","reason":"fine graphite drawing under light, shaped washes; value planes carry the cat's markings and the face, dry focal details, selective closing ink",
+   "regions":{
+     "3T.human-hair":{"style":"ink-and-wash","reason":"curly hair strands are thinner than a brush mark: one mixed grey-black value mass with a few directional ink curls"},
+     "3T.human-hair-side":{"style":"ink-and-wash","reason":"same hair mass running down the right side of the head, broken edge into paper"}}},
+ "families":[
+   {"id":"3T.cat-head","bounds":[0,0,0.5,0.47],"baseMove":"wet on dry","referenceCue":"ginger tabby head looking up-left: pale burnt-orange patches on white fur, darker sienna stripes on the brow and cheek, white muzzle left as paper, pale green eyes with dark upper lids"},
+   {"id":"3T.cat-body","bounds":[0,0.47,0.5,1],"baseMove":"wet on dry","referenceCue":"white chest and throat left as paper; orange and brown fur patches down the right side, broken directional brush marks fading into paper"},
+   {"id":"3T.human-hair","bounds":[0.5,0.2,1,0.5],"baseMove":"wet on dry","referenceCue":"dark curly hair as a cool grey-black mass, lighter grey breaks inside, ragged top edge vignetting into white paper"},
+   {"id":"3T.human-hair-side","bounds":[0.85,0.35,1,0.74],"baseMove":"wet on dry","referenceCue":"hair falling down the right side of the face, ragged dry edge into the paper"},
+   {"id":"3T.human-face","bounds":[0.5,0.42,0.95,1],"baseMove":"wet on dry","referenceCue":"pale warm skin, forehead and nose ridge near paper; sepia mid planes in the eye sockets, under the nose, cheek turn and stubble; dark brows and lids"}],
+ "reserves":[
+   {"reason":"catchlight, cat right (large) eye, upper left of the pupil","bounds":[0.2677,0.2154,0.2760,0.2251]},
+   {"reason":"catchlight, cat left (small) eye","bounds":[0.0843,0.2405,0.0920,0.2502]},
+   {"reason":"catchlight, man left eye iris","bounds":[0.6100,0.7201,0.6153,0.7270]},
+   {"reason":"catchlight, man right eye iris","bounds":[0.8200,0.6834,0.8253,0.6903]}]}

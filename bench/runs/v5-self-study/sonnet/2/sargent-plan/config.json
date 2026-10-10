@@ -1,0 +1,42 @@
+{
+  "subject": "sargent",
+  "name": "White Ships (Sargent)",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "pure watercolor: wet-on-dry value planes on cream paper carry the hull; no ink, no fur or foliage; no region style overrides so no rectangular style seams",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.hull",
+      "bounds": [0.2, 0, 0.66, 0.97],
+      "baseMove": "wet on dry",
+      "referenceCue": "tall greyed-cerulean hull: one smooth transparent wash, darker saturated blue along its left rim, paler to the right, scratched white swishes left as paper"
+    },
+    {
+      "id": "sargent.rigging",
+      "bounds": [0.62, 0, 1, 0.68],
+      "baseMove": "wet on dry",
+      "referenceCue": "cream paper with a few pale blue rope/rigging strokes, grey bollard disc top right, orange-brown spar crossing the top"
+    },
+    {
+      "id": "sargent.sea",
+      "bounds": [0.64, 0.68, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "turquoise and olive sea under a horizon at 0.69, paper sparkle, thin orange-brown mast with dots crossing it"
+    },
+    {
+      "id": "sargent.left",
+      "bounds": [0, 0, 0.22, 0.6],
+      "baseMove": "wet on dry",
+      "referenceCue": "pale blue sky, orange-pink mast on the far left, grey diagonal spars"
+    },
+    {
+      "id": "sargent.foot",
+      "bounds": [0, 0.6, 0.3, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "blue water at left, sandy-orange anchor, dark waterline across the bottom"
+    }
+  ],
+  "reserves": []
+}

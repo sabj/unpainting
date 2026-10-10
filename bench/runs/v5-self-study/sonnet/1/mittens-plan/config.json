@@ -1,0 +1,41 @@
+{
+  "subject": "mittens",
+  "name": "Mittens (cat and man, watercolor portrait sketch)",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Mostly bare paper with a few painted value planes; dry focal edges at the eyes, brows and nostrils; fine pen lines carry whiskers, lids and curls rather than ink filling any mass.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat-head",
+      "bounds": [0, 0, 0.52, 0.56],
+      "baseMove": "wet on dry",
+      "referenceCue": "orange tabby head tipped up: broken orange and brown patches over white fur, green eye under a dark upper lid, white muzzle, ears with brown inner tone; pale and mostly paper between the patches"
+    },
+    {
+      "id": "mittens.cat-body",
+      "bounds": [0, 0.5, 0.55, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "faded chest and shoulder: ragged vertical strips of pale orange on the left and brown patches against the man's cheek, large white paper gaps, soft lost edges"
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [0.47, 0.15, 1, 0.6],
+      "baseMove": "wet on dry",
+      "referenceCue": "dark blue-grey curly hair as one mottled mass: lighter grey in the lit tufts, darkest at the temple and the hairline, ragged dry-brush edge with white paper flecks and a few loose curls"
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [0.5, 0.4, 0.95, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "pale warm skin that is mostly paper; sepia shadow along the left cheek and jaw, dark brown brows and upper lids, small eyes with catchlights, nostril darks, stubble tone around the mouth"
+    }
+  ],
+  "reserves": [
+    { "reason": "catchlight in the cat's near eye", "bounds": [0.2667, 0.2124, 0.2783, 0.2259] },
+    { "reason": "catchlight in the cat's far eye", "bounds": [0.084, 0.2386, 0.0947, 0.2502] },
+    { "reason": "catchlight in the man's left eye", "bounds": [0.595, 0.7115, 0.6057, 0.7231] },
+    { "reason": "catchlight in the man's right eye", "bounds": [0.8033, 0.6729, 0.814, 0.6845] }
+  ]
+}

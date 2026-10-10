@@ -1,0 +1,47 @@
+{
+  "subject": "BENCHMITTENS",
+  "name": "Mittens portrait sketch, V5 try 3",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference uses transparent warm and cool value masses with a few crisp facial and fur lines; broad planes stay light and the eyes stay sharp.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat",
+      "bounds": [0.0, 0.0, 0.53, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cropped ginger-and-white cat at left: warm forehead and cheek markings, pale blaze and muzzle, pointed ears, and short fur turning out from the nose."
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [0.51, 0.02, 1.0, 0.43],
+      "baseMove": "wet on dry",
+      "referenceCue": "The person's connected charcoal curl mass above and beside the forehead, deepest in its interior, irregular and pale-flecked at the outer edge."
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [0.53, 0.22, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The person's pale forehead, eye sockets, nose, cheek and lower face; the lit planes stay close to paper and the eyes and mouth retain small crisp landmarks."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Small bare-paper glint at the cat's far eye, about 1.5 target pixels across.",
+      "bounds": [0.098, 0.314, 0.103, 0.319]
+    },
+    {
+      "reason": "Small bare-paper glint at the cat's near eye, about 1.5 target pixels across.",
+      "bounds": [0.265, 0.225, 0.270, 0.230]
+    },
+    {
+      "reason": "Small bare-paper glint at the person's left eye, about 1.5 target pixels across.",
+      "bounds": [0.691, 0.644, 0.696, 0.649]
+    },
+    {
+      "reason": "Small bare-paper glint at the person's right eye, about 1.5 target pixels across.",
+      "bounds": [0.900, 0.663, 0.905, 0.668]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{"t": "2026-10-10 00:55:50 PDT", "kind": "start", "modelMinutes": 6.27, "variant": "region_w13_dk10_sg9_cur_ms300_spl4_lad_cg10_tp1", "renderKey": "6a1347529d1bb89ee3ffb6d64fbb637b131afc9989b7ab1713e0f8d135f3d278"}
+{"t": "2026-10-10 01:17:27 PDT", "kind": "machine-lost", "modelMinutes": 11.12, "n": 1, "why": "infra: exit 1, 1e655f7cd42d5d721544981885889c PAINTER_TARGET_GUARD=gentle node tools/aware/segments.mjs V5ABENCHSFc2b515f7 region_w13_dk10_sg9_cur_ms300_spl4_lad_cg10_tp1 1216"}
+{"t": "2026-10-10 01:21:53 PDT", "kind": "continue", "modelMinutes": 12.66, "boundary": "0", "stopAt": "end", "strokes": 0}
+{"t": "2026-10-10 01:25:07 PDT", "kind": "continue", "modelMinutes": 13.89, "boundary": null, "stopAt": 6, "strokes": null}
+{"t": "2026-10-10 01:29:50 PDT", "kind": "look", "modelMinutes": 15.31, "n": 1, "boundary": "6", "strokes": 4298, "penLines": 45, "passesDone": 6, "passesPlanned": 24}
+{"t": "2026-10-10 01:32:44 PDT", "kind": "revise", "modelMinutes": 16.87, "boundary": "6", "revision": 1, "strokes": 4298, "passesDone": 6, "changed": ["config.json", "extra-args.json", "variant.txt"], "variant": "region_w13_dk10_sg9_cur_ms300_cg10_tp1_lf"}
+{"t": "2026-10-10 01:36:53 PDT", "kind": "continue", "modelMinutes": 19.06, "boundary": null, "stopAt": 16, "strokes": null}
+{"t": "2026-10-10 02:05:41 PDT", "kind": "look", "modelMinutes": 31.01, "n": 2, "boundary": "16", "strokes": 19481, "penLines": 45, "passesDone": 16, "passesPlanned": 23}
+{"t": "2026-10-10 02:10:38 PDT", "kind": "revise", "modelMinutes": 34.6, "boundary": "16", "revision": 2, "strokes": 19481, "passesDone": 16, "changed": ["config.json", "extra-args.json", "variant.txt"], "variant": "region_w15_lay1_dk9_mg5_sg9_cur_ms300_cg10_tp1_lf"}
+{"t": "2026-10-10 02:12:58 PDT", "kind": "continue", "modelMinutes": 35.69, "boundary": "17", "stopAt": 22, "strokes": 19500}
+{"t": "2026-10-10 02:14:42 PDT", "kind": "look", "modelMinutes": 36.5, "n": 3, "boundary": "22", "strokes": 19649, "penLines": 45, "passesDone": 22, "passesPlanned": 39}
+{"t": "2026-10-10 02:18:06 PDT", "kind": "continue", "modelMinutes": 39.91, "boundary": "22", "stopAt": 33, "strokes": 19649}
+{"t": "2026-10-10 02:19:06 PDT", "kind": "adopted", "modelMinutes": 39.9, "unanswered": ["45"]}
+{"t": "2026-10-10 02:22:49 PDT", "kind": "look", "modelMinutes": 43.04, "n": 4, "boundary": "33", "strokes": 20348, "penLines": 45, "passesDone": 33, "passesPlanned": 39}
+{"t": "2026-10-10 02:29:24 PDT", "kind": "revise", "modelMinutes": 47.96, "boundary": "33", "revision": 3, "strokes": 20348, "passesDone": 33, "changed": ["closing-lines.json"], "variant": "region_w15_lay1_dk9_mg5_sg9_cur_ms300_cg10_tp1_lf"}
+{"t": "2026-10-10 02:37:53 PDT", "kind": "look", "modelMinutes": 53.3, "n": 5, "boundary": "closing", "strokes": 26789, "penLines": 45, "passesDone": 45, "passesPlanned": 45}
+{"t": "2026-10-10 02:39:04 PDT", "kind": "continue", "modelMinutes": 54.49, "boundary": "closing", "stopAt": "end", "strokes": 26789}
+{"t": "2026-10-10 02:41:24 PDT", "kind": "finished", "modelMinutes": 55.3, "strokes": 26789}
+{"t": "2026-10-10 02:41:56 PDT", "kind": "session-end", "modelMinutes": 55.84, "why": "you ended the session", "looks": 5, "revisions": 3}

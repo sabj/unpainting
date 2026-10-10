@@ -1,0 +1,4 @@
+{"t": "2026-10-09 18:10:12 PDT", "kind": "start", "modelMinutes": 2.51, "variant": "region_w13_blk15_bka12_sep4_dwg100", "renderKey": "29cc42c7afc471c6aa1f13cfe3e5b740af66ad84e4f4ea4803451315321f9523"}
+{"t": "2026-10-09 18:13:01 PDT", "kind": "look", "modelMinutes": 2.62, "n": 1, "boundary": "0", "strokes": 0, "penLines": 29, "passesDone": 0, "passesPlanned": 81}
+{"t": "2026-10-09 18:13:09 PDT", "kind": "continue", "modelMinutes": 2.75, "boundary": "0", "stopAt": "closing", "strokes": 0}
+{"t": "2026-10-09 18:43:59 PDT", "kind": "session-end", "modelMinutes": 3.47, "why": "the wall-clock safety limit", "looks": 1, "revisions": 0}

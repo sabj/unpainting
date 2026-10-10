@@ -1,0 +1,43 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull: sunlit Gothic stone hall under a pale blue sky",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry the form: broad pale stone and sky washes, shaped mid planes on dry paper, one cross-boundary shadow glaze, dark window recesses last, selective closing ink on the hard edges the picture shows.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0, 0, 1, 0.3],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale cerulean-to-ultramarine sky with soft white cloud lights at upper right and between the gable and the right tower; one connected graded wash laid as overlapping lanes on dry paper, hard edge only where it meets the roof and tower silhouettes."
+    },
+    {
+      "id": "Y1.tree",
+      "bounds": [0.62, 0.62, 0.78, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "Slim yellow-green street tree against pale stone, with olive and sap-green bushes at the lower left: one irregular mass with olive darks on the shadow side, crisp leaf edges, trunk last."
+    },
+    {
+      "id": "Y1.stone-roofs-windows",
+      "bounds": [0, 0.05, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "Coursed ochre and honey stone: one broad pale connected plane per wall with paper showing through, cream string courses and copings kept light; the left tower and left wing in cooler brown-grey shade with one connected shadow glaze across wall, window and roof edge; blue-grey slate roofs as flat cool planes with crisp edges; deep navy window panes in pale stone frames and pointed arches as the last dry, crisp dark accents."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "brightest cloud at upper right, kept as bare paper",
+      "bounds": [0.925, 0.025, 0.965, 0.085]
+    },
+    {
+      "reason": "white lamp pole, bare paper",
+      "bounds": [0.277, 0.61, 0.293, 0.99]
+    },
+    {
+      "reason": "white lower banner pole, bare paper",
+      "bounds": [0.403, 0.727, 0.415, 0.99]
+    }
+  ]
+}

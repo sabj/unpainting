@@ -1,0 +1,55 @@
+{
+ "subject": "Y1",
+ "name": "Trumbull (gothic stone college, precise architectural watercolor)",
+ "styleSelection": {
+  "style": "precise-watercolor",
+  "reason": "Painted value planes carry the form of the stone gable, towers and wings; windows and arches are dry, hard-edged dark shapes; ink only restores structure the wash cannot hold.",
+  "regions": {}
+ },
+ "families": [
+  {
+   "id": "trumbull.sky",
+   "bounds": [
+    0,
+    0,
+    1,
+    0.33
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "pale blue sky in fragments between towers, roofs and clouds, lighter toward the horizon; broad pale washes on dry paper, clouds left as paper"
+  },
+  {
+   "id": "trumbull.stone",
+   "bounds": [
+    0,
+    0.08,
+    1,
+    0.97
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "warm ochre-tan sandstone, lit faces broad and pale, shaded side planes and towers a darker brown-ochre; irregular coursed blocks, hard edges on dry paper"
+  },
+  {
+   "id": "trumbull.foliage",
+   "bounds": [
+    0.62,
+    0.62,
+    0.78,
+    0.99
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "young street tree, yellow-green mass with light gaps, darker green on the shaded side"
+  }
+ ],
+ "reserves": [
+  {
+   "reason": "brightest cloud top right",
+   "bounds": [
+    0.94,
+    0.015,
+    0.99,
+    0.075
+   ]
+  }
+ ]
+}

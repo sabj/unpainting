@@ -1,0 +1,263 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "opus",
+  "name": "Opus 5.5",
+  "id": "claude-opus-5-5",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true
+ },
+ "session": {
+  "minutes": 22.9,
+  "tokens": 2884811,
+  "costUSD": null,
+  "estCostUSD": 2.26,
+  "usage": {
+   "input": 56,
+   "cacheWrite1h": 67162,
+   "cacheWrite5m": 0,
+   "cacheRead": 2759078,
+   "output": 58515
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 1179,
+   "minutes": 6.6,
+   "smallShare": 0.129,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0016,
+   "images": {
+    "final": "hills.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.27,
+    "pm": 0.14,
+    "complete": true,
+    "classic": 7.53,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 2.67,
+     "marks_texture": 1.67,
+     "classic_value": 5.12,
+     "classic_edge": 8.23,
+     "classic_landmark": null,
+     "classic_marks": 9.24
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 2,
+     "100": 3
+    },
+    "earlyMean": 1.5,
+    "mean": 1.9,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "c": 8,
+     "m": 7,
+     "a": 1,
+     "f": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The build-up proceeds by flat rectangular colour slabs and a large dark mass dropped in region-by-region with texture sharpening only at the end, reading as a digital mosaic/wipe progression rather than a brush-and-pen painting order.",
+     "Qwen/Qwen3.5-9B": "The sequence depicts a digital posterization or low-resolution fill effect using rectangular blocks, rather than brushwork or ink wash."
+    }
+   },
+   "painterNote": "Trees go from olive stamped crowns to blue-slate masses (sage-slate wet underwash, masked lit crown tops, one connected navy shadow glaze across the woods), grass gets a brighter lime base plus a green second wash with yellow patches left, and ink gets stronger (trail edges, trunks, branches), because a1 was olive, stamp-like and too yellow-pale in the grass compared with the target."
+  },
+  "sargent": {
+   "strokes": 213,
+   "minutes": 5.3,
+   "smallShare": 0.268,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.041,
+   "images": {
+    "final": "sargent.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 5.12,
+    "pm": 0.2,
+    "complete": true,
+    "classic": 6.56,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 4,
+     "marks_texture": 2.33,
+     "classic_value": 5.19,
+     "classic_edge": 5.37,
+     "classic_landmark": null,
+     "classic_marks": 9.11
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 5
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 4,
+     "50": 5,
+     "75": 5,
+     "100": 5
+    },
+    "earlyMean": 4.5,
+    "mean": 4.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable watercolor build-up — pale first tint, wet-edged hull block-in, then darks and finally rigging and chain details — with only the slightly even blue hull slab at 25% as a minor tell."
+    }
+   },
+   "painterNote": "Invert the value structure to match the target: the hull becomes one connected mid-blue wash (charged darker wet-in-wet at its turns, paler upper-middle) against a pale cream background, and the polygon sweeps and blocky darks become feathered curved strokes, because attempt 1's pale hull on a blue background lost the bow's form and read as stripes and slabs."
+  },
+  "south-france": {
+   "strokes": 1682,
+   "minutes": 11,
+   "smallShare": 0.316,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": 0.0232,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 6.12,
+    "pm": 0.12,
+    "complete": true,
+    "classic": 7.57,
+    "criteria": {
+     "composition_values": 6.33,
+     "edges_detail": 4.33,
+     "marks_texture": 4,
+     "classic_value": 4.59,
+     "classic_edge": 8.8,
+     "classic_landmark": null,
+     "classic_marks": 9.31
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 2,
+     "50": 3,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 2.5,
+    "mean": 3.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "g": 1,
+     "c": 1,
+     "d": 1,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The loose-to-fitting, light-to-dark progression is broadly painterly, but the straight wash front at 10%, the scattered flat roof-coloured slabs arriving before any building form at 25%, and the lone near-finished building amid untouched blobs at 50% read as generated rather than brushed."
+    }
+   },
+   "painterNote": "Trees as individual lobed crowns (light yellow-green body, shadow crescent lower-right, dark gaps under them) placed back to front instead of one dot per coarse cell; the pine redrawn as a bright compound crown at x~85 with a visible trunk and branches instead of dark stripes; corrected house/cypress positions, stronger roofs and darker ink, because a1 read as a flat olive grid with a striped fore"
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 5.5,
+  "partialComposite": null,
+  "pm": null,
+  "cropsScored": 3,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.5,
+   "level": "medium",
+   "basis": "highest crop"
+  },
+  "progressionRisk": {
+   "score": 0.5,
+   "level": "medium"
+  },
+  "review": null
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

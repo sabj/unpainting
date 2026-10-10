@@ -1,0 +1,14 @@
+[
+  "--paints",
+  "ochre,rawsienna,sienna,paynes",
+  "--openingpressure",
+  "0.30",
+  "--closingpressure",
+  "0.38",
+  "--drawwant",
+  "0.75",
+  "--drawstroke",
+  "0.30",
+  "--touchgain",
+  "0.35"
+]

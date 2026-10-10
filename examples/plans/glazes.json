@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "id": "glazes",
+  "title": "Three dried glazes",
+  "source": {
+    "note": "Three overlapping bands, each dried before the next."
+  },
+  "paperRGB": [
+    246,
+    245,
+    239
+  ],
+  "paper": {
+    "fibres": 0.32,
+    "tooth": 0.3,
+    "coldPress": {
+      "bumpMm": [
+        0.5,
+        1.6
+      ],
+      "cover": 2.2,
+      "swell": 0.15
+    }
+  },
+  "paperSeed": 17,
+  "grid": {
+    "w": 240,
+    "h": 200,
+    "mmPerCell": 0.125
+  },
+  "palette": [
+    "hansa",
+    "rose",
+    "ultramarine"
+  ],
+  "commands": [
+    {
+      "id": "hansa",
+      "operation": "stroke",
+      "requiredPaper": "dry",
+      "role": "paint",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 12,
+        "orientation": "follow"
+      },
+      "load": {
+        "capacityMm3": 160,
+        "waterQuantityMm3": 112,
+        "concentration": {
+          "hansa": 0.45
+        }
+      },
+      "paths": [
+        [
+          {
+            "x": 0.3,
+            "y": 0.1,
+            "p": 0.85,
+            "rMm": 6.0
+          },
+          {
+            "x": 0.3,
+            "y": 0.9,
+            "p": 0.85,
+            "rMm": 6.0
+          }
+        ]
+      ]
+    },
+    {
+      "id": "dry-0",
+      "operation": "dry"
+    },
+    {
+      "id": "rose",
+      "operation": "stroke",
+      "requiredPaper": "dry",
+      "role": "paint",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 12,
+        "orientation": "follow"
+      },
+      "load": {
+        "capacityMm3": 160,
+        "waterQuantityMm3": 112,
+        "concentration": {
+          "rose": 0.45
+        }
+      },
+      "paths": [
+        [
+          {
+            "x": 0.5,
+            "y": 0.1,
+            "p": 0.85,
+            "rMm": 6.0
+          },
+          {
+            "x": 0.5,
+            "y": 0.9,
+            "p": 0.85,
+            "rMm": 6.0
+          }
+        ]
+      ]
+    },
+    {
+      "id": "dry-1",
+      "operation": "dry"
+    },
+    {
+      "id": "ultramarine",
+      "operation": "stroke",
+      "requiredPaper": "dry",
+      "role": "paint",
+      "brush": {
+        "kind": "flat",
+        "widthMm": 12,
+        "orientation": "follow"
+      },
+      "load": {
+        "capacityMm3": 160,
+        "waterQuantityMm3": 112,
+        "concentration": {
+          "ultramarine": 0.45
+        }
+      },
+      "paths": [
+        [
+          {
+            "x": 0.7,
+            "y": 0.1,
+            "p": 0.85,
+            "rMm": 6.0
+          },
+          {
+            "x": 0.7,
+            "y": 0.9,
+            "p": 0.85,
+            "rMm": 6.0
+          }
+        ]
+      ]
+    },
+    {
+      "id": "dry-2",
+      "operation": "dry"
+    }
+  ]
+}

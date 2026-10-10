@@ -1,0 +1,17 @@
+{"t": "2026-10-09 18:57:26 PDT", "kind": "start", "modelMinutes": 9.92, "variant": "region_w13_lay2_dk11", "renderKey": "dd3b4a06242692c8892b267d1bf375c51f58176362ef2f8ac543e9944dd912bb"}
+{"t": "2026-10-09 19:00:36 PDT", "kind": "look", "modelMinutes": 10.27, "n": 1, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 42}
+{"t": "2026-10-09 19:30:00 PDT", "kind": "revise-refused", "modelMinutes": 12.59, "boundary": "0", "strokes": 0, "changed": ["extra-args.json"], "reasons": ["palette change"], "palette": {"now": {"palette": ["cerulean blue", "quinacridone rose", "hansa yellow", "cerulean blue, granulating, for the sky"], "inks": ["graphite=graphite HB", "ink=sepia ink"]}, "revised": {"palette": ["French ultramarine", "cerulean blue", "yellow ochre", "burnt sienna", "sepia"], "inks": ["graphite=graphite HB", "ink=sepia ink"]}}}
+{"t": "2026-10-09 19:47:38 PDT", "kind": "revise", "modelMinutes": 13.34, "boundary": "0", "revision": 1, "strokes": 0, "passesDone": 0, "changed": ["config.json"], "variant": "region_w13_lay2_dk11"}
+{"t": "2026-10-09 19:50:56 PDT", "kind": "look", "modelMinutes": 13.47, "n": 2, "boundary": "1", "strokes": 70, "penLines": 0, "passesDone": 1, "passesPlanned": 42}
+{"t": "2026-10-09 19:51:11 PDT", "kind": "continue", "modelMinutes": 13.71, "boundary": "1", "stopAt": 3, "strokes": 70}
+{"t": "2026-10-09 19:52:11 PDT", "kind": "look", "modelMinutes": 13.72, "n": 3, "boundary": "3", "strokes": 283, "penLines": 0, "passesDone": 3, "passesPlanned": 42}
+{"t": "2026-10-09 19:52:22 PDT", "kind": "continue", "modelMinutes": 13.91, "boundary": "3", "stopAt": 11, "strokes": 283}
+{"t": "2026-10-09 19:56:08 PDT", "kind": "look", "modelMinutes": 14.0, "n": 4, "boundary": "11", "strokes": 1096, "penLines": 0, "passesDone": 11, "passesPlanned": 42}
+{"t": "2026-10-09 19:56:19 PDT", "kind": "continue", "modelMinutes": 14.19, "boundary": "11", "stopAt": 33, "strokes": 1096}
+{"t": "2026-10-09 20:03:52 PDT", "kind": "look", "modelMinutes": 14.36, "n": 5, "boundary": "33", "strokes": 2824, "penLines": 0, "passesDone": 33, "passesPlanned": 42}
+{"t": "2026-10-09 20:04:03 PDT", "kind": "continue", "modelMinutes": 14.55, "boundary": "33", "stopAt": 42, "strokes": 2824}
+{"t": "2026-10-09 20:07:33 PDT", "kind": "look", "modelMinutes": 14.67, "n": 6, "boundary": "43", "strokes": 4059, "penLines": 0, "passesDone": 43, "passesPlanned": 47}
+{"t": "2026-10-09 20:07:47 PDT", "kind": "continue", "modelMinutes": 14.89, "boundary": "43", "stopAt": "end", "strokes": 4059}
+{"t": "2026-10-09 20:11:13 PDT", "kind": "finished", "modelMinutes": 14.97, "strokes": 6864}
+{"t": "2026-10-09 20:11:16 PDT", "kind": "look", "modelMinutes": 15.01, "n": 7, "boundary": "final"}
+{"t": "2026-10-09 20:16:14 PDT", "kind": "session-end", "modelMinutes": 19.98, "why": "the painting finished five minutes ago", "looks": 7, "revisions": 1}

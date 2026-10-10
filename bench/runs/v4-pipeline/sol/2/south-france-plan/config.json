@@ -1,0 +1,154 @@
+{
+  "subject": "SF",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Requested pen plus light wash: roof junctions, wall corners, narrow cypresses and branching trunks carry structure in fine black ink; connected transparent green and ochre washes carry the hillside values.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "SF.focal-houses",
+      "bounds": [
+        0.66,
+        0.33,
+        0.97,
+        0.81
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The right-hand stepped group has terracotta roofs, pale ochre sunlit walls, cool left faces and dark openings. Architecture recipe: opening structure, connected light wall planes, dry, cross-plane shadow glaze, selective closing junctions."
+    },
+    {
+      "id": "SF.upper-village",
+      "bounds": [
+        0.39,
+        0,
+        0.78,
+        0.23
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small distant village roofs and lavender shaded walls above the canopy: pale planar wash and fewer, lighter structural pen lines; omit masonry texture."
+    },
+    {
+      "id": "SF.terraces",
+      "bounds": [
+        0,
+        0.03,
+        0.36,
+        0.46
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad golden terrace walls and pale paths at upper left; connected watery ochre wash, protected sun flecks, sparse wall junctions in ink."
+    },
+    {
+      "id": "SF.central-canopies",
+      "bounds": [
+        0.04,
+        0.21,
+        0.68,
+        0.69
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Interlocking olive and yellow-green crowns have broad irregular masses and connected deep green shadow groups. Foliage recipe: pale connected mass, full dry, coherent shadow glaze; no leaf dots or complete canopy outlines."
+    },
+    {
+      "id": "SF.foreground-tree",
+      "bounds": [
+        0.14,
+        0.55,
+        0.49,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large yellow-green foreground crown with a dark tapering trunk and spreading branches. Light mass and dry shadow groups; line-scale trunk and branches in directional black pen, no leaf stipple."
+    },
+    {
+      "id": "SF.cypresses",
+      "bounds": [
+        0.25,
+        0,
+        0.45,
+        0.36
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall narrow dark cypress silhouettes anchor the village and overlap terraces. Pale green foundation, dry connected blue-green shadow shape, few tapered structural lines; preserve the neighboring golden wall."
+    },
+    {
+      "id": "SF.distant-slope",
+      "bounds": [
+        0.78,
+        0,
+        1,
+        0.31
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Upper right distance is blue-grey hill and subdued small green crowns, with no sky. One pale continuous cool wash; softer low contrast edges and little pen detail."
+    },
+    {
+      "id": "SF.foreground-ground",
+      "bounds": [
+        0.4,
+        0.66,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broken golden paths and pale stone gaps weave between foreground olive crowns. Thin warm ground wash, paper glints, and a dry shadow glaze crossing ground and vegetation at tree feet."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Bare-paper small sun glint on the right roof ridge; neighboring tile planes receive the light warm wash",
+      "bounds": [
+        0.88816,
+        0.35944,
+        0.89474,
+        0.36546
+      ]
+    },
+    {
+      "reason": "Bare-paper small lit stone fleck in the left terrace wall",
+      "bounds": [
+        0.33553,
+        0.40161,
+        0.34211,
+        0.41365
+      ]
+    },
+    {
+      "reason": "Bare-paper pinpoint light within the focal house sunlit wall; surrounding wall remains a pale painted plane",
+      "bounds": [
+        0.76316,
+        0.43775,
+        0.76974,
+        0.4498
+      ]
+    },
+    {
+      "reason": "Bare-paper small sunlit foreground facade fleck beside the dark openings",
+      "bounds": [
+        0.9144736842105263,
+        0.7028112449799196,
+        0.9210526315789473,
+        0.7108433734939759
+      ]
+    },
+    {
+      "reason": "Bare-paper pale path glint between foreground crowns",
+      "bounds": [
+        0.63816,
+        0.6506,
+        0.64474,
+        0.65863
+      ]
+    },
+    {
+      "reason": "Bare-paper narrow lower path stone glint; surrounding ground receives a thin ochre wash",
+      "bounds": [
+        0.4375,
+        0.8996,
+        0.44408,
+        0.90763
+      ]
+    }
+  ]
+}

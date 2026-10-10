@@ -1,0 +1,421 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "luna",
+  "name": "Codex Luna",
+  "id": "gpt-6-luna",
+  "effort": "xhigh",
+  "runner": "codex"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 32.2,
+  "tokens": 8661845,
+  "costUSD": null,
+  "estCostUSD": 0.141,
+  "usage": {
+   "input": 232836,
+   "cachedInput": 8359936,
+   "output": 69073
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 75,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 66,
+   "dotStrokes": 0,
+   "copyHF": -0.0099,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "score": {
+    "composite": 3.34,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 1.33,
+    "classic": 5.35,
+    "criteria": {
+     "composition_values": 1.33,
+     "edges_detail": 1.33,
+     "marks_texture": 4,
+     "classic_value": 3.87,
+     "classic_edge": 4.25,
+     "classic_landmark": null,
+     "classic_marks": 7.94
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 2,
+    "mean": 2,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "b": 5,
+     "i": 5,
+     "c": 5,
+     "m": 5,
+     "f": 5
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence just accumulates repeated scallop-edged leaf stamps with cut, notched contours that never block in the target's hillside, path or tree masses, and the 100% panel is a finished abstract pattern on bare paper rather than the target image.",
+     "Qwen/Qwen3.5-9B": "The sequence shows digital flat shapes appearing rather than brushwork painting the target landscape."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 94,
+   "minutes": 0.4,
+   "smallShare": 0.103,
+   "shortStrokes": 52,
+   "dotStrokes": 0,
+   "copyHF": 0.0063,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "score": {
+    "composite": 4.42,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 5.51,
+    "criteria": {
+     "composition_values": 4,
+     "edges_detail": 2.33,
+     "marks_texture": 4.33,
+     "classic_value": 3.59,
+     "classic_edge": 4.36,
+     "classic_landmark": null,
+     "classic_marks": 8.59
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 4
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2.5,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 2.25,
+    "mean": 2.1,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "i": 4,
+     "f": 3,
+     "h": 1,
+     "a": 2,
+     "b": 2,
+     "c": 8,
+     "j": 4,
+     "g": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Roof slabs arrive coloured before any walls or pen lines exist, foliage is scattered as repeated scalloped triangular dabs rather than drawn forms, and the 10% and 25% panels are virtually unchanged, reading as procedural stamping rather than a painter's sequence.",
+     "Qwen/Qwen3.5-9B": "The sequence reveals AI-generated flat color slabs and uniform texture dumps appearing in a mechanical sequence rather than organic brushwork."
+    }
+   },
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 54,
+   "minutes": 0.1,
+   "smallShare": 0.704,
+   "shortStrokes": 19,
+   "dotStrokes": 15,
+   "copyHF": 0.0014,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "score": {
+    "composite": 3.66,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 4.98,
+    "criteria": {
+     "composition_values": 2,
+     "edges_detail": 1.33,
+     "marks_texture": 4,
+     "classic_value": 4.1,
+     "classic_edge": 3.07,
+     "classic_landmark": null,
+     "classic_marks": 7.77
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 1.5
+    },
+    "earlyMean": 1.75,
+    "mean": 1.6,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "c": 2,
+     "f": 2,
+     "d": 1,
+     "h": 5,
+     "a": 3,
+     "i": 3,
+     "l": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The strokes never converge on the target boat: flat crescent slabs and a finished green wash are already present at 10%, later snapshots only add scattered speckle dots, and the 100% panel remains an unrelated abstraction rather than the subject.",
+     "Qwen/Qwen3.5-9B": "The sequence displays identical static images with no visible progression of strokes."
+    }
+   },
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 84,
+   "minutes": 0.1,
+   "smallShare": 0.321,
+   "shortStrokes": 20,
+   "dotStrokes": 1,
+   "copyHF": -0.0337,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "score": {
+    "composite": 3.47,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 4.61,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 1.67,
+     "marks_texture": 2.67,
+     "classic_value": 2.99,
+     "classic_edge": 2.83,
+     "classic_landmark": null,
+     "classic_marks": 8.02
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 2,
+    "mean": 2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 5,
+     "f": 1,
+     "h": 1,
+     "c": 3,
+     "i": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The facade is built from identical scalloped dab-chain washes that ignore the architecture, the 25% stage shows no progress, and details arrive in batches, reading as an automated stroke reveal rather than brush work."
+    }
+   },
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 112,
+   "minutes": 0.1,
+   "smallShare": 0.447,
+   "shortStrokes": 32,
+   "dotStrokes": 0,
+   "copyHF": -0.0104,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "changes": null,
+   "score": {
+    "composite": 3.83,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 5.33,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 2.67,
+     "classic_value": 3.71,
+     "classic_edge": 3.37,
+     "classic_landmark": null,
+     "classic_marks": 8.9
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 2,
+     "50": 2,
+     "75": 3,
+     "100": 2
+    },
+    "earlyMean": 2.5,
+    "mean": 2.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "c": 4,
+     "j": 2,
+     "b": 1,
+     "f": 1,
+     "h": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sketch-to-wash-to-detail sequence is superficially human, but the flat pink face slab, the checkered pattern dumped onto the hat, angular cut-out cat patches, stalled stages with almost no change, and a 100% frame that never reaches the target's dark hair or cat body betray a digital region-fill reveal rather than brushwork."
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ]
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 3.74,
+  "partialComposite": null,
+  "pm": 0.05,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.28,
+   "level": "low",
+   "parts": {
+    "progression": 0.7,
+    "earlyStageMean": 2.1,
+    "copyHF": {
+     "hills": -0.0099,
+     "south-france": 0.0063,
+     "sargent": 0.0014,
+     "trumbull": -0.0337,
+     "mittens": -0.0104
+    },
+    "copy": 0,
+    "smallStrokeShare": 0.315,
+    "small": 0.03,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.36,
+   "level": "medium"
+  },
+  "review": null
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

@@ -1,0 +1,12 @@
+[
+  "--paints",
+  "ochre,rawsienna,sienna,ultramarine,sepia,paynes",
+  "--openingpressure",
+  "0.24",
+  "--openingminmm",
+  "1.5",
+  "--closingpressure",
+  "0.46",
+  "--drawwant",
+  "0.8"
+]

@@ -1,0 +1,53 @@
+{
+  "subject": "BENCHMITTENS",
+  "name": "Mittens portrait crop, V5 try 2",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is a light portrait sketch: connected pale washes carry the large forms, while dry, selective sepia lines carry the eyes, whiskers and curl accents.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat",
+      "bounds": [0.0, 0.0, 0.53, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The cropped ginger-and-white tabby on the left: broad warm forehead and cheek planes, upright ears, pale blaze and muzzle, with fur direction running out from the nose."
+    },
+    {
+      "id": "mittens.hair",
+      "bounds": [0.51, 0.02, 1.0, 0.43],
+      "baseMove": "wet on dry",
+      "referenceCue": "One irregular charcoal-grey curl mass, darkest inside and broken at its soft outer edge; leave selected paper flecks and keep the forehead boundary clean."
+    },
+    {
+      "id": "mittens.face",
+      "bounds": [0.53, 0.22, 1.0, 0.79],
+      "baseMove": "wet on dry",
+      "referenceCue": "The person's pale face: broad forehead and cheek planes, eye sockets and brows, a narrow nose turn, and a lightly drawn mouth; soften only the turning cheek edge."
+    },
+    {
+      "id": "mittens.paper",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "The open white sheet around the portrait and the near-white fur and skin. Leave the background bare and let the cropped edges vignette into paper."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Bare-paper glint in the cat's far eye.",
+      "bounds": [0.093, 0.309, 0.108, 0.324]
+    },
+    {
+      "reason": "Bare-paper glint in the cat's near eye.",
+      "bounds": [0.261, 0.220, 0.274, 0.235]
+    },
+    {
+      "reason": "Bare-paper glint in the person's left eye.",
+      "bounds": [0.686, 0.638, 0.700, 0.654]
+    },
+    {
+      "reason": "Bare-paper glint in the person's right eye.",
+      "bounds": [0.895, 0.657, 0.909, 0.673]
+    }
+  ]
+}

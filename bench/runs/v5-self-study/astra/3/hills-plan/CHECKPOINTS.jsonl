@@ -1,0 +1,16 @@
+{"t": "2026-10-09 18:41:33 PDT", "kind": "start", "modelMinutes": 8.18, "variant": "region_w15_lay0_sep3_dwg100_dk11_cg10_ms240_noslane_lf", "renderKey": "616159112d49507d67f30c997aafcb7c350406358734cd4fbfd226432e6b6bdf"}
+{"t": "2026-10-09 18:46:23 PDT", "kind": "look", "modelMinutes": 8.8, "n": 1, "boundary": "0", "strokes": 0, "penLines": 8, "passesDone": 0, "passesPlanned": 118}
+{"t": "2026-10-09 18:46:28 PDT", "kind": "continue", "modelMinutes": 8.89, "boundary": "0", "stopAt": 4, "strokes": 0}
+{"t": "2026-10-09 18:48:48 PDT", "kind": "restart", "modelMinutes": 10.29, "n": 1}
+{"t": "2026-10-09 19:10:41 PDT", "kind": "start", "modelMinutes": 11.34, "variant": "region_w15_lay0_sep3_dwg100_dk11_cg10_ms240_noslane_lf", "renderKey": "75f36ac2e1cf6b78c581f73342c4de14954d19a2ce6b6cc46a55e142b5c37197"}
+{"t": "2026-10-09 19:13:30 PDT", "kind": "continue", "modelMinutes": 11.75, "boundary": "0", "stopAt": 4, "strokes": 0}
+{"t": "2026-10-09 19:15:15 PDT", "kind": "look", "modelMinutes": 11.88, "n": 2, "boundary": "4", "strokes": 232, "penLines": 8, "passesDone": 4, "passesPlanned": 118}
+{"t": "2026-10-09 19:15:29 PDT", "kind": "continue", "modelMinutes": 12.13, "boundary": "4", "stopAt": 16, "strokes": 232}
+{"t": "2026-10-09 19:19:54 PDT", "kind": "look", "modelMinutes": 12.31, "n": 3, "boundary": "16", "strokes": 898, "penLines": 8, "passesDone": 16, "passesPlanned": 118}
+{"t": "2026-10-09 19:45:36 PDT", "kind": "revise", "modelMinutes": 16.83, "boundary": "16", "revision": 1, "strokes": 898, "passesDone": 16, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w15_lay0_sep3_dwg100_dk11_cg10_ms240_noslane_lf_spl3_wre6"}
+{"t": "2026-10-09 20:07:12 PDT", "kind": "look", "modelMinutes": 17.49, "n": 4, "boundary": "59", "strokes": 4797, "penLines": 8, "passesDone": 59, "passesPlanned": 118}
+{"t": "2026-10-09 20:24:01 PDT", "kind": "revise", "modelMinutes": 19.49, "boundary": "59", "revision": 2, "strokes": 4797, "passesDone": 59, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w15_lay0_sep3_dwg100_dk11_cg10_ms240_noslane_lf"}
+{"t": "2026-10-09 20:57:29 PDT", "kind": "look", "modelMinutes": 20.59, "n": 5, "boundary": "closing", "strokes": 9224, "penLines": 8, "passesDone": 118, "passesPlanned": 118}
+{"t": "2026-10-09 20:58:03 PDT", "kind": "continue", "modelMinutes": 21.16, "boundary": "closing", "stopAt": "end", "strokes": 9224}
+{"t": "2026-10-09 21:00:26 PDT", "kind": "finished", "modelMinutes": 21.23, "strokes": 9224}
+{"t": "2026-10-09 21:00:36 PDT", "kind": "session-end", "modelMinutes": 21.39, "why": "you ended the session", "looks": 5, "revisions": 2}

@@ -1,0 +1,8 @@
+{
+ "note": "The V3 session prompts. {N}, {PREV}, {TRIES}, {STROKES} and {MIN} are filled in by bench/scripts/v3.mjs. done is added when the model may end early.",
+ "attemptsExact": "This run has exactly {TRIES} attempts. After attempt 1 the harness shows you your painting next to the target and asks for attempt 2.",
+ "attemptsUpTo": "This run has up to {TRIES} attempts. After each attempt the harness shows you your painting next to the target and asks for the next one; you may instead declare the painting done.",
+ "first": "Read bench/BRIEF.md in this directory and do attempt 1 as it says. The target crop is attached. Work without asking questions; nobody will answer.",
+ "next": "Attempt {PREV} is over: {STROKES} strokes, {MIN} minutes. bench/attempts/a{PREV}/compare.png shows the target (left) next to your painting (right); open it and look. Earlier attempts (final.png, frames, scripts, stats) are in bench/attempts/. Now paint attempt {N} of {OF} on a fresh sheet with the same budget: 2,500 strokes and about 30 minutes (you are stopped at 30). You decide what to change. First write one line to bench/attempts/a{N}-changed.txt: what you are changing and why. Then paint, end with kit.finish, update bench/NOTES.md, and stop.",
+ "done": "\n\nIf you judge the painting done, and another attempt would not make it better, do not paint: write one line to bench/DONE saying why, and stop."
+}

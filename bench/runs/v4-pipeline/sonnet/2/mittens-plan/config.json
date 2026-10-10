@@ -1,0 +1,22 @@
+{"subject":"mittens","name":"Mittens (private)",
+ "styleSelection":{"style":"precise-watercolor",
+   "reason":"light washes on mostly bare paper: value planes carry the cat and the face, fine lines draw the eyes, whiskers, nose and mouth, a dark slate hair mass is the one heavy value",
+   "regions":{}},
+ "families":[
+  {"id":"mittens.cat-head","bounds":[0,0,0.52,0.6],"baseMove":"wet on dry",
+   "referenceCue":"orange tabby head and ears: ochre and burnt sienna patches with hard ragged edges, white paper between them, pale green eyes under a dark upper lid, white muzzle"},
+  {"id":"mittens.cat-body","bounds":[0,0.58,0.55,1],"baseMove":"wet on dry",
+   "referenceCue":"cat chest and shoulder: a few broken vertical strokes of orange and brown on bare paper, a darker brown shoulder edge against the man's cheek"},
+  {"id":"mittens.hair","bounds":[0.5,0.18,1,0.55],"baseMove":"wet on dry",
+   "referenceCue":"curly hair as one slate blue-grey mass, ragged dry-edged tufts, darkest at the temple and at the left, lighter grey interior, paper flecks"},
+  {"id":"mittens.hair-side","bounds":[0.84,0.5,1,0.8],"baseMove":"wet on dry",
+   "referenceCue":"hair continuing down the right temple as broken slate-grey strokes with paper between them"},
+  {"id":"mittens.face","bounds":[0.5,0.43,0.9,1],"baseMove":"wet on dry",
+   "referenceCue":"young man's face: nearly bare paper forehead and cheeks, a pale sepia wash on the shadow side and under the brows, dark brows and lids, soft stubble wash around the mouth"}
+ ],
+ "reserves":[
+  {"reason":"catchlight in the cat's large eye","bounds":[0.265,0.2124,0.2733,0.222]},
+  {"reason":"catchlight in the cat's small eye","bounds":[0.085,0.2413,0.0933,0.251]},
+  {"reason":"catchlight in the man's left eye","bounds":[0.6,0.7154,0.6083,0.724]},
+  {"reason":"catchlight in the man's right eye","bounds":[0.8077,0.6788,0.8167,0.6885]}
+ ]}

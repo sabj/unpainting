@@ -1,0 +1,165 @@
+{
+ "subject": "Y1",
+ "name": "Trumbull College corner, precise architectural watercolor (V5 try 3)",
+ "styleSelection": {
+  "style": "precise-watercolor",
+  "reason": "Requested precise architectural watercolor: a light graphite lay-in, painted value planes carry the stone masses, dark window glass painted over the wall wash, dry focal detail and selective closing ink on the hard lines the target shows. One style for every family so no style boundary cuts the facade washes.",
+  "regions": {}
+ },
+ "families": [
+  {
+   "id": "Y1.sky",
+   "bounds": [
+    0,
+    0,
+    1,
+    0.3
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Pale blue sky graded from deeper cerulean-ultramarine at top left to near paper at the right, soft white cumulus top right; laid as one connected granulating wet passage of overlapping lanes (base sky lanes), hard edge only where it meets the roofline. Not a family wet-on-wet: the blue colour cluster also holds window glass, which must stay dry."
+  },
+  {
+   "id": "Y1.roof-main",
+   "bounds": [
+    0.29,
+    0.02,
+    0.55,
+    0.21
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Blue-grey slate roof between the left tower and the gable; one cool mid wash, darker along the eave."
+  },
+  {
+   "id": "Y1.roof-right",
+   "bounds": [
+    0.69,
+    0.19,
+    1,
+    0.34
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Distant blue-grey slate roofs behind the right tower; pale cool wash, softer and lighter than the main roof."
+  },
+  {
+   "id": "Y1.roof-low",
+   "bounds": [
+    0.74,
+    0.62,
+    0.94,
+    0.7
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Low pale grey roof over the right wing, lit top plane, darker eave line."
+  },
+  {
+   "id": "Y1.gable-front",
+   "bounds": [
+    0.41,
+    0,
+    0.69,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Sunlit gable front, the focal plane: warm pale ochre stone, broad connected wash, sparse irregular block hints, lancet and arched windows dark blue glass."
+  },
+  {
+   "id": "Y1.shade-wing",
+   "bounds": [
+    0.27,
+    0.12,
+    0.42,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Main block's left face and the tower's shadow side: same stone in half-shade, a violet-umber shadow glaze over the local colour, deeper in the recesses."
+  },
+  {
+   "id": "Y1.left-range",
+   "bounds": [
+    0,
+    0.15,
+    0.29,
+    0.93
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Left range and tower: warm stone in part shade, gabled roofline, mullioned windows as dark glass with pale frames."
+  },
+  {
+   "id": "Y1.left-tower-top",
+   "bounds": [
+    0.15,
+    0,
+    0.29,
+    0.15
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Upper left tower against the sky, lit stone with a shaded right flank and dark slit openings."
+  },
+  {
+   "id": "Y1.right-range",
+   "bounds": [
+    0.69,
+    0.08,
+    1,
+    0.94
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Right range and square tower: lit warm stone, crenellated top against the sky, mullioned windows dark glass with pale frames."
+  },
+  {
+   "id": "Y1.tree-right",
+   "bounds": [
+    0.62,
+    0.63,
+    0.77,
+    0.97
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Young street tree, yellow-green canopy lit from the left, a darker green shadow side and a thin trunk; one irregular canopy mass."
+  },
+  {
+   "id": "Y1.trees-left",
+   "bounds": [
+    0,
+    0.5,
+    0.25,
+    0.97
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Muted olive shrubs and small trees at the left base, soft against the stone, darker at the ground."
+  },
+  {
+   "id": "Y1.street",
+   "bounds": [
+    0,
+    0.93,
+    1,
+    1
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Street level: grey pavement, passers-by in light clothes, a cool violet-grey ground glaze."
+  },
+  {
+   "id": "Y1.signs",
+   "bounds": [
+    0.37,
+    0.56,
+    0.45,
+    0.74
+   ],
+   "baseMove": "wet on dry",
+   "referenceCue": "Navy street sign panels with small white lettering on a thin grey pole: darkest accents near the focal corner."
+  }
+ ],
+ "reserves": [
+  {
+   "reason": "Brightest white cumulus at the top right corner of the sky stays paper",
+   "bounds": [
+    0.94,
+    0.01,
+    0.985,
+    0.05
+   ]
+  }
+ ]
+}

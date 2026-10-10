@@ -1,0 +1,18 @@
+{"t": "2026-10-09 19:42:54 PDT", "kind": "start", "modelMinutes": 12.83, "variant": "region_w13_blk15_bka12_sep4_dwg100", "renderKey": "79bb4d3ed219e578631e95e1425e2ed703efe4aa6fb73edbb0d2aee37f74c768"}
+{"t": "2026-10-09 19:45:36 PDT", "kind": "look", "modelMinutes": 12.93, "n": 1, "boundary": "0", "strokes": 0, "penLines": 29, "passesDone": 0, "passesPlanned": 81}
+{"t": "2026-10-09 19:45:57 PDT", "kind": "continue", "modelMinutes": 13.29, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 19:46:44 PDT", "kind": "look", "modelMinutes": 13.31, "n": 2, "boundary": "1", "strokes": 8, "penLines": 29, "passesDone": 1, "passesPlanned": 81}
+{"t": "2026-10-09 19:47:06 PDT", "kind": "continue", "modelMinutes": 13.67, "boundary": "1", "stopAt": 16, "strokes": 8}
+{"t": "2026-10-09 19:53:30 PDT", "kind": "look", "modelMinutes": 13.76, "n": 3, "boundary": "16", "strokes": 919, "penLines": 29, "passesDone": 16, "passesPlanned": 81}
+{"t": "2026-10-09 19:53:45 PDT", "kind": "continue", "modelMinutes": 14.02, "boundary": "16", "stopAt": 64, "strokes": 919}
+{"t": "2026-10-09 20:10:32 PDT", "kind": "look", "modelMinutes": 14.34, "n": 4, "boundary": "64", "strokes": 3298, "penLines": 29, "passesDone": 64, "passesPlanned": 81}
+{"t": "2026-10-09 20:10:56 PDT", "kind": "continue", "modelMinutes": 14.75, "boundary": "64", "stopAt": 80, "strokes": 3298}
+{"t": "2026-10-09 20:27:22 PDT", "kind": "look", "modelMinutes": 15.11, "n": 5, "boundary": "80", "strokes": 5763, "penLines": 29, "passesDone": 80, "passesPlanned": 81}
+{"t": "2026-10-09 20:27:34 PDT", "kind": "continue", "modelMinutes": 15.31, "boundary": "80", "stopAt": 81, "strokes": 5763}
+{"t": "2026-10-09 20:28:24 PDT", "kind": "look", "modelMinutes": 15.35, "n": 6, "boundary": "82", "strokes": 6413, "penLines": 29, "passesDone": 82, "passesPlanned": 90}
+{"t": "2026-10-09 20:28:33 PDT", "kind": "continue", "modelMinutes": 15.5, "boundary": "82", "stopAt": "closing", "strokes": 6413}
+{"t": "2026-10-09 20:38:13 PDT", "kind": "look", "modelMinutes": 15.81, "n": 7, "boundary": "closing", "strokes": 14230, "penLines": 29, "passesDone": 98, "passesPlanned": 98}
+{"t": "2026-10-09 20:38:29 PDT", "kind": "continue", "modelMinutes": 16.08, "boundary": "closing", "stopAt": "end", "strokes": 14230}
+{"t": "2026-10-09 20:40:23 PDT", "kind": "finished", "modelMinutes": 16.1, "strokes": 14230}
+{"t": "2026-10-09 20:40:28 PDT", "kind": "look", "modelMinutes": 16.18, "n": 8, "boundary": "final"}
+{"t": "2026-10-09 20:40:44 PDT", "kind": "session-end", "modelMinutes": 16.44, "why": "you ended the session", "looks": 8, "revisions": 0}

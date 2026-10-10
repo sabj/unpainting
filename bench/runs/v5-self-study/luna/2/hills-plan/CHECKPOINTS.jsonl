@@ -1,0 +1,20 @@
+{"t": "2026-10-09 17:22:35 PDT", "kind": "start", "modelMinutes": 8.07, "variant": "region_w15_lay2_dk10_cg10_ls30_sep4_ink3_dwg100", "renderKey": "c15456e2c753baba20df836f6e80a5909424c8b0bf6da258dd32457cf988ac77"}
+{"t": "2026-10-09 19:18:15 PDT", "kind": "look", "modelMinutes": 15.17, "n": 1, "boundary": "0", "strokes": 0, "penLines": 9, "passesDone": 0, "passesPlanned": 73}
+{"t": "2026-10-09 19:19:23 PDT", "kind": "continue", "modelMinutes": 16.3, "boundary": "0", "stopAt": 1, "strokes": 0}
+{"t": "2026-10-09 19:20:37 PDT", "kind": "look", "modelMinutes": 16.35, "n": 2, "boundary": "1", "strokes": 110, "penLines": 9, "passesDone": 1, "passesPlanned": 73}
+{"t": "2026-10-09 19:20:58 PDT", "kind": "continue", "modelMinutes": 16.7, "boundary": "1", "stopAt": 10, "strokes": 110}
+{"t": "2026-10-09 19:25:29 PDT", "kind": "look", "modelMinutes": 16.91, "n": 3, "boundary": "10", "strokes": 649, "penLines": 9, "passesDone": 10, "passesPlanned": 73}
+{"t": "2026-10-09 19:25:53 PDT", "kind": "continue", "modelMinutes": 17.3, "boundary": "10", "stopAt": 25, "strokes": 649}
+{"t": "2026-10-09 19:33:10 PDT", "kind": "look", "modelMinutes": 17.51, "n": 4, "boundary": "25", "strokes": 1664, "penLines": 9, "passesDone": 25, "passesPlanned": 73}
+{"t": "2026-10-09 19:33:20 PDT", "kind": "continue", "modelMinutes": 17.67, "boundary": "25", "stopAt": 48, "strokes": 1664}
+{"t": "2026-10-09 19:37:33 PDT", "kind": "machine-lost", "modelMinutes": 17.76, "n": 1, "why": "never ran: box ended while the job waited"}
+{"t": "2026-10-09 19:42:24 PDT", "kind": "look", "modelMinutes": 18.03, "n": 5, "boundary": "0", "strokes": 0, "penLines": 9, "passesDone": 0, "passesPlanned": 73}
+{"t": "2026-10-09 19:42:25 PDT", "kind": "continue", "modelMinutes": 18.04, "boundary": "0", "stopAt": 48, "strokes": 0}
+{"t": "2026-10-09 20:00:40 PDT", "kind": "look", "modelMinutes": 18.46, "n": 6, "boundary": "48", "strokes": 3086, "penLines": 9, "passesDone": 48, "passesPlanned": 73}
+{"t": "2026-10-09 20:14:15 PDT", "kind": "revise", "modelMinutes": 22.06, "boundary": "48", "revision": 1, "strokes": 3086, "passesDone": 48, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w15_lay2_dk7_cg7_ls30_sep4_ink3_dwg100"}
+{"t": "2026-10-09 20:19:00 PDT", "kind": "machine-lost", "modelMinutes": 25.3, "n": 2, "why": "infra: exit 1, None"}
+{"t": "2026-10-09 20:22:54 PDT", "kind": "look", "modelMinutes": 25.81, "n": 7, "boundary": "0", "strokes": 0, "penLines": 9, "passesDone": 0, "passesPlanned": 41}
+{"t": "2026-10-09 20:23:41 PDT", "kind": "continue", "modelMinutes": 26.6, "boundary": "0", "stopAt": "end", "strokes": 0}
+{"t": "2026-10-09 20:46:20 PDT", "kind": "finished", "modelMinutes": 27.53, "strokes": 6222}
+{"t": "2026-10-09 20:46:29 PDT", "kind": "look", "modelMinutes": 27.67, "n": 8, "boundary": "final"}
+{"t": "2026-10-09 20:46:54 PDT", "kind": "session-end", "modelMinutes": 28.09, "why": "you ended the session", "looks": 8, "revisions": 1}

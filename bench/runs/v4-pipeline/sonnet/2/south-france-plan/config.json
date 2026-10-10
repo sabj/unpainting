@@ -1,0 +1,31 @@
+{
+  "subject": "sf",
+  "name": "South France",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Requested urban sketch, pen plus light wash: the pen carries roofs, wall edges, windows, cypress contours and the pine's trunk and branches; pale flat washes with white paper kept in the lit stone and path, one shadow glaze for the foliage darks.",
+    "regions": {}
+  },
+  "families": [
+    {"id": "sf.houses-right", "bounds": [0.655, 0.33, 0.965, 0.82], "baseMove": "wet on dry",
+     "referenceCue": "Terracotta hip roofs, ochre and mauve-grey stone walls: flat pale planes, lit faces kept light, one connected shadow glaze across the wall faces; pen carries eaves, corners and windows."},
+    {"id": "sf.village-top", "bounds": [0.36, 0.0, 0.82, 0.27], "baseMove": "wet on dry",
+     "referenceCue": "Small stone houses stepping up the hill between dark cypress and olive: mauve wall, orange roof, pale ochre faces; kept small and dry."},
+    {"id": "sf.terrace-path", "bounds": [0.0, 0.04, 0.38, 0.43], "baseMove": "wet on dry",
+     "referenceCue": "Ochre sunlit path and terrace wall, pale and warm with paper showing; tall dark cypress columns standing on it."},
+    {"id": "sf.canopy-mid", "bounds": [0.38, 0.25, 0.68, 0.62], "baseMove": "wet on dry",
+     "referenceCue": "Dark grey-green olive and oak masses against paler lime tops; connected shapes, one dark glaze."},
+    {"id": "sf.pine-left", "bounds": [0.1, 0.5, 0.5, 1.0], "baseMove": "wet on dry",
+     "referenceCue": "Large pale yellow-green pine canopy with sparkling light gaps; dark trunk and rising branches drawn in pen."},
+    {"id": "sf.olive-left", "bounds": [0.0, 0.4, 0.2, 0.85], "baseMove": "wet on dry",
+     "referenceCue": "Grey-green olive trees with thin dark trunks over tan ground."},
+    {"id": "sf.foliage-lower-right", "bounds": [0.55, 0.62, 1.0, 1.0], "baseMove": "wet on dry",
+     "referenceCue": "Mid green olive tops, dark undersides, tan ground showing between."},
+    {"id": "sf.hills-far", "bounds": [0.8, 0.0, 1.0, 0.14], "baseMove": "wet on wet",
+     "referenceCue": "Distant blue-green hills, pale and soft."}
+  ],
+  "reserves": [
+    {"reason": "pale limestone rubble on the path, bare paper", "bounds": [0.448, 0.889, 0.498, 0.939]},
+    {"reason": "sunlit stones at the bottom edge", "bounds": [0.487, 0.962, 0.526, 0.994]}
+  ]
+}

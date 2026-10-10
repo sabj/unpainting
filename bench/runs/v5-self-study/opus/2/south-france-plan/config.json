@@ -1,0 +1,19 @@
+{"subject":"SF","name":"South France hillside village",
+ "styleSelection":{"style":"urban-sketch",
+   "reason":"Requested urban sketch: a confident black pen drawing carries the buildings, cypresses and the pine; pale local-colour washes from a six-paint earth/green box; lights left as paper where the target is near paper",
+   "regions":{}},
+ "families":[
+  {"id":"SF.village-focal","bounds":[0.66,0.33,0.975,0.82],"baseMove":"wet on dry","referenceCue":"three stone tower houses, terracotta roofs, violet-grey shadow sides, dark eaves and windows; focal point"},
+  {"id":"SF.village-upper","bounds":[0.39,0,0.79,0.23],"baseMove":"wet on dry","referenceCue":"upper village houses and cypresses, paler and smaller"},
+  {"id":"SF.distant-hills","bounds":[0.79,0,1,0.14],"baseMove":"wet on dry","referenceCue":"blue-green distant hills, palest and coolest"},
+  {"id":"SF.terraces","bounds":[0,0,0.38,0.44],"baseMove":"wet on dry","referenceCue":"sunlit ochre terraces and walls, the lightest plane"},
+  {"id":"SF.olive-slope","bounds":[0.35,0.23,0.66,0.86],"baseMove":"wet on dry","referenceCue":"grey-green olive and oak masses, darker shadow sides"},
+  {"id":"SF.pine-foreground","bounds":[0.04,0.5,0.48,1],"baseMove":"wet on dry","referenceCue":"yellow-green foreground pine with a dark trunk and branches"},
+  {"id":"SF.left-slope","bounds":[0,0.44,0.13,0.86],"baseMove":"wet on dry","referenceCue":"olive trees on ochre ground, small red roof below"},
+  {"id":"SF.lower-right","bounds":[0.48,0.82,1,1],"baseMove":"wet on dry","referenceCue":"foreground shrubs and the pale path"}
+ ],
+ "reserves":[
+  {"reason":"sunlit wall of the right tower below its string course (lit wall kept as paper)","bounds":[0.862,0.476,0.922,0.505]},
+  {"reason":"sunlit upper front of the lower tower, right of the round window","bounds":[0.895,0.61,0.94,0.66]},
+  {"reason":"pale path glint in the foreground","bounds":[0.51,0.95,0.54,0.995]}
+ ]}

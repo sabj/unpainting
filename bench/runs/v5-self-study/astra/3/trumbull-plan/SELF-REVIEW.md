@@ -1,0 +1,21 @@
+# Independent review of try 2
+
+Viewed the target/previous painting comparison and progress contact sheet before reading FEEDBACK.md.
+
+The silhouette, steep central gable, two tall chimneys, paired Gothic windows, banner, traffic signals and lower tree make the subject recognizable. The blue roof and sky against warm stone are useful colour families. The opening construction is restrained and the first pale wall wash is a plausible beginning.
+
+The finished architecture lacks the target's precision. Thin mullions, cornice lines, paired window divisions and the little round gable window are missing or weak. Some pointed openings have become blunt irregular dark slots. The wall colour is too uniformly pinkish tan: the target has a bright golden sunlit front and a cooler, darker left plane. The left wall's mottled dark islands and the central facade's pale polygons feel like segmented fills, not connected stone planes. The canopy reads as a sparse ochre smudge. The chimney faces need clearer vertical structure. The sky is pleasantly pale but the roof has excessive white breaks. Reserves in a few windows read as holes rather than restrained reflections.
+
+The earliest failure is already in the opening drawing: it locates a few big edges but not enough window or chimney structure to support precise architectural watercolor. The early wash itself is appropriately light, but the 10% and 25% frames barely differ. By 50%, a large light facade has accumulated many small wash bands without establishing the shadow-side hierarchy. Between 50% and 75%, almost all dark structure arrives, together with fragmented masonry texture. The closing stage does not recover the needed selective line detail. Thus the mid-value/shadow planning is the main paint failure; drawing selection is a separate failure, not a reason for heavy ink everywhere.
+
+Independent scores: finished painting **5.8/10**; plausibility of being painted by a person **3.0/5**. These are my visual assessments, not calibrated external judge scores. It is recognizably watercolor architecture, but the chopped value shapes and delayed jump in contrast weaken both precision and process.
+
+Intended direction before external feedback: retain a sparse opening but add the missing structural landmarks; strengthen selective closing mullions and arches; build the left plane as a coherent cooler shadow; use fewer purposeful wall layers with smoother connected coverage; preserve the luminous gold front. Keep sky soft and architectural edges dry and crisp. Avoid replacing texture problems with blanket dark outlines.
+
+## Comparison with external feedback
+
+I agree with the progression panel about the weak distinction between the early frames, the late simultaneous arrival of texture/darks, and the flat pale slabs. The contact sheet supplies independent visible evidence for these points. I also agree with its low detail/mark ratings in direction, though my overall visual score is less severe: the large landmarks and composition do work. The panel is incomplete because some calls failed; its null composite is not a usable overall score.
+
+I reject the classic edge score of 9.7 as an artistic acceptance criterion. Crisp boundaries alone do not establish window tracery or correct roof/stone edge hierarchy. I also reject the blanket claim that a pale underwash is inherently a digital reveal: a light wash is appropriate, but thousands of narrow repetitive strokes and very little value development are not. I will not reverse the light-to-dark order to make the early strip look finished. The change is fewer broad initial strokes, a more informative sparse drawing and a simpler middle build.
+
+Code inspection adds a concrete cause: several ornament lines in the former closing file had weight below the closing selection threshold, and all closing lines also face a contrast gate. Move the complete, faint ornament placement into the opening; retain supported closing accents. Use one middle wash to avoid the extra whole-sheet quantile contour. Reduce the added ashlar coverage from .25 to .12 and its pigment fraction from .10 to .08. Broad 10 mm lanes replace the previous 4 mm lanes; one middle layer replaces two. These are candidates to judge physically, not guarantees of better art.

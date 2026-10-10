@@ -1,0 +1,283 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V1",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "haiku",
+  "name": "Haiku 4.5",
+  "id": "claude-haiku-4-5-20251001",
+  "effort": "n/a",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": []
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 25,
+  "tokens": 5004778,
+  "costUSD": null,
+  "estCostUSD": 0.878,
+  "usage": {
+   "input": 626,
+   "cacheWrite1h": 75185,
+   "cacheWrite5m": 0,
+   "cacheRead": 4881103,
+   "output": 47864
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 10,
+   "minutes": null,
+   "smallShare": 0.667,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": -0.0042,
+   "images": {
+    "final": "hills.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 1.95,
+    "pm": 0,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 2.89,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.33,
+     "marks_texture": 1.33,
+     "classic_value": 2.98,
+     "classic_edge": 0.7,
+     "classic_landmark": null,
+     "classic_marks": 5
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 16,
+   "minutes": 0,
+   "smallShare": 0.778,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": -0.0106,
+   "images": {
+    "final": "south-france.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.08,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.17,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.67,
+     "marks_texture": 2,
+     "classic_value": 3.14,
+     "classic_edge": 0.72,
+     "classic_landmark": null,
+     "classic_marks": 5.65
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 9,
+   "minutes": null,
+   "smallShare": 0.667,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0077,
+   "images": {
+    "final": "sargent.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.3,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.6,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.67,
+     "marks_texture": 1,
+     "classic_value": 3.06,
+     "classic_edge": 1.02,
+     "classic_landmark": null,
+     "classic_marks": 6.71
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 24,
+   "minutes": 0,
+   "smallShare": 0.667,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0091,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": null
+   },
+   "score": {
+    "composite": 2.15,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 1,
+    "classic": 3.29,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.33,
+     "marks_texture": 1.33,
+     "classic_value": 2.46,
+     "classic_edge": 1.39,
+     "classic_landmark": null,
+     "classic_marks": 6.01
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null,
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 12,
+   "minutes": null,
+   "smallShare": 0.5,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0079,
+   "images": {
+    "final": "mittens.webp",
+    "stages": null
+   },
+   "changes": null,
+   "score": {
+    "composite": 2.24,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 0.67,
+    "classic": 3.81,
+    "criteria": {
+     "composition_values": 1,
+     "edges_detail": 0.33,
+     "marks_texture": 1.67,
+     "classic_value": 3.62,
+     "classic_edge": 0.85,
+     "classic_landmark": null,
+     "classic_marks": 6.95
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 0,
+     "zai-org/GLM-5.3-Flash": 1,
+     "Qwen/Qwen3.5-9B": 1
+    }
+   },
+   "progression": null
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 2.14,
+  "partialComposite": null,
+  "pm": 0.04,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.11,
+   "level": "low",
+   "parts": {
+    "progression": null,
+    "earlyStageMean": null,
+    "copyHF": {
+     "hills": -0.0042,
+     "south-france": -0.0106,
+     "sargent": 0.0077,
+     "trumbull": 0.0091,
+     "mittens": 0.0079
+    },
+    "copy": 0,
+    "smallStrokeShare": 0.656,
+    "small": 0.71,
+    "audit": 0,
+    "progressionMissing": true
+   }
+  },
+  "progressionRisk": {
+   "score": 0.18,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

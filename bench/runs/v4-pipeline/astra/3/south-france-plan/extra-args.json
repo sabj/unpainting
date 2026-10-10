@@ -1,0 +1,14 @@
+[
+  "--paints",
+  "ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,sapgreen",
+  "--inkprofile",
+  "black-ink",
+  "--openingpressure",
+  "0.55",
+  "--closingpressure",
+  "0.65",
+  "--openingminmm",
+  "2.5",
+  "--drawinglastmin",
+  "0.60"
+]

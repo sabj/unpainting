@@ -1,0 +1,13 @@
+{
+  "subject": "BENCHSF",
+  "name": "South France Sketch",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "pen structure with light local color washes, architectural emphasis"
+  },
+  "families": [
+    {"id": "sf.sky", "bounds": [0, 0, 1, 0.35], "baseMove": "wet in wet", "referenceCue": "pale sky"},
+    {"id": "sf.landscape", "bounds": [0, 0.34, 1, 1], "baseMove": "wet on dry", "referenceCue": "terrain and architecture"}
+  ],
+  "reserves": []
+}

@@ -1,0 +1,117 @@
+{
+  "subject": "Y1",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Precise architectural watercolor: broad luminous golden wall planes, dry crisp Gothic openings, restrained late sepia structure.",
+    "regions": {
+      "Y1.sky": {
+        "style": "precise-watercolor",
+        "reason": "Pale blue sky bounded by crisp roofs: a connected watery wet-on-dry foundation, joining its own wet edge, with one middle color build. The attempted prewetted sky exceeded the measured whole-footprint water limit; keep the dry-base and per-stroke gates enabled."
+      },
+      "Y1.main-gable": {
+        "style": "precise-watercolor",
+        "reason": "Sunlit golden gable, pale quoins and paired pointed arches are the focal architecture. Broad light wash then dry shaped mid planes and one connected shadow glaze; thin mullions belong to drawing."
+      },
+      "Y1.left-wing": {
+        "style": "precise-watercolor",
+        "reason": "Cooler ochre side wall and rectangular windows; coherent shaded wall planes, dry crisp window recesses, restrained warm stone tooth only after the foundation."
+      },
+      "Y1.left-chimney": {
+        "style": "precise-watercolor",
+        "reason": "Tall cropped chimney with projecting cap and vertical flues; warm light right edge against cool side, drawing carries the narrow flue divisions."
+      },
+      "Y1.right-wing": {
+        "style": "precise-watercolor",
+        "reason": "Right chimney and receding wing with slate roof and stacked windows; slightly quieter values and less drawing than the central gable."
+      },
+      "Y1.foreground-tree": {
+        "style": "precise-watercolor",
+        "reason": "Yellow-green foreground canopy beside the doorway; connected irregular foliage wash, dry connected shadow groups and a few crisp tapered branch accents; no equal leaf disks."
+      },
+      "Y1.street": {
+        "style": "precise-watercolor",
+        "reason": "Small people, pavement, banners and traffic signal anchor the base. Broad neutral base; dry dark accents, no invented faces or lettering."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.32
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale blue sky bounded by crisp roofs: a connected watery wet-on-dry foundation, joining its own wet edge, with one middle color build. The attempted prewetted sky exceeded the measured whole-footprint water limit; keep the dry-base and per-stroke gates enabled."
+    },
+    {
+      "id": "Y1.main-gable",
+      "bounds": [
+        0.395,
+        0.025,
+        0.69,
+        0.99
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit golden gable, pale quoins and paired pointed arches are the focal architecture. Broad light wash then dry shaped mid planes and one connected shadow glaze; thin mullions belong to drawing. Establish complete pale planes with joined 4 mm brush lanes where broad enough; dry fully before shaped mid planes. Sparse stone hints remain subordinate."
+    },
+    {
+      "id": "Y1.left-wing",
+      "bounds": [
+        0,
+        0.16,
+        0.405,
+        0.985
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cooler ochre side wall and rectangular windows; coherent shaded wall planes, dry crisp window recesses, restrained warm stone tooth only after the foundation. Establish complete pale planes with joined 4 mm brush lanes where broad enough; dry fully before shaped mid planes. Sparse stone hints remain subordinate."
+    },
+    {
+      "id": "Y1.left-chimney",
+      "bounds": [
+        0.145,
+        0,
+        0.292,
+        0.83
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall cropped chimney with projecting cap and vertical flues; warm light right edge against cool side, drawing carries the narrow flue divisions. Establish complete pale planes with joined 4 mm brush lanes where broad enough; dry fully before shaped mid planes. Sparse stone hints remain subordinate."
+    },
+    {
+      "id": "Y1.right-wing",
+      "bounds": [
+        0.69,
+        0.1,
+        1,
+        0.98
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right chimney and receding wing with slate roof and stacked windows; slightly quieter values and less drawing than the central gable. Establish complete pale planes with joined 4 mm brush lanes where broad enough; dry fully before shaped mid planes. Sparse stone hints remain subordinate."
+    },
+    {
+      "id": "Y1.foreground-tree",
+      "bounds": [
+        0.635,
+        0.6,
+        0.785,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Yellow-green foreground canopy beside the doorway; connected irregular foliage wash, dry connected shadow groups and a few crisp tapered branch accents; no equal leaf disks. Establish complete pale planes with joined 4 mm brush lanes where broad enough; dry fully before shaped mid planes. Sparse stone hints remain subordinate."
+    },
+    {
+      "id": "Y1.street",
+      "bounds": [
+        0,
+        0.88,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small people, pavement, banners and traffic signal anchor the base. Broad neutral base; dry dark accents, no invented faces or lettering. Establish complete pale planes with joined 4 mm brush lanes where broad enough; dry fully before shaped mid planes. Sparse stone hints remain subordinate."
+    }
+  ],
+  "reserves": []
+}

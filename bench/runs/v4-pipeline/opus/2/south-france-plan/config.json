@@ -1,0 +1,15 @@
+{"subject":"SF","name":"South France hill village, urban sketch",
+ "styleSelection":{"style":"urban-sketch","reason":"Requested urban sketch: pen carries the houses, cypresses and pine; one light wash per area and a shadow glaze, warm paper showing in the lit terraces and walls",
+   "regions":{}},
+ "families":[
+  {"id":"SF.distance","bounds":[0.77,0,1,0.2],"baseMove":"wet on dry, watery","referenceCue":"pale blue-green distant valley and ridge, softest values"},
+  {"id":"SF.village-top","bounds":[0.38,0,0.77,0.26],"baseMove":"wet on dry, medium","referenceCue":"upper houses: ochre walls, terracotta roofs, violet shadow sides"},
+  {"id":"SF.terrace","bounds":[0,0,0.38,0.4],"baseMove":"wet on dry, watery","referenceCue":"sunlit ochre terraced slope and stone wall, the lightest plane"},
+  {"id":"SF.focal-houses","bounds":[0.65,0.33,0.97,0.82],"baseMove":"wet on dry, medium, hard edges","referenceCue":"focal stone house cluster: terracotta roofs, cream lit walls, mauve shadow walls"},
+  {"id":"SF.woods","bounds":[0.38,0.2,0.65,0.62],"baseMove":"wet on dry, medium","referenceCue":"rounded olive and oak canopies, sage to deep green, cypress spires"},
+  {"id":"SF.left-trees","bounds":[0,0.4,0.2,0.78],"baseMove":"wet on dry, medium","referenceCue":"olive trees on pale ground"},
+  {"id":"SF.pine","bounds":[0.2,0.5,0.5,1],"baseMove":"wet on dry, medium, then glaze","referenceCue":"foreground pine: yellow-green lit crown, dark trunk and limbs"},
+  {"id":"SF.low-foliage","bounds":[0.5,0.78,1,1],"baseMove":"wet on dry, medium","referenceCue":"foreground shrubs, mixed greens over pale ground"}],
+ "reserves":[
+  {"reason":"sunlit far-right wall, the brightest wall in the target","bounds":[0.957,0.33,0.98,0.375]},
+  {"reason":"sunlit terrace wall top, paper glint along the wall","bounds":[0.06,0.17,0.13,0.185]}]}

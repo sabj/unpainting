@@ -1,0 +1,11 @@
+{"subject":"sf","name":"South France v2",
+ "styleSelection":{"style":"urban-sketch","reason":"pen structure defines architecture and trees, light wash follows",
+   "regions":{"sf.grass":{"style":"urban-sketch","reason":"pale field wash with foreground texture"},
+             "sf.trees":{"style":"urban-sketch","reason":"cypress and tree silhouettes, soft canopy"},
+             "sf.buildings":{"style":"urban-sketch","reason":"rooflines and building forms from pen, shadow planes"},
+             "sf.sky":{"style":"urban-sketch","reason":"pale graded wash"}}},
+ "families":[{"id":"sf.grass","bounds":[0,0.5,1,1],"baseMove":"wet on dry","referenceCue":"pale green field with gentle turning planes"},
+             {"id":"sf.trees","bounds":[0,0.15,0.65,0.65],"baseMove":"wet on dry","referenceCue":"cypress and mixed trees, dark green mass"},
+             {"id":"sf.buildings","bounds":[0.6,0.25,1,0.85],"baseMove":"wet on dry","referenceCue":"terracotta buildings with shadow sides and roofs"},
+             {"id":"sf.sky","bounds":[0,0,1,0.4],"baseMove":"wet on dry","referenceCue":"pale blue-grey sky, subtle gradation"}],
+ "reserves":[]}

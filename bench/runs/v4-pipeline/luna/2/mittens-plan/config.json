@@ -1,0 +1,39 @@
+{
+  "subject": "MITTENS",
+  "name": "Mittens and the sitter",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The crop is carried by pale painted planes, reserved paper, and a few crisp facial and fur details.",
+    "regions": {
+      "MITTENS.cat": {
+        "style": "ink-and-wash",
+        "reason": "The tabby's short fur and whiskers read as directional fine lines over a light connected ochre wash."
+      },
+      "MITTENS.hair": {
+        "style": "ink-and-wash",
+        "reason": "The sitter's dark curls need a connected blue-grey mass with a few broken directional lines."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "MITTENS.cat",
+      "bounds": [0.0, 0.0, 0.55, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "warm orange tabby head and chest, white muzzle, pale whiskers, dark eyes and nose"
+    },
+    {
+      "id": "MITTENS.hair",
+      "bounds": [0.49, 0.12, 1.0, 0.55],
+      "baseMove": "wet on dry",
+      "referenceCue": "broken-edged charcoal blue-grey curls above and beside the sitter's forehead"
+    },
+    {
+      "id": "MITTENS.face",
+      "bounds": [0.49, 0.48, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "warm pale face with dry dark brows, clear eyes, a softly shaped nose and mouth"
+    }
+  ],
+  "reserves": []
+}

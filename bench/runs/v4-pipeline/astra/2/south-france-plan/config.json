@@ -1,0 +1,23 @@
+{
+  "subject": "SF",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Requested pen plus light wash: connected roof and wall junctions describe the village; transparent warm stone and grouped olive-green washes preserve the sunlit paths. Use the supplied ink-and-wash value floor at reduced strength so cypresses remain legible.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"SF.upper-village","bounds":[0.39,0,0.8,0.25],"baseMove":"wet on dry","referenceCue":"Small distant ochre houses with terracotta roofs: pale warm planes, thin dry pen at roof junctions, reduced detail."},
+    {"id":"SF.focal-houses","bounds":[0.66,0.335,0.95,0.78],"baseMove":"wet on dry","referenceCue":"Three stepped houses on the right: light ochre walls, sienna roofs, violet-grey shadow sides; pen defines eaves and wall corners, selective openings last."},
+    {"id":"SF.terraces","bounds":[0,0.10,0.37,0.49],"baseMove":"wet on dry","referenceCue":"Sunlit limestone terrace walls and winding pale paths: broad dilute warm washes, paper gaps and broken edges, no masonry hatching."},
+    {"id":"SF.middle-olives","bounds":[0.02,0.19,0.67,0.72],"baseMove":"wet on dry","referenceCue":"Interlocking olive crowns alternate yellow-green sun and cool grey-green shade. Paint connected crown groups and then one connected dry shadow glaze; preserve light gaps, no leaf dots."},
+    {"id":"SF.cypresses","bounds":[0.24,0,0.42,0.38],"baseMove":"wet on dry","referenceCue":"Tall narrow blue-green cypresses punctuate the warm terraces; keep tapering silhouettes, reserve adjacent pale stone, shade the dark side after drying."},
+    {"id":"SF.foreground-pine","bounds":[0.12,0.54,0.53,1],"baseMove":"wet on dry","referenceCue":"Foreground open pine has a dark leaning trunk and branching rhythm below a light olive canopy. Thin directional branch ink over connected transparent foliage, never ink filling a crown."},
+    {"id":"SF.lower-path","bounds":[0.43,0.58,0.85,1],"baseMove":"wet on dry","referenceCue":"Pale winding path descends between olive trees; keep the connected light corridor and paint the crossing tree shadows as a dry glaze."},
+    {"id":"SF.distant-grove","bounds":[0.8,0,1,0.34],"baseMove":"wet on dry","referenceCue":"Distant blue-grey olive grove in upper right is a pale wash with quiet edges, no individual branches or pen texture."}
+  ],
+  "reserves": [
+    {"reason":"Bare paper sliver on sunlit right roof ridge","bounds":[0.8816,0.3635,0.8947,0.3695]},
+    {"reason":"Bare paper glint on small central stone wall top","bounds":[0.3191,0.3855,0.3290,0.3916]},
+    {"reason":"Bare paper glint within lower winding path","bounds":[0.5806,0.9237,0.5905,0.9357]}
+  ]
+}

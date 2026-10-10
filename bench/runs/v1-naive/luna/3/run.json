@@ -1,0 +1,425 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V1",
+ "release": "0.1.0",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": null,
+ "painter": {
+  "key": "luna",
+  "name": "Codex Luna",
+  "id": "gpt-6-luna",
+  "effort": "xhigh",
+  "runner": "codex"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 13.2,
+  "tokens": 6530486,
+  "costUSD": null,
+  "estCostUSD": 0.101,
+  "usage": {
+   "input": 141923,
+   "cachedInput": 6341376,
+   "output": 47187
+  }
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "strokes": 824,
+   "minutes": 0.5,
+   "smallShare": 0,
+   "shortStrokes": 787,
+   "dotStrokes": 783,
+   "copyHF": -0.012,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "score": {
+    "composite": 4.48,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 6.3,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 2.67,
+     "classic_value": 3.8,
+     "classic_edge": 6.5,
+     "classic_landmark": null,
+     "classic_marks": 8.61
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 2.5,
+     "50": 2.5,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 2,
+    "mean": 2.7,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 7,
+     "l": 1,
+     "j": 3,
+     "i": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The whole composition is already faintly present at 10% and merely densifies uniformly everywhere, a fade-in/density ramp rather than a painter's ordered build-up of washes, masses, then detail.",
+     "Qwen/Qwen3.5-9B": "The sequence depicts a digital fade-in effect where the fully formed image is simply revealed at increasing opacity, rather than being built up with brushstrokes."
+    }
+   },
+   "painterNote": null
+  },
+  "south-france": {
+   "strokes": 742,
+   "minutes": 0.7,
+   "smallShare": 0.031,
+   "shortStrokes": 616,
+   "dotStrokes": 577,
+   "copyHF": -0.0154,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "score": {
+    "composite": 4.44,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 6.55,
+    "criteria": {
+     "composition_values": 2.67,
+     "edges_detail": 2,
+     "marks_texture": 3.33,
+     "classic_value": 3.84,
+     "classic_edge": 7.02,
+     "classic_landmark": null,
+     "classic_marks": 8.79
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2.5,
+     "50": 2,
+     "75": 3,
+     "100": 3
+    },
+    "earlyMean": 2.25,
+    "mean": 2.5,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "a": 4,
+     "e": 2,
+     "b": 1,
+     "d": 1,
+     "f": 2,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Foliage accumulates as scattered round dabs instead of drawn strokes, houses and a scalloped terracotta blob arrive as finished regions beside untouched paper, and the pen texture of the target never develops, reading more as a dab-stamping simulation than a brush-and-pen sequence.",
+     "Qwen/Qwen3.5-9B": "The sequence reveals distinct layers (green foliage blocks then house blocks) appearing rather than a continuous sketch, with the first panel resembling a faded-in effect."
+    }
+   },
+   "painterNote": null
+  },
+  "sargent": {
+   "strokes": 303,
+   "minutes": 0.4,
+   "smallShare": 0.495,
+   "shortStrokes": 119,
+   "dotStrokes": 5,
+   "copyHF": -0.0148,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "score": {
+    "composite": 3.65,
+    "pm": 0.14,
+    "complete": true,
+    "visionOverall": 1.67,
+    "classic": 5.64,
+    "criteria": {
+     "composition_values": 2.67,
+     "edges_detail": 1.33,
+     "marks_texture": 1.33,
+     "classic_value": 2.74,
+     "classic_edge": 5.34,
+     "classic_landmark": null,
+     "classic_marks": 8.84
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 1,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 2,
+     "75": 2,
+     "100": 1.5
+    },
+    "earlyMean": 1.5,
+    "mean": 1.7,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "a": 2,
+     "c": 5,
+     "e": 6
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The washes-then-rigging order looks superficially sane, but the flat rectangular water slabs, stippled speckle patches, and a 100% state that never reaches the target's darks, anchor, or warm accents reveal a stroke-sampled filter uncovering the image rather than a painter building it.",
+     "Qwen/Qwen3.5-9B": "The sequence shows a static image fading in (dissolve) rather than a painting progressing toward the target figure."
+    }
+   },
+   "painterNote": null
+  },
+  "trumbull": {
+   "strokes": 369,
+   "minutes": 0.7,
+   "smallShare": 0.443,
+   "shortStrokes": 69,
+   "dotStrokes": 3,
+   "copyHF": 0.0105,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "score": {
+    "composite": 4.78,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 6.55,
+    "criteria": {
+     "composition_values": 3.67,
+     "edges_detail": 2.67,
+     "marks_texture": 3.33,
+     "classic_value": 3.62,
+     "classic_edge": 6.92,
+     "classic_landmark": null,
+     "classic_marks": 9.12
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 3
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 2,
+     "50": 2.5,
+     "75": 2.5,
+     "100": 2
+    },
+    "earlyMean": 1.75,
+    "mean": 2.1,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "b": 1,
+     "c": 2,
+     "m": 2,
+     "d": 1,
+     "i": 2,
+     "k": 1,
+     "f": 1,
+     "h": 1,
+     "j": 5,
+     "e": 1,
+     "g": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The building mass appears as flat stair-stepped tan slabs before any drawn form, dark glyph-like squiggles stand in for Gothic tracery, and the final stage barely changes while never approaching the target's trees, sky, or street life — a layered digital fill, not a brush-and-pen order.",
+     "Qwen/Qwen3.5-9B": "The sequence exhibits a digital 'faded in' effect and a uniform texture dump rather than organic brushwork progression."
+    }
+   },
+   "painterNote": null
+  },
+  "mittens": {
+   "strokes": 133,
+   "minutes": 0.1,
+   "smallShare": 0.091,
+   "shortStrokes": 95,
+   "dotStrokes": 57,
+   "copyHF": -0.002,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "changes": null,
+   "score": {
+    "composite": 3.92,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 5.5,
+    "criteria": {
+     "composition_values": 3.33,
+     "edges_detail": 2,
+     "marks_texture": 3,
+     "classic_value": 3.83,
+     "classic_edge": 3.41,
+     "classic_landmark": null,
+     "classic_marks": 9.25
+    },
+    "callsPerModel": 5,
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 2
+    }
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2.5,
+     "75": 3,
+     "100": 3.5
+    },
+    "earlyMean": 2,
+    "mean": 2.6,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "c": 9,
+     "l": 1,
+     "j": 1,
+     "d": 1,
+     "h": 2,
+     "b": 1,
+     "f": 3
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A fully-textured hair blob and flat scalloped peach slabs arrive before any drawing exists, then features pop in region-by-region, reading more like a masked build-up than a brush-and-pen sketch.",
+     "Qwen/Qwen3.5-9B": "The sequence reveals digital block masks rather than brushwork, with identical frames indicating a non-human generation process."
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ]
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "composite": 4.25,
+  "partialComposite": null,
+  "pm": 0.06,
+  "cropsScored": 5,
+  "complete": true,
+  "status": "scored"
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.32,
+   "level": "medium",
+   "parts": {
+    "progression": 0.8,
+    "earlyStageMean": 1.9,
+    "copyHF": {
+     "hills": -0.012,
+     "south-france": -0.0154,
+     "sargent": -0.0148,
+     "trumbull": 0.0105,
+     "mittens": -0.002
+    },
+    "copy": 0,
+    "smallStrokeShare": 0.212,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.4,
+   "level": "medium"
+  },
+  "review": null
+ },
+ "complete": true,
+ "judgeVersion": "J1"
+}

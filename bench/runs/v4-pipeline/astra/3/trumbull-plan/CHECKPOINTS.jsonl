@@ -1,0 +1,13 @@
+{"t": "2026-10-09 17:32:12 PDT", "kind": "start", "modelMinutes": 8.33, "variant": "region_w13_lay3_sk1_dwg139_sep4", "renderKey": "b13bf0ae2b2e3dc7a00eab4f9be5cdb30416860adb57990db3e37b8e3e0feb30"}
+{"t": "2026-10-09 17:34:23 PDT", "kind": "machine-lost", "modelMinutes": 8.99, "n": 1, "why": "infra: exit None, PROVISION FAILED"}
+{"t": "2026-10-09 17:48:27 PDT", "kind": "look", "modelMinutes": 13.24, "n": 1, "boundary": "0", "strokes": 0, "penLines": 46, "passesDone": 0, "passesPlanned": 74}
+{"t": "2026-10-09 17:48:44 PDT", "kind": "continue", "modelMinutes": 13.52, "boundary": "0", "stopAt": 16, "strokes": 0}
+{"t": "2026-10-09 17:55:15 PDT", "kind": "look", "modelMinutes": 15.43, "n": 2, "boundary": "16", "strokes": 919, "penLines": 46, "passesDone": 16, "passesPlanned": 74}
+{"t": "2026-10-09 18:44:39 PDT", "kind": "revise", "modelMinutes": 30.48, "boundary": "16", "revision": 1, "strokes": 919, "passesDone": 16, "changed": ["variant.txt"], "variant": "region_w13_lay3_sk1_dwg139_sep4_spl8_lad_sml60"}
+{"t": "2026-10-09 18:54:26 PDT", "kind": "look", "modelMinutes": 33.3, "n": 3, "boundary": "29", "strokes": 3379, "penLines": 46, "passesDone": 29, "passesPlanned": 74}
+{"t": "2026-10-09 18:55:24 PDT", "kind": "continue", "modelMinutes": 34.28, "boundary": "29", "stopAt": "closing", "strokes": 3379}
+{"t": "2026-10-09 19:36:44 PDT", "kind": "machine-lost", "modelMinutes": 45.81, "n": 2, "why": "never ran: box ended while the job waited"}
+{"t": "2026-10-09 19:44:47 PDT", "kind": "continue", "modelMinutes": 50.84, "boundary": "0", "stopAt": "end", "strokes": 0}
+{"t": "2026-10-09 20:48:58 PDT", "kind": "finished", "modelMinutes": 64.21, "strokes": 32402}
+{"t": "2026-10-09 20:49:54 PDT", "kind": "look", "modelMinutes": 65.14, "n": 4, "boundary": "final"}
+{"t": "2026-10-09 20:50:06 PDT", "kind": "session-end", "modelMinutes": 65.35, "why": "you ended the session", "looks": 4, "revisions": 1}

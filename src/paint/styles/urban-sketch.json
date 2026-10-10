@@ -1,0 +1,76 @@
+{
+  "structure": "ink",
+  "order": [
+    "reserve",
+    "opening pen or pencil",
+    "flat light wash",
+    "dry",
+    "selective closing pen"
+  ],
+  "weights": [
+    1,
+    0,
+    0,
+    0,
+    0
+  ],
+  "water": [
+    0.5,
+    0.5,
+    0.5,
+    0.5,
+    0.5
+  ],
+  "brushes": [
+    "pen",
+    "pencil",
+    "flat",
+    "small round"
+  ],
+  "moves": [
+    "wet on dry",
+    "directional ink"
+  ],
+  "edge": "confident connected pen junctions; pale flat washes; dominant white paper",
+  "ink": 0.9,
+  "graphite": 0.25,
+  "textures": {
+    "fur": "ink",
+    "hair": "ink",
+    "foliage": "ink",
+    "grass": "ink",
+    "skin": "wash",
+    "architecture": "ink",
+    "sky": "wash",
+    "water": "wash",
+    "fabric": "ink"
+  },
+  "reserve": [
+    "white paper majority",
+    "trim",
+    "sky gaps",
+    "lit walls"
+  ],
+  "refs": [
+    "Y2 A6 possible pass; needs far more ink",
+    "Cray/Haseler progression: pen first"
+  ],
+  "emphasis": [
+    "pen structure and junctions",
+    "white paper share",
+    "few pale flat washes",
+    "focal detail"
+  ],
+  "pigment": "black",
+  "name": "urban-sketch",
+  "version": 1,
+  "washCount": 1,
+  "waterLevel": "per-layer calibrated load",
+  "detailThresholdCells": 4,
+  "wetMix": 0.3,
+  "bridge": 0.82,
+  "bridgeSoft": 2.4,
+  "closingContrast": 0.06,
+  "openingMinLength": 0.012,
+  "paintStrength": 0.25
+}

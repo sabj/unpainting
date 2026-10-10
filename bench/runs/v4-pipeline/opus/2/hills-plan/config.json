@@ -1,0 +1,9 @@
+{"subject":"HILLS","name":"Hills",
+ "styleSelection":{"style":"ink-and-wash","reason":"Loose ink and wash requested: pen carries the track edges, meadow silhouettes and the shadow side of the tree clumps over two connected value washes (light wash, then a shadow glaze), all wet on dry.",
+   "regions":{}},
+ "families":[
+   {"id":"HILLS.woods","bounds":[0,0,1,1],"baseMove":"wet on dry","referenceCue":"blue-green oak canopy masses, mid value with indigo shadow undersides; one connected mixed-dark wash, shadow glaze, then pen scallops on the shadow side"},
+   {"id":"HILLS.meadow-upper","bounds":[0.46,0,1,0.27],"baseMove":"wet on dry","referenceCue":"bright yellow-green sunlit slope, top right, with a pale track; one connected pale field wash"},
+   {"id":"HILLS.meadow-left","bounds":[0.17,0.13,0.42,0.36],"baseMove":"wet on dry","referenceCue":"yellow-green slope beside the upper track; one connected pale field wash"},
+   {"id":"HILLS.meadow-lower","bounds":[0.31,0.56,0.9,1],"baseMove":"wet on dry","referenceCue":"broad sunlit meadow around the lower track bend, the focal area; one connected pale field wash"}],
+ "reserves":[]}

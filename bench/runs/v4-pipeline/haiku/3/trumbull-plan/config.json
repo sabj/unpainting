@@ -1,0 +1,23 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "sharp architectural planes and edges; structure over atmosphere"
+  },
+  "families": [
+    {
+      "id": "sky",
+      "bounds": [0, 0, 1, 0.27],
+      "baseMove": "wet on dry",
+      "referenceCue": "pale graded blue sky"
+    },
+    {
+      "id": "building",
+      "bounds": [0, 0.27, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "stone building facade with fenestration"
+    }
+  ],
+  "reserves": []
+}

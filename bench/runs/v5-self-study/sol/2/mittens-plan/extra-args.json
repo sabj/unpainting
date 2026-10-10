@@ -1,0 +1,18 @@
+[
+  "--paints",
+  "ochre,sienna,ultramarine,sepia,paynes,sapgreen",
+  "--inkprofile",
+  "sepia-ink",
+  "--openingpressure",
+  "0.32",
+  "--closingpressure",
+  "0.38",
+  "--openingminmm",
+  "3",
+  "--closingedgemin",
+  "0.12",
+  "--stylegain",
+  "0.9",
+  "--touchpoints",
+  "0"
+]

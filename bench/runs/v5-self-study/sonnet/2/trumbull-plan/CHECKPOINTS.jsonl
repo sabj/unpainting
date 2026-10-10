@@ -1,0 +1,10 @@
+{"t": "2026-10-09 22:09:16 PDT", "kind": "start", "modelMinutes": 4.17, "variant": "region_w13_dk11_lw_lit20", "renderKey": "e8f55c19ef343d255c7c6b97b881301ef2ce9fb0242ea2d85b3d09de2a35da53"}
+{"t": "2026-10-09 22:13:08 PDT", "kind": "continue", "modelMinutes": 4.38, "boundary": "0", "stopAt": 18, "strokes": 0}
+{"t": "2026-10-09 22:19:57 PDT", "kind": "look", "modelMinutes": 4.6, "n": 1, "boundary": "18", "strokes": 1105, "penLines": 21, "passesDone": 18, "passesPlanned": 103}
+{"t": "2026-10-09 22:20:06 PDT", "kind": "continue", "modelMinutes": 4.75, "boundary": "18", "stopAt": 38, "strokes": 1105}
+{"t": "2026-10-09 22:26:01 PDT", "kind": "look", "modelMinutes": 4.96, "n": 2, "boundary": "38", "strokes": 2043, "penLines": 21, "passesDone": 38, "passesPlanned": 103}
+{"t": "2026-10-09 22:26:10 PDT", "kind": "continue", "modelMinutes": 5.1, "boundary": "38", "stopAt": 62, "strokes": 2043}
+{"t": "2026-10-09 22:29:01 PDT", "kind": "adopted", "modelMinutes": 6.44, "unanswered": []}
+{"t": "2026-10-09 22:33:56 PDT", "kind": "look", "modelMinutes": 5.3, "n": 3, "boundary": "62", "strokes": 3056, "penLines": 21, "passesDone": 62, "passesPlanned": 103}
+{"t": "2026-10-09 22:34:08 PDT", "kind": "continue", "modelMinutes": 5.5, "boundary": "62", "stopAt": "closing", "strokes": 3056}
+{"t": "2026-10-09 23:03:30 PDT", "kind": "session-end", "modelMinutes": 6.32, "why": "the wall-clock safety limit", "looks": 3, "revisions": 0}

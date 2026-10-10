@@ -1,0 +1,24 @@
+{
+  "subject": "sf",
+  "name": "South France",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "pen plus light wash: the pen carries buildings, cypresses, trunks and leaf-clump contours; one pale wash per mass leaves paper showing",
+    "regions": {}
+  },
+  "families": [
+    {"id": "SF.terrace", "bounds": [0, 0, 0.36, 0.36], "baseMove": "wet on dry", "referenceCue": "sandy terrace walls and path, pale ochre flat wash, cypress flames in the corner"},
+    {"id": "SF.village", "bounds": [0.36, 0, 0.8, 0.24], "baseMove": "wet on dry", "referenceCue": "small stone houses with terracotta roofs, pale lilac-grey shade side"},
+    {"id": "SF.hills", "bounds": [0.8, 0, 1, 0.34], "baseMove": "wet in wet", "referenceCue": "distant cool blue-green hills and dark cypress edge, soft"},
+    {"id": "SF.cluster", "bounds": [0.64, 0.34, 0.98, 0.82], "baseMove": "wet on dry", "referenceCue": "focal stone houses: warm terracotta roofs, sunlit ochre walls, cool shade planes, dark window recesses"},
+    {"id": "SF.olive", "bounds": [0, 0.36, 0.2, 0.78], "baseMove": "wet on dry", "referenceCue": "grey-green olive trees on sandy ground, thin trunks"},
+    {"id": "SF.pine", "bounds": [0.1, 0.5, 0.45, 1], "baseMove": "wet on dry", "referenceCue": "pale yellow-green pine crown with dark trunk and branches kept for the pen"},
+    {"id": "SF.forest", "bounds": [0.36, 0.24, 0.66, 0.78], "baseMove": "wet on dry", "referenceCue": "mid and dark olive-green foliage masses, lit tops and shaded undersides"},
+    {"id": "SF.slope", "bounds": [0.45, 0.78, 1, 1], "baseMove": "wet on dry", "referenceCue": "foreground green and sandy scrub, pale rock streaks kept as paper"}
+  ],
+  "reserves": [
+    {"reason": "sunlit wall of the tower", "bounds": [0.84, 0.4, 0.89, 0.445]},
+    {"reason": "pale rock streak, foreground", "bounds": [0.38, 0.88, 0.44, 0.915]},
+    {"reason": "lit stone corner of the lower house", "bounds": [0.8, 0.585, 0.835, 0.625]}
+  ]
+}

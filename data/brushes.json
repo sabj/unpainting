@@ -1,0 +1,65 @@
+{
+  "about": "Physical assumptions for the painter's brushes (--physical 1, V073). Every pixel size is derived: mm per cell = sheet width in mm / render width in cells. Stroke length per load = water held / (uptake per cm2 x stroke width). Values are typical, not measured on a particular brush; each carries its source so it can be checked.",
+  "sheet": {
+    "width_mm": 101.6,
+    "height_mm": 152.4,
+    "note": "A 6 x 4 in postcard (152.4 x 101.6 mm), turned to the picture's orientation; the picture is fitted inside it, so mm per cell = min(101.6 / short side, 152.4 / long side). A 540 x 360 landscape is 152.4 mm wide, 0.282 mm a cell. --sheetmm fixes the width instead. src/media/sheet-size.mjs holds the same sheet."
+  },
+  "brushes": {
+    "mop": {
+      "width_mm": 38,
+      "water_ml": 2.0,
+      "note": "Size 10-12 squirrel or synthetic mop, belly about 35-40 mm spread flat when loaded (e.g. Escoda Aquario, Da Vinci Casaneo 10). A loaded mop holds on the order of 1.5-2.5 ml; painters lay a sky in one or two loads."
+    },
+    "flat1in": {
+      "width_mm": 25.4,
+      "water_ml": 1.2,
+      "note": "1 in (25.4 mm) wash flat, synthetic. Holds about 1 ml; one load lays a band across a quarter sheet."
+    },
+    "round12": {
+      "width_mm": 7.0,
+      "water_ml": 0.18,
+      "note": "Round #12: belly about 6.5-7.5 mm in makers' size charts (W&N Series 7 #12 is listed near 7 mm). Holds about 0.3-0.4 ml but releases about half before it must be reloaded, so 0.18 ml per load."
+    },
+    "round8": {
+      "width_mm": 5.0,
+      "water_ml": 0.08,
+      "note": "Round #8: belly about 4.5-5.5 mm. Holds about 0.1-0.2 ml; releases about 0.08 ml per load (a mid-value stroke of 5-10 cm before reloading)."
+    },
+    "round4": {
+      "width_mm": 3.0,
+      "water_ml": 0.03,
+      "note": "Round #4: belly about 2.5-3.2 mm. Holds about 0.05 ml, releases about 0.03 ml per load."
+    },
+    "rigger": {
+      "width_mm": 1.2,
+      "water_ml": 0.015,
+      "note": "Rigger / liner #2: long hair, about 1-1.5 mm wide, holds a long line's worth for its width."
+    },
+    "dry": {
+      "width_mm": 4.0,
+      "water_ml": 0.03,
+      "pigment": "dense",
+      "note": "An old #6 round or a split 1/4 in flat used for dry brush: loaded with thick paint and blotted, so little water (about 0.02-0.04 ml) but a full charge of pigment. Breakup comes from skipping the paper's hollows, not from running out."
+    },
+    "pen": {
+      "width_mm": 0.5,
+      "ink_ml": 0.02,
+      "note": "Dip pen (e.g. G-nib or Hunt 512), line 0.3-0.8 mm; a dip holds about 0.01-0.03 ml, enough for several lines. Not used to size anything: the pen's own model is left as it is and measured (V071: 373-468 px of line per dip, about 10-12 cm, 6 lines per dip)."
+    }
+  },
+  "uptake_ml_per_cm2": {
+    "wet on wet": 0.02,
+    "wet on dry": 0.02,
+    "glazed": 0.015,
+    "dry brush": 0.0015,
+    "note": "Liquid the paper takes per cm2 of stroke. Cold-pressed 300 g/m2 cotton paper holds about 0.02 ml/cm2 in a juicy wash (a 1 in flat's ~1 ml covers about 50 cm2, a band 25 mm x 20 cm). A glaze is laid thinner. Dry brush touches only the tooth's high points, a tenth or less of the area, with a blotted brush."
+  },
+  "roles": {
+    "wash": "mop",
+    "floor": "round4",
+    "detail": "rigger",
+    "drag": "dry",
+    "note": "Which brush does which job: the widest sweeps use the mop, no wash stroke before the detail passes is narrower than the floor brush, the detail passes may go down to the rigger, and the drags use the dry brush."
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "structure": "paint",
+  "order": [
+    "reserve or plan lift",
+    "rewet",
+    "graded light wash",
+    "dark charge at sheen",
+    "lift lights",
+    "dry",
+    "sparse dry accents"
+  ],
+  "weights": [
+    0.55,
+    0,
+    0,
+    0.45,
+    0
+  ],
+  "water": [
+    0.88,
+    0.88,
+    0.88,
+    0.28,
+    0.28
+  ],
+  "brushes": [
+    "wide flat",
+    "mop",
+    "thirsty round",
+    "pointed round"
+  ],
+  "moves": [
+    "wet on wet",
+    "dry on wet",
+    "lift"
+  ],
+  "edge": "graded soft and lost edges; retain cloud shapes; crisp ripples only after drying",
+  "ink": 0,
+  "graphite": 0,
+  "textures": {
+    "fur": "wash",
+    "hair": "wash",
+    "foliage": "wash",
+    "grass": "wash",
+    "skin": "wash",
+    "architecture": "wash",
+    "sky": "wash",
+    "water": "dry brush",
+    "fabric": "wash"
+  },
+  "reserve": [
+    "cloud lights: planned lift",
+    "foam: bare paper",
+    "water sparkle",
+    "horizon glints"
+  ],
+  "refs": [
+    "Connected sky washes with soft transitions; avoid excessive blending."
+  ],
+  "emphasis": [
+    "continuous graded passage",
+    "cloud form survives merging",
+    "lifted lights",
+    "soft edges without contours"
+  ],
+  "pigment": "sepia",
+  "name": "atmospheric-wet",
+  "version": 1,
+  "washCount": 2,
+  "waterLevel": "per-layer calibrated load",
+  "detailThresholdCells": 4,
+  "wetMix": 0.85,
+  "bridge": 0.98,
+  "bridgeSoft": 3,
+  "closingContrast": 0.06,
+  "openingMinLength": 0.012,
+  "paintStrength": 1
+}

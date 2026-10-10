@@ -1,0 +1,19 @@
+{
+  "subject": "sargent",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor: pale ships, curved blue-grey hull shadows, rusty rigging and dark fittings carried by transparent value planes and dry painted accents. No ink or graphite.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"sargent.left-hull","bounds":[0.21,0,0.665,0.96],"baseMove":"wet on dry","referenceCue":"Rounded left hull: luminous broken pale blue planes inside a connected blue-grey turning shadow, dark curved rim above and deep wedge below. Connected foundation, dry middle washes, then connected shadow glazes. Preserve pale diagonal lights as negative spaces, not stipple."},
+    {"id":"sargent.right-hull","bounds":[0.59,0,1,0.715],"baseMove":"wet on dry","referenceCue":"Right ship: broad warm-paper white plane, pale cool horizontal turns and narrow blue right-edge shadow. Thin foundation, selective dry middle planes, broad central light. Dark oval fittings are last dry painted accents."},
+    {"id":"sargent.left-background","bounds":[0,0,0.22,0.82],"baseMove":"wet on dry","referenceCue":"Muted blue-grey gaps between ochre spars and rusty rigging, broken blue shapes near the water. Connected thin underwash then dry shaped planes. Ropes have changing width and interrupted color, never black outlines."},
+    {"id":"sargent.water","bounds":[0,0.70,1,1],"baseMove":"wet on dry","referenceCue":"Green-blue and ochre horizontal reflections around the deep cool hull shadow. Pale short ripples stay negative-painted gaps. Broad underwash then connected reflected-color shapes on dry paper; no equal flecks or dots."},
+    {"id":"sargent.rust-rigging","bounds":[0.81,0.30,0.94,1],"baseMove":"wet on dry","referenceCue":"Slanting right rope: ochre body with burnt-sienna interruptions over dry pale hull and water. Narrow painted round/rigger shapes with point contact; real fitted diagonal silhouette, no rectangular boundary."}
+  ],
+  "reserves": [
+    {"reason":"Small near-paper core in upper right ship light; surrounding hull is a pale painted plane.","bounds":[0.72,0.05,0.734,0.068]},
+    {"reason":"Small near-paper core in central right hull light, surrounded by thin cream foundation.","bounds":[0.66,0.46,0.674,0.478]}
+  ]
+}

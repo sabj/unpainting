@@ -1,0 +1,18 @@
+{
+  "subject": "Y1",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Golden Gothic architecture: connected luminous wall washes, coherent cooler shadow sides, dry precise openings and fine selective sepia structure.",
+    "regions": {}
+  },
+  "families": [
+    {"id":"Y1.sky","bounds":[0,0,1,0.32],"baseMove":"wet on dry","referenceCue":"Pale blue continuous sky and softly variegated clouds. Wash question: watery connected dry-base wash joining its own wet edge; one middle build, no extra quantile sky islands. Retain dry architectural barriers. The former wet prewash failed its measured water gate, so do not request flooded paper."},
+    {"id":"Y1.main-gable","bounds":[0.395,0.025,0.69,0.99],"baseMove":"wet on dry","referenceCue":"Luminous golden central gable and paired pointed openings are the focal point. Broad pale ochre base, dry, one connected middle wash, dry, two complementary shadow glazes across masonry and openings. Pale stone trim stays tinted. Ornament, mullions and arch tracery below four native cells are fine sepia drawing; no stone stippling."},
+    {"id":"Y1.left-wing","bounds":[0,0.16,0.405,0.985],"baseMove":"wet on dry","referenceCue":"Cooler shaded left wall and stacked rectangular openings. Broad connected local-color wash, one dry middle plane and connected cool shadow glazes crossing window reveals and ledges. Fine mullions are ink-and-wash detail. Avoid separately filled masonry islands."},
+    {"id":"Y1.left-chimney","bounds":[0.145,0,0.292,0.83],"baseMove":"wet on dry","referenceCue":"Cropped tall chimney: pale golden right face, shaded left face, projecting cap and vertical flue ribs. Wash planes on dry paper; fine rib drawing sets structure early and selected dark junctions close last."},
+    {"id":"Y1.right-wing","bounds":[0.69,0.1,1,0.98],"baseMove":"wet on dry","referenceCue":"Receding right wing, chimney and low annex: pale warm wall washes, slate roof middle plane, connected cornice/coping shadows, small dark openings late. Ink explains fine divisions; quiet detail compared with focal gable."},
+    {"id":"Y1.foreground-tree","bounds":[0.635,0.6,0.785,1],"baseMove":"wet on dry","referenceCue":"Yellow-green foreground tree: connected irregular local-color mass on dry paper, dry then connected green shadow groups, crisp selected leaf-group edges. Leaves below four cells are grouped value shapes, never individual disks. No foliage outlining."},
+    {"id":"Y1.street","bounds":[0,0.88,1,1],"baseMove":"wet on dry","referenceCue":"Pavement, tiny figures, dark banner and traffic signal. Pale ground wash, dry small local-color masses, cool connected ground shadow and darkest accents last. Keep signal and banner graphic, people gestural; no invented lettering or faces."}
+  ],
+  "reserves": []
+}

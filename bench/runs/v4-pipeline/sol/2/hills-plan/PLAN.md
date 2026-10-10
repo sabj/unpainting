@@ -1,0 +1,49 @@
+# Hills, V4 try 2: loose ink and wash
+
+Reference: `bench/targets/hills-crop.png`, 306 × 242 source pixels. Final sheet: 1224 × 968 native cells, 158.0479 × 124.9921 mm. Date: 2026-10-09. Frozen V096 painter; independent painting, no earlier tries consulted.
+
+## Composition and values
+
+There is no sky in this crop. Read the picture as four values: cream tracks and minute paper glints; luminous yellow-green slopes; muted grey-green light crowns; deep blue-green wooded ravines. The focal point is the large branching tree immediately left of the foreground path bend, about (100,150) in the reference. The winding cream ribbon must remain continuous and connect the near meadow to the smaller upper slopes. The diagonal dark woods give depth, rather than an even spread of leaf texture.
+
+Use ink-and-wash throughout. Family bounds describe the painter's target-derived shapes, and never serve as rectangular painting masks. Retain the fitted production geometry. The executed profile puts a transparent foundation into band 1 and the connected shadow glaze into band 4: two main applications per place, with late restrained paint touch-ups. Separate pigment passes are parts of those applications, not invitations to add successive washes everywhere. No mid-value quantile layering is requested. Lights and hills outside the shadow support receive their full local-color plane in the foundation.
+
+## Regions and technique
+
+Every first stroke starts on measured dry paper. Within one connected passage, its own wet overlap is allowed. Water and pigment consistency are separate: foundation water 0.55, watery to medium pigment at fitted target demand; shadow water 0.40, medium to strong pigment at fitted demand. The executor must check the entire stroke footprint and neighbours; dry, wait or move elsewhere if the next dry layer is not admitted. The fixed physical painter handles drying and calibration; do not infer paper state from elapsed time.
+
+1. High ridge: wash question. The chartreuse ridge is a broad transparent plane on dry paper, not grass blades. Pale hansa/ochre/sap-green mixture, warm track left light. Small distant tree groups share the muted cool mass and receive only a shadow glaze after complete drying. Broken silhouettes, less contrast and no extra distant branch detail.
+2. Left slope and path: wash question, with selective ink at nearby tree forks. Carry the warm pale track through the green plane; do not outline both banks. Let the wash establish the turns. Dry, then glaze the adjacent wooded darks as connected groups, with a crisp edge where the track cuts past a tree and a lost edge within the canopy.
+3. Middle ravine: wash question for the masses, ink-and-wash for a few branches. First a connected blue-green and grey-green foundation; dry fully; one coherent shadow application crosses adjacent crowns, trunks and the low ground rather than filling each crown separately. Ultramarine, sepia and sap green provide the dark mixture. The light-facing grey-green crown shapes must survive. Darks stay pigment washes, never a pen fill.
+4. Foreground trees: ink-and-wash question for the thin branching trunk; wash question for the crown. Sparse structural sepia drawing first; connected crown foundation; dry; strong, controlled blue-green shadow glaze; dry; selective closing sepia forks and broken crown gestures concentrated around the focal tree. One firm external edge and some lost internal edges. No equal leaf disks or stippling.
+5. Foreground meadow and S-shaped track: wash question. One connected luminous local-color plane with broad changes in terrain value. The target contains small broken ground accents, but blades are below reliable wash scale and must not become a field of separate marks. Dry ground shadows connect to the bordering tree groups. The broad near track is cream/raw sienna, with its brightest areas protected and its banks irregular. Closing lines stay in dark bordering vegetation.
+
+## Resolution and brush decisions
+
+One source pixel is 0.5165 mm and four native cells; one native cell is 0.12912 mm. Track widths range from roughly 2–14 source pixels, or 8–56 native cells: paint the plane. Light crown groups are about 3–12 source pixels, or 12–48 native cells: paint connected shapes. Tiny branch ribbons, roughly 0.15–0.40 mm (1.2–3.1 cells), belong to physical sepia ink. Individual blades and leaf flecks are not separate watercolor shapes.
+
+Retain target-fitted physical brush paths and side/belly contact for planes, point contact for narrow shapes. Representative intended brush radii are 1.5–4 mm (12–31 cells) for meadow planes and 1–3 mm (8–23 cells) for crowns, reduced along narrowing geometry. A 12-cell crown support against an 8-cell brush radius gives a support/radius ratio of 1.5; four cells is the minimum useful wash body. Actual support estimates and brush geometry come from the compile, not the source upscale. Judge final ink and edges at 1224 native width; the low-resolution reference is only a geometry and value guide.
+
+## Protected lights and drawing
+
+The two small explicit reserves sit inside real pale track lights: lower track at source x149–151.5, y214–217; upper track at x223–225.5, y3–6. Each short side exceeds 1 mm. They are bare-paper glints. Most of each track is a pale painted plane, not a rectangular white reserve. The executor also protects connected near-paper target lights. Lit hilltops and crown faces are painted light green/grey-green, not paper white. No planned lift or masking edge is needed.
+
+Opening drawing: 12 long source-supported gestures around the foreground forks and major wooded turns, pressure about 0.25; it should read as a sparse setup on one dip, not complete line art. Closing drawing: at most 54 supported gestures, ranked toward the focal and near trees. Each follows the target's actual thin-dark-line geometry; short texture fragments are dropped. Sepia ink declared explicitly by the recipe, absorption scale 4 rather than the base 8, width gain 1 rather than 2, and closing pressure 0.48 rather than 1. Check that the executed pigment is sepia ink and that opening/closing path routing uses the supplied files. No second closing file is needed; base ink4 falls back to closing-lines.json.
+
+## Order and checkpoints
+
+Reserve lights; sparse opening sepia; connected pale local-color foundations; measured full dry; connected cool shadow glaze across tree families; measured full dry; small physical paint touch-ups; restrained closing sepia on dry paint. No early dark or wet-in-wet exception: this reference shows controlled broken silhouettes and clean light tracks, which justify wet-on-dry foundations and dry glazing.
+
+Before physics, run bench/check.sh and inspect its value plan for connected light and shadow supports, no unsupported straight reserve edges, and the expected two-step progression. The fixed benchmark does not allow an independent crop physics test; use the opening stop and early foundation passages as the live technique proof instead.
+
+At the opening stop, expect a mostly bare sheet with only a few long gestures. After the foundation, expect connected pale hills and grey-green crowns with cream paths clearly visible; do not judge this stage against finished darks. After shadow glazing, expect the diagonal blue-green wooded mass and the focal trunk to read while hill light survives. Before closing, judge thumbnail values first, then lights, edge roles, landmarks and mark character. Closing ink adds local structure rather than recovering a failed wash.
+
+Failure signs: missing or blocked path ribbon; luminous slopes dulled to grey; all trees equally dark; disconnected leaf-shaped dots; uniformly blurred crowns; nested contour bands; long rectangular seams; black ink filling foliage; or excessive branch detail in the distance. Revise only unpainted passages at the first visible failure and document the observed reason here. Acceptance follows the watercolor skill's final judging list: value shapes, lights, edges, landmarks, purposeful mark character, natural light-to-dark progression and concentrated detail. Assess material execution separately from artistic quality.
+
+## Choices relative to the frozen base
+
+The new subject explicitly selects loose ink-and-wash and descriptive terrain families. The seven-paint box supplies warm paths, chartreuse slopes and mixed blue-green darks. Reduced ink absorption and width, plus lower drawing pressures, keep the fine sepia layer subordinate to connected washes. No architecture, sky or noise tokens are requested. The base's irrelevant subject-specific controls remain harness defaults.
+
+## Admission observations
+
+The frozen-width option/limit pre-check returned `ok: true`, with no failures. An independent permitted 612-cell compile reached the executable value plan: 24 pigment/region passes, 625 connected shapes, six target-color families, the chosen sepia material profile, and no unsupported band-1 axis edges. Its opening-path preview is sparse. The local `bench/check.sh` could not advance to its planning subprocess because this shell denies creation of its hard-coded shared slot under `/tmp`; the waiting command was stopped. `bench/paint.sh start` was submitted instead, since the harness performs the same admission check. After more than 12 minutes the harness still reported admission running and the painting unstarted. A subsequent `finish` request was declined because the check was still under way. Repeated `wait` and `status` requests returned the same pending admission state. No physical sheet has been available to inspect or judge, and no artistic acceptance is claimed. The submitted painting settings have not been revised. Full-width `ADMITTED` and a completed painting remain outstanding until the controller's admission job completes.

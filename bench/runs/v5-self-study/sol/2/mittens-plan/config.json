@@ -1,0 +1,93 @@
+{
+  "subject": "mittens",
+  "name": "Mittens — an economical sepia drawing with connected light washes",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "The target is a high-key fine-line portrait sketch. Thin lids, whiskers, fur growth and curls need drawing over a local-colour foundation and one coherent dry shadow glaze, without tiled middle-value layers.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "mittens.cat-head",
+      "bounds": [
+        0,
+        0,
+        0.51,
+        0.59
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Tall ears, upward gaze, pale green-gold iris and warm tabby patches. Controlled watery wash on dry paper; fine lids and directional whiskers in sepia; muzzle and glints kept light."
+    },
+    {
+      "id": "mittens.cat-body",
+      "bounds": [
+        0,
+        0.58,
+        0.51,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large irregular white bib, warm orange flank and oblique tabby bands. Connected local wash with lost light edges; a dry cross-boundary shadow and a few directional lines, no stippling."
+    },
+    {
+      "id": "mittens.portrait",
+      "bounds": [
+        0.51,
+        0.42,
+        0.94,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Almost-white forehead and nose ridge, pale warm cheek planes, gentle sockets and smile. Watery transparent skin wash on dry paper; upper lids in fine ink; lower lids stay quiet."
+    },
+    {
+      "id": "mittens.hair-contact",
+      "bounds": [
+        0.49,
+        0.2,
+        1,
+        0.73
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected charcoal curls with irregular paper gaps. Payne grey, sepia and ultramarine carry the dark mass; one dry glaze and sparse curved drawing, never ink filling."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Cat left eye catchlight: bare paper glint",
+      "bounds": [
+        0.08600000000000001,
+        0.24247104247104245,
+        0.091,
+        0.24826254826254826
+      ]
+    },
+    {
+      "reason": "Cat right eye catchlight: bare paper glint",
+      "bounds": [
+        0.266,
+        0.21428571428571427,
+        0.27099999999999996,
+        0.22007722007722008
+      ]
+    },
+    {
+      "reason": "Portrait left eye catchlight: pale glint preserved at this small scale",
+      "bounds": [
+        0.5993333333333334,
+        0.7162162162162162,
+        0.6043333333333334,
+        0.722007722007722
+      ]
+    },
+    {
+      "reason": "Portrait right eye catchlight: small pale reflected glint",
+      "bounds": [
+        0.8075,
+        0.6772200772200773,
+        0.8125,
+        0.683011583011583
+      ]
+    }
+  ]
+}

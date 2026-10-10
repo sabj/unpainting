@@ -1,0 +1,43 @@
+{"t": "2026-10-09 14:01:04 PDT", "kind": "adopted", "modelMinutes": 19.02, "unanswered": []}
+{"t": "2026-10-09 14:03:11 PDT", "kind": "start", "modelMinutes": 17.57, "variant": "region_w13", "renderKey": "b296e975a575afd59f4870aeab80fe6fb71f46ea384a451f17c833015856a217"}
+{"t": "2026-10-09 14:06:06 PDT", "kind": "adopted", "modelMinutes": 18.97, "unanswered": []}
+{"t": "2026-10-09 14:11:01 PDT", "kind": "adopted", "modelMinutes": 17.86, "unanswered": []}
+{"t": "2026-10-09 14:17:44 PDT", "kind": "look", "modelMinutes": 17.82, "n": 1, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 129}
+{"t": "2026-10-09 14:19:31 PDT", "kind": "revise", "modelMinutes": 18.42, "boundary": "0", "revision": 1, "strokes": 0, "passesDone": 0, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w13_onedom"}
+{"t": "2026-10-09 14:22:15 PDT", "kind": "adopted", "modelMinutes": 19.31, "unanswered": []}
+{"t": "2026-10-09 14:23:09 PDT", "kind": "adopted", "modelMinutes": 18.69, "unanswered": []}
+{"t": "2026-10-09 14:24:19 PDT", "kind": "machine-lost", "modelMinutes": 18.55, "n": 1, "why": "infra: exit 1, None"}
+{"t": "2026-10-09 14:24:24 PDT", "kind": "machine-lost", "modelMinutes": 18.62, "n": 2, "why": "infra: exit 1, queued 1 jobs on lease 1009130337-220; outputs land in <local path>"}
+{"t": "2026-10-09 14:27:28 PDT", "kind": "machine-lost", "modelMinutes": 18.72, "n": 3, "why": "infra: exit 1, queued 1 jobs on lease 1009130337-220; outputs land in <local path>"}
+{"t": "2026-10-09 14:29:52 PDT", "kind": "look", "modelMinutes": 18.79, "n": 2, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 112}
+{"t": "2026-10-09 14:30:04 PDT", "kind": "adopted", "modelMinutes": 18.99, "unanswered": []}
+{"t": "2026-10-09 14:30:20 PDT", "kind": "continue", "modelMinutes": 19.26, "boundary": "0", "stopAt": 6, "strokes": 0}
+{"t": "2026-10-09 14:31:25 PDT", "kind": "restart", "modelMinutes": 19.87, "n": 1}
+{"t": "2026-10-09 14:33:18 PDT", "kind": "start", "modelMinutes": 19.86, "variant": "region_w13_onedom", "renderKey": "3f3062c042f78b9c0a69261308f38e3ba383933ab8b3b2a91205bdaa8dd12e54"}
+{"t": "2026-10-09 14:36:24 PDT", "kind": "look", "modelMinutes": 20.01, "n": 3, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 112}
+{"t": "2026-10-09 14:36:25 PDT", "kind": "look", "modelMinutes": 20.03, "n": 4, "boundary": "0", "strokes": 0, "penLines": 0, "passesDone": 0, "passesPlanned": 112}
+{"t": "2026-10-09 14:36:38 PDT", "kind": "continue", "modelMinutes": 20.24, "boundary": "0", "stopAt": 6, "strokes": 0}
+{"t": "2026-10-09 14:38:52 PDT", "kind": "look", "modelMinutes": 20.3, "n": 5, "boundary": "6", "strokes": 577, "penLines": 0, "passesDone": 6, "passesPlanned": 112}
+{"t": "2026-10-09 14:39:01 PDT", "kind": "continue", "modelMinutes": 20.45, "boundary": "6", "stopAt": 20, "strokes": 577}
+{"t": "2026-10-09 14:43:51 PDT", "kind": "look", "modelMinutes": 20.47, "n": 6, "boundary": "20", "strokes": 1977, "penLines": 0, "passesDone": 20, "passesPlanned": 112}
+{"t": "2026-10-09 14:44:07 PDT", "kind": "continue", "modelMinutes": 20.73, "boundary": "20", "stopAt": 40, "strokes": 1977}
+{"t": "2026-10-09 14:51:00 PDT", "kind": "look", "modelMinutes": 20.76, "n": 7, "boundary": "40", "strokes": 3812, "penLines": 0, "passesDone": 40, "passesPlanned": 112}
+{"t": "2026-10-09 14:53:42 PDT", "kind": "revise", "modelMinutes": 21.78, "boundary": "40", "revision": 1, "strokes": 3812, "passesDone": 40, "changed": ["variant.txt"], "variant": "region_w13_onedom_ew8"}
+{"t": "2026-10-09 15:06:03 PDT", "kind": "look", "modelMinutes": 21.82, "n": 8, "boundary": "60", "strokes": 5464, "penLines": 0, "passesDone": 60, "passesPlanned": 113}
+{"t": "2026-10-09 15:06:24 PDT", "kind": "look", "modelMinutes": 22.18, "n": 9, "boundary": "60", "strokes": 5464, "penLines": 0, "passesDone": 60, "passesPlanned": 113}
+{"t": "2026-10-09 15:06:30 PDT", "kind": "continue", "modelMinutes": 22.28, "boundary": "60", "stopAt": 98, "strokes": 5464}
+{"t": "2026-10-09 15:12:00 PDT", "kind": "adopted", "modelMinutes": 23.23, "unanswered": []}
+{"t": "2026-10-09 15:16:56 PDT", "kind": "look", "modelMinutes": 22.33, "n": 10, "boundary": "98", "strokes": 7527, "penLines": 0, "passesDone": 98, "passesPlanned": 113}
+{"t": "2026-10-09 15:16:57 PDT", "kind": "look", "modelMinutes": 22.35, "n": 11, "boundary": "98", "strokes": 7527, "penLines": 0, "passesDone": 98, "passesPlanned": 113}
+{"t": "2026-10-09 15:17:42 PDT", "kind": "continue", "modelMinutes": 23.11, "boundary": "98", "stopAt": 105, "strokes": 7527}
+{"t": "2026-10-09 15:20:02 PDT", "kind": "adopted", "modelMinutes": 23.93, "unanswered": []}
+{"t": "2026-10-09 15:21:14 PDT", "kind": "look", "modelMinutes": 25.03, "n": 12, "boundary": "105", "strokes": 8195, "penLines": 0, "passesDone": 105, "passesPlanned": 113}
+{"t": "2026-10-09 15:23:45 PDT", "kind": "revise", "modelMinutes": 26.18, "boundary": "105", "revision": 2, "strokes": 8195, "passesDone": 105, "changed": ["extra-args.json", "variant.txt"], "variant": "region_w13_onedom_ew8_dk11"}
+{"t": "2026-10-09 15:28:02 PDT", "kind": "adopted", "modelMinutes": 30.34, "unanswered": []}
+{"t": "2026-10-09 15:32:22 PDT", "kind": "look", "modelMinutes": 34.59, "n": 13, "boundary": "112", "strokes": 8642, "penLines": 0, "passesDone": 112, "passesPlanned": 113}
+{"t": "2026-10-09 15:32:38 PDT", "kind": "continue", "modelMinutes": 34.85, "boundary": "112", "stopAt": "closing", "strokes": 8642}
+{"t": "2026-10-09 15:34:30 PDT", "kind": "adopted", "modelMinutes": 35.22, "unanswered": []}
+{"t": "2026-10-09 15:38:13 PDT", "kind": "look", "modelMinutes": 38.84, "n": 14, "boundary": "closing", "strokes": 11562, "penLines": 0, "passesDone": 128, "passesPlanned": 128}
+{"t": "2026-10-09 15:38:25 PDT", "kind": "continue", "modelMinutes": 39.04, "boundary": "closing", "stopAt": "end", "strokes": 11562}
+{"t": "2026-10-09 15:38:37 PDT", "kind": "adopted", "modelMinutes": 39.03, "unanswered": ["227"]}
+{"t": "2026-10-09 15:41:20 PDT", "kind": "session-end", "modelMinutes": 40.44, "why": "you ended the session", "looks": 14, "revisions": 2}

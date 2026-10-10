@@ -1,0 +1,125 @@
+{
+  "subject": "BENCHMITTENS",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is a portrait sketch: pale warm value planes and coherent charcoal curls, dry focal edges, fine selective sepia lines.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "cat.ears",
+      "bounds": [
+        0,
+        0,
+        0.51,
+        0.33
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Open pale ear interiors with amber broken rims; wet-on-dry plane, dry fine rim lines."
+    },
+    {
+      "id": "cat.face",
+      "bounds": [
+        0,
+        0.12,
+        0.51,
+        0.61
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ochre tabby planes, outward cheek growth, white muzzle and four-cell lid ribbons; wash plus fine fitted ink."
+    },
+    {
+      "id": "cat.chest",
+      "bounds": [
+        0.025,
+        0.52,
+        0.54,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large untouched white chest, warm side planes and downward fur groups; connected light washes and shadow glaze."
+    },
+    {
+      "id": "human.hair",
+      "bounds": [
+        0.49,
+        0.19,
+        1,
+        0.75
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Charcoal curls grouped into a connected mixed-dark wash with irregular paper breaks; only a few directional curl lines."
+    },
+    {
+      "id": "human.face",
+      "bounds": [
+        0.5,
+        0.43,
+        0.96,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale warm skin, dry crisp eyes, warm brows and soft cheek turns; light wash, dry mids, unified edge shadow."
+    },
+    {
+      "id": "human.eyes",
+      "bounds": [
+        0.54,
+        0.65,
+        0.88,
+        0.78
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small upper lid ribbons, brown irises and clear catchlights; controlled dry paint shapes with fine sepia drawing."
+    },
+    {
+      "id": "human.mouth",
+      "bounds": [
+        0.63,
+        0.81,
+        0.87,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Nostril accents and an understated upward mouth corner; dry precise planes and selective closing pen."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "cat far-eye catchlight: bare paper",
+      "bounds": [
+        0.085,
+        0.24362934362934363,
+        0.08966666666666666,
+        0.24903474903474904
+      ]
+    },
+    {
+      "reason": "cat near-eye catchlight: bare paper",
+      "bounds": [
+        0.26633333333333337,
+        0.21428571428571427,
+        0.27133333333333337,
+        0.22007722007722008
+      ]
+    },
+    {
+      "reason": "human left-eye catchlight: bare paper",
+      "bounds": [
+        0.597,
+        0.7193050193050193,
+        0.6016666666666667,
+        0.7247104247104247
+      ]
+    },
+    {
+      "reason": "human right-eye catchlight: bare paper",
+      "bounds": [
+        0.8056666666666666,
+        0.6806949806949807,
+        0.8103333333333333,
+        0.686100386100386
+      ]
+    }
+  ]
+}

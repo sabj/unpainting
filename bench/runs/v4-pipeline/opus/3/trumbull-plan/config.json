@@ -1,0 +1,26 @@
+{"subject":"Y1","name":"BENCHTRUMBULL",
+ "styleSelection":{"style":"precise-watercolor","reason":"precise architectural watercolor: stone planes as shaped washes on dry paper, hard irregular edges, cross-region shadow glazes, selective sepia closing ink on structure","regions":{}},
+ "families":[
+  {"id":"Y1.sky-right","bounds":[0.58,0,1,0.30],"baseMove":"wet on dry","referenceCue":"pale blue sky with white cumulus at the top right; connected graded sky wash (the painter folds its soft sky passages into graded washes), cloud lights kept"},
+  {"id":"Y1.sky-left","bounds":[0,0,0.155,0.19],"baseMove":"wet on dry","referenceCue":"pale blue sky behind the left wing and spire; same graded sky wash"},
+  {"id":"Y1.glass-left","bounds":[0,0.15,0.075,0.30],"baseMove":"wet on dry","referenceCue":"cool grey-blue modern glass block in the distance; one pale flat wash, no detail"},
+  {"id":"Y1.tower-left","bounds":[0.15,0,0.29,0.75],"baseMove":"wet on dry","referenceCue":"warm stone tower, lit left face and a cooler shadowed right face; broad plane then shadow glaze"},
+  {"id":"Y1.roof-main","bounds":[0.29,0.02,0.53,0.20],"baseMove":"wet on dry","referenceCue":"blue-grey slate roof plane, lighter at the ridge; one wash, then a darker glaze at the eave"},
+  {"id":"Y1.gable","bounds":[0.38,0,0.68,0.42],"baseMove":"wet on dry","referenceCue":"sunlit warm stone gable with rose window and lancet windows; broad pale ochre plane"},
+  {"id":"Y1.facade-central","bounds":[0.28,0.20,0.68,0.98],"baseMove":"wet on dry","referenceCue":"warm stone facade with arched windows; one connected plane, stone courses as texture, dark window recesses last"},
+  {"id":"Y1.buttress-shadow","bounds":[0.655,0.36,0.745,0.66],"baseMove":"wet on dry","referenceCue":"shadowed stone buttress between gable and right wing; mid value plane then the deepest shadow glaze"},
+  {"id":"Y1.tower-right","bounds":[0.795,0.095,0.905,0.42],"baseMove":"wet on dry","referenceCue":"warm stone chimney tower against the sky, crisp silhouette"},
+  {"id":"Y1.roof-right","bounds":[0.69,0.19,1,0.37],"baseMove":"wet on dry","referenceCue":"blue-grey slate roof of the right wing, gables and dormers"},
+  {"id":"Y1.wing-right","bounds":[0.69,0.35,1,0.97],"baseMove":"wet on dry","referenceCue":"warm stone right wing with mullioned windows; broad plane, window darks last"},
+  {"id":"Y1.wing-left","bounds":[0,0.18,0.155,0.95],"baseMove":"wet on dry","referenceCue":"warm stone left wing in partial shade with mullioned windows"},
+  {"id":"Y1.roof-low","bounds":[0.745,0.625,0.93,0.685],"baseMove":"wet on dry","referenceCue":"low pale slate roof over the right porch"},
+  {"id":"Y1.tree-right","bounds":[0.625,0.63,0.775,0.99],"baseMove":"wet on dry","referenceCue":"young yellow-green tree; one irregular canopy wash, darker green groups on the shadow side, thin trunk last"},
+  {"id":"Y1.tree-left","bounds":[0.11,0.72,0.22,0.97],"baseMove":"wet on dry","referenceCue":"small olive tree in shade at the left tower foot; one soft canopy mass"},
+  {"id":"Y1.foliage-edge","bounds":[0,0.5,0.05,0.87],"baseMove":"wet on dry","referenceCue":"green foliage at the left edge; a soft mass"},
+  {"id":"Y1.sign","bounds":[0.37,0.57,0.44,0.73],"baseMove":"wet on dry","referenceCue":"dark navy street sign; crisp dark shape on dry paper, white lettering left as paper by the painter"},
+  {"id":"Y1.street","bounds":[0.23,0.78,0.35,0.99],"baseMove":"wet on dry","referenceCue":"traffic signals, green street signs and the grey lamp post; small dark accents on dry paper"},
+  {"id":"Y1.ground","bounds":[0,0.95,1,1],"baseMove":"wet on dry","referenceCue":"pale pavement and small figures; mostly paper, light warm grey touches"}
+ ],
+ "reserves":[
+  {"reason":"brightest white cumulus core at the top right of the sky, bare paper; edges softened by the sky wash around it","bounds":[0.94,0.02,0.985,0.07]}
+ ]}

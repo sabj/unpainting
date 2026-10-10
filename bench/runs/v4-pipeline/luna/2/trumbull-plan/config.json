@@ -1,0 +1,48 @@
+{
+  "subject": "trumbull",
+  "name": "Trumbull V4 try 2: precise architectural watercolor",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Warm limestone planes and fitted architectural edges carry the image; keep the V096 light-to-dark paint ladder and use sepia ink only on the target's hard structural lines.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "trumbull.sky",
+      "bounds": [0, 0, 1, 0.43],
+      "baseMove": "wet in wet",
+      "referenceCue": "Cool blue, lightly variegated sky visible above and between the roof silhouettes; one connected soft first wash, with the roof edge kept dry."
+    },
+    {
+      "id": "trumbull.main-facade",
+      "bounds": [0.12, 0.03, 0.78, 0.99],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad, sunlit golden limestone gable and tower; pale wall planes with crisp arched openings and deeper eave turns."
+    },
+    {
+      "id": "trumbull.left-wing",
+      "bounds": [0, 0.14, 0.29, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "Receding left stone wing in cooler shade, with a few dark rectangular window groups."
+    },
+    {
+      "id": "trumbull.right-wing",
+      "bounds": [0.69, 0.22, 1, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right stone wing and low connector, with shaded roof planes and small window grids."
+    },
+    {
+      "id": "trumbull.foliage",
+      "bounds": [0.63, 0.58, 0.9, 0.99],
+      "baseMove": "wet on dry",
+      "referenceCue": "Irregular green tree mass against the right facade; retain a few broken light gaps and avoid separate round leaf stamps."
+    },
+    {
+      "id": "trumbull.foreground",
+      "bounds": [0, 0.87, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "Narrow ground, curb and street objects; keep their dark marks small and attached to the lower edge."
+    }
+  ],
+  "reserves": []
+}

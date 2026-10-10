@@ -1,0 +1,19 @@
+# Independent review, before reading FEEDBACK.md
+
+The winding pale road and the broad arrangement of wooded hills are recognizable. The biggest foreground clearing, left bend, upper road and dark tree groups are in roughly the right places. Cool foliage against warmer grass gives a readable value thumbnail. There is a credible pale-to-dark progression rather than a dark image appearing all at once.
+
+The grass is too ochre and flat relative to the target's lively yellow-green. The foliage is broken into nested, similarly sized grey patches with scattered nearly black holes. Those darks often have no trunk or connected shadow to explain them. The large central and right-hand trees lack their distinctive vertical form. The road is mostly glaring paper white rather than a warm, pale painted plane; white gaps also run around many unrelated shapes. There is almost no selective drawing to carry trunks, the forked foreground tree, or the road's interrupted edges, so this is closer to segmented wash than loose ink and wash. The paint feels opaque and posterized, with repeated scalloped shapes rather than a few purposeful brush gestures.
+
+The earliest visible problem is already in the 10% stage: a broad flat grey foundation carries diagonal brush bands on the right and treats most woods as one undifferentiated fill. At 25%, separate ochre islands and the over-white road establish the wrong grass colour and too many disconnected reserves. At 50%, repeated grey canopy fragments establish the patchwork. Later blue-black additions increase contrast but do not restore coherent tree/shadow masses; they sometimes intensify the holes. The final stage supplies little new drawing or structure.
+
+My score for the finished painting: **5.0 / 10**. My score for how plausibly it was painted: **3.0 / 5**. The ordering is plausible, but uniform segmentation, diagonal underwash traces, and many isolated dark chips make the hand and decisions less convincing.
+
+For the next attempt I would first improve connected warm-green ground planes and the warm road tint, keep a lighter and less uniform foliage base, use fewer connected canopy shadow groups, and add sparse structural ink at the road bends and important trunks. I would avoid trying to cure the entire image with extra black ink or dense leaf tracing.
+
+# After reading the external feedback
+
+I agree with the weak early-stage scores and their flat slabs, straight diagonal front and dotted trails. These are visible in the first two stages independently of the numerical ratings. I also agree that edges/detail and mark character are weaker than the composition. The finished composite of 4.98 is very close to my own 5.0, although the panel's individual 2–3 ratings are more severe than my assessment of its readable composition.
+
+I disagree with 5/5 plausibility at 75% and 100%: the repeated grey patches and isolated dark chips remain obvious then. I also reject the high classic edge/mark scores as an artistic endorsement; sharp segmented silhouettes are not enough to make convincing watercolor marks. The late texture arrives more gradually than a literal one-time dump, but the wash-first/texture-later contrast is too abrupt because the opening is weak. I will improve the earlier layer rather than add more late texture. I do not interpret the criticism as a request for dense outlines, individual grass blades, or a whole-sheet wet blur.
+
+Accepted changes: classify this full-bleed photo crop as containing no broad paper-white region, paint the cream road from the first wash, use a cleaner yellow/green palette, reduce woodland foundation strength, use overlapping physically planned strokes with local charge variation in broad planes, simplify dark support, and draw a few meaningful tree gestures at useful pressure. Retained: fitted irregular geometry, light-to-dark sequence, full drying before glazes, selective ink, fixed native density and all real paper physics.

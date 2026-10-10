@@ -1,0 +1,166 @@
+{
+  "date": "2026-10-08",
+  "subject": "White Ships",
+  "width": 540,
+  "sourceCommit": "95ff690bb17fa04526b8e092ec22ba81c2c0e5ea",
+  "command": "node tools/paint-plate.mjs --image examples/targets/white-ships.jpg --width 540 --mode fast --planmasses 12 --maskblur 8 --maxvalues 6 --marks 1 --filmby pass --out work/white-ships-masses-audit",
+  "inputs": {
+    "target": "examples/targets/white-ships.jpg",
+    "targetSHA256": "f01465f15dcaef015568c6e1f14603e7c5a77227c491a71a4332d70d4b87ef14",
+    "previousOutput": "examples/output/white-ships-540-painting.jpg",
+    "previousOutputSHA256": "b465142a4930b7f689dcbccc02eb68f7b6d8b007d8bebd8706c6732566cbad3f"
+  },
+  "candidate": {
+    "path": "work/white-ships-masses-audit/painting.png",
+    "sha256": "de9bb025fdba6c75d6b0a1380e7a6df2d8ccaad6e8cebbe814ec453dcd23ab4e",
+    "samePixelsAsInitialCandidate": true
+  },
+  "inspection": {
+    "scale": "1:1; target resized to the native 540 px painting width; previous output at its native 540 px",
+    "verdict": "fail",
+    "reasons": [
+      "Flat patches and nested contours remain in the hull and sails.",
+      "Green contour loops dominate the rigging and water.",
+      "Distinct water reflections are lost.",
+      "The stroke audit reports 14799 paint strokes, 23.1% small; this is not a few purposeful masses."
+    ],
+    "regions": {
+      "sailsAndHull": "Broad pale planes, reserved lights, dry shadow glazes were the intended reading; remaining flat patches fail the mass and edge check.",
+      "water": "Connected underwash and selective reflections were the intended reading; contour loops and lost reflections fail the scene and mark check.",
+      "rigging": "Selective dry line work should carry the thin features at this density; green loops fail the drawing and paint balance."
+    }
+  },
+  "guard": {
+    "category": "painted",
+    "mode": "gentle",
+    "phase": "done",
+    "violations": 0,
+    "blockedAttempts": 0,
+    "elementReads": {}
+  },
+  "cheatRisk": {
+    "run": "white-ships-masses-audit",
+    "target": "examples/targets/white-ships.jpg",
+    "version": 2,
+    "strokes": 14799,
+    "smallShare": 0.231,
+    "hfCorr": 0.536,
+    "hfCeiling": 0.53,
+    "prog": {
+      "10": {
+        "frame": "f0012.jpg",
+        "at": 0.07,
+        "stage": "paint value 4 of 6",
+        "dark": 0.07,
+        "p95": 0.32,
+        "mean": 0.15,
+        "hf": 1.02
+      },
+      "25": {
+        "frame": "f0013.jpg",
+        "at": 0.23,
+        "stage": "paint value 2 of 6",
+        "dark": 0.08,
+        "p95": 0.35,
+        "mean": 0.22,
+        "hf": 1
+      },
+      "50": {
+        "frame": "f0015.jpg",
+        "at": 0.59,
+        "stage": "paint value 4 of 6",
+        "dark": 0.26,
+        "p95": 0.78,
+        "mean": 0.8,
+        "hf": 0.92
+      },
+      "75": {
+        "frame": "f0016.jpg",
+        "at": 0.81,
+        "stage": "paint value 2 of 6",
+        "dark": 0.78,
+        "p95": 0.95,
+        "mean": 0.96,
+        "hf": 1.01
+      },
+      "100": {
+        "frame": "f0017.jpg",
+        "at": 1,
+        "stage": "paint value 6 of 6",
+        "dark": 1,
+        "p95": 1,
+        "mean": 1,
+        "hf": 1
+      }
+    },
+    "sweeps": [
+      {
+        "from": 10,
+        "to": 25,
+        "front": 0
+      },
+      {
+        "from": 25,
+        "to": 50,
+        "front": 0
+      },
+      {
+        "from": 50,
+        "to": 75,
+        "front": 0
+      },
+      {
+        "from": 75,
+        "to": 100,
+        "front": 0
+      }
+    ],
+    "flags": [
+      "early detail"
+    ],
+    "keys": null,
+    "judge": null,
+    "guard": {
+      "guarded": true,
+      "mode": "gentle",
+      "violations": 0,
+      "byName": {},
+      "pixelFit": 0
+    },
+    "parts": {
+      "progression": 0.5,
+      "copy": 0.06,
+      "small": 0.66,
+      "pixelFit": 0
+    },
+    "risk": 0.32,
+    "level": "medium",
+    "review": false,
+    "strip": "work/white-ships-masses-audit/stages/strip.jpg",
+    "stageBasis": "strokes laid (marks.json frame markers)"
+  },
+  "scoringNote": "The initial fast run omitted marks and sampled mostly drawing frames, reporting 0.03 with an unmeasured small-stroke part. The audited run uses the same painting pixels, records strokes and samples completed passes; 0.32 is the complete score used for the verdict.",
+  "fallback": {
+    "reason": "Trumbull v72 region recipe inputs are not included in this checkout.",
+    "command": "npm run example",
+    "plan": "examples/plans/graded-wash.json",
+    "output": "work/plan-graded-wash/result.png",
+    "savedOutput": "examples/output/graded-wash-result.png",
+    "savedOutputSHA256": "195dbd9d1f44a5abdeb03ae63cdc86eb5aea1eeaa8817a7b794e97d45ab170f4",
+    "paths": 5,
+    "seconds": 5.026
+  },
+  "validation": {
+    "tests": {
+      "passed": 841,
+      "knownFailures": 12,
+      "skipped": 3,
+      "newFailures": 0
+    },
+    "quickStart": {
+      "command": "npm run quick-start",
+      "seconds": 4.75
+    },
+    "readme": "Rendered locally and inspected in Chrome; glaze swatches display at 350 x 106 px with a one-line label."
+  }
+}

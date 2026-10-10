@@ -1,0 +1,48 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull V5 try 2",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is already a watercolor plate: broad connected stone and sky washes carry the value planes; crisp roof, arch and window edges carry structure; sepia drawing stays selective.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0, 0, 1, 0.28],
+      "baseMove": "wet on dry",
+      "referenceCue": "One pale blue field broken by the target's irregular white cloud openings and roof silhouettes."
+    },
+    {
+      "id": "Y1.left-tower",
+      "bounds": [0, 0.02, 0.39, 0.88],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm left tower, its lit front plane, darker return, and the partly cropped neighboring roof."
+    },
+    {
+      "id": "Y1.central-gable",
+      "bounds": [0.24, 0, 0.73, 0.94],
+      "baseMove": "wet on dry",
+      "referenceCue": "Luminous ochre gable with a clear roof ridge, paired pointed arches, and a small number of firm window recesses."
+    },
+    {
+      "id": "Y1.right-wing",
+      "bounds": [0.66, 0.18, 1, 0.91],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cooler receding roof and stone planes, with a distinct side wall and narrow dark openings."
+    },
+    {
+      "id": "Y1.foliage",
+      "bounds": [0.58, 0.57, 0.99, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "A compact yellow-green tree mass in front of the right facade, with connected shadow clumps and an irregular silhouette."
+    },
+    {
+      "id": "Y1.street",
+      "bounds": [0, 0.73, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "A few connected pavement planes and the small, high-contrast sign, post, signal and cropped street marks."
+    }
+  ],
+  "reserves": []
+}

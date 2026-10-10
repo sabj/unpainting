@@ -1,0 +1,67 @@
+{
+  "subject": "BENCHSARGENT",
+  "name": "White Ships — connected brush washes and restrained dry shadows, V5 try 3",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure transparent watercolor. Pale connected washes, dry, one middle-color passage, dry, restrained cross-region shadows. Broad planes use overlapping loaded strokes; fine fittings remain dry-paper shapes. No ink or graphite.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "BENCHSARGENT.central-bow",
+      "bounds": [
+        0.21,
+        0,
+        0.68,
+        0.93
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale curved blue-grey bow, oblique cream strakes, firm upper rim and fine central fitting. Wash question: connected light and middle washes using overlapping broad loaded sweeps; dry between layers. Shadows last join the lower bow to its reflection. Internal turns softened selectively, silhouette firm. Watery light load, medium middle load, restrained medium shadow glaze; no white slit through the blue body."
+    },
+    {
+      "id": "BENCHSARGENT.cream-hull",
+      "bounds": [
+        0.62,
+        0,
+        1,
+        0.73
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm cream right hull with soft blue turning shadows, oval dark fittings and narrow crossing ropes. Negative-painting and wash question. Bare paper only in the brightest connected planes; pale painted tints around them. Light wash then dry; medium blue shadow planes then dry; controlled dark fittings last. No tiled rectangular reserves and no ink."
+    },
+    {
+      "id": "BENCHSARGENT.left-rigging-anchor",
+      "bounds": [
+        0,
+        0,
+        0.31,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ochre anchor, sienna rigging and slender cool supports. Narrow wash-body question. Connected warm foundation on dry paper, dry, shaped warm middle body, dry, selective dark joints last. Controlled medium load, firm light flank and tapered fitted ends. Preserve anchor holes and pale golden edge; no scattered dots."
+    },
+    {
+      "id": "BENCHSARGENT.water-reflection",
+      "bounds": [
+        0,
+        0.68,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Fresh blue-green water, pale broken horizontal glints and a connected dark reflection below the bow. Broad wash question with paper-tooth sparkle. Pale underwash on dry paper using its own wet overlap; dry, middle blue/green wash; dry, one shadow intention in two restrained transparent applications crossing bow into water. No straight ground cutoff or artificial stipple."
+    },
+    {
+      "id": "BENCHSARGENT.right-rope",
+      "bounds": [
+        0.78,
+        0.21,
+        0.97,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Diagonal rusty ochre rope crossing cream hull and green water. Narrow connected painted body on dry paper with controlled medium load. Pale warm foundation, dry, warm middle shape, dry, selective dark junctions. Keep its narrow light flank and true interruptions; no ink outline."
+    }
+  ],
+  "reserves": []
+}

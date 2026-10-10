@@ -1,0 +1,128 @@
+{
+  "subject": "HILLS",
+  "name": "Hills — loose ink and wash",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "The winding pale track and bright open slopes read through connected green washes; sparse dry black branch gestures explain the woodland without outlining every crown.",
+    "regions": {
+      "HILLS.foreground-meadow": {
+        "style": "precise-watercolor",
+        "reason": "The sunlit yellow-green slopes and warm pale track need distinct transparent value planes and dry terrain edges; narrow grass detail is omitted, with ink reserved for neighboring trunks."
+      },
+      "HILLS.upper-meadow": {
+        "style": "precise-watercolor",
+        "reason": "The sunlit yellow-green slopes and warm pale track need distinct transparent value planes and dry terrain edges; narrow grass detail is omitted, with ink reserved for neighboring trunks."
+      },
+      "HILLS.left-meadow": {
+        "style": "precise-watercolor",
+        "reason": "The sunlit yellow-green slopes and warm pale track need distinct transparent value planes and dry terrain edges; narrow grass detail is omitted, with ink reserved for neighboring trunks."
+      },
+      "HILLS.central-path": {
+        "style": "precise-watercolor",
+        "reason": "The sunlit yellow-green slopes and warm pale track need distinct transparent value planes and dry terrain edges; narrow grass detail is omitted, with ink reserved for neighboring trunks."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "HILLS.distant-wood",
+      "bounds": [
+        0,
+        0,
+        0.6,
+        0.27
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Upper-left distant woodland: grey olive crown tops over a cool blue-grey connected foundation, quieter than the central trees. Wash first; dry shadow glaze; no individual distant leaves."
+    },
+    {
+      "id": "HILLS.upper-meadow",
+      "bounds": [
+        0.44,
+        0,
+        1,
+        0.33
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Upper-right sunlit yellow-green hillside and pale descending track. Broad transparent wash with lost internal grass edges; preserve the light track as a pale warm painted plane."
+    },
+    {
+      "id": "HILLS.left-meadow",
+      "bounds": [
+        0.16,
+        0.17,
+        0.47,
+        0.54
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Diagonal sunlit grass beside the upper-left path. A connected pale yellow-green wash; dry restrained olive terrain shadows; the road has irregular light edges."
+    },
+    {
+      "id": "HILLS.central-wood",
+      "bounds": [
+        0.31,
+        0.15,
+        0.91,
+        0.67
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Main belt of overlapping cool blue-green and olive trees. Connected underwash, full dry, then coherent shadow groups crossing crowns and trunks, retaining warm crown-top lights."
+    },
+    {
+      "id": "HILLS.left-foreground-wood",
+      "bounds": [
+        0,
+        0.46,
+        0.43,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark near trees along the left side, including the forked tree beside the central bend. Mixed-dark wash and dry shadow glaze; the few narrow trunks and forks belong to selective black ink."
+    },
+    {
+      "id": "HILLS.foreground-meadow",
+      "bounds": [
+        0.42,
+        0.58,
+        0.96,
+        0.96
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Large luminous yellow-green slope to the right of the central path. One connected wash, gentle olive turning shadow on fully dry paint; grass stays a value plane with only broken edge texture."
+    },
+    {
+      "id": "HILLS.central-path",
+      "bounds": [
+        0.4,
+        0.55,
+        0.55,
+        0.96
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "The warm cream track bends out of the central woodland and descends toward the lower edge. Pale ochre wash, held near-paper lights, tiny dry accents only where a tree shadow meets it; no continuous pen outline."
+    },
+    {
+      "id": "HILLS.right-foreground-wood",
+      "bounds": [
+        0.81,
+        0.63,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Near right-hand trees interrupting the meadow. Cool connected wash followed by dry dark interiors, broken lit crown rims and a few tapering trunk marks."
+    },
+    {
+      "id": "HILLS.bottom-wood",
+      "bounds": [
+        0.32,
+        0.9,
+        0.83,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "referenceCue": "Foreground olive foliage across the foot of the pale track. Coherent mid-value wash with dry shadow pockets; leave small target-supported light interruptions."
+    }
+  ],
+  "reserves": []
+}

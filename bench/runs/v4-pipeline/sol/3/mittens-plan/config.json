@@ -1,0 +1,26 @@
+{
+  "subject": "Mittens",
+  "name": "Mittens and companion — fine lines and light washes",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is an airy portrait sketch: connected pale value planes, dry eyes, and fine selective sepia lines. Preserve the fitted shapes and the white vignette.",
+    "regions": {
+      "Mittens.cat-head": {"style": "precise-watercolor", "reason": "Warm tabby planes carry head likeness; fur strands and whiskers are a separate sparse ink layer over dry washes."},
+      "Mittens.cat-chest": {"style": "precise-watercolor", "reason": "The white bib is paper, with a connected ochre side plane and only a few directional fur edges."},
+      "Mittens.human-face": {"style": "precise-watercolor", "reason": "Very pale warm skin planes, crisp upper lids, softly turning cheek shadows, and almost untouched forehead."},
+      "Mittens.human-hair": {"style": "precise-watercolor", "reason": "The broad broken charcoal hair mass is painted progressively in mixed neutral washes; a few curling contours explain locks."}
+    }
+  },
+  "families": [
+    {"id": "Mittens.cat-head", "bounds": [0, 0, 0.515, 0.615], "baseMove": "wet on dry", "referenceCue": "Ochre and sienna tabby stripes around upward-looking green-grey eyes; dry upper lids; white muzzle; whiskers curve down and outward. Wash planes first, sparse directional ink after drying."},
+    {"id": "Mittens.cat-chest", "bounds": [0.025, 0.575, 0.535, 1], "baseMove": "wet on dry", "referenceCue": "Large reserved white bib and left shoulder; warm connected shadow down the right flank. Flowing wash body with broken fur edges, never stippled strands."},
+    {"id": "Mittens.human-face", "bounds": [0.505, 0.423, 0.952, 1], "baseMove": "wet on dry", "referenceCue": "High-key warm olive skin; almost white forehead and nose ridge; brown irises tucked under tapered dry upper lids; faint mouth and beard planes. Dry shaped mids followed by one connected cheek-to-temple shadow."},
+    {"id": "Mittens.human-hair", "bounds": [0.488, 0.2, 1, 0.68], "baseMove": "wet on dry", "referenceCue": "Connected neutral charcoal curls, broken by white paper gaps. Pale neutral foundation, dry, broad darker wash and shadow glaze; isolated curling pen accents only at a few outer locks."}
+  ],
+  "reserves": [
+    {"reason": "Cat left eye catchlight, bare paper", "bounds": [0.0855, 0.2417, 0.091, 0.2481]},
+    {"reason": "Cat right eye catchlight, bare paper", "bounds": [0.2667, 0.2134, 0.2722, 0.2198]},
+    {"reason": "Human left eye catchlight, tiny paper glint within toned iris", "bounds": [0.6005, 0.7166, 0.6055, 0.7224]},
+    {"reason": "Human right eye catchlight, tiny paper glint within toned iris", "bounds": [0.81, 0.6788, 0.815, 0.6846]}
+  ]
+}

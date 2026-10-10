@@ -1,0 +1,24 @@
+{"t": "2026-10-09 13:49:30 PDT", "kind": "start", "modelMinutes": 5.51, "variant": "region_w13_lay2_dk11", "renderKey": "0c5b5bf366b87c848e11984a81f1ac7b676dff15f493e932c8a03d00873b7fd5"}
+{"t": "2026-10-09 14:01:04 PDT", "kind": "adopted", "modelMinutes": 6.49, "unanswered": []}
+{"t": "2026-10-09 14:06:06 PDT", "kind": "adopted", "modelMinutes": 6.99, "unanswered": []}
+{"t": "2026-10-09 14:08:14 PDT", "kind": "look", "modelMinutes": 6.34, "n": 1, "boundary": "0", "strokes": 0, "penLines": 40, "passesDone": 0, "passesPlanned": 16}
+{"t": "2026-10-09 14:11:01 PDT", "kind": "adopted", "modelMinutes": 9.13, "unanswered": []}
+{"t": "2026-10-09 14:12:48 PDT", "kind": "revise", "modelMinutes": 7.57, "boundary": "0", "revision": 1, "strokes": 0, "passesDone": 0, "changed": ["closing-lines.json"], "variant": "region_w13_lay2_dk11"}
+{"t": "2026-10-09 14:16:00 PDT", "kind": "look", "modelMinutes": 8.14, "n": 2, "boundary": "1", "strokes": 143, "penLines": 40, "passesDone": 1, "passesPlanned": 16}
+{"t": "2026-10-09 14:16:07 PDT", "kind": "continue", "modelMinutes": 8.27, "boundary": "1", "stopAt": 3, "strokes": 143}
+{"t": "2026-10-09 14:17:22 PDT", "kind": "look", "modelMinutes": 8.29, "n": 3, "boundary": "3", "strokes": 247, "penLines": 40, "passesDone": 3, "passesPlanned": 16}
+{"t": "2026-10-09 14:17:42 PDT", "kind": "continue", "modelMinutes": 8.62, "boundary": "3", "stopAt": 6, "strokes": 247}
+{"t": "2026-10-09 14:19:55 PDT", "kind": "look", "modelMinutes": 8.65, "n": 4, "boundary": "6", "strokes": 494, "penLines": 40, "passesDone": 6, "passesPlanned": 16}
+{"t": "2026-10-09 14:20:02 PDT", "kind": "continue", "modelMinutes": 8.75, "boundary": "6", "stopAt": 11, "strokes": 494}
+{"t": "2026-10-09 14:22:15 PDT", "kind": "adopted", "modelMinutes": 9.47, "unanswered": []}
+{"t": "2026-10-09 14:22:43 PDT", "kind": "look", "modelMinutes": 8.82, "n": 5, "boundary": "11", "strokes": 784, "penLines": 40, "passesDone": 11, "passesPlanned": 16}
+{"t": "2026-10-09 14:22:51 PDT", "kind": "continue", "modelMinutes": 8.96, "boundary": "11", "stopAt": 15, "strokes": 784}
+{"t": "2026-10-09 14:23:09 PDT", "kind": "adopted", "modelMinutes": 8.96, "unanswered": ["42"]}
+{"t": "2026-10-09 14:25:13 PDT", "kind": "look", "modelMinutes": 9.02, "n": 6, "boundary": "15", "strokes": 1038, "penLines": 40, "passesDone": 15, "passesPlanned": 16}
+{"t": "2026-10-09 14:25:20 PDT", "kind": "continue", "modelMinutes": 9.14, "boundary": "15", "stopAt": "closing", "strokes": 1038}
+{"t": "2026-10-09 14:30:04 PDT", "kind": "adopted", "modelMinutes": 9.33, "unanswered": []}
+{"t": "2026-10-09 14:31:22 PDT", "kind": "look", "modelMinutes": 9.29, "n": 7, "boundary": "closing", "strokes": 8700, "penLines": 40, "passesDone": 25, "passesPlanned": 25}
+{"t": "2026-10-09 14:31:28 PDT", "kind": "continue", "modelMinutes": 9.38, "boundary": "closing", "stopAt": "end", "strokes": 8700}
+{"t": "2026-10-09 14:33:27 PDT", "kind": "finished", "modelMinutes": 9.41, "strokes": 8700}
+{"t": "2026-10-09 14:33:30 PDT", "kind": "look", "modelMinutes": 9.47, "n": 8, "boundary": "final"}
+{"t": "2026-10-09 14:33:49 PDT", "kind": "session-end", "modelMinutes": 9.78, "why": "you ended the session", "looks": 8, "revisions": 1}

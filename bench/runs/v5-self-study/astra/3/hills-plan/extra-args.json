@@ -1,0 +1,14 @@
+[
+  "--paints", "hansa,sapgreen,ochre,sienna,ultramarine,cerulean,sepia",
+  "--paperrel", "0",
+  "--paperlights", "0",
+  "--paperbase", "white",
+  "--paperrgb", "252,251,248",
+  "--openingpressure", "0.25",
+  "--closingpressure", "0.48",
+  "--touchpoints", "0",
+  "--midgain", "0.95",
+  "--litlift", "0.22",
+  "--litl", "78",
+  "--litreserve", "96"
+]

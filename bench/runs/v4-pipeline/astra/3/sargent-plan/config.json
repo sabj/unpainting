@@ -1,0 +1,47 @@
+{
+  "subject": "BENCHSARGENT",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor: luminous cool hull planes, warm ochre rigging, shaped dry-paper fittings and connected final shadow glazes. Structure is carried entirely by paint and reserved light.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "ship.central-hull",
+      "bounds": [0.22, 0.0, 0.66, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Broad curved blue-grey hull with pale reflected streaks: a connected watery foundation, two transparent middle planes on dry paper, then cool shadow glazing across the lower hull. Preserve the lighter central belly."
+    },
+    {
+      "id": "ship.right-hull",
+      "bounds": [0.62, 0.0, 1.0, 0.69],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm off-white right hull with angular blue reflections: retain the brightest target-shaped paper lights; pale painted planes elsewhere; dry shaped blue shadows and crisp dark oval fittings."
+    },
+    {
+      "id": "ship.left-rigging",
+      "bounds": [0.0, 0.0, 0.30, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ochre ropes and spars cross pale cool gaps; use connected long tapered painted shapes, then warmer sienna knots on dry paper. Keep their lit faces and the gaps between rigging; no traced outline."
+    },
+    {
+      "id": "ship.water",
+      "bounds": [0.65, 0.66, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small turquoise and olive water area at lower right: pale connected underwash, dry transparent darker reflection shapes; leave narrow irregular light streaks rather than evenly spaced ripples."
+    },
+    {
+      "id": "ship.lower-shadow",
+      "bounds": [0.24, 0.68, 0.65, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected dark blue-neutral wedge at the lower hull: build depth last in two transparent glazes crossing hull and adjacent reflected shapes, preserving the warm rope crossing in front."
+    },
+    {
+      "id": "ship.fittings",
+      "bounds": [0.43, 0.18, 0.97, 0.39],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small dark scuppers and oval fittings at centre and upper right are selective painted accents on fully dry hulls, with pale holes retained inside the shapes and rust notes kept warm."
+    }
+  ],
+  "reserves": []
+}
