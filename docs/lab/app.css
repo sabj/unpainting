@@ -68,3 +68,7 @@ body.canvas-focus #exit-focus{top:max(8px,env(safe-area-inset-top));right:12px}
  body.canvas-focus #playbar progress{order:0;flex-basis:auto}
 }
 .sheetbar label:has(#auto-redip){display:flex;align-items:center;gap:8px;min-height:44px;white-space:nowrap;font-size:14px}.sheetbar #auto-redip{width:20px;height:20px;margin:0}.replaying label:has(#auto-redip),body.canvas-focus .sheetbar label:has(#auto-redip){display:none}
+
+/* Scratch paint stays above the page background and below every UI region. */
+body{isolation:isolate}
+#scratch{z-index:-1;pointer-events:none}
