@@ -84,6 +84,9 @@ const settings = { tool: 'round', pigment: 'rose', sizeMm: 10, water: 2.0, amoun
 let lastPaintTool = 'round';
 let temporaryWater=false, altHeld=false, barrelHeld=false;
 const manualPressure=document.getElementById('manual-pressure');
+// Mouse and finger strokes use the fixed Pressure slider by default: pressure from pointer speed jumps with uneven
+// event timing and leaves blotches. A stylus always uses its own pressure.
+document.getElementById('pressure').disabled=!manualPressure.checked;lab.manualPressure=manualPressure.checked;
 manualPressure.addEventListener('change',()=>{document.getElementById('pressure').disabled=!manualPressure.checked;lab.manualPressure=manualPressure.checked;queueCursor();});
 const qualitySelect=document.getElementById('quality');
 qualitySelect.value=quality;lab.quality=quality;
