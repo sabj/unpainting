@@ -74,7 +74,7 @@ import { accentCells, accentFamilies } from '../src/paint/methods/final-darks.mj
 import { blockInPigments, gradeSmoothPassages, dropMask } from '../src/crop/blockin.mjs';
 import { choosePlateMixes, toMixAmounts, panMix } from '../src/crop/mixes.mjs';
 import { shapeDeficit, shapeCharge, shapeOwedColour } from '../src/paint/methods/shape-deficit.mjs';
-import { washPaths, brushedWashPaths, sweepCover, sweepCount, containPaths, gradientSweepAngle, openEdgeShare, prewetArea, softArcs, soften } from '../src/media/wash.mjs';
+import { washPaths, brushedWashPaths, sweepCover, sweepCount, setSweepIntervals, containPaths, gradientSweepAngle, openEdgeShare, prewetArea, softArcs, soften } from '../src/media/wash.mjs';
 import { loadSubject, splitFirstWash, softenFirstWash } from '../src/paint/methods/first-wash.mjs';
 import { faceDetail } from '../src/paint/techniques/face-detail.mjs';
 import { measureLine, pencilDraw as physicalPencilDraw } from '../src/paint/methods/pencil-line.mjs';
@@ -188,6 +188,7 @@ const SPEED_PAPER = num('speedpaper', 0) > 0;
 const SPEED_CONTACT = num('speedcontact', 0) > 0;
 const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
 const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
+setSweepIntervals(num('speedcoverage', 0) > 0);
 const VALUE_CONTACT_WORK = new ContactWorkspace();
 const SPEED_GPU_OPTICS = num('speedopticalgpu', 0) > 0;
 if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
