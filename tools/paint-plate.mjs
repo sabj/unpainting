@@ -2003,6 +2003,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const K = opt('cellscale', '0') !== '0' ? w / 420 : 1;
   // --penfacenib f: the nib a face is drawn with, as a multiple of the usual one (thin, 0.5)
   const PEN = { nib: 0.8 * K * (STYLE_ON() ? VALUE_PLAN.style.ink : num('penfacenib', 1)), flex: 1.5 * K, travel: 1.5 * K, reach: 12 * K, reservoir: num('penreservoir',250) * K * K, feed: 1.2 * K };
+  if(!(PEN.reservoir>0)||!Number.isFinite(PEN.reservoir))throw Error('--penreservoir must be finite and positive');
   // --penblur: scale of the ridge field the pen reads (default 1); coarser gives one line to follow, not a braid.
   const PENBLUR = num('penblur', 1);
   const field = lineField(DRAW_SOURCE, inkWant, w, h, { sigmas: [0.8, 1.2, 1.8].map(v => v * K * PENBLUR) });

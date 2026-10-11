@@ -40,7 +40,7 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     // `dip` on a gesture re-dips at its start; a number is the load. `low` is how empty the pen may run before a
     // re-dip inside the gesture (--drawinglogic 2)
     const refillBelow = allowStarvation ? (g.low ?? low) : Math.max(g.low ?? low, Math.min(.9, pen.starve * 1.2));
-    if (g.dip || pen.ink < pen.capacity * refillBelow) { dipPen(pen, ink, typeof g.dip === 'number' ? g.dip : 1); dips++; }
+    if (pen.ink <= 0 || g.dip || pen.ink < pen.capacity * refillBelow) { dipPen(pen, ink, typeof g.dip === 'number' ? g.dip : 1); dips++; }
     // a point may carry its own pressure share `s`, contact width `nw`, speed `v`, and a `dwell` where ink pools
     // (--drawinglogic 2)
     const path = g.points.map(p => {
