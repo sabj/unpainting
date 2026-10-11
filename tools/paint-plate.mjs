@@ -622,7 +622,15 @@ const setClip=(target,mask)=>{
   }
   if(!mask)return physicalSetClip(target,clipBase);
   const combined=new Uint8Array(target.n);
-  for(let i=0;i<target.n;i++)combined[i]=clipBase[i]&&mask[i]?1:0;
+  if(mask instanceof Uint8Array&&mask.byteOffset%4===0&&mask.length>=target.n){
+    const words=target.n>>>2,baseWords=new Uint32Array(clipBase.buffer,0,words),maskWords=new Uint32Array(mask.buffer,mask.byteOffset,words),outWords=new Uint32Array(combined.buffer,0,words);
+    for(let i=0;i<words;i++){
+      const v=maskWords[i];
+      if((v&0xfefefefe)===0)outWords[i]=baseWords[i]&v;
+      else for(let j=i*4,end=j+4;j<end;j++)combined[j]=clipBase[j]&&mask[j]?1:0;
+    }
+    for(let i=words*4;i<target.n;i++)combined[i]=clipBase[i]&&mask[i]?1:0;
+  }else for(let i=0;i<target.n;i++)combined[i]=clipBase[i]&&mask[i]?1:0;
   physicalSetClip(target,combined);
 };
 const MOD = await planModulation({ A, K: PIGS.length, w, h, n, px, image: opt('image', ''), root, fs, path, sharp, gaussian, num, opt, log: console.log, SRC: ART_DENSITY(), colourBudget: COLOUR_BUDGET });
