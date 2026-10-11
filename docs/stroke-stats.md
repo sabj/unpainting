@@ -1,6 +1,6 @@
-# Stroke sizes and the tiny-dab gate
+# Stroke sizes and broad-area tiny-mark reliance
 
-Use fewer, larger strokes to establish the picture. Build connected value masses with broad paint washes, then mid brushes, then selected fine marks. A good result must keep its shapes, values and landmarks within this constraint.
+Tiny paint marks are useful on edges, textures and small features. The gate warns only when they carry a planned broad, low-detail wash interior. Paint counts, the largest brush, early wash counts and the old summed swept area are secondary diagnostics.
 
 ```sh
 node tools/stroke-stats.mjs /path/to/run --out /path/to/panel
@@ -10,25 +10,61 @@ node tools/run-plan.mjs plan.json --stroke-gate reject --out work/plan
 node tools/paint-plate.mjs --image target.jpg --marks 1 --strokegate reject --out work/plate
 ```
 
-Stats write `panel.json` and `panel.svg`, and JSON to stdout. Gate defaults to `warn`, returns JSON, and prints plain-language warnings to stderr. `reject` exits 4 when measured limits fail; input errors exit 2. `off` retains diagnostics but suppresses warnings and rejection. The stroke-plan painter checks admission before allocating or painting and refuses with its usual exit 1. It records the report in `run.json`. The plate painter writes stats and gate reports alongside its recorded tape after rendering and exits 4 on a hard failure. Its generated stroke paths do not exist at plan admission, so this is a run check. A hard plate gate requires `--marks 1`; the default warns when strokes are unmeasured. Checkpoint stops are partial stages, not final gate approval.
+Stats JSON version 2 contains `composition` and the original count histograms. `loadStats` is now asynchronous because finished-image decoding supplies the visible weights. The SVG adds a bar for composition carried by large, mid and tiny paint marks. Grey represents visible paint that the contact estimate cannot attribute.
 
-The stats reader accepts a run folder, `marks.json`, `marks.json.gz`, an explicit stroke plan (`grid` and `commands`), or `run.json` pointing to that plan. Planned paths are labeled as planned, never as observed deposits. Pass `--sheetmm 152.4` or `--log painter.log` for old tapes. The reader prefers precise `--sheetmm` in an adjacent `run.sh`, then the painter's rounded physical-size log. New plate tapes include `sheetWidthMm`. It never silently assumes a sheet size. Value plans without paths and video snapshots cannot supply stroke-size measurements.
+Tiny means median paint contact under 1 mm wide OR a path under 3 mm long. Large means width over a tenth of the sheet and length at least its width; other paint is mid. Pen and clean water are separate. A zero-concentration dip is clean water even if an old tape did not mark it as prewetting. Zero pressure or zero observed pigment loss cannot contribute paint.
 
-| Threshold key | Default | Meaning |
+## The two gate limits
+
+| Config key | Default | Meaning, for each broad interior |
 |---|---:|---|
-| `maxTinyPaintShare` | 0.30 | At most 30% of paint marks may be under 1 mm wide or under 3 mm long, counted once in the union |
-| `maxUnder1MmShare` | 0.20 | At most 20% under 1 mm wide |
-| `maxUnder3MmLongShare` | 0.25 | At most 25% under 3 mm long |
-| `minLargestPaintWidthSheetFraction` | 0.10 | Largest paint contact reaches a tenth of sheet width |
-| `minBroadWashAreaShare` | 0.50 | At least half the swept paint area comes from paint marks wider than a tenth of the sheet and at least as long as their width |
-| `minEarlyBroadWashCount` | 1 | At least one qualifying wash in the first quarter of paint marks |
+| `maxBroadAreaTinyAreaShare` | 0.30 | At most 30% of interior area carried by tiny paint |
+| `maxBroadAreaTinyVisibleShare` | 0.30 | At most 30% of visible paint tone and colour carried by tiny paint |
 
-These are provisional engineering limits chosen from the historical seven-subject distribution and the broad-wash goal. They are not validated human percentile thresholds, and do not reliably separate v0.1.0 from RC2. The reference band of 25.4 to 50.8 mm denotes large practice brushes, not a required width for every sheet. [Castagnet's supply list](https://www.scottsdaleartschool.org/usr/library/documents/supply-lists/castagnet-alvaro_supply-list_watercolor.pdf) calls for big mops, a flat at least two inches wide, and detail brushes. [Penley's manual](https://archive.org/details/systemofwatercol00penl/page/n29/mode/2up) supports broad initial washes. Adapt the guide for miniature sheets and purposeful detail. See the local calibration report `local/STROKE-STATS.md` for the measurements and human-data limits.
+Equality passes. Global count share and global tiny coverage never trigger a painting-quality flag. `flags` contain only failing broad areas, identified by plan ID. Missing spatial or deposit evidence has a separate `unmeasured` reason, with `verified: false`; hard rejection refuses an unverified input. Default warning permits rendering. `off` suppresses warnings and rejection.
 
-Override any thresholds with a JSON object through `stroke-gate --config limits.json`, `run-plan --stroke-gate-config limits.json`, or `paint-plate --strokegateconfig limits.json`. Omitted keys keep their defaults. Unknown keys and invalid values are errors. Use an explicit override for a miniature study, detail-only passage or special style rather than making its geometry appear larger.
+The limits are provisional engineering choices, not calibrated human percentiles. They allow small accents over a wash while catching an interior filled by tiny paint instead of a wash. A gate pass still needs visual judgment.
 
-Width histograms use median path contact diameter, falling back to brush diameter; the largest contact metric uses maximum point diameter. Pen width uses recorded contact width or nib plus pressure flex, and accounts for fine-sheet recording resolution. Length is the whole polyline arc length, not endpoint distance. Clean-water and pen counts never satisfy paint thresholds. Zero-length contacts count as dabs. A broad single-point dab cannot count as a wash.
+Override limits with a JSON object through `stroke-gate --config`, `run-plan --stroke-gate-config` or `paint-plate --strokegateconfig`. Old count-based threshold keys are errors, so a stale config cannot silently keep rejecting legitimate detail.
 
-Area share is a geometric proxy: local width times path length plus a round end cap. It does not apply a union mask, pressure-dependent bristle coverage, clipping, pigment load, evaporation or later spreading. Overlaps and repeated coats count again. Inspect deposited coverage and the actual painting before treating a gate pass as success. Fine ink lines remain legitimate; the tiny-mark gate concerns paint only. Timeline uses saved-frame indices, or command indices for stroke plans, rather than elapsed seconds.
+## Broad areas come from the plan
 
-To reproduce a gallery, give `tools/stroke-stats-gallery.mjs` a JSON array of `{title, version, run, sheetmm, commit, args}` records and an output directory. Human references can supply `{title, image, reason, url}` instead. The gallery includes panels, gate flags, provenance, downloads and a keyboard/touch lightbox.
+Explicit stroke plans declare intended broad low-detail areas as normalized polygons:
+
+```json
+{
+  "broadAreas": [{
+    "id": "wall",
+    "label": "Sunlit wall wash",
+    "polygon": [[0.1,0.2],[0.9,0.2],[0.9,0.8],[0.1,0.8]],
+    "edgeClearanceMm": 1,
+    "detailPolygons": [[[0.4,0.3],[0.6,0.3],[0.6,0.6],[0.4,0.6]]]
+  }]
+}
+```
+
+The window in `detailPolygons` is exempt. One millimetre inside the area's contour is also exempt by default. An explicit empty `broadAreas` array declares a detail-only plan; it must still supply measurable pigment loads. An absent array is unmeasured, rather than an automatic exemption. These annotations describe intent and must be reviewed with the plan.
+
+Historical image-painter runs use adjacent `value-plan.json` and `value-commands.jsonl`. The tool pairs command geometry with the tape's quantized paths and takes each broad value-shape's recorded clip. A non-texture planned shape qualifies when its area is at least 1% of the sheet and its planned support width is at least 3 mm. Later glazes qualify too. One millimetre around every planned hard/soft value or feature boundary is excluded; tiny shapes with no substantial interior remain detail. Each area is reported separately, with its plan ID, physical interior area, tiny carried area, tiny visible contribution, tiny covered area and tiny-only area. Overlapping passage reports are not additive. No detail mask is inferred from the noisy final painting.
+
+## How the weighted estimate works
+
+The analysis uses a CPU raster 512 cells wide, scaled to the physical sheet. Recorded contact discs follow the whole polyline and local radius, clipped to the sheet, recorded passage clip and masking fluid. A cell is counted once for coverage, even under repeated coats.
+
+For matched executed commands, pigment loss from the brush before/after snapshots estimates each mark's deposited mass. For other marks, recorded concentration, contact area, pressure, film thickness and a finite prepared brush reservoir estimate delivery, with depletion between dips. The pigment's channel absorption coefficients apportion those deposits between red, green and blue.
+
+At each cell, tiny's share of estimated pigment absorption apportions one cell of carried area. The average over the whole broad interior is `tinyCarriedAreaShare`; unpainted cells contribute zero. This prevents a light accent over a substantial wash from claiming the entire cell. `tinyCoveredShare` records any tiny paint contact and `tinyOnlyShare` records cells supported exclusively by tiny paint. They are useful diagnostics, but do not reject an accent over a wash.
+
+Visible contribution uses the saved final image's per-channel optical distance from the recorded paper colour. Subtracting the ink snapshot's distance removes the estimated ink-first drawing contribution. Deposit shares apportion the remaining paint distance, including tone and colour changes. Final paper-colour pixels contribute nothing. JSON reports tiny's share of visible paint, tiny's share of the whole final distance from paper, and the fraction of paint distance attributable to recorded footprints. Without a final image the report is explicitly a deposit projection, not measured final appearance.
+
+This is an estimate from per-mark deposits, not a wet-transport replay or measured pigment ancestry. Contact discs omit bristle gaps; reservoir loss can include mixing; spreading, pickup, later lifting, and paper texture can change the final support. Coarse raster sampling can miss very fine contacts. Inspect the reported attribution fraction and actual painting. Missing recipes cannot silently establish a pass.
+
+## Inputs and gallery
+
+The reader accepts a run directory, plain/compressed tape, explicit stroke plan, or `run.json` pointing to one. Old tapes need `--sheetmm` or an adjacent log/run script; precise physical sheet flags take precedence over rounded logs. `--plan`, `--commands`, `--final` and `--ink` select the composition inputs explicitly. Adjacent files are detected automatically. Value plans without executed paths cannot supply mark sizes or spatial deposit attribution.
+
+The plate painter writes stats, panel and gate beside its tape after rendering; partial checkpoints do not establish final admission. Its generated paths do not exist before execution. Hard gating requires `--marks 1`. The stroke-plan painter checks projected broad-area reliance before allocation.
+
+`tools/stroke-stats-gallery.mjs manifest.json directory` builds cards with the composition bar, per-area reports, secondary counts, provenance and the keyboard/touch lightbox. Records may supply `tape` and `compositionInputs` for preserved tapes. `archivedStats` retains cached measured results when tapes are unavailable; archived count-only data is clearly unmeasured and never approved by the weighted gate. The generator writes `comparison.json` and `summary.json`.
+
+Human process references lack calibrated stroke paths and deposits. They stay explicitly unmeasured.

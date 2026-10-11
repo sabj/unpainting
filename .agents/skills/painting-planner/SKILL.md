@@ -55,7 +55,7 @@ A later ink pass or a paint-first order is an exception. State its purpose in th
 
 ## Marks
 
-Choose contact, direction, pressure change, reload and lift for each mark's job. Use broad contact for broad passages. Texture should follow the shapes already painted. Limit strokes so a wash is not rebuilt from many small dabs. Run the [stroke-size gate](../../../docs/stroke-stats.md) on explicit stroke plans before painting and recorded runs afterward. The default warning caps paint marks under 1 mm wide or 3 mm long at 30% combined (20% narrow, 25% short), asks for half the swept paint area from washes wider than a tenth of the sheet, and requires an early broad wash. Keep pen detail separate. These are provisional engineering limits, not measured human percentiles. Use larger connected passages and fewer marks to stay within them; a pass still needs visual review.
+Choose contact, direction, pressure change, reload and lift for each mark's job. Use broad contact for broad passages. Texture should follow the shapes already painted. Limit strokes so a wash is not rebuilt from many small dabs. Run the [stroke-size gate](../../../docs/stroke-stats.md) on explicit stroke plans before painting and recorded runs afterward. The default warning concerns only tiny paint carrying broad low-detail wash interiors: at most 30% of each interior's carried area or visible paint contribution. Declare broadAreas and exempt detail features on explicit stroke plans. Keep counts as secondary diagnostics and pen detail separate. These are provisional limits; a pass still needs visual review.
 
 ## Review
 
