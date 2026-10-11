@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
+import { admitStrokePlan, printGate } from './stroke-gate.mjs';
 import { makePaper } from '../src/media/paper.mjs';
 import { createSheet, step, dry, layersOf, DEFAULTS } from '../src/media/sheet.mjs';
 import { createBrush, dip, stroke, candidateContact } from '../src/media/brush.mjs';
@@ -62,6 +63,14 @@ function checkFiniteSheet(command) {
 }
 
 validate(plan);
+const gateModeIdx = args.indexOf('--stroke-gate');
+const gateConfigIdx = args.indexOf('--stroke-gate-config');
+const strokeGate = admitStrokePlan(plan, {
+  mode: gateModeIdx >= 0 ? args[gateModeIdx + 1] : 'warn',
+  config: gateConfigIdx >= 0 ? JSON.parse(fs.readFileSync(args[gateConfigIdx + 1], 'utf8')) : {},
+});
+printGate(strokeGate);
+if (!strokeGate.ok) fail('stroke-size admission refused; use larger connected washes and fewer fine marks');
 const g = plan.grid, n = g.w * g.h;
 const pigments = plan.palette.map(k => ({ ...boxPigment(BOX.find(p => p.key === k)), key: k }));
 const paper = makePaper(g.w, g.h, { ...plan.paper, seed: plan.paperSeed ?? 1, mmPerCell: g.mmPerCell,
@@ -100,5 +109,5 @@ fs.mkdirSync(out, { recursive: true });
 const rgb = renderLayers(layersOf(sheet), pigments, paperRGB, n);
 const png = path.join(out, 'result.png');
 await sharp(Buffer.from(rgb), { raw: { width: g.w, height: g.h, channels: 3 } }).png().toFile(png);
-fs.writeFileSync(path.join(out, 'run.json'), JSON.stringify({ plan: path.resolve(file), strokes, seconds: (Date.now() - t0) / 1000 }, null, 2));
+fs.writeFileSync(path.join(out, 'run.json'), JSON.stringify({ plan: path.resolve(file), strokes, strokeGate, seconds: (Date.now() - t0) / 1000 }, null, 2));
 console.log(png);

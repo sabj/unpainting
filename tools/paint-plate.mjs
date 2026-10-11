@@ -50,6 +50,8 @@ if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CON
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
+import { loadStats, panelSVG } from './stroke-stats.mjs';
+import { evaluateGate, printGate } from './stroke-gate.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -1727,8 +1729,11 @@ const SNAPS = [];
 const snap = extra => { if(!FRAME_POLICY.all || NATIVE_PAINT_MODE.mode==='fast')return; const F = framer(); SNAPS.push(F ? { id: F.capture(), stage: { ...STAGE, ...extra } } : { buf: INKRES ? INKRES.compose(view()) : view(), stage: { ...STAGE, ...extra } }); };
 
 // --marks 1: record the mark tape: every stroke as a brush index and a path, with the water schedule between them.
+if (!['warn', 'reject', 'off'].includes(opt('strokegate', 'warn'))) throw new Error('strokegate must be warn, reject or off');
+if (opt('strokegate', 'warn') === 'reject' && opt('marks', '0') === '0') throw new Error('--strokegate reject requires --marks 1');
 const MARKTAPE = opt('marks', '0') !== '0' || STROKE_BUDGET ? recordMarks(true) : null;
 if (MARKTAPE) tapeSheet(MARKTAPE);
+else if (opt('strokegate', 'warn') === 'warn') console.warn('stroke gate warning: stroke sizes unverified; use --marks 1 to measure this run');
 // --pausedir DIR: the painter offers a stop at every passage boundary and a harness decides where it stops
 // (tools/aware/pause.mjs). --resumestate DIR: a fresh process takes over a painting saved at a boundary (state.json
 // there), with the plan files as they now stand: the planning runs again, nothing before the boundary is painted
@@ -3679,12 +3684,20 @@ if (MARKTAPE) {
   const asTape = p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, ArrayBuffer.isView(v) ? Array.from(v) : v]));
   // Everything a player needs to make the same sheet: the paper recipe, the pans, the flow options and the base.
   fs.writeFileSync(file, JSON.stringify({
-    w: W2, h: H2, scale: 10,
+    w: W2, h: H2, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM),
     version:2, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
     base: Array.from(base.subarray(0, 3)),
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
   }));
+  const strokeStats = loadStats(file);
+  const strokeGate = evaluateGate(strokeStats, { mode: opt('strokegate', 'warn'),
+    config: opt('strokegateconfig', '') ? JSON.parse(fs.readFileSync(opt('strokegateconfig'), 'utf8')) : {} });
+  fs.writeFileSync(path.join(out, 'stroke-stats.json'), JSON.stringify(strokeStats, null, 2));
+  fs.writeFileSync(path.join(out, 'stroke-stats.svg'), panelSVG(strokeStats));
+  fs.writeFileSync(path.join(out, 'stroke-gate.json'), JSON.stringify(strokeGate, null, 2));
+  printGate(strokeGate);
+  if (!strokeGate.ok) process.exitCode = 4;
   const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
   const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
   console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`);
