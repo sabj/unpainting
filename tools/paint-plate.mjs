@@ -273,6 +273,7 @@ const phaseMark = name => { const t = performance.now(); WALL_PHASES.push(`${nam
 
 const src = sharp(path.resolve(root, opt('image'))).flatten({ background: '#ffffff' }).resize({ width: num('width', 700) });
 const { data: PX_SOURCE, info } = await src.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+const paperSetupStarted = performance.now();
 // --washinkfree 1 (needs --drawingfile): the planner reads the target with the planned pen lines filled from their
 // surroundings (src/crop/ink-free.mjs), so the wash carries mass and the pen carries line, not both. Pre-paint only.
 const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
@@ -335,6 +336,8 @@ setWashSplat(WASH_SPLAT_SETTINGS.enabled,{water:WASH_SPLAT_SETTINGS.water});
 const RUN_CACHE = { dir: process.env.W2_CACHE_DIR || path.join(root, 'work', 'cache'), enabled: opt('runcache', '1') !== '0' };
 const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [fileURLToPath(import.meta.url)]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
+SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
+const paletteFitStarted = performance.now();
 const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: CODE_HASH, track: optTrack, inputs: { px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
   const authoredFile=opt('areaplan','');const explicit=authoredFile?authoredPalette(JSON.parse(fs.readFileSync(path.resolve(root,authoredFile)))):null;if(explicit)return {pigments:explicit,authored:true,monochrome:explicit.length===1,paintChroma:0,note:'explicit authored production palette; no source palette fit'};
   const from = opt('palettefrom', '');
@@ -365,6 +368,7 @@ const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: CODE_HA
   }
   return palette;
 })).value;
+SPEED_PROFILE?.add('setup:palette-fit', performance.now() - paletteFitStarted);
 // --pigphys: each pigment given a physics by its hue (src/paint/methods/pigment-physics.mjs)
 // --skyblue 1: a second, granulating tube of the palette's blue, used for the sky only.
 // --skygran: its granulation as a multiple of --gran (default 1.2); --skybluewick: stain on the paper's peaks (default 0.6).
@@ -464,6 +468,7 @@ if (FIG_MASK && PLAN_MASSES <= 0) {
   console.log(`figure layers: the figure's plan is an edge-preserving mean over ${r} cells; its hard-edged passages are dried before they are laid`);
 }
 // each pixel as amounts of those pigments: this is what a painter mixes, not a grey level
+const pigmentFitStarted = performance.now();
 let A = (await cachedStep({ ...RUN_CACHE, name:'pigment-fit', code:CODE_HASH, track:optTrack, inputs:{D_PLAN,D_AIM,px,n,PIGS,paperRGB,PLAN_MASSES,COLOUR_BUDGET,SHAPE_REFIT:[num("shaperefit",0),num("refitfamilies",24),num("refitmin",0.0005)]} }, async()=>{
 let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
 // Under --planmasses the shape refit aims at the simplified plan, not the source, so the speckle stays out.
@@ -486,6 +491,7 @@ let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
 }
 return A;
 })).value;
+SPEED_PROFILE?.add('setup:pigment-fit', performance.now() - pigmentFitStarted);
 // --skyblue: the plan's blue in the sky cells comes from the granulating tube. The sky is the plate's sky segment
 // (work/segments); without one, the blue cells off the figure mask.
 if (PIGS.length && PIGS[PIGS.length - 1]._skyOf !== undefined) {
@@ -635,7 +641,9 @@ const BLOCK_OPTIONS = { glaze: num('glaze', 0.12), maxValues: num('maxvalues', 2
   // --firstwhite w (default f/2): stays-white threshold; --firstcolours K (default 4): local colours; --firstmax m (default --glaze): deepest.
   ...(FIRST_FLOOR > 0 ? { firstFloor: FIRST_FLOOR, firstMax: opt('firstmax', '') !== '' ? num('firstmax', 0.12) : null, firstWhite: opt('firstwhite', '') !== '' ? num('firstwhite', 0) : null, firstLabels: num('firstcolours', 4) > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: Math.round(num('firstcolours', 4)), floor: FIRST_FLOOR }).labels : null, firstOnly: FIRST_ONLY } : {}) };
 const AUTHORED_INPUT=opt('areaplan','')&&JSON.parse(fs.readFileSync(path.resolve(root,opt('areaplan','')))).areas.some(a=>a.passes.some(p=>p.source==='authored'));
+const blockPlanStarted = performance.now();
 let { layers: blocked, steps, delivered: PLAN_DELIVERED } = (await cachedStep({ ...RUN_CACHE, name:'block-plan',code:CODE_HASH,track:optTrack,inputs:{PLANA,PLANK,w,h,BLOCK_OPTIONS,AUTHORED_INPUT} },async()=>AUTHORED_INPUT?{layers:[],steps:1,delivered:new Float32Array(PLANA.length)}:blockInPigments(PLANA, PLANK, w, h, BLOCK_OPTIONS))).value;
+SPEED_PROFILE?.add('setup:block-plan', performance.now() - blockPlanStarted);
 if(MOD?.paintOwnedTransfer)throw Error('--modpaintplanes was removed by the anti-cheat rules: per-cell residual charge inside a shape');
 if(MOD?.paintOwnedTransfer){MOD.paintOwnedCharge=allocateShapeLocalCharge({layers:blocked,K:PIGS.length,n,residual:MOD.paintOwnedResidual,selected:MOD.paintOwnedTransfer.selected,lights:MOD.lights,planned:PLAN_DELIVERED,fixtureCells:MOD.paintOwnedFixtureCells??[],excludeMixedFirstWash:MOD_PAINT_FLOOR_SKIP===1,ownComponents:MOD_PAINT_FLOOR_SKIP===1});fs.writeFileSync(path.join(out,'paint-owned-shape-local-allocation.json'),JSON.stringify({...MOD.paintOwnedCharge,fitPigmentChannels:PIGS.length,geometryPreserved:true,deliveredCredit:0},null,2));}
 if(MOD?.paintOwnedTransfer){
