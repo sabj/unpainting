@@ -170,3 +170,5 @@ A field left out, or set to `auto`, adds no flag. The painter's own default appl
 For a pen-and-wash target, `tools/seg/ink-lines.mjs` takes the candidates from the target's own pen lines: the ink the separator in `src/crop/inkwash.mjs` estimates, traced to center lines and joined where pieces continue each other. With `--regions` it tags each line with the region it lies in, from the label map `tools/seg/subject-regions.py` writes (Mask R-CNN for the person, Segment Anything for named parts). A plan uses them with `lines: "regions"` and `maxLines`.
 
 [examples/plans/trumbull-values.json](../examples/plans/trumbull-values.json) asks for every candidate line in heavy sepia ink, opening and closing.
+
+For the stroke gate, annotate intended broad wash interiors with `broadAreas` polygons and optional `detailPolygons`; see [stroke statistics](stroke-stats.md). Count share is diagnostic. Only area and visible contribution from tiny paint inside these planned interiors can trigger the gate.

@@ -3690,14 +3690,6 @@ if (MARKTAPE) {
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
   }));
-  const strokeStats = loadStats(file);
-  const strokeGate = evaluateGate(strokeStats, { mode: opt('strokegate', 'warn'),
-    config: opt('strokegateconfig', '') ? JSON.parse(fs.readFileSync(opt('strokegateconfig'), 'utf8')) : {} });
-  fs.writeFileSync(path.join(out, 'stroke-stats.json'), JSON.stringify(strokeStats, null, 2));
-  fs.writeFileSync(path.join(out, 'stroke-stats.svg'), panelSVG(strokeStats));
-  fs.writeFileSync(path.join(out, 'stroke-gate.json'), JSON.stringify(strokeGate, null, 2));
-  printGate(strokeGate);
-  if (!strokeGate.ok) process.exitCode = 4;
   const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
   const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
   console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`);
@@ -3714,6 +3706,17 @@ if (MARKTAPE) {
     const washLayer = after.map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - (INK_THK ? INK_THK[j][i] : 0))));
     await sharp(Buffer.from(renderLayers([washLayer], SHEET_PIGS, base, N2, 1).buffer), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'wash.jpg'));
   }
+}
+// Final contribution stats need both the finished painting and the exported ink layer.
+if (MARKTAPE) {
+  const strokeStats = await loadStats(path.join(out, 'marks.json'));
+  const strokeGate = evaluateGate(strokeStats, { mode: opt('strokegate', 'warn'),
+    config: opt('strokegateconfig', '') ? JSON.parse(fs.readFileSync(opt('strokegateconfig'), 'utf8')) : {} });
+  fs.writeFileSync(path.join(out, 'stroke-stats.json'), JSON.stringify(strokeStats, null, 2));
+  fs.writeFileSync(path.join(out, 'stroke-stats.svg'), panelSVG(strokeStats));
+  fs.writeFileSync(path.join(out, 'stroke-gate.json'), JSON.stringify(strokeGate, null, 2));
+  printGate(strokeGate);
+  if (!strokeGate.ok) process.exitCode = 4;
 }
 await sharp(px, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'source.jpg'));
 // the picture the painter aimed at, so a photo plate is compared with a watercolour, not a photograph

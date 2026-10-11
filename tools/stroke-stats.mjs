@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { composition, compositionContext } from './stroke-composition.mjs';
 
 export const WIDTH_EDGES = [0, .125, .25, .5, 1, 2, 4, 8, 16, 32, 64, 128, Infinity];
 export const LENGTH_EDGES = [0, .5, 1, 2, 3, 6, 12, 24, 48, 96, 192, 384, Infinity];
@@ -30,8 +31,9 @@ export function normalize(input, { sheetmm } = {}) {
   if (Array.isArray(input.marks) && input.w && input.h) {
     const width = positive(Number(sheetmm ?? input.sheetWidthMm ?? input.w * input.mmPerCell), 'sheet width in mm (use --sheetmm or a painter log)');
     const mm = width / input.w, scale = positive(input.scale ?? 1, 'tape scale');
-    let frame = 0;
-    for (const m of input.marks) {
+    let frame = 0; const loads = new Map();
+    for (const [tapeIndex,m] of input.marks.entries()) {
+      if (m.k === 'd') { loads.set(m.b,m.c); continue; }
       if (m.k === 'm') { frame = m.i; continue; }
       if (!['s', 'P'].includes(m.k) || !m.d?.length) continue;
       const pen = m.k === 'P', resolution = pen ? positive(m.r ?? 1, 'pen resolution') : 1;
@@ -41,9 +43,9 @@ export function normalize(input, { sheetmm } = {}) {
       const widths = m.d.map(q => pen
         ? (q[5] >= 0 ? q[5] / 100 : b.nib + (b.flex ?? 0) * (q[2] < 0 || q[2] == null ? .5 : q[2] / 100)) * mm / resolution
         : 2 * (q[3] >= 0 ? q[3] / scale : b.radius) * mm);
-      marks.push({ kind: pen ? 'pen' : m.wt ? 'water' : 'paint', time: frame, ...measure(points, widths) });
+      marks.push({ kind: pen ? 'pen' : m.wt || (loads.has(m.b) && !loads.get(m.b).some(v=>v>0)) ? 'water' : 'paint', time: frame, tapeIndex, points, widths, pressures:m.d.map(q=>q[2]>=0?q[2]/100:1), ...measure(points, widths) });
     }
-    return { sheet: { widthMm: width, heightMm: input.h * mm }, basis: 'recorded paths', timeUnit: 'saved frame', marks };
+    return { tape:input, broadAreas:input.broadAreas, sheet: { widthMm: width, heightMm: input.h * mm }, basis: 'recorded paths', timeUnit: 'saved frame', marks };
   }
   if (Array.isArray(input.commands) && input.grid) {
     const g = input.grid, mm = positive(g.mmPerCell, 'grid.mmPerCell');
@@ -52,15 +54,18 @@ export function normalize(input, { sheetmm } = {}) {
       if (c.operation === 'dry') return;
       if (c.operation !== 'stroke' || !c.paths?.length) throw new Error('stroke plan must supply paths');
       const widthMm = positive(c.brush?.widthMm, 'brush.widthMm');
-      for (const ps of c.paths) marks.push({ kind: c.role === 'clean-water' ? 'water' : c.role === 'pen' ? 'pen' : 'paint', time,
-        ...measure(ps.map(q => [q.x * width, q.y * height]), ps.map(q => q.rMm == null ? widthMm : 2 * q.rMm)) });
+      for (const ps of c.paths) {
+        const points=ps.map(q=>[q.x*width,q.y*height]), widths=ps.map(q=>q.rMm==null?widthMm:2*q.rMm);
+        const concentration=Object.values(c.load?.concentration??{}).reduce((s,v)=>s+v,0);
+        marks.push({kind:c.role==='clean-water'?'water':c.role==='pen'?'pen':'paint',time,points,widths,pressures:ps.map(q=>q.p??1),depositRGB:Array(3).fill((c.load?.waterQuantityMm3??1)*concentration),...measure(points,widths)});
+      }
     });
-    return { sheet: { widthMm: width, heightMm: height }, basis: 'planned paths, not proof of execution', timeUnit: 'command index', marks };
+    return { broadAreas:input.broadAreas, sheet: { widthMm: width, heightMm: height }, basis: 'planned paths, not proof of execution', timeUnit: 'command index', marks };
   }
   throw new Error('no measurable paths: use a recorded marks.json(.gz) or a stroke plan with grid and commands; value plans and video snapshots alone cannot measure strokes');
 }
 
-export function summarize(normalized) {
+export function summarize(normalized, context = {}) {
   const { marks, sheet, basis, timeUnit } = normalized;
   const hist = edges => edges.slice(0, -1).map((lo, i) => ({ minMm: lo, maxMm: Number.isFinite(edges[i+1]) ? edges[i+1] : null, paint: 0, pen: 0, water: 0 }));
   const widths = hist(WIDTH_EDGES), lengths = hist(LENGTH_EDGES);
@@ -81,10 +86,11 @@ export function summarize(normalized) {
   const maxPaint = paint.reduce((n, m) => Math.max(n, m.maxWidthMm), 0);
   const broad = paint.filter(m => m.widthMm > sheet.widthMm / 10 && m.lengthMm >= m.widthMm);
   const early = paint.slice(0, Math.ceil(paint.length / 4));
-  return { version: 1, basis, sheet, timeUnit, areaMethod: 'sum of path length times local contact width plus round end cap; overlaps and repeated coats count again; geometry proxy, not unique covered area or deposited pigment',
+  const carried=composition(normalized, {...context,tape:context.tape??normalized.tape});
+  return { version: 2, basis, sheet, timeUnit, composition: carried, areaMethod: 'sum of path length times local contact width plus round end cap; overlaps and repeated coats count again; geometry proxy, not unique covered area or deposited pigment',
     counts: { paint: paint.length, pen: marks.filter(m => m.kind === 'pen').length, water: marks.filter(m => m.kind === 'water').length },
     histograms: { widthMm: widths, lengthMm: lengths, paintAreaByWidth: area }, marksOverTime: [...timeline.values()].sort((a,b) => a.time-b.time),
-    metrics: { paintUnder1MmShare: fraction(m => m.widthMm < 1), paintUnder3MmLongShare: fraction(m => m.lengthMm < 3), tinyPaintShare: fraction(m => m.widthMm < 1 || m.lengthMm < 3),
+    metrics: { tinyPaintAreaShare:carried.tinyCoveredSheetShare, tinyPaintVisibleShare:carried.tinyVisibleShare, tinyPaintFinalPaperDifferenceShare:carried.tinyFinalPaperDifferenceShare, paintUnder1MmShare: fraction(m => m.widthMm < 1), paintUnder3MmLongShare: fraction(m => m.lengthMm < 3), tinyPaintShare: fraction(m => m.widthMm < 1 || m.lengthMm < 3),
       largestPaintWidthMm: maxPaint, largestPaintWidthSheetFraction: paint.length ? maxPaint / sheet.widthMm : null,
       largestAnyWidthMm: marks.reduce((n,m) => Math.max(n,m.maxWidthMm),0),
       broadWashAreaShare: totalArea ? broad.reduce((s,m) => s+m.areaMm2,0) / totalArea : null,
@@ -94,7 +100,7 @@ export function summarize(normalized) {
       sources: ['https://www.scottsdaleartschool.org/usr/library/documents/supply-lists/castagnet-alvaro_supply-list_watercolor.pdf', 'https://archive.org/details/systemofwatercol00penl/page/n29/mode/2up'] } };
 }
 
-export function loadStats(inputPath, { sheetmm, log } = {}) {
+export async function loadStats(inputPath, { sheetmm, log, ...options } = {}) {
   let f = path.resolve(inputPath);
   if (fs.statSync(f).isDirectory()) {
     f = ['marks.json', 'marks.json.gz', 'paint/marks.json', 'paint/marks.json.gz', 'run.json'].map(n => path.join(f,n)).find(n => fs.existsSync(n));
@@ -117,12 +123,13 @@ export function loadStats(inputPath, { sheetmm, log } = {}) {
       if (exact || physical) { sheetmm = Number((exact ?? physical)[1]); sizeSource = `${p}${exact ? '' : ' (rounded painter log)'}`; break; }
     }
   }
-  return { ...summarize(normalize(input, { sheetmm })), source: f, sizeSource };
+  const context=input.marks?await compositionContext(f,input,options):{};
+  return { ...summarize(normalize(input, { sheetmm }),context), source: f, sizeSource };
 }
 
 export function panelSVG(stats, { title = 'Stroke sizes' } = {}) {
   const colors = { paint: '#246eaa', pen: '#444', water: '#59a5a0' };
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 520" role="img"><title>${esc(title)}</title><rect width="760" height="520" fill="#faf8f1"/><g font-family="system-ui,sans-serif" fill="#292929"><text x="20" y="26" font-size="18">${esc(title)}</text><text x="20" y="46" font-size="11">${esc(stats.basis)}; sheet ${stats.sheet.widthMm.toFixed(1)} mm; area is a repeated swept-area proxy</text>`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 650" role="img"><title>${esc(title)}</title><rect width="760" height="650" fill="#faf8f1"/><g font-family="system-ui,sans-serif" fill="#292929"><text x="20" y="26" font-size="18">${esc(title)}</text><text x="20" y="46" font-size="11">${esc(stats.basis)}; sheet ${stats.sheet.widthMm.toFixed(1)} mm; composition uses clipped deposits and the final image</text>`;
   function chart(rows, x, y, label, mode, edges) {
     const w = 338, h = 140, keys = mode === 'area' ? ['share'] : ['paint','pen','water'];
     const min = edges ? edges[1] / 2 : 1, max = edges ? edges.at(-2) * 2 : rows.length;
@@ -140,18 +147,33 @@ export function panelSVG(stats, { title = 'Stroke sizes' } = {}) {
   }
   chart(stats.histograms.widthMm,20,85,'Contact width (mm, log scale)','width',WIDTH_EDGES);
   chart(stats.histograms.lengthMm,402,85,'Path length (mm, log buckets)','length',LENGTH_EDGES);
-  chart(stats.histograms.paintAreaByWidth,20,298,'Paint area share by width (mm)','area',WIDTH_EDGES);
+  chart(stats.histograms.paintAreaByWidth,20,298,'Swept paint area by width (proxy)','area',WIDTH_EDGES);
   const times = stats.marksOverTime;
   const grouped = Array.from({length:Math.min(40,times.length)},(_,i) => { const a=times.slice(Math.floor(i*times.length/Math.min(40,times.length)),Math.floor((i+1)*times.length/Math.min(40,times.length))); return {time:a[0].time,...Object.fromEntries(['paint','pen','water'].map(k=>[k,a.reduce((s,t)=>s+t[k],0)]))}; });
   chart(grouped,402,298,'Marks over painting order','time');
-  svg += `<text x="20" y="480" font-size="12" fill="${colors.paint}">Paint ${stats.counts.paint}</text><text x="150" y="480" font-size="12" fill="${colors.pen}">Pen ${stats.counts.pen}</text><text x="270" y="480" font-size="12" fill="${colors.water}">Water ${stats.counts.water}</text><text x="20" y="504" font-size="11">Practice: a few large washes early, mid brushes, few fine paint marks. Guide band is qualitative.</text></g></svg>`;
+  svg += `<text x="20" y="480" font-size="12" fill="${colors.paint}">Paint ${stats.counts.paint}</text><text x="150" y="480" font-size="12" fill="${colors.pen}">Pen ${stats.counts.pen}</text><text x="270" y="480" font-size="12" fill="${colors.water}">Water ${stats.counts.water}</text><text x="20" y="504" font-size="11">Practice: connected washes for broad shapes; fine marks for detail. Guide band is qualitative.</text>`;
+  svg += compositionBarSVG(stats)+'</g></svg>';
   return svg;
+}
+
+export function compositionBarSVG(stats) {
+  const c=stats.composition,pct=x=>x==null?'unmeasured':(100*x).toFixed(1)+'%';
+  let s='<text x="20" y="532" font-size="13">Composition carried by large, mid and tiny marks (visible paint)</text>';
+  if(!c?.depositMeasured)return s+'<text x="20" y="555" font-size="12">Unmeasured: pigment loads or image contribution unavailable.</text>';
+  const colors={large:'#246eaa',mid:'#63a88b',tiny:'#d37540'};let x=20;
+  for(const g of c.classes) {const width=Math.max(0,g.visibleShare??0)*720;s+=`<rect x="${x}" y="542" width="${width}" height="22" fill="${colors[g.kind]}"><title>${g.kind}: ${pct(g.visibleShare)}</title></rect>`;x+=width;}
+  s+=`<rect x="${x}" y="542" width="${Math.max(0,740-x)}" height="22" fill="#ddd"><title>Unattributed paint contribution</title></rect>`;
+  s+=`<text x="20" y="583" font-size="11">${c.classes.map(g=>g.kind+' '+pct(g.visibleShare)).join(' · ')} · unassigned ${pct(1-(c.attributedVisibleShare??0))}</text>`;
+  s+=`<text x="20" y="603" font-size="11">Tiny covered sheet ${pct(c.tinyCoveredSheetShare)}; visible paint ${pct(c.tinyVisibleShare)}; count ${pct(stats.metrics.tinyPaintShare)}.</text>`;
+  s+=`<text x="20" y="623" font-size="11">Broad wash interiors: ${c.broadAreasMeasured?c.broadAreas.length:'unmeasured'}; only tiny reliance inside these areas is gated.</text>`;
+  s+='<text x="20" y="642" font-size="10">Per-mark deposit attribution estimate; overlap counted once; transport and lifting are not replayed.</text>';
+  return s;
 }
 
 export function cliArgs(args) {
   const opts = {}, positional = [];
   for (let i=0;i<args.length;i++) {
-    if (args[i].startsWith('--')) { const k=args[i].slice(2); if (!['out','sheetmm','log','mode','config','title'].includes(k) || !args[i+1] || args[i+1].startsWith('--')) throw new Error(`unknown option or missing value: ${args[i]}`); opts[k]=args[++i]; }
+    if (args[i].startsWith('--')) { const k=args[i].slice(2); if (!['out','sheetmm','log','mode','config','title','plan','commands','final','ink'].includes(k) || !args[i+1] || args[i+1].startsWith('--')) throw new Error(`unknown option or missing value: ${args[i]}`); opts[k]=args[++i]; }
     else positional.push(args[i]);
   }
   if (positional.length !== 1) throw new Error('usage: stroke-stats.mjs <run directory|marks.json[.gz]|stroke plan> [--sheetmm mm] [--log file] [--out prefix]');
@@ -159,7 +181,7 @@ export function cliArgs(args) {
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const a = cliArgs(process.argv.slice(2)), stats = loadStats(a.file,a);
+    const a = cliArgs(process.argv.slice(2)), stats = await loadStats(a.file,a);
     const prefix = path.resolve(a.out ?? 'stroke-stats'); fs.mkdirSync(path.dirname(prefix),{recursive:true});
     fs.writeFileSync(prefix+'.json',JSON.stringify(stats,null,2)+'\n'); fs.writeFileSync(prefix+'.svg',panelSVG(stats,a));
     console.log(JSON.stringify(stats,null,2));
