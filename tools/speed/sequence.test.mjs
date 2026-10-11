@@ -26,6 +26,7 @@ test('sequence uses fresh processes, shares a private cache and retains each mea
     assert.equal(fs.readFileSync(path.join(out, 'sequence/0/painting.png'), 'utf8'), 'before');
     assert.equal(fs.existsSync(path.join(out, '.sequence-cache')), false);
     assert.equal(fs.existsSync(path.join(out, 'sequence/0/f0001.jpg')), false);
+    assert.equal(fs.existsSync(path.join(out, 'f0001.jpg')), false);
     await assert.rejects(runSpeedSequence(['--out', out, '--speedsequence', '[["--image","other.png"]]'], script), /cannot override/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
