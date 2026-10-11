@@ -1,0 +1,15 @@
+{
+  "meanAbsoluteDifference": 15.049116512345678,
+  "maxDifference": 228,
+  "range": "0\u2013255 RGB",
+  "executor": "9ee5439",
+  "backend": "CPU, four threads",
+  "width": 360,
+  "height": 240,
+  "seconds": 130.045384583,
+  "columns": [
+    "painter",
+    "old Live executor"
+  ],
+  "note": "Historical executor and paper/drying rules, applied to the same complete tape at native resolution."
+}

@@ -6,6 +6,8 @@ import sharp from 'sharp';
 import {runTape,SHEET_FIELDS} from '../../docs/lab/worker/live-tape.js';
 import {encodeState} from '../../docs/lab/worker/history.js';
 import {tapeSheet,tapePixels,tapeFlow} from '../../docs/lab/worker/tape-sheet.js';
+// Use the browser's serial solver: Node's banded solver does not implement the
+// fixed-layer settling used by these tapes, so it is not an equivalent backend.
 const root=new URL('../../docs/lab/',import.meta.url),manifestURL=new URL('examples/recorded.json',root);
 const manifest=JSON.parse(await fs.readFile(manifestURL));
 const ri=process.argv.indexOf('--runs'),runs=ri<0?null:process.argv.slice(ri+1,ri+5);

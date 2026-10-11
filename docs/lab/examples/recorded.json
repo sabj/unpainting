@@ -2,7 +2,7 @@
   "examples": [
     {
       "id": "h36-a",
-      "title": "Yale gateway · h36-a",
+      "title": "Yale gateway \u00b7 h36-a",
       "kind": "Ink and watercolor",
       "target": "examples/h36-a/h36-a.png",
       "thumb": "examples/h36-a/thumb.webp",
@@ -175,6 +175,36 @@
             "image": "examples/h36-a/checkpoints/2500-100.webp"
           }
         ]
+      },
+      "studies": {
+        "250": {
+          "label": "250-stroke painting",
+          "strokes": 250,
+          "width": 360,
+          "height": 240,
+          "painting": "examples/h36-a/studies/250/painting.png",
+          "comparison": "examples/h36-a/studies/250/after-side-by-side.png",
+          "metrics": "examples/h36-a/studies/250/after.json",
+          "beforeComparison": "examples/h36-a/studies/250/before-side-by-side.png",
+          "beforeMetrics": "examples/h36-a/studies/250/before.json",
+          "run": "examples/h36-a/studies/250/run.json",
+          "budgetAudit": "examples/h36-a/studies/250/stroke-budget.json",
+          "guard": "examples/h36-a/studies/250/target-guard.json"
+        },
+        "2500": {
+          "label": "2,500-stroke painting",
+          "strokes": 2500,
+          "width": 360,
+          "height": 240,
+          "painting": "examples/h36-a/studies/2500/painting.png",
+          "comparison": "examples/h36-a/studies/2500/after-side-by-side.png",
+          "metrics": "examples/h36-a/studies/2500/after.json",
+          "beforeComparison": "examples/h36-a/studies/2500/before-side-by-side.png",
+          "beforeMetrics": "examples/h36-a/studies/2500/before.json",
+          "run": "examples/h36-a/studies/2500/run.json",
+          "budgetAudit": "examples/h36-a/studies/2500/stroke-budget.json",
+          "guard": "examples/h36-a/studies/2500/target-guard.json"
+        }
       }
     },
     {
@@ -292,6 +322,36 @@
             "image": "examples/white-ships/checkpoints/2500-100.webp"
           }
         ]
+      },
+      "studies": {
+        "250": {
+          "label": "250-stroke painting",
+          "strokes": 250,
+          "width": 360,
+          "height": 257,
+          "painting": "examples/white-ships/studies/250/painting.png",
+          "comparison": "examples/white-ships/studies/250/after-side-by-side.png",
+          "metrics": "examples/white-ships/studies/250/after.json",
+          "beforeComparison": "examples/white-ships/studies/250/before-side-by-side.png",
+          "beforeMetrics": "examples/white-ships/studies/250/before.json",
+          "run": "examples/white-ships/studies/250/run.json",
+          "budgetAudit": "examples/white-ships/studies/250/stroke-budget.json",
+          "guard": "examples/white-ships/studies/250/target-guard.json"
+        },
+        "2500": {
+          "label": "2,500-stroke painting",
+          "strokes": 2500,
+          "width": 360,
+          "height": 257,
+          "painting": "examples/white-ships/studies/2500/painting.png",
+          "comparison": "examples/white-ships/studies/2500/after-side-by-side.png",
+          "metrics": "examples/white-ships/studies/2500/after.json",
+          "beforeComparison": "examples/white-ships/studies/2500/before-side-by-side.png",
+          "beforeMetrics": "examples/white-ships/studies/2500/before.json",
+          "run": "examples/white-ships/studies/2500/run.json",
+          "budgetAudit": "examples/white-ships/studies/2500/stroke-budget.json",
+          "guard": "examples/white-ships/studies/2500/target-guard.json"
+        }
       }
     }
   ]

@@ -55,9 +55,9 @@ export const DEFAULTS = {
 // row bands by a pool of workers (sheet-par.mjs), with output bit-identical to the serial step. Set it before making
 // the sheets: a sheet made earlier keeps plain arrays and steps serially.
 let PAR = null;
-export async function setThreads(n) {
+export async function setThreads(n, load = () => import('./sheet-par.mjs')) {
   if (!(n > 1)) { if (PAR) PAR.stop(); PAR = null; return 1; }
-  PAR = await import('./sheet-par.mjs');
+  PAR = await load();
   return PAR.start(n);
 }
 export const threadStats = () => (PAR ? PAR.stats() : null);
@@ -625,7 +625,12 @@ function stepBox(sheet, o, box) {
     // changes its mobility, not the height of the filled hollow. Off preserves historical output.
     // the deposit each grain rolls over, at the wet cells, which are the only cells a grain leaves or reaches; the
     // buffer it moves into is cleared where it is spent
-    for (let q = 0; q < nw; q++) { const i = wl[q]; let d = 0; for (let n = 0; n < n3; n++) d += D[act3[n]][i]; if (o.fixedBed > 0) for (const layer of sheet.layers) for (let k = 0; k < K; k++) d += layer[k][i]; dep[i] = fill * d; }
+    const liveBed=sheet._liveFixedBed;
+    const cachedBed=liveBed&&liveBed.layers===sheet.layers&&liveBed.count===sheet.layers.length&&liveBed.version===(sheet._layerVer||0);
+    for (let q = 0; q < nw; q++) { const i = wl[q]; let d = 0; for (let n = 0; n < n3; n++) d += D[act3[n]][i]; if (o.fixedBed > 0) {
+      if(cachedBed){d+=liveBed.lower[i];const top=sheet.layers.at(-1);if(top)for(let k=0;k<K;k++)d+=top[k][i];}
+      else for (const layer of sheet.layers) for (let k = 0; k < K; k++) d += layer[k][i];
+    } dep[i] = fill * d; }
     // The surface a grain (or a clump) of pigment k rolls over, f1 * fibre + floc * tooth + deposit, is the same for
     // every pigment with the same floc: it is worked out once per floc at the wet cells, which are the only cells a
     // grain leaves or reaches, instead of five times per pigment per cell.

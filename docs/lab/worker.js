@@ -1,4 +1,4 @@
-import {tapeBase,tapeFlow} from './worker/tape-sheet.js';
+import {tapeBase,tapeFlow,tapeRenderBase} from './worker/tape-sheet.js';
 import {OPERATION_NAMES, footprint, applyHandOperation, watchContact} from './worker/operations.js';
 import { runTape, SHEET_FIELDS } from './worker/live-tape.js';
 import { contactAudit } from './worker/contact-audit.js';
@@ -148,6 +148,7 @@ function foldLayers() { if(sheet.resist){baseDirty=true;return;}while (sheet.lay
 // colour into a temporary base rather than permanently baking it into the paper.
 function renderBase() {
   if(sheet.layers.length<2)return baseR;
+  if(sheet._liveTape)return tapeRenderBase(sheet,baseR,glaze);
   const out=Float32Array.from(baseR);
   for(const layer of sheet.layers.slice(0,-1))glaze(out,layer);
   return out;
@@ -532,7 +533,7 @@ async function restoreExact(bytes) {
   if (v.version !== 1 && v.version !== 2) throw new Error('Unsupported saved sheet');
   await newSheet({ paperW: v.paperIn[0], paperH: v.paperIn[1], dpi: v.dpi, surface: v.surface, seed: v.seed });
   NAMES = v.names; PIGS = v.pigments || NAMES.map(k => BY_KEY[k]); if(v.recordedPaper)paper=v.recordedPaper; sheet = createSheet(paper, PIGS);
-  Object.assign(sheet, v.fields); sheet.wetDirty = 1;masksDirty=true;
+  Object.assign(sheet, v.fields); sheet._liveTape=!!v.recordedPaper;sheet.wetDirty = 1;masksDirty=true;
   baseIsBare = v.version === 2 && v.baseIsBare === true;
   if (!baseIsBare) baseR = v.baseR; else baseR.set(bareBase());
   graphite = v.graphite;
@@ -677,7 +678,7 @@ async function liveTape(data,current){
     demoPlaying='live';
     PIGS=tape.pigments;NAMES=PIGS.map((_,i)=>`recorded-${i}`);
     paper=makePaper(W,H,tape.paper);
-    sheet=createSheet(paper,PIGS);if(saved){Object.assign(sheet,saved.fields);sheet.wetDirty=1;}baseR.set(Float32Array.from(tapeBase(tape,paper),v=>v/255));baseIsBare=false;
+    sheet=createSheet(paper,PIGS);sheet._liveTape=true;if(saved){Object.assign(sheet,saved.fields);sheet.wetDirty=1;}baseR.set(Float32Array.from(tapeBase(tape,paper),v=>v/255));baseIsBare=false;
     if(phys){phys.setPigments(PIGS);await phys.load(sheet,baseR,graphite);}else if(gpu)rebuildGl();
     paused=false;masksDirty=true;strokes=saved?.tape.done||0;await render();
     postMessage({type:'live-ready',liveRun:data.liveRun,done:strokes,total:tape.strokeCount});
@@ -748,7 +749,7 @@ async function liveTape(data,current){
     flow:(dry,m)=>locked(async()=>{if(!current())return;
       if(phys)await phys.syncAll(sheet);tapeFlow(tape,sheet,dry,m);if(phys)await phys.load(sheet,baseR,graphite);baseDirty=true;
       lastDt=null;ticks++;dirty=true;})
-  },saved?.tape);}finally{if(current()){active=null;replayPoint=null;operation=null;demoPlaying=null;paused=false;await locked(async()=>{await render();await checkpoint();});postMessage({type:'played',liveRun:data.liveRun,name:'live',example:true,wet:true,strokes:completed});}}
+  },saved?.tape);}finally{if(current()){active=null;replayPoint=null;operation=null;demoPlaying=null;paused=false;await locked(async()=>{await render();await checkpoint();});postMessage({type:'played',liveRun:data.liveRun,name:'live',example:true,wet:sheet.W.some(v=>v>0)||sheet.s.some(v=>v>0),strokes:completed});}}
 }
 
 onmessage = ({ data }) => {

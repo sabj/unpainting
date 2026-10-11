@@ -191,7 +191,7 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 <div class="paint-title"><h1>Paint Lab</h1><button class="help-toggle" popovertarget="paint-help">How it works</button></div>
 <div id="paint-help" popover role="dialog" aria-labelledby="paint-help-title">
 <header><strong id="paint-help-title">How it works</strong><button popovertarget="paint-help" popovertargetaction="hide" aria-label="Close help">Close ×</button></header>
-<p>Choose recorded early strokes, carry on a painting, or try a technique. Live runs the recorded strokes through the simulator here. Jump to a thumbnail to continue from that sheet state, or choose Carry on painting. Replay shows the original saved frames without fades, with a labelled stroke path.</p>
+<p>Choose a complete stroke-budget painting, carry on a painting, or try a technique. Live runs its full recorded strokes through the simulator here. Jump to a thumbnail to continue from that sheet state, or choose Carry on painting. Replay shows the original saved frames without fades, with a labelled stroke path.</p>
 <p>Drag to paint. Pinch to zoom, use two fingers to pan. Fit resets the view.</p>
 <p>A stylus controls pressure. The round brush has a round cursor; the flat brush shows its width and direction.</p>
 <p>Mouse and finger pressure is fixed by default. Turn off “Fixed mouse / finger pressure” for a gentle response to drawing speed. Hold Alt or the stylus barrel button for clean water.</p>
@@ -204,7 +204,7 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 <div class="lab">
   <div class="stage">
 <div class="stage-heading"><span id="sheet-title">Your painting studio</span><button id="focus-view" aria-pressed="false">⛶ Fullscreen</button></div>
-  <div class="toolbar" id="run-settings"><label>Mode <select id="run-mode" aria-label="Playback mode"><option value="replay" selected>Recording · the painter's real frames</option><option value="live">Live · paint a complete study here</option></select></label><label>Painting budget <select id="stroke-limit" aria-label="Painting budget"><option value="250">250-stroke painting</option><option value="2500">2,500-stroke painting</option></select></label></div>
+  <div class="toolbar" id="run-settings"><label>Mode <select id="run-mode" aria-label="Playback mode"><option value="replay" selected>Recording · the painter's real frames</option><option value="live">Live · paint a complete study here</option></select></label><label id="live-budget" hidden>Painting budget <select id="stroke-limit" aria-label="Painting budget"><option value="250">250-stroke painting</option><option value="2500">2,500-stroke painting</option></select></label></div>
   <p id="mode-note">Recording · original saved frames, stepped without fades. Overlay: stroke path.</p>
 
     <div id="return-sheet" class="toolbar paint-controls" hidden><button id="keep-painting">Keep painting</button><button id="dismiss-return">Start fresh</button></div>

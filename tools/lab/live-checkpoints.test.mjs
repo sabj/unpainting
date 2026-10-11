@@ -52,3 +52,13 @@ test('shipped seek points contain finite physical states at the advertised strok
   }
  }
 });
+
+test('checkpoint codec preserves shared pigment planes without aliasing independent water arrays',async()=>{
+ const empty=new Float32Array(32),water=new Float32Array(32),pigment=new Float32Array([0,-0,.3]);
+ const saved=await decodeState(await encodeState({W:water,s:new Float32Array(32),layers:[[empty,pigment],[empty,pigment]]}));
+ assert.equal(saved.layers[0][0],saved.layers[1][0]);
+ assert.equal(saved.layers[0][1],saved.layers[1][1]);
+ assert.notEqual(saved.W,saved.s);assert.notEqual(saved.W,saved.layers[0][0]);
+ saved.W[0]=1;assert.equal(saved.s[0],0);assert.equal(saved.layers[0][0][0],0);
+ assert.deepEqual(saved.layers[0][1],pigment);
+});

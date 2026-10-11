@@ -1,0 +1,48 @@
+{
+  "budget": 2500,
+  "strokes": 2500,
+  "counts": {
+    "s": 2386,
+    "P": 114,
+    "g": 0
+  },
+  "seconds": 175.91197265625,
+  "costUSD": 0,
+  "backend": "laptop GPU",
+  "nativeWidth": 360,
+  "paper": {
+    "mmPerCell": 0.3953307392996109,
+    "seed": 9,
+    "scale": 1,
+    "toothScale": 0.2,
+    "fibres": 0.5,
+    "tooth": 0.5,
+    "proudBlur": 1,
+    "coldPress": {
+      "mmPerCell": 0.3953307392996109,
+      "bumpMm": [
+        0.5,
+        2
+      ],
+      "cover": 2.2,
+      "swell": 0.3
+    }
+  },
+  "target": "docs/lab/examples/white-ships-run/source.jpg",
+  "targetSHA256": "30db9b814fed96c75ba185db0a9fd417eeda32dff8aa8f39cbbe0e4826868650",
+  "plan": {
+    "subject": "whiteships",
+    "families": [],
+    "reserves": []
+  },
+  "flags": "--width 360 --mode fast --video 0 --strokebudget 2500 --marks 1 --targetguard strict",
+  "guard": {
+    "mode": "gentle",
+    "violations": 0,
+    "category": "painted"
+  },
+  "renderVersion": "f87a3fff5cc06dac7e75e8f997615127fee1e40a-dirty",
+  "implementationCommit": "0632db533e64cfe0ff97038c81201d53a288461e",
+  "sourceNote": "Rendered from the working painter implementation before its commit; frames retain the original base commit plus dirty marker. implementationCommit identifies the rebased source.",
+  "savedFrames": 22
+}

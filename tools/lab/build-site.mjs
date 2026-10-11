@@ -24,7 +24,7 @@ function painter() {
   const shipped = manifest.examples;
   const outExamples = path.join(dir, 'lab', 'examples');
   fs.mkdirSync(outExamples, { recursive: true });
-  const files = new Set(shipped.flatMap(ex => [ex.target, ex.thumb, ex.film.paths, ex.film.final, ...ex.film.frames, ...Object.values(ex.live??{}), ...Object.values(ex.studies??{}).flatMap(s=>[s.painting,s.comparison,s.metrics]), ...Object.values(ex.checkpoints??{}).flat().flatMap(c=>[c.state,c.image])].filter(Boolean)));
+  const files = new Set(shipped.flatMap(ex => [ex.target, ex.thumb, ex.film.paths, ex.film.final, ...ex.film.frames, ...Object.values(ex.live??{}), ...Object.values(ex.studies??{}).flatMap(s=>[s.painting,s.comparison,s.metrics,s.beforeComparison,s.beforeMetrics,s.run,s.budgetAudit,s.guard]), ...Object.values(ex.checkpoints??{}).flat().flatMap(c=>[c.state,c.image])].filter(Boolean)));
   for (const file of files) {
     const dest = path.join(dir, 'lab', file);
     fs.mkdirSync(path.dirname(dest), {recursive:true});
