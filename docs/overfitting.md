@@ -4,11 +4,11 @@ Some painter settings were fitted by self study on a few benchmark images, mostl
 
 ## How it is contained
 
-- The default recipe (`src/paint/recipe.mjs`) sets only general methods: value planning from light to dark, shaped marks, four middle layers, two touch-up rounds, a drawing first and last, physical cold-press paper. No value in it was fitted to one image.
-- Fitted settings live in `src/paint/tuned/` and run only through a named preset (`src/paint/tuned/presets.mjs`). A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe default+architecture`.
+- The opt-in `--recipe general` (`src/paint/recipe.mjs`) sets only general methods: value planning from light to dark, shaped marks, four middle layers, two touch-up rounds, a drawing first and last, physical cold-press paper. No value in it was fitted to one image.
+- Fitted settings live in `src/paint/tuned/` and run through the compatibility recipe or a named preset (`src/paint/tuned/presets.mjs`). A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe general+architecture`.
 - No painting code outside `src/paint/tuned/` checks a subject id. Rules fitted to one subject are switched by a flag that only its preset sets (`--trumbullrules`, `--portraitrules`, `--drawsubject`).
-- `--recipe v096` is the old default, the V096 approved recipe. It adds the tuned flags and sky lanes to every subject, and applies the per-subject presets by itself when the plan names `Y1`, `Y4`, `3T` or `1D`, as V096 did. Use it to repeat the README hero, the benchmark records and the saved examples.
-- `src/paint/overfit.test.mjs` fails if the default recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
+- `--recipe default` and `--recipe v096` retain the V096 compatibility recipe for this RC; the general recipe regressed held-out dark-mass balance. It adds the tuned flags and sky lanes to every subject, and applies the per-subject presets by itself when the plan names `Y1`, `Y4`, `3T` or `1D`, as V096 did. Use the v0.1.0 tag for exact historical simulation output.
+- `src/paint/overfit.test.mjs` fails if the general recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
 
 Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`. `Y4` is a second Trumbull-derived subject. `3T` (a portrait), `1D` (an ink and wash dog), `2W` (a beach scene with a figure and a dog) and `4I` (hills with a figure) are private benchmark images.
 
@@ -105,7 +105,7 @@ The general method defaults (for example the value bands, `--midlayers 4` and `-
 
 ## Held-out measurement
 
-Each subject painted from the image alone at 540 px with `--mode fast --targetguard strict --video 0 --marks 0`, once with `--recipe v096` and once with the new default, on the Mac mini (2026-10-10). Correlation and mean absolute gray difference are against the target, computed after painting. Ink is the line share of the finished painting by the painter's own ink separator (`src/crop/inkwash.mjs`); source line is the same separator on the target. Clean paper is the share within 10 gray levels of the blank sheet; the target figure uses its brightest tenth. Trumbull has no value plan here, so V096 runs its tuned flags but not the Y1 rules.
+Each subject painted from the image alone at 540 px with `--mode fast --targetguard strict --video 0 --marks 0`, once with `--recipe v096` and once with the then-proposed general default, on the Mac mini (2026-10-10). Correlation and mean absolute gray difference are against the target, computed after painting. Ink is the line share of the finished painting by the painter's own ink separator (`src/crop/inkwash.mjs`); source line is the same separator on the target. Clean paper is the share within 10 gray levels of the blank sheet; the target figure uses its brightest tenth. Trumbull has no value plan here, so V096 runs its tuned flags but not the Y1 rules.
 
 | Subject | Correlation, V096 to new | Gray diff, V096 to new | Ink, V096 to new (source line) | Clean paper, V096 to new (target) |
 |---|---|---|---|---|

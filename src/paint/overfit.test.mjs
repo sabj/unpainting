@@ -1,4 +1,4 @@
-// Containment of overfit settings (docs/overfitting.md): the default recipe sets no fitted flag, and painting code
+// Containment of overfit settings (docs/overfitting.md): the general recipe sets no fitted flag, and painting code
 // never branches on a benchmark subject id. Fitted rules live in src/paint/tuned/ and run only through a preset that
 // the plan or --recipe names.
 import test from 'node:test';
@@ -29,8 +29,8 @@ function paintingCode() {
   return files;
 }
 
-test('the default recipe sets no tuned flag', () => {
-  const given = new Set(names(expandRecipe({ argv: [] }).argv));
+test('the general recipe sets no tuned flag', () => {
+  const given = new Set(names(expandRecipe({ argv: ['--recipe', 'general'] }).argv));
   const tuned = new Set([...presetFlagNames(), ...names(TUNED_DEFAULT_FLAGS.split(' '))]);
   assert.deepEqual([...given].filter(n => tuned.has(n)), []);
 });
@@ -48,11 +48,11 @@ test('no painting code outside src/paint/tuned branches on a subject id', () => 
 });
 
 test('presets apply only when the plan or --recipe names them', () => {
-  const plain = expandRecipe({ argv: ['--valueplan', 'examples/plans/trumbull-values.json', '--presetless'] });
+  const plain = expandRecipe({ argv: ['--recipe', 'general', '--valueplan', 'examples/plans/trumbull-values.json', '--presetless'] });
   assert.match(plain.note, /presets architecture, glaze-gains, trumbull/);
-  const typed = expandRecipe({ argv: ['--recipe', 'default+architecture'] }).argv;
+  const typed = expandRecipe({ argv: ['--recipe', 'general+architecture'] }).argv;
   for (const flag of presetFlags(['architecture']).filter(a => a.startsWith('--'))) assert.ok(typed.includes(flag), flag);
-  assert.throws(() => expandRecipe({ argv: ['--recipe', 'default+nosuch'] }), /unknown preset nosuch/);
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+nosuch'] }), /unknown preset nosuch/);
 });
 
 test('every preset is flag and value pairs', () => {
