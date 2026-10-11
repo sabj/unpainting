@@ -1,0 +1,37 @@
+--- a/tools/ops/cloud/render-batch.py
++++ b/tools/ops/cloud/render-batch.py
+@@ -681,6 +681,7 @@
+ 
+ 
+ LAST_JOB = [time.time()]
++ACTIVE_JOBS = [0]  # keep idle slots alive while another slot still paints
+ 
+ 
+ def ship_inputs(box, tree, inputs):
+@@ -725,12 +726,14 @@
+             except queue.Empty:
+                 sub = governor.claim(BATCH)
+                 if sub is None:
+-                    if time.time() - LAST_JOB[0] >= args.linger * 60:
++                    if ACTIVE_JOBS[0] == 0 and q.empty() and time.time() - LAST_JOB[0] >= args.linger * 60:
+                         return
+                     time.sleep(10)
+                     continue
+                 idx, cmd = f"s{sub[0].stem}", sub[1].get("cmd", "true")
+                 log(f"submitted job {idx} from {sub[1].get('owner')}: {cmd}")
++            with lock:
++                ACTIVE_JOBS[0] += 1
+             try:
+                 if sub:
+                     ship_inputs(box, tree, sub[1].get("inputs", []))
+@@ -739,7 +742,9 @@
+                 log(f"job {idx} error: {e}")
+                 with lock:
+                     results.append({"idx": idx, "cmd": cmd, "exit": 254, "error": str(e)})
+-            LAST_JOB[0] = time.time()
++            with lock:
++                ACTIVE_JOBS[0] -= 1
++                LAST_JOB[0] = time.time()
+             if sub:
+                 row = next((r for r in results if r.get("idx") == idx), {"idx": idx, "exit": 254})
+                 governor.finish(sub[0], {**row, "out": str(outdir / f"job-{idx}.out")})

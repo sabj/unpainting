@@ -1,6 +1,7 @@
 // A whole sheet.mjs step on the GPU with the sheet resident (see stepfull.wgsl). Node with the `webgpu` package (Dawn),
 // or a browser's navigator.gpu passed to openGpu. sheet.mjs stays the reference and the fallback.
 import fs from 'node:fs';
+import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
 import {edgePingPong} from './edge-pingpong.mjs';
 import {fastDryChunk} from './fast-dry-chunk.mjs';
 import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mjs';
@@ -26,7 +27,7 @@ export async function openGpu(gpu) {
   const adapter = await gpu.requestAdapter(); if (!adapter) throw new Error('no WebGPU adapter'); KEEP.push(adapter);
   const L = adapter.limits;
   const device = await adapter.requestDevice({ requiredFeatures: process.env.GPU_TIMESTAMPS === '1' && adapter.features.has('timestamp-query') ? ['timestamp-query'] : [], requiredLimits: {
-    maxStorageBuffersPerShaderStage: Math.min(12, L.maxStorageBuffersPerShaderStage),
+    maxStorageBuffersPerShaderStage: Math.min(process.env.GPU_FUSE_WETSCAN === '1' ? 14 : 12, L.maxStorageBuffersPerShaderStage),
     maxStorageBufferBindingSize: L.maxStorageBufferBindingSize, maxBufferSize: L.maxBufferSize,
     // the brush kernel keeps its hairs (16 KB) and the feed's log (9.6 KB) in workgroup memory
     maxComputeWorkgroupStorageSize: Math.min(32768, L.maxComputeWorkgroupStorageSize),
@@ -105,7 +106,7 @@ export class GpuSheet {
     if (o.fixedBed > 0) { B.DEP.destroy(); B.DEP = mk(f * 3); }
     for (const k of ['PAPER', 'PAPER2', 'PAPER3', 'BPAP']) B[k] = mk(f * 4);
     // the stroke plan and the hairs (up to SB floats), then the brush's last touch of each cell and the paper's capacity
-    this.strokePlanBudget=strokePlanBudget(planMiB(process.env.GPU_STROKE_PLAN_MIB,n),n,d.limits);this.SB=this.strokePlanBudget.words;const strokeSource=strokePlanShader(SRC,this.SB);B.BSTR=mk(this.strokePlanBudget.gpuBufferBytes);
+    this.strokePlanBudget=strokePlanBudget(planMiB(process.env.GPU_STROKE_PLAN_MIB,n),n,d.limits);this.SB=this.strokePlanBudget.words;const strokeSource=strokePlanShader(SRC,this.SB)+(process.env.GPU_FUSE_WETSCAN==='1'&&d.limits.maxStorageBuffersPerShaderStage>=13?FINISH_WET_SCAN:'');B.BSTR=mk(this.strokePlanBudget.gpuBufferBytes);
     this.resistMask = null;
     for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM', 'PN', 'DD']) B[k] = mk(f * K);
     B.FXY = mk(f * 2); B.QXY = mk(f * 2 * K);   // the fused step's fluxes (stepsInPass)
@@ -235,13 +236,14 @@ export class GpuSheet {
     const nD = this.cap;
     const go = (name, indirectOffset = 0, dispatch = null) => { if (indirectOffset === 12 && !this.act.length) return; pass.setPipeline(this.p[name]); pass.setBindGroup(0, this.bg[name]); if (dispatch) pass.dispatchWorkgroups(...dispatch); else if (this.persistent && indirectOffset < 24) pass.dispatchWorkgroups(this.workers, indirectOffset === 12 ? this.act.length : 1); else if (this.resident) pass.dispatchWorkgroupsIndirect(B.ARGS, indirectOffset); else pass.dispatchWorkgroups(nD, indirectOffset ? this.act.length : 1); };
     const nT = Math.ceil(this.ntiles / 64);
+    const finish = () => { if (this.p.p5c_wetscan) go('p5c_wetscan'); else { go('p5c'); go('wetscan'); } };
     // Once M is empty, no wet front can form without a stamped source. Keep
     // capillary transport and pore drying, but skip the surface-only passes.
     if (this.resident && this.dryS?.dampOnly) {
       for(let s=0;s<steps;s++) {
         if (SPARSE_ALL) go('sparse_all',0,[1]); else { go('sparse_start',0,[1]); go('sparse_build',24); go('tiles_args',0,[1]); }
         if (process.env.GPU_STEP !== 'old' && o.edgeWidth + 1 <= 7) go('cap_sp'); else { go('cap_s'); go('cap_p', 12); }
-        go('p5a'); go('p5c'); go('wetscan');
+        go('p5a'); finish();
       }
       return;
     }
@@ -253,7 +255,7 @@ export class GpuSheet {
         for (let it = 0; it < o.flowIters; it++) { go('faces_wsc'); go('pflux_sc'); go(it === 0 ? 'apply_f0' : 'apply_f1'); }
         go('p3a_dep');
         if ((o.slide ?? 0) > 0) { go('slide_out_all'); go('slide_apply_all'); }
-        go('cap_sp'); go('p5a'); go('p5b'); go('p5c'); go('wetscan');
+        go('cap_sp'); go('p5a'); go('p5b'); finish();
       }
       return;
     }
@@ -267,7 +269,7 @@ export class GpuSheet {
       }
       go('p3a');
       if ((o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      go('cap_s'); go('cap_p', 12); go('p5a'); go('p5b'); go('p5c'); go('wetscan');
+      go('cap_s'); go('cap_p', 12); go('p5a'); go('p5b'); finish();
     }
   }
 
