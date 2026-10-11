@@ -67,7 +67,11 @@ def measure(bgr, *, long_edge=1000, sheet_mm=152.4, ridge_cut=.045):
     bgr = cv2.resize(bgr, (max(1, round(original[1]*scale)), max(1, round(original[0]*scale))),
                      interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC)
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
-    paper = max(.1, float(np.percentile(gray, 98)))
+    h, w = gray.shape
+    # Scans often have a white mount around cream paper. Estimate paper inside
+    # the sheet, using its light upper range, rather than the brightest border.
+    interior = gray[max(0, int(.05*h)):max(1, int(.95*h)), max(0, int(.05*w)):max(1, int(.95*w))]
+    paper = max(.1, float(np.percentile(interior, 85)))
     gray = np.clip(gray/paper, 0, 1)
     tone = 1-gray
     # Local contrast keeps narrow lines out of broad wash and pencil masses.
@@ -108,6 +112,7 @@ def measure(bgr, *, long_edge=1000, sheet_mm=152.4, ridge_cut=.045):
     return {'version': 'dry-drawing-raster-v1', 'originalPixels': [original[1], original[0]],
             'analysisPixels': [w, h], 'normalizedLongEdge': long_edge,
             'displaySheetWidthMm': sheet_mm, 'ridgeCut': ridge_cut,
+            'paperEstimate': {'gray': paper, 'method': 'central 90% rectangle, luminance percentile 85'},
             'pathFragments': len(paths), 'pathFragmentsPerMegapixel': len(paths)/mp,
             'pathFragmentsPerCm2': len(paths)/(area_mm2/100),
             'skeletonPxPerMegapixel': float(skeleton.sum()/mp),
