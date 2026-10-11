@@ -179,18 +179,21 @@ const optTrack = {
 };
 const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
 // Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
-const SPEED_TRANSFERS = num('speedtransfers', 0) > 0;
-if (SPEED_TRANSFERS) { process.env.GPU_DEMAND_READBACK = 'fast'; process.env.GPU_DIRTY_UPLOAD = '1'; }
+const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
+if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
 const NATIVE_UPLOAD_POLICY = nativeUploadPolicy(NATIVE_PAINT_MODE.mode, process.env.GPU_DIRTY_UPLOAD);
+if (SPEED_TRANSFERS && process.env.GPU_DIRTY_UPLOAD == null) {
+  Object.assign(NATIVE_UPLOAD_POLICY, { value: '1', enabled: true, selection: 'speed-transfer-default' });
+}
 process.env.GPU_DIRTY_UPLOAD ??= NATIVE_UPLOAD_POLICY.value;
 NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
 // --video 0|1: 0 keeps stage images and passage checkpoints; 1 retains and encodes the film. Default 1.
 const OUTPUT_VIDEO = num('video', 1);
 if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
 // Diagnostic counters preserve dispatch ordering; GPU times are sampled, not serialized.
-process.env.GPU_FUSE_WETSCAN = String(num('speedscan', 0));
+process.env.GPU_FUSE_WETSCAN = String(num('speedscan', 1));
 process.env.GPU_QUIET_DT = String(num('speedquietdt', 0));
-process.env.GPU_EDGE_PINGPONG = String(num('speededge', 0));
+process.env.GPU_EDGE_PINGPONG = String(num('speededge', 1));
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
 
