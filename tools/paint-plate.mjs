@@ -2402,6 +2402,7 @@ if (num('finaldarks', 0) > 0) {
   console.log(`final darks: ${a} accent cells (${(100 * a / n).toFixed(2)}% of the sheet) in ${FD_SHAPES.length} families, ${FD_SHAPES.reduce((s, t) => s + t.area, 0)} cells, cut before painting`);
 }
 const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(num('prepkeep', 2)))) : null;
+SPEED_PROFILE?.add('planningAndSetup', process.uptime() * 1000);
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step`);
 if (!RESUMING && RESIST && !PRACTICE && Math.round(num('masses', 0)) <= 0) { if(AREA_PLAN){const cells=Array.from(up(AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(sheet,cells);if(!paper.dry)throw Error('semantic film requires actual dry paper before apply');AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(sheet, up(RESIST), RESIST_SOFT && upF(RESIST_SOFT)); STAGE = { stage: 'frisket', cells: RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
@@ -2433,6 +2434,8 @@ async function drawPrepStage(PEN) {
   await stageShot('prep', before);
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
+  const speedDrawStart = performance.now();
+  try {
   const PLAN = PEN_PLANS[first ? 'first' : fine ? 'fine' : 'last'];
   if (!PLAN) throw new Error('drawing: this pen pass was not planned before painting');
   const { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures } = PLAN;
@@ -2499,6 +2502,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
   if (stageBefore && (first ? STAGE_PLAN.files.prepInk && STAGE_PLAN.stages.prepInk : STAGE_PLAN.files.finishInk)) await stageShot(first ? 'prepink' : 'finishink', stageBefore);
   if (INKRES) { INKRES.settle(); console.log(`inkres ${INKRES.N}: the pens on a ${INKRES.width} x ${INKRES.height} sheet, ${INKRES.stats.calls} calls, ${(INKRES.stats.ms / 1000).toFixed(1)} s so far`); }
   console.log(`drawing: ${drawnCount} pen gestures in pigment ${inkPig}, long share ${longShare(gestures, w).toFixed(2)}`);
+  } finally { SPEED_PROFILE?.add('drawing', performance.now() - speedDrawStart); }
 }
 let INK_THK = null, WASH_THK = null;
 if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
