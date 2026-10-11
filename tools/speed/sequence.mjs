@@ -24,7 +24,10 @@ export async function runSpeedSequence(argv, script) {
       const dir = path.join(out, 'sequence', String(i)), childArgs = args.slice();
       childArgs[oi + 1] = dir;
       fs.mkdirSync(dir, { recursive: true });
-      const fd = fs.openSync(path.join(dir, 'paint.log'), 'w'), start = performance.now();
+      // The painter requires an empty output directory at startup. Keep the
+      // open child log beside it until the painter has finished.
+      const logFile = path.join(out, 'sequence', String(i) + '.log');
+      const fd = fs.openSync(logFile, 'w'), start = performance.now();
       let code;
       try {
         code = await new Promise((resolve, reject) => {
@@ -36,6 +39,7 @@ export async function runSpeedSequence(argv, script) {
           child.once('error', reject); child.once('close', resolve);
         });
       } finally { fs.closeSync(fd); }
+      fs.renameSync(logFile, path.join(dir, 'paint.log'));
       const painting = path.join(dir, 'painting.png');
       const row = { index: i, args: runs[i], seconds: (performance.now() - start) / 1000, exit: code,
         sha256: fs.existsSync(painting) ? crypto.createHash('sha256').update(fs.readFileSync(painting)).digest('hex') : null };

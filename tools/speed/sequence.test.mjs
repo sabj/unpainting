@@ -10,7 +10,9 @@ test('sequence uses fresh processes, shares a private cache and retains each mea
   try {
     const script = path.join(root, 'fake.mjs'), out = path.join(root, 'paint');
     fs.writeFileSync(script, `import fs from 'node:fs'; import path from 'node:path';
+      import {prepareOutputDirectory} from ${JSON.stringify(new URL('../../src/paint/output-directory.mjs', import.meta.url).href)};
       const args=process.argv.slice(2),out=args[args.lastIndexOf('--out')+1],cache=process.env.W2_CACHE_DIR;
+      prepareOutputDirectory(out);
       fs.mkdirSync(cache,{recursive:true}); const hit=fs.existsSync(path.join(cache,'value'));
       fs.writeFileSync(path.join(cache,'value'),'stored');
       fs.writeFileSync(path.join(out,'painting.png'),String(args[args.lastIndexOf('--variant')+1]));
