@@ -200,6 +200,7 @@ const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrende
 process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
+const CPU_PROFILE = num('speedcpu', 0) > 0 ? await import('./speed/cpu-profile.mjs').then(m => m.startCpuProfile()) : null;
 void opt('downtrace', '0'); // tracing is selected from argv while GPU modules load
 
 if (RECIPE_NOTE) console.log(RECIPE_NOTE);
@@ -3769,3 +3770,4 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
 }
 
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
+if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
