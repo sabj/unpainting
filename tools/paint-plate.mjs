@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
+import {startSpeedProfile} from './speed/profile.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
 import {splitLoadsFeathered} from '../src/paint/methods/brushes.mjs';
 import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
@@ -182,6 +183,9 @@ NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
 // --video 0|1: 0 keeps stage images and raw frames but skips retiming and encoding the film. Default 1.
 const OUTPUT_VIDEO = num('video', 1);
 if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
+// Diagnostic counters preserve dispatch ordering; GPU times are sampled, not serialized.
+const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
+
 if (RECIPE_NOTE) console.log(RECIPE_NOTE);
 // The release, painter and sim versions and the git commit, recorded in frames.json and backend.json (docs/versions.md)
 const PAINTER = versionStamp();
@@ -3724,3 +3728,5 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
     if (opt('allowunused', '0') === '0' && unused.some(k => !optional.has(k))) process.exitCode = 3;
   }
 }
+
+if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
