@@ -16,3 +16,34 @@ Serve it with `python3 -m http.server 8000 --directory docs` and open the server
 [Running the painter](../running.md#paint-lab) covers the examples and how to rebuild their animations. `tools/lab/build-site.mjs` copies this folder into the static site.
 
 Manual brush and pen loads survive lifting. Use Re-dip brush / pen for a fresh load. Changing a material or tool loads that choice. Surface and pore water evaporate through the normal CPU or WebGPU physics; scratch marks use separate disposable paper.
+
+Live operations are explicit. Blue-grey tint shows recorded masking fluid (`r`);
+an ochre outline shows the allowed passage (`c`), which clips brush deposition.
+The named operation timeline includes applying/removing either, loading tools,
+drying, settling, blotting, and rewetting. Drying colours the affected wet area;
+hand drying shows the local heat footprint. Unknown tape events stop with an
+error instead of disappearing silently. Recording mode still shows saved frames.
+
+Use **Mask** to paint fluid, then paint washes and **Remove mask** to lift it.
+**Show masks & boundaries** hides only the overlay, not the physical protection.
+**Remove boundary** releases a recorded passage when carrying on by hand.
+**Lift** removes mobile colour with a damp tool (staining remains); **Blot** takes
+surface water and suspended pigment; **Water** rewets; **Dryer** dries locally.
+These changes participate in undo/autosave. Masks are restored when seeking.
+Masking should precede the washes it protects.
+
+The first-wash gaps have two explicit causes in both shipped tapes: resist and
+passage clips. h36's 1086 × 724 tape masks 92,398 cells; White Ships' 720 × 514
+tape masks 23,485. Their 2,500-stroke excerpts contain `r`, `c`, and `y` operations
+but no `R` removal, so the fluid stays on until a later recorded removal or the
+user removes it. Dry contact and depleted load can also leave broken marks;
+they are not substitutes for the explicit recorded masks.
+
+The previous live indicator drew a nominal circle regardless of blocked contact.
+It also used the default brush radius for WebGPU read/write bounds, although
+both first washes record larger per-point radii (h36: up to 358.8 versus
+135.4 source cells; White Ships: 257.3 versus 96.1). Replay now includes those radii
+in the upload bounds and outlines only cells whose water or pigment actually
+changed in that application. The indicator is presented with the completed paint
+frame and cleared between strokes and operations; there is no interpolated
+travel animation across untouched paper. Overlays do not enter image exports.

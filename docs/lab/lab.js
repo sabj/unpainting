@@ -1,3 +1,4 @@
+import {createOperationsUI} from './ui/operations.js';
 // The paint lab page: pointer input, controls and the frames from the simulation worker.
 import {createPlaybackUI,loadBytes,loadTape} from './ui/playback.js';
 import { setupScratch } from './ui/scratch.js';
@@ -27,6 +28,7 @@ let surface = SURFACE_KEYS.includes(query.get('surface')) ? query.get('surface')
 let paperKey = PAPERS[query.get('paper')] ? query.get('paper') : '8x6', dpi = dpiAsked ?? (quality === 'full' ? 200 : CPU_DPI);
 let W = canvas.width, H = canvas.height, PIXELS_PER_INCH = dpi;
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+const operations=createOperationsUI(sheetEl,m=>{cancelStroke();worker.postMessage(m);});
 // The physics runs on WebGPU in the worker when the browser has it, and the worker then draws straight into this canvas
 // from the GPU buffers. Without WebGPU (or with ?physics=cpu) the physics is the CPU's and the colour render runs on WebGL2
 // in the worker, straight into this canvas. ?render=cpu keeps the CPU render, which is also the fallback when WebGL2 is
@@ -56,6 +58,7 @@ function begin() {
 let introConsidered = false;
 function onSheet(data) {
   if(data.dpi!==dpi)lab.dpiChoice='loaded sheet';
+  operations.reset(data.width,data.height);
   W = data.width; H = data.height; PIXELS_PER_INCH = data.dpi; dpi = data.dpi; lab.dpi = dpi; lab.sheet = { width: W, height: H, dpi, paperIn: data.paperIn, surface: data.surface };
   document.getElementById('resolution-choice').textContent=`${lab.dpiChoice??'Selected'} · ${dpi} dpi`;
   if (!gpuCanvas && ctx) { canvas.width = W; canvas.height = H; image = ctx.createImageData(W, H); }
@@ -90,7 +93,7 @@ function updateActiveTool() {
   const diameter = settings.sizeMm / MM;
   const eligible = settings.tool === 'flat' && Math.abs(settings.water - 1) < 0.001 && diameter >= 0.25 && diameter <= 0.5;
   const toolText = paintTool ? `${settings.tool} · ${settings.sizeMm.toFixed(1)} mm` : `${settings.tool} · ${settings.sizeMm.toFixed(1)} mm`;
-  const pigmentText = settings.tool === 'pencil' ? 'graphite' : settings.tool === 'pen' ? 'walnut ink' : settings.tool === 'water' || settings.tool === 'dryer' ? 'no pigment' : settings.mixture ? 'mixed paint' : BY_KEY[settings.pigment].name.toLowerCase();
+  const pigmentText = settings.tool === 'pencil' ? 'graphite' : settings.tool === 'pen' ? 'walnut ink' : ['water','dryer','mask','lift','blot'].includes(settings.tool) ? 'no pigment' : settings.mixture ? 'mixed paint' : BY_KEY[settings.pigment].name.toLowerCase();
   const modeText = paintTool && settings.reservoirMode === 'area' ? ` · ${eligible ? 'calibrated load' : 'standard load'}` : '';
   document.getElementById('active-tool').textContent = temporaryWater?'Temporary clean water · release Alt / barrel to return':`${toolText} · ${pigmentText}${modeText}`;
   pigmentSet.disabled = !PIGMENT_TOOLS.includes(settings.tool);
@@ -221,6 +224,7 @@ const playPause = document.getElementById('play-pause'), replaySpeed = document.
 const filmCanvas = document.getElementById('film');
 let playingWhat = '', playingExample = false, filmRun = 0, filmSkip = false, replayPaused = false, tapeRequest=null;
 const setPlaying = on => {
+  operations.playing(on);operations.canvas.hidden=on&&lab.mode==='replay';if(!on)operations.clear();
   playing = on; lab.playing = on;document.body.classList.toggle('replaying',on); pauseButton.disabled = on; quickDryButton.disabled = on || Boolean(lab.quickDry);
   playbar.hidden = !on; caption.hidden = !on;if(!on)document.getElementById('current-materials').hidden=true;
   if(on){caption.textContent='Preparing the paper';playProgress.value=0;lab.progress=null;document.getElementById('skip').disabled=true;}
@@ -339,7 +343,7 @@ function startTouch() {
   worker.postMessage({ type: 'down', pt: last, tool: toolInHand() });
 }
 const applyView = () => {
-  for (const el of [canvas, filmCanvas, document.getElementById('seek-preview'), document.getElementById('cursor')]) { el.style.transformOrigin = '0 0'; el.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`; }
+  for (const el of [canvas, filmCanvas, operations.canvas, document.getElementById('seek-preview'), document.getElementById('cursor')]) { el.style.transformOrigin = '0 0'; el.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`; }
   cacheRect(); queueCursor();
 };
 let focusScroll=0;
@@ -433,8 +437,8 @@ function paintCursor() {
   // whose tip has dragged clear of the finger and its own footprint is shown. A pen's and a mouse's pointer hides nothing.
   if (hover.touch && !(live?.tip && Math.hypot(live.tip.x - x, live.tip.y - y) > ((FINGER_MM + settings.sizeMm / 2) / MM) * PIXELS_PER_INCH)) return;
   lab.cursor = cursor.draw({
-    x, y, w: W, dpi: PIXELS_PER_INCH, tool, model: settings.model, tiltX: hover.tiltX, tiltY: hover.tiltY, flat: tool === 'flat', sizeMm: settings.sizeMm, p: hover.p,
-    colour: tool === 'water' || tool === 'dryer' ? '#7fa6c9' : PIGMENT_TOOLS.includes(tool)&&settings.mixture ? `rgb(${previewMix(settings.mixture,settings.amount,SURFACES[surface].colour).paint.join(' ')})` : PIGMENT_COLOUR[settings.pigment], sat: live?.sat ?? settings.water, tip: live?.tip ?? null, bend: live?.bend ?? 0, len: live?.len ?? null, hx: heading.x, hy: heading.y,
+    x, y, w: W, dpi: PIXELS_PER_INCH, tool:['mask','lift','blot'].includes(tool)?'water':tool, model: settings.model, tiltX: hover.tiltX, tiltY: hover.tiltY, flat: tool === 'flat', sizeMm: settings.sizeMm, p: hover.p,
+    colour: ['water','dryer','mask','lift','blot'].includes(tool) ? '#7fa6c9' : PIGMENT_TOOLS.includes(tool)&&settings.mixture ? `rgb(${previewMix(settings.mixture,settings.amount,SURFACES[surface].colour).paint.join(' ')})` : PIGMENT_COLOUR[settings.pigment], sat: live?.sat ?? settings.water, tip: live?.tip ?? null, bend: live?.bend ?? 0, len: live?.len ?? null, hx: heading.x, hy: heading.y,
   });
 }
 const queueCursor = () => { if (!cursorQueued) { cursorQueued = true; requestAnimationFrame(paintCursor); } };
@@ -487,6 +491,7 @@ worker.addEventListener('message', ({ data }) => {
     else download(data.blob);
   }
   else if (data.type === 'live-ready') {playbackUI.ready();lab.seeking=false;playProgress.value=data.done/data.total;playbackUI.update(data.done/data.total);document.getElementById('skip').disabled=false;lab.progress={done:data.done,total:data.total,phase:'painting'};}
+  else if(data.type==='operation'){operations.stage(data);lab.operationStage={kind:data.kind,label:data.label,done:data.done};if(playing){caption.textContent=data.label;playbackUI.materials({phase:data.label,tool:'',pigments:[]});}}
   else if (data.type === 'materials') {playbackUI.materials(data);lab.materials=data;if(data.total)caption.textContent=`${data.phase} · ${data.done+1} / ${data.total} strokes`;}
   else if (data.type === 'caption') { if (playing) caption.textContent = data.text; }
   else if (data.type === 'progress') {
@@ -507,6 +512,7 @@ worker.addEventListener('message', ({ data }) => {
   else if (data.type === 'frame') {
     const t0 = performance.now();
     if (data.rgba && image) { image.data.set(data.rgba); ctx.putImageData(image, 0, 0); }
+    operations.frame(data);lab.operation=data.operation; if(data.masks)lab.masks={resistCells:data.masks.resist?.reduce((n,v)=>n+v,0)||0,clipCells:data.masks.clip?.reduce((n,v)=>n+v,0)??null};
     const held = live; live = data.cursor ?? null; if (hover && (live || held)) queueCursor(); // the brush in hand, for the preview
     // how long the last stroke point took from the page to a drawn frame: the lag a painter sees
     if (data.moveT) { lab.lags.push(now() - data.moveT); if (lab.lags.length > 300) lab.lags.shift(); }
@@ -519,7 +525,7 @@ worker.addEventListener('message', ({ data }) => {
     lab.gpuSteps = data.gpuSteps; lab.gpuFrameMs = data.gpuFrameMs; lab.wet = Boolean(data.wet);
     lab.lastTool = data.lastTool;lab.load=data.load;lab.replayPoint=data.replayPoint;
     document.getElementById('load-state').textContent=data.load?`Water ${data.load.water.toFixed(1)} · paint ${data.load.pigment.toFixed(1)} · ${settings.autoRedip?'auto re-dip when low':'re-dip when dry'}`:'';
-    if(lab.mode==='live'&&playing){filmCanvas.hidden=lab.seeking||!data.replayPoint||!document.getElementById('show-brush').checked;if(!filmCanvas.hidden){if(filmCanvas.width!==W||filmCanvas.height!==H){filmCanvas.width=W;filmCanvas.height=H;}const g=filmCanvas.getContext('2d');g.clearRect(0,0,W,H);const p=data.replayPoint;g.beginPath();g.arc(p.x,p.y,Math.max(1,p.r),0,2*Math.PI);g.strokeStyle='#fff9';g.lineWidth=2;g.stroke();g.strokeStyle='#5a4036';g.lineWidth=.75;g.stroke();g.beginPath();g.arc(p.x,p.y,1,0,2*Math.PI);g.fillStyle='#5a4036';g.fill();g.beginPath();g.moveTo(p.x+2,p.y-3);g.lineTo(p.x+8,p.y-13);g.strokeStyle='#fff9';g.lineWidth=3;g.stroke();g.strokeStyle=lab.materials?.tool==='Dip pen'?'#39362f':'#99543a';g.lineWidth=1.5;g.stroke();}}
+    if(lab.mode==='live'&&playing)filmCanvas.hidden=true;
 
     lab.frames++; if (data.gpuDrawn) lab.gpuDrawnEpoch = data.gpuDrawn; lab.workerRenderMs = data.renderMs; lab.workerRenders = data.renderCount;
     if (handNote && (performance.now() > handNote.until || data.strokes !== handNote.strokes)) handNote = null;
