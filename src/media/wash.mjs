@@ -299,22 +299,45 @@ export function brushedWashPaths(mask, w, h, { maxRadius = 14, overlap = 0.15, f
  * A five by five structure tensor at every step of every sweep costs more than the fluid simulation it feeds. The
  * field does not change while a passage is being painted, so it is built once and read.
  */
+let FLOW_RECTANGLE = false, FLOW_OBSERVE = null;
+export function setFlowRectangle(enabled, observe = null) {
+  if (observe !== null && typeof observe !== 'function') throw Error('Flow observer must be a function');
+  FLOW_RECTANGLE = !!enabled; FLOW_OBSERVE = observe;
+}
+
 export function flowField(field, w, h) {
+  const started = FLOW_OBSERVE ? performance.now() : 0;
+  const finish = result => { FLOW_OBSERVE?.({ milliseconds: performance.now() - started }); return result; };
   // A passage's field is zero outside the passage, and a zero field has no gradient and no direction, so only the rows
   // within reach of a nonzero one (one for the gradient, two more for the five by five tensor) can differ from zero.
-  let r0 = -1, r1 = -1;
-  for (let y = 0; y < h && r0 < 0; y++) { const b = y * w; for (let x = 0; x < w; x++) if (field[b + x] !== 0) { r0 = y; break; } }
-  if (r0 >= 0) for (let y = h - 1; y >= r0 && r1 < 0; y--) { const b = y * w; for (let x = 0; x < w; x++) if (field[b + x] !== 0) { r1 = y; break; } }
+  let r0 = -1, r1 = -1, c0 = w, c1 = -1;
+  if (FLOW_RECTANGLE) {
+    // Only the first and last nonzero cell of each row are needed. Broad
+    // passages avoid scanning their interior; narrow ones avoid full-width
+    // tensor work. NaNs/infinities count as support as in the original scan.
+    for (let y = 0; y < h; y++) {
+      const b = y * w; let a = 0, z = w - 1;
+      while (a < w && field[b + a] === 0) a++;
+      if (a === w) continue;
+      while (z > a && field[b + z] === 0) z--;
+      if (r0 < 0) r0 = y;
+      r1 = y; c0 = Math.min(c0, a); c1 = Math.max(c1, z);
+    }
+  } else {
+    for (let y = 0; y < h && r0 < 0; y++) { const b = y * w; for (let x = 0; x < w; x++) if (field[b + x] !== 0) { r0 = y; break; } }
+    if (r0 >= 0) for (let y = h - 1; y >= r0 && r1 < 0; y--) { const b = y * w; for (let x = 0; x < w; x++) if (field[b + x] !== 0) { r1 = y; break; } }
+  }
   const n = w * h;
-  if (r0 < 0) return { fx: new Float32Array(n), fy: new Float32Array(n), coh: new Float32Array(n) };
+  if (r0 < 0) return finish({ fx: new Float32Array(n), fy: new Float32Array(n), coh: new Float32Array(n) });
   const rng = { glo: Math.max(1, r0 - 1), ghi: Math.min(h - 2, r1 + 1), tlo: Math.max(2, r0 - 3), thi: Math.min(h - 3, r1 + 3) };
+  if (FLOW_RECTANGLE) Object.assign(rng, { gxlo: Math.max(1, c0 - 1), gxhi: Math.min(w - 2, c1 + 1), txlo: Math.max(2, c0 - 3), txhi: Math.min(w - 3, c1 + 3) });
   const par = FLOW_THREADS && FLOW_THREADS(field, w, h, rng);
-  if (par) return par;
+  if (par) return finish(par);
   const fx = new Float32Array(n), fy = new Float32Array(n), coh = new Float32Array(n);
   const gx = new Float32Array(n), gy = new Float32Array(n);
-  gradRows(field, w, gx, gy, rng.glo, rng.ghi);
-  tensorRows(gx, gy, w, fx, fy, coh, rng.tlo, rng.thi);
-  return { fx, fy, coh };
+  gradRows(field, w, gx, gy, rng.glo, rng.ghi, rng.gxlo, rng.gxhi);
+  tensorRows(gx, gy, w, fx, fy, coh, rng.tlo, rng.thi, rng.txlo, rng.txhi);
+  return finish({ fx, fy, coh });
 }
 // flowField for the same field array (and size) is the same field: kept while the array lives
 const FLOW_CACHE = new WeakMap();

@@ -16,8 +16,8 @@ export function runJob(a, c, nC) {
     if (rows < 1) return;
     const ya = lo + Math.floor((rows * c) / nC), yb = lo + Math.floor((rows * (c + 1)) / nC) - 1;
     if (yb < ya) return;
-    if (a.kind === 'grad') gradRows(a.field, a.w, a.gx, a.gy, ya, yb);
-    else tensorRows(a.gx, a.gy, a.w, a.fx, a.fy, a.coh, ya, yb);
+    if (a.kind === 'grad') gradRows(a.field, a.w, a.gx, a.gy, ya, yb, a.xlo, a.xhi);
+    else tensorRows(a.gx, a.gy, a.w, a.fx, a.fy, a.coh, ya, yb, a.xlo, a.xhi);
   } else if (a.kind === 'blurH' || a.kind === 'blurV') {
     const y0 = Math.floor((a.h * c) / nC), y1 = Math.floor((a.h * (c + 1)) / nC);
     if (y1 > y0) { if (a.kind === 'blurH') blurRows(a.src, a.tmp, a.w, a.k, a.r, y0, y1); else blurCols(a.tmp, a.out, a.w, a.h, a.k, a.r, y0, y1); }

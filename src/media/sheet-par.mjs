@@ -240,8 +240,8 @@ function flowField(field, w, h, rng = {}) {
   const n = w * h, f = into('field', field);
   // zeroed as the serial call's fresh arrays are: the passes leave the borders and flat cells unwritten
   const [gx, gy, fx, fy, coh] = ['gx', 'gy', 'fx', 'fy', 'coh'].map(k => buf(k, Float32Array, n).fill(0));
-  job({ kind: 'grad', field: f, w, h, gx, gy, lo: rng.glo, hi: rng.ghi });
-  job({ kind: 'tensor', gx, gy, w, h, fx, fy, coh, lo: rng.tlo, hi: rng.thi });
+  job({ kind: 'grad', field: f, w, h, gx, gy, lo: rng.glo, hi: rng.ghi, xlo: rng.gxlo, xhi: rng.gxhi });
+  job({ kind: 'tensor', gx, gy, w, h, fx, fy, coh, lo: rng.tlo, hi: rng.thi, xlo: rng.txlo, xhi: rng.txhi });
   POOL.stats.flow++;
   return { fx: fx.slice(), fy: fy.slice(), coh: coh.slice() };
 }
