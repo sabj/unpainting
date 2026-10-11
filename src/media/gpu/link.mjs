@@ -1,9 +1,5 @@
-// Sum only fixed layers below the liftable top; GPU fix adds each superseded top once.
-function fixedBedLower(sheet) {
- const bed = new Float32Array(sheet.n);
- for (const layer of sheet.layers.slice(0,-1)) for (const plane of layer) for(let i=0;i<bed.length;i++) bed[i]+=plane[i];
- return bed;
-}
+import { fixedBedLower as sumFixedBedLower } from '../fixed-bed.mjs';
+const fixedBedLower = sheet => sumFixedBedLower(sheet, { skipEmpty: process.env.GPU_SKIP_ZERO_LAYER === '1' });
 // The painter's side of the GPU sheet backend. attachGpu(sheet, O, { mode }) starts a worker that holds the sheet on the
 // GPU and sets sheet._gpu; with it unset (mode 'off', no adapter, no `webgpu` package) sheet, brush and pen run on the CPU.
 // Keeps the GPU copy and the CPU copy agreed: strokes read and write back rectangles, whole-sheet readers call
