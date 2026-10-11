@@ -190,7 +190,7 @@ export function drawingFlags(drawing) {
   if (colour) flags.push('--inkprofile', `${colour}-ink`);
   const ink = inkFlags(drawing.ink, colour);
   flags.push(...ink.flags);
-  const source = choice(drawing, 'source', LINE_SOURCES);
+  const source = drawing.source === 'auto' ? 'auto' : choice(drawing, 'source', LINE_SOURCES);
   if (source) flags.push('--linesource', source);
   const amount = unit(drawing, 'amount');
   if (amount != null) flags.push('--openinglines', UNCAPPED, '--closinglines', UNCAPPED, '--drawshare', round(amount));
@@ -213,7 +213,7 @@ export function drawingFlags(drawing) {
     return flags;
   }
   if (closing === 0) flags.push('--drawing', 'first');
-  else if (closing != null) flags.push('--closingedgemin', round(CLOSING_EDGE_SPAN * (1 - closing)));
+  else if (closing != null) flags.push('--drawing', 'both', '--closingedgemin', round(CLOSING_EDGE_SPAN * (1 - closing)));
   return flags;
 }
 

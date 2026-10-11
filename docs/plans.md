@@ -4,6 +4,8 @@ A plan is the set of decisions written down before painting. A passage is a wash
 
 The usual order is drawing, drying, pale washes, deeper glazes (transparent washes over dried paint) and a few dark accents. Lights need space left for bare paper. Wet passages can join; separate glazes need time to dry. Brush water and paper moisture are separate choices. The plan records intent. The saved sheet and stroke records show what happened.
 
+The default image painter uses one [combined plan and technique toolbox](combined-painter.md). Its `drawing`, `washes` and `order` sections select the process together; CLI options are overrides. Use `--recipe v096` for the historical fitted recipe.
+
 ## Three formats
 
 [Stroke plans](plan-format.md) give ordered brush paths, loads and drying commands. Run one with `node tools/run-plan.mjs <file>`. The JSON files in [examples/plans/](../examples/plans/) include four stroke plans:

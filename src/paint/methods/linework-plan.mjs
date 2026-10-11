@@ -166,6 +166,7 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
     const sx=imageSize.w/density.w,sy=imageSize.h/density.h;
     r.finishInk.push(...extra.map(g=>({...g,points:g.points.map(([x,y])=>[x*sx,y*sy]),widths:g.widths.map(v=>v*sx)})));
     r.summary.finishInk[kind]=extra.length;
+    r.summary.finishInk.lines=r.finishInk.length;
   }
   for (const [key, name] of [['prep', 'prep'], ['prepInk', 'prepink'], ['finishInk', 'finishink']]) {
     if (!r[key] && !(key === 'prepInk' && r.prep)) continue;

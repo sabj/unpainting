@@ -15,10 +15,6 @@ const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
 const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --marks 1';
-// Clean colour (light-to-dark.mjs): first washes and middle layers mixed per colour family, saturated and muted
-// families apart, each passage charged at its median with the rest carried to the next band, carried glazes placed at
-// brush scale, and pale planes kept to one wash.
-const CLEAN_COLOUR_FLAGS = '--huechroma 30 --passcap 0.5 --maskmm 2 --lightfamilies 1 --palelights 0.16';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
@@ -27,7 +23,7 @@ const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loa
 const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skysplit 1';
 
 const RECIPES = {
-  general: [METHOD_FLAGS, CLEAN_COLOUR_FLAGS, TECHNIQUE_FLAGS].join(' '),
+  general: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   default: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   combined: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   v096: [V096_METHOD_FLAGS, V096_TECHNIQUE_FLAGS, TUNED_DEFAULT_FLAGS].join(' '),

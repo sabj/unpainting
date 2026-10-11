@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
 import {splitLoadsFeathered} from '../src/paint/methods/brushes.mjs';
 import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
@@ -110,6 +111,7 @@ import { gouacheCover, dryCover, overlay } from '../src/media/gouache.mjs';
 import { planCurls } from '../src/crop/curls.mjs';
 import { layCurls } from '../src/crop/curlpaint.mjs';
 // Optional stages, one module each, off unless their flag is given.
+import { furLightReserves } from '../src/paint/methods/finish-texture.mjs';
 import { sameWash } from '../src/paint/methods/wash-session.mjs';
 import { expandRecipe } from '../src/paint/recipe.mjs';
 import { versionStamp, versionLine } from '../src/painter-version.mjs';
@@ -1169,6 +1171,11 @@ const pencilDraw=(target,gs,pigment,options)=>{
 if(VALUE_ENABLED){
  if(MOD||MIXES||FINISH_FILE||opt('curls','0')!=='0'||num('bgfirst',0)>0)throw Error('value planner cannot combine with independent modulation/mixes/finish/curls/bgfirst adapters; use --order legacy-painter for legacy replay');
  const shaped=num('shapedmarks',0)>0;const stone=shaped&&TRUMBULL_RULES?shapeStoneDemand(AL,PIGS.length,px,PIGS,{foliage:num('foliagerefit',0)>0,w,h,minCells:num('stonemincells',64),ochreMin:num('stoneochremin',.45),warm:num('stonewarm',0)>0,split:num('stonesplit',0)}):null;if(stone)fs.writeFileSync(path.join(out,'value-hue-check.json'),JSON.stringify(stone.audit,null,2));
+ if (opt('furreserves','')) {
+  const reserves=furLightReserves({D:SRC,w,h},JSON.parse(opt('furreserves')));
+  HOLD=Uint8Array.from(reserves,(v,i)=>v||(HOLD?.[i]??0)?1:0);
+  fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
+ }
  VALUE_PLAN=planLightToDark({bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)});
  layers=VALUE_PLAN.layers;steps=5;
  // --washsession 2: within each band step, a region's pigment passes follow one another, so its wash is charged with
@@ -1250,7 +1257,7 @@ const ABLATE = new Set(opt('ablate', '').split(',').filter(Boolean));
 // --inkresgain: the fine pen's ink strength; the default is a power-law fit in sheet width.
 const INKRES = num('inkres', 1) > 1 ? (() => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); return makeInkRes({ N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, main: sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
 const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
-if(PEN_STATE_GATE && INKRES) throw Error('--penstategate requires --inkres 1');
+
 const TARGET_DRAW_EDGE=new Float32Array(N2);
 for(let y=1;y<H2-1;y++)for(let x=1;x<W2-1;x++){const i=y*W2+x;const lum=j=>{const sx=Math.min(w-1,Math.floor((j%W2)*w/W2)),sy=Math.min(h-1,Math.floor(Math.floor(j/W2)*h/H2)),k=3*(sy*w+sx);return (px[k]+px[k+1]+px[k+2])/765;};TARGET_DRAW_EDGE[i]=Math.min(1,Math.hypot(lum(i+1)-lum(i-1),lum(i+W2)-lum(i-W2)));}
 const DRAW_MATERIAL_STATE={opening:{used:0},closing:{used:0}};
@@ -1270,7 +1277,7 @@ const drawingCapsFor = (stage, graphite = false) => {
 };
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
- const execute=paths=>drawMaterial(sh,paths,want,w,h,{...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT});
+ const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };

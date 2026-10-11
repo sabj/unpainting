@@ -18,7 +18,7 @@ test('the heaviest plan reproduces the old forced ink flags', () => {
   const f = pairs(drawingFlags({ medium: 'ink', inkColor: 'sepia', amount: 1, lines: 'all', weight: 1, closingLines: 1 }));
   assert.deepEqual(f, {
     '--outlinemedium': 'ink', '--inkprofile': 'sepia-ink', '--openinglines': '100000', '--closinglines': '100000',
-    '--drawshare': '1', '--inkkscale': '8', '--drawwidthgain': '2', '--drawwant': '1', '--closingpressure': '1', '--closingedgemin': '0',
+    '--drawshare': '1', '--inkkscale': '8', '--drawwidthgain': '2', '--drawwant': '1', '--closingpressure': '1', '--drawing': 'both', '--closingedgemin': '0',
   });
 });
 
@@ -103,7 +103,7 @@ test('stages: contradictions and unknown names are refused with the field named'
 
 test('source and ink: the line source, the colour and waterproof ink', () => {
   assert.deepEqual(drawingFlags({ source: 'source-ink' }), ['--linesource', 'source-ink']);
-  assert.deepEqual(drawingFlags({ source: 'auto' }), []);
+  assert.deepEqual(drawingFlags({ source: 'auto' }), ['--linesource','auto']);
   assert.deepEqual(drawingFlags({ ink: { color: 'black', waterproof: true } }), ['--inkprofile', 'black-ink', '--inkfast', '1']);
   assert.deepEqual(drawingFlags({ ink: { color: 'sepia' } }), ['--inkprofile', 'sepia-ink']);
   assert.throws(() => drawingFlags({ source: 'hed' }), /drawing.source/);

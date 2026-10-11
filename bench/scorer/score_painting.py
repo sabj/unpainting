@@ -10,7 +10,7 @@ vision:    Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B on Together see the target and 
            the three medians. A judge with fewer than 3 valid calls makes the score incomplete.
 composite: mean(vision overall, classic mean), or null when incomplete.
 
-Needs TOGETHER_API_KEY in the environment. --no-vision runs the classic part only and needs no key.
+Uses OPENROUTER_API_KEY with zero-data-retention providers when available, otherwise TOGETHER_API_KEY. --no-vision runs the classic part only and needs no key.
 """
 import argparse, base64, io, json, math, os, re, sys, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -23,7 +23,9 @@ import classic  # noqa: E402
 from common import Pair, load_rgb  # noqa: E402
 
 RUBRIC_VERSION = "bench-v3-median5"
-URL = "https://api.together.xyz/v1/chat/completions"
+PROVIDER = "openrouter" if os.environ.get("OPENROUTER_API_KEY") else "together"
+URL = "https://openrouter.ai/api/v1/chat/completions" if PROVIDER == "openrouter" else "https://api.together.xyz/v1/chat/completions"
+ROUTER_MODELS = {"moonshotai/Kimi-K3":"moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash":"z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B":"qwen/qwen3.5-9b"}
 JUDGES = ["moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B"]
 CALLS = int(os.environ.get("BENCH_SCORE_CALLS", "5"))
 MIN_VALID = min(3, CALLS)
@@ -78,8 +80,11 @@ def data_uri(img, max_side=768):
 
 
 def _post(model, messages, max_tokens=8000, timeout=150, retries=3):
-    body = json.dumps({"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": 0}).encode()
-    hdr = {"Authorization": "Bearer " + os.environ["TOGETHER_API_KEY"], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
+    payload = {"model": ROUTER_MODELS[model] if PROVIDER == "openrouter" else model, "messages": messages, "max_tokens": max_tokens, "temperature": 0}
+    if PROVIDER == "openrouter":
+        payload["provider"] = {"zdr": True, "data_collection": "deny", "ignore": ["Hyperbolic"]}
+    body = json.dumps(payload).encode()
+    hdr = {"Authorization": "Bearer " + os.environ["OPENROUTER_API_KEY" if PROVIDER == "openrouter" else "TOGETHER_API_KEY"], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
     for i in range(retries):
         try:
@@ -92,7 +97,7 @@ def _post(model, messages, max_tokens=8000, timeout=150, retries=3):
         except Exception as e:  # timeout, connection reset
             last = repr(e)
         time.sleep(2 ** (i + 1))
-    raise RuntimeError("together call failed: " + str(last))
+    raise RuntimeError(PROVIDER + " call failed: " + str(last))
 
 
 def _valid(d):
@@ -180,6 +185,7 @@ def score(target, image, style, vision=True):
         "callsPerModel": CALLS if vision else 0,
         "visionErrors": {m: len(e) for m, e in vi["errors"].items()},
         "rubric": RUBRIC_VERSION,
+        "judgeVersion": "J1", "provider": PROVIDER,
     }
 
 
@@ -191,8 +197,8 @@ def main():
     ap.add_argument("--no-vision", action="store_true")
     ap.add_argument("--out")
     a = ap.parse_args()
-    if not a.no_vision and not os.environ.get("TOGETHER_API_KEY"):
-        sys.exit("TOGETHER_API_KEY is not set; pass --no-vision for the classic part only")
+    if not a.no_vision and not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("TOGETHER_API_KEY")):
+        sys.exit("Neither OPENROUTER_API_KEY nor TOGETHER_API_KEY is set; pass --no-vision for the classic part only")
     s = json.dumps(score(a.target, a.image, a.style, not a.no_vision), indent=1)
     if a.out:
         open(a.out, "w").write(s)

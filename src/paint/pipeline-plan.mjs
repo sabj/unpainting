@@ -28,6 +28,7 @@ export function resolvePipeline(plan = {}) {
   const resolved = {
     drawing,
     washes: {
+      furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
       inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
@@ -49,6 +50,7 @@ export function resolvePipeline(plan = {}) {
 export function pipelineFlags(plan) {
   const p = resolvePipeline(plan), w = p.washes, flags = drawingFlags(p.drawing);
   const add = (k,v) => flags.push('--'+k,String(v));
+  if (w.furReserves) add('furreserves', JSON.stringify(w.furReserves));
   add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
   add('huechroma', w.colour === 'family' ? 30 : 0);
   add('passcap', w.colour === 'family' ? w.charge : 0);
