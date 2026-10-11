@@ -432,10 +432,64 @@ export function sweepCover(paths, mask, w, h) {
   return under / cells;
 }
 
+// Trial switch for measuring the exact row-union rasterizer against the original.
+let SWEEP_INTERVALS = false;
+export function setSweepIntervals(enabled) { SWEEP_INTERVALS = !!enabled; }
+
+function eachCellUnderIntervals(pts, w, h, visit) {
+  if (!pts.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const q of pts) { x0 = Math.min(x0, q.x - q.r); y0 = Math.min(y0, q.y - q.r); x1 = Math.max(x1, q.x + q.r); y1 = Math.max(y1, q.y + q.r); }
+  x0 = Math.max(0, Math.floor(x0) - 1); y0 = Math.max(0, Math.floor(y0) - 1); x1 = Math.min(w - 1, Math.ceil(x1) + 1); y1 = Math.min(h - 1, Math.ceil(y1) + 1);
+  if (!(x1 >= x0 && y1 >= y0)) return;
+  const rows = new Array(y1 - y0 + 1);
+  const add = (y, start, end) => {
+    start = Math.max(x0, start); end = Math.min(x1, end);
+    if (start > end) return;
+    const runs = rows[y - y0] ??= [], last = runs[runs.length - 1];
+    if (last && start <= last[1] + 1 && end >= last[0] - 1) {
+      last[0] = Math.min(last[0], start); last[1] = Math.max(last[1], end);
+    } else runs.push([start, end]);
+  };
+  for (const q of pts) {
+    const R = Math.ceil(q.r), rr = q.r * q.r, ax = q.x - 0.5, ay = q.y - 0.5;
+    // Addition can round a value just below a half-integer onto the tie when dx
+    // changes magnitude. Keep scalar rounding for those rare coordinates.
+    const fraction = ax - Math.floor(ax), nearTie = fraction !== 0.5 && Math.abs(fraction - 0.5) <= 4 * Number.EPSILON * Math.max(1, Math.abs(ax) + R);
+    for (let dy = -R; dy <= R; dy++) {
+      const y = Math.round(ay + dy), yy = dy * dy;
+      if (y < y0 || y > y1 || yy > rr) continue;
+      let m = Math.floor(Math.sqrt(rr - yy));
+      while (m >= 0 && m * m + yy > rr) m--;
+      while ((m + 1) * (m + 1) + yy <= rr) m++;
+      if (nearTie) {
+        for (let dx = -m; dx <= m; dx++) { const x = Math.round(ax + dx); add(y, x, x); }
+      } else add(y, Math.round(ax - m), Math.round(ax + m));
+    }
+  }
+  for (let row = 0; row < rows.length; row++) {
+    const runs = rows[row]; if (!runs) continue;
+    runs.sort((a, b) => a[0] - b[0]);
+    let start = runs[0][0], end = runs[0][1];
+    const srow = (y0 + row) * w;
+    for (let j = 1; j < runs.length; j++) {
+      const run = runs[j];
+      if (run[0] <= end + 1) end = Math.max(end, run[1]);
+      else { for (let x = start; x <= end; x++) visit(srow + x); start = run[0]; end = run[1]; }
+    }
+    for (let x = start; x <= end; x++) visit(srow + x);
+  }
+}
+
 // eachCellUnder's cells that are in `mask`, counted: the same cells by the same test, with each disc row walked only over
 // the columns its radius can reach and one stamp buffer reused across sweeps instead of a fresh one per sweep
 let STAMP = new Int32Array(0), STAMP_ID = 0;
 function countUnder(pts, mask, w, h) {
+  if (SWEEP_INTERVALS) {
+    let under = 0;
+    eachCellUnderIntervals(pts, w, h, i => { if (mask[i]) under++; });
+    return under;
+  }
   if (!pts.length) return 0;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const q of pts) { x0 = Math.min(x0, q.x - q.r); y0 = Math.min(y0, q.y - q.r); x1 = Math.max(x1, q.x + q.r); y1 = Math.max(y1, q.y + q.r); }
@@ -475,7 +529,8 @@ function countUnder(pts, mask, w, h) {
  */
 export function sweepCount(paths, w, h) {
   const count = new Uint16Array(w * h);
-  for (const pts of paths) eachCellUnder(pts, w, h, i => { if (count[i] < 65535) count[i]++; });
+  const cover = SWEEP_INTERVALS ? eachCellUnderIntervals : eachCellUnder;
+  for (const pts of paths) cover(pts, w, h, i => { if (count[i] < 65535) count[i]++; });
   return count;
 }
 
