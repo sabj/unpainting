@@ -8,7 +8,7 @@ Run one with:
 node tools/run-plan.mjs examples/plans/graded-wash.json --out work/plan-graded-wash
 ```
 
-It writes `result.png` (the dried sheet) and `run.json`.
+It writes `result.png` (the dried sheet) and `run.json`. Stroke-size admission warns by default; `--stroke-gate reject` refuses tiny-dab plans before painting. See [stroke sizes and thresholds](stroke-stats.md) for configuration and the planner guide.
 
 ![The graded-wash plan's stroke paths over its dried result](img/graded-wash.webp)
 
