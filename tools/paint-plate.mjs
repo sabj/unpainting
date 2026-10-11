@@ -158,6 +158,9 @@ import { writeState, readState } from './aware/state-io.mjs';
 import { tapeState, restoreTapeState } from '../src/media/brush.mjs';
 
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
+// Run the physical material diagnostic through the sweep's standard entry point.
+if(process.argv.includes('--materialstudy'))await import('./judge/ink-material-study.mjs');
+
 // GPU paths default on for painter runs; set 0 to turn one off.
 // The defaults live here because generic dry() callers may depend on synchronous counts.
 process.env.GPU_RESIDENT ??= '1';

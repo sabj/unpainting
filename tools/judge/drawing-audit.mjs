@@ -2,6 +2,7 @@
 // Summarize executed instrument records separately from raster scan proxies.
 import fs from 'node:fs';
 import path from 'node:path';
+import {gunzipSync} from 'node:zlib';
 
 export function distribution(values) {
   const a=values.filter(Number.isFinite).sort((x,y)=>x-y);
@@ -31,7 +32,11 @@ export function drawingAudit(records) {
 }
 if(process.argv[1]===new URL(import.meta.url).pathname){
  const args=process.argv.slice(2),i=args.indexOf('--out'),out=i<0?null:args[i+1];
- const dirs=i<0?args:args.slice(0,i),rows=dirs.map(dir=>({run:path.basename(dir),...drawingAudit(JSON.parse(fs.readFileSync(path.join(dir,'pen-state-audit.json'),'utf8')))}));
+ const dirs=i<0?args:args.slice(0,i),rows=dirs.map(dir=>{
+  const p=path.join(dir,'pen-state-audit.json');
+  const data=fs.existsSync(p)?fs.readFileSync(p):gunzipSync(fs.readFileSync(p+'.gz'));
+  return {run:path.basename(dir),...drawingAudit(JSON.parse(data))};
+ });
  const text=rows.map(r=>JSON.stringify(r)).join('\n')+'\n';
  if(out)fs.writeFileSync(out,text);else process.stdout.write(text);
 }
