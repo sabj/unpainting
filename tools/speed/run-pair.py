@@ -7,6 +7,7 @@ Inputs is a sweep job's in/ directory, containing target, plan.json and segments
 import hashlib
 import json
 import os
+import resource
 from pathlib import Path
 import shutil
 import subprocess
@@ -32,15 +33,18 @@ for run in cfg['runs']:
             '--width', str(cfg['width']), '--mode', 'full', '--video', '0',
             '--valueplan', str(inputs / 'plan.json'), '--gpu', 'on',
             *run.get('args', []), '--out', str(out), '--targetguard', 'strict']
+    cpu_start = resource.getrusage(resource.RUSAGE_CHILDREN)
     started = time.perf_counter()
     with (out.parent / 'paint.log').open('w') as log:
         result = subprocess.run(args, cwd=work, stdout=log, stderr=subprocess.STDOUT,
                                 env=dict(os.environ, DAWN_FLAGS='backend=vulkan', PAINTER_TARGET_GUARD='strict'))
     seconds = time.perf_counter() - started
+    cpu_end = resource.getrusage(resource.RUSAGE_CHILDREN)
     frames = list(out.glob('f[0-9]*.jpg'))
     painting = out / 'painting.png'
     row = dict(name=run['name'], commit=run['commit'], args=args, seconds=seconds,
-               exit=result.returncode, frames=len(frames), frameBytes=sum(p.stat().st_size for p in frames),
+               exit=result.returncode, userSeconds=cpu_end.ru_utime - cpu_start.ru_utime,
+               systemSeconds=cpu_end.ru_stime - cpu_start.ru_stime, frames=len(frames), frameBytes=sum(p.stat().st_size for p in frames),
                sha256=hashlib.sha256(painting.read_bytes()).hexdigest() if painting.exists() else None)
     rows.append(row)
     (root / 'timings.json').write_text(json.dumps(rows, indent=2))

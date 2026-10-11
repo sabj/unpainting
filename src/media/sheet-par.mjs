@@ -3,7 +3,7 @@
 // (jobs-kernel.mjs). Node only: sheet.mjs loads this on setThreads(n > 1).
 import { Worker, MessageChannel } from 'node:worker_threads';
 import os from 'node:os';
-import { useRenderThreads } from './km.mjs';
+import { useRenderThreads, useRenderCellsThreads } from './km.mjs';
 import { useFlowThreads } from './wash.mjs';
 import { useUnmixThreads } from '../crop/pigments.mjs';
 import { useBlurThreads } from '../keyframes/density.mjs';
@@ -28,7 +28,7 @@ export const isShared = a => a != null && a.buffer instanceof SharedArrayBuffer;
 const sharedCopy = a => { const b = shared(a.constructor, a.length); b.set(a); return b; };
 
 /** Start the pool: `n` threads in all, the main thread and n - 1 workers. */
-export function start(n) {
+export function start(n, { opticsOnly = false } = {}) {
   if (POOL) stop();
   const T = Math.max(1, Math.min(MAXT, Math.floor(n)));
   if (T > os.availableParallelism()) console.warn(`sheet: ${T} threads on ${os.availableParallelism()} cores`);
@@ -46,7 +46,11 @@ export function start(n) {
   const t0 = Date.now(); let r;
   while ((r = Atomics.load(ctrl, READY)) < T - 1) { if (Date.now() - t0 > 30000) throw new Error(`sheet: ${r} of ${T - 1} workers started`); Atomics.wait(ctrl, READY, r, 100); }
   POOL = { T, ctrl, prm, workers, gen: Atomics.load(ctrl, GEN), ctxs: new WeakMap(), live: [], nextId: 1, stats: { par: 0, serial: 0, render: 0, flow: 0, tiles: 0, thick: 0 } };
-  if (T > 1) { useRenderThreads(renderLayers); useFlowThreads(flowField); useUnmixThreads(unmix); useBlurThreads(blur); }
+  if (T > 1) {
+    useRenderThreads(renderLayers);
+    if (process.env.KM_PARALLEL_CELLS === '1') useRenderCellsThreads(renderCellsParallel);
+    if (!opticsOnly) { useFlowThreads(flowField); useUnmixThreads(unmix); useBlurThreads(blur); }
+  }
   return T;
 }
 
@@ -55,7 +59,7 @@ export function stop() {
   const { ctrl } = POOL;
   ctrl[PHASE] = PH.QUIT; Atomics.store(ctrl, GEN, (POOL.gen + 1) | 0); Atomics.notify(ctrl, GEN);
   for (const { wk } of POOL.workers) wk.terminate();
-  useRenderThreads(null); useFlowThreads(null); useUnmixThreads(null); useBlurThreads(null);
+  useRenderThreads(null); useRenderCellsThreads(null); useFlowThreads(null); useUnmixThreads(null); useBlurThreads(null);
   POOL = null;
 }
 
@@ -173,6 +177,23 @@ function renderLayers(layers, pigments, paperRGB, n, scale) {
   job({ kind: 'render', layers: L, Kp: pigments.map(p => p.K), Sp: pigments.map(p => p.S), paperRGB: into('paper', paperRGB), n, scale, out });
   POOL.stats.render++;
   return out.slice();
+}
+
+// Cached composites use the same cell arithmetic, with optional double-precision
+// initial/saved composites. JOB prevents reentering the pool from the main share.
+function renderCellsParallel(layers, Kp, Sp, paperRGB, c0, c1, scale, extra, out, init, keep, micro) {
+  if (process.env.KM_PARALLEL_CELLS !== '1' || JOB || !POOL || POOL.T < 2 || extra || c0 !== 0 || c1 < MIN_CELLS || paperRGB.length !== c1 * 3) return false;
+  if (![paperRGB, out, init, keep, micro?.t].filter(Boolean).every(typed) || !layers.every(L => L.every(typed))) return false;
+  const L = layers.map((layer, l) => layer.map((a, k) => into(`cells.layer${l}.${k}`, a)));
+  const rgb = out ? buf('cells.rgb', out.constructor, out.length) : null;
+  const initial = init ? into('cells.init', init) : null;
+  const saved = keep ? (keep === init ? initial : buf('cells.keep', keep.constructor, keep.length)) : null;
+  job({ kind: 'render', layers: L, Kp, Sp, paperRGB: into('cells.paper', paperRGB), n: c1, scale,
+    out: rgb, init: initial, keep: saved, micro: micro ? {t: into('cells.micro', micro.t), amp: micro.amp} : null });
+  if (out) out.set(rgb);
+  if (keep && keep !== saved) keep.set(saved);
+  POOL.stats.render++;
+  return true;
 }
 
 /** sheet.mjs wetBoxes' whole-sheet scan for wet tiles, in rows of tiles; false where it declines. */
