@@ -16,6 +16,7 @@ import {planLightToDark,valueTechnique,selectValueInk,softBoundaryPaths} from '.
 import {unsupportedAxisEdges} from '../src/paint/methods/target-regions.mjs';
 import {writeValuePreview} from './painter/value-plan-preview.mjs';
 import {removePlannedInk} from '../src/crop/ink-free.mjs';
+import {subjectField,orderBySubject,OVERLAP} from '../src/paint/methods/subject-order.mjs';
 import { availableParallelism } from 'node:os';
 import { boundsOf } from '../src/mask-bounds.mjs';
 import { DEFAULT_SHEET_MM } from '../src/media/sheet-size.mjs';
@@ -1194,6 +1195,15 @@ if(VALUE_ENABLED){
  // in value-region-check.json, but do not reject a valid drawing because an
  // unused wash plan failed its seam check. Full paintings still fail closed.
  if(seams.length && num('drawingonly',0)===0)throw Error('compiled band-1 mask contains unsupported axis-aligned seams');
+ // --subjectorder s (0..1): the plan's subjectOrder brought on subject by subject, light to dark within each, held back
+ // by s (src/paint/methods/subject-order.mjs). 0, the default, keeps the whole-sheet bands.
+ {const so=num('subjectorder',0);if(!(so>=0&&so<=1))throw Error('--subjectorder: a number from 0 to 1');
+  const field=VALUE_CONFIG?.subjectOrder?subjectField({subjectOrder:VALUE_CONFIG.subjectOrder,families:VALUE_CONFIG.families??[],labels:VALUE_PLAN.regions.labels,w,h}):null;
+  if(so>0&&!field)console.log('subject order: the plan names no subjectOrder; whole-sheet bands kept');
+  const r=orderBySubject(layers,{field,strength:so,w,n});
+  if(r.summary){layers=r.layers;fs.writeFileSync(path.join(out,'subject-order.json'),JSON.stringify({strength:so,overlap:OVERLAP,subjects:r.summary,passes:r.order},null,1));
+   {const pal=[[230,159,0],[86,180,233],[0,158,115],[240,228,66],[0,114,178],[213,94,0],[204,121,167],[120,120,120]],img=Buffer.alloc(n*3);for(let i=0;i<n;i++){const c=pal[field.rank[i]%pal.length];img[3*i]=c[0];img[3*i+1]=c[1];img[3*i+2]=c[2];}await sharp(img,{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'subject-order.png'));}
+   console.log(`subject order ${so}: ${layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
  HOLD=VALUE_PLAN.protectedCells;
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:VALUE_PLAN.value.peak,geometry:VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:VALUE_PLAN.omittedDemand,lights:VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  console.log(`target values: ${layers.length} pigment/region passes, ${VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
