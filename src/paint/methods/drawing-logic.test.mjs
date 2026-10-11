@@ -40,6 +40,8 @@ test('hand taper and stroke splits retain prepared instrument controls and drawi
   const prepared = shapeGesture(g);
   const strokes = personStrokes(prepared, 25);
   assert.ok(strokes.every(s => s.tier === 2 && s.role === 'landmark' && s.low === .03));
+  assert.equal(strokes[0].dip, .4);
+  assert.ok(strokes.slice(1).every(s => s.dip === false), 'a split continuation keeps the reservoir rather than dipping again');
   const contact = strokes.flatMap(s => s.points).find(p => p.sourcePointIndex === 7);
   assert.equal(contact.nw, 1.2);
   assert.equal(contact.v, .8);

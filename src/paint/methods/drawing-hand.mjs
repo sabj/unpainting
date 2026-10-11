@@ -113,5 +113,6 @@ export function personStrokes(g, L, { dipFirst = false, load = 1, low = null } =
   if (cur.length >= 2) out.push(cur);
   // dipFirst: the gesture starts on a fresh dip and runs on it; the pen is dipped again inside it only when low
   return out.map((points, i) => ({ ...g, points, length: pathLength(points), tier: g.tier ?? 1, weight: g.weight ?? 1,
+    ...(g.dip == null ? {} : { dip: i === 0 ? g.dip : false }),
     ...(dipFirst && i === 0 ? { dip: load === 1 ? true : load } : {}), ...(dipFirst && low != null ? { low } : {}) }));
 }
