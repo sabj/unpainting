@@ -6,6 +6,7 @@ Still jobs (`--video 0`) keep passage checkpoints at 10/25/50/75/100 percent, fi
 
 Tier 1 switches default to 1; pass 0 to disable each independently. Tier 2 quiet drying defaults to 0:
 
+- `--speedoptics 1`: skip zero pigment fractions in CPU optical channel reductions, retaining double precision and pigment order. Nonfinite optical coefficients use all lanes.
 - `--speededge 1`: alternate shared edge-distance buffers, with the same arithmetic and neighbor order.
 - `--speedscan 1`: fuse cell finalization and active wet-tile scanning on GPUs with at least 13 storage-buffer bindings. Smaller adapters keep separate kernels.
 - `--speedtransfers 1`: use the existing tracked CPU fallback transfer path without selecting Fast physics.
