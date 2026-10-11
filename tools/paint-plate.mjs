@@ -335,7 +335,10 @@ if (whitePaper) console.log(`paper: the lightest tenth reads ${lightest.map(v =>
 const WASH_SPLAT_SETTINGS={enabled:num('washsplat',0)>0,water:num('splatwater',2)};
 setWashSplat(WASH_SPLAT_SETTINGS.enabled,{water:WASH_SPLAT_SETTINGS.water});
 // --runcache 0: refit the palette every run instead of reading it from work/cache (src/paint/run-cache.mjs). Default 1.
-const RUN_CACHE = { dir: process.env.W2_CACHE_DIR || path.join(root, 'work', 'cache'), enabled: opt('runcache', '1') !== '0' };
+// Sweep jobs unpack into a private /root/sweepwork/<job> tree which is removed after painting.
+// Keep pure, code-and-input-hashed planner entries beside those trees so a repeat target can reuse them on that box.
+const SWEEP_CACHE = path.dirname(root) === '/root/sweepwork' ? '/root/sweepwork/cache' : null;
+const RUN_CACHE = { dir: process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root, 'work', 'cache'), enabled: opt('runcache', '1') !== '0' };
 const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [fileURLToPath(import.meta.url)]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
