@@ -5,6 +5,8 @@ export function framePolicy({ video = false, keepAll = false } = {}) {
   let next = 0, firstWash = false, last = null;
   return {
     all,
+    state() { return {next, firstWash, last}; },
+    restore(state) { if (state) ({next, firstWash, last} = state); },
     keep(stage) {
       if (all) return true;
       const key = JSON.stringify(stage);
