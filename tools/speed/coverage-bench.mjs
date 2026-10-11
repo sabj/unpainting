@@ -15,7 +15,7 @@ for (const density of [1, 2]) {
     setSweepIntervals(enabled);
     sweepCount(paths, w, h); sweepCover(paths, mask, w, h);
     const start = performance.now(); let count, cover;
-    for (let i = 0; i < 5; i++) { count = sweepCount(paths, w, h); cover = sweepCover(paths, mask, w, h); }
+    for (let i = 0; i < 5; i++) { count = sweepCount(paths, w, h); cover = sweepCover(paths, mask, w, h, enabled ? { counts: count } : undefined); }
     rows.push({ enabled, milliseconds: (performance.now() - start) / 5, cover,
       countHash: crypto.createHash('sha256').update(new Uint8Array(count.buffer)).digest('hex') });
   }

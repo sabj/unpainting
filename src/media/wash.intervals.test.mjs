@@ -9,6 +9,7 @@ function compare(paths, mask, w, h) {
     setSweepIntervals(true);
     assert.deepEqual(sweepCount(paths, w, h), count);
     assert.equal(sweepCover(paths, mask, w, h), cover);
+    assert.equal(sweepCover(paths, mask, w, h, { counts: sweepCount(paths, w, h) }), cover);
   } finally { setSweepIntervals(false); }
 }
 

@@ -141,12 +141,31 @@ export function clipRuns(mask) {
   return r;
 }
 
-export function liftResist(sheet) {
+export function liftResist(sheet, { byPlane = false } = {}) {
   if (TAPE && sheet._tape) TAPE.push({ k: 'R' });
   const r = sheet.resist; if (!r) return;
   coherent(sheet);
   const from = sheet.resistFrom ?? sheet.layers.length, st = sheet.resistStrength ?? null;
-  for (let i = 0; i < sheet.n; i++) {
+  if (byPlane) {
+    const layers = sheet.layers;
+    let nh = 0, np = 0;
+    for (let i = 0; i < sheet.n; i++) if (r[i]) { if (st && st[i] < 1) np++; else nh++; }
+    const hard = new Int32Array(nh), partial = new Int32Array(np), keep = new Float64Array(np);
+    nh = 0; np = 0;
+    for (let i = 0; i < sheet.n; i++) if (r[i]) {
+      if (st && st[i] < 1) { partial[np] = i; keep[np++] = 1 - st[i]; sheet.W[i] *= 1 - st[i]; }
+      else { hard[nh++] = i; sheet.W[i] = 0; sheet.M[i] = 0; }
+    }
+    // Plane order preserves repeated writes even if a caller aliases planes.
+    // Cache the layers getter once and walk adjacent masked cells per plane.
+    const planes = [];
+    for (let k = 0; k < sheet.K; k++) planes.push(sheet.G[k], sheet.D[k], sheet.P[k]);
+    for (let L = from; L < layers.length; L++) for (let k = 0; k < sheet.K; k++) planes.push(layers[L][k]);
+    for (const plane of planes) {
+      for (let j = 0; j < hard.length; j++) plane[hard[j]] = 0;
+      for (let j = 0; j < partial.length; j++) plane[partial[j]] *= keep[j];
+    }
+  } else for (let i = 0; i < sheet.n; i++) {
     if (!r[i]) continue;
     if (st && st[i] < 1) { const keep = 1 - st[i]; sheet.W[i] *= keep; for (let k = 0; k < sheet.K; k++) { sheet.G[k][i] *= keep; sheet.D[k][i] *= keep; sheet.P[k][i] *= keep; } for (let L = from; L < sheet.layers.length; L++) for (let k = 0; k < sheet.K; k++) sheet.layers[L][k][i] *= keep; continue; }
     sheet.W[i] = 0; sheet.M[i] = 0;
