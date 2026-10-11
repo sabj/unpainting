@@ -1,6 +1,7 @@
 // A whole sheet.mjs step on the GPU with the sheet resident (see stepfull.wgsl). Node with the `webgpu` package (Dawn),
 // or a browser's navigator.gpu passed to openGpu. sheet.mjs stays the reference and the fallback.
 import fs from 'node:fs';
+import {edgePingPong} from './edge-pingpong.mjs';
 import {fastDryChunk} from './fast-dry-chunk.mjs';
 import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mjs';
 import { runStrokePrefixDiagnostic } from './stroke-prefix-diagnostic.mjs';
@@ -42,7 +43,7 @@ export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UBYTES = UF.length * 4 + 512 + 64; const UBYTES_EXPORT = UBYTES;
 const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  kl: array<vec4<u32>, 4>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\n`;
-const SRC = PRELUDE + WGSL; const SRC_EXPORT = SRC;
+const SRC = PRELUDE + (process.env.GPU_EDGE_PINGPONG === '1' ? edgePingPong(WGSL) : WGSL); const SRC_EXPORT = SRC;
 
 // which bindings each entry point touches, found from the source: its own body plus the helpers it calls
 function analyse(src) {
