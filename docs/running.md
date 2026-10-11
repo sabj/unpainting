@@ -121,6 +121,8 @@ Run `npx knip` from the repository root. The configuration includes benchmark co
 
 Paint Lab copies `src/media` through `tools/lab/sync-site-media.mjs`. The source `permeability` export is used by the browser GPU sheet through that copy. Generated `cpu-stroke-dirty.js` keeps the source exports for synchronization. The generated sheet's optional `sheet-par.mjs` import is Node-only; Paint Lab does not enable CPU threads. `ffmpeg` and `codex` are external executables, not npm dependencies.
 
+In 0.2.0-rc.1, source-line extraction is an explicit choice (`--linesource auto` or `source-ink`), and final darks require `--finaldarks 1`. The held-out Guardi run exposed over-heavy marks when these ran automatically. Without a prepared drawing or these options, the bounded drawing path remains in use.
+
 ### Complete stroke-budget studies
 
 `--strokebudget 250` (or `2500`) plans a complete picture within that many
