@@ -3728,13 +3728,15 @@ if (MARKTAPE) {
   // The physics reads more than K and S (rho, omega, gamma, floc, wick), so the tape copies every own property of a pigment.
   const asTape = p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, ArrayBuffer.isView(v) ? Array.from(v) : v]));
   // Everything a player needs to make the same sheet: the paper recipe, the pans, the flow options and the base.
-  fs.writeFileSync(file, JSON.stringify({
+  const { markTapeJSON } = await import('../src/media/mark-tape-json.mjs');
+  const fd = fs.openSync(file, 'w');
+  try { for (const chunk of markTapeJSON({
     w: W2, h: H2, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM),
     version:2, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
     base: Array.from(base.subarray(0, 3)),
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
-  }));
+  })) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
   const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
   const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
   console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`);
