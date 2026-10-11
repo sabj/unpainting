@@ -63,6 +63,10 @@ export function renderCells(layers, Kp, Sp, paperRGB, c0, c1, scale, extra, out,
   const K = Kp.length, NL = layers.length;
   // a cell's layers are walked once, not once per channel
   const frac = new Float64Array(K);
+  // Zero fractions contribute exactly +0 with finite optical coefficients. Keep
+  // surviving pigment terms in their original order, including their divisions.
+  const sparse = (typeof process === 'undefined' || process.env.KM_SPARSE_CHANNELS !== '0')
+    && Kp.every(a => a.every(Number.isFinite)) && Sp.every(a => a.every(Number.isFinite));
   // Cells go a block at a time and, inside a block, a layer at a time, so empty layers are skipped per block.
   // Each cell still sees its layers oldest first with the same arithmetic.
   const B = Math.min(c1 - c0, RENDER_BLOCK), R = new Float64Array(B * 3), xt = new Float64Array(B);
@@ -90,12 +94,28 @@ export function renderCells(layers, Kp, Sp, paperRGB, c0, c1, scale, extra, out,
           for (let k = 0; k < K; k++) frac[k] = layer[k][i] / x0;
           x = x0 * scale;
         }
+        if (sparse) {
+          // Independent channel sums share one pigment walk. Every sum keeps
+          // exactly the original multiply/add order; only zero terms vanish.
+          let k0 = 0, s0 = 0, k1 = 0, s1 = 0, k2 = 0, s2 = 0;
+          for (let k = 0; k < K; k++) {
+            const f = frac[k]; if (f === 0) continue;
+            const pk = Kp[k], ps = Sp[k];
+            k0 += f * pk[0]; s0 += f * ps[0];
+            k1 += f * pk[1]; s1 += f * ps[1];
+            k2 += f * pk[2]; s2 += f * ps[2];
+          }
+          let r = R[c * 3]; rt(k0, s0, x); R[c * 3] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
+          r = R[c * 3 + 1]; rt(k1, s1, x); R[c * 3 + 1] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
+          r = R[c * 3 + 2]; rt(k2, s2, x); R[c * 3 + 2] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
+        } else {
         let Kc = 0, Sc = 0, r = R[c * 3]; for (let k = 0; k < K; k++) { Kc += frac[k] * Kp[k][0]; Sc += frac[k] * Sp[k][0]; }
         rt(Kc, Sc, x); R[c * 3] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
         Kc = 0; Sc = 0; r = R[c * 3 + 1]; for (let k = 0; k < K; k++) { Kc += frac[k] * Kp[k][1]; Sc += frac[k] * Sp[k][1]; }
         rt(Kc, Sc, x); R[c * 3 + 1] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
         Kc = 0; Sc = 0; r = R[c * 3 + 2]; for (let k = 0; k < K; k++) { Kc += frac[k] * Kp[k][2]; Sc += frac[k] * Sp[k][2]; }
         rt(Kc, Sc, x); R[c * 3 + 2] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
+        }
       }
     }
     if (keep) for (let c = 0; c < nb * 3; c++) keep[b0 * 3 + c] = R[c];
