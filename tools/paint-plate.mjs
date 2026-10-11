@@ -44,7 +44,7 @@ if(Number(process.env.PAINT_MEMLOG)>0){const t0=Date.now();setInterval(()=>{cons
 // Paint a plate with the simulated instruments: glazes of recovered pigment laid by a brush on absorbent paper.
 // Usage: node tools/paint-plate.mjs --image <reference> --width 700 --out work/plate
 import {AUTHORING_CONTRACT,validateAreaDocument,rasterAreaPlan,compileAreaLayers,semanticTechnique,createAreaExecution,semanticMaterialReady,semanticDrawingGroups,semanticBrushOptions,semanticHighlights,semanticUsesNumericClip,semanticMaterialContact,semanticPreparation,withSemanticWaterClip,semanticPrewetLoad,prepareSemanticContact,semanticGesture,semanticPreparationGesture,semanticReferenceLengths, calibrateSemanticInstrument,semanticCalibrationGain,semanticCalibrationStages,semanticCalibrationSelection,requireAuthoredCalibration,semanticFilmRemovalReady,sha256} from './painter/semantic-areas.mjs';
-import {measurePaper,measureBrush} from '../src/paint/methods/wetdry.mjs';
+import {measurePaper as physicalMeasurePaper,measureBrush} from '../src/paint/methods/wetdry.mjs';
 import {productionWaterLoad} from './painter/production-water-load.mjs';
 import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
@@ -191,6 +191,8 @@ const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
 const SPEED_COVERAGE = num('speedcoverage', 0) > 0;
 setSweepIntervals(SPEED_COVERAGE);
 const SPEED_FILM = num('speedfilm', 0) > 0;
+const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 0) > 0;
+const measurePaper = (target, cells, paperOnly = false) => physicalMeasurePaper(target, cells, paperOnly, { uniform: SPEED_UNIFORM_PAPER });
 const liftResist = target => {
   const started = performance.now();
   try { return physicalLiftResist(target, { byPlane: SPEED_FILM }); }
