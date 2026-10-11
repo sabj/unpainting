@@ -66,3 +66,17 @@ test('source-ink closing pen defaults to light pressure, opening keeps its weigh
   assert.ok(closing.pressure <= CLOSING_PRESSURE_MAX);
   assert.ok(opening.pressure > closing.pressure);
 });
+
+test('damp finish ink admits measured moisture and retains hybrid speed and dwell',()=>{
+ const pigment=materialProfile('black-ink').pigment,sh=createSheet(makePaper(80,40),[pigment]);
+ for(let i=0;i<sh.n;i++){sh.s[i]=sh.paper.capacity[i]*.35;sh.ever[i]=1;}
+ const audit=[],paths=[{dip:.6,low:.03,points:[{x:10,y:20,s:.4,v:.6,dwell:1},{x:10,y:20,s:.4,v:.6},{x:60,y:20,s:.4,v:2}]}];
+ drawMaterial(sh,paths,new Float32Array(sh.n),80,40,{medium:'black-ink',stage:'closing',mmPerCell:.2,caps:{lines:10,pressure:.5,edgeMin:0},dryInk:false,O:DEFAULTS,audit});
+ assert.equal(audit.length,1);assert.ok(audit[0].before.pore>.3);assert.equal(audit[0].dried,false);
+ assert.equal(audit[0].dwellTime,1);assert.equal(audit[0].speeds.at(-1),2);assert.ok(sh.P[0].some(v=>v>0));
+});
+test('explicit pencil controls reach dry graphite execution',()=>{
+ const sh=createSheet(makePaper(30,20),[materialProfile('graphite-HB').pigment]);let seen;
+ drawMaterial(sh,g,new Float32Array(600),30,20,{medium:'graphite-HB',mmPerCell:.5,O:DEFAULTS,graphiteOptions:{amount:.12,vary:.35,seed:7},graphiteExecute:(_s,_g,_k,o)=>{seen=o;return {drawn:1};}});
+ assert.equal(seen.amount,.12);assert.equal(seen.vary,.35);assert.equal(seen.seed,7);
+});

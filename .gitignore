@@ -2,7 +2,7 @@ work/
 bench/work/
 task/
 output/
-node_modules/
+node_modules
 .venv/
 *.pre-damp-runs
 __pycache__/

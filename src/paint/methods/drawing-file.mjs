@@ -8,7 +8,7 @@ import { boundPreparation } from './preparation-binding.mjs';
 import { drawingLogic } from './drawing-logic.mjs';
 import { planLines } from '../drawing-plan.mjs';
 import { scribbleMasses } from './drawing-scribble.mjs';
-import { personStrokes } from './drawing-hand.mjs';
+import { personStrokes, handDrawing } from './drawing-hand.mjs';
 import { gaussian } from '../../keyframes/density.mjs';
 
 // Contact width for a drawn width W: the pen at K 1 on dry paper draws about 0.72 x contact + 0.3 cells,
@@ -54,6 +54,16 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // thick marks when copying with this instrument. Explicit calibration wins.
   const copyingNib = opt('inkprofile', '') === 'drawing-ink';
   const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', copyingNib ? .3 : MARGIN), gain = num('drawwidthgain', copyingNib ? .95 : GAIN), minNib = num('drawwidthmin', 0.3);
+  if (num('drawinghand', 0) > 0) {
+    const r = handDrawing(lines, { gap: num('drawjoingap', 4) * K,
+      cos: num('drawjoincos', .8), aim: num('drawjoinaim', .7),
+      strokeLength: num('drawstroke', .35) * Math.min(w, h),
+      base, gain, margin, minNib, inLen: num('drawtaperin', 3) * K,
+      outLen: num('drawtaperout', 5) * K, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
+      D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * K });
+    log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
+    return r.strokes;
+  }
   const perPoint = q => (q.width == null && q.weight == null ? q : {
     x: q.x, y: q.y,
     ...(q.width == null ? {} : { nw: Math.max(minNib, q.width * gain - margin) }),

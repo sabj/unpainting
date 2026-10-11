@@ -72,6 +72,7 @@ export function scaleLines(doc, w, h, { keepOrder = false, file = null } = {}) {
       const out = { points, length: pathLength(points), strength: Number.isFinite(g.strength) ? g.strength : 0 };
       if (Number.isFinite(g.weight)) out.weight = g.weight;
       if (g.role) out.role = g.role;
+      if (g.kind) out.kind = g.kind;
       if (g.object) out.object = g.object;
       if (g.region) out.region = g.region;
       return out;

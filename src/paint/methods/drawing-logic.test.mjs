@@ -161,3 +161,27 @@ test('unreviewed opening remains identical to ordinary shape and projection pres
  const g=line(3,4,12,4,10,{weight:.2});const shape={base:.6,floor:.7};const actual=shapeReviewedOpening(g,{D:new Float32Array(100),w:10,h:10,shape});const expected=shapeGesture(g,shape);assert.deepEqual(actual.points,expected.points);
  const point={x:510,y:480,nw:2,s:.13,sourcePointIndex:29,contactRole:'upper lid wing'};assert.deepEqual(projectSelectedDrawing([{points:[point,{...point,x:520}]}],{box:{left:505,top:475,width:415,height:265}})[0].points[0],{...point,x:5,y:5});
 });
+
+import { scaleDrawingGestures, handDrawing } from './drawing-hand.mjs';
+test('sheet conversion preserves hybrid contact, speed, pauses and reservoir instructions at 2x', () => {
+ const gestures=[{dip:.4,low:.03,tier:1,role:'structure',length:10,points:[{x:2,y:3,s:.2,v:.6,dwell:1.2},{x:12,y:3,s:.8,v:2.4,nw:2}]}];
+ const copy=structuredClone(gestures),fine=scaleDrawingGestures(gestures,2)[0];
+ assert.equal(fine.dip,.4);assert.equal(fine.low,.03);assert.equal(fine.role,'structure');
+ assert.equal(fine.points[0].dwell,1.2);assert.equal(fine.points[0].v,1.2);assert.equal(fine.points[1].nw,4);
+ assert.equal(fine.points[0].s,.2);assert.deepEqual(gestures,copy);
+});
+test('reviewed hand route joins continuations but preserves distinct roles and tapered light breaks', () => {
+ const gs=[line(2,8,20,8,19,{role:'structure',weight:.8}),line(22,8,40,8,19,{role:'structure',weight:.8}),line(42,8,58,8,17,{role:'hatch',weight:.5})];
+ const D=new Float32Array(60*16).fill(.4);for(let y=0;y<16;y++)for(let x=28;x<34;x++)D[y*60+x]=.01;
+ const r=handDrawing(gs,{gap:3,strokeLength:100,D,w:60,h:16,lit:.1});
+ assert.equal(r.joined,1);assert.equal(r.gestures,2);assert.equal(r.runs,3);
+ assert.ok(r.strokes.every(g=>g.points.every(p=>p.x<28||p.x>=34)));
+ assert.ok(r.strokes[0].points[0].s<r.strokes[0].points[3].s);
+});
+test('hybrid walker revisits do not redraw or double back on a file contour', async () => {
+ const {walkOnLines}=await import('./drawing-hybrid.mjs');
+ const file=[line(5,10,70,10,66)],walk=[{points:[{x:5,y:10},{x:55,y:10},{x:15,y:10},{x:70,y:10}]}];
+ const r=walkOnLines(walk,file,new Float32Array(80*20).fill(1),80,20,{reach:2,bridge:4});
+ assert.equal(r.gestures.length,1);const P=r.gestures[0].points;
+ assert.ok(P.every((p,i)=>i===0||p.x>=P[i-1].x));assert.equal(new Set(P.map(p=>p.x)).size,P.length);
+});

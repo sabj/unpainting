@@ -75,9 +75,19 @@ export function walkOnLines(walker, lines, field, w, h, { reach = 3, par = 0.7, 
     for (const e of hits) {
       if (!e) continue;
       const r = runs[runs.length - 1];
-      if (r && r.li === e.li && e.wk - r.wk1 <= bridge) { r.k1 = e.k; r.wk1 = e.wk; r.s.push([e.k, e.s]); }
-      else runs.push({ li: e.li, k0: e.k, k1: e.k, wk0: e.wk, wk1: e.wk, s: [[e.k, e.s]] });
+      const direction = r ? Math.sign(e.k - r.k1) : 0;
+      if (r && r.li === e.li && e.wk - r.wk1 <= bridge && (!r.direction || !direction || direction === r.direction)) {
+        r.direction ||= direction; r.k1 = e.k; r.wk1 = e.wk; r.s.push([e.k, e.s]);
+      } else runs.push({ li: e.li, k0: e.k, k1: e.k, wk0: e.wk, wk1: e.wk, direction: 0, s: [[e.k, e.s]] });
     }
+    // A looping walker can visit a file contour repeatedly. Keep its longest
+    // monotone visit instead of drawing out-and-back knots on the same contour.
+    const longest = new Map();
+    for (const r of runs) {
+      r.span = pathLength(lines[r.li].points.slice(Math.min(r.k0, r.k1), Math.max(r.k0, r.k1) + 1));
+      if (!longest.has(r.li) || r.span > longest.get(r.li).span) longest.set(r.li, r);
+    }
+    const uniqueRuns = runs.filter(r => longest.get(r.li) === r);
     let cur = [], claimed = [];
     // a gesture mostly made of bridges is the walk's own path again, and is not drawn; a gesture that is not drawn
     // gives its lines back, so the closing pen still draws them
@@ -87,7 +97,7 @@ export function walkOnLines(walker, lines, field, w, h, { reach = 3, par = 0.7, 
       else for (const li of claimed) owner[li] = -1;
       cur = []; claimed = [];
     };
-    runs.forEach((r, ri) => {
+    uniqueRuns.forEach((r, ri) => {
       const L = lines[r.li].points, fwd = r.k1 >= r.k0;
       let a = r.k0, b = r.k1;
       // a run that covers most of its line takes the ends the walk just missed
@@ -107,7 +117,7 @@ export function walkOnLines(walker, lines, field, w, h, { reach = 3, par = 0.7, 
         for (const p of S) { if ((fwd ? p[0] <= k : p[0] >= k) && Math.abs(p[0] - k) <= Math.abs(lo[0] - k)) lo = p; if ((fwd ? p[0] >= k : p[0] <= k) && Math.abs(p[0] - k) <= Math.abs(hi[0] - k)) hi = p; }
         return lo[0] === hi[0] ? lo[1] : lo[1] + (hi[1] - lo[1]) * (k - lo[0]) / (hi[0] - lo[0]); };
       const seg = ks.map(k => ({ ...L[k], s: sAt(k) }));
-      const prev = runs[ri - 1];
+      const prev = uniqueRuns[ri - 1];
       if (cur.length) {
         const gapWalk = r.wk0 - (prev ? prev.wk1 : r.wk0), end = cur[cur.length - 1], d = Math.hypot(seg[0].x - end.x, seg[0].y - end.y);
         // the walk carries on through a short gap: its own path there, smoothed hard (a moving mean over `smooth`
