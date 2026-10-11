@@ -29,3 +29,19 @@ test('plane-wise film removal preserves every float bit, masking metadata and ol
     assert.equal(after._layerVer, before._layerVer);
   }
 });
+
+test('shifted plane views and aliased strength retain the original cell update order', () => {
+  for (const strengthAlias of [false, true]) {
+    const make = () => {
+      const n = 119, values = Float32Array.from({ length: n + 2 }, (_, i) => .019 + Math.sin(i) * .001);
+      return { n, K: 1, W: new Float32Array(n).fill(.017), M: new Uint8Array(n),
+        G: [values.subarray(0, n)], D: [values.subarray(1, n + 1)], P: [values.subarray(2)], layers: [],
+        resist: new Uint8Array(n).fill(1), resistFrom: 0,
+        resistStrength: strengthAlias ? values.subarray(1, n + 1) : Float32Array.from({ length: n }, (_, i) => (i % 5 + 1) * .12345) };
+    };
+    const before = make(), after = make();
+    liftResist(before); liftResist(after, { byPlane: true });
+    assert.deepEqual(new Uint8Array(after.G[0].buffer), new Uint8Array(before.G[0].buffer));
+    assert.deepEqual(after.W, before.W);
+  }
+});
