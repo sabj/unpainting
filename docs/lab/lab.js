@@ -223,7 +223,7 @@ const setPanel = active => {
   requestAnimationFrame(() => { cacheRect(); queueCursor(); });
 };
 panelButtons.forEach(b => b.addEventListener('click', () => setPanel(controlsPanel.dataset.activePanel === b.dataset.panelToggle ? null : b.dataset.panelToggle)));
-// Recorded excerpts and techniques share the top picker and playback controls.
+// Complete paintings and techniques share the top picker and playback controls.
 const playbar = document.getElementById('playbar'), playProgress = document.getElementById('play-progress');
 const caption = document.getElementById('step-caption'), dryingEl = document.getElementById('drying'), dryingProgress = document.getElementById('drying-progress'), dryingLabel = document.getElementById('drying-label');
 const playPause = document.getElementById('play-pause'), replaySpeed = document.getElementById('replay-speed');
@@ -242,11 +242,11 @@ const cancelPlayback = () => {
   playPause.textContent='Pause'; playPause.setAttribute('aria-pressed','false');
   worker.postMessage({type:'pause',on:false}); setPlaying(false);
 };
-const newSheet = () => { playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent='Your painting studio'; cancelStroke(); cancelPlayback(); worker.postMessage({type:'clear',seed:PAPER_SEED}); announce('New sheet'); };
+const newSheet = () => { liveBudget.hidden=true;playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent='Your painting studio'; cancelStroke(); cancelPlayback(); worker.postMessage({type:'clear',seed:PAPER_SEED}); announce('New sheet'); };
 function startDemo(name, title) {
   playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent=title;
   // Technique samples have live instructions, not a saved-frame recording.
-  runMode.value='live';lab.mode='live';document.getElementById('mode-note').textContent='Live technique · paint, water and pigment simulated here.';
+  runMode.value='live';lab.mode='live';liveBudget.hidden=true;document.getElementById('mode-note').textContent='Live technique · paint, water and pigment simulated here.';
   cancelStroke(); setPlaying(true); playPause.hidden=true; handNote=null; playingWhat=title.toLowerCase(); playingExample=false;
   worker.postMessage({type:'play',name,seed:PAPER_SEED});
 }
@@ -268,9 +268,9 @@ document.getElementById('skip').addEventListener('click',()=>{if(!playingExample
 playPause.addEventListener('click',()=>{
   replayPaused=!replayPaused;worker.postMessage({type:'live-pause',on:replayPaused});playPause.textContent=replayPaused?'Play':'Pause';playPause.setAttribute('aria-pressed',String(replayPaused));
 });
-const runMode=document.getElementById('run-mode'),strokeLimit=document.getElementById('stroke-limit');
-// Examples open on the painter's own saved frames. Live re-paints only the first recorded strokes with the browser's
-// physics, a different build, so it is an opt-in study, not the painting. Technique demos switch to live for themselves.
+const runMode=document.getElementById('run-mode'),strokeLimit=document.getElementById('stroke-limit'),liveBudget=document.getElementById('live-budget');
+// Examples open on the painter's saved frames. Live re-paints a complete budgeted
+// study using its native paper, materials and event schedule. Technique demos select Live.
 let exampleMode='replay';lab.mode=exampleMode;
 for(const el of [runMode,strokeLimit])el.addEventListener('change',()=>{exampleMode=runMode.value;lab.mode=runMode.value;document.getElementById('mode-note').textContent=lab.mode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';targets.replay();});
 replaySpeed.addEventListener('change',()=>worker.postMessage({type:'live-speed',value:Number(replaySpeed.value)}));
@@ -279,7 +279,7 @@ document.getElementById('redip').addEventListener('click',()=>{worker.postMessag
 document.getElementById('auto-redip').addEventListener('change',e=>{settings.autoRedip=e.target.checked;});
 async function playExampleFilm(example, carry=false, seek=0) {
   const run=++filmRun, alive=()=>run===filmRun;
-  runMode.value=exampleMode;lab.mode=exampleMode;document.getElementById('mode-note').textContent=exampleMode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';
+  runMode.value=exampleMode;lab.mode=exampleMode;liveBudget.hidden=exampleMode!=='live';document.getElementById('mode-note').textContent=exampleMode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';
   cancelStroke();hover=null;queueCursor();setPlaying(true);playPause.hidden=false;handNote=null;playingWhat=example.title.toLowerCase();playingExample=true;filmSkip=carry;
   document.getElementById('paint-hint').hidden=true;
   state.textContent=`Playing: ${example.title}`;caption.textContent='A complete budgeted painting. Carry on painting when you are ready.';

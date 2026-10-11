@@ -1,0 +1,3255 @@
+{
+ "category": "painted",
+ "mode": "gentle",
+ "requestedMode": "strict",
+ "phase": "done",
+ "violations": 0,
+ "blockedAttempts": 0,
+ "elementReads": {},
+ "byName": {},
+ "records": [],
+ "looks": {
+  "count": 230,
+  "cells": 782489,
+  "refused": 0,
+  "overBudget": 0,
+  "byCheckpoint": {
+   "passage": {
+    "count": 230,
+    "refused": 0,
+    "overBudget": 0
+   }
+  },
+  "entries": [
+   {
+    "checkpoint": "passage",
+    "label": "L1/s0",
+    "cells": 61112,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 1191,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 2623,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 1955,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 2233,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L2/s0",
+    "cells": 1952,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L3/s0",
+    "cells": 61112,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1191,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 2623,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1955,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 2233,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L4/s0",
+    "cells": 1952,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L5/s0",
+    "cells": 61112,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 1191,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 2623,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 1955,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 2233,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L6/s0",
+    "cells": 1952,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L7/s0",
+    "cells": 61112,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1191,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 2623,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1955,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1596,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 2233,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L8/s0",
+    "cells": 1952,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 1589,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 2063,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 637,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L9/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 668,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L10/s0",
+    "cells": 672,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L11/s0",
+    "cells": 1049,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L11/s0",
+    "cells": 2024,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L11/s0",
+    "cells": 473,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L11/s0",
+    "cells": 657,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 443,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 461,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1089,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1722,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 569,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 939,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 394,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L12/s0",
+    "cells": 911,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 3626,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 2208,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 2436,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 756,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1408,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L13/s0",
+    "cells": 1227,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L14/s0",
+    "cells": 1589,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L14/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L14/s0",
+    "cells": 2063,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L14/s0",
+    "cells": 637,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L14/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 668,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L15/s0",
+    "cells": 672,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 398,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 730,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L16/s0",
+    "cells": 423,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 1049,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 2024,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 473,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L17/s0",
+    "cells": 657,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 443,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 461,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1089,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1722,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 569,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 939,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 394,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L18/s0",
+    "cells": 911,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 3626,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 2208,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 2436,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 1265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 756,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 1408,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L19/s0",
+    "cells": 1227,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 1589,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 2063,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 637,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L20/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L21/s0",
+    "cells": 668,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L21/s0",
+    "cells": 672,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L22/s0",
+    "cells": 398,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L22/s0",
+    "cells": 730,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L22/s0",
+    "cells": 423,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L23/s0",
+    "cells": 1049,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L23/s0",
+    "cells": 2024,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L23/s0",
+    "cells": 473,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L23/s0",
+    "cells": 657,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 443,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 461,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 1089,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 1722,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 569,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 939,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 394,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L24/s0",
+    "cells": 911,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 3626,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 2208,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 2436,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 1265,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 756,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 1408,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L25/s0",
+    "cells": 1227,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L26/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L26/s0",
+    "cells": 2063,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L26/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L27/s0",
+    "cells": 398,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L27/s0",
+    "cells": 730,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L27/s0",
+    "cells": 423,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 443,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 461,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 1089,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 1722,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 569,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 939,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 394,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L28/s0",
+    "cells": 911,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L29/s0",
+    "cells": 1589,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L29/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L29/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L30/s0",
+    "cells": 668,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L32/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L32/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L32/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L32/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L33/s0",
+    "cells": 3626,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L33/s0",
+    "cells": 2436,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L34/s0",
+    "cells": 1589,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L34/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L34/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L35/s0",
+    "cells": 668,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L36/s0",
+    "cells": 730,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L38/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L38/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L38/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L38/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L39/s0",
+    "cells": 3626,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L39/s0",
+    "cells": 2436,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L40/s0",
+    "cells": 1589,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L40/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L40/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L41/s0",
+    "cells": 668,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L42/s0",
+    "cells": 730,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L44/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L44/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L44/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L44/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L45/s0",
+    "cells": 3626,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L45/s0",
+    "cells": 2436,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L46/s0",
+    "cells": 11914,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L46/s0",
+    "cells": 2302,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L47/s0",
+    "cells": 730,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L48/s0",
+    "cells": 1638,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L48/s0",
+    "cells": 1365,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L48/s0",
+    "cells": 2131,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L48/s0",
+    "cells": 1378,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 176,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 262,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 528,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 196,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 126,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 649,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L49/s0",
+    "cells": 211,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 176,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 262,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 528,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 196,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 126,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 649,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L50/s0",
+    "cells": 211,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 176,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 262,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 528,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 196,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 126,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 649,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L51/s0",
+    "cells": 211,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 176,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 528,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 649,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L52/s0",
+    "cells": 211,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L53/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L53/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L53/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L54/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L54/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L54/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L55/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L55/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L55/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L56/s0",
+    "cells": 19831,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L56/s0",
+    "cells": 2793,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   },
+   {
+    "checkpoint": "passage",
+    "label": "L56/s0",
+    "cells": 1096,
+    "ref": [
+     "A"
+    ],
+    "sheet": [
+     "ledger",
+     "booked"
+    ],
+    "phase": "paint",
+    "where": "file:///private/tmp/unpainting-live-budget/tools/paint-plate.mjs:2728:29"
+   }
+  ],
+  "budget": null,
+  "minCells": 64,
+  "checkpoints": [
+   "peek",
+   "review",
+   "passage",
+   "texture"
+  ]
+ },
+ "image": "docs/lab/examples/white-ships-run/source.jpg"
+}

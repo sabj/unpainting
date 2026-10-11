@@ -1,0 +1,14 @@
+{
+  "meanAbsoluteDifference": 0.7280119613777202,
+  "maxDifference": 32,
+  "range": "0\u2013255 RGB",
+  "width": 360,
+  "height": 257,
+  "columns": [
+    "painter",
+    "Live executor"
+  ],
+  "painterBackend": "laptop GPU",
+  "executorBackend": "shared browser executor, serial CPU with cached fixed layers",
+  "note": "Full shared browser executor at native resolution, including every recorded flow and dry operation. Comparisons include native GPU versus CPU numerical differences."
+}
