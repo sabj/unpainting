@@ -18,7 +18,7 @@ export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,p
  const K=pigments.length,n=w*h,paths=[],panels=[];
  const marks=createMarkPreview(w,h,pigments,paperRGB,plan.protectedCells);
  const targetHash=(await import('node:crypto')).createHash('sha256').update(fs.readFileSync(target)).digest('hex');
- const drawing=(file,first)=>file&&hasLines(file)?selectValueInk(loadLines(file,w,h,{keepOrder:true}),{first,w,h,density:plan.value.values,reserves:plan.protectedCells,subject,styleSelection:plan.style?{style:plan.style.name,reason:plan.style.reason}:null,shaped:plan.instructions[0]?.shaped}):[];
+ const drawing=(file,first)=>file&&hasLines(file)?selectValueInk(loadLines(file,w,h,{keepOrder:true}),{first,w,h,sourceInk:plan.style?.structure==='ink',density:plan.value.values,reserves:plan.protectedCells,subject,styleSelection:plan.style?{style:plan.style.name,reason:plan.style.reason}:null,shaped:plan.instructions[0]?.shaped}):[];
  const open=drawing(opening,true),close=drawing(closing,false);
  let drawings=[];
  const panel=async(stage)=>{
@@ -34,9 +34,18 @@ export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,p
  };
  await panel('0 reserve whites / catchlights; no opaque correction');drawings=open;await panel(`opening drawing: ${open.length} selected structure paths (CPU)`);
  for(let band=1;band<=5;band++){
-  for(const L of plan.layers.filter(l=>l.value===band))for(const sh of L.shapes){const m=sh.mask,p=sh._valuePlan.shaped?shapedPlanePaths(m,w,h,{texture:sh._valuePlan.texture}):brushedWashPaths(m,w,h,{pad:1.5,minRadius:1,minLength:3}),load=markLoad(L,sh,K);marks.paint(p,load,{clip:sh._valuePlan.shaped?m:undefined});if(compilePaths)paths.push({id:sh._valuePlan.id,valueBand:band,phase:sh._valuePlan.phase,regions:sh._valuePlan.regions,load,paths:p});}
+  for(const L of plan.layers.filter(l=>l.value===band))for(const sh of L.shapes){
+   const m=sh.mask,p=sh._strokePlan?.paths??(sh._valuePlan.shaped?shapedPlanePaths(m,w,h,{texture:sh._valuePlan.texture}):brushedWashPaths(m,w,h,{pad:1.5,minRadius:1,minLength:3})),load=markLoad(L,sh,K);
+   const factors=sh._strokePlan?.factors;
+   if(factors)for(let i=0;i<p.length;i++)marks.paint([p[i]],load.map(v=>v*factors[i]),{clip:m});
+   else marks.paint(p,load,{clip:sh._valuePlan.shaped?m:undefined});
+   if(compilePaths)paths.push({id:sh._valuePlan.id,valueBand:band,phase:sh._valuePlan.phase,regions:sh._valuePlan.regions,load,paths:p,...(factors?{factors}: {})});
+  }
   await panel(`${band} ${band===1?'light wash':band<=3?'dry middle values':'LAST dry-base cross-region shadow glaze'}; value band ${band}/5`);
  }
+ // The planned sheet without any ink: every compiled wash mark, no drawing overlay, no caption. Consumed by
+ // tools/judge/ink-wash-consistency.mjs as the proposed wash.
+ await sharp(Buffer.from(marks.pixels()),{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'planned-wash.png'));
  drawings=[...open,...close];await panel(`closing ink: ${close.length} selective paths; dry paint required`);
  const pw=Math.max(540,w),ph=Math.round(h*pw/w)+88,cols=4,head=54;
  const header=Buffer.from(`<svg width="${cols*pw}" height="${head}"><rect width="100%" height="100%" fill="#111"/><text x="10" y="20" fill="white" font-family="Arial" font-size="16">CPU compiled band progression; marks-only preview; no physics. No control column.</text><text x="10" y="42" fill="white" font-family="Arial" font-size="14">OWNER VERDICT: none recorded | marks-only preview / registered paths</text></svg>`);

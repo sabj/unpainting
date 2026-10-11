@@ -11,3 +11,17 @@ async function stages(p,target,out){fs.mkdirSync(out);await writeValuePreview({p
 test('planned preview pixels survive target replacement',async()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'w17-'));try{const target=path.join(dir,'target.png');await sharp({create:{width:w,height:h,channels:3,background:'#ff0000'}}).png().toFile(target);const a=await stages(plan,target,path.join(dir,'a'));await sharp({create:{width:w,height:h,channels:3,background:'#0000ff'}}).png().toFile(target);const changed={...plan,layers:plan.layers.map(l=>({...l,shapes:l.shapes.map(s=>({...s,graded:new Float32Array(w*h).fill(9)}))}))};const b=await stages(changed,target,path.join(dir,'b'));assert.deepEqual(b,a);assert.notDeepEqual(a[2],a[0]);}finally{fs.rmSync(dir,{recursive:true,force:true});}});
 test('deleting all marks leaves blank paper, including reserved film',async()=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'w17-'));try{const target=path.join(dir,'target.png');await sharp({create:{width:w,height:h,channels:3,background:'#000000'}}).png().toFile(target);const images=await stages({...plan,layers:[]},target,path.join(dir,'out'));const blank=await sharp(Buffer.from(Uint8Array.from({length:w*h*3},(_,i)=>paperRGB[i%3])),{raw:{width:w,height:h,channels:3}}).png().toBuffer().then(b=>sharp(b).resize(540,540).png().toBuffer()).then(b=>sharp(b).raw().toBuffer());for(const image of images)assert.equal(image.equals(blank),true,`blank pixel mismatch: ${Array.from(image.slice(0,12))} vs ${Array.from(blank.slice(0,12))}`);}finally{fs.rmSync(dir,{recursive:true,force:true});}});
 test('footprint, reserve, load and order control glazes',()=>{const paths=[[{x:8,y:8,r:2},{x:10,y:8,r:2}]],m=createMarkPreview(w,h,pigments,paperRGB,reserves);m.paint(paths,markLoad(plan.layers[0],shape,1));const a=m.pixels();assert.deepEqual(Array.from(a.slice(0,3)),paperRGB);assert.deepEqual(Array.from(a.slice(136*3,136*3+3)),paperRGB);assert.ok(a[135*3]<255);m.paint(paths,[.5]);assert.ok(m.pixels()[135*3]<a[135*3]);});
+
+test('preview uses compiled lane geometry and charge factors',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ink-preview-'));
+ try {
+  const target=path.join(dir,'target.png');await sharp({create:{width:w,height:h,channels:3,background:'#fff'}}).png().toFile(target);
+  const paths=[[{x:4,y:4,r:1,p:1},{x:10,y:4,r:1,p:1}]];
+  const make=factor=>({...plan,layers:[{value:1,pigment:0,shapes:[{...shape,_valuePlan:{...shape._valuePlan,shaped:true},_strokePlan:{paths,factors:[factor]}}]}]});
+  const blank=await stages(make(0),target,path.join(dir,'blank'));
+  const painted=await stages(make(1),target,path.join(dir,'painted'));
+  assert.deepEqual(blank[2],blank[0]);assert.notDeepEqual(painted[2],blank[2]);
+  const compiled=JSON.parse(fs.readFileSync(path.join(dir,'painted','value-compiled-paths.json')));
+  assert.deepEqual(compiled.paths[0].paths,paths);assert.deepEqual(compiled.paths[0].factors,[1]);
+ } finally {fs.rmSync(dir,{recursive:true,force:true});}
+});
