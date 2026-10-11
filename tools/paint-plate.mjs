@@ -185,6 +185,7 @@ NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
 const OUTPUT_VIDEO = num('video', 1);
 if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
 // Diagnostic counters preserve dispatch ordering; GPU times are sampled, not serialized.
+process.env.GPU_EDGE_PINGPONG = String(num('speededge', 0));
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
 
