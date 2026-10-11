@@ -185,6 +185,7 @@ NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
 const OUTPUT_VIDEO = num('video', 1);
 if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
 // Diagnostic counters preserve dispatch ordering; GPU times are sampled, not serialized.
+process.env.GPU_QUIET_DT = String(num('speedquietdt', 0));
 process.env.GPU_EDGE_PINGPONG = String(num('speededge', 0));
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
@@ -2730,7 +2731,7 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
-    js: { laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET },
+    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state);
@@ -2761,6 +2762,7 @@ const awareRestore = () => {
     layers.length = 0; layers.push(...head, ...rebuilt);
   }
   const j = st.js;
+  FRAME_POLICY.restore(j.framePolicy);
   ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET } = j);
   const refill = (a, b) => { a.length = 0; for (const v of b) a.push(v); };
   refill(FRAMES, j.FRAMES); refill(marks, j.marks); refill(TECHS, j.TECHS); refill(colourTrace, j.colourTrace);

@@ -682,6 +682,11 @@ export class GpuSheet {
       if (globalThis.DRY_TRACE) console.error(`dry t=${S.t} count=${c[0]} wet=${c[1]} cap=${this.cap} ${(performance.now() - (this._t0 ??= performance.now())).toFixed(0)}ms`);
       if (process.env.DRY_TRACE2) (S.hist??=[]).push(S.t+":"+c[0]+":"+c[1]+":"+new Float32Array(c.buffer)[7].toExponential(1));
       if (this.resident && c[6] === 0 && process.env.GPU_DAMP !== '0') { if(!S.dampOnly) S.dampAt=S.t; S.dampOnly = true; }
+      // Experimental tier 2: pore-only drying after the measured surface film is gone.
+      // No wet edge or surface-flow dispatch is skipped by this switch.
+      if (process.env.GPU_QUIET_DT === '1' && S.fast && S.dampOnly && !S.quietDtUsed && until === Infinity) {
+        this.setOptions({ dt: S.dt * 2 }); S.quietDtUsed = true;
+      }
       if (S.analyticTail && S.fast && until === Infinity && new Float32Array(c.buffer, c.byteOffset, c.length)[7] <= 3 * this.o.wetEps) {
         this.setOptions({ dt: Math.max(S.dt, 140) }); S.adaptiveUsed = true;
       }
@@ -708,7 +713,7 @@ export class GpuSheet {
     if (process.env.DRY_TRACE2) console.error(`DRYT t=${S.t} fastAt=${S.fastAt} level=${S.level} levelMax=${S.levelMax} dt=${S.dt} tail=${S.analyticTail} tailUsed=${!!S.analyticTailUsed} adaptive=${!!S.adaptiveUsed} damp=${!!S.dampOnly} dampAt=${S.dampAt} cnt=${S.lastCounters?.[0]} hist=${(S.hist??[]).join(",")}`);
     let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} if (c[1] !== 0) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`);
     this.setOptions({ dt: S.oLevel });
-    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
+    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.lastWetCounter=c[1];m.quietDtCalls=(m.quietDtCalls??0)+(S.quietDtUsed?1:0);m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
     return S.t;
   }
   /**
