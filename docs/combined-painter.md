@@ -79,3 +79,49 @@ Every entry gives a use and a failure mode. These are choices, not mandatory rul
 The historical recovery list also includes teaching recordings, target-keyframe timing, rejected ruled hatch and fitted mass-lock variants. They are not new-job painting tools. Target-keyframe copying and paint-time target steering remain excluded. `--prepfade` is an explicit graphic fade model, not a claim that real waterproof ink dissolves.
 
 Photo model evidence from the historical linebench study: lineart realistic led faces and objects (mean F1 at 6 px .546), HED led beaches (.460), and ArtLine stated dark masses. These are old model-choice clues, not validation on the current subjects. `photo-sketch` has a working classical fallback and accepts a prepared model map; it does not require the deleted linebench runner.
+
+## Historical ink inventory: supporting tools and limits
+
+These entries complete the inventory in addition to the tools above. Main choices belong in `drawing`; the lower-level options below remain explicit CLI overrides. Availability does not mean a tool helped the current six paintings. See the validation report for exercised coverage.
+
+| Tool | Location / access | Fits | Hurts or limit |
+|---|---|---|---|
+| Ridge walker | `src/media/draw.mjs`, drawing source none | Sparse finish lines in a pen source | Walks fur and sand as squiggles |
+| Line-length budget | `draw.mjs`, `--inkbudget` | Bound a walker by the source's ink share | Deletes short landmarks if spent on texture |
+| Ink gate | `draw.mjs`, `--inkgate` | Keep a walker near narrow source ink | Separator mistakes also gate out useful lines |
+| Ink tiers | `src/crop/inktiers.mjs`, `--inktiers` | Silhouette, features, then hair | Budget can suppress the lower tiers entirely |
+| Ink filter | `src/crop/inkfilter.mjs`, `--inkfilter` | Reject texture in fur and foliage | Can remove real dark-against-light structure |
+| Segment outlines and ground lines | `methods/seg-ink.mjs`, `--segink` | A few subject silhouettes | A whole traced drawing looks cut out |
+| Learned line evidence | `methods/ml-lines.mjs`, `tools/seg/lines.py`, `--mllines`; prepared maps through `drawing.source: line-map` | Faces and objects when a suitable model map exists | Optional model dependencies are not bundled; sand and sky texture can become lines |
+| Authored line selection | `methods/drawing-file.mjs`, `tools/seg/select-drawing.py`, `--drawingfile` | A reviewed line set compiled before painting | Drawing an unreviewed extraction whole is usually too dense |
+| Per-segment model extraction | `tools/seg/drawing/` | Different model evidence for faces, clothing and scenery | Historical runners refer to external model weights and linebench paths; use a prepared map when unavailable |
+| Fitted revision-4 map rules | Historical `paint/tools/seg/drawing-from-maps.py` | Evidence that region-specific extraction can help photos | Not ported as a universal preset; it was fitted on four subjects. Current photo-sketch and prepared-map routes replace the missing runner |
+| Region ranking | `drawing.lines: regions`, `drawing-plan.mjs` | Head, hands and held object before clothing and setting | Needs reliable region labels |
+| Form versus tone split | `methods/drawing-logic.mjs`, `--drawinglogic 1` | Structure first, sparse tonal finish later | The old split can send too much texture to the closing pen; explicit linked stages are clearer |
+| Hand order and taper | `methods/drawing-hand.mjs` through drawing logic | Join continuations and press in, lift off | Poor candidates remain poor after ordering |
+| Hybrid walker | `methods/drawing-hybrid.mjs`, prepInk.method connected | Longer gestures on prepared geometry | Can knot into squiggles |
+| Pencil erase / prep fade | `methods/pencil-stage.mjs`, `--pencilerase`, prep.fade | Let a construction drawing recede | An explicit graphic model, not physical erasure or soluble waterproof ink |
+| Dark-mass budget | `methods/mass-budget.mjs`, `--massbudget` | Bound planned ink inside a dark coat | Can starve defining lines; dark paint is still the wash's job |
+| Region exclusions | `--inkoffbox`, `--inkoffoutline`, `--inkofffoliage`, `--inkofftrees`, `--inkskin`, `--penface`, `--facedetail` in `paint-plate.mjs` | An explicit reviewed exclusion or face policy | Heuristic tree detection removed stone on h36-a; avoid universal defaults |
+| Opening and closing caps | `methods/material-profiles.mjs`, drawing.amount/maxLines/weight/closingLines | Limit marks and pressure per stage | A fixed 12-line cap underdraws an authored source-ink file |
+| Graphite outlines | `--penoutline`, `paint-plate.mjs` | A light placement scaffold | Full silhouette outlining can make a cut-out |
+| Photo versus artwork declaration | Separate prepared drawing file and `src/paint/styles/` | Keep photographic evidence separate from an ink original | A wrong declaration causes inappropriate tracing or wash interpretation |
+| Practice style proportions | `methods/practice-style.mjs`, `tuned/style-cuts.mjs`, `--practice` | Historical studies of ink, dry and wet shares | Requires measured art evidence; not a default new-subject recipe |
+| Reload and dip cadence | `media/draw.mjs`, `media/pen.mjs` | Continuity across short marks and timely reloads | Forced fresh dips on every tiny mark create dark spots |
+| Pressure, speed and dwell | `media/draw.mjs`, prepared point weights/widths | Thick-to-thin expressive contact | A long pause pools; observed widths still obey the instrument range |
+| Lit-edge taper | `methods/drawing-scribble.mjs`, scribble | Open the illuminated edge of a dark lock | Can break necessary architectural junctions |
+| Simplify, chains and pen blur | `--pensimplify`, `--penfrom chains`, `--penblur` | Clean noisy candidate geometry before marks | Excess simplification removes character; blur is not a substitute for pen control |
+| Separate soluble ink | `--inkcolour sep`, drawing.ink | Sepia studies with wash softening | Unwanted rewetting muddies crisp urban sketch lines |
+| Damp-sheet ink | `media/pen.mjs` | Deliberately feathered ink tests | Production material pens enforce dry contact; no planner shortcut bypasses that gate |
+| Glaze-aware pen colour | `--penwant glaze`, `paint-plate.mjs` | Plan ink density in relation to underlying tone | Must be compiled before the target seal; not target feedback during the stroke |
+| Ink/wash separation | `src/crop/inkwash.mjs`, `wash-ink-free.mjs` | Avoid laying wash pigment into known pen lines | Broad dark paint is not ink and must remain a wash |
+| Closing cleanup | Historical `--closeclean` | Historical cleanup of a selected final line set | Current painter only accepts this as a legacy optional name; it has no active implementation and is not a planner tool |
+| Curls and dark-mass curls | `techniques/dark-mass.mjs`, `--darkmasscurls` | Curly coats in an explicitly stylized passage | Repeated curls look like a texture filter |
+| Dog scribble route | `methods/dog-scribble.mjs`; generic finishInk.masses scribble | Dark hair and fur accents | Historical dogpaint route has fitted settings; the generic plan path avoids those coordinates |
+| Fur flicks and dry brush | `src/crop/fur.mjs`, `src/media/brush.mjs`; legacy `--fur` path | Edge hairs and broken dry contact | Too many flecks create speckle; the legacy lazy fur field is not certified under strict guard. Prefer the preplanned finish-fur path |
+| Target-keyframe tracing and timing | Historical stage-trace and `--timeline target` | Replaying a documented teaching sequence only | Excluded from new-subject planning: a finished target does not supply its own prep stage |
+| Ruled 60-degree hatch | Historical rejected drawing variant | None recommended | Rejected grid texture, especially in fur; not ported |
+| Original fitted mass-lock brush route | Historical V072 `experimental/mass-locks.mjs` | The old dog study | Not ported unchanged: fitted coordinates and target-time reads. Generic preplanned locks and light reserves are available above |
+| Ink measure and legibility | `src/eval/ink.mjs`, `linequality.mjs`, `tools/ink-judge.mjs` | Inspect a line, loop, share, precision and recall | Inferred ink can include wash boundaries; not a quality score |
+| Stage, length and pen-box audit | `tools/judge/line-study.py`, stage snapshots, `pen-state-audit.json` | Verify what each pass actually laid | Historical stage judges need reference keyframes; no invented stage ground truth |
+| Ink lab and house demo | Historical paint repository `tools/ink-lab.mjs` and house demos | Controlled instrument teaching and regression studies | Not ported as a painting method. Demonstrations do not establish quality on a new subject |
