@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
+import {framePolicy} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
 import {splitLoadsFeathered} from '../src/paint/methods/brushes.mjs';
@@ -184,6 +185,7 @@ NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
 const OUTPUT_VIDEO = num('video', 1);
 if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
 // Diagnostic counters preserve dispatch ordering; GPU times are sampled, not serialized.
+const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
 
 if (RECIPE_NOTE) console.log(RECIPE_NOTE);
@@ -1667,7 +1669,7 @@ let STAGE = { stage: 'paper', pass: 0, value: 0 };
 // Frames taken inside the sheet's synchronous physics (while a passage is laid or dries) are rendered at once and
 // written at the next shoot, in order.
 const SNAPS = [];
-const snap = extra => { if(NATIVE_PAINT_MODE.mode==='fast')return; const F = framer(); SNAPS.push(F ? { id: F.capture(), stage: { ...STAGE, ...extra } } : { buf: INKRES ? INKRES.compose(view()) : view(), stage: { ...STAGE, ...extra } }); };
+const snap = extra => { if(!FRAME_POLICY.all || NATIVE_PAINT_MODE.mode==='fast')return; const F = framer(); SNAPS.push(F ? { id: F.capture(), stage: { ...STAGE, ...extra } } : { buf: INKRES ? INKRES.compose(view()) : view(), stage: { ...STAGE, ...extra } }); };
 
 // --marks 1: record the mark tape: every stroke as a brush index and a path, with the water schedule between them.
 const MARKTAPE = opt('marks', '0') !== '0' || STROKE_BUDGET ? recordMarks(true) : null;
@@ -1685,8 +1687,9 @@ const RESUME_AT = RESUME_DIR ? JSON.parse(fs.readFileSync(path.join(RESUME_DIR, 
 let LAST_FRAME_STAGE=null;
 const shoot = async () => {
   if (RESUMING) return; // a fresh process taking over a saved painting: its frames are already on disk
+  if (!FRAME_POLICY.keep(STAGE)) return;
   // Fast films only completed paint boundaries, every fourth pass; all other stages survive.
-  if(NATIVE_PAINT_MODE.mode==='fast' && STAGE.stage==='paint' && (STAGE.laying || ((STAGE.pass??0)>1 && STAGE.pass%4!==0)))return;
+  if(FRAME_POLICY.all && NATIVE_PAINT_MODE.mode==='fast' && STAGE.stage==='paint' && (STAGE.laying || ((STAGE.pass??0)>1 && STAGE.pass%4!==0)))return;
   const stageKey=JSON.stringify(STAGE);
   if(NATIVE_PAINT_MODE.mode==='fast' && LAST_FRAME_STAGE===stageKey)return;
   LAST_FRAME_STAGE=stageKey;
@@ -3384,6 +3387,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh.ids = null; }
   layer.mask = null; layer.ids = null;
   STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, ...(layer._order ? { order: layer._order.phase } : {}), techniques: Object.fromEntries(Object.entries(used).filter(([k]) => ['wet on dry', 'wet on wet', 'glazed', 'dry brush', 'detail marks', 'small brush'].includes(k))) };
+  if (!FRAME_POLICY.all) await shoot();
   if (FILM_BY_PAINT) {
     // the pass's whole booking, whether or not every passage found a path, so the shares stay on the plan's mass
     filmPass += layer.shapes.reduce((a, sh) => a + (FILM_MASS.get(sh) ?? 0), 0); filmLaid = filmPass;
@@ -3675,7 +3679,7 @@ const placed = FRAMES.map((f, i) => {
 if (opt('thkdump', '0') !== '0') { coherent(sheet); const th = thickness(sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
 fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet) }, null, 1));
-fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
+fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
 {
   const layer = PIGS.map(() => new Float32Array(n));
