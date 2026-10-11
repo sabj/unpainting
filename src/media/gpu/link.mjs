@@ -25,7 +25,7 @@ import { mergeOf } from '../brush.mjs';
 
 const PLANES = K => 4 + 3 * K;
 // DOWN_TRACE=1: count rectangle reads by caller, printed at exit
-const DOWN_TRACE = typeof process !== 'undefined' && process.env.DOWN_TRACE === '1' ? new Map() : null;
+const DOWN_TRACE = typeof process !== 'undefined' && (process.env.DOWN_TRACE === '1' || process.argv.includes('--downtrace')) ? new Map() : null;
 if (DOWN_TRACE) process.on('exit', () => { for (const [k, [n, cells]] of [...DOWN_TRACE].sort((a, b) => b[1][0] - a[1][0]).slice(0, 15)) console.error(`DOWN ${n} reads ${cells} cells: ${k}`); });
 // (read when used, not when loaded: paint-plate sets them from its options after this file is imported)
 const SYNC_STROKES = () => typeof process !== 'undefined' && process.env.GPU_SYNCSTROKES === '1';
