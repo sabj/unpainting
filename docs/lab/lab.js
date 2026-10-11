@@ -266,14 +266,17 @@ playPause.addEventListener('click',()=>{
   replayPaused=!replayPaused;worker.postMessage({type:'live-pause',on:replayPaused});playPause.textContent=replayPaused?'Play':'Pause';playPause.setAttribute('aria-pressed',String(replayPaused));
 });
 const runMode=document.getElementById('run-mode'),strokeLimit=document.getElementById('stroke-limit');
-lab.mode='live';
-for(const el of [runMode,strokeLimit])el.addEventListener('change',()=>{lab.mode=runMode.value;document.getElementById('mode-note').textContent=lab.mode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';targets.replay();});
+// Examples open on the painter's own saved frames. Live re-paints only the first recorded strokes with the browser's
+// physics, a different build, so it is an opt-in study, not the painting. Technique demos switch to live for themselves.
+let exampleMode='replay';lab.mode=exampleMode;
+for(const el of [runMode,strokeLimit])el.addEventListener('change',()=>{exampleMode=runMode.value;lab.mode=runMode.value;document.getElementById('mode-note').textContent=lab.mode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';targets.replay();});
 replaySpeed.addEventListener('change',()=>worker.postMessage({type:'live-speed',value:Number(replaySpeed.value)}));
 document.querySelectorAll('[data-seek]').forEach(b=>b.addEventListener('click',()=>targets.replay(Number(b.dataset.seek))));
 document.getElementById('redip').addEventListener('click',()=>{worker.postMessage({type:'redip'});announce('Re-dipped. The next stroke starts with a fresh load.');});
 document.getElementById('auto-redip').addEventListener('change',e=>{settings.autoRedip=e.target.checked;});
 async function playExampleFilm(example, carry=false, seek=0) {
   const run=++filmRun, alive=()=>run===filmRun;
+  runMode.value=exampleMode;lab.mode=exampleMode;document.getElementById('mode-note').textContent=exampleMode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';
   cancelStroke();hover=null;queueCursor();setPlaying(true);playPause.hidden=false;handNote=null;playingWhat=example.title.toLowerCase();playingExample=true;filmSkip=carry;
   document.getElementById('paint-hint').hidden=true;
   state.textContent=`Playing: ${example.title}`;caption.textContent='Recorded early strokes. Carry on painting when you are ready.';
