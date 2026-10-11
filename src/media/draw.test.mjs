@@ -5,11 +5,45 @@ import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
 import { createSheet, thickness } from './sheet.mjs';
 import { drawGestures, lineField, lineBudget } from './draw.mjs';
+import {recordMarks} from './brush.mjs';
+import {createPen,dipPen,penStroke} from './pen.mjs';
 
 const pigment = { rho: .05, omega: 1.4, gamma: .15, K: [.35, .49, .66], S: [.06, .025, .014] };
 const W = 80, H = 40;
 const line = y => ({ points: Array.from({ length: 51 }, (_, i) => ({ x: 15 + i, y })) });
 const inkAlong = (sheet, y, r) => { const t = thickness(sheet)[0]; let s = 0; for (let x = 20; x < 60; x++) for (let dy = -r; dy <= r; dy++) s += t[(y + dy) * W + x]; return s; };
+
+test('a long two-point drawing reloads within the segment and reaches its far end', () => {
+  const sheet = createSheet(makePaper(320, 20, {seed:3}), [pigment]);
+  const after = [];
+  const result = drawGestures(sheet, [{points:[{x:5,y:10,nw:2,s:.8},{x:310,y:10,nw:2,s:.8}]}],
+    new Float32Array(6400).fill(.8), 320, 20,
+    {ink:[4], pen:{reservoir:8,drop:.1}, afterStroke:e=>after.push(e.reloads)});
+  assert(result.dips > 2, 'reloads are not restricted to the two input vertices');
+  assert(after[0] > 1);
+  const t = thickness(sheet)[0];
+  for(let x=15;x<305;x++) assert(t[10*320+x] > 0, `missing ink at ${x}`);
+});
+
+test('within-stroke reloads remain interleaved with pen segments on the replay tape',()=>{
+ const make=()=>createSheet(makePaper(160,20,{seed:3}),[pigment]);
+ const sheet=make(),replayed=make(),penOpts={reservoir:8,drop:.1};
+ const marks=recordMarks(true);sheet._tape=1;
+ try {
+  drawGestures(sheet,[{points:[{x:5,y:10,nw:2,s:.8},{x:150,y:10,nw:2,s:.8}]}],
+   new Float32Array(3200).fill(.8),160,20,{ink:[4],pen:penOpts});
+ } finally {recordMarks(false);}
+ assert(marks.filter(m=>m.k==='D').length>2);
+ const pen=createPen(penOpts);
+ for(const m of marks){
+  if(m.k==='D')dipPen(pen,m.ink,m.a);
+  if(m.k==='P')penStroke(pen,replayed,m.d.map(([x,y,p,v,d,nw])=>({x:x/10,y:y/10,p:p/100,v:v/100,nw:nw/100})),{spacing:m.sp});
+ }
+ const a=thickness(sheet)[0],b=thickness(replayed)[0];
+ let error=0,mass=0;for(let i=0;i<a.length;i++){error+=Math.abs(a[i]-b[i]);mass+=a[i];}
+ assert(error/mass<1e-6,`replayed mass error ${error/mass}`);
+ assert(b[10*160+145]>0,'replay reaches the final segment');
+});
 
 test('a gesture drawn with the pen leaves a line, not a band', () => {
   const sheet = createSheet(makePaper(W, H, { seed: 3 }), [pigment]);

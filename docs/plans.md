@@ -31,7 +31,7 @@ No area plan example ships in `examples/plans/`.
 
 The [automatic planner](how-it-paints.md#plan) reads the target image. It groups regions and values, fits pigment mixtures, selects drawing contours and orders paint passages. It produces layers, shapes, brush paths and technique choices for the painter. These are computed instructions, rather than an authored JSON plan. `plan.jpg` previews the planned paint.
 
-A recipe is a preset of painter settings. The default recipe adds 49 flags before the user's flags. Count the command-line arguments starting with `--` returned by `expandRecipe({ argv: [] })` in [src/paint/recipe.mjs](../src/paint/recipe.mjs), including [the tuned defaults](../src/paint/tuned/default-flags.mjs). A user flag can override a recipe flag. A run with a Trumbull value plan can add `--paints`; an area plan uses no default recipe unless one is named.
+A recipe is a preset of painter settings. The default recipe puts its flags before the user's flags; `expandRecipe({ argv: [] })` in [src/paint/recipe.mjs](../src/paint/recipe.mjs) returns them. A value plan's `"presets"` add [fitted settings](overfitting.md) after the recipe. A user flag can override a recipe or preset flag. An area plan uses no default recipe unless one is named.
 
 ## In the benchmark
 

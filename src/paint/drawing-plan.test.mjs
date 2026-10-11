@@ -67,3 +67,46 @@ test('lines "regions" ranks subject first and maxLines caps the count', () => {
   // no flags: every line
   assert.equal(planLines(lines, num({})).length, lines.length);
 });
+
+test('stages: any subset, each with a few choices, written as painter flags', () => {
+  const f = pairs(drawingFlags({ stages: { prep: { amount: 0.4 }, prepInk: { from: 'prep', keep: 0.8, add: 0.1, method: 'scribble' }, finishInk: { from: 'prepInk', select: 'darks', restate: 0.3, masses: 'scribble' } } }));
+  assert.equal(f['--stages'], 'prep,prepink,finishink');
+  assert.equal(f['--prepamount'], '0.4');
+  assert.equal(f['--prepinkfrom'], 'prep');
+  assert.equal(f['--prepinkkeep'], '0.8');
+  assert.equal(f['--drawinglogic'], '3');
+  assert.equal(f['--scribbleink'], '0');
+  assert.equal(f['--finishselect'], 'darks');
+  assert.equal(f['--finishmasses'], '1');
+  assert.deepEqual(drawingFlags({ stages: { prepInk: true, finishInk: true } }), ['--stages', 'prepink,finishink']);
+  assert.deepEqual(drawingFlags({ stages: { finishInk: {} } }), ['--stages', 'finishink']);
+});
+
+test('stages: the architecture finish preset strengthens sepia, not black', () => {
+  const sepia = pairs(drawingFlags({ stages: { finishInk: { method: 'architecture' } } }));
+  assert.equal(sepia['--finishmethod'], 'architecture');
+  assert.equal(sepia['--closingpressure'], '1');
+  assert.equal(sepia['--inkkscale'], '8');
+  assert.equal(pairs(drawingFlags({ ink: { color: 'black' }, stages: { finishInk: { method: 'architecture' } } }))['--inkkscale'], undefined);
+});
+
+test('stages: contradictions and unknown names are refused with the field named', () => {
+  assert.throws(() => drawingFlags({ stages: { prepInk: { from: 'prep' } } }), /needs a prep stage/);
+  assert.throws(() => drawingFlags({ stages: { finishInk: { from: 'prepInk' } } }), /needs a prepInk stage/);
+  assert.throws(() => drawingFlags({ stages: { sketch: true } }), /drawing.stages/);
+  assert.throws(() => drawingFlags({ stages: {} }), /at least one/);
+  assert.throws(() => drawingFlags({ closingLines: 0, stages: { prepInk: true } }), /closingLines and stages/);
+  assert.throws(() => drawingFlags({ medium: 'graphite', stages: { prepInk: true } }), /stages.prep/);
+  assert.throws(() => drawingFlags({ stages: { prepInk: { method: 'hatch' } } }), /prepInk.method/);
+  assert.throws(() => drawingFlags({ stages: { finishInk: { restate: 3 } } }), /finishInk.restate/);
+});
+
+test('source and ink: the line source, the colour and waterproof ink', () => {
+  assert.deepEqual(drawingFlags({ source: 'source-ink' }), ['--linesource', 'source-ink']);
+  assert.deepEqual(drawingFlags({ source: 'auto' }), []);
+  assert.deepEqual(drawingFlags({ ink: { color: 'black', waterproof: true } }), ['--inkprofile', 'black-ink', '--inkfast', '1']);
+  assert.deepEqual(drawingFlags({ ink: { color: 'sepia' } }), ['--inkprofile', 'sepia-ink']);
+  assert.throws(() => drawingFlags({ source: 'hed' }), /drawing.source/);
+  assert.throws(() => drawingFlags({ ink: { waterproof: 'yes' } }), /waterproof/);
+  assert.throws(() => drawingFlags({ inkColor: 'black', ink: { color: 'sepia' } }), /disagree/);
+});

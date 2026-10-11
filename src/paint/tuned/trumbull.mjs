@@ -1,10 +1,9 @@
 // Settings fitted to Trumbull reference images, including examples/targets/trumbull.jpg
 // with examples/plans/trumbull-values.json. Limitations: docs/techniques.md.
 
-// The value plan subject that turns on the recess, shadow glaze, first-ink and stone mix rules.
-export const TRUMBULL_SUBJECT = 'Y1';
-// Value plan subjects that get TRUMBULL_PAINTS in the default recipe unless --paints is given.
-export const TRUMBULL_SUBJECTS = new Set(['Y1', 'subject-e']);
+// The rules below run only through presets (presets.mjs): --recesses 1 (architecture) turns on RECESS, and
+// --trumbullrules 1 (trumbull) the shadow glaze, first-ink and stone mix rules. The trumbull and trumbull-paints
+// presets set this paint box.
 export const TRUMBULL_PAINTS = 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen';
 
 // A dark recess (window, door, deep opening): brightest channel under `dark`, or blue over red by more than

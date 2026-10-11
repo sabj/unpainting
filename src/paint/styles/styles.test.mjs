@@ -4,12 +4,12 @@ import {loadStyle,loadSubjects,resolveStyle,STYLE_NAMES} from './loader.mjs';
 import {planLightToDark,selectValueInk,valueTechnique} from '../methods/light-to-dark.mjs';
 const inputs={w:12,h:12,k:1,demand:new Float32Array(144).fill(.5),density:new Float32Array(144).fill(.5)};
 const snapshot=(subject,selection)=>planLightToDark({...inputs,subject,styleSelection:selection}).instructions;
-test('changing subject-a style affects only subject-a plan',()=>{
+test('changing 1D style affects only 1D plan',()=>{
  const subjects=loadSubjects(); const before=Object.fromEntries(['subject-a','subject-c','Y2','Cape'].map(id=>[id,snapshot(id,subjects[id])]));
  subjects['subject-a']={style:'precise-watercolor',reason:'Isolation test changes this subject only',regions:{}};
  for(const id of ['subject-c','Y2','Cape'])assert.deepEqual(snapshot(id,subjects[id]),before[id]);
  assert.notDeepEqual(snapshot('subject-a',subjects['subject-a']),before['subject-a']);
- assert.equal(new Set(before['subject-a'].map(i=>i.valueBand)).size,2);
+ assert.equal(new Set(before['subject-a'].map(i=>i.valueBand)).size,5);
  assert.equal(new Set(before.Y2.map(i=>i.valueBand)).size,1);
 });
 test('profiles are independent, explicit and strict',()=>{
@@ -23,4 +23,21 @@ test('paper requirements and drawing follow selected profile',()=>{
  assert.deepEqual(selectValueInk([{points:[{x:0,y:0},{x:12,y:12}],outline:true}],{first:true,w:12,h:12,density:inputs.density,subject:'Cape'}),[]);
 });
 
-test('subject-a routes to ink-and-wash with sepia ink',()=>{const r=resolveStyle('subject-a');assert.equal(r.name,'ink-and-wash');assert.equal(r.pigment,'sepia');});
+test('1D routes to ink-and-wash with sepia ink',()=>{const r=resolveStyle('subject-a');assert.equal(r.name,'ink-and-wash');assert.equal(r.pigment,'sepia');});
+
+test('source pen contours survive adjacent reserved paper and short feature marks',()=>{
+ const paths=[{points:[{x:2,y:2},{x:3,y:2}]}],reserves=new Uint8Array(144).fill(1);
+ assert.equal(selectValueInk(paths,{first:true,w:12,h:12,density:inputs.density,reserves,sourceInk:true}).length,1);
+ assert.equal(selectValueInk(paths,{first:true,w:12,h:12,density:inputs.density,reserves}).length,0);
+});
+
+test('ink washes keep light and dark parts of one connected form in different nested masses',()=>{
+ const w=24,h=24,density=Float32Array.from({length:w*h},(_,i)=>i%w<12?.15:.8);
+ const p=planLightToDark({w,h,k:1,density,demand:density.slice(),subject:'unseen-ink-study',styleSelection:{style:'ink-and-wash',reason:'Connected light and dark planes'},shaped:true});
+ const mass=new Float32Array(w*h);
+ for(const l of p.layers)for(const s of l.shapes)for(let i=0;i<mass.length;i++)if(s.mask[i])mass[i]+=s.graded[i];
+ for(let i=0;i<mass.length;i++)assert(Math.abs(mass[i]-density[i])<1e-6);
+ const last=p.layers.filter(l=>l.value===5);
+ assert(last.length>0);
+ assert(last.every(l=>l.shapes.every(s=>s.mask.every((v,i)=>!v||i%w>=12))));
+});

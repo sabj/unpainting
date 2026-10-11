@@ -88,5 +88,10 @@
       "baseMove": "wet on dry"
     }
   ],
-  "reserves": []
+  "reserves": [],
+  "presets": [
+    "architecture",
+    "glaze-gains",
+    "trumbull"
+  ]
 }

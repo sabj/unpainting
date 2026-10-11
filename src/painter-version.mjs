@@ -9,15 +9,15 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** The painter version: planning, recipe, methods and techniques (src/paint). The internal V number. Bump it when they change. */
-export const PAINTER_VERSION = 'V096';
+export const PAINTER_VERSION = 'V097-dev';
 /** Simulation version for paper, water, pigment, brush and pen. Bump when src/media behavior changes.
  * The initial value is documented in docs/versions.md. */
-export const SIM_VERSION = '100';
+export const SIM_VERSION = '101';
 /** Benchmark panel, rubric and image protocol. Bump for any change to judging. */
 export const JUDGE_VERSION = 'J1';
 export const JUDGE_RE = /^J[1-9]\d*$/;
 
-export const PAINTER_RE = /^V\d{3,}$/;
+export const PAINTER_RE = /^V\d{3,}(?:-dev)?$/;
 export const SIM_RE = /^\d+$/;
 export const SEMVER_RE = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 

@@ -28,6 +28,8 @@ export function targetRegions({w,h,rgb,demand,k,density,families=[]}) {
 export function unsupportedAxisEdges(mask,w,h,rgb,{minimum=Math.max(12,Math.round(Math.min(w,h)*.08)),contrast=12}={}) {
   const supported=(x,y,vertical)=>{for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=x+dx,yy=y+dy,ax=xx-(vertical?1:0),ay=yy-(vertical?0:1);if(ax<0||ay<0||xx>=w||yy>=h)continue;let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[(yy*w+xx)*3+q]-rgb[(ay*w+ax)*3+q]));if(d>=contrast)return true;}return false;};
   const failures=[];
-  for(const vertical of [true,false]){const across=vertical?w:h,along=vertical?h:w;for(let a=1;a<across;a++){let start=-1;for(let b=0;b<=along;b++){const x=vertical?a:b,y=vertical?b:a,i=y*w+x,j=i-(vertical?1:w);const edge=b<along&&mask[i]!==mask[j]&&!supported(x,y,vertical);if(edge&&start<0)start=b;if(!edge&&start>=0){if(b-start>=minimum)failures.push({axis:vertical?'vertical':'horizontal',at:a,start,length:b-start});start=-1;}}}}
+  // The support test needs a full +/-2-cell neighbourhood plus the preceding
+  // sample. A clipped paper rim is not an internal passage seam.
+  for(const vertical of [true,false]){const across=vertical?w:h,along=vertical?h:w;for(let a=3;a<across-2;a++){let start=-1;for(let b=0;b<=along;b++){const x=vertical?a:b,y=vertical?b:a,i=y*w+x,j=i-(vertical?1:w);const edge=b<along&&mask[i]!==mask[j]&&!supported(x,y,vertical);if(edge&&start<0)start=b;if(!edge&&start>=0){if(b-start>=minimum)failures.push({axis:vertical?'vertical':'horizontal',at:a,start,length:b-start});start=-1;}}}}
   return failures;
 }

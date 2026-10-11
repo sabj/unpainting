@@ -99,7 +99,8 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 
 | Field | Type and meaning | Default if omitted |
 |---|---|---|
-| `subject` | string used for subject settings and style lookup in `src/paint/tuned/subjects.json` | no subject mapping |
+| `subject` | string used for the style lookup in `src/paint/tuned/subjects.json`; it turns on no fitted rule except under `--recipe v096` | no subject mapping |
+| `presets` | array of preset names from `src/paint/tuned/presets.mjs` (`architecture`, `glaze-gains`, `trumbull`, `trumbull-paints`, `portrait-3t`, `dog-1d`); their flags go after the recipe's, and an unknown name stops the run ([overfitting.md](overfitting.md)) | no presets |
 | `name` | string for the preview title | preview fallback title |
 | `photo` | source photo label in the preview; only its basename is used, and no photo is read | `unknown` |
 | `families` | array of descriptive region families, described below | empty array |
@@ -131,10 +132,40 @@ Line models (`tools/seg/lines.py`) only extract candidate lines. They are option
 | `amount` | 0 to 1 | the share of candidate lines drawn, strongest first (`--drawshare`). A line's strength is the model's mean response along it times its length. The opening and closing count caps become 100000 (`--openinglines` and `--closinglines`). Minimum lengths and other drawing filters still apply |
 | `lines` | `all`, `contours`, `subject`, `regions` | which candidates from a `--drawingfile`: `contours` leaves out dark fill (`--drawingskip "dark fill"`), `subject` leaves out setting lines (`--drawingskip setting`). `regions` ranks the lines by the region each lies in (`--drawregions 1`): head, face, hands and book first, then clothing, then the setting (chair, background and unknown regions), and lines in a dark wash last; strongest first inside a tier. It needs a line file whose lines carry a `region`, such as `tools/seg/ink-lines.mjs --regions` writes |
 | `maxLines` | whole number | the most candidate lines drawn, taken in the order above (`--drawmax`); without `regions`, the strongest. Lifts the opening and closing count caps like `amount` |
-| `weight` | 0 to 1 | how heavy the line is. 0 is the painter's default; 1 is the heaviest. It scales `--inkkscale` 1 to 8, `--drawwidthgain` 1.39 to 2, `--drawwant` 0.6 to 1 and `--closingpressure` 0.4 to 1 |
-| `closingLines` | 0 to 1 | how much the closing pen draws. 0 sets `--drawing first`, with no closing pen. Above 0 it sets `--closingedgemin` to 0.44 x (1 - closingLines), so 0.5 is the default 0.22 and 1 draws everywhere |
+| `weight` | 0 to 1 | how heavy the line is. 0 selects the light end of the explicit range; 1 is the heaviest. Omit the field to use the medium's default. It scales `--inkkscale` 1 to 8, `--drawwidthgain` 1.39 to 2, `--drawwant` 0.6 to 1 and `--closingpressure` 0.4 to 1 |
+| `closingLines` | 0 to 1 | how much the closing pen draws. 0 sets `--drawing first`, with no closing pen. Above 0 it sets `--closingedgemin` to 0.44 x (1 - closingLines), so 0.5 sets 0.22 and 1 removes that extra edge gate |
+| `source` | `auto`, `source-ink`, `photo-sketch` | where the line set comes from (`--linesource`): the target's own pen lines, or `tools/seg/sketch-lines.py` on a photograph. `auto` (the default recipe's) picks `source-ink` when the target shows 0.5% pen line or more, else `photo-sketch` when python3 with numpy and OpenCV is available, else the pen's own walk. A `--drawingfile` on the command line wins |
+| `ink` | `{ "color": "sepia" or "black", "waterproof": true or false }` | the ink (`--inkprofile`) and whether it sets before the washes (`--inkfast`). `waterproof` defaults to true for black and false for sepia |
+| `stages` | `{ "prep", "prepInk", "finishInk" }` | the linked drawing stages, any subset; see below. Not with `closingLines`, and not with `medium: "graphite"` (use `prep`) |
 
-A field left out, or set to `auto`, adds no flag. The painter's own default applies: `--outlinemedium auto` picks ink when the target shows its own pen line and graphite when it does not, with the default caps and pressure. A plan with no `drawing` section uses these defaults. A recipe is a preset of painter settings. The plan's flags go after the recipe's and before the command line's, so a flag on the command line still wins. Code: `src/paint/drawing-plan.mjs`.
+### Stages
+
+```json
+"drawing": { "source": "auto", "ink": { "color": "sepia" },
+  "stages": { "prep": { "amount": 0.5 },
+              "prepInk": { "from": "prep", "keep": 0.8, "add": 0.15, "method": "contour" },
+              "finishInk": { "from": "prepInk", "select": "both", "restate": 0.3, "method": "accent" } } }
+```
+
+A stage left out is not drawn; `true` takes its defaults. Prep uses amount 0.5; prep ink directly from lines keeps amount 1 without deviation; from pencil it keeps 0.8 and adds 0.15, with small bounded deviation. Finish restates 0.3. Zero shares produce zero marks. `from` defaults to the stage before it that is present.
+
+| stage | field | values | meaning |
+|---|---|---|---|
+| `prep` | `amount` | 0 to 1 | the share of the line set's length the pencil places, structure first |
+| `prepInk` | `from` | `prep`, `lines` | ink over the pencil, or straight from the line set |
+| | `keep`, `add` | 0 to 1 | the share of pencil lines inked (the rest stay pencil), and how many more lines to add, as a share of those kept |
+| | `amount` | 0 to 1 | with `from: "lines"`, the share of the line set's length inked |
+| | `method` | `contour`, `connected`, `scribble` | as planned; joined into walker gestures (`--drawinglogic 2`); fewer longer strokes with the lit edges open and the dark masses scribbled (`--drawinglogic 3`) |
+| | `deviate` | 0 to 1 | bounded variation; default 0 directly from lines, 0.25 over pencil |
+| `finishInk` | `from` | `prepInk`, `prep`, `lines` | which earlier lines it restates |
+| | `select` | `edges`, `darks`, `both` | where it restates: the target's strongest edges, its darks, or both |
+| | `restate` | 0 to 1 | the share of those lines restated |
+| | `method` | `accent`, `architecture` | the strongest part of each line, or whole lines at full pressure with widths from the target's darkness, and strong sepia |
+| | `masses` | `none`, `scribble` | `scribble` adds loose scribble over the dark masses (`--finishmasses 1`); default none |
+
+[ink.md](ink.md#linework-stages) says which stage and method fits which job. Code: `src/paint/methods/drawing-stages.mjs` and `linework-plan.mjs`.
+
+A field left out, or set to `auto`, adds no flag. The painter's own default applies: `--outlinemedium auto` picks ink when the target shows its own pen line and graphite when it does not, with the drawing limits and pressure appropriate to the medium. Source ink keeps the source/plan line budget and short marks; graphite keeps sparse construction-sketch limits. A plan with no `drawing` section uses these defaults. A recipe is a preset of painter settings. The plan's flags go after the recipe's and before the command line's, so a flag on the command line still wins. Code: `src/paint/drawing-plan.mjs`.
 
 For a pen-and-wash target, `tools/seg/ink-lines.mjs` takes the candidates from the target's own pen lines: the ink the separator in `src/crop/inkwash.mjs` estimates, traced to center lines and joined where pieces continue each other. With `--regions` it tags each line with the region it lies in, from the label map `tools/seg/subject-regions.py` writes (Mask R-CNN for the person, Segment Anything for named parts). A plan uses them with `lines: "regions"` and `maxLines`.
 
