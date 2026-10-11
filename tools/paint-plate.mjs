@@ -74,7 +74,7 @@ import { accentCells, accentFamilies } from '../src/paint/methods/final-darks.mj
 import { blockInPigments, gradeSmoothPassages, dropMask } from '../src/crop/blockin.mjs';
 import { choosePlateMixes, toMixAmounts, panMix } from '../src/crop/mixes.mjs';
 import { shapeDeficit, shapeCharge, shapeOwedColour } from '../src/paint/methods/shape-deficit.mjs';
-import { washPaths, brushedWashPaths, sweepCover, sweepCount, setSweepIntervals, containPaths, gradientSweepAngle, openEdgeShare, prewetArea, softArcs, soften } from '../src/media/wash.mjs';
+import { washPaths, brushedWashPaths, sweepCover, sweepCount, setSweepIntervals, setFlowRectangle, containPaths, gradientSweepAngle, openEdgeShare, prewetArea, softArcs, soften } from '../src/media/wash.mjs';
 import { loadSubject, splitFirstWash, softenFirstWash } from '../src/paint/methods/first-wash.mjs';
 import { faceDetail } from '../src/paint/techniques/face-detail.mjs';
 import { measureLine, pencilDraw as physicalPencilDraw } from '../src/paint/methods/pencil-line.mjs';
@@ -190,6 +190,8 @@ const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
 const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
 const SPEED_COVERAGE = num('speedcoverage', 0) > 0;
 setSweepIntervals(SPEED_COVERAGE);
+const SPEED_FLOW_RECT = num('speedflowrect', 0) > 0;
+setFlowRectangle(SPEED_FLOW_RECT, num('speedprofile', 0) > 0 ? ({ milliseconds }) => SPEED_PROFILE?.add('painting:flow-field', milliseconds) : null);
 const SPEED_FILM = num('speedfilm', 0) > 0;
 const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 0) > 0;
 const measurePaper = (target, cells, paperOnly = false) => physicalMeasurePaper(target, cells, paperOnly, { uniform: SPEED_UNIFORM_PAPER });
