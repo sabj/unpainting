@@ -3,13 +3,13 @@
 // the one read.
 //
 // default: general watercolor methods only: light-to-dark value planning with shaped marks and clean-colour passages,
-// four middle layers, two touch-up rounds, a round of final darks and a drawing first and last, on physical cold-press paper. No value in it was fitted to one
+// four middle layers, two touch-up rounds and a drawing first and last, on physical cold-press paper. No value in it was fitted to one
 // benchmark image. The plan's drawing section chooses the medium, amount and weight of that drawing
 // (drawing-plan.mjs); without one the painter picks graphite or ink from the image. The subject's own inputs stay on
 // the command line: --valueplan, --drawingfile, --drawinglast and --sheetmm. --recipe none paints with the bare
 // defaults, as does an --areaplan run that names no recipe.
 //
-// v096: the default recipe until 2026-10-10, kept so the README hero, benchmark records and examples repeat exactly. It
+// v096: the default recipe until 2026-10-10, kept to preserve historical recipe flags. Exact historical output requires the v0.1.0 tag. It
 // adds the tuned flags (tuned/default-flags.mjs) and sky lanes to every subject, and applies the per-subject presets V096
 // applied by itself when the plan names Y1, Y4, 3T or 1D (tuned/presets.mjs).
 //
@@ -27,7 +27,7 @@ import { drawingFlags } from './drawing-plan.mjs';
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 1 --layerhue 1 --drawing both --sourcelines 1 --linesource auto --frames 8 --marks 1';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 1 --linesource auto --frames 8 --marks 1';
 // Clean colour (light-to-dark.mjs): first washes and middle layers mixed per colour family, saturated and muted
 // families apart, each passage charged at its median with the rest carried to the next band, carried glazes placed at
 // brush scale, and pale planes kept to one wash.

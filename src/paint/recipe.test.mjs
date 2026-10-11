@@ -68,3 +68,10 @@ test('the default recipe draws the source\'s own ink lines when no line file is 
   const { argv } = expandRecipe({ argv: [] });
   assert.equal(argv[argv.lastIndexOf('--sourcelines') + 1], '1');
 });
+
+// The full held-out Guardi run exposed heavy isolated accents with automatic final darks.
+test('final darks require an explicit choice and command-line choices win', () => {
+  const value = args => {const {argv} = expandRecipe({argv: args}); return argv[argv.lastIndexOf('--finaldarks') + 1];};
+  assert.equal(value([]), '0');
+  assert.equal(value(['--finaldarks', '1']), '1');
+});

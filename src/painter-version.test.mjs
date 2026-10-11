@@ -34,3 +34,9 @@ test('inside this checkout the commit is a sha', () => {
   const c = commit();
   if (c !== null) assert.match(c, /^[0-9a-f]{40}(-dirty)?$/);
 });
+
+test('development painter stamps validate without accepting arbitrary suffixes', () => {
+  assert.match('V097-dev', PAINTER_RE);
+  assert.match('V096', PAINTER_RE);
+  for (const bad of ['V97-dev', 'V097-foo', 'V097-dev-extra']) assert.equal(PAINTER_RE.test(bad), false);
+});
