@@ -203,6 +203,9 @@ if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
 // Diagnostic counters preserve dispatch ordering; GPU times are sampled, not serialized.
 process.env.GPU_FUSE_WETSCAN = String(num('speedscan', 1));
 process.env.GPU_EDGE_PINGPONG = String(num('speededge', 1));
+// 1: fused single-workgroup wet frontier; 0: parallel three-dispatch build.
+// Both construct the same active tile set and retain the same cell arithmetic.
+process.env.GPU_SPARSE_ALL = String(num('speedfrontier', 1));
 // Parallel optics improved the 540-cell runs; native-size trials showed no gain.
 const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrenderthreads', opt('gpu', 'auto') === 'off' || num('width', 700) > 540 ? 1 : Math.min(4, availableParallelism())))));
 process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';
