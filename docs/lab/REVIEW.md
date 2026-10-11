@@ -56,3 +56,28 @@ Fresh Chrome checks used real pointer strokes and the live simulation in both We
 Validation: `npm test` (854 passed, 3 skipped, 0 failed), `npm run bench:test` (36 passed), and `node tools/lab/build-site.mjs` (159 files). Local evidence and browser scripts are in `output/playwright/{brush,playback,scratch}-results.json`, `check-{brush,playback,scratch}.mjs`, and the corresponding screenshots in this verification worktree.
 
 No requested behavior was omitted. The old generic replay-circle drawing was deliberately not restored: main's outline follows the actual applied contact, including clipping and depletion. This verification changes documentation only.
+
+## Wet hand-brush feed and stroke-start reload — 2026-10-10
+
+Measured from `e05a78a` before changing the Lab settings. Slow feed was most visible at scratch resolution: round outer hairs crossed below free-liquid saturation while the belly still held paint. At ordinary sheet resolution a fresh wet brush retained coverage, but lane pigment varied. The separate 20% reload threshold let partially spent loads begin long washes.
+
+`handBrushOptions` now uses feed 0.6 for wet loads (Water >= 0.4), retaining 0.06 for blotted loads. Transfers still debit water and pigment from the finite belly. Capacity, belly size, contact physics and painter defaults are unchanged. Auto re-dip starts each wet visitor stroke with a fresh palette load; manual mode and low-water dry brush retain their remaining load. Neither mode adds water during an uninterrupted stroke. Sheet and scratch both consume this helper. The faster feed lays more liquid and therefore spends a load sooner: at Water 2 the broad-area test now expects two even sweeps before the third begins thinning.
+
+Reproduce the feed comparison with `node tools/lab/measure-load.mjs`. Cold-press paper, 25 mm brush, pressure 0.8, seed 149, pigment concentration 0.5; pointer segments are two cells long. Sample the inner 65% of the radius, in bands along a 24-inch stroke, before paper flow. Lane CV is standard deviation / mean of pigment per transverse lane; maxima below are over bands with 15–80% load remaining.
+
+| Round brush measurement | Feed 0.06 | Wet feed 0.6 |
+| --- | ---: | ---: |
+| Mid Water 1.5, scratch 15 dpi, worst lane CV | 20.67% | 1.89% |
+| Mid Water 1.5, sheet 60 dpi, worst lane CV | 4.80% | 1.46% |
+| Full Water 3, scratch 15 dpi, worst lane CV | 14.77% | 2.65% |
+| Full Water 3, sheet 60 dpi, worst lane CV | 5.42% | 1.75% |
+| Loaded interior coverage, all these cases | 100% | 100% |
+| Dry hairs while loaded, scratch mid/full | up to 2 | 0 |
+
+Mid-water breakup begins with under 3.1% load remaining across round/flat brushes at 15, 60 and 90 dpi. Low Water 0.15 is numerically unchanged: initial round-brush coverage is 21.7%, 32.1% and 38.7% respectively, then fades.
+
+For the reload regression, scale a dipped 10 mm brush's water and pigment to 25% or 40%, retaining Water 2, then paint from x=20 to 700 on a 720-cell, 90 dpi sheet. At 25%, the old policy's final interior coverage was 15.5% round / 16.9% flat; fresh stroke-start loads give 100% for both. The 40% fixture already reached 100%, but now also reloads. Tests cover both Water 2 and 3, both brush shapes, both remaining-load fractions, and manual/dry reload exceptions.
+
+Browser verification used actual pointer drags in Chromium with WebGPU sheet physics and the CPU scratch canvas: a full-water sheet wash and 720-CSS-pixel scratch stroke remained continuous (100% sampled interior coverage). An uninterrupted manual mid-water stroke stayed solid, then faded into broken texture on both surfaces. Screenshots were reviewed at native browser size. `src/media/brush.mjs` and its generated Lab copy remain unchanged; `node tools/lab/sync-site-media.mjs --check` passes.
+
+Validation: `npm test` — 878 passed, 3 skipped; `npm run bench:test` — 36 passed. Initial benchmark attempts hit sandbox worktree restrictions and disk exhaustion; the final complete run passed with temporary worktree access and available disk space.

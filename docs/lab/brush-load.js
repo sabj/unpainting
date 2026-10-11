@@ -6,13 +6,15 @@ export function handBrushOptions(t, { dpi = 60, res = dpi / 60, seed = 3 } = {})
   const water = Math.max(0, t.water);
   return { flat, radius, bristles: Math.max(12, Math.round(radius * (flat ? 2.3 : 2))),
     capacity: 32 * res, belly: 1 + 4 * water * Math.min(water, 1),
-    feed: 0.06, give: 0.8, free: 0.4, film: 0.25, seed, model: t.model ?? 'row' };
+    // Wet hairs wick quickly from the finite belly; blotted loads retain slow dry-brush feed.
+    feed: water >= 0.4 ? 0.6 : 0.06, give: 0.8, free: 0.4, film: 0.25, seed, model: t.model ?? 'row' };
 }
 
 export const brushWater = b => b.resW + b.hairs.reduce((sum, h) => sum + h.water, 0);
 
 // Called only between visitor strokes; recorded tapes retain their explicit dips.
+// A wet wash starts with a palette load, even if the previous stroke left 25–40%.
+// Blotted/dry brushes keep their finite load until the visitor explicitly re-dips.
 export function needsRedip(b, enabled = true) {
-  const full = b.load * b.capacity * (b.hairs.length * b.belly + b.hairs.reduce((sum, h) => sum + h.len, 0));
-  return enabled && full > 0 && brushWater(b) < full * 0.2;
+  return enabled && b.load >= b.free;
 }
