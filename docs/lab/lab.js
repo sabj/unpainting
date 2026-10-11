@@ -527,7 +527,7 @@ worker.addEventListener('message', ({ data }) => {
     dryingLabel.title = 'Share of the peak wet area that has dried';
     lab.gpuSteps = data.gpuSteps; lab.gpuFrameMs = data.gpuFrameMs; lab.wet = Boolean(data.wet);
     lab.lastTool = data.lastTool;lab.load=data.load;lab.replayPoint=data.replayPoint;
-    document.getElementById('load-state').textContent=data.load?`Water ${data.load.water.toFixed(1)} · paint ${data.load.pigment.toFixed(1)} · ${settings.autoRedip?'auto re-dip when low':'re-dip when dry'}`:'';
+    document.getElementById('load-state').textContent=data.load?`Water ${data.load.water.toFixed(1)} · paint ${data.load.pigment.toFixed(1)} · ${settings.autoRedip?'auto re-dip each wet stroke':'manual re-dip'}`:'';
     if(lab.mode==='live'&&playing)filmCanvas.hidden=true;
 
     lab.frames++; if (data.gpuDrawn) lab.gpuDrawnEpoch = data.gpuDrawn; lab.workerRenderMs = data.renderMs; lab.workerRenders = data.renderCount;

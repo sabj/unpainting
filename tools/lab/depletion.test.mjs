@@ -5,6 +5,7 @@ import {createBrush,dip,stroke} from '../../src/media/brush.mjs';
 import {createPen,dipPen,penStroke} from '../../src/media/pen.mjs';
 import {handBrushOptions,needsRedip} from '../../docs/lab/brush-load.js';
 import {paperOptions} from '../../docs/lab/media/papers.js';
+import {measureLoad} from './measure-load.mjs';
 const pigment={K:[.4,.6,.9],S:[.01,.01,.01],rho:.05,omega:1.4,gamma:.15};
 const sum=a=>a.reduce((s,v)=>s+v,0),water=b=>b.resW+sum(b.hairs.map(h=>h.water)),paint=b=>sum(b.resP)+sum(b.hairs.map(h=>sum(h.pig)));
 const path=Array.from({length:17},(_,j)=>[{x:j%2?280:20,y:12+j*10,p:.8,v:.3},{x:j%2?20:280,y:12+j*10,p:.8,v:.3}]).flat();
@@ -37,19 +38,19 @@ for(const tool of ['round','flat'])test(`one loaded ${tool} brush glazes a broad
  const s=createSheet(labPaper(),[pigment]);
  const b=createBrush(handBrushOptions({tool,sizeMm:25,water:2},{seed:149}));
  dip(b,{water:2,conc:[.08]});const initial=water(b),bands=[];
- assert.equal(needsRedip(b),false);
- for(let j=0;j<3;j++){stroke(b,s,sweep(j));bands.push(band(s,j));}
- // Three 178 mm sweeps from one dip: at least 30% of an 8 x 6 inch sheet.
+ assert.equal(needsRedip(b),true);
+ for(let j=0;j<2;j++){stroke(b,s,sweep(j));bands.push(band(s,j));}
+ // Faster wet feed spends one finite load sooner: two broad, even sweeps.
  for(const r of bands){assert.ok(r.wet>.95,`${tool} wet coverage ${r.wet}`);assert.ok(r.film>.1);}
- assert.ok(bands[2].pigment/bands[0].pigment>.85,'glaze concentration stays even');
+ assert.ok(bands[1].pigment/bands[0].pigment>.85,'glaze concentration stays even');
  const wetArea=()=>s.W.reduce((n,w)=>n+(w>.02),0);
- assert.ok(wetArea()>s.n*.3,`${wetArea()} wet cells`);
+ assert.ok(wetArea()>s.n*.2,`${wetArea()} wet cells`);
  for(let i=0;i<10;i++)step(s,{dt:.3});
- assert.ok(wetArea()>s.n*.3,'water survives settling on the paper');
- assert.ok(water(b)<initial*.2,'load really leaves the brush');
+ assert.ok(wetArea()>s.n*.2,'water survives settling on the paper');
+ assert.ok(water(b)<initial*.5,'load really leaves the brush');
  assert.equal(needsRedip(b),true,'next visitor stroke can re-dip');
  assert.equal(needsRedip(b,false),false,'manual depletion mode does not re-dip');
- for(let j=3;j<6;j++)stroke(b,s,sweep(j));
+ for(let j=2;j<6;j++)stroke(b,s,sweep(j));
  assert.ok(water(b)<initial*.01,'continued painting without a dip runs out');
  assert.ok(band(s,5).pigment<bands[0].pigment*.01,'late stroke fades');
 });
@@ -60,4 +61,46 @@ test('the low-water hand brush skips the tooth and runs dry within one sweep',()
  assert.ok(first.painted>.05&&first.painted<.5,`broken tooth contact ${first.painted}`);
  assert.equal(first.wet,0);assert.ok(water(b)<initial*.1);
  stroke(b,s,sweep(1));assert.ok(band(s,1).pigment<first.pigment*.1);
+});
+
+// Check transverse paint uniformity as well as bare-paper coverage: a striped
+// wash can still put a trace of pigment in every cell.
+for(const dpi of [15,60,90])for(const tool of ['round','flat'])for(const water of [1.5,3])
+ test(`${tool} at water ${water}, ${dpi} dpi keeps loaded lanes even along a long stroke`,()=>{
+  const r=measureLoad({dpi,tool,water});
+  const loaded=r.bands.filter(b=>b.before<.8&&b.left>.15);
+  assert.ok(loaded.length>3);
+  for(const b of loaded){
+   assert.ok(b.coverage>.99,`coverage ${b.coverage} at load ${b.left}`);
+   assert.ok(b.laneCV<.04,`lane variation ${b.laneCV} at load ${b.left}`);
+   assert.equal(b.dryHairs,0,'loaded belly keeps all hairs wet');
+  }
+  const gap=r.bands.find(b=>b.coverage<.95);
+  if(gap)assert.ok(gap.before<.08,`breakup starts only near empty: ${gap.before}`);
+  if(water===1.5){assert.ok(gap,'finite load eventually breaks up');assert.ok(r.remaining<.01);}
+ });
+for(const dpi of [15,60,90])test(`low water retains dry-brush breakup at ${dpi} dpi`,()=>{
+ const {bands}=measureLoad({dpi,water:.15});
+ assert.ok(bands[0].coverage>.05&&bands[0].coverage<.5);
+ assert.ok(bands.at(-1).mass<bands[0].mass*.05);
+});
+for(const fraction of [.25,.4])for(const tool of ['round','flat'])for(const water of [2,3])test(`${tool} water ${water} wash re-dips from ${fraction*100}% and covers the sheet through its end`,()=>{
+ const b=createBrush(handBrushOptions({tool,sizeMm:10,water},{dpi:90,seed:149}));
+ dip(b,{water,conc:[.5]});
+ b.resW*=fraction;b.resP=b.resP.map(p=>p*fraction);
+ for(const h of b.hairs){h.water*=fraction;h.pig=h.pig.map(p=>p*fraction);}
+ assert.equal(needsRedip(b,false),false,'manual mode keeps the remaining load');
+ assert.equal(needsRedip(b),true,'auto mode returns to the palette each wet stroke');
+ if(needsRedip(b))dip(b,{water,conc:[.5]});
+ const s=createSheet({...makePaper(720,100,paperOptions('cold',90,7)),mmPerCell:25.4/90},[pigment]);
+ for(let x=20;x<700;x+=4)stroke(b,s,[{x,y:50,p:.8},{x:x+4,y:50,p:.8}],{lift:false});
+ for(let x=660;x<696;x++)for(let y=43;y<57;y++){
+  const i=y*s.w+x;assert.ok(s.G[0][i]+s.D[0][i]+s.P[0][i]>1e-5,`end gap at ${x},${y}`);
+ }
+});
+test('auto re-dip leaves a blotted brush finite',()=>{
+ const b=createBrush(handBrushOptions({tool:'round',sizeMm:10,water:.15}));
+ dip(b,{water:.15,conc:[.5]});assert.equal(needsRedip(b),false);
+ b.resW=0;for(const h of b.hairs)h.water=0;
+ assert.equal(needsRedip(b),false);
 });
