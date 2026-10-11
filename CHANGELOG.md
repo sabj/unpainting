@@ -7,11 +7,11 @@ Releases are plain semver, with a git tag per release. Each release names its pa
 Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publication.
 
 - Port consolidated linework, linked pencil/opening/finish stages, structural planning and ink/wash consistency tools onto the squashed public history. Preserve long-line ink delivery and replay order.
-- Move fitted settings into explicit presets and restore source-line routing. The V096 recipe remains available; use the v0.1.0 tag for exact historical simulation.
+- Move fitted settings into explicit presets and add explicit source-line routing. The V096 recipe remains available; use the v0.1.0 tag for exact historical simulation.
 - Add clean-colour family washes, median charges with carried demand, pale-plane washes and optional connected wet sessions.
 - Add opt-in subject ordering (`--subjectorder`, plan `subjectOrder`); zero retains whole-sheet ordering.
 - Support hole rims, Marangoni flow and slope on the GPU. Physics options remain off by default.
-- Keep the final-dark pass opt-in after excessive accents in held-out Guardi output. Photo-map smoothing and linked pencil/finish ink remain deliberate planner choices.
+- Keep the final-dark pass and automatic source-line extraction opt-in after excessive accents and figure blotting in held-out Guardi output. Photo-map smoothing and linked pencil/finish ink remain deliberate planner choices.
 - Preserve small closed contours across Python thinning backends.
 
 ## 0.1.0 - 2026-10-10

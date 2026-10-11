@@ -64,9 +64,12 @@ test('an unseen ink-and-wash plan uses source paper and a lean palette, with exp
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
 
-test('the default recipe draws the source\'s own ink lines when no line file is given', () => {
+test('source extraction stays opt-in when no line file is given', () => {
   const { argv } = expandRecipe({ argv: [] });
-  assert.equal(argv[argv.lastIndexOf('--sourcelines') + 1], '1');
+  assert.equal(argv[argv.lastIndexOf('--sourcelines') + 1], '0');
+  assert.equal(argv[argv.lastIndexOf('--linesource') + 1], 'none');
+  const explicit = expandRecipe({ argv: ['--linesource', 'source-ink'] }).argv;
+  assert.equal(explicit[explicit.lastIndexOf('--linesource') + 1], 'source-ink');
 });
 
 // The full held-out Guardi run exposed heavy isolated accents with automatic final darks.
