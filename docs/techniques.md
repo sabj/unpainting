@@ -106,7 +106,7 @@ Modules, with their flags:
 - `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.
 - `methods/wetdry.mjs` (always on): paper wetness, brush load and waiting for the paper to dry.
 
-`--holefill` and `--holerim` work around a known drying weakness. They are off by default and run on the CPU only. See [future idea 8](future-ideas.md#8-edge-drying-that-knows-how-much-water-there-is).
+`--holefill` and `--holerim` work around a known drying weakness. They are off by default and run on the CPU and the GPU. See [future idea 8](future-ideas.md#8-edge-drying-that-knows-how-much-water-there-is).
 
 ## Targeted techniques
 

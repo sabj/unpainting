@@ -35,8 +35,9 @@ export async function openGpu(gpu) {
 
 const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntiles', 'u'], ['K', 'u'], ['hasTop', 'u'], ['holdOn', 'u'], ['cap', 'u'], ['nAct', 'u'], ['p3', 'u'],
   ...['dt', 'evap', 'edgeEvap', 'edgeWidth', 'capE', 'absorb', 'film', 'flow', 'ff', 'flowDepth', 'diffuse', 'cd', 'settle', 'liftDepth', 'rewetLift', 'granFill', 'holdCap', 'slide', 'slideFill', 'capStep', 'capEps', 'capDelta', 'sizing', 'wickFilter', 'wetEps', 'paperDry', 'capSigma', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre',
-  // encloseEase and slideCap, holeFill in cells; a pad keeps the pigment table that follows on a 16-byte boundary
-  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'padC', 'padD'].map(k => [k, 'f'])];
+  // encloseEase and slideCap, holeFill and holeSpan in cells, marangoni and slope; pads keep the pigment table that
+  // follows on a 16-byte boundary
+  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'padD', 'padE'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UBYTES = UF.length * 4 + 512 + 64; const UBYTES_EXPORT = UBYTES;
@@ -84,8 +85,6 @@ export class GpuSheet {
   async init(device, sheet, o) {
     this.allocationGeneration=(this.allocationGeneration??0)+1;
     this.demandSetup=null;this.demandSetupCount=0;
-    if ((o.marangoni ?? 0) !== 0 || (o.slope ?? 0) !== 0) throw new Error('GpuSheet: marangoni and slope must be 0 (the V071 recipes use neither)');
-    if ((o.holeSpan ?? 0) !== 0) throw new Error('GpuSheet: holeSpan (--holerim) is not on the GPU; run it with --gpu off');
     const { w, h, n, K, paper } = sheet, d = device;
     if (K > 16) throw new Error('GpuSheet: at most 16 pigments');
     this.resident = process.env.GPU_RESIDENT === '1';
@@ -176,6 +175,7 @@ export class GpuSheet {
       capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? 0.85, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
       enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: this.workers, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03,
+      holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length;
     const gran = o.gran ?? 1, scour = o.scour ?? 0;

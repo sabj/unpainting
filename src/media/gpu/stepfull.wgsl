@@ -4,7 +4,7 @@ const FIXED_BED: bool = false;
 // A whole stepBox (sheet.mjs) as gathers on 16x16 tiles: edge distance, drying and absorption, flow with pigment
 // transport, pigment exchange, slide, capillary spread, wet fronts. The JS driver prepends `struct U` and the
 // uniform binding (see stepfull.mjs). Tiles that hold or border water are listed each step (tiles_*), the other kernels
-// run on that list by indirect dispatch, so a small wet passage costs a small dispatch. marangoni and slope are 0.
+// run on that list by indirect dispatch, so a small wet passage costs a small dispatch.
 //
 // Reads of a neighbour's scratch (flux, budget) are guarded by the neighbour's wet mask: scratch outside the active
 // tiles is stale, and a face only exists between two wet cells.
@@ -183,7 +183,13 @@ fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
 // Edge distance
 fn edgeAt(j: u32, prev: u32) -> f32 {   // prev: 0 = first pass (nothing computed yet), 1 = read EA, 2 = read EB
   if (M[j] == 1u) { if (prev == 0u) { return u.capE; } if (prev == 1u) { return EA[j]; } return EB[j]; }
-  return select(0.0, u.capE, EVER[j] == 1u);
+  return select(0.0, u.capE, EVER[j] == 1u || heldRim(j % u.w, j / u.w));
+}
+// holeSpan (sheet.mjs, --holerim): a dry cell the wash holds on all four sides within holeSpan cells (water now, or
+// paper the wash has covered) is not a drying edge. Read only at the dry neighbours of wet cells, as on the CPU.
+fn heldRim(x: u32, y: u32) -> bool {
+  if (u.holeSpan <= 0.0) { return false; }
+  return heldHoleOf(x, y, u32(u.holeSpan), true);
 }
 fn edgeNew(c: Cx, prev: u32) -> f32 {
   var e = u.capE;
@@ -242,6 +248,7 @@ fn faces_tile(wid: vec3<u32>, lid: vec3<u32>) {
       let m = max(wi, wj) / u.flowDepth;
       let rate = min(0.25, max(0.0, p * u.flow * select(m * m, 1.0, m >= 1.0)));
       fx = rate * (wi - wj);
+      if (u.slope != 0.0 || u.mar != 0.0) { fx = faceDrive(i, i + 1u, wi, wj, p, rate); }
     }
     if (c.y < u.h - 1u && M[i + u.w] == 1u) {
       let wj = W[i + u.w];
@@ -249,6 +256,7 @@ fn faces_tile(wid: vec3<u32>, lid: vec3<u32>) {
       let m = max(wi, wj) / u.flowDepth;
       let rate = min(0.25, max(0.0, p * u.flow * select(m * m, 1.0, m >= 1.0)));
       fy = rate * (wi - wj);
+      if (u.slope != 0.0 || u.mar != 0.0) { fy = faceDrive(i, i + u.w, wi, wj, p, rate); }
     }
   }
   FX[i] = fx; FY[i] = fy;
@@ -505,18 +513,26 @@ fn p5a_tile(wid: vec3<u32>, lid: vec3<u32>) {
 // the value a raster-order walk sees for cell j when it is at cell i: cells before i are final, cells after are not
 fn sSeen(j: u32, i: u32) -> f32 { return select(S[j], S2[j], j < i); }
 // water (M) within R cells of (x, y) in each of the four directions (sheet.mjs heldHole with ever = M)
-fn heldHole(x: u32, y: u32, R: u32) -> bool {
+fn heldHole(x: u32, y: u32, R: u32) -> bool { return heldHoleOf(x, y, R, false); }
+// sheet.mjs heldHole: water, or with `ever` also paper the wash has covered, within R cells in each of the four directions
+fn heldHoleOf(x: u32, y: u32, R: u32, ever: bool) -> bool {
   for (var d = 0u; d < 4u; d++) {
     var held = false;
     for (var k = 1u; k <= R; k++) {
       var xx = i32(x); var yy = i32(y);
       if (d == 0u) { xx += i32(k); } else if (d == 1u) { xx -= i32(k); } else if (d == 2u) { yy += i32(k); } else { yy -= i32(k); }
       if (xx < 0 || yy < 0 || xx >= i32(u.w) || yy >= i32(u.h)) { break; }
-      if (M[u32(yy) * u.w + u32(xx)] != 0u) { held = true; break; }
+      let j = u32(yy) * u.w + u32(xx);
+      if (M[j] != 0u || (ever && EVER[j] != 0u)) { held = true; break; }
     }
     if (!held) { return false; }
   }
   return true;
+}
+// a wet cell among the four neighbours of (x, y)
+fn wetBeside(x: u32, y: u32) -> bool {
+  let i = y * u.w + x;
+  return (x > 0u && M[i - 1u] == 1u) || (y > 0u && M[i - u.w] == 1u) || (x < u.w - 1u && M[i + 1u] == 1u) || (y < u.h - 1u && M[i + u.w] == 1u);
 }
 fn p5b_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }
@@ -613,6 +629,8 @@ fn edge_phase1_tile(wid: vec3<u32>, lid: vec3<u32>, li: u32) {
       let j = u32(gy) * u.w + u32(gx);
       wet = select(0u, 1u, M[j] == 1u);
       v = select(0.0, u.capE, M[j] == 1u || EVER[j] == 1u);
+      // a held hole (holeSpan) reads as covered paper; only a dry cell beside a wet one is ever read
+      if (v == 0.0 && u.holeSpan > 0.0 && wetBeside(u32(gx), u32(gy)) && heldRim(u32(gx), u32(gy))) { v = u.capE; }
     }
     eCur[q] = v; eWet[q] = wet;
   }
@@ -660,6 +678,7 @@ fn faceX(a: u32) -> f32 {
   let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[a].x);
   let m = max(wi, wj) / u.flowDepth;
   let rate = min(0.25, max(0.0, p * u.flow * select(m * m, 1.0, m >= 1.0)));
+  if (u.slope != 0.0 || u.mar != 0.0) { return faceDrive(a, a + 1u, wi, wj, p, rate); }
   return rate * (wi - wj);
 }
 fn faceY(a: u32) -> f32 {
@@ -667,7 +686,21 @@ fn faceY(a: u32) -> f32 {
   let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[a].y);
   let m = max(wi, wj) / u.flowDepth;
   let rate = min(0.25, max(0.0, p * u.flow * select(m * m, 1.0, m >= 1.0)));
+  if (u.slope != 0.0 || u.mar != 0.0) { return faceDrive(a, a + u.w, wi, wj, p, rate); }
   return rate * (wi - wj);
+}
+// sheet.mjs flow with slope and marangoni: the surface is the water plus slope x the paper's height, and paint's binder
+// pulls the water towards cleaner water beside it (Marangoni), by the pigment concentration as the binder's stand-in
+fn concAt(i: u32) -> f32 {
+  let wi = W[i]; if (wi < 1e-4) { return 0.0; }
+  var c = 0.0; for (var ka = 0u; ka < u.nAct; ka++) { c += G[klAt(ka) * u.n + i]; }
+  return min(2.0, c / wi);
+}
+fn faceDrive(i: u32, j: u32, wi: f32, wj: f32, p: f32, rate: f32) -> f32 {
+  let hi = wi + u.slope * PAPER3[i].z;
+  var f = rate * (hi - wj - u.slope * PAPER3[j].z);
+  if (u.mar != 0.0) { f += p * u.mar * (concAt(i) - concAt(j)) * min(wi, wj); }
+  return f;
 }
 fn faces_wsc_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }

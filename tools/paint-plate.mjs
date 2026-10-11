@@ -1289,9 +1289,9 @@ const OUT_W = INKRES ? INKRES.width : W2, OUT_H = INKRES ? INKRES.height : H2;
 const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', 0.0012), gran: num('gran', 0.25), granFill: num('granfill', 0), ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}), ...(num('slidecap', 0) > 0 ? { slideCap: num('slidecap', 0) } : {}),
   ...(num('holerim', 0) > 0 ? { holeSpan: Math.max(1, Math.round(num('holerim', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}),
   ...(num('holefill', 0) > 0 ? { holeFill: Math.max(1, Math.round(num('holefill', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}) };
-// --holefill mm: a dry hollow the wash surrounds within mm fills where it is lower than the wet paper beside it (CPU only).
+// --holefill mm: a dry hollow the wash surrounds within mm fills where it is lower than the wet paper beside it.
 // --slidecap c: settled grains rolling into hollows may not reverse the slope they rolled down (src/media/sheet.mjs).
-// --holerim mm: a dry hole the wash holds on all four sides within mm dries without a dark rim (CPU only).
+// --holerim mm: a dry hole the wash holds on all four sides within mm dries without a dark rim.
 // Each is set only when used.
 // --gpu auto|on|off: sheet backend (Metal on Macs via optional `webgpu`); auto falls back to CPU. Written to backend.json.
 // --layercache check: every cached layer sum and render is also worked out the plain way and compared (slow; a test)
