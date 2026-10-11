@@ -72,7 +72,7 @@ def make_bundle(tree, extra, path):
 SETUP = r"""set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq xz-utils curl git libatomic1 ffmpeg bc libegl1 libgl1 libvulkan1 vulkan-tools ca-certificates python3 >/dev/null
+apt-get install -y -qq xz-utils curl git libatomic1 ffmpeg bc libegl1 libgl1 libvulkan1 vulkan-tools ca-certificates python3 python3-venv >/dev/null
 if ! node -v 2>/dev/null | grep -q v26; then curl -fsSL %(node)s | tar -xJ -C /usr/local --strip-components=1; fi
 mkdir -p %(tree)s/work; touch %(tree)s/work/runs.jsonl
 export XDG_RUNTIME_DIR=/tmp;
@@ -86,6 +86,7 @@ if command -v nvidia-smi >/dev/null && ! ls /usr/share/vulkan/icd.d/nvidia* /etc
 fi
 PKG=$( [ -f package.json ] && pwd || dirname "$(pwd)" )
 (cd "$PKG" && npm install --no-audit --no-fund >/dev/null 2>&1)
+[ ! -f tools/cloud/setup-lines.sh ] || bash tools/cloud/setup-lines.sh
 cat > /usr/local/bin/git <<'SHIM'
 #!/bin/bash
 case "$*" in
