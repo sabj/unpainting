@@ -5,7 +5,8 @@ import crypto from 'node:crypto';
 
 // Diagnostic runner: independent Node processes, sequentially on one GPU box.
 // All runs share inputs and a private pure-step cache. The last run's ordinary
-// outputs remain at --out; each run retains its painting, log and telemetry.
+// painting/checkpoints remain at --out; each run retains its painting, log and
+// telemetry. Large command tapes and frame sequences are unnecessary here.
 export async function runSpeedSequence(argv, script) {
   const at = argv.lastIndexOf('--speedsequence');
   if (at < 0) return false;
@@ -38,7 +39,9 @@ export async function runSpeedSequence(argv, script) {
       console.log('speed sequence:', JSON.stringify(row));
       if (code !== 0) throw Error('speed sequence run failed: ' + code + '; see ' + path.join(dir, 'paint.log'));
       if (i === runs.length - 1) {
-        for (const name of fs.readdirSync(dir)) fs.cpSync(path.join(dir, name), path.join(out, name), { recursive: true });
+        for (const name of fs.readdirSync(dir)) {
+          if (name === 'stages' || name.endsWith('.json') || name.endsWith('.png') || ['source.jpg', 'plan.jpg', 'wash.jpg'].includes(name)) fs.cpSync(path.join(dir, name), path.join(out, name), { recursive: true });
+        }
       }
       for (const name of fs.readdirSync(dir)) {
         if (name !== 'painting.png' && name !== 'paint.log' && !['speed-profile.json', 'backend.json', 'target-guard.json', 'value-executed-counts.json'].includes(name)) fs.rmSync(path.join(dir, name), { recursive: true, force: true });
