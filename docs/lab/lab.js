@@ -1,8 +1,9 @@
+import {addToolIcons} from './ui/tool-icons.js';
 import {createOperationsUI} from './ui/operations.js';
 // The paint lab page: pointer input, controls and the frames from the simulation worker.
 import {createPlaybackUI,loadBytes,loadTape} from './ui/playback.js';
 import { setupScratch } from './ui/scratch.js';
-import { pointerSample } from './ui/contact.js';
+import { pointerSample, createPointerSampler } from './ui/contact.js';
 import { createMoveQueue } from './ui/move-queue.js';
 import { createCursor } from './ui/cursor.js';
 import { PIGMENTS, BY_KEY, stains } from './media/pigments.js';
@@ -29,6 +30,7 @@ let paperKey = PAPERS[query.get('paper')] ? query.get('paper') : '8x6', dpi = dp
 let W = canvas.width, H = canvas.height, PIXELS_PER_INCH = dpi;
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 const operations=createOperationsUI(sheetEl,m=>{cancelStroke();worker.postMessage(m);});
+addToolIcons();
 // The physics runs on WebGPU in the worker when the browser has it, and the worker then draws straight into this canvas
 // from the GPU buffers. Without WebGPU (or with ?physics=cpu) the physics is the CPU's and the colour render runs on WebGL2
 // in the worker, straight into this canvas. ?render=cpu keeps the CPU render, which is also the fallback when WebGL2 is
@@ -317,10 +319,11 @@ new ResizeObserver(cacheRect).observe(sheetEl);
 window.addEventListener('scroll', cacheRect, { passive: true, capture: true });
 window.addEventListener('resize', cacheRect);
 cacheRect();
+const contactSampler = createPointerSampler();
 const toSheet = (e,previous=null) => {
-  const dt=previous?e.timeStamp-previous.timeStamp:0;
-  const speed=dt>0?Math.hypot(e.clientX-previous.clientX,e.clientY-previous.clientY)/dt:undefined;
-  return pointerSample(e,canvasRect,W,H,settings.pressure,{manual:manualPressure.checked,speed,release:e.type==='pointerup'});
+  const options={manual:manualPressure.checked,dpi:PIXELS_PER_INCH,release:e.type==='pointerup'};
+  return previous ? contactSampler.sample(e,canvasRect,W,H,settings.pressure,options)
+    : pointerSample(e,canvasRect,W,H,settings.pressure,options);
 };
 const recordContact=(pt,phase)=>{lab.lastContact={pressure:pt.p,source:pt.pressureSource,phase,pointerType:lastPointerType};(lab.contacts??=[]).push(lab.lastContact);if(lab.contacts.length>100)lab.contacts.shift();};
 const toolInHand=()=>temporaryWater?{...settings,tool:'water'}:{...settings};
@@ -344,7 +347,7 @@ function startTouch() {
   const start = touchStart;
   clearPendingTouch();
   if (!start || !started || playing || gesture || pointer !== null) return;
-  cacheRect(); canvas.focus({preventScroll:true}); pointer = start.pointerId; lastPointerType='touch'; lastScreen=start; last = toSheet(start); recordContact(last,'down'); lastT = start.timeStamp; lastMove = performance.now();
+  cacheRect(); canvas.focus({preventScroll:true}); pointer = start.pointerId; lastPointerType='touch'; lastScreen=start; contactSampler.reset(); last = toSheet(start,true); recordContact(last,'down'); lastT = start.timeStamp; lastMove = performance.now();
   document.getElementById('paint-hint').hidden = true;
   worker.postMessage({ type: 'down', pt: last, tool: toolInHand() });
 }
@@ -408,7 +411,7 @@ sheetEl.addEventListener('pointerdown', e => {
   playbackUI.dismiss();
   cacheRect(); // A control can move the sheet without resizing it.
   lastPointerType=e.pointerType;barrelHeld=e.pointerType==='pen'&&Boolean(e.buttons&2);setTemporaryWater();
-  canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId); pointer = e.pointerId; lastScreen=e; last = toSheet(e);recordContact(last,'down');lastT = e.timeStamp; lastMove = e.timeStamp;
+  canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId); pointer = e.pointerId; lastScreen=e; contactSampler.reset(); last = toSheet(e,true);recordContact(last,'down');lastT = e.timeStamp; lastMove = e.timeStamp;
   document.getElementById('paint-hint').hidden = true;
   worker.postMessage({ type: 'down', pt: last, tool: toolInHand() });
 });
@@ -518,7 +521,7 @@ worker.addEventListener('message', ({ data }) => {
   else if (data.type === 'frame') {
     const t0 = performance.now();
     if (data.rgba && image) { image.data.set(data.rgba); ctx.putImageData(image, 0, 0); }
-    operations.frame(data);lab.operation=data.operation; if(data.masks)lab.masks={resistCells:data.masks.resist?.reduce((n,v)=>n+v,0)||0,clipCells:data.masks.clip?.reduce((n,v)=>n+v,0)??null};
+    operations.frame(data);if(data.operation!==undefined)lab.operation=data.operation; if(data.masks)lab.masks={resistCells:data.masks.resist?.reduce((n,v)=>n+v,0)||0,clipCells:data.masks.clip?.reduce((n,v)=>n+v,0)??null};
     const held = live; live = data.cursor ?? null; if (hover && (live || held)) queueCursor(); // the brush in hand, for the preview
     // how long the last stroke point took from the page to a drawn frame: the lag a painter sees
     if (data.moveT) { lab.lags.push(now() - data.moveT); if (lab.lags.length > 300) lab.lags.shift(); }

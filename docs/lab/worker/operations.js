@@ -31,10 +31,17 @@ export function applyHandOperation(sheet, kind, mask) {
 // contact, pen spreads, tuft lag, depleted tools, and clips without guessing.
 export function watchContact(sheet, rect) {
  const [x,y,w,h]=rect, planes=[sheet.W,sheet.s,...sheet.G,...sheet.P,...sheet.D];
- const before=planes.map(a=>Float32Array.from({length:w*h},(_,j)=>a[(y+Math.floor(j/w))*sheet.w+x+j%w]));
+ const before=planes.map(a=>{
+  const copy=new Float32Array(w*h);
+  for(let row=0;row<h;row++){const start=(y+row)*sheet.w+x;copy.set(a.subarray(start,start+w),row*w);}
+  return copy;
+ });
  return ()=>{
   const mask=new Uint8Array(w*h);
-  for(let j=0;j<mask.length;j++){const i=(y+Math.floor(j/w))*sheet.w+x+j%w;for(let k=0;k<planes.length;k++)if(planes[k][i]!==before[k][j]){mask[j]=1;break;}}
+  for(let row=0;row<h;row++){
+   const start=(y+row)*sheet.w+x,offset=row*w;
+   for(let col=0;col<w;col++)for(let k=0;k<planes.length;k++)if(planes[k][start+col]!==before[k][offset+col]){mask[offset+col]=1;break;}
+  }
   return {x,y,w,h,mask};
  };
 }

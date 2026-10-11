@@ -81,3 +81,25 @@ For the reload regression, scale a dipped 10 mm brush's water and pigment to 25%
 Browser verification used actual pointer drags in Chromium with WebGPU sheet physics and the CPU scratch canvas: a full-water sheet wash and 720-CSS-pixel scratch stroke remained continuous (100% sampled interior coverage). An uninterrupted manual mid-water stroke stayed solid, then faded into broken texture on both surfaces. Screenshots were reviewed at native browser size. `src/media/brush.mjs` and its generated Lab copy remain unchanged; `node tools/lab/sync-site-media.mjs --check` passes.
 
 Validation: `npm test` — 878 passed, 3 skipped; `npm run bench:test` — 36 passed. Initial benchmark attempts hit sandbox worktree restrictions and disk exhaustion; the final complete run passed with temporary worktree access and available disk space.
+
+## Pressure, replay cost and tool icons — 2026-10-10
+
+Built on `80671ca`, including `9579700`'s fixed mouse/finger pressure default (0.8). Existing coalesced pointer input and the brush's continuous 0.7-cell deposition already cover sparse, long mouse segments; no second interpolation layer was added. Optional speed pressure now has an 80 ms filter, a gentle response around 0.7, and a maximum change of 0.012 per millimetre on paper. Stylus pressure uses a 12 ms filter; release is immediate. Each new stroke resets the filter.
+
+Chrome on Apple M3, 60 dpi, 1280×900 viewport: actual mouse paths with uneven waits (1, 31, 2, 30, 16 ms), the same path at 4× speed, and a single-event 420-cell drag were checked with fixed and optional speed pressure on CPU and WebGPU. All twelve strokes had 100% sampled interior wet coverage. Width coefficient of variation was 2.8–4.2%; central tone variation was 2.1–3.3%. The native brush remains responsible for paper texture, depletion and paint transfer. Browser screenshots showed connected, even washes; no page errors occurred. Unit regressions cover these paths, fixed mouse/touch pressure, limited speed response, stylus smoothing and release.
+
+The profiler measures worker renders through frame posting (including the WebGPU completion wait), main-thread frame handlers, changed-contact capture, and drying frames. Run from the repository root with `node tools/lab/measure-interaction.mjs /tmp/lab-timings.json`. The fixture uses a 480×360 hand stroke, 4.5 seconds of natural drying, 4.5 seconds after Dry layer, and 9 seconds of a sustained 360×270 live tape at 4× speed with a passage mask. CPU means CPU physics with the normal WebGL2 renderer. Before is `80671ca`; after is this change. These are local measurements, not a frame-rate guarantee.
+
+| Measurement | CPU before → after | WebGPU before → after |
+| --- | ---: | ---: |
+| Live replay main-thread handler, mean ms/frame | 0.54 → 0.22 | 0.55 → 0.21 |
+| Live worker render/post, mean ms/frame | 0.41 → 0.85 | 1.36 → 1.01 |
+| Live frame posts in 9 seconds | 1,793 → 491 | 1,798 → 496 |
+| Total live worker render/post time, ms | 734 → 418 | 2,453 → 501 |
+| Changed-contact capture plus deposition, mean ms/sample | 0.14 → 0.07 | 0.15 → 0.07 |
+| Natural drying worker frame, mean ms | 7.65 → 8.50 | 2.69 → 3.18 |
+| CPU Dry layer UI handler, mean ms/frame | 2.60 → 0.16 | — |
+
+Live presentation is now paced to about one display interval, retaining every physical sample and displaying the latest applied contact. Mask and operation backgrounds are cached; unchanged operation masks are no longer cloned into every worker post. Contact snapshots copy contiguous typed-array rows. An unused scratch canvas no longer scans the page layout on each status mutation. Physics steps and drying cadence were not changed: the drying timings show run-to-run variation rather than a claimed physics speedup. CPU render cost per displayed replay frame increased, but total replay render work fell 43%; WebGPU render work fell 80%.
+
+All nine tools have small inline SVG icons with visible labels and decorative SVG accessibility attributes. Icons inherit button colour; the interface follows the system light/dark preference. Desktop and 390-pixel phone checks showed no clipped tool labels. Real White Ships live playback, mask persistence and Carry on painting were checked. `npm test`: 882 passed, 3 skipped; `npm run bench:test`: 36 passed. `sync-site-media.mjs --check` passed.

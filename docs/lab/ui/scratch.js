@@ -15,7 +15,7 @@ export function setupScratch(canvas,settings){
  function protectedRects(){return [...document.querySelectorAll(occupied)].flatMap(el=>
   getComputedStyle(el).visibility==='hidden'?[]:[...el.getClientRects()]);}
  const blocked=(e,rects=protectedRects())=>rects.some(r=>e.clientX>=r.left-2&&e.clientX<=r.right+2&&e.clientY>=r.top-2&&e.clientY<=r.bottom+2);
- function mask(){for(const r of protectedRects()){
+ function mask(){if(!sheet)return;for(const r of protectedRects()){
   const x=Math.floor((r.left-2)*scale),y=Math.floor((r.top-2)*scale);
   g.clearRect(x,y,Math.ceil((r.right+2)*scale)-x,Math.ceil((r.bottom+2)*scale)-y);
  }}
