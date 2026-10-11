@@ -106,3 +106,37 @@ preparation, settings and actual guard report on every comparison.
 See [plan format](plan-format.md#stages) for the schema. The original measured
 opening-drawing study remains on the local `line-quality` branch under
 `work/lines/LINEWORK.md`; it is separate from full-pipeline release validation.
+
+## Dry drawing measurements
+
+`tools/judge/drawing-stats.py` measures reference scans and executed drawing
+checkpoints with the same analysis settings. It needs NumPy and OpenCV:
+
+```sh
+python tools/judge/drawing-stats.py reference.jpg drawing-opening.png --out stats.jsonl
+python tools/judge/drawing-stats-test.py
+```
+
+The tool normalizes the long edge to 1000 pixels. It reports path fragments per
+area, width and length distributions, open endpoints, line density by local
+value, a corner extension estimate, and optical tone versus width. Millimetres
+refer to a common 152.4 mm display width, not the reference's original sheet.
+Use `--sheetmm` to change that display size. Retain original images and hashes
+outside Git so the study can be repeated.
+
+These are raster proxies. Crossings split paths, scans can include wash or paper
+texture, local darkness does not identify a semantic shadow, and neither actual
+pressure nor directional graphite sheen can be inferred from a scan. The corner
+estimate is particularly ambiguous and must not gate acceptance. Inspect the
+whole drawing and native crops beside real references, then check landmarks
+against the target. Fewer fragments or closer median statistics do not justify
+invented windows, rigging or lost anatomy.
+
+Graphite is a dry material. The HB and 2B profiles vary pressure, tone and tooth;
+the optional `graphite-2B-side` profile also allows broad contact up to 2 mm.
+Freeze contours and coarse shadow gestures before painting with
+`graphite-plan.py`. Keep grain out of the path extraction. Its dry smudge is a
+small neighboring-cell deposit, and its sheen is a bounded flat-view cue rather
+than directional reflection. The side profile is experimental: inspect broad
+tone coverage and the cat or face landmarks before adding washes. An unlimited
+line budget alone cannot make a poor contour plan into a good drawing.
