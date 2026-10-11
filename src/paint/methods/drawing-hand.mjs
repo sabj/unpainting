@@ -94,7 +94,7 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
   const lineWeight = g.weight ?? 1;
   const points = P.map((q, k) => {
     const e = env(s[k]), dark = floor + (1 - floor) * Math.max(0, Math.min(1, q.weight ?? lineWeight));
-    const out = { x: q.x, y: q.y, s: Math.min(1, base * dark * e * scale) };
+    const out = { ...q, s: Math.min(1, base * dark * e * scale) };
     if (q.width != null) out.nw = Math.max(minNib, (q.width * gain - margin) * (0.5 + 0.5 * e));
     return out;
   });
@@ -112,6 +112,6 @@ export function personStrokes(g, L, { dipFirst = false, load = 1, low = null } =
   }
   if (cur.length >= 2) out.push(cur);
   // dipFirst: the gesture starts on a fresh dip and runs on it; the pen is dipped again inside it only when low
-  return out.map((points, i) => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1,
+  return out.map((points, i) => ({ ...g, points, length: pathLength(points), tier: g.tier ?? 1, weight: g.weight ?? 1,
     ...(dipFirst && i === 0 ? { dip: load === 1 ? true : load } : {}), ...(dipFirst && low != null ? { low } : {}) }));
 }

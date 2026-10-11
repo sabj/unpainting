@@ -34,6 +34,18 @@ test('personStrokes cuts a long gesture into strokes and keeps every point', () 
   assert.ok(s.every(x => x.tier === 1));
 });
 
+test('hand taper and stroke splits retain prepared instrument controls and drawing roles', () => {
+  const g = line(0, 0, 60, 0, 61, {tier: 2, role: 'landmark', low: .03, dip: .4});
+  g.points[20] = {...g.points[20], nw: 1.2, v: .8, dwell: 2, sourcePointIndex: 7};
+  const prepared = shapeGesture(g);
+  const strokes = personStrokes(prepared, 25);
+  assert.ok(strokes.every(s => s.tier === 2 && s.role === 'landmark' && s.low === .03));
+  const contact = strokes.flatMap(s => s.points).find(p => p.sourcePointIndex === 7);
+  assert.equal(contact.nw, 1.2);
+  assert.equal(contact.v, .8);
+  assert.equal(contact.dwell, 2);
+});
+
 test('subjectRegion fills the inside of a closed outline', () => {
   const box = [line(10, 10, 50, 10), line(50, 10, 50, 50), line(50, 50, 10, 50), line(10, 50, 10, 10)].map(g => ({ ...g, role: 'subject' }));
   const R = subjectRegion(box, 60, 60, { cell: 2, close: 1 });
