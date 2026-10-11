@@ -31,6 +31,7 @@ const JITTER_MS = () => (typeof process !== 'undefined' ? +(process.env.GPU_JITT
 const RING_SLOTS = 256, RING_FLOATS = 6144;
 const POST_LIMIT = 4 * 1024 * 1024; // floats: 16 MB
 const TIMEOUT_MS = 30 * 60 * 1000;
+const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
 const READ_OPS = new Set(['down', 'paperDown', 'sums', 'topDown', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
 const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth'];
@@ -53,6 +54,7 @@ export class GpuLink {
     this.noSums = typeof process !== 'undefined' && process.env.GPU_SUMS === '0'; // thickness and frames from the whole sheet brought down
     this.resident = process.env.GPU_RESIDENT === '1' && process.env.GPU_BATCH !== '0';
     this.brushKeys = new WeakMap(); this.brushKey = 0; this.pendingLayers = [];
+    this.archiveBudgetBytes = DEFERRED_ARCHIVE_BUDGET_BYTES;
     this.planning = null; this.seq = 0; this.owners = new Array(RING_SLOTS).fill(null);
     // The pigments that may hold mass on the GPU sheet: those in its wet and unfixed pigment (wetMask) and in the newest dried
     // layer (topMask). The step runs its per-pigment kernels over these alone; see stepfull.wgsl klAt.
@@ -482,6 +484,7 @@ export class GpuLink {
         if(hadTop){this.pendingLayers.push({index:sheet.layers.length-1,mask:oldMask,id:archive});this.stats.deferredLayers=(this.stats.deferredLayers??0)+1;}
         this.topMask=mask;sheet.layers.push(this.layerPlanes(sheet,mask));this.topPlaceholder=true;
       }
+      this.boundDeferredLayers(sheet);
       this.stats.dryDrains=(this.stats.dryDrains??0)+1;this.stats.dryDrainMs=(this.stats.dryDrainMs??0)+performance.now()-t;
     } finally {this.drainingDrys=false;}
   }
@@ -533,6 +536,7 @@ export class GpuLink {
       this.topMask = ctrl[7] >>> 0;
       sheet.layers.push(this.layerPlanes(sheet, this.topMask)); this.topPlaceholder = true;
     }
+    this.boundDeferredLayers(sheet);
     this.wetMask = 0; this.syncAct(); // dried: nothing is wet or unfixed, and what is in the newest layer is what was just fixed
     this.stale = true; this.topStale = true; this.fresh.stale(); this.stats.drys++; this.stats.dryMs += performance.now() - t;
     this.stats.drySolverIterations=(this.stats.drySolverIterations??0)+ctrl[1];this.stats.drySolverCalls=(this.stats.drySolverCalls??0)+1;
@@ -542,6 +546,24 @@ export class GpuLink {
   layerPlanes(sheet, mask) {
     const zero = sheet._zeroLayer || (sheet._zeroLayer = new Float32Array(this.n));
     return sheet.pigments.map((_, k) => ((mask >>> k) & 1 ? new Float32Array(this.n) : zero));
+  }
+  /** Keep immutable archived layers from accumulating for an entire dense ink pass.
+   * Reading them releases their GPU buffers and fills the existing CPU placeholders.
+   * Layer order, float values, the liftable top and drying physics are unchanged.
+   */
+  boundDeferredLayers(sheet) {
+    let bytes = 0;
+    for (const pending of this.pendingLayers) {
+      let planes = 0;
+      for (let k = 0; k < this.K; k++) planes += (pending.mask >>> k) & 1;
+      bytes += Math.max(16, planes * this.n * 4);
+    }
+    const budget = this.archiveBudgetBytes ?? DEFERRED_ARCHIVE_BUDGET_BYTES;
+    this.stats.deferredArchiveBudgetBytes = budget;
+    this.stats.maxDeferredArchiveBytes = Math.max(this.stats.maxDeferredArchiveBytes ?? 0, bytes);
+    if (bytes < budget) return;
+    this.syncLower(sheet);
+    this.stats.deferredArchiveDrains = (this.stats.deferredArchiveDrains ?? 0) + 1;
   }
   optPick(o) { const p = {}; for (const k of OPT_KEYS) if (o[k] !== undefined) p[k] = o[k]; return p; }
 
