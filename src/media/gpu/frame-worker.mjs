@@ -2,6 +2,9 @@
 // Keeps the composite of dried layers as render-cache.mjs does, so output matches the painter's own render byte for byte.
 import { parentPort, workerData } from 'node:worker_threads';
 import sharp from 'sharp';
+import {startSpeedProfile} from '../../../tools/speed/profile.mjs';
+const speedProfile = startSpeedProfile(process.env.GPU_PROF === '1');
+let renderMs = 0;
 import path from 'node:path';
 import { renderCells } from '../km.mjs';
 import { execution } from '../../eval/composite.mjs';
@@ -47,6 +50,7 @@ const settle = id => {
 
 port.on('message', m => {
   if (m.type === 'lower') { addLower(planes(m.ks, m.data, 0)); return; }
+  const renderStart = performance.now();
   // a snapshot: render.mjs's renderSheet over the composite, then paint-plate's finishRGB (the wet darkening)
   const top = m.hasTop ? planes(m.top, m.data, m.sums.length) : null, sums = planes(m.sums, m.data, 0);
   const rest = top ? [top, sums] : [sums], o = new Uint8ClampedArray(n * 3);
@@ -57,6 +61,7 @@ port.on('message', m => {
     for (let i = 0; i < n; i++) { const wv = Wv[i]; if (wv > 1e-4) { const f = 1 - wet.dark * Math.min(1, wv / wet.cap); o[i * 3] *= f; o[i * 3 + 1] *= f; o[i * 3 + 2] *= f * 1.01; } }
   }
   rendered.set(m.id, Buffer.from(o.buffer));
+  renderMs += performance.now() - renderStart;
   settle(m.id);
 });
 
@@ -69,6 +74,7 @@ parentPort.on('message', async m => {
     await Promise.all(writes); writes = [];
     const res = [...marks.entries()].map(([id, v]) => ({ id, pass: v.pass, numbers: v.numbers, paintedD: v.paintedD }));
     marks.clear();
+    if (speedProfile) speedProfile.write(out, {worker: 'frame', renderMs}, 'speed-frame-profile.json');
     parentPort.postMessage({ type: 'drained', marks: res }, res.map(r => r.paintedD.buffer));
   }
 });
