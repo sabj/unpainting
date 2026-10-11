@@ -49,7 +49,7 @@ A learned world model would predict the sheet after a passage (a wash or group o
 
 ### 8. Edge drying that knows how much water there is
 
-Known weakness. A wet cell within 2 cells of any dry cell evaporates about 9 times faster (`src/media/sheet.mjs`), and water flows toward that edge carrying pigment. The rule cannot tell a wash's outer edge from a millimetre-wide pit the brush skipped. On cold-press paper, every skipped pit can then dry as a white dot in a dark ring. `--holefill` and `--holerim` patch this on the CPU only, as workarounds.
+Known weakness. A wet cell within 2 cells of any dry cell evaporates about 9 times faster (`src/media/sheet.mjs`), and water flows toward that edge carrying pigment. The rule cannot tell a wash's outer edge from a millimetre-wide pit the brush skipped. On cold-press paper, every skipped pit can then dry as a white dot in a dark ring. `--holefill` and `--holerim` patch this on the CPU and the GPU, as workarounds.
 - In real paint the ring depends on the water. A damp wash leaves skipped pits as clean white flecks. A very wet wash can fill a pit, or leave a faint ring or bloom as it dries back.
 - Test: scale the extra edge evaporation with the share of dry paper within a few millimetres of a cell. Scale the ring strength with the standing water. Check that outer edges keep their dark rim, pits in damp washes stay clean, and wet washes still bloom. Compare all four benchmark targets before and after, on CPU and GPU.
 

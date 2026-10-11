@@ -1,13 +1,15 @@
 // GPU (strokes on the GPU, or with GPU_STROKES=0 on the CPU) against the CPU sheet, on the gpu-backend test's painting
 // at a chosen size: mean and largest difference of the pigment fields, and the share of cells differing by more than 1e-4.
-//   node tools/gpu/stroke-diff.mjs [size=96] [seed=3]
+//   node tools/gpu/stroke-diff.mjs [size=96] [seed=3] [cpustrokes] [option=value ...]   e.g. ... 96 3 holeSpan=4 holeFill=3
 import { makePaper } from '../../src/media/paper.mjs';
 import { createSheet, step, dry, thickness, DEFAULTS } from '../../src/media/sheet.mjs';
 import { createBrush, dip, stroke } from '../../src/media/brush.mjs';
 import { attachGpu, gpuStats } from '../../src/media/gpu/link.mjs';
 
 const N = +(process.argv[2] || 96), SEED = +(process.argv[3] || 3);
-if (process.argv[4] === 'cpustrokes') process.env.GPU_STROKES = '0'; // the sheet on the GPU, the brush on the CPU
+// sheet options after the size and seed, as step-check.mjs takes them
+const extra = Object.fromEntries(process.argv.slice(4).filter(a => a.includes('=')).map(a => a.split('=')).map(([k, v]) => [k, +v]));
+if (process.argv.slice(4).includes('cpustrokes')) process.env.GPU_STROKES = '0'; // the sheet on the GPU, the brush on the CPU
 const pigments = [
   { K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 },
   { K: [0.8, 0.5, 0.2], S: [0.03, 0.03, 0.02], rho: 0.3, omega: 0.9, gamma: 0.6 },
@@ -35,11 +37,11 @@ function paint(sheet, O) {
   return thickness(sheet);
 }
 const fresh = () => createSheet(makePaper(N, N, { seed: 5 }), pigments);
-const O = { ...DEFAULTS, gran: 0.25 };
+const O = { ...DEFAULTS, gran: 0.25, ...extra };
 const ref = paint(fresh(), O);
 const g = fresh(), info = attachGpu(g, O, { mode: 'on', log: () => {} });
 const out = paint(g, O);
 let max = 0, sum = 0, over = 0, cnt = 0, peak = 0;
 for (let k = 0; k < ref.length; k++) for (let i = 0; i < ref[k].length; i++) { const d = Math.abs(out[k][i] - ref[k][i]); if (d > max) max = d; sum += d; if (d > 1e-4) over++; cnt++; peak = Math.max(peak, ref[k][i]); }
-console.log(`${N}x${N} seed ${SEED}: mean |diff| ${sum / cnt} (peak field ${peak.toFixed(3)}), largest ${max}, cells over 1e-4: ${(100 * over / cnt).toFixed(3)}%`, JSON.stringify(gpuStats(g)));
+console.log(`${N}x${N} seed ${SEED} ${JSON.stringify(extra)}: mean |diff| ${sum / cnt} (peak field ${peak.toFixed(3)}), largest ${max}, cells over 1e-4: ${(100 * over / cnt).toFixed(3)}%`, JSON.stringify(gpuStats(g)));
 g._gpu.close(); process.exit(0);
