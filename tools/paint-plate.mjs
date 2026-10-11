@@ -185,6 +185,7 @@ const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
 const SPEED_PAPER = num('speedpaper', 0) > 0;
 const SPEED_CONTACT = num('speedcontact', 0) > 0;
 const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
+const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
 const VALUE_CONTACT_WORK = new ContactWorkspace();
 const SPEED_GPU_OPTICS = num('speedopticalgpu', 0) > 0;
 if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
@@ -678,7 +679,12 @@ const BLOCK_OPTIONS = { glaze: num('glaze', 0.12), maxValues: num('maxvalues', 2
   ...(FIRST_FLOOR > 0 ? { firstFloor: FIRST_FLOOR, firstMax: opt('firstmax', '') !== '' ? num('firstmax', 0.12) : null, firstWhite: opt('firstwhite', '') !== '' ? num('firstwhite', 0) : null, firstLabels: num('firstcolours', 4) > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: Math.round(num('firstcolours', 4)), floor: FIRST_FLOOR }).labels : null, firstOnly: FIRST_ONLY } : {}) };
 const AUTHORED_INPUT=opt('areaplan','')&&JSON.parse(fs.readFileSync(path.resolve(root,opt('areaplan','')))).areas.some(a=>a.passes.some(p=>p.source==='authored'));
 const blockPlanStarted = performance.now();
-let { layers: blocked, steps, delivered: PLAN_DELIVERED } = (await cachedStep({ ...RUN_CACHE, name:'block-plan',code:CODE_HASH,track:optTrack,inputs:{PLANA,PLANK,w,h,BLOCK_OPTIONS,AUTHORED_INPUT} },async()=>AUTHORED_INPUT?{layers:[],steps:1,delivered:new Float32Array(PLANA.length)}:blockInPigments(PLANA, PLANK, w, h, BLOCK_OPTIONS))).value;
+// The target value planner replaces this ladder before execution. Optional
+// legacy adapters that consume its demand or geometry keep the original path.
+const SKIP_DISCARDED_PLAN=SPEED_VALUE_ONLY&&VALUE_ENABLED&&!MOD&&!MIXES&&!opt('finishareaplan','')&&opt('curls','0')==='0'&&num('bgfirst',0)===0&&num('detailpasses',0)===0&&num('detailtrim',0)===0&&num('figurevalues',0)===0&&num('fieldmix',0)===0&&num('numericplanledger',0)===0&&num('plandiag',0)===0;
+let { layers: blocked, steps, delivered: PLAN_DELIVERED } = SKIP_DISCARDED_PLAN
+ ? {layers:[],steps:1,delivered:new Float32Array(PLANA.length)}
+ : (await cachedStep({ ...RUN_CACHE, name:'block-plan',code:CODE_HASH,track:optTrack,inputs:{PLANA,PLANK,w,h,BLOCK_OPTIONS,AUTHORED_INPUT} },async()=>AUTHORED_INPUT?{layers:[],steps:1,delivered:new Float32Array(PLANA.length)}:blockInPigments(PLANA, PLANK, w, h, BLOCK_OPTIONS))).value;
 SPEED_PROFILE?.add('setup:block-plan', performance.now() - blockPlanStarted);
 if(MOD?.paintOwnedTransfer)throw Error('--modpaintplanes was removed by the anti-cheat rules: per-cell residual charge inside a shape');
 if(MOD?.paintOwnedTransfer){MOD.paintOwnedCharge=allocateShapeLocalCharge({layers:blocked,K:PIGS.length,n,residual:MOD.paintOwnedResidual,selected:MOD.paintOwnedTransfer.selected,lights:MOD.lights,planned:PLAN_DELIVERED,fixtureCells:MOD.paintOwnedFixtureCells??[],excludeMixedFirstWash:MOD_PAINT_FLOOR_SKIP===1,ownComponents:MOD_PAINT_FLOOR_SKIP===1});fs.writeFileSync(path.join(out,'paint-owned-shape-local-allocation.json'),JSON.stringify({...MOD.paintOwnedCharge,fitPigmentChannels:PIGS.length,geometryPreserved:true,deliveredCredit:0},null,2));}
@@ -787,9 +793,10 @@ if (MIXES) for (const layer of blocked) {
   layer.mix = panMix(mix, PIGS.length, layer.amount);
   for (const sh of layer.shapes) sh.mix = panMix(mix, PIGS.length, sh.amount);
 }
-console.log(`${blocked.length} glazes over ${steps} values, each one region of one mixed colour`);
+if(SKIP_DISCARDED_PLAN)console.log('setup: skipped legacy ladder replaced by the executable target value plan');
+else console.log(`${blocked.length} glazes over ${steps} values, each one region of one mixed colour`);
 // What share of the sheet the plan touches at all: a plan that covers everything cannot leave paper.
-(() => {
+if(!SKIP_DISCARDED_PLAN)(() => {
   const touched = new Uint8Array(n);
   for (const L of blocked) for (const sh of L.shapes) { const m = sh.mask; if (m) for (let i = 0; i < n; i++) if (m[i]) touched[i] = 1; }
   let c = 0;
