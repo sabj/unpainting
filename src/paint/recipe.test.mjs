@@ -56,7 +56,7 @@ test('an unseen ink-and-wash plan uses source paper and a lean palette, with exp
   try {
     const file = path.join(dir, 'plan.json');
     fs.writeFileSync(file, JSON.stringify({ subject:'unseen-ink-study', styleSelection:{style:'ink-and-wash',reason:'Visible brown ink and pale washes'} }));
-    const read = args => {const {argv}=expandRecipe({argv:['--valueplan',file,...args]});const get=name=>argv[argv.lastIndexOf('--'+name)+1];get.has=name=>argv.includes('--'+name);return get;};
+    const read = args => {const {argv}=expandRecipe({argv:['--recipe','general','--valueplan',file,...args]});const get=name=>argv[argv.lastIndexOf('--'+name)+1];get.has=name=>argv.includes('--'+name);return get;};
     const base=read([]);
     assert.equal(base('paperrgb'),'source');assert.equal(base('palettewide'),'0');assert.equal(base('boxpick'),'0');assert.ok(!base.has('stoneblocks'));
     const own=read(['--palettewide','1','--paperrgb','250,250,250']);
@@ -77,4 +77,14 @@ test('final darks require an explicit choice and command-line choices win', () =
   const value = args => {const {argv} = expandRecipe({argv: args}); return argv[argv.lastIndexOf('--finaldarks') + 1];};
   assert.equal(value([]), '0');
   assert.equal(value(['--finaldarks', '1']), '1');
+});
+
+// The general recipe lost connected dark masses on Hills in the release comparison.
+test('release defaults preserve compatibility while general washes remain explicit', () => {
+  const flags = args => expandRecipe({argv: args}).argv;
+  const base = flags([]), general = flags(['--recipe','general']);
+  for (const flag of ['--darkgain','--coolgain','--skylanes','--shadowraw']) assert.ok(base.includes(flag), flag);
+  for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) {
+    assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
+  }
 });

@@ -2,19 +2,19 @@
 // the value plan's drawing flags. A flag given on the command line still wins, since the last of a repeated flag is
 // the one read.
 //
-// default: general watercolor methods only: light-to-dark value planning with shaped marks and clean-colour passages,
+// general: opt-in general watercolor methods only: light-to-dark value planning with shaped marks and clean-colour passages,
 // four middle layers, two touch-up rounds and a drawing first and last, on physical cold-press paper. No value in it was fitted to one
 // benchmark image. The plan's drawing section chooses the medium, amount and weight of that drawing
 // (drawing-plan.mjs); without one the painter picks graphite or ink from the image. The subject's own inputs stay on
 // the command line: --valueplan, --drawingfile, --drawinglast and --sheetmm. --recipe none paints with the bare
 // defaults, as does an --areaplan run that names no recipe.
 //
-// v096: the default recipe until 2026-10-10, kept to preserve historical recipe flags. Exact historical output requires the v0.1.0 tag. It
+// default / v096: compatibility recipe retained for the 0.2.0 RC after held-out regressions. Exact historical output requires the v0.1.0 tag. It
 // adds the tuned flags (tuned/default-flags.mjs) and sky lanes to every subject, and applies the per-subject presets V096
 // applied by itself when the plan names Y1, Y4, 3T or 1D (tuned/presets.mjs).
 //
 // Presets (tuned/presets.mjs) are fitted settings a run opts into: "presets": [...] in the value plan, or
-// --recipe default+architecture+glaze-gains on the command line.
+// --recipe general+architecture+glaze-gains on the command line.
 //
 // person: opening ink and closing accents, with segment washes and shape controls. It leaves --order at painter,
 // so the value planner replaces the legacy ladder with five light-to-dark bands.
@@ -40,7 +40,8 @@ const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loa
 const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skysplit 1';
 
 const RECIPES = {
-  default: [METHOD_FLAGS, CLEAN_COLOUR_FLAGS, TECHNIQUE_FLAGS].join(' '),
+  general: [METHOD_FLAGS, CLEAN_COLOUR_FLAGS, TECHNIQUE_FLAGS].join(' '),
+  default: [V096_METHOD_FLAGS, V096_TECHNIQUE_FLAGS, TUNED_DEFAULT_FLAGS, '--sourcelines 0 --linesource none --finaldarks 0'].join(' '),
   v096: [V096_METHOD_FLAGS, V096_TECHNIQUE_FLAGS, TUNED_DEFAULT_FLAGS].join(' '),
   person: '--masses 8 --masscap 0.15 --massload 0.5 --masswet 99 --mopgap 1.3 --masspaper 0.12 --massfeather 0.4 --massmaxlevel 1 --segwash 1 --segwashes 1 --pigphys 1 --gran 0.08 --skipheld 0.15 --skipheldmin 0.01 --whitefloor 1.0 --resistmin 0.002 --smalllights frisket --drawing both --inkfilter 1 --inktiers 1 --outlinemedium ink --segink 1 --tier3 0.15 --mllines 1 --contain 0 --cutin 0 --maxvalues 4 --minshape 80 --shapes 3 --shapedeep 1.6 --shapequant 0.6 --shapeload 0.7 --ladderseg 0.5 --boxpick 0 --texture 0 --washgrain 0.15 --marks 1',
 };
@@ -79,7 +80,7 @@ export function expandRecipe({ argv, root = process.cwd() }) {
   const at = argv.lastIndexOf('--recipe');
   const [given, ...typed] = at < 0 ? [argv.includes('--areaplan') ? 'none' : DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
   const name = given === 'none' && at < 0 ? null : given;
-  const presets = [...new Set([...(name === 'v096' ? v096PresetsFor(plan?.subject ?? null) : []), ...planPresets(plan), ...typed])];
+  const presets = [...new Set([...(['default', 'v096'].includes(name) ? v096PresetsFor(plan?.subject ?? null) : []), ...planPresets(plan), ...typed])];
   const extra = presetArgv(presets, argv);
   const tail = [...extra, ...drawing];
   const describe = note => [note, presets.length ? `presets ${presets.join(', ')}` : null, drawing.length ? 'drawing from the plan' : null].filter(Boolean).join(', ');
@@ -90,7 +91,7 @@ export function expandRecipe({ argv, root = process.cwd() }) {
   const flags = preset.split(' ');
   // Pen-and-wash uses its source-toned sheet and a lean wash palette. Methods meant for colorful paintings should not
   // recolor sepia studies.
-  if (name === 'default' && plan?.styleSelection?.style === 'ink-and-wash') {
+  if (name === 'general' && plan?.styleSelection?.style === 'ink-and-wash') {
     const inkWash = {'--palettewide':'0', '--boxpick':'0', '--paperrgb':'source', '--strokeplan':'1', '--laneadapt':'1'};
     for (const [flag, value] of Object.entries(inkWash)) {
       const at = flags.indexOf(flag);

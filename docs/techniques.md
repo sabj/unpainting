@@ -6,7 +6,7 @@ The painter's code in `src/paint/` is grouped by purpose. This page is an index:
 - [Targeted techniques](#targeted-techniques) (`src/paint/techniques/`) handle one kind of feature or surface: faces, dark fur, curly dog coats, foliage, skies, sea, sand and buildings. Most are off unless a flag turns them on.
 - [Tuned settings](#tuned-settings) (`src/paint/tuned/`) were fitted to specific benchmark images. They can help those images and hurt others. [src/paint/tuned/README.md](../src/paint/tuned/README.md) covers the overfitting risk.
 
-The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The default now uses general methods; fitted settings require an explicit preset. See [overfitting.md](overfitting.md) and [linework.md](linework.md) for preset and drawing-stage choices.
+The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The release default preserves the V096 compatibility recipe after held-out regressions. Use `--recipe general` for the new general methods and clean-colour washes; its fitted settings require an explicit preset. See [overfitting.md](overfitting.md) and [linework.md](linework.md) for preset and drawing-stage choices.
 
 Subject ids name benchmark images. `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`, and `subject-e` is a second Trumbull-derived subject. subject-b, subject-c, subject-d, subject-a and the architecture photograph are private benchmark images.
 
@@ -168,7 +168,7 @@ Modules:
 
 - `tuned/architecture-clouds.mjs` (`--passages architecture`): cirrus clouds lifted from a wet sky. Architecture photograph; high.
 - `tuned/architecture-reference.plan.json` (`--architectureplan`): polygons for the architecture passage. Only useful for that photograph.
-- `tuned/default-flags.mjs` (`--recipe v096` and explicit presets): the tuned flags above. Mostly Y1.
+- `tuned/default-flags.mjs` (`--recipe default|v096` and explicit presets): the tuned flags above. Mostly Y1.
 - `tuned/dog-coats.mjs` (`--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium.
 - `tuned/drawing-caps.mjs` (`--drawsubject`): per-subject pen line limits. subject-c, subject-a; low.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
@@ -179,9 +179,9 @@ Modules:
 - `tuned/stone-demand.mjs` (`--shapedmarks 1` on Y1): one mix per stone or leaf shape. Y1; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `tuned/subjects.json` (value plan subject): the style profile for each benchmark subject. 15 subjects; low.
-- `tuned/trumbull.mjs` (explicit Trumbull preset, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
+- `tuned/trumbull.mjs` (compatibility recipe or explicit Trumbull preset, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
 
-| `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. Default recipe only. | `--huechroma 0` |  |  |
-| `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. Default recipe only. | `--passcap 0` |  |  |
-| `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. Default recipe only. | `--maskmm 0` |  |  |
-| `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. Default recipe only. | `--palelights 0` |  |  |
+| `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. `--recipe general` only. | `--huechroma 0` |  |  |
+| `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. `--recipe general` only. | `--passcap 0` |  |  |
+| `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. `--recipe general` only. | `--maskmm 0` |  |  |
+| `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. `--recipe general` only. | `--palelights 0` |  |  |
