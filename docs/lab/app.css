@@ -82,3 +82,13 @@ body{isolation:isolate}
 #operation-timeline li{padding:3px 7px;border:1px solid var(--line);border-radius:3px}
 #operation-timeline [aria-current=step]{color:var(--ink);border-color:var(--accent);background:#99543a10}
 body.canvas-focus #operation-controls,body.canvas-focus #operation-timeline{display:none!important}
+
+/* Labels remain visible; currentColor follows selected, light and dark states. */
+.panel .seg.tools button{display:flex;align-items:center;justify-content:center;gap:5px}
+.panel .seg.tools svg{flex:none;width:20px;height:20px}
+@media(max-width:480px){.panel .seg.tools button{min-height:48px}}
+@media(prefers-color-scheme:dark){
+ #paint-help,.paint-controls select,.paint-info-panel{background:var(--paper)}
+ #welcome{background:#24231fd9}#welcome button{background:var(--paper)}.mix-preview small{background:#24231fdd}
+ :root{color-scheme:dark;--paper:#24231f;--ink:#eee8dc;--muted:#bbb2a3;--line:#eee8dc38;--accent:#dfab87;--paint-paper:var(--paper);--paint-ink:var(--ink);--paint-muted:var(--muted);--paint-line:var(--line);--paint-accent:var(--accent)}
+}

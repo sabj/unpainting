@@ -179,7 +179,7 @@ async function auditContact(stage, brush, points) {
 }
 
 
-let operation=null, masksDirty=true;
+let operation=null, postedOperation, masksDirty=true;
 function nameOperation(kind, mask=null, extra={}) {
  operation={kind,label:OPERATION_NAMES[kind]||kind,mask,...extra};
  postMessage({type:'operation',...operation});
@@ -330,8 +330,8 @@ async function render() {
   const wetArea = phys ? (dryWait === 'surface' ? phys.sheet.surfaceTiles : phys.sheet.wetTiles) : wetCells;
   if (drying) dryPeak = Math.max(dryPeak, wetArea || 0);
   const dryingProgress = drying && dryPeak ? Math.max(0, 1 - wetArea / dryPeak) : 0;
-  postMessage({ type: 'frame', operation, masks:masksDirty?{resist:sheet.resist,clip:sheet.clip}:undefined, replayPoint:replayPoint||(demoPlaying&&active?.last?{...active.last,r:active.brush?.radius||active.pen?.nib||1}:null), load: toolLoad(), drying, dryingProgress, dryingSteps: ticks - dryStart, quickDry, quality, moveT: drawnMove, gpuSteps: chunkSteps, gpuFrameMs, rgba, wet: wetCells, layers: sheet.layers.length, dryer, paused, ticks, strokes, lastTool, paperSeed, renderMs, renderCount, gpuDrawn: drawn, marks: markStats(marks, MM), stepMs, stepCount, cursor: cursorState(), physics: phys ? 'webgpu' : 'cpu' }, rgba ? [rgba.buffer] : []);
-  masksDirty=false;
+  postMessage({ type: 'frame', operation:operation===postedOperation?undefined:operation, masks:masksDirty?{resist:sheet.resist,clip:sheet.clip}:undefined, replayPoint:replayPoint||(demoPlaying&&active?.last?{...active.last,r:active.brush?.radius||active.pen?.nib||1}:null), load: toolLoad(), drying, dryingProgress, dryingSteps: ticks - dryStart, quickDry, quality, moveT: drawnMove, gpuSteps: chunkSteps, gpuFrameMs, rgba, wet: wetCells, layers: sheet.layers.length, dryer, paused, ticks, strokes, lastTool, paperSeed, renderMs, renderCount, gpuDrawn: drawn, marks: markStats(marks, MM), stepMs, stepCount, cursor: cursorState(), physics: phys ? 'webgpu' : 'cpu' }, rgba ? [rgba.buffer] : []);
+  masksDirty=false;postedOperation=operation;
 }
 
 // Real GPU time per draw from timer queries (EXT_disjoint_timer_query_webgl2), or null where the extension is missing.
@@ -681,18 +681,22 @@ async function liveTape(data,current){
     paused=false;masksDirty=true;strokes=saved?.tape.done||0;await render();
     postMessage({type:'live-ready',liveRun:data.liveRun,done:strokes,total:tape.strokeCount});
   });
-  let completed=saved?.tape.done||0,deadline=performance.now(),strokeStart=0,sawWash=tape.marks.slice(0,saved?.tape.index||0).some(m=>m.k==='s');
+  let completed=saved?.tape.done||0,deadline=performance.now(),strokeStart=0,lastPresent=0,presentTravelMs=0,sawWash=tape.marks.slice(0,saved?.tape.index||0).some(m=>m.k==='s');
   try{await runTape(tape,{
     sheet:()=>sheet,
     ready:async done=>{while(livePaused&&current()&&!liveCarry)await sleep(30);return current()&&!liveCarry;},
     begin:(tool,isPen,{mark,done,total})=>{operation=null;active=isPen?{kind:'pen',pen:tool}:{kind:'brush',brush:tool};
-      strokeStart=deadline=performance.now();
+      strokeStart=deadline=performance.now();lastPresent=0;presentTravelMs=0;
       const conc=isPen?tool.conc:tape.pigments.map((_,i)=>(tool.resP?.[i]||0)+tool.hairs.reduce((n,h)=>n+(h.pig?.[i]||0),0)),phase=isPen?(sawWash?'Closing ink':'Drawing'):mark.wt?'Rewetting the paper':tool.radius>4?'Washes':'Darks & detail';
       if(!isPen&&!mark.wt)sawWash=true;
       postMessage({type:'operation',liveRun:data.liveRun,kind:mark.wt?'water':'paint',label:phase,done,total});
       postMessage({type:'materials',liveRun:data.liveRun,phase,tool:isPen?'Dip pen':mark.wt?'Water brush':tool.flat?'Flat brush':'Round brush',pigments:tape.pigments.map((p,i)=>({...p,amount:conc[i]||0})).filter(p=>p.amount>0),done,total});
     },
-    end:async()=>{if(current()){active=null;replayPoint=null;await locked(()=>render());}},
+    end:async()=>{if(current()){
+      // Flush the last deposited point before lifting, including very short strokes.
+      if(presentTravelMs>0)await locked(()=>render());
+      presentTravelMs=0;active=null;replayPoint=null;
+    }},
     touch:(pts,reach,fn)=>locked(async()=>{
       if(!current())return null;
       const points=active?.brush?.tip?[...pts,active.brush.tip]:pts;
@@ -710,9 +714,15 @@ async function liveTape(data,current){
       // The indicator and the paint are presented in the same frame, only after
       // deposition. An empty contact never displays an invented brush footprint.
       replayPoint=contact?.mask.some(Boolean)?{...pt,r,contact}:null;
+      const travelMs=distance/110*1000/liveSpeed;
+      deadline+=travelMs;presentTravelMs+=travelMs;
+      // Deposition keeps every sample. Present only the latest applied contact
+      // once a display interval of travel or computation has accumulated.
+      if(lastPresent && presentTravelMs<16 && performance.now()-lastPresent<16)return;
       await locked(async()=>{if(!current())return;await render();dirty=false;});
-      deadline+=distance/110*1000/liveSpeed;
+      presentTravelMs=0;
       const wait=Math.min(40,deadline-performance.now());if(wait>0)await sleep(wait);else deadline=performance.now();
+      lastPresent=performance.now();
     },
     operation:async(event,apply)=>{
       if(!current())return;
