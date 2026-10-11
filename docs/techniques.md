@@ -168,7 +168,7 @@ Modules:
 
 - `tuned/architecture-clouds.mjs` (`--passages architecture`): cirrus clouds lifted from a wet sky. Architecture photograph; high.
 - `tuned/architecture-reference.plan.json` (`--architectureplan`): polygons for the architecture passage. Only useful for that photograph.
-- `tuned/default-flags.mjs` (default recipe): the tuned flags above. Mostly Y1.
+- `tuned/default-flags.mjs` (`--recipe v096` and explicit presets): the tuned flags above. Mostly Y1.
 - `tuned/dog-coats.mjs` (`--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium.
 - `tuned/drawing-caps.mjs` (`--drawsubject`): per-subject pen line limits. subject-c, subject-a; low.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
@@ -179,7 +179,7 @@ Modules:
 - `tuned/stone-demand.mjs` (`--shapedmarks 1` on Y1): one mix per stone or leaf shape. Y1; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `tuned/subjects.json` (value plan subject): the style profile for each benchmark subject. 15 subjects; low.
-- `tuned/trumbull.mjs` (default flags, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
+- `tuned/trumbull.mjs` (explicit Trumbull preset, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
 
 | `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. Default recipe only. | `--huechroma 0` |  |  |
 | `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. Default recipe only. | `--passcap 0` |  |  |
