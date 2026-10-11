@@ -78,9 +78,14 @@ body{isolation:isolate}
 #operation-controls{order:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
 #operation-controls label{display:flex;align-items:center;gap:6px;min-height:44px}
 #operation-controls input{width:20px;height:20px}#mask-status{flex-basis:100%;color:var(--muted)}
-#operation-timeline{order:6;display:flex;gap:8px;flex-wrap:wrap;max-height:74px;overflow:auto;list-style:none;margin:0;padding:4px 0;font-size:12px;color:var(--muted)}
-#operation-timeline li{padding:3px 7px;border:1px solid var(--line);border-radius:3px}
-#operation-timeline [aria-current=step]{color:var(--ink);border-color:var(--accent);background:#99543a10}
+/* A bounded terminal-style history. Rows wrap; the sheet never grows with the log. */
+#operation-timeline{order:6;height:6.8rem;max-height:6.8rem;min-width:0;overflow:auto;overscroll-behavior:contain;overflow-anchor:none;scrollbar-gutter:stable;margin:0;padding:7px 10px;border:1px solid var(--line);border-radius:3px;background:var(--paper);color:var(--muted);font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;touch-action:pan-y}
+#operation-timeline:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#operation-timeline ol{list-style:none;margin:0;padding:0}
+#operation-timeline li{margin:0;padding:1px 0;overflow-wrap:anywhere}
+#operation-timeline [aria-current=step]{color:var(--ink)}
+#operation-timeline ol:empty::before{content:'Ready to paint';color:var(--muted)}
+@media(max-width:480px){#operation-timeline{height:6rem;max-height:6rem;font-size:12px;padding:6px 8px}}
 body.canvas-focus #operation-controls,body.canvas-focus #operation-timeline{display:none!important}
 
 /* Labels remain visible; currentColor follows selected, light and dark states. */

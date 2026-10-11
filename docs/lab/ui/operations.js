@@ -1,3 +1,4 @@
+import {createStatusLog} from './status-log.js';
 // A separate overlay: paint exports remain paint; physical masks stay on the sheet
 // whether or not the viewer chooses to display their tint.
 export function createOperationsUI(sheet, send) {
@@ -9,7 +10,7 @@ export function createOperationsUI(sheet, send) {
  const boundary=document.createElement('button');boundary.type='button';boundary.id='remove-boundary';boundary.textContent='Remove boundary';boundary.addEventListener('click',()=>send({type:'remove-boundary'}));
  const status=document.createElement('span');status.id='mask-status';
  controls.append(label,remove,boundary,status);document.getElementById('replay-controls').after(controls);
- const timeline=document.createElement('ol');timeline.id='operation-timeline';timeline.setAttribute('aria-label','Painting operation timeline');controls.after(timeline);
+ const timeline=document.createElement('div');controls.after(timeline);const log=createStatusLog(timeline);
  const tools=document.querySelector('[data-tool="dryer"]').parentElement;
  for(const [kind,text,title] of [['mask','Mask','Paint masking fluid'],['lift','Lift','Lift mobile paint with a damp tool; staining remains'],['blot','Blot','Blot wet paint with tissue']]){
   const b=document.createElement('button');b.type='button';b.dataset.tool=kind;b.textContent=text;b.title=title;b.setAttribute('aria-pressed','false');tools.append(b);
@@ -49,15 +50,14 @@ export function createOperationsUI(sheet, send) {
   status.textContent=[masked?'Blue-grey: masking fluid remains':'',clipped?'Ochre line: allowed passage':''].filter(Boolean).join(' · ');
  }
  return {
-  canvas,
-  reset(width,height){w=width;h=height;canvas.width=w;canvas.height=h;masks={};operation=contact=null;backdropDirty=true;timeline.replaceChildren();updateStatus();draw();},
+  canvas, log,
+  reset(width,height){w=width;h=height;canvas.width=w;canvas.height=h;masks={};operation=contact=null;backdropDirty=true;if(!playing)log.reset();updateStatus();draw();},
   playing(on){playing=on;updateStatus();},
   clear(){operation=contact=null;backdropDirty=true;draw();},
   stage(data){
-   const last=timeline.lastElementChild;
-   if(last?.dataset.label===data.label){last.textContent=data.label+(data.done!=null?` · after stroke ${data.done}`:'');return;}
-   last?.removeAttribute('aria-current');const li=document.createElement('li');li.dataset.label=data.label;li.textContent=data.label+(data.done!=null?` · after stroke ${data.done}`:'');li.setAttribute('aria-current','step');timeline.append(li);
-   if(timeline.children.length>200)timeline.firstElementChild.remove();timeline.scrollTop=timeline.scrollHeight;
+   // Routine palette reloads and the paint preamble are described by materials.
+   if(['dip','ink','paint'].includes(data.kind)||data.liveRun!=null&&data.kind==='water')return;
+   log.write({phase:data.label,operation:data.kind,done:data.done,total:data.total});
   },
   frame(data){if(data.masks){masks=data.masks;backdropDirty=true;updateStatus();}if(data.operation!==undefined){operation=data.operation;backdropDirty=true;}contact=data.replayPoint?.contact??null;draw();}
  };
