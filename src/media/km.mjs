@@ -61,7 +61,11 @@ export function renderCells(layers, Kp, Sp, paperRGB, c0, c1, scale, extra, out,
   // before 8-bit rounding (render-cache.mjs)
   const K = Kp.length, NL = layers.length;
   // a cell's layers are walked once, not once per channel
-  const frac = new Float64Array(K);
+  const frac = new Float64Array(K), active = new Uint32Array(K);
+  // Zero fractions contribute exactly +0 with finite optical coefficients. Keep
+  // surviving pigment terms in their original order, including their divisions.
+  const sparse = (typeof process === 'undefined' || process.env.KM_SPARSE_CHANNELS !== '0')
+    && Kp.every(a => a.every(Number.isFinite)) && Sp.every(a => a.every(Number.isFinite));
   // Cells go a block at a time and, inside a block, a layer at a time, so empty layers are skipped per block.
   // Each cell still sees its layers oldest first with the same arithmetic.
   const B = Math.min(c1 - c0, RENDER_BLOCK), R = new Float64Array(B * 3), xt = new Float64Array(B);
@@ -76,24 +80,24 @@ export function renderCells(layers, Kp, Sp, paperRGB, c0, c1, scale, extra, out,
       for (let c = 0; c < nb; c++) {
         const x0 = xt[c]; if (x0 <= 1e-7) continue;
         const i = b0 + c;
-        let x;
+        let x, used = 0;
         if (micro) {
           // microtexture (microAmps): each paint's share moved toward the hollows by its own granulation
           const tv = micro.t[i];
           let xm = 0;
           for (let k = 0; k < K; k++) { const v = layer[k][i] * (1 + micro.amp[k] * tv); frac[k] = v; xm += v; }
           if (xm <= 1e-9) continue;
-          for (let k = 0; k < K; k++) frac[k] /= xm;
+          for (let k = 0; k < K; k++) { frac[k] /= xm; if (!sparse || frac[k] !== 0) active[used++] = k; }
           x = xm * scale;
         } else {
-          for (let k = 0; k < K; k++) frac[k] = layer[k][i] / x0;
+          for (let k = 0; k < K; k++) { frac[k] = layer[k][i] / x0; if (!sparse || frac[k] !== 0) active[used++] = k; }
           x = x0 * scale;
         }
-        let Kc = 0, Sc = 0, r = R[c * 3]; for (let k = 0; k < K; k++) { Kc += frac[k] * Kp[k][0]; Sc += frac[k] * Sp[k][0]; }
+        let Kc = 0, Sc = 0, r = R[c * 3]; for (let q = 0; q < used; q++) { const k = active[q]; Kc += frac[k] * Kp[k][0]; Sc += frac[k] * Sp[k][0]; }
         rt(Kc, Sc, x); R[c * 3] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
-        Kc = 0; Sc = 0; r = R[c * 3 + 1]; for (let k = 0; k < K; k++) { Kc += frac[k] * Kp[k][1]; Sc += frac[k] * Sp[k][1]; }
+        Kc = 0; Sc = 0; r = R[c * 3 + 1]; for (let q = 0; q < used; q++) { const k = active[q]; Kc += frac[k] * Kp[k][1]; Sc += frac[k] * Sp[k][1]; }
         rt(Kc, Sc, x); R[c * 3 + 1] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
-        Kc = 0; Sc = 0; r = R[c * 3 + 2]; for (let k = 0; k < K; k++) { Kc += frac[k] * Kp[k][2]; Sc += frac[k] * Sp[k][2]; }
+        Kc = 0; Sc = 0; r = R[c * 3 + 2]; for (let q = 0; q < used; q++) { const k = active[q]; Kc += frac[k] * Kp[k][2]; Sc += frac[k] * Sp[k][2]; }
         rt(Kc, Sc, x); R[c * 3 + 2] = RT_R + RT_T * RT_T * r / (1 - RT_R * r);
       }
     }
