@@ -65,7 +65,7 @@ import { attachGpu, gpuStats } from '../src/media/gpu/link.mjs';
 import { renderLayers, renderLayersCached, renderCells, microAmps } from '../src/media/km.mjs';
 import { renderSheet } from '../src/media/render-cache.mjs';
 import { createFramer } from '../src/media/gpu/framer.mjs';
-import { createBrush as createBrushRaw, dip as dipBrush, stroke as physicalStrokeRaw, candidateContact as candidateContactRaw, recordMarks, thirsty, setWashSplat } from '../src/media/brush.mjs';
+import { createBrush as createBrushRaw, dip as dipBrush, stroke as physicalStrokeRaw, candidateContact as candidateContactRaw, ContactWorkspace, recordMarks, thirsty, setWashSplat } from '../src/media/brush.mjs';
 import { paperOf, pickPalette, paletteOptions } from '../src/crop/palettepick.mjs';
 import { widePalette, puddleLabels } from '../src/crop/palettewide.mjs';
 import { channelDensity, unmix } from '../src/crop/pigments.mjs';
@@ -183,6 +183,8 @@ const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
 // Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
 const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
 const SPEED_PAPER = num('speedpaper', 0) > 0;
+const SPEED_CONTACT = num('speedcontact', 0) > 0;
+const VALUE_CONTACT_WORK = new ContactWorkspace();
 const SPEED_GPU_OPTICS = num('speedopticalgpu', 0) > 0;
 if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
 const NATIVE_UPLOAD_POLICY = nativeUploadPolicy(NATIVE_PAINT_MODE.mode, process.env.GPU_DIRTY_UPLOAD);
@@ -1146,7 +1148,7 @@ const stroke=(b,target,points,options)=>{
  if(AREA_NUMERIC_CONTACT_STOP&&target===sheet)return;
  if(VALUE_ACTIVE&&target===sheet){
   if(VALUE_ACTIVE.shaped)options={...options,upright:VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
-  const contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3}),cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors],SPEED_PAPER);
+  const contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null}),cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors],SPEED_PAPER);
   let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),SPEED_PAPER).dry;
   if(paint&&!['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();if(!paper.dry)throw Error('value-plan dry-paper contact gate failed');}
   // --wetgate 0: log a wet wash whose footprint is not evenly wet instead of stopping the run. Default 1.
