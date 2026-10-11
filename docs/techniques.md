@@ -180,3 +180,8 @@ Modules:
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `tuned/subjects.json` (value plan subject): the style profile for each benchmark subject. 15 subjects; low.
 - `tuned/trumbull.mjs` (default flags, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
+
+| `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. Default recipe only. | `--huechroma 0` |  |  |
+| `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. Default recipe only. | `--passcap 0` |  |  |
+| `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. Default recipe only. | `--maskmm 0` |  |  |
+| `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. Default recipe only. | `--palelights 0` |  |  |

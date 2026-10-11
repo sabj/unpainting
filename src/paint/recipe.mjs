@@ -2,8 +2,8 @@
 // the value plan's drawing flags. A flag given on the command line still wins, since the last of a repeated flag is
 // the one read.
 //
-// default: general watercolor methods only: light-to-dark value planning with shaped marks, four middle layers, two
-// touch-up rounds, a round of final darks and a drawing first and last, on physical cold-press paper. No value in it was fitted to one
+// default: general watercolor methods only: light-to-dark value planning with shaped marks and clean-colour passages,
+// four middle layers, two touch-up rounds, a round of final darks and a drawing first and last, on physical cold-press paper. No value in it was fitted to one
 // benchmark image. The plan's drawing section chooses the medium, amount and weight of that drawing
 // (drawing-plan.mjs); without one the painter picks graphite or ink from the image. The subject's own inputs stay on
 // the command line: --valueplan, --drawingfile, --drawinglast and --sheetmm. --recipe none paints with the bare
@@ -28,6 +28,10 @@ const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
 const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 1 --layerhue 1 --drawing both --sourcelines 1 --linesource auto --frames 8 --marks 1';
+// Clean colour (light-to-dark.mjs): first washes and middle layers mixed per colour family, saturated and muted
+// families apart, each passage charged at its median with the rest carried to the next band, carried glazes placed at
+// brush scale, and pale planes kept to one wash.
+const CLEAN_COLOUR_FLAGS = '--huechroma 30 --passcap 0.5 --maskmm 2 --lightfamilies 1 --palelights 0.16';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
@@ -36,7 +40,7 @@ const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loa
 const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skysplit 1';
 
 const RECIPES = {
-  default: [METHOD_FLAGS, TECHNIQUE_FLAGS].join(' '),
+  default: [METHOD_FLAGS, CLEAN_COLOUR_FLAGS, TECHNIQUE_FLAGS].join(' '),
   v096: [V096_METHOD_FLAGS, V096_TECHNIQUE_FLAGS, TUNED_DEFAULT_FLAGS].join(' '),
   person: '--masses 8 --masscap 0.15 --massload 0.5 --masswet 99 --mopgap 1.3 --masspaper 0.12 --massfeather 0.4 --massmaxlevel 1 --segwash 1 --segwashes 1 --pigphys 1 --gran 0.08 --skipheld 0.15 --skipheldmin 0.01 --whitefloor 1.0 --resistmin 0.002 --smalllights frisket --drawing both --inkfilter 1 --inktiers 1 --outlinemedium ink --segink 1 --tier3 0.15 --mllines 1 --contain 0 --cutin 0 --maxvalues 4 --minshape 80 --shapes 3 --shapedeep 1.6 --shapequant 0.6 --shapeload 0.7 --ladderseg 0.5 --boxpick 0 --texture 0 --washgrain 0.15 --marks 1',
 };
