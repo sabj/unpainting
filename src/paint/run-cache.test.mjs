@@ -4,6 +4,32 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {codeHash,cachedStep} from './run-cache.mjs';
+import {planLightToDark} from './methods/light-to-dark.mjs';
+
+test('value plan cache restores mutable demand, shapes and material instructions',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'value-cache-'));
+ try{
+  const w=48,h=40,k=2,n=w*h;
+  const inputs=()=>({w,h,k,shaped:true,litWarm:true,litLift:.2,litReserveL:99,layerSmoothMm:0,subject:null,
+   pigments:[{name:'yellow ochre'},{name:"Payne's grey"}],
+   density:Float32Array.from({length:n},(_,i)=>.1+(i%w)*.015),
+   demand:Float32Array.from({length:n*k},(_,i)=>i%2?.12:.05),
+   rgb:Uint8Array.from({length:n*3},(_,i)=>[230,218,180][i%3])});
+  const track={start(){},stop(){return []},current(){return null},replay(){}};
+  const run=async options=>{
+   const saved=await cachedStep({dir,name:'value-plan',code:'value-test',track,inputs:options},async()=>({plan:planLightToDark(options),demand:options.demand}));
+   if(saved.cached)options.demand.set(saved.value.demand);
+   return saved;
+  };
+  const a=inputs(),b=inputs(),first=await run(a),second=await run(b);
+  assert.equal(first.cached,false);assert.equal(second.cached,true);
+  assert.deepEqual(b.demand,a.demand);
+  assert.deepEqual(second.value,first.value);
+  assert.ok(first.value.plan.layers.length);
+  const changed=inputs();changed.density[0]+=.3;
+  assert.equal((await run(changed)).cached,false);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
 test('warm plans retain typed data; target, options, and planning sources invalidate',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'w6-cache-'));
  try{
