@@ -141,13 +141,41 @@ export function clipRuns(mask) {
   return r;
 }
 
+// Identical views repeat a multiplication on the same cell in the same order.
+// Shifted views can instead map different cells onto one float, whose rounding
+// depends on cell order. Aliased mask/strength inputs must also stay read in
+// the original order as writes may change their later entries.
+function filmPlaneOrderSafe(planes, inputs, n) {
+  const buffers = new Map();
+  for (const plane of planes) {
+    if (!ArrayBuffer.isView(plane) || !plane.BYTES_PER_ELEMENT || plane.length < n) return false;
+    const from = plane.byteOffset, to = from + n * plane.BYTES_PER_ELEMENT;
+    const ranges = buffers.get(plane.buffer) ?? [];
+    for (const prior of ranges) if (from < prior.to && prior.from < to &&
+      (from !== prior.from || plane.BYTES_PER_ELEMENT !== prior.size)) return false;
+    if (!ranges.some(prior => prior.from === from && prior.size === plane.BYTES_PER_ELEMENT)) ranges.push({ from, to, size: plane.BYTES_PER_ELEMENT });
+    buffers.set(plane.buffer, ranges);
+  }
+  for (const input of inputs) if (input && ArrayBuffer.isView(input)) {
+    const from = input.byteOffset, to = from + input.byteLength;
+    if ((buffers.get(input.buffer) ?? []).some(prior => from < prior.to && prior.from < to)) return false;
+  }
+  return true;
+}
+
 export function liftResist(sheet, { byPlane = false } = {}) {
   if (TAPE && sheet._tape) TAPE.push({ k: 'R' });
   const r = sheet.resist; if (!r) return;
   coherent(sheet);
   const from = sheet.resistFrom ?? sheet.layers.length, st = sheet.resistStrength ?? null;
+  let layers, planes;
   if (byPlane) {
-    const layers = sheet.layers;
+    layers = sheet.layers; planes = [];
+    for (let k = 0; k < sheet.K; k++) planes.push(sheet.G[k], sheet.D[k], sheet.P[k]);
+    for (let L = from; L < layers.length; L++) for (let k = 0; k < sheet.K; k++) planes.push(layers[L][k]);
+    byPlane = filmPlaneOrderSafe([sheet.W, sheet.M, ...planes], [r, st], sheet.n);
+  }
+  if (byPlane) {
     let nh = 0, np = 0;
     for (let i = 0; i < sheet.n; i++) if (r[i]) { if (st && st[i] < 1) np++; else nh++; }
     const hard = new Int32Array(nh), partial = new Int32Array(np), keep = new Float64Array(np);
@@ -156,11 +184,8 @@ export function liftResist(sheet, { byPlane = false } = {}) {
       if (st && st[i] < 1) { partial[np] = i; keep[np++] = 1 - st[i]; sheet.W[i] *= 1 - st[i]; }
       else { hard[nh++] = i; sheet.W[i] = 0; sheet.M[i] = 0; }
     }
-    // Plane order preserves repeated writes even if a caller aliases planes.
+    // Plane order preserves repeated writes through identical plane views.
     // Cache the layers getter once and walk adjacent masked cells per plane.
-    const planes = [];
-    for (let k = 0; k < sheet.K; k++) planes.push(sheet.G[k], sheet.D[k], sheet.P[k]);
-    for (let L = from; L < layers.length; L++) for (let k = 0; k < sheet.K; k++) planes.push(layers[L][k]);
     for (const plane of planes) {
       for (let j = 0; j < hard.length; j++) plane[hard[j]] = 0;
       for (let j = 0; j < partial.length; j++) plane[partial[j]] *= keep[j];
