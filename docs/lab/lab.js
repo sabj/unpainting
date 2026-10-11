@@ -1,3 +1,4 @@
+import {handStatus,recordedStatus} from './ui/status-log.js';
 import {addToolIcons} from './ui/tool-icons.js';
 import {createOperationsUI} from './ui/operations.js';
 // The paint lab page: pointer input, controls and the frames from the simulation worker.
@@ -232,7 +233,7 @@ const setPlaying = on => {
   operations.playing(on);operations.canvas.hidden=on&&lab.mode==='replay';if(!on)operations.clear();
   playing = on; lab.playing = on;document.body.classList.toggle('replaying',on); pauseButton.disabled = on; quickDryButton.disabled = on || Boolean(lab.quickDry);
   playbar.hidden = !on; caption.hidden = !on;if(!on)document.getElementById('current-materials').hidden=true;
-  if(on){caption.textContent='Preparing the paper';playProgress.value=0;lab.progress=null;document.getElementById('skip').disabled=true;}
+  if(on){operations.log.reset();caption.textContent='Preparing the paper';playProgress.value=0;lab.progress=null;document.getElementById('skip').disabled=true;}
   queueCursor();
 };
 const cancelPlayback = () => {
@@ -299,7 +300,7 @@ async function playExampleFilm(example, carry=false, seek=0) {
   const film={...example.film, frames:example.film.frames.map(f=>new URL(f,base).href),paths:example.film.paths?new URL(example.film.paths,base).href:null};
   lab.target={id:example.id,film:true,frames:film.frames.length,started:performance.now()};
   worker.postMessage({type:'pause',on:true});
-  playFilm(film,filmCanvas,W,H,{progress:(d,t)=>{playbackUI.ready();lab.seeking=false;playbackUI.update(d/t);document.getElementById('skip').disabled=false;playProgress.value=d/t;lab.replayProgress=d/t;}, skipped:()=>filmSkip,alive,
+  playFilm(film,filmCanvas,W,H,{progress:(d,t)=>{playbackUI.ready();lab.seeking=false;playbackUI.update(d/t);document.getElementById('skip').disabled=false;playProgress.value=d/t;lab.replayProgress=d/t;operations.log.write(recordedStatus(film,d/t));}, skipped:()=>filmSkip,alive,
     seek,paused:()=>replayPaused,speed:()=>Number(replaySpeed.value),brush:()=>document.getElementById('show-brush').checked})
     .then(({final,box})=>{if(!alive())return;state.textContent='Ready to carry on painting';worker.postMessage({type:'base',width:W,height:H,rgba:sheetPixels(final,box,W,H),white:SURFACES.cold.colour,surface:'cold'});})
     .catch(error=>{if(!alive())return;console.error(error);filmCanvas.hidden=true;setPlaying(false);state.textContent='The recording could not be loaded';worker.postMessage({type:'pause',on:false});});
@@ -349,6 +350,7 @@ function startTouch() {
   if (!start || !started || playing || gesture || pointer !== null) return;
   cacheRect(); canvas.focus({preventScroll:true}); pointer = start.pointerId; lastPointerType='touch'; lastScreen=start; contactSampler.reset(); last = toSheet(start,true); recordContact(last,'down'); lastT = start.timeStamp; lastMove = performance.now();
   document.getElementById('paint-hint').hidden = true;
+  if(['round','flat','pen','pencil'].includes(toolInHand().tool))operations.log.write(handStatus(toolInHand(),strokeCount+1,BY_KEY));
   worker.postMessage({ type: 'down', pt: last, tool: toolInHand() });
 }
 const applyView = () => {
@@ -413,6 +415,7 @@ sheetEl.addEventListener('pointerdown', e => {
   lastPointerType=e.pointerType;barrelHeld=e.pointerType==='pen'&&Boolean(e.buttons&2);setTemporaryWater();
   canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId); pointer = e.pointerId; lastScreen=e; contactSampler.reset(); last = toSheet(e,true);recordContact(last,'down');lastT = e.timeStamp; lastMove = e.timeStamp;
   document.getElementById('paint-hint').hidden = true;
+  if(['round','flat','pen','pencil'].includes(toolInHand().tool))operations.log.write(handStatus(toolInHand(),strokeCount+1,BY_KEY));
   worker.postMessage({ type: 'down', pt: last, tool: toolInHand() });
 });
 sheetEl.addEventListener('pointermove', e => {
@@ -501,10 +504,11 @@ worker.addEventListener('message', ({ data }) => {
   }
   else if (data.type === 'live-ready') {playbackUI.ready();lab.seeking=false;playProgress.value=data.done/data.total;playbackUI.update(data.done/data.total);document.getElementById('skip').disabled=false;lab.progress={done:data.done,total:data.total,phase:'painting'};}
   else if(data.type==='operation'){operations.stage(data);lab.operationStage={kind:data.kind,label:data.label,done:data.done};if(playing){caption.textContent=data.label;playbackUI.materials({phase:data.label,tool:'',pigments:[]});}}
-  else if (data.type === 'materials') {playbackUI.materials(data);lab.materials=data;if(data.total)caption.textContent=`${data.phase} · ${data.done+1} / ${data.total} strokes`;}
+  else if (data.type === 'materials') {operations.log.write({phase:data.phase,tool:data.tool,pigments:data.pigments.map(p=>p.name||'Recorded pigment'),done:data.done==null?undefined:data.done+1,total:data.total});playbackUI.materials(data);lab.materials=data;if(data.total)caption.textContent=`${data.phase} · ${data.done+1} / ${data.total} strokes`;}
   else if (data.type === 'caption') { if (playing) caption.textContent = data.text; }
   else if (data.type === 'progress') {
     if (!playing) return;
+    operations.log.progress(data.done,data.total);
     document.getElementById('skip').disabled=data.phase==='seeking';
     if (playingExample) {playbackUI.update(data.done/data.total);caption.textContent=`${lab.materials?.phase||'Painting'} · ${data.done} / ${data.total} strokes`;}
     playProgress.value = data.total ? data.done / data.total : 0; lab.progress = { done: data.done, total: data.total, phase: data.phase };
@@ -543,6 +547,7 @@ worker.addEventListener('message', ({ data }) => {
     if (wasPaused !== null && data.paused !== wasPaused) announce(data.paused ? 'Drying paused' : 'Drying resumed');
     wasPaused = data.paused;
     if (data.strokes !== strokeCount) canvas.setAttribute('aria-label', `Paper with ${data.strokes} ${data.strokes === 1 ? 'stroke' : 'strokes'}. Drag to paint.`);
+    if(!playing&&data.strokes!==strokeCount)operations.log.progress(data.strokes);
     strokeCount = data.strokes;
     pauseButton.setAttribute('aria-pressed', String(data.paused));pauseButton.textContent = data.paused ? 'Resume drying' : 'Pause drying';
     showMarks(data);

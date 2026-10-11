@@ -216,7 +216,7 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
       <div class="toolbar paint-controls" role="toolbar" aria-label="Sheet"><button id="reset-view" aria-label="Fit paper" title="Reset zoom and pan">Fit</button><button id="clear" aria-label="New sheet">New</button><button id="undo" disabled title="Undo (Cmd/Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (Shift+Cmd/Ctrl+Z)">Redo</button><button id="redip" type="button">Re-dip</button><label><input id="auto-redip" type="checkbox" checked> Auto re-dip each wet stroke</label><output id="load-state" aria-live="polite"></output><button id="dry-layer" title="Dry the current layer (Shift+D)">Dry layer</button><button id="save" aria-label="Save image">Save</button></div>
     </div>
     <div id="drying" class="drying" hidden><span id="drying-label">Drying</span><progress id="drying-progress" max="1" aria-label="Share of peak wet area dried"></progress></div>
-    <p id="step-caption" hidden aria-live="polite"></p>
+    <p id="step-caption" hidden></p>
     <div class="playbar" id="playbar" hidden><button id="play-pause" aria-pressed="false">Pause</button><progress id="play-progress" max="1" value="0" aria-label="Progress of the painting"></progress><button id="skip">Carry on painting</button></div>
 
     <div class="toolbar paint-controls" id="replay-controls"><button id="replay">Restart</button><label for="replay-speed">Speed <select id="replay-speed"><option value="0.5">Half speed</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><label><input id="show-brush" type="checkbox" checked> Show brush</label></div>
