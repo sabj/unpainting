@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds the static GitHub Pages site into one folder:
 //   index.html         a landing page: one sentence, a WebGPU check, and a link into the painter
-//   painter/           Paint Lab (docs/index.html and docs/lab/), with the recorded early-stroke excerpts and shared media
+//   painter/           Paint Lab (docs/index.html and docs/lab/), with the complete budgeted studies and shared media
 // Every URL is relative, so the site works under a project path such as /unpainting/.
 //
 //   node tools/lab/build-site.mjs [OUT=_site]
@@ -24,7 +24,7 @@ function painter() {
   const shipped = manifest.examples;
   const outExamples = path.join(dir, 'lab', 'examples');
   fs.mkdirSync(outExamples, { recursive: true });
-  const files = new Set(shipped.flatMap(ex => [ex.target, ex.thumb, ex.film.paths, ex.film.final, ...ex.film.frames, ...Object.values(ex.live??{}), ...Object.values(ex.checkpoints??{}).flat().flatMap(c=>[c.state,c.image])].filter(Boolean)));
+  const files = new Set(shipped.flatMap(ex => [ex.target, ex.thumb, ex.film.paths, ex.film.final, ...ex.film.frames, ...Object.values(ex.live??{}), ...Object.values(ex.studies??{}).flatMap(s=>[s.painting,s.comparison,s.metrics]), ...Object.values(ex.checkpoints??{}).flat().flatMap(c=>[c.state,c.image])].filter(Boolean)));
   for (const file of files) {
     const dest = path.join(dir, 'lab', file);
     fs.mkdirSync(path.dirname(dest), {recursive:true});

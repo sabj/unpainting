@@ -30,7 +30,7 @@ function makePen({ nib = 0.8, flex = 1.5, reservoir = 250, wick = 0.15, feed = 1
 
 /** Dip: fill the reservoir with ink at `conc` (pigment per unit of water, per pigment); `amount` is how full (0..1). */
 export function dipPen(pen, conc, amount = 1) {
-  if (TAPE && pen._tapeId !== undefined) TAPE.push({ k: 'D', pen: pen._tapeId, ink: Array.from(conc, v => +v.toFixed(4)), a: amount });
+  if (TAPE && pen._tapeId !== undefined) TAPE.push({ k: 'D', pen: pen._tapeId, ink: Array.from(conc), a: amount });
   pen.ink = pen.capacity * amount; pen.drop = pen.dropSize * amount; pen.conc = conc.slice();
 }
 
@@ -167,7 +167,7 @@ function penStrokeImpl(pen, sheet, path, { between, spacing = 0.5,flowEvery=0 } 
   // only the painting's own sheet, and only a pen the recorder gave an id to
   const rec = TAPE && pen._tapeId !== undefined && sheet._tape ? [] : null;
   if (rec) TAPE.push({
-    k: 'P', pen: pen._tapeId, sp: spacing,
+    k: 'P', pen: pen._tapeId, sp: spacing, points: path.map(p=>({...p})),
     // step indices where this stroke flowed the sheet
     fl: rec,
     // points as integers: x and y in tenths of a cell; pressure, speed and dwell in hundredths

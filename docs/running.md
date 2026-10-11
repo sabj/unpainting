@@ -120,3 +120,26 @@ To rebuild the example animations, run `sh tools/lab/paint-examples.sh`. It clea
 Run `npx knip` from the repository root. The configuration includes benchmark commands copied into temporary worktrees: `bench/v4v5/paint.mjs`, `bench/v4v5/tools/*.mjs`, and `bench/scripts/pipeline/dry-planner.mjs`.
 
 Paint Lab copies `src/media` through `tools/lab/sync-site-media.mjs`. The source `permeability` export is used by the browser GPU sheet through that copy. Generated `cpu-stroke-dirty.js` keeps the source exports for synchronization. The generated sheet's optional `sheet-par.mjs` import is Node-only; Paint Lab does not enable CPU threads. `ffmpeg` and `codex` are external executables, not npm dependencies.
+
+### Complete stroke-budget studies
+
+`--strokebudget 250` (or `2500`) plans a complete picture within that many
+physical brush, pen and graphite strokes, including clean-water brush marks.
+The default is `0` (off); ordinary renders keep their existing settings.
+Budgets must be integers of at least 25. Use `--marks 1 --video 0` to save the
+full material tape and stage frames without encoding a movie.
+
+The planner reduces drawing share and value layers, keeps the colour channels
+of each selected passage together, and covers passages with fewer, broader
+lanes. Optional touch-ups and edge-softening marks yield to that budget.
+It does not stop an ordinary painting after its first N marks. Small passages
+and exhausted drawing candidates can finish slightly below the requested limit.
+`stroke-budget.json` records the actual counts; exceeding the limit fails the run.
+
+Paint Lab's complete study tapes retain native resolution, physical paper,
+pigments, full-precision geometry, flow timing and drying/fixing. The final
+checkpoint includes trailing drying and mask removal. Rebuild with
+`tools/lab/build-live-examples.mjs` (four run directories) followed by
+`tools/lab/build-live-checkpoints.mjs`. `tools/lab/compare-live.mjs RUN OUT`
+compares the shared Live executor to the painter's `painting.png` in RGB units
+from 0 to 255, writing numerical results and a side-by-side PNG.

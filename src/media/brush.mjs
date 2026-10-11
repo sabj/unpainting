@@ -35,7 +35,7 @@ function makeBrush({ loadWater = 0, depositDepth = 0, bristles = 22, radius = 6,
 export function dip(brush, { water = 1, conc }) {
   // A pending GPU stroke's hair state is overwritten here; stroke() still restores the generator state.
   if (brush._pend) brush._pend.hairs = false;
-  if (TAPE && brush._tapeId !== undefined) TAPE.push({ k: 'd', b: brush._tapeId, w: water, c: conc.map(v => +v.toFixed(4)) });
+  if (TAPE && brush._tapeId !== undefined) TAPE.push({ k: 'd', b: brush._tapeId, w: water, c: Array.from(conc) });
   brush.K = conc.length; brush.load = water; brush.carry = 0; brush.travel = 0;
   brush.dips = (brush.dips ?? 0) + 1; brush.sinceDip = 0; brush._onPaper = false;
   if (varietyOf(brush)) reclump(brush);
@@ -448,7 +448,7 @@ function tapeStroke(brush, sheet, path, { spacing, lift, upright, splat = false 
   let rec = TAPE && brush._tapeId !== undefined && sheet._tape ? [] : null;
   // Only the painting's own sheet records; scrap test sheets do not.
   if (TAPE && brush._tapeId !== undefined && sheet._tape) TAPE.push({
-    k: 's', b: brush._tapeId,
+    k: 's', b: brush._tapeId, points: path.map(p=>({...p})),
     u: upright === false ? 0 : upright === true ? 1 : 2,
     // prewet strokes: sheet.wetting marks sheet.ever, which bounds where later washes creep
     ...(sheet.wetting ? { wt: 1 } : {}),

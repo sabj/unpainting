@@ -1,3 +1,4 @@
+import {tapeBase,tapeFlow} from './worker/tape-sheet.js';
 import {OPERATION_NAMES, footprint, applyHandOperation, watchContact} from './worker/operations.js';
 import { runTape, SHEET_FIELDS } from './worker/live-tape.js';
 import { contactAudit } from './worker/contact-audit.js';
@@ -672,11 +673,11 @@ async function liveTape(data,current){
   const saved=data.checkpoint?await decodeState(data.checkpoint):null;if(!current())return;
   await locked(async()=>{
     if(!current())return;
-    await newSheet({paperW:6,paperH:6*tape.h/tape.w,dpi:60,seed:tape.paper?.seed??9});
+    await newSheet({paperW:tape.w/60,paperH:tape.h/60,dpi:60,seed:tape.paper?.seed??9});
     demoPlaying='live';
     PIGS=tape.pigments;NAMES=PIGS.map((_,i)=>`recorded-${i}`);
-    paper={...makePaper(W,H,{...tape.paper,scale:Math.max(.2,(tape.paper?.scale||1)*W/tape.w)}),mmPerCell:MM/dpi};
-    sheet=createSheet(paper,PIGS);if(saved){Object.assign(sheet,saved.fields);sheet.wetDirty=1;}baseR.set(bareBase());
+    paper=makePaper(W,H,tape.paper);
+    sheet=createSheet(paper,PIGS);if(saved){Object.assign(sheet,saved.fields);sheet.wetDirty=1;}baseR.set(Float32Array.from(tapeBase(tape,paper),v=>v/255));baseIsBare=false;
     if(phys){phys.setPigments(PIGS);await phys.load(sheet,baseR,graphite);}else if(gpu)rebuildGl();
     paused=false;masksDirty=true;strokes=saved?.tape.done||0;await render();
     postMessage({type:'live-ready',liveRun:data.liveRun,done:strokes,total:tape.strokeCount});
@@ -744,8 +745,8 @@ async function liveTape(data,current){
       postMessage({type:'progress',liveRun:data.liveRun,done,total,phase:'painting'});
       await sleep(Math.max(30/liveSpeed,280/liveSpeed-(performance.now()-strokeStart)));},
     mutate:fn=>locked(async()=>{if(!current())return;if(phys)await phys.syncAll(sheet);fn();if(phys)await phys.load(sheet,baseR,graphite);dirty=baseDirty=true;}),
-    flow:(dry,m)=>locked(async()=>{if(!current())return;const opts={...DEFAULTS,dt:dry?2:.3};
-      if(phys){phys.setOptions(opts);await phys.step(dry?Math.min(m?.m||30,90):1);}else for(let i=0;i<(dry?Math.min(m?.m||30,90):1);i++)step(sheet,opts);
+    flow:(dry,m)=>locked(async()=>{if(!current())return;
+      if(phys)await phys.syncAll(sheet);tapeFlow(tape,sheet,dry,m);if(phys)await phys.load(sheet,baseR,graphite);baseDirty=true;
       lastDt=null;ticks++;dirty=true;})
   },saved?.tape);}finally{if(current()){active=null;replayPoint=null;operation=null;demoPlaying=null;paused=false;await locked(async()=>{await render();await checkpoint();});postMessage({type:'played',liveRun:data.liveRun,name:'live',example:true,wet:true,strokes:completed});}}
 }

@@ -64,14 +64,13 @@ test('hand masking persists across strokes; removal, blotting and lifting change
  assert.ok(sheet.P[0][30*64+40]<1);assert.equal(sheet.P[0][0],1);
 });
 
-test('shipped excerpts contain explicit resist and clip operations; removal is not invented',()=>{
+test('complete shipped studies preserve masks and their actual removal',()=>{
  for(const name of ['h36-a','white-ships']){
   const tape=JSON.parse(gunzipSync(fs.readFileSync(new URL(`../../docs/lab/examples/${name}/live-2500.json.gz`,import.meta.url))));
-  assert.ok(tape.marks.some(m=>m.k==='r'&&m.m.some(Boolean)));
+  assert.equal(tape.complete,true);
   assert.ok(tape.marks.some(m=>m.k==='c'&&m.r?.length));
-  assert.equal(tape.marks.some(m=>m.k==='R'),false);
-  const wash=tape.marks.find(m=>m.k==='s'),brush=tape.brushOpts[tape.brushes[wash.b]??wash.b];
-  assert.ok(wash.d.some(p=>p[3]/tape.scale>brush.radius),'first wash exceeds the default brush radius');
+  assert.ok(tape.marks.some(m=>m.k==='R'),'the complete run includes physical mask removal');
+  assert.ok(tape.marks.some(m=>m.k==='y'),'the complete run includes drying');
  }
 });
 

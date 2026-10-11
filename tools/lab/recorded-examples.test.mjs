@@ -5,11 +5,13 @@ import zlib from 'node:zlib';
 import {pointOnPath} from '../../docs/lab/targets/film.js';
 const lab = new URL('../../docs/lab/', import.meta.url);
 const json = p => JSON.parse(fs.readFileSync(new URL(p, lab)));
-test('published paintings ship real live materials, dips, early strokes and saved recordings', () => {
+test('published paintings ship complete budgeted live paintings, materials and saved recordings', () => {
   for (const ex of json('examples/recorded.json').examples) {
     for (const limit of [250,2500]) {
       const t=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL(ex.live[limit],lab))));
-      assert.equal(t.marks.filter(m=>m.k==='s'||m.k==='P').length,limit);
+      const count=t.marks.filter(m=>['s','P','g'].includes(m.k)).length;
+      assert.equal(t.complete,true);assert.equal(t.strokeBudget,limit);assert.equal(t.strokeCount,count);assert.ok(count<=limit&&count>=limit*.8);
+      assert.ok(t.marks.at(-1).k==='m'||t.marks.at(-1).k==='y'||t.marks.at(-1).k==='c');
       assert.ok(t.pigments.length&&t.brushOpts.length);
       assert.ok(t.marks.some(m=>m.k==='d'||m.k==='D'));
     }
