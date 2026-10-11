@@ -11,6 +11,17 @@ spec.loader.exec_module(sketch)
 
 
 class SketchTests(unittest.TestCase):
+    def test_small_degree_two_ring_stays_closed(self):
+        s = np.zeros((15, 15), 'uint8')
+        for y in range(15):
+            for x in range(15):
+                if abs(x - 7) + abs(y - 7) == 3:
+                    s[y, x] = 1
+        paths = sketch.trace(s, min_points=2)
+        self.assertEqual(len(paths), 1)
+        self.assertTrue(np.array_equal(paths[0][0], paths[0][-1]))
+        self.assertGreater(sketch.arc_length(paths[0]), 16)
+
     def test_junction_does_not_fragment_structure(self):
         s = np.zeros((80, 120), 'uint8')
         s[40, 10:110] = 1; s[25:56, 60] = 1

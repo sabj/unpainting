@@ -73,5 +73,6 @@ consistency measures agreement with a frozen wash estimate. Neither certifies
 artist-quality selection. Record the commit, native size, seed, plan source,
 preparation, settings and actual guard report on every comparison.
 
-See [plan format](plan-format.md#stages) for the schema and
-[consolidated study](../work/lines/LINEWORK.md) for measured results and limitations.
+See [plan format](plan-format.md#stages) for the schema. The original measured
+opening-drawing study remains on the local `line-quality` branch under
+`work/lines/LINEWORK.md`; it is separate from full-pipeline release validation.

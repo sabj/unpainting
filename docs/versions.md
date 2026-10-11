@@ -5,11 +5,13 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 ## The four versions
 
 - Release: plain semver in `package.json`, such as `0.1.0`. Each release gets an annotated git tag, `v<release>`, on the main commit that ships it. [CHANGELOG.md](../CHANGELOG.md) lists what each release changed.
-- Painter: the internal V number, such as `V096`. It covers planning, the recipe, methods and techniques (`src/paint`). A painter change takes the next V number.
+- Painter: the internal V number, such as `V096`. It covers planning, the recipe, methods and techniques (`src/paint`). A painter change takes the next V number. Development candidates may append `-dev`, such as `V097-dev`.
 - Judges: `judgeVersion`, starting at `J1`. A new panel, rubric or image protocol gets a new J number. Scores from different J versions are not compared. J1 uses Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B, rubric `bench-v3-median5`, five calls per judge with the median, and native-size images. Current calls use OpenRouter zero-data-retention providers. Earlier published calls used Together; all published scores are J1.
 - Sim: a plain number, such as `100`. It covers the physics and simulation of paper, water, pigment, brush and pen (`src/media`). A simulation change takes the next sim number.
 
 `PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions. Release 0.1.0 is painter V096, sim 100 and judges J1.
+
+The local 0.2.0 release candidate is `0.2.0-rc.1`, painter `V097-dev`, sim `101`, judges `J1`. Sim 101 includes pen reload/replay changes and GPU hole-rim, Marangoni and slope support. It is untagged and awaits owner review. Existing benchmark scores remain attached to V096 / sim 100.
 
 Sim numbers before this release are an estimate of past simulation revisions. The private history has no sim version number. About 100 commits changed the media modules there (102 commits touching `painter/src/media` and its earlier files, 2026-09-15 to 2026-09-30), so sim starts at 100.
 

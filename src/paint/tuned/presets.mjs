@@ -27,7 +27,7 @@ export const PRESETS = Object.freeze({
 });
 
 // The presets the V096 recipe (the default before 2026-10-10) applied by itself when a value plan named one of these
-// subjects. Only --recipe v096 reads this map, so old runs repeat exactly.
+// subjects. Only --recipe v096 reads this map; exact old output also requires the original simulator.
 export const V096_SUBJECT_PRESETS = Object.freeze({
   Y1: Object.freeze(['architecture', 'trumbull']),
   'subject-e': Object.freeze(['trumbull-paints']),

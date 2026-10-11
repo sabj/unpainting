@@ -67,7 +67,10 @@ def trace(skel, min_points=4):
                         d = np.subtract(p, cur)
                         return float(np.dot(v, d)/np.linalg.norm(d))
                     nxt = max(options, key=turn)
-                    if turn(nxt) < -0.1:
+                    # A degree-two contour has only one continuation. A short
+                    # ring can turn past the five-pixel tangent; breaking here
+                    # splits it into open halves on the skimage skeleton.
+                    if len(neighbours[cur]) != 2 and turn(nxt) < -0.1:
                         break
                 else:
                     nxt = min(options, key=lambda p: (p[1], p[0]))
