@@ -158,7 +158,8 @@ export function gestureStats(gs) {
  * @param land,lift,turnDwell  the rests at the start, the end and a hard turn, in the pen's time units
  */
 export function shapeHybrid(g, { want = 1, inLen = 3, outLen = 5, start = 0.45, end = 0.3, gain = 1.39, margin = 0.42, nib = 0.8, flex = 1.5,
-  mix = 0.6, fast = 2.4, slow = 0.6, slowEnds = 4, land = 1.2, lift = 0.6, turnDwell = 0.5, hardTurn = 0.9 } = {}) {
+  mix = 0.6, fast = 2.4, slow = 0.6, slowEnds = 4, land = 1.2, lift = 0.6, turnDwell = 0.5, hardTurn = 0.9,
+  pressureFloor=.25, pressureGain=.6, pressureExponent=1 } = {}) {
   const P = g.points, n = P.length, s = [0];
   for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
   const L = s[n - 1] || 1, tin = Math.min(inLen, 0.25 * L), tout = Math.min(outLen, 0.3 * L), ease = u => u * u * (3 - 2 * u);
@@ -175,7 +176,8 @@ export function shapeHybrid(g, { want = 1, inLen = 3, outLen = 5, start = 0.45, 
   let lastDwell = -Infinity;
   for (let k = 0; k < n; k++) {
     const q = P[k], e = env(s[k]), tk = turn(k);
-    const sWidth = q.width != null ? Math.max(0, Math.min(1, ((q.width * gain - margin - nib) / flex - 0.25) / 0.6)) : q.s ?? 1;
+    const contactShare=q.width!=null?Math.max(0,Math.min(1,(q.width*gain-margin-nib)/flex)):null;
+    const sWidth = contactShare!=null ? Math.max(0, Math.min(1, (contactShare**(1/pressureExponent)-pressureFloor)/pressureGain)) : q.s ?? 1;
     const share = Math.min(1, want * e * (mix * sWidth + (1 - mix) * (q.s ?? 1)));
     const nearEnd = Math.min(s[k], L - s[k]) < slowEnds ? 1 - Math.min(s[k], L - s[k]) / slowEnds : 0;
     const bend = Math.min(1, tk / hardTurn);

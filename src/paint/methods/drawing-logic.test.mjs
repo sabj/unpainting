@@ -197,3 +197,12 @@ test('hybrid walker revisits do not redraw or double back on a file contour', as
  assert.equal(r.gestures.length,1);const P=r.gestures[0].points;
  assert.ok(P.every((p,i)=>i===0||p.x>=P[i-1].x));assert.equal(new Set(P.map(p=>p.x)).size,P.length);
 });
+
+test('hybrid file width inverts the actual physical material pressure law',async()=>{
+ const {shapeHybrid}=await import('./drawing-hybrid.mjs');
+ const profile={nib:.2,flex:8,pressureExponent:1.3},g=line(0,0,60,0,61);
+ g.points.forEach(p=>{p.width=2;p.s=1;});
+ const r=shapeHybrid(g,{...profile,pressureFloor:0,pressureGain:1,gain:1,margin:0,mix:1,want:1,land:0,lift:0,turnDwell:0}).points;
+ const s=r[30].s;assert.ok(Math.abs(profile.nib+profile.flex*s**profile.pressureExponent-2)<1e-9);
+ assert.ok(r.every(p=>!p.dwell));
+});

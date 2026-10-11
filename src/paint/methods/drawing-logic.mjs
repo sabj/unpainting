@@ -1,4 +1,5 @@
 import { planLines } from '../drawing-plan.mjs';
+import { materialProfile } from './material-profiles.mjs';
 import sharp from 'sharp';
 import {separate} from '../../crop/inkwash.mjs';
 import {registerReviewedWholeDrawing} from './reviewed-whole-registration.mjs';
@@ -199,6 +200,12 @@ export function drawingLogic({ base, first, w, h, opt, num, log, D, want, cells,
     gain: num('drawwidthgain', 1.39), margin: num('drawwidthmargin', 0.42), minNib: num('drawwidthmin', 0.3) };
   const strokeLen = num('drawstroke', 0.12) * Math.min(w, h);
   const key = `${base}|${w}x${h}`;
+  const hybridProfile=materialProfile(opt('outlinemedium','ink').startsWith('graphite')?opt('graphiteprofile','graphite-HB'):opt('inkprofile','black-ink'));
+  const hybridMm=num('sheetmm',152.4)/w;
+  const hybridShape={...shape,nib:hybridProfile.widthMm[0]/hybridMm,flex:(hybridProfile.widthMm[1]-hybridProfile.widthMm[0])/hybridMm,
+    pressureFloor:0,pressureGain:1,pressureExponent:hybridProfile.pressureExponent,
+    want:num('hybridwant',1.3),mix:num('hybridmix',.4),fast:num('hybridfast',2.4),slow:num('hybridslow',.6),
+    land:num('hybridland',1.2),lift:num('hybridlift',.6),turnDwell:num('hybriddwell',.5)};
   let tone;
   if (mode === 2) {
     if (first) {
@@ -219,8 +226,7 @@ export function drawingLogic({ base, first, w, h, opt, num, log, D, want, cells,
       USED.set(key, r.used);
       log(`drawing logic 2, first pen: V041's ${stat(guide)} (${stat(outlines)} of outline and ${stat(walker)} of walk) laid on ${r.used.size} of ${whole.length} file lines: ${stat(r.gestures)}, in V041's order`);
       // the pen's own nib and flex, as paint-plate sets them (PEN), so a width target becomes the pressure that makes it
-      const pen = { nib: 0.8 * K, flex: 1.5 * K };
-      return r.gestures.map(g => shapeHybrid(g, { ...shape, ...pen, want: num('hybridwant', 1.3), mix: num('hybridmix', 0.4), fast: num('hybridfast', 2.4), slow: num('hybridslow', 0.6) }))
+      return r.gestures.map(g => shapeHybrid(g, hybridShape))
         // One dip per gesture, loaded for its length, so a long contour starts dark and runs down to dry near its end.
         .flatMap(g => personStrokes(g, num('hybridstroke', 0.25) * Math.min(w, h), { dipFirst: true, low: num('hybridlow', 0.03),
           load: Math.min(1, num('hybridload', 0.2) + num('hybridloadper', 0.0006) * pathLength(g.points)) }));
@@ -245,8 +251,7 @@ export function drawingLogic({ base, first, w, h, opt, num, log, D, want, cells,
       const { gestures } = connect(split.form, { gap: num('scribblejoin', 14) * K, cos: num('scribblecos', 0.6), aim: 0.5 });
       const kept = handOrder(gestures.filter(g => pathLength(g.points) >= minL));
       const broken = kept.flatMap(g => breakOnLights(g, D, w, h, { lit: num('scribblelit', 0.15), reach: 2 * K }));
-      const pen = { nib: 0.8 * K, flex: 1.5 * K };
-      const lines = broken.map(g => shapeHybrid(g, { ...shape, ...pen, want: num('hybridwant', 1.3), mix: num('hybridmix', 0.4), fast: num('hybridfast', 2.4), slow: num('hybridslow', 0.6) }))
+      const lines = broken.map(g => shapeHybrid(g, hybridShape))
         .flatMap(g => personStrokes(g, num('scribblestroke', 0.2) * short, { dipFirst: true, low: num('hybridlow', 0.03), load: Math.min(1, num('hybridload', 0.2) + num('hybridloadper', 0.0006) * pathLength(g.points)) }));
       const masses = num('scribblemasses', 1) > 0 ? scribbleMasses(D, w, h, gaussian, { K, dark: num('scribbledark', 0.06), minMass: num('scribblemass', 0.002), loop: num('scribbleloop', 0.008), hole: num('scribblehole', 0.35), seed: 7 }) : [];
       const scribbles = masses.flatMap(g => personStrokes(g, num('scribblestrokes', 0.12) * short, { dipFirst: true, load: 0.6, low: 0.05 }));

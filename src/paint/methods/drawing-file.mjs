@@ -55,12 +55,13 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const copyingNib = opt('inkprofile', '') === 'drawing-ink';
   const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', copyingNib ? .3 : MARGIN), gain = num('drawwidthgain', copyingNib ? .95 : GAIN), minNib = num('drawwidthmin', 0.3);
   if (num('drawinghand', 0) > 0) {
-    const r = handDrawing(lines, { gap: num('drawjoingap', 4) * K,
+    const handScale=w/1080*152.4/num('sheetmm',152.4);
+    const r = handDrawing(lines, { gap: num('drawjoingap', 4) * handScale,
       cos: num('drawjoincos', .8), aim: num('drawjoinaim', .7),
       strokeLength: num('drawstroke', .35) * Math.min(w, h),
-      base, gain, margin, minNib, inLen: num('drawtaperin', 3) * K,
-      outLen: num('drawtaperout', 5) * K, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
-      D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * K });
+      base, gain, margin:margin*handScale, minNib:minNib*handScale, inLen: num('drawtaperin', 3) * handScale,
+      outLen: num('drawtaperout', 5) * handScale, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
+      D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
     log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
     return r.strokes;
   }
