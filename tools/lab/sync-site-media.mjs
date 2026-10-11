@@ -11,7 +11,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const SRC = path.join(ROOT, 'src', 'media');
-export const ROOTS = ['paper', 'sheet', 'brush', 'pen', 'pencil', 'km'];
+export const ROOTS = ['paper', 'sheet', 'brush', 'pen', 'pencil', 'graphite', 'km'];
 const HEADER = from => `// Generated from src/media/${from} by tools/lab/sync-site-media.mjs. Edit the source.\n`;
 
 const relImports = code => [...code.matchAll(/^\s*(?:import|export)\s[^'"]*?from\s+'([^']+)'|^\s*import\s+'([^']+)'/gm)].map(m => m[1] ?? m[2]);

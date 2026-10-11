@@ -1,0 +1,23 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createBrush,dip,stroke,recordMarks,BRUSHES,BRUSHOPTS,PENS,PENOPTS} from '../../docs/lab/media/brush.js';
+import {tapeSheet,tapeFlow,tapePixels} from '../../docs/lab/worker/tape-sheet.js';
+import {tapeSheet as recordSheet,step,dry,DEFAULTS} from '../../docs/lab/media/sheet.js';
+import {pencilDraw} from '../../docs/lab/media/graphite.js';
+import {runTape} from '../../docs/lab/worker/live-tape.js';
+import {PIGMENTS} from '../../docs/lab/media/pigments.js';
+test('complete tape reproduces native brush, graphite, within-stroke flows and fixed dry layers',async()=>{
+ const t={version:2,w:48,h:32,scale:10,paper:{seed:9,mmPerCell:.8,coldPress:{mmPerCell:.8}},paperRGB:[250,248,240],paperShade:.04,pigments:[PIGMENTS[5]],opts:{...DEFAULTS,gran:.25,fixedBed:1}};
+ const native=tapeSheet(t);native._tape=1;const marks=recordMarks(true);recordSheet(marks);
+ const b=createBrush({radius:3.237,flat:true,capacity:10,seed:7});dip(b,{water:.72,conc:[.371294]});
+ stroke(b,native,[{x:4.231,y:10.03,p:.634},{x:35.822,y:18.72,p:.785}],{upright:'sweep',spacing:1.1,between:n=>{if(n%8===0)step(native,t.opts);}});
+ pencilDraw(native,[{points:[{x:10,y:24,s:.24,nw:.78},{x:38,y:27,s:.3,nw:.5}]}],0,{amount:.6,width:.9,usePointWidths:true});
+ dry(native,30000,t.opts,{levelMax:90,dt:14,analyticTail:true});
+ Object.assign(t,{marks,brushes:[...BRUSHES],brushOpts:[...BRUSHOPTS],pens:[...PENS],penOpts:[...PENOPTS],strokeCount:2});
+ recordMarks(false);recordSheet(null);
+ const replay=tapeSheet(t);let finalIndex;
+ await runTape(t,{sheet:()=>replay,ready:async()=>true,begin:()=>{},end:()=>{},touch:async(p,r,fn)=>fn(),present:()=>{},progress:()=>{},mutate:async fn=>fn(),flow:async(d,m)=>tapeFlow(t,replay,d,m),finished:(done,state)=>{finalIndex=state().index;}});
+ assert.equal(finalIndex,marks.length,'100% includes the trailing dry');
+ assert.deepEqual(tapePixels(t,replay),tapePixels(t,native));
+ for(const key of ['W','s','G','D','P','layers'])assert.deepEqual(replay[key],native[key],key);
+});

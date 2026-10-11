@@ -282,14 +282,14 @@ async function playExampleFilm(example, carry=false, seek=0) {
   runMode.value=exampleMode;lab.mode=exampleMode;document.getElementById('mode-note').textContent=exampleMode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';
   cancelStroke();hover=null;queueCursor();setPlaying(true);playPause.hidden=false;handNote=null;playingWhat=example.title.toLowerCase();playingExample=true;filmSkip=carry;
   document.getElementById('paint-hint').hidden=true;
-  state.textContent=`Playing: ${example.title}`;caption.textContent='Recorded early strokes. Carry on painting when you are ready.';
+  state.textContent=`Playing: ${example.title}`;caption.textContent='A complete budgeted painting. Carry on painting when you are ready.';
   const base=new URL('./',import.meta.url);
   document.body.classList.add('has-example');playbackUI.dismiss();playbackUI.example(example,strokeLimit.value,runMode.value);document.getElementById('sheet-title').textContent=example.title.split(' · ')[0];
   const selected=seek?playbackUI.preview(seek):null;lab.seeking=!!selected;
   if(selected){playProgress.value=seek;lab.progress={done:selected.done,total:Number(strokeLimit.value),phase:'restoring'};}
   if(!selected)playbackUI.ready();
   if(runMode.value==='live'){
-    lab.target={id:example.id,live:true,started:performance.now()};caption.textContent=selected?`Opening the ${Math.round(seek*100)}% point…`:'Live · first '+Number(strokeLimit.value).toLocaleString()+' recorded strokes';
+    lab.target={id:example.id,live:true,started:performance.now()};caption.textContent=selected?`Opening the ${Math.round(seek*100)}% point…`:'Live · '+Number(strokeLimit.value).toLocaleString()+'-stroke painting';
     try{
       const [tape,checkpoint]=await Promise.all([loadTape(example.live[strokeLimit.value]),selected?loadBytes(selected.state):null]);
       if(alive())worker.postMessage({type:'live',tape,checkpoint,liveRun:run});
