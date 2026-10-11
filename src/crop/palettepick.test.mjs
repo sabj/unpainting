@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paperOf, pickPalette, WHITE_PAPER } from './palettepick.mjs';
+import { paletteOf } from './palette.mjs';
 
 const W = 72, H = 60, N = W * H;
 
@@ -15,6 +16,17 @@ function hills() {
   }
   return px;
 }
+
+test('shared palette fitting preserves every candidate result', () => {
+  const px = hills(), paper = paperOf(px, W, H).paperRGB, shared = new Map();
+  for (const options of [
+    { paints: 4, gainPerPigment: 0.02, neutralBelow: 0.18 },
+    { paints: 6, gainPerPigment: 0.005, neutralBelow: 0.08 },
+    { paints: 4, gainPerPigment: 0, neutralBelow: 0 },
+  ]) {
+    assert.deepEqual(paletteOf(px, N, paper, { ...options, shared }), paletteOf(px, N, paper, options));
+  }
+});
 
 test('a cool lightest tenth is a sky, painted on white paper; a warm one is the sheet the drawing was made on', () => {
   const sky = paperOf(hills(), W, H);

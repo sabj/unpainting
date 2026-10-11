@@ -80,22 +80,24 @@ export function pickPalette(px, w, h, paperRGB, {
   monoScatter = 'ink',
 } = {}) {
   const n = w * h;
-  const lean = paletteOf(px, n, paperRGB, { paints: pigs, gainPerPigment: gain, neutralBelow: neutral, rescue, monoScatter });
+  const shared = new Map();
+  const candidate = options => paletteOf(px, n, paperRGB, { ...options, shared });
+  const lean = candidate({ paints: pigs, gainPerPigment: gain, neutralBelow: neutral, rescue, monoScatter });
   if (!palettepick) return { palette: lean, name: 'lean', note: null, e: null };
   // --gain and --neutral: how much a further pigment has to explain to be kept, and how grey a pigment may be before it
   // is dropped as mud.
   // --palettepick: recover a lean and a rich palette, render each one's unmixed amounts onto the paper, and keep the
   // lean one unless the rich one reproduces the source's colour better by a clear margin. No single gain threshold
   // serves both a grey-blue sheet read as one brown and a brown drawing given pigments it does not have.
-  const rich = paletteOf(px, n, paperRGB, { paints: 6, gainPerPigment: 0.005, neutralBelow: 0.08, rescue, monoScatter });
+  const rich = candidate({ paints: 6, gainPerPigment: 0.005, neutralBelow: 0.08, rescue, monoScatter });
   // --greypick: a third palette that keeps grey pigments, taken when the source's grey passages come back in colour.
   // Grey is otherwise dropped as mud, and no mix of two oranges makes grey.
-  const grey = greypick ? paletteOf(px, n, paperRGB, { paints: pigs, gainPerPigment: 0.005, neutralBelow: 0, rescue, monoScatter }) : null;
+  const grey = greypick ? candidate({ paints: pigs, gainPerPigment: 0.005, neutralBelow: 0, rescue, monoScatter }) : null;
   // --widepick: two candidates that take four pigments whatever the gain says, one dropping greys and one keeping them,
   // held to the same margin. The gain is measured in density, where a photograph's bright colours weigh little.
   const wide = widepick ? [
-    paletteOf(px, n, paperRGB, { paints: 4, gainPerPigment: 0, neutralBelow: 0.08, rescue, monoScatter }),
-    paletteOf(px, n, paperRGB, { paints: 4, gainPerPigment: 0, neutralBelow: 0, rescue, monoScatter }),
+    candidate({ paints: 4, gainPerPigment: 0, neutralBelow: 0.08, rescue, monoScatter }),
+    candidate({ paints: 4, gainPerPigment: 0, neutralBelow: 0, rescue, monoScatter }),
   ] : [];
   if (rich.pigments.length === lean.pigments.length && !(grey && grey.pigments.length > lean.pigments.length) && !wide.length && !boxpick) {
     return { palette: lean, name: 'lean', note: null, e: null };
