@@ -608,7 +608,23 @@ if (MIXES) {
 // --modulate: washes scaled down in the highlight and detail areas, the rest kept for dry brush
 // (src/paint/methods/modulate.mjs)
 const ART_DENSITY = () => { const pl0 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2]; return Float32Array.from({ length: n }, (_, i) => Math.max(0, -Math.log(Math.max(0.02, Math.min(1, lum(i) / pl0))))); };
-const setClip=(target,mask)=>{if(target===sheet&&MOD?.furPlan){const negative=Uint8Array.from({length:target.n},(_,i)=>MOD.furPlan.negative[Math.floor((i/target.w|0)*h/target.h)*w+Math.floor((i%target.w)*w/target.w)]);physicalSetClip(target,Uint8Array.from({length:target.n},(_,i)=>!negative[i]&&(!mask||mask[i])?1:0));}else if(VALUE_PLAN&&target===sheet){const reserves=VALUE_PLAN.protectedCells;physicalSetClip(target,Uint8Array.from({length:target.n},(_,i)=>!reserves[Math.floor((i/target.w|0)*h/target.h)*w+Math.floor((i%target.w)*w/target.w)]&&(!mask||mask[i])?1:0));}else physicalSetClip(target,mask);};
+let clipBaseSource=null, clipBaseWidth=0, clipBaseHeight=0, clipBase=null;
+const setClip=(target,mask)=>{
+  const excluded=target===sheet?(MOD?.furPlan?.negative??VALUE_PLAN?.protectedCells):null;
+  if(!excluded)return physicalSetClip(target,mask);
+  if(clipBaseSource!==excluded||clipBaseWidth!==target.w||clipBaseHeight!==target.h){
+    clipBase=new Uint8Array(target.n);
+    for(let y=0;y<target.h;y++){
+      const sourceRow=Math.floor(y*h/target.h)*w, targetRow=y*target.w;
+      for(let x=0;x<target.w;x++)clipBase[targetRow+x]=excluded[sourceRow+Math.floor(x*w/target.w)]?0:1;
+    }
+    clipBaseSource=excluded;clipBaseWidth=target.w;clipBaseHeight=target.h;
+  }
+  if(!mask)return physicalSetClip(target,clipBase);
+  const combined=new Uint8Array(target.n);
+  for(let i=0;i<target.n;i++)combined[i]=clipBase[i]&&mask[i]?1:0;
+  physicalSetClip(target,combined);
+};
 const MOD = await planModulation({ A, K: PIGS.length, w, h, n, px, image: opt('image', ''), root, fs, path, sharp, gaussian, num, opt, log: console.log, SRC: ART_DENSITY(), colourBudget: COLOUR_BUDGET });
 // --drags (src/paint/methods/drags.mjs): the washes thinned where the dry-brush drags will carry their share
 const DRAGS = dragRegion({ w, h, n, SRC: ART_DENSITY(), num, opt });
