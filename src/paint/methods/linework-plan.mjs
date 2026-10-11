@@ -16,10 +16,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { writeInkLines } from '../../crop/ink-lines-file.mjs';
+import { finishTexture } from './finish-texture.mjs';
 import { linePaths } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
 
-export const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch']);
+export const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch', 'structure-lines', 'structure-combine', 'line-map']);
 // fewer source-ink lines than this and the stages fall back to edge chains
 const MIN_STAGE_LINES = 12;
 const STAGE_KEYS = Object.freeze({ prep: 'prep', prepink: 'prepInk', finishink: 'finishInk' });
@@ -69,12 +70,12 @@ function runSketch({ python, root, image, stem, map, segments, log }) {
  * edge chains on the plan grid, [{ points: [{x, y}] }].
  * @returns { source, stages, files } for the run's linework.json
  */
-export async function planLinework({ opt, num, argv, out, root, inkShare, density, grid, edges, log, planLines }) {
-  const stages = stagesFromFlags(opt, num);
-  const mode = opt('linesource', 'none');
-  const info = { source: opt('drawingfile', '') ? 'file' : 'walker', requested: mode, stages: null, files: {} };
-  if (opt('drawing', 'first') === 'none') return info;
-  const image = path.resolve(root, opt('image', ''));
+// Extract the immutable source before wash compilation, so washes can exclude drawn ink.
+export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()=>{}}) {
+  const mode=opt('linesource','none');
+  const info={source:opt('drawingfile','')?'file':'walker',requested:mode,stages:null,files:{}};
+  if(opt('drawing','first')==='none') return info;
+  const image=path.resolve(root,opt('image',''));
   if (!opt('drawingfile', '') && mode !== 'none') {
     const python = opt('sketchpython', 'python3');
     const canSketch = mode === 'photo-sketch' || (mode === 'auto' && 100 * inkShare < num('penfirst', 0.5) && sketchAvailable(python));
@@ -100,8 +101,40 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
       runSketch({ python, root, image, stem, map: opt('sketchmap', '') ? path.resolve(root, opt('sketchmap', '')) : null, segments: opt('sketchsegments', '') ? path.resolve(root, opt('sketchsegments', '')) : null, log });
       argv.push('--drawingfile', stem);
       info.source = 'photo-sketch';
+    } else if (['structure-lines', 'structure-combine', 'line-map'].includes(choice)) {
+      const stem = path.join(out, 'lines-' + choice);
+      const run = args => {
+        const r = spawnSync(python, args, {encoding:'utf8', timeout:900000, env:{...process.env, OMP_NUM_THREADS:'2', OPENBLAS_NUM_THREADS:'2'}});
+        if (r.error || r.status !== 0) throw Error(`${choice} failed: ${r.error?.message ?? r.stderr}`);
+      };
+      if (choice === 'line-map') {
+        if (!opt('sketchmap','')) throw Error('line-map needs drawing.map or --sketchmap');
+        run([path.join(root,'tools/seg/copy-lines.py'), path.resolve(root,opt('sketchmap')), '--out',stem,'--width',String(num('width',540)), '--kind','line-map','--map-tolerance',String(num('mapsmoothing',.25))]);
+      } else {
+        run([path.join(root,'tools/seg/structure-lines.py'),image,'--out',stem,'--width',String(num('width',540)), '--seed',String(num('seed',0))]);
+        if (choice === 'structure-combine') {
+          const traced=stem+'-detail';
+          runSketch({python,root,image,stem:traced,map:opt('sketchmap','')||null,segments:opt('sketchsegments','')||null,log});
+          run([path.join(root,'tools/seg/structure-combine.py'),stem+'-lines.json',traced+'-lines.json','--out',stem]);
+        }
+      }
+      argv.push('--drawingfile',stem); info.source=choice; info.extractor=choice;
     } else log(`line source auto: ${(100 * inkShare).toFixed(2)}% pen line in the target and no sketch planner (${python} lacks numpy or OpenCV); the pen finds its own lines`);
   }
+  return info;
+}
+
+export async function planLinework({ opt, num, argv, out, root, inkShare, density, grid, edges, log, planLines, drawingOverride = null }) {
+  const stages = stagesFromFlags(opt, num);
+  if (stages && drawingOverride) {
+    if (drawingOverride === 'first') delete stages.finishInk;
+    if (drawingOverride === 'last') {delete stages.prep; delete stages.prepInk; if(stages.finishInk) stages.finishInk.from='lines';}
+  }
+  const mode = opt('linesource', 'none');
+  const info = { source: opt('drawingfile', '') ? 'file' : 'walker', requested: mode, stages: null, files: {} };
+  if (opt('drawing', 'first') === 'none') return info;
+  const image = path.resolve(root, opt('image', ''));
+  Object.assign(info, await prepareLineSource({opt,num,argv,out,root,inkShare,log}));
   if (!stages) return info;
   // the one line set the stages share, in its own source pixels
   let doc, setName;
@@ -126,6 +159,14 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
   // the plan's line choice (amount, lines, maxLines) applies to the set once, before the stages are cut from it
   const lines = planLines ? planLines(doc.lines.filter(g => g.points?.length >= 2), imageSize) : doc.lines;
   const r = planStages(lines, { image: imageSize, stages, density });
+  if (r.finishInk && density) for (const kind of ['hatch','fur']) {
+    const raw=opt('finish'+kind,'');
+    if (!raw) continue;
+    const extra=finishTexture(density,{...JSON.parse(raw),kind});
+    const sx=imageSize.w/density.w,sy=imageSize.h/density.h;
+    r.finishInk.push(...extra.map(g=>({...g,points:g.points.map(([x,y])=>[x*sx,y*sy]),widths:g.widths.map(v=>v*sx)})));
+    r.summary.finishInk[kind]=extra.length;
+  }
   for (const [key, name] of [['prep', 'prep'], ['prepInk', 'prepink'], ['finishInk', 'finishink']]) {
     if (!r[key] && !(key === 'prepInk' && r.prep)) continue;
     const stem = path.join(out, `stage-${name}`);

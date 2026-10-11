@@ -8,7 +8,7 @@ export const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
 export const INK_COLOURS = Object.freeze(['sepia', 'black']);
 export const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
 // Where the line set comes from (--linesource, src/paint/methods/linework-plan.mjs).
-export const LINE_SOURCES = Object.freeze(['auto', 'photo-sketch', 'source-ink']);
+export const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
 // The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
 export const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
 export const PREP_INK_METHODS = Object.freeze(['contour', 'connected', 'scribble']);
@@ -97,7 +97,16 @@ export function stageFlags(stages, { inkColor = null } = {}) {
   if (!names.length) throw new Error('drawing.stages: name at least one of prep, prepInk and finishInk (or use medium "none")');
   const flags = ['--stages', names.join(',')];
   const unitFlag = (o, path, key, flag) => { const v = stageUnit(o, path, key); if (v != null) flags.push(flag, round(v)); };
-  if (prep) unitFlag(prep, 'prep', 'amount', '--prepamount');
+  if (prep) {
+    unitFlag(prep, 'prep', 'amount', '--prepamount');
+    unitFlag(prep, 'prep', 'weight', '--preppressure');
+    const fade = stageUnit(prep, 'prep', 'fade');
+    if (fade != null) flags.push('--prepfade', fade > 0 ? '1' : '0', '--prepunder', String(fade));
+    if (prep.frames != null) {
+      if (!Array.isArray(prep.frames) || prep.frames.length !== 3 || prep.frames.some(n=>!Number.isInteger(n)||n<1||n>30)) throw Error('drawing.stages.prep.frames: three positive frame counts, at most 30');
+      flags.push('--prepframes', prep.frames.join(','));
+    }
+  }
   if (prepInk) {
     const from = stageChoice(prepInk, 'prepInk', 'from', ['prep', 'lines']);
     if (from === 'prep' && !prep) throw new Error('drawing.stages.prepInk.from "prep" needs a prep stage');
@@ -117,6 +126,12 @@ export function stageFlags(stages, { inkColor = null } = {}) {
     if (from === 'prepInk' && !prepInk) throw new Error('drawing.stages.finishInk.from "prepInk" needs a prepInk stage');
     if (from === 'prep' && !prep) throw new Error('drawing.stages.finishInk.from "prep" needs a prep stage');
     if (from) flags.push('--finishfrom', from);
+    for (const [key, flag] of [['hatch', 'finishhatch'], ['fur', 'finishfur']]) {
+      const v=finishInk[key];
+      if (v == null || v === false) continue;
+      if (typeof v !== 'object' || Array.isArray(v)) throw Error(`drawing.stages.finishInk.${key}: an object`);
+      flags.push('--'+flag, JSON.stringify(v));
+    }
     const select = stageChoice(finishInk, 'finishInk', 'select', FINISH_SELECT);
     if (select) flags.push('--finishselect', select);
     unitFlag(finishInk, 'finishInk', 'restate', '--finishrestate');
@@ -158,6 +173,18 @@ export function drawingFlags(drawing) {
   const medium = choice(drawing, 'medium', MEDIA);
   if (medium === 'none') return ['--drawing', 'none'];
   const flags = [];
+  if (drawing.resolution != null) {
+    if (![1,2].includes(drawing.resolution)) throw Error('drawing.resolution: 1 or 2');
+    flags.push('--inkres', String(drawing.resolution));
+  }
+  if (drawing.map != null) {
+    if (typeof drawing.map !== 'string' || !drawing.map) throw Error('drawing.map: prepared line map path');
+    flags.push('--sketchmap', drawing.map);
+  }
+  if (drawing.mapSmoothing != null) {
+    if (!Number.isFinite(drawing.mapSmoothing) || drawing.mapSmoothing < 0 || drawing.mapSmoothing > 2) throw Error('drawing.mapSmoothing: 0..2 cells');
+    flags.push('--mapsmoothing', String(drawing.mapSmoothing));
+  }
   if (medium) flags.push('--outlinemedium', medium);
   const colour = choice(drawing, 'inkColor', INK_COLOURS);
   if (colour) flags.push('--inkprofile', `${colour}-ink`);
