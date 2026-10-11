@@ -178,6 +178,9 @@ const optTrack = {
   replay(names) { for (const k of names) OPTS_READ.add(k); },
 };
 const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
+// Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
+const SPEED_TRANSFERS = num('speedtransfers', 0) > 0;
+if (SPEED_TRANSFERS) { process.env.GPU_DEMAND_READBACK = 'fast'; process.env.GPU_DIRTY_UPLOAD = '1'; }
 const NATIVE_UPLOAD_POLICY = nativeUploadPolicy(NATIVE_PAINT_MODE.mode, process.env.GPU_DIRTY_UPLOAD);
 process.env.GPU_DIRTY_UPLOAD ??= NATIVE_UPLOAD_POLICY.value;
 NATIVE_PAINT_MODE.uploadPolicy = NATIVE_UPLOAD_POLICY;
@@ -3686,7 +3689,7 @@ const placed = FRAMES.map((f, i) => {
 // --thkdump 1: the finished sheet's pigment thickness per pigment as raw floats (thickness.f32), to compare two runs cell by cell
 if (opt('thkdump', '0') !== '0') { coherent(sheet); const th = thickness(sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
-fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet) }, null, 1));
+fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet), performanceOptions: { trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1', quietDt: process.env.GPU_QUIET_DT === '1' } }, null, 1));
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
 {
