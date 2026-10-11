@@ -2,6 +2,7 @@
 import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
 import {framePolicy} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
+import {runSpeedSequence} from './speed/sequence.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
 import {splitLoadsFeathered} from '../src/paint/methods/brushes.mjs';
 import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
@@ -158,6 +159,7 @@ process.env.GPU_COMPOSITE ??= '1';
 process.env.GPU_ASYNC_DRY ??= '1';
 
 const argv0 = process.argv.slice(2);
+if(await runSpeedSequence(argv0,fileURLToPath(import.meta.url)))process.exit(0);
 // --recipe: a named preset of flags put in front of the command line (src/paint/recipe.mjs)
 const { argv, note: RECIPE_NOTE, pipeline: PIPELINE } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(fileURLToPath(import.meta.url))) });
 // every option name the painter asks for, so options given but never read are reported at the end
