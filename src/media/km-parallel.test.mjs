@@ -9,7 +9,7 @@ test('parallel cached optics preserve unrounded doubles, chunk boundaries and mi
   const random = () => ((seed = Math.imul(seed, 1664525) + 1013904223 >>> 0) / 4294967296);
   const Kp = Array.from({length: K}, (_, k) => [k ? random() : 0, random(), random()]);
   const Sp = Array.from({length: K}, (_, k) => [random(), k ? random() : 0, random()]);
-  const paper = Uint8Array.from({length: n * 3}, () => 190 + random() * 65);
+  const paper = Buffer.from(Uint8Array.from({length: n * 3}, () => 190 + random() * 65));
   const init = Float64Array.from(paper, v => v / 255);
   const prior = process.env.KM_PARALLEL_CELLS;
   process.env.KM_PARALLEL_CELLS = '1';

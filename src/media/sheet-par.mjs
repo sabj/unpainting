@@ -23,7 +23,10 @@ let MIN_AREA = 4096, MIN_WET = 2048, MIN_ROWS = 6, MIN_BAND_WET = 1024;
 export const tune = ({ minArea = MIN_AREA, minWet = MIN_WET, minRows = MIN_ROWS, minBandWet = MIN_BAND_WET } = {}) => { MIN_AREA = minArea; MIN_WET = minWet; MIN_ROWS = minRows; MIN_BAND_WET = minBandWet; };
 
 let POOL = null;
-export const shared = (Ctor, n) => new Ctor(new SharedArrayBuffer(Ctor.BYTES_PER_ELEMENT * Math.max(1, n)));
+export const shared = (Ctor, n) => {
+  const memory = new SharedArrayBuffer(Ctor.BYTES_PER_ELEMENT * Math.max(1, n));
+  return Ctor === Buffer ? Buffer.from(memory) : new Ctor(memory);
+};
 export const isShared = a => a != null && a.buffer instanceof SharedArrayBuffer;
 const sharedCopy = a => { const b = shared(a.constructor, a.length); b.set(a); return b; };
 
