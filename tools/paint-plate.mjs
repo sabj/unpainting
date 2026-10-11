@@ -110,6 +110,7 @@ import { gouacheCover, dryCover, overlay } from '../src/media/gouache.mjs';
 import { planCurls } from '../src/crop/curls.mjs';
 import { layCurls } from '../src/crop/curlpaint.mjs';
 // Optional stages, one module each, off unless their flag is given.
+import { sameWash } from '../src/paint/methods/wash-session.mjs';
 import { expandRecipe } from '../src/paint/recipe.mjs';
 import { versionStamp, versionLine } from '../src/painter-version.mjs';
 import { pigmentPhysics } from '../src/paint/methods/pigment-physics.mjs';
@@ -117,7 +118,7 @@ import { segmentInk } from '../src/paint/methods/seg-ink.mjs';
 import { mlLines } from '../src/paint/methods/ml-lines.mjs';
 import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/methods/drawing-logic.mjs';
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
-import { planLinework } from '../src/paint/methods/linework-plan.mjs';
+import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { scaleLines } from '../src/crop/lines.mjs';
 import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
 import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
@@ -152,7 +153,7 @@ process.env.GPU_ASYNC_DRY ??= '1';
 
 const argv0 = process.argv.slice(2);
 // --recipe: a named preset of flags put in front of the command line (src/paint/recipe.mjs)
-const { argv, note: RECIPE_NOTE } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(fileURLToPath(import.meta.url))) });
+const { argv, note: RECIPE_NOTE, pipeline: PIPELINE } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(fileURLToPath(import.meta.url))) });
 // every option name the painter asks for, so options given but never read are reported at the end
 const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
@@ -191,30 +192,14 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
-// --sourcelines 1: with no --drawingfile, the pen's candidates are the target's own estimated ink lines, written to the
-// output folder before painting, as tools/seg/ink-lines.mjs writes them (src/crop/ink-lines-file.mjs). A planning step:
-// the target is read before the first mark. The line file then counts as the plan's pen drawing (see sourceInkDrawing).
-if (opt('linesource', 'none') === 'none' && num('sourcelines', 0) > 0 && num('copylines', 0) === 0 && num('sketchlines', 0) === 0 && !opt('drawingfile', '') && opt('drawing', 'first') !== 'none' && opt('image', '') && fs.existsSync(path.resolve(root, opt('image'))) && !opt('resumestate', '')) {
-  const stem = path.join(out, 'source-ink'), r = await writeInkLines(path.resolve(root, opt('image')), stem);
-  argv.push('--drawingfile', stem);
-  console.log(`source lines: ${r.lines.length} lines from the target's own ink (${r.inkCells} ink cells at ${r.w}x${r.h}), drawn as --drawingfile`);
+// Legacy extraction flags remain CLI aliases; the plan has one source choice.
+if (!argv0.includes('--linesource')) {
+  if (num('copylines',0)>0) argv.push('--linesource','source-ink');
+  else if (num('sketchlines',0)>0) argv.push('--linesource','photo-sketch');
+  else if (num('sourcelines',0)>0) argv.push('--linesource','source-ink');
 }
-// The optional structural planner is a separate pre-paint process. Only its
-// immutable line JSON reaches planPen; the Python process ends before the guard.
-if ((num('sketchlines', 0) > 0 || num('copylines', 0) > 0) && !opt('drawingfile', '') && opt('drawing', 'first') !== 'none' && !opt('resumestate', '')) {
-  const { spawnSync } = await import('node:child_process');
-  const stem = path.join(out, 'sketch');
-  const copying = num('copylines', 0) > 0;
-  const args = [path.join(root, copying ? 'tools/seg/copy-lines.py' : 'tools/seg/sketch-lines.py'), path.resolve(root, opt('image')), '--out', stem];
-  if (copying) args.push('--width', String(num('width', 1080)));
-  if (!copying && opt('sketchmodel', '')) args.push('--model', path.resolve(root, opt('sketchmodel')));
-  if (!copying && opt('sketchmap', '')) args.push('--map', path.resolve(root, opt('sketchmap')));
-  if (!copying && opt('sketchsegments', '')) args.push('--segments', path.resolve(root, opt('sketchsegments')));
-  const result = spawnSync(opt('sketchpython', 'python3'), args, { encoding: 'utf8', env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' } });
-  if (result.error || result.status !== 0) throw new Error(`Sketch planning failed: ${result.error?.message ?? result.stderr}. See tools/seg/README.md for setup.`);
-  console.log(`sketch planning: ${result.stdout.trim()}`);
-  argv.push('--drawingfile', stem);
-}
+const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
+  ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';
 const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -238,7 +223,9 @@ process.on('exit',()=>fs.writeFileSync(path.join(out,'native-sparse-contact.json
 
 console.log(`native paint mode: ${NATIVE_PAINT_MODE.mode}; ${NATIVE_PAINT_MODE.approximation}`);
 console.log(`native tracked CPU upload: ${NATIVE_UPLOAD_POLICY.value}; ${NATIVE_UPLOAD_POLICY.selection}`);
-const VALUE_CONFIG=(()=>{const c=opt('valueplan','')?JSON.parse(fs.readFileSync(path.resolve(root,opt('valueplan','')))):null;
+if (PIPELINE) fs.writeFileSync(path.join(out, 'pipeline-plan.json'), JSON.stringify({plan:PIPELINE, overrides:argv0},null,2));
+const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(path.resolve(root,opt('valueplan','')))):null;
+  if (c && PIPELINE) c = {...c, subjectOrder: PIPELINE.order.subjects};
   // --regionstyle family=style[,family=style]: per-run region style override on top of subjects.json; needs --valueplan.
   if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection??loadSubjects()[c.subject];if(!base)throw Error('--regionstyle needs a subject style mapping');
   const regions={...(base.regions??{})};for(const kv of opt('regionstyle','').split(',')){const [family,style]=kv.split('=');if(!family||!style)throw Error('--regionstyle family=style');regions[family]={style,reason:'run override --regionstyle for an A/B test'};}
@@ -250,7 +237,7 @@ let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_COMMAND=
 // pigments, charged into the same wet wash. 0 (default): every value-plan shape starts on a dry sheet.
 const WASH_SESSION = Math.max(0, Math.round(num('washsession', 0)));
 let WASH_LAST = null;
-const sameWash = (a, b) => a && b && a.value === b.value && a._valuePhase === b._valuePhase && a._valuePhase !== 'shadow' && (a._order?.region ?? null) === (b._order?.region ?? null);
+
 const MAJOR_FILE=opt('majorintent',''), MAJOR_INTENT=MAJOR_FILE?validateLegacyIntent(JSON.parse(fs.readFileSync(path.resolve(root,MAJOR_FILE))),{imageSHA:sha256(path.resolve(root,opt('image'))),loadedContact:num('loadedcontact',0)}):null;let MAJOR_TECHNIQUE=null,MAJOR_COMMAND=0,MAJOR_PREVIOUS=null,MAJOR_PLANE_CONTACT=null;
 if(MAJOR_INTENT)fs.writeFileSync(path.join(out,'major-intents-before.json'),JSON.stringify(MAJOR_INTENT,null,2));
 const NUMERIC_TUFT_SHAPES=opt('numerictuftshapes','').split(',').filter(Boolean),NUMERIC_TUFT_CAL=new Map();
@@ -980,12 +967,15 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(SRC, w, h, gaussian, { s
 
 // The separator's reading of the source: which cells are pen line, which are wash. Read once; the ink's colour, the
 // line budget and the gate on the pen all use it.
-const SEP = separate(px, w, h, paperRGB);
+const SEP = separate(PX_SOURCE, w, h, paperRGB);
+// Removing ink from the wash target must not erase the evidence used to select finish ink.
+const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
 // The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
 // come from, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
-const LINEWORK = await planLinework({ opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: SRC, w, h }, grid: { w, h }, log: console.log,
+const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, log: console.log,
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
+if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. auto (default) is ink when the source shows
@@ -2394,6 +2384,7 @@ if (num('finaldarks', 0) > 0) {
   let a = 0; for (const v of cells) a += v;
   console.log(`final darks: ${a} accent cells (${(100 * a / n).toFixed(2)}% of the sheet) in ${FD_SHAPES.length} families, ${FD_SHAPES.reduce((s, t) => s + t.area, 0)} cells, cut before painting`);
 }
+const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(num('prepkeep', 2)))) : null;
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step`);
 if (!RESUMING && RESIST && !PRACTICE && Math.round(num('masses', 0)) <= 0) { if(AREA_PLAN){const cells=Array.from(up(AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(sheet,cells);if(!paper.dry)throw Error('semantic film requires actual dry paper before apply');AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(sheet, up(RESIST), RESIST_SOFT && upF(RESIST_SOFT)); STAGE = { stage: 'frisket', cells: RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
@@ -2545,9 +2536,9 @@ if(process.env.PHASE_EXIT==='drawing-material-opening'){
 // --prepfade 1: the opening drawing recedes as the washes cover it (pencil-stage.mjs prepFade): its pigment is the
 // graphite when the first pen drew in pencil, else the separate ink, which the closing pen uses only once the washes are down
 const PREPF = num('prepfade', 0) > 0 && PEN_FIRST && DRAWING !== 'none' ? (() => {
-  const k = GRAPHITE && (PENCIL || opt('firstpen', 'ink') === 'graphite') ? GRAPHITE_AT : INK ? PIGS.length : -1;
+  const k = GRAPHITE && (STAGE_PLAN?.files.prep || OUTLINE_MEDIUM === 'graphite' || PENCIL || opt('firstpen', 'ink') === 'graphite') ? GRAPHITE_AT : INK ? PIGS.length : -1;
   if (k < 0) { console.log('prep fade: the first pen drew in a wash pigment, nothing to fade'); return null; }
-  const keep = up(dilate(SEP.ink, w, h, Math.round(num('prepkeep', 2))));
+  const keep = PREP_KEEP;
   console.log(`prep fade: pigment ${k}, ${sheet.layers.length} layers hold the drawing, ${(100 * keep.reduce((a, v) => a + (v ? 1 : 0), 0) / N2).toFixed(1)}% of the sheet kept as the finish's line`);
   return { k, upto: sheet.layers.length, keep, applied: new Float32Array(N2).fill(1), kk: PIGS.map(p => (p.K[0] + p.K[1] + p.K[2]) / 3 / 0.55) };
 })() : null;

@@ -1,0 +1,29 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { resolvePipeline, pipelineFlags } from './pipeline-plan.mjs';
+import { sameWash } from './methods/wash-session.mjs';
+import { finishTexture } from './methods/finish-texture.mjs';
+
+test('one plan selects ink stages, wash sessions, flow and subject order',()=>{
+ const p={drawing:{source:'source-ink',stages:{prep:{weight:.8},prepInk:{from:'prep'},finishInk:{from:'prepInk',restate:.2}}},washes:{sessions:'connected',physics:{holeRimMm:.4,marangoni:.01}},order:{subjects:[{id:'sky',bounds:[[0,0,1,.4]]},{id:'rest'}]}};
+ const r=pipelineFlags(p), m=new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ assert.equal(m.get('--stages'),'prep,prepink,finishink'); assert.equal(m.get('--washsession'),'2');assert.equal(m.get('--washinkfree'),'1');assert.equal(m.get('--subjectorder'),'0.5');assert.equal(m.get('--physics'),'marangoni=0.01,slope=0');
+ assert.throws(()=>resolvePipeline({...p,subjectOrder:[{id:'rest'}]}),/not both/);
+ assert.throws(()=>resolvePipeline({order:{strength:.5}}),/needs/);
+ assert.throws(()=>resolvePipeline({washes:{sessions:'whatever'}}),/sessions/);
+});
+test('wet sessions cannot mix subjects or successive glazes with the same value',()=>{
+ const layer=(step,rank=0)=>({value:2,_valuePhase:'mid',_order:{region:1},_subject:{rank},shapes:[{_valuePlan:{id:`mid/${step}/region1`}}]});
+ assert.equal(sameWash(layer('b2L1'),layer('b2L1')),true);
+ assert.equal(sameWash(layer('b2L1'),layer('b2L2')),false);
+ assert.equal(sameWash(layer('b2L1'),layer('b2L1',1)),false);
+ assert.equal(sameWash({...layer('b4'),_valuePhase:'shadow'},{...layer('b4'),_valuePhase:'shadow'}),false);
+});
+test('recovered texture stays in planned bounds and leaves light gaps',()=>{
+ const w=80,h=80,D=Float32Array.from({length:w*h},(_,i)=>i%w<40?.8:0);
+ for(const kind of ['hatch','fur']) {
+  const paths=finishTexture({D,w,h},{kind,bounds:[.1,.1,.9,.9],budget:12});
+  assert.ok(paths.length>0&&paths.length<=12);
+  for(const g of paths) for(const [x,y] of g.points) assert.ok(x>=7&&x<41&&y>=7&&y<73);
+ }
+});

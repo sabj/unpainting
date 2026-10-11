@@ -21,8 +21,8 @@ test('v096 keeps the old default: the tuned flags on every subject, and the subj
   for (const flag of ['--trumbullrules', '--recesses', '--paints']) assert.ok(y1.argv.includes(flag), flag);
 });
 
-test('a Trumbull value plan adds its paint box unless --paints is given', () => {
-  const plan = ['--valueplan', 'examples/plans/trumbull-values.json'];
+test('the historical recipe adds the Trumbull paint box unless --paints is given', () => {
+  const plan = ['--recipe', 'v096', '--valueplan', 'examples/plans/trumbull-values.json'];
   assert.ok(expandRecipe({ argv: plan }).argv.includes('--paints'));
   const own = expandRecipe({ argv: [...plan, '--paints', 'ochre'] }).argv;
   assert.equal(own.filter(a => a === '--paints').length, 1);
@@ -80,9 +80,9 @@ test('final darks require an explicit choice and command-line choices win', () =
 });
 
 // The general recipe lost connected dark masses on Hills in the release comparison.
-test('release defaults preserve compatibility while general washes remain explicit', () => {
+test('combined defaults use general washes and v096 retains fitted settings', () => {
   const flags = args => expandRecipe({argv: args}).argv;
-  const base = flags([]), general = flags(['--recipe','general']);
+  const base = flags(['--recipe','v096']), general = flags([]);
   for (const flag of ['--darkgain','--coolgain','--skylanes','--shadowraw']) assert.ok(base.includes(flag), flag);
   for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) {
     assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
