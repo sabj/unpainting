@@ -6,7 +6,7 @@ Still jobs (`--video 0`) keep passage checkpoints at 10/25/50/75/100 percent, fi
 
 The GPU switches default to 1; pass 0 to disable each independently. Rendering thread controls are described below:
 
-- `--speedrenderthreads 4`: render cached optical composites over independent cell ranges with the original double-precision arithmetic. Set 1 for serial rendering. An existing physics worker pool is reused; otherwise an optical-only pool starts. Explicit `--gpu off` defaults to serial optics.
+- `--speedrenderthreads 4`: render cached optical composites over independent cell ranges with the original double-precision arithmetic. The default is up to 4 threads at widths of 540 or less, and 1 above 540: native-size trials showed no wall-time gain. Set 1 for serial rendering or explicitly select 4 to try parallel optics at larger sizes. An existing physics worker pool is reused; otherwise an optical-only pool starts. Explicit `--gpu off` defaults to serial optics.
 - `--speededge 1`: alternate shared edge-distance buffers, with the same arithmetic and neighbor order.
 - `--speedscan 1`: fuse cell finalization and active wet-tile scanning on GPUs with at least 13 storage-buffer bindings. Smaller adapters keep separate kernels.
 - `--speedtransfers 1`: use the existing tracked CPU fallback transfer path without selecting Fast physics.
