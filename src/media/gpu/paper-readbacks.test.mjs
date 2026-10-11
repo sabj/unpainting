@@ -14,5 +14,8 @@ test('neighboring paper checks share a tile read; mutation forces a fresh map an
  assert.equal(reads.length,1);assert.deepEqual(reads[0].rect,[0,0,64,64]);assert.equal(link.stats.paperDownBytes,64*64*12);
  assert.ok(fresh.staleBounds([10,10,1,1]),'paper observation must not mark pigment planes fresh');
  link.version++;measurePaper(sheet,cells);assert.equal(reads.length,2);
+ process.env.GPU_PAPER_OBSERVE='0';link.version++;measurePaper(sheet,cells,true);
+ assert.equal(reads.length,3,'explicit paper observation works in Full mode');
+ assert.ok(fresh.staleBounds([10,10,1,1]),'explicit paper observation leaves pigment stale');
  }finally{if(old===undefined)delete process.env.GPU_PAPER_OBSERVE;else process.env.GPU_PAPER_OBSERVE=old;}
 });

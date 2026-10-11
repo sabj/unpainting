@@ -180,6 +180,7 @@ const optTrack = {
 const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
 // Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
 const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
+const SPEED_PAPER = num('speedpaper', 0) > 0;
 if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
 const NATIVE_UPLOAD_POLICY = nativeUploadPolicy(NATIVE_PAINT_MODE.mode, process.env.GPU_DIRTY_UPLOAD);
 if (SPEED_TRANSFERS && process.env.GPU_DIRTY_UPLOAD == null) {
@@ -198,6 +199,7 @@ const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrende
 process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
+void opt('downtrace', '0'); // tracing is selected from argv while GPU modules load
 
 if (RECIPE_NOTE) console.log(RECIPE_NOTE);
 // The release, painter and sim versions and the git commit, recorded in frames.json and backend.json (docs/versions.md)
@@ -1113,12 +1115,12 @@ const stroke=(b,target,points,options)=>{
  if(AREA_NUMERIC_CONTACT_STOP&&target===sheet)return;
  if(VALUE_ACTIVE&&target===sheet){
   if(VALUE_ACTIVE.shaped)options={...options,upright:VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
-  const contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3}),cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors]);
-  let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i))).dry;
+  const contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3}),cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors],SPEED_PAPER);
+  let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),SPEED_PAPER).dry;
   if(paint&&!['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();if(!paper.dry)throw Error('value-plan dry-paper contact gate failed');}
   // --wetgate 0: log a wet wash whose footprint is not evenly wet instead of stopping the run. Default 1.
   if(paint&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(paper.moistShare<.7||paper.waterMax>.15)){const info='value-plan wet wash whole-footprint gate failed '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:paper.moistShare,waterMax:paper.waterMax,cells:cells.length});if(opt('wetgate','1')==='0')console.log('WARN '+info);else throw Error(info);}
-  const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,primary:measurePaper(target,cells),neighbors:measurePaper(target,neighbors),brushBefore:load,geometry:points,options};
+  const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
   if(VALUE_ACTIVE.shaped&&TRUMBULL_RULES&&w===540){const total=VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0});if(total.strokes+1>12256||total.contacts+cells.length>12443022)throw Error('W13 Y1 contact budget would exceed W7; fix this band before continuing');}
   const result=physicalStroke(b,target,points,options);

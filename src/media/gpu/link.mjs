@@ -255,8 +255,8 @@ export class GpuLink {
   }
 
   /** Fresh W/s/M for a read-only material observation; never advances pigment freshness. */
-  ensurePaperFresh(sheet, rect) {
-    if(process.env.GPU_PAPER_OBSERVE!=='1'||this.paused||this.stroke||sheet._cpuDemandWindow)return this.ensureFresh(sheet,rect);
+  ensurePaperFresh(sheet, rect, force = false) {
+    if((!force&&process.env.GPU_PAPER_OBSERVE!=='1')||this.paused||this.stroke||sheet._cpuDemandWindow)return this.ensureFresh(sheet,rect);
     this.flushDrys(sheet);this.notPlanning('a read of paper state');
     if(this.needFullUp)this.fullUp(sheet);
     rect=this.validRect(rect);
