@@ -98,21 +98,25 @@ export function strokeCells(sheet, points, radius) {
   return [...cells];
 }
 
-export function measurePaper(sheet, cells, paperOnly = false) {
+export function measurePaper(sheet, cells, paperOnly = false, { uniform = false } = {}) {
   if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, waterP95: 0, moistShare: 0, dry: true };
   let x0 = sheet.w, x1 = 0, y0 = sheet.h, y1 = 0;
   for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   if (sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, [x0, y0, x1 - x0 + 1, y1 - y0 + 1], paperOnly);
-  let waterMax = 0, saturationMax = 0, moist = 0; const waters = [];
+  let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = uniform ? null : [];
   for (const i of cells) {
     const water = sheet.W[i], saturation = sheet.s[i] / Math.max(1e-8, sheet.paper.capacity[i]);
     if (!Number.isFinite(water) || !Number.isFinite(saturation)) throw new Error('Non-finite paper state');
-    waters.push(water); waterMax = Math.max(waterMax, water); saturationMax = Math.max(saturationMax, saturation);
+    if (waters) waters.push(water);
+    else if (index === 0) firstWater = water;
+    else if (!Object.is(water, firstWater)) { waters = new Array(index).fill(firstWater); waters.push(water); }
+    index++;
+    waterMax = Math.max(waterMax, water); saturationMax = Math.max(saturationMax, saturation);
     if (water >= PAPER_STATE.moistWater || saturation >= PAPER_STATE.moistSaturation) moist++;
   }
-  waters.sort((a, b) => a - b);
-  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, waterP95: quantile(waters, 0.95), moistShare: moist / cells.length,
+  if (waters) waters.sort((a, b) => a - b);
+  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, waterP95: waters ? quantile(waters, 0.95) : firstWater, moistShare: moist / cells.length,
     dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
 }
 
