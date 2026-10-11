@@ -4,7 +4,7 @@
 
 Still jobs (`--video 0`) keep passage checkpoints at 10/25/50/75/100 percent, first wash, paper, drawing and material stages. `--keepallframes 1` restores the previous frame cadence. Video output retains that cadence automatically. Progress means completed passages in the current plan; the finished frame remains the final state when touch-up passes extend the plan. Snapshots used by feedback are independent and are retained.
 
-Experimental switches, each independently reversible:
+Tier 1 switches default to 1; pass 0 to disable each independently. Tier 2 quiet drying defaults to 0:
 
 - `--speededge 1`: alternate shared edge-distance buffers, with the same arithmetic and neighbor order.
 - `--speedscan 1`: fuse cell finalization and active wet-tile scanning on GPUs with at least 13 storage-buffer bindings. Smaller adapters keep separate kernels.
