@@ -6,8 +6,8 @@ import {planLanes} from './stroke-plan.mjs';
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
 import { passage } from '../../crop/blockin.mjs';
-import { TRUMBULL_SUBJECT, RECESS, SHADOW_GLAZE, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND, FIRST_INK_SKIP } from '../tuned/trumbull.mjs';
-import { PORTRAIT_SUBJECT, TEX_ZONE, JAW_INK } from '../tuned/portrait.mjs';
+import { RECESS, SHADOW_GLAZE, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND, FIRST_INK_SKIP } from '../tuned/trumbull.mjs';
+import { TEX_ZONE, JAW_INK } from '../tuned/portrait.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
 const neighbors = (i,w,n) => [i%w?i-1:-1,i%w<w-1?i+1:-1,i>=w?i-w:-1,i+w<n?i+w:-1].filter(j=>j>=0);
@@ -19,7 +19,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1}) {
+export function planLightToDark({bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,trumbullRules=false,recesses=false,portraitRules=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1,layerIncrement=false,nestedBands=false}) {
   let coolGroup=null;setRecessMax(recessMax);
   // shadowRaw: with no burnt sienna in the box, raw sienna is the shadow glaze's warm part, so it is not pure ultramarine.
   const SHADOW_WARM=shadowRaw&&!pigments.some(p=>p?.name==='burnt sienna')?'raw sienna':'burnt sienna';
@@ -89,8 +89,8 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
       // a smaller darker plane only where the target is darker. Each plane holds a narrow value
       // range, so its single wash value matches the target.
       if(nested){const share=Math.min(1,.32/Math.max(1e-6,v));weights[1][i]=middle*share;weights[2][i]=middle*(1-share);}
-      // Hard dark architectural recesses are last paint accents on the dried wall (tuned on one benchmark subject; see docs/techniques.md).
-      if(subject===TRUMBULL_SUBJECT&&rgb&&isRecess(rgb,i)){weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=1-light;if(recessAccent)accentCells[i]=1;
+      // --recesses 1 (the architecture preset): hard dark architectural recesses are last paint accents on the dried wall (fitted on Y1; docs/overfitting.md).
+      if(recesses&&rgb&&isRecess(rgb,i)){weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=1-light;if(recessAccent)accentCells[i]=1;
         // Darks build in two dried layers, as a painter restates a window: band 4 then band 5.
         if(recessLayers>1){const keep=recessClean?1:1-light;if(recessClean)weights[0][i]=0;weights[3][i]=keep*recessShare;weights[4][i]=keep*recessShare;}}
       // accentShare: small dark features (brows, lids, iris rims, nostrils, lip line) are too small for the shadow
@@ -98,13 +98,13 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
       if(accentShare>0&&!shadowMask[i]&&v>accentMin){const a=middle*accentShare*Math.min(1,(v-accentMin)/.2);weights[1][i]-=a*weights[1][i]/Math.max(1e-6,middle);weights[2][i]-=a*weights[2][i]/Math.max(1e-6,middle);weights[4][i]+=a;accentCells[i]=1;}
       // deepAccent m: cells with max channel below m (pupils, iris rims, nostrils, brow cores, lip corners) are
       // restated last in two dried layers, band 4 then band 5, as a painter darkens an eye last.
-      if(deepMask&&subject!==TRUMBULL_SUBJECT&&!protectedCells[i]&&deepMask[i]&&!irisBody[i]){const keep=1-light;weights[1][i]=weights[2][i]=0;weights[3][i]=keep*.75;weights[4][i]=keep*.75;accentCells[i]=1;}
-      // texZone: a lower-face stubble box (tuned on one benchmark subject; see docs/techniques.md). Band 3 is laid there
+      if(deepMask&&!recesses&&!protectedCells[i]&&deepMask[i]&&!irisBody[i]){const keep=1-light;weights[1][i]=weights[2][i]=0;weights[3][i]=keep*.75;weights[4][i]=keep*.75;accentCells[i]=1;}
+      // --portraitrules 1 (the portrait-3t preset): texZone, a lower-face stubble box fitted on 3T (docs/overfitting.md). Band 3 is laid there
       // as short dry-brush marks, so stubble reads as broken texture, not a flat plane.
       // texShadow s: in texZone the shadow glazes (bands 4-5) keep share s; the rest of their demand moves to band 3.
       // texShare s: in texZone share s of the band-2 demand moves to band 3.
-      if(texShadow<1&&subject===PORTRAIT_SUBJECT&&!accentCells[i]){const y=Math.floor(i/w)/h,x=(i%w)/w;if(y>texZone[1]&&y<texZone[3]&&x>=texZone[0]&&x<=texZone[2]){const a=(weights[3][i]+weights[4][i])*(1-texShadow);weights[3][i]*=texShadow;weights[4][i]*=texShadow;weights[2][i]+=a;}}
-      if(texShare>0&&subject===PORTRAIT_SUBJECT){const y=Math.floor(i/w)/h,x=(i%w)/w;if(y>texZone[1]&&y<texZone[3]&&x>=texZone[0]&&x<=texZone[2]&&!accentCells[i]){const a=weights[1][i]*texShare;weights[1][i]-=a;weights[2][i]+=a;}}
+      if(texShadow<1&&portraitRules&&!accentCells[i]){const y=Math.floor(i/w)/h,x=(i%w)/w;if(y>texZone[1]&&y<texZone[3]&&x>=texZone[0]&&x<=texZone[2]){const a=(weights[3][i]+weights[4][i])*(1-texShadow);weights[3][i]*=texShadow;weights[4][i]*=texShadow;weights[2][i]+=a;}}
+      if(texShare>0&&portraitRules){const y=Math.floor(i/w)/h,x=(i%w)/w;if(y>texZone[1]&&y<texZone[3]&&x>=texZone[0]&&x<=texZone[2]&&!accentCells[i]){const a=weights[1][i]*texShare;weights[1][i]-=a;weights[2][i]+=a;}}
       // groundGlaze: a cool-neutral ground (road, pavement shadow side) is one blue-violet glaze across
       // the whole ground on dry paint, not separate light washes; share g of its middle demand moves to band 4.
       if(groundGlaze>0&&rgb&&!protectedCells[i]&&Math.floor(i/w)/h>groundFrom&&!isRecess(rgb,i)){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2],L=.2126*r+.7152*g+.0722*b;
@@ -138,6 +138,21 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
   const floor=valueFloor?loadStyle(valueFloor):null;
   if(profile)for(let i=0;i<n;i++){
     const chosen=cellStyle(i);if(chosen.name==='precise-watercolor')continue;
+    // A connected sepia silhouette may span paper-light limbs and deep folds.
+    // Giving it one mean charge erases those forms. Build nested value masses,
+    // each with its own wash charge, before sealing the target. Their weights
+    // sum to one; no target sampling is needed while the brush paints.
+    if(chosen.name==='ink-and-wash'){
+      const v=value.values[i];
+      for(let band=0;band<5;band++){
+        const lo=band?VALUE_CAPS[band-1]:0;
+        // bandRound: a cell joins a band only when it reaches halfway up that band's step. Each passage is laid with
+        // one mean charge, so a cell barely inside a band otherwise takes the whole step and its lights go dark.
+        if(bandRound&&v<lo+.5*(VALUE_CAPS[band]-lo)){weights[band][i]=0;continue;}
+        weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*chosen.paintStrength*styleGain:0;
+      }
+      continue;
+    }
     // valueFloor (a style name, such as ink-and-wash): urban-sketch cells paint at least that style's value depth
     // per band. urban-sketch alone is one 25% band, a near-blank sheet.
     for(let band=0;band<5;band++){const own=chosen.weights[band]*chosen.paintStrength;weights[band][i]=(floor&&chosen.name==='urban-sketch'?Math.max(own,floor.weights[band]*floor.paintStrength):own)*styleGain;}
@@ -146,6 +161,12 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
     if(chosen.name==='atmospheric-wet')shadowMask[i]=1;
     else if(!shadowMask[i]){weights[chosen.structure==='ink'?0:1][i]+=weights[3][i]+weights[4][i];weights[3][i]=weights[4][i]=0;}
   }
+  // nestedBands: every cell's demand is split into the five value bands as flat value steps, the nested masses the
+  // ink-and-wash style uses, whatever the style. Band k covers the cells darker than the band below it and carries the
+  // step from that band's cap to its own, so each passage's one mean charge fits all of its cells. Without it a light
+  // cell and a dark neighbour share a band in different proportions and the mean charge muddies the light one.
+  if(nestedBands)for(let i=0;i<n;i++){if(profile&&cellStyle(i).name==='ink-and-wash')continue;const v=value.values[i];
+    for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*styleGain:0;}}
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
   const layers=[],instructions=[];let omittedDemand=0;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
@@ -153,7 +174,7 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
   // before the next. Layer 0 covers the whole middle form; each later layer covers only the
   // darker part of the smoothed value field, so value builds gradually.
   const steps=[1,2,3,4,5].map(band=>({band,wt:weights[band-1],tag:''}));
-  if(shaped&&washLayers>0){
+  if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'&&!nestedBands){
     const r=Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w))),sm=boxMeanValue(value.values,w,h,r);
     const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(sm[i]);live.sort((a,b)=>a-b);
     const q=[0,.3,.55,.78].slice(0,washLayers).map(f=>live[Math.floor(f*(live.length-1))]??0);
@@ -165,7 +186,12 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
     const cover=q.map((t,j)=>{if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);return removeSmall(closeLocal(Uint8Array.from(sm,(v,i)=>v>t&&!skyCells?.[i]?1:0),w,h,layerSmoothMm<2?1:2),w,h,layerSmoothMm<2?minShape:minShape*4);});
     const count=new Uint8Array(n);for(const c of cover)for(let i=0;i<n;i++)count[i]+=c[i];
     // The layers carry all middle demand; no separate per-region band-3 patchwork.
-    const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))/count[i]:0)}));
+    // layerIncrement: each layer carries the value step between its threshold and the next layer's, as a painter lays
+    // one flat value over the whole form and then only darker steps where the form is darker. An equal split (the
+    // default) gives a light cell all its middle demand in layer 0 while a dark neighbour puts only a quarter there, so
+    // the shape's one mean charge is too dark for the light cells and too light for the dark ones.
+    const share=layerIncrement?layerShares(cover,q,sm,n):null;
+    const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
@@ -179,8 +205,8 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
     for(let pigment=0;pigment<k;pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n);
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        if(shaped&&subject===TRUMBULL_SUBJECT&&phase==='shadow'&&rgb&&!isRecess(rgb,i)){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];const name=pigments[pigment]?.name;let ub=SHADOW_GLAZE.blueShare;if(violetShadow){const r=rgb[i*3],b=rgb[i*3+2];ub=SHADOW_GLAZE.blueShare+SHADOW_GLAZE.violetLift*Math.max(0,Math.min(1,(b-r+SHADOW_GLAZE.violetOffset)/SHADOW_GLAZE.violetSpan));}fitted=roseViolet?(name==='French ultramarine'?mass*SHADOW_GLAZE.roseBlue:name==='quinacridone rose'?mass*SHADOW_GLAZE.roseRose:0):name==='French ultramarine'?mass*ub:name===SHADOW_WARM?mass*(1-ub):0;}
-        G[i]=fitted*step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(coolGain!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?coolGain:1);const recess=shaped&&subject===TRUMBULL_SUBJECT&&rgb&&isRecess(rgb,i);mask[i]=phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(shaped&&phase!=='light'&&G[i]<=1e-8)mask[i]=0;}
+        if(shaped&&trumbullRules&&phase==='shadow'&&rgb&&!isRecess(rgb,i)){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];const name=pigments[pigment]?.name;let ub=SHADOW_GLAZE.blueShare;if(violetShadow){const r=rgb[i*3],b=rgb[i*3+2];ub=SHADOW_GLAZE.blueShare+SHADOW_GLAZE.violetLift*Math.max(0,Math.min(1,(b-r+SHADOW_GLAZE.violetOffset)/SHADOW_GLAZE.violetSpan));}fitted=roseViolet?(name==='French ultramarine'?mass*SHADOW_GLAZE.roseBlue:name==='quinacridone rose'?mass*SHADOW_GLAZE.roseRose:0):name==='French ultramarine'?mass*ub:name===SHADOW_WARM?mass*(1-ub):0;}
+        G[i]=fitted*step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(coolGain!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?coolGain:1);const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(shaped&&phase!=='light'&&G[i]<=1e-8)mask[i]=0;}
       // Middle local colors belong to regions. Shadow connectivity ignores ownership boundaries.
       // midDomains=false: a middle plane follows the target value, not the colour-cluster boundary,
       // so smooth skin is not split into flat posterized patches along invisible cluster lines.
@@ -213,14 +239,14 @@ export function planLightToDark({valueFloor=null,demand,k,density,w,h,hold=null,
           const warm=rgb&&list.filter(i=>rgb[i*3]-rgb[i*3+2]>18&&rgb[i*3+1]-rgb[i*3+2]>8).length>list.length*.6;
           const family=profile&&touched.map(r=>r.descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name),
             chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
-          const texture=shaped&&!step.pig&&(identity?band===3&&((subject===TRUMBULL_SUBJECT&&warm)||(subject===PORTRAIT_SUBJECT&&box.y0/h>texZone[1]-.02&&box.y1/h<texZone[3]+.02&&box.x0/w>=texZone[0]-.02&&box.x1/w<=texZone[2]+.02)):chosen.textureRules?.some(rule=>rule.subject===subject&&rule.band===band&&(rule.cue==='warm stone'?warm:box.y0/h>rule.minY&&box.y1/h<rule.maxY)));
+          const texture=shaped&&!step.pig&&(identity?band===3&&((trumbullRules&&warm)||(portraitRules&&box.y0/h>texZone[1]-.02&&box.y1/h<texZone[3]+.02&&box.x0/w>=texZone[0]-.02&&box.x1/w<=texZone[2]+.02)):chosen.textureRules?.some(rule=>(rule.rules==='trumbull'?trumbullRules:rule.rules==='portrait-3t'?portraitRules:false)&&rule.band===band&&(rule.cue==='warm stone'?warm:box.y0/h>rule.minY&&box.y1/h<rule.maxY)));
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
           const wet=phase==='light'&&touched.every(r=>r.baseMove==='wet on wet');
           const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue+(texture?' Fine stone or lower-face stubble is below wash resolution: paper tooth, light dry brush, no individual dark dots.':''),
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',
             shaped,subject,texture,move:texture?'dry on dry':wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
             brush:{kind:shaped?'flat physical brush; one directional gesture per connected plane':'existing physical wash brush',contact:texture?'light pressure .35; broken tooth contact with flowing load':'side/belly; point for narrow shape',width:'target-fitted physical paths'},
-            resolution:{question:texture?'dry brush':'wash',minimumWashBodyCells:4,estimatedSupportWidthCells:2*list.length/Math.max(1,hard.length+soft.length),estimateMethod:'twice area over boundary length; not a measured lid or mullion width',mmPerCell:sheetWidthMm/w,detail:'sub-four-cell lines belong to the existing ink layer'},layer:band,break:wet?'reference requests a connected soft first wet passage':null,load:{water:texture?.22:wet?.88:phase==='shadow'?(shadowWater>0?shadowWater:.45):.62,pigment:texture?'light texture share (12% of middle demand), calibrated dry-brush delivery':shaped&&subject===TRUMBULL_SUBJECT&&phase==='shadow'?'ultramarine + burnt sienna 55:45 glaze; dark recesses retain fitted mixture':'fitted target band demand; calibrated delivery',reload:'existing finite instrument route'},
+            resolution:{question:texture?'dry brush':'wash',minimumWashBodyCells:4,estimatedSupportWidthCells:2*list.length/Math.max(1,hard.length+soft.length),estimateMethod:'twice area over boundary length; not a measured lid or mullion width',mmPerCell:sheetWidthMm/w,detail:'sub-four-cell lines belong to the existing ink layer'},layer:band,break:wet?'reference requests a connected soft first wet passage':null,load:{water:texture?.22:wet?.88:phase==='shadow'?(shadowWater>0?shadowWater:.45):.62,pigment:texture?'light texture share (12% of middle demand), calibrated dry-brush delivery':shaped&&trumbullRules&&phase==='shadow'?'ultramarine + burnt sienna 55:45 glaze; dark recesses retain fitted mixture':'fitted target band demand; calibrated delivery',reload:'existing finite instrument route'},
             edges:{hardCells:hard,softCells:soft,policy:'dry placement; clean damp brush only on selected soft boundaries'},
             protectedLights:reserves.map(r=>r.reason).concat('held target paper whites'),failureSigns:'Lost lights, disconnected value shapes, uniform blur, pale unpainted interiors.',stop:'after band'};
           if(chosen){
@@ -257,10 +283,13 @@ export function valueTechnique(intent) {
   if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:intent.texture?'dry brush':wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
   const wet=intent.move==='wet on wet';if(intent.texture)return {name:'dry brush',water:.22,wetMix:0,bridge:.35,bridgeSoft:1.2,intoWet:false,dryAfter:true,passes:1,valuePlan:intent};return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
 }
-export function selectValueInk(paths,{first,w,h,density,reserves=null,subject=null,shaped=false,styleSelection=null}){
+export function selectValueInk(paths,{first,w,h,density,reserves=null,subject=null,shaped=false,styleSelection=null,trumbullRules=false,portraitRules=false,sourceInk=false}){
   const profile=subject&&(styleSelection||loadSubjects()[subject])?resolveStyle(subject,null,styleSelection):null;
+  // Pen contours naturally border paper lights. A wash reserve is not a reason
+  // to delete the entire source line, and short marks carry faces and capitals.
+  if(sourceInk)return paths.filter(g=>g.points?.length>=2);
   if(profile&&profile.name!=='precise-watercolor'&&(first?profile.ink+profile.graphite:profile.ink)===0)return [];
-  return paths.filter(g=>{const pts=g.points;if(!pts?.length)return false;let length=0,contrast=0,count=0,protectedCount=0;for(let j=0;j<pts.length;j++){const p=pts[j],x=Math.max(0,Math.min(w-1,Math.round(p.x))),y=Math.max(0,Math.min(h-1,Math.round(p.y))),i=y*w+x;if(j)length+=Math.hypot(p.x-pts[j-1].x,p.y-pts[j-1].y);if(reserves?.[i])protectedCount++;for(const q of neighbors(i,w,w*h))contrast+=Math.abs(density[i]-density[q]);count+=neighbors(i,w,w*h).length;}const jaw=shaped&&subject===PORTRAIT_SUBJECT&&pts.filter(p=>p.y/h>JAW_INK.yMin&&p.y/h<JAW_INK.yMax).length>pts.length*JAW_INK.share&&length/w>JAW_INK.minLength;const window=shaped&&subject===TRUMBULL_SUBJECT&&first&&FIRST_INK_SKIP.test(g.object??'');return !jaw&&!window&&!protectedCount&&(first?(g.outline||g.tier==='outline'||length/w>=.035):contrast/Math.max(1,count)>=.06);});
+  return paths.filter(g=>{const pts=g.points;if(!pts?.length)return false;let length=0,contrast=0,count=0,protectedCount=0;for(let j=0;j<pts.length;j++){const p=pts[j],x=Math.max(0,Math.min(w-1,Math.round(p.x))),y=Math.max(0,Math.min(h-1,Math.round(p.y))),i=y*w+x;if(j)length+=Math.hypot(p.x-pts[j-1].x,p.y-pts[j-1].y);if(reserves?.[i])protectedCount++;for(const q of neighbors(i,w,w*h))contrast+=Math.abs(density[i]-density[q]);count+=neighbors(i,w,w*h).length;}const jaw=shaped&&portraitRules&&pts.filter(p=>p.y/h>JAW_INK.yMin&&p.y/h<JAW_INK.yMax).length>pts.length*JAW_INK.share&&length/w>JAW_INK.minLength;const window=shaped&&trumbullRules&&first&&FIRST_INK_SKIP.test(g.object??'');return !jaw&&!window&&!protectedCount&&(first?(g.outline||g.tier==='outline'||length/w>=.035):contrast/Math.max(1,count)>=.06);});
 }
 
 // Connected soft edge chains only; hard boundaries remain dry placement.
@@ -334,3 +363,18 @@ function wobbleField(w,h,amp,cellMm){const key=w+'x'+h+'x'+amp.toFixed(3);if(WOB
  const u=new Float32Array(w*h),v=new Float32Array(w*h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let a=0,b=0;for(const c of waves){const ph=c.kx*x+c.ky*y;a+=c.a*Math.sin(ph+c.p);b+=c.a*Math.sin(ph*1.13+c.q);}u[y*w+x]=a*amp/1.4;v[y*w+x]=b*amp/1.4;}
  const f={u,v};WOB.set(key,f);return f;}
 function wobbleMask(M,w,h,amp,protect,cellMm){const {u,v}=wobbleField(w,h,amp,cellMm),out=new Uint8Array(M.length);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(protect&&protect[i])continue;const sx=Math.round(x+u[i]),sy=Math.round(y+v[i]);if(sx>=0&&sy>=0&&sx<w&&sy<h)out[i]=M[sy*w+sx];}return out;}
+
+// Per layer and cell, the share of the cell's middle demand that layer carries under layerIncrement: the cell's smoothed
+// value s split at the thresholds of the layers that cover it, each layer taking the step up to the next one's threshold
+// and the last taking the rest. Shares of a cell sum to 1.
+export function layerShares(cover,thresholds,sm,n){
+  const L=cover.length,share=Array.from({length:L},()=>new Float32Array(n));
+  for(let i=0;i<n;i++){
+    const on=[];for(let j=0;j<L;j++)if(cover[j][i])on.push(j);
+    if(!on.length)continue;
+    const s=Math.max(sm[i],1e-6);let total=0;
+    for(let k=0;k<on.length;k++){const j=on[k],lo=k?thresholds[j]:0,hi=k<on.length-1?thresholds[on[k+1]]:Infinity;const v=Math.max(0,Math.min(s,hi)-lo);share[j][i]=v;total+=v;}
+    if(total>0)for(const j of on)share[j][i]/=total;else share[on[0]][i]=1;
+  }
+  return share;
+}

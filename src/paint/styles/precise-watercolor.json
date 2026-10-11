@@ -83,12 +83,12 @@
   "darkRecessMaxRGB": 105,
   "textureRules": [
     {
-      "subject": "Y1",
+      "rules": "trumbull",
       "cue": "warm stone",
       "band": 3
     },
     {
-      "subject": "subject-c",
+      "rules": "portrait-3t",
       "minY": 0.48,
       "maxY": 0.9,
       "band": 3

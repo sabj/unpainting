@@ -16,11 +16,21 @@ A plan can set this itself. Its `drawing` section sets the medium, the ink color
 
 ## Where the lines come from
 
-The pen draws only lines found in the target first:
+A plan picks the line set with `drawing.source`:
+
+| Source | Use it for | Avoid it for |
+|---|---|---|
+| `source-ink` | pen drawings and pen-and-wash masters: the target's own pen lines, traced | photographs (it traces dark ridges, not structure) |
+| `photo-sketch` | architecture photographs: continuous structural lines with a width hierarchy (`tools/seg/sketch-lines.py`) | portraits and loose landscapes, where it is weaker; it needs python3 with numpy and OpenCV |
+| `auto` (default) | anything: `source-ink` when at least 0.5% of the target reads as pen line, else `photo-sketch` when it can run, else the pen finds its own lines | |
+
+Under the plan's choice, the painter's tools are:
 
 - The ink separator in `src/crop/inkwash.mjs` sorts the picture into ink, pigment, edges and bare paper.
 - `tools/seg/ink-lines.mjs` traces that estimated ink into center lines and joins pieces that continue each other.
 - Optional: a trained line model (`tools/seg/lines.py`) makes a line drawing from any target. You don't need it.
+
+- `tools/seg/sketch-map.py` (optional) runs the published fine and coarse lineart models once before painting; `sketch-lines.py --map` uses that map as evidence ([setup](../tools/seg/README.md)).
 
 The plan picks which candidates to draw. A plan with `lines: "regions"` orders lines by the part of the picture they lie in. Head and hands come first, then clothing, then the setting. `maxLines` caps the count.
 
@@ -36,9 +46,42 @@ The plan picks which candidates to draw. A plan with `lines: "regions"` orders l
 
 The ink color is separate from the wash palette. The default is a warm sepia, and black is the other choice.
 
+Black opening ink sets before the washes by default; sepia stays soluble. `drawing.ink.waterproof` chooses whether it sets (`--inkfast auto|1|0`). The pen uses the declared `--inkconc` load and keeps one nib reservoir across marks until it needs another dip. A plan can say the target is drawn in pen. Then the pen draws the source's own ink, short descriptive marks included. The sparse sketch's 12-line, 8 mm limits do not apply. The plan says so with an `ink-and-wash` style, `drawing.medium: "ink"`, or a prepared line file (`--drawingfile`). A painted target without such a plan keeps the sparse limits. The separator also reads dark painted edges, such as foliage and windows, as ink. `--sourceink 0|1` overrides the choice. The source-ink closing pen defaults to pressure 0.6. Explicit `--openinglines`, `--closinglines`, `--openingminmm` and pressure flags still win.
+
+Three flags shape the closing pen. `--closingshare c` gives the opening and closing pens one line budget, with `c` of it for the closing pass. `--inkdarkskip v` cuts closing lines where the plan's value is above `v`, since the wash already states those edges. `--closingconc f` dilutes the closing ink, so accents stay lighter than the darkest wash.
+
+See [Choosing linework](linework.md) for the short job-to-tool guide and current defaults.
+
+## Linework stages
+
+A drawing is up to three jobs, each from the same line set:
+
+| Stage | Job | Medium | When to use it | Skip it when |
+|---|---|---|---|---|
+| `prep` | place the big shapes lightly before any ink | pencil (graphite) | placement is hard: architecture in perspective, portrait proportions, or a style that shows graphite | the subject is a simple silhouette, or the source is pen only |
+| `prepInk` | the opening pen drawing, before the washes | ink | the structure must hold the washes (pen and wash, urban sketch) | pure watercolor with no visible line |
+| `finishInk` | closing accents over the dry washes | ink | edges and darks the washes softened need restating | the opening ink already reads at the finish |
+
+The stages are linked. Prep ink follows the pencil with small deviations: it refines each line, drops some (that pencil stays visible) and adds a few the pencil left out. Finish ink restates a share of the prep ink where the target's edges or darks are strongest. The default, with no `stages` in the plan, is prep ink plus finish ink, each planned on its own as before.
+
+Each stage takes a few choices ([plan-format.md](plan-format.md#value-plans-the-drawing-section)):
+
+| Choice | Pick | For |
+|---|---|---|
+| `prepInk.method` | `contour` (default) | clean outlines; architecture and most subjects |
+| | `connected` | longer, joined gestures over the same lines |
+| | `scribble` | black or curly coats, dark hair: fewer longer strokes, lit edges left open, dark masses as loose scribble |
+| `finishInk.method` | `accent` (default) | the strongest part of each chosen line, restated |
+| | `architecture` | frames, arches, cornices and sills restated whole, thin and dark at full pressure (the Y1 closing pen) |
+| `finishInk.masses` | `scribble` | a black coat that needs a pen texture over its paint; off by default, since a dark surface is paint's job |
+
+Ink is waterproof (`drawing.ink.waterproof`) by default for black and soluble for sepia. Waterproof ink suits pen and watercolor and urban sketches, where the line must survive the washes. Soluble sepia suits brown ink-and-wash masters, where a wet wash should soften the line.
+
+Each run with stages writes `stage-prep.jpg`, `stage-prepink.jpg` and `stage-finishink.jpg` (the sheet after each stage) and `layer-*.jpg` (what each stage laid on its own), with the stage line files and `linework.json`.
+
 ## Drawing order
 
-The default recipe draws first, lets the drawing dry, paints the washes, then adds closing ink accents. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The washes soften and partly cover the lines. The closing pass adds a few dark accents where the target has strong edges.
+The default recipe draws first, lets the drawing dry, paints the washes, then adds closing ink accents. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The pen keeps one reservoir across marks and dips again when it runs low, so a long line does not run dry. The washes soften and partly cover the lines. The closing pass adds a few dark accents where the target has strong edges.
 
 | `--drawing` | Before paint | After paint |
 |---|---|---|
@@ -58,5 +101,7 @@ node tools/paint-plate.mjs --image <target> --drawing last
 node tools/paint-plate.mjs --image <target> --outlinemedium graphite
 node tools/paint-plate.mjs --image <target> --inkprofile black-ink
 ```
+
+For a value plan that selects `ink-and-wash`, the default recipe keeps the target's paper tone (`--paperrgb source`), a lean fitted palette, nested light-to-dark value masses and planned stroke lanes (`--strokeplan 1 --laneadapt 1`).
 
 [running.md](running.md#main-command-line-controls) lists the other controls.

@@ -56,7 +56,7 @@ node tools/paint-plate.mjs --image path/to/picture.jpg --width 540 \
 
 Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. To save an animation too, install ffmpeg and remove `--video 0`.
 
-The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a drawing first and last in the medium and weight the plan chooses, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`, and a plan for Trumbull (subject id `Y1`) or the second Trumbull-derived subject (id `subject-e`) also picks the fixed palette of seven paints. Every other subject paints with `--palettewide 1`. Some default values were fitted to benchmark images; [techniques.md](techniques.md) lists them with the flag that turns each off.
+The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a drawing first and last in the medium and weight the plan chooses, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture`, `glaze-gains` and `trumbull`, which also picks its fixed palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is the default before 2026-10-10, which ran the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [overfitting.md](overfitting.md) lists every preset and fitted item.
 
 `tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with an earlier version of the painter (2026-10-06). Today's commands paint differently.
 
@@ -70,7 +70,7 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--out` | output directory | `work/plate` | same |
 | `--width` | planning width in cells | 700 | same |
 | `--mode` | `fast`, `full` | `fast` | same |
-| `--recipe` | `default`, `person`, `none`; `v096` aliases `default` | omitted selects `default` | `default` |
+| `--recipe` | `default`, `v096`, `person`, `none`, each optionally followed by `+<preset>` | omitted selects `default` | `default` |
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |

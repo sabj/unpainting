@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
 import {splitLoadsFeathered} from '../src/paint/methods/brushes.mjs';
-import {materialProfile,drawMaterial,prepareDrawing} from '../src/paint/methods/material-profiles.mjs';
+import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
+import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
+import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
+import {materialProfile,drawMaterial,prepareDrawing,drawingCaps,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
 import {passageBrushPaths} from '../src/paint/methods/passage-brush.mjs';
 import {resolveStyle,loadSubjects} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
 import {shapeStoneDemand} from '../src/paint/tuned/stone-demand.mjs';
-import {TRUMBULL_SUBJECT,GROUND} from '../src/paint/tuned/trumbull.mjs';
-import {PORTRAIT_SUBJECT,TEX_ZONE,TRACE_BOX} from '../src/paint/tuned/portrait.mjs';
-import {TUNED_DRAWING_CAPS} from '../src/paint/tuned/drawing-caps.mjs';
+import {GROUND} from '../src/paint/tuned/trumbull.mjs';
+import {TEX_ZONE,TRACE_BOX} from '../src/paint/tuned/portrait.mjs';
 import {setTextureVariety,setTextureFlow,flowField} from '../src/paint/techniques/shaped-marks.mjs';
 import {planLightToDark,valueTechnique,selectValueInk,softBoundaryPaths} from '../src/paint/methods/light-to-dark.mjs';
 import {unsupportedAxisEdges} from '../src/paint/methods/target-regions.mjs';
 import {writeValuePreview} from './painter/value-plan-preview.mjs';
+import {removePlannedInk} from '../src/crop/ink-free.mjs';
 import { availableParallelism } from 'node:os';
 import { boundsOf } from '../src/mask-bounds.mjs';
 import { DEFAULT_SHEET_MM } from '../src/media/sheet-size.mjs';
@@ -60,6 +63,7 @@ import { createBrush as createBrushRaw, dip as dipBrush, stroke as physicalStrok
 import { paperOf, pickPalette, paletteOptions } from '../src/crop/palettepick.mjs';
 import { widePalette, puddleLabels } from '../src/crop/palettewide.mjs';
 import { channelDensity, unmix } from '../src/crop/pigments.mjs';
+import { accentCells, accentFamilies } from '../src/paint/methods/final-darks.mjs';
 import { blockInPigments, gradeSmoothPassages, dropMask } from '../src/crop/blockin.mjs';
 import { choosePlateMixes, toMixAmounts, panMix } from '../src/crop/mixes.mjs';
 import { shapeDeficit, shapeCharge, shapeOwedColour } from '../src/paint/methods/shape-deficit.mjs';
@@ -71,7 +75,7 @@ import { localSubjectWash } from '../src/paint/techniques/subject-local.mjs';
 import { pencilBatches, penEndPosition, eraseFactor, prepFade } from '../src/paint/methods/pencil-stage.mjs';
 import { tintRegions, tintSubject } from '../src/paint/techniques/subject-tint.mjs';
 import { painterOrder, subjectRegions } from '../src/paint/methods/painter-order.mjs';
-import { hasLines, loadLines } from '../src/crop/lines.mjs';
+import { hasLines, loadLines, linePaths } from '../src/crop/lines.mjs';
 import { deferredFirstWash } from '../src/paint/methods/colour-budget.mjs';
 import { retimeRun, codeForImage, concatList, phaseAt, phaseShares, PHASES, labelFrames } from '../src/paint/film-timeline.mjs';
 import { distanceToZero } from '../src/raster.js';
@@ -112,6 +116,9 @@ import { segmentInk } from '../src/paint/methods/seg-ink.mjs';
 import { mlLines } from '../src/paint/methods/ml-lines.mjs';
 import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/methods/drawing-logic.mjs';
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
+import { planLinework } from '../src/paint/methods/linework-plan.mjs';
+import { scaleLines } from '../src/crop/lines.mjs';
+import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
 import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
 import { localLights } from '../src/paint/methods/local-lights.mjs';
 import { makeMopLanes } from '../src/paint/methods/mop-lanes.mjs';
@@ -155,6 +162,9 @@ const STROKE_BUDGET = num('strokebudget', 0);
 for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
 // --texvariety v: how much the short texture marks vary in length and pressure (src/paint/techniques/shaped-marks.mjs)
 setTextureVariety(num('texvariety', 0));
+// Per-subject rules, on only when a preset the plan or --recipe names sets them (src/paint/tuned/presets.mjs):
+// --trumbullrules 1 (trumbull), --portraitrules 1 (portrait-3t), --recesses 1 (architecture).
+const TRUMBULL_RULES = num('trumbullrules', 0) > 0, PORTRAIT_RULES = num('portraitrules', 0) > 0, RECESSES = num('recesses', 0) > 0;
 const optTrack = {
   start() { OPT_TRACK = []; },
   stop() { const r = OPT_TRACK; OPT_TRACK = null; return r; },
@@ -180,6 +190,30 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
+// --sourcelines 1: with no --drawingfile, the pen's candidates are the target's own estimated ink lines, written to the
+// output folder before painting, as tools/seg/ink-lines.mjs writes them (src/crop/ink-lines-file.mjs). A planning step:
+// the target is read before the first mark. The line file then counts as the plan's pen drawing (see sourceInkDrawing).
+if (opt('linesource', 'none') === 'none' && num('sourcelines', 0) > 0 && num('copylines', 0) === 0 && num('sketchlines', 0) === 0 && !opt('drawingfile', '') && opt('drawing', 'first') !== 'none' && opt('image', '') && fs.existsSync(path.resolve(root, opt('image'))) && !opt('resumestate', '')) {
+  const stem = path.join(out, 'source-ink'), r = await writeInkLines(path.resolve(root, opt('image')), stem);
+  argv.push('--drawingfile', stem);
+  console.log(`source lines: ${r.lines.length} lines from the target's own ink (${r.inkCells} ink cells at ${r.w}x${r.h}), drawn as --drawingfile`);
+}
+// The optional structural planner is a separate pre-paint process. Only its
+// immutable line JSON reaches planPen; the Python process ends before the guard.
+if ((num('sketchlines', 0) > 0 || num('copylines', 0) > 0) && !opt('drawingfile', '') && opt('drawing', 'first') !== 'none' && !opt('resumestate', '')) {
+  const { spawnSync } = await import('node:child_process');
+  const stem = path.join(out, 'sketch');
+  const copying = num('copylines', 0) > 0;
+  const args = [path.join(root, copying ? 'tools/seg/copy-lines.py' : 'tools/seg/sketch-lines.py'), path.resolve(root, opt('image')), '--out', stem];
+  if (copying) args.push('--width', String(num('width', 1080)));
+  if (!copying && opt('sketchmodel', '')) args.push('--model', path.resolve(root, opt('sketchmodel')));
+  if (!copying && opt('sketchmap', '')) args.push('--map', path.resolve(root, opt('sketchmap')));
+  if (!copying && opt('sketchsegments', '')) args.push('--segments', path.resolve(root, opt('sketchsegments')));
+  const result = spawnSync(opt('sketchpython', 'python3'), args, { encoding: 'utf8', env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' } });
+  if (result.error || result.status !== 0) throw new Error(`Sketch planning failed: ${result.error?.message ?? result.stderr}. See tools/seg/README.md for setup.`);
+  console.log(`sketch planning: ${result.stdout.trim()}`);
+  argv.push('--drawingfile', stem);
+}
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';
 const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -220,7 +254,16 @@ const WALL_PHASES = [`load ${process.uptime().toFixed(1)}s`]; let phaseT = perfo
 const phaseMark = name => { const t = performance.now(); WALL_PHASES.push(`${name} ${((t - phaseT) / 1000).toFixed(1)}s`); phaseT = t; if (process.env.PHASE_EXIT === name) { console.log(`phases: ${WALL_PHASES.join(', ')} (PHASE_EXIT)`); process.exit(0); } };
 
 const src = sharp(path.resolve(root, opt('image'))).flatten({ background: '#ffffff' }).resize({ width: num('width', 700) });
-const { data: PX_RAW, info } = await src.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+const { data: PX_SOURCE, info } = await src.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+// --washinkfree 1 (needs --drawingfile): the planner reads the target with the planned pen lines filled from their
+// surroundings (src/crop/ink-free.mjs), so the wash carries mass and the pen carries line, not both. Pre-paint only.
+const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
+  const base = opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
+  const doc = JSON.parse(fs.readFileSync(path.resolve(root, linePaths(base).lines), 'utf8'));
+  const r = removePlannedInk(PX_SOURCE, info.width, info.height, doc, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marginMm: num('washinkmargin', 0.3) });
+  console.log(`wash target: planned ink removed from ${r.changed} cells (${(100 * r.changed / (info.width * info.height)).toFixed(1)}% of the sheet)`);
+  return Buffer.from(r.rgb);
+})() : PX_SOURCE;
 // --targetguard gentle|hard|warn|off (tools/guard/no-target.mjs): from the first mark on, px and maps made from it are sealed.
 // gentle (default) blocks reads but allows shape-level looks; hard also caps looks (--lookbudget, default 100); warn only records.
 const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE), targetPaths: [path.resolve(root, opt('image', ''))], log: null, lookBudget: opt('lookbudget', '') === '' ? null : num('lookbudget', HARD_LOOK_BUDGET) });
@@ -254,11 +297,11 @@ const lum = i => 0.2126 * px[i * 3] + 0.7152 * px[i * 3 + 1] + 0.0722 * px[i * 3
 // --palettemargin, --greymargin, --boxpick, --boxmargin, --boxgain) are documented in src/crop/palettepick.mjs.
 // --paperbase auto|source|white: paper colour, independent of the --paper texture. Without it, --paper decides.
 const PAPER_PICK = paperOf(px, w, h, { margin: num('papermargin', 0.03), mode: opt('paperbase', ['auto', 'source', 'white'].includes(opt('paper', 'coldpress')) ? opt('paper', 'coldpress') : 'auto') });
-// --paperrgb r,g,b|auto: declared sheet colour. auto keeps a cream target sheet (red 10+ above blue), else bright white 252,251,248.
+// --paperrgb r,g,b|auto|source: declared sheet colour (source uses paperbase). auto keeps a cream target sheet (red 10+ above blue), else bright white 252,251,248.
 // auto reads the sheet from the largest connected bright region (estimatePaper), not the lightest tenth.
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(px, w, h, new Float32Array(w * h)) : null;
 const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
-const PAPER_DECLARED = PAPER_AUTO ?? (opt('paperrgb', '') ? opt('paperrgb', '').split(',').map(Number) : null);
+const PAPER_DECLARED = opt('paperrgb', '') === 'source' ? PAPER_PICK.paperRGB : PAPER_AUTO ?? (opt('paperrgb', '') ? opt('paperrgb', '').split(',').map(Number) : null);
 if (PAPER_AUTO) console.log(`paper: auto sheet ${PAPER_AUTO.join('/')} from the largest bright region ${PAPER_EST ? PAPER_EST.rgb.map(v => v.toFixed(0)).join('/') + ' (' + (100 * PAPER_EST.cells / (w * h)).toFixed(1) + '% of the sheet)' : 'none (under 1%)'}`);
 if (PAPER_DECLARED && (PAPER_DECLARED.length !== 3 || PAPER_DECLARED.some(v => !(v > 0 && v <= 255)))) throw Error('--paperrgb needs three values in 1..255');
 const { lightest, white: whitePaper } = PAPER_PICK, paperRGB = PAPER_DECLARED ?? PAPER_PICK.paperRGB;
@@ -931,6 +974,13 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(SRC, w, h, gaussian, { s
 // The separator's reading of the source: which cells are pen line, which are wash. Read once; the ink's colour, the
 // line budget and the gate on the pen all use it.
 const SEP = separate(px, w, h, paperRGB);
+// The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
+// come from, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
+const LINEWORK = await planLinework({ opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: SRC, w, h }, grid: { w, h }, log: console.log,
+  edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
+  planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
+fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
+const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. auto (default) is ink when the source shows
 // --penfirst per cent of line or more, else graphite.
 const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
@@ -951,11 +1001,15 @@ const FACE_INK = () => FACE_INK_CACHE ??= (num('penfacelong', 0) > 0 ? (() => {
 })() : SEP.ink);
 
 // Ink uses a separate material profile. --inkprofile chooses it; --inkk and --inkkscale control absorption.
-// Default sepia can rewet. --inkcolour and --inkfast have no consumers.
+// --inkfast auto|1|0: 1 sets the ink before washes (waterproof); 0 keeps the material's rewetting. auto (default) is
+// waterproof for black ink and soluble for sepia, as a plan's drawing.ink.waterproof defaults. --inkcolour is unused.
 const REQUESTED_DRAW_MEDIUM=OUTLINE_REQUESTED==='auto'?OUTLINE.medium:OUTLINE_REQUESTED;
 const SUBJECT_STYLE=VALUE_CONFIG?.subject&&(VALUE_CONFIG.styleSelection||loadSubjects()[VALUE_CONFIG.subject])?resolveStyle(VALUE_CONFIG.subject,null,VALUE_CONFIG.styleSelection):null;
 // precise-watercolor is the identity profile for the shaped planner; other styles scale ink and graphite by their weights
 const STYLE_ON=()=>!!VALUE_PLAN?.style&&VALUE_PLAN.style.name!=='precise-watercolor';
+// The pen's ink load. --closingconc f dilutes the closing pen's ink (default 1): a closing accent restates an edge over
+// dried washes and should not come out darker than the darkest of them.
+const INKLOAD=()=>(STYLE_ON()?num('inkconc',8)*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))*(AREA_DRAW_STAGE==='closing'?num('closingconc',1):1);
 const STYLE_INK_DEFAULT=SUBJECT_STYLE?.pigment==='black'?'black-ink':'sepia-ink';
 const INK_PROFILE=materialProfile(opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT));
 const GRAPHITE_PROFILE=materialProfile(opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'));
@@ -966,8 +1020,9 @@ if(!['ink','graphite'].includes(OUTLINE_MEDIUM))materialProfile(OUTLINE_MEDIUM);
 // --inkk r,g,b overrides the profile's absorption; --inkkscale multiplies it.
 const INK_K_DECLARED=opt('inkk','')?opt('inkk','').split(',').map(Number):null;
 if(INK_K_DECLARED&&(INK_K_DECLARED.length!==3||INK_K_DECLARED.some(v=>!(v>0))))throw Error('--inkk needs three positive numbers');
-const INK={...INK_PROFILE.pigment,K:(INK_K_DECLARED??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
-console.log('drawing material profiles:',JSON.stringify({ink:INK_PROFILE,graphite:GRAPHITE_PROFILE}));
+const INK_FAST=opt('inkfast','auto')==='auto'?!INK_PROFILE.rewets:num('inkfast',0)>0;
+const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
+console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
 // --outlinemedium graphite: pen-first outlines in pencil, not ink; graphite is a neutral grey, waterproof and light.
 // only on a sheet that will be drawn first (the same test as PEN_FIRST below), so a sheet washed first carries no unused pigment
 const DRAWS_FIRST = opt('prep', '0') !== '0' || ['first', 'both'].includes(opt('drawing', 'first'))
@@ -978,7 +1033,7 @@ const PENCIL = opt('penpencil', '') && DRAWS_FIRST ? await (async () => {
   return { ...m, pig: {...GRAPHITE_PROFILE.pigment,strength:GRAPHITE_PROFILE.concentration} };
 })() : null;
 const PENCIL_STAGE = DRAWS_FIRST && num('pencilstage', 0) > 0;
-const GRAPHITE = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (OUTLINE_MEDIUM === 'graphite' || (OUTLINE_MEDIUM !== 'ink' && materialProfile(OUTLINE_MEDIUM).kind==='graphite')) && opt('drawing', 'first') !== 'none' && DRAWS_FIRST
+const GRAPHITE = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STAGE_PLAN?.files.prep || OUTLINE_MEDIUM === 'graphite' || (OUTLINE_MEDIUM !== 'ink' && materialProfile(OUTLINE_MEDIUM).kind==='graphite')) && opt('drawing', 'first') !== 'none' && DRAWS_FIRST
   ? GRAPHITE_PROFILE.pigment
   : null;
 // --wickfloor f: least share of a granulating paint's water-borne pigment the pores take, 0..0.9, so peaks stay pale. Default 0.
@@ -1036,10 +1091,12 @@ const stroke=(b,target,points,options)=>{
   if(paint&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(paper.moistShare<.7||paper.waterMax>.15)){const info='value-plan wet wash whole-footprint gate failed '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:paper.moistShare,waterMax:paper.waterMax,cells:cells.length});if(opt('wetgate','1')==='0')console.log('WARN '+info);else throw Error(info);}
   const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,primary:measurePaper(target,cells),neighbors:measurePaper(target,neighbors),brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
-  if(VALUE_ACTIVE.shaped&&VALUE_CONFIG?.subject===TRUMBULL_SUBJECT&&w===540){const total=VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0});if(total.strokes+1>12256||total.contacts+cells.length>12443022)throw Error('W13 Y1 contact budget would exceed W7; fix this band before continuing');}
+  if(VALUE_ACTIVE.shaped&&TRUMBULL_RULES&&w===540){const total=VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0});if(total.strokes+1>12256||total.contacts+cells.length>12443022)throw Error('W13 Y1 contact budget would exceed W7; fix this band before continuing');}
   const result=physicalStroke(b,target,points,options);
   {const count=VALUE_COUNTS[VALUE_ACTIVE.valueBand-1];count.strokes++;count.contacts+=cells.length;}
-  if(paint)for(const i of contact.cells)if(contact.primaryMask[i])VALUE_OWN_CONTACT.add(i);
+  // Clean-water preparation belongs to this passage too. Otherwise the first
+  // pigment stroke dries away the very wet bed prepared for merging its lanes.
+  for(const i of contact.cells)VALUE_OWN_CONTACT.add(i);
   fs.appendFileSync(path.join(out,'value-commands.jsonl'),JSON.stringify({...record,status:'EXECUTED',brushAfter:measureBrush(b)})+'\n');return result;
  }
 
@@ -1107,15 +1164,15 @@ throw Error(`semantic material gate failed ${a.key}: ${JSON.stringify(paper)}`);
 };
 const pencilDraw=(target,gs,pigment,options)=>{
  const recorded=num('recordgraphite',0)>0||!!opt('preparationbinding','');
- const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:{lines:num('openinglines',drawSubject()==='subject-c'?18:12),pressure:num('openingpressure',drawSubject()==='subject-c'?.25:drawSubject()==='subject-a'?.28:.3),minLengthMm:num('openingminmm',drawSubject()==='subject-c'?4:8)},O,audit:PEN_STATE_AUDIT,
+ const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:{lines:num('openinglines',DC('opening').lines),pressure:num('openingpressure',DC('opening').pressure),minLengthMm:num('openingminmm',DC('opening').minLengthMm)},O,audit:PEN_STATE_AUDIT,
   ...(recorded?{graphiteExecute:(sh,paths,k,profileOptions)=>recordGraphiteBatch({sheet:sh,strokes:paths,pigment:k,options:{...profileOptions,seed:options.seed},material:SHEET_PIGS[k],source:{binding:opt('preparationbinding','')||null,target:opt('image',''),guide:opt('penpencil',''),drawing:opt('drawingfile',''),frame:[target.w,target.h],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)},execute:physicalPencilDraw,observe:measurePaper,record:r=>fs.appendFileSync(path.join(out,'preparation-graphite.jsonl'),JSON.stringify(r)+'\n')})}: {})});
  if(!AREA_PLAN)return execute(gs);
  let cells=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,AREA_DRAW_STAGE,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('actual dry graphite',{geometry:g.gesture.points,options,drawingRole:g.area.drawingRole,material:GRAPHITE_PROFILE},()=>execute([g.gesture]));cells+=r.cellsLaid??r.cells??0;}AREA_EXEC.set(null);return {cellsLaid:cells};};
 
 if(VALUE_ENABLED){
  if(MOD||MIXES||FINISH_FILE||opt('curls','0')!=='0'||num('bgfirst',0)>0)throw Error('value planner cannot combine with independent modulation/mixes/finish/curls/bgfirst adapters; use --order legacy-painter for legacy replay');
- const shaped=num('shapedmarks',0)>0;const stone=shaped&&VALUE_CONFIG?.subject===TRUMBULL_SUBJECT?shapeStoneDemand(AL,PIGS.length,px,PIGS,{foliage:num('foliagerefit',0)>0,w,h,minCells:num('stonemincells',64),ochreMin:num('stoneochremin',.45),warm:num('stonewarm',0)>0,split:num('stonesplit',0)}):null;if(stone)fs.writeFileSync(path.join(out,'value-hue-check.json'),JSON.stringify(stone.audit,null,2));
- VALUE_PLAN=planLightToDark({valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)});
+ const shaped=num('shapedmarks',0)>0;const stone=shaped&&TRUMBULL_RULES?shapeStoneDemand(AL,PIGS.length,px,PIGS,{foliage:num('foliagerefit',0)>0,w,h,minCells:num('stonemincells',64),ochreMin:num('stoneochremin',.45),warm:num('stonewarm',0)>0,split:num('stonesplit',0)}):null;if(stone)fs.writeFileSync(path.join(out,'value-hue-check.json'),JSON.stringify(stone.audit,null,2));
+ VALUE_PLAN=planLightToDark({bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)});
  layers=VALUE_PLAN.layers;steps=5;
  // --darkfirst: shadow-phase layers (shadow glazes, deep accents) before the middle layers, light first still
  if(num('darkfirst',0)>0){const ph=l=>l._valuePhase==='light'?0:l._valuePhase==='shadow'?1:2;layers=layers.map((l,i)=>({l,i})).sort((a,b)=>ph(a.l)-ph(b.l)||a.i-b.i).map(q=>q.l);console.log('darkfirst: '+layers.map(l=>l._valuePhase[0]).join(''));}
@@ -1123,7 +1180,10 @@ if(VALUE_ENABLED){
  const baseMass=new Float32Array(n);for(const l of layers.filter(l=>l.value===1))for(const sh of l.shapes)for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){const i=y*w+x;if(sh.ids[i]===sh.id)baseMass[i]+=sh.graded[i];}
  let warm=0,warmPainted=0;for(let i=0;i<n;i++)if(px[3*i]-px[3*i+2]>18&&px[3*i+1]-px[3*i+2]>8){warm++;if(baseMass[i]>0)warmPainted++;}
  fs.writeFileSync(path.join(out,'value-region-check.json'),JSON.stringify({source:VALUE_PLAN.regions.source,band1UnsupportedAxisEdges:seams,regionCount:VALUE_PLAN.regions.regions.length,regions:VALUE_PLAN.regions.regions,warmTargetCells:warm,warmCellsWithPositiveBand1Pigment:warmPainted,physicalReserve:'same target-white mask as compiled plan'},null,2));
- if(seams.length)throw Error('compiled band-1 mask contains unsupported axis-aligned seams');
+ // A line-only checkpoint never executes these wash masks. Keep their diagnostic
+ // in value-region-check.json, but do not reject a valid drawing because an
+ // unused wash plan failed its seam check. Full paintings still fail closed.
+ if(seams.length && num('drawingonly',0)===0)throw Error('compiled band-1 mask contains unsupported axis-aligned seams');
  HOLD=VALUE_PLAN.protectedCells;
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:VALUE_PLAN.value.peak,geometry:VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:VALUE_PLAN.omittedDemand,lights:VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  console.log(`target values: ${layers.length} pigment/region passes, ${VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
@@ -1184,10 +1244,23 @@ if(PEN_STATE_GATE && INKRES) throw Error('--penstategate requires --inkres 1');
 const TARGET_DRAW_EDGE=new Float32Array(N2);
 for(let y=1;y<H2-1;y++)for(let x=1;x<W2-1;x++){const i=y*W2+x;const lum=j=>{const sx=Math.min(w-1,Math.floor((j%W2)*w/W2)),sy=Math.min(h-1,Math.floor(Math.floor(j/W2)*h/H2)),k=3*(sy*w+sx);return (px[k]+px[k+1]+px[k+2])/765;};TARGET_DRAW_EDGE[i]=Math.min(1,Math.hypot(lum(i+1)-lum(i-1),lum(i+W2)-lum(i-W2)));}
 const DRAW_MATERIAL_STATE={opening:{used:0},closing:{used:0}};
-const drawSubject=()=>opt('drawsubject',Object.keys(TUNED_DRAWING_CAPS).includes(VALUE_CONFIG?.subject)?VALUE_CONFIG.subject:'default');
+// --drawsubject <caps set>: drawing caps fitted on one subject (src/paint/tuned/drawing-caps.mjs), set by its preset.
+const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSubject(),stage);
+// Use one policy in planning and execution. The source's own ink is drawn with its short descriptive marks when the
+// plan says the target is drawn in pen: a pen-and-wash style, an ink medium in its drawing section, or a prepared line
+// file of the target's pen lines (--drawingfile). A painted target with no such plan keeps the sparse caps, since the
+// separator also finds "ink" in dark painted edges (foliage, windows) that were never pen lines. --sourceink 0|1
+// overrides. CLI limits override both.
+const sourceInkDrawing = () => OUTLINE.medium === 'ink' && (opt('sourceink', '') !== '' ? num('sourceink', 0) > 0
+  : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', ''));
+const drawingCapsFor = (stage, graphite = false) => {
+ const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,subject:drawSubject(),sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
+ return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
+  ...(stage==='opening'?{minLengthMm:num('openingminmm',defaults.minLengthMm)}:{edgeMin:num('closingedgemin',defaults.edgeMin)})};
+};
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
- const execute=paths=>drawMaterial(sh,paths,want,w,h,{...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:{lines:num(stage+'lines',(drawSubject()==='subject-c'?{opening:18,closing:16}:drawSubject()==='subject-a'?{opening:12,closing:20}:{opening:12,closing:24})[stage]),pressure:num(stage+'pressure',stage==='opening'?(drawSubject()==='subject-c'?.25:drawSubject()==='subject-a'?.28:.3):(drawSubject()==='subject-c'?.32:drawSubject()==='subject-a'?.35:.4)),...(stage==='opening'?{minLengthMm:num('openingminmm',drawSubject()==='subject-c'?4:8)}:{edgeMin:num('closingedgemin',drawSubject()==='subject-c'?.25:drawSubject()==='subject-a'?.28:.22)})},audit:PEN_STATE_AUDIT});
+ const execute=paths=>drawMaterial(sh,paths,want,w,h,{...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT});
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
@@ -1340,7 +1413,7 @@ if (LOOK) console.log(`look: relief ${LOOK_RELIEF}, papergrain ${LOOK_GRAIN}, mi
 
 // Read-only pigment accounting, including every wet, pore, deposited and fixed reservoir.
 const colourTrace = [];
-const traceBox = opt('image','').includes(PORTRAIT_SUBJECT) ? TRACE_BOX : [.12,.50,.35,.64];
+const traceBox = PORTRAIT_RULES ? TRACE_BOX : [.12,.50,.35,.64];
 const traceCells=[];
 if(COLOUR_TRACE) for(let y=Math.round(traceBox[1]*h);y<Math.round(traceBox[3]*h);y++)for(let x=Math.round(traceBox[0]*w);x<Math.round(traceBox[2]*w);x++) traceCells.push(y*w+x);
 function colourMass(stage, extra={}) {
@@ -1389,6 +1462,11 @@ console.log(`masking ${(100 * masked / n).toFixed(0)}% of the sheet as reserved 
 
 // What the plan says the sheet should hold at each point, so each pass is marked against its own job.
 const expected = new Float32Array(n * PIGS.length);
+// --deliverycal 1: at each full read of the sheet, what it holds of each pigment over what the brush was charged for
+// (the ledger) sets a per-pigment charge factor for later passages (src/paint/methods/delivery-cal.mjs). Sheet against
+// ledger only. --deliverycalmax caps the factor (default 1.8). Default 0.
+const DELIVERY = num('deliverycal', 0) > 0 ? createDeliveryCal(PIGS.length, { max: num('deliverycalmax', 1.8) }) : null;
+const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
 const planDensity = () => {
   const D = new Float32Array(n);
   for (let i = 0; i < n; i++) { let d = 0; for (let j = 0; j < PIGS.length; j++) d += expected[i * PIGS.length + j] * (PIGS[j].K[0] + PIGS[j].K[1] + PIGS[j].K[2]) / 3; D[i] = d; }
@@ -1772,12 +1850,16 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // the ink is the darkest fluid on the palette, as walnut ink is darker than any wash made from it
   // --firstpen graphite: the first pen's drawing as a light pencil lay-in, ink kept for the closing pen. Needs a graphite
   // outline medium; --prep does the same.
-  const graphiteFirst = first && GRAPHITE && (preparing || !!PENCIL || OUTLINE_MEDIUM==='graphite' || GRAPHITE_PROFILE.kind==='graphite');
+  // linked stages: the pencil is its own pass (prep), and the first pen is ink
+  const graphiteFirst = first && GRAPHITE && !(STAGE_PLAN && OUTLINE_MEDIUM === 'ink') && (preparing || !!PENCIL || OUTLINE_MEDIUM==='graphite' || GRAPHITE_PROFILE.kind==='graphite');
   const inkPig = graphiteFirst ? GRAPHITE_AT : INK ? PIGS.length : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0];
   // As much line as the source shows, and no more: see lineBudget. --inkbudget 0 draws every gesture found.
   // --drawfloor s: ink share assumed when the source is not a drawing, so it still gets a preparatory drawing (default 0.04 with --prep).
   const share = Math.max(SOURCE_INK, num('drawfloor', preparing ? 0.04 : 0));
-  const CELLS = share * n * num('inkbudget', 6), NIB = 1.5 * K;
+  // --closingshare c: with both an opening and a closing pen, the two share one budget, c of it for the closing pass
+  // (default 0.3), so the drawing as a whole carries as much line as the source shows, not twice that.
+  const passShare = PEN_FIRST && DRAW_LAST && !fine && num('closingshare', 0) > 0 ? (first ? 1 - num('closingshare', 0) : num('closingshare', 0)) : 1;
+  const CELLS = share * n * num('inkbudget', 6) * passShare, NIB = 1.5 * K;
   const cellsOf = gs => gs.reduce((a, g) => a + (g.length ?? pathLength(g.points)) * NIB, 0);
   const TIERED = INKTIERS && num('inkbudget', preparing ? 0 : 6) > 0;
   const FAINT_CELLS = CELLS * num('tier3faint', 0.1);
@@ -1841,7 +1923,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     // The excess comes off the tail of the greedy walk, the least structural part of the set.
     return { paths: [...t1, ...t2, ...t3], cap: lineBudget(gestures, CELLS, { width: NIB }).length, t1n: t1.length, t2n: t2.length, t3n: t3.length };
   })() : null;
-  const budgeted = (tiered ? tiered.paths : (num('inkbudget', preparing ? 0 : 6) > 0 ? lineBudget(gestures, share * n * num('inkbudget', 6), { width: 1.5 * K }) : gestures)).slice();
+  const budgeted = (tiered ? tiered.paths : (num('inkbudget', preparing ? 0 : 6) > 0 ? lineBudget(gestures, CELLS, { width: 1.5 * K }) : gestures)).slice();
   console.log(`line budget: source ink ${(100 * share).toFixed(1)}% of cells, ${budgeted.length} of ${gestures.length} gestures`);
   // --outline 0|1: a lighter second pass on fainter ridges away from what is drawn, within the line budget. Default 1.
   // --outlinemin p: run it only when the source shows at least p per cent of its cells as line. Default 0.
@@ -1855,7 +1937,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     const more = planGestures(faint, w, h, { floor: floorF, keep: num('keep', 400), claimRadius: 2 * K, reachShare: num('outlinereach', 0.05), turn: 1, carry: num('outlinecarry', 6) * K, scales: [0], tries: 3000 }).gestures;
     const used0 = budgeted.reduce((a, g) => a + (g.length ?? g.points.length) * 1.5 * K, 0);
     // --tier3faint: under --inktiers the faint pass gets a floor of its own, not only the leftovers.
-    const left = TIERED ? Math.max(FAINT_CELLS, CELLS - used0) : Math.max(0, share * n * num('inkbudget', 6) - used0);
+    const left = TIERED ? Math.max(FAINT_CELLS, CELLS - used0) : Math.max(0, CELLS - used0);
     const extra = lineBudget(more, left, { width: 1.5 * K });
     console.log(TIERED
       ? `ink tier 3 faint:    ${extra.length}/${more.length} paths, ${Math.round(cellsOf(extra))} of ${Math.round(left)} cells`
@@ -1995,7 +2077,11 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   }
   // --inkfilter: classify each path on the density the walker followed, once the budget and subject clip are applied.
   // The paths stay in the array either way: the schedule below is built from all of them.
-  if(VALUE_PLAN)kept=selectValueInk(kept,{first,w,h,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection});
+  // --inkdarkskip v: no closing pen line inside the plan's darkest washes (planned value above v); the opening drawing
+  // goes under the washes as a painter's does. src/paint/methods/ink-dark-skip.mjs
+  if (VALUE_PLAN && !first && num('inkdarkskip', 0) > 0) { const before = kept.length; kept = cutInDarkWash(kept, VALUE_PLAN.value.values, w, h, num('inkdarkskip', 0)); console.log(`ink dark skip: ${before} ${first ? 'opening' : 'closing'} gestures cut to ${kept.length} runs outside planned value ${num('inkdarkskip', 0)}`); }
+  // A prepared pencil drawing describes the same contours as pen, including paper-light borders.
+  if(VALUE_PLAN)kept=selectValueInk(kept,{first,w,h,sourceInk:sourceInkDrawing()||(first&&graphiteFirst&&!!opt('drawingfile','')) ,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,trumbullRules:TRUMBULL_RULES,portraitRules:PORTRAIT_RULES});
   const passName = first ? 'first' : fine ? 'fine' : 'last';
   const inkVerdict = INKFILTER && !SELECTED ? classifyInkPaths(kept, DRAW_SOURCE, w, h, { scale: num('inkfilterscale', K), accent: num('inkfilteraccent', 10) * K }) : null;
   if (inkVerdict) {
@@ -2005,8 +2091,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     await writeInkFilter(DRAW_SOURCE);
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
-  let scaled = kept.map((g, i) => ({ reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature,openingRole:g.openingRole,preparationRole:g.preparationRole, sourceOrdinal:g.sourceOrdinal, instruction:g.instruction, outline: g.outline, tier: g.tier, ...(g.rank == null ? {} : { rank: g.rank }), ml: !!g.ml, draw: !inkVerdict || inkVerdict[i].kept, points: g.points.map(q => (q.nw == null && q.s == null ? { x: q.x * SC, y: q.y * SC } : { x: q.x * SC, y: q.y * SC, ...(q.s == null ? {} : { s: q.s }), ...(q.nw == null ? {} : { nw: q.nw * SC }) })) }));
-  scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{share:SELECTED?1:num('drawshare',1),pressure:num(first?'openingpressure':'closingpressure',first?(drawSubject()==='subject-c'?.25:drawSubject()==='subject-a'?.28:.3):(drawSubject()==='subject-c'?.32:drawSubject()==='subject-a'?.35:.4)),minLengthMm:num('openingminmm',drawSubject()==='subject-c'?4:8),edgeMin:num('closingedgemin',drawSubject()==='subject-c'?.25:drawSubject()==='subject-a'?.28:.22),lines:num(first?'openinglines':'closinglines',first?(drawSubject()==='subject-c'?18:12):(drawSubject()==='subject-c'?16:drawSubject()==='subject-a'?20:24))}});
+  let scaled = kept.map((g, i) => ({ weight:g.weight, strength:g.strength, ...(g.length==null?{}:{length:g.length*SC}), reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature,openingRole:g.openingRole,preparationRole:g.preparationRole, sourceOrdinal:g.sourceOrdinal, instruction:g.instruction, outline: g.outline, tier: g.tier, ...(g.rank == null ? {} : { rank: g.rank }), ml: !!g.ml, draw: !inkVerdict || inkVerdict[i].kept, points: g.points.map(q => (q.nw == null && q.s == null ? { x: q.x * SC, y: q.y * SC } : { x: q.x * SC, y: q.y * SC, ...(q.s == null ? {} : { s: q.s }), ...(q.nw == null ? {} : { nw: q.nw * SC }) })) }));
+  scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
   const press = penWant !== 'glaze' ? field : Float32Array.from(field, (v, i) => v * Math.max(num('penfloor', 0.2), Math.min(1, (DRAW_SOURCE[i] - planD[i]) / Math.max(1e-3, DRAW_SOURCE[i]))));
@@ -2272,15 +2358,60 @@ if (TP_ROUNDS > 0) {
   TP_SHAPES = groups.map(cells => { const mask = new Uint8Array(n), look = new Uint8Array(n); for (const i of cells) { mask[i] = 1; if (!PENCELLS[i]) look[i] = 1; } const t = { mask, area: cells.length, amount: 0, mix: PIGS.map(() => 0), _look: look }; techniqueOf(t); return t; });
   console.log(`touchpoints: ${TP_ROUNDS} rounds over ${TP_SHAPES.length} planning shapes (${TP_SHAPES.reduce((a, t) => a + t.area, 0)} cells), cut before painting`);
 }
+// --finaldarks 1: after the touch-up rounds, one round of small decisive darks (src/paint/methods/final-darks.mjs). The
+// accent cells and their families are cut here, before painting; at the end each family gets one shape-level look.
+let FD_SHAPES = null;
+if (num('finaldarks', 0) > 0) {
+  const mmCell = (PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM)) / w, pen = new Uint8Array(n);
+  for (const P of [PEN_PLANS.first, PEN_PLANS.last]) for (const g of P?.scaled ?? []) if (g.draw !== false) for (const q of g.points ?? []) {
+    const x = Math.round(q.x / SC), y = Math.round(q.y / SC);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h) pen[yy * w + xx] = 1; }
+  }
+  const cells = accentCells(channelDensity(px, n, paperRGB), w, h, { mmPerCell: mmCell, pen, darkQ: num('fdquantile', 0.9), minValue: num('fdmin', 0.45), contrast: num('fdcontrast', 0.08), surroundMm: num('fdsurroundmm', 2.5), minMm2: num('fdminmm2', 0.5) });
+  const fams = accentFamilies(cells, w, h, { mmPerCell: mmCell, tileMm: num('fdtilemm', 10), minCells: 64 });
+  const T0 = { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true, passes: 1 };
+  FD_SHAPES = fams.map(f => { const mask = new Uint8Array(n); for (const i of f.cells) mask[i] = 1; const t = { mask, area: f.cells.length, amount: 0, mix: PIGS.map(() => 0), _look: mask }; TECHNIQUE.set(t, T0); return t; });
+  let a = 0; for (const v of cells) a += v;
+  console.log(`final darks: ${a} accent cells (${(100 * a / n).toFixed(2)}% of the sheet) in ${FD_SHAPES.length} families, ${FD_SHAPES.reduce((s, t) => s + t.area, 0)} cells, cut before painting`);
+}
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step`);
 if (!RESUMING && RESIST && !PRACTICE && Math.round(num('masses', 0)) <= 0) { if(AREA_PLAN){const cells=Array.from(up(AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(sheet,cells);if(!paper.dry)throw Error('semantic film requires actual dry paper before apply');AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(sheet, up(RESIST), RESIST_SOFT && upF(RESIST_SOFT)); STAGE = { stage: 'frisket', cells: RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
+// Linked stages: each stage's own layer (what it laid) and the sheet as it stands after it, as layer-<stage>.jpg and
+// stage-<stage>.jpg, so the stages can be judged one at a time.
+const stageShot = async (name, before) => {
+  const now = thickness(sheet), raw = { raw: { width: W2, height: H2, channels: 3 } };
+  const layer = now.map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - (before ? before[j][i] : 0))));
+  await sharp(Buffer.from(renderLayers([layer], SHEET_PIGS, base, N2, 1).buffer), raw).jpeg({ quality: 90 }).toFile(path.join(out, `layer-${name}.jpg`));
+  await sharp(view(), raw).jpeg({ quality: 90 }).toFile(path.join(out, `stage-${name}.jpg`));
+};
+// The prep stage: the pencil placement, laid dry and light before the first pen, in three passes (big shapes light, then
+// the features with the big shapes restated, then the detail), each filmed (pencil-stage.mjs pencilBatches). Its lines
+// carry their pass as `rank` (drawing-stages.mjs). Pressure is a share of the pencil's opening cap.
+async function drawPrepStage(PEN) {
+  const doc = JSON.parse(fs.readFileSync(STAGE_PLAN.files.prep + '-lines.json', 'utf8'));
+  const sx = W2 / doc.image.w, sy = H2 / doc.image.h, P0 = drawingCapsFor('opening', true).pressure;
+  const strokes = doc.lines.map(g => ({ rank: g.rank ?? 1, points: g.points.map(([x, y], k) => ({ x: x * sx, y: y * sy, s: P0 * Math.max(0.15, Math.min(1, g.weights?.[k] ?? g.weight ?? 1)) })) }));
+  const batches = pencilBatches(strokes, { frames: String(opt('prepframes', '3,2,2')).split(',').map(Number), first: num('prepfirst', 0.45) });
+  const want = new Float32Array(N2).fill(1), before = thickness(sheet).map(a => Float32Array.from(a));
+  let drawn = 0;
+  for (const [bi, b] of batches.entries()) {
+    for (const q of b.parts) { const r = clock('strokes', () => penDraw(sheet, q.strokes.map(g => ({ ...g, points: g.points.map(p => ({ ...p, s: p.s * q.gain })) })), want, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === GRAPHITE_AT ? 1 : 0)), pen: PEN, O, peak: 1 })); drawn += r.drawn ?? 0; }
+    STAGE = { stage: 'prep', step: `pencil ${b.name}`, batch: bi + 1, of: batches.length };
+    await shoot();
+  }
+  drawnCount += drawn;
+  console.log(`prep stage: ${strokes.length} pencil lines in ${batches.length} frames (${[0, 1, 2].map(p => `${['big shapes', 'features', 'detail'][p]} ${strokes.filter(g => (g.rank === 1 ? 0 : g.rank === 2 ? 1 : 2) === p).length}`).join(', ')}), ${drawn} strokes laid`);
+  await stageShot('prep', before);
+}
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const PLAN = PEN_PLANS[first ? 'first' : fine ? 'fine' : 'last'];
   if (!PLAN) throw new Error('drawing: this pen pass was not planned before painting');
   const { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures } = PLAN;
   VALUE_ACTIVE=null;
   AREA_DRAW_STAGE=first?'opening':'closing';
+  if (first && STAGE_PLAN?.files.prep && GRAPHITE) await drawPrepStage(PEN);
+  const stageBefore = STAGE_PLAN && !fine ? thickness(sheet).map(a => Float32Array.from(a)) : null;
   // --penoutline (pen first only, default on): the main shapes' outlines first, so the drawing alone states the subject.
   if (first && PREP && GRAPHITE && ANCHORS) {
     const points=Object.fromEntries(ANCHORS.landmarks.map(a=>[a.id,{x:a.painting[0]*W2/ANCHORS.canvas[0],y:a.painting[1]*H2/ANCHORS.canvas[1]}]));
@@ -2293,7 +2424,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
     const wantO = new Float32Array(N2).fill(num('outlinewant', 0.6));
     const perO = Math.max(1, Math.ceil(outlines.length / 4));
     for (let k = 0; k < outlines.length; k += perO) {
-      const outlinePig = GRAPHITE ? GRAPHITE_AT : inkPig, outlineConc = GRAPHITE ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : (STYLE_ON()?4*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10));
+      const outlinePig = GRAPHITE ? GRAPHITE_AT : inkPig, outlineConc = GRAPHITE ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD();
       const r0 = clock('strokes', () => penDraw(sheet, outlines.slice(k, k + perO).filter(g => g.draw), wantO, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === outlinePig ? outlineConc : 0)), pen: PEN, O, peak: 1 }));
       drawnCount += r0.drawn;
       STAGE = { stage: first ? (GRAPHITE && !PENCIL ? 'prep' : 'pen') : 'ink', step: 'outlines', batch: 0, of: Math.ceil(scaled.length / Math.max(1, Math.ceil(scaled.length / 8))), outline: true };
@@ -2310,7 +2441,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
     const batches = pencilBatches(scaled.filter(g => g.tier === 1 && g.draw !== false), { frames: String(opt('pencilframes', '4,3,3')).split(',').map(Number), first: num('pencilfirst', 0.45) });
     console.log(`pencil stage: ${[0, 1, 2].map(p => `${['big shapes', 'features', 'detail'][p]} ${batches.filter(b => b.pass === p).reduce((a, b) => a + b.parts.reduce((c, q) => c + q.strokes.length, 0), 0)} strokes in ${batches.filter(b => b.pass === p).length} frames`).join(', ')}`);
     for (const [bi, b] of batches.entries()) {
-      if (!PENCIL) for (const q of b.parts) { const r1 = clock('strokes', () => penDraw(sheet, q.strokes, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (STYLE_ON()?4*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10)) * q.gain : 0)), pen: PEN, O, peak: 1 })); drawnCount += r1.drawn; }
+      if (!PENCIL) for (const q of b.parts) { const r1 = clock('strokes', () => penDraw(sheet, q.strokes, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? INKLOAD() * q.gain : 0)), pen: PEN, O, peak: 1 })); drawnCount += r1.drawn; }
       if (PENCIL) for (const q of b.parts) { const r1 = clock('strokes', () => pencilDraw(sheet, q.strokes, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1) * q.gain, pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + 31 * bi + (q.gain < 1 ? 7 : 0) })); drawnCount += r1.drawn; }
       STAGE = { stage: 'pen', step: `pencil ${b.name}`, batch: bi + 1, of: batches.length };
       await shoot();
@@ -2323,12 +2454,12 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
     const drawMain = inkVerdict ? main.filter(g => g.draw) : main, drawThin = inkVerdict ? thin.filter(g => g.draw) : thin;
     const drawT1 = inkVerdict ? first1.filter(g => g.draw) : first1;
     if (drawT1.length && PENCIL && first && SELECTED) { const r1 = clock('strokes', () => pencilDraw(sheet, drawT1, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1), pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k })); drawnCount += r1.drawn; }
-    else if (drawT1.length) { const r1 = clock('strokes', () => penDraw(sheet, drawT1, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : (STYLE_ON()?4*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))) : 0)), pen: PEN, O, peak: 1 })); drawnCount += r1.drawn; }
+    else if (drawT1.length) { const r1 = clock('strokes', () => penDraw(sheet, drawT1, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); drawnCount += r1.drawn; }
     // --mlwant: a line from the learned map is drawn at a constant pressure, like the outline tier (ml-lines.mjs)
     const mlWant = ML_LINES ? ML_LINES.want : 0;
     const drawML = mlWant ? drawMain.filter(g => g.ml) : [], drawRest = mlWant ? drawMain.filter(g => !g.ml) : drawMain;
-    if (drawML.length) { const wantML = new Float32Array(N2).fill(mlWant); const rm = clock('strokes', () => penDraw(sheet, drawML, wantML, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : (STYLE_ON()?4*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))) : 0)), pen: PEN, O, peak: 1 })); drawnCount += rm.drawn; }
-    const r = clock('strokes', () => penDraw(sheet, drawRest, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : (STYLE_ON()?4*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))) : 0)), pen: PEN, O, peak: peakMain }));
+    if (drawML.length) { const wantML = new Float32Array(N2).fill(mlWant); const rm = clock('strokes', () => penDraw(sheet, drawML, wantML, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); drawnCount += rm.drawn; }
+    const r = clock('strokes', () => penDraw(sheet, drawRest, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: peakMain }));
     if (drawThin.length) { const r2 = clock('strokes', () => penDraw(sheet, drawThin, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst ? (STYLE_ON()?3*VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : num('outlineconc', 6.5)) : 0)), pen: PEN, O, peak: peakThin })); drawnCount += r2.drawn; }
     drawnCount += r.drawn;
     STAGE = { stage: first ? (GRAPHITE && !PENCIL ? 'prep' : 'pen') : 'ink', step: fine ? 'fine' : 'gestures', batch: k / per + 1, of: Math.ceil(scaled.length / per) };
@@ -2337,6 +2468,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
     if (!FILM_BY_PAINT || bi === ofB || bi % Math.max(1, Math.round(ofB / PEN_FRAMES)) === 0) await shoot();
   }
   clock('dry', () => dry(sheet, 20000, O, { levelMax: 200 }));
+  if (stageBefore && (first ? STAGE_PLAN.files.prepInk && STAGE_PLAN.stages.prepInk : STAGE_PLAN.files.finishInk)) await stageShot(first ? 'prepink' : 'finishink', stageBefore);
   if (INKRES) { INKRES.settle(); console.log(`inkres ${INKRES.N}: the pens on a ${INKRES.width} x ${INKRES.height} sheet, ${INKRES.stats.calls} calls, ${(INKRES.stats.ms / 1000).toFixed(1)} s so far`); }
   console.log(`drawing: ${drawnCount} pen gestures in pigment ${inkPig}, long share ${longShare(gestures, w).toFixed(2)}`);
 }
@@ -2346,6 +2478,17 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
   const before = thickness(sheet).map(a => Float32Array.from(a));
   await drawPass(null, { first: true });
   INK_THK = thickness(sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
+  await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
+}
+// An actual dry-pen checkpoint, using the same planned strokes and physics as
+// the full painting. The process exit hook still writes the strict guard report.
+if (num('drawingonly', 0) > 0) {
+  if (RESUMING || !PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none') throw new Error('--drawingonly requires an opening drawing');
+  fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
+  fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
+  fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: drawnCount, backend: GPU_INFO }));
+  await drainFrames(); if (FRAMER) FRAMER.close(); sheet._gpu?.close();
+  console.log('drawing-only: dry opening complete, before washes'); process.exit(0);
 }
 if(MAJOR_INTENT)await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-drawing-opening.png'));
 if(num('treelayerslate',0)===1&&PEN_FIRST&&DRAWING!=='none')await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'production-drawing-opening.png'));
@@ -2506,11 +2649,30 @@ const touchCorrections = round => {
     if (any) glazed++;
   });
   const maxV = Math.max(...layers.filter(l => !l._touch).map(l => l.value || 0));
-  const add = byPig.map((shapes, j) => { if (!shapes.length) return null; const tmpl = layers.filter(l => l.pigment === j && !l._touch && !l._detail).at(-1) ?? layers.find(l => !l._touch); return { ...tmpl, pigment: j, value: maxV + round, shapes, _touched: round }; }).filter(Boolean);
+  const add = byPig.map((shapes, j) => { if (!shapes.length) return null; const tmpl = layers.filter(l => l.pigment === j && !l._touch && !l._darks && !l._detail).at(-1) ?? layers.find(l => !l._touch && !l._darks); return { ...tmpl, pigment: j, value: maxV + round, shapes, _touched: round }; }).filter(Boolean);
   console.log(`touchpoint ${round}: looked at ${looked} shapes, ${glazed} lighter than the reference get a corrective glaze (${add.reduce((a, l) => a + l.shapes.length, 0)} passages over ${add.length} pans)`);
   return add;
 };
 if (TP_SHAPES) layers.push({ _touch: 1, shapes: [], value: 0, pigment: 0 });
+const finalDarks = () => {
+  dry(sheet, 20000, O, { levelMax: 200 });
+  const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), byPig = PIGS.map(() => []), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
+  let looked = 0, laid = 0;
+  FD_SHAPES.forEach((t, k) => {
+    const lk = TARGET_GUARD.look('passage', `darks/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
+    const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
+    const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
+    if (Math.max(...d) < num('fddmin', 0.06)) return;
+    const a = unmix(Float32Array.from(d), 1, Ks); let any = false;
+    for (let j = 0; j < PIGS.length; j++) if (a[j] > 0.004) { const amt = a[j] * num('fdgain', 1), sh = { mask: t.mask, area: t.area, amount: amt, mix: PIGS.map((_, q) => (q === j ? amt : 0)) }; TECHNIQUE.set(sh, TECHNIQUE.get(t)); byPig[j].push(sh); any = true; }
+    if (any) laid++;
+  });
+  const maxV = Math.max(...layers.filter(l => !l._touch && !l._darks).map(l => l.value || 0));
+  const add = byPig.map((shapes, j) => { if (!shapes.length) return null; const tmpl = layers.filter(l => l.pigment === j && !l._touch && !l._darks && !l._detail).at(-1) ?? layers.find(l => !l._touch && !l._darks); return { ...tmpl, pigment: j, value: maxV + 3, shapes, _touched: 'darks', _darkPass: 1 }; }).filter(Boolean);
+  console.log(`final darks: looked at ${looked} families, ${laid} lighter than the reference get a dark (${add.reduce((a, l) => a + l.shapes.length, 0)} passages over ${add.length} pans)`);
+  return add;
+};
+if (FD_SHAPES?.length) layers.push({ _darks: 1, shapes: [], value: 0, pigment: 0 });
 // ---- stops at passage boundaries and the take-over of a saved painting (tools/aware/pause.mjs) -------------------------
 // What a revision may not change once painting has started is checked by the harness; here the painter only refuses to
 // save a painting whose state it cannot carry whole (features with state of their own that is not saved below).
@@ -2611,6 +2773,9 @@ else await awareBoundary({ kind: 'start' });
 for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   if(L===FINISH_START){AREA_PLAN=FINISH_PLAN;AREA_COMPILED=FINISH_COMPILED;AREA_EXEC.set(null);if(FINISH_PLAN.doc.finishingBase){const b=FINISH_PLAN.doc.finishingBase;dry(sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));if(!paper.dry)throw Error('finishing connected pass requires measured dry base');}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(sheet);FINISH_MASS_BEFORE=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0));}
   const layer = layers[L];
+  // --finishsnaps 1: the sheet as the finish begins (the planned ladder laid, before the touch-up rounds), for review
+  if (layer._touch === 1 && num('finishsnaps', 0) > 0) { dry(sheet, 20000, O, { levelMax: 200 }); await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'finish-start.png')); }
+  if (layer._darks) { if (num('finishsnaps', 0) > 0) { dry(sheet, 20000, O, { levelMax: 200 }); await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'finish-touched.png')); } const add = finalDarks(); if (add.length) layers.splice(L + 1, 0, ...add); continue; }
   if (layer._touch) { if (!PASS_LATE_DONE) { PASS_LATE_DONE = true; await PASSAGE_HOOK.run("washes"); } const add = touchCorrections(layer._touch); if (add.length) { layers.splice(L + 1, 0, ...add); if (layer._touch < TP_ROUNDS) layers.splice(L + 1 + add.length, 0, { _touch: layer._touch + 1, shapes: [], value: 0, pigment: 0 }); } continue; }
   if(AREA_PLAN)AREA_EXEC.set(layer._semantic);
   if (!PASS_LATE_DONE && ((num('bgfirst', 0) > 0 ? layer._order?.side !== 'ground' : layer._order?.phase !== 'ground') || L === layers.length - 1)) { PASS_LATE_DONE = true; await PASSAGE_HOOK.run('washes'); }
@@ -2628,6 +2793,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     if (SC === 1) { const P = PIGS.length; for (let j = 0; j < P; j++) { const t = th[j]; for (let k = 0; k < N2; k++) ONSHEET[k * P + j] = t[k]; } }
     else for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = ((y / SC) | 0) * w + ((x / SC) | 0), k = y * W2 + x; for (let j = 0; j < PIGS.length; j++) ONSHEET[i * PIGS.length + j] += th[j][k] / (SC * SC); }
     feedbackStats.read++; FEEDBACK_FRESH = false;
+    if (DELIVERY) { const P = PIGS.length, held = new Float64Array(P); for (let k = 0; k < n; k++) for (let j = 0; j < P; j++) held[j] += ONSHEET[k * P + j]; DELIVERY.observe(held); }
     if (FEEDBACK_LAG) FEEDBACK_BASE = { onsheet: ONSHEET.slice(), booked: expected.slice() };
     if (REMIX) REMIX.refresh(th.map(t => { const c = new Float32Array(n); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) c[((y / SC) | 0) * w + ((x / SC) | 0)] += t[y * W2 + x] / (SC * SC); return c; }));
     }
@@ -2770,7 +2936,11 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   // the technique that last laid each cell, so coverage can be read per technique at the end
   { const id = (TECHS.includes(T.name) ? TECHS : TECHS.push(T.name) && TECHS).indexOf(T.name); for (let y = MB.y0; y <= MB.y1; y++) for (let i = y * w + MB.x0, e = y * w + MB.x1; i <= e; i++) if (MASK[i]) LAST[i] = id + 1; }
   // How far through the ladder this pass is, 0..1.
-  const through = (layer.value - 1) / Math.max(1, steps - 1);
+  // --touchbroad 1: a touch-up glaze (its pass numbered past the ladder's end) is laid as a mid-ladder glaze with the
+  // floor brush, not as detail marks or rigger touches, which is what its pass number alone would make of it.
+  // A final dark (--finaldarks) is laid as the ladder's last passes are, with the small floored brush, not as detail marks.
+  const throughRaw = (layer.value - 1) / Math.max(1, steps - 1);
+  const through = layer._darkPass ? Math.min(throughRaw, 0.95) : layer._touched && num('touchbroad', 0) > 0 ? Math.min(throughRaw, num('touchthrough', 0.5)) : throughRaw;
   // --detailfrom t: passes later than t of the ladder are laid as detail marks, not glazes. Default 2, never.
   const authoredPaths=sh._semantic?lowerAuthoredGestures(sh._semantic,{target:AREA_PLAN.doc.target,crop:AREA_PLAN.crop,width:W2,height:H2,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*AREA_PLAN.doc.target.width/AREA_PLAN.crop[2]}):null;
   // --skylanes 1: a large plane that reads cool at one shape-level look (blue over red by 10+) is laid as overlapping wet lanes.
@@ -2786,13 +2956,15 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   // --brushfloor R: smallest wash brush, R px at 1086 wide, until --floorfrom of the ladder (default 0.85). The sheet's clip holds the edge.
   // Under --physical, passes after --floorfrom may use the detail brush (rigger).
   // --detailfloor 1: under --physical the floor brush moves toward the detail brush by the share of cells with focus over --detailfocus.
-  const FLOOR = (() => { const f = num('brushfloor', 0); if (authoredPaths || (f <= 0 && !PB) || detail) return 0; if (through > num('floorfrom', 0.85)) return PB ? Math.max(SC, PB.detailR) : 0; const base = Math.max(SC, PB ? PB.floorR : f * W2 / 1086); if (PB && FOCUS && num('detailfloor', 0) > 0) { const thr = num('detailfocus', 0.5); let a = 0, c = 0; for (let i = 0; i < n; i++) if (sh.mask[i]) { a++; if (FOCUS[i] > thr) c++; } const q = a ? c / a : 0; return Math.max(SC, base + (Math.max(SC, PB.detailR) - base) * q); } return base; })();
+  const FLOOR = (() => { const f = num('brushfloor', 0); if (layer._darkPass || authoredPaths || (f <= 0 && !PB) || detail) return 0; if (through > num('floorfrom', 0.85)) return PB ? Math.max(SC, PB.detailR) : 0; const base = Math.max(SC, PB ? PB.floorR : f * W2 / 1086); if (PB && FOCUS && num('detailfloor', 0) > 0) { const thr = num('detailfocus', 0.5); let a = 0, c = 0; for (let i = 0; i < n; i++) if (sh.mask[i]) { a++; if (FOCUS[i] > thr) c++; } const q = a ? c / a : 0; return Math.max(SC, base + (Math.max(SC, PB.detailR) - base) * q); } return base; })();
   const FLOORMASK = FLOOR ? up(brushMask(sh)) : null;
   let FLOOR_R = FLOOR;
   // under --strokebudget the passage gets its share of the strokes: the brush and the closing radius grow together
   // until its sweeps fit (stroke-budget.mjs)
   const floorPaths = rr => { const plan = prof('floor close', () => closeLocal(FLOORMASK, W2, H2, rr)); return prof('floor lanes', () => brushedWashPaths(plan, W2, H2, { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), field: SHAPE_LOAD, seed: 17 + laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle })).map(pts => pts.map(p => ({ ...p, r: Math.max(rr, p.r) }))); };
-  const paths = shapedPaths ?? authoredPaths ?? clock('paths', () => FLOOR
+  // a final dark goes on with a small round brush drawn through the accent itself, held to it by the clip below
+  const darkPaths = layer._darkPass ? washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: 0.5 * SC, minLength: 2 * SC }).map(pts => pts.map(p => ({ ...p, r: Math.min(p.r, Math.max(SC, PB ? PB.detailR : SC)) }))) : null;
+  const paths = shapedPaths ?? authoredPaths ?? darkPaths ?? clock('paths', () => FLOOR
     ? (() => { let rr = FLOOR, P = floorPaths(rr); const T = BUDGET ? BUDGET.target(sh) : Infinity; for (let it = 0; it < 7 && P.length > T && rr < 3 * BRUSH; it++) { rr *= 1.6; P = floorPaths(rr); } FLOOR_R = rr; return P; })()
     : (detail
     ? detailMarks(SHAPE_LOAD, w, h, { length: num('marklen', 11), spacing: num('markgap', 6), seed: 7 + laid + SEED, coverage: num('markcover', 0.3) })
@@ -2810,7 +2982,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     paths.length = 0; paths.push(...held);
   }
   // --cutin 0|1: run a small brush along the inside of the passage's edge before filling it, as a painter cuts in. Default 1.
-  if (!BUDGET && !shapedPaths && !authoredPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
+  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutbandin n: cut-in band inside the subject (--fwmask); --cutband (default 2) elsewhere.
     const CB = num('cutband', 2), CBIN = opt('cutbandin', '') !== '' && FW_SUBJ ? num('cutbandin', CB) : CB;
@@ -2832,6 +3004,16 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     used['cut in'] = (used['cut in'] || 0) + edge.length;
   }
   // A passage too narrow for a wash sweep gets a small brush rather than being skipped: the plan booked it as delivered.
+  // under --touchbroad a touch-up glaze too small for a sweep of the floor brush is not laid at all: a single dab of a
+  // corrective charge lands as a blot, which is worse than the small shortfall it was meant to fix
+  // under --touchbroad a touch-up glaze too small for a sweep of the floor brush goes on as a final dark does: a small
+  // round brush drawn through the shape, clipped to it. A single dab of a corrective charge would land as a blot.
+  let touchSmall = false;
+  if (!paths.length && layer._touched && !layer._darkPass && num('touchbroad', 0) > 0) {
+    paths.push(...washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: 0.5 * SC, minLength: 2 * SC }).map(pts => pts.map(p => ({ ...p, r: Math.min(p.r, Math.max(SC, PB ? PB.detailR : SC)) }))));
+    if (!paths.length) { used['touch-up too small, left'] = (used['touch-up too small, left'] || 0) + 1; continue; }
+    touchSmall = true; used['touch-up small brush'] = (used['touch-up small brush'] || 0) + 1;
+  }
   if (!paths.length) {
     // --rescue sweep: a round brush as wide as the passage, drawn down its middle, instead of small marks (default marks).
     // Under --brushfloor a passage too small for a sweep is one clipped touch of the floor brush across its middle.
@@ -2844,7 +3026,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     const floorDabParts = axis => { const lab = new Int32Array(N2).fill(-1), parts = [], q = new Int32Array(N2); for (let s = 0; s < N2; s++) { if (!FLOORMASK[s] || lab[s] >= 0) continue; let qh = 0, qt = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, c = 0, x0 = W2, x1 = 0; q[qt++] = s; lab[s] = parts.length; while (qh < qt) { const i = q[qh++], x = i % W2, y = (i / W2) | 0; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; c++; if (x < x0) x0 = x; if (x > x1) x1 = x; for (const j of [x > 0 ? i - 1 : -1, x < W2 - 1 ? i + 1 : -1, y > 0 ? i - W2 : -1, y < H2 - 1 ? i + W2 : -1]) if (j >= 0 && FLOORMASK[j] && lab[j] < 0) { lab[j] = parts.length; q[qt++] = j; } } const mx = sx / c, my = sy / c, cxx = sxx / c - mx * mx, cyy = syy / c - my * my, cxy = sxy / c - mx * my, th = 0.5 * Math.atan2(2 * cxy, cxx - cyy), l1 = (cxx + cyy) / 2 + Math.sqrt(((cxx - cyy) / 2) ** 2 + cxy * cxy), l2 = Math.max(0, (cxx + cyy) - l1); parts.push({ c, cx: mx + 0.5, cy: my + 0.5, width: Math.sqrt(12 * l2), ...(axis ? { dx: Math.cos(th), dy: Math.sin(th), hw: Math.max(1, Math.sqrt(3 * Math.max(0, l1))) } : { dx: 1, dy: 0, hw: Math.max(1, (x1 - x0) / 2) }) }); } const minW = num('floordabminw', 0), minC = num('floordabskip', 0) * Math.PI * FLOOR * FLOOR; return parts.filter(p => !(minW > 0 && p.width < minW && p.hw > 2 * minW) && !(minC > 0 && p.c < minC)).sort((a, b) => b.c - a.c).slice(0, num('floordabmax', 24)).map(p => [{ x: p.cx - p.dx * p.hw, y: p.cy - p.dy * p.hw, r: FLOOR, p: 1 }, { x: p.cx, y: p.cy, r: FLOOR, p: 1 }, { x: p.cx + p.dx * p.hw, y: p.cy + p.dy * p.hw, r: FLOOR, p: 1 }]); };
     // --floordabminw w: a fragment thinner than w cells and longer than twice that gets no touch of its own. Default 0.
     // --floordabskip f: a fragment smaller than f of the floor brush's footprint gets no touch. Default 0.
-    const DABMODE = opt('floordab', 'span');
+    const DABMODE = layer._darkPass ? 'parts' : opt('floordab', 'span');
     const rescued = FLOOR ? (DABMODE === 'parts' || DABMODE === 'axis' ? floorDabParts(DABMODE === 'axis') : floorDab()) : opt('rescue', 'marks') === 'sweep'
       ? washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: 0.5 * SC, minLength: 2 * SC })
       : detailMarks(SHAPE_LOAD, w, h, { length: num('marklen', 9), spacing: 2, seed: 7 + laid + SEED, coverage: 0.9, minWant: 0.005 })
@@ -2859,10 +3041,12 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   const crispHere = !!BUDGET || !!shapedPaths || semanticUsesNumericClip(sh._semantic) && CRISP.on && CRISP.wants(T, detail);
   // --washreach: a planned stroke may end past the outline, so the clip is the passage grown by the reach, still off
   // the plan's reserved lights; the edge is where the strokes end, not the mask
+  if (touchSmall) setClip(sheet, up(dilate(MASK, w, h, 1)));
+  if (layer._darkPass) { setClip(sheet, up(dilate(MASK, w, h, 1))); used['final dark'] = (used['final dark'] || 0) + paths.length; }
   if (crispHere) { setClip(sheet, up(sh._strokePlan?.reachCells > 0 ? (() => { const g = dilate(brushMask(sh), w, h, Math.ceil(sh._strokePlan.reachCells * 0.8) + 1), P = VALUE_PLAN?.protectedCells; return P ? Uint8Array.from(g, (v, i) => (v && !P[i] ? 1 : 0)) : g; })() : brushMask(sh))); used['crisp edge'] = (used['crisp edge'] || 0) + 1; }
   // under --brushfloor the clip is the passage closed by --clipclose (default 1.5) floor radii, joined with the probe's,
   // so pinholes inside a passage do not become paper holes. The outer edge is not moved.
-  if (!BUDGET && !shapedPaths && FLOOR && semanticUsesNumericClip(sh._semantic)) { const cr = num('clipclose', 1.5) * FLOOR, reach = MASSP ? edgeReach(sh, num) * FLOOR : 0, cm0 = prof('clip close', () => closeLocal(FLOORMASK, W2, H2, cr)), cm = reach >= 1 ? dilate(cm0, W2, H2, reach) : cm0; const c0 = PROBE ? Uint8Array.from(cm, (v, i) => v & PROBE.clip[i]) : cm;
+  if (!BUDGET && !shapedPaths && FLOOR && !touchSmall && semanticUsesNumericClip(sh._semantic)) { const cr = num('clipclose', 1.5) * FLOOR, reach = MASSP ? edgeReach(sh, num) * FLOOR : 0, cm0 = prof('clip close', () => closeLocal(FLOORMASK, W2, H2, cr)), cm = reach >= 1 ? dilate(cm0, W2, H2, reach) : cm0; const c0 = PROBE ? Uint8Array.from(cm, (v, i) => v & PROBE.clip[i]) : cm;
     // under --ladderkeepout the clip is also held off the passages' cells, so closing does not reach back into them
     const KO = (num('ladderkeepout', 0) > 0 || PASSAGE_HOOK.exact) && PASSAGE_HOOK.names.length && !NOKEEP ? keepoutMask() : null;
     // --keepsmooth s: cut the keep-out smooth at the sheet's grid, as --foliagesmooth does the seal
@@ -2872,8 +3056,9 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   if (detail) used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] = (used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] || 0) + paths.length;
   // wet on wet means the paper is wet when the paint arrives: clean water first, over the same shape.
   // --prewet 1: dampen a passage laid in more than --prewetlanes lanes first, so lanes do not dry into rims. Default 0.
-  // --splwet (default on with --strokeplan): a passage laid in planned lanes is dampened first, so its lanes merge.
-  if (!BUDGET && !sh._semantic&&(T.intoWet || (!WETPOL && (opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
+  // --splwet: optional dampening for stroke lanes. A value plan controls its own wet/dry technique;
+  // do not silently prewet its dry-base glazes. Explicit --splwet 1 still prepares a connected wet bed.
+  if (!BUDGET && !sh._semantic&&(T.intoWet || (!WETPOL && (opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', sh._valuePlan ? 0 : 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
     // --gradedprewet s: a graded wash's clean water reaches s of the short side past it onto equally pale paper. Default 0.03.
     const reach = sh.graded && !sh._follow ? Math.round(num('gradedprewet', 0.03) * Math.min(w, h)) : 0;
     // --prewetinset k: wet the shape shrunk by k cells at 540 px, not its paths, so its edge lands on dry paper. Default 0.
@@ -2959,7 +3144,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
       CHARGE_CAL=NUMERIC_TUFT_CAL.get(key).gain;fs.appendFileSync(path.join(out,'numeric-tuft-consumed.jsonl'),JSON.stringify({shapeId:MAJOR_TECHNIQUE.shapeId,radius:r,calibration:CHARGE_CAL,water:WET(T),passes:T.passes,originalGeometry:true,profile:semanticBrushObservation(brush)})+'\n');
     }
 
-    productionDip(brush, { water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map(v => v * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) });
+    productionDip(brush, { water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) });
     const cadence=nativeBodyCadence({mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),detail,instructionBound:!!sh._semantic,technique:T.name,radiusCells:r,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/W2,every:flowEvery(paths.length),spacing:FAST_BODY_SPACING});
     if(cadence.approximated)BODY_CADENCE_RECORD.sourceSweepsSelected++;
     const every=cadence.every;
@@ -2998,7 +3183,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
         return count ? sum / count : (MASK[sy * w + sx] ? readField(sy*w+sx) : sh.amount);
       };
       const f = LOADS.map(ch => { if (!F&&!chargeField) return 1; let a = 0; for (const q of ch) a += readLoad(q); return Math.max(lo, Math.min(hi, a / ch.length / Math.max(1e-4, sh.amount))); });
-      const base = sh.mix.map(v => v * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       const extra=LOADS.map((ch,k)=>{
         if(!chargeField&&!componentField)return {factor:1};
         const contact=candidateContact(brush,{...sheet,clip:null},ch,{upright:UPRIGHT,spacing:cadence.spacing});
@@ -3015,7 +3200,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
       // One amount per shape: the chunks carry the passage's amount, not a per-cell field.
       const f = chunks.map(() => 1), mean = 1;
-      const base = sh.mix.map(v => v * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       // The water moves on the sweep's clock, counted across its chunks, so the sheet flows while a chunked sweep is laid.
       let st = 0;
       clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: base.map(v => v * f[k] / mean) }); numericalStroke(brush, sheet, ch, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(sheet, O)); } }); }); });
@@ -3055,7 +3240,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     else if (PASSFRAMES > 0 && ++shIdx % PASSFRAMES === 0) snap({ stage: 'wash', pass: L + 1, of: layers.length, value: layer.value, laying: true });
   }
   if(FINISH_PLAN&&L===FINISH_START){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-deposition-immediate.png'));coherent(sheet);const after=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0)),commands=AREA_EXEC.records.filter(r=>r.operation==='physical brush stroke'&&r.status==='executed'),command=commands.at(-1);fs.writeFileSync(path.join(out,'finishing-dose-proof.json'),JSON.stringify({kind:'actual all-sheet pigment inventory delta over one finishing pass; per-contact brush loss separately logged',areaId:command?.areaId,passId:command?.passId,commandId:command?.id,commandIds:commands.map(r=>r.id),gestureIds:commands.map(r=>r.geometry?.[0]?.gestureId??null),paperBeforeByContact:commands.map(r=>r.paper),primaryCellsByContact:commands.map(r=>r.primaryCells?.length??0),primaryCells:command?.primaryCells?.length,requestedDepth:sh.amount,requestedMass:sh.amount*commands.reduce((s,r)=>s+(r.primaryCells?.length??0),0),beforePigmentMass:FINISH_MASS_BEFORE,afterPigmentMass:after,depositedPigmentMass:after.map((v,j)=>v-FINISH_MASS_BEFORE[j]),paperBefore:command?.paper,limit:'all-sheet conserved pigment delta, not percell depth/value/coverage proof; ordinary transport remains active'},null,2));}
-  if (crispHere || FLOOR) setClip(sheet, PROBE ? PROBE.clip : null);
+  if (crispHere || FLOOR || layer._darkPass || touchSmall) setClip(sheet, PROBE ? PROBE.clip : null);
   if(!BUDGET&&!sh._valuePlan?.texture&&sh._valuePlan?.edges.softCells.length&&paths.length){
     const softSplit=num('softsplit',0)>0,hardNear=softSplit?(()=>{const near=new Set(),R=Math.ceil(num('softmm',.35)/(num('sheetmm', DEFAULT_SHEET_MM)/w))+1;for(const i of sh._valuePlan.edges.hardCells){const x=i%w,y=(i/w)|0;for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<w&&yy*w+xx<n)near.add(yy*w+xx);}}return near;})():null;
     // softsplit: a turning edge is softened up to, not across, the nearby hard edges: the arc is cut
@@ -3165,6 +3350,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
       // one amount per shape: the ledger books what the brush was charged, the passage's amount in every cell
       void gr; void amt;
       for (let j = 0; j < P; j++) expected[i * P + j] += mix[j] * share;
+      if (DELIVERY) for (let j = 0; j < P; j++) DELIVERY.book(j, mix[j] * share * (sh._fb ?? 1) * DCAL(sh, j));
     }
   }
   if(VALUE_PLAN){const next=layers[L+1];if(!next||next.value!==layer.value){VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png'));}}
@@ -3192,6 +3378,7 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   }
   await awareBoundary({ kind: 'pass', L });
 }
+if (DELIVERY) { const hst = DELIVERY.history(); console.log(`delivery calibration: ${hst.length} reads; kept of charge ${JSON.stringify(hst.at(-1)?.kept ?? [])}; charge factors ${DELIVERY.factors().map(v => v.toFixed(2)).join(', ')}`); fs.writeFileSync(path.join(out, 'delivery-cal.json'), JSON.stringify({ kind: 'sheet against ledger, per pigment; no target reads', history: hst }, null, 1)); }
 if (FEEDBACK_LAG) console.log(`feedback: ${feedbackStats.read} passes read the sheet, ${feedbackStats.predicted} predicted it from the last read and the ledger`);
 if(AREA_PLAN)AREA_EXEC.set(null);
 if(FINISH_PLAN){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-immediate.png'));dry(sheet,30000,O,{levelMax:140,dt:2});await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-ordinary-dried.png'));AREA_PLAN=null;AREA_EXEC.set(null);}

@@ -1,8 +1,7 @@
 // Portrait-specific settings fitted to a reference outside this repository.
 // Risks: docs/techniques.md.
 
-// The value plan subject that turns on the lower-face texture and first-ink jaw rules.
-export const PORTRAIT_SUBJECT = 'subject-c';
+// --portraitrules 1 (the portrait-3t preset, presets.mjs) turns on the lower-face texture and first-ink jaw rules.
 
 // Lower-face texture zone as shares of the sheet: x0, y0, x1, y1. --texzone overrides it.
 export const TEX_ZONE = Object.freeze([0, .5, 1, .88]);

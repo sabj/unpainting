@@ -6,7 +6,7 @@ The painter's code in `src/paint/` is grouped by purpose. This page is an index:
 - [Targeted techniques](#targeted-techniques) (`src/paint/techniques/`) handle one kind of feature or surface: faces, dark fur, curly dog coats, foliage, skies, sea, sand and buildings. Most are off unless a flag turns them on.
 - [Tuned settings](#tuned-settings) (`src/paint/tuned/`) were fitted to specific benchmark images. They can help those images and hurt others. [src/paint/tuned/README.md](../src/paint/tuned/README.md) covers the overfitting risk.
 
-The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. Making the default generalize is [future idea 5](future-ideas.md#5-making-the-default-generalize).
+The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The default now uses general methods; fitted settings require an explicit preset. See [overfitting.md](overfitting.md) and [linework.md](linework.md) for preset and drawing-stage choices.
 
 Subject ids name benchmark images. `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`, and `subject-e` is a second Trumbull-derived subject. subject-b, subject-c, subject-d, subject-a and the architecture photograph are private benchmark images.
 

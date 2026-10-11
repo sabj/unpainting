@@ -4,9 +4,26 @@
 // apply: --outlinemedium auto picks graphite or ink from the image, with the default caps and pressure.
 // docs/plan-format.md describes the fields.
 
-const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
-const INK_COLOURS = Object.freeze(['sepia', 'black']);
-const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
+export const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
+export const INK_COLOURS = Object.freeze(['sepia', 'black']);
+export const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
+// Where the line set comes from (--linesource, src/paint/methods/linework-plan.mjs).
+export const LINE_SOURCES = Object.freeze(['auto', 'photo-sketch', 'source-ink']);
+// The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
+export const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
+export const PREP_INK_METHODS = Object.freeze(['contour', 'connected', 'scribble']);
+export const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
+export const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
+export const FINISH_MASSES = Object.freeze(['none', 'scribble']);
+// prepInk.method: contour draws the stage's lines as planned; connected lays the walker's connected gestures on them
+// (--drawinglogic 2); scribble joins them into fewer, longer strokes, opens the lit edges and scribbles the dark masses
+// (--drawinglogic 3).
+const METHOD_LOGIC = Object.freeze({ connected: '2', scribble: '3' });
+// finishInk.method "architecture": the Y1 / V096 closing pen. Traced lines restated whole at full pressure, widths from
+// the target's darkness, a wide nib and strong ink. (--inkofftrees is left out: its tree detector read 64% of h36-a's
+// stone as trees and removed 148 of 171 opening lines.) For buildings drawn from photographs or pen sheets.
+const ARCHITECTURE_FLAGS = Object.freeze(['--closingpressure', '1', '--drawwant', '1', '--drawwidthgain', '2']);
+const ARCHITECTURE_SEPIA = Object.freeze(['--inkkscale', '8']);
 
 // Weight 0 is the painter's default line; weight 1 is the heaviest ink the default recipe used to force on every
 // subject. Each flag runs linearly between the two.
@@ -45,9 +62,95 @@ function choice(drawing, key, allowed) {
   return v;
 }
 
+function stageObject(stages, key) {
+  const v = stages[key];
+  if (v == null || v === false) return null;
+  if (v === true) return {};
+  if (typeof v !== 'object' || Array.isArray(v)) throw new Error(`drawing.stages.${key}: true or an object`);
+  return v;
+}
+
+function stageUnit(o, path, key) {
+  const v = o[key];
+  if (v == null) return null;
+  if (typeof v !== 'number' || !(v >= 0 && v <= 1)) throw new Error(`drawing.stages.${path}.${key}: a number from 0 to 1, not ${JSON.stringify(v)}`);
+  return v;
+}
+
+function stageChoice(o, path, key, allowed) {
+  const v = o[key];
+  if (v == null) return null;
+  if (!allowed.includes(v)) throw new Error(`drawing.stages.${path}.${key}: one of ${allowed.join(', ')}, not ${JSON.stringify(v)}`);
+  return v;
+}
+
+/**
+ * Painter flags for drawing.stages: { prep?: {amount}, prepInk?: {from, keep, add, amount, method},
+ * finishInk?: {from, select, restate, method, masses} }. A stage that is missing or false is not drawn; true takes
+ * its defaults. `inkColor` decides whether the architecture method strengthens sepia.
+ */
+export function stageFlags(stages, { inkColor = null } = {}) {
+  if (typeof stages !== 'object' || stages == null || Array.isArray(stages)) throw new Error('drawing.stages: an object with prep, prepInk and finishInk');
+  for (const k of Object.keys(stages)) if (!STAGES.includes(k)) throw new Error(`drawing.stages: prep, prepInk or finishInk, not ${k}`);
+  const prep = stageObject(stages, 'prep'), prepInk = stageObject(stages, 'prepInk'), finishInk = stageObject(stages, 'finishInk');
+  const names = [prep && 'prep', prepInk && 'prepink', finishInk && 'finishink'].filter(Boolean);
+  if (!names.length) throw new Error('drawing.stages: name at least one of prep, prepInk and finishInk (or use medium "none")');
+  const flags = ['--stages', names.join(',')];
+  const unitFlag = (o, path, key, flag) => { const v = stageUnit(o, path, key); if (v != null) flags.push(flag, round(v)); };
+  if (prep) unitFlag(prep, 'prep', 'amount', '--prepamount');
+  if (prepInk) {
+    const from = stageChoice(prepInk, 'prepInk', 'from', ['prep', 'lines']);
+    if (from === 'prep' && !prep) throw new Error('drawing.stages.prepInk.from "prep" needs a prep stage');
+    if (from) flags.push('--prepinkfrom', from);
+    unitFlag(prepInk, 'prepInk', 'keep', '--prepinkkeep');
+    unitFlag(prepInk, 'prepInk', 'add', '--prepinkadd');
+    unitFlag(prepInk, 'prepInk', 'amount', '--prepinkamount');
+    unitFlag(prepInk, 'prepInk', 'deviate', '--prepinkdeviate');
+    const method = stageChoice(prepInk, 'prepInk', 'method', PREP_INK_METHODS);
+    if (METHOD_LOGIC[method]) flags.push('--drawinglogic', METHOD_LOGIC[method]);
+    // a plan that asks for scribble gets it, whatever the style's ink share (logic 3 otherwise falls back to logic 1
+    // under --scribbleink 0.5)
+    if (method === 'scribble') flags.push('--scribbleink', '0');
+  }
+  if (finishInk) {
+    const from = stageChoice(finishInk, 'finishInk', 'from', ['prepInk', 'prep', 'lines']);
+    if (from === 'prepInk' && !prepInk) throw new Error('drawing.stages.finishInk.from "prepInk" needs a prepInk stage');
+    if (from === 'prep' && !prep) throw new Error('drawing.stages.finishInk.from "prep" needs a prep stage');
+    if (from) flags.push('--finishfrom', from);
+    const select = stageChoice(finishInk, 'finishInk', 'select', FINISH_SELECT);
+    if (select) flags.push('--finishselect', select);
+    unitFlag(finishInk, 'finishInk', 'restate', '--finishrestate');
+    unitFlag(finishInk, 'finishInk', 'deviate', '--finishdeviate');
+    const method = stageChoice(finishInk, 'finishInk', 'method', FINISH_METHODS);
+    if (method === 'architecture') flags.push('--finishmethod', 'architecture', ...ARCHITECTURE_FLAGS, ...(inkColor === 'black' ? [] : ARCHITECTURE_SEPIA));
+    if (stageChoice(finishInk, 'finishInk', 'masses', FINISH_MASSES) === 'scribble') flags.push('--finishmasses', '1');
+  }
+  return flags;
+}
+
+/** drawing.ink: { color: sepia|black, waterproof: true|false }. Waterproof defaults to the colour's own (black yes). */
+function inkFlags(ink, inkColor) {
+  if (ink == null) return { flags: [], color: inkColor };
+  if (typeof ink !== 'object' || Array.isArray(ink)) throw new Error('drawing.ink: an object with color and waterproof');
+  for (const k of Object.keys(ink)) if (!['color', 'waterproof'].includes(k)) throw new Error(`drawing.ink: color or waterproof, not ${k}`);
+  const flags = [];
+  let color = inkColor;
+  if (ink.color != null && ink.color !== 'auto') {
+    if (!INK_COLOURS.includes(ink.color)) throw new Error(`drawing.ink.color: one of ${INK_COLOURS.join(', ')}, or "auto", not ${JSON.stringify(ink.color)}`);
+    if (inkColor && inkColor !== ink.color) throw new Error('drawing.ink.color and drawing.inkColor disagree');
+    if (!inkColor) flags.push('--inkprofile', `${ink.color}-ink`);
+    color = ink.color;
+  }
+  if (ink.waterproof != null && ink.waterproof !== 'auto') {
+    if (typeof ink.waterproof !== 'boolean') throw new Error(`drawing.ink.waterproof: true, false or "auto", not ${JSON.stringify(ink.waterproof)}`);
+    flags.push('--inkfast', ink.waterproof ? '1' : '0');
+  }
+  return { flags, color };
+}
+
 /**
  * Painter flags for a plan's drawing section, as an argv array. Null or {} gives [].
- * @param {object|null} drawing { medium, inkColor, amount, lines, weight, closingLines, maxLines }
+ * @param {object|null} drawing { medium, inkColor, ink, source, amount, lines, weight, closingLines, maxLines, stages }
  */
 export function drawingFlags(drawing) {
   if (drawing == null) return [];
@@ -58,6 +161,10 @@ export function drawingFlags(drawing) {
   if (medium) flags.push('--outlinemedium', medium);
   const colour = choice(drawing, 'inkColor', INK_COLOURS);
   if (colour) flags.push('--inkprofile', `${colour}-ink`);
+  const ink = inkFlags(drawing.ink, colour);
+  flags.push(...ink.flags);
+  const source = choice(drawing, 'source', LINE_SOURCES);
+  if (source) flags.push('--linesource', source);
   const amount = unit(drawing, 'amount');
   if (amount != null) flags.push('--openinglines', UNCAPPED, '--closinglines', UNCAPPED, '--drawshare', round(amount));
   const lines = choice(drawing, 'lines', LINE_SETS);
@@ -72,6 +179,12 @@ export function drawingFlags(drawing) {
   const weight = unit(drawing, 'weight');
   if (weight != null) for (const [flag, range] of Object.entries(WEIGHT_RANGE)) flags.push(`--${flag}`, round(lerp(range, weight)));
   const closing = unit(drawing, 'closingLines');
+  if (drawing.stages != null) {
+    if (closing != null) throw new Error('drawing: closingLines and stages both decide the closing pen; use stages.finishInk');
+    if (medium === 'graphite') throw new Error('drawing: medium "graphite" with stages; use stages.prep for the pencil and leave medium out');
+    flags.push(...stageFlags(drawing.stages, { inkColor: ink.color }));
+    return flags;
+  }
   if (closing === 0) flags.push('--drawing', 'first');
   else if (closing != null) flags.push('--closingedgemin', round(CLOSING_EDGE_SPAN * (1 - closing)));
   return flags;

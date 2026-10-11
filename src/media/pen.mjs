@@ -161,30 +161,30 @@ export function penStroke(pen, sheet, path, options = {}) {
  * Draw along points {x, y, p, v} (p pressure 0..1, v speed in pixels per unit of time; a point with dwell > 0 holds the
  * pen there for that time). Returns the ink left. `between(step)` lets the sheet flow as the pen moves.
  */
-function penStrokeImpl(pen, sheet, path, { between, spacing = 0.5,flowEvery=0 } = {}) {
+function penStrokeImpl(pen, sheet, path, { between, spacing = 0.5,flowEvery=0, refill = null, refillBelow = 0 } = {}) {
   if (!pen.conc) return 0;
   // only the painting's own sheet, and only a pen the recorder gave an id to
-  const rec = TAPE && pen._tapeId !== undefined && sheet._tape ? [] : null;
-  if (rec) TAPE.push({
-    k: 'P', pen: pen._tapeId, sp: spacing, points: path.map(p=>({...p})),
-    // step indices where this stroke flowed the sheet
-    fl: rec,
-    // points as integers: x and y in tenths of a cell; pressure, speed and dwell in hundredths
-    d: path.map(q => [
+  let rec = TAPE && pen._tapeId !== undefined && sheet._tape ? [] : null;
+  // points as integers: x and y in tenths of a cell; pressure, speed and dwell in hundredths
+  const encode = q => [
       Math.round(q.x * 10), Math.round(q.y * 10),
       q.p == null ? -1 : Math.round(q.p * 100),
       q.v == null ? -1 : Math.round(q.v * 100),
       q.dwell ? Math.round(q.dwell * 100) : 0,
       // contact width, only when the path sets one
       ...(q.nw == null ? [] : [Math.round(q.nw * 100)]),
-    ]),
+    ];
+  const record = points => {
+    const mark = {k:'P',pen:pen._tapeId,sp:spacing,points:points.map(p=>({...p})),fl:rec,d:points.map(encode),
     // a pen drawn on a finer sheet than the painting's (--inkres), in that sheet's cells; absent otherwise
-    ...(sheet._tapeRes ? { r: sheet._tapeRes } : {}),
-  });
+      ...(sheet._tapeRes ? { r: sheet._tapeRes } : {})};
+    TAPE.push(mark);return mark;
+  };
+  let mark = rec ? record(path) : null, recordStart = 0, recordHead = null, flowStart = 0;
   buffers(pen, sheet);
   if(sheet._cpuDemandWindow && lookaheadCount(flowEvery))sheet._cpuDemandPenAhead=penContactLookahead(pen,path,spacing,lookaheadCount(flowEvery),sheet.w,sheet.h);
   let steps = 0;
-  if (rec) collectFlows(rec, () => steps);
+  if (rec) collectFlows(rec, () => steps-flowStart);
   const tick = () => { steps++; if (between) between(steps); };
   // the nib running dry ends the stroke; the tape has to be released on that path too, so it breaks rather than returns
   walk: for (let k = 0; k < path.length; k++) {
@@ -195,6 +195,19 @@ function penStrokeImpl(pen, sheet, path, { between, spacing = 0.5,flowEvery=0 } 
     const L = Math.hypot(b.x - a.x, b.y - a.y), m = Math.max(1, Math.ceil(L / spacing)), va = a.v ?? 1, vb = b.v ?? va;
     const na = a.nw, nb = b.nw ?? na;
     for (let q = 0; q < m; q++) {
+      // A planned drawing may reload at the current position, including inside
+      // a long simplified segment. Standalone physical strokes still run dry.
+      if (refill && pen.ink < pen.capacity * refillBelow) {
+        const t=q/m, point={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,
+          p:(a.p??.5)+((b.p??.5)-(a.p??.5))*t,v:va+(vb-va)*t,
+          ...(na==null?{}:{nw:na+(nb-na)*t})};
+        // End the recorded path at the dip, then record D followed by the rest
+        // of P. Existing replay tools need no new event format. Simulation and
+        // its flow cadence continue uninterrupted at exactly the same sample.
+        if(rec){const done=[...(recordHead?[recordHead]:[]),...path.slice(recordStart,k+1),point];mark.d=done.map(encode);mark.points=done.map(p=>({...p}));}
+        refill(pen);
+        if(rec){rec=[];flowStart=steps;recordStart=k+1;recordHead=point;mark=record([point,...path.slice(k+1)]);collectFlows(rec,()=>steps-flowStart);}
+      }
       if (pen.ink <= 0 && pen.drop <= 0) break walk;
       const u = q / m, v = Math.max(0.05, va + (vb - va) * u);
       touch(pen, sheet, a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, (a.p ?? 0.5) + ((b.p ?? 0.5) - (a.p ?? 0.5)) * u, L / m / v, na == null ? undefined : na + (nb - na) * u);

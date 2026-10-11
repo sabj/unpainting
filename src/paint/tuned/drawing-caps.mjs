@@ -1,5 +1,6 @@
-// Subject-specific drawing limits fitted to reference images.
-// Other subjects use methods/material-profiles.mjs defaults.
+// Per-subject caps on the drawing stages, fitted by self study to two private benchmark subjects: 3T (a portrait)
+// and 1D (an ink and wash dog). --drawsubject 3T or 1D picks a set; the portrait-3t and dog-1d presets set it. Other runs
+// use the default caps in methods/material-profiles.mjs.
 // lines: most gestures per stage; pressure: 0..1 cap; minLengthMm: shortest opening gesture; edgeMin: the closing
 // pen draws only where edge strength is at least this.
 export const TUNED_DRAWING_CAPS = Object.freeze({

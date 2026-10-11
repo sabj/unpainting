@@ -6,6 +6,9 @@ import { pathLength } from '../../crop/inktiers.mjs';
 import { boundPreparation } from './preparation-binding.mjs';
 import { drawingLogic } from './drawing-logic.mjs';
 import { planLines } from '../drawing-plan.mjs';
+import { scribbleMasses } from './drawing-scribble.mjs';
+import { personStrokes } from './drawing-hand.mjs';
+import { gaussian } from '../../keyframes/density.mjs';
 
 // Contact width for a drawn width W: the pen at K 1 on dry paper draws about 0.72 x contact + 0.3 cells,
 // so contact = (W - 0.3) / 0.72 = 1.39 W - 0.42 cells.
@@ -21,7 +24,9 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (!hasLines(b)) throw new Error(`drawing: no work/lines/${b}-lines.json`);
   if (first && opt('preparationbinding','')) return boundPreparation({bindingFile:opt('preparationbinding',''),base:b,image:opt('image',''),guide:opt('penpencil',''),w,h,num,log});
   // --drawinglogic 1: rank, budget, filter, connect and shape the file's lines (drawing-logic.mjs)
-  if (num('drawinglogic', 0) > 0) return drawingLogic({ base: b, first, w, h, opt, num, log, D, want, cells, K, walker, field, style });
+  // --drawinglastlogic: the closing pen's own logic (default --drawinglogic); linked stages set it to 0, since the
+  // finish-ink file is already the closing drawing
+  if (num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic', 0)) > 0) return drawingLogic({ base: b, first, w, h, opt, num, log, D, want, cells, K, walker, field, style });
   // --drawingskip: comma list of line roles left out of both pens ('dark fill' drops hatching, leaving contours)
   const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean));
   // the plan's choice (drawing-plan.mjs planLines): --drawshare's strongest share, --drawregions' subject-first ranking
@@ -36,7 +41,11 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1 })); };
   // Per-point `width` (px) and `weight` (0..1) set the pen along the stroke: contact = width x --drawwidthgain
   // - --drawwidthmargin cells (see GAIN), pressure = weight x --drawwant. Points without them are unchanged.
-  const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', MARGIN), gain = num('drawwidthgain', GAIN), minNib = num('drawwidthmin', 0.3);
+  // The flexible drawing nib's high-concentration dry line is approximately
+  // contact + 0.3 cells. The legacy K=1 calibration above over-widens observed
+  // thick marks when copying with this instrument. Explicit calibration wins.
+  const copyingNib = opt('inkprofile', '') === 'drawing-ink';
+  const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', copyingNib ? .3 : MARGIN), gain = num('drawwidthgain', copyingNib ? .95 : GAIN), minNib = num('drawwidthmin', 0.3);
   const perPoint = q => (q.width == null && q.weight == null ? q : {
     x: q.x, y: q.y,
     ...(q.width == null ? {} : { nw: Math.max(minNib, q.width * gain - margin) }),
@@ -44,7 +53,17 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   });
   const measured = lines.some(g => g.points.some(q => q.width != null || q.weight != null));
   if (measured) log(`drawing: per-point widths and darkness from the file, contact = width x ${gain} - ${margin} cells, pressure share = ${base} x darkness`);
-  return lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
+  const strokes = lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
+  // --finishmasses 1 (plan finishInk.masses "scribble"): the closing pen also states the dark masses of the plan-time
+  // source density as looping scribble with the lights left open (drawing-scribble.mjs), for black or curly coats and
+  // dark hair. Off by default: a dark surface is paint's job, not the pen's.
+  if (!first && num('finishmasses', 0) > 0 && D) {
+    const masses = scribbleMasses(D, w, h, gaussian, { K, dark: num('scribbledark', 0.06), minMass: num('scribblemass', 0.002), loop: num('scribbleloop', 0.008), hole: num('scribblehole', 0.35), seed: 11 });
+    const scribbles = masses.flatMap(g => personStrokes(g, num('scribblestrokes', 0.12) * Math.min(w, h), { dipFirst: true, load: 0.6, low: 0.05 })).map(g => ({ ...g, tier: 1, weight: num('finishmassweight', 0.6) }));
+    log(`drawing, closing pen: ${masses.length} dark masses as scribble in ${scribbles.length} strokes (--finishmasses)`);
+    return [...strokes, ...scribbles];
+  }
+  return strokes;
 }
 
 // Pen pressure field for a selected drawing, on the sheet grid (W2 x H2, SC sheet cells per plan cell): each stroke's
