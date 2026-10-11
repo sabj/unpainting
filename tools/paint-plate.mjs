@@ -194,7 +194,8 @@ if (![0,1].includes(OUTPUT_VIDEO)) throw Error('--video takes 0 or 1');
 process.env.GPU_FUSE_WETSCAN = String(num('speedscan', 1));
 process.env.GPU_QUIET_DT = String(num('speedquietdt', 0));
 process.env.GPU_EDGE_PINGPONG = String(num('speededge', 1));
-process.env.KM_SPARSE_CHANNELS = String(num('speedoptics', 1));
+const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrenderthreads', opt('gpu', 'auto') === 'off' ? 1 : Math.min(4, availableParallelism())))));
+process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';
 const FRAME_POLICY = framePolicy({ video: OUTPUT_VIDEO, keepAll: num('keepallframes', 0) > 0 });
 const SPEED_PROFILE = startSpeedProfile(num('speedprofile', 0) > 0);
 
@@ -206,6 +207,11 @@ console.log(`${versionLine(PAINTER)}${PAINTER.commit ? ` at ${PAINTER.commit.sli
 // Default up to 6 in fast mode, 1 in full mode.
 const THREADS_DEFAULT = NATIVE_PAINT_MODE.mode === 'fast' ? Math.max(1, Math.min(6, availableParallelism() - 2)) : 1;
 if (await setThreads(num('threads', THREADS_DEFAULT)) > 1) process.on('exit', () => console.log(`threads: ${num('threads', THREADS_DEFAULT)}, boxes stepped in bands and serially: ${JSON.stringify(threadStats())}`));
+let opticalThreads = 1;
+if (SPEED_RENDER_THREADS > 1) {
+  const opticsPool = await import('../src/media/sheet-par.mjs');
+  opticalThreads = opticsPool.threads() > 1 ? opticsPool.threads() : opticsPool.start(SPEED_RENDER_THREADS, { opticsOnly: true });
+}
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
@@ -3693,7 +3699,7 @@ const placed = FRAMES.map((f, i) => {
 // --thkdump 1: the finished sheet's pigment thickness per pigment as raw floats (thickness.f32), to compare two runs cell by cell
 if (opt('thkdump', '0') !== '0') { coherent(sheet); const th = thickness(sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
-fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet), performanceOptions: { sparseOptics: process.env.KM_SPARSE_CHANNELS !== '0', trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1', quietDt: process.env.GPU_QUIET_DT === '1' } }, null, 1));
+fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet), performanceOptions: { opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1', quietDt: process.env.GPU_QUIET_DT === '1' } }, null, 1));
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
 {

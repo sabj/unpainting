@@ -9,7 +9,7 @@ import { blurRows, blurCols } from '../keyframes/blur-kernel.mjs';
 export function runJob(a, c, nC) {
   if (a.kind === 'render') {
     const c0 = Math.floor((a.n * c) / nC), c1 = Math.floor((a.n * (c + 1)) / nC);
-    if (c1 > c0) renderCells(a.layers, a.Kp, a.Sp, a.paperRGB, c0, c1, a.scale, null, a.out);
+    if (c1 > c0) renderCells(a.layers, a.Kp, a.Sp, a.paperRGB, c0, c1, a.scale, null, a.out, a.init ?? null, a.keep ?? null, a.micro ?? null);
   } else if (a.kind === 'grad' || a.kind === 'tensor') {
     // rows lo..hi of the pass, an even share each
     const lo = a.lo ?? (a.kind === 'grad' ? 1 : 2), hi = a.hi ?? (a.kind === 'grad' ? a.h - 2 : a.h - 3), rows = hi - lo + 1;
