@@ -14,13 +14,14 @@ test('sequence uses fresh processes, shares a private cache and retains each mea
       fs.mkdirSync(cache,{recursive:true}); const hit=fs.existsSync(path.join(cache,'value'));
       fs.writeFileSync(path.join(cache,'value'),'stored');
       fs.writeFileSync(path.join(out,'painting.png'),String(args[args.lastIndexOf('--variant')+1]));
-      fs.writeFileSync(path.join(out,'backend.json'),JSON.stringify({pid:process.pid,hit,guard:args[args.lastIndexOf('--targetguard')+1]}));
+      fs.writeFileSync(path.join(out,'backend.json'),JSON.stringify({pid:process.pid,hit,guard:args[args.lastIndexOf('--targetguard')+1],marks:args[args.lastIndexOf('--marks')+1]}));
       fs.writeFileSync(path.join(out,'f0001.jpg'),'frame'); console.log('finished');`);
-    assert.equal(await runSpeedSequence(['--out', out, '--targetguard', 'strict', '--speedsequence', JSON.stringify([['--variant', 'before'], ['--variant', 'after']])], script), true);
+    assert.equal(await runSpeedSequence(['--out', out, '--targetguard', 'strict', '--marks', '1', '--speedsequence', JSON.stringify([['--variant', 'before'], ['--variant', 'after', '--marks', '1']])], script), true);
     const rows = JSON.parse(fs.readFileSync(path.join(out, 'sequence.json')));
     const a = JSON.parse(fs.readFileSync(path.join(out, 'sequence/0/backend.json'))), b = JSON.parse(fs.readFileSync(path.join(out, 'sequence/1/backend.json')));
     assert.notEqual(a.pid, b.pid); assert.equal(a.hit, false); assert.equal(b.hit, true);
     assert.equal(a.guard, 'strict'); assert.equal(b.guard, 'strict');
+    assert.equal(a.marks, '0'); assert.equal(b.marks, '0');
     assert.ok(rows.every(r => r.seconds > 0 && r.exit === 0 && r.sha256));
     assert.equal(fs.readFileSync(path.join(out, 'painting.png'), 'utf8'), 'after');
     assert.equal(fs.readFileSync(path.join(out, 'sequence/0/painting.png'), 'utf8'), 'before');
