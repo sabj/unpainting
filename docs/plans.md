@@ -19,6 +19,16 @@ Each count is the length of that file's `commands` array. It includes clean-wate
 
 Value plans, which group areas by lightness, guide the image painter by naming families (groups) of regions. Each family has bounds, a reference cue and a base technique. [trumbull-values.json](../examples/plans/trumbull-values.json) has 7 entries in its `families` array. Use `--valueplan <file>` with `tools/paint-plate.mjs`, or run `npm run example:architecture` for Trumbull. The painter still builds the brush paths.
 
+By default a value plan lays each band across the whole sheet at once. To work subject by subject, add `subjectOrder` to the value plan and paint with `--subjectorder s`:
+
+```json
+"subjectOrder": [{"id": "wall", "families": ["h36a.stoneLit"], "reason": "background first"},
+                 {"id": "rest"},
+                 {"id": "gate", "families": ["h36a.gate"], "reason": "focal subject last"}]
+```
+
+Each entry names plan families or its own `bounds` list. `{"id": "rest"}` places every cell no entry covers; without it those cells go last. With `s` from 0 to 1, each later subject is held back by `0.85 s` of the ladder: 0 keeps the whole-sheet bands, 0.5 overlaps neighbouring subjects, and 1 brings each subject mostly through its washes and glazes before the next starts. Light to dark still holds within a subject. The painter writes `subject-order.json` (the pass order) and `subject-order.png` (which subject each cell belongs to).
+
 Area plans describe named areas and their ordered passes. They set values (lightness), brushes, loads, lights and dependencies. Passes can supply explicit brush paths. Use `--areaplan <file>`. The [area-plan contract](../tools/painter/semantic-areas.mjs) is printed by:
 
 ```sh
