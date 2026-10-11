@@ -1,13 +1,14 @@
 // Geometry of shaped plane marks, shared by planner and executor: one flat-brush gesture per plane, short texture marks
 // and sky lanes. A physical contact clip retains concavities, recesses and reserved lights.
-export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1}={}) {
+export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null}={}) {
  // An authored per-passage tool choice is shared with every geometry consumer.
  if(mask.passageBrush)return mask.passageBrush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale}))); 
  // lanesR: a large sky plane is one wet passage of overlapping horizontal lanes (a graded band wash with a wide flat),
  // not one fitted diagonal gesture, whose straight sides leave wedges and streaks.
  if(lanesR>0&&!texture)return skyLanes(mask,w,h,lanesR,scale,laneStep);
+ const x0=box?.x0??0,x1=box?.x1??w-1,y0=box?.y0??0,y1=box?.y1??h-1;
  let count=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;
- for(let i=0;i<mask.length;i++)if(mask[i]){const x=i%w+.5,y=Math.floor(i/w)+.5;count++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;}
+ for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x=i%w+.5,y=Math.floor(i/w)+.5;count++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;}
  if(count<4)return [];
  const cx=sx/count,cy=sy/count,a=sxx/count-cx*cx,b=syy/count-cy*cy,c=sxy/count-cx*cy;
  const angle=.5*Math.atan2(2*c,a-b),dx=Math.cos(angle),dy=Math.sin(angle);
@@ -16,7 +17,7 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  if(texture&&shortMm>0)return shortTextureMarks(mask,w,h,dx,dy,shortMm,scale,shortPress,flowDark);
  let lo=Infinity,hi=-Infinity;
  const bins=new Map();
- for(let i=0;i<mask.length;i++)if(mask[i]){const x=i%w+.5-cx,y=Math.floor(i/w)+.5-cy,t=x*dx+y*dy,u=-x*dy+y*dx,j=Math.round(t),bin=bins.get(j)??[Infinity,-Infinity];bin[0]=Math.min(bin[0],u-.75);bin[1]=Math.max(bin[1],u+.75);bins.set(j,bin);lo=Math.min(lo,j);hi=Math.max(hi,j);}
+ for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x=i%w+.5-cx,y=Math.floor(i/w)+.5-cy,t=x*dx+y*dy,u=-x*dy+y*dx,j=Math.round(t),bin=bins.get(j)??[Infinity,-Infinity];bin[0]=Math.min(bin[0],u-.75);bin[1]=Math.max(bin[1],u+.75);bins.set(j,bin);lo=Math.min(lo,j);hi=Math.max(hi,j);}
  const points=[];
  for(let j=lo;j<=hi;j++){const bin=bins.get(j);if(!bin)continue;let sum=0,num=0;for(let q=j-3;q<=j+3;q++){const v=bins.get(q);if(v){sum+=(v[0]+v[1])/2;num++;}}const u=sum/num,r=Math.max(1,(bin[1]-bin[0])/2);points.push({x:(cx+dx*j-dy*u)*scale,y:(cy+dy*j+dx*u)*scale,r:r*scale,p:texture?.35:.9});}
  if(points.length<2)return [];

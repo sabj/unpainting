@@ -489,13 +489,17 @@ function eachCellUnder(pts, w, h, visit) {
   if (!(x1 >= x0 && y1 >= y0)) return;       // a sweep wholly off the sheet covers nothing (and a NaN radius is off it)
   const bw = x1 - x0 + 1, seen = new Uint8Array(bw * (y1 - y0 + 1));
   for (const q of pts) {
-    const R = Math.ceil(q.r);
-    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
-      if (dx * dx + dy * dy > q.r * q.r) continue;
-      const x = Math.round(q.x - 0.5 + dx), y = Math.round(q.y - 0.5 + dy);
-      if (x < x0 || y < y0 || x > x1 || y > y1) continue;
-      const k = (y - y0) * bw + (x - x0);
-      if (!seen[k]) { seen[k] = 1; visit(y * w + x); }
+    const R = Math.ceil(q.r), rr = q.r * q.r, ax = q.x - 0.5, ay = q.y - 0.5;
+    for (let dy = -R; dy <= R; dy++) {
+      const y = Math.round(ay + dy);
+      if (y < y0 || y > y1) continue;
+      let m = R; while (m >= 0 && m * m + dy * dy > rr) m--;
+      for (let dx = -m; dx <= m; dx++) {
+        const x = Math.round(ax + dx);
+        if (x < x0 || x > x1) continue;
+        const k = (y - y0) * bw + (x - x0);
+        if (!seen[k]) { seen[k] = 1; visit(y * w + x); }
+      }
     }
   }
 }
