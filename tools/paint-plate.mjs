@@ -90,7 +90,7 @@ import { components, removeSmall, open as openMask, dilate, erode, minFilter, ma
 import { chooseTechnique, detailMarks } from '../src/crop/technique.mjs';
 import { intermediates, execution } from '../src/eval/composite.mjs';
 import { gaussian } from '../src/keyframes/density.mjs';
-import { applyResist, liftResist, setClip as physicalSetClip } from '../src/media/sheet.mjs';
+import { applyResist, liftResist as physicalLiftResist, setClip as physicalSetClip } from '../src/media/sheet.mjs';
 import { makeCrisp } from '../src/paint/methods/crisp-edges.mjs';
 import { breakLights } from '../src/paint/methods/lights-shape.mjs';
 import { detailLayers, trimPassage } from '../src/paint/methods/detail-passes.mjs';
@@ -188,7 +188,14 @@ const SPEED_PAPER = num('speedpaper', 0) > 0;
 const SPEED_CONTACT = num('speedcontact', 0) > 0;
 const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
 const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
-setSweepIntervals(num('speedcoverage', 0) > 0);
+const SPEED_COVERAGE = num('speedcoverage', 0) > 0;
+setSweepIntervals(SPEED_COVERAGE);
+const SPEED_FILM = num('speedfilm', 0) > 0;
+const liftResist = target => {
+  const started = performance.now();
+  try { return physicalLiftResist(target, { byPlane: SPEED_FILM }); }
+  finally { SPEED_PROFILE?.add('painting:film-removal', performance.now() - started); }
+};
 const VALUE_CONTACT_WORK = new ContactWorkspace();
 const SPEED_GPU_OPTICS = num('speedopticalgpu', 0) > 0;
 if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
@@ -1162,7 +1169,9 @@ const stroke=(b,target,points,options)=>{
  if(AREA_NUMERIC_CONTACT_STOP&&target===sheet)return;
  if(VALUE_ACTIVE&&target===sheet){
   if(VALUE_ACTIVE.shaped)options={...options,upright:VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
-  const contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null}),cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors],SPEED_PAPER);
+  const contactStarted=performance.now(),contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
+  SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
+  const cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors],SPEED_PAPER);
   let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),SPEED_PAPER).dry;
   if(paint&&!['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();if(!paper.dry)throw Error('value-plan dry-paper contact gate failed');}
   // --wetgate 0: log a wet wash whose footprint is not evenly wet instead of stopping the run. Default 1.
@@ -3192,7 +3201,14 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     }
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
-  const SHARE = num('gradedshare', 0.6), UNDER = sh.graded && !detail && SHARE > 0 ? sweepCount(paths, W2, H2) : null;
+  const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = sh.graded && !detail && SHARE > 0 ? sweepCount(paths, W2, H2) : null;
+  SPEED_PROFILE?.add('painting:sweep-count', performance.now() - coverStarted);
+  const passageCover = () => {
+    const started = performance.now();
+    const result = sweepCover(paths, up(MASK), W2, H2, SPEED_COVERAGE ? { counts: UNDER } : undefined);
+    SPEED_PROFILE?.add('painting:sweep-cover', performance.now() - started);
+    return result;
+  };
   for (let pts of paths) {
     if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
     const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
@@ -3219,9 +3235,9 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
     const PF = PATH_FACTOR.get(pts) ?? 1; // --strokeplan: this stroke's planned charge factor
     // A passage laid in overlapping lanes is charged for the overlap, once per passage: see sweepCover. Detail marks
     // leave paper between them on purpose and are not divided.
-    if (sh._cover == null) sh._cover = detail || opt('cover', '0') === '0' ? 1 : Math.pow(Math.max(1, sweepCover(paths, up(MASK), W2, H2)), num('coverpow', 1));
+    if (sh._cover == null) sh._cover = detail || opt('cover', '0') === '0' ? 1 : Math.pow(Math.max(1, passageCover()), num('coverpow', 1));
     // --undercover 0|1: raise the charge by area over brush footprint, floored at --underfloor (default 0.4), so the planned mass arrives. Default 1.
-    if (sh._under == null) sh._under = detail || opt('undercover', '1') === '0' ? 1 : 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, up(MASK), W2, H2)));
+    if (sh._under == null) sh._under = detail || opt('undercover', '1') === '0' ? 1 : 1 / Math.max(num('underfloor', 0.4), Math.min(1, passageCover()));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (sh.graded && sh._gcal == null) {

@@ -424,8 +424,14 @@ export function prewetArea(mask, D, w, h, { reach = 6, margin = 0.05 } = {}) {
 
 /** Estimate mean sweep overlap per cell.
  * Divide the passage charge by this factor so overlapping lanes do not multiply the paint load. */
-export function sweepCover(paths, mask, w, h) {
+export function sweepCover(paths, mask, w, h, { counts = null } = {}) {
   let under = 0, cells = 0;
+  // A caller that already charged a graded wash has these exact counts. Reuse
+  // them only when Uint16 saturation cannot have lost overlap information.
+  if (counts && counts.length === w * h && paths.length <= 65535) {
+    for (let i = 0; i < w * h; i++) if (mask[i]) { cells++; under += counts[i]; }
+    return cells ? under / cells : 0;
+  }
   for (let i = 0; i < w * h; i++) cells += mask[i] ? 1 : 0;
   if (!cells) return 0;
   for (const pts of paths) under += countUnder(pts, mask, w, h);
