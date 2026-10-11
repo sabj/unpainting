@@ -797,9 +797,25 @@ function planFits(brush, path, spacing,limit=3900000) {
   return (len / spacing + 2) * perStep + 400 + (brush.hairs.length + 2) * (4 + (brush.K || 16)) + 3 * (4 * rmax + 20) ** 2 < limit;
 }
 
+/** Reusable ROW observation buffers. A result using this workspace is valid until
+ * the next prediction using it. Live sheet arrays are never used as scratch. */
+export class ContactWorkspace {
+  prepare(n) {
+    if (this.n !== n) {
+      this.n = n;
+      for (const key of ['mask', 'primaryMask', 'liftMask', 'neighbors']) this[key] = new Uint8Array(n);
+      this.touched = new Int32Array(n);
+    } else if (this.hi >= this.lo) {
+      for (const key of ['mask', 'primaryMask', 'liftMask', 'neighbors']) this[key].fill(0, this.lo, this.hi + 1);
+    }
+    this.lo = n; this.hi = -1;
+    return this;
+  }
+}
+
 /** Read-only upper bound of the cells a stroke can touch, from the GPU planner's geometry and stamp tests, plus the
  *  unclipped lift-off disk. Neighbours are unclipped because wet paint can flow across a passage boundary. */
-export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = true, upright = false, neighborRadius = 0, sparseRow = false } = {}) {
+export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = true, upright = false, neighborRadius = 0, sparseRow = false, workspace = null } = {}) {
   if (brush.model !== 'tuft' && !brush.depositDepth && splats(brush)) throw new Error('candidate contact does not support the active wash-splat route');
   if (!Number.isFinite(spacing) || spacing <= 0) throw new Error('candidate contact spacing must be positive');
   if (!Number.isInteger(neighborRadius) || neighborRadius < 0) throw new Error('candidate neighbor radius must be a nonnegative integer');
@@ -807,7 +823,8 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   for (const q of path) if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y) || (q.p !== undefined && (!Number.isFinite(q.p) || q.p < 0)) || (q.r !== undefined && (!Number.isFinite(q.r) || q.r < 0))) throw new Error('candidate contact path coordinates, pressure and radius must be finite and valid');
   if (![brush.radius, brush.splay, brush.carry, brush.travel].every(Number.isFinite) || brush.radius < 0 || brush.carry < 0) throw new Error('candidate contact instrument geometry must be finite and valid');
   for (let k = 1; k < path.length; k++) if (!Number.isFinite(Math.hypot(path[k].x - path[k - 1].x, path[k].y - path[k - 1].y))) throw new Error('candidate contact path segment must be finite');
-  const n = sheet.w * sheet.h, mask = new Uint8Array(n), copy = { ...brush, tip:brush.tip?{...brush.tip}:null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() };
+  const n = sheet.w * sheet.h, work = brush.model !== 'tuft' && workspace instanceof ContactWorkspace ? workspace.prepare(n) : null;
+  const mask = work?.mask ?? new Uint8Array(n), copy = { ...brush, tip:brush.tip?{...brush.tip}:null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() };
   const sparse = sparseRow === true && brush.model !== 'tuft', emitted = sparse ? [] : null;
   // row-major index range of the set cells, so dense passes scan only that range
   let lo = n, hi = -1, primaryCount = 0, neighborCount = 0;
@@ -815,8 +832,11 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
     beginPlan() { const F = new Float32Array(16 + brush.clumps.length); return { F, U: new Uint32Array(F.buffer), I: new Int32Array(F.buffer), step() { return 0; }, emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;} mask[i]=1; } return 0; } }; },
     endPlan() {},
   };
+  if (work && sheet.touched) work.touched.set(sheet.touched);
   const scratch = { w: sheet.w, h: sheet.h, K: sheet.K, paper: sheet.paper, clip: sheet.clip, _gpu: link, clock: sheet.clock,
-    touched: sheet.touched?.slice(), contactStrength:sheet.contactStrength?.slice(), _contactBrush: sheet._contactBrush === brush ? copy : null };
+    touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
+    contactStrength:brush.model === 'tuft' ? sheet.contactStrength?.slice() : undefined,
+    _contactBrush: sheet._contactBrush === brush ? copy : null };
   // an undipped tuft is treated as full, the widest footprint
   if (brush.model==='tuft' && !brush.K) for (const hr of copy.hairs) hr.water=brush.capacity*hr.len;
   if (path.length > 1) {
@@ -824,7 +844,8 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
     else strokeGpu(copy,scratch,path,{spacing,lift,upright},true);
   }
   const tuft = brush.model === 'tuft'; if (tuft) { lo = 0; hi = n - 1; } // strokeImpl writes the mask directly
-  const primaryMask = mask.slice(), liftMask = new Uint8Array(n), sparseCells = sparse ? emitted.slice() : null, sparseNeighbors = sparse ? [] : null;
+  const primaryMask = work?.primaryMask ?? mask.slice(), liftMask = work?.liftMask ?? new Uint8Array(n), sparseCells = sparse ? emitted.slice() : null, sparseNeighbors = sparse ? [] : null;
+  if (work && hi >= lo) primaryMask.set(mask.subarray(lo, hi + 1), lo);
   let liftCount=0;
   if (lift && path.length > 1) {
     const vp = varyPath(brush, path, sheet.paper, lift), last = vp[vp.length - 1], r = Math.max(1.5, brush.radius * 0.35);
@@ -832,9 +853,39 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
       for (let xx = Math.max(0, Math.floor(last.x - r)); xx <= Math.min(sheet.w - 1, Math.ceil(last.x + r)); xx++)
         if (Math.hypot(xx - last.x, yy - last.y) <= r) { const i=yy*sheet.w+xx; liftMask[i]=1; liftCount++; if(sparse&&!mask[i])sparseCells.push(i); if(i<lo)lo=i; if(i>hi)hi=i; mask[i]=1; }
   }
-  const neighbors = new Uint8Array(n);
+  const neighbors = work?.neighbors ?? new Uint8Array(n);
   let nlo = lo, nhi = hi;
-  if (neighborRadius) for (let k=sparse?0:Math.max(0,lo), count=sparse?sparseCells.length:hi+1; k<count; k++) { const i=sparse?sparseCells[k]:k; if (!mask[i]) continue;
+  if (work && neighborRadius && hi >= lo) {
+    // The union of a disk halo around a horizontal run is one interval on
+    // each halo row. Fill those intervals instead of visiting the disk for
+    // every interior contact cell. The final scan removes the contact itself.
+    const reach = [];
+    for (let dy = -neighborRadius; dy <= neighborRadius; dy++) {
+      let dx = neighborRadius;
+      while (dx * dx + dy * dy > neighborRadius * neighborRadius) dx--;
+      reach.push(dx);
+    }
+    for (let row = Math.floor(lo / sheet.w); row <= Math.floor(hi / sheet.w); row++) {
+      const end = Math.min((row + 1) * sheet.w, hi + 1);
+      for (let i = Math.max(row * sheet.w, lo); i < end;) {
+        if (!mask[i]) { i++; continue; }
+        const start = i;
+        while (i < end && mask[i]) i++;
+        const xa = start - row * sheet.w, xb = i - row * sheet.w;
+        for (let dy = -neighborRadius; dy <= neighborRadius; dy++) {
+          const yy = row + dy;
+          if (yy < 0 || yy >= sheet.h) continue;
+          const dx = reach[dy + neighborRadius], a = yy * sheet.w + Math.max(0, xa - dx), b = yy * sheet.w + Math.min(sheet.w, xb + dx);
+          neighbors.fill(1, a, b);
+          nlo = Math.min(nlo, a); nhi = Math.max(nhi, b - 1);
+        }
+      }
+    }
+    for (let i = nlo; i <= nhi; i++) {
+      if (mask[i]) neighbors[i] = 0;
+      else if (neighbors[i]) { neighborCount++; if (sparse) sparseNeighbors.push(i); }
+    }
+  } else if (neighborRadius) for (let k=sparse?0:Math.max(0,lo), count=sparse?sparseCells.length:hi+1; k<count; k++) { const i=sparse?sparseCells[k]:k; if (!mask[i]) continue;
     const x = i % sheet.w, y = Math.floor(i / sheet.w);
     for (let dy = -neighborRadius; dy <= neighborRadius; dy++) for (let dx = -neighborRadius; dx <= neighborRadius; dx++) {
       if (dx * dx + dy * dy > neighborRadius * neighborRadius) continue;
@@ -847,6 +898,7 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   const indices = [], neighborIndices = [];
   if(sparse) { sparseCells.sort((a,b)=>a-b); sparseNeighbors.sort((a,b)=>a-b); for(const i of sparseCells)indices.push(i); for(const i of sparseNeighbors)neighborIndices.push(i); }
   else for (let i = Math.max(0, Math.min(lo, nlo)), end = Math.min(n - 1, Math.max(hi, nhi)); i <= end; i++) { if (mask[i]) indices.push(i); if (neighbors[i]) neighborIndices.push(i); }
+  if (work) { work.lo = Math.min(lo, nlo); work.hi = Math.max(hi, nhi); }
   // a stable identity for the contract and instrument, not a source hash
   const source = 'brush-primary-contact-v1:' + JSON.stringify({ model:brush.model??'row', lag:brush.lag??.6, flat: !!brush.flat, radius: brush.radius, splay: brush.splay, spacing, upright, lift, neighborRadius, ...(varietyOf(brush) ? { variety: varietyOf(brush) } : {}) });
   return { kind: 'instrument-candidate-contact', source, cells: indices, mask, primaryMask, liftMask, neighbors, neighborIndices,
