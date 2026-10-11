@@ -181,6 +181,7 @@ const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
 // Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
 const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
 const SPEED_PAPER = num('speedpaper', 0) > 0;
+const SPEED_GPU_OPTICS = num('speedopticalgpu', 0) > 0;
 if (SPEED_TRANSFERS) process.env.GPU_DEMAND_READBACK ??= 'fast';
 const NATIVE_UPLOAD_POLICY = nativeUploadPolicy(NATIVE_PAINT_MODE.mode, process.env.GPU_DIRTY_UPLOAD);
 if (SPEED_TRANSFERS && process.env.GPU_DIRTY_UPLOAD == null) {
@@ -232,7 +233,7 @@ const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?
 if(![0,1].includes(FAST_PAPER_OBSERVE))throw Error('--fastpaperobserve takes 0 or 1');
 const PAPER_OBSERVE_POLICY={requested:FAST_PAPER_OBSERVE,enabled:NATIVE_PAINT_MODE.mode==='fast'&&FAST_PAPER_OBSERVE===1&&process.env.GPU_PAPER_OBSERVE!=='0',scope:'fresh regional W/s plus wet-recipient M observation only; pigment/layer freshness independent; CPU stroke/demand windows use original full observation'};
 process.env.GPU_PAPER_OBSERVE=PAPER_OBSERVE_POLICY.enabled?'1':'0';NATIVE_PAINT_MODE.paperObservation=PAPER_OBSERVE_POLICY;
-NATIVE_PAINT_MODE.syncPolicy={demand:process.env.GPU_DEMAND_READBACK,paperObservation:PAPER_OBSERVE_POLICY.enabled,frames:!FRAME_POLICY.all?'completed passage checkpoints at 10/25/50/75/100 percent; first wash and other stages retained':NATIVE_PAINT_MODE.mode==='fast'?'completed paint boundary every fourth pass; other stages retained; no within-stroke snapshots':'full existing cadence',optical:NATIVE_PAINT_MODE.mode==='fast'?'GPU optical RGB for frame and density feedback; Full retains CPU composite':'CPU composite',mask:NATIVE_PAINT_MODE.mode==='fast'?'demand CPU uploads conservatively retain all pigment lanes and signed zero':'original'};
+NATIVE_PAINT_MODE.syncPolicy={demand:process.env.GPU_DEMAND_READBACK,paperObservation:PAPER_OBSERVE_POLICY.enabled,frames:!FRAME_POLICY.all?'completed passage checkpoints at 10/25/50/75/100 percent; first wash and other stages retained':NATIVE_PAINT_MODE.mode==='fast'?'completed paint boundary every fourth pass; other stages retained; no within-stroke snapshots':'full existing cadence',optical:NATIVE_PAINT_MODE.mode==='fast'||SPEED_GPU_OPTICS?'GPU optical RGB for frame and density feedback':'CPU composite',mask:NATIVE_PAINT_MODE.mode==='fast'?'demand CPU uploads conservatively retain all pigment lanes and signed zero':'original'};
 fs.writeFileSync(path.join(out,'native-paper-observation.json'),JSON.stringify(PAPER_OBSERVE_POLICY,null,2));
 fs.writeFileSync(path.join(out,'native-mode.json'),JSON.stringify(NATIVE_PAINT_MODE,null,2));
 const FAST_BODY_ENABLED=num('fastbodycadence',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -1370,7 +1371,7 @@ const renderRaw = () => {
   if (!link) return renderSheet(sheet, SHEET_PIGS, base, N2, 1);
   const key = `${link.version}|${sheet._layerVer || 0}|${sheet.layers.length}`;
   if (RENDER_MEMO && RENDER_MEMO.key === key) { RENDER_REUSED++; return RENDER_MEMO.rgb.slice(); }
-  const rgb = NATIVE_PAINT_MODE.mode==='fast' && link.resident && process.env.GPU_COMPOSITE==='1' && !WETRENDER && num('pencilerase',0)===0 ? (()=>{
+  const rgb = (NATIVE_PAINT_MODE.mode==='fast' || SPEED_GPU_OPTICS) && link.resident && process.env.GPU_COMPOSITE==='1' && !WETRENDER && num('pencilerase',0)===0 ? (()=>{
       const link=sheet._gpu;link.initOptical(sheet,null);const under=new Float64Array(N2*3);
       if(sheet.layers.length>1){link.syncLower(sheet,1);renderCells([sheet.layers[0]],SHEET_PIGS.map(p=>p.K),SHEET_PIGS.map(p=>p.S),base,0,N2,1,null,null,null,under);}
       else for(let i=0;i<under.length;i++)under[i]=base[i]/255;
