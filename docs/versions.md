@@ -11,7 +11,7 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 
 `PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions. Release 0.1.0 is painter V096, sim 100 and judges J1.
 
-The local 0.2.0 release candidate is `0.2.0-rc.1`, painter `V097-dev`, sim `101`, judges `J1`. Sim 101 includes pen reload/replay changes and GPU hole-rim, Marangoni and slope support. It is untagged and awaits owner review. Existing benchmark scores remain attached to V096 / sim 100.
+The local 0.2.0 release candidate is `0.2.0-rc.2`, painter `V098-dev`, sim `101`, judges `J1`. It integrates the combined painter and exact-output render speedups. It is untagged and awaits owner review. The previous `0.2.0-rc.1` candidate used `V097-dev`; sim 101 includes pen reload/replay changes and GPU hole-rim, Marangoni and slope support. Existing benchmark scores remain attached to V096 / sim 100.
 
 Sim numbers before this release are an estimate of past simulation revisions. The private history has no sim version number. About 100 commits changed the media modules there (102 commits touching `painter/src/media` and its earlier files, 2026-09-15 to 2026-09-30), so sim starts at 100.
 
