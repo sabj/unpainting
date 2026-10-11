@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolvePipeline, pipelineFlags } from './pipeline-plan.mjs';
 import { sameWash } from './methods/wash-session.mjs';
-import { finishTexture } from './methods/finish-texture.mjs';
+import { finishTexture, furLightReserves } from './methods/finish-texture.mjs';
 
 test('one plan selects ink stages, wash sessions, flow and subject order',()=>{
  const p={drawing:{source:'source-ink',stages:{prep:{weight:.8},prepInk:{from:'prep'},finishInk:{from:'prepInk',restate:.2}}},washes:{sessions:'connected',physics:{holeRimMm:.4,marangoni:.01}},order:{subjects:[{id:'sky',bounds:[[0,0,1,.4]]},{id:'rest'}]}};
@@ -26,4 +26,12 @@ test('recovered texture stays in planned bounds and leaves light gaps',()=>{
   assert.ok(paths.length>0&&paths.length<=12);
   for(const g of paths) for(const [x,y] of g.points) assert.ok(x>=7&&x<41&&y>=7&&y<73);
  }
+});
+
+test('fur reserves retain local light groups but reject singleton glints',()=>{
+ const w=100,h=100,D=new Float32Array(w*h).fill(1.8);
+ D[50*w+50]=.1;D[50*w+51]=.1;D[20*w+20]=.1;
+ const R=furLightReserves({D,w,h},{reach:10,drop:.5,dark:.8});
+ assert.equal(R[50*w+50],1);assert.equal(R[50*w+51],1);assert.equal(R[20*w+20],0);
+ assert.equal(R.reduce((a,b)=>a+b),2);
 });

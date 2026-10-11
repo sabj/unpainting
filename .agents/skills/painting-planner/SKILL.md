@@ -7,6 +7,8 @@ description: Plans a whole watercolor or ink-and-wash painting for the unpaintin
 
 Write the plan before rendering. Take material, moisture and density decisions from the [watercolor-technique skill](../watercolor-technique/SKILL.md). Stroke plans for `tools/run-plan.mjs` follow `docs/plan-format.md`.
 
+For the image painter, read [the combined plan and technique toolbox](../../../docs/combined-painter.md). Author one plan with `drawing`, `washes` and `order`; select methods from target cues instead of stacking flags. Include the ink toolbox in the choice even when the correct decision is no ink. CLI flags are explicit overrides, and `--recipe v096` is the historical compatibility path. Freeze target-derived line paths, reserves and ordering before the guard seals the target.
+
 ## Workflow
 
 Copy this checklist into the plan and tick it off:
