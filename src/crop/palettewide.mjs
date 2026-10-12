@@ -80,6 +80,39 @@ export function wideScore(sample, colours, paints, weight = 1) {
   return sampleError(sample, paints, rendered) + weight * localError(sample, colours, paints, rendered).mean;
 }
 
+/** Key hues must survive the optical fit, even when their area is too small to earn
+ * another pan on whole-sheet mean error. Greys have no meaningful hue to protect. */
+export function keyHueCoverage(sample, colours, paints, { minChroma = 20, maxHueError = 12, minChromaRatio = 0.8 } = {}) {
+  const rendered = renderedLab(sample, paints);
+  const hues = colours.filter(r => !r.grey && r.C >= minChroma).map(r => {
+    let a = 0, b = 0;
+    for (const i of r.cells) { a += rendered.a[i]; b += rendered.b[i]; }
+    const count = Math.max(1, r.cells.length), C = Math.hypot(a, b) / count;
+    const h = ((Math.atan2(b, a) * 180) / Math.PI + 360) % 360;
+    const diff = Math.abs(h - r.h), hueError = C < 1 ? 180 : Math.min(diff, 360 - diff);
+    const loss = Math.max(0, hueError - maxHueError, r.C * minChromaRatio - C);
+    return { h: r.h, C: r.C, share: r.share, fittedHue: h, fittedChroma: C, hueError, loss };
+  });
+  return { hues, loss: Math.max(0, ...hues.map(r => r.loss)) };
+}
+
+/** Fill a measured hue gap with a real pan, within the existing palette cap.
+ * This runs before painting and does not alter pigment physics or authored pans. */
+export function coverKeyHues(sample, colours, paints, { max = 6, library = BOX, ...options } = {}) {
+  let kept = [...paints], coverage = keyHueCoverage(sample, colours, kept, options);
+  const added = [];
+  while (coverage.loss > 1e-6 && kept.length < max) {
+    let best = null;
+    for (const paint of library.filter(p => !kept.some(q => q.key === p.key))) {
+      const trial = keyHueCoverage(sample, colours, [...kept, paint], options);
+      if (trial.loss < coverage.loss - 1e-6 && (!best || trial.loss < best.coverage.loss)) best = { paint, coverage: trial };
+    }
+    if (!best) break;
+    kept.push(best.paint); added.push(best.paint.key); coverage = best.coverage;
+  }
+  return { paints: kept, added, coverage };
+}
+
 /**
  * The wide palette: box paints chosen on sheet error plus local-colour error (see the head of this file). `lean` is the
  * recovered lean palette; a monochrome lean palette is returned unchanged.
@@ -96,13 +129,17 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
     : chooseBox(px, w, h, paperRGB, { min, max, gain, score });
   // --paintsadd a,b,c: the fitted pans stay and these are added for passages that need them, so the figure keeps its
   // colours
-  const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !chosen.paints.some(q => q.key === p.key));
-  const paints = [...chosen.paints, ...extra], e = extra.length ? score(paints) : chosen.e, trail = extra.length ? [...chosen.trail, e] : chosen.trail;
+  const covered = keys ? { paints: chosen.paints, added: [], coverage: null } : coverKeyHues(sample, colours, chosen.paints, { max });
+  const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !covered.paints.some(q => q.key === p.key));
+  const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length;
+  const e = changed ? score(paints) : chosen.e, trail = changed ? [...chosen.trail, e] : chosen.trail;
   const n = w * h, chroma = chromaOf(channelDensity(px, n, paperRGB), n);
   const loc = localError(sample, colours, paints);
   const palette = { pigments: paints.map(p => boxPigment(p)), ink: 0, chroma, paintChroma: chroma, inkApart: 0, monochrome: false, wide: true, box: { keys: paints.map(p => p.key), sampleError: e, trail } };
+  if (covered.added.length || covered.coverage?.loss > 1e-6) palette.hueCoverage = covered.coverage;
   const cols = colours.map((r, q) => `${r.grey ? 'greys ' : ''}h ${r.h.toFixed(0)} C ${r.C.toFixed(0)} ${(100 * r.share).toFixed(1)}% off ${loc.per[q].toFixed(1)}`).join('; ');
-  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}` };
+  const coverageNote = palette.hueCoverage ? `; key hues ${covered.coverage.loss < 1e-6 ? 'covered' : `gap ${covered.coverage.loss.toFixed(1)} at palette limit`}${covered.added.length ? `, added ${covered.added.join(', ')}` : ''}` : '';
+  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}` };
 }
 
 /**
