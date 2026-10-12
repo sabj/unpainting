@@ -3,8 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paperOf, pickPalette } from './palettepick.mjs';
 import { paletteOf } from './palette.mjs';
-import { widePalette, localColours, kmeans, splitByPuddle, puddleLabels } from './palettewide.mjs';
+import { widePalette, localColours, kmeans, splitByPuddle, puddleLabels, coverKeyHues, keyHueCoverage } from './palettewide.mjs';
 import { sampleSource } from './boxpick.mjs';
+import { BOX } from './box.mjs';
 
 const W = 60, H = 48, N = W * H;
 
@@ -41,6 +42,22 @@ test('local colours find the small saturated shirt as its own colour', () => {
   const px = overlook(), { paperRGB } = paperOf(px, W, H), colours = localColours(sampleSource(px, W, H, paperRGB));
   assert.ok(colours.some(c => c.h < 50 && c.C > 30), JSON.stringify(colours.map(c => [c.h | 0, c.C | 0])));
   assert.ok(colours.some(c => c.h > 250 && c.h < 300), 'the sky');
+});
+
+test('a small orange passage gets optical hue coverage despite a mostly grey sheet', () => {
+  const px = new Uint8ClampedArray(N * 3);
+  for (let i = 0; i < N; i++) px.set(i % W < 8 ? [225, 130, 35] : [165, 165, 165], i * 3);
+  const paper = [252, 251, 248], sample = sampleSource(px, W, H, paper), colours = localColours(sample);
+  const deficient = ['ultramarine', 'lampblack'].map(key => BOX.find(p => p.key === key));
+  const before = keyHueCoverage(sample, colours, deficient);
+  const fixed = coverKeyHues(sample, colours, deficient, { max: 4 });
+  assert.ok(before.loss > 10, 'cool and black pans cannot cover the orange');
+  assert.equal(fixed.coverage.loss, 0, JSON.stringify(fixed.coverage));
+  assert.ok(fixed.paints.length <= 4);
+  assert.ok(fixed.added.every(key => !['lampblack', 'paynes', 'sepia'].includes(key)), 'a missing chromatic passage gets chromatic paint');
+  const capped = coverKeyHues(sample, colours, deficient, { max: 2 });
+  assert.deepEqual(capped.paints, deficient);
+  assert.ok(capped.coverage.loss > 0, 'an explicit cap reports the remaining gap');
 });
 
 test('kmeans separates two clouds', () => {

@@ -19,6 +19,13 @@ test('wet sessions cannot mix subjects or successive glazes with the same value'
  assert.equal(sameWash(layer('b2L1'),layer('b2L1',1)),false);
  assert.equal(sameWash({...layer('b4'),_valuePhase:'shadow'},{...layer('b4'),_valuePhase:'shadow'}),false);
 });
+test('layered washes preserve source colour families through the foundation',()=>{
+ const {flags}=pipelineFlags({washes:{colour:'layered'}});
+ const m=new Map(Array.from({length:flags.length/2},(_,i)=>flags.slice(i*2,i*2+2)));
+ assert.equal(m.get('--huechroma'),'30');
+ assert.equal(m.get('--lightfamilies'),'1');
+ assert.equal(m.get('--passcap'),'0', 'layered washes still use their mean charge');
+});
 test('recovered texture stays in planned bounds and leaves light gaps',()=>{
  const w=80,h=80,D=Float32Array.from({length:w*h},(_,i)=>i%w<40?.8:0);
  for(const kind of ['hatch','fur']) {
