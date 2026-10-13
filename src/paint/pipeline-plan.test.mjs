@@ -58,3 +58,10 @@ test('washes.paints names the authored box palette',()=>{
  assert.throws(()=>resolvePipeline({washes:{paints:['vermilion']}}),/washes.paints/);
  assert.throws(()=>resolvePipeline({washes:{paints:[]}}),/washes.paints/);
 });
+
+test('washes.darkGain scales the shadow glazes when the plan sets it',()=>{
+ const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ assert.equal(m(pipelineFlags({washes:{darkGain:2}})).get('--darkgain'),'2');
+ assert.equal(m(pipelineFlags({})).get('--darkgain'),undefined);
+ assert.throws(()=>resolvePipeline({washes:{darkGain:5}}),/washes.darkGain/);
+});

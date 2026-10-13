@@ -38,6 +38,7 @@ export function resolvePipeline(plan = {}) {
     washes: {
       furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
       paints: paints(washes.paints),
+      darkGain: washes.darkGain == null ? null : number(washes.darkGain, 1, .5, 3, 'washes.darkGain'),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
       inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
@@ -61,6 +62,9 @@ export function pipelineFlags(plan) {
   const add = (k,v) => flags.push('--'+k,String(v));
   if (w.furReserves) add('furreserves', JSON.stringify(w.furReserves));
   if (w.paints) add('paints', w.paints.join(','));
+  // washes.darkGain: shadow glazes (bands 4-5) are charged at this multiple of their fitted demand. The physical
+  // wash delivers about 70% of a planned dark, so a dark subject names the gain it needs to reach its value.
+  if (w.darkGain != null) add('darkgain', w.darkGain);
   add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
   // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
   // washes still keep light colour families apart, split on perceptual chroma, so a neutral
