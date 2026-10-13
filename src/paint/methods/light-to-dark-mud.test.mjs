@@ -45,6 +45,14 @@ test('hueChroma: saturated and muted regions of one hue family take separate mid
   assert.ok(split < mixed / 4, `blue on orange in the middle layers ${split} vs ${mixed}`);
 });
 
+test('hueChromaLab: a muted brown with a wide RGB range does not share the saturated orange light wash', () => {
+  const brown = rgb.slice();
+  for (let i = 0; i < n; i++) if (i % w >= w / 2 && Math.floor(i / w) >= TOP && !pale(i)) brown.set([130, 100, 80], i * 3);
+  const opts = { rgb: brown, lightFamilies: true, hueChroma: 30 };
+  const rgbRange = blueOnOrange(plan(opts)).light, lab = blueOnOrange(plan({ ...opts, hueChromaLab: true })).light;
+  assert.ok(lab < rgbRange / 4, `blue light wash on orange ${lab} vs ${rgbRange}`);
+});
+
 test('passCap: a passage charged at its median over-charges fewer cells and still lays the planned mass', () => {
   const over = p => { const per = laidPerCell(p); let o = 0, t = 0; for (let i = 0; i < n * k; i++) { t += demand[i]; if (demand[i] > 0) o += Math.max(0, per[i] - demand[i]); } return o / t; };
   const mass = p => { const per = laidPerCell(p); let a = 0, b = 0; for (let i = 0; i < n * k; i++) { a += per[i]; b += demand[i]; } return a / b; };
