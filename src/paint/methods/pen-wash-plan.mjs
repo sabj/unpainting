@@ -13,7 +13,7 @@ import { gaussian } from '../../keyframes/density.mjs';
 import { components, dilate, erode } from '../../raster.js';
 import { renderLayers } from '../../media/km.mjs';
 
-export const PENWASH_PLANNERS = Object.freeze(['values', 'colour']);
+const PENWASH_PLANNERS = Object.freeze(['values', 'colour']);
 export const PENWASH_MAX_PASSAGES = 6;
 
 // sRGB 0..255 to CIE L*a*b* (D65), one cell.
@@ -26,7 +26,7 @@ function lab(r, g, b) {
 }
 
 /** L*, a*, b* planes of an RGB buffer, each blurred by sigma cells (0: unblurred). */
-export function labPlanesOf(px, w, h, sigma = 0) {
+function labPlanesOf(px, w, h, sigma = 0) {
   const n = w * h, L = new Float32Array(n), a = new Float32Array(n), b = new Float32Array(n);
   for (let i = 0; i < n; i++) { const v = lab(px[i * 3], px[i * 3 + 1], px[i * 3 + 2]); L[i] = v[0]; a[i] = v[1]; b[i] = v[2]; }
   return sigma > 0 ? { L: gaussian(L, w, h, sigma), a: gaussian(a, w, h, sigma), b: gaussian(b, w, h, sigma) } : { L, a, b };
@@ -88,7 +88,7 @@ export function valueGroups(L, w, h, { sigma = 6, minLight = 0.3, maxDark = 0.22
  * A photograph's dark mount or plate border: out to the innermost row or column near each edge that is dark
  * (L* under `dark`) nearly all along, at most `maxShare` of the side. Returns the border mask and its thickness per side; it is neither painted nor planned.
  */
-export function frameMask(L, w, h, { dark = 40, maxShare = 0.08 } = {}) {
+function frameMask(L, w, h, { dark = 40, maxShare = 0.08 } = {}) {
   // a border line is dark nearly all along (85th percentile), unlike a building's shadow side that meets the sky
   const med = a => { const s = Float32Array.from(a).sort(); return s[Math.floor(0.85 * (s.length - 1))]; };
   const row = y => med(Array.from({ length: w }, (_, x) => L[y * w + x])), col = x => med(Array.from({ length: h }, (_, y) => L[y * w + x]));
@@ -108,7 +108,7 @@ export function frameMask(L, w, h, { dark = 40, maxShare = 0.08 } = {}) {
  * the 98th percentile) joined to
  * the edge of the picture or to `frame`. Like a border, it is left as paper and is no sky.
  */
-export function paperMargin(L, w, h, { frame = null, tol = 2.5, minL = 94 } = {}) {
+function paperMargin(L, w, h, { frame = null, tol = 2.5, minL = 94 } = {}) {
   const s = Float32Array.from(L).sort(), pale = Math.max(minL, s[Math.floor(0.98 * (s.length - 1))] - tol), n = w * h;
   const m = new Uint8Array(n), stack = [];
   const seed = i => { if (!m[i] && (L[i] >= pale || (frame && frame[i]))) { m[i] = 1; stack.push(i); } };
@@ -188,7 +188,7 @@ const passage = (id, role, mask, dir, strength, extra = {}) => ({ id, role, mask
  * sheet. Each wash's mix is fitted once to its region's median colour (fitMix); monochrome targets take palette roles. Returns { passages, groups, sky, monochrome, notes }. Each passage has a mask on the
  * plan grid, a mix direction (sums to one), a strength (optical density of the whole mix), and how it is laid.
  */
-export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
+function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
   const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, skyStrength: 0, skyTo: 0.3, deepContrast: 0, deepShare: 0.06, deepRingMm: 2, keepLights: 0, keepLightsMm2: 4, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
   // a photograph's dark border and a painting's bare margin are no part of the subject: found on the barely blurred
@@ -359,14 +359,14 @@ function hueSplit(P, mask, w, h, { minShare, minGap }) {
 }
 
 // One wash, not a scatter: gaps narrower than `r` cells closed, then pieces under `minArea` cells dropped.
-export function consolidate(mask, w, h, r, minArea) {
+function consolidate(mask, w, h, r, minArea) {
   const c = erode(dilate(mask, w, h, r), w, h, r), { labels, areas } = components(c, w, h), out = new Uint8Array(mask.length);
   for (let i = 0; i < out.length; i++) if (labels[i] && areas[labels[i]] >= minArea) out[i] = 1;
   return out;
 }
 
 /** The comparison planner: up to `k` colour regions, one flat wash each, light to dark. Light regions stay paper. */
-export function planColourRegions({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
+function planColourRegions({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
   const o = { blurMm: 2.5, k: 5, minLight: 0.3, lightness: 0.5, minArea: 0.03, ...options };
   const P = labPlanesOf(px, w, h, cells(o.blurMm)), frame0 = frameMask(P.L, w, h).mask, margin = paperMargin(P.L, w, h, { frame: frame0 }), frame = Uint8Array.from(frame0, (v, i) => v | margin[i]), paperLab = lab(...(paperRGB ?? [247, 244, 236]));
