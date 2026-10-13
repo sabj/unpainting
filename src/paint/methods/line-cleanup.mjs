@@ -1,7 +1,7 @@
 // Line selection and cleanup for the linework stage (linework-stage.mjs), the same for every source and style:
 //
 //   0. With `join` (and the target's edge evidence), broken pieces of one contour are joined first and only isolated
-//      marks on no contour are deleted (line-join.mjs); the rhythm prune then deletes nothing but near repeats.
+//      marks on no contour are deleted (line-join.mjs); no speck rule, and the rhythm prune deletes only near repeats.
 //   1. Specks under `minMm` go.
 //   2. Shadow and value edges go. Across a traced line the stage reads the target on both sides: a dark ridge (darker
 //      than both sides) is a drawn or structural line; a step whose sides differ in lightness while every channel
@@ -106,7 +106,8 @@ export function cleanLines(lines, target, { mmPerCell, kind = 'trace', seed = 1,
     if (!target.ev) throw new Error('cleanLines: join needs the target edge evidence (target.ev)');
     joined = joinThenPrune(lines, target.ev, target.L, { mmPerCell });
     lines = joined.lines;
-    options = { ...options, prune: { keepAbove: -Infinity, tileInkMm: Infinity, ...(options.prune ?? {}) } };
+    // join, then prune: only isolated marks are deleted (line-join.mjs), so no speck rule and no omission here
+    options = { ...options, minMm: 0, prune: { keepAbove: -Infinity, tileInkMm: Infinity, minMm: 0, ...(options.prune ?? {}) } };
   }
   if (kind === 'pen') options = { ...options, minMm: options.minMm ?? CLEANUP.penMinMm, prune: { keepAbove: -Infinity, tileInkMm: Infinity, minMm: CLEANUP.penMinMm, vary: 0, litWeight: 1, ...(options.prune ?? {}) } };
   const o = { ...CLEANUP, ...options, prune: { ...CLEANUP.prune, ...(options.prune ?? {}) } }, cells = mm => mm / mmPerCell, { w, h } = target;

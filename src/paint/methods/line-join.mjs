@@ -5,16 +5,27 @@
 //   1. their ends face each other and the gap is small next to both pieces (at most `gapShare` of the shorter, and
 //      under `maxGapMm`);
 //   2. their directions agree, and the joined path does not turn sharply at either end of the gap;
-//   3. the target shows the same edge across the gap: every few cells along the gap a target edge runs the same way,
-//      with its light side on the same side as at both ends (a contour passing into light has no edge there, so its
-//      deliberate break stays);
+//   3. the target shows the same edge across the gap: every few cells along the gap a target edge (any gradient in its
+//      strongest 30%) runs the same way, with its light side on the same side as at both ends (a contour passing into
+//      light has no edge there, so its deliberate break stays). A gap under `skipMm` is a skip of the nib or the tracer
+//      and needs no evidence;
 //   4. the gap crosses no other line (never through a crossing).
-// Pieces are joined shortest gap first, each end once per pass, for a few passes. Then a mark shorter than `isolatedMm`
-// that lies on no target edge is deleted. Widths, weights and wobble of the pieces are kept; the gap is drawn at the
+// Pieces are joined shortest gap first, each end once per pass, for a few passes. Then a mark is deleted only when it
+// is isolated: shorter than `isolatedMm`, mostly off every target edge, and with no other line within `aloneMm`. Widths, weights and wobble of the pieces are kept; the gap is drawn at the
 // mean of the two ends. Pure, planning only. Lines are plan-grid polylines [{ points: [{x, y, width?, weight?}] }].
 
 const JOIN = Object.freeze({ maxGapMm: 2.5, gapShare: 0.5, facing: 0.9, agree: 0.9, turnDeg: 25, endMm: 0.8, edgeCells: 1.5, edgeAgree: 0.85,
-  support: 0.75, isolatedMm: 1.5, offEdge: 0.6, passes: 3 });
+  support: 0.75, skipMm: 0.5, weakQuantile: 0.7, isolatedMm: 1.5, offEdge: 0.6, aloneMm: 1, passes: 3 });
+
+import { nearestEdge } from './line-evidence.mjs';
+
+// The target's weak edges: every cell whose gradient is in the strongest (1 - q) of the sheet, with the distance to
+// the nearest and its index. Thicker than the thinned edges, so a faint stretch of a contour still counts.
+function weakEdges(ev, q) {
+  const m = Float32Array.from(ev.mag).filter(v => v > 0).sort(), cut = m.length ? m[Math.floor(q * (m.length - 1))] : Infinity;
+  const mask = Uint8Array.from(ev.mag, v => (v >= cut ? 1 : 0));
+  return { ...ev, ...nearestEdge(mask, ev.w, ev.h) };
+}
 
 const len = pts => { let d = 0; for (let k = 1; k < pts.length; k++) d += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return d; };
 
@@ -101,8 +112,9 @@ function bridge(a, b) {
  * Join broken pieces of one contour, then delete isolated marks that lie on no target edge.
  * @returns { lines, stats: { in, joined, deleted, out } }
  */
-export function joinThenPrune(lines, ev, L, { mmPerCell, options = {} } = {}) {
-  const o = { ...JOIN, ...options }, cells = mm => mm / mmPerCell, { w, h } = ev, cosTurn = Math.cos(o.turnDeg * Math.PI / 180);
+export function joinThenPrune(lines, ev0, L, { mmPerCell, options = {} } = {}) {
+  const o = { ...JOIN, ...options }, cells = mm => mm / mmPerCell, { w, h } = ev0, cosTurn = Math.cos(o.turnDeg * Math.PI / 180);
+  const ev = weakEdges(ev0, o.weakQuantile);
   let cur = lines.filter(g => g.points?.length >= 2).map(g => ({ ...g, points: g.points.slice() }));
   const stats = { in: cur.length, joined: 0, deleted: 0 };
   for (let pass = 0; pass < o.passes; pass++) {
@@ -134,7 +146,7 @@ export function joinThenPrune(lines, ev, L, { mmPerCell, options = {} } = {}) {
       const a = ends[ka], b = ends[kb];
       if (usedEnd.has(ka) || usedEnd.has(kb) || usedLine.has(a.i) || usedLine.has(b.i)) continue;
       if (crosses(a.p, b.p, own, w, h, a.i, b.i)) continue;
-      if (!gapSupported(a.p, b.p, ev, L, o)) continue;
+      if (Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) > cells(o.skipMm) && !gapSupported(a.p, b.p, ev, L, o)) continue;
       usedEnd.add(ka); usedEnd.add(kb); usedLine.add(a.i); usedLine.add(b.i);
       merges.push([a, b]);
     }
@@ -150,12 +162,20 @@ export function joinThenPrune(lines, ev, L, { mmPerCell, options = {} } = {}) {
     stats.joined += merges.length;
     cur = [...cur.filter((_, i) => !gone.has(i)), ...added];
   }
-  // delete isolated marks: short and mostly off every target edge
-  const kept = cur.filter(g => {
+  // delete isolated marks: short, mostly off every target edge, and with no other line near
+  const own = occupancy(cur, w, h), R = Math.ceil(cells(o.aloneMm));
+  const alone = (g, i) => {
+    for (const q of g.points) for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const X = Math.round(q.x) + dx, Y = Math.round(q.y) + dy;
+      if (X >= 0 && Y >= 0 && X < w && Y < h && own[Y * w + X] >= 0 && own[Y * w + X] !== i) return false;
+    }
+    return true;
+  };
+  const kept = cur.filter((g, i) => {
     if (len(g.points) >= cells(o.isolatedMm)) return true;
     let off = 0;
     for (const q of g.points) { const X = Math.round(q.x), Y = Math.round(q.y); if (X < 0 || Y < 0 || X >= w || Y >= h || ev.dist[Y * w + X] > o.edgeCells) off++; }
-    if (off / g.points.length >= o.offEdge) { stats.deleted++; return false; }
+    if (off / g.points.length >= o.offEdge && alone(g, i)) { stats.deleted++; return false; }
     return true;
   });
   return { lines: kept, stats: { ...stats, out: kept.length } };
