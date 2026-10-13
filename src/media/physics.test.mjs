@@ -82,8 +82,15 @@ test('a brush lifted clear of the sheet keeps its bead', () => {
 });
 
 test('a flat brush lifted to no pressure stays on its lanes', () => {
-  const s = sheet(24), b = createBrush({ flat: true }); dip(b,{water:1,conc:[.5]});
-  stroke(b,s,[{x:4.5,y:12.5,p:0},{x:18.5,y:12.5,p:0}]); finite(s);
+  // pressed, this brush (radius 6) wets rows 5 to 19; lifted, only the rows its tip lanes touch along the path
+  const laid = p => { const s = sheet(24), b = createBrush({ flat: true }); dip(b,{water:1,conc:[.5]}); const had = brushMass(b);
+    stroke(b,s,[{x:4.5,y:12.5,p},{x:18.5,y:12.5,p}]); finite(s); near(brushMass(b).water + totals(s).water, had.water);
+    const rows = new Set(); for (let i = 0; i < s.n; i++) if (s.W[i] + s.s[i] + s.G[0][i] + s.P[0][i] > 0) { rows.add(Math.floor(i / 24)); assert.ok(i % 24 >= 3 && i % 24 <= 19, `paint past the path's ends at ${i}`); }
+    return { rows: [...rows].sort((a, b) => a - b), water: totals(s).water }; };
+  const lifted = laid(0), pressed = laid(1);
+  assert.ok(lifted.water > 0, 'the lifted tip still touches the paper');
+  assert.ok(lifted.rows.every(y => Math.abs(y + .5 - 12.5) <= 2), `lifted paint off its lanes: rows ${lifted.rows}`);
+  assert.ok(pressed.rows.length > 2 * lifted.rows.length && lifted.water < pressed.water / 10, 'lifting is what keeps it narrow and light');
 });
 
 test('instruments used off the edge of the sheet do nothing, quietly', () => {
