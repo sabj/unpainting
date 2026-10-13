@@ -50,6 +50,7 @@ import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
+import { canaryStopPass, stopAtCanary } from '../src/paint/canary-stop.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
 import { loadStats, panelSVG } from './stroke-stats.mjs';
 import { evaluateGate, printGate } from './stroke-gate.mjs';
@@ -2804,6 +2805,7 @@ if (FIRST_FLOOR > 0) { const fw = layers.filter(isFirst); if (fw.length) { layer
 if(AREA_PLAN){try{AREA_COMPILED=compileAreaLayers(AREA_PLAN,layers,PIGS);}catch(e){fs.writeFileSync(path.join(out,'semantic-coverage.json'),JSON.stringify(e.diagnostics??{error:e.message},null,2));throw e;}layers=AREA_COMPILED.layers;validateCompiledAreaStop(opt('areastop',''),layers);fs.writeFileSync(path.join(out,'semantic-coverage.json'),JSON.stringify(AREA_COMPILED.diagnostics,null,2));}
 const BUDGET = STROKE_BUDGET ? completeBudget({N:STROKE_BUDGET,layers,drawing:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length}) : null;
 if (BUDGET) console.log(`stroke budget: ${BUDGET.N} paths, washes ${Math.round(BUDGET.wash)}, drags ${BUDGET.drags}, dry brush ${BUDGET.dry}, accents ${BUDGET.accents}${FOCUS ? ', weighted by the focus map' : ''}`);
+const CANARY_STOP = canaryStopPass(num('canarystop', 0), layers.length);
 if(MOD?.paintOwnedTransfer){
  const stop=opt('majorstop',''),requested=stop.startsWith('pass:')?Number(stop.slice(5)):null;if(requested!==null&&(!Number.isInteger(requested)||requested<1||requested>layers.length))throw Error('owned head checkpoint outside actual reordered paint route');
  fs.writeFileSync(path.join(out,'paint-owned-route-before.json'),JSON.stringify({kind:'actual post-split/reordered route before body painting; not executed contact',passes:layers.length,checkpoint:requested,shapes:layers.map((l,L)=>({pass:L+1,value:l.value,owned:l.shapes.map((sh,S)=>sh._paintOwnedComponentCharge?{shapeId:'numeric-L'+L+'-S'+S,area:sh.area,supportCells:sh._paintOwnedComponentCharge.size}:null).filter(Boolean)}))},null,2));
@@ -3546,6 +3548,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   layer.mask = null; layer.ids = null;
   STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, ...(layer._order ? { order: layer._order.phase } : {}), techniques: Object.fromEntries(Object.entries(used).filter(([k]) => ['wet on dry', 'wet on wet', 'glazed', 'dry brush', 'detail marks', 'small brush'].includes(k))) };
   if (!FRAME_POLICY.all) await shoot();
+  if (CANARY_STOP === L + 1) await stopAtCanary({ out, pass: L + 1, passes: layers.length, value: layer.value, brushMarks: laid, backend: GPU_INFO,
+    writeImage: f => sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(f), close: async () => { await drainFrames(); FRAMER?.close(); sheet._gpu?.close(); } });
   if (FILM_BY_PAINT) {
     // the pass's whole booking, whether or not every passage found a path, so the shares stay on the plan's mass
     filmPass += layer.shapes.reduce((a, sh) => a + (FILM_MASS.get(sh) ?? 0), 0); filmLaid = filmPass;
