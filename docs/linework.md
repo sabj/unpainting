@@ -6,6 +6,36 @@ from one prepared line set: **prep** places the hard geometry in light pencil;
 washes. Omit any stage that has no job. Inspect the executed opening drawing
 before spending time on washes.
 
+## The universal linework stage
+
+`--linework auto` (plan `"drawing": { "linework": "auto" }`) runs one linework stage that every style uses, before
+the first mark and before the target guard seals the target (`src/paint/methods/linework-stage.mjs`). It writes an
+ordinary drawing file and points the pens at it, so linked stages, the pen-and-wash prune and both pens read it as
+they read any prepared drawing. Its record is `linework-stage.json` in the run folder.
+
+1. Source, first that holds. A target the separator reads as at least 2.5% pen line is a pen source and tries its own
+   lines first.
+   - Its own lines (`copy-lines.py` at the plan grid): for a pen source they lose only specks, shadow outlines and
+     near repeats.
+   - An image model's pen sketch from `--sketchcache` (made beforehand by `tools/seg/sketch-target.mjs`, one fixed
+     prompt, keyed by the target's SHA-256). It is used only if it passes the geometry check
+     (`sketch-check.mjs`): registered to the target's own edges, a line with no matching edge within 2.5 mm is
+     invented and dropped, kept lines are snapped onto their edges, and the whole sketch falls back when under 55%
+     of its ink matches, over 30% is invented or it covers under half of the strongest edges.
+   - The sketch planner (`sketch-lines.py`), else the JavaScript trace when python lacks NumPy and OpenCV.
+2. Cleanup (`line-cleanup.mjs`): specks; lines that only trace a shadow or value step (the two sides differ in
+   lightness while every channel scales alike; long straight lines stay); the structure filter on a photograph's
+   trace; repeated small marks pruned into a rhythm, lit areas losing most (`pen-wash-lines.mjs`).
+3. Gate (`line-gate.mjs`), per image: built structure (two or more vanishing points carrying 12% of the long edges,
+   `tools/seg/perspective.py`) or a checked sketch is drawn in ink; a soft subject gets a light graphite
+   construction; too little line after cleanup draws nothing. `--linemedium ink|graphite|none`, a plan's
+   `drawing.medium` or `--outlinemedium` fixes the medium instead.
+4. Styles keep their own use of the lines: pen and wash draws them dominant with its economy prune, Combined draws
+   them under its value plan's caps.
+
+Python with NumPy and OpenCV (`--sketchpython`) runs the copier, the sketch planner and the perspective measure.
+Which skeleton thinning it has (OpenCV contrib, scikit-image or NumPy) changes the traced paths; the stage records it.
+
 | Job | Tool | What to inspect |
 |---|---|---|
 | Copy an existing pen drawing or ink-led sketch | `copy-lines.py`, then a prepared drawing file | Short marks, curved contours and measured widths survive. Inspect the extracted ink mask: dark wash texture can masquerade as ink. |

@@ -62,9 +62,10 @@ test('detail regions need both a dense trace and local contrast', () => {
 
 test('a pen source keeps its small marks; a selective drawing prunes them in lit areas', () => {
   const t = planes(paint(() => [235, 230, 220]));
-  const ticks = Array.from({ length: 40 }, (_, k) => ({ points: [{ x: 10 + 2.5 * k, y: 40 }, { x: 10 + 2.5 * k, y: 45 }] }));
+  const ticks = Array.from({ length: 40 }, (_, k) => ({ points: [{ x: 10 + 2.5 * k, y: 40, weight: 0.9, width: 1.2 }, { x: 10 + 2.5 * k, y: 45, weight: 0.9, width: 1.2 }] }));
   const pen = cleanLines(ticks, t, { mmPerCell: MM, kind: 'pen' }), drawing = cleanLines(ticks, t, { mmPerCell: MM, kind: 'drawing' });
   assert.equal(pen.lines.length, 40);
+  assert.ok(pen.lines.every(g => g.points.every(q => q.weight === 0.9 && q.width === 1.2)), 'a pen source keeps its own weights and widths');
   assert.ok(drawing.lines.length < 40);
   assert.throws(() => cleanLines(ticks, t, { mmPerCell: MM, kind: 'tracing' }), /drawing, trace or pen/);
 });

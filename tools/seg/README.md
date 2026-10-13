@@ -9,6 +9,8 @@ Segmentation divides an image into labeled regions. These scripts identify those
 | `sam-points.py` | One named region from Segment Anything, prompted by points, in the segments format | `src/crop/segments.mjs` |
 | `sketch-map.py` | published fine/coarse structural maps and fusion, with source hashes | `sketch-lines.py` |
 | `sketch-lines.py` | continuous hierarchical pre-paint strokes, optional sky exclusion | `--drawingfile` / `--sketchlines 1` |
+| `sketch-target.mjs` | `<cache>/<target SHA-256>.png`, an image model's pen sketch of a target (one fixed prompt, OpenRouter), and its record | `--sketchcache`, checked by `src/paint/methods/sketch-check.mjs` |
+| `perspective.py` | JSON: vanishing points and the share of long edges that converge on them | the linework gate, `src/paint/methods/line-gate.mjs` |
 | `copy-lines.py` | observed source-ink paths and measured widths, without a sketch-detail budget | `--drawingfile` / `--copylines 1` |
 | `lines.py` | `work/lines/<base>-lines.json`, Informative Drawings line map traced to polylines (paths of connected straight segments) | `src/crop/lines.mjs` |
 | `lines-map.py` | A line file moved from a photograph onto the painting made from it, through a given 2x3 similarity transform (alignment by translation, rotation and uniform scale) | `src/crop/lines.mjs` |

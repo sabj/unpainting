@@ -97,7 +97,7 @@ export function detailRegion(lines, L, w, h, { radius = 6, quantile = 0.8 } = {}
 export function cleanLines(lines, target, { mmPerCell, kind = 'trace', seed = 1, options = {} } = {}) {
   if (!['drawing', 'trace', 'pen'].includes(kind)) throw new Error(`cleanLines: drawing, trace or pen, not ${kind}`);
   const trace = kind === 'trace';
-  if (kind === 'pen') options = { ...options, minMm: options.minMm ?? CLEANUP.penMinMm, prune: { keepAbove: -Infinity, tileInkMm: Infinity, minMm: CLEANUP.penMinMm, ...(options.prune ?? {}) } };
+  if (kind === 'pen') options = { ...options, minMm: options.minMm ?? CLEANUP.penMinMm, prune: { keepAbove: -Infinity, tileInkMm: Infinity, minMm: CLEANUP.penMinMm, vary: 0, litWeight: 1, ...(options.prune ?? {}) } };
   const o = { ...CLEANUP, ...options, prune: { ...CLEANUP.prune, ...(options.prune ?? {}) } }, cells = mm => mm / mmPerCell, { w, h } = target;
   const stats = { in: lines.length, specks: 0, shadow: 0, structure: 0 };
   let kept = lines.filter(g => { if (pathLength(g.points) * mmPerCell < o.minMm) { stats.specks++; return false; } return true; });
