@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inkHand } from './drawing-file.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { inkHand, selectedDrawing } from './drawing-file.mjs';
 
 const line = pts => ({ weight: 1, points: pts.map(([x, y]) => ({ x, y, s: 0.6, nw: 2 })) });
 
@@ -20,4 +23,26 @@ test('the hand slows on a curve and runs faster along a straight', () => {
   const atCorner = g.points[20].v, straight = g.points[10].v;
   assert.ok(atCorner < straight, `${atCorner} at the corner, ${straight} on the straight`);
   assert.ok(straight > 1.9 - 1.1 * 0.6, 'a straight run is faster than the plain pen');
+});
+
+const flagsOf = args => { const opt = (n, d) => { const i = args.lastIndexOf('--' + n); return i >= 0 ? args[i + 1] : d; }; return { opt, num: (n, d) => Number(opt(n, d)) }; };
+
+test('a first pen that selects no line from a named drawing fails the run', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'empty-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, lines: [] }));
+    const f = flagsOf(['--drawingfile', path.join(dir, 'empty')]);
+    assert.throws(() => selectedDrawing({ first: true, w: 100, h: 100, ...f, log: () => {}, walked: 7 }), /selected 0 of 0 lines/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('an empty opening file the linked stages marked as meant lays no ink and does not fail', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'stage-prepink-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, lines: [], empty: 'the plan has a prep pencil and no prepInk stage' }));
+    const logs = [];
+    const r = selectedDrawing({ first: true, w: 100, h: 100, ...flagsOf(['--drawingfile', path.join(dir, 'stage-prepink')]), log: m => logs.push(m), walked: 7 });
+    assert.deepEqual(r, []);
+    assert.match(logs.at(-1), /no opening ink, since the plan has a prep pencil/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

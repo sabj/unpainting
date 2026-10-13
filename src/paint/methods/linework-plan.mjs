@@ -120,6 +120,10 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
       }
       argv.push('--drawingfile',stem); info.source=choice; info.extractor=choice;
     } else log(`line source auto: ${(100 * inkShare).toFixed(2)}% pen line in the target and no sketch planner (${python} lacks numpy or OpenCV); the pen finds its own lines`);
+    if (mode === 'auto' && choice === 'none' && 100 * inkShare < num('penfirst', 0.5)) {
+      info.warning = `photo-sketch skipped: ${python} cannot import cv2 and numpy`;
+      log(`WARNING line source auto: photo-sketch skipped, ${python} cannot import cv2 and numpy (pass --sketchpython with a python that has them); the pen finds its own lines instead`);
+    }
   }
   return info;
 }
@@ -171,7 +175,10 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
   for (const [key, name] of [['prep', 'prep'], ['prepInk', 'prepink'], ['finishInk', 'finishink']]) {
     if (!r[key] && !(key === 'prepInk' && r.prep)) continue;
     const stem = path.join(out, `stage-${name}`);
-    fs.writeFileSync(`${stem}-lines.json`, JSON.stringify(stageDoc(r[key] ?? [], { image: imageSize, stage: key, source: setName })) + '\n');
+    // a prep pencil with no prepInk stage: an empty opening file, marked so the opening pen knows it is meant
+    // (drawing-file.mjs), while every other reader of the opening file sees no lines, as before
+    const empty = r[key] ? null : 'the plan has a prep pencil and no prepInk stage; the pencil is the opening drawing';
+    fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ ...stageDoc(r[key] ?? [], { image: imageSize, stage: key, source: setName }), ...(empty ? { empty } : {}) }) + '\n');
     info.files[key] = stem;
   }
   if (info.files.prepInk) argv.push('--drawingfile', info.files.prepInk);

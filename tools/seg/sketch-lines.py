@@ -420,7 +420,8 @@ def main():
     for g in lines:
         cv2.polylines(preview, [np.rint(g['points']).astype('int32')], False, (40, 40, 40), 1, cv2.LINE_AA)
     cv2.imwrite(str(stem)+'-geometry.png', preview)
-    print(json.dumps(stats))
+    # which skeleton thinning ran (lines.py thin: cv2.ximgproc, skimage or zhang-suen); traced paths depend on it
+    print(json.dumps({**stats, 'thinning': thin(np.zeros((3, 3), np.uint8))[1]}))
 
 
 if __name__ == '__main__':

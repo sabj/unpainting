@@ -116,7 +116,8 @@ def main():
     Path(str(stem)+'-lines.json').write_text(json.dumps(doc)+'\n')
     cv2.imwrite(str(stem)+'-ink.png', (1-mask)*255)
     cv2.imwrite(str(stem)+'-skeleton.png', (1-skeleton)*255)
-    print(json.dumps(stats))
+    # which skeleton thinning ran (lines.py thin: cv2.ximgproc, skimage or zhang-suen); traced paths depend on it
+    print(json.dumps({**stats, 'thinning': thin(np.zeros((3, 3), np.uint8))[1]}))
 
 
 if __name__ == '__main__':
