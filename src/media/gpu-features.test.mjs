@@ -62,7 +62,7 @@ const CASES = [
 
 for (const [name, extra, pits] of CASES) {
   const wash = () => washOf(pits);
-  test(`${name} on the GPU sheet paints within the CPU sheet's own float noise`, { timeout: 180000 }, () => {
+  test(`${name} on the GPU sheet paints within the CPU sheet's own float noise`, { timeout: 180000 }, t => {
     const base = { ...DEFAULTS, gran: 0.25 }, O = { ...base, ...extra };
     const ref = paint(wash(), O), scale = peak(ref.thick);
     const O2 = { ...O }; for (const k of ['flow', 'diffuse', 'evap']) O2[k] = Math.fround(O[k] * (1 + 1e-6));
@@ -72,7 +72,7 @@ for (const [name, extra, pits] of CASES) {
     assert.ok(without.max > Math.max(50 * floor.max, 2e-3 * scale), `${name} barely changes the CPU result: ${without.max} against floor ${floor.max} (peak ${scale})`);
 
     const g = wash(), info = attachGpu(g, O, { mode: 'auto', log: () => {} });
-    if (info.backend !== 'gpu') { console.log(`# skipped: ${info.reason}`); return; }
+    if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
     try {
       const out = paint(g, O), d = stats(out.thick, ref.thick), dm = stats(midOf(out), midOf(ref));
       assert.ok(gpuStats(g).steps >= 40 && gpuStats(g).drys === 1, 'the run went through the GPU');
@@ -87,13 +87,13 @@ for (const [name, extra, pits] of CASES) {
 // Strong marangoni is unstable on the CPU too: a float32 nudge of three constants moves the result by a quarter of its
 // peak, so there is no float-noise floor to hold the GPU to. The GPU must part from the CPU no more than the CPU parts
 // from itself.
-test('strong marangoni on the GPU sheet parts from the CPU no more than the CPU parts from itself', { timeout: 180000 }, () => {
+test('strong marangoni on the GPU sheet parts from the CPU no more than the CPU parts from itself', { timeout: 180000 }, t => {
   const O = { ...DEFAULTS, gran: 0.25, marangoni: 0.5 }, wash = () => washOf(false);
   const ref = paint(wash(), O);
   const O2 = { ...O }; for (const k of ['flow', 'diffuse', 'evap']) O2[k] = Math.fround(O[k] * (1 + 1e-6));
   const floor = stats(paint(wash(), O2).thick, ref.thick);
   const g = wash(), info = attachGpu(g, O, { mode: 'auto', log: () => {} });
-  if (info.backend !== 'gpu') { console.log(`# skipped: ${info.reason}`); return; }
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
   try {
     const d = stats(paint(g, O).thick, ref.thick);
     console.log(`# marangoni 0.5: thickness max ${d.max.toExponential(2)} mean ${d.mean.toExponential(2)} (CPU against itself ${floor.max.toExponential(2)} / ${floor.mean.toExponential(2)})`);
