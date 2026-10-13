@@ -16,6 +16,8 @@ Segmentation divides an image into labeled regions. These scripts identify those
 | `subject-regions.py` | A label map of named regions (person from Mask R-CNN in `pp/models.py`, parts from Segment Anything prompted by boxes or points) and its legend | `ink-lines.mjs` |
 | `ink-lines.mjs` | `<out>-lines.json`, a pen-and-wash target's estimated ink (`src/crop/inkwash.mjs`) traced to polylines, each tagged with its region | `--drawingfile` |
 | `face-mask.py` | A soft face ellipse from Keypoint R-CNN | `--litface` |
+| `structure-filter.mjs` | A structural opening drawing from a dense traced line file: long straight lines, plus lines inside detail regions where the trace is dense and local value contrast is high (one rule, no hand boxes) | `--drawingfile` |
+| `late-lines.mjs` | A late closing-pen line file: the long straight lines of a dense trace that a cleaner opening file does not already draw | `--drawingfile` for the closing pen |
 | `check-sheet.mjs` | A sheet of source, label map and outlines, read back through the JavaScript loader | you |
 
 ## Setup

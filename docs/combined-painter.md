@@ -25,7 +25,7 @@ The default is a drawing first (ink or graphite from the source), family-colour 
     "sessions": "connected",
     "inkAware": false,
     "charge": 0.5,
-    "carryMm": 2,
+    "carryMm": 0,
     "paleLimit": 0.16,
     "physics": {"holeRimMm": 0, "marangoni": 0, "slope": 0}
   },
@@ -38,6 +38,10 @@ Use `drawing.medium: "none"` to omit drawing. Without `stages`, the ordinary bou
 Drawing source choices: `none` (bounded walker), `auto`, `source-ink`, `photo-sketch`, `structure-lines`, `structure-combine`, `line-map`. Python extractors need NumPy and OpenCV. Explicit choices fail if unavailable except source-ink's documented narrow-ridge fallback. `line-map` requires `drawing.map`; `drawing.mapSmoothing` is its simplification tolerance in planning cells. This is a prepared model line map, never a photograph passed as a line map.
 
 Wash colour is `family` or `layered`. Sessions are `dry`, `passage` or `connected`. Connected sessions join pigments only within the same subject, region, phase and glaze step. Shadows and later glazes dry separately. `inkAware` defaults true for source-ink and line-map and needs a prepared drawing file; it removes planned narrow lines from the wash target before value compilation. It should stay false for approximate construction drawings. Physics is inside washes: holeRimMm 0..3, marangoni 0..1, slope -1..1. These are material choices, not subject-quality knobs. CLI `--physics key=value` overrides named coefficients without clearing other planned coefficients.
+
+Colour washes charge each passage at the `charge` quantile of its demand and carry what a cell still needs into the next band. `carryMm` averages that carried mask over a brush-sized area in family mode. Prefer 0 in new plans. On Yale (matched native 540, seed 0; one subject), 2 mm diluted the warm stone to C14.0 (target 21.6) and painted over the lit stone at L85.6 (target 94.3); 0 measured C18.7 and L88.1. The code default stays 2 mm, and every benchmark plan sets its own value.
+
+Optional colour fields: `paints` names the box pans by key (for example `["sienna","hansa","paynes"]`) instead of letting the palette fit choose them. `darkGain` (0.5..3) charges the shadow glazes above their fitted demand, because the physical wash delivers about 70% of a planned dark. `deepAccent` `{max, grow, families}` restates cells darker than `max` (0..255, darkest channel) as last accents, only inside the named families.
 
 Order uses `subjects`, a list of `{id, families:[family IDs]}` or `{id, bounds:[[x0,y0,x1,y1]]}`, with optional `{id:"rest"}`. Strength 0..1 delays later subjects while keeping light-to-dark within each. Missing order means whole-sheet bands. Legacy `subjectOrder` is accepted only when `order.subjects` is absent.
 
