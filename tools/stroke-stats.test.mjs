@@ -156,3 +156,33 @@ test('unattributed final colour stays in each broad area denominator instead of 
  const c=composition(n,{tape:t,finalRGB:rgb,paperRGB:t.base}),a=c.broadAreas[0];
  assert.ok(a.tinyVisibleShare<.01);assert.ok(a.attributedVisibleShare<.01);
 });
+
+// Windshield-wiper filling: a narrow brush swept back and forth across a broad interior.
+const narrowTape=()=>{const t=depositTape();t.brushes=[0,1,2];t.brushOpts=[...t.brushOpts,{radius:2,film:.25,capacity:100}];t.marks=[{k:'d',b:2,w:1,c:[.5]}];return t;};
+const sweep=(y,extra={})=>({k:'s',b:2,d:[[100,y*10,100],[900,y*10,100]],...extra});
+test('windshield wiper requires a narrow brush, repeated alignment, broad filling and heavy overlap',()=>{
+ const t=narrowTape();for(let coat=0;coat<2;coat++)for(let y=14;y<=46;y+=4)t.marks.push(sweep(y));
+ const s=weighted(t),a=s.composition.broadAreas[0];
+ assert.ok(a.windshieldWiperShare>.5);assert.ok(a.sweeps[0].passes>=6&&a.sweeps[0].overlapRatio>=1.8);
+ assert.ok(evaluateGate(s,{mode:'reject'}).flags.some(f=>f.code==='windshieldWiperShare'));
+ const wide=depositTape();wide.marks.push({k:'s',b:0,d:[[900,300,100],[100,300,100]]});
+ assert.equal(weighted(wide).composition.broadAreas[0].windshieldWiperShare,0);assert.equal(evaluateGate(weighted(wide),{mode:'reject'}).ok,true);
+ const texture=narrowTape();for(let coat=0;coat<2;coat++)for(let y=14;y<=46;y+=4)texture.marks.push(sweep(y,{purpose:'texture'}));
+ assert.equal(weighted(texture).composition.broadAreas[0].windshieldWiperShare,0);
+ const oneCoat=narrowTape();for(let y=14;y<=46;y+=4)oneCoat.marks.push(sweep(y));
+ assert.equal(weighted(oneCoat).composition.broadAreas[0].windshieldWiperShare,0);
+});
+test('one zigzag with repeated overlapping reversals is also a windshield wiper; sparse strokes are not',()=>{
+ const t=narrowTape(),d=[];for(let j=0;j<17;j++)d.push([j%2?900:100,(14+j*2)*10,100]);t.marks.push({k:'s',b:2,d});
+ assert.ok(weighted(t).composition.broadAreas[0].windshieldWiperShare>.3);
+ const sparse=narrowTape();for(let y=14;y<=46;y+=6)sparse.marks.push(sweep(y));
+ assert.equal(weighted(sparse).composition.broadAreas[0].windshieldWiperShare,0);
+});
+test('the wiper limit passes at equality and older stats without a wiper share stay unmeasured for it',()=>{
+ const s=weighted(depositTape()),a=s.composition.broadAreas[0];
+ a.windshieldWiperShare=.3;assert.equal(evaluateGate(s,{mode:'reject'}).ok,true);
+ a.windshieldWiperShare=.300001;assert.deepEqual(evaluateGate(s,{mode:'reject'}).flags.map(f=>f.code),['windshieldWiperShare']);
+ delete a.windshieldWiperShare;assert.equal(evaluateGate(s,{mode:'reject'}).ok,true);
+ a.windshieldWiperShare=NaN;assert.throws(()=>evaluateGate(s),/windshieldWiperShare/);
+ assert.throws(()=>weighted(depositTape(),[{...broadArea,widthMm:-1}]),/widthMm/);
+});

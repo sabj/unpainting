@@ -4,18 +4,20 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
+import { strokeDirection, detectWipers } from '../src/eval/windshield-wiper.mjs';
 
 export const markClass = (m, sheet) => m.widthMm < 1 || m.lengthMm < 3 ? 'tiny' : m.widthMm > sheet.widthMm / 10 && m.lengthMm >= m.widthMm ? 'large' : 'mid';
 const keys = ['large', 'mid', 'tiny'];
+const isDetail = m => ['detail','texture','edge','small-feature'].includes(m.purpose);
 const signature = ps => ps.map(p => `${Math.round(p[0])},${Math.round(p[1])}`).join(';');
 const optical = (mass, pigments) => [0,1,2].map(ch => mass.reduce((s,v,k) => s + Math.max(0,v) * (pigments?.[k]?.K?.[ch] ?? 0),0));
 
 // Keep masks in recorded coordinates. A clip is shared by its marks, rather than copied for each stroke.
 export function tapeDeposits(tape) {
-  let clip = null, resist = null;
+  let clip = null, resist = null, clipId = 0;
   const loads = new Map(), records = new Map();
   tape.marks.forEach((m,index) => {
-    if (m.k === 'c') { clip = m.r ? {runs:m.r} : m.m ? {mask:m.m} : null; return; }
+    if (m.k === 'c') { clipId++; clip = m.r ? {runs:m.r} : m.m ? {mask:m.m} : null; return; }
     if (m.k === 'r') { resist = m.m; return; }
     if (m.k === 'R') { resist = null; return; }
     if (m.k === 'd') {
@@ -24,7 +26,7 @@ export function tapeDeposits(tape) {
       loads.set(m.b,{conc:m.c,remaining:m.c.map(v=>v*water),water:m.w}); return;
     }
     if (m.k !== 's' || !m.d?.length) return;
-    records.set(index,{clip,resist,load:loads.get(m.b) ?? null});
+    records.set(index,{clipId,clip,resist,load:loads.get(m.b) ?? null});
   });
   return records;
 }
@@ -113,7 +115,7 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
   const {sheet,marks}=normalized,w=analysisWidth,h=Math.max(1,Math.round(w*sheet.heightMm/sheet.widthMm)),n=w*h;
   const fields=Object.fromEntries(keys.map(k=>[k,[new Float64Array(n),new Float64Array(n),new Float64Array(n)]]));
   const records=tape?tapeDeposits(tape):new Map(),byPath=commandDeposits(commands),maskCache=new Map(),passMasks=new Map();
-  const all=new Uint8Array(n).fill(1),remaining=new Map();let observed=0,estimated=0,zeroDeposit=0,matched=0;
+  const strokeRecords=[],all=new Uint8Array(n).fill(1),remaining=new Map();let observed=0,estimated=0,zeroDeposit=0,matched=0;
   const maskFor=c=>{if(!c)return all;if(!maskCache.has(c))maskCache.set(c,sampledMask(c,tape,w,h));return maskCache.get(c);};
   for(const m of marks) {
     const rec=records.get(m.tapeIndex),raw=tape?.marks[m.tapeIndex];
@@ -145,6 +147,8 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
     else continue;
     if(!density.some(v=>v>0)){zeroDeposit++;continue;}
     const f=fields[markClass(m,sheet)];
+    // Wash strokes that may fill a broad area: planned detail, texture and edge marks are exempt.
+    if(!isDetail(m)&&!plan?.passes?.find(p=>p.id===command?.intent)?.texture)strokeRecords.push({mark:m,cells,dir:strokeDirection(m),group:command?.intent??m.group??`frame-${m.time}/clip-${rec?.clipId??0}`});
     for(const i of cells)for(let ch=0;ch<3;ch++)f[ch][i]+=density[ch]/cells.length;
   }
   const explicit=normalized.broadAreas!==undefined?normalized.broadAreas:plan?.broadAreas;
@@ -156,10 +160,11 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
       if(!a||typeof a.id!=='string'||!a.id||ids.has(a.id))throw Error('broad areas need unique nonempty IDs');
       ids.add(a.id);
       if(a.edgeClearanceMm!=null&&(!Number.isFinite(a.edgeClearanceMm)||a.edgeClearanceMm<0))throw Error('edgeClearanceMm must be finite and nonnegative');
+      if(a.widthMm!=null&&(!Number.isFinite(a.widthMm)||a.widthMm<=0))throw Error('broad area widthMm must be positive');
       if(a.detailPolygons!==undefined&&!Array.isArray(a.detailPolygons))throw Error('detailPolygons must be an array');
       let mask=erode(polygonMask(a.polygon,w,h),w,h,(a.edgeClearanceMm??1)*w/sheet.widthMm);
       for(const detail of a.detailPolygons??[]) {const d=polygonMask(detail,w,h);mask=mask.map((v,i)=>v&&!d[i]?1:0);}
-      areas.push({id:a.id,label:a.label??a.id,mask,source:'authored broad low-detail polygon'});
+      areas.push({id:a.id,label:a.label??a.id,widthMm:a.widthMm,mask,source:'authored broad low-detail polygon'});
     }
   }else if(plan?.passes) {
     // Measure each large planned value shape, including later glazes. Overlapping passage reports are not additive.
@@ -184,7 +189,7 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
       if(interior.reduce((s,v)=>s+v,0)<n*.001)continue;
       const key=createHash('sha256').update(interior).digest('hex');
       if(areaMasks.has(key)){areaMasks.get(key).planIds.push(p.id);continue;}
-      const a={id:p.id,planIds:[p.id],label:`${[...new Set((p.regions??[]).map(id=>regionProfiles.find(r=>r.id===id)?.descriptiveFamily??id))].join(', ')} (${p.phase}, band ${p.valueBand}, ${p.id.split('/').at(-1)})`,mask:interior,source:'planned broad value-shape clip, >=1% sheet and >=3 mm support; excludes 1 mm around all planned value/feature boundaries'};
+      const a={id:p.id,planIds:[p.id],widthMm:p.resolution.estimatedSupportWidthCells*mm,label:`${[...new Set((p.regions??[]).map(id=>regionProfiles.find(r=>r.id===id)?.descriptiveFamily??id))].join(', ')} (${p.phase}, band ${p.valueBand}, ${p.id.split('/').at(-1)})`,mask:interior,source:'planned broad value-shape clip, >=1% sheet and >=3 mm support; excludes 1 mm around all planned value/feature boundaries'};
       areas.push(a);areaMasks.set(key,a);
     }
   }
@@ -209,12 +214,13 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
     for(const j of byCell[i]) {const a=regionResults[j];a.cells++;if(total>0)a.covered++;if(sums[2]>0)a.tinyCovered++;if(only)a.tinyOnly++;a.tinyCarried+=tinyFraction;a.visible+=v;a.attributedVisible+=av;a.tinyVisible+=tv;}
   }
   const fraction=(v,t)=>t?v/t:null;
+  const wipers=regionResults.map(a=>detectWipers(a,strokeRecords,{sheet,w,h,footprint}));
   return {method:'clipped CPU contact raster; observed brush pigment loss where matched, finite-load film estimate otherwise; per-channel pigment absorption apportions final optical distance from paper after subtracting ink-first distance; no wet-transport replay',
     finalImageMeasured:!!finalRGB,depositMeasured:attributedVisible>0,grid:{width:w,height:h,cellMm:sheet.widthMm/w},observations:{matchedCommands:matched,observedDepositMarks:observed,estimatedDepositMarks:estimated,zeroDepositMarks:zeroDeposit},
     classes:keys.map(k=>({kind:k,coveredSheetShare:coverage[k]/n,visibleShare:fraction(visible[k],totalVisible)})),
     coveredSheetShare:covered/n,tinyCoveredSheetShare:coverage.tiny/n,tinyOnlySheetShare:tinyOnly/n,tinyVisibleShare:fraction(visible.tiny,totalVisible),tinyFinalPaperDifferenceShare:fraction(visible.tiny,paperDifference),attributedVisibleShare:fraction(attributedVisible,totalVisible),
     broadAreasMeasured:explicit!==undefined||areas.length>0,broadAreaSource:explicit?'authored broadAreas':'saved value-plan broad value shapes and command clips',
-    broadAreas:regionResults.map(a=>({id:a.id,planIds:a.planIds??[a.id],label:a.label,source:a.source,areaMm2:a.cells*(sheet.widthMm/w)**2,coveredShare:fraction(a.covered,a.cells),tinyCoveredShare:fraction(a.tinyCovered,a.cells),tinyOnlyShare:fraction(a.tinyOnly,a.cells),tinyCarriedAreaShare:fraction(a.tinyCarried,a.cells),tinyVisibleShare:fraction(a.tinyVisible,a.visible),attributedVisibleShare:fraction(a.attributedVisible,a.visible)})),
+    broadAreas:regionResults.map((a,j)=>({windshieldWiperShare:wipers[j].share,sweeps:wipers[j].sweeps,id:a.id,planIds:a.planIds??[a.id],label:a.label,source:a.source,areaMm2:a.cells*(sheet.widthMm/w)**2,coveredShare:fraction(a.covered,a.cells),tinyCoveredShare:fraction(a.tinyCovered,a.cells),tinyOnlyShare:fraction(a.tinyOnly,a.cells),tinyCarriedAreaShare:fraction(a.tinyCarried,a.cells),tinyVisibleShare:fraction(a.tinyVisible,a.visible),attributedVisibleShare:fraction(a.attributedVisible,a.visible)})),
     limitations:'Spatial attribution is an estimate: contact discs and uniform per-mark deposits omit bristle gaps, pigment pickup, wet spreading and later lifting. Final image supplies visible weights, not measured pigment ancestry. Overlaps share one cell; repeated coats do not inflate sheet coverage. Edge/feature exclusions come from the plan, never from noisy final pixels.'};
 }
 
