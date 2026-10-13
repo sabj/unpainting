@@ -71,7 +71,9 @@ export function pipelineFlags(plan) {
   if (w.colour === 'layered') add('huechromalab', 1);
   // Layered shadow glazes also keep colour families apart: the grey shadow does not pool its blue across the orange.
   if (w.colour === 'layered') add('shadowfamilies', 1);
-  add('passcap', w.colour === 'family' ? w.charge : 0);
+  // Both modes charge each passage at the washes.charge quantile of its demand and carry the rest into the next
+  // band, so the darkest cells of a shadow get a smaller, darker restatement instead of the shape's flat mean.
+  add('passcap', w.charge);
   add('maskmm', w.colour === 'family' ? w.carryMm : 0);
   add('lightfamilies', 1);
   add('palelights', w.colour === 'family' ? w.paleLimit : 0);
