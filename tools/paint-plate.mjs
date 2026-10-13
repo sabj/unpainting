@@ -887,6 +887,9 @@ const upTo = (mask, F, win = null) => {
 // what each passage asks for, read off the source once: how wet, into wet paper or dry, dragged or laid
 // --wetedge: share of a passage's edge that must fade in the source for it to go in wet on wet. Default 0.5.
 // keyed on the passage, and weakly, so a pass that is finished with can let everything it held go
+// --drypieces: bare-paper pieces per 1000 cells a dragged passage needs. 30, not the library default 9: a pale
+// passage over photographic grain (a flat sky) has many tiny bare specks and was dry-brushed into a speckled field.
+const DRY_PIECES = 30;
 const TECHNIQUE = new WeakMap();
 // Source-inferred techniques before runtime and semantic overrides; execution uses used[T.name] below.
 // Counted per passage and by area, since one big wet-in-wet passage and forty small dry-brush ones differ.
@@ -894,7 +897,7 @@ const TECHNIQUE_USE = new Map();
 const techniqueOf = sh => {
   if (!TECHNIQUE.has(sh)) {
     const win = maskWindow(sh.mask, FINE);
-    const T = chooseTechnique(FINE.D, upTo(sh.mask, FINE, win), FINE.w, FINE.h, { win, peak: peakD, wetEdge: num('wetedge', 0.5), dryTooth: num('drytooth', 0.06), dryPieces: num('drypieces', 9) });
+    const T = chooseTechnique(FINE.D, upTo(sh.mask, FINE, win), FINE.w, FINE.h, { win, peak: peakD, wetEdge: num('wetedge', 0.5), dryTooth: num('drytooth', 0.06), dryPieces: num('drypieces', DRY_PIECES) });
     TECHNIQUE.set(sh, numericalGlazePasses(T, num('glazepasses', 2)));
     const u = TECHNIQUE_USE.get(T.name) ?? { n: 0, area: 0 };
     u.n++; u.area += sh.area ?? 0;
