@@ -54,6 +54,8 @@ test('the value planner makes a few connected washes: sky, local colour, shadow'
   const shadow = plan.passages.find(p => p.id === 'shadow');
   assert.equal(shadow.mask[40 * W + 72], 1); assert.equal(shadow.mask[40 * W + 50], 0);
   for (const p of plan.passages.slice(1)) assert.equal(p.mask[85 * W + 10], 0, `${p.id} leaves the street white`);
+  const deep = planPenWash({ planner: 'values', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, options: { skyStrength: 0.2, skyTo: 0.6 } }).passages[0];
+  assert.equal(deep.strength, 0.2); assert.equal(deep.grade.to, 0.6);
   // a graded sky is darker at the top
   const a = passageAmounts(plan.passages[0], W, H, 3);
   assert.ok(a[(2 * W + 10) * 3] > a[(12 * W + 10) * 3]);

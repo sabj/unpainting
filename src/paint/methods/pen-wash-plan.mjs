@@ -190,7 +190,7 @@ const passage = (id, role, mask, dir, strength, extra = {}) => ({ id, role, mask
  */
 export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
-  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
+  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, skyStrength: 0, skyTo: 0.3, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
   // a photograph's dark border and a painting's bare margin are no part of the subject: found on the barely blurred
   // picture, then read as paper before the planning blur, so the border's dark cannot bleed into the sky
   const P1 = labPlanesOf(px, w, h, 1), frame = frameMask(P1.L, w, h), margin = paperMargin(P1.L, w, h, { frame: frame.mask });
@@ -226,7 +226,9 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
     const sky = erode(sky0, w, h, cells(o.haloMm));
     const f = monochrome ? null : fit(sky), dir = f ? f.dir : roleMix(roles, K, { cool: 0.85, earth: 0.15 });
     // a warm light reached from the top is lit wall, not sky: same pale graded wash, honest name
-    passages.push(passage(f && f.want[2] > 6 ? 'top-light' : 'sky', 'unify', sky, dir, Math.min(0.14, Math.max(0.07, 0.6 * medOD(sky) + 0.06)), { wet: true, grade: { from: 1, to: 0.3 } }));
+    // with skyStrength > 0 a true sky takes that charge, graded down to skyTo: a deeper sky sets a pale lit tower off it
+    const lit = f && f.want[2] > 6;
+    passages.push(passage(lit ? 'top-light' : 'sky', 'unify', sky, dir, o.skyStrength > 0 && !lit ? o.skyStrength : Math.min(0.14, Math.max(0.07, 0.6 * medOD(sky) + 0.06)), { wet: true, grade: { from: 1, to: lit ? 0.3 : o.skyTo } }));
   } else {
     const glow = dilate(masses, w, h, cells(1.5));
     const dir = monochrome ? roleMix(roles, K, { warm: 0.8, earth: 0.2 }) : fit(masses).dir;
