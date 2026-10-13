@@ -18,6 +18,7 @@ import { CpuDemandWindow } from './cpu-demand-window.mjs';
 import { demandPolicy } from './demand-policy.mjs';
 import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
+import { deviceHealth, brokenReason, assertHealthy } from './device-health.mjs';
 
 const PLANES = K => 4 + 3 * K;
 // DOWN_TRACE=1: count rectangle reads by caller, printed at exit
@@ -63,16 +64,18 @@ export class GpuLink {
   }
 
   call(msg, transfer) {
+    assertHealthy(this.health);
     const { ctrl } = this; if (!READ_OPS.has(msg.op)) this.version++;
     Atomics.store(ctrl, 0, 0); this.worker.postMessage(msg, transfer);
     const waitStart = performance.now();
     while (Atomics.wait(ctrl, 0, 0, TIMEOUT_MS) === 'timed-out') throw new Error(`gpu worker did not answer '${msg.op}'`);
     // time this painter thread spent blocked on the GPU thread, by op (gpuStats.waitMs)
     const wm = this.stats.waitMs ??= {}; wm[msg.op] = (wm[msg.op] ?? 0) + performance.now() - waitStart;
+    assertHealthy(this.health);
     if (ctrl[2]) { ctrl[2] = 0; throw new Error(`gpu worker failed: ${this.errText()}`); }
   }
   errText() { let e = 0; while (e < this.err.length && this.err[e]) e++; return new TextDecoder().decode(this.err.slice(0, e)); }
-  post(msg, transfer) { if(msg.op==='framePort')this.frameWorkerActive=true; if (!READ_OPS.has(msg.op)) this.version++; this.worker.postMessage(msg, transfer); }
+  post(msg, transfer) { assertHealthy(this.health); if(msg.op==='framePort')this.frameWorkerActive=true; if (!READ_OPS.has(msg.op)) this.version++; this.worker.postMessage(msg, transfer); }
 
   applyOptions(o) {
     if (o === this.lastO) return;
@@ -714,13 +717,14 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   const rectSab = new SharedArrayBuffer(4 * PLANES(K) * n), layerSab = new SharedArrayBuffer(4 * K * n);
   const ringSab = new SharedArrayBuffer(4 * RING_SLOTS * RING_FLOATS), doneSab = new SharedArrayBuffer(4 * RING_SLOTS), sumSab = new SharedArrayBuffer(4 * K * n);
   const ctrl = new Int32Array(ctrlSab);
-  const gpuData = { ctrl: ctrlSab, err: errSab, adapterMetadata,strokePlanMetadata, rect: rectSab, layer: layerSab, ring: ringSab, done: doneSab, sum: sumSab };
+  const health = deviceHealth(); // a device error in the GPU thread, seen by every later call (device-health.mjs)
+  const gpuData = { ctrl: ctrlSab, health, err: errSab, adapterMetadata,strokePlanMetadata, rect: rectSab, layer: layerSab, ring: ringSab, done: doneSab, sum: sumSab };
   // tools/gpu/paint-batch.mjs: this painter is one sheet of a batch; its GPU thread is shared and reached through a port
   const batchPort = threadData?.gpuBatchPort;
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
   worker.unref();
   let workerDied = null; worker.on('error', e => { workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); });
-  const shared = { ctrl, err: new Uint8Array(errSab), rectData: new Float32Array(rectSab), layerData: new Float32Array(layerSab), ring: new Float32Array(ringSab), done: new Int32Array(doneSab), sumData: new Float32Array(sumSab) };
+  const shared = { ctrl, health, err: new Uint8Array(errSab), rectData: new Float32Array(rectSab), layerData: new Float32Array(layerSab), ring: new Float32Array(ringSab), done: new Int32Array(doneSab), sumData: new Float32Array(sumSab) };
   const link = new GpuLink(worker, shared, sheet);
   const o = { ...O }; sheet._fixedBed = O.fixedBed > 0;
   const paper = sheet.paper, top = sheet.layers.length ? sheet.layers[sheet.layers.length - 1] : null;
@@ -737,8 +741,8 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
     top: top ? top.map(clone) : null,
   });
   while (Atomics.load(ctrl, 3) === 0) Atomics.wait(ctrl, 3, 0, 200); // booting
-  if (Atomics.load(ctrl, 3) !== 1) {
-    const reason = workerDied ? String(workerDied.message ?? workerDied) : link.errText() || 'GPU unavailable';
+  if (Atomics.load(ctrl, 3) !== 1 || brokenReason(health)) {
+    const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || 'GPU unavailable';
     worker.terminate();
     if (mode === 'on') throw new Error(`--gpu on but the GPU sheet is unavailable: ${reason}`);
     log(`[gpu] not used (${reason}); running the CPU sheet`);

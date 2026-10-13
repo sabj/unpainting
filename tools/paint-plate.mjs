@@ -64,6 +64,7 @@ import sharp from 'sharp';
 import { makePaper, coldPressField } from '../src/media/paper.mjs';
 import { createSheet, step, dry as physicalDry, layersOf, thickness, layersChanged, DEFAULTS, tapeSheet, blot, setThreads, threadStats, coherent } from '../src/media/sheet.mjs';
 import { attachGpu, gpuStats } from '../src/media/gpu/link.mjs';
+import { assertDeviceHealthy } from '../src/media/gpu/device-health.mjs';
 import { renderLayers, renderLayersCached, renderCells, microAmps } from '../src/media/km.mjs';
 import { renderSheet } from '../src/media/render-cache.mjs';
 import { createFramer } from '../src/media/gpu/framer.mjs';
@@ -2650,6 +2651,7 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
 // the full painting. The process exit hook still writes the strict guard report.
 if (num('drawingonly', 0) > 0) {
   if (RESUMING || !PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none') throw new Error('--drawingonly requires an opening drawing');
+  assertDeviceHealthy(sheet);
   fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
   fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
   fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: drawnCount, backend: GPU_INFO }));
@@ -3763,6 +3765,7 @@ const FINAL = renderSub();
 if (FINAL.fine) await sharp(FINAL.fine, { raw: { width: W2 * SUBGRID, height: H2 * SUBGRID, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg'));
 if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); await sharp(F.buf, { raw: { width: F.FW, height: F.FH, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg')); }
 const FINAL_PIXELS=INKRES ? INKRES.compose(view()) : FINAL.coarse;
+assertDeviceHealthy(sheet); // a broken GPU device never writes a painting (src/media/gpu/device-health.mjs)
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png'));
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
 if (STROKE_BUDGET) {

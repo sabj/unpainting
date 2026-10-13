@@ -74,9 +74,10 @@ export function sheetBufferFit(n, K, fixedBed, limits) {
 export class GpuSheet {
   static async create(device, sheet, o) {
     const g = new GpuSheet(); let failure = null;
-    device.pushErrorScope('validation');
+    // out of memory while the sheet starts is a failed start (the CPU sheet takes over), not an uncaptured device error
+    device.pushErrorScope('out-of-memory'); device.pushErrorScope('validation');
     try { await g.init(device, sheet, o); } catch (error) { failure = error; }
-    const validation = await device.popErrorScope();
+    const scoped = await device.popErrorScope(), oom = await device.popErrorScope(), validation = scoped ?? oom;
     if (failure || validation) {
       for (const buffer of Object.values(g.b ?? {})) buffer.destroy();
       throw failure ?? new Error(`GpuSheet initialization failed: ${validation.message}`);
