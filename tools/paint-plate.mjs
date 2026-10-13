@@ -126,6 +126,7 @@ import { mlLines } from '../src/paint/methods/ml-lines.mjs';
 import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/methods/drawing-logic.mjs';
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
+import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
 import { scaleLines } from '../src/crop/lines.mjs';
 import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
 import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
@@ -252,6 +253,22 @@ if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
   else if (num('sketchlines',0)>0) argv.push('--linesource','photo-sketch');
   else if (num('sourcelines',0)>0) argv.push('--linesource','source-ink');
+}
+// --linework auto (plan drawing.linework "auto"): the universal linework stage (src/paint/methods/linework-stage.mjs)
+// picks the line source, cleans the lines and gates whether to draw, the medium and how much, before every other line
+// route, and writes an ordinary drawing file that replaces --linesource and any --drawingfile. --linemedium
+// ink|graphite|none, a plan's drawing.medium or --outlinemedium fixes the medium; --sketchcache <dir> holds image-model
+// sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. Off by default.
+let LINEWORK_STAGE = null;
+if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
+  if (opt('linework') !== 'auto') throw Error(`--linework: auto or off, not ${opt('linework')}`);
+  const om = argv.includes('--outlinemedium') ? opt('outlinemedium','auto') : 'auto';
+  const requested = opt('linemedium','') || (om === 'auto' ? null : /graphite/.test(om) ? 'graphite' : 'ink');
+  const r = await planUniversalLinework({ image: path.resolve(root, opt('image','')), out, root, width: num('width', 700), sheetMm: num('sheetmm', DEFAULT_SHEET_MM),
+    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', python: opt('sketchpython','python3'), sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null,
+    seed: num('seed', 0), log: console.log });
+  argv.push(...r.flags);
+  LINEWORK_STAGE = r.record;
 }
 const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
   ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
@@ -1075,6 +1092,7 @@ const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor});
+if (LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${LINEWORK_STAGE.source}`, universal:{gate:LINEWORK_STAGE.gate, features:LINEWORK_STAGE.features, lines:LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. auto (default) is ink when the source shows
