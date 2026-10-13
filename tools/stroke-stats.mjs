@@ -127,6 +127,16 @@ export async function loadStats(inputPath, { sheetmm, log, ...options } = {}) {
   return { ...summarize(normalize(input, { sheetmm }),context), source: f, sizeSource };
 }
 
+/**
+ * Stats from a tape the painter already holds (src/paint/stroke-ledger.mjs), with the value plan, command log and
+ * images found in `dir`. Nothing is read back from marks.json, which a native run may not write or may write larger
+ * than one string can hold.
+ */
+export async function tapeStats(tape, dir, options = {}) {
+  const context = await compositionContext(path.join(dir, 'marks.json'), tape, options);
+  return { ...summarize(normalize(tape), context), source: 'painter tape', sizeSource: 'input metadata' };
+}
+
 export function panelSVG(stats, { title = 'Stroke sizes' } = {}) {
   const colors = { paint: '#246eaa', pen: '#444', water: '#59a5a0' };
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 650" role="img"><title>${esc(title)}</title><rect width="760" height="650" fill="#faf8f1"/><g font-family="system-ui,sans-serif" fill="#292929"><text x="20" y="26" font-size="18">${esc(title)}</text><text x="20" y="46" font-size="11">${esc(stats.basis)}; sheet ${stats.sheet.widthMm.toFixed(1)} mm; composition uses clipped deposits and the final image</text>`;

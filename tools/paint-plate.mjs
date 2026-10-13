@@ -51,7 +51,8 @@ if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CON
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
-import { loadStats, panelSVG } from './stroke-stats.mjs';
+import { tapeStats, panelSVG } from './stroke-stats.mjs';
+import { startStrokeLedger } from '../src/paint/stroke-ledger.mjs';
 import { evaluateGate, printGate } from './stroke-gate.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -1773,11 +1774,10 @@ const SNAPS = [];
 const snap = extra => { if(!FRAME_POLICY.all || NATIVE_PAINT_MODE.mode==='fast')return; const F = framer(); SNAPS.push(F ? { id: F.capture(), stage: { ...STAGE, ...extra } } : { buf: INKRES ? INKRES.compose(view()) : view(), stage: { ...STAGE, ...extra } }); };
 
 // --marks 1: record the mark tape: every stroke as a brush index and a path, with the water schedule between them.
+// Without it the stroke ledger still records what the stroke gate measures (src/paint/stroke-ledger.mjs).
 if (!['warn', 'reject', 'off'].includes(opt('strokegate', 'warn'))) throw new Error('strokegate must be warn, reject or off');
-if (opt('strokegate', 'warn') === 'reject' && opt('marks', '0') === '0') throw new Error('--strokegate reject requires --marks 1');
-const MARKTAPE = opt('marks', '0') !== '0' || STROKE_BUDGET ? recordMarks(true) : null;
+const FULL_TAPE = opt('marks', '0') !== '0' || Boolean(STROKE_BUDGET), MARKTAPE = startStrokeLedger({ full: FULL_TAPE });
 if (MARKTAPE) tapeSheet(MARKTAPE);
-else if (opt('strokegate', 'warn') === 'warn') console.warn('stroke gate warning: stroke sizes unverified; use --marks 1 to measure this run');
 // --pausedir DIR: the painter offers a stop at every passage boundary and a harness decides where it stops
 // (tools/aware/pause.mjs). --resumestate DIR: a fresh process takes over a painting saved at a boundary (state.json
 // there), with the plan files as they now stand: the planning runs again, nothing before the boundary is painted
@@ -3785,11 +3785,11 @@ if (MARKTAPE) {
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
   };
-  const fd = fs.openSync(file, 'w');
+  if (FULL_TAPE) { const fd = fs.openSync(file, 'w');
   try { for (const chunk of markTapeJSON(exportedMarkTape)) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
   const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
   const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
-  console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`);
+  console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`); }
 }
 {
   // Pen last: the ink is what the sheet gained while drawing. Pen first: the ink is what the drawing laid, and the washes
@@ -3806,7 +3806,7 @@ if (MARKTAPE) {
 }
 // Final contribution stats need both the finished painting and the exported ink layer.
 if (MARKTAPE) {
-  const strokeStats = await loadStats(path.join(out, 'marks.json'));
+  const strokeStats = await tapeStats(exportedMarkTape, out);
   const strokeGate = evaluateGate(strokeStats, { mode: opt('strokegate', 'warn'),
     config: opt('strokegateconfig', '') ? JSON.parse(fs.readFileSync(opt('strokegateconfig'), 'utf8')) : {} });
   fs.writeFileSync(path.join(out, 'stroke-stats.json'), JSON.stringify(strokeStats, null, 2));
