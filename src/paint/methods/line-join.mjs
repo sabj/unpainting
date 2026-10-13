@@ -9,7 +9,9 @@
 //      strongest 30%) runs the same way, with its light side on the same side as at both ends (a contour passing into
 //      light has no edge there, so its deliberate break stays). A gap under `skipMm` is a skip of the nib or the tracer
 //      and needs no evidence;
-//   4. the gap crosses no other line (never through a crossing).
+//   4. the gap crosses no other line (never through a crossing);
+//   5. both pieces belong to the same part of the drawing: a file's role, kind, object and region, where it names them,
+//      agree (from the ink-track hand route, drawing-hand.mjs handDrawing), so a window is never stitched to its wall.
 // Pieces are joined shortest gap first, each end once per pass, for a few passes. Then a mark is deleted only when it
 // is isolated: shorter than `isolatedMm`, mostly off every target edge, and with no other line within `aloneMm`. Widths, weights and wobble of the pieces are kept; the gap is drawn at the
 // mean of the two ends. Pure, planning only. Lines are plan-grid polylines [{ points: [{x, y, width?, weight?}] }].
@@ -26,6 +28,10 @@ function weakEdges(ev, q) {
   const mask = Uint8Array.from(ev.mag, v => (v >= cut ? 1 : 0));
   return { ...ev, ...nearestEdge(mask, ev.w, ev.h) };
 }
+
+// Two lines are parts of one drawing element when every label both carry agrees.
+const PART_KEYS = Object.freeze(['role', 'kind', 'object', 'region']);
+export const samePart = (g, h) => PART_KEYS.every(k => g[k] == null || h[k] == null || g[k] === h[k]);
 
 const len = pts => { let d = 0; for (let k = 1; k < pts.length; k++) d += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return d; };
 
@@ -137,6 +143,7 @@ export function joinThenPrune(lines, ev0, L, { mmPerCell, options = {} } = {}) {
           if (a.x * ux + a.y * uy < cosTurn || -(b.x * ux + b.y * uy) < cosTurn) continue;
         }
         if (-(a.x * b.x + a.y * b.y) < o.agree) continue;
+        if (!samePart(cur[a.i], cur[b.i])) continue;
         pairs.push({ ka, kb, gap });
       }
     });

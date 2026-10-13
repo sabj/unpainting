@@ -43,3 +43,11 @@ test('only isolated marks off every edge are deleted', () => {
   assert.equal(r.stats.deleted, 1);
   assert.equal(r.lines.length, 2);
 });
+
+test('pieces labelled as different parts of the drawing are never joined', async () => {
+  const { samePart } = await import('./line-join.mjs');
+  assert.equal(samePart({ role: 'opening' }, { role: 'opening', region: 'tower' }), true);
+  assert.equal(samePart({ role: 'opening' }, { role: 'structure' }), false);
+  assert.equal(samePart({}, { object: 'window' }), true);
+  assert.equal(samePart({ object: 'door' }, { object: 'window' }), false);
+});
