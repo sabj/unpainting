@@ -138,10 +138,17 @@ test('a box limits the look to the shape\'s rows and columns', () => {
 });
 
 
-test('strict is an older name for gentle; unknown names are refused', () => {
-  assert.equal(normalizeMode('strict'), 'gentle');
-  assert.equal(createTargetGuard({ mode: 'strict' }).mode, 'gentle');
-  assert.equal(createTargetGuard({ mode: 'strict' }).summary().requestedMode, 'strict');
+test('strict means hard, with its look budget; unknown names are refused', () => {
+  assert.equal(normalizeMode('strict'), 'hard');
+  const g = createTargetGuard({ mode: 'strict', lookBudget: 1 });
+  assert.equal(g.mode, 'hard');
+  assert.equal(g.summary().requestedMode, 'strict');
+  assert.equal(createTargetGuard({ mode: 'strict' }).lookBudget, HARD_LOOK_BUDGET);
+  g.provide('A', new Float32Array(100)); g.beginPaint();
+  const all = new Uint8Array(100).fill(1);
+  assert.ok(g.look('review', 'first', all, { ref: ['A'] }));
+  assert.equal(g.look('review', 'second', all, { ref: ['A'] }), null, 'a strict run gets no look past its budget');
+  assert.equal(g.summary().looks.overBudget, 1);
   assert.throws(() => normalizeMode('loose'), /gentle/);
 });
 
