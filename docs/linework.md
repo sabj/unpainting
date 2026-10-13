@@ -132,11 +132,29 @@ whole drawing and native crops beside real references, then check landmarks
 against the target. Fewer fragments or closer median statistics do not justify
 invented windows, rigging or lost anatomy.
 
-Graphite is a dry material. The HB and 2B profiles vary pressure, tone and tooth;
-the optional `graphite-2B-side` profile also allows broad contact up to 2 mm.
-Freeze contours and coarse shadow gestures before painting with
-`graphite-plan.py`. Keep grain out of the path extraction. Its dry smudge is a
-small neighboring-cell deposit, and its sheen is a bounded flat-view cue rather
-than directional reflection. The side profile is experimental: inspect broad
-tone coverage and the cat or face landmarks before adding washes. An unlimited
-line budget alone cannot make a poor contour plan into a good drawing.
+Graphite is a dry material: the HB and 2B profiles vary pressure, tone and width on the paper's tooth.
+
+## Hand handling and pen dynamics
+
+These came from the ink-track study (October 11, 1080 cells on a 152.4 mm sheet). Gaps, tapers and width offsets are
+nominal at that scale and keep their physical size at other densities.
+
+- `--drawinghand 1` draws a prepared file as a hand would without changing its selection: facing continuations are
+  joined within one role, kind, object and region (`--drawjoingap 4`, `--drawjoincos .8`, `--drawjoinaim .7`), the
+  strokes are ordered from the last pen lift, and each presses in and lifts off (`--drawtaperin 3`, `--drawtaperout 5`,
+  `--drawtaperstart .45`, `--drawtaperend .3`). `--drawlit .04` to `.10` also breaks a contour where both its sides
+  are light (`--drawlitreach 2`). Off by default. On h36-a the opening drawing alone rated higher with
+  `--drawinghand 1 --inkconc 6 --drawjoingap 1 --drawlit .04 --drawstroke .5` (economy 1.44 to 3.61, fidelity 2.87 to
+  3.25 of 5), but the whole painting judged lower (6.61 to 5.63), so it stays a drawing option.
+- `--penstarve 1` lets a gesture run down to its own refill threshold, for an intended dry tail. `--finishinkdamp 1`
+  lets the closing pen draw on the paper's existing moisture (it adds no water), so a finish line placed before the
+  sheet dries can feather. `--penreservoir` sets the nib's capacity (250 in model units before cell scaling).
+- A pen with no ink always dips first. Speed, pause, dip and refill controls on a gesture survive the conversion to the
+  sheet, and a finer ink sheet (`--inkres`) scales speed as it scales width, so a pause lasts as long.
+- `--drawinglogic 2` keeps the walker's longest monotone visit to each contour instead of out-and-back knots, and its
+  width-to-pressure inversion uses the declared nib's width range and pressure exponent. `--hybridland 1.2`,
+  `--hybridlift .6` and `--hybriddwell .5` set its pauses.
+- `tools/judge/drawing-audit.mjs RUN ... --out audit.jsonl` summarizes the executed contact widths, pressure, speed,
+  pauses, reservoir and paper state from a run's pen audit. `--materialstudy 1 --width 1080 --out DIR` renders dry and
+  damp, speed, pressure, starvation, graphite and brush swatches on a fixed 152.4 mm sheet. They are diagnostics, not a
+  quality gate.
