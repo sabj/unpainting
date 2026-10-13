@@ -5,10 +5,16 @@ import path from 'node:path';
 import sharp from 'sharp';
 
 const DEFAULT_DIR = 'work/segments';
+// The maps segment-prep.mjs made for this run, by the target's name: one painting, one target, one map.
+const PREPARED = new Map();
 
-// A bare name is looked up in the segment directory; anything with a slash is taken as the path prefix itself.
+/** The map at `stem` (a path prefix) answers for the target named `base` from here on. */
+export function registerSegments(base, stem) { PREPARED.set(base, stem); }
+
+// A name segment-prep.mjs registered goes to its map. Otherwise a bare name is looked up in the segment directory;
+// anything with a slash is taken as the path prefix itself.
 export function segmentPaths(base, dir = DEFAULT_DIR) {
-  const stem = base.includes('/') ? base : path.join(dir, base);
+  const stem = PREPARED.get(base) ?? (base.includes('/') ? base : path.join(dir, base));
   return { labels: `${stem}.png`, legend: `${stem}.json`, contours: `${stem}-contours.json` };
 }
 

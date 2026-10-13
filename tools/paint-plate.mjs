@@ -137,6 +137,7 @@ import { prunePenLines } from '../src/paint/methods/pen-wash-lines.mjs';
 import { paintPenWash } from '../src/paint/methods/pen-wash.mjs';
 import { paintShapes } from '../src/paint/methods/shapes.mjs';
 import { passageHook } from '../src/paint/methods/passages.mjs';
+import { prepareSegments } from '../src/crop/segment-prep.mjs';
 import { leftToTheWashes } from '../src/paint/methods/ladder-seg.mjs';
 import { massBudget } from '../src/paint/methods/mass-budget.mjs';
 import { darkMass } from '../src/paint/techniques/dark-mass.mjs';
@@ -320,6 +321,8 @@ const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE),
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });
 let px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
+// Segments before every painting: SAM's regions of the target, cached by its hash; without SAM the run fails (src/crop/segment-prep.mjs)
+prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
 const createBrush = o => createBrushRaw(gpuHairCap(o));
@@ -2431,7 +2434,8 @@ let { R: RESIST, S: RESIST_SOFT } = MOD&&!AREA_PLAN ? joinResist(RESIST_BASE, RE
 if(AREA_PLAN){RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(let i=0;i<n;i++)if(AREA_PLAN.film[i]){RESIST[i]=1;RESIST_SOFT[i]=1;}}
 if(VALUE_PLAN){
  // The same target-white mask owns planning and physical film; inferred highlights include pale painted planes.
- RESIST=VALUE_PLAN.protectedCells.slice();RESIST_SOFT=Float32Array.from(RESIST);
+ // --locallights cells join it: they were laid in RESIST_BASE above and would otherwise be dropped here.
+ RESIST=Uint8Array.from(VALUE_PLAN.protectedCells,(v,i)=>v||LOCAL_LIGHTS?.[i]?1:0);RESIST_SOFT=Float32Array.from(RESIST);
 }
 if(VALUE_PLAN&&VALUE_CONFIG?.reserves?.length){RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(const r of VALUE_CONFIG.reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h){RESIST[y*w+x]=1;RESIST_SOFT[y*w+x]=1;}}const cells=Array.from({length:N2},(_,i)=>i),paper=measurePaper(sheet,cells);if(!paper.dry)throw Error('essential light film requires dry paper');fs.appendFileSync(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'essential-light-film-plan',paper,operation:'real applyResist through existing union lifecycle; full strength; remove after last dry shadow',reserves:VALUE_CONFIG.reserves})+'\n');}
 const upF = f => { if (SC === 1) return f; const m = new Float32Array(N2); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) m[y * W2 + x] = f[((y / SC) | 0) * w + ((x / SC) | 0)]; return m; };
