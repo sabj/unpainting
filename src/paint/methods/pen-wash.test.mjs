@@ -153,6 +153,19 @@ test('with vary, pen weight follows structure and the shadow side', () => {
   assert.ok(a.points[0].width > 2 && c.points[0].width < 2, 'width follows the same score');
 });
 
+test('the one shadow wash can keep the lights inside it', () => {
+  // a shaded wall with a sunlit patch in its middle
+  const px = warmScene(), at = (x, y) => y * W + x;
+  for (let y = 20; y < 58; y++) for (let x = 62; x < 118; x++) px.set([110, 100, 90], at(x, y) * 3);
+  for (let y = 32; y < 44; y++) for (let x = 80; x < 96; x++) px.set([235, 215, 160], at(x, y) * 3);
+  const opts = { minLight: 0.6, hueGap: 18, shadowBlurMm: 0.6, shadowOneMm: 3 };
+  const shadowOf = o => planPenWash({ planner: 'values', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, options: o }).passages.find(p => p.id === 'shadow');
+  assert.equal(shadowOf(opts).mask[at(88, 38)], 1, 'closed over by default');
+  const kept = shadowOf({ ...opts, keepLights: 10, keepLightsMm2: 4 });
+  assert.equal(kept.mask[at(88, 38)], 0, 'the sunlit patch stays out of the glaze');
+  assert.equal(kept.mask[at(70, 50)], 1, 'the shade around it is still glazed');
+});
+
 test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
   const m = new Uint8Array(N); for (let y = 20; y < 60; y++) for (let x = 30; x < 90; x++) m[y * W + x] = 1;
   const f = washFootprint(m, W, H, { slip: 4, angle: 0, edgeSigma: 1, edgeAmp: 0 });

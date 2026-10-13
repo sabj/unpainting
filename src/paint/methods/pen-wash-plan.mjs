@@ -190,7 +190,7 @@ const passage = (id, role, mask, dir, strength, extra = {}) => ({ id, role, mask
  */
 export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
-  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, skyStrength: 0, skyTo: 0.3, deepContrast: 0, deepShare: 0.06, deepRingMm: 2, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
+  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, skyStrength: 0, skyTo: 0.3, deepContrast: 0, deepShare: 0.06, deepRingMm: 2, keepLights: 0, keepLightsMm2: 4, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
   // a photograph's dark border and a painting's bare margin are no part of the subject: found on the barely blurred
   // picture, then read as paper before the planning blur, so the border's dark cannot bleed into the sky
   const P1 = labPlanesOf(px, w, h, 1), frame = frameMask(P1.L, w, h), margin = paperMargin(P1.L, w, h, { frame: frame.mask });
@@ -268,10 +268,22 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
     // with `shadowOneMm` > 0: the shadow pattern as one connected cool wash, its gaps narrower than shadowOneMm closed,
     // instead of hue-split pieces; the deep glaze below still states the darkest darks
     const m0 = foliage ? Uint8Array.from(darks, (v, i) => (v && !foliage[i] ? 1 : 0)) : darks;
-    const m = consolidate(m0, w, h, cells(o.shadowOneMm), o.minPiece * n), localOD = passages.at(-1).strength;
+    let m = consolidate(m0, w, h, cells(o.shadowOneMm), o.minPiece * n); const localOD = passages.at(-1).strength;
+    // with `keepLights` > 0 (L*): the one wash leaves its lights. Inside it, connected patches at least keepLights
+    // brighter than the wash's median (on the finer read) and of at least keepLightsMm2 stay out of the glaze, so
+    // dappled sun on a shaded wall or path keeps the local colour under it instead of being filled in
+    let kept = 0;
+    if (o.keepLights > 0) {
+      const Lf = gaussian(Float32Array.from(P1.L, (v, i) => (frame.mask[i] ? 100 : v)), w, h, cells(o.shadowBlurMm || 0.8) / 2);
+      const inside = []; for (let i = 0; i < n; i++) if (m[i]) inside.push(Lf[i]);
+      const cut = quantile(inside, 0.5) + o.keepLights, lit = Uint8Array.from(Lf, (v, i) => (m[i] && v >= cut ? 1 : 0));
+      const { labels, areas } = components(lit, w, h), minCells = o.keepLightsMm2 / (mmPerCell * mmPerCell);
+      m = Uint8Array.from(m, (v, i) => { const hole = labels[i] && areas[labels[i]] >= minCells; if (v && hole) kept++; return v && !hole ? 1 : 0; });
+      notes.push(`lights kept inside the shadow wash: ${(100 * kept / n).toFixed(1)}% of the sheet`);
+    }
     const f = monochrome ? null : fit(m, false), base = f ? f.dir : roleMix(roles, K, { cool: 0.6, earth: 0.4 });
     const dir = base.map((v, j) => 0.5 * v + (j === roles.cool ? 0.5 : 0));
-    passages.push(passage('shadow', 'shadow', m, dir, Math.min(Math.max(0.32, o.shadowMin), Math.max(o.shadowMin, o.lightness * medOD(m) - 0.5 * localOD)), { wet: false, fit: f, joinMm: o.shadowOneMm }));
+    passages.push(passage('shadow', 'shadow', m, dir, Math.min(Math.max(0.32, o.shadowMin), Math.max(o.shadowMin, o.lightness * medOD(m) - 0.5 * localOD)), { wet: false, fit: f, joinMm: o.keepLights > 0 ? 0 : o.shadowOneMm }));
     notes.push(`one connected shadow wash (gaps under ${o.shadowOneMm} mm closed): ${(100 * share(m, n)).toFixed(0)}% of the sheet`);
   }
   if (share(darks, n) > 0.01) {
