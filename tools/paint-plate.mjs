@@ -149,6 +149,8 @@ import { paintPenWash } from '../src/paint/methods/pen-wash.mjs';
 import { paintShapes } from '../src/paint/methods/shapes.mjs';
 import { passageHook } from '../src/paint/methods/passages.mjs';
 import { prepareSegments } from '../src/crop/segment-prep.mjs';
+import { subjectWashField, subjectBlockOptions } from '../src/paint/methods/subject-washes.mjs';
+import { writeWashPlan } from '../src/paint/methods/wash-plan-image.mjs';
 import { leftToTheWashes } from '../src/paint/methods/ladder-seg.mjs';
 import { massBudget } from '../src/paint/methods/mass-budget.mjs';
 import { darkMass } from '../src/paint/techniques/dark-mass.mjs';
@@ -371,6 +373,8 @@ let px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
 // Segments before every painting: SAM's regions of the target, cached by its hash; without SAM the run fails (src/crop/segment-prep.mjs)
 prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
+// --subjectwash 1: the washes cut by subject as well as by colour and value (src/paint/methods/subject-washes.mjs)
+const SUBJECTS = await subjectWashField({ image: opt('image', ''), px, w, h, families: VALUE_CONFIG?.families ?? [], shaped: num('shapedmarks', 0) > 0, opt, num, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
 const createBrush = o => createBrushRaw(gpuHairCap(o));
@@ -748,7 +752,7 @@ const PLANFOLLOW = num('planfollow', 0);
 const BLOCK_OPTIONS = { glaze: num('glaze', 0.12), maxValues: num('maxvalues', 24), deepQ: num('deepq', 0.55), headroom: num('headroom', 0.5), follow: PLANFOLLOW || (FIG_MASK ? num('figurefollow', 0) : 0), followCap: num('followcap', PLANFOLLOW > 0 ? 3 : FIG_MASK ? num('figurecap', 6) : 3), followFloor: num('followfloor', PLANFOLLOW > 0 ? 0.5 : FIG_MASK ? num('figurefloor', 0.25) : 0.5), followMask: PLANFOLLOW > 0 ? null : FIG_MASK, followMaskShare: num('figureshare', 0.25), quantileIn: num('quantilein', 0.12), maskBlur: num('maskblur', 1), minShape: num('minshape', 0) || null, finest: num('finest', 0.08), floorShape: num('floorshape', 8), washFloor: num('washfloor', 0.6), sampleSupport: MIXES && opt('mixsupport', '1') !== '0', preMix: MIXES ? false : PUDDLES ? true : opt('premix', '0') !== '0', puddles: PUDDLES?.labels ?? null, puddleFloor: PUDDLES ? num('puddlefloor', 0) : 0, reserve: opt('lightplan', '1') !== '0' ? SMALL : null, hold: HOLD,
   // --firstfloor f: open the ladder with one broad light wash of local colour over cells planned at f or more (src/crop/blockin.mjs).
   // --firstwhite w (default f/2): stays-white threshold; --firstcolours K (default 4): local colours; --firstmax m (default --glaze): deepest.
-  ...(FIRST_FLOOR > 0 ? { firstFloor: FIRST_FLOOR, firstMax: opt('firstmax', '') !== '' ? num('firstmax', 0.12) : null, firstWhite: opt('firstwhite', '') !== '' ? num('firstwhite', 0) : null, firstLabels: num('firstcolours', 4) > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: Math.round(num('firstcolours', 4)), floor: FIRST_FLOOR }).labels : null, firstOnly: FIRST_ONLY } : {}) };
+  ...(FIRST_FLOOR > 0 ? { firstFloor: FIRST_FLOOR, firstMax: opt('firstmax', '') !== '' ? num('firstmax', 0.12) : null, firstWhite: opt('firstwhite', '') !== '' ? num('firstwhite', 0) : null, firstLabels: num('firstcolours', 4) > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: Math.round(num('firstcolours', 4)), floor: FIRST_FLOOR }).labels : null, firstOnly: FIRST_ONLY } : {}), ...subjectBlockOptions(VALUE_ENABLED ? null : SUBJECTS) };
 const AUTHORED_INPUT=opt('areaplan','')&&JSON.parse(fs.readFileSync(path.resolve(root,opt('areaplan','')))).areas.some(a=>a.passes.some(p=>p.source==='authored'));
 const blockPlanStarted = performance.now();
 // The target value planner replaces this ladder before execution. Optional
@@ -1328,7 +1332,7 @@ if(VALUE_ENABLED){
   HOLD=Uint8Array.from(reserves,(v,i)=>v||(HOLD?.[i]??0)?1:0);
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
- const valueOptions={bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
+ const valueOptions={bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
@@ -1363,7 +1367,7 @@ if(VALUE_ENABLED){
    console.log(`subject order ${so}: ${layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
  HOLD=VALUE_PLAN.protectedCells;
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:VALUE_PLAN.value.peak,geometry:VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:VALUE_PLAN.omittedDemand,lights:VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
- console.log(`target values: ${layers.length} pigment/region passes, ${VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
+ console.log(`target values: ${layers.length} pigment/region passes, ${VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; ${SUBJECTS ? 'washes kept to their wash groups, shadows to their shadow groups' : 'shadows never split by region'}`);
  if(num('valuepreviewonly',0)){
   const preview=await writeValuePreview({plan:VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});
   fs.writeFileSync(path.join(out,'compile-result.json'),JSON.stringify(preview,null,2));console.log('CPU preview',preview.board,preview.seconds);process.exit(0);
@@ -2393,6 +2397,8 @@ let laid = 0, dropped = 0, droppedMass = 0, plannedMass = 0;
 // and goes over the masking fluid on them rather than round them
 const brushMask = sh => (SMALL && opt('lightfill', '1') !== '0' ? (sh._brushMask ??= fillReserved(sh.mask, SMALL, w, h, { reach: LIGHT_CELLS })) : sh.mask);
 for (const L2 of layers) for (const sh of L2.shapes) plannedMass += sh.amount * sh.area;
+// --washplanpng 1: the wash plan drawn before any paint, with the segment boundaries (src/paint/methods/wash-plan-image.mjs)
+if (num('washplanpng', 0) > 0) await writeWashPlan({ layers, steps, w, h, out, image: opt('image', ''), subjects: SUBJECTS, log: console.log });
 // each passage's booking as planned, before the finish field clips it, so the film's shares add up to the plan's mass
 const FILM_MASS = new WeakMap(); for (const L2 of layers) for (const sh of L2.shapes) FILM_MASS.set(sh, sh.amount * sh.area);
 // --firstwash: the opening wash paler, off the subject, held to its passage and softened (src/paint/methods/first-wash.mjs)
@@ -2783,7 +2789,7 @@ if (PENWASH_PLAN) {
 }
 if (MASSES > 0) {
   const massLaid = await paintMasses({
-    sheet, w, h, n, SC, W2, H2, PIGS, A, expected, used, O, SEED, UPRIGHT, BRUSH, CAL, WET, subject: TIER_MASK,
+    sheet, w, h, n, SC, W2, H2, PIGS, A, expected, used, O, SEED, UPRIGHT, BRUSH, CAL, WET, subject: TIER_MASK, subjects: SUBJECTS,
     masses: MASSES, mopLanes, handAngle, flowEvery, dip, up, clock, shoot, setStage, opt, num, log: console.log,
   });
   laid += massLaid;
@@ -2804,7 +2810,7 @@ const passageBrush = opts => {
 };
 const PASSAGE_HOOK = await passageHook({
   share: {
-    outDir: out, root, sheet, w, h, n, SC, W2, H2, N2, PIGS, K: PIGS.length, SHEET_PIGS, A, expected, used, O, SEED, UPRIGHT, subject: TIER_MASK, fwSubject: FW_SUBJ, paperRGB,
+    outDir: out, root, sheet, w, h, n, SC, W2, H2, N2, PIGS, K: PIGS.length, SHEET_PIGS, A, expected, used, O, SEED, UPRIGHT, subject: TIER_MASK, fwSubject: FW_SUBJ, paperRGB, subjects: SUBJECTS,
     thickness, gaussian, components, dilate, erode, removeSmall, distanceToZero, createBrush: passageBrush, dip, stroke, thirsty, step, dry, blot, applyResist, liftResist, setClip, render,
     mopLanes, washPaths, brushedWashPaths, containPaths, sweepCover, handAngle, clock, snap, opt, num, log: console.log, furMarks, orientationField, detailMarks,
   },

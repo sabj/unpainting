@@ -105,7 +105,10 @@ Modules, with their flags:
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
 - `methods/stroke-plan.mjs` (`--strokeplan 1`): a passage as overlapping parallel sweeps.
 - `methods/subject.mjs` (not reached): the subject's big shapes in wash order.
+- `methods/subject-clusters.mjs` (`--subjectwash 1`): SAM regions cut into colour and value clusters, with wash and shadow groups and each subject's own lights.
+- `methods/subject-washes.mjs` (`--subjectwash 1`): cuts the value plan's and the ladder's passes at the wash groups and lays subject lights early.
 - `methods/target-regions.mjs` (always on): colour and value regions for the value planner.
+- `methods/wash-plan-image.mjs` (`--washplanpng 1`): the wash plan as pictures, with the segment boundaries.
 - `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.
 - `methods/wetdry.mjs` (always on): paper wetness, brush load and waiting for the paper to dry.
 
