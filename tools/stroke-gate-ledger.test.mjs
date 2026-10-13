@@ -24,6 +24,23 @@ test('an unverified painting is never ok, in any gate mode', () => {
   }
 });
 
+const plannedWash = () => ({
+  tape: { w: 100, h: 60, scale: 10, sheetWidthMm: 100, base: [255, 255, 255], pigments: [{ K: [1, .5, .2] }], brushes: [0], brushOpts: [{ radius: 15, film: .25, capacity: 100 }],
+    marks: [{ k: 'd', b: 0, w: 1, c: [.5] }, { k: 's', b: 0, d: [[100, 300, 100], [900, 300, 100]] }] },
+  plan: { passes: [{ id: 'wall', phase: 'light', valueBand: 1, area: 4000, regions: [], resolution: { mmPerCell: 1, estimatedSupportWidthCells: 40 },
+    edges: { hardCells: [], softCells: Array.from({ length: 6000 }, (_, i) => i) } }] },
+  commands: [{ status: 'EXECUTED', intent: 'wall', geometry: [{ x: 10, y: 30 }, { x: 90, y: 30 }] }],
+});
+
+test('soft planned edges no longer hide every broad wash from the gate; hard edges still exempt accents', () => {
+  const { tape, plan, commands } = plannedWash();
+  const s = summarize(normalize(tape), { plan, commands });
+  assert.equal(s.composition.broadAreasMeasured, true, 'a wash whose plan marks every cell as a soft edge is still measured');
+  assert.equal(evaluateGate(s).status, 'passed');
+  plan.passes[0].edges = { hardCells: plan.passes[0].edges.softCells, softCells: [] };
+  assert.equal(summarize(normalize(tape), { plan, commands }).composition.broadAreasMeasured, false);
+});
+
 const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
   '--physical', '1', '--order', 'painter', '--midlayers', '2', '--drawing', 'both', '--outlinemedium', 'ink', '--texture', '0',
   '--mode', 'fast', '--video', '0', '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off'];

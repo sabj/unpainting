@@ -169,7 +169,9 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
       if(detailMask)for(let i=0;i<n;i++)if(detailMask[i])exclude[i]=1;
       const qm=q.resolution?.mmPerCell;if(!(qm>0))continue;
       const qw=Math.round(sheet.widthMm/qm);
-      for(const i of [...(q.edges?.hardCells??[]),...(q.edges?.softCells??[])]) {
+      // Hard edges hold features and accents. Soft edges are where washes melt into each other: excluding them too left
+      // detailed plans (hundreds of shapes) with no measurable interior, so the gate could neither pass nor flag them.
+      for(const i of q.edges?.hardCells??[]) {
         const x=Math.floor((i%qw+.5)*w/qw),y=Math.floor((Math.floor(i/qw)+.5)*w/qw);
         if(x>=0&&x<w&&y>=0&&y<h)exclude[y*w+x]=1;
       }
@@ -184,7 +186,7 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
       if(interior.reduce((s,v)=>s+v,0)<n*.001)continue;
       const key=createHash('sha256').update(interior).digest('hex');
       if(areaMasks.has(key)){areaMasks.get(key).planIds.push(p.id);continue;}
-      const a={id:p.id,planIds:[p.id],label:`${[...new Set((p.regions??[]).map(id=>regionProfiles.find(r=>r.id===id)?.descriptiveFamily??id))].join(', ')} (${p.phase}, band ${p.valueBand}, ${p.id.split('/').at(-1)})`,mask:interior,source:'planned broad value-shape clip, >=1% sheet and >=3 mm support; excludes 1 mm around all planned value/feature boundaries'};
+      const a={id:p.id,planIds:[p.id],label:`${[...new Set((p.regions??[]).map(id=>regionProfiles.find(r=>r.id===id)?.descriptiveFamily??id))].join(', ')} (${p.phase}, band ${p.valueBand}, ${p.id.split('/').at(-1)})`,mask:interior,source:'planned broad value-shape clip, >=1% sheet and >=3 mm support; excludes 1 mm around hard planned boundaries'};
       areas.push(a);areaMasks.set(key,a);
     }
   }
