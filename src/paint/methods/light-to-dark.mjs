@@ -6,6 +6,7 @@ import {planLanes} from './stroke-plan.mjs';
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
 import { passage } from '../../crop/blockin.mjs';
+import { labOf } from '../../eval/colour.mjs';
 import { RECESS, SHADOW_GLAZE, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND, FIRST_INK_SKIP } from '../tuned/trumbull.mjs';
 import { TEX_ZONE, JAW_INK } from '../tuned/portrait.mjs';
 
@@ -21,7 +22,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,trumbullRules=false,recesses=false,portraitRules=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0}) {
+export function planLightToDark({bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,trumbullRules=false,recesses=false,portraitRules=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0}) {
   let coolGroup=null;setRecessMax(recessMax);
   // shadowRaw: with no burnt sienna in the box, raw sienna is the shadow glaze's warm part, so it is not pure ultramarine.
   const SHADOW_WARM=shadowRaw&&!pigments.some(p=>p?.name==='burnt sienna')?'raw sienna':'burnt sienna';
@@ -230,7 +231,11 @@ export function planLightToDark({bandRound=false,valueFloor=null,demand,k,densit
       const groupMode=layerHue&&(step.tag||((skySplit||lightFamilies)&&phase==='light'));
       if(groupMode&&!coolGroup){coolGroup=new Uint8Array(region.regions.length+1);const sr=new Float64Array(region.regions.length+1),sb=new Float64Array(region.regions.length+1),cnt=new Float64Array(region.regions.length+1);for(let q=0;q<n;q++){const L=region.labels[q];sr[L]+=rgb[q*3];sb[L]+=rgb[q*3+2];cnt[L]++;}const sg=new Float64Array(region.regions.length+1);for(let q=0;q<n;q++)sg[region.labels[q]]+=rgb[q*3+1];
         // Three families: cool (sky, glass), yellow-green foliage (hue >= 50 deg), warm stone.
-        for(let L=1;L<=region.regions.length;L++){const r=sr[L]/Math.max(1,cnt[L]),g=sg[L]/Math.max(1,cnt[L]),b=sb[L]/Math.max(1,cnt[L]),hue=Math.atan2(Math.sqrt(3)*(g-b),2*r-g-b)*180/Math.PI;coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(hueChroma>0&&Math.max(r,g,b)-Math.min(r,g,b)>=hueChroma?3:0);}}
+        for(let L=1;L<=region.regions.length;L++){const r=sr[L]/Math.max(1,cnt[L]),g=sg[L]/Math.max(1,cnt[L]),b=sb[L]/Math.max(1,cnt[L]),hue=Math.atan2(Math.sqrt(3)*(g-b),2*r-g-b)*180/Math.PI;
+          // hueChromaLab: RGB range confuses a dark muted brown with a saturated orange. Perceptual
+          // chroma keeps their shared warm hue from pooling one charge (layered washes only).
+          const sat=hueChromaLab?Math.hypot(...labOf([r,g,b],0,[255,255,255]).slice(1)):Math.max(r,g,b)-Math.min(r,g,b);
+          coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(hueChroma>0&&sat>=hueChroma?3:0);}}
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
       const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0):[];
       const domains=groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];

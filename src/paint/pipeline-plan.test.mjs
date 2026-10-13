@@ -24,8 +24,10 @@ for (const colour of ['layered', 'family']) {
   const {flags}=pipelineFlags({washes:{colour,charge:.4,carryMm:2,paleLimit:.1}});
   const m=new Map(Array.from({length:flags.length/2},(_,i)=>flags.slice(i*2,i*2+2)));
   const family=colour==='family';
-  assert.equal(m.get('--huechroma'),family?'30':'0');
-  assert.equal(m.get('--lightfamilies'),family?'1':'0');
+  // Both modes keep light colour families apart; layered splits them on Lab chroma.
+  assert.equal(m.get('--huechroma'),'30');
+  assert.equal(m.get('--lightfamilies'),'1');
+  assert.equal(m.get('--huechromalab'),family?undefined:'1');
   assert.equal(m.get('--passcap'),family?'0.4':'0');
   assert.equal(m.get('--maskmm'),family?'2':'0');
   assert.equal(m.get('--palelights'),family?'0.1':'0');
