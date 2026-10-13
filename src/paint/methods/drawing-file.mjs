@@ -54,7 +54,9 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   });
   const measured = lines.some(g => g.points.some(q => q.width != null || q.weight != null));
   if (measured) log(`drawing: per-point widths and darkness from the file, contact = width x ${gain} - ${margin} cells, pressure share = ${base} x darkness`);
-  const strokes = lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
+  let strokes = lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
+  // --inkhand 1 (ink only): each stroke as a hand draws it (inkHand)
+  if (num('inkhand', 0) > 0 && !/graphite/.test(opt('outlinemedium', 'auto'))) { strokes = strokes.map(g => inkHand(g, { base })); log(`drawing: ${strokes.length} strokes set down, tapered and slowed on curves (--inkhand)`); }
   // --finishmasses 1 (plan finishInk.masses "scribble"): the closing pen also states the dark masses of the plan-time
   // source density as looping scribble with the lights left open (drawing-scribble.mjs), for black or curly coats and
   // dark hair. Off by default: a dark surface is paint's job, not the pen's.
@@ -65,6 +67,39 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
     return [...strokes, ...scribbles];
   }
   return strokes;
+}
+
+const ease = u => u * u * (3 - 2 * u);
+/**
+ * A stroke as a hand draws it with a dip pen, in the pen's own terms (src/media/pen.mjs): the nib sets down and holds
+ * a moment, so the first drop pools into a small blot (`dwell`); pressure and width rise over the first `inLen` cells
+ * and fall over the last `outLen`; the hand slows on curves, and a slow nib lays a wider, darker line by capillary
+ * pull, while a long straight run is drawn faster and finer. Speed `v` runs from 1.9 - 1.1 x share, as draw.mjs sets
+ * it, scaled by the curve. Points keep their positions.
+ */
+export function inkHand(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.35, end = 0.25, dwell = 0.5, slow = 0.45, fast = 1.15, turnSpan = 2 } = {}) {
+  const P = g.points, n = P.length, d = [0];
+  for (let k = 1; k < n; k++) d.push(d[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
+  const L = d[n - 1] || 1, tin = Math.min(inLen, 0.3 * L), tout = Math.min(outLen, 0.35 * L);
+  const env = t => Math.min(tin > 0 && t < tin ? start + (1 - start) * ease(t / tin) : 1, tout > 0 && L - t < tout ? end + (1 - end) * ease((L - t) / tout) : 1);
+  // turning at a point, over about turnSpan cells each way: 0 straight, 1 a right angle or more
+  const turn = k => {
+    let a = k, b = k;
+    while (a > 0 && d[k] - d[a] < turnSpan) a--;
+    while (b < n - 1 && d[b] - d[k] < turnSpan) b++;
+    if (a === k || b === k) return 0;
+    const ux = P[k].x - P[a].x, uy = P[k].y - P[a].y, vx = P[b].x - P[k].x, vy = P[b].y - P[k].y;
+    const c = (ux * vx + uy * vy) / ((Math.hypot(ux, uy) * Math.hypot(vx, vy)) || 1);
+    return Math.min(1, Math.acos(Math.max(-1, Math.min(1, c))) / (Math.PI / 2));
+  };
+  const points = P.map((q, k) => {
+    const e = env(d[k]), share = (q.s ?? base * (g.weight ?? 1)) * e, c = turn(k);
+    const out = { ...q, s: share, v: (1.9 - 1.1 * Math.min(1, share)) * (c > 0.05 ? 1 - slow * c : fast) };
+    if (q.nw != null) out.nw = q.nw * (0.6 + 0.4 * e);
+    if (k === 0) out.dwell = dwell;
+    return out;
+  });
+  return { ...g, points };
 }
 
 // Pen pressure field for a selected drawing, on the sheet grid (W2 x H2, SC sheet cells per plan cell): each stroke's

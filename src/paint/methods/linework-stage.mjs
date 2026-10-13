@@ -17,6 +17,8 @@
 //   3. Gate (line-gate.mjs): draw or not, ink or graphite, how much. An explicit medium wins.
 //   4. Usage is the style's: pen and wash draws the file dominant with its own economy prune (pen-wash-lines.mjs),
 //      Combined draws it under its value plan's line caps and lets the washes carry the mass.
+// --linework file cleans and gates a given --drawingfile instead of choosing a source. --linejoin 1 joins broken pieces
+// of one contour before pruning (line-join.mjs).
 // Writes <out>/lines-universal-lines.json (an ordinary --drawingfile) and <out>/linework-stage.json, and returns the
 // painter flags that point the pens at it. Every later route (linked stages, the pen-and-wash prune, the opening and
 // closing pens) reads that file as it would any prepared drawing.
@@ -26,7 +28,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
 import { gaussian } from '../../keyframes/density.mjs';
-import { scaleLines } from '../../crop/lines.mjs';
+import { scaleLines, linePaths } from '../../crop/lines.mjs';
 import { writeInkLines } from '../../crop/ink-lines-file.mjs';
 import { separate } from '../../crop/inkwash.mjs';
 import { paperOf } from '../../crop/palettepick.mjs';
@@ -93,14 +95,14 @@ const toFile = (lines, w, h, extra) => ({
  * interpreter for copy-lines; `sketchCache` the directory of image-model sketches.
  * @returns { flags, record }
  */
-export async function planUniversalLinework({ image, out, root, width, sheetMm, requested = null, style = 'default', python = null, sketchCache = null, seed = 0, log = () => {} }) {
+export async function planUniversalLinework({ image, out, root, width, sheetMm, requested = null, style = 'default', python = null, sketchCache = null, seed = 0, join = false, drawingFile = null, log = () => {} }) {
   if (requested && !MEDIA.includes(requested)) throw new Error(`--linemedium: ${MEDIA.join(', ')}, not ${requested}`);
   const bytes = fs.readFileSync(image), sha = crypto.createHash('sha256').update(bytes).digest('hex');
   const { data: rgb, info } = await sharp(bytes).flatten({ background: '#ffffff' }).resize({ width }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const w = info.width, h = info.height, n = w * h, mmPerCell = sheetMm / w;
   // the outer 4% is left out, as the pens leave it: a scan's mount and border are not the picture's edges
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
-  const target = { w, h, L: ev.smooth[0], A: ev.smooth[1], B: ev.smooth[2], rgb: [0, 1, 2].map(c => gaussian(Float32Array.from({ length: n }, (_, i) => lin(rgb[3 * i + c])), w, h, 1)) };
+  const target = { w, h, ev, L: ev.smooth[0], A: ev.smooth[1], B: ev.smooth[2], rgb: [0, 1, 2].map(c => gaussian(Float32Array.from({ length: n }, (_, i) => lin(rgb[3 * i + c])), w, h, 1)) };
   const { paperRGB } = paperOf(rgb, w, h, { mode: 'source' });
   const perspective = pythonReady(python) ? JSON.parse(runPython(python, [path.join(root, 'tools/seg/perspective.py'), image, '--width', String(width)], 'perspective').trim().split('\n').at(-1)) : null;
   const features = { perspective, penLine: +(separate(rgb, w, h, paperRGB).stats.ink / n).toFixed(4) };
@@ -140,8 +142,14 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
     },
   };
   let chosen = null;
+  if (drawingFile) {
+    // a prepared drawing is the source: it is an artist's selection, cleaned as a pen source's own lines are
+    const raw = scaleLines(JSON.parse(fs.readFileSync(linePaths(drawingFile).lines, 'utf8')), w, h, { keepOrder: true });
+    record.order = ['file']; record.sources.push({ source: 'file', file: path.basename(linePaths(drawingFile).lines), lines: raw.length, accepted: true });
+    chosen = { source: 'file', lines: raw, kind: 'pen' };
+  }
   for (const name of order) if (!chosen) chosen = await sources[name]();
-  const clean = cleanLines(chosen.lines, target, { mmPerCell, kind: chosen.kind, seed: 1 + seed });
+  const clean = cleanLines(chosen.lines, target, { mmPerCell, kind: chosen.kind, seed: 1 + seed, join });
   const areaCm2 = (w * mmPerCell / 10) * (h * mmPerCell / 10), inkMm = clean.lines.reduce((a, g) => a + pathLength(g.points) * mmPerCell, 0);
   const gate = decideLinework({ ...features, density: inkMm / areaCm2, sketch: chosen.source === 'sketch', pen: chosen.kind === 'pen' }, { requested });
   const usage = gate.weight;

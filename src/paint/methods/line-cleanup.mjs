@@ -1,5 +1,7 @@
 // Line selection and cleanup for the linework stage (linework-stage.mjs), the same for every source and style:
 //
+//   0. With `join` (and the target's edge evidence), broken pieces of one contour are joined first and only isolated
+//      marks on no contour are deleted (line-join.mjs); the rhythm prune then deletes nothing but near repeats.
 //   1. Specks under `minMm` go.
 //   2. Shadow and value edges go. Across a traced line the stage reads the target on both sides: a dark ridge (darker
 //      than both sides) is a drawn or structural line; a step whose sides differ in lightness while every channel
@@ -17,6 +19,7 @@
 // specks, shadow outlines and near repeats. Points are kept as they are, with their own widths, weights and hand
 // wobble. Pure, planning only.
 import { prunePenLines } from './pen-wash-lines.mjs';
+import { joinThenPrune } from './line-join.mjs';
 
 const CLEANUP = Object.freeze({
   minMm: 0.8, penMinMm: 0.4, sideMm: 0.6, ridge: 0.025, step: 0.07, scaleSpread: 1.3, minChroma: 0.06, shadowShare: 0.6, ridgeShare: 0.25, straightMm: 10, straight: 0.92,
@@ -92,14 +95,22 @@ export function detailRegion(lines, L, w, h, { radius = 6, quantile = 0.8 } = {}
  *   'trace'    a dense trace of a photograph: also the structure filter
  *   'pen'      a pen source's own lines, already an artist's selection: only specks, shadow outlines and near repeats
  *              go, every other line stays (no structure filter, no omission, no density cap)
+ * `join` true (needs `target.ev`, edge evidence from line-evidence.mjs): join, then prune.
  * @returns { lines, stats }
  */
-export function cleanLines(lines, target, { mmPerCell, kind = 'trace', seed = 1, options = {} } = {}) {
+export function cleanLines(lines, target, { mmPerCell, kind = 'trace', seed = 1, join = false, options = {} } = {}) {
   if (!['drawing', 'trace', 'pen'].includes(kind)) throw new Error(`cleanLines: drawing, trace or pen, not ${kind}`);
   const trace = kind === 'trace';
+  let joined = null;
+  if (join) {
+    if (!target.ev) throw new Error('cleanLines: join needs the target edge evidence (target.ev)');
+    joined = joinThenPrune(lines, target.ev, target.L, { mmPerCell });
+    lines = joined.lines;
+    options = { ...options, prune: { keepAbove: -Infinity, tileInkMm: Infinity, ...(options.prune ?? {}) } };
+  }
   if (kind === 'pen') options = { ...options, minMm: options.minMm ?? CLEANUP.penMinMm, prune: { keepAbove: -Infinity, tileInkMm: Infinity, minMm: CLEANUP.penMinMm, vary: 0, litWeight: 1, ...(options.prune ?? {}) } };
   const o = { ...CLEANUP, ...options, prune: { ...CLEANUP.prune, ...(options.prune ?? {}) } }, cells = mm => mm / mmPerCell, { w, h } = target;
-  const stats = { in: lines.length, specks: 0, shadow: 0, structure: 0 };
+  const stats = { in: joined ? joined.stats.in : lines.length, ...(joined ? { joined: joined.stats.joined, isolated: joined.stats.deleted } : {}), specks: 0, shadow: 0, structure: 0 };
   let kept = lines.filter(g => { if (pathLength(g.points) * mmPerCell < o.minMm) { stats.specks++; return false; } return true; });
   const longStraight = g => pathLength(g.points) >= cells(o.straightMm) && chordShare(g.points) >= o.straight;
   kept = kept.filter(g => {

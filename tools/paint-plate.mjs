@@ -258,15 +258,18 @@ if (!argv0.includes('--linesource')) {
 // picks the line source, cleans the lines and gates whether to draw, the medium and how much, before every other line
 // route, and writes an ordinary drawing file that replaces --linesource and any --drawingfile. --linemedium
 // ink|graphite|none, a plan's drawing.medium or --outlinemedium fixes the medium; --sketchcache <dir> holds image-model
-// sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. Off by default.
+// sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. --linework file cleans and gates
+// the given --drawingfile instead of choosing a source; --linejoin 1 joins broken contours before pruning. Off by default.
 let LINEWORK_STAGE = null;
 const LINEWORK_SOURCES = { python: opt('sketchpython','python3'), sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null };
+const LINEWORK_JOIN = num('linejoin', 0) > 0;
 if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
-  if (opt('linework') !== 'auto') throw Error(`--linework: auto or off, not ${opt('linework')}`);
+  if (!['auto', 'file'].includes(opt('linework'))) throw Error(`--linework: auto, file or off, not ${opt('linework')}`);
+  if (opt('linework') === 'file' && !opt('drawingfile','')) throw Error('--linework file needs --drawingfile');
   const om = argv.includes('--outlinemedium') ? opt('outlinemedium','auto') : 'auto';
   const requested = opt('linemedium','') || (om === 'auto' ? null : /graphite/.test(om) ? 'graphite' : 'ink');
   const r = await planUniversalLinework({ image: path.resolve(root, opt('image','')), out, root, width: num('width', 700), sheetMm: num('sheetmm', DEFAULT_SHEET_MM),
-    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', ...LINEWORK_SOURCES,
+    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', ...LINEWORK_SOURCES, join: LINEWORK_JOIN, drawingFile: opt('linework') === 'file' ? path.resolve(root, opt('drawingfile','')) : null,
     seed: num('seed', 0), log: console.log });
   argv.push(...r.flags);
   LINEWORK_STAGE = r.record;
@@ -2264,7 +2267,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     await writeInkFilter(DRAW_SOURCE);
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
-  let scaled = kept.map((g, i) => ({ weight:g.weight, strength:g.strength, ...(g.length==null?{}:{length:g.length*SC}), reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature,openingRole:g.openingRole,preparationRole:g.preparationRole, sourceOrdinal:g.sourceOrdinal, instruction:g.instruction, outline: g.outline, tier: g.tier, ...(g.rank == null ? {} : { rank: g.rank }), ml: !!g.ml, draw: !inkVerdict || inkVerdict[i].kept, points: g.points.map(q => (q.nw == null && q.s == null ? { x: q.x * SC, y: q.y * SC } : { x: q.x * SC, y: q.y * SC, ...(q.s == null ? {} : { s: q.s }), ...(q.nw == null ? {} : { nw: q.nw * SC }) })) }));
+  let scaled = kept.map((g, i) => ({ weight:g.weight, strength:g.strength, ...(g.length==null?{}:{length:g.length*SC}), reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature,openingRole:g.openingRole,preparationRole:g.preparationRole, sourceOrdinal:g.sourceOrdinal, instruction:g.instruction, outline: g.outline, tier: g.tier, ...(g.rank == null ? {} : { rank: g.rank }), ml: !!g.ml, draw: !inkVerdict || inkVerdict[i].kept, points: g.points.map(q => (q.nw == null && q.s == null && q.v == null && q.dwell == null ? { x: q.x * SC, y: q.y * SC } : { x: q.x * SC, y: q.y * SC, ...(q.s == null ? {} : { s: q.s }), ...(q.nw == null ? {} : { nw: q.nw * SC }), ...(q.v == null ? {} : { v: q.v }), ...(q.dwell == null ? {} : { dwell: q.dwell }) })) }));
   scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
