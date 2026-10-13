@@ -21,6 +21,10 @@
     "bench/v2/kit/**",
     "bench/scripts/dry-painter.mjs"
   ],
+  "ignoreBinaries": [
+    "codex",
+    "ffmpeg"
+  ],
   "ignoreIssues": {
     "src/media/sheet-size.mjs": [
       "duplicates"
