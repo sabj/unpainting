@@ -14,16 +14,17 @@ Stats JSON version 2 contains `composition` and the original count histograms. `
 
 Tiny means median paint contact under 1 mm wide OR a path under 3 mm long. Large means width over a tenth of the sheet and length at least its width; other paint is mid. Pen and clean water are separate. A zero-concentration dip is clean water even if an old tape did not mark it as prewetting. Zero pressure or zero observed pigment loss cannot contribute paint.
 
-## The two gate limits
+## The three gate limits
 
 | Config key | Default | Meaning, for each broad interior |
 |---|---:|---|
 | `maxBroadAreaTinyAreaShare` | 0.30 | At most 30% of interior area carried by tiny paint |
 | `maxBroadAreaTinyVisibleShare` | 0.30 | At most 30% of visible paint tone and colour carried by tiny paint |
+| `maxBroadAreaWiperShare` | 0.30 | At most 30% of interior area filled by narrow overlapping sweeps |
 
 Equality passes. Global count share and global tiny coverage never trigger a painting-quality flag. `flags` contain only failing broad areas, identified by plan ID. Missing spatial or deposit evidence has a separate `unmeasured` reason, with `verified: false`; hard rejection refuses an unverified input. Default warning permits rendering. `off` suppresses warnings and rejection.
 
-The limits are provisional engineering choices, not calibrated human percentiles. They allow small accents over a wash while catching an interior filled by tiny paint instead of a wash. A gate pass still needs visual judgment.
+The limits are provisional engineering choices, not calibrated human percentiles. They allow small accents over a wash while catching an interior filled by tiny paint, or by a narrow brush swept back and forth, instead of a wash. A gate pass still needs visual judgment.
 
 Override limits with a JSON object through `stroke-gate --config`, `run-plan --stroke-gate-config` or `paint-plate --strokegateconfig`. Old count-based threshold keys are errors, so a stale config cannot silently keep rejecting legitimate detail.
 
@@ -46,6 +47,12 @@ Explicit stroke plans declare intended broad low-detail areas as normalized poly
 The window in `detailPolygons` is exempt. One millimetre inside the area's contour is also exempt by default. An explicit empty `broadAreas` array declares a detail-only plan; it must still supply measurable pigment loads. An absent array is unmeasured, rather than an automatic exemption. These annotations describe intent and must be reviewed with the plan.
 
 Historical image-painter runs use adjacent `value-plan.json` and `value-commands.jsonl`. The tool pairs command geometry with the tape's quantized paths and takes each broad value-shape's recorded clip. A non-texture planned shape qualifies when its area is at least 1% of the sheet and its planned support width is at least 3 mm. Later glazes qualify too. One millimetre around every planned hard/soft value or feature boundary is excluded; tiny shapes with no substantial interior remain detail. Each area is reported separately, with its plan ID, physical interior area, tiny carried area, tiny visible contribution, tiny covered area and tiny-only area. Overlapping passage reports are not additive. No detail mask is inferred from the noisy final painting.
+
+## Windshield-wiper filling
+
+A broad interior can also be filled by a brush far narrower than the passage, swept back and forth. The detector groups wash marks by passage (the executed commands intent, a stroke plans `passage`, or the recorded frame and clip). A group counts when region width divided by brush width is above 4, it has at least six aligned passes, direction coherence is at least 0.7, footprint overlap is at least 1.8 and it covers at least 20% of the interior. One zigzag with six or more reversals counts as repeated passes. `windshieldWiperShare` is the union of detected groups over the interior, and `sweeps` lists each groups marks, passes, overlap and region-to-brush width ratio. Region width is the areas `widthMm` (a broad areas own, or the plans estimated support width); otherwise twice the interior area divided by its boundary length.
+
+Commands with `purpose` `detail`, `edge`, `texture` or `small-feature`, and texture passages, are exempt. One or two properly sized passes and sparse strokes do not trigger it. Stats saved before the detector have no wiper share and stay unmeasured for that limit. The detector is a review heuristic measured on few paintings; it does not show that every detected sweep is poor painting.
 
 ## How the weighted estimate works
 

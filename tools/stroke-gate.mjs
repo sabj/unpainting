@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { cliArgs, loadStats, normalize, summarize } from './stroke-stats.mjs';
 
 // Provisional limits for broad low-detail interiors only. Counts and global brush sizes are diagnostics.
-export const DEFAULT_THRESHOLDS = Object.freeze({maxBroadAreaTinyAreaShare:.30,maxBroadAreaTinyVisibleShare:.30});
+export const DEFAULT_THRESHOLDS = Object.freeze({maxBroadAreaTinyAreaShare:.30,maxBroadAreaTinyVisibleShare:.30,maxBroadAreaWiperShare:.30});
 export function thresholds(overrides = {}) {
   if (!overrides || Array.isArray(overrides) || typeof overrides !== 'object') throw new Error('threshold config must be an object');
   for (const [key,v] of Object.entries(overrides)) {
@@ -24,7 +24,9 @@ export function evaluateGate(stats, { mode = 'warn', config = {} } = {}) {
     for(const a of c.broadAreas) {
       for(const metric of ['tinyCarriedAreaShare','tinyVisibleShare'])
         if(a[metric]!==null&&(!Number.isFinite(a[metric])||a[metric]<0||a[metric]>1+1e-9))throw Error('invalid or missing measured metric '+metric);
-      for(const [metric,limit,label]of [['tinyCarriedAreaShare','maxBroadAreaTinyAreaShare','interior area carried by tiny marks'],['tinyVisibleShare','maxBroadAreaTinyVisibleShare','visible paint contribution from tiny marks']])
+      // Stats saved before the wiper detector have no wiper share; that metric stays unmeasured for them.
+      if(a.windshieldWiperShare!==undefined&&(!Number.isFinite(a.windshieldWiperShare)||a.windshieldWiperShare<0||a.windshieldWiperShare>1+1e-9))throw Error('invalid measured metric windshieldWiperShare');
+      for(const [metric,limit,label]of [['tinyCarriedAreaShare','maxBroadAreaTinyAreaShare','interior area carried by tiny marks'],['tinyVisibleShare','maxBroadAreaTinyVisibleShare','visible paint contribution from tiny marks'],['windshieldWiperShare','maxBroadAreaWiperShare','interior filled by narrow overlapping sweeps']])
         if(a[metric]>limits[limit])flags.push({code:metric,areaId:a.id,message:`${a.label}: ${label} ${pct(a[metric])}, above ${pct(limits[limit])}.`});
     }
   }

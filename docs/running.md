@@ -74,7 +74,7 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
-| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `both` |
+| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first` (`--recipe v096`: `both`) |
 | `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `auto` | same; plan may override |
 | `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |
 | `--inkk`, `--inkkscale` | three positive comma-separated absorption values; scale factor | profile absorption; scale 1 | same; plan may override |
@@ -85,6 +85,9 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--video` | `0`, `1` | `1` | same |
 | `--frames` | target wash frame count | 40 | 8 |
 | `--marks` | `0`, `1` | `0` | `1` |
+| `--canarystop` | `0`, or a planned pass number N: save `canary-pass-N.png` and `canary.json` after pass N and stop before `painting.png` | `0` | same |
+| `--notargetlooks` | `0`, `1`: paint with the charges frozen at planning and no painting-time reference look ([plan-format.md](plan-format.md)) | `0` | same |
+| `--washinkfile` | line-file base: the target's own ink removed from wash demand under `--washinkfree 1`, when the pen draws a different (cleaner) file | the `--drawingfile` | same |
 
 `fast` approximates the final part of ordinary drying; `full` keeps the full drying schedule. They need not produce the same pixels. [techniques.md](techniques.md) lists the other recipe flags and off switches. There is no complete reference for every experimental flag. Unknown recipe names add no recipe flags.
 

@@ -44,7 +44,7 @@ export function normalize(input, { sheetmm } = {}) {
       const widths = m.d.map(q => pen
         ? (q[5] >= 0 ? q[5] / 100 : b.nib + (b.flex ?? 0) * (q[2] < 0 || q[2] == null ? .5 : q[2] / 100)) * mm / resolution
         : 2 * (q[3] >= 0 ? q[3] / scale : b.radius) * mm);
-      marks.push({ kind: pen ? 'pen' : m.wt || (loads.has(m.b) && !loads.get(m.b).some(v=>v>0)) ? 'water' : 'paint', time: frame, tapeIndex, points, widths, pressures:m.d.map(q=>q[2]>=0?q[2]/100:1), ...measure(points, widths) });
+      marks.push({ kind: pen ? 'pen' : m.wt || (loads.has(m.b) && !loads.get(m.b).some(v=>v>0)) ? 'water' : 'paint', time: frame, tapeIndex, purpose:m.purpose, points, widths, pressures:m.d.map(q=>q[2]>=0?q[2]/100:1), ...measure(points, widths) });
     }
     return { tape:input, broadAreas:input.broadAreas, sheet: { widthMm: width, heightMm: input.h * mm }, basis: 'recorded paths', timeUnit: 'saved frame', marks };
   }
@@ -58,7 +58,7 @@ export function normalize(input, { sheetmm } = {}) {
       for (const ps of c.paths) {
         const points=ps.map(q=>[q.x*width,q.y*height]), widths=ps.map(q=>q.rMm==null?widthMm:2*q.rMm);
         const concentration=Object.values(c.load?.concentration??{}).reduce((s,v)=>s+v,0);
-        marks.push({kind:c.role==='clean-water'?'water':c.role==='pen'?'pen':'paint',time,points,widths,pressures:ps.map(q=>q.p??1),depositRGB:Array(3).fill((c.load?.waterQuantityMm3??1)*concentration),...measure(points,widths)});
+        marks.push({kind:c.role==='clean-water'?'water':c.role==='pen'?'pen':'paint',time,purpose:c.purpose,group:c.passage,points,widths,pressures:ps.map(q=>q.p??1),depositRGB:Array(3).fill((c.load?.waterQuantityMm3??1)*concentration),...measure(points,widths)});
       }
     });
     return { broadAreas:input.broadAreas, sheet: { widthMm: width, heightMm: height }, basis: 'planned paths, not proof of execution', timeUnit: 'command index', marks };

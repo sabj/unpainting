@@ -172,3 +172,5 @@ For a pen-and-wash target, `tools/seg/ink-lines.mjs` takes the candidates from t
 [examples/plans/trumbull-values.json](../examples/plans/trumbull-values.json) asks for every candidate line in heavy sepia ink, opening and closing.
 
 For the stroke gate, annotate intended broad wash interiors with `broadAreas` polygons and optional `detailPolygons`; see [stroke statistics](stroke-stats.md). Count share is diagnostic. Only area and visible contribution from tiny paint inside these planned interiors can trigger the gate.
+
+Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen at planning and skips every optional shape-average reference look during painting (charge correction, kept-colour recharge, touch-ups, final darks, sky lane selection and texture darkness). With `--feedback 0 --touchpoints 0 --finaldarks 0` it paints with no target look at all; check `target-guard.json` for zero looks, zero element reads and zero violations. Use the same flags on both arms of a comparison. The default, 0, keeps the looks the strict guard allows.

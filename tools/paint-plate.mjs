@@ -50,6 +50,8 @@ import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
+import { canaryStopPass, stopAtCanary } from '../src/paint/canary-stop.mjs';
+import { paintingLooks } from '../src/paint/painting-look.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
 import { tapeStats, panelSVG } from './stroke-stats.mjs';
 import { startStrokeLedger } from '../src/paint/stroke-ledger.mjs';
@@ -195,16 +197,17 @@ const optTrack = {
 const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
 // Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
 const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
-const SPEED_PAPER = num('speedpaper', 0) > 0;
-const SPEED_CONTACT = num('speedcontact', 0) > 0;
+// Exact CPU and GPU speed switches (SPEED2, SPEED3): byte-identical paintings, on by default; pass 0 to disable each.
+const SPEED_PAPER = num('speedpaper', 1) > 0;
+const SPEED_CONTACT = num('speedcontact', 1) > 0;
 const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
-const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
-const SPEED_COVERAGE = num('speedcoverage', 0) > 0;
+const SPEED_VALUE_ONLY = num('speedvalueonly', 1) > 0;
+const SPEED_COVERAGE = num('speedcoverage', 1) > 0;
 setSweepIntervals(SPEED_COVERAGE);
-const SPEED_FLOW_RECT = num('speedflowrect', 0) > 0;
+const SPEED_FLOW_RECT = num('speedflowrect', 1) > 0;
 setFlowRectangle(SPEED_FLOW_RECT, num('speedprofile', 0) > 0 ? ({ milliseconds }) => SPEED_PROFILE?.add('painting:flow-field', milliseconds) : null);
-const SPEED_FILM = num('speedfilm', 0) > 0;
-const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 0) > 0;
+const SPEED_FILM = num('speedfilm', 1) > 0;
+const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 1) > 0;
 const measurePaper = (target, cells, paperOnly = false) => physicalMeasurePaper(target, cells, paperOnly, { uniform: SPEED_UNIFORM_PAPER });
 const liftResist = target => {
   const started = performance.now();
@@ -229,7 +232,7 @@ process.env.GPU_EDGE_PINGPONG = String(num('speededge', 1));
 // 1: fused single-workgroup wet frontier; 0: parallel three-dispatch build.
 // Both construct the same active tile set and retain the same cell arithmetic.
 process.env.GPU_SPARSE_ALL = String(num('speedfrontier', 1));
-process.env.GPU_SKIP_ZERO_LAYER = String(num('speedemptylayers', 0));
+process.env.GPU_SKIP_ZERO_LAYER = String(num('speedemptylayers', 1));
 // Parallel optics improved the 540-cell runs; native-size trials showed no gain.
 const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrenderthreads', opt('gpu', 'auto') === 'off' || num('width', 700) > 540 ? 1 : Math.min(4, availableParallelism())))));
 process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';
@@ -319,8 +322,10 @@ const { data: PX_SOURCE, info } = await src.removeAlpha().raw().toBuffer({ resol
 const paperSetupStarted = performance.now();
 // --washinkfree 1 (needs --drawingfile): the planner reads the target with the planned pen lines filled from their
 // surroundings (src/crop/ink-free.mjs), so the wash carries mass and the pen carries line, not both. Pre-paint only.
+// --washinkfile <base>: the line file of the target's own ink to remove, when the pen draws a different drawing
+// (a cleaner opening file). Default: the --drawingfile.
 const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
-  const base = opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
+  const base = opt('washinkfile', '') || opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
   const doc = JSON.parse(fs.readFileSync(path.resolve(root, linePaths(base).lines), 'utf8'));
   const r = removePlannedInk(PX_SOURCE, info.width, info.height, doc, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marginMm: num('washinkmargin', 0.3) });
   console.log(`wash target: planned ink removed from ${r.changed} cells (${(100 * r.changed / (info.width * info.height)).toFixed(1)}% of the sheet)`);
@@ -329,6 +334,7 @@ const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
 // --targetguard gentle|hard|warn|off (tools/guard/no-target.mjs): from the first mark on, px and maps made from it are sealed.
 // gentle (default) blocks reads but allows shape-level looks; hard also caps looks (--lookbudget, default 100); warn only records.
 const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE), targetPaths: [path.resolve(root, opt('image', ''))], log: null, lookBudget: opt('lookbudget', '') === '' ? null : num('lookbudget', HARD_LOOK_BUDGET) });
+const paintingLook = paintingLooks(TARGET_GUARD, num('notargetlooks', 0));
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });
 let px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
@@ -2817,6 +2823,7 @@ if (FIRST_FLOOR > 0) { const fw = layers.filter(isFirst); if (fw.length) { layer
 if(AREA_PLAN){try{AREA_COMPILED=compileAreaLayers(AREA_PLAN,layers,PIGS);}catch(e){fs.writeFileSync(path.join(out,'semantic-coverage.json'),JSON.stringify(e.diagnostics??{error:e.message},null,2));throw e;}layers=AREA_COMPILED.layers;validateCompiledAreaStop(opt('areastop',''),layers);fs.writeFileSync(path.join(out,'semantic-coverage.json'),JSON.stringify(AREA_COMPILED.diagnostics,null,2));}
 const BUDGET = STROKE_BUDGET ? completeBudget({N:STROKE_BUDGET,layers,drawing:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length}) : null;
 if (BUDGET) console.log(`stroke budget: ${BUDGET.N} paths, washes ${Math.round(BUDGET.wash)}, drags ${BUDGET.drags}, dry brush ${BUDGET.dry}, accents ${BUDGET.accents}${FOCUS ? ', weighted by the focus map' : ''}`);
+const CANARY_STOP = canaryStopPass(num('canarystop', 0), layers.length);
 if(MOD?.paintOwnedTransfer){
  const stop=opt('majorstop',''),requested=stop.startsWith('pass:')?Number(stop.slice(5)):null;if(requested!==null&&(!Number.isInteger(requested)||requested<1||requested>layers.length))throw Error('owned head checkpoint outside actual reordered paint route');
  fs.writeFileSync(path.join(out,'paint-owned-route-before.json'),JSON.stringify({kind:'actual post-split/reordered route before body painting; not executed contact',passes:layers.length,checkpoint:requested,shapes:layers.map((l,L)=>({pass:L+1,value:l.value,owned:l.shapes.map((sh,S)=>sh._paintOwnedComponentCharge?{shapeId:'numeric-L'+L+'-S'+S,area:sh.area,supportCells:sh._paintOwnedComponentCharge.size}:null).filter(Boolean)}))},null,2));
@@ -2828,7 +2835,7 @@ const touchCorrections = round => {
   const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), byPig = PIGS.map(() => []), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
   let looked = 0, glazed = 0;
   TP_SHAPES.forEach((t, k) => {
-    const lk = TARGET_GUARD.look('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
+    const lk = paintingLook('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
     if (Math.max(...d) < num('touchdmin', 0.04)) return;
@@ -2847,7 +2854,7 @@ const finalDarks = () => {
   const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), byPig = PIGS.map(() => []), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
   let looked = 0, laid = 0;
   FD_SHAPES.forEach((t, k) => {
-    const lk = TARGET_GUARD.look('passage', `darks/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
+    const lk = paintingLook('passage', `darks/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
     if (Math.max(...d) < num('fddmin', 0.06)) return;
@@ -3077,7 +3084,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const colourMix = COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
   const LEDGER = ONSHEET ?? expected;
   const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
-  const LOOK = TARGET_GUARD.look('passage', `L${L + 1}/s${shIdx}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
+  const LOOK = paintingLook('passage', `L${L + 1}/s${shIdx}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
   const SHAPE_LACK = LOOK ? shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.ledger, { mix: colourMix, pigment: layer.pigment }) : sh.amount;
   const SHAPE_LOAD = new Float32Array(n);
   for (let y = MB.y0; y <= MB.y1; y++) for (let i = y * w + MB.x0, e = y * w + MB.x1; i <= e; i++) if (MASK[i]) SHAPE_LOAD[i] = SHAPE_LACK;
@@ -3107,7 +3114,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       // --keeprecharge 1|2: once cut, recharge from the plan over the kept cells: 1 amount only, 2 amount and colour. Default 0.
       // Both are read as shape means through a look, never cell by cell.
       const KR = Math.round(num('keeprecharge', 0));
-      const KLOOK = KR > 0 && sh.mix && !sh.graded ? TARGET_GUARD.look('passage', `L${L + 1}/s${shIdx}/kept`, MASK, { ref: [LOOK_PLAN], sheet: { ledger: { arr: LEDGER, stride: PIGS.length } } }) : null;
+      const KLOOK = KR > 0 && sh.mix && !sh.graded ? paintingLook('passage', `L${L + 1}/s${shIdx}/kept`, MASK, { ref: [LOOK_PLAN], sheet: { ledger: { arr: LEDGER, stride: PIGS.length } } }) : null;
       if (KLOOK) {
         const K = PIGS.length, o = shapeOwedColour(KLOOK.ref[LOOK_PLAN], KLOOK.sheet.ledger);
         let S = 0; for (let j = 0; j < K; j++) S += o[j];
@@ -3134,9 +3141,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // --detailfrom t: passes later than t of the ladder are laid as detail marks, not glazes. Default 2, never.
   const authoredPaths=sh._semantic?lowerAuthoredGestures(sh._semantic,{target:AREA_PLAN.doc.target,crop:AREA_PLAN.crop,width:W2,height:H2,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*AREA_PLAN.doc.target.width/AREA_PLAN.crop[2]}):null;
   // --skylanes 1: a large plane that reads cool at one shape-level look (blue over red by 10+) is laid as overlapping wet lanes.
-  const skyLaneRadius=sh2=>{if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;if(!(a>n*num('skylanemin',.015)))return 0;const lk=TARGET_GUARD.look('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});return lk&&lk.ref.px[2]>lk.ref.px[0]+10?num('skylanemm',3)/(num('sheetmm', DEFAULT_SHEET_MM)/w):0;};
+  const skyLaneRadius=sh2=>{if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;if(!(a>n*num('skylanemin',.015)))return 0;const lk=paintingLook('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});return lk&&lk.ref.px[2]>lk.ref.px[0]+10?num('skylanemm',3)/(num('sheetmm', DEFAULT_SHEET_MM)/w):0;};
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
-  const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=TARGET_GUARD.look('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
+  const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);return q;});
   const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB})):null;
@@ -3560,6 +3567,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   layer.mask = null; layer.ids = null;
   STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, ...(layer._order ? { order: layer._order.phase } : {}), techniques: Object.fromEntries(Object.entries(used).filter(([k]) => ['wet on dry', 'wet on wet', 'glazed', 'dry brush', 'detail marks', 'small brush'].includes(k))) };
   if (!FRAME_POLICY.all) await shoot();
+  if (CANARY_STOP === L + 1) await stopAtCanary({ out, pass: L + 1, passes: layers.length, value: layer.value, brushMarks: laid, backend: GPU_INFO,
+    writeImage: f => sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(f), close: async () => { await drainFrames(); FRAMER?.close(); sheet._gpu?.close(); } });
   if (FILM_BY_PAINT) {
     // the pass's whole booking, whether or not every passage found a path, so the shares stay on the plan's mass
     filmPass += layer.shapes.reduce((a, sh) => a + (FILM_MASS.get(sh) ?? 0), 0); filmLaid = filmPass;
