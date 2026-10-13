@@ -51,6 +51,7 @@ if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CON
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
 import { canaryStopPass, stopAtCanary } from '../src/paint/canary-stop.mjs';
+import { paintingLooks } from '../src/paint/painting-look.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
 import { loadStats, panelSVG } from './stroke-stats.mjs';
 import { evaluateGate, printGate } from './stroke-gate.mjs';
@@ -318,6 +319,7 @@ const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
 // --targetguard gentle|hard|warn|off (tools/guard/no-target.mjs): from the first mark on, px and maps made from it are sealed.
 // gentle (default) blocks reads but allows shape-level looks; hard also caps looks (--lookbudget, default 100); warn only records.
 const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE), targetPaths: [path.resolve(root, opt('image', ''))], log: null, lookBudget: opt('lookbudget', '') === '' ? null : num('lookbudget', HARD_LOOK_BUDGET) });
+const paintingLook = paintingLooks(TARGET_GUARD, num('notargetlooks', 0));
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });
 let px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
@@ -2817,7 +2819,7 @@ const touchCorrections = round => {
   const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), byPig = PIGS.map(() => []), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
   let looked = 0, glazed = 0;
   TP_SHAPES.forEach((t, k) => {
-    const lk = TARGET_GUARD.look('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
+    const lk = paintingLook('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
     if (Math.max(...d) < num('touchdmin', 0.04)) return;
@@ -2836,7 +2838,7 @@ const finalDarks = () => {
   const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), byPig = PIGS.map(() => []), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
   let looked = 0, laid = 0;
   FD_SHAPES.forEach((t, k) => {
-    const lk = TARGET_GUARD.look('passage', `darks/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
+    const lk = paintingLook('passage', `darks/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
     if (Math.max(...d) < num('fddmin', 0.06)) return;
@@ -3065,7 +3067,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const colourMix = COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
   const LEDGER = ONSHEET ?? expected;
   const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
-  const LOOK = TARGET_GUARD.look('passage', `L${L + 1}/s${shIdx}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
+  const LOOK = paintingLook('passage', `L${L + 1}/s${shIdx}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
   const SHAPE_LACK = LOOK ? shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.ledger, { mix: colourMix, pigment: layer.pigment }) : sh.amount;
   const SHAPE_LOAD = new Float32Array(n);
   for (let y = MB.y0; y <= MB.y1; y++) for (let i = y * w + MB.x0, e = y * w + MB.x1; i <= e; i++) if (MASK[i]) SHAPE_LOAD[i] = SHAPE_LACK;
@@ -3095,7 +3097,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       // --keeprecharge 1|2: once cut, recharge from the plan over the kept cells: 1 amount only, 2 amount and colour. Default 0.
       // Both are read as shape means through a look, never cell by cell.
       const KR = Math.round(num('keeprecharge', 0));
-      const KLOOK = KR > 0 && sh.mix && !sh.graded ? TARGET_GUARD.look('passage', `L${L + 1}/s${shIdx}/kept`, MASK, { ref: [LOOK_PLAN], sheet: { ledger: { arr: LEDGER, stride: PIGS.length } } }) : null;
+      const KLOOK = KR > 0 && sh.mix && !sh.graded ? paintingLook('passage', `L${L + 1}/s${shIdx}/kept`, MASK, { ref: [LOOK_PLAN], sheet: { ledger: { arr: LEDGER, stride: PIGS.length } } }) : null;
       if (KLOOK) {
         const K = PIGS.length, o = shapeOwedColour(KLOOK.ref[LOOK_PLAN], KLOOK.sheet.ledger);
         let S = 0; for (let j = 0; j < K; j++) S += o[j];
@@ -3122,9 +3124,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // --detailfrom t: passes later than t of the ladder are laid as detail marks, not glazes. Default 2, never.
   const authoredPaths=sh._semantic?lowerAuthoredGestures(sh._semantic,{target:AREA_PLAN.doc.target,crop:AREA_PLAN.crop,width:W2,height:H2,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*AREA_PLAN.doc.target.width/AREA_PLAN.crop[2]}):null;
   // --skylanes 1: a large plane that reads cool at one shape-level look (blue over red by 10+) is laid as overlapping wet lanes.
-  const skyLaneRadius=sh2=>{if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;if(!(a>n*num('skylanemin',.015)))return 0;const lk=TARGET_GUARD.look('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});return lk&&lk.ref.px[2]>lk.ref.px[0]+10?num('skylanemm',3)/(num('sheetmm', DEFAULT_SHEET_MM)/w):0;};
+  const skyLaneRadius=sh2=>{if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;if(!(a>n*num('skylanemin',.015)))return 0;const lk=paintingLook('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});return lk&&lk.ref.px[2]>lk.ref.px[0]+10?num('skylanemm',3)/(num('sheetmm', DEFAULT_SHEET_MM)/w):0;};
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
-  const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=TARGET_GUARD.look('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
+  const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);return q;});
   const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB})):null;
