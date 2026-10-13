@@ -213,7 +213,7 @@ export function planLightToDark({bandRound=false,valueFloor=null,demand,k,densit
   // wet on dry between the middle layers and the shadow glazes.
   if(shaped&&stoneBlocks>0&&rgb){const B=makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover:stoneBlocks,mm:stoneBlockMm,pigments,irregular:stoneIrregular,courses:stoneCourses,clusters:stoneClusters});
     if(B){const at=steps.findIndex(s=>s.band>=4);steps.splice(at<0?steps.length:at,0,{band:3,tag:'B',wt:Float32Array.from(B,(v,i)=>v>=0?stoneBlockAmt:0),pig:B});}}
-  // subjects: a subject's own lights take its first washes only; later layers and glazes go round them
+  // subjects: a subject's lit planes take its first washes only; the later middle layers go round them
   if(subjects)steps.splice(0,steps.length,...holdSubjectLights(steps,subjects.lights));
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.

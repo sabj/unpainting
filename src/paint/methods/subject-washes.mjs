@@ -3,7 +3,8 @@
 // it for a painting and gives each consumer its part:
 //   the value plan (light-to-dark.mjs)   subjectCovers, holdSubjectLights, subjectDomain
 //   the legacy ladder (blockin.mjs)      subjectBlockOptions
-// Flags: --subjectwash 0|1 (default 0), --subjectform 3 (mm: the form smoothing inside a subject), and the field's own
+// Flags: --subjectwash 0|1 (default 0), --subjectform 3 (mm: the form smoothing inside a subject), --subjectbands
+// subject|sheet (a subject's middle layers cut at its own value quantiles, or at the whole sheet's), and the field's own
 // --subjectk, --subjectsplit, --subjectedge, --subjectmean, --subjectvalue, --subjectchroma, --subjectlights,
 // --subjectlightgap.
 import path from 'node:path';
@@ -28,9 +29,11 @@ export async function subjectWashField({ image, px, w, h, families = [], shaped 
   if (!base || !hasSegments(base)) throw new Error('--subjectwash 1 needs the segments, and there are none (see --segments)');
   const seg = await loadSegments(base, w, h);
   const options = Object.fromEntries(Object.entries(FLAGS).map(([k, flag]) => [k, num(flag, SUBJECT_DEFAULTS[k])]));
-  const minShape = Math.max(shaped ? 144 : 4, Math.round(w * h * 0.00015));
-  const field = { ...subjectField({ seg, px, w, h, families, minShape, options }), formMm: num('subjectform', 3) };
-  log(describeField(field));
+  const minShape = Math.max(shaped ? 144 : 4, Math.round(w * h * 0.00015)), started = performance.now();
+  const bands = opt('subjectbands', 'subject');
+  if (!['subject', 'sheet'].includes(bands)) throw new Error(`--subjectbands: subject or sheet, not ${bands}`);
+  const field = { ...subjectField({ seg, px, w, h, families, minShape, options }), formMm: num('subjectform', 3), bands };
+  log(`${describeField(field)} (${((performance.now() - started) / 1000).toFixed(1)} s)`);
   return field;
 }
 
@@ -45,7 +48,12 @@ export function subjectCovers({ subjects, values, weights, protectedCells, skyCe
   const live = new Map();
   for (let i = 0; i < n; i++) if (!protectedCells[i] && weights[i] > 0) { const s = subject[i]; if (!live.has(s)) live.set(s, []); live.get(s).push(sm[i]); }
   const cut = new Map();
-  for (const [s, v] of live) {
+  // --subjectbands sheet: every subject is cut at the whole sheet's quantiles, still of the value smoothed inside it
+  if (subjects.bands === 'sheet') {
+    const all = [...live.values()].flat().sort((a, b) => a - b), at = q => all[Math.floor(q * (all.length - 1))] ?? Infinity;
+    const q = LAYER_QUANTILES.slice(0, count).map(at);
+    for (const s of live.keys()) cut.set(s, q);
+  } else for (const [s, v] of live) {
     if (v.length < 4 * minShape) continue;
     v.sort((a, b) => a - b);
     const at = q => v[Math.floor(q * (v.length - 1))], pale = at(PALE_END);
@@ -60,20 +68,17 @@ export function subjectCovers({ subjects, values, weights, protectedCells, skyCe
 }
 
 /**
- * Each subject's lights keep their first wash and miss the rest: from every step after the first middle one, the
- * light cells' share moves into that first middle step, so the cell's whole demand is still laid, early.
+ * Each subject's lit planes keep the light wash and the first middle layer and miss the later middle layers, which go
+ * round them, so they stay the subject's lightest shapes. A light the plan puts in shadow (any shadow-band weight) is
+ * not a lit plane and keeps every layer. No demand is moved: a passage lays one mean charge, so demand moved into it
+ * would spread over the whole passage instead of landing on the light.
  */
 export function holdSubjectLights(steps, lights) {
   const first = steps.findIndex(s => s.band === 2);
   if (first < 0 || !lights) return steps;
-  const early = Float32Array.from(steps[first].wt);
-  const out = steps.map((s, k) => {
-    if (k <= first || s.band < 2 || s.pig) return s;
-    const wt = Float32Array.from(s.wt);
-    for (let i = 0; i < wt.length; i++) if (lights[i] && wt[i] > 0) { early[i] += wt[i]; wt[i] = 0; }
-    return { ...s, wt };
-  });
-  return out.map((s, k) => (k === first ? { ...s, wt: early } : s));
+  const shadows = steps.filter(s => s.band >= 4);
+  const held = Uint8Array.from(lights, (v, i) => (v && !shadows.some(s => s.wt[i] > 0) ? 1 : 0));
+  return steps.map((s, k) => (k <= first || s.band < 2 || s.band >= 4 || s.pig ? s : { ...s, wt: Float32Array.from(s.wt, (v, i) => (held[i] ? 0 : v)) }));
 }
 
 /** A step's passages: connected pieces of its mask inside one wash group (one shadow group for a glaze). */

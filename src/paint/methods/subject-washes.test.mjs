@@ -31,16 +31,17 @@ test("subject covers: a flat subject is one wash; a graded one is cut at its own
   assert.ok(covers[3].reduce((a, v) => a + v, 0) < covers[1].reduce((a, v) => a + v, 0), 'later layers cover less');
 });
 
-test("a subject's lights keep their whole demand, laid in the first middle step", () => {
-  const n = 3, lights = Uint8Array.from([1, 0, 0]);
+test("a subject's lit planes miss the later middle layers; a light in shadow keeps them", () => {
+  const lights = Uint8Array.from([1, 1, 0]);
   const steps = [{ band: 1, wt: Float32Array.from([0.1, 0.1, 0.1]) }, { band: 2, tag: 'L0', wt: Float32Array.from([0.2, 0.2, 0.2]) },
-    { band: 2, tag: 'L1', wt: Float32Array.from([0.3, 0.3, 0.3]) }, { band: 4, wt: Float32Array.from([0.4, 0.4, 0.4]) }];
+    { band: 2, tag: 'L1', wt: Float32Array.from([0.3, 0.3, 0.3]) }, { band: 4, wt: Float32Array.from([0, 0.4, 0.4]) }];
   const before = steps.map(s => Float32Array.from(s.wt));
   const out = holdSubjectLights(steps, lights);
-  assert.ok(Math.abs(out[1].wt[0] - 0.9) < 1e-6);
-  assert.equal(out[2].wt[0], 0); assert.equal(out[3].wt[0], 0);
-  assert.ok(Math.abs(out[2].wt[1] - 0.3) < 1e-6, 'other cells keep their later layers');
-  for (let i = 0; i < n; i++) assert.ok(Math.abs(out.reduce((a, s) => a + s.wt[i], 0) - before.reduce((a, w) => a + w[i], 0)) < 1e-6);
+  assert.ok(Math.abs(out[1].wt[0] - 0.2) < 1e-6, 'the first middle layer is kept as it was');
+  assert.equal(out[2].wt[0], 0, 'the lit plane misses the later layer');
+  assert.ok(Math.abs(out[2].wt[1] - 0.3) < 1e-6, 'a light in shadow keeps it');
+  assert.ok(Math.abs(out[2].wt[2] - 0.3) < 1e-6, 'other cells keep it');
+  assert.equal(out[3], steps[3], 'shadow steps are untouched');
   steps.forEach((s, k) => assert.deepEqual(s.wt, before[k], 'the steps passed in are left as they were'));
 });
 
