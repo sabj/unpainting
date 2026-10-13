@@ -65,3 +65,13 @@ test('washes.darkGain scales the shadow glazes when the plan sets it',()=>{
  assert.equal(m(pipelineFlags({})).get('--darkgain'),undefined);
  assert.throws(()=>resolvePipeline({washes:{darkGain:5}}),/washes.darkGain/);
 });
+
+test('washes.deepAccent restates darks inside named families only',()=>{
+ const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ const families=[{id:'cat-fur'},{id:'man-skin'}];
+ const f=m(pipelineFlags({families,washes:{deepAccent:{max:75,families:['cat-fur']}}}));
+ assert.equal(f.get('--deepaccent'),'75'); assert.equal(f.get('--deepgrow'),'0'); assert.equal(f.get('--deepaccentin'),'cat-fur');
+ assert.equal(m(pipelineFlags({families})).get('--deepaccent'),undefined);
+ assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:75,families:['dog']}}}),/deepAccent.families/);
+ assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:300,families:['cat-fur']}}}),/deepAccent.max/);
+});
