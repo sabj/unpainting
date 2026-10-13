@@ -113,6 +113,21 @@ test('a coloured light takes the local wash, a capped wash keeps its hue, and a 
   assert.ok(f.dir[roles.warm] >= 0.5, `fit ${f.dir}`);
 });
 
+test('foliage gets its own green wash and the shadow pattern can be one connected wash', () => {
+  // the warm scene with a green shrub on the wall's lower left and two cast shadows a few cells apart
+  const px = warmScene(), at = (x, y) => y * W + x;
+  for (let y = 40; y < 58; y++) for (let x = 2; x < 30; x++) px.set([70, 110, 50], at(x, y) * 3);
+  for (let y = 20; y < 40; y++) for (let x = 80; x < 86; x++) px.set([120, 110, 105], at(x, y) * 3);
+  for (let y = 20; y < 40; y++) for (let x = 89; x < 95; x++) px.set([120, 110, 105], at(x, y) * 3);
+  const plan = planPenWash({ planner: 'values', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, options: { minLight: 0.6, hueGap: 18, shadowBlurMm: 0.6, foliageGreen: 5, shadowOneMm: 3 } });
+  const foliage = plan.passages.find(p => p.id === 'foliage'), shadows = plan.passages.filter(p => p.id.startsWith('shadow'));
+  assert.ok(foliage && foliage.mask[at(15, 50)], 'the shrub has its own wash');
+  assert.equal(foliage.mask[at(30, 30)], 0, 'the ochre wall is not foliage');
+  assert.equal(shadows.length, 1, plan.passages.map(p => p.id).join());
+  assert.equal(shadows[0].mask[at(15, 50)], 0, 'the shadow glaze keeps off the foliage');
+  assert.equal(shadows[0].mask[at(87, 30)], 1, 'the gap between the two cast shadows is closed: one wash');
+});
+
 test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
   const m = new Uint8Array(N); for (let y = 20; y < 60; y++) for (let x = 30; x < 90; x++) m[y * W + x] = 1;
   const f = washFootprint(m, W, H, { slip: 4, angle: 0, edgeSigma: 1, edgeAmp: 0 });

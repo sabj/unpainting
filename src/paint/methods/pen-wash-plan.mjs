@@ -190,7 +190,7 @@ const passage = (id, role, mask, dir, strength, extra = {}) => ({ id, role, mask
  */
 export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
-  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
+  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
   // a photograph's dark border and a painting's bare margin are no part of the subject: found on the barely blurred
   // picture, then read as paper before the planning blur, so the border's dark cannot bleed into the sky
   const P1 = labPlanesOf(px, w, h, 1), frame = frameMask(P1.L, w, h), margin = paperMargin(P1.L, w, h, { frame: frame.mask });
@@ -248,12 +248,35 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
     passages.push(passage(`local-${k + 1}`, 'local', m, dir, Math.min(o.localMax, Math.max(0.08, strength)), { wet: false, fit: f }));
   });
   if (split) notes.push(`local colour split by hue into ${split.length} washes`);
+  // 2b. with `foliageGreen` > 0, clearly green cells (a* at most -foliageGreen) get their own green wash at their own
+  // value, fitted on the whole foliage (lights and darks), and the shadow glaze keeps off them so the green stays clean
+  let foliage = null;
+  if (o.foliageGreen > 0 && !monochrome) {
+    const g0 = Uint8Array.from({ length: n }, (_, i) => (!frame.mask[i] && !sky0[i] && P.a[i] <= -o.foliageGreen && P.b[i] > 0 ? 1 : 0));
+    const m = consolidate(g0, w, h, cells(o.joinMm), o.minPiece * n);
+    if (share(m, n) >= 0.01) {
+      const f = fitMix(medianLab(P, m, paperLab, o.lightness, false, o.chroma), pigments, paperRGB, FIT_AMOUNTS.filter(v => v <= o.foliageMax), o.capLWeight);
+      passages.push(passage('foliage', 'local', m, f.dir, Math.min(o.foliageMax, Math.max(0.08, f.amount)), { wet: false, fit: f }));
+      foliage = m;
+      notes.push(`foliage: ${(100 * share(m, n)).toFixed(0)}% of the sheet in its own green wash`);
+    }
+  }
   // 3. one shadow glaze over the dark value, cool and neutral
+  if (o.shadowOneMm > 0 && share(darks, n) > 0.01) {
+    // with `shadowOneMm` > 0: the shadow pattern as one connected cool wash, its gaps narrower than shadowOneMm closed,
+    // instead of hue-split pieces; the deep glaze below still states the darkest darks
+    const m0 = foliage ? Uint8Array.from(darks, (v, i) => (v && !foliage[i] ? 1 : 0)) : darks;
+    const m = consolidate(m0, w, h, cells(o.shadowOneMm), o.minPiece * n), localOD = passages.at(-1).strength;
+    const f = monochrome ? null : fit(m, false), base = f ? f.dir : roleMix(roles, K, { cool: 0.6, earth: 0.4 });
+    const dir = base.map((v, j) => 0.5 * v + (j === roles.cool ? 0.5 : 0));
+    passages.push(passage('shadow', 'shadow', m, dir, Math.min(Math.max(0.32, o.shadowMin), Math.max(o.shadowMin, o.lightness * medOD(m) - 0.5 * localOD)), { wet: false, fit: f, joinMm: o.shadowOneMm }));
+    notes.push(`one connected shadow wash (gaps under ${o.shadowOneMm} mm closed): ${(100 * share(m, n)).toFixed(0)}% of the sheet`);
+  }
   if (share(darks, n) > 0.01) {
     // split like the local colour where the darks clearly differ in hue (green foliage against blue shadow on stone)
-    const dsplit = monochrome ? null : hueSplit(P, darks, w, h, { minShare: 0.04, minGap: o.darkHueGap ?? o.hueGap ?? 12 });
+    const dsplit = monochrome || o.shadowOneMm > 0 ? null : hueSplit(P, darks, w, h, { minShare: 0.04, minGap: o.darkHueGap ?? o.hueGap ?? 12 });
     const localOD = passages.at(-1).strength;
-    (dsplit ?? [darks]).forEach((m, k) => {
+    (o.shadowOneMm > 0 ? [] : dsplit ?? [darks]).forEach((m, k) => {
       const f = monochrome ? null : fit(m, false), base = f ? f.dir : roleMix(roles, K, { cool: 0.6, earth: 0.4 });
       // a shadow leans to the cool paint; a clearly coloured dark (foliage) keeps its own hue
       const chromaOf = f ? Math.hypot(f.want[1], f.want[2]) : 0, cool = chromaOf > 14 ? 0.15 : 0.4;
