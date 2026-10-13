@@ -1,0 +1,110 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
+import { prunePenLines } from './pen-wash-lines.mjs';
+import { washFootprint } from './pen-wash.mjs';
+import { expandRecipe, styleAlias } from '../recipe.mjs';
+import { BOX, boxPigment } from '../../crop/box.mjs';
+
+const W = 120, H = 90, N = W * H;
+// a limited palette of real box paints: blue, yellow earth, red earth
+const PIGS = ['ultramarine', 'ochre', 'sienna'].map(k => ({ ...boxPigment(BOX.find(p => p.key === k)), key: k }));
+
+// A pale sky over a mid building with a dark shadow side, on a light street: grey, so the planner treats it as monochrome.
+function scene() {
+  const px = new Uint8ClampedArray(N * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const building = x > 40 && x < 80 && y > 15 && y < 70, shadow = building && x > 64;
+    const v = shadow ? 55 : building ? 140 : y >= 70 ? 225 : 235;
+    px.fill(v, (y * W + x) * 3, (y * W + x) * 3 + 3);
+  }
+  return { px };
+}
+
+test('the three-value map keeps white paper and stays three flat groups', () => {
+  const L = Float32Array.from({ length: N }, (_, i) => 100 * (i % W) / W);
+  const { groups, shares } = valueGroups(L, W, H, { sigma: 2, minLight: 0.3, maxDark: 0.2 });
+  assert.ok(shares[0] >= 0.29, `light share ${shares[0]}`);
+  assert.ok(shares[2] <= 0.21, `dark share ${shares[2]}`);
+  assert.deepEqual([...new Set(groups)].sort(), [0, 1, 2]);
+  // light to dark runs right to left, as the luminance does
+  assert.equal(groups[W - 1], 0); assert.equal(groups[0], 2);
+});
+
+test('the sky is the light reached from the top edge', () => {
+  const g = new Uint8Array(N).fill(1); for (let i = 0; i < W * 20; i++) g[i] = 0; for (let i = N - W * 5; i < N; i++) g[i] = 0;
+  const s = skyMask(g, W, H);
+  assert.equal(s.reduce((a, v) => a + v, 0), W * 20, 'the light street at the bottom is not sky');
+});
+
+test('the value planner makes a few connected washes: sky, local colour, shadow', () => {
+  const { px } = scene();
+  const plan = planPenWash({ planner: 'values', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5 });
+  const ids = plan.passages.map(p => p.id);
+  assert.ok(plan.monochrome);
+  assert.ok(plan.passages.length >= 3 && plan.passages.length <= PENWASH_MAX_PASSAGES, ids.join());
+  assert.equal(ids[0], 'sky'); assert.ok(ids.includes('shadow')); assert.ok(ids.some(id => id.startsWith('local')));
+  const roles = paletteRoles(PIGS);
+  assert.equal(roles.cool, 0); assert.ok(plan.passages[0].dir[roles.cool] > 0.5, 'the sky is mostly the blue');
+  for (const p of plan.passages) {
+    assert.ok(Math.abs(p.dir.reduce((a, v) => a + v, 0) - 1) < 1e-6, `${p.id} mix sums to one`);
+    assert.ok(p.strength > 0 && p.strength <= 0.32, `${p.id} stays a transparent wash`);
+  }
+  // the shadow glaze sits on the shadow side only, and the lit street stays paper under every wash but the sky
+  const shadow = plan.passages.find(p => p.id === 'shadow');
+  assert.equal(shadow.mask[40 * W + 72], 1); assert.equal(shadow.mask[40 * W + 50], 0);
+  for (const p of plan.passages.slice(1)) assert.equal(p.mask[85 * W + 10], 0, `${p.id} leaves the street white`);
+  // a graded sky is darker at the top
+  const a = passageAmounts(plan.passages[0], W, H, 3);
+  assert.ok(a[(2 * W + 10) * 3] > a[(12 * W + 10) * 3]);
+});
+
+test('the colour-region planner is the comparison: flat washes per region, light regions left', () => {
+  const { px } = scene();
+  const plan = planPenWash({ planner: 'colour', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5 });
+  assert.ok(plan.passages.length >= 1 && plan.passages.length <= PENWASH_MAX_PASSAGES);
+  assert.ok(plan.passages.every(p => p.role === 'region' && !p.grade));
+  assert.throws(() => planPenWash({ planner: 'cells', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5 }), /values or colour/);
+});
+
+test('line pruning keeps structure whole and thins small repeated marks, most in the light', () => {
+  const groups = new Uint8Array(N); for (let i = 0; i < N; i++) groups[i] = (i % W) < W / 2 ? 0 : 2;
+  const box = (x, y) => ({ points: [{ x, y, weight: 1 }, { x: x + 2, y, weight: 1 }, { x: x + 2, y: y + 3, weight: 1 }, { x, y: y + 3, weight: 1 }], length: 10 });
+  const windows = []; for (let y = 4; y < H - 6; y += 5) for (let x = 2; x < W - 4; x += 4) windows.push(box(x, y));
+  const wall = { points: [{ x: 1, y: 1, weight: 1 }, { x: 1, y: H - 2, weight: 1 }], length: H - 3 };
+  const speck = { points: [{ x: 50, y: 50 }, { x: 50.5, y: 50 }], length: 0.5 };
+  const { lines, stats } = prunePenLines([wall, speck, ...windows], { w: W, h: H, mmPerCell: 0.5, groups, seed: 3 });
+  assert.ok(lines.includes(wall) || lines.some(g => g.points.length === 2 && g.length === wall.length), 'structure kept');
+  assert.ok(!lines.includes(speck)); assert.equal(stats.short, 1);
+  const kept = lines.filter(g => g !== wall && g.length === 10);
+  const lit = kept.filter(g => g.points[0].x < W / 2).length, shade = kept.filter(g => g.points[0].x >= W / 2).length;
+  assert.ok(kept.length < windows.length, 'some windows omitted');
+  assert.ok(shade > lit, `the shadow side keeps more (${shade} vs ${lit})`);
+  assert.deepEqual(prunePenLines([wall, speck, ...windows], { w: W, h: H, mmPerCell: 0.5, groups, seed: 3 }).stats, stats, 'deterministic');
+  // a long line over lit paper is drawn lighter
+  const litWall = lines.find(g => g.length === wall.length);
+  assert.ok(litWall.points[0].weight < 1);
+});
+
+test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
+  const m = new Uint8Array(N); for (let y = 20; y < 60; y++) for (let x = 30; x < 90; x++) m[y * W + x] = 1;
+  const f = washFootprint(m, W, H, { slip: 4, angle: 0, edgeSigma: 1, edgeAmp: 0 });
+  assert.equal(f[40 * W + 31], 0); assert.equal(f[40 * W + 92], 1);
+  const loud = Float32Array.from({ length: N }, (_, i) => (i % 7 === 0 ? 3 : -3)), g = washFootprint(m, W, H, { edgeSigma: 1, edgeAmp: 0.3, noise: loud });
+  assert.equal(g[7 * W], 0, 'edge noise raises no island far from the shape');
+  const full = new Uint8Array(N).fill(1), v = washFootprint(full, W, H, { margin: 6, edgeAmp: 0 });
+  assert.equal(v[0], 0); assert.equal(v[45 * W + 60], 1);
+});
+
+test('--style penwash names the pen-and-wash recipe; the default recipe is unchanged', () => {
+  assert.deepEqual(styleAlias(['--image', 'a.jpg', '--style', 'penwash']), ['--recipe', 'penwash', '--image', 'a.jpg']);
+  assert.deepEqual(styleAlias(['--style', '0.5']), ['--style', '0.5']);
+  assert.throws(() => styleAlias(['--recipe', 'v096', '--style', 'penwash']), /conflicts/);
+  const pen = expandRecipe({ argv: ['--image', 'a.jpg', '--style', 'penwash'] }).argv;
+  const at = k => pen[pen.lastIndexOf(k) + 1];
+  assert.equal(at('--penwash'), '1'); assert.equal(at('--drawing'), 'first'); assert.equal(at('--touchpoints'), '0');
+  assert.ok(!pen.includes('--style'));
+  const def = expandRecipe({ argv: ['--image', 'a.jpg'] }).argv;
+  assert.ok(!def.includes('--penwash'));
+  assert.equal(def[def.lastIndexOf('--touchpoints') + 1], '2');
+});

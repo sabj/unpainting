@@ -132,6 +132,9 @@ import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
 import { localLights } from '../src/paint/methods/local-lights.mjs';
 import { makeMopLanes } from '../src/paint/methods/mop-lanes.mjs';
 import { paintMasses } from '../src/paint/methods/masses.mjs';
+import { planPenWash, describePlan, passageAmounts } from '../src/paint/methods/pen-wash-plan.mjs';
+import { prunePenLines } from '../src/paint/methods/pen-wash-lines.mjs';
+import { paintPenWash } from '../src/paint/methods/pen-wash.mjs';
 import { paintShapes } from '../src/paint/methods/shapes.mjs';
 import { passageHook } from '../src/paint/methods/passages.mjs';
 import { leftToTheWashes } from '../src/paint/methods/ladder-seg.mjs';
@@ -1822,6 +1825,31 @@ let filmLaid = 0, filmNext = 1;
 await shoot();
 
 phaseMark('sheet');
+// --penwash 1 (--style penwash, src/paint/recipe.mjs): pen and wash. The ink drawing is drawn whole from its prepared
+// file with its small repeated marks pruned (pen-wash-lines.mjs), then three to six simple washes planned here from a
+// three-value simplification (--penwashplan values) or, for comparison, from colour regions (--penwashplan colour)
+// replace the value ladder (pen-wash-plan.mjs, pen-wash.mjs). Planned now, before the target guard seals the target.
+const PENWASH = num('penwash', 0) > 0;
+let PENWASH_LINES = null;
+const PENWASH_PLAN = PENWASH ? (() => {
+  const plan = planPenWash({ planner: opt('penwashplan', 'values'), px: PX_RAW, w, h, pigments: PIGS, paperRGB, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w,
+    options: { lightness: num('pwlightness', 0.5), minLight: num('pwminlight', 0.45), maxDark: num('pwmaxdark', 0.22), blurMm: num('pwblur', 2.5), minArea: num('pwminarea', 0.006), hueGap: num('pwhuegap', 10), joinMm: num('pwjoin', 2), minPiece: num('pwminpiece', 0.008) } });
+  const doc = { planner: opt('penwashplan', 'values'), palette: PIGS.map(p => p.name ?? null), ...describePlan(plan, n, PIGS) };
+  fs.writeFileSync(path.join(out, 'penwash-plan.json'), JSON.stringify(doc, null, 2));
+  console.log(`pen wash: ${plan.passages.length} passages planned from ${doc.planner}${plan.monochrome ? ', monochrome target, palette roles' : ''}: ${doc.passages.map(q => `${q.id} ${(100 * q.area).toFixed(0)}%`).join(', ')}`);
+  return plan;
+})() : null;
+// Flat previews of the plan before any mark: the value map and the washes laid flat on paper (no physics).
+const penWashFlat = () => {
+  const flat = new Uint8ClampedArray(n * 3); for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) flat[3 * i + c] = paperRGB[c];
+  return renderLayers(PENWASH_PLAN.passages.map(p => { const a = passageAmounts(p, w, h, PIGS.length); return PIGS.map((_, j) => Float32Array.from({ length: n }, (_, i) => a[i * PIGS.length + j])); }), PIGS, flat, n, 1);
+};
+if (PENWASH_PLAN) {
+  const grey = [250, 165, 70], vm = Buffer.alloc(n * 3);
+  for (let i = 0; i < n; i++) vm.fill(PENWASH_PLAN.groups[i] < 3 && opt('penwashplan', 'values') === 'values' ? grey[PENWASH_PLAN.groups[i]] : Math.round(40 + 200 * PENWASH_PLAN.groups[i] / 6), i * 3, i * 3 + 3);
+  await sharp(vm, { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'penwash-values.png'));
+  await sharp(Buffer.from(penWashFlat()), { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'penwash-plan.png'));
+}
 // Wrap the target and its per-cell maps (--targetguard): planning may read them until TARGET_GUARD.beginPaint()
 // closes them before the first mark. The look gets shape-level means only.
 TARGET_GUARD.provide('px', PX_RAW, { stride: 3 }); TARGET_GUARD.provide('A', A, { stride: PIGS.length }); if (AL !== A) TARGET_GUARD.provide('AL', AL, { stride: PIGS.length });
@@ -2092,7 +2120,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : DARK_MASS ? DARK_MASS.cutPen : PRACTICE_CUT && !first && !fine ? PRACTICE_CUT : g => g;
   // --darkmasscurls walker: the first pass's walker gestures on a dark mass become its curly brush strokes
   if (DARK_MASS && first && !fine) DARK_MASS.takeGestures(drawn);
-  const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, walker: drawn, field, style: DRAW_STYLE }));
+  const penWashPrune = PENWASH_PLAN && first && !fine ? lines => { const r = prunePenLines(lines, { w, h, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w, groups: opt('penwashplan', 'values') === 'values' ? PENWASH_PLAN.groups : null, seed: 1 + Math.round(num('seed', 0)) }); PENWASH_LINES = r.stats; console.log(`pen wash lines: ${r.stats.out} of ${r.stats.in} lines kept (${r.stats.short} specks, ${r.stats.omitted} omitted, ${r.stats.duplicate} repeats, ${r.stats.density} over density), ink ${r.stats.inkMmOut} of ${r.stats.inkMmIn} mm`); return r.lines; } : null;
+  const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, walker: drawn, field, style: DRAW_STYLE, prune: penWashPrune }));
   let kept = SELECTED ? SELECTED : cutPen(penKeep ? drawn.filter(penKeep) : drawn);
   // --inkskin x0,y0,x1,y1 (sheet fractions): the closing pen keeps off warm skin interiors of the figure in the box. Default off.
   // --inkskinerode: interior erosion in cells (default 3); --inkskinshare: share of points inside that drops a gesture (default 0.6).
@@ -2606,6 +2635,13 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
   await drawPass(null, { first: true });
   INK_THK = thickness(sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
+  if (PENWASH_PLAN) {
+    // the flat plan over the actual dry ink, multiplied as a transparent wash would sit on it
+    const ink = render(), flat = penWashFlat(), mix = Buffer.alloc(N2 * 3);
+    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = y * W2 + x, j = ((y / SC) | 0) * w + ((x / SC) | 0); for (let c = 0; c < 3; c++) mix[i * 3 + c] = Math.round(ink[i * 3 + c] * flat[j * 3 + c] / Math.max(1, paperRGB[c])); }
+    await sharp(mix, { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'penwash-preview.png'));
+    if (PENWASH_LINES) fs.writeFileSync(path.join(out, 'penwash-lines.json'), JSON.stringify(PENWASH_LINES, null, 2));
+  }
 }
 // An actual dry-pen checkpoint, using the same planned strokes and physics as
 // the full painting. The process exit hook still writes the strict guard report.
@@ -2680,6 +2716,15 @@ if (PRACTICE) {
 const MASSES = Math.round(num('masses', 0));
 const mopLanes = makeMopLanes({ num });
 const setStage = s => { STAGE = s; };
+if (PENWASH_PLAN) {
+  const r = await paintPenWash({
+    createBrush, stroke, step, dry, thickness, sheet, w, h, n, W2, H2, PIGS, O, SEED, UPRIGHT, CAL, WET, mopLanes, handAngle, flowEvery, dip, up, clock, shoot, setStage, num, log: console.log, expected, used,
+    mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / W2,
+    checkpoint: async (k, id) => sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, `penwash-${String(k).padStart(2, '0')}-${id}.png`)),
+  }, PENWASH_PLAN);
+  laid += r.laid;
+  fs.writeFileSync(path.join(out, 'penwash-run.json'), JSON.stringify({ passages: r.records, lines: PENWASH_LINES }, null, 2));
+}
 if (MASSES > 0) {
   const massLaid = await paintMasses({
     sheet, w, h, n, SC, W2, H2, PIGS, A, expected, used, O, SEED, UPRIGHT, BRUSH, CAL, WET, subject: TIER_MASK,
@@ -2898,7 +2943,7 @@ const awareBoundary = async at => {
 let L_START = 0;
 if (RESUMING) { const at = awareRestore(); L_START = at.kind === 'start' ? 0 : at.kind === 'pass' ? at.L + 1 : layers.length; }
 else await awareBoundary({ kind: 'start' });
-for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
+for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(L===FINISH_START){AREA_PLAN=FINISH_PLAN;AREA_COMPILED=FINISH_COMPILED;AREA_EXEC.set(null);if(FINISH_PLAN.doc.finishingBase){const b=FINISH_PLAN.doc.finishingBase;dry(sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));if(!paper.dry)throw Error('finishing connected pass requires measured dry base');}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(sheet);FINISH_MASS_BEFORE=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0));}
   const layer = layers[L];
   // --finishsnaps 1: the sheet as the finish begins (the planned ladder laid, before the touch-up rounds), for review
@@ -3627,7 +3672,7 @@ console.log(`techniques: ${Object.entries(used).map(([k, v]) => `${k} ${v}`).joi
 if (dropped) console.log(`${dropped} passages yielded no brush path and were never painted, carrying ${(100 * droppedMass / Math.max(1e-6, plannedMass)).toFixed(1)}% of the planned mass; the plan counts them delivered`);
 await drainFrames();
 const judged = intermediates(marks, w, h, gaussian);
-console.log(`carried the plan: forms ${(100 * judged.endFormKept).toFixed(0)}% at agreement ${judged.endFormStructure.toFixed(2)}; at one cell ${(100 * judged.endFineKept).toFixed(0)}% at ${judged.endStructure.toFixed(2)} (the tooth, which the plan cannot state)`);
+if (judged.steps.length) console.log(`carried the plan: forms ${(100 * judged.endFormKept).toFixed(0)}% at agreement ${judged.endFormStructure.toFixed(2)}; at one cell ${(100 * judged.endFineKept).toFixed(0)}% at ${judged.endStructure.toFixed(2)} (the tooth, which the plan cannot state)`);
 for (const f of judged.flags) console.log(`  ! ${f}`);
 {
   // What each pigment was planned against what the sheet holds of it, so a wrong hue can be traced to one pigment.

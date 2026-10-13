@@ -17,7 +17,8 @@ const GAIN = 1.39, MARGIN = 0.42;
 // The selected drawing as tier-1 strokes, or null when no file applies to this pen. `walked` is for the log only.
 // --drawinglast <base>: the closing pen (--drawing both|last, over the dry sheet) draws only lines of weight at least
 // --drawinglastmin, so the darks and features stay crisp over the glazes.
-export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, walker = null, field = null, style = null }) {
+// `prune` (pen and wash, pen-wash-lines.mjs) thins the opening pen's planned lines before they are split into strokes.
+export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, walker = null, field = null, style = null, prune = null }) {
   const lastPass = !first && !fine && opt('drawinglast', '');
   if (!(first && opt('drawingfile', '')) && !lastPass) return null;
   const b = first ? opt('drawingfile', '') : opt('drawinglast', '');
@@ -32,7 +33,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // the plan's choice (drawing-plan.mjs planLines): --drawshare's strongest share, --drawregions' subject-first ranking
   // and --drawmax's cap
   const candidates = loadLines(b, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), min = num('drawinglastmin', 0.6);
-  const all = planLines(candidates, num);
+  const planned = planLines(candidates, num), all = first && prune ? prune(planned) : planned;
   if (skip.size) log(`drawing: lines with role ${[...skip].join(', ')} left out`);
   if (all.length < candidates.length) log(`drawing: ${all.length} of ${candidates.length} lines kept (--drawshare ${num('drawshare', 1)}, --drawregions ${num('drawregions', 0)}, --drawmax ${num('drawmax', Infinity)})`);
   const lines = first ? all : all.filter(g => (g.weight ?? 1) >= min);
