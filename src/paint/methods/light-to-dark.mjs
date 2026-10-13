@@ -6,7 +6,6 @@ import {planLanes} from './stroke-plan.mjs';
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
 import { passage } from '../../crop/blockin.mjs';
-import { labOf } from '../../eval/colour.mjs';
 import { RECESS, SHADOW_GLAZE, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND, FIRST_INK_SKIP } from '../tuned/trumbull.mjs';
 import { TEX_ZONE, JAW_INK } from '../tuned/portrait.mjs';
 
@@ -231,11 +230,7 @@ export function planLightToDark({bandRound=false,valueFloor=null,demand,k,densit
       const groupMode=layerHue&&(step.tag||((skySplit||lightFamilies)&&phase==='light'));
       if(groupMode&&!coolGroup){coolGroup=new Uint8Array(region.regions.length+1);const sr=new Float64Array(region.regions.length+1),sb=new Float64Array(region.regions.length+1),cnt=new Float64Array(region.regions.length+1);for(let q=0;q<n;q++){const L=region.labels[q];sr[L]+=rgb[q*3];sb[L]+=rgb[q*3+2];cnt[L]++;}const sg=new Float64Array(region.regions.length+1);for(let q=0;q<n;q++)sg[region.labels[q]]+=rgb[q*3+1];
         // Three families: cool (sky, glass), yellow-green foliage (hue >= 50 deg), warm stone.
-        for(let L=1;L<=region.regions.length;L++){const r=sr[L]/Math.max(1,cnt[L]),g=sg[L]/Math.max(1,cnt[L]),b=sb[L]/Math.max(1,cnt[L]),hue=Math.atan2(Math.sqrt(3)*(g-b),2*r-g-b)*180/Math.PI;
-          // RGB range confuses a dark muted brown with a saturated orange. Use
-          // perceptual chroma so their shared warm hue does not pool their paint.
-          const [,a,bb]=labOf([r,g,b],0,[255,255,255]);
-          coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(hueChroma>0&&Math.hypot(a,bb)>=hueChroma?3:0);}}
+        for(let L=1;L<=region.regions.length;L++){const r=sr[L]/Math.max(1,cnt[L]),g=sg[L]/Math.max(1,cnt[L]),b=sb[L]/Math.max(1,cnt[L]),hue=Math.atan2(Math.sqrt(3)*(g-b),2*r-g-b)*180/Math.PI;coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(hueChroma>0&&Math.max(r,g,b)-Math.min(r,g,b)>=hueChroma?3:0);}}
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
       const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0):[];
       const domains=groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
