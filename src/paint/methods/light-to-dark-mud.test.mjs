@@ -53,6 +53,12 @@ test('hueChromaLab: a muted brown with a wide RGB range does not share the satur
   assert.ok(lab < rgbRange / 4, `blue light wash on orange ${lab} vs ${rgbRange}`);
 });
 
+test('shadowFamilies: the grey shadow glaze does not pool its blue charge across the orange', () => {
+  const opts = { lightFamilies: true, hueChroma: 30, hueChromaLab: true };
+  const pooled = blueOnOrange(plan(opts)).shadow, split = blueOnOrange(plan({ ...opts, shadowFamilies: true })).shadow;
+  assert.ok(pooled > 0 && split < pooled / 2, `blue shadow glaze on orange ${split} vs ${pooled}`);
+});
+
 test('passCap: a passage charged at its median over-charges fewer cells and still lays the planned mass', () => {
   const over = p => { const per = laidPerCell(p); let o = 0, t = 0; for (let i = 0; i < n * k; i++) { t += demand[i]; if (demand[i] > 0) o += Math.max(0, per[i] - demand[i]); } return o / t; };
   const mass = p => { const per = laidPerCell(p); let a = 0, b = 0; for (let i = 0; i < n * k; i++) { a += per[i]; b += demand[i]; } return a / b; };

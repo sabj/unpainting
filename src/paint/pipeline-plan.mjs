@@ -59,6 +59,8 @@ export function pipelineFlags(plan) {
   // middle washes instead of pooling with muted warm and grey neighbours. Family mode keeps RGB range 30.
   add('huechroma', w.colour === 'layered' ? 20 : 30);
   if (w.colour === 'layered') add('huechromalab', 1);
+  // Layered shadow glazes also keep colour families apart: the grey shadow does not pool its blue across the orange.
+  if (w.colour === 'layered') add('shadowfamilies', 1);
   add('passcap', w.colour === 'family' ? w.charge : 0);
   add('maskmm', w.colour === 'family' ? w.carryMm : 0);
   add('lightfamilies', 1);
