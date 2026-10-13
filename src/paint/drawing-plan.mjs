@@ -4,17 +4,17 @@
 // apply: --outlinemedium auto picks graphite or ink from the image, with the default caps and pressure.
 // docs/plan-format.md describes the fields.
 
-export const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
-export const INK_COLOURS = Object.freeze(['sepia', 'black']);
-export const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
+const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
+const INK_COLOURS = Object.freeze(['sepia', 'black']);
+const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
 // Where the line set comes from (--linesource, src/paint/methods/linework-plan.mjs).
-export const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
+const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
 // The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
-export const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
-export const PREP_INK_METHODS = Object.freeze(['contour', 'connected', 'scribble']);
-export const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
-export const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
-export const FINISH_MASSES = Object.freeze(['none', 'scribble']);
+const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
+const PREP_INK_METHODS = Object.freeze(['contour', 'connected', 'scribble']);
+const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
+const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
+const FINISH_MASSES = Object.freeze(['none', 'scribble']);
 // prepInk.method: contour draws the stage's lines as planned; connected lays the walker's connected gestures on them
 // (--drawinglogic 2); scribble joins them into fewer, longer strokes, opens the lit edges and scribbles the dark masses
 // (--drawinglogic 3).
@@ -89,7 +89,7 @@ function stageChoice(o, path, key, allowed) {
  * finishInk?: {from, select, restate, method, masses} }. A stage that is missing or false is not drawn; true takes
  * its defaults. `inkColor` decides whether the architecture method strengthens sepia.
  */
-export function stageFlags(stages, { inkColor = null } = {}) {
+function stageFlags(stages, { inkColor = null } = {}) {
   if (typeof stages !== 'object' || stages == null || Array.isArray(stages)) throw new Error('drawing.stages: an object with prep, prepInk and finishInk');
   for (const k of Object.keys(stages)) if (!STAGES.includes(k)) throw new Error(`drawing.stages: prep, prepInk or finishInk, not ${k}`);
   const prep = stageObject(stages, 'prep'), prepInk = stageObject(stages, 'prepInk'), finishInk = stageObject(stages, 'finishInk');

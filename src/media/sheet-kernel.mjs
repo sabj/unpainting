@@ -4,8 +4,10 @@
 // distance is capped at edgeWidth + 1 so each band recomputes nearby rows privately. DOM free, no Node imports.
 
 // ctrl (Int32) layout
-export const GEN = 0, PHASE = 1, SHEET = 2, DONE = 3, ERR = 4, NT = 5, READY = 6, NXT = 7, NCH = 8;
-export const BOX = 16, IT = 20, ITERS = 21, LAST = 22, NA = 23, N3 = 24, NGROUP = 25, NK = 26;
+export const GEN = 0, PHASE = 1, SHEET = 2, DONE = 3, ERR = 4, NT = 5, READY = 6, NCH = 8;
+const NXT = 7;
+export const BOX = 16, IT = 20, ITERS = 21, LAST = 22, NA = 23, N3 = 24, NGROUP = 25;
+const NK = 26;
 export const MAXT = 64, MAXC = 256, MAXK = 64;
 export const BAND = 64, ACT = BAND + 2 * MAXC, ACT3 = ACT + MAXK, GROUP = ACT3 + MAXK, GREP = GROUP + MAXK, MV = GREP + MAXK, AF = MV + MAXK, DF = AF + MAXK, TF = DF + MAXK, CTRL_LEN = TF + MAXK;
 // prm (Float64) layout: the step's constants, worked out on the main thread exactly as stepBox works them out

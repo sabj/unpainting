@@ -50,7 +50,7 @@ function stampSegment(mask, w, h, ax, ay, bx, by, r) {
 }
 
 /** Fill masked cells from unmasked ones by push-pull (pyramid averaging), per channel. Returns a new buffer. */
-export function pushPullFill(rgb, mask, w, h, channels = 3) {
+function pushPullFill(rgb, mask, w, h, channels = 3) {
   const levels = [];
   let cw = w, ch = h, val = new Float32Array(w * h * channels), wt = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) if (!mask[i]) { wt[i] = 1; for (let c = 0; c < channels; c++) val[i * channels + c] = rgb[i * channels + c]; }

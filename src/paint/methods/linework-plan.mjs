@@ -20,7 +20,7 @@ import { finishTexture } from './finish-texture.mjs';
 import { linePaths } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
 
-export const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch', 'structure-lines', 'structure-combine', 'line-map']);
+const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch', 'structure-lines', 'structure-combine', 'line-map']);
 // fewer source-ink lines than this and the stages fall back to edge chains
 const MIN_STAGE_LINES = 12;
 const STAGE_KEYS = Object.freeze({ prep: 'prep', prepink: 'prepInk', finishink: 'finishInk' });
@@ -50,7 +50,7 @@ export function chooseLineSource(mode, { inkShare, threshold = 0.5, sketchAvaila
 }
 
 /** Whether the sketch planner's python has numpy and OpenCV. */
-export function sketchAvailable(python) {
+function sketchAvailable(python) {
   const r = spawnSync(python, ['-c', 'import cv2, numpy'], { encoding: 'utf8', timeout: 60000 });
   return !r.error && r.status === 0;
 }
