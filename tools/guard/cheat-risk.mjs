@@ -189,8 +189,10 @@ async function writeStrip(files, out, W, H) {
   return out;
 }
 
-export async function cheatRisk({ run, target, sheetMm, keys = '', keybox = '', stagesDir = path.join(run, 'stages') }) {
-  const mk = readMarks(run), sm = smallShare(mk, sheetMm);
+export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox = '', stagesDir = path.join(run, 'stages') }) {
+  // A running painter already holds its tape. Reuse it rather than reading a
+  // native recording into a single string that can exceed V8's string limit.
+  const mk = marks ?? readMarks(run), sm = smallShare(mk, sheetMm);
   const paint = findPainting(run);
   const pm = await sharp(paint).metadata();
   // compared at the painting's own scale up to 540 px wide: upsampling a small painting erases its 2-4 px band

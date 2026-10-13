@@ -329,6 +329,17 @@ test('cheatRisk on a run writes stage frames and catches a copied target', async
   assert.equal(a.guard.pixelFit, 0);
 });
 
+test('an in-memory tape preserves every audit result without rereading its export', async () => {
+  for (const options of [{}, { copyTarget: true }, { guard: { mode: 'gentle', violations: 1, byName: { px: 1 } } }]) {
+    const run = await fakeRun(options), file = path.join(run.d, 'marks.json');
+    const marks = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const fromFile = await cheatRisk({ run: run.d, target: run.target, sheetMm: 64 });
+    fs.writeFileSync(file, 'not readable JSON');
+    const fromMemory = await cheatRisk({ run: run.d, target: run.target, sheetMm: 64, marks });
+    assert.deepEqual(fromMemory, fromFile);
+  }
+});
+
 test('promotion check refuses unguarded and target-reading runs, and marks high risk for review', async () => {
   const ok = await fakeRun({ guard: { mode: 'gentle', violations: 0, byName: {} } });
   fs.writeFileSync(path.join(ok.d, 'cheat-risk.json'), JSON.stringify({ risk: 0.1, level: 'low', flags: [] }));
