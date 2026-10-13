@@ -52,12 +52,11 @@ export function pipelineFlags(plan) {
   const add = (k,v) => flags.push('--'+k,String(v));
   if (w.furReserves) add('furreserves', JSON.stringify(w.furReserves));
   add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
-  // Layering changes dilution and charge, not the source's colour families. A neutral
-  // foundation crossing an orange passage cannot be corrected by a later light wash.
-  add('huechroma', 30);
+  // Honour the authored wash mode: colour-family splitting changes the passage plan.
+  add('huechroma', w.colour === 'family' ? 30 : 0);
   add('passcap', w.colour === 'family' ? w.charge : 0);
   add('maskmm', w.colour === 'family' ? w.carryMm : 0);
-  add('lightfamilies', 1);
+  add('lightfamilies', w.colour === 'family' ? 1 : 0);
   add('palelights', w.colour === 'family' ? w.paleLimit : 0);
   add('washinkfree', +w.inkAware);
   add('subjectorder', p.order.strength);
