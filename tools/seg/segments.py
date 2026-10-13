@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 """A label map of the scene's parts, with their outlines.
 
-Segment Anything's automatic masks give the boundaries when a checkpoint is present, else k-means in Lab. Names
-always come from rules over position, mean Lab colour and size; the figure is u2net's mask
-(tools/seg/segment.py, work/masks/<base>.png).
+Two modes. --mode scene (the default) names a beach-like scene's parts by rules over position, mean Lab colour and
+size; the figure is u2net's mask (tools/seg/segment.py, work/masks/<base>.png), and Segment Anything's automatic masks
+give the boundaries when a checkpoint is present, else k-means in Lab. --mode regions is the painter's: SAM's masks
+made into one partition of general regions r1..rN, with no names from rules (tools/seg/sam_regions.py). The painter
+runs it before every painting (src/crop/segment-prep.mjs).
+
+--sam auto uses SAM when it can and says so when it cannot; --sam require stops with an error instead of falling
+back to k-means; --sam off is k-means only.
 
   python3 tools/seg/segments.py <image> --out work/segments
+  python3 tools/seg/segments.py <image> --mode regions --sam require --checkpoint <sam_vit_b_01ec64.pth>
 
 writes work/segments/<base>.png (label map, one byte per pixel, source resolution), <base>.json (legend and each
 region's area share, bounding box, mean Lab and foreground flag) and <base>-contours.json (each label's external
@@ -25,6 +31,9 @@ import sys
 
 import cv2
 import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import sam_regions  # noqa: E402
 
 # Working size for SAM and the clustering; the label map is still written at the source's size.
 WORK_SIDE = 1024
@@ -208,7 +217,8 @@ def rule_field(lab, clusters, blocked, horizon, paper, shape):
 def find_checkpoint(explicit):
     if explicit:
         return explicit if os.path.exists(explicit) else None
-    for p in (os.environ.get('SAM_CHECKPOINT', ''),
+    for p in (os.environ.get('PAINTER_SAM_CHECKPOINT', ''), os.environ.get('SAM_CHECKPOINT', ''),
+              os.path.join(os.path.expanduser('~'), 'painter-models', 'sam_vit_b_01ec64.pth'),
               'work/models/sam_vit_b_01ec64.pth'):
         if p and os.path.exists(p):
             return p
@@ -372,7 +382,7 @@ def shared_boundaries(field, a_idx, b_idx, eps, min_points, reach):
     return out
 
 
-def contour_report(field, present, shape):
+def contour_report(field, present, shape, pairs=None):
     H, W = shape
     short = min(H, W)
     eps = EPS_FRACTION * short
@@ -384,7 +394,7 @@ def contour_report(field, present, shape):
         report['regions'].append({'id': int(idx), 'name': name, 'polygons': polys})
     for i, a in enumerate(present, start=1):
         for j, b in enumerate(present, start=1):
-            if j <= i:
+            if j <= i or (pairs is not None and (i, j) not in pairs):
                 continue
             # trace the smaller region's outline: a silhouette belongs to the object, not to the sand behind it
             small, large = (i, j) if (field == i).sum() <= (field == j).sum() else (j, i)
@@ -432,9 +442,13 @@ def segment(path, args):
     if args.sam != 'off':
         checkpoint = find_checkpoint(args.checkpoint)
         if checkpoint is None:
+            if args.sam == 'require':
+                raise SystemExit('segments: SAM required and no checkpoint was found')
             notes.append('SAM off: no checkpoint found')
         else:
             masks, note = sam_masks(small, checkpoint, args.model)
+            if masks is None and args.sam == 'require':
+                raise SystemExit(f'segments: SAM required and it did not run: {note}')
             notes.append(note)
             if masks:
                 names = snap_to_sam(names, masks, keep=set(np.unique(names)) - {''})
@@ -462,13 +476,47 @@ def resize_names(names, size):
     return out
 
 
+def segment_regions(path, args):
+    """--mode regions: SAM's masks as general regions, or k-means when SAM is off or (under --sam auto) cannot run."""
+    full = read_image(path)
+    H, W = full.shape[:2]
+    scale = min(1.0, WORK_SIDE / float(max(H, W)))
+    small = cv2.resize(full, (int(round(W * scale)), int(round(H * scale))), interpolation=cv2.INTER_AREA)
+    lab = to_lab(small)
+    notes, backend, field = [], None, None
+    if args.sam != 'off':
+        checkpoint = find_checkpoint(args.checkpoint)
+        try:
+            if checkpoint is None:
+                raise RuntimeError('no SAM checkpoint found (--checkpoint, PAINTER_SAM_CHECKPOINT, SAM_CHECKPOINT, '
+                                   '~/painter-models, work/models)')
+            masks, info = sam_regions.sam_masks(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), checkpoint, args.model, args.points)
+            field, used = sam_regions.sam_partition(masks, lab)
+            backend = {**info, 'laid': used, 'checkpoint': os.path.basename(checkpoint)}
+            notes.append(f"SAM {info['model']} on {info['device']}: {info['masks']} masks, {used} laid, {info['seconds']} s")
+        except RuntimeError as e:
+            if args.sam == 'require':
+                raise SystemExit(f'segments: SAM required and it did not run: {e}')
+            notes.append(f'SAM off: {e}')
+    if field is None:
+        field = sam_regions.kmeans_regions(lab, args.k)
+        backend = {'backend': 'kmeans', 'k': args.k}
+        notes.append(f'k-means in Lab, k {args.k}')
+    big = sam_regions.renumber(cv2.resize(field.astype(np.uint8), (W, H), interpolation=cv2.INTER_NEAREST).astype(np.int32))
+    legend, regions, names = sam_regions.describe(big, to_lab(full))
+    pairs = set(sam_regions.adjacency(big))
+    return big, legend, regions, contour_report(big, names, (H, W), pairs), notes, backend
+
+
 def main():
     ap = argparse.ArgumentParser(description='A label map of a picture\'s parts, and their outlines.')
     ap.add_argument('images', nargs='+')
     ap.add_argument('--out', default='work/segments')
     ap.add_argument('--masks', default='work/masks', help='where tools/seg/segment.py left the u2net masks')
     ap.add_argument('--mask', default='', help='one figure mask, overriding --masks for a single image')
-    ap.add_argument('--sam', choices=['auto', 'off'], default='auto')
+    ap.add_argument('--mode', choices=['scene', 'regions'], default='scene')
+    ap.add_argument('--sam', choices=['auto', 'off', 'require'], default='auto')
+    ap.add_argument('--points', type=int, default=32, help='SAM points per side (--mode regions)')
     ap.add_argument('--checkpoint', default='', help='a SAM checkpoint; otherwise the usual caches are searched')
     ap.add_argument('--model', default='vit_b')
     ap.add_argument('--k', type=int, default=6, help='colour clusters the background is cut into')
@@ -476,11 +524,14 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     for path in args.images:
         base = os.path.splitext(os.path.basename(path))[0]
-        field, legend, regions, contours, notes = segment(path, args)
+        if args.mode == 'regions':
+            field, legend, regions, contours, notes, backend = segment_regions(path, args)
+        else:
+            (field, legend, regions, contours, notes), backend = segment(path, args), None
         cv2.imwrite(os.path.join(args.out, base + '.png'), field.astype(np.uint8))
         with open(os.path.join(args.out, base + '.json'), 'w') as f:
-            json.dump({'source': path, 'image': contours['image'], 'legend': legend, 'regions': regions,
-                       'notes': notes}, f, indent=1)
+            json.dump({'source': path, 'mode': args.mode, 'backend': backend, 'image': contours['image'],
+                       'legend': legend, 'regions': regions, 'notes': notes}, f, indent=1)
         with open(os.path.join(args.out, base + '-contours.json'), 'w') as f:
             json.dump(contours, f)
         share = ', '.join(f"{r['name']} {r['area'] * 100:.1f}%" for r in regions)
