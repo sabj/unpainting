@@ -34,7 +34,7 @@ test('the recipes pin the mark cadence to their old --frames, and a later --fram
 
 const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80',
   '--palettewide', '1', '--physical', '1', '--order', 'painter', '--midlayers', '2', '--texture', '0', '--mode', 'fast', '--video', '0',
-  '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off'];
+  '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1'];
 const run = (args, log) => new Promise(resolve => {
   const p = spawn(process.execPath, args, { cwd: ROOT, stdio: ['ignore', fs.openSync(log, 'w'), fs.openSync(log, 'a')] });
   p.on('close', resolve);

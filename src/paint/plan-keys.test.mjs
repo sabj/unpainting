@@ -49,7 +49,7 @@ test('the painter exits 3 on a plan key it never reads, unless --allowunusedplan
     const plan = path.join(dir, 'plan.json');
     fs.writeFileSync(plan, JSON.stringify({ subject: 'x', families: [{ id: 'a', bounds: [0, 0, 1, 1], looseness: 1 }] }));
     const run = (out, extra = []) => spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--width', '48',
-      '--mode', 'fast', '--video', '0', '--gpu', 'off', '--valueplan', plan, '--valuepreviewonly', '1', '--out', path.join(dir, out), ...extra],
+      '--mode', 'fast', '--video', '0', '--gpu', 'off', '--valueplan', plan, '--valuepreviewonly', '1', '--allowdirty', '1', '--out', path.join(dir, out), ...extra],
     { cwd: root, encoding: 'utf8', timeout: 120000 });
     const strict = run('strict');
     assert.equal(strict.status, 3, strict.stderr);

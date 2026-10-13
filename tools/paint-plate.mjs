@@ -58,6 +58,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { prepareOutputDirectory } from '../src/paint/output-directory.mjs';
+import { checkCodeState } from '../src/paint/code-state.mjs';
 import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -253,6 +254,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
+// the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
+checkCodeState({ root, out, allowDirty: num('allowdirty', 0) > 0 });
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');

@@ -51,7 +51,7 @@ test('the painter reports the plan carried in the sheet\'s units, not hundreds o
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-optics-'));
   try {
     const r = spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--width', '64', '--mode', 'fast', '--video', '0',
-      '--gpu', 'off', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 240000 });
+      '--gpu', 'off', '--allowdirty', '1', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 240000 });
     assert.equal(r.status, 0, r.stderr);
     const carried = r.stdout.match(/carried the plan: forms (\d+)% at agreement ([\d.]+)/);
     assert.ok(carried, 'the run reports how much of the plan it carried');
