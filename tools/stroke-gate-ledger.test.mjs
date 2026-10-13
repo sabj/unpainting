@@ -13,6 +13,17 @@ import { evaluateGate } from './stroke-gate.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+test('an unverified painting is never ok, in any gate mode', () => {
+  const s = summarize(normalize({ w: 100, h: 50, scale: 10, sheetWidthMm: 200, brushes: [0], brushOpts: [{ radius: 10 }], marks: [{ k: 's', b: 0, d: [[0, 100], [900, 100]] }] }));
+  for (const mode of ['warn', 'reject']) {
+    const g = evaluateGate(s, { mode });
+    assert.equal(g.verified, false);
+    assert.equal(g.ok, false, `${mode}: unverified must not read as ok`);
+    assert.equal(g.status, 'unverified');
+    assert.equal(g.blocks, mode === 'reject');
+  }
+});
+
 const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
   '--physical', '1', '--order', 'painter', '--midlayers', '2', '--drawing', 'both', '--outlinemedium', 'ink', '--texture', '0',
   '--mode', 'fast', '--video', '0', '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off'];

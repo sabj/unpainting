@@ -3813,7 +3813,7 @@ if (MARKTAPE) {
   fs.writeFileSync(path.join(out, 'stroke-stats.svg'), panelSVG(strokeStats));
   fs.writeFileSync(path.join(out, 'stroke-gate.json'), JSON.stringify(strokeGate, null, 2));
   printGate(strokeGate);
-  if (!strokeGate.ok) process.exitCode = 4;
+  if (strokeGate.blocks) process.exitCode = 4;
 }
 await sharp(px, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'source.jpg'));
 // the picture the painter aimed at, so a photo plate is compared with a watercolour, not a photograph

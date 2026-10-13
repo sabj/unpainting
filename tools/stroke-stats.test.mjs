@@ -35,7 +35,7 @@ test('contact radius overrides nominal brush size; path length includes bends',(
 test('width and length flags use strict physical bounds, and zero-length dabs count',()=>{
  const plan={grid:{w:100,h:50,mmPerCell:1},commands:[{operation:'stroke',brush:{widthMm:1},paths:[[{x:0,y:0},{x:.03,y:0}],[{x:0,y:0},{x:0,y:0}]]}]};
  const s=summarize(normalize(plan));assert.equal(s.metrics.paintUnder1MmShare,0);assert.equal(s.metrics.paintUnder3MmLongShare,.5);
- assert.equal(admitStrokePlan(plan).ok,true);assert.equal(admitStrokePlan(plan,{mode:'reject'}).ok,false);
+ assert.equal(admitStrokePlan(plan).ok,false);assert.equal(admitStrokePlan(plan).blocks,false);assert.equal(admitStrokePlan(plan,{mode:'reject'}).blocks,true);
  assert.throws(()=>admitStrokePlan(plan,{config:{maxBroadAreaTinyAreaShare:1.1}}),/invalid/);
  assert.throws(()=>evaluateGate(s,{mode:'oops'}),/mode/);
  assert.throws(()=>evaluateGate(s,{config:{typo:1}}),/unknown/);
