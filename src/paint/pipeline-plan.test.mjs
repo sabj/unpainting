@@ -50,3 +50,11 @@ test('fur reserves retain local light groups but reject singleton glints',()=>{
  assert.equal(R[50*w+50],1);assert.equal(R[50*w+51],1);assert.equal(R[20*w+20],0);
  assert.equal(R.reduce((a,b)=>a+b),2);
 });
+
+test('washes.paints names the authored box palette',()=>{
+ const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ assert.equal(m(pipelineFlags({washes:{paints:['sienna','hansa','ultramarine']}})).get('--paints'),'sienna,hansa,ultramarine');
+ assert.equal(m(pipelineFlags({})).get('--paints'),undefined);
+ assert.throws(()=>resolvePipeline({washes:{paints:['vermilion']}}),/washes.paints/);
+ assert.throws(()=>resolvePipeline({washes:{paints:[]}}),/washes.paints/);
+});
