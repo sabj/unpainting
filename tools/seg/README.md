@@ -1,11 +1,22 @@
 # Segmentation and line extraction
 
-Segmentation divides an image into labeled regions. These scripts identify those regions and lines, once per source image. The painter reads their output files; no trained model runs during painting, and the pen still makes every mark.
+Segmentation divides an image into labeled regions. These scripts identify those regions and lines, once per source image. The painter reads their output files, and the pen still makes every mark.
+
+The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs` runs `segments.py --mode regions` on the target, unless a map for the same target bytes and script version is already in `work/segments/by-hash/`. Segment Anything (SAM) must run: when the python or the checkpoint is missing, or SAM fails, the painting stops with an error and does not fall back to k-means. Every run logs a line such as `segments: SAM vit_b on mps (132 masks, 13 laid), 12 regions, 9 inside the frame; from the cache` and writes `segments.json` in its output folder. SAM takes about 20 seconds per image on an M4's GPU.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--segments` | `sam` | `sam`, `kmeans` (Lab clusters, logged as such) or `off` |
+| `--segpython` | `$PAINTER_SEG_PYTHON`, then `.venv-seg/bin/python`, `~/painter-strategy/.venv-seg/bin/python`, `.venv/bin/python` | a python with numpy, opencv, torch and segment_anything |
+| `--samcheckpoint` | `$PAINTER_SAM_CHECKPOINT`, then `~/painter-models/`, then `work/models/` | `sam_vit_b_01ec64.pth` |
+| `--segcache` | `work/segments/by-hash` | where the maps are kept |
+
+`--mode regions` names no parts: each region is `r1`, `r2` and so on, largest first, with its area, box, mean and spread of Lab color and the share of the frame it touches. A region that touches the frame along less than 12% of its outline is marked foreground. Hooks that look up parts by name, such as `--passages sky` or `--fleckoff sky,sea`, find nothing in these maps and keep their fallbacks; the hooks that use every region or the foreground flag (`--locallights`, `--segwash`, `--segink`, `--practice`, `--darkmass auto`) use them.
 
 | Script | Writes | Read by |
 |---|---|---|
 | `segment.py` | `work/masks/<base>.png`, a figure-and-ground mask from u2net | `segments.py` |
-| `segments.py` | `work/segments/<base>.png` label map, `.json` legend and `-contours.json` outlines | `src/crop/segments.mjs` |
+| `segments.py` | `work/segments/<base>.png` label map, `.json` legend and `-contours.json` outlines. `--mode scene` (default) names beach-scene parts by rule; `--mode regions` is SAM's masks as general regions (`sam_regions.py`) | `src/crop/segments.mjs`, `src/crop/segment-prep.mjs` |
 | `sam-points.py` | One named region from Segment Anything, prompted by points, in the segments format | `src/crop/segments.mjs` |
 | `sketch-map.py` | published fine/coarse structural maps and fusion, with source hashes | `sketch-lines.py` |
 | `sketch-lines.py` | continuous hierarchical pre-paint strokes, optional sky exclusion | `--drawingfile` / `--sketchlines 1` |
@@ -114,7 +125,7 @@ curl -sL -o work/models/u2net.onnx https://github.com/danielgatis/rembg/releases
 .venv/bin/python tools/seg/segment.py work/masks examples/targets/*.jpg
 ```
 
-`segments.py` and `sam-points.py` use Segment Anything when a checkpoint (trained model file) is present (see `segments.py` for where it looks). Without one, `segments.py` falls back to k-means, which groups pixels by similar colors. It uses Lab, a color space that separates lightness from color. `lines.py` lists its model files and cache directory in its header. `face-mask.py` and `subject-regions.py` need PyTorch and torchvision. Mask R-CNN uses torchvision's default trained model files, and Keypoint R-CNN downloads the URL in `face-mask.py`; both need network access on the first run.
+`segments.py` and `sam-points.py` use Segment Anything when a checkpoint (trained model file) is present (see `segments.py` for where it looks). Without one, `segments.py --sam auto` falls back to k-means, which groups pixels by similar colors, and `--sam require` stops with an error. k-means uses Lab, a color space that separates lightness from color. `lines.py` lists its model files and cache directory in its header. `face-mask.py` and `subject-regions.py` need PyTorch and torchvision. Mask R-CNN uses torchvision's default trained model files, and Keypoint R-CNN downloads the URL in `face-mask.py`; both need network access on the first run.
 
 u2net takes about 0.7 seconds per image on CPU. The masks are independent of object categories. That is enough for the three uses: weighting the pen to a mask's boundary over an interior fold, treating the background as a region, and keeping hatching to a form.
 

@@ -137,6 +137,7 @@ import { prunePenLines } from '../src/paint/methods/pen-wash-lines.mjs';
 import { paintPenWash } from '../src/paint/methods/pen-wash.mjs';
 import { paintShapes } from '../src/paint/methods/shapes.mjs';
 import { passageHook } from '../src/paint/methods/passages.mjs';
+import { prepareSegments } from '../src/crop/segment-prep.mjs';
 import { leftToTheWashes } from '../src/paint/methods/ladder-seg.mjs';
 import { massBudget } from '../src/paint/methods/mass-budget.mjs';
 import { darkMass } from '../src/paint/techniques/dark-mass.mjs';
@@ -320,6 +321,8 @@ const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE),
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });
 let px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
+// Segments before every painting: SAM's regions of the target, cached by its hash; without SAM the run fails (src/crop/segment-prep.mjs)
+prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
 const createBrush = o => createBrushRaw(gpuHairCap(o));
