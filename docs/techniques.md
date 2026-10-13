@@ -35,6 +35,10 @@ Default recipe flags, with the value that turns each off:
 - `--drawing both`: pen line first, closing pen pass last. Off: `none`.
 - `--frames 8`: about 8 recorded frames of the washes. Off: `40`.
 - `--marks 1`: records every stroke to `marks.json`. Off: `0`.
+- `--subjectseam 0.5`: a wash is cut at a subject edge only where half the cut follows a colour edge. Off: `0`.
+- `--smallmarks 1`: catchlights and lit gaps under the minimum shape stay paper; small darks are laid once, last. Off: `0`.
+- `--washjoin 1`: a colour-domain piece under the minimum shape joins the neighbouring wash. Off: `0`.
+- `--undercover 0`: a passage its sweeps only partly cover is not charged up (that charge dried as a blot). Old: `1`.
 
 The default recipe sets no drawing medium, amount or weight. Each subject's plan chooses them in its `drawing` section ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
 
