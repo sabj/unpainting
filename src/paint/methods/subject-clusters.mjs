@@ -32,7 +32,7 @@ const PAPER_L = 94, PAPER_C = 6;
 const FIT_SAMPLE = 12000;
 
 /** Box mean of a field over a (2r+1) square, clipped at the sheet's edge. */
-export function boxMean(src, w, h, r) {
+function boxMean(src, w, h, r) {
   const n = w * h, row = new Float32Array(n), out = new Float32Array(n);
   for (let y = 0; y < h; y++) { let s = 0, c = 0; for (let x = -r; x < w + r; x++) { const a = x + r, b = x - r - 1; if (a >= 0 && a < w) { s += src[y * w + a]; c++; } if (b >= 0 && b < w) { s -= src[y * w + b]; c--; } if (x >= 0 && x < w) row[y * w + x] = s / c; } }
   for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let y = -r; y < h + r; y++) { const a = y + r, b = y - r - 1; if (a >= 0 && a < h) { s += row[a * w + x]; c++; } if (b >= 0 && b < h) { s -= row[b * w + x]; c--; } if (y >= 0 && y < h) out[y * w + x] = s / c; } }
