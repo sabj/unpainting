@@ -136,7 +136,9 @@ const share = (mask, n) => mask.reduce((a, v) => a + v, 0) / n;
  * comes closest (CIEDE76) to the region's median colour `want` = [L, a, b]. Returns { dir, amount }. One fit per
  * passage, so the wash keeps a single charge; nothing is fitted per cell.
  */
-export function fitMix(want, pigments, paperRGB = [247, 244, 236], amounts = [0.04, 0.06, 0.08, 0.11, 0.15, 0.2, 0.25, 0.32, 0.4, 0.6, 0.9]) {
+const FIT_AMOUNTS = [0.04, 0.06, 0.08, 0.11, 0.15, 0.2, 0.25, 0.32, 0.4, 0.6, 0.9];
+// `lWeight` < 1 weighs lightness less than hue: a wash capped below its region's value matches its hue, not its depth.
+export function fitMix(want, pigments, paperRGB = [247, 244, 236], amounts = FIT_AMOUNTS, lWeight = 1) {
   const K = pigments.length, step = K > 4 ? 0.25 : 0.1, dirs = [];
   const walk = (j, left, cur) => { if (j === K - 1) { dirs.push([...cur, left]); return; } for (let v = 0; v <= left + 1e-9; v += step) walk(j + 1, +(left - v).toFixed(4), [...cur, +v.toFixed(4)]); };
   walk(0, 1, []);
@@ -146,7 +148,7 @@ export function fitMix(want, pigments, paperRGB = [247, 244, 236], amounts = [0.
   const rgb = renderLayers([layer], pigments, paper, m, 1);
   let best = null;
   for (let i = 0; i < m; i++) {
-    const [L, a, b] = lab(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]), e = Math.hypot(L - want[0], a - want[1], b - want[2]);
+    const [L, a, b] = lab(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]), e = Math.hypot(lWeight * (L - want[0]), a - want[1], b - want[2]);
     if (!best || e < best.e) best = { e, dir: dirs[(i / amounts.length) | 0], amount: amounts[i % amounts.length], got: [L, a, b] };
   }
   return { ...best, want };
@@ -188,7 +190,7 @@ const passage = (id, role, mask, dir, strength, extra = {}) => ({ id, role, mask
  */
 export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
-  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, ...options };
+  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
   // a photograph's dark border and a painting's bare margin are no part of the subject: found on the barely blurred
   // picture, then read as paper before the planning blur, so the border's dark cannot bleed into the sky
   const P1 = labPlanesOf(px, w, h, 1), frame = frameMask(P1.L, w, h), margin = paperMargin(P1.L, w, h, { frame: frame.mask });
@@ -201,9 +203,18 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
   const monochrome = chroma < 6, roles = paletteRoles(pigments), notes = [];
   const density = Float32Array.from(P.L, v => Math.max(0, Math.log10(100 / Math.max(1, v))) );
   const medOD = mask => { const v = []; for (let i = 0; i < n; i++) if (mask[i]) v.push(density[i]); return quantile(v, 0.5); };
-  const paperLab = lab(...(paperRGB ?? [247, 244, 236])), fit = (mask, lit = true) => fitMix(medianLab(P, mask, paperLab, o.lightness, lit, o.chroma), pigments, paperRGB);
+  const paperLab = lab(...(paperRGB ?? [247, 244, 236])), fit = (mask, lit = true, max = Infinity) => fitMix(medianLab(P, mask, paperLab, o.lightness, lit, o.chroma), pigments, paperRGB, FIT_AMOUNTS.filter(v => v <= max), Number.isFinite(max) ? o.capLWeight : 1);
   const passages = [];
-  const masses = Uint8Array.from(groups, (v, i) => (v > 0 && !frame.mask[i] ? 1 : 0)), darks = Uint8Array.from(groups, (v, i) => (v === 2 && !frame.mask[i] ? 1 : 0));
+  const masses = Uint8Array.from(groups, (v, i) => (v > 0 && !frame.mask[i] ? 1 : 0)), darks0 = Uint8Array.from(groups, (v, i) => (v === 2 && !frame.mask[i] ? 1 : 0));
+  // with `shadowBlurMm` > 0 the shadow glaze is read from a finer value map, so cast shadows keep their shapes (dappled
+  // shade across a wall) instead of melting into the masses; its pieces may be smaller (`shadowMinPiece`)
+  const fineDarks = o.shadowBlurMm > 0 ? (() => {
+    const Lf = Float32Array.from(P1.L, (v, i) => (frame.mask[i] ? 100 : v));
+    const g = valueGroups(Lf, w, h, { sigma: cells(o.shadowBlurMm), minLight: o.minLight, maxDark: o.shadowMaxDark, minArea: o.minArea / 4 }).groups;
+    return Uint8Array.from(g, (v, i) => (v === 2 && !frame.mask[i] ? 1 : 0));
+  })() : null;
+  const darks = fineDarks ?? darks0, shadowPiece = fineDarks ? { joinMm: o.shadowJoinMm, minPiece: o.shadowMinPiece } : {};
+  if (fineDarks) notes.push(`shadows read at ${o.shadowBlurMm} mm: ${(100 * share(darks, n)).toFixed(0)}% of the sheet`);
   // 1. sky or a pale unifying wash
   // a sky spans the top: light reached from the top in at least `skyColumns` of the columns, not a lit patch of wall
   const sky1 = skyMask(groups, w, h, { frame: frame.mask });
@@ -223,26 +234,31 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
     notes.push('no sky: a pale unifying wash over the masses');
   }
   // 2. local colour over mid and dark, split in two only where the hue clearly differs
-  const local = Uint8Array.from(masses, (v, i) => (v && !sky0[i] ? 1 : 0));
+  // with `lightChroma` > 0, a light that is clearly coloured (sunlit ochre stone, not a grey pavement) takes the local
+  // wash too: local colour is laid across the lit form, and the shadow glaze then makes its value
+  const warmLight = o.lightChroma > 0 ? Uint8Array.from(groups, (v, i) => (v === 0 && !frame.mask[i] && !sky0[i] && Math.hypot(P.a[i], P.b[i]) >= o.lightChroma ? 1 : 0)) : null;
+  const local = Uint8Array.from(masses, (v, i) => ((v || (warmLight && warmLight[i])) && !sky0[i] ? 1 : 0));
+  if (warmLight) notes.push(`coloured lights (chroma ${o.lightChroma} or more, ${(100 * share(warmLight, n)).toFixed(0)}% of the sheet) take the local wash`);
   const split = monochrome ? null : hueSplit(P, local, w, h, { minShare: 0.06, minGap: o.hueGap ?? 12 });
   const locals = split ?? [local];
   locals.forEach((m, k) => {
-    const f = monochrome ? null : fit(m), dir = f ? f.dir : roleMix(roles, K, { warm: 0.6, earth: 0.4 });
+    // the mix is fitted within the strength the wash may have, so a capped wash keeps its hue instead of greying
+    const f = monochrome ? null : fit(m, true, o.localMax), dir = f ? f.dir : roleMix(roles, K, o.monoLocal);
     const strength = f ? f.amount : o.lightness * medOD(m);
-    passages.push(passage(`local-${k + 1}`, 'local', m, dir, Math.min(0.26, Math.max(0.08, strength)), { wet: false, fit: f }));
+    passages.push(passage(`local-${k + 1}`, 'local', m, dir, Math.min(o.localMax, Math.max(0.08, strength)), { wet: false, fit: f }));
   });
   if (split) notes.push(`local colour split by hue into ${split.length} washes`);
   // 3. one shadow glaze over the dark value, cool and neutral
   if (share(darks, n) > 0.01) {
     // split like the local colour where the darks clearly differ in hue (green foliage against blue shadow on stone)
-    const dsplit = monochrome ? null : hueSplit(P, darks, w, h, { minShare: 0.04, minGap: o.hueGap ?? 12 });
+    const dsplit = monochrome ? null : hueSplit(P, darks, w, h, { minShare: 0.04, minGap: o.darkHueGap ?? o.hueGap ?? 12 });
     const localOD = passages.at(-1).strength;
     (dsplit ?? [darks]).forEach((m, k) => {
       const f = monochrome ? null : fit(m, false), base = f ? f.dir : roleMix(roles, K, { cool: 0.6, earth: 0.4 });
       // a shadow leans to the cool paint; a clearly coloured dark (foliage) keeps its own hue
       const chromaOf = f ? Math.hypot(f.want[1], f.want[2]) : 0, cool = chromaOf > 14 ? 0.15 : 0.4;
       const dir = base.map((v, j) => (1 - cool) * v + (j === roles.cool ? cool : 0));
-      passages.push(passage(dsplit ? `shadow-${k + 1}` : 'shadow', 'shadow', m, dir, Math.min(0.32, Math.max(0.12, o.lightness * medOD(m) - 0.5 * localOD)), { wet: false, fit: f }));
+      passages.push(passage(dsplit ? `shadow-${k + 1}` : 'shadow', 'shadow', m, dir, Math.min(Math.max(0.32, o.shadowMin), Math.max(o.shadowMin, o.lightness * medOD(m) - 0.5 * localOD)), { wet: false, fit: f, ...shadowPiece }));
     });
     if (dsplit) notes.push('shadow split by hue into 2 glazes');
     const dir = passages.at(-1).dir;
@@ -251,9 +267,9 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
     const deep = dilate(erode(deep0, w, h, cells(0.6)), w, h, cells(0.6));
     const keep = new Uint8Array(n), { labels, areas } = components(deep, w, h);
     for (let i = 0; i < n; i++) if (labels[i] && areas[labels[i]] >= o.minArea * n) keep[i] = 1;
-    if (share(keep, n) >= 0.01) passages.push(passage('deep', 'shadow', keep, roleMix(roles, K, { cool: 0.55, earth: 0.45 }).map((v, j) => (monochrome ? v : 0.5 * v + 0.5 * dir[j])), Math.min(0.22, Math.max(0.1, 0.25 * medOD(keep))), { wet: false }));
+    if (share(keep, n) >= 0.01) passages.push(passage('deep', 'shadow', keep, roleMix(roles, K, { cool: 0.55, earth: 0.45 }).map((v, j) => (monochrome ? v : 0.5 * v + 0.5 * dir[j])), Math.min(Math.max(0.22, o.deepMin), Math.max(o.deepMin, 0.25 * medOD(keep))), { wet: false }));
   }
-  for (const p of passages) { for (let i = 0; i < n; i++) if (frame.mask[i]) p.mask[i] = 0; p.mask = consolidate(p.mask, w, h, cells(o.joinMm), o.minPiece * n); }
+  for (const p of passages) { for (let i = 0; i < n; i++) if (frame.mask[i]) p.mask[i] = 0; p.mask = consolidate(p.mask, w, h, cells(p.joinMm ?? o.joinMm), (p.minPiece ?? o.minPiece) * n); }
   return { passages: passages.slice(0, PENWASH_MAX_PASSAGES), groups, frame: frame.mask, sky: skyArea >= o.skyMin ? sky0 : null, monochrome, chroma, thresholds, shares, roles, notes };
 }
 

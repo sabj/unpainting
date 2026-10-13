@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
+import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, fitMix, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
 import { prunePenLines } from './pen-wash-lines.mjs';
 import { washFootprint } from './pen-wash.mjs';
 import { expandRecipe, styleAlias } from '../recipe.mjs';
@@ -86,6 +86,33 @@ test('line pruning keeps structure whole and thins small repeated marks, most in
   assert.ok(litWall.points[0].weight < 1);
 });
 
+// Under a pale sky and a dark cornice, a sunlit ochre wall (pale but clearly yellow) with a narrow cast shadow across it, over a grey pavement.
+function warmScene() {
+  const px = new Uint8ClampedArray(N * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const sky = y < 10, cornice = y >= 10 && y < 15, wall = y < 60, stripe = wall && !sky && Math.abs(x - y - 30) < 3;
+    const c = sky ? [225, 232, 240] : cornice ? [150, 130, 100] : stripe ? [120, 110, 105] : wall ? (x < 60 ? [242, 226, 172] : [205, 178, 120]) : [240, 240, 238];
+    px.set(c, (y * W + x) * 3);
+  }
+  return px;
+}
+
+test('a coloured light takes the local wash, a capped wash keeps its hue, and a fine read keeps a cast shadow', () => {
+  const px = warmScene(), at = (x, y) => y * W + x;
+  const common = { minLight: 0.6, hueGap: 18 }, base = planPenWash({ planner: 'values', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, options: common });
+  const warm = planPenWash({ planner: 'values', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, options: { ...common, lightChroma: 14, localMax: 0.22, capLWeight: 0.3, shadowBlurMm: 0.6, shadowMaxDark: 0.3 } });
+  const local = plan => ({ mask: Uint8Array.from({ length: N }, (_, i) => (plan.passages.some(p => p.role === 'local' && p.mask[i]) ? 1 : 0)) });
+  assert.equal(local(base).mask[at(30, 30)], 0, 'without lightChroma the sunlit wall stays paper');
+  assert.equal(local(warm).mask[at(30, 30)], 1, 'the sunlit ochre wall takes the local wash');
+  assert.equal(local(warm).mask[at(10, 80)], 0, 'the grey pavement stays paper');
+  const roles = paletteRoles(PIGS), l = warm.passages.find(p => p.role === 'local' && p.mask[at(30, 30)]);
+  assert.ok(l.strength <= 0.22 && l.dir[roles.cool] < 0.2, `a capped local wash is no grey: ${l.dir.map(v => v.toFixed(2))}`);
+  assert.ok(warm.passages.some(p => p.role === 'shadow' && p.mask[at(55, 25)]), 'the narrow cast shadow keeps its own glaze');
+  // a hue-weighted fit picks the yellow earth for a pale yellow, where the full-weight fit at a low cap may grey it
+  const f = fitMix([74, 2, 18], PIGS, [247, 244, 236], [0.04, 0.08, 0.15, 0.2], 0.3);
+  assert.ok(f.dir[roles.warm] >= 0.5, `fit ${f.dir}`);
+});
+
 test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
   const m = new Uint8Array(N); for (let y = 20; y < 60; y++) for (let x = 30; x < 90; x++) m[y * W + x] = 1;
   const f = washFootprint(m, W, H, { slip: 4, angle: 0, edgeSigma: 1, edgeAmp: 0 });
@@ -103,6 +130,7 @@ test('--style penwash names the pen-and-wash recipe; the default recipe is uncha
   const pen = expandRecipe({ argv: ['--image', 'a.jpg', '--style', 'penwash'] }).argv;
   const at = k => pen[pen.lastIndexOf(k) + 1];
   assert.equal(at('--penwash'), '1'); assert.equal(at('--drawing'), 'first'); assert.equal(at('--touchpoints'), '0');
+  assert.equal(at('--pwallwet'), '1'); assert.equal(at('--pwminlight'), '0.7');
   assert.ok(!pen.includes('--style'));
   const def = expandRecipe({ argv: ['--image', 'a.jpg'] }).argv;
   assert.ok(!def.includes('--penwash'));
