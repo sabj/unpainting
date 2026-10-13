@@ -174,9 +174,9 @@ export function checkSketch(lines, ev, { mmPerCell, blur, dark = null, options =
   const matched = stats.inkMm ? stats.matchedMm / stats.inkMm : 0, invented = stats.inkMm ? stats.inventedMm / stats.inkMm : 1;
   stats.snapMm = out.length ? stats.snapMm / Math.max(1, out.length) : 0;
   const why = [];
-  if (matched < o.minMatched) why.push(`only ${(100 * matched).toFixed(0)}% of the sketch's ink matches the target's edges (needs ${100 * o.minMatched}%)`);
-  if (invented > o.maxInvented) why.push(`${(100 * invented).toFixed(0)}% of its ink has no edge in the target (allows ${100 * o.maxInvented}%)`);
-  if (stats.coverage < o.minCoverage) why.push(`it covers ${(100 * stats.coverage).toFixed(0)}% of the target's strongest edges (needs ${100 * o.minCoverage}%)`);
+  if (matched < o.minMatched) why.push(`only ${(100 * matched).toFixed(0)}% of the sketch's ink matches the target's edges (needs ${Math.round(100 * o.minMatched)}%)`);
+  if (invented > o.maxInvented) why.push(`${(100 * invented).toFixed(0)}% of its ink has no edge in the target (allows ${Math.round(100 * o.maxInvented)}%)`);
+  if (stats.coverage < o.minCoverage) why.push(`it covers ${(100 * stats.coverage).toFixed(0)}% of the target's strongest edges (needs ${Math.round(100 * o.minCoverage)}%)`);
   const round = v => +v.toFixed(3);
   return {
     accepted: why.length === 0, lines: out, why,
