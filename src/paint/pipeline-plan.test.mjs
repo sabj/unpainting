@@ -29,7 +29,7 @@ for (const colour of ['layered', 'family']) {
   assert.equal(m.get('--lightfamilies'),'1');
   assert.equal(m.get('--huechromalab'),family?undefined:'1');
   assert.equal(m.get('--shadowfamilies'),family?undefined:'1');
-  assert.equal(m.get('--passcap'),family?'0.4':'0');
+  assert.equal(m.get('--passcap'),'0.4');
   assert.equal(m.get('--maskmm'),family?'2':'0');
   assert.equal(m.get('--palelights'),family?'0.1':'0');
  });
