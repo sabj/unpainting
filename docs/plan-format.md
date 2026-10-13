@@ -109,7 +109,7 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 | `view` | optional metadata object; a truthy `wholeOf` enables per-cell family style selection unless `--cellfamilies` overrides it | region-level style selection |
 | `drawing` | drawing choices in the next section | no drawing flags added |
 
-Each family can have `id`, `bounds`, `referenceCue` and `baseMove`. `bounds` is `[x0, y0, x1, y1]` in normalized target coordinates. It helps describe target-derived color regions; it does not clip a wash to a box. `referenceCue` is a note about the target, and `baseMove` is a descriptive move such as `wet on dry`. Missing cues and moves use generated descriptions and `wet on dry`. Family fields have no separate schema validation. Use ordered bounds between 0 and 1 and distinct string ids.
+Each family can have `id`, `bounds`, `referenceCue` and `baseMove`. `bounds` is `[x0, y0, x1, y1]` in normalized target coordinates. It helps describe target-derived color regions; it does not clip a wash to a box. `referenceCue` is a note about the target, and `baseMove` is the family's move. `wet in wet` (also written `wet on wet`) lays a light family's pale foundation into moist paper; later layers and other moves such as `wet on dry` or `glaze` paint on dry paper (`src/paint/methods/passage-move.mjs`). Missing cues and moves use generated descriptions and `wet on dry`. Family fields have no separate schema validation. Use ordered bounds between 0 and 1 and distinct string ids.
 
 Each reserve needs a nonempty `reason` and four finite `bounds` values between 0 and 1, with `x0 < x1` and `y0 < y1`. Invalid reserves stop planning. They protect the bounded cells as bare-paper highlights.
 

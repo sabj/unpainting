@@ -9,6 +9,7 @@ import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { RECESS, SHADOW_GLAZE, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND, FIRST_INK_SKIP } from '../tuned/trumbull.mjs';
 import { TEX_ZONE, JAW_INK } from '../tuned/portrait.mjs';
+import {normalizePassageMove} from './passage-move.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
 // The q quantile of G over a passage's cells.
@@ -267,7 +268,7 @@ export function planLightToDark({bandRound=false,valueFloor=null,demand,k,densit
             chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
           const texture=shaped&&!step.pig&&(identity?band===3&&((trumbullRules&&warm)||(portraitRules&&box.y0/h>texZone[1]-.02&&box.y1/h<texZone[3]+.02&&box.x0/w>=texZone[0]-.02&&box.x1/w<=texZone[2]+.02)):chosen.textureRules?.some(rule=>(rule.rules==='trumbull'?trumbullRules:rule.rules==='portrait-3t'?portraitRules:false)&&rule.band===band&&(rule.cue==='warm stone'?warm:box.y0/h>rule.minY&&box.y1/h<rule.maxY)));
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
-          const wet=phase==='light'&&touched.every(r=>r.baseMove==='wet on wet');
+          const wet=phase==='light'&&touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet');
           const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue+(texture?' Fine stone or lower-face stubble is below wash resolution: paper tooth, light dry brush, no individual dark dots.':''),
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',
             shaped,subject,texture,move:texture?'dry on dry':wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
