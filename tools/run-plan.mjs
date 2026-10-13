@@ -70,7 +70,7 @@ const strokeGate = admitStrokePlan(plan, {
   config: gateConfigIdx >= 0 ? JSON.parse(fs.readFileSync(args[gateConfigIdx + 1], 'utf8')) : {},
 });
 printGate(strokeGate);
-if (!strokeGate.ok) fail('stroke-size admission refused; use larger connected washes and fewer fine marks');
+if (strokeGate.blocks) fail('stroke-size admission refused; use larger connected washes and fewer fine marks');
 const g = plan.grid, n = g.w * g.h;
 const pigments = plan.palette.map(k => ({ ...boxPigment(BOX.find(p => p.key === k)), key: k }));
 const paper = makePaper(g.w, g.h, { ...plan.paper, seed: plan.paperSeed ?? 1, mmPerCell: g.mmPerCell,

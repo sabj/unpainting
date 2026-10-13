@@ -17,12 +17,12 @@ import { drawingFlags } from './drawing-plan.mjs';
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --marks 1';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
 // V096 as it was: the methods with --shadowraw, shaped marks and sky lanes, then the tuned flags.
-const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --shadowraw 1 --layerhue 1 --drawing both --frames 8 --marks 1';
+const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --shadowraw 1 --layerhue 1 --drawing both --frames 8 --markcadence 8 --marks 1';
 const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skysplit 1';
 
 // The pen-and-wash washes as tuned by eye on Flatiron and Yale (2026-10-13): every passage flooded wet in wet, 60% of

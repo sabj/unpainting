@@ -14,7 +14,7 @@
 //           the budget returns nothing and is counted.
 //   warn    records cell-level reads but does not block them. For diagnosis only; the run is not 'painted'.
 //   off     no guard.
-//   strict  alias for gentle.
+//   strict  the hard mode. Run cards and scripts ask for strict, so it must mean the strictest blocking mode.
 //
 //   const guard = createTargetGuard({ mode: 'gentle', targetPaths: [file] });
 //   let px = guard.register('px', pxRaw);       // plan freely
@@ -30,7 +30,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 
 export const MODES = ['off', 'warn', 'gentle', 'hard'];
-export const MODE_ALIASES = { strict: 'gentle' };
+export const MODE_ALIASES = { strict: 'hard' };
 export const DEFAULT_MODE = 'gentle';
 export const HARD_LOOK_BUDGET = 100;
 // names that, in this codebase, hold the target or a per-cell map computed from it
@@ -52,10 +52,10 @@ export class TargetGuardError extends Error {
   constructor(message, record) { super(message); this.name = 'TargetGuardError'; this.record = record; }
 }
 
-/** The mode a flag value names, with 'strict' read as 'gentle'. Throws on anything else. */
+/** The mode a flag value names, with 'strict' read as 'hard'. Throws on anything else. */
 export function normalizeMode(mode = DEFAULT_MODE) {
   const m = MODE_ALIASES[mode] ?? mode;
-  if (!MODES.includes(m)) throw new Error(`target guard mode must be one of ${MODES.join(', ')} (or strict, an older name for gentle), got ${mode}`);
+  if (!MODES.includes(m)) throw new Error(`target guard mode must be one of ${MODES.join(', ')} (or strict, another name for hard), got ${mode}`);
   return m;
 }
 

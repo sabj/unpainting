@@ -1,9 +1,11 @@
 // Two runs' finished pigment thickness (--thkdump 1), cell by cell: mean and largest difference, and the share of cells
 // that differ by more than 1e-4 (and by more than 1e-3), over all pigments and over the cells either run painted.
-//   node tools/gpu/thk-diff.mjs <run dir a> <run dir b> [pigments]
+//   node tools/gpu/thk-diff.mjs <run dir a> <run dir b> [pigments] [--mixedbackends]   (a CPU/GPU parity check needs the flag)
 import fs from 'node:fs';
+import { assertSameBackend } from '../../src/media/gpu/backend-record.mjs';
 
-const [a, b, K0] = process.argv.slice(2);
+const [a, b, K0] = process.argv.slice(2).filter(x => x !== '--mixedbackends');
+assertSameBackend([a, b], { allowMixed: process.argv.includes('--mixedbackends') });
 const A = new Float32Array(fs.readFileSync(`${a}/thickness.f32`).buffer.slice(0)), B = new Float32Array(fs.readFileSync(`${b}/thickness.f32`).buffer.slice(0));
 if (A.length !== B.length) throw new Error(`sizes differ: ${A.length} and ${B.length}`);
 let sum = 0, max = 0, over = 0, over3 = 0, painted = 0, sumP = 0, peak = 0;

@@ -8,13 +8,14 @@ import { GpuOpticalComposite } from './optical-gpu.mjs';
 import { createHash } from 'node:crypto';
 import { observeFrontier } from './frontier-layout.mjs';
 import { instrumentDispatches } from './dispatch-profile.mjs';
+import { watchDevice, markBroken } from './device-health.mjs';
 
 if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // say when a step in a stroke had more active tiles than it was sized for
 const RING_FLOATS = 6144; // must match link.mjs
 const ring = new Float32Array(workerData.ring), done = new Int32Array(workerData.done), sumData = new Float32Array(workerData.sum);
 const ctrl = new Int32Array(workerData.ctrl), rectData = new Float32Array(workerData.rect), layerData = new Float32Array(workerData.layer), err = new Uint8Array(workerData.err);
 // ctrl: 0 ack, 1 int result, 2 failed, 3 status (0 booting, 1 ready, 2 unavailable), 4 layer returned by a dry, 5 layer pushed by a dry, 6 wet tiles left by the last step
-let gpu = null, sheet = null, chain = Promise.resolve();
+let gpu = null, sheet = null, chain = Promise.resolve(), watcher = null;
 const queuedDrys=[];
 let fullBrushPigments = false;
 function signedZero(a) { const bits = new Uint32Array(a.buffer, a.byteOffset, a.length); return bits.includes(0x80000000); }
@@ -72,6 +73,7 @@ async function handleOp(m) {
       try { webgpu = await import('webgpu'); } catch (e) { return fail(`the webgpu package is not installed (${e.code ?? e.message})`, 2); }
       let device, adapter;
       try { Object.assign(globalThis, webgpu.globals); ({ device, adapter } = await openGpu(webgpu.create(process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : []))); } catch (e) { return fail(`no WebGPU adapter (${e.message})`, 2); }
+      watcher = watchDevice(device, text => { console.error('[gpu] device error:', text); markBroken(workerData.health, text); fail('GPU device error: ' + text); });
       if (PROF || process.env.GPU_TIMESTAMPS === '1') instrumentDispatches(device);
       sheet = m.sheet; sheet.layers = m.top ? [m.top] : [];
       fullBrushPigments = [...sheet.G, ...sheet.D, ...sheet.P, ...(m.top ?? [])].some(signedZero);
@@ -185,4 +187,4 @@ async function handleOp(m) {
   }
   if (m.wait !== false) ack();
 }
-parentPort.on('message', m => { chain = chain.then(() => handle(m)).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); }); });
+parentPort.on('message', m => { watcher?.tick(); chain = chain.then(() => handle(m)).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); }); });

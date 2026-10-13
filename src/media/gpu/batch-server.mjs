@@ -13,10 +13,13 @@ import { openGpu } from './stepfull.mjs';
 import { SheetBatch } from './sheet-batch.mjs';
 import { GpuOpticalComposite } from './optical-gpu.mjs';
 import { writeAdapterEvidence } from './adapter-evidence.mjs';
+import { watchDevice, markBroken } from './device-health.mjs';
 
 const RING_FLOATS = 6144;
 const NS = workerData.sheets;
 let core = null, coreReady = null, device = null, adapter = null;
+// every sheet's device state (device-health.mjs): one device error breaks all the sheets on the device
+const HEALTH = new Set(); let BROKEN = '';
 const asyncDry = process.env.GPU_ASYNC_DRY === '1' && process.env.GPU_RESIDENT === '1';
 function signedZero(a) { const bits = new Uint32Array(a.buffer, a.byteOffset, a.length); return bits.includes(0x80000000); }
 
@@ -24,7 +27,7 @@ async function deviceOnce() {
   if (device) return;
   const webgpu = await import('webgpu'); Object.assign(globalThis, webgpu.globals);
   ({ device, adapter } = await openGpu(webgpu.create(process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : [])));
-  device.addEventListener?.('uncapturederror', e => console.error('[batch gpu] uncaptured', e.error?.message));
+  watchDevice(device, text => { BROKEN = text; console.error('[batch gpu] device error:', text); for (const h of HEALTH) markBroken(h, text); });
 }
 // the batch is made by the first sheet to arrive (all share its size and step options)
 function coreFor(sheet, O) { return coreReady ??= (async () => { await deviceOnce(); core = await SheetBatch.create(device, NS, sheet, O); return core; })(); }
@@ -48,7 +51,7 @@ function sheetHandler(sid, port) {
     const t0 = perf.now(); try { return await handleOp(m); } finally { const e = opStats[m.op] ??= [0, 0]; e[0]++; e[1] += perf.now() - t0; }
   }
   async function handleOp(m) {
-    if (m.op === 'hello') { wd = m.data; ring = new Float32Array(wd.ring); done = new Int32Array(wd.done); sumData = new Float32Array(wd.sum); ctrl = new Int32Array(wd.ctrl); rectData = new Float32Array(wd.rect); layerData = new Float32Array(wd.layer); err = new Uint8Array(wd.err); return; }
+    if (m.op === 'hello') { wd = m.data; if (wd.health) { HEALTH.add(wd.health); if (BROKEN) markBroken(wd.health, BROKEN); } ring = new Float32Array(wd.ring); done = new Int32Array(wd.done); sumData = new Float32Array(wd.sum); ctrl = new Int32Array(wd.ctrl); rectData = new Float32Array(wd.rect); layerData = new Float32Array(wd.layer); err = new Uint8Array(wd.err); return; }
     if (m.op === 'step') { pendingSteps += m.n; return; }
     if (m.op !== 'init') await flushSteps();
     // BATCH_URGENT=1: a painter blocked on a read does not wait for the GPU to drain (dry loops still do)

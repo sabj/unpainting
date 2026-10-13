@@ -29,7 +29,9 @@ export function evaluateGate(stats, { mode = 'warn', config = {} } = {}) {
     }
   }
   const unmeasured=verified?null:'Broad wash interiors or pigment deposits are unmeasured; supply a passage plan and recorded loads. Count share cannot approve or reject a painting.';
-  return {version:2,mode,thresholds:limits,verified,passes:verified&&flags.length===0,ok:mode!=='reject'||(verified&&flags.length===0),flags,unmeasured,
+  // ok only when measured and clean: an unverified painting is never ok. blocks: what stops a run (reject mode only).
+  const passes=verified&&flags.length===0,status=mode==='off'?'off':!verified?'unverified':passes?'passed':'flagged';
+  return {version:2,mode,thresholds:limits,verified,passes,ok:passes,blocks:mode==='reject'&&!passes,status,flags,unmeasured,
     basis:c?.finalImageMeasured?'estimated deposits weighted by final image':'planned or recorded deposit estimate; final appearance unverified'};
 }
 export function admitStrokePlan(plan, options = {}) { return evaluateGate(summarize(normalize(plan)),options); }
@@ -37,6 +39,7 @@ export function printGate(report) {
   if(report.mode==='off')return;
   const messages=[...(report.unmeasured?[report.unmeasured]:[]),...report.flags.map(f=>f.message)];
   for(const message of messages)console.warn(`stroke gate ${report.mode === 'reject' ? 'reject' : 'warning'}: ${message}`);
+  console.log(`stroke gate: ${report.status} (${report.mode} mode${report.blocks ? ', run rejected' : ''})`);
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   try {
@@ -45,6 +48,6 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     const stats=data?.histograms&&data.metrics?data:await loadStats(a.file,a);
     const report=evaluateGate(stats,{mode:a.mode??'warn',config}); printGate(report);
     if(a.out){fs.mkdirSync(path.dirname(path.resolve(a.out)),{recursive:true});fs.writeFileSync(a.out,JSON.stringify(report,null,2)+'\n');}
-    console.log(JSON.stringify(report,null,2));if(!report.ok)process.exitCode=4;
+    console.log(JSON.stringify(report,null,2));if(report.blocks)process.exitCode=4;
   }catch(e){console.error('stroke-gate: '+e.message);process.exitCode=2;}
 }

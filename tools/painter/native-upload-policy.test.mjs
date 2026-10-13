@@ -24,7 +24,7 @@ test('actual CLI records effective policy before failed image load; mode uses la
    [5,['--mode','full'],undefined,'1','speed-transfer-default'],
   ]){
    const out=path.join(folder,'out'+n),env={...process.env};delete env.GPU_DIRTY_UPLOAD;if(explicit!==undefined)env.GPU_DIRTY_UPLOAD=explicit;
-   const r=spawnSync(process.execPath,['tools/paint-plate.mjs',...args,'--image',path.join(folder,'absent.png'),'--gpu','off','--out',out],{cwd:path.resolve(import.meta.dirname,'../..'),env,encoding:'utf8',timeout:10000});
+   const r=spawnSync(process.execPath,['tools/paint-plate.mjs',...args,'--image',path.join(folder,'absent.png'),'--gpu','off','--allowdirty','1','--out',out],{cwd:path.resolve(import.meta.dirname,'../..'),env,encoding:'utf8',timeout:10000});
    assert.equal(r.status,1);const actual=JSON.parse(fs.readFileSync(path.join(out,'native-mode.json')));
    assert.equal(actual.uploadPolicy.value,want);assert.equal(actual.uploadPolicy.enabled,want==='1');assert.equal(actual.uploadPolicy.selection,selection);assert.match(r.stdout,/native tracked CPU upload:/);
   }

@@ -51,18 +51,22 @@ if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CON
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
-import { loadStats, panelSVG } from './stroke-stats.mjs';
+import { tapeStats, panelSVG } from './stroke-stats.mjs';
+import { startStrokeLedger } from '../src/paint/stroke-ledger.mjs';
 import { evaluateGate, printGate } from './stroke-gate.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { prepareOutputDirectory } from '../src/paint/output-directory.mjs';
+import { checkCodeState } from '../src/paint/code-state.mjs';
 import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { makePaper, coldPressField } from '../src/media/paper.mjs';
 import { createSheet, step, dry as physicalDry, layersOf, thickness, layersChanged, DEFAULTS, tapeSheet, blot, setThreads, threadStats, coherent } from '../src/media/sheet.mjs';
 import { attachGpu, gpuStats } from '../src/media/gpu/link.mjs';
+import { assertDeviceHealthy } from '../src/media/gpu/device-health.mjs';
+import { backendLine } from '../src/media/gpu/backend-record.mjs';
 import { renderLayers, renderLayersCached, renderCells, microAmps } from '../src/media/km.mjs';
 import { renderSheet } from '../src/media/render-cache.mjs';
 import { createFramer } from '../src/media/gpu/framer.mjs';
@@ -89,6 +93,7 @@ import { distanceToZero } from '../src/raster.js';
 import { components, removeSmall, open as openMask, dilate, erode, minFilter, maxFilter, closeLocal } from '../src/raster.js';
 import { chooseTechnique, detailMarks } from '../src/crop/technique.mjs';
 import { intermediates, execution } from '../src/eval/composite.mjs';
+import { planDensityOver, cellRGB } from '../src/eval/plan-optics.mjs';
 import { gaussian } from '../src/keyframes/density.mjs';
 import { applyResist, liftResist as physicalLiftResist, setClip as physicalSetClip } from '../src/media/sheet.mjs';
 import { makeCrisp } from '../src/paint/methods/crisp-edges.mjs';
@@ -119,6 +124,7 @@ import { layCurls } from '../src/crop/curlpaint.mjs';
 import { furLightReserves } from '../src/paint/methods/finish-texture.mjs';
 import { sameWash } from '../src/paint/methods/wash-session.mjs';
 import { expandRecipe } from '../src/paint/recipe.mjs';
+import { reportUnusedPlanKeys } from '../src/paint/plan-keys.mjs';
 import { versionStamp, versionLine } from '../src/painter-version.mjs';
 import { pigmentPhysics } from '../src/paint/methods/pigment-physics.mjs';
 import { segmentInk } from '../src/paint/methods/seg-ink.mjs';
@@ -154,6 +160,7 @@ import { cheatRisk } from './guard/cheat-risk.mjs';
 import { createPause } from './aware/pause.mjs';
 import { writeState, readState } from './aware/state-io.mjs';
 import { tapeState, restoreTapeState } from '../src/media/brush.mjs';
+import { passDue, markDue } from '../src/paint/pass-cadence.mjs';
 
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
 // GPU paths default on for painter runs; set 0 to turn one off.
@@ -248,6 +255,8 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
+// the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
+checkCodeState({ root, out, allowDirty: num('allowdirty', 0) > 0 });
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
@@ -286,6 +295,8 @@ const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(pa
   if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection??loadSubjects()[c.subject];if(!base)throw Error('--regionstyle needs a subject style mapping');
   const regions={...(base.regions??{})};for(const kv of opt('regionstyle','').split(',')){const [family,style]=kv.split('=');if(!family||!style)throw Error('--regionstyle family=style');regions[family]={style,reason:'run override --regionstyle for an A/B test'};}
   return {...c,styleSelection:{...base,regions}};})();
+// value plan keys nothing reads are logged and exit 3 like unused options (src/paint/plan-keys.mjs); --allowunusedplan 1 allows them
+if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
 let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
@@ -1077,7 +1088,7 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing
 const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, log: console.log,
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
-if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor});
+if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. auto (default) is ink when the source shows
@@ -1417,7 +1428,7 @@ if (opt('gpustrokes', '') === 'check') process.env.GPU_STROKES = 'check'; // com
 const GPU_MODE = opt('gpu', 'auto');
 if (!['auto', 'on', 'off'].includes(GPU_MODE)) throw new Error(`--gpu takes auto, on or off, not ${GPU_MODE}`);
 const GPU_INFO = {...attachGpu(sheet, O, { mode: GPU_MODE }),nativePaintMode:NATIVE_PAINT_MODE};
-console.log(`sheet backend: ${GPU_INFO.backend}${GPU_INFO.reason ? ` (${GPU_INFO.reason})` : ''}`);
+console.log(backendLine(GPU_INFO));
 const base = Buffer.alloc(N2 * 3);
 const SHADE = num('papershade', 0.04);
 for (let i = 0; i < N2; i++) { const t = 1 - SHADE + SHADE * paper.height[i]; for (let c = 0; c < 3; c++) base[i * 3 + c] = Math.min(255, paperRGB[c] * t); }
@@ -1594,11 +1605,9 @@ const expected = new Float32Array(n * PIGS.length);
 // ledger only. --deliverycalmax caps the factor (default 1.8). Default 0.
 const DELIVERY = num('deliverycal', 0) > 0 ? createDeliveryCal(PIGS.length, { max: num('deliverycalmax', 1.8) }) : null;
 const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
-const planDensity = () => {
-  const D = new Float32Array(n);
-  for (let i = 0; i < n; i++) { let d = 0; for (let j = 0; j < PIGS.length; j++) d += expected[i * PIGS.length + j] * (PIGS[j].K[0] + PIGS[j].K[1] + PIGS[j].K[2]) / 3; D[i] = d; }
-  return D;
-};
+// the plan in the sheet's units: the planned layers over the sheet before the first wash (src/eval/plan-optics.mjs)
+let WASH_BASE = null;
+const planDensity = () => planDensityOver(expected, PIGS, paperRGB, n, WASH_BASE);
 const sheetDensity = big => {
   const D = new Float32Array(n);
   const pl2 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
@@ -1776,11 +1785,10 @@ const SNAPS = [];
 const snap = extra => { if(!FRAME_POLICY.all || NATIVE_PAINT_MODE.mode==='fast')return; const F = framer(); SNAPS.push(F ? { id: F.capture(), stage: { ...STAGE, ...extra } } : { buf: INKRES ? INKRES.compose(view()) : view(), stage: { ...STAGE, ...extra } }); };
 
 // --marks 1: record the mark tape: every stroke as a brush index and a path, with the water schedule between them.
+// Without it the stroke ledger still records what the stroke gate measures (src/paint/stroke-ledger.mjs).
 if (!['warn', 'reject', 'off'].includes(opt('strokegate', 'warn'))) throw new Error('strokegate must be warn, reject or off');
-if (opt('strokegate', 'warn') === 'reject' && opt('marks', '0') === '0') throw new Error('--strokegate reject requires --marks 1');
-const MARKTAPE = opt('marks', '0') !== '0' || STROKE_BUDGET ? recordMarks(true) : null;
+const FULL_TAPE = opt('marks', '0') !== '0' || Boolean(STROKE_BUDGET), MARKTAPE = startStrokeLedger({ full: FULL_TAPE });
 if (MARKTAPE) tapeSheet(MARKTAPE);
-else if (opt('strokegate', 'warn') === 'warn') console.warn('stroke gate warning: stroke sizes unverified; use --marks 1 to measure this run');
 // --pausedir DIR: the painter offers a stop at every passage boundary and a harness decides where it stops
 // (tools/aware/pause.mjs). --resumestate DIR: a fresh process takes over a painting saved at a boundary (state.json
 // there), with the plan files as they now stand: the planning runs again, nothing before the boundary is painted
@@ -2654,6 +2662,7 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
 // the full painting. The process exit hook still writes the strict guard report.
 if (num('drawingonly', 0) > 0) {
   if (RESUMING || !PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none') throw new Error('--drawingonly requires an opening drawing');
+  assertDeviceHealthy(sheet);
   fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
   fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
   fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: drawnCount, backend: GPU_INFO }));
@@ -2883,7 +2892,7 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
-    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET },
+    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state);
@@ -2915,7 +2924,7 @@ const awareRestore = () => {
   }
   const j = st.js;
   FRAME_POLICY.restore(j.framePolicy);
-  ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET } = j);
+  ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET, WASH_BASE } = j);
   const refill = (a, b) => { a.length = 0; for (const v of b) a.push(v); };
   refill(FRAMES, j.FRAMES); refill(marks, j.marks); refill(TECHS, j.TECHS); refill(colourTrace, j.colourTrace);
   expected.set(j.expected); LAST.set(j.LAST);
@@ -2950,6 +2959,7 @@ const awareBoundary = async at => {
 let L_START = 0;
 if (RESUMING) { const at = awareRestore(); L_START = at.kind === 'start' ? 0 : at.kind === 'pass' ? at.L + 1 : layers.length; }
 else await awareBoundary({ kind: 'start' });
+if (!WASH_BASE && !(PRACTICE || PENWASH) && L_START < layers.length) WASH_BASE = cellRGB(render(), { w, h, SC, W2 });
 for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(L===FINISH_START){AREA_PLAN=FINISH_PLAN;AREA_COMPILED=FINISH_COMPILED;AREA_EXEC.set(null);if(FINISH_PLAN.doc.finishingBase){const b=FINISH_PLAN.doc.finishingBase;dry(sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));if(!paper.dry)throw Error('finishing connected pass requires measured dry base');}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(sheet);FINISH_MASS_BEFORE=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0));}
   const layer = layers[L];
@@ -3562,9 +3572,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(num('treelayerslate',0)===1&&L===0){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'production-first-numeric-layer.png'));fs.writeFileSync(path.join(out,'production-first-numeric-layer.json'),JSON.stringify({kind:'actual first completed numeric layer, not wholefirstwash or area completion',layer:L,value:layer.value,order:layer._order,backend:GPU_INFO},null,2));}
   // --order painter: a frame at the end of each ground region, so the first wash is seen going on region by region
   if (layer._order?.shoot && FILM_BY_PAINT) await shoot();
-  // the plan-against-sheet record keeps the pass cadence whatever is filmed, so the log's numbers do not move
-  if (L % Math.max(1, Math.round(layers.length / num('frames', 40))) === 0) {
-    if (!FILM_BY_PAINT) await shoot();
+  // the plan-against-sheet record keeps its own cadence (--markcadence) whatever is filmed (src/paint/pass-cadence.mjs)
+  if (!FILM_BY_PAINT && passDue(L, layers.length, FILM_FRAMES)) await shoot();
+  if (markDue(L, layers.length, opt('markcadence'))) {
     mark(L + 1);
     FEEDBACK_FRESH = true; // the mark's render waited for the GPU: the next pass reads the sheet at no extra wait
   }
@@ -3689,14 +3699,9 @@ for (const f of judged.flags) console.log(`  ! ${f}`);
 }
 if (marks.length) {
   // covered: of the cells the plan washes, the share holding at least half of it by tone. Both sides through the same
-  // optics: the plan is rendered on flat paper as plan.jpg is, since planDensity() reads blues too dark.
+  // optics: the plan is rendered on flat paper as plan.jpg is.
   const paintedD = lastPainted;
-  const layer = PIGS.map(() => new Float32Array(n));
-  for (let i = 0; i < n; i++) for (let j = 0; j < PIGS.length; j++) layer[j][i] = expected[i * PIGS.length + j];
-  const flat = new Uint8ClampedArray(n * 3);
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) flat[i * 3 + c] = paperRGB[c];
-  const rgb = renderLayers([layer], PIGS, flat, n, 1), pl2 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
-  const planD = Float32Array.from({ length: n }, (_, i) => Math.max(0, -Math.log(Math.max(0.02, Math.min(1, (0.2126 * rgb[i * 3] + 0.7152 * rgb[i * 3 + 1] + 0.0722 * rgb[i * 3 + 2]) / pl2)))));
+  const planD = planDensityOver(expected, PIGS, paperRGB, n);
   let asked = 0, arrived = 0;
   for (let i = 0; i < n; i++) if (planD[i] > 0.1) { asked++; if (paintedD[i] >= 0.5 * planD[i]) arrived++; }
   const cov = asked ? arrived / asked : 1;
@@ -3767,6 +3772,7 @@ const FINAL = renderSub();
 if (FINAL.fine) await sharp(FINAL.fine, { raw: { width: W2 * SUBGRID, height: H2 * SUBGRID, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg'));
 if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); await sharp(F.buf, { raw: { width: F.FW, height: F.FH, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'painting-fine.jpg')); }
 const FINAL_PIXELS=INKRES ? INKRES.compose(view()) : FINAL.coarse;
+assertDeviceHealthy(sheet); // a broken GPU device never writes a painting (src/media/gpu/device-health.mjs)
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png'));
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
 if (STROKE_BUDGET) {
@@ -3774,6 +3780,7 @@ if (STROKE_BUDGET) {
  fs.writeFileSync(path.join(out,'stroke-budget.json'),JSON.stringify({budget:STROKE_BUDGET,strokes:count,complete:count<=STROKE_BUDGET,counts:Object.fromEntries(['s','P','g'].map(k=>[k,MARKTAPE.filter(m=>m.k===k).length]))},null,2));
  if(count>STROKE_BUDGET)throw Error(`Whole painting exceeded stroke budget: ${count}/${STROKE_BUDGET}`);
 }
+let exportedMarkTape = null;
 if (MARKTAPE) {
   const file = path.join(out, 'marks.json');
   const { BRUSHES, BRUSHOPTS, PENS, PENOPTS } = await import('../src/media/brush.mjs');
@@ -3781,17 +3788,18 @@ if (MARKTAPE) {
   const asTape = p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, ArrayBuffer.isView(v) ? Array.from(v) : v]));
   // Everything a player needs to make the same sheet: the paper recipe, the pans, the flow options and the base.
   const { markTapeJSON } = await import('../src/media/mark-tape-json.mjs');
-  const fd = fs.openSync(file, 'w');
-  try { for (const chunk of markTapeJSON({
+  exportedMarkTape = {
     w: W2, h: H2, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM),
     version:2, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
     base: Array.from(base.subarray(0, 3)),
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
-  })) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
+  };
+  if (FULL_TAPE) { const fd = fs.openSync(file, 'w');
+  try { for (const chunk of markTapeJSON(exportedMarkTape)) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
   const strokes = MARKTAPE.filter(m => m.k === 's'), lines = MARKTAPE.filter(m => m.k === 'P');
   const pts = strokes.reduce((a, m) => a + m.d.length, 0), lpts = lines.reduce((a, m) => a + m.d.length, 0);
-  console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`);
+  console.log(`marks: ${strokes.length} strokes over ${pts} points, ${lines.length} pen lines over ${lpts} points, ${MARKTAPE.length - strokes.length - lines.length} other, ${BRUSHES.length} brushes over ${BRUSHOPTS.length} shapes, ${PENS.length} pens over ${PENOPTS.length} nibs, ${(fs.statSync(file).size / 1048576).toFixed(2)} MB`); }
 }
 {
   // Pen last: the ink is what the sheet gained while drawing. Pen first: the ink is what the drawing laid, and the washes
@@ -3808,14 +3816,14 @@ if (MARKTAPE) {
 }
 // Final contribution stats need both the finished painting and the exported ink layer.
 if (MARKTAPE) {
-  const strokeStats = await loadStats(path.join(out, 'marks.json'));
+  const strokeStats = await tapeStats(exportedMarkTape, out);
   const strokeGate = evaluateGate(strokeStats, { mode: opt('strokegate', 'warn'),
     config: opt('strokegateconfig', '') ? JSON.parse(fs.readFileSync(opt('strokegateconfig'), 'utf8')) : {} });
   fs.writeFileSync(path.join(out, 'stroke-stats.json'), JSON.stringify(strokeStats, null, 2));
   fs.writeFileSync(path.join(out, 'stroke-stats.svg'), panelSVG(strokeStats));
   fs.writeFileSync(path.join(out, 'stroke-gate.json'), JSON.stringify(strokeGate, null, 2));
   printGate(strokeGate);
-  if (!strokeGate.ok) process.exitCode = 4;
+  if (strokeGate.blocks) process.exitCode = 4;
 }
 await sharp(px, { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'source.jpg'));
 // the picture the painter aimed at, so a photo plate is compared with a watercolour, not a photograph
@@ -3854,6 +3862,7 @@ const placed = FRAMES.map((f, i) => {
 if (opt('thkdump', '0') !== '0') { coherent(sheet); const th = thickness(sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
 fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet), performanceOptions: { opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1' } }, null, 1));
+console.log(backendLine(GPU_INFO)); // the backend this painting was made on, again at the end (details in backend.json)
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
 {
@@ -3884,7 +3893,7 @@ phaseMark('film');
 // The guard's report is written first so the score can read it.
 if (TARGET_GUARD.mode !== 'off') writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') });
 try {
-  const risk = await cheatRisk({ run: out, target: path.resolve(root, opt('image', '')), sheetMm: num('sheetmm', DEFAULT_SHEET_MM) });
+  const risk = await cheatRisk({ run: out, target: path.resolve(root, opt('image', '')), sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marks: exportedMarkTape });
   fs.writeFileSync(path.join(out, 'cheat-risk.json'), JSON.stringify(risk, null, 1));
   console.log(`cheat risk: ${risk.level} (${risk.risk})${risk.flags.length ? `, flags ${risk.flags.join(', ')}` : ''}${risk.review ? '; review the stage strip before showing this painting' : ''}`);
 } catch (e) {

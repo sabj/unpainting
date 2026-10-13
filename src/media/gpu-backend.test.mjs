@@ -34,7 +34,7 @@ const fresh = () => createSheet(makePaper(N, N, { seed: 5 }), pigments);
 const stats = (a, b) => { let max = 0, sum = 0; for (let k = 0; k < a.length; k++) for (let i = 0; i < a[k].length; i++) { const d = Math.abs(a[k][i] - b[k][i]); if (d > max) max = d; sum += d; } return { max, mean: sum / (a.length * a[0].length) }; };
 const peak = t => Math.max(...t.map(a => a.reduce((m, v) => Math.max(m, v), 0)));
 
-test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 120000 }, () => {
+test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 120000 }, t => {
   const O = { ...DEFAULTS, gran: 0.25 };
   const cpuSheet = fresh(), ref = paint(cpuSheet, O);
   assert.equal(cpuSheet._gpu, undefined, 'the CPU run must not touch the GPU path');
@@ -43,7 +43,7 @@ test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 
   const floor = stats(paint(fresh(), O2), ref);
 
   const g = fresh(), info = attachGpu(g, O, { mode: 'auto', log: () => {} });
-  if (info.backend !== 'gpu') { console.log(`# skipped: ${info.reason}`); return; }
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
   try {
     const out = paint(g, O), d = stats(out, ref), scale = peak(ref);
     assert.ok(gpuStats(g).steps > 100 && gpuStats(g).drys === 2, 'the run went through the GPU');
@@ -58,11 +58,11 @@ test('--gpu off leaves the sheet on the untouched CPU path', () => {
   assert.equal(info.backend, 'cpu'); assert.equal(off._gpu, undefined);
 });
 
-test('accumulated support follows GPU fixation and CPU edits to lower layers', { timeout: 120000 }, () => {
+test('accumulated support follows GPU fixation and CPU edits to lower layers', { timeout: 120000 }, t => {
   const O = { ...DEFAULTS, gran: 0.25, fixedBed: 1 };
   const cpu = fresh(), gpu = fresh();
   const info = attachGpu(gpu, O, {mode:'auto', log:()=>{}});
-  if(info.backend !== 'gpu'){console.log(`# skipped: ${info.reason}`);return;}
+  if(info.backend !== 'gpu'){t.skip(`no GPU: ${info.reason}`);return;}
   try {
     for(let round=0;round<2;round++) {
       const ref=paint(cpu,O),out=paint(gpu,O),d=stats(out,ref);

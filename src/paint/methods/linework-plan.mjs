@@ -4,7 +4,7 @@
 //
 //   --linesource none|auto|source-ink|photo-sketch   none (painter default): the pen finds its own lines (the walker),
 //       unless --drawingfile names a line file. source-ink: the target's own pen lines (src/crop/ink-lines-file.mjs).
-//       photo-sketch: tools/seg/sketch-lines.py (needs python3 with numpy and OpenCV, --sketchpython; --sketchmap a
+//       photo-sketch: tools/seg/sketch-lines.py (needs numpy and OpenCV; line-python.mjs picks the python; --sketchmap a
 //       learned map from tools/seg/sketch-map.py). auto: source-ink when the separator reads --penfirst per cent of the
 //       target as pen line (default 0.5), else photo-sketch when it can run, else the walker.
 //   --stages prep,prepink,finishink   the stages drawn, any subset; options --prepamount, --prepinkfrom, --prepinkkeep,
@@ -19,6 +19,7 @@ import { writeInkLines } from '../../crop/ink-lines-file.mjs';
 import { finishTexture } from './finish-texture.mjs';
 import { linePaths } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
+import { linePython } from './line-python.mjs';
 
 const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch', 'structure-lines', 'structure-combine', 'line-map']);
 // fewer source-ink lines than this and the stages fall back to edge chains
@@ -49,12 +50,6 @@ export function chooseLineSource(mode, { inkShare, threshold = 0.5, sketchAvaila
   return sketchAvailable ? 'photo-sketch' : 'none';
 }
 
-/** Whether the sketch planner's python has numpy and OpenCV. */
-function sketchAvailable(python) {
-  const r = spawnSync(python, ['-c', 'import cv2, numpy'], { encoding: 'utf8', timeout: 60000 });
-  return !r.error && r.status === 0;
-}
-
 function runSketch({ python, root, image, stem, map, segments, log }) {
   const args = [path.join(root, 'tools/seg/sketch-lines.py'), image, '--out', stem];
   if (map) args.push('--map', map);
@@ -77,12 +72,13 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
   if(opt('drawing','first')==='none') return info;
   const image=path.resolve(root,opt('image',''));
   if (!opt('drawingfile', '') && mode !== 'none') {
-    const python = opt('sketchpython', 'python3');
-    const canSketch = mode === 'photo-sketch' || (mode === 'auto' && 100 * inkShare < num('penfirst', 0.5) && sketchAvailable(python));
+    const lp = linePython({ flag: opt('sketchpython', ''), log }), python = lp.path;
+    info.python = lp;
+    const canSketch = mode === 'photo-sketch' || (mode === 'auto' && 100 * inkShare < num('penfirst', 0.5) && lp.ready);
     const choice = chooseLineSource(mode, { inkShare, threshold: num('penfirst', 0.5), sketchAvailable: canSketch });
     if (choice === 'source-ink') {
       const stem = path.join(out, 'lines-source-ink');
-      if (sketchAvailable(python)) {
+      if (lp.ready) {
         const r = spawnSync(python, [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(num('width', 1080))],
           { encoding: 'utf8', timeout: 900000, env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' } });
         if (r.error || r.status !== 0) throw new Error(`source-ink copy failed: ${r.error?.message ?? r.stderr}`);
@@ -92,7 +88,7 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
       } else {
         const r = await writeInkLines(image, stem);
         info.extractor = 'ink-lines fallback (numpy/OpenCV unavailable)';
-        log(`line source source-ink fallback: ${r.lines.length} narrow-ridge lines; install numpy/OpenCV for observed-width copying`);
+        log(`!!! line source source-ink fallback: ${r.lines.length} narrow-ridge lines, because ${python} cannot import numpy and OpenCV; run tools/cloud/setup-lines.sh`);
       }
       argv.push('--drawingfile', stem);
       info.source = 'source-ink';

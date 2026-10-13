@@ -91,6 +91,9 @@ actual dried opening drawing in a full painting. A drawing-only run also writes
 Alternatively `--linesource photo-sketch --sketchpython work/line-env/bin/python
 --sketchmap work/lines/maps/photo.png` (a plan's `drawing.source: "photo-sketch"`) runs this planner automatically
 before painting; `--linesource auto` runs it on a target with little pen line when the python has numpy and OpenCV.
+Without `--sketchpython` the painter picks the line python itself: `PAINTER_LINES_PYTHON`, else `~/painter-lines` or
+`/opt/painter-lines` (`tools/cloud/setup-lines.sh` installs either), else `python3`. `paint.log` and `linework.json`
+record the python and its numpy, OpenCV and scikit-image versions.
 An explicit `--drawingfile` takes precedence. Without a model, the JSON explicitly reports the geometric/ridge
 fallback. `--map FILE.png` / painter `--sketchmap FILE.png` accepts another dark-on-white structural map. Weights and reference images must remain outside git. The older
 ensemble's missing `run_models.py` is not needed by this route.

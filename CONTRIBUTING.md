@@ -15,6 +15,21 @@ npm run quick-start
 
 Tests use bundled inputs or recorded expectations. GPU checks need a WebGPU adapter; the rest run on the CPU.
 
+`npm test` also runs the Python line-tool tests (`tools/seg/*-test.py`, `tools/judge/*-test.py`) with the line python the painter uses (`tools/cloud/setup-lines.sh` installs it). Without numpy and OpenCV, and without a WebGPU adapter for the GPU checks, those tests are reported as skipped, not passed.
+
+The painter refuses to paint from uncommitted changes. Each run writes `code-state.json` with the commit, the changed files and a hash of the diff. Commit first, or pass `--allowdirty 1` for a scratch run; the run is then recorded as dirty.
+
+## Worktrees
+
+A git worktree has no `node_modules` of its own. Link the main checkout's install, which survives a reboot, never another worktree's link:
+
+```sh
+git worktree add ../unpainting-fix -b fix/name
+ln -sfn "$PWD/node_modules" ../unpainting-fix/node_modules
+```
+
+Run this from the main checkout. Use `ln -sfn`: a plain `ln -s` onto an existing link writes the new link inside the linked folder. Run `npm ci` in the main checkout when `package-lock.json` changes. A worktree whose `package-lock.json` differs from the main checkout's needs its own `npm ci`. Worktrees under `/private/tmp` are deleted by a reboot, links and all.
+
 ## Images and licenses
 
 Only add images you have permission to distribute. Record the source and rights in [NOTICE](NOTICE) and [examples/SOURCES.md](examples/SOURCES.md). Code contributions are MIT licensed. Image rights are separate, and NOTICE sets the terms for the bundled photographs and their derivatives.
