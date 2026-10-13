@@ -130,3 +130,10 @@ test('form score falls away on both sides of the plan\'s own variation', () => {
   assert.ok(over.formScore < 0.85, `noisy formScore ${over.formScore} should not pass`);
   assert.ok(under.formScore <= under.formKept + 1e-9 && under.formScore < 0.8, `flattened formScore ${under.formScore}`);
 });
+
+test("a pass with more form-scale variation than the plan departs from its forms; it does not lose 400% of them", () => {
+  const steps = [{ pass: 1, formKept: 4.27, formScore: 0, formStructure: 0.45, fineKept: 1, structure: 1 }, { pass: 2, formKept: 0.4, formScore: 0.4, formStructure: 0.9, fineKept: 1, structure: 1 }];
+  const over = intermediates(steps, 10, 10, null).flags[0], under = intermediates(steps.slice(1), 10, 10, null).flags[0];
+  assert.match(over, /departs from the plan.s forms at pass 1: it holds 427% of the plan.s variation/);
+  assert.match(under, /loses the plan.s forms at pass 2: it keeps 40% of the plan.s variation/);
+});

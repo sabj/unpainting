@@ -92,6 +92,7 @@ import { distanceToZero } from '../src/raster.js';
 import { components, removeSmall, open as openMask, dilate, erode, minFilter, maxFilter, closeLocal } from '../src/raster.js';
 import { chooseTechnique, detailMarks } from '../src/crop/technique.mjs';
 import { intermediates, execution } from '../src/eval/composite.mjs';
+import { planDensityOver, cellRGB } from '../src/eval/plan-optics.mjs';
 import { gaussian } from '../src/keyframes/density.mjs';
 import { applyResist, liftResist as physicalLiftResist, setClip as physicalSetClip } from '../src/media/sheet.mjs';
 import { makeCrisp } from '../src/paint/methods/crisp-edges.mjs';
@@ -1598,11 +1599,9 @@ const expected = new Float32Array(n * PIGS.length);
 // ledger only. --deliverycalmax caps the factor (default 1.8). Default 0.
 const DELIVERY = num('deliverycal', 0) > 0 ? createDeliveryCal(PIGS.length, { max: num('deliverycalmax', 1.8) }) : null;
 const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
-const planDensity = () => {
-  const D = new Float32Array(n);
-  for (let i = 0; i < n; i++) { let d = 0; for (let j = 0; j < PIGS.length; j++) d += expected[i * PIGS.length + j] * (PIGS[j].K[0] + PIGS[j].K[1] + PIGS[j].K[2]) / 3; D[i] = d; }
-  return D;
-};
+// the plan in the sheet's units: the planned layers over the sheet before the first wash (src/eval/plan-optics.mjs)
+let WASH_BASE = null;
+const planDensity = () => planDensityOver(expected, PIGS, paperRGB, n, WASH_BASE);
 const sheetDensity = big => {
   const D = new Float32Array(n);
   const pl2 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
@@ -2886,7 +2885,7 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
-    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET },
+    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state);
@@ -2918,7 +2917,7 @@ const awareRestore = () => {
   }
   const j = st.js;
   FRAME_POLICY.restore(j.framePolicy);
-  ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET } = j);
+  ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET, WASH_BASE } = j);
   const refill = (a, b) => { a.length = 0; for (const v of b) a.push(v); };
   refill(FRAMES, j.FRAMES); refill(marks, j.marks); refill(TECHS, j.TECHS); refill(colourTrace, j.colourTrace);
   expected.set(j.expected); LAST.set(j.LAST);
@@ -2953,6 +2952,7 @@ const awareBoundary = async at => {
 let L_START = 0;
 if (RESUMING) { const at = awareRestore(); L_START = at.kind === 'start' ? 0 : at.kind === 'pass' ? at.L + 1 : layers.length; }
 else await awareBoundary({ kind: 'start' });
+if (!WASH_BASE && !(PRACTICE || PENWASH) && L_START < layers.length) WASH_BASE = cellRGB(render(), { w, h, SC, W2 });
 for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(L===FINISH_START){AREA_PLAN=FINISH_PLAN;AREA_COMPILED=FINISH_COMPILED;AREA_EXEC.set(null);if(FINISH_PLAN.doc.finishingBase){const b=FINISH_PLAN.doc.finishingBase;dry(sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));if(!paper.dry)throw Error('finishing connected pass requires measured dry base');}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(sheet);FINISH_MASS_BEFORE=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0));}
   const layer = layers[L];
@@ -3692,14 +3692,9 @@ for (const f of judged.flags) console.log(`  ! ${f}`);
 }
 if (marks.length) {
   // covered: of the cells the plan washes, the share holding at least half of it by tone. Both sides through the same
-  // optics: the plan is rendered on flat paper as plan.jpg is, since planDensity() reads blues too dark.
+  // optics: the plan is rendered on flat paper as plan.jpg is.
   const paintedD = lastPainted;
-  const layer = PIGS.map(() => new Float32Array(n));
-  for (let i = 0; i < n; i++) for (let j = 0; j < PIGS.length; j++) layer[j][i] = expected[i * PIGS.length + j];
-  const flat = new Uint8ClampedArray(n * 3);
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) flat[i * 3 + c] = paperRGB[c];
-  const rgb = renderLayers([layer], PIGS, flat, n, 1), pl2 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
-  const planD = Float32Array.from({ length: n }, (_, i) => Math.max(0, -Math.log(Math.max(0.02, Math.min(1, (0.2126 * rgb[i * 3] + 0.7152 * rgb[i * 3 + 1] + 0.0722 * rgb[i * 3 + 2]) / pl2)))));
+  const planD = planDensityOver(expected, PIGS, paperRGB, n);
   let asked = 0, arrived = 0;
   for (let i = 0; i < n; i++) if (planD[i] > 0.1) { asked++; if (paintedD[i] >= 0.5 * planD[i]) arrived++; }
   const cov = asked ? arrived / asked : 1;

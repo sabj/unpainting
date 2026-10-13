@@ -204,8 +204,10 @@ export function intermediates(pairs, w, h, blur, options = {}) {
   // first failing pass and whether it recovers, read at form scale: at one cell paper tooth has no plan counterpart
   const bad = steps.filter(s => (s.formScore ?? s.formKept) < 0.6 || s.formStructure < 0.6);
   if (bad.length) {
-    const first = bad[0];
-    flags.push(`the sheet first loses the plan's forms at pass ${first.pass}: ${(100 * first.formKept).toFixed(0)}% of them, agreement ${first.formStructure.toFixed(2)}`);
+    const first = bad[0], kept = `${(100 * first.formKept).toFixed(0)}% of the plan's variation at form scale, agreement ${first.formStructure.toFixed(2)}`;
+    // above 1 the sheet has variation of its own on top of the plan's: it departs from the forms rather than losing them
+    flags.push(first.formKept > 1 ? `the sheet first departs from the plan's forms at pass ${first.pass}: it holds ${kept}`
+      : `the sheet first loses the plan's forms at pass ${first.pass}: it keeps ${kept}`);
     if (bad.length > steps.length * 0.6) flags.push(`and it is not one bad pass: ${bad.length} of ${steps.length} lose it`);
   }
   // a pass that undoes the one before it
