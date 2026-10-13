@@ -38,3 +38,14 @@ test('reserved lights are never re-marked and a large dark mass is left to the g
   assert.equal(r.darks[5 * W + 5], 0);
   assert.equal(r.darkCount, 0, 'a 1200-cell mass is not a small mark');
 });
+
+test('isolation keeps a lone catchlight and leaves clustered coat glints to the wash', () => {
+  // a dark coat with three glints 2 cells apart, and a lone glint in a dark eye far away
+  const values = field((x, y) => ((x === 5 || x === 7 || x === 9) && y === 30 ? 0.02 : (x === 30 && y === 10) ? 0.02 : 0.8));
+  const none = new Uint8Array(W * H);
+  const r = smallLandmarks({ values, smooth: values, shadowMask: none, protect: none, w: W, h: H, cellMm: CELL, maxCells: 288, isolationMm: 1.5 });
+  assert.equal(r.lights[10 * W + 30], 1, 'lone catchlight kept');
+  assert.equal(r.lights[30 * W + 7], 0, 'clustered glints dropped');
+  const all = smallLandmarks({ values, smooth: values, shadowMask: none, protect: none, w: W, h: H, cellMm: CELL, maxCells: 288 });
+  assert.equal(all.lights[30 * W + 7], 1, 'without isolation the cluster is kept');
+});

@@ -50,6 +50,7 @@ Modules, with their flags:
 - `run-cache.mjs` (always on): caches slow, input-determined steps on disk.
 - `styles/loader.mjs` (`--valueplan <json>`): loads watercolor style profiles and subject mappings.
 - `methods/brushes.mjs` (`--physical 1`): sizes brushes from real ones and splits strokes where water runs out.
+- `methods/charge-layers.mjs` (`--charge 1`, parked): a region's middle layers laid in one wet session.
 - `methods/colour-budget.mjs` (`--colourbudget 1`, `--fwrepay 1`): defers colour held back from a pale first wash to a later glaze.
 - `methods/crisp-edges.mjs` (`--crisp 1`): wet-on-dry glazes stopped at hard region edges.
 - `methods/detail-passes.mjs` (`--detailpasses`, `--detailtrim`): late small passages where the detail is.
@@ -102,11 +103,13 @@ Modules, with their flags:
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
 - `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
+- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`, parked): clean water past a passage's soft edges before its colour.
 - `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
 - `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
 - `methods/stroke-plan.mjs` (`--strokeplan 1`): a passage as overlapping parallel sweeps.
 - `methods/subject-order.mjs` (`--subjectorder s`, `--subjectseam s`): subject-by-subject order; a wash is cut at a subject edge only along a colour edge.
+- `methods/touch-cover.mjs` (`--touchcover c`, parked): a touch-up whose sweeps touch under share c of its shape is left out.
 - `methods/subject.mjs` (not reached): the subject's big shapes in wash order.
 - `methods/target-regions.mjs` (always on): colour and value regions for the value planner.
 - `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.

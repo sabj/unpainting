@@ -33,11 +33,12 @@ function pieceAndRing(list, values, w, h, ring, member) {
  * Returns { lights, darks } masks and counts. lights: pieces at most `lightMaxMm2` mm2, paper-pale (value under
  * lightValue), whose 2-cell ring is at least `lightContrast` darker and itself at least `ringDark` deep. darks:
  * pieces of the smoothed field over `darkValue` that the shadow support left out, from `darkMinMm2` mm2 up to
- * `maxCells`, at least `darkContrast` deeper than their ring.
+ * `maxCells`, at least `darkContrast` deeper than their ring. isolationMm: keep only lights with no other candidate
+ * light that close.
  */
 export function smallLandmarks({ values, smooth, shadowMask, protect, w, h, cellMm, maxCells,
   lightValue = 0.12, lightMaxMm2 = 2, lightContrast = 0.25, ringDark = 0.35,
-  darkValue = 0.38, darkMinMm2 = 0.5, darkContrast = 0.12, maxLights = 120 } = {}) {
+  darkValue = 0.38, darkMinMm2 = 0.5, darkContrast = 0.12, maxLights = 120, isolationMm = 0 } = {}) {
   const n = w * h, cell2 = cellMm * cellMm;
   const lightMax = Math.max(2, Math.round(lightMaxMm2 / cell2)), darkMin = Math.max(4, Math.round(darkMinMm2 / cell2));
   const lights = new Uint8Array(n), darks = new Uint8Array(n);
@@ -50,7 +51,16 @@ export function smallLandmarks({ values, smooth, shadowMask, protect, w, h, cell
     if (list.length < 1 || list.length > lightMax) continue;
     const m = pieceAndRing(list, values, w, h, 2, pale);
     if (m.ring == null || m.ring < ringDark || m.ring - m.inside < lightContrast) continue;
-    found.push({ list, c: m.ring - m.inside });
+    let sx = 0, sy = 0;
+    for (const i of list) { sx += i % w; sy += (i / w) | 0; }
+    found.push({ list, c: m.ring - m.inside, x: sx / list.length, y: sy / list.length });
+  }
+  // isolationMm: a catchlight or a glint stands alone; lights with another candidate this close are coat or foliage
+  // texture, and reserving them all reads as white pinholes, so they are left to the wash.
+  if (isolationMm > 0) {
+    const r2 = (isolationMm / cellMm) ** 2;
+    const alone = found.filter(a => !found.some(b => b !== a && (a.x - b.x) ** 2 + (a.y - b.y) ** 2 < r2));
+    found.length = 0; found.push(...alone);
   }
   found.sort((a, b) => b.c - a.c);
   for (const f of found.slice(0, maxLights)) for (const i of f.list) lights[i] = 1;
