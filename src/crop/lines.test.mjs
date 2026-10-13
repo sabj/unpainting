@@ -61,3 +61,17 @@ test('loadLines reads the file, and says so when there is none', () => {
   assert.equal(lines[0].length, 120);
   assert.equal(lines[0].points.length, 2);
 });
+
+test('a line file made for another image or another aspect than the bound target is refused', async () => {
+  const { bindLineTarget, lineTargetMismatch } = await import('./lines.mjs');
+  try {
+    bindLineTarget({ sha256: 'a'.repeat(64), w: 200, h: 100 });
+    assert.equal(lineTargetMismatch({ ...DOC, targetSHA256: 'a'.repeat(64) }), null, 'same image, same aspect');
+    assert.equal(lineTargetMismatch({ ...DOC, image: { w: 101, h: 50 } }), null, 'rounding between grids is not a stretch');
+    assert.match(lineTargetMismatch({ ...DOC, targetSHA256: 'b'.repeat(64) }), /made for image bbbbbbbb/);
+    assert.match(lineTargetMismatch({ ...DOC, image: { w: 100, h: 80 } }), /stretched/);
+    assert.throws(() => scaleLines({ ...DOC, image: { w: 100, h: 80 } }, 300, 150), /does not belong to this target/);
+    bindLineTarget(null);
+    assert.equal(lineTargetMismatch({ ...DOC, image: { w: 100, h: 80 } }), null, 'nothing bound, nothing checked');
+  } finally { bindLineTarget(null); }
+});

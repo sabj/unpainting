@@ -127,7 +127,8 @@ import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/m
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
-import { scaleLines } from '../src/crop/lines.mjs';
+import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-registration.mjs';
+import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
 import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
 import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
 import { localLights } from '../src/paint/methods/local-lights.mjs';
@@ -260,6 +261,10 @@ if (!argv0.includes('--linesource')) {
 // ink|graphite|none, a plan's drawing.medium or --outlinemedium fixes the medium; --sketchcache <dir> holds image-model
 // sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. --linework file cleans and gates
 // the given --drawingfile instead of choosing a source; --linejoin 1 joins broken contours before pruning. Off by default.
+// every line file is checked against the target (lines.mjs); a --drawingfile made for another image or aspect is
+// registered to the target first (drawing-registration.mjs)
+if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('image',''))).catch(() => null));
+const DRAWING_REGISTRATION = !opt('resumestate','') && opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
 let LINEWORK_STAGE = null;
 const LINEWORK_SOURCES = { python: opt('sketchpython','python3'), sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null };
 const LINEWORK_JOIN = num('linejoin', 0) > 0;
@@ -1096,6 +1101,7 @@ const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor});
+if (DRAWING_REGISTRATION) LINEWORK.registration = DRAWING_REGISTRATION;
 if (LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${LINEWORK_STAGE.source}`, universal:{gate:LINEWORK_STAGE.gate, features:LINEWORK_STAGE.features, lines:LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
