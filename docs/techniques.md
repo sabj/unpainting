@@ -63,7 +63,6 @@ Modules, with their flags:
 - `methods/drawing.mjs` (not reached): pencil drawing of the figure's edge and big darks.
 - `methods/first-wash.mjs` (`--firstwash 1`): a paler opening wash split at the subject mask.
 - `methods/flecks.mjs` (`--fleckshape 1`): small reserved lights as broken paper flecks.
-- `methods/flow-shape.mjs` (`--flowshape mm`, `--flowholes mm2`): value passages smoothed along the target's structure direction, pinholes painted through.
 - `methods/ink-res.mjs` (`--inkres N`): pens drawn on a finer sheet and averaged down.
 - `methods/ladder-seg.mjs` (`--ladderseg`): leaves glazes on ground segments to the washes.
 - `methods/lay.mjs` (not reached): one passage from one mixing well, in sweeps.

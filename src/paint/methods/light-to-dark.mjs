@@ -2,7 +2,6 @@ import {resolveStyle,profileTechnique,loadSubjects,loadStyle} from '../styles/lo
 import {choosePassageBrush} from './passage-brush.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
-import {flowField,flowShapeMask,fillSmallHoles} from './flow-shape.mjs';
 import {joinDomainFragments} from './wash-join.mjs';
 import {smallLandmarks} from './small-marks.mjs';
 // Target-value scheduling. Pure CPU planning; no paper mutation or bitmap painting.
@@ -25,8 +24,8 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({smallMarks=false,washJoin=false,flowShapeMm=0,flowHoleMm2=0,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,trumbullRules=false,recesses=false,portraitRules=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0}) {
-  let coolGroup=null,FLOW=null;setRecessMax(recessMax);
+export function planLightToDark({smallMarks=false,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,trumbullRules=false,recesses=false,portraitRules=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0}) {
+  let coolGroup=null;setRecessMax(recessMax);
   // shadowRaw: with no burnt sienna in the box, raw sienna is the shadow glaze's warm part, so it is not pure ultramarine.
   const SHADOW_WARM=shadowRaw&&!pigments.some(p=>p?.name==='burnt sienna')?'raw sienna':'burnt sienna';
   // A subject with a style mapping reads its decisions from the profile. precise-watercolor is the identity profile
@@ -259,16 +258,7 @@ export function planLightToDark({smallMarks=false,washJoin=false,flowShapeMm=0,f
       const joined=washJoin&&domains.length>1?joinDomainFragments(mask,w,h,i=>groupMode?coolGroup[region.labels[i]]:typeof domains[0]==='string'?domains.indexOf(cellStyle(i).name)+1:region.labels[i],minShape):null;
       for(const domain of domains){
         const M0=joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&coolGroup[region.labels[i]]===coolGroup[domain]?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
-        const Mw=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
-        // flowShapeMm (flow-shape.mjs): the passage follows the target's structure direction instead of its value
-        // staircase. Cells may join only where this step could paint them, in this domain, off the reserved lights.
-        let M=Mw;
-        if(flowShapeMm>0){const cellMm=sheetWidthMm/w;FLOW??=flowField(value.values,w,h,{sigma:Math.max(2,Math.round(.8/cellMm))});
-          const inDomain=i=>groupMode?coolGroup[region.labels[i]]===coolGroup[domain]:typeof domain==='string'?cellStyle(i).name===domain:domain?region.labels[i]===domain:true;
-          const allowed=Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&step.wt[i]>0&&(phase!=='shadow'||shadowMask[i]||accentCells[i])&&(!step.pig||step.pig[i]===pigment)&&inDomain(i)?1:0);
-          M=flowShapeMask(Mw,w,h,FLOW,{along:flowShapeMm/cellMm,across:1,allowed,protect:protectedCells});}
-        // flowHoleMm2: pinholes inside a passage (at most this many mm2) are painted through; reserved lights stay paper.
-        if(flowHoleMm2>0)M=fillSmallHoles(M,w,h,Math.round(flowHoleMm2/(sheetWidthMm/w)**2),protectedCells);
+        const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
         const c=components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
         const shapes=[];
@@ -279,7 +269,7 @@ export function planLightToDark({smallMarks=false,washJoin=false,flowShapeMm=0,f
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
             const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
           if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<4){omittedDemand+=total;continue;}
-          if(total<=1e-8)continue;const own=M===Mw?list:list.filter(i=>Mw[i]),base=own.length?own:list,amount=placed?quantileOf(base,G,passCap):base.reduce((a,i)=>a+G[i],0)/base.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
+          if(total<=1e-8)continue;const amount=placed?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
           sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=G;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
