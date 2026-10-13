@@ -1,13 +1,14 @@
 // --drawingfile <base>: the first pen draws exactly the lines of work/lines/<base>-lines.json (tools/seg/select-drawing.py),
 // whole, in file order, at the outline tier's pressure; no walker gestures, ink filter or silhouette pass.
 // Each line is split into strokes of --drawstroke (share of the short side), one dip each, so the pen does not run dry.
-import { hasLines, loadLines } from '../../crop/lines.mjs';
+import fs from 'node:fs';
+import { hasLines, loadLines, linePaths } from '../../crop/lines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
 import { boundPreparation } from './preparation-binding.mjs';
 import { drawingLogic } from './drawing-logic.mjs';
 import { planLines } from '../drawing-plan.mjs';
 import { scribbleMasses } from './drawing-scribble.mjs';
-import { personStrokes } from './drawing-hand.mjs';
+import { personStrokes, handDrawing } from './drawing-hand.mjs';
 import { gaussian } from '../../keyframes/density.mjs';
 
 // Contact width for a drawn width W: the pen at K 1 on dry paper draws about 0.72 x contact + 0.3 cells,
@@ -37,8 +38,14 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (skip.size) log(`drawing: lines with role ${[...skip].join(', ')} left out`);
   if (all.length < candidates.length) log(`drawing: ${all.length} of ${candidates.length} lines kept (--drawshare ${num('drawshare', 1)}, --drawregions ${num('drawregions', 0)}, --drawmax ${num('drawmax', Infinity)})`);
   const lines = first ? all : all.filter(g => (g.weight ?? 1) >= min);
-  log(first ? `drawing: ${lines.length} selected lines from work/lines/${b}-lines.json, drawn whole; the walker's ${walked} gestures are not used`
-    : `drawing, closing pen: ${lines.length} of ${all.length} lines of work/lines/${b}-lines.json at weight ${min} or more, over the dry sheet`);
+  const file = linePaths(b).lines;
+  // an empty opening file marked by the linked stages (a prep pencil and no prepInk stage) is meant: the pencil is the
+  // opening drawing. A first pen that selects nothing from any other drawing is a broken input or plan.
+  const empty = first && !candidates.length ? JSON.parse(fs.readFileSync(file, 'utf8')).empty : null;
+  if (empty) { log(`drawing: no opening ink, since ${empty}; the walker's ${walked} gestures are not used`); return []; }
+  if (first && !lines.length) throw new Error(`drawing: the first pen selected 0 of ${candidates.length} lines from ${file}${skip.size ? ` (roles left out: ${[...skip].join(', ')})` : ''}`);
+  log(first ? `drawing: ${lines.length} selected lines from ${file}, drawn whole; the walker's ${walked} gestures are not used`
+    : `drawing, closing pen: ${lines.length} of ${all.length} lines of ${file} at weight ${min} or more, over the dry sheet`);
   const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1 })); };
   // Per-point `width` (px) and `weight` (0..1) set the pen along the stroke: contact = width x --drawwidthgain
   // - --drawwidthmargin cells (see GAIN), pressure = weight x --drawwant. Points without them are unchanged.
@@ -47,6 +54,17 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // thick marks when copying with this instrument. Explicit calibration wins.
   const copyingNib = opt('inkprofile', '') === 'drawing-ink';
   const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', copyingNib ? .3 : MARGIN), gain = num('drawwidthgain', copyingNib ? .95 : GAIN), minNib = num('drawwidthmin', 0.3);
+  if (num('drawinghand', 0) > 0) {
+    const handScale=w/1080*152.4/num('sheetmm',152.4);
+    const r = handDrawing(lines, { gap: num('drawjoingap', 4) * handScale,
+      cos: num('drawjoincos', .8), aim: num('drawjoinaim', .7),
+      strokeLength: num('drawstroke', .35) * Math.min(w, h),
+      base, gain, margin:margin*handScale, minNib:minNib*handScale, inLen: num('drawtaperin', 3) * handScale,
+      outLen: num('drawtaperout', 5) * handScale, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
+      D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
+    log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
+    return r.strokes;
+  }
   const perPoint = q => (q.width == null && q.weight == null ? q : {
     x: q.x, y: q.y,
     ...(q.width == null ? {} : { nw: Math.max(minNib, q.width * gain - margin) }),
@@ -54,7 +72,9 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   });
   const measured = lines.some(g => g.points.some(q => q.width != null || q.weight != null));
   if (measured) log(`drawing: per-point widths and darkness from the file, contact = width x ${gain} - ${margin} cells, pressure share = ${base} x darkness`);
-  const strokes = lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
+  let strokes = lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
+  // --inkhand 1 (ink only): each stroke as a hand draws it (inkHand)
+  if (num('inkhand', 0) > 0 && !/graphite/.test(opt('outlinemedium', 'auto'))) { strokes = strokes.map(g => inkHand(g, { base })); log(`drawing: ${strokes.length} strokes set down, tapered and slowed on curves (--inkhand)`); }
   // --finishmasses 1 (plan finishInk.masses "scribble"): the closing pen also states the dark masses of the plan-time
   // source density as looping scribble with the lights left open (drawing-scribble.mjs), for black or curly coats and
   // dark hair. Off by default: a dark surface is paint's job, not the pen's.
@@ -65,6 +85,39 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
     return [...strokes, ...scribbles];
   }
   return strokes;
+}
+
+const ease = u => u * u * (3 - 2 * u);
+/**
+ * A stroke as a hand draws it with a dip pen, in the pen's own terms (src/media/pen.mjs): the nib sets down and holds
+ * a moment, so the first drop pools into a small blot (`dwell`); pressure and width rise over the first `inLen` cells
+ * and fall over the last `outLen`; the hand slows on curves, and a slow nib lays a wider, darker line by capillary
+ * pull, while a long straight run is drawn faster and finer. Speed `v` runs from 1.9 - 1.1 x share, as draw.mjs sets
+ * it, scaled by the curve. Points keep their positions.
+ */
+export function inkHand(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.35, end = 0.25, dwell = 0.5, slow = 0.45, fast = 1.15, turnSpan = 2 } = {}) {
+  const P = g.points, n = P.length, d = [0];
+  for (let k = 1; k < n; k++) d.push(d[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
+  const L = d[n - 1] || 1, tin = Math.min(inLen, 0.3 * L), tout = Math.min(outLen, 0.35 * L);
+  const env = t => Math.min(tin > 0 && t < tin ? start + (1 - start) * ease(t / tin) : 1, tout > 0 && L - t < tout ? end + (1 - end) * ease((L - t) / tout) : 1);
+  // turning at a point, over about turnSpan cells each way: 0 straight, 1 a right angle or more
+  const turn = k => {
+    let a = k, b = k;
+    while (a > 0 && d[k] - d[a] < turnSpan) a--;
+    while (b < n - 1 && d[b] - d[k] < turnSpan) b++;
+    if (a === k || b === k) return 0;
+    const ux = P[k].x - P[a].x, uy = P[k].y - P[a].y, vx = P[b].x - P[k].x, vy = P[b].y - P[k].y;
+    const c = (ux * vx + uy * vy) / ((Math.hypot(ux, uy) * Math.hypot(vx, vy)) || 1);
+    return Math.min(1, Math.acos(Math.max(-1, Math.min(1, c))) / (Math.PI / 2));
+  };
+  const points = P.map((q, k) => {
+    const e = env(d[k]), share = (q.s ?? base * (g.weight ?? 1)) * e, c = turn(k);
+    const out = { ...q, s: share, v: (1.9 - 1.1 * Math.min(1, share)) * (c > 0.05 ? 1 - slow * c : fast) };
+    if (q.nw != null) out.nw = q.nw * (0.6 + 0.4 * e);
+    if (k === 0) out.dwell = dwell;
+    return out;
+  });
+  return { ...g, points };
 }
 
 // Pen pressure field for a selected drawing, on the sheet grid (W2 x H2, SC sheet cells per plan cell): each stroke's

@@ -25,7 +25,7 @@ export function lineField(D, residual, w, h, { sigmas = [0.8, 1.2, 1.8] } = {}) 
  * @param opts.ink  concentration per pigment of the ink in the pen, as dipPen takes it
  * @param opts.peak the want that means a full-pressure line; defaults to the 95th percentile of the gestures' own
  */
-export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pen: penOpts = {}, low = 0.25, flowEvery = 60, O, beforeStroke = null, afterStroke = null } = {}) {
+export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pen: penOpts = {}, low = 0.25, allowStarvation = false, flowEvery = 60, O, beforeStroke = null, afterStroke = null } = {}) {
   const at = (x, y) => want[Math.max(0, Math.min(h - 1, Math.round(y))) * w + Math.max(0, Math.min(w - 1, Math.round(x)))];
   if (peak == null) {
     const v = [];
@@ -39,8 +39,8 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     if (g.points.length < 2) continue;
     // `dip` on a gesture re-dips at its start; a number is the load. `low` is how empty the pen may run before a
     // re-dip inside the gesture (--drawinglogic 2)
-    const refillBelow = Math.max(g.low ?? low, Math.min(.9, pen.starve * 1.2));
-    if (g.dip || pen.ink < pen.capacity * refillBelow) { dipPen(pen, ink, typeof g.dip === 'number' ? g.dip : 1); dips++; }
+    const refillBelow = allowStarvation ? (g.low ?? low) : Math.max(g.low ?? low, Math.min(.9, pen.starve * 1.2));
+    if (pen.ink <= 0 || g.dip || pen.ink < pen.capacity * refillBelow) { dipPen(pen, ink, typeof g.dip === 'number' ? g.dip : 1); dips++; }
     // a point may carry its own pressure share `s`, contact width `nw`, speed `v`, and a `dwell` where ink pools
     // (--drawinglogic 2)
     const path = g.points.map(p => {

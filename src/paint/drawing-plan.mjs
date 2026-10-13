@@ -7,6 +7,9 @@
 const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);
 const INK_COLOURS = Object.freeze(['sepia', 'black']);
 const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
+// drawing.linework "auto": the universal linework stage (src/paint/methods/linework-stage.mjs) picks the source, cleans
+// the lines and gates whether to draw, the medium and how much; "off" (the default) leaves the source to drawing.source.
+const LINEWORK = Object.freeze(['auto', 'off']);
 // Where the line set comes from (--linesource, src/paint/methods/linework-plan.mjs).
 const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
 // The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
@@ -165,7 +168,7 @@ function inkFlags(ink, inkColor) {
 
 /**
  * Painter flags for a plan's drawing section, as an argv array. Null or {} gives [].
- * @param {object|null} drawing { medium, inkColor, ink, source, amount, lines, weight, closingLines, maxLines, stages }
+ * @param {object|null} drawing { medium, inkColor, ink, linework, source, amount, lines, weight, closingLines, maxLines, stages }
  */
 export function drawingFlags(drawing) {
   if (drawing == null) return [];
@@ -173,6 +176,10 @@ export function drawingFlags(drawing) {
   const medium = choice(drawing, 'medium', MEDIA);
   if (medium === 'none') return ['--drawing', 'none'];
   const flags = [];
+  if (drawing.linework != null) {
+    if (!LINEWORK.includes(drawing.linework)) throw new Error(`drawing.linework: one of ${LINEWORK.join(', ')}, not ${JSON.stringify(drawing.linework)}`);
+    flags.push('--linework', drawing.linework);
+  }
   if (drawing.resolution != null) {
     if (![1,2].includes(drawing.resolution)) throw Error('drawing.resolution: 1 or 2');
     flags.push('--inkres', String(drawing.resolution));

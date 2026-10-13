@@ -48,12 +48,21 @@ export function prepareDrawing(gestures,{medium,stage='opening',subject='default
  }
  return out;
 }
-export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',subject,mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],...opts}){
+export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',subject,mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},...opts}){
  const profile=materialProfile(medium),k=sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
  if(k<0)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
  const selected=prepareDrawing(gestures,{medium,stage,subject,mmPerCell,edgeStrength,w,h,state,caps,sourceInk});
  const dryGate=dryPenGate({O,audit});
- const gate=event=>{dryGate(event);const record=audit.at(-1);record.material=medium;record.stage=stage;record.registration={sourceOrdinal:event.gesture?.sourceOrdinal,reviewedOrdinal:event.gesture?.reviewedOrdinal,focalFeature:event.gesture?.focalFeature};record.contactWidthMm=event.gesture?.points.map(p=>p.nw*mmPerCell);const points=event.path??event.gesture?.points??[];record.pathLengthMm=points.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-points[i].x,p.y-points[i].y)*mmPerCell,0);record.physicalPressure=event.path?.map(p=>p.p)??event.gesture?.points.map(p=>p.p);record.pressureShares=event.gesture?.points.map(p=>p.s);if(profile.kind==='ink')opts.beforeStroke?.(event);};
- if(profile.kind==='graphite')return (opts.graphiteExecute??pencilDraw)(sheet,selected,k,{amount:profile.concentration,width:profile.widthMm[1]/mmPerCell,vary:.15,tooth:.4,pressureReference:1,usePointWidths:true,beforeStroke:({cells,gesture})=>{if(!cells.length)return;let x0=w,y0=h,x1=0,y1=0;for(const i of cells){const x=i%w,y=Math.floor(i/w);x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}const x=Math.max(0,x0-3),y=Math.max(0,y0-3);gate({sheet,gesture,pen:{ink:1,capacity:1,conc:[profile.concentration]},footprint:[x,y,Math.min(w-1,x1+3)-x+1,Math.min(h-1,y1+3)-y+1],index:audit.length});}});
+ const gate=event=>{
+  if(dryInk||profile.kind==='graphite')dryGate(event);
+  else{
+   const {sheet,pen,footprint}=event;sheet._gpu?.ensureFresh(sheet,footprint);
+   const [x,y,bw,bh]=footprint;let water=0,pore=0;
+   for(let yy=y;yy<y+bh;yy++)for(let xx=x;xx<x+bw;xx++){const i=yy*w+xx;water=Math.max(water,sheet.W[i]);pore=Math.max(pore,sheet.s[i]/Math.max(1e-9,sheet.paper.capacity[i]));}
+   audit.push({index:event.index,technique:'finish ink on existing paper moisture',footprint,before:{water,pore},after:{water,pore},dried:false,instrument:{ink:pen.ink,capacity:pen.capacity,fill:pen.ink/pen.capacity,drop:pen.drop,concentration:Array.from(pen.conc)}});
+  }
+  const record=audit.at(-1);record.material=medium;record.stage=stage;record.registration={sourceOrdinal:event.gesture?.sourceOrdinal,reviewedOrdinal:event.gesture?.reviewedOrdinal,focalFeature:event.gesture?.focalFeature};record.contactWidthMm=event.gesture?.points.map(p=>p.nw*mmPerCell);const points=event.path??event.gesture?.points??[];record.pathLengthMm=points.slice(1).reduce((sum,p,i)=>sum+Math.hypot(p.x-points[i].x,p.y-points[i].y)*mmPerCell,0);record.physicalPressure=event.path?.map(p=>p.p)??event.gesture?.points.map(p=>p.p);record.pressureShares=event.gesture?.points.map(p=>p.s);record.speeds=points.map(p=>p.v);record.dwellTime=points.reduce((s,p)=>s+(p.dwell??0),0);record.refillThreshold=opts.allowStarvation?(event.gesture?.low??.25):Math.max(event.gesture?.low??.25,Math.min(.9,event.pen.starve*1.2));if(profile.kind==='ink')opts.beforeStroke?.(event);
+ };
+ if(profile.kind==='graphite')return (opts.graphiteExecute??pencilDraw)(sheet,selected,k,{amount:profile.concentration,width:profile.widthMm[1]/mmPerCell,vary:.15,tooth:.4,pressureReference:1,usePointWidths:true,arcScale:mmPerCell/(152.4/1080),...graphiteOptions,beforeStroke:({cells,gesture})=>{if(!cells.length)return;let x0=w,y0=h,x1=0,y1=0;for(const i of cells){const x=i%w,y=Math.floor(i/w);x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}const x=Math.max(0,x0-3),y=Math.max(0,y0-3);gate({sheet,gesture,pen:{ink:1,capacity:1,conc:[graphiteOptions.amount??profile.concentration]},footprint:[x,y,Math.min(w-1,x1+3)-x+1,Math.min(h-1,y1+3)-y+1],index:audit.length});}});
  return drawGestures(sheet,selected,want,w,h,{...opts,O,ink:sheet.pigments.map((_,j)=>j===k?(opts.ink?.[k]??profile.concentration):0),peak:1,pen:{...opts.pen,nib:profile.widthMm[0]/mmPerCell,flex:(profile.widthMm[1]-profile.widthMm[0])/mmPerCell,drop:.1},beforeStroke:gate,afterStroke:({pen,reloads})=>{const record=audit.at(-1);record.inkAfter=pen.ink;record.reloadsWithinStroke=reloads;}});
 }

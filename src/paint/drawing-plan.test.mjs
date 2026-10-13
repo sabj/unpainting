@@ -110,3 +110,10 @@ test('source and ink: the line source, the colour and waterproof ink', () => {
   assert.throws(() => drawingFlags({ ink: { waterproof: 'yes' } }), /waterproof/);
   assert.throws(() => drawingFlags({ inkColor: 'black', ink: { color: 'sepia' } }), /disagree/);
 });
+
+test('linework "auto" runs the universal linework stage; other values are refused', () => {
+  assert.deepEqual(drawingFlags({ linework: 'auto' }), ['--linework', 'auto']);
+  assert.deepEqual(drawingFlags({ linework: 'off' }), ['--linework', 'off']);
+  assert.deepEqual(drawingFlags({ linework: 'auto', medium: 'none' }), ['--drawing', 'none']);
+  assert.throws(() => drawingFlags({ linework: 'on' }), /drawing.linework/);
+});

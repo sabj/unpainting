@@ -34,6 +34,20 @@ test('personStrokes cuts a long gesture into strokes and keeps every point', () 
   assert.ok(s.every(x => x.tier === 1));
 });
 
+test('hand taper and stroke splits retain prepared instrument controls and drawing roles', () => {
+  const g = line(0, 0, 60, 0, 61, {tier: 2, role: 'landmark', low: .03, dip: .4});
+  g.points[20] = {...g.points[20], nw: 1.2, v: .8, dwell: 2, sourcePointIndex: 7};
+  const prepared = shapeGesture(g);
+  const strokes = personStrokes(prepared, 25);
+  assert.ok(strokes.every(s => s.tier === 2 && s.role === 'landmark' && s.low === .03));
+  assert.equal(strokes[0].dip, .4);
+  assert.ok(strokes.slice(1).every(s => s.dip === false), 'a split continuation keeps the reservoir rather than dipping again');
+  const contact = strokes.flatMap(s => s.points).find(p => p.sourcePointIndex === 7);
+  assert.equal(contact.nw, 1.2);
+  assert.equal(contact.v, .8);
+  assert.equal(contact.dwell, 2);
+});
+
 test('subjectRegion fills the inside of a closed outline', () => {
   const box = [line(10, 10, 50, 10), line(50, 10, 50, 50), line(50, 50, 10, 50), line(10, 50, 10, 10)].map(g => ({ ...g, role: 'subject' }));
   const R = subjectRegion(box, 60, 60, { cell: 2, close: 1 });
@@ -160,4 +174,37 @@ test('registered crop projection retains literal point lineage and role metadata
 test('unreviewed opening remains identical to ordinary shape and projection preserves all fields',()=>{
  const g=line(3,4,12,4,10,{weight:.2});const shape={base:.6,floor:.7};const actual=shapeReviewedOpening(g,{D:new Float32Array(100),w:10,h:10,shape});const expected=shapeGesture(g,shape);assert.deepEqual(actual.points,expected.points);
  const point={x:510,y:480,nw:2,s:.13,sourcePointIndex:29,contactRole:'upper lid wing'};assert.deepEqual(projectSelectedDrawing([{points:[point,{...point,x:520}]}],{box:{left:505,top:475,width:415,height:265}})[0].points[0],{...point,x:5,y:5});
+});
+
+import { scaleDrawingGestures, handDrawing } from './drawing-hand.mjs';
+test('sheet conversion preserves hybrid contact, speed, pauses and reservoir instructions at 2x', () => {
+ const gestures=[{dip:.4,low:.03,tier:1,role:'structure',length:10,points:[{x:2,y:3,s:.2,v:.6,dwell:1.2},{x:12,y:3,s:.8,v:2.4,nw:2}]}];
+ const copy=structuredClone(gestures),fine=scaleDrawingGestures(gestures,2)[0];
+ assert.equal(fine.dip,.4);assert.equal(fine.low,.03);assert.equal(fine.role,'structure');
+ assert.equal(fine.points[0].dwell,1.2);assert.equal(fine.points[0].v,1.2);assert.equal(fine.points[1].nw,4);
+ assert.equal(fine.points[0].s,.2);assert.deepEqual(gestures,copy);
+});
+test('reviewed hand route joins continuations but preserves distinct roles and tapered light breaks', () => {
+ const gs=[line(2,8,20,8,19,{role:'structure',weight:.8}),line(22,8,40,8,19,{role:'structure',weight:.8}),line(42,8,58,8,17,{role:'hatch',weight:.5})];
+ const D=new Float32Array(60*16).fill(.4);for(let y=0;y<16;y++)for(let x=28;x<34;x++)D[y*60+x]=.01;
+ const r=handDrawing(gs,{gap:3,strokeLength:100,D,w:60,h:16,lit:.1});
+ assert.equal(r.joined,1);assert.equal(r.gestures,2);assert.equal(r.runs,3);
+ assert.ok(r.strokes.every(g=>g.points.every(p=>p.x<28||p.x>=34)));
+ assert.ok(r.strokes[0].points[0].s<r.strokes[0].points[3].s);
+});
+test('hybrid walker revisits do not redraw or double back on a file contour', async () => {
+ const {walkOnLines}=await import('./drawing-hybrid.mjs');
+ const file=[line(5,10,70,10,66)],walk=[{points:[{x:5,y:10},{x:55,y:10},{x:15,y:10},{x:70,y:10}]}];
+ const r=walkOnLines(walk,file,new Float32Array(80*20).fill(1),80,20,{reach:2,bridge:4});
+ assert.equal(r.gestures.length,1);const P=r.gestures[0].points;
+ assert.ok(P.every((p,i)=>i===0||p.x>=P[i-1].x));assert.equal(new Set(P.map(p=>p.x)).size,P.length);
+});
+
+test('hybrid file width inverts the actual physical material pressure law',async()=>{
+ const {shapeHybrid}=await import('./drawing-hybrid.mjs');
+ const profile={nib:.2,flex:8,pressureExponent:1.3},g=line(0,0,60,0,61);
+ g.points.forEach(p=>{p.width=2;p.s=1;});
+ const r=shapeHybrid(g,{...profile,pressureFloor:0,pressureGain:1,gain:1,margin:0,mix:1,want:1,land:0,lift:0,turnDwell:0}).points;
+ const s=r[30].s;assert.ok(Math.abs(profile.nib+profile.flex*s**profile.pressureExponent-2)<1e-9);
+ assert.ok(r.every(p=>!p.dwell));
 });

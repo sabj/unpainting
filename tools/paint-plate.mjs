@@ -5,6 +5,7 @@ import {startSpeedProfile} from './speed/profile.mjs';
 import {runSpeedSequence} from './speed/sequence.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
 import {splitLoadsFeathered} from '../src/paint/methods/brushes.mjs';
+import {scaleDrawingGestures} from '../src/paint/methods/drawing-hand.mjs';
 import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
 import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
 import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
@@ -134,7 +135,9 @@ import { mlLines } from '../src/paint/methods/ml-lines.mjs';
 import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/methods/drawing-logic.mjs';
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
-import { scaleLines } from '../src/crop/lines.mjs';
+import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
+import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-registration.mjs';
+import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
 import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
 import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
 import { localLights } from '../src/paint/methods/local-lights.mjs';
@@ -163,8 +166,12 @@ import { createPause } from './aware/pause.mjs';
 import { writeState, readState } from './aware/state-io.mjs';
 import { tapeState, restoreTapeState } from '../src/media/brush.mjs';
 import { passDue, markDue } from '../src/paint/pass-cadence.mjs';
+import { resolveLinePython } from '../src/paint/methods/line-python.mjs';
 
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
+// Run the physical material diagnostic through the sweep's standard entry point.
+if(process.argv.includes('--materialstudy'))await import('./judge/ink-material-study.mjs');
+
 // GPU paths default on for painter runs; set 0 to turn one off.
 // The defaults live here because generic dry() callers may depend on synchronous counts.
 process.env.GPU_RESIDENT ??= '1';
@@ -265,6 +272,30 @@ if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
   else if (num('sketchlines',0)>0) argv.push('--linesource','photo-sketch');
   else if (num('sourcelines',0)>0) argv.push('--linesource','source-ink');
+}
+// --linework auto (plan drawing.linework "auto"): the universal linework stage (src/paint/methods/linework-stage.mjs)
+// picks the line source, cleans the lines and gates whether to draw, the medium and how much, before every other line
+// route, and writes an ordinary drawing file that replaces --linesource and any --drawingfile. --linemedium
+// ink|graphite|none, a plan's drawing.medium or --outlinemedium fixes the medium; --sketchcache <dir> holds image-model
+// sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. --linework file cleans and gates
+// the given --drawingfile instead of choosing a source; --linejoin 1 joins broken contours before pruning. Off by default.
+// every line file is checked against the target (lines.mjs); a --drawingfile made for another image or aspect is
+// registered to the target first (drawing-registration.mjs)
+if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('image',''))).catch(() => null));
+const DRAWING_REGISTRATION = !opt('resumestate','') && opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
+let LINEWORK_STAGE = null;
+const LINEWORK_SOURCES = { python: resolveLinePython({ flag: opt('sketchpython','') }).path, sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null };
+const LINEWORK_JOIN = num('linejoin', 0) > 0;
+if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
+  if (!['auto', 'file'].includes(opt('linework'))) throw Error(`--linework: auto, file or off, not ${opt('linework')}`);
+  if (opt('linework') === 'file' && !opt('drawingfile','')) throw Error('--linework file needs --drawingfile');
+  const om = argv.includes('--outlinemedium') ? opt('outlinemedium','auto') : 'auto';
+  const requested = opt('linemedium','') || (om === 'auto' ? null : /graphite/.test(om) ? 'graphite' : 'ink');
+  const r = await planUniversalLinework({ image: path.resolve(root, opt('image','')), out, root, width: num('width', 700), sheetMm: num('sheetmm', DEFAULT_SHEET_MM),
+    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', ...LINEWORK_SOURCES, join: LINEWORK_JOIN, drawingFile: opt('linework') === 'file' ? path.resolve(root, opt('drawingfile','')) : null,
+    seed: num('seed', 0), log: console.log });
+  argv.push(...r.flags);
+  LINEWORK_STAGE = r.record;
 }
 const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
   ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
@@ -1095,6 +1126,8 @@ const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
+if (DRAWING_REGISTRATION) LINEWORK.registration = DRAWING_REGISTRATION;
+if (LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${LINEWORK_STAGE.source}`, universal:{gate:LINEWORK_STAGE.gate, features:LINEWORK_STAGE.features, lines:LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. auto (default) is ink when the source shows
@@ -1282,7 +1315,7 @@ throw Error(`semantic material gate failed ${a.key}: ${JSON.stringify(paper)}`);
 };
 const pencilDraw=(target,gs,pigment,options)=>{
  const recorded=num('recordgraphite',0)>0||!!opt('preparationbinding','');
- const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:{lines:num('openinglines',DC('opening').lines),pressure:num('openingpressure',DC('opening').pressure),minLengthMm:num('openingminmm',DC('opening').minLengthMm)},O,audit:PEN_STATE_AUDIT,
+ const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:drawingCapsFor(AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,
   ...(recorded?{graphiteExecute:(sh,paths,k,profileOptions)=>recordGraphiteBatch({sheet:sh,strokes:paths,pigment:k,options:{...profileOptions,seed:options.seed},material:SHEET_PIGS[k],source:{binding:opt('preparationbinding','')||null,target:opt('image',''),guide:opt('penpencil',''),drawing:opt('drawingfile',''),frame:[target.w,target.h],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)},execute:physicalPencilDraw,observe:measurePaper,record:r=>fs.appendFileSync(path.join(out,'preparation-graphite.jsonl'),JSON.stringify(r)+'\n')})}: {})});
  if(!AREA_PLAN)return execute(gs);
  let cells=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,AREA_DRAW_STAGE,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('actual dry graphite',{geometry:g.gesture.points,options,drawingRole:g.area.drawingRole,material:GRAPHITE_PROFILE},()=>execute([g.gesture]));cells+=r.cellsLaid??r.cells??0;}AREA_EXEC.set(null);return {cellsLaid:cells};};
@@ -1404,7 +1437,7 @@ const drawingCapsFor = (stage, graphite = false) => {
 };
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
- const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
+  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
@@ -1882,7 +1915,7 @@ if (TARGET_GUARD.mode !== 'off') {
 }
 // What the washes cannot carry is drawn with a pen: take the planned washes out of the picture and what is left is ink.
 // The pen's layer is the thickness each pigment gained while drawing, not a separate buffer.
-let drawnCount = 0;
+let drawnCount = 0, prepDrawn = 0;
 // The share of the source's cells the separator reads as pen line, and the washes the plan lays, both known before a
 // mark is made, so the drawing can come first.
 const SOURCE_INK = SEP.stats.ink / n;
@@ -1987,7 +2020,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --cellscale 1: scale the pen's cell sizes by sheet width over 420, so they are sizes on the paper. Default 0.
   const K = opt('cellscale', '0') !== '0' ? w / 420 : 1;
   // --penfacenib f: the nib a face is drawn with, as a multiple of the usual one (thin, 0.5)
-  const PEN = { nib: 0.8 * K * (STYLE_ON() ? VALUE_PLAN.style.ink : num('penfacenib', 1)), flex: 1.5 * K, travel: 1.5 * K, reach: 12 * K, reservoir: 250 * K * K, feed: 1.2 * K };
+  const PEN = { nib: 0.8 * K * (STYLE_ON() ? VALUE_PLAN.style.ink : num('penfacenib', 1)), flex: 1.5 * K, travel: 1.5 * K, reach: 12 * K, reservoir: num('penreservoir',250) * K * K, feed: 1.2 * K };
+  if(!(PEN.reservoir>0)||!Number.isFinite(PEN.reservoir))throw Error('--penreservoir must be finite and positive');
   // --penblur: scale of the ridge field the pen reads (default 1); coarser gives one line to follow, not a braid.
   const PENBLUR = num('penblur', 1);
   const field = lineField(DRAW_SOURCE, inkWant, w, h, { sigmas: [0.8, 1.2, 1.8].map(v => v * K * PENBLUR) });
@@ -2262,7 +2296,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     await writeInkFilter(DRAW_SOURCE);
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
-  let scaled = kept.map((g, i) => ({ weight:g.weight, strength:g.strength, ...(g.length==null?{}:{length:g.length*SC}), reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature,openingRole:g.openingRole,preparationRole:g.preparationRole, sourceOrdinal:g.sourceOrdinal, instruction:g.instruction, outline: g.outline, tier: g.tier, ...(g.rank == null ? {} : { rank: g.rank }), ml: !!g.ml, draw: !inkVerdict || inkVerdict[i].kept, points: g.points.map(q => (q.nw == null && q.s == null ? { x: q.x * SC, y: q.y * SC } : { x: q.x * SC, y: q.y * SC, ...(q.s == null ? {} : { s: q.s }), ...(q.nw == null ? {} : { nw: q.nw * SC }) })) }));
+  let scaled = scaleDrawingGestures(kept, SC).map((g,i)=>({...g,ml:!!g.ml,draw:!inkVerdict||inkVerdict[i].kept}));
   scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
@@ -2574,7 +2608,7 @@ async function drawPrepStage(PEN) {
     STAGE = { stage: 'prep', step: `pencil ${b.name}`, batch: bi + 1, of: batches.length };
     await shoot();
   }
-  drawnCount += drawn;
+  drawnCount += drawn; prepDrawn += drawn;
   console.log(`prep stage: ${strokes.length} pencil lines in ${batches.length} frames (${[0, 1, 2].map(p => `${['big shapes', 'features', 'detail'][p]} ${strokes.filter(g => (g.rank === 1 ? 0 : g.rank === 2 ? 1 : 2) === p).length}`).join(', ')}), ${drawn} strokes laid`);
   await stageShot('prep', before);
 }
@@ -2646,7 +2680,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
   clock('dry', () => dry(sheet, 20000, O, { levelMax: 200 }));
   if (stageBefore && (first ? STAGE_PLAN.files.prepInk && STAGE_PLAN.stages.prepInk : STAGE_PLAN.files.finishInk)) await stageShot(first ? 'prepink' : 'finishink', stageBefore);
   if (INKRES) { INKRES.settle(); console.log(`inkres ${INKRES.N}: the pens on a ${INKRES.width} x ${INKRES.height} sheet, ${INKRES.stats.calls} calls, ${(INKRES.stats.ms / 1000).toFixed(1)} s so far`); }
-  console.log(`drawing: ${drawnCount} pen gestures in pigment ${inkPig}, long share ${longShare(gestures, w).toFixed(2)}`);
+  console.log(`drawing: ${drawnCount} pen gestures${prepDrawn ? ` (${prepDrawn} of them the prep pencil, in pigment ${GRAPHITE_AT})` : ''} in pigment ${inkPig}, long share ${longShare(gestures, w).toFixed(2)}`);
   } finally { SPEED_PROFILE?.add('drawing', performance.now() - speedDrawStart); }
 }
 let INK_THK = null, WASH_THK = null;

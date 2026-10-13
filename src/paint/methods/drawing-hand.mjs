@@ -3,6 +3,39 @@
 // DOM free, no file IO.
 import { joinLines } from '../../crop/joinlines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
+import { breakOnLights } from './drawing-scribble.mjs';
+
+// Conversion to the sheet must retain instrument controls as well as geometry.
+export function scaleDrawingGestures(gestures, scale) {
+  return gestures.map(g => ({ ...g,
+    ...(g.length == null ? {} : { length: g.length * scale }),
+    points: g.points.map(p => ({ ...p, x: p.x * scale, y: p.y * scale,
+      ...(p.nw == null ? {} : { nw: p.nw * scale }),
+      ...(p.v == null ? {} : { v: p.v * scale }),
+    })),
+  }));
+}
+
+// Hand handling of a reviewed file without the form/toning budget changing its selection.
+export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength = Infinity,
+  D = null, w, h, lit = 0, reach = 2, ...shape } = {}) {
+  const groups = new Map();
+  for (const g of lines) {
+    const key = [g.role, g.kind, g.object, g.region].join('|');
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(g);
+  }
+  let joined = 0;
+  const gestures = [...groups.values()].flatMap(gs => {
+    const r = gap > 0 ? connect(gs, { gap, cos, aim }) : { gestures: gs, joined: 0 };
+    joined += r.joined;
+    return r.gestures;
+  });
+  const ordered = handOrder(gestures);
+  const broken = lit > 0 && D ? ordered.flatMap(g => breakOnLights(g, D, w, h, { lit, reach, minPts: 2 })) : ordered;
+  return { joined, gestures: ordered.length, runs: broken.length,
+    strokes: broken.map(g => shapeGesture(g, shape)).flatMap(g => personStrokes(g, strokeLength)) };
+}
 
 /** Join lines that continue one another. `gap` in cells. Loose gates: a segmenter breaks contours at every junction. */
 export function connect(lines, { gap = 4, cos = 0.8, aim = 0.7 } = {}) {
@@ -61,7 +94,7 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
   const lineWeight = g.weight ?? 1;
   const points = P.map((q, k) => {
     const e = env(s[k]), dark = floor + (1 - floor) * Math.max(0, Math.min(1, q.weight ?? lineWeight));
-    const out = { x: q.x, y: q.y, s: Math.min(1, base * dark * e * scale) };
+    const out = { ...q, s: Math.min(1, base * dark * e * scale) };
     if (q.width != null) out.nw = Math.max(minNib, (q.width * gain - margin) * (0.5 + 0.5 * e));
     return out;
   });
@@ -79,6 +112,7 @@ export function personStrokes(g, L, { dipFirst = false, load = 1, low = null } =
   }
   if (cur.length >= 2) out.push(cur);
   // dipFirst: the gesture starts on a fresh dip and runs on it; the pen is dipped again inside it only when low
-  return out.map((points, i) => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1,
+  return out.map((points, i) => ({ ...g, points, length: pathLength(points), tier: g.tier ?? 1, weight: g.weight ?? 1,
+    ...(g.dip == null ? {} : { dip: i === 0 ? g.dip : false }),
     ...(dipFirst && i === 0 ? { dip: load === 1 ? true : load } : {}), ...(dipFirst && low != null ? { low } : {}) }));
 }

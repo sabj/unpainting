@@ -47,6 +47,20 @@ test('stages over a given line file write the stage files and point the pens at 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test('a prep pencil with no prepInk stage gives the opening pen an empty file marked as meant', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'linework-prep-'));
+  try {
+    const lines = Array.from({ length: 20 }, (_, i) => ({ points: [[10, 10 + 8 * i], [190, 10 + 8 * i]], weight: 0.9, strength: 0.5 }));
+    fs.writeFileSync(path.join(dir, 'set-lines.json'), JSON.stringify({ image: { w: 200, h: 180 }, lines }));
+    const f = flags(['--drawingfile', path.join(dir, 'set'), '--stages', 'prep,finishink']);
+    const info = await planLinework({ ...f, out: dir, root: dir, inkShare: 0, density: null, grid: { w: 200, h: 180 }, edges: () => [], log: () => {} });
+    const doc = JSON.parse(fs.readFileSync(`${info.files.prepInk}-lines.json`, 'utf8'));
+    assert.deepEqual(doc.lines, []);
+    assert.match(doc.empty, /no prepInk stage/);
+    assert.equal(f.opt('drawingfile'), info.files.prepInk);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('source-ink uses the observed-width copier when Python dependencies are available', async () => {
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'linework-copy-'));
  try {

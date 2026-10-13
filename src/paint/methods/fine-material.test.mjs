@@ -9,7 +9,8 @@ test('fine ink preserves measured physical width, dry gate and pigment transfer'
  const w=30,h=20,pigments=[materialProfile('drawing-ink').pigment],main=createSheet(makePaper(w,h),pigments);
  const fine=makeInkRes({N:2,W2:w,H2:h,paperOpts:{seed:9},pigments,main});
  const audit=[];
- const r=drawFineMaterial(fine,[{points:[{x:3,y:8,s:.6,nw:.8},{x:22,y:8,s:.6,nw:.8}]}],{w,h,medium:'drawing-ink',sourceInk:true,mmPerCell:.25,O:DEFAULTS,audit});
+ const r=drawFineMaterial(fine,[{points:[{x:3,y:8,s:.6,nw:.8,v:.6,dwell:1},{x:3,y:8,s:.6,nw:.8,v:.6},{x:22,y:8,s:.6,nw:.8,v:2.4}]}],{w,h,medium:'drawing-ink',sourceInk:true,mmPerCell:.25,O:DEFAULTS,audit});
+ assert.deepEqual(audit[0].speeds,[1.2,1.2,4.8]);assert.equal(audit[0].dwellTime,1);
  assert.equal(r.drawn,1);assert.equal(fine.stats.calls,1);assert.equal(audit[0].after.water,0);
  assert(audit[0].contactWidthMm.every(v=>Math.abs(v-.2)<1e-6));
  assert(main.D[0].some(v=>v>0));assert.equal(fine.compose(Buffer.alloc(w*h*3,255)).length,w*h*3*4);

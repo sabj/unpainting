@@ -13,6 +13,7 @@ Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publicat
 - Support hole rims, Marangoni flow and slope on the GPU. Physics options remain off by default.
 - Keep the final-dark pass and automatic source-line extraction opt-in after excessive accents and figure blotting in held-out Guardi output. Photo-map smoothing and linked pencil/finish ink remain deliberate planner choices.
 - Preserve small closed contours across Python thinning backends.
+- Add an opt-in universal linework stage (`--linework auto`, plan `drawing.linework`) that every style uses: a geometry-checked image-model sketch, the sketch planner or the target's own lines, one cleanup (specks, shadow outlines, repeated marks) and a per-image gate on drawing, medium and amount.
 
 ## 0.1.0 - 2026-10-10
 
