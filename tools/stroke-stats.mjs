@@ -4,6 +4,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { composition, compositionContext } from './stroke-composition.mjs';
+import { readMarkTape } from '../src/media/mark-tape-read.mjs';
 
 export const WIDTH_EDGES = [0, .125, .25, .5, 1, 2, 4, 8, 16, 32, 64, 128, Infinity];
 export const LENGTH_EDGES = [0, .5, 1, 2, 3, 6, 12, 24, 48, 96, 192, 384, Infinity];
@@ -106,7 +107,7 @@ export async function loadStats(inputPath, { sheetmm, log, ...options } = {}) {
     f = ['marks.json', 'marks.json.gz', 'paint/marks.json', 'paint/marks.json.gz', 'run.json'].map(n => path.join(f,n)).find(n => fs.existsSync(n));
     if (!f) throw new Error('run has no mark tape or stroke-plan run.json; rerun with --marks 1');
   }
-  let input = readJSON(f);
+  let input = /marks\.json(\.gz)?$/.test(f) ? await readMarkTape(f) : readJSON(f);
   if (input.plan && !input.commands && !input.marks) {
     f = path.isAbsolute(input.plan) ? input.plan : path.resolve(path.dirname(f), input.plan);
     input = readJSON(f);

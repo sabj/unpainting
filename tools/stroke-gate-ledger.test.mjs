@@ -24,6 +24,21 @@ test('an unverified painting is never ok, in any gate mode', () => {
   }
 });
 
+test('stroke stats read a command log as a stream, never as one string', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tape-stats-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const log = path.join(dir, 'value-commands.jsonl');
+  fs.writeFileSync(log, '{"id":"c1","status":"SKIPPED"}\n{"id":"c2","status":"SKIPPED"}\n');
+  // stands in for a native command log longer than V8's longest string
+  const read = fs.readFileSync;
+  fs.readFileSync = function (f, ...a) { if (String(f) === log) throw new RangeError('Invalid string length'); return read.call(this, f, ...a); };
+  t.after(() => { fs.readFileSync = read; });
+  const tape = { w: 100, h: 50, scale: 10, sheetWidthMm: 200, base: [250, 248, 240], brushes: [0], brushOpts: [{ radius: 10 }], marks: [{ k: 's', b: 0, d: [[0, 100], [900, 100]] }] };
+  const s = await tapeStats(tape, dir);
+  assert.equal(s.counts.paint, 1);
+  assert.equal(s.source, 'painter tape');
+});
+
 const plannedWash = () => ({
   tape: { w: 100, h: 60, scale: 10, sheetWidthMm: 100, base: [255, 255, 255], pigments: [{ K: [1, .5, .2] }], brushes: [0], brushOpts: [{ radius: 15, film: .25, capacity: 100 }],
     marks: [{ k: 'd', b: 0, w: 1, c: [.5] }, { k: 's', b: 0, d: [[100, 300, 100], [900, 300, 100]] }] },

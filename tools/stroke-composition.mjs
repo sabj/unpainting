@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import readline from 'node:readline';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 
@@ -220,13 +221,20 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
     limitations:'Spatial attribution is an estimate: contact discs and uniform per-mark deposits omit bristle gaps, pigment pickup, wet spreading and later lifting. Final image supplies visible weights, not measured pigment ancestry. Overlaps share one cell; repeated coats do not inflate sheet coverage. Edge/feature exclusions come from the plan, never from noisy final pixels.'};
 }
 
+// One command per line, read as a stream: a native run's command log can outgrow the longest string V8 can hold.
+export async function readJSONLines(file) {
+  const input=fs.createReadStream(file),lines=readline.createInterface({input:file.endsWith('.gz')?input.pipe(zlib.createGunzip()):input,crlfDelay:Infinity}),out=[];
+  for await(const line of lines)if(line.trim())out.push(JSON.parse(line));
+  return out;
+}
+
 export async function compositionContext(file,tape,{final,ink,plan:planFile,commands:commandsFile,analysisWidth=512}={}) {
   const dir=path.dirname(file),choose=(given,name)=>given??(fs.existsSync(path.join(dir,name))?path.join(dir,name):null);
   const pf=choose(planFile,'value-plan.json'),cf=choose(commandsFile,'value-commands.jsonl')??choose(null,'value-commands.jsonl.gz');
   const plan=pf?JSON.parse(fs.readFileSync(pf,'utf8')):null;
   const adjacentProfiles=pf?path.join(path.dirname(pf),'value-region-check.json'):null;
   const rf=choose(null,'value-region-check.json')??(adjacentProfiles&&fs.existsSync(adjacentProfiles)?adjacentProfiles:null),regionProfiles=rf?JSON.parse(fs.readFileSync(rf,'utf8')).regions:[];
-  const commands=cf?(cf.endsWith('.gz')?zlib.gunzipSync(fs.readFileSync(cf)).toString('utf8'):fs.readFileSync(cf,'utf8')).trim().split('\n').filter(Boolean).map(s=>JSON.parse(s)):[];
+  const commands=cf?await readJSONLines(cf):[];
   const ff=choose(final,'painting.png')??choose(null,'painting.jpg'),inf=choose(ink,'ink.jpg');
   const h=Math.max(1,Math.round(analysisWidth*tape.h/tape.w));
   const read=async f=>{if(!f)return null;const {data,info}=await sharp(f).flatten({background:'#fff'}).toColourspace('srgb').resize(analysisWidth,h,{fit:'fill'}).raw().toBuffer({resolveWithObject:true});if(info.channels!==3)throw Error('composition image must decode to RGB');return data;};
