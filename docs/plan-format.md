@@ -95,7 +95,7 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 
 ## Value plan input
 
-`--valueplan FILE` reads a JSON object. It supplies descriptions and style choices to the value planner when `--order painter` is active and no area plan is present. It does not supply brush strokes or replace the target image. There is no version field or whole-file schema validator. The consumers validate drawing choices, style choices and explicit reserves separately.
+`--valueplan FILE` reads a JSON object. It supplies descriptions and style choices to the value planner when `--order painter` is active and no area plan is present. It does not supply brush strokes or replace the target image. There is no version field. The consumers validate drawing choices, style choices and explicit reserves separately, and `src/paint/plan-keys.mjs` reports keys that nothing reads.
 
 | Field | Type and meaning | Default if omitted |
 |---|---|---|
@@ -115,7 +115,7 @@ Each reserve needs a nonempty `reason` and four finite `bounds` values between 0
 
 A style selection needs a `style` and nonempty `reason`. The supported styles are `ink-and-wash`, `precise-watercolor`, `urban-sketch` and `atmospheric-wet`. `regions` maps family ids to `{ "style": "...", "reason": "..." }` overrides; each override needs a reason. Unknown styles stop planning. Style selection is resolved only when `subject` is present. Without a subject mapping or explicit selection, the planner keeps its own settings. `--regionstyle family=style[,family=style]` overrides family styles and requires a plan with a style mapping.
 
-Code: `src/paint/methods/light-to-dark.mjs`, `target-regions.mjs`, `src/paint/styles/loader.mjs` and `tools/painter/value-plan-preview.mjs`. Extra JSON fields are not rejected. They have no effect unless a consumer reads them.
+Code: `src/paint/methods/light-to-dark.mjs`, `target-regions.mjs`, `src/paint/styles/loader.mjs` and `tools/painter/value-plan-preview.mjs`. A key no consumer reads is reported, not ignored: the painter logs `UNUSED PLAN KEYS`, writes `unused-plan-keys.txt` and exits 3 after writing its outputs, as it does for unused command-line options. `--allowunusedplan 1` keeps exit 0. `washes` and `order` are read only by the default (combined) recipe. `rationale`, `drawingNote`, `run` and a subject's `reason` are notes for people and are not reported. `src/paint/plan-keys.mjs` lists every key the painter reads.
 
 ## Value plans: the drawing section
 

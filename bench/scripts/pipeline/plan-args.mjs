@@ -148,7 +148,7 @@ const valueFloorFor = config => { const s = config?.styleSelection; const styles
 
 // options a plan may never set: the subject, size, guard, seed, recording and stops are the harness's
 const LOCKED_OPTIONS = new Set(['image', 'width', 'scale', 'sheetmm', 'out', 'targetguard', 'gpu', 'mode', 'seed', 'frames', 'marks', 'video', 'runcache', 'valueplan',
-  'allowunused', 'physical', 'paperphysical', 'wetframes', 'passframes', 'pausedir', 'resumestate', 'recipe', 'valuepreviewonly']);
+  'allowunused', 'allowunusedplan', 'physical', 'paperphysical', 'wetframes', 'passframes', 'pausedir', 'resumestate', 'recipe', 'valuepreviewonly']);
 const isPathLike = v => path.isAbsolute(v) || v.includes('/') || v.includes('..');
 /** Problems with extra-args.json (empty = fine): locked options, and path values that leave the plan folder. */
 export function checkExtraArgs(extra, planDir) {

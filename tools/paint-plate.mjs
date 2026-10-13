@@ -122,6 +122,7 @@ import { layCurls } from '../src/crop/curlpaint.mjs';
 import { furLightReserves } from '../src/paint/methods/finish-texture.mjs';
 import { sameWash } from '../src/paint/methods/wash-session.mjs';
 import { expandRecipe } from '../src/paint/recipe.mjs';
+import { reportUnusedPlanKeys } from '../src/paint/plan-keys.mjs';
 import { versionStamp, versionLine } from '../src/painter-version.mjs';
 import { pigmentPhysics } from '../src/paint/methods/pigment-physics.mjs';
 import { segmentInk } from '../src/paint/methods/seg-ink.mjs';
@@ -289,6 +290,8 @@ const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(pa
   if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection??loadSubjects()[c.subject];if(!base)throw Error('--regionstyle needs a subject style mapping');
   const regions={...(base.regions??{})};for(const kv of opt('regionstyle','').split(',')){const [family,style]=kv.split('=');if(!family||!style)throw Error('--regionstyle family=style');regions[family]={style,reason:'run override --regionstyle for an A/B test'};}
   return {...c,styleSelection:{...base,regions}};})();
+// value plan keys nothing reads are logged and exit 3 like unused options (src/paint/plan-keys.mjs); --allowunusedplan 1 allows them
+if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
 let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
