@@ -11,7 +11,7 @@ The GPU switches default to 1; pass 0 to disable each independently. Rendering t
 - `--speedscan 1`: fuse cell finalization and active wet-tile scanning on GPUs with at least 13 storage-buffer bindings. Smaller adapters keep separate kernels.
 - `--speedtransfers 1`: use the existing tracked CPU fallback transfer path without selecting Fast physics.
 
-`node tools/speed/compare.mjs BASE.png CANDIDATE.png OUT` writes exact PNG hashes, maximum and mean channel differences, native side-by-side images, absolute differences and differences amplified ten times. `OUT/index.html` displays the paintings at one image pixel per CSS pixel without downscaling.
+`node tools/speed/compare.mjs BASE.png CANDIDATE.png OUT` refuses two runs whose `backend.json` (beside each PNG) name different sheet backends, unless `--mixedbackends` is given. It writes exact PNG hashes, maximum and mean channel differences, native side-by-side images, absolute differences and differences amplified ten times. `OUT/index.html` displays the paintings at one image pixel per CSS pixel without downscaling.
 
 `python3 tools/speed/run-pair.py CONFIG.json` runs trusted committed archives sequentially on the same sweep box, records wall times and PNG hashes, and removes frame payloads and code copies after each run. The config names a new output root, the box's `node_modules`, a prepared sweep job's `in` directory, its image filename, width, and runs with `name`, `archive`, `commit` and optional `args`. Include `tools`, `src`, `data`, `examples` and `package.json` in each archive. Run under the sweep lease's cost and lifetime limits. Do not compare timings from different boxes as a controlled speedup.
 

@@ -1,9 +1,11 @@
 // Mean and share of pixels over 2 levels between the numbered frames of two runs: where do they first part company?
-//   node tools/gpu/frame-diff.mjs <run dir a> <run dir b>
+//   node tools/gpu/frame-diff.mjs <run dir a> <run dir b> [--mixedbackends]   (runs on different backends: refused without the flag)
 import fs from 'node:fs';
 import sharp from 'sharp';
+import { assertSameBackend } from '../../src/media/gpu/backend-record.mjs';
 
-const [a, b] = process.argv.slice(2);
+const [a, b] = process.argv.slice(2).filter(x => x !== '--mixedbackends');
+assertSameBackend([a, b], { allowMixed: process.argv.includes('--mixedbackends') });
 const frames = fs.readdirSync(a).filter(f => /^f\d+\.jpg$/.test(f)).sort();
 for (const f of frames) {
   if (!fs.existsSync(`${b}/${f}`)) continue;

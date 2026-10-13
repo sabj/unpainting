@@ -65,6 +65,7 @@ import { makePaper, coldPressField } from '../src/media/paper.mjs';
 import { createSheet, step, dry as physicalDry, layersOf, thickness, layersChanged, DEFAULTS, tapeSheet, blot, setThreads, threadStats, coherent } from '../src/media/sheet.mjs';
 import { attachGpu, gpuStats } from '../src/media/gpu/link.mjs';
 import { assertDeviceHealthy } from '../src/media/gpu/device-health.mjs';
+import { backendLine } from '../src/media/gpu/backend-record.mjs';
 import { renderLayers, renderLayersCached, renderCells, microAmps } from '../src/media/km.mjs';
 import { renderSheet } from '../src/media/render-cache.mjs';
 import { createFramer } from '../src/media/gpu/framer.mjs';
@@ -1416,7 +1417,7 @@ if (opt('gpustrokes', '') === 'check') process.env.GPU_STROKES = 'check'; // com
 const GPU_MODE = opt('gpu', 'auto');
 if (!['auto', 'on', 'off'].includes(GPU_MODE)) throw new Error(`--gpu takes auto, on or off, not ${GPU_MODE}`);
 const GPU_INFO = {...attachGpu(sheet, O, { mode: GPU_MODE }),nativePaintMode:NATIVE_PAINT_MODE};
-console.log(`sheet backend: ${GPU_INFO.backend}${GPU_INFO.reason ? ` (${GPU_INFO.reason})` : ''}`);
+console.log(backendLine(GPU_INFO));
 const base = Buffer.alloc(N2 * 3);
 const SHADE = num('papershade', 0.04);
 for (let i = 0; i < N2; i++) { const t = 1 - SHADE + SHADE * paper.height[i]; for (let c = 0; c < 3; c++) base[i * 3 + c] = Math.min(255, paperRGB[c] * t); }
@@ -3855,6 +3856,7 @@ const placed = FRAMES.map((f, i) => {
 if (opt('thkdump', '0') !== '0') { coherent(sheet); const th = thickness(sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
 fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet), performanceOptions: { opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1' } }, null, 1));
+console.log(backendLine(GPU_INFO)); // the backend this painting was made on, again at the end (details in backend.json)
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.
 {

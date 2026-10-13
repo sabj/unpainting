@@ -1,12 +1,15 @@
 #!/usr/bin/env node
-// node tools/speed/compare.mjs baseline/painting.png candidate/painting.png OUT
+// node tools/speed/compare.mjs baseline/painting.png candidate/painting.png OUT [--mixedbackends]
+// Refuses runs whose backend.json beside painting.png name different sheet backends, unless --mixedbackends.
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
+import {assertSameBackend} from '../../src/media/gpu/backend-record.mjs';
 
-const [base, candidate, out] = process.argv.slice(2);
-if (!base || !candidate || !out) throw Error('usage: compare.mjs BASE CANDIDATE OUT');
+const [base, candidate, out] = process.argv.slice(2).filter(a => a !== '--mixedbackends');
+if (!base || !candidate || !out) throw Error('usage: compare.mjs BASE CANDIDATE OUT [--mixedbackends]');
+assertSameBackend([path.dirname(base), path.dirname(candidate)], {allowMixed: process.argv.includes('--mixedbackends')});
 fs.mkdirSync(out, {recursive: true});
 const read = file => sharp(file).removeAlpha().toColourspace('srgb').raw().toBuffer({resolveWithObject: true});
 const [a, b] = await Promise.all([read(base), read(candidate)]);

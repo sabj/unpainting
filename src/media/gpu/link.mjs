@@ -19,6 +19,7 @@ import { demandPolicy } from './demand-policy.mjs';
 import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
 import { deviceHealth, brokenReason, assertHealthy } from './device-health.mjs';
+import { cpuFallbackWarning } from './backend-record.mjs';
 
 const PLANES = K => 4 + 3 * K;
 // DOWN_TRACE=1: count rectangle reads by caller, printed at exit
@@ -711,7 +712,7 @@ export class GpuLink {
  */
 export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m) } = {}) {
   const note = { mode };
-  if (mode === 'off') return sheet._gpuInfo = { ...note, backend: 'cpu', reason: '--gpu off' };
+  if (mode === 'off') return sheet._gpuInfo = { ...note, backend: 'cpu', fallback: false, reason: '--gpu off' };
   const K = sheet.K, n = sheet.n, ctrlSab = new SharedArrayBuffer(64), errSab = new SharedArrayBuffer(512);
   const adapterMetadata = new SharedArrayBuffer(4096),strokePlanMetadata=new SharedArrayBuffer(32);
   const rectSab = new SharedArrayBuffer(4 * PLANES(K) * n), layerSab = new SharedArrayBuffer(4 * K * n);
@@ -745,8 +746,8 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
     const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || 'GPU unavailable';
     worker.terminate();
     if (mode === 'on') throw new Error(`--gpu on but the GPU sheet is unavailable: ${reason}`);
-    log(`[gpu] not used (${reason}); running the CPU sheet`);
-    return sheet._gpuInfo = { ...note, backend: 'cpu', reason };
+    log(cpuFallbackWarning(reason));
+    return sheet._gpuInfo = { ...note, backend: 'cpu', fallback: true, reason };
   }
   Atomics.store(ctrl, 0, 0);
   const planMeta=new Float64Array(strokePlanMetadata);link.strokePlanCapacity=3900000*(planMeta[1]||16)/16;link.strokePlanMiB=planMeta[1]||16;link.stats.strokePlanBudget={requestedMiB:planMeta[0]||16,effectiveMiB:link.strokePlanMiB,effectiveWords:link.strokePlanMiB*1024*1024/4,gpuBufferBytes:link.strokePlanMiB*1024*1024+sheet.n*4,maxStorageBufferBindingSize:planMeta[2],maxBufferSize:planMeta[3],fallback:planMeta[0]!==planMeta[1]};
@@ -757,7 +758,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   }
   link.lastO = null; link.applyOptions(O); link.initMasks(sheet);
   const adapterEvidence = readAdapterEvidence(new Uint8Array(adapterMetadata));
-  const info = { ...note, backend: 'gpu', adapter: 'webgpu (Dawn)', adapterEvidence, tile: 16 };
+  const info = { ...note, backend: 'gpu', fallback: false, adapter: 'webgpu (Dawn)', adapterEvidence, tile: 16 };
   sheet._gpuInfo = info; log('[gpu] sheet running on the GPU');
   return info;
 }
