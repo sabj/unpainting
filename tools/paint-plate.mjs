@@ -1887,7 +1887,7 @@ if (TARGET_GUARD.mode !== 'off') {
 }
 // What the washes cannot carry is drawn with a pen: take the planned washes out of the picture and what is left is ink.
 // The pen's layer is the thickness each pigment gained while drawing, not a separate buffer.
-let drawnCount = 0;
+let drawnCount = 0, prepDrawn = 0;
 // The share of the source's cells the separator reads as pen line, and the washes the plan lays, both known before a
 // mark is made, so the drawing can come first.
 const SOURCE_INK = SEP.stats.ink / n;
@@ -2578,7 +2578,7 @@ async function drawPrepStage(PEN) {
     STAGE = { stage: 'prep', step: `pencil ${b.name}`, batch: bi + 1, of: batches.length };
     await shoot();
   }
-  drawnCount += drawn;
+  drawnCount += drawn; prepDrawn += drawn;
   console.log(`prep stage: ${strokes.length} pencil lines in ${batches.length} frames (${[0, 1, 2].map(p => `${['big shapes', 'features', 'detail'][p]} ${strokes.filter(g => (g.rank === 1 ? 0 : g.rank === 2 ? 1 : 2) === p).length}`).join(', ')}), ${drawn} strokes laid`);
   await stageShot('prep', before);
 }
@@ -2650,7 +2650,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
   clock('dry', () => dry(sheet, 20000, O, { levelMax: 200 }));
   if (stageBefore && (first ? STAGE_PLAN.files.prepInk && STAGE_PLAN.stages.prepInk : STAGE_PLAN.files.finishInk)) await stageShot(first ? 'prepink' : 'finishink', stageBefore);
   if (INKRES) { INKRES.settle(); console.log(`inkres ${INKRES.N}: the pens on a ${INKRES.width} x ${INKRES.height} sheet, ${INKRES.stats.calls} calls, ${(INKRES.stats.ms / 1000).toFixed(1)} s so far`); }
-  console.log(`drawing: ${drawnCount} pen gestures in pigment ${inkPig}, long share ${longShare(gestures, w).toFixed(2)}`);
+  console.log(`drawing: ${drawnCount} pen gestures${prepDrawn ? ` (${prepDrawn} of them the prep pencil, in pigment ${GRAPHITE_AT})` : ''} in pigment ${inkPig}, long share ${longShare(gestures, w).toFixed(2)}`);
   } finally { SPEED_PROFILE?.add('drawing', performance.now() - speedDrawStart); }
 }
 let INK_THK = null, WASH_THK = null;

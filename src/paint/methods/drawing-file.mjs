@@ -1,7 +1,7 @@
 // --drawingfile <base>: the first pen draws exactly the lines of work/lines/<base>-lines.json (tools/seg/select-drawing.py),
 // whole, in file order, at the outline tier's pressure; no walker gestures, ink filter or silhouette pass.
 // Each line is split into strokes of --drawstroke (share of the short side), one dip each, so the pen does not run dry.
-import { hasLines, loadLines } from '../../crop/lines.mjs';
+import { hasLines, loadLines, linePaths } from '../../crop/lines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
 import { boundPreparation } from './preparation-binding.mjs';
 import { drawingLogic } from './drawing-logic.mjs';
@@ -37,8 +37,12 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (skip.size) log(`drawing: lines with role ${[...skip].join(', ')} left out`);
   if (all.length < candidates.length) log(`drawing: ${all.length} of ${candidates.length} lines kept (--drawshare ${num('drawshare', 1)}, --drawregions ${num('drawregions', 0)}, --drawmax ${num('drawmax', Infinity)})`);
   const lines = first ? all : all.filter(g => (g.weight ?? 1) >= min);
-  log(first ? `drawing: ${lines.length} selected lines from work/lines/${b}-lines.json, drawn whole; the walker's ${walked} gestures are not used`
-    : `drawing, closing pen: ${lines.length} of ${all.length} lines of work/lines/${b}-lines.json at weight ${min} or more, over the dry sheet`);
+  const file = linePaths(b).lines;
+  // a linked-stage plan with a prep pencil and no prepInk stage hands the opening pen an empty file on purpose: the
+  // pencil (drawPrepStage) is the opening drawing, and the first ink comes with finishInk
+  if (first && !candidates.length) log(`drawing: ${file} holds no lines, so the opening pen lays no ink (a plan with a prep stage and no prepInk stage leaves the opening drawing to the pencil); the walker's ${walked} gestures are not used`);
+  else log(first ? `drawing: ${lines.length} selected lines from ${file}, drawn whole; the walker's ${walked} gestures are not used`
+    : `drawing, closing pen: ${lines.length} of ${all.length} lines of ${file} at weight ${min} or more, over the dry sheet`);
   const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1 })); };
   // Per-point `width` (px) and `weight` (0..1) set the pen along the stroke: contact = width x --drawwidthgain
   // - --drawwidthmargin cells (see GAIN), pressure = weight x --drawwant. Points without them are unchanged.
