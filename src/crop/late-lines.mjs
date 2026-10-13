@@ -22,7 +22,7 @@ export function tilt(pts) {
 }
 
 /** A cell grid marking every cell within `radius` of an opening line. */
-export function clearanceGrid(opening, w, h, radius) {
+function clearanceGrid(opening, w, h, radius) {
   const grid = new Uint8Array(w * h), r = Math.max(0, Math.ceil(radius));
   const mark = (x, y) => {
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
