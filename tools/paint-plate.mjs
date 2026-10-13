@@ -156,6 +156,7 @@ import { cheatRisk } from './guard/cheat-risk.mjs';
 import { createPause } from './aware/pause.mjs';
 import { writeState, readState } from './aware/state-io.mjs';
 import { tapeState, restoreTapeState } from '../src/media/brush.mjs';
+import { passDue, markDue } from '../src/paint/pass-cadence.mjs';
 
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
 // GPU paths default on for painter runs; set 0 to turn one off.
@@ -3561,9 +3562,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(num('treelayerslate',0)===1&&L===0){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'production-first-numeric-layer.png'));fs.writeFileSync(path.join(out,'production-first-numeric-layer.json'),JSON.stringify({kind:'actual first completed numeric layer, not wholefirstwash or area completion',layer:L,value:layer.value,order:layer._order,backend:GPU_INFO},null,2));}
   // --order painter: a frame at the end of each ground region, so the first wash is seen going on region by region
   if (layer._order?.shoot && FILM_BY_PAINT) await shoot();
-  // the plan-against-sheet record keeps the pass cadence whatever is filmed, so the log's numbers do not move
-  if (L % Math.max(1, Math.round(layers.length / num('frames', 40))) === 0) {
-    if (!FILM_BY_PAINT) await shoot();
+  // the plan-against-sheet record keeps its own cadence (--markcadence) whatever is filmed (src/paint/pass-cadence.mjs)
+  if (!FILM_BY_PAINT && passDue(L, layers.length, FILM_FRAMES)) await shoot();
+  if (markDue(L, layers.length, opt('markcadence'))) {
     mark(L + 1);
     FEEDBACK_FRESH = true; // the mark's render waited for the GPU: the next pass reads the sheet at no extra wait
   }
