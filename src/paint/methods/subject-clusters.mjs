@@ -78,6 +78,38 @@ function chooseClusters(cells, F, { kMax, split, minCells }) {
   return { label: new Int32Array(cells.length), centres: [[0, 0, 0]], counts: Int32Array.of(cells.length) };
 }
 
+/**
+ * SAM's boundaries settled onto the picture's own edges. A cell within `reach` of another subject goes to the subject
+ * whose nearby cells (within reach + 2) it matches best in colour, when that is `gain` Delta E closer than its own.
+ * SAM draws a boundary at its working size and the map is smoothed at a brush width; a wash edge belongs on the edge
+ * a painter sees. Two rounds, each read from the labels before it.
+ */
+export function snapToEdges(subject, F, w, h, { reach = 2, gain = 3, rounds = 2 } = {}) {
+  const n = w * h, R = reach + 2;
+  let cur = subject, moved = 0;
+  for (let round = 0; round < rounds; round++) {
+    const next = Uint16Array.from(cur);
+    for (let i = 0; i < n; i++) {
+      const x0 = i % w, y0 = (i - x0) / w, own = cur[i];
+      let edge = false;
+      for (let y = Math.max(0, y0 - reach); y <= Math.min(h - 1, y0 + reach) && !edge; y++) for (let x = Math.max(0, x0 - reach); x <= Math.min(w - 1, x0 + reach); x++) if (cur[y * w + x] !== own) { edge = true; break; }
+      if (!edge) continue;
+      const sums = new Map();
+      for (let y = Math.max(0, y0 - R); y <= Math.min(h - 1, y0 + R); y++) for (let x = Math.max(0, x0 - R); x <= Math.min(w - 1, x0 + R); x++) {
+        const j = y * w + x; if (j === i) continue;
+        const q = sums.get(cur[j]) ?? [0, 0, 0, 0]; q[0] += F[0][j]; q[1] += F[1][j]; q[2] += F[2][j]; q[3]++; sums.set(cur[j], q);
+      }
+      const dist = q => Math.hypot(F[0][i] - q[0] / q[3], F[1][i] - q[1] / q[3], F[2][i] - q[2] / q[3]);
+      const mine = sums.has(own) ? dist(sums.get(own)) : Infinity;
+      let best = own, bd = mine;
+      for (const [s2, q] of sums) if (s2 !== own) { const d = dist(q); if (d < bd) { bd = d; best = s2; } }
+      if (best !== own && mine - bd > gain) { next[i] = best; moved++; }
+    }
+    cur = next;
+  }
+  return { subject: cur, moved };
+}
+
 /** Each subject cut into its clusters: one domain id per cell (1-based), and each domain's subject. */
 function clusterSubjects(subject, F, w, h, { kMax, split, minShape }) {
   const n = w * h, domain = new Int32Array(n), subjectOf = [0], cellsOf = new Map();
@@ -210,7 +242,7 @@ export function subjectField({ seg, px, w, h, families = [], minShape, options =
   const o = { ...SUBJECT_DEFAULTS, ...options }, n = w * h;
   if (seg.width !== w || seg.height !== h) throw new Error(`subject field: segments are ${seg.width}x${seg.height}, the plan ${w}x${h}`);
   const lab = labPlanes(px, n, [255, 255, 255]), F = [boxMean(lab.L, w, h, 1), boxMean(lab.a, w, h, 1), boxMean(lab.b, w, h, 1)];
-  const subject = Uint16Array.from(seg.labels);
+  const snapped = snapToEdges(Uint16Array.from(seg.labels), F, w, h), subject = snapped.subject;
   const { domain, subjectOf } = clusterSubjects(subject, F, w, h, { kMax: o.k, split: o.split, minShape });
   const stats = boundaryStats(domain, F, w, h, o.side);
   const { wash, shadow, count } = joinGroups(stats, subjectOf, domainMeans(domain, F, subjectOf.length), o);
@@ -220,7 +252,7 @@ export function subjectField({ seg, px, w, h, families = [], minShape, options =
   let lit = 0; for (let i = 0; i < n; i++) lit += lights[i];
   const table = groupTable(W.field, subject, F, n);
   const summary = { subjects: new Set(subject).size, clusters: subjectOf.length - 1, washGroups: W.ids.length, shadowGroups: S.ids.length,
-    subjectBoundaries: count.bounds, washCrossings: count.wash, shadowCrossings: count.shadow, lightShare: lit / n, groups: table };
+    subjectBoundaries: count.bounds, washCrossings: count.wash, shadowCrossings: count.shadow, lightShare: lit / n, snapped: snapped.moved / n, groups: table };
   return { labels, regions, source: 'SAM subject regions cut into colour and value clusters; washes cross where colour and value continue',
     subject, subjectOf, wash: W.field, washIds: W.ids, shadow: S.field, shadowIds: S.ids, lights, summary };
 }
@@ -245,5 +277,5 @@ export function componentsBy(mask, groups, w, h, small = 1) {
 /** One line for the log. */
 export function describeField(f) {
   const s = f.summary;
-  return `subject washes: ${s.subjects} SAM regions cut into ${s.clusters} colour and value clusters, ${s.washGroups} wash groups; washes cross ${s.washCrossings} of ${s.subjectBoundaries} subject boundaries where colour and value continue, shadow glazes ${s.shadowCrossings}; ${(100 * s.lightShare).toFixed(1)}% of the sheet reserved as subject lights`;
+  return `subject washes: ${s.subjects} SAM regions (${(100 * s.snapped).toFixed(1)}% of cells moved onto the picture's edges) cut into ${s.clusters} colour and value clusters, ${s.washGroups} wash groups; washes cross ${s.washCrossings} of ${s.subjectBoundaries} subject boundaries where colour and value continue, shadow glazes ${s.shadowCrossings}; ${(100 * s.lightShare).toFixed(1)}% of the sheet reserved as subject lights`;
 }

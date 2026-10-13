@@ -2,7 +2,7 @@
 // subject share a wash, how shadows group, and which cells are a subject's own lights.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { componentsBy, confinedMean, describeField, subjectField } from './subject-clusters.mjs';
+import { componentsBy, confinedMean, describeField, snapToEdges, subjectField } from './subject-clusters.mjs';
 
 const W = 60, H = 40, N = W * H;
 // subject 1 is the left half, subject 2 the right
@@ -47,7 +47,7 @@ test("a subject's lights are its own lightest planes, well over its median", () 
   assert.equal(f.lights[at(12, 14)], 1);
   assert.equal(f.lights[at(3, 30)], 0);
   assert.equal(f.lights[at(45, 20)], 0, 'a flat subject has no lights of its own');
-  assert.match(describeField(f), /^subject washes: 2 SAM regions cut into \d+ colour and value clusters/);
+  assert.match(describeField(f), /^subject washes: 2 SAM regions \([\d.]+% of cells moved onto the picture's edges\) cut into \d+ colour and value clusters/);
 });
 
 test('the group table lists each wash group with its subjects', () => {
@@ -71,4 +71,15 @@ test('componentsBy cuts one connected mask at a group boundary', () => {
 
 test('a field on a mismatched grid is refused', () => {
   assert.throws(() => subjectField({ seg: { width: 10, height: 10, labels: new Uint8Array(100) }, px: new Uint8Array(N * 3), w: W, h: H, minShape: 4 }), /segments are 10x10/);
+});
+
+test("SAM's boundary settles onto the picture's own edge", () => {
+  // the colour edge is at x = 30; SAM put the boundary at x = 27
+  const px = paint(x => (x < 30 ? [200, 120, 60] : [40, 70, 160]));
+  const seg = Uint16Array.from({ length: N }, (_, i) => (i % W < 27 ? 1 : 2));
+  const lab = subjectField({ seg: { width: W, height: H, labels: Uint8Array.from(seg) }, px, w: W, h: H, minShape: 12, options: { lights: 0 } });
+  assert.equal(lab.subject[at(28, 20)], 1, 'the orange cells SAM gave to the blue side come back');
+  assert.equal(lab.subject[at(31, 20)], 2);
+  const flat = snapToEdges(seg, [new Float32Array(N).fill(50), new Float32Array(N), new Float32Array(N)], W, H);
+  assert.equal(flat.moved, 0, 'with no edge in the picture nothing moves');
 });
