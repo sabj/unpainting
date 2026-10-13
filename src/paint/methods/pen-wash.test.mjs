@@ -183,7 +183,7 @@ test('--style penwash names the pen-and-wash recipe; the default recipe is uncha
   const pen = expandRecipe({ argv: ['--image', 'a.jpg', '--style', 'penwash'] }).argv;
   const at = k => pen[pen.lastIndexOf(k) + 1];
   assert.equal(at('--penwash'), '1'); assert.equal(at('--drawing'), 'first'); assert.equal(at('--touchpoints'), '0');
-  assert.equal(at('--pwallwet'), '1'); assert.equal(at('--pwminlight'), '0.7');
+  assert.equal(at('--pwallwet'), '1'); assert.equal(at('--pwminlight'), '0.6');
   assert.ok(!pen.includes('--style'));
   const def = expandRecipe({ argv: ['--image', 'a.jpg'] }).argv;
   assert.ok(!def.includes('--penwash'));
