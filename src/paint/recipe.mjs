@@ -27,8 +27,9 @@ const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skyspli
 
 // The pen-and-wash washes as tuned by eye on Flatiron and Yale (2026-10-13): every passage flooded wet in wet, 70% of
 // the picture kept as light, strong shadow (0.45) and deep (0.8) glazes read from a finer value map, coloured lights in the local
-// wash, and a capped local mix fitted for hue (pen-wash-plan.mjs, pen-wash.mjs).
-const PENWASH_FLAGS = '--pwallwet 1 --pwminlight 0.7 --pwlightness 0.7 --pwshadowmin 0.45 --pwdeepmin 0.8 --pwshadowblur 0.8 --pwhuegap 18 --pwdarkhuegap 10 --pwlightchroma 14 --pwlocalmax 0.22 --pwcaplweight 0.3 --pwchroma 1.25 --pwmonolocal warm:0.7,cool:0.15,earth:0.15';
+// wash, a capped local mix fitted for hue (pen-wash-plan.mjs, pen-wash.mjs), sparser small marks (pen-wash-lines.mjs)
+// and closer mop lanes with no overhang, so a flooded wash edge is smooth rather than sawtoothed.
+const PENWASH_FLAGS = '--pwallwet 1 --pwminlight 0.7 --pwlightness 0.7 --pwshadowmin 0.45 --pwdeepmin 0.8 --pwshadowblur 0.8 --pwhuegap 18 --pwdarkhuegap 10 --pwlightchroma 14 --pwlocalmax 0.22 --pwcaplweight 0.3 --pwchroma 1.25 --pwmonolocal warm:0.7,cool:0.15,earth:0.15 --pwtileink 5 --pwkeep 0.4 --pwspeck 1.2 --mopgap 0.6 --mopover 0';
 const RECIPES = {
   general: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   default: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
