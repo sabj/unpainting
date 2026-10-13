@@ -55,7 +55,9 @@ export function pipelineFlags(plan) {
   // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
   // washes still keep light colour families apart, split on perceptual chroma, so a neutral
   // foundation cannot pool its sepia charge across a saturated orange passage.
-  add('huechroma', 30);
+  // Layered washes split at Lab chroma 20: the cat's broad orange (C20-30) then gets its own connected light and
+  // middle washes instead of pooling with muted warm and grey neighbours. Family mode keeps RGB range 30.
+  add('huechroma', w.colour === 'layered' ? 20 : 30);
   if (w.colour === 'layered') add('huechromalab', 1);
   add('passcap', w.colour === 'family' ? w.charge : 0);
   add('maskmm', w.colour === 'family' ? w.carryMm : 0);
