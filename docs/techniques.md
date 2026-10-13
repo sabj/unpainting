@@ -6,7 +6,7 @@ The painter's code in `src/paint/` is grouped by purpose. This page is an index:
 - [Targeted techniques](#targeted-techniques) (`src/paint/techniques/`) handle one kind of feature or surface: faces, dark fur, curly dog coats, foliage, skies, sea, sand and buildings. Most are off unless a flag turns them on.
 - [Tuned settings](#tuned-settings) (`src/paint/tuned/`) were fitted to specific benchmark images. They can help those images and hurt others. [src/paint/tuned/README.md](../src/paint/tuned/README.md) covers the overfitting risk.
 
-The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The release default preserves the V096 compatibility recipe after held-out regressions. Use `--recipe general` for the new general methods and clean-colour washes; its fitted settings require an explicit preset. See [overfitting.md](overfitting.md) and [linework.md](linework.md) for preset and drawing-stage choices.
+The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The default, `--recipe general` and `--recipe combined` are one general process: the painting plan chooses the drawing, washes and order ([combined-painter.md](combined-painter.md)), and the washes are the clean-colour family washes below. Fitted settings require an explicit preset. `--recipe v096` restores the V096 compatibility recipe and its tuned flags. See [overfitting.md](overfitting.md) and [linework.md](linework.md) for preset and drawing-stage choices.
 
 Subject ids name benchmark images. `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`, and `subject-e` is a second Trumbull-derived subject. subject-b, subject-c, subject-d, subject-a and the architecture photograph are private benchmark images.
 
@@ -30,11 +30,13 @@ Default recipe flags, with the value that turns each off:
 - `--paperphysical 1`: paper fibre and relief in millimetres, not cells. Off: `0`.
 - `--texture 0`: per-passage dry-brush texture marks stay off.
 - `--touchpoints 2`: two touch-up glaze passes on shapes that read too light. Off: `0`.
-- `--shadowraw 1`: raw sienna as the warm shadow half when there is no burnt sienna. Off: `0`.
+- `--shadowraw 1`: raw sienna as the warm shadow half when there is no burnt sienna. `--recipe v096` only. Off: `0`.
 - `--layerhue 1`: keeps wash layers apart by colour group. Off: `0`.
-- `--drawing both`: pen line first, closing pen pass last. Off: `none`.
+- `--drawing first`: the drawing goes down first; the plan's drawing section chooses any closing pass (`--recipe v096` sets `both`). Off: `none`.
 - `--frames 8`: about 8 recorded frames of the washes. Off: `40`.
 - `--marks 1`: records every stroke to `marks.json`. Off: `0`.
+- `--washsession 1 --huechroma 30 --passcap 0.5 --maskmm 2 --lightfamilies 1 --palelights 0.16`: clean-colour family washes in passage sessions, from the plan's `washes` section (rows below). Off: `--recipe v096`.
+- `--finaldarks 0`, `--sourcelines 0 --linesource none`: final darks and automatic source lines stay off until a plan or flag asks for them.
 
 The default recipe sets no drawing medium, amount or weight. Each subject's plan chooses them in its `drawing` section ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
 
@@ -57,6 +59,7 @@ Modules, with their flags:
 - `methods/drawing-rank.mjs` (helper): ranks a dense drawing file's lines into tiers.
 - `methods/drawing-scribble.mjs` (helper): long open lines with dark masses as looping scribble.
 - `methods/drawing.mjs` (not reached): pencil drawing of the figure's edge and big darks.
+- `methods/final-darks.mjs` (`--finaldarks 1`, `--fdminmm2`, `--fdtilemm`, `--fdgain`): finds the final-dark cells and groups them into families for one shape-level look each. Off by default.
 - `methods/first-wash.mjs` (`--firstwash 1`): a paler opening wash split at the subject mask.
 - `methods/flecks.mjs` (`--fleckshape 1`): small reserved lights as broken paper flecks.
 - `methods/ink-res.mjs` (`--inkres N`): pens drawn on a finer sheet and averaged down.
@@ -181,7 +184,8 @@ Modules:
 - `tuned/subjects.json` (value plan subject): the style profile for each benchmark subject. 15 subjects; low.
 - `tuned/trumbull.mjs` (compatibility recipe or explicit Trumbull preset, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
 
-| `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. `--recipe general` only. | `--huechroma 0` |  |  |
-| `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. `--recipe general` only. | `--passcap 0` |  |  |
-| `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. `--recipe general` only. | `--maskmm 0` |  |  |
-| `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. `--recipe general` only. | `--palelights 0` |  |  |
+| `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. On in the default recipe; `--recipe v096` leaves it off. | `--huechroma 0` |  |  |
+| `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. On in the default recipe; `--recipe v096` leaves it off. | `--passcap 0` |  |  |
+| `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. On in the default recipe; `--recipe v096` leaves it off. | `--maskmm 0` |  |  |
+| `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. On in the default recipe; `--recipe v096` leaves it off. | `--palelights 0` |  |  |
+| `--finaldarks 1` | method | After the touch-up passes, lays the picture's small decisive darks: cells among the darkest that are clearly darker than their surroundings, joined and at least 0.5 mm² (`--fdminmm2`), less the pen's cells, cut before painting and grouped by 10 mm tile (`--fdtilemm`). Each group gets one look at its mean colour and one dark glaze with a small brush clipped to the accent (`--fdgain`). Off by default: the held-out Guardi run showed over-heavy accents. | `--finaldarks 0` |  |  |
