@@ -142,6 +142,17 @@ test('the deep glaze rule keeps a dark that stands out from its surround, not on
   assert.equal(m[at(40, 45)], 0);
 });
 
+test('with vary, pen weight follows structure and the shadow side', () => {
+  const groups = new Uint8Array(N); for (let i = 0; i < N; i++) groups[i] = (i % W) < W / 2 ? 0 : 2;
+  const line = (x, len) => ({ points: [{ x, y: 10, weight: 1, width: 2 }, { x, y: 10 + len, weight: 1, width: 2 }], length: len });
+  const shadeWall = line(100, 60), litWall = line(10, 60), litMark = line(20, 8);
+  const { lines } = prunePenLines([shadeWall, litWall, litMark], { w: W, h: H, mmPerCell: 0.5, groups, seed: 3, options: { vary: 0.6, keepAbove: -99 } });
+  const [a, b, c] = [100, 10, 20].map(x => lines.find(g => g.points[0].x === x));
+  assert.equal(a.points[0].weight, 1, 'long shadow-side structure stays full');
+  assert.ok(b.points[0].weight < 1 && c.points[0].weight < b.points[0].weight, 'lit lines lighter, short lit detail lightest');
+  assert.ok(a.points[0].width > 2 && c.points[0].width < 2, 'width follows the same score');
+});
+
 test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
   const m = new Uint8Array(N); for (let y = 20; y < 60; y++) for (let x = 30; x < 90; x++) m[y * W + x] = 1;
   const f = washFootprint(m, W, H, { slip: 4, angle: 0, edgeSigma: 1, edgeAmp: 0 });

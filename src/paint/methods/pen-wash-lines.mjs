@@ -9,6 +9,10 @@
 //   3. A short mark that nearly repeats a kept neighbour (same place within 0.5 mm, same direction) goes.
 //   4. No 4 mm tile carries more than 9 mm of small marks.
 //   5. Long lines over lit paper are drawn a little lighter, so the weight hierarchy reads light to dark.
+//   6. With `vary` > 0 every kept line's weight follows a score instead: its importance (length, from detailMm up to
+//      structMm, on a log scale) and the side the light falls on (lit 0, mid 0.5, shadow 1). Weight is scaled by
+//      1 - vary x (1 - score) and width by 1 + 0.8 x vary x (score - 0.5): long shadow-side structure stays full and
+//      wide, short lit detail goes light and fine.
 // Pure: lines in, lines out, deterministic for a seed. Planning only, before the target guard seals the target.
 import { gaussian } from '../../keyframes/density.mjs';
 
@@ -32,7 +36,7 @@ const dirOf = g => { const a = g.points[0], b = g.points.at(-1), d = Math.hypot(
  * Returns { lines, stats }.
  */
 export function prunePenLines(lines, { w, h, mmPerCell, groups = null, seed = 1, options = {} }) {
-  const o = { minMm: 0.8, detailMm: 3, patchMm: 7, bias: [-0.7, 0, 0.6], jitter: 0.35, keepAbove: 0, dupMm: 0.5, tileMm: 4, tileInkMm: 9, litWeight: 0.8, ...options };
+  const o = { minMm: 0.8, detailMm: 3, patchMm: 7, bias: [-0.7, 0, 0.6], jitter: 0.35, keepAbove: 0, dupMm: 0.5, tileMm: 4, tileInkMm: 9, litWeight: 0.8, vary: 0, structMm: 15, ...options };
   const cells = mm => mm / mmPerCell, field = omissionField(w, h, Math.max(1, cells(o.patchMm) / 2), seed);
   const groupAt = q => (groups ? at(groups, w, h, q) : 1);
   const stats = { in: lines.length, short: 0, omitted: 0, duplicate: 0, density: 0, inkMmIn: 0, inkMmOut: 0 };
@@ -65,7 +69,15 @@ export function prunePenLines(lines, { w, h, mmPerCell, groups = null, seed = 1,
   }
   // keep the file's order (big shapes first) among the survivors
   const keep = new Set([...long, ...kept]), longSet = new Set(long);
-  const out = lines.filter(g => keep.has(g)).map(g => (groupAt(mid(g)) === 0 && longSet.has(g)
+  const scoreOf = g => {
+    const mm = Math.max(o.detailMm, g.length * mmPerCell), imp = Math.min(1, Math.log(mm / o.detailMm) / Math.log(o.structMm / o.detailMm));
+    return 0.6 * imp + 0.4 * [0, 0.5, 1][groupAt(mid(g))];
+  };
+  const varied = g => {
+    const sc = scoreOf(g), fw = 1 - o.vary * (1 - sc), fx = 1 + 0.8 * o.vary * (sc - 0.5);
+    return { ...g, weight: (g.weight ?? 1) * fw, points: g.points.map(p => ({ ...p, weight: (p.weight ?? 1) * fw, ...(p.width == null ? {} : { width: p.width * fx }) })) };
+  };
+  const out = lines.filter(g => keep.has(g)).map(g => (o.vary > 0 ? varied(g) : groupAt(mid(g)) === 0 && longSet.has(g)
     ? { ...g, points: g.points.map(p => (p.weight == null ? p : { ...p, weight: p.weight * o.litWeight })) } : g));
   for (const g of out) stats.inkMmOut += g.length * mmPerCell;
   stats.out = out.length; stats.long = long.length;
