@@ -12,6 +12,7 @@ Judge version: `J1`. All published scores are J1. A new panel, rubric or image p
 
 - AI image judges: Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B. Each sees the target and the painting, blind, with a short description of the target's painting style. Each gives 0 to 10 for `composition_values`, `edges_detail` and `marks_texture`, and one overall.
 - Combined judge score: each judge is called 5 times at temperature 0 (the least random sampling setting). Its score is the median of its valid calls, and it needs at least 3. The vision score is the mean of the three judges' medians. If a judge has fewer than 3 valid calls, the painting's score is incomplete and stays empty. No average over a smaller panel is made.
+- Judge J2, for internal gates only (`score_painting.py --judge J2`): the same panel, prompt, images and medians as J1, but every judge needs all 5 calls valid. A call that fails, is cut off at the token limit or does not parse is made again with both images; a reply rewritten into JSON from text alone does not count. Each result records `judgeVersion`, `minValidCalls`, `callCounts` and, for J2, every attempt with its HTTP status and finish reason (`visionAttempts`). Published scores stay J1, and J2 scores are not compared with them.
 - Repeatable image measurements: value shapes, edges and marks, each normalized to 0 to 10, from `scorer/classic.py`. Their mean is the classic score. No metric uses pixel error.
 - Composite: the mean of the vision score and the classic score. A try's score is the mean of its targets' composites and needs every target.
 
