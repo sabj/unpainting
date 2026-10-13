@@ -190,7 +190,7 @@ const passage = (id, role, mask, dir, strength, extra = {}) => ({ id, role, mask
  */
 export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
-  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, skyStrength: 0, skyTo: 0.3, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
+  const o = { joinMm: 2, minPiece: 0.008, blurMm: 2.5, minLight: 0.3, maxDark: 0.22, lightness: 0.5, chroma: 1, skyMin: 0.06, skyColumns: 0.4, haloMm: 0.8, minArea: 0.004, lightChroma: 0, localMax: 0.26, monoLocal: { warm: 0.6, earth: 0.4 }, capLWeight: 1, shadowMin: 0.12, deepMin: 0.1, shadowBlurMm: 0, shadowMaxDark: 0.3, shadowJoinMm: 1, shadowMinPiece: 0.002, foliageGreen: 0, foliageMax: 0.3, shadowOneMm: 0, skyStrength: 0, skyTo: 0.3, deepContrast: 0, deepShare: 0.06, deepRingMm: 2, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
   // a photograph's dark border and a painting's bare margin are no part of the subject: found on the barely blurred
   // picture, then read as paper before the planning blur, so the border's dark cannot bleed into the sky
   const P1 = labPlanesOf(px, w, h, 1), frame = frameMask(P1.L, w, h), margin = paperMargin(P1.L, w, h, { frame: frame.mask });
@@ -288,14 +288,43 @@ export function planValues({ px, w, h, pigments, mmPerCell, paperRGB, options = 
     if (dsplit) notes.push('shadow split by hue into 2 glazes');
     const dir = passages.at(-1).dir;
     // 4. a deeper glaze where the deepest darks hold together
-    const deepT = quantile(Lp, 0.06), deep0 = Uint8Array.from(Lp, (v, i) => (darks[i] && v <= deepT ? 1 : 0));
-    const deep = dilate(erode(deep0, w, h, cells(0.6)), w, h, cells(0.6));
-    const keep = new Uint8Array(n), { labels, areas } = components(deep, w, h);
-    for (let i = 0; i < n; i++) if (labels[i] && areas[labels[i]] >= o.minArea * n) keep[i] = 1;
-    if (share(keep, n) >= 0.01) passages.push(passage('deep', 'shadow', keep, roleMix(roles, K, { cool: 0.55, earth: 0.45 }).map((v, j) => (monochrome ? v : 0.5 * v + 0.5 * dir[j])), Math.min(Math.max(0.22, o.deepMin), Math.max(o.deepMin, 0.25 * medOD(keep))), { wet: false }));
+    let keep;
+    if (o.deepContrast > 0) {
+      // with `deepContrast` > 0, the same rule for every subject: on a finer read, the darkest connected shapes (the
+      // darkest `deepShare` of the sheet, at least `minArea`) that stand at least deepContrast L* under a ring around
+      // them, so a dark opening in a lit wall gets the deep glaze and a dark that merely shades into dark does not
+      const Lf = gaussian(Float32Array.from(P1.L, (v, i) => (frame.mask[i] ? 100 : v)), w, h, cells(o.shadowBlurMm || 0.8) / 2);
+      keep = contrastDarks(Lf, w, h, { share: o.deepShare, minArea: Math.round(o.minArea * n), ring: Math.max(2, Math.round(cells(o.deepRingMm))), contrast: o.deepContrast, close: Math.max(1, Math.round(cells(0.6))) });
+      notes.push(`deep: darkest shapes standing ${o.deepContrast} L* under their ${o.deepRingMm} mm surround, ${(100 * share(keep, n)).toFixed(1)}% of the sheet`);
+    } else {
+      const deepT = quantile(Lp, 0.06), deep0 = Uint8Array.from(Lp, (v, i) => (darks[i] && v <= deepT ? 1 : 0));
+      const deep = dilate(erode(deep0, w, h, cells(0.6)), w, h, cells(0.6));
+      keep = new Uint8Array(n); const { labels, areas } = components(deep, w, h);
+      for (let i = 0; i < n; i++) if (labels[i] && areas[labels[i]] >= o.minArea * n) keep[i] = 1;
+    }
+    if (share(keep, n) >= (o.deepContrast > 0 ? 0.003 : 0.01)) passages.push(passage('deep', 'shadow', keep, roleMix(roles, K, { cool: 0.55, earth: 0.45 }).map((v, j) => (monochrome ? v : 0.5 * v + 0.5 * dir[j])), Math.min(Math.max(0.22, o.deepMin), Math.max(o.deepMin, 0.25 * medOD(keep))), { wet: false }));
   }
   for (const p of passages) { for (let i = 0; i < n; i++) if (frame.mask[i]) p.mask[i] = 0; p.mask = consolidate(p.mask, w, h, cells(p.joinMm ?? o.joinMm), (p.minPiece ?? o.minPiece) * n); }
   return { passages: passages.slice(0, PENWASH_MAX_PASSAGES), groups, frame: frame.mask, sky: skyArea >= o.skyMin ? sky0 : null, monochrome, chroma, thresholds, shares, roles, notes };
+}
+
+/**
+ * The darkest connected shapes of L (the darkest `share` of cells, gaps under `close` cells closed) of at least
+ * `minArea` cells whose mean L stands at least `contrast` under the mean of a `ring` cells wide band around them.
+ */
+export function contrastDarks(L, w, h, { share: q = 0.06, minArea = 20, ring = 6, contrast = 15, close = 1 } = {}) {
+  const n = w * h, t = quantile(L, q), dark = erode(dilate(Uint8Array.from(L, v => (v <= t ? 1 : 0)), w, h, close), w, h, close);
+  const { labels, areas } = components(dark, w, h), out = new Uint8Array(n), box = new Map();
+  for (let i = 0; i < n; i++) { const k = labels[i]; if (!k || areas[k] < minArea) continue; const x = i % w, y = (i - x) / w, b = box.get(k); if (!b) box.set(k, [x, y, x, y, 0, 0]); else { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } }
+  for (const [k, b] of box) {
+    const x0 = Math.max(0, b[0] - ring), y0 = Math.max(0, b[1] - ring), x1 = Math.min(w - 1, b[2] + ring), y1 = Math.min(h - 1, b[3] + ring), bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    const own = new Uint8Array(bw * bh); let inS = 0, inN = 0;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (labels[y * w + x] === k) { own[(y - y0) * bw + x - x0] = 1; inS += L[y * w + x]; inN++; }
+    const grown = dilate(own, bw, bh, ring); let rS = 0, rN = 0;
+    for (let j = 0; j < bw * bh; j++) if (grown[j] && !own[j]) { const x = x0 + (j % bw), y = y0 + ((j / bw) | 0), i = y * w + x; if (!dark[i]) { rS += L[i]; rN++; } }
+    if (rN && rS / rN - inS / inN >= contrast) for (let j = 0; j < bw * bh; j++) if (own[j]) out[(y0 + ((j / bw) | 0)) * w + x0 + (j % bw)] = 1;
+  }
+  return out;
 }
 
 // The mass split into two by hue (k-means on a*, b*), or null when one wash serves it.

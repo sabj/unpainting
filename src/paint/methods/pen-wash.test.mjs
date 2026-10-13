@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, fitMix, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
+import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, fitMix, contrastDarks, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
 import { prunePenLines } from './pen-wash-lines.mjs';
 import { washFootprint } from './pen-wash.mjs';
 import { expandRecipe, styleAlias } from '../recipe.mjs';
@@ -128,6 +128,18 @@ test('foliage gets its own green wash and the shadow pattern can be one connecte
   assert.equal(shadows.length, 1, plan.passages.map(p => p.id).join());
   assert.equal(shadows[0].mask[at(15, 50)], 0, 'the shadow glaze keeps off the foliage');
   assert.equal(shadows[0].mask[at(87, 30)], 1, 'the gap between the two cast shadows is closed: one wash');
+});
+
+test('the deep glaze rule keeps a dark that stands out from its surround, not one inside a dark mass', () => {
+  // a light field with a dark opening on the left, and on the right a dark patch inside a mid-dark mass
+  const L = new Float32Array(N).fill(85), at = (x, y) => y * W + x;
+  for (let y = 30; y < 60; y++) for (let x = 10; x < 25; x++) L[at(x, y)] = 20;
+  for (let y = 10; y < 80; y++) for (let x = 60; x < 115; x++) L[at(x, y)] = 32;
+  for (let y = 30; y < 60; y++) for (let x = 80; x < 95; x++) L[at(x, y)] = 22;
+  const m = contrastDarks(L, W, H, { share: 0.08, minArea: 40, ring: 5, contrast: 15 });
+  assert.equal(m[at(17, 45)], 1, 'the opening in the lit wall is kept');
+  assert.equal(m[at(87, 45)], 0, 'a dark that only shades into a dark mass is not');
+  assert.equal(m[at(40, 45)], 0);
 });
 
 test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
