@@ -9,15 +9,16 @@
 //      long line partly matched keeps its matched runs.
 //   3. Snap. A kept line moves onto its target edge by its own smoothed offset (over `smoothMm`), so the sketch's
 //      choice of lines, its weights and its small hand wobble stay while their positions are the target's.
-//   4. Acceptance. The sketch is used only when enough of its ink matched, little was invented, and it covers enough
-//      of the target's strongest edges; otherwise the stage falls back to its next source.
+//   4. Acceptance. The sketch is used only when enough of its ink matched, little was invented, and it covers at least
+//      half of the target's strongest edges (a sketch that leaves out half the structure is too thin to carry the
+//      drawing); otherwise the stage falls back to its next source.
 // Short unmatched marks over dark areas of the target are hatching, kept as such and not counted either way.
 //
 // Pure: lines are plan-grid polylines [{ points: [{x, y, width?, weight?}], ... }], evidence from edgeEvidence.
 
 export const SKETCH_CHECK = Object.freeze({
   matchMm: 2.5, angle: 30, smoothMm: 3, invented: 0.4, partial: 0.75, gapMm: 1.5, hatchMm: 3, hatchDark: 0.45, minMm: 0.8,
-  minMatched: 0.55, maxInvented: 0.3, minCoverage: 0.25, maxScale: 0.25, maxShiftShare: 0.08, minGain: 0.02, coverMm: 1.2,
+  minMatched: 0.55, maxInvented: 0.3, minCoverage: 0.5, maxScale: 0.25, maxShiftShare: 0.08, minGain: 0.02, coverMm: 1.2,
 });
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

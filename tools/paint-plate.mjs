@@ -260,12 +260,13 @@ if (!argv0.includes('--linesource')) {
 // ink|graphite|none, a plan's drawing.medium or --outlinemedium fixes the medium; --sketchcache <dir> holds image-model
 // sketches (tools/seg/sketch-target.mjs); --sketchpython the python for copy-lines. Off by default.
 let LINEWORK_STAGE = null;
+const LINEWORK_SOURCES = { python: opt('sketchpython','python3'), sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null };
 if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
   if (opt('linework') !== 'auto') throw Error(`--linework: auto or off, not ${opt('linework')}`);
   const om = argv.includes('--outlinemedium') ? opt('outlinemedium','auto') : 'auto';
   const requested = opt('linemedium','') || (om === 'auto' ? null : /graphite/.test(om) ? 'graphite' : 'ink');
   const r = await planUniversalLinework({ image: path.resolve(root, opt('image','')), out, root, width: num('width', 700), sheetMm: num('sheetmm', DEFAULT_SHEET_MM),
-    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', python: opt('sketchpython','python3'), sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null,
+    requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', ...LINEWORK_SOURCES,
     seed: num('seed', 0), log: console.log });
   argv.push(...r.flags);
   LINEWORK_STAGE = r.record;

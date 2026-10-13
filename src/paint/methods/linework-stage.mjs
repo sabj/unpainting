@@ -29,13 +29,13 @@ import { paperOf } from '../../crop/palettepick.mjs';
 import { edgeEvidence } from './line-evidence.mjs';
 import { checkSketch } from './sketch-check.mjs';
 import { cleanLines } from './line-cleanup.mjs';
-import { straightShare, decideLinework } from './line-gate.mjs';
+import { decideLinework } from './line-gate.mjs';
 
 const MEDIA = Object.freeze(['ink', 'graphite', 'none']);
+const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
 // How heavily each style uses the lines: pen and wash states the drawing, the others keep it light under the washes.
 export const STYLE_WEIGHT = Object.freeze({ penwash: 1, default: 1 });
 
-const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
 const pathLength = pts => { let d = 0; for (let k = 1; k < pts.length; k++) d += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return d; };
 
 /** Whether python has numpy and OpenCV. */
@@ -90,7 +90,8 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
   const target = { w, h, L: ev.smooth[0], A: ev.smooth[1], B: ev.smooth[2], rgb: [0, 1, 2].map(c => gaussian(Float32Array.from({ length: n }, (_, i) => lin(rgb[3 * i + c])), w, h, 1)) };
   const { paperRGB } = paperOf(rgb, w, h, { mode: 'source' });
-  const features = { straight: straightShare(ev.edge, w, h, { mmPerCell }), penLine: separate(rgb, w, h, paperRGB).stats.ink / n };
+  const perspective = pythonReady(python) ? JSON.parse(runPython(python, [path.join(root, 'tools/seg/perspective.py'), image, '--width', String(width)], 'perspective').trim().split('\n').at(-1)) : null;
+  const features = { perspective, penLine: +(separate(rgb, w, h, paperRGB).stats.ink / n).toFixed(4) };
   const record = { stage: 'universal linework', targetSHA256: sha, grid: { w, h }, mmPerCell: +mmPerCell.toFixed(5), style, sources: [] };
   fs.mkdirSync(out, { recursive: true });
   let chosen = null;
@@ -125,7 +126,7 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
   const usage = (STYLE_WEIGHT[style] ?? STYLE_WEIGHT.default) * gate.weight;
   const kept = gate.draw ? withinBudget(clean.lines, gate.budget * areaCm2, mmPerCell) : [];
   const lines = kept.map(g => ({ ...g, weight: (g.weight ?? 1) * usage, points: g.points.map(q => ({ ...q, weight: (q.weight ?? 1) * usage })) }));
-  Object.assign(record, { source: chosen.source, features: Object.fromEntries(Object.entries(features).map(([k, v]) => [k, +v.toFixed(4)])), cleanup: clean.stats,
+  Object.assign(record, { source: chosen.source, features, cleanup: clean.stats,
     inkMmPerCm2: +(inkMm / areaCm2).toFixed(2), gate: { ...gate, usage: +usage.toFixed(3) }, lines: lines.length,
     drawnMmPerCm2: +(lines.reduce((a, g) => a + pathLength(g.points) * mmPerCell, 0) / areaCm2).toFixed(2) });
   fs.writeFileSync(path.join(out, 'linework-stage.json'), JSON.stringify(record, null, 2) + '\n');
