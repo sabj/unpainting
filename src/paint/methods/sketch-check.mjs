@@ -16,7 +16,7 @@
 //
 // Pure: lines are plan-grid polylines [{ points: [{x, y, width?, weight?}], ... }], evidence from edgeEvidence.
 
-export const SKETCH_CHECK = Object.freeze({
+const SKETCH_CHECK = Object.freeze({
   matchMm: 2.5, angle: 30, smoothMm: 3, invented: 0.4, partial: 0.75, gapMm: 1.5, hatchMm: 3, hatchDark: 0.45, minMm: 0.8,
   minMatched: 0.55, maxInvented: 0.3, minCoverage: 0.5, maxScale: 0.25, maxShiftShare: 0.08, minGain: 0.02, coverMm: 1.2,
 });
@@ -37,16 +37,6 @@ function samples(lines, step) {
     }
   }
   return out;
-}
-
-/** Distance to the nearest target edge at (x, y) and how well the tangent (tx, ty) runs along it (1 along, 0 across). */
-export function supportAt(ev, x, y, tx, ty) {
-  const { w, h } = ev, X = Math.round(x), Y = Math.round(y);
-  if (X < 0 || Y < 0 || X >= w || Y >= h) return { d: Infinity, agree: 0 };
-  const i = Y * w + X, j = ev.near[i];
-  if (j < 0) return { d: Infinity, agree: 0 };
-  const gx = Math.cos(ev.ori[j]), gy = Math.sin(ev.ori[j]);
-  return { d: ev.dist[i], agree: Math.abs(tx * gy - ty * gx) };
 }
 
 // A blurred raster of points on a grid `f` times coarser than the plan's.
@@ -79,7 +69,7 @@ function ncc(T, S, f, cx, cy, sx, sy, dx, dy) {
  * The best whole-sketch scale per axis and shift against the target's edges: normalised cross-correlation of blurred
  * edge rasters, coarse to fine. `blur` is (F, w, h, sigma) => F.
  */
-export function registerSketch(lines, ev, { blur, maxScale = SKETCH_CHECK.maxScale, maxShift, sampleStep = 1 } = {}) {
+function registerSketch(lines, ev, { blur, maxScale = SKETCH_CHECK.maxScale, maxShift, sampleStep = 1 } = {}) {
   const { w, h, edge, mag } = ev, strong = [];
   for (let i = 0; i < edge.length; i++) if (edge[i]) strong.push(mag[i]);
   strong.sort((a, b) => a - b);

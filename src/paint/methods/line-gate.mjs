@@ -14,12 +14,13 @@
 //   ink       when the target is built structure, or a checked sketch carries the drawing
 //   graphite  otherwise: a light pencil construction under the washes, at a smaller budget
 // An explicit medium (plan drawing.medium, --linemedium or --outlinemedium) always wins; the gate still records what it
-// would have chosen. Amount: an ink budget in mm per cm2 (built structure keeps its full set, a soft subject less).
-export const GATE = Object.freeze({ builtPoints: 2, builtShare: 0.12, minDensity: 2,
+// would have chosen. Amount: a line budget in mm per cm2: a pen source keeps all its own lines, built structure up
+// to 40, a soft subject up to 12.
+const GATE = Object.freeze({ builtPoints: 2, builtShare: 0.12, minDensity: 2,
   budget: Object.freeze({ built: 40, soft: 12 }), weight: Object.freeze({ ink: 1, graphite: 0.8 }) });
 
 /**
- * The gate's decision. `features` { perspective: { vanishingPoints, share } | null, penLine, density, sketch };
+ * The gate's decision. `features` { perspective: { vanishingPoints, share } | null, penLine, density, sketch, pen };
  * `requested` an explicit medium ('ink' | 'graphite' | 'none') or null for the gate's own choice.
  * @returns { draw, medium, gate, chosen, built, budget (mm of line per cm2), weight, why }
  */
@@ -33,6 +34,7 @@ export function decideLinework(features, { requested = null, options = {} } = {}
   else { medium = 'graphite'; why.push(p ? `no perspective structure (${p.vanishingPoints} vanishing points): a light construction` : 'perspective unknown (no OpenCV): a light construction'); }
   const gate = medium;
   if (requested) { medium = requested; why.push(`medium ${requested} set by the plan or command line (the gate chose ${gate})`); }
-  const budget = built || f.sketch ? o.budget.built : o.budget.soft;
+  // a pen source's own lines are the artist's: no budget
+  const budget = f.pen ? Infinity : built || f.sketch ? o.budget.built : o.budget.soft;
   return { draw: medium !== 'none', medium, gate, chosen: !requested, built, budget, weight: o.weight[medium] ?? 0, why };
 }

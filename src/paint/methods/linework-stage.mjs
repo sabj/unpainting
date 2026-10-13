@@ -8,9 +8,10 @@
 //                (sketch-check.mjs): registered to the target's edges, invented lines dropped, kept lines snapped
 //        sketch planner  the target's structure as hierarchical pen strokes with width and pressure cues
 //                (tools/seg/sketch-lines.py, the photo-sketch source), when python has numpy and OpenCV
-//        trace   the target's observed dark lines at their widths (tools/seg/copy-lines.py, else src/crop/ink-lines-file.mjs),
-//                with the structure filter
-// Lines are copied at twice the plan grid, so a fine pen line keeps its measured width on the sheet.
+//        trace   the target's observed dark lines at their widths (tools/seg/copy-lines.py, else src/crop/ink-lines-file.mjs);
+//                a pen source keeps all its own lines but shadow outlines, a photograph's trace gets the structure filter
+// A sketch is copied at twice the plan grid, so its fine pen line keeps a measured width on the sheet; the target's
+// own lines are copied at the plan grid.
 //   2. Cleanup (line-cleanup.mjs): specks, shadow and value edges, the structure filter on a trace, repeated small
 //      marks pruned into rhythm, weight hierarchy; points keep their widths and wobble.
 //   3. Gate (line-gate.mjs): draw or not, ink or graphite, how much. An explicit medium wins.
@@ -120,7 +121,7 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
       const sketchSHA = crypto.createHash('sha256').update(fs.readFileSync(sketchFile)).digest('hex');
       record.sources.push({ source: 'sketch', sketchSHA256: sketchSHA, copier, accepted: c.accepted, why: c.why, stats: c.stats, transform: c.transform });
       log(`linework: image-model sketch ${c.accepted ? 'accepted' : 'rejected'}: ${c.accepted ? `${(100 * c.stats.matched).toFixed(0)}% of its ink on the target's edges, ${c.stats.inventedLines} invented lines dropped` : c.why.join('; ')}`);
-      return c.accepted ? { source: 'sketch', lines: c.lines, trace: false } : null;
+      return c.accepted ? { source: 'sketch', lines: c.lines, kind: 'drawing' } : null;
     },
     planner: async () => {
       if (!pythonReady(python)) return null;
@@ -128,24 +129,25 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
       runPython(python, [path.join(root, 'tools/seg/sketch-lines.py'), image, '--out', stem, '--width', String(2 * width)], 'sketch-lines');
       const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
       record.sources.push({ source: 'sketch planner', lines: raw.length, accepted: true });
-      return { source: 'sketch planner', lines: raw, trace: false };
+      return { source: 'sketch planner', lines: raw, kind: 'drawing' };
     },
     trace: async () => {
-      const stem = path.join(out, 'lines-trace'), copier = await copyLines(image, stem, { width: 2 * width, python, root });
+      // the target's own lines at the plan grid, as a prepared copy of them is made
+      const stem = path.join(out, 'lines-trace'), copier = await copyLines(image, stem, { width, python, root });
       const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
       record.sources.push({ source: 'trace', copier, lines: raw.length, accepted: true });
-      return { source: 'trace', lines: raw, trace: true };
+      return { source: 'trace', lines: raw, kind: pen ? 'pen' : 'trace' };
     },
   };
   let chosen = null;
   for (const name of order) if (!chosen) chosen = await sources[name]();
-  const clean = cleanLines(chosen.lines, target, { mmPerCell, trace: chosen.trace, seed: 1 + seed });
+  const clean = cleanLines(chosen.lines, target, { mmPerCell, kind: chosen.kind, seed: 1 + seed });
   const areaCm2 = (w * mmPerCell / 10) * (h * mmPerCell / 10), inkMm = clean.lines.reduce((a, g) => a + pathLength(g.points) * mmPerCell, 0);
-  const gate = decideLinework({ ...features, density: inkMm / areaCm2, sketch: chosen.source === 'sketch' }, { requested });
+  const gate = decideLinework({ ...features, density: inkMm / areaCm2, sketch: chosen.source === 'sketch', pen: chosen.kind === 'pen' }, { requested });
   const usage = gate.weight;
-  const kept = gate.draw ? withinBudget(clean.lines, gate.budget * areaCm2, mmPerCell) : [];
+  const kept = !gate.draw ? [] : Number.isFinite(gate.budget) ? withinBudget(clean.lines, gate.budget * areaCm2, mmPerCell) : clean.lines;
   const lines = kept.map(g => ({ ...g, weight: (g.weight ?? 1) * usage, points: g.points.map(q => ({ ...q, weight: (q.weight ?? 1) * usage })) }));
-  Object.assign(record, { source: chosen.source, features, cleanup: clean.stats,
+  Object.assign(record, { source: chosen.source, cleanupKind: chosen.kind, features, cleanup: clean.stats,
     inkMmPerCm2: +(inkMm / areaCm2).toFixed(2), gate: { ...gate, usage: +usage.toFixed(3) }, lines: lines.length,
     drawnMmPerCm2: +(lines.reduce((a, g) => a + pathLength(g.points) * mmPerCell, 0) / areaCm2).toFixed(2) });
   fs.writeFileSync(path.join(out, 'linework-stage.json'), JSON.stringify(record, null, 2) + '\n');

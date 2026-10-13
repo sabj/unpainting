@@ -35,3 +35,7 @@ test('built structure keeps a larger line budget than a soft subject', () => {
   const b = decideLinework({ perspective: built, penLine: 0, density: 10, sketch: false }), s = decideLinework({ perspective: soft, penLine: 0, density: 10, sketch: false });
   assert.ok(b.budget > s.budget);
 });
+
+test('a pen source keeps all its own lines', () => {
+  assert.equal(decideLinework({ perspective: built, penLine: 0.03, density: 60, sketch: false, pen: true }).budget, Infinity);
+});

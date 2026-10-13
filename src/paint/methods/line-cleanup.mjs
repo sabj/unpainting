@@ -13,11 +13,13 @@
 //      has contrast but a sparse trace.
 //   4. Repeated small marks are pruned into a simplified rhythm and the weight hierarchy is set (pen-wash-lines.mjs,
 //      on a three-value map of the target): lit areas lose most small marks, long shadow-side structure stays full.
-// Points are kept as they are, with their own widths, weights and hand wobble. Pure, planning only.
+// A pen source's own lines (an ink-and-wash target) are an artist's selection already: they keep everything but
+// specks, shadow outlines and near repeats. Points are kept as they are, with their own widths, weights and hand
+// wobble. Pure, planning only.
 import { prunePenLines } from './pen-wash-lines.mjs';
 
-export const CLEANUP = Object.freeze({
-  minMm: 0.8, sideMm: 0.6, ridge: 0.025, step: 0.07, scaleSpread: 1.3, minChroma: 0.06, shadowShare: 0.6, ridgeShare: 0.25, straightMm: 10, straight: 0.92,
+const CLEANUP = Object.freeze({
+  minMm: 0.8, penMinMm: 0.4, sideMm: 0.6, ridge: 0.025, step: 0.07, scaleSpread: 1.3, minChroma: 0.06, shadowShare: 0.6, ridgeShare: 0.25, straightMm: 10, straight: 0.92,
   detailQuantile: 0.65, detailRadiusMm: 1.7, structMm: 3.4, structStraight: 0.85, lightShare: 0.55, darkShare: 0.15,
   prune: Object.freeze({ tileInkMm: 9, keepAbove: 0, minMm: 0.8, vary: 0.5, structMm: 15 }),
 });
@@ -85,11 +87,17 @@ export function detailRegion(lines, L, w, h, { radius = 6, quantile = 0.8 } = {}
 }
 
 /**
- * Clean a line set. `lines` plan-grid polylines; `target` { L, rgb, w, h } from the stage; `trace` true for a dense
- * trace of the target (the structure filter runs), false for a selective drawing such as a checked sketch.
+ * Clean a line set. `lines` plan-grid polylines; `target` { L, A, B, rgb, w, h } from the stage. `kind`:
+ *   'drawing'  a selective drawing (a checked sketch, the sketch planner): shadow outlines go, small marks are pruned
+ *   'trace'    a dense trace of a photograph: also the structure filter
+ *   'pen'      a pen source's own lines, already an artist's selection: only specks, shadow outlines and near repeats
+ *              go, every other line stays (no structure filter, no omission, no density cap)
  * @returns { lines, stats }
  */
-export function cleanLines(lines, target, { mmPerCell, trace = true, seed = 1, options = {} } = {}) {
+export function cleanLines(lines, target, { mmPerCell, kind = 'trace', seed = 1, options = {} } = {}) {
+  if (!['drawing', 'trace', 'pen'].includes(kind)) throw new Error(`cleanLines: drawing, trace or pen, not ${kind}`);
+  const trace = kind === 'trace';
+  if (kind === 'pen') options = { ...options, minMm: options.minMm ?? CLEANUP.penMinMm, prune: { keepAbove: -Infinity, tileInkMm: Infinity, minMm: CLEANUP.penMinMm, ...(options.prune ?? {}) } };
   const o = { ...CLEANUP, ...options, prune: { ...CLEANUP.prune, ...(options.prune ?? {}) } }, cells = mm => mm / mmPerCell, { w, h } = target;
   const stats = { in: lines.length, specks: 0, shadow: 0, structure: 0 };
   let kept = lines.filter(g => { if (pathLength(g.points) * mmPerCell < o.minMm) { stats.specks++; return false; } return true; });
