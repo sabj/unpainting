@@ -59,6 +59,7 @@ Modules, with their flags:
 - `methods/drawing.mjs` (not reached): pencil drawing of the figure's edge and big darks.
 - `methods/first-wash.mjs` (`--firstwash 1`): a paler opening wash split at the subject mask.
 - `methods/flecks.mjs` (`--fleckshape 1`): small reserved lights as broken paper flecks.
+- `methods/flow-shape.mjs` (`--flowshape mm`, `--flowholes mm2`): value passages smoothed along the target's structure direction, pinholes painted through.
 - `methods/ink-res.mjs` (`--inkres N`): pens drawn on a finer sheet and averaged down.
 - `methods/ladder-seg.mjs` (`--ladderseg`): leaves glazes on ground segments to the washes.
 - `methods/lay.mjs` (not reached): one passage from one mixing well, in sweeps.
@@ -97,14 +98,17 @@ Modules, with their flags:
 - `methods/shape-local-charge.mjs` (`--modpaintplanes`, refused by the CLI): shares remaining pigment among planned shapes.
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
+- `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
 - `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
 - `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
 - `methods/stroke-plan.mjs` (`--strokeplan 1`): a passage as overlapping parallel sweeps.
+- `methods/subject-order.mjs` (`--subjectorder s`, `--subjectseam s`): subject-by-subject order; a wash is cut at a subject edge only along a colour edge.
 - `methods/subject.mjs` (not reached): the subject's big shapes in wash order.
 - `methods/target-regions.mjs` (always on): colour and value regions for the value planner.
 - `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.
 - `methods/wetdry.mjs` (always on): paper wetness, brush load and waiting for the paper to dry.
+- `methods/wash-join.mjs` (`--washjoin 1`): a colour-domain piece under the minimum shape joins the neighbouring passage instead of leaving a bare-paper shard.
 
 `--holefill` and `--holerim` work around a known drying weakness. They are off by default and run on the CPU and the GPU. See [future idea 8](future-ideas.md#8-edge-drying-that-knows-how-much-water-there-is).
 
