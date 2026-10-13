@@ -309,8 +309,10 @@ const { data: PX_SOURCE, info } = await src.removeAlpha().raw().toBuffer({ resol
 const paperSetupStarted = performance.now();
 // --washinkfree 1 (needs --drawingfile): the planner reads the target with the planned pen lines filled from their
 // surroundings (src/crop/ink-free.mjs), so the wash carries mass and the pen carries line, not both. Pre-paint only.
+// --washinkfile <base>: the line file of the target's own ink to remove, when the pen draws a different drawing
+// (a cleaner opening file). Default: the --drawingfile.
 const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
-  const base = opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
+  const base = opt('washinkfile', '') || opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
   const doc = JSON.parse(fs.readFileSync(path.resolve(root, linePaths(base).lines), 'utf8'));
   const r = removePlannedInk(PX_SOURCE, info.width, info.height, doc, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marginMm: num('washinkmargin', 0.3) });
   console.log(`wash target: planned ink removed from ${r.changed} cells (${(100 * r.changed / (info.width * info.height)).toFixed(1)}% of the sheet)`);
