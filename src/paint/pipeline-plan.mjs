@@ -1,6 +1,7 @@
 // One plan owns drawing, washes and order. Flags are an execution adapter, not a second plan.
 import { drawingFlags } from './drawing-plan.mjs';
 import { readSubjectOrder } from './methods/subject-order.mjs';
+import { BOX } from '../crop/box.mjs';
 
 function object(v, name) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error(`${name}: expected an object`);
@@ -10,6 +11,13 @@ function number(v, fallback, min, max, name) {
   v ??= fallback;
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) throw Error(`${name}: expected ${min}..${max}`);
   return v;
+}
+// washes.paints: the authored box palette, by box key. A colour subject names its pans instead of the fit choosing them.
+function paints(v) {
+  if (v == null) return null;
+  const keys = BOX.map(p => p.key);
+  if (!Array.isArray(v) || !v.length || v.some(k => !keys.includes(k))) throw Error(`washes.paints: expected box keys from ${keys.join(", ")}`);
+  return [...v];
 }
 function choice(v, fallback, choices, name) {
   v ??= fallback;
@@ -29,6 +37,7 @@ export function resolvePipeline(plan = {}) {
     drawing,
     washes: {
       furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
+      paints: paints(washes.paints),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
       inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
@@ -51,6 +60,7 @@ export function pipelineFlags(plan) {
   const p = resolvePipeline(plan), w = p.washes, flags = drawingFlags(p.drawing);
   const add = (k,v) => flags.push('--'+k,String(v));
   if (w.furReserves) add('furreserves', JSON.stringify(w.furReserves));
+  if (w.paints) add('paints', w.paints.join(','));
   add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
   // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
   // washes still keep light colour families apart, split on perceptual chroma, so a neutral
