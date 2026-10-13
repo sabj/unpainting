@@ -1,66 +1,36 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "tools/*.mjs",
-    "src/**/*.test.mjs",
-    "tools/**/*.test.mjs",
+    "tools/**/*.mjs",
     "bench/scripts/*.mjs",
-    "bench/v2/kit/*.mjs",
+    "bench/scripts/pipeline/*.mjs",
+    "bench/v4v5/**/*.mjs",
     "docs/lab/lab.js",
     "docs/lab/worker.js",
     "src/paint/techniques/passages/*.mjs",
     "src/media/gpu/batch-server.mjs",
-    "tools/gpu/*.mjs",
-    "tools/guard/*.mjs",
-    "tools/judge/*.mjs",
-    "tools/judge/rounds/{run,tally}.mjs",
-    "tools/lab/*.mjs",
-    "tools/readme/*.mjs",
-    "tools/seg/*.mjs",
-    "tools/judge/rounds/box.mjs",
-    "bench/v4v5/paint.mjs",
-    "bench/v4v5/tools/*.mjs",
-    "bench/scripts/pipeline/dry-planner.mjs"
+    "src/media/gpu/web-brush.mjs"
   ],
   "project": [
-    "**/*.{js,mjs}"
+    "src/**/*.mjs",
+    "tools/**/*.mjs",
+    "bench/**/*.mjs",
+    "docs/lab/**/*.js"
   ],
   "ignore": [
-    ".reorg-notes/**"
-  ],
-  "ignoreUnresolved": [
-    "^\\./kit\\.mjs$",
-    "^\\.\\./src/"
+    "bench/v2/kit/**",
+    "bench/scripts/dry-painter.mjs"
   ],
   "ignoreIssues": {
-    "docs/lab/media/{brush,km,paper,pen,pencil,sheet}.js": [
-      "exports"
-    ],
-    "src/media/gpu/web-brush.mjs": [
-      "exports"
-    ],
-    "src/media/sheet-par.mjs": [
-      "exports"
-    ],
-    "src/media/sheet-kernel.mjs": [
-      "exports"
-    ],
     "src/media/sheet-size.mjs": [
       "duplicates"
     ],
-    "src/media/sheet.mjs": [
-      "exports"
-    ],
-    "docs/lab/media/cpu-stroke-dirty.js": [
+    "docs/lab/media/**": [
       "exports"
     ],
     "docs/lab/media/sheet.js": [
       "exports",
       "unresolved"
     ]
-  },
-  "ignoreBinaries": [
-    "ffmpeg",
-    "codex"
-  ]
+  }
 }

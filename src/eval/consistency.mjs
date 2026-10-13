@@ -65,7 +65,7 @@ const invert = (mask) => { const o = new Uint8Array(mask.length); for (let i = 0
 const below = (T, t) => { const m = new Uint8Array(T.length); for (let i = 0; i < m.length; i++) m[i] = T[i] < t ? 1 : 0; return m; };
 
 /** 8-connected components of mask; returns label per cell (0 = none) and per-label bounding-box span. */
-export function components(mask, w, h) {
+function components(mask, w, h) {
   const label = new Int32Array(w * h), spans = [0], areas = [0], stack = [];
   let next = 1;
   for (let s = 0; s < mask.length; s++) {

@@ -52,7 +52,7 @@ export function mergeShapes(shapes, { n, tol = 0.25, amt = 1.35, film = null }) 
  * --strokebudget N: brush paths, dip to lift, shared out as --budgetsplit (washes, drags, dry brush, accents). Returns
  * each passage's share of the wash paths by area times focus, at least one, and counts for the other brushes.
  */
-export function planBudget({ N, layers, focus, n, split = [0.6, 0.2, 0.08, 0.12] }) {
+function planBudget({ N, layers, focus, n, split = [0.6, 0.2, 0.08, 0.12] }) {
   if (!(N > 0)) return null;
   const wt = m => { if (!focus) { let a = 0; for (let i = 0; i < n; i++) a += m[i]; return a; } let a = 0; for (let i = 0; i < n; i++) if (m[i]) a += 0.25 + focus[i]; return a; };
   const shapeW = new WeakMap(); let total = 0;

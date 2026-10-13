@@ -296,6 +296,7 @@ function throatTable(n) {
 // Permeability of each face between cells, towards +x and +y: water on damp paper runs along the fibres and is held up
 // across them, as in MoXi (Chu and Tai 2005). An advancing front fingers into the paper instead of spreading as a disc.
 const PERM = new WeakMap();
+/** @public Paint Lab imports this from its synced copy. */
 export function permeability(paper) {
   if (PERM.has(paper)) return PERM.get(paper);
   const { w, h, fdx, fdy, grain } = paper, px = new Float32Array(w * h), py = new Float32Array(w * h);

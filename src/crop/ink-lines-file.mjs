@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import { inkLines } from './ink-lines.mjs';
 import { paperOf } from './palettepick.mjs';
 
-export const INK_LINE_DEFAULTS = Object.freeze({ width: 720, minLength: 8, bridge: 1, join: 12, margin: 0.02, darkWash: Infinity,
+const INK_LINE_DEFAULTS = Object.freeze({ width: 720, minLength: 8, bridge: 1, join: 12, margin: 0.02, darkWash: Infinity,
   ridgeHigh: 0.03, ridgeLow: 0.015, stepOverRidge: 1.4, maxWidth: 5 });
 
 /**

@@ -1,6 +1,6 @@
 // Empty pigments share one positive-zero plane. Verify it before skipping it:
 // callers may have edited a layer directly, including this shared array.
-export function sharedZeroLayer(sheet) {
+function sharedZeroLayer(sheet) {
   const zero = sheet._zeroLayer;
   if (!(zero instanceof Float32Array) || zero.length !== sheet.n) return null;
   const bits = new Uint32Array(zero.buffer, zero.byteOffset, zero.length);

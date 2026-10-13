@@ -10,11 +10,11 @@
 // Every choice is made here, before the first mark, from the line file and the target's density at plan time. DOM free,
 // no file IO, deterministic: the same set and options give the same stages.
 
-export const STAGE_NAMES = Object.freeze(['prep', 'prepInk', 'finishInk']);
-export const PREP_INK_FROM = Object.freeze(['prep', 'lines']);
-export const FINISH_FROM = Object.freeze(['prepInk', 'prep', 'lines']);
-export const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
-export const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
+const STAGE_NAMES = Object.freeze(['prep', 'prepInk', 'finishInk']);
+const PREP_INK_FROM = Object.freeze(['prep', 'lines']);
+const FINISH_FROM = Object.freeze(['prepInk', 'prep', 'lines']);
+const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
+const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
 
 export const STAGE_DEFAULTS = Object.freeze({
   prep: Object.freeze({ amount: 0.5 }),
@@ -34,14 +34,14 @@ export function polyLength(points) {
 }
 
 /** A sampler of a plan-time field (the target's density), in source pixels: mean along a line, or per point. */
-export function fieldSampler(F, fw, fh, imageW, imageH) {
+function fieldSampler(F, fw, fh, imageW, imageH) {
   if (!F) return null;
   const sx = fw / imageW, sy = fh / imageH;
   return ([x, y]) => F[Math.min(fh - 1, Math.max(0, Math.round(y * sy))) * fw + Math.min(fw - 1, Math.max(0, Math.round(x * sx)))];
 }
 
 /** Gradient magnitude of a field (central differences), for the edge selection. */
-export function edgeField(F, w, h) {
+function edgeField(F, w, h) {
   const E = new Float32Array(w * h);
   for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
     const i = y * w + x;
@@ -53,7 +53,7 @@ export function edgeField(F, w, h) {
 const mean = (pts, at) => (at ? pts.reduce((a, p) => a + at(p), 0) / Math.max(1, pts.length) : 0);
 
 /** A line's placement score: length, its own weight and strength, its role, and how dark and edged it sits. */
-export function placementScore(g, { dark = null, edge = null } = {}) {
+function placementScore(g, { dark = null, edge = null } = {}) {
   const L = g.length ?? polyLength(g.points);
   const role = ROLE_GAIN[g.role] ?? 1;
   const weight = Number.isFinite(g.weight) ? g.weight : 1, strength = Number.isFinite(g.strength) ? g.strength : 0.5;
