@@ -1,18 +1,21 @@
 // The universal linework stage (--linework auto, plan drawing.linework "auto"): one stage every style uses, before the
 // first mark and before the target guard seals the target.
 //
-//   1. Line source, first that holds:
+//   1. Line source, first that holds (a target the separator reads as at least 2.5% pen line is a pen source, and
+//      tries its own trace first):
 //        sketch  an image model's pen sketch of this target from the sketch cache (tools/seg/sketch-target.mjs, keyed by
 //                the target's SHA-256), copied at its observed widths and accepted only if it passes the geometry check
 //                (sketch-check.mjs): registered to the target's edges, invented lines dropped, kept lines snapped
 //        sketch planner  the target's structure as hierarchical pen strokes with width and pressure cues
 //                (tools/seg/sketch-lines.py, the photo-sketch source), when python has numpy and OpenCV
-//        trace   else the target's observed dark ridges (src/crop/ink-lines-file.mjs)
+//        trace   the target's observed dark lines at their widths (tools/seg/copy-lines.py, else src/crop/ink-lines-file.mjs),
+//                with the structure filter
 // Lines are copied at twice the plan grid, so a fine pen line keeps its measured width on the sheet.
 //   2. Cleanup (line-cleanup.mjs): specks, shadow and value edges, the structure filter on a trace, repeated small
 //      marks pruned into rhythm, weight hierarchy; points keep their widths and wobble.
 //   3. Gate (line-gate.mjs): draw or not, ink or graphite, how much. An explicit medium wins.
-//   4. Usage by style: pen and wash keeps the lines dominant, every other style keeps them light (--lineweight).
+//   4. Usage is the style's: pen and wash draws the file dominant with its own economy prune (pen-wash-lines.mjs),
+//      Combined draws it under its value plan's line caps and lets the washes carry the mass.
 // Writes <out>/lines-universal-lines.json (an ordinary --drawingfile) and <out>/linework-stage.json, and returns the
 // painter flags that point the pens at it. Every later route (linked stages, the pen-and-wash prune, the opening and
 // closing pens) reads that file as it would any prepared drawing.
@@ -33,10 +36,18 @@ import { decideLinework } from './line-gate.mjs';
 
 const MEDIA = Object.freeze(['ink', 'graphite', 'none']);
 const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-// How heavily each style uses the lines: pen and wash states the drawing, the others keep it light under the washes.
-export const STYLE_WEIGHT = Object.freeze({ penwash: 1, default: 1 });
 
 const pathLength = pts => { let d = 0; for (let k = 1; k < pts.length; k++) d += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return d; };
+
+// The separator's pen-line share at which a target counts as a pen source and is drawn from its own lines.
+const PEN_SOURCE = 0.025;
+
+/** The python's OpenCV and NumPy versions and which skeleton thinning tools/seg/lines.py will use, or null. */
+function pythonInfo(python) {
+  if (!pythonReady(python)) return null;
+  const r = spawnSync(python, ['-c', "import cv2, numpy, importlib.util as u; print(cv2.__version__, numpy.__version__, 'ximgproc' if hasattr(cv2, 'ximgproc') else 'skimage' if u.find_spec('skimage') else 'numpy thinning')"], { encoding: 'utf8', timeout: 60000 });
+  return r.status === 0 ? r.stdout.trim() : null;
+}
 
 /** Whether python has numpy and OpenCV. */
 function pythonReady(python) {
@@ -94,36 +105,44 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
   const features = { perspective, penLine: +(separate(rgb, w, h, paperRGB).stats.ink / n).toFixed(4) };
   const record = { stage: 'universal linework', targetSHA256: sha, grid: { w, h }, mmPerCell: +mmPerCell.toFixed(5), style, sources: [] };
   fs.mkdirSync(out, { recursive: true });
+  // a target that shows a lot of pen line (an ink-and-wash or pen source) is drawn from its own lines first; every
+  // other target from a checked sketch, then the sketch planner
+  const pen = features.penLine >= PEN_SOURCE, order = pen ? ['trace', 'sketch', 'planner'] : ['sketch', 'planner', 'trace'];
+  record.order = order; record.python = pythonInfo(python);
+  const sources = {
+    sketch: async () => {
+      const sketchFile = sketchCache ? path.join(sketchCache, `${sha}.png`) : null;
+      if (!sketchFile || !fs.existsSync(sketchFile)) { record.sources.push({ source: 'sketch', accepted: false, why: [sketchCache ? 'no cached sketch for this target' : 'no sketch cache'] }); return null; }
+      const stem = path.join(out, 'lines-sketch');
+      const copier = await copyLines(sketchFile, stem, { width: 2 * width, python, root });
+      const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
+      const c = checkSketch(raw, ev, { mmPerCell, blur: gaussian, dark: Float32Array.from(target.L, v => 1 - v) });
+      const sketchSHA = crypto.createHash('sha256').update(fs.readFileSync(sketchFile)).digest('hex');
+      record.sources.push({ source: 'sketch', sketchSHA256: sketchSHA, copier, accepted: c.accepted, why: c.why, stats: c.stats, transform: c.transform });
+      log(`linework: image-model sketch ${c.accepted ? 'accepted' : 'rejected'}: ${c.accepted ? `${(100 * c.stats.matched).toFixed(0)}% of its ink on the target's edges, ${c.stats.inventedLines} invented lines dropped` : c.why.join('; ')}`);
+      return c.accepted ? { source: 'sketch', lines: c.lines, trace: false } : null;
+    },
+    planner: async () => {
+      if (!pythonReady(python)) return null;
+      const stem = path.join(out, 'lines-planner');
+      runPython(python, [path.join(root, 'tools/seg/sketch-lines.py'), image, '--out', stem, '--width', String(2 * width)], 'sketch-lines');
+      const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
+      record.sources.push({ source: 'sketch planner', lines: raw.length, accepted: true });
+      return { source: 'sketch planner', lines: raw, trace: false };
+    },
+    trace: async () => {
+      const stem = path.join(out, 'lines-trace'), copier = await copyLines(image, stem, { width: 2 * width, python, root });
+      const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
+      record.sources.push({ source: 'trace', copier, lines: raw.length, accepted: true });
+      return { source: 'trace', lines: raw, trace: true };
+    },
+  };
   let chosen = null;
-  const sketchFile = sketchCache ? path.join(sketchCache, `${sha}.png`) : null;
-  if (sketchFile && fs.existsSync(sketchFile)) {
-    const stem = path.join(out, 'lines-sketch');
-    const copier = await copyLines(sketchFile, stem, { width: 2 * width, python, root });
-    const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
-    const c = checkSketch(raw, ev, { mmPerCell, blur: gaussian, dark: Float32Array.from(target.L, v => 1 - v) });
-    const sketchSHA = crypto.createHash('sha256').update(fs.readFileSync(sketchFile)).digest('hex');
-    record.sources.push({ source: 'sketch', sketchSHA256: sketchSHA, copier, accepted: c.accepted, why: c.why, stats: c.stats, transform: c.transform });
-    log(`linework: image-model sketch ${c.accepted ? 'accepted' : 'rejected'}: ${c.accepted ? `${(100 * c.stats.matched).toFixed(0)}% of its ink on the target's edges, ${c.stats.inventedLines} invented lines dropped` : c.why.join('; ')}`);
-    if (c.accepted) chosen = { source: 'sketch', lines: c.lines, trace: false };
-  } else record.sources.push({ source: 'sketch', accepted: false, why: [sketchCache ? 'no cached sketch for this target' : 'no sketch cache'] });
-  if (!chosen && pythonReady(python)) {
-    const stem = path.join(out, 'lines-planner');
-    runPython(python, [path.join(root, 'tools/seg/sketch-lines.py'), image, '--out', stem, '--width', String(2 * width)], 'sketch-lines');
-    const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
-    record.sources.push({ source: 'sketch planner', lines: raw.length, accepted: true });
-    chosen = { source: 'sketch planner', lines: raw, trace: false };
-  }
-  if (!chosen) {
-    const stem = path.join(out, 'lines-trace');
-    await writeInkLines(image, stem, { width: 2 * width });
-    const raw = scaleLines(JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8')), w, h, { keepOrder: true });
-    record.sources.push({ source: 'trace', copier: 'ink-lines', lines: raw.length, accepted: true });
-    chosen = { source: 'trace', lines: raw, trace: true };
-  }
+  for (const name of order) if (!chosen) chosen = await sources[name]();
   const clean = cleanLines(chosen.lines, target, { mmPerCell, trace: chosen.trace, seed: 1 + seed });
   const areaCm2 = (w * mmPerCell / 10) * (h * mmPerCell / 10), inkMm = clean.lines.reduce((a, g) => a + pathLength(g.points) * mmPerCell, 0);
   const gate = decideLinework({ ...features, density: inkMm / areaCm2, sketch: chosen.source === 'sketch' }, { requested });
-  const usage = (STYLE_WEIGHT[style] ?? STYLE_WEIGHT.default) * gate.weight;
+  const usage = gate.weight;
   const kept = gate.draw ? withinBudget(clean.lines, gate.budget * areaCm2, mmPerCell) : [];
   const lines = kept.map(g => ({ ...g, weight: (g.weight ?? 1) * usage, points: g.points.map(q => ({ ...q, weight: (q.weight ?? 1) * usage })) }));
   Object.assign(record, { source: chosen.source, features, cleanup: clean.stats,

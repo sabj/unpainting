@@ -7,7 +7,7 @@
 //      that is mostly such steps is dropped. Colour only tells where there is colour: a step whose lit side is near
 //      grey (a monochrome photograph, a grey wall) is left undecided and kept. Long straight lines stay whatever their
 //      profile (corners, sills, eaves).
-//   3. Dense traces keep their structure (the structure filter of technique/paint-colour 919ef52c, one fixed quantile):
+//   3. Dense traces keep their structure (the structure filter of technique/paint-colour 919ef52c at its Yale quantile, 0.65):
 //      a line stays when it is long and nearly straight or lies mostly in a detail region, where the trace is dense and
 //      the target's local value contrast high. A crack mesh on a flat wall is dense but low in contrast; a shadow edge
 //      has contrast but a sparse trace.
@@ -18,7 +18,7 @@ import { prunePenLines } from './pen-wash-lines.mjs';
 
 export const CLEANUP = Object.freeze({
   minMm: 0.8, sideMm: 0.6, ridge: 0.025, step: 0.07, scaleSpread: 1.3, minChroma: 0.06, shadowShare: 0.6, ridgeShare: 0.25, straightMm: 10, straight: 0.92,
-  detailQuantile: 0.8, detailRadiusMm: 1.7, structMm: 3.4, structStraight: 0.85, lightShare: 0.55, darkShare: 0.15,
+  detailQuantile: 0.65, detailRadiusMm: 1.7, structMm: 3.4, structStraight: 0.85, lightShare: 0.55, darkShare: 0.15,
   prune: Object.freeze({ tileInkMm: 9, keepAbove: 0, minMm: 0.8, vary: 0.5, structMm: 15 }),
 });
 
