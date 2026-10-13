@@ -189,16 +189,17 @@ const optTrack = {
 const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
 // Reuse the tracked, exact CPU fallback transfer path independently of Fast physics.
 const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
-const SPEED_PAPER = num('speedpaper', 0) > 0;
-const SPEED_CONTACT = num('speedcontact', 0) > 0;
+// Exact CPU and GPU speed switches (SPEED2, SPEED3): byte-identical paintings, on by default; pass 0 to disable each.
+const SPEED_PAPER = num('speedpaper', 1) > 0;
+const SPEED_CONTACT = num('speedcontact', 1) > 0;
 const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
-const SPEED_VALUE_ONLY = num('speedvalueonly', 0) > 0;
-const SPEED_COVERAGE = num('speedcoverage', 0) > 0;
+const SPEED_VALUE_ONLY = num('speedvalueonly', 1) > 0;
+const SPEED_COVERAGE = num('speedcoverage', 1) > 0;
 setSweepIntervals(SPEED_COVERAGE);
-const SPEED_FLOW_RECT = num('speedflowrect', 0) > 0;
+const SPEED_FLOW_RECT = num('speedflowrect', 1) > 0;
 setFlowRectangle(SPEED_FLOW_RECT, num('speedprofile', 0) > 0 ? ({ milliseconds }) => SPEED_PROFILE?.add('painting:flow-field', milliseconds) : null);
-const SPEED_FILM = num('speedfilm', 0) > 0;
-const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 0) > 0;
+const SPEED_FILM = num('speedfilm', 1) > 0;
+const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 1) > 0;
 const measurePaper = (target, cells, paperOnly = false) => physicalMeasurePaper(target, cells, paperOnly, { uniform: SPEED_UNIFORM_PAPER });
 const liftResist = target => {
   const started = performance.now();
@@ -223,7 +224,7 @@ process.env.GPU_EDGE_PINGPONG = String(num('speededge', 1));
 // 1: fused single-workgroup wet frontier; 0: parallel three-dispatch build.
 // Both construct the same active tile set and retain the same cell arithmetic.
 process.env.GPU_SPARSE_ALL = String(num('speedfrontier', 1));
-process.env.GPU_SKIP_ZERO_LAYER = String(num('speedemptylayers', 0));
+process.env.GPU_SKIP_ZERO_LAYER = String(num('speedemptylayers', 1));
 // Parallel optics improved the 540-cell runs; native-size trials showed no gain.
 const SPEED_RENDER_THREADS = Math.max(1, Math.min(16, Math.floor(num('speedrenderthreads', opt('gpu', 'auto') === 'off' || num('width', 700) > 540 ? 1 : Math.min(4, availableParallelism())))));
 process.env.KM_PARALLEL_CELLS = SPEED_RENDER_THREADS > 1 ? '1' : '0';

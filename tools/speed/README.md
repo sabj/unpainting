@@ -11,6 +11,19 @@ The GPU switches default to 1; pass 0 to disable each independently. Rendering t
 - `--speedscan 1`: fuse cell finalization and active wet-tile scanning on GPUs with at least 13 storage-buffer bindings. Smaller adapters keep separate kernels.
 - `--speedtransfers 1`: use the existing tracked CPU fallback transfer path without selecting Fast physics.
 
+These exact switches are also on by default. Each keeps the painting byte-identical; pass 0 to disable it. SPEED3 measured native Mittens with the CPU switches at 162.6 s before and 148.6 s after, with the same PNG. The harvest of 10-13 rendered Mittens, Overlook, Yale h36a and Flatiron at 540 cells, seed 0, with all eight on: every painting matched the off render byte for byte.
+
+- `--speedcontact 1`: reuse value-contact scratch masks and build the neighbour halo by row.
+- `--speedvalueonly 1`: skip the legacy block plan that value planning replaces.
+- `--speedcoverage 1`: rasterize sweep coverage as exact row unions and reuse graded overlap counts.
+- `--speedflowrect 1`: compute slow flow fields only over their nonzero support rectangle.
+- `--speedfilm 1`: remove masking film by plane.
+- `--speeduniformpaper 1`: skip water allocation and sorting for uniform measured paper footprints.
+- `--speedpaper 1`: read back only the water and saturation planes from the GPU for value-plan paper observations.
+- `--speedemptylayers 1`: skip verified empty pigment planes when the GPU link rebuilds the fixed bed.
+
+`--speedvaluecache 1` (setup reuse across jobs) and `--speedopticalgpu 1` (changes output by up to 54/255) stay off.
+
 `node tools/speed/compare.mjs BASE.png CANDIDATE.png OUT` writes exact PNG hashes, maximum and mean channel differences, native side-by-side images, absolute differences and differences amplified ten times. `OUT/index.html` displays the paintings at one image pixel per CSS pixel without downscaling.
 
 `python3 tools/speed/run-pair.py CONFIG.json` runs trusted committed archives sequentially on the same sweep box, records wall times and PNG hashes, and removes frame payloads and code copies after each run. The config names a new output root, the box's `node_modules`, a prepared sweep job's `in` directory, its image filename, width, and runs with `name`, `archive`, `commit` and optional `args`. Include `tools`, `src`, `data`, `examples` and `package.json` in each archive. Run under the sweep lease's cost and lifetime limits. Do not compare timings from different boxes as a controlled speedup.
