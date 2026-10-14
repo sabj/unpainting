@@ -146,8 +146,6 @@ Modules:
 - `techniques/face-detail.mjs` (`--facedetail 1`): eyes, lids, nostrils and mouth with a small nib.
 - `techniques/face-planes.mjs` (`--faceplanes 2|3`): the face as two or three soft value planes.
 - `techniques/lit-planes.mjs` (`--litplanes`): skin cut into lit, half and shadow planes.
-- `techniques/passages/architecture-plan.mjs` (helper): architecture regions from reference polygons.
-- `techniques/passages/architecture.mjs` (`--passages architecture`): building and sky planes.
 - `techniques/passages/dog.mjs` (`--passages dog`): a dark-coated dog with edge flicks.
 - `techniques/passages/foliage.mjs` (`--passages foliage`): a hillside of bushes, light to dark and broken.
 - `techniques/passages/sand.mjs` (`--passages sand`): a pale warm wash with dry-brush drags.
@@ -181,8 +179,6 @@ Default recipe flags, with the off value, the images they were fitted on and the
 
 Modules:
 
-- `tuned/architecture-clouds.mjs` (`--passages architecture`): cirrus clouds lifted from a wet sky. Architecture photograph; high.
-- `tuned/architecture-reference.plan.json` (`--architectureplan`): polygons for the architecture passage. Only useful for that photograph.
 - `tuned/default-flags.mjs` (`--recipe default|v096` and explicit presets): the tuned flags above. Mostly Y1.
 - `tuned/dog-coats.mjs` (`--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.

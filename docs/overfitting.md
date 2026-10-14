@@ -61,8 +61,6 @@ Three groups: flags that V096 ran on every subject, opt-in modules, and lookups 
 | Paint-owned residual | `tuned/paint-owned-residual.mjs` | One private image | Moves detail residual into the wash inside authored polygons. | `--modpaintplanes <file>` | Low: needs an authored file. |
 | Dog coats | `tuned/dog-coats.mjs` | 2W, private dry-coat photos | Wet and dry curly coat presets. | `--dogpaint`, `--dogcoat` | Medium: both assume a black curly coat. |
 | Olive families | `tuned/olive-families.mjs` | One olive study, checked on 2W | Colour group rules for the tree layers passage. | `--passages treelayers` | Medium: hard colour rules with no flag. |
-| Architecture clouds | `tuned/architecture-clouds.mjs` | A private architecture photograph | Cirrus lifted with tissue. | `--passages architecture` | High for other skies. |
-| Architecture plan | `tuned/architecture-reference.plan.json` | The same photograph | Polygons and colour filters. | `--architectureplan` | Only useful for that photograph. |
 | Mass plan | `tuned/mass-plan.mjs` | The Mona Lisa layout | Named masses, order and edges for oil. | `--medium oil`, `--massplan 1` | High for other layouts. |
 | Style cuts | `tuned/style-cuts.mjs` | About 40 artworks with benchmark pieces | Thresholds for the practice planner's ink and dry brush. | `--practice 1`, `--modulate 1`, `--drawinglogic 3` | Low to medium. |
 | Sand sizes | `techniques/passages/sand.mjs` | One beach crop | Mark sizes scaled from a 192-cell region. | `--passages sand` | Medium. |
