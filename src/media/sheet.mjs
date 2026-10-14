@@ -850,7 +850,7 @@ export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4
 // A dry that reaches its step limit with water still on the sheet does not stop the painting (--strict 1 restores the
 // stop): the water left stands where it is and dries there, with no more flow, and the event is counted (src/media/checks.mjs).
 // On the GPU the worker does the same when the dry is sent with allowWet; with --strict it throws there instead.
-export const DRY_LIMIT = 'Sheet is still wet after dry() limit';
+const DRY_LIMIT = 'Sheet is still wet after dry() limit';
 function wetness(sheet) {
   let wetCells = 0, water = 0;
   for (let i = 0; i < sheet.n; i++) { if (sheet.M[i] || sheet.s[i] > 0.02 * sheet.paper.capacity[i]) wetCells++; water += sheet.W[i] + sheet.s[i]; }
