@@ -4,7 +4,7 @@ Releases are plain semver, with a git tag per release. Each release names its pa
 
 ## 0.2.0-rc.1 - unreleased
 
-Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publication.
+Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publication yet; it lives on the [`wip/0.2`](https://github.com/sabj/unpainting/tree/wip/0.2) branch.
 
 - Port consolidated linework, linked pencil/opening/finish stages, structural planning and ink/wash consistency tools onto the squashed public history. Preserve long-line ink delivery and replay order.
 - Isolate fitted settings in named presets and add explicit source-line routing. The release default retains the V096 compatibility recipe after held-out regressions; use the v0.1.0 tag for exact historical simulation.
@@ -16,7 +16,7 @@ Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publicat
 
 ## 0.1.0 - 2026-10-10
 
-Release 0.1.0: painter V096, sim 100. All published benchmark rounds V1-V5 use it. Tag `v0.1.0`. Sim 100 is an estimate of past simulation revisions.
+Release 0.1.0: painter V096, sim 100. All published benchmark rounds V1-V5 use it. Tag [`v0.1.0`](https://github.com/sabj/unpainting/tree/v0.1.0). Sim 100 is an estimate of past simulation revisions.
 
 - Every painting records `release`, `painterVersion`, `simVersion` and `commit` in `frames.json` and `backend.json`, and prints them at the start of a run.
 - Every benchmark run.json records the same fields. results.json groups each round's tries by painter and sim version, labelled with the release, and the leaderboard and gallery show all three. To benchmark a newer painter or sim, rerun V4 or V5 with it.
