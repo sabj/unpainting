@@ -63,7 +63,7 @@ export function preparePassageBed({ observe, wet, pickup, advance = null, maxAct
   for (let attempt = 0; attempt < maxActions; attempt++) {
     if (paper.moistShare >= .7 && paper.waterMax <= .15) return { paper, actions };
     const before = paper;
-    if (paper.waterMax > .15) {
+    if (paper.moistShare >= .7 && paper.waterMax > .15) {
       pickup();
       paper = observe();
       actions.push({ operation: 'pick up excess surface water', before, after: paper });
