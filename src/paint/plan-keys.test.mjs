@@ -11,14 +11,14 @@ const root = fileURLToPath(new URL('../..', import.meta.url));
 
 test('keys nothing reads are reported at every level, notes are not', () => {
   const plan = {
-    subject: 'x', rationale: 'why', sheet: { widthMm: 152.4 },
+    subject: 'x', rationale: 'why', sheet: { widthMm: 152.4, seed: 0, targetGuard: 'strict', dpi: 300 },
     families: [{ id: 'a', bounds: [0, 0, 1, 1], referenceCue: 'fur', looseness: 1 }, { id: 'b', looseness: 2 }],
     reserves: [{ bounds: [0, 0, .1, .1], reason: 'glint', id: 'r1' }],
     styleSelection: { style: 'ink-and-wash', reason: 'pen', regions: { a: { style: 'atmospheric-wet', reason: 'sky', mood: 1 } } },
     drawing: { source: 'source-ink', authored: [], ink: { color: 'black' }, stages: { prep: { amount: .3, frames: [1, 2, 3] }, finishInk: { hatch: { budget: 9, angle: 4 } } } },
     order: { subjects: [{ id: 'cat', families: ['a'], reason: 'first' }], strength: .5 },
   };
-  assert.deepEqual(unusedPlanKeys(plan, { pipeline: true }), ['sheet', 'families[].looseness', 'reserves[].id', 'styleSelection.regions.a.mood',
+  assert.deepEqual(unusedPlanKeys(plan, { pipeline: true }), ['sheet.dpi', 'families[].looseness', 'reserves[].id', 'styleSelection.regions.a.mood',
     'drawing.authored', 'drawing.stages.finishInk.hatch.angle']);
 });
 

@@ -103,6 +103,7 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 | `presets` | array of preset names from `src/paint/tuned/presets.mjs` (`architecture`, `glaze-gains`, `trumbull`, `trumbull-paints`, `portrait-3t`, `dog-1d`); their flags go after the recipe's, and an unknown name stops the run ([overfitting.md](overfitting.md)) | no presets |
 | `name` | string for the preview title | preview fallback title |
 | `photo` | source photo label in the preview; only its basename is used, and no photo is read | `unknown` |
+| `sheet` | optional `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match `--sheetmm` when both are given; `seed` and `targetGuard` set defaults | command-line or painter defaults |
 | `families` | array of descriptive region families, described below | empty array |
 | `reserves` | array of explicit bare-paper highlights, described below | empty array |
 | `styleSelection` | object with `style`, `reason` and optional `regions` | subject mapping, when present |
