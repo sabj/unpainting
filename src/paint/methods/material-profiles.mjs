@@ -2,7 +2,6 @@
 import { strongestShare } from '../drawing-plan.mjs';
 import { drawGestures, dryPenGate } from '../../media/draw.mjs';
 import { pencilDraw } from './pencil-line.mjs';
-import { TUNED_DRAWING_CAPS } from '../tuned/drawing-caps.mjs';
 const pigment = (name, K, omega = 60) => Object.freeze({name,K,S:[.02,.02,.02],rho:.05,omega,gamma:0});
 const MATERIAL_PROFILES = Object.freeze({
  'sepia-ink': {pigment:pigment('sepia ink',[.396,.481,.619],1.4),rewets:true,widthMm:[.12,.45],pressureExponent:1.2,concentration:4,kind:'ink'},
@@ -15,23 +14,22 @@ const MATERIAL_PROFILES = Object.freeze({
 });
 for(const p of Object.values(MATERIAL_PROFILES)){p.paperResponse=p.kind==='ink'?'crisp on dry; capillary bleed on damp':'dry deposition on tooth; fixed under washes';p.registration='source drawing points in sheet coordinates; no added paths';Object.freeze(p);}
 export function materialProfile(name){const p=MATERIAL_PROFILES[name];if(!p)throw Error(`No drawing material profile: ${name}`);return p;}
-const SUBJECT_CAPS=Object.freeze({default:{opening:{lines:12,pressure:.3,minLengthMm:8},closing:{lines:24,pressure:.4,edgeMin:.22}},...TUNED_DRAWING_CAPS});
-// The drawing caps for a stage from a named caps set (--drawsubject, set by a preset); unknown names get the default caps.
-export function drawingCaps(name,stage){return (SUBJECT_CAPS[name]??SUBJECT_CAPS.default)[stage];}
+// The sparse caps on each drawing stage. Every subject gets the same caps; flags and the plan override them.
+const DRAWING_CAPS=Object.freeze({opening:Object.freeze({lines:12,pressure:.3,minLengthMm:8}),closing:Object.freeze({lines:24,pressure:.4,edgeMin:.22})});
 // An ink drawing already has a source/plan budget. Sparse construction-sketch caps
 // must not discard its short descriptive marks. Explicit caps still win.
 // Closing ink restates a few edges over the dried washes; at full pressure it outweighs the drawing under it. A plan
 // or flag that asks for more (--closingpressure) still gets it.
 export const CLOSING_PRESSURE_MAX=.6;
-export function sourceDrawingCaps({medium,stage='opening',subject='default',sourceInk=false,plannedDrawing=false}) {
- const sparse=drawingCaps(subject,stage);
+export function sourceDrawingCaps({medium,stage='opening',sourceInk=false,plannedDrawing=false}) {
+ const sparse=DRAWING_CAPS[stage];
  if(plannedDrawing && stage==='opening' && materialProfile(medium).kind==='graphite') return {...sparse,lines:100000,minLengthMm:.5};
- return sourceInk && materialProfile(medium).kind==='ink' && (subject==='default'||!Object.hasOwn(SUBJECT_CAPS,subject))
+ return sourceInk && materialProfile(medium).kind==='ink'
   ? {...sparse,lines:100000,pressure:stage==='closing'?CLOSING_PRESSURE_MAX:.75,minLengthMm:0,edgeMin:0}
   : {...sparse};
 }
-export function prepareDrawing(gestures,{medium,stage='opening',subject='default',mmPerCell,edgeStrength,w,h,state={used:0},caps,sourceInk=false}){
- const profile=materialProfile(medium),cap={...sourceDrawingCaps({medium,stage,subject,sourceInk}),...caps};
+export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeStrength,w,h,state={used:0},caps,sourceInk=false}){
+ const profile=materialProfile(medium),cap={...sourceDrawingCaps({medium,stage,sourceInk}),...caps};
  if(!cap||!['opening','closing'].includes(stage)||!(mmPerCell>0)||!Number.isFinite(cap.lines)||cap.lines<0||!Number.isFinite(cap.pressure)||cap.pressure<0||cap.pressure>1)throw Error('Invalid drawing stage/physical scale');
  const at=p=>edgeStrength?.[Math.max(0,Math.min(h-1,Math.round(p.y)))*w+Math.max(0,Math.min(w-1,Math.round(p.x)))];
  const out=[];
@@ -48,10 +46,10 @@ export function prepareDrawing(gestures,{medium,stage='opening',subject='default
  }
  return out;
 }
-export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',subject,mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},...opts}){
+export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},...opts}){
  const profile=materialProfile(medium),k=sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
  if(k<0)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
- const selected=prepareDrawing(gestures,{medium,stage,subject,mmPerCell,edgeStrength,w,h,state,caps,sourceInk});
+ const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,w,h,state,caps,sourceInk});
  const dryGate=dryPenGate({O,audit});
  const gate=event=>{
   if(dryInk||profile.kind==='graphite')dryGate(event);

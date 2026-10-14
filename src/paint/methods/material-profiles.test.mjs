@@ -26,7 +26,7 @@ test('graphite pressure remains absolute instead of normalizing every stroke to 
 
 test('source ink keeps short descriptive lines while graphite stays sparse',()=>{
  const strokes=Array.from({length:40},(_,i)=>({points:[{x:2,y:i+2},{x:5,y:i+2}]}));
- const opts={medium:'sepia-ink',sourceInk:true,subject:'unseen-study',mmPerCell:.5,w:50,h:50};
+ const opts={medium:'sepia-ink',sourceInk:true,mmPerCell:.5,w:50,h:50};
  assert.equal(prepareDrawing(strokes,opts).length,40);
  assert.equal(prepareDrawing(strokes,{...opts,medium:'graphite-HB'}).length,0);
  assert.equal(prepareDrawing(strokes,{...opts,caps:{lines:7}}).length,7);

@@ -6,7 +6,10 @@ Some painter settings were fitted by self study on a few benchmark images, mostl
 
 - The default recipe (`src/paint/recipe.mjs`; also `--recipe general` or `combined`) sets only general methods: value planning from light to dark, shaped marks, four middle layers, two touch-up rounds, a drawing first (the plan chooses any closing pass), physical cold-press paper. No value in it was fitted to one image.
 - Fitted settings live in `src/paint/tuned/` and run through the compatibility recipe or a named preset (`src/paint/tuned/presets.mjs`). A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe general+architecture`.
-- No painting code outside `src/paint/tuned/` checks a subject id. Rules fitted to one subject are switched by a flag (`--drawsubject`). The `--portraitrules` rules were removed: the lower-face stubble box, the jaw-band ink skip and the colour trace window. The `--trumbullrules` rules were removed: the 55:45 ultramarine shadow glaze and its violet lift, warm-stone dry brush, the first-ink skips and the per-shape stone and leaf mixes.
+- No painting code outside `src/paint/tuned/` checks a subject id, and no flag turns on a rule fitted to one subject. These per-subject switches were removed:
+  - `--trumbullrules`: the 55:45 ultramarine shadow glaze and its violet lift, warm-stone dry brush, the first-ink skips and the per-shape stone and leaf mixes (Y1).
+  - `--portraitrules`: the lower-face stubble box, the jaw-band ink skip and the colour trace window (3T).
+  - `--drawsubject`: drawing caps fitted on 3T and 1D.
 - `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject. It applies no preset by subject id. Use the v0.1.0 tag for exact historical simulation output.
 - `src/paint/overfit.test.mjs` fails if the general recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
 
@@ -23,7 +26,7 @@ Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbu
 
 ## Inventory
 
-Four groups: flags that V096 ran on every subject, rules that checked a subject id, opt-in modules, and lookups or harnesses. "Where" paths are under `src/paint/` unless they start with `tools/` or `bench/`. Risk is for images the item was not fitted on.
+Three groups: flags that V096 ran on every subject, opt-in modules, and lookups or harnesses. "Where" paths are under `src/paint/` unless they start with `tools/` or `bench/`. Risk is for images the item was not fitted on.
 
 ### V096 default flags, now in presets
 
@@ -48,13 +51,6 @@ Four groups: flags that V096 ran on every subject, rules that checked a subject 
 | `--recessshare .75` | `methods/light-to-dark.mjs` | Y1 | Each recess layer carries 0.75 of the demand. | `architecture`, v096 | Low: needs `--recesses`. |
 | `--recessclean 1` | `methods/light-to-dark.mjs` | Y1 | No light wash under recesses. | `architecture`, v096 | Low: needs `--recesses`. |
 | `--texvariety 0.8` | `techniques/shaped-marks.mjs` | Y1 stone, 3T stubble | Varies short texture marks. | `architecture`, v096 | None: the value planner no longer lays texture passages. |
-
-### Rules that checked a subject id, now behind a preset flag
-
-| Item | Where | Fitted on | What it does | Switched on by | Risk |
-|---|---|---|---|---|---|
-| Drawing caps for 3T | `tuned/drawing-caps.mjs`, `methods/material-profiles.mjs` | 3T | 18 opening lines at pressure 0.25, 16 closing at 0.32. | `--drawsubject 3T` (`portrait-3t`) | Low. |
-| Drawing caps for 1D | `tuned/drawing-caps.mjs` | 1D | 12 opening lines at 0.28, 20 closing at 0.35. | `--drawsubject 1D` (`dog-1d`) | Low. |
 
 ### Opt-in tuned modules, unchanged
 

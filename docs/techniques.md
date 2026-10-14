@@ -186,7 +186,6 @@ Modules:
 - `tuned/architecture-reference.plan.json` (`--architectureplan`): polygons for the architecture passage. Only useful for that photograph.
 - `tuned/default-flags.mjs` (`--recipe default|v096` and explicit presets): the tuned flags above. Mostly Y1.
 - `tuned/dog-coats.mjs` (`--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium.
-- `tuned/drawing-caps.mjs` (`--drawsubject`): per-subject pen line limits. subject-c, subject-a; low.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
 - `tuned/modulation-anatomy.mjs` (`--modanatomy <file>`): skin and fur regions for modulation. subject-c; low.
 - `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.

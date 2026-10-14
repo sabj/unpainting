@@ -15,7 +15,7 @@ import {scaleDrawingGestures} from '../src/paint/methods/drawing-hand.mjs';
 import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
 import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
 import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
-import {materialProfile,drawMaterial,prepareDrawing,drawingCaps,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
+import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
 import {passageBrushPaths} from '../src/paint/methods/passage-brush.mjs';
 import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
@@ -1344,7 +1344,7 @@ check('semantic material gate failed',false,{pass:a.key,paper});}
 };
 const pencilDraw=(target,gs,pigment,options)=>{
  const recorded=num('recordgraphite',0)>0||!!opt('preparationbinding','');
- const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:drawingCapsFor(AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,
+ const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:drawingCapsFor(AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,
   ...(recorded?{graphiteExecute:(sh,paths,k,profileOptions)=>recordGraphiteBatch({sheet:sh,strokes:paths,pigment:k,options:{...profileOptions,seed:options.seed},material:SHEET_PIGS[k],source:{binding:opt('preparationbinding','')||null,target:opt('image',''),guide:opt('penpencil',''),drawing:opt('drawingfile',''),frame:[target.w,target.h],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)},execute:physicalPencilDraw,observe:measurePaper,record:r=>fs.appendFileSync(path.join(out,'preparation-graphite.jsonl'),JSON.stringify(r)+'\n')})}: {})});
  if(!AREA_PLAN)return execute(gs);
  let cells=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,AREA_DRAW_STAGE,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('actual dry graphite',{geometry:g.gesture.points,options,drawingRole:g.area.drawingRole,material:GRAPHITE_PROFILE},()=>execute([g.gesture]));cells+=r.cellsLaid??r.cells??0;}AREA_EXEC.set(null);return {cellsLaid:cells};};
@@ -1458,8 +1458,6 @@ const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 const TARGET_DRAW_EDGE=new Float32Array(N2);
 for(let y=1;y<H2-1;y++)for(let x=1;x<W2-1;x++){const i=y*W2+x;const lum=j=>{const sx=Math.min(w-1,Math.floor((j%W2)*w/W2)),sy=Math.min(h-1,Math.floor(Math.floor(j/W2)*h/H2)),k=3*(sy*w+sx);return (px[k]+px[k+1]+px[k+2])/765;};TARGET_DRAW_EDGE[i]=Math.min(1,Math.hypot(lum(i+1)-lum(i-1),lum(i+W2)-lum(i-W2)));}
 const DRAW_MATERIAL_STATE={opening:{used:0},closing:{used:0}};
-// --drawsubject <caps set>: drawing caps fitted on one subject (src/paint/tuned/drawing-caps.mjs), set by its preset.
-const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSubject(),stage);
 // Use one policy in planning and execution. The source's own ink is drawn with its short descriptive marks when the
 // plan says the target is drawn in pen: a pen-and-wash style, an ink medium in its drawing section, or a prepared line
 // file of the target's pen lines (--drawingfile). A painted target with no such plan keeps the sparse caps, since the
@@ -1468,13 +1466,13 @@ const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSub
 const sourceInkDrawing = () => OUTLINE.medium === 'ink' && (opt('sourceink', '') !== '' ? num('sourceink', 0) > 0
   : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', ''));
 const drawingCapsFor = (stage, graphite = false) => {
- const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,subject:drawSubject(),sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
+ const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
  return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
   ...(stage==='opening'?{minLengthMm:num('openingminmm',defaults.minLengthMm)}:{edgeMin:num('closingedgemin',defaults.edgeMin)})};
 };
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
-  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
+  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
@@ -2337,7 +2335,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
   let scaled = scaleDrawingGestures(kept, SC).map((g,i)=>({...g,ml:!!g.ml,draw:!inkVerdict||inkVerdict[i].kept}));
-  scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
+  scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
   const press = penWant !== 'glaze' ? field : Float32Array.from(field, (v, i) => v * Math.max(num('penfloor', 0.2), Math.min(1, (DRAW_SOURCE[i] - planD[i]) / Math.max(1e-3, DRAW_SOURCE[i]))));
