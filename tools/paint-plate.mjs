@@ -2096,7 +2096,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     : budgeted;
   // The pen follows the subject, else the finish field, as the washes do. Ground texture is a cross hatch,
   // never a traced contour.
-  const PEN_FIELD = SUBJECT ?? FINISH;
+  const PEN_FIELD = SUBJECT ?? (!first ? FINISH : null);
   const penKeep = PEN_FIELD ? (g => { let inside = 0; for (const q of g.points) { const x = Math.min(w - 1, Math.max(0, Math.round(q.x))), y = Math.min(h - 1, Math.max(0, Math.round(q.y))); if (PEN_FIELD[y * w + x] >= num('pendrawat', 0.5)) inside++; } return inside >= g.points.length * num('penkeep', 0.5); }) : null;
   // --drawingfile <base>: the first pen draws a selected drawing whole, in strokes of a person's length, and nothing
   // the walker found (src/paint/methods/drawing-file.mjs)
@@ -2485,8 +2485,10 @@ if (opt('passages', '').split(',').includes('treelayers') || num('inkofftrees', 
 // --touchpoints R: once the planned passes are laid, R rounds comparing each planning shape's mean with the reference (TARGET_GUARD.look).
 // A shape that reads lighter gets one corrective glaze; only deficits are glazed, nothing is read cell by cell.
 const TP_ROUNDS = Math.max(0, Math.round(num('touchpoints', 0)));
-let TP_SHAPES = null;
+let TP_SHAPES = null, TOUCH_ROUND_MASS = 0;
 if (TP_ROUNDS > 0) {
+  TOUCH_ROUND_MASS = num('touchbudget', 0.05) * plannedMass;
+  plannedMass += TOUCH_ROUND_MASS * TP_ROUNDS;
   const { planningShapes, lineMask } = await import('../src/paint/methods/shape-refit.mjs');
   const lf = v => (!v ? null : v.includes('/') ? path.resolve(root, v + '-lines.json') : path.resolve(root, 'work/lines', v + '-lines.json'));
   const PENCELLS = lineMask([...new Set([lf(opt('drawingfile', '')), lf(opt('drawinglast', ''))])], w, h, { pad: Math.round(num('touchlinepad', 1)), fs });
@@ -2776,22 +2778,40 @@ if(MOD?.paintOwnedTransfer){
 }
 if(FINISH_PLAN){const appended=appendFinishingLayers(layers,FINISH_COMPILED);FINISH_START=appended.start;layers=appended.layers;validateCompiledAreaStop(opt('areastop',''),FINISH_COMPILED.layers);}
 if(opt('receiverobserver','')){if(!MAJOR_INTENT||AREA_PLAN)throw Error('receiverobserver requires original numeric major route');const doc=JSON.parse(fs.readFileSync(path.resolve(root,opt('receiverobserver','')),'utf8'));if(opt('majorstop','')!=='pass:'+doc.pass)throw Error('receiverobserver requires its existing pass checkpoint');RECEIVER_OBSERVER=createReceiverObserver(doc,{out,w:W2,h:H2,targetSHA:crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex'),coherent,render});}
+const Y_OD = [0.2126, 0.7152, 0.0722];
+const lumOf = v => v.reduce((s, x, q) => s + Y_OD[q] * x, 0);
 const touchCorrections = round => {
   dry(sheet, 20000, O, { levelMax: 200 });
   const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), byPig = PIGS.map(() => []), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
-  let looked = 0, glazed = 0;
+  const dmin = num('touchdmin', 0.06), ymin = num('touchymin', 0.025), pmin = num('touchpigmin', 0.012), gain = num('touchgain', 0.65);
+  const cands = []; let looked = 0;
   TP_SHAPES.forEach((t, k) => {
     const lk = TARGET_GUARD.look('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
-    if (Math.max(...d) < num('touchdmin', 0.04)) return;
-    const a = unmix(Float32Array.from(d), 1, Ks); let any = false;
-    for (let j = 0; j < PIGS.length; j++) if (a[j] > 0.004) { const amt = a[j] * num('touchgain', 0.8), sh = { mask: t.mask, area: t.area, amount: amt, mix: PIGS.map((_, q) => (q === j ? amt : 0)) }; TECHNIQUE.set(sh, TECHNIQUE.get(t)); byPig[j].push(sh); any = true; }
-    if (any) glazed++;
+    if (Math.min(...d) < dmin * 0.75 || lumOf(d) < ymin) return;
+    const a = unmix(Float32Array.from(d), 1, Ks);
+    const mix = Array.from(a, v => (v > 0.004 ? v * gain : 0));
+    const amt = mix.reduce((s, v) => s + v, 0);
+    if (!(amt > 0.004)) return;
+    const cY = mix.reduce((s, v, j) => s + lumOf(Ks[j].map(k => k * v)), 0);
+    if (cY < pmin) return;
+    const jMax = mix.reduce((best, v, j) => (v > mix[best] ? j : best), 0);
+    cands.push({ j: jMax, t, amt, mix, score: cY * t.area, mass: amt * t.area });
   });
+  cands.sort((p, q) => q.score - p.score);
+  let spent = 0; const glazedShapes = new Set();
+  for (const { j, t, amt, mix, mass } of cands) {
+    if (TOUCH_ROUND_MASS > 0 && spent + mass > TOUCH_ROUND_MASS && spent > 0) continue;
+    const sh = { mask: t.mask, area: t.area, amount: amt, mix };
+    TECHNIQUE.set(sh, TECHNIQUE.get(t)); FILM_MASS.set(sh, mass); byPig[j].push(sh);
+    spent += mass; glazedShapes.add(t);
+  }
+  plannedMass += spent - TOUCH_ROUND_MASS;
+  if (!glazedShapes.size && round < TP_ROUNDS) plannedMass -= TOUCH_ROUND_MASS * (TP_ROUNDS - round);
   const maxV = Math.max(...layers.filter(l => !l._touch).map(l => l.value || 0));
   const add = byPig.map((shapes, j) => { if (!shapes.length) return null; const tmpl = layers.filter(l => l.pigment === j && !l._touch && !l._darks && !l._detail).at(-1) ?? layers.find(l => !l._touch && !l._darks); return { ...tmpl, pigment: j, value: maxV + round, shapes, _touched: round }; }).filter(Boolean);
-  console.log(`touchpoint ${round}: looked at ${looked} shapes, ${glazed} lighter than the reference get a corrective glaze (${add.reduce((a, l) => a + l.shapes.length, 0)} passages over ${add.length} pans)`);
+  console.log(`touchpoint ${round}: looked at ${looked} shapes, ${glazedShapes.size} lighter than the reference get a corrective glaze (${add.reduce((a, l) => a + l.shapes.length, 0)} passages over ${add.length} pans)`);
   return add;
 };
 if (TP_SHAPES) layers.push({ _touch: 1, shapes: [], value: 0, pigment: 0 });
@@ -2805,7 +2825,7 @@ const finalDarks = () => {
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
     if (Math.max(...d) < num('fddmin', 0.06)) return;
     const a = unmix(Float32Array.from(d), 1, Ks); let any = false;
-    for (let j = 0; j < PIGS.length; j++) if (a[j] > 0.004) { const amt = a[j] * num('fdgain', 1), sh = { mask: t.mask, area: t.area, amount: amt, mix: PIGS.map((_, q) => (q === j ? amt : 0)) }; TECHNIQUE.set(sh, TECHNIQUE.get(t)); byPig[j].push(sh); any = true; }
+    for (let j = 0; j < PIGS.length; j++) if (a[j] > 0.004) { const amt = a[j] * num('fdgain', 1), mass = amt * t.area, sh = { mask: t.mask, area: t.area, amount: amt, mix: PIGS.map((_, q) => (q === j ? amt : 0)) }; TECHNIQUE.set(sh, TECHNIQUE.get(t)); FILM_MASS.set(sh, mass); plannedMass += mass; byPig[j].push(sh); any = true; }
     if (any) laid++;
   });
   const maxV = Math.max(...layers.filter(l => !l._touch && !l._darks).map(l => l.value || 0));

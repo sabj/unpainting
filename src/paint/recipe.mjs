@@ -17,7 +17,7 @@ const DEFAULT_RECIPE = 'default';
 // Technique rules (technique/strokes, 2026-10-13): a wash is cut at a subject edge only along a colour edge, small
 // darks are kept as deliberate marks (small lights are not: reserved in a dark coat they read as speckle), small colour-domain pieces join their neighbour's wash, and a
 // passage its sweeps only partly cover is not charged up into a blot.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 0 --washjoin 1 --undercover 0';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 1 --midlayers 8 --detailscale 0.85 --layerlocal 1 --layersmooth 0.3 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 0 --washjoin 1 --undercover 0';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
