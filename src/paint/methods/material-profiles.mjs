@@ -36,7 +36,7 @@ export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeSt
  // --drawshare (the plan's drawing.amount): the pen keeps only the strongest share of its candidate lines.
  const candidates=strongestShare(gestures,cap.share??1);
  const ordered=stage==='opening'?[...candidates].sort((a,b)=>Number(b.reviewedOrdinal!=null||b.focalFeature!=null)-Number(a.reviewedOrdinal!=null||a.focalFeature!=null)):candidates;
- for(const g of ordered){if(stage==='opening'&&(g.openingRole==='pale under-eye plane cue'||g.focalFeature?.includes('under-eye plane')))continue;if(state.used>=cap.lines)break;if(!g.points||g.points.length<2)continue;
+ for(const g of ordered){if(state.used>=cap.lines)break;if(!g.points||g.points.length<2)continue;
   let length=0;for(let i=1;i<g.points.length;i++)length+=Math.hypot(g.points[i].x-g.points[i-1].x,g.points[i].y-g.points[i-1].y)*mmPerCell;
   if(stage==='opening'&&length<cap.minLengthMm&&g.reviewedOrdinal==null&&g.focalFeature==null)continue;
   const runs=[];let run=[];

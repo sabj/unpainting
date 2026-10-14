@@ -100,7 +100,6 @@ Modules, with their flags:
 - `methods/practice-regions.mjs` (helper): practice regions bounded by the drawing's lines.
 - `methods/practice-style.mjs` (`--practice 1`): measures the target's mix of ink, dry brush, wash and paper.
 - `methods/preparation-binding.mjs` (`--preparationbinding <file>`): pencil paths from a hash-checked preparation file.
-- `methods/reviewed-whole-registration.mjs` (helper): scales a reviewed drawing onto the plan grid.
 - `methods/seg-ink.mjs` (`--segink 1`): foreground segments as the ink subject.
 - `methods/segment-washes.mjs` (`--segwash 1`): mop wash regions from labelled object regions.
 - `methods/shape-deficit.mjs` (always on): charges each passage from its whole shape's colour difference.
@@ -190,7 +189,6 @@ Modules:
 - `tuned/modulation-anatomy.mjs` (`--modanatomy <file>`): skin and fur regions for modulation. subject-c; low.
 - `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.
 - `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
-- `tuned/portrait.mjs` (value plan subject subject-c): constants for the subject-c portrait. subject-c; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `tuned/trumbull.mjs` (`architecture` preset or compatibility recipe): recess, wall and ground constants. Y1, subject-e; high.
 

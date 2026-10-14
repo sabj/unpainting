@@ -140,7 +140,6 @@ import { versionStamp, versionLine } from '../src/painter-version.mjs';
 import { pigmentPhysics } from '../src/paint/methods/pigment-physics.mjs';
 import { segmentInk } from '../src/paint/methods/seg-ink.mjs';
 import { mlLines } from '../src/paint/methods/ml-lines.mjs';
-import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/methods/drawing-logic.mjs';
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
@@ -423,8 +422,6 @@ const PAPER_DECLARED = opt('paperrgb', '') === 'source' ? PAPER_PICK.paperRGB : 
 if (PAPER_AUTO) console.log(`paper: auto sheet ${PAPER_AUTO.join('/')} from the largest bright region ${PAPER_EST ? PAPER_EST.rgb.map(v => v.toFixed(0)).join('/') + ' (' + (100 * PAPER_EST.cells / (w * h)).toFixed(1) + '% of the sheet)' : 'none (under 1%)'}`);
 if (PAPER_DECLARED && (PAPER_DECLARED.length !== 3 || PAPER_DECLARED.some(v => !(v > 0 && v <= 255)))) throw Error('--paperrgb needs three values in 1..255');
 const { lightest, white: whitePaper } = PAPER_PICK, paperRGB = PAPER_DECLARED ?? PAPER_PICK.paperRGB;
-if(opt('revieweddrawingcrop',''))await prepareReviewedCropDrawing(opt('revieweddrawingcrop',''),paperRGB);
-if(opt('reviewedwholebinding',''))await prepareReviewedCropDrawing(opt('reviewedwholebinding',''),paperRGB);
 if (whitePaper) console.log(`paper: the lightest tenth reads ${lightest.map(v => v.toFixed(0)).join('/')}, painting on white paper`);
 // --palettefrom file: fit the pans to this artwork and paint the photograph with them; content still comes from the photograph.
 // --washsplat 1: loaded wash brushes (capacity 50+, dip 0.3+) lay soft round splats instead of hairs (src/media/brush.mjs). Default off.
@@ -2763,7 +2760,6 @@ if(AREA_PLAN && PEN_FIRST && opt('draw','1')!=='0' && DRAWING!=='none'){
    guide:guide?{path:path.resolve(root,guide),sha256:sha256(path.resolve(root,guide))}:null,
    trace:traceFile&&fs.existsSync(traceFile)?{path:traceFile,sha256:sha256(traceFile)}:null,
    material:PENCIL?'physical dry graphite':'existing production outline material',
-   reviewedStrategy:reviewedOpeningStrategy(base,opt),
    drawingCommands:AREA_EXEC.records.filter(r=>r.operation==='actual dry graphite'||r.operation==='physical pen gesture'),
    prepfadeRequested:num('prepfade',0)>0,closingInkExecuted:false,paintExecuted:false,backend:GPU_INFO
   },null,2));

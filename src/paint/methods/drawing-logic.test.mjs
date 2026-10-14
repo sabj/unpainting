@@ -104,78 +104,6 @@ test('splitForm: every short line on the face is a feature, ahead of higher-cont
   assert.deepEqual(form.map(g => g.index).sort(), [2, 3]);
 });
 
-import fs from 'node:fs';
-import { reviewedFaceFeatures, drawingLogic } from './drawing-logic.mjs';
-import { scaleLines } from '../../crop/lines.mjs';
-// A face region in normalised coordinates, as a reviewed subject file gives it.
-const facePoly = [[0.5,0.33],[0.58,0.3],[0.7,0.3],[0.82,0.32],[0.88,0.38],[0.86,0.5],[0.8,0.6],[0.72,0.66],[0.62,0.66],[0.54,0.6],[0.5,0.5]];
-// The reviewed subject, its trace and its target are private and stay outside the repository.
-const subjectPath = new URL('../../../work/subjects/portrait.json', import.meta.url);
-test('reviewed focal path selection preserves geometry and measured weight, validates region and cap', () => {
-  const g = line(60, 50, 65, 50, 6, { length: 5, weight: .2 });
-  const instruction = { maxPaths: 1, features: [{ ordinal: 0, name: 'lid' }] };
-  const selected = reviewedFaceFeatures([g], instruction, { w: 100, h: 100, facePoly });
-  assert.equal(selected[0].object, 'face');assert.equal(selected[0].points, g.points);assert.equal(selected[0].weight, .2);
-  assert.throws(() => reviewedFaceFeatures([line(0, 0, 5, 0, 6, {length:5})], instruction, {w:100,h:100,facePoly}), /outside its registered face/);
-  assert.throws(() => reviewedFaceFeatures([g], {...instruction,maxPaths:0}, {w:100,h:100,facePoly}), /capped path count/);
-});
-// The private subject file names its own trace and target, so nothing private is named here.
-const privateSubject = fs.existsSync(subjectPath) ? JSON.parse(fs.readFileSync(subjectPath)).drawingFeatures : null;
-const traceBase = privateSubject?.traceBase ?? '';
-const targetFile = privateSubject?.target?.path ?? '';
-const tracePath = new URL(`../../../work/lines/${traceBase}-lines.json`, import.meta.url);
-const targetPath = new URL(`../../../${targetFile}`, import.meta.url);
-test('reviewed subject lids, irises and under-eye paths survive capped selection; other face texture remains sparse', {skip:!privateSubject||!fs.existsSync(tracePath)||!fs.existsSync(targetPath)}, async () => {
-  const sharp = (await import('sharp')).default;
-  const doc = JSON.parse(fs.readFileSync(tracePath));
-  const portrait = JSON.parse(fs.readFileSync(subjectPath)), instruction = portrait.drawingFeatures, required = new Set(instruction.features.map(f=>f.ordinal));
-  assert.equal(instruction.features.length,8);
-  for (const w of [540,1086]) {
-    const h = Math.round(w*1448/1086), K = 1;
-    const rgb = await sharp(targetPath.pathname).resize(w,h).removeAlpha().raw().toBuffer();
-    const D = Float32Array.from({length:w*h},(_,i)=>Math.max(0,-Math.log(Math.max(.02,(.2126*rgb[3*i]+.7152*rgb[3*i+1]+.0722*rgb[3*i+2])/255))));
-    const original=scaleLines(doc,w,h,{keepOrder:true});
-    const marked=reviewedFaceFeatures(original,instruction,{w,h,facePoly});
-    const ranked=rankLines(marked,{w,h,D,K});
-    const baseline=splitForm(rankLines(original,{w,h,D,K}),{cells:0,features:40});
-    const selected=splitForm(ranked,{cells:0,features:40});
-    const selectedIds=new Set(selected.form.map(g=>g.index));
-    assert.ok([...required].every(i=>selectedIds.has(i)),'each reviewed lid/iris/under-eye path reaches opening selection');
-    assert.ok(selected.form.length<=40,'focal paths displace other features instead of adding a new budget');
-    const faceTexture=ranked.filter(g=>g.tier===2&&!required.has(g.index)&&g.points.every(q=>q.x/w>.5&&q.x/w<.88&&q.y/h>.47&&q.y/h<.66));
-    assert.ok(faceTexture.some(g=>!selectedIds.has(g.index)),'unrelated lower-face texture is not retained wholesale');
-    assert.ok([...required].some(i=>!baseline.form.some(g=>g.index===i)),'actual input demonstrates the old omission');
-    for(const i of required){assert.equal(marked[i].points,original[i].points);assert.equal(marked[i].weight,original[i].weight);}
-    const options={image:targetFile,drawinglogic:1};
-    const logs=[];const gestures=drawingLogic({base:traceBase,first:true,w,h,D,cells:0,K,opt:(n,f)=>options[n]??f,num:(n,f)=>options[n]??f,log:s=>logs.push(s)});
-    assert.ok(gestures.length>0);assert.ok(logs.some(s=>s.includes('target/trace hashes matched')));
-    const deliveredPoints=new Set(gestures.flatMap(g=>g.points.map(q=>`${q.x},${q.y}`)));
-    for(const i of required){
-      if(instruction.openingPolicies?.[i]?.kind==='pale-plane'){
-        const cue=gestures.find(g=>g.reviewedOrdinal===i),sourcePoints=new Set(original[i].points.map(q=>`${q.x},${q.y}`));
-        assert.ok(cue?.points.length>=2,'pale-plane cue retains a connected original span');
-        assert.ok(cue.points.every(q=>sourcePoints.has(`${q.x},${q.y}`)),'pale-plane control only removes original geometry');
-      }else assert.ok(original[i].points.every(q=>deliveredPoints.has(`${q.x},${q.y}`)),'structural geometry survives default joining, ranking and stroke splitting');
-    }
-  }
-});
-
-import {prepareReviewedCropDrawing,projectSelectedDrawing,shapeReviewedOpening} from './drawing-logic.mjs';
-import os from 'node:os';
-import path from 'node:path';
-test('registered crop projection retains literal point lineage and role metadata',()=>{
- const source=[{reviewedOrdinal:2,openingRole:'iris',points:[{x:510,y:480,nw:1.2,s:.3,sourcePointIndex:7,contactRole:'structural iris rim'},{x:520,y:485,nw:1.8,s:.4,sourcePointIndex:8,contactRole:'upper lid wing'}]},{points:[{x:0,y:0},{x:5,y:5}]}];
- const copy=structuredClone(source),got=projectSelectedDrawing(source,{box:{left:505,top:475,width:415,height:265}});
- assert.equal(got.length,1);assert.equal(got[0].reviewedOrdinal,2);assert.equal(got[0].openingRole,'iris');
- assert.deepEqual(got[0].points,[{...source[0].points[0],x:5,y:5},{...source[0].points[1],x:15,y:10}]);assert.deepEqual(source,copy);
- const reviewed=shapeReviewedOpening({reviewedOrdinal:2,openingPolicy:{kind:'iris-rim',maxContactWidthCells:2},points:source[0].points.map(q=>({...q,weight:.5,openingPolicy:{kind:'iris-rim',maxContactWidthCells:2}}))},{D:new Float32Array(40*40),w:40,h:40,shape:{base:.6,floor:.7}});
- assert.ok(reviewed.points.every(q=>q.nw<=2));assert.ok(reviewed.points.every(q=>Number.isInteger(q.sourcePointIndex)));
-});
-test('unreviewed opening remains identical to ordinary shape and projection preserves all fields',()=>{
- const g=line(3,4,12,4,10,{weight:.2});const shape={base:.6,floor:.7};const actual=shapeReviewedOpening(g,{D:new Float32Array(100),w:10,h:10,shape});const expected=shapeGesture(g,shape);assert.deepEqual(actual.points,expected.points);
- const point={x:510,y:480,nw:2,s:.13,sourcePointIndex:29,contactRole:'upper lid wing'};assert.deepEqual(projectSelectedDrawing([{points:[point,{...point,x:520}]}],{box:{left:505,top:475,width:415,height:265}})[0].points[0],{...point,x:5,y:5});
-});
-
 import { scaleDrawingGestures, handDrawing } from './drawing-hand.mjs';
 test('sheet conversion preserves hybrid contact, speed, pauses and reservoir instructions at 2x', () => {
  const gestures=[{dip:.4,low:.03,tier:1,role:'structure',length:10,points:[{x:2,y:3,s:.2,v:.6,dwell:1.2},{x:12,y:3,s:.8,v:2.4,nw:2}]}];
@@ -184,7 +112,7 @@ test('sheet conversion preserves hybrid contact, speed, pauses and reservoir ins
  assert.equal(fine.points[0].dwell,1.2);assert.equal(fine.points[0].v,1.2);assert.equal(fine.points[1].nw,4);
  assert.equal(fine.points[0].s,.2);assert.deepEqual(gestures,copy);
 });
-test('reviewed hand route joins continuations but preserves distinct roles and tapered light breaks', () => {
+test('hand route joins continuations but preserves distinct roles and tapered light breaks', () => {
  const gs=[line(2,8,20,8,19,{role:'structure',weight:.8}),line(22,8,40,8,19,{role:'structure',weight:.8}),line(42,8,58,8,17,{role:'hatch',weight:.5})];
  const D=new Float32Array(60*16).fill(.4);for(let y=0;y<16;y++)for(let x=28;x<34;x++)D[y*60+x]=.01;
  const r=handDrawing(gs,{gap:3,strokeLength:100,D,w:60,h:16,lit:.1});

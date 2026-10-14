@@ -1,8 +1,5 @@
 import { planLines } from '../drawing-plan.mjs';
 import { materialProfile } from './material-profiles.mjs';
-import sharp from 'sharp';
-import {separate} from '../../crop/inkwash.mjs';
-import {registerReviewedWholeDrawing} from './reviewed-whole-registration.mjs';
 // --drawinglogic 1: the walker's inking logic, run over a selected drawing file instead of bypassed by it.
 //
 // Without the flag drawing-file.mjs draws every line of the file whole, in the file's order, at the file's own
@@ -39,11 +36,7 @@ import {registerReviewedWholeDrawing} from './reviewed-whole-registration.mjs';
 // --hybridslow 0.6, --hybridstroke 0.25, --hybridload 0.2 and --hybridloadper 0.0006 the dip's load and its rise per cell of gesture, --hybridlow 0.03 how empty before a re-dip), the unused lines as toning.
 //
 // DOM free. Reads the line file through lines.mjs.
-import fs from 'node:fs';
-import crypto from 'node:crypto';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { loadLines,linePaths } from '../../crop/lines.mjs';
+import { loadLines } from '../../crop/lines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
 import { rankLines, splitForm, inkFilterOn, toneRuns } from './drawing-rank.mjs';
 import { connect, handOrder, shapeGesture, personStrokes } from './drawing-hand.mjs';
@@ -51,143 +44,16 @@ import { walkOnLines, shapeHybrid, gestureStats } from './drawing-hybrid.mjs';
 import { breakOnLights, scribbleMasses } from './drawing-scribble.mjs';
 import { edgeChains } from '../../crop/contours.mjs';
 import { gaussian } from '../../keyframes/density.mjs';
-import { EYE_PLANE_ORDINALS, EYE_PLANE_CONTRAST_MIN } from '../tuned/portrait.mjs';
-
-// Reviewed subject instructions, not inferred object labels. Bind the target and registered trace before using
-// path ordinals. The instructions describe one private photograph, so they live outside the repository in
-// work/subjects/portrait.json; without that file every subject keeps the ordinary selection.
-const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
-const SUBJECT_FILE = path.join(ROOT, 'work/subjects/portrait.json');
-let SUBJECT;
-function reviewedSubject() {
- if (SUBJECT === undefined) SUBJECT = fs.existsSync(SUBJECT_FILE) ? JSON.parse(fs.readFileSync(SUBJECT_FILE, 'utf8')) : null;
- return SUBJECT;
-}
-function requireSubject() {
- const subject = reviewedSubject();
- if (!subject?.drawingFeatures) throw new Error(`reviewed drawing needs ${path.relative(ROOT, SUBJECT_FILE)}, which is not in this repository`);
- return subject;
-}
-function sameCropBase(base,b,bindingPath){const registered=b.drawingProjection?.traceBase;if(!registered)return false;return path.resolve(ROOT,base)===path.resolve(ROOT,registered)||path.resolve(base)===path.resolve(path.dirname(bindingPath),path.basename(registered));}
-const REVIEWED_CROP_DENSITY=new Map();
-const REVIEWED_POINT_ROLE=new WeakMap();
-export async function prepareReviewedCropDrawing(bindingPath,paperRGB){
- const PORTRAIT=requireSubject(),b=JSON.parse(fs.readFileSync(bindingPath,'utf8')),target=path.resolve(ROOT,PORTRAIT.drawingFeatures.target.path);
- if(b.targetSHA256!==PORTRAIT.drawingFeatures.target.sha256||sha(target)!==b.targetSHA256)throw new Error('Reviewed full-frame drawing target mismatch');
- const projection=b.drawingProjection;
- if(!projection||sha(projection.sourceTrace)!==PORTRAIT.drawingFeatures.traceSHA256||projection.sourceTraceSHA256!==PORTRAIT.drawingFeatures.traceSHA256||projection.projectedTraceSHA256!==projection.traceSHA256)throw new Error('Reviewed source trace binding mismatch');
- const {width:w,height:h}=PORTRAIT.drawingFeatures.target,px=await sharp(target).removeAlpha().resize(w,h,{fit:'fill'}).raw().toBuffer(),pl=(.2126*paperRGB[0]+.7152*paperRGB[1]+.0722*paperRGB[2]);
- const D=Float32Array.from({length:w*h},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*px[i*3]+.7152*px[i*3+1]+.0722*px[i*3+2])/pl)))));
- REVIEWED_CROP_DENSITY.set(bindingPath,{b,D,target,inkShare:separate(px,w,h,paperRGB).stats.ink/(w*h)});
-}
-export function projectSelectedDrawing(gestures,b){
- const {left,top,width:w,height:h}=b.box;
- return gestures.filter(g=>g.points.some((p,i)=>{if(p.x>=left&&p.x<left+w&&p.y>=top&&p.y<top+h)return true;const q=g.points[i-1];return q&&Math.min(p.x,q.x)<left+w&&Math.max(p.x,q.x)>=left&&Math.min(p.y,q.y)<top+h&&Math.max(p.y,q.y)>=top;})).map(g=>({...g,points:g.points.map(p=>({...p,x:p.x-left,y:p.y-top}))}));
-}
-const sha = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-function inside(x, y, poly) {
-  let yes = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [ax, ay] = poly[i], [bx, by] = poly[j];
-    if ((ay > y) !== (by > y) && x < (bx - ax) * (y - ay) / (by - ay) + ax) yes = !yes;
-  }
-  return yes;
-}
-export function reviewedFaceFeatures(lines, instruction, { w, h, facePoly }) {
-  if (!instruction) return lines;
-  if (instruction.features.length > instruction.maxPaths) throw new Error('Reviewed face features exceed their capped path count');
-  const byOrdinal = new Map(instruction.features.map(f => [f.ordinal, f]));
-  if (byOrdinal.size !== instruction.features.length) throw new Error('Duplicate reviewed face feature ordinal');
-  for (const [ordinal, feature] of byOrdinal) {
-    const g = lines[ordinal];
-    if (!g || g.points.length < 2) throw new Error(`Missing reviewed face feature: ${feature.name}`);
-    const share = g.points.filter(q => inside(q.x / w, q.y / h, facePoly)).length / g.points.length;
-    if (share < .8 || g.length > (instruction.maxFeatureLength ?? .2 * Math.min(w, h))) throw new Error(`Reviewed face feature lies outside its registered face: ${feature.name}`);
-  }
-  return lines.map((g,ordinal)=>{
-    if(!byOrdinal.has(ordinal))return g;
-    const openingPolicy=instruction.openingPolicies?.[ordinal]??null;
-    if(instruction.openingPolicies)g.points.forEach((q,sourcePointIndex)=>REVIEWED_POINT_ROLE.set(q,{reviewedOrdinal:ordinal,sourcePointIndex,openingPolicy}));
-    return {...g,object:'face',focalFeature:byOrdinal.get(ordinal).name,reviewedOrdinal:ordinal,openingPolicy};
-  });
-}
-function projectReviewedFaceInstructions(instruction,binding,originalOrdinals){const b=binding.box,features=instruction.features.map(f=>({...f,ordinal:originalOrdinals.indexOf(f.ordinal)}));if(features.some(f=>f.ordinal<0))throw new Error('Reviewed eye feature absent from registered crop');return {...instruction,features,maxFeatureLength:.2*Math.min(instruction.target.width,instruction.target.height),facePoly:PORTRAIT.regions.find(r=>r.id==='face').poly.map(([x,y])=>[(x*instruction.target.width-b.left)/b.width,(y*instruction.target.height-b.top)/b.height])};}
-function originalFaceInstructions(base, opt) {
-  const bindingPath=(opt('revieweddrawingcrop','')||opt('humaneyesreference',''));
-  const instruction = (bindingPath ? requireSubject() : reviewedSubject())?.drawingFeatures;
-  if(bindingPath){const b=JSON.parse(fs.readFileSync(bindingPath,'utf8'));if(!sameCropBase(base,b,bindingPath))throw new Error('Reviewed crop drawing base mismatch');const p=b.drawingProjection;if(b.targetSHA256!==instruction.target.sha256||sha(p.sourceTrace)!==instruction.traceSHA256||sha(opt('image',''))!==b.cropSHA256||sha(path.resolve(ROOT,linePaths(base).lines))!==p.traceSHA256)throw new Error('Reviewed crop eye target/trace projection mismatch');return projectReviewedFaceInstructions(instruction,b,p.originalOrdinals);}
-  const fullTrace=opt('reviewedfulltrace','');
-  if (!instruction || (base !== instruction.traceBase && (!fullTrace||linePaths(base).lines!==fullTrace))) return null;
-  const image = opt('image', '');
-  if (path.basename(image) !== path.basename(instruction.target.path)) return null;
-  const target = path.resolve(ROOT, image), trace = fullTrace || path.resolve(ROOT, 'work/lines', `${base}-lines.json`);
-  if (sha(target) !== instruction.target.sha256 || sha(trace) !== instruction.traceSHA256)
-    throw new Error('Reviewed face instructions do not match target and registered trace');
-  return instruction;
-}
-
-export function reviewedOpeningStrategy(base,opt){
- const bound=originalFaceInstructions(base,opt);if(!bound)return null;
- return {id:'drawing',region:'hash-bound original3T human-eye structure',referenceCue:'registered target lid/iris rims versus faint under-eye painted planes',move:'existing wet pen on dry opening sheet',edgeValue:'dark fine structural iris rims; slightly stronger upper-lid wing; short faint under-eye cues',protectedLights:'sclera and catchlights remain paper; iris body and pale-plane remainder are paint-owned',brushLoad:'existing pen family, ink mixture, dip and reload; literal per-point contact widths and local weights consumed without added ink/gain',requiredBase:'ordinary opening dry sheet; existing pen material route retained',materialCheck:'actual per-point nib width/share and pen dip/arguments recorded; optical wicking/value remains physical gate',geometry:'original registered points, full-source 40-feature selector then crop projection; under-eye cue is one existing target-supported subset',expectedResult:'fine rims without filling iris body as ink or outlining pale under-eye planes',stop:'cat-opening exports after actual drawing and ordinary dry; artistic gate before wash',openingPolicies:PORTRAIT.drawingFeatures.openingPolicies,binding:{target:PORTRAIT.drawingFeatures.target,traceSHA256:PORTRAIT.drawingFeatures.traceSHA256}};
-}
-
-// The target's faint under-eye plane edge is paint-owned outside its strongest
-// connected cue. Keep one subset of the original trace, never add a mark or bridge.
-function shapeReviewedEyePlane(g,{D,w,h,shape}){
- if(!EYE_PLANE_ORDINALS.includes(g.reviewedOrdinal))return shapeGesture(g,shape);
- const policy=g.openingPolicy??{localContrastMin:EYE_PLANE_CONTRAST_MIN,maxContactWidthCells:2};
- const contrast=q=>{const x=Math.round(q.x),y=Math.round(q.y);let background=Infinity;for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<w&&yy<h)background=Math.min(background,D[yy*w+xx]);}return D[y*w+x]-background;};
- let best=[],run=[];const hold=()=>{if(run.length>=2&&pathLength(run)>pathLength(best))best=run;run=[];};
- for(const q of g.points){if(contrast(q)>=policy.localContrastMin)run.push(q);else hold();}hold();
- if(best.length<2)return null;
- const shaped=shapeGesture({...g,points:best},{...shape,floor:0});
- return {...shaped,openingRole:'pale under-eye plane cue',openingControl:{reference:'registered target local line/background optical contrast >=.22; one longest connected source span',remainder:'paint-owned pale modeling, not opening ink',formFloor:0,maxContactWidthCells:policy.maxContactWidthCells},points:shaped.points.map(q=>({...q,nw:Math.min(policy.maxContactWidthCells,q.nw??policy.maxContactWidthCells)}))};
-}
-
-// Policies are attached to the hash-bound original roles before selection. Per-point
-// lineage keeps a joined inner corner unchanged while rim and lid points get their own contact.
-export function shapeReviewedOpening(g,{D,w,h,shape}){
- if(g.openingPolicy?.kind==='pale-plane')return shapeReviewedEyePlane(g,{D,w,h,shape});
- const role=q=>REVIEWED_POINT_ROLE.get(q)??q,shaped=shapeGesture(g,shape),roles=[...new Set(g.points.map(q=>role(q).reviewedOrdinal).filter(v=>v!=null))];
- if(!g.points.some(q=>role(q).openingPolicy?.kind.startsWith('iris-rim')))return {...shaped,reviewedRoles:roles};
- const points=shaped.points.map((q,i)=>{const raw=g.points[i],meta=role(raw),policy=meta.openingPolicy;if(!policy?.kind.startsWith('iris-rim'))return q;const dark=Math.max(0,Math.min(1,raw.weight??g.weight??1)),oldDark=(shape.floor??0)+(1-(shape.floor??0))*dark,cap=policy.kind==='iris-rim-and-lid'?(meta.sourcePointIndex>=policy.lidStartSourcePoint?policy.lidContactWidthCells:policy.rimContactWidthCells):policy.maxContactWidthCells;return {...q,s:oldDark>0?q.s*dark/oldDark:0,nw:Math.min(cap,q.nw??cap),contactRole:policy.kind==='iris-rim-and-lid'&&meta.sourcePointIndex>=policy.lidStartSourcePoint?'upper lid wing':'structural iris rim',reviewedOrdinal:meta.reviewedOrdinal,sourcePointIndex:meta.sourcePointIndex};});
- return {...shaped,points,reviewedRoles:roles,openingRole:'structural iris rim; stronger upper-lid wing where specified',openingControl:{reference:'hash-bound original role policies; exact registered points and local dark weight',ownership:'iris body paint-owned; sclera/catchlight reserved',policies:Object.fromEntries(g.points.map(role).filter(q=>q.openingPolicy).map(q=>[q.reviewedOrdinal,q.openingPolicy])),formFloor:0}};
-}
-
 // The lines the first pen's hybrid walk used, by file and grid, so the closing pen of the same run leaves them out.
 const USED = new Map();
 
 export function drawingLogic({ base, first, w, h, opt, num, log, D, want, cells, K = 1, walker = null, field = null, style = null }) {
-  const wholeBinding=opt('reviewedwholebinding','');
-  if(wholeBinding){
-   if(opt('revieweddrawingcrop','')||opt('humaneyesreference',''))throw Error('reviewed whole binding cannot also crop the drawing');
-   const prepared=REVIEWED_CROP_DENSITY.get(wholeBinding);if(!prepared)throw Error('Reviewed whole drawing full-source preparation missing');
-   const {b,D:fullD,target,inkShare}=prepared,source=requireSubject().drawingFeatures;
-   if(sha(opt('image',''))!==b.targetSHA256||sha(path.resolve(ROOT,linePaths(base).lines))!==source.traceSHA256||b.drawingProjection.sourceTraceSHA256!==source.traceSHA256)throw Error('Reviewed whole drawing target/source changed');
-   const fullOpt=(name,d)=>name==='reviewedwholebinding'?'':name==='image'?target:name==='reviewedfulltrace'?b.drawingProjection.sourceTrace:opt(name,d);
-   const full=drawingLogic({base:b.drawingProjection.sourceTrace.replace(/-lines\.json$/,''),first,w:source.target.width,h:source.target.height,opt:fullOpt,num,log,D:fullD,want,cells:Math.max(inkShare,num('drawfloor',0))*source.target.width*source.target.height*num('inkbudget',6),K:opt('cellscale','0')!=='0'?source.target.width/420:1,style});
-   log(`drawing semantics: reviewed whole ${first?'opening':'closing'} selected in original ${source.target.width}x${source.target.height} frame, then registered onto ${w}x${h}; source USED pool shared; pen calibration is separate`);
-   return registerReviewedWholeDrawing(full,source.target,{w,h});
-  }
-
-  const cropBinding=(opt('revieweddrawingcrop','')||opt('humaneyesreference',''))||opt('shirtreference','')||opt('catlockreference','');
-  if(first&&cropBinding){
-   const prepared=REVIEWED_CROP_DENSITY.get(cropBinding);if(!prepared)throw new Error('Reviewed crop drawing full-source preparation missing');
-   const {b,D:fullD,target,inkShare}=prepared,source=requireSubject().drawingFeatures;
-   if(!sameCropBase(base,b,cropBinding)||sha(b.drawingProjection.sourceTrace)!==source.traceSHA256||sha(opt('image',''))!==b.cropSHA256||sha(path.resolve(ROOT,linePaths(base).lines))!==b.drawingProjection.traceSHA256)throw new Error('Reviewed drawing crop bindings changed');
-   const fullOpt=(name,d)=>(name==='revieweddrawingcrop'||name==='humaneyesreference'||name==='shirtreference'||name==='catlockreference')?'':name==='image'?target:name==='reviewedfulltrace'?b.drawingProjection.sourceTrace:opt(name,d);
-   const full=drawingLogic({base:b.drawingProjection.sourceTrace.replace(/-lines\.json$/,''),first:true,w:source.target.width,h:source.target.height,opt:fullOpt,num,log,D:fullD,want,cells:Math.max(inkShare,num('drawfloor',0))*source.target.width*source.target.height*num('inkbudget',6),K:opt('cellscale','0')!=='0'?source.target.width/420:1,style});
-   log(`drawing semantics: selected in original ${source.target.width}x${source.target.height} frame before registered crop projection; no crop reranking or cap`);
-   return projectSelectedDrawing(full,b);
-  }
   if (!D) throw new Error('drawing logic: no source density');
   const mode = Math.round(num('drawinglogic', 1));
   const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean));
-  const faceInstructions = originalFaceInstructions(base, opt);
   // the plan's choice (drawing-plan.mjs planLines): --drawshare, --drawregions and --drawmax
   const loaded = planLines(loadLines(base, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), num);
-  const all = reviewedFaceFeatures(loaded, faceInstructions, { w, h, facePoly: faceInstructions?.facePoly??reviewedSubject()?.regions.find(r => r.id === 'face').poly }).filter(g => !skip.has(g.role));
-  if (faceInstructions) log(`drawing semantics: ${faceInstructions.features.length} reviewed human-eye paths, target/trace hashes matched; original widths and weights retained`);
+  const all = loaded;
   // Joined before ranking, per role and kind, so a contour the segmenter broke at every junction is ranked as the one
   // long line it is, and a strand is never stitched to a contour. 8 cells keeps the lines connected.
   const joinOpts = { gap: num('drawjoingap', 8) * K, cos: num('drawjoincos', 0.7), aim: num('drawjoinaim', 0.6) };
@@ -264,7 +130,7 @@ export function drawingLogic({ base, first, w, h, opt, num, log, D, want, cells,
       const { gestures, joined } = connect(split.form, joinOpts);
       const ordered = handOrder(gestures);
       log(`drawing logic 1, first pen: ${split.form.length} lines joined ${joined} more times into ${stat(ordered)}, in a hand's order, tapered`);
-      return ordered.map(g=>faceInstructions?.openingPolicies?shapeReviewedOpening(g,{D,w,h,shape:{...shape,base:num('drawwant',num('tier1want',.6)),floor:num('drawformfloor',.7)}}):shapeGesture(g,{...shape,base:num('drawwant',num('tier1want',.6)),floor:num('drawformfloor',.7)})).filter(Boolean).flatMap(g=>personStrokes(g,strokeLen).map(s=>({...s,rank:g.tier,...(g.reviewedRoles?{reviewedRoles:g.reviewedRoles}:{}),...(g.reviewedOrdinal==null?{}:{reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature}),...(g.openingControl?{openingRole:g.openingRole,openingControl:g.openingControl}:{})})));
+      return ordered.map(g=>shapeGesture(g,{...shape,base:num('drawwant',num('tier1want',.6)),floor:num('drawformfloor',.7)})).filter(Boolean).flatMap(g=>personStrokes(g,strokeLen).map(s=>({...s,rank:g.tier,...(g.reviewedRoles?{reviewedRoles:g.reviewedRoles}:{}),...(g.reviewedOrdinal==null?{}:{reviewedOrdinal:g.reviewedOrdinal,focalFeature:g.focalFeature}),...(g.openingControl?{openingRole:g.openingRole,openingControl:g.openingControl}:{})})));
     }
     tone = split.tone;
   }

@@ -10,6 +10,7 @@ Some painter settings were fitted by self study on a few benchmark images, mostl
   - `--trumbullrules`: the 55:45 ultramarine shadow glaze and its violet lift, warm-stone dry brush, the first-ink skips and the per-shape stone and leaf mixes (Y1).
   - `--portraitrules`: the lower-face stubble box, the jaw-band ink skip and the colour trace window (3T).
   - `--drawsubject`: drawing caps fitted on 3T and 1D.
+  - The reviewed 3T drawing (`--revieweddrawingcrop`, `--humaneyesreference`, `--reviewedwholebinding`, `--reviewedfulltrace`, `--shirtreference`, `--catlockreference`): eye strokes kept by trace ordinal, bound by hash to one private portrait.
 - `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject. It applies no preset by subject id. Use the v0.1.0 tag for exact historical simulation output.
 - `src/paint/overfit.test.mjs` fails if the general recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
 
@@ -56,7 +57,6 @@ Three groups: flags that V096 ran on every subject, opt-in modules, and lookups 
 
 | Item | Where | Fitted on | What it does | Switched on by | Risk |
 |---|---|---|---|---|---|
-| Eye-plane strokes | `EYE_PLANE_ORDINALS` in `tuned/portrait.mjs`, `methods/drawing-logic.mjs` | 3T | Keeps two reviewed under-eye strokes in the opening ink. | A private `work/subjects/portrait.json` | Low: needs that file. |
 | Modulation anatomy | `tuned/modulation-anatomy.mjs` | 3T | Skin and fur regions; cat cells by 3T region id. | `--modulate 1 --modanatomy <file>` | Low: needs a registered file. |
 | Paint-owned residual | `tuned/paint-owned-residual.mjs` | One private image | Moves detail residual into the wash inside authored polygons. | `--modpaintplanes <file>` | Low: needs an authored file. |
 | Dog coats | `tuned/dog-coats.mjs` | 2W, private dry-coat photos | Wet and dry curly coat presets. | `--dogpaint`, `--dogcoat` | Medium: both assume a black curly coat. |
