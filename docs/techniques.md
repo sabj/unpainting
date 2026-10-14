@@ -177,7 +177,7 @@ Default recipe flags, with the off value, the images they were fitted on and the
 - `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1 only; low.
 - `--recessshare .75`: demand per recess layer. Off: `.5`. Y1 only; low.
 - `--recessclean 1`: no light wash under recesses. Off: `0`. Y1 only; low.
-- `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble; none by default.
+- `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble; inert since the value planner lays no texture passages.
 - `--touchgain .6`: strength of touch-up glazes. Off: `.8`. Y1, subject-e; medium.
 
 Modules:

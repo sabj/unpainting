@@ -17,7 +17,7 @@ export function resolveStyle(subject, region=null, selection=null) {
   if (override && !override.reason) throw Error(`Region ${region} needs a style reason`);
   return {...loadStyle(override?.style ?? mapping.style), reason:override?.reason ?? mapping.reason};
 }
-export function profileTechnique(profile, phase, band, texture=false) {
+export function profileTechnique(profile, phase, band) {
   const wet = profile.name === 'atmospheric-wet';
-  return {style:profile.name,structure:profile.structure,move:texture?'dry on dry':wet?(phase==='shadow'?'dry on wet':'wet on wet'):'wet on dry',paperBefore:wet?'measured sheen across footprint and neighbors':'fully dry; own same-passage overlap allowed',water:profile.water[band-1],brush:profile.brushes,edgePolicy:profile.edge,detailStrategy:profile.textures,inkWeight:profile.ink,graphiteWeight:profile.graphite,inkPigment:profile.pigment,layerOrder:profile.order,wetMix:profile.wetMix,bridge:profile.bridge,bridgeSoft:profile.bridgeSoft};
+  return {style:profile.name,structure:profile.structure,move:wet?(phase==='shadow'?'dry on wet':'wet on wet'):'wet on dry',paperBefore:wet?'measured sheen across footprint and neighbors':'fully dry; own same-passage overlap allowed',water:profile.water[band-1],brush:profile.brushes,edgePolicy:profile.edge,detailStrategy:profile.textures,inkWeight:profile.ink,graphiteWeight:profile.graphite,inkPigment:profile.pigment,layerOrder:profile.order,wetMix:profile.wetMix,bridge:profile.bridge,bridgeSoft:profile.bridgeSoft};
 }

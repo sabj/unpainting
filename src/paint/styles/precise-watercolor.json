@@ -80,13 +80,5 @@
   "closingContrast": 0.06,
   "openingMinLength": 0.035,
   "paintStrength": 1,
-  "darkRecessMaxRGB": 105,
-  "textureRules": [
-    {
-      "rules": "portrait-3t",
-      "minY": 0.48,
-      "maxY": 0.9,
-      "band": 3
-    }
-  ]
+  "darkRecessMaxRGB": 105
 }

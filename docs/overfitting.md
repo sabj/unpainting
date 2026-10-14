@@ -6,7 +6,7 @@ Some painter settings were fitted by self study on a few benchmark images, mostl
 
 - The default recipe (`src/paint/recipe.mjs`; also `--recipe general` or `combined`) sets only general methods: value planning from light to dark, shaped marks, four middle layers, two touch-up rounds, a drawing first (the plan chooses any closing pass), physical cold-press paper. No value in it was fitted to one image.
 - Fitted settings live in `src/paint/tuned/` and run through the compatibility recipe or a named preset (`src/paint/tuned/presets.mjs`). A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe general+architecture`.
-- No painting code outside `src/paint/tuned/` checks a subject id. Rules fitted to one subject are switched by a flag (`--portraitrules`, `--drawsubject`). The `--trumbullrules` rules were removed: the 55:45 ultramarine shadow glaze and its violet lift, warm-stone dry brush, the first-ink skips and the per-shape stone and leaf mixes.
+- No painting code outside `src/paint/tuned/` checks a subject id. Rules fitted to one subject are switched by a flag (`--drawsubject`). The `--portraitrules` rules were removed: the lower-face stubble box, the jaw-band ink skip and the colour trace window. The `--trumbullrules` rules were removed: the 55:45 ultramarine shadow glaze and its violet lift, warm-stone dry brush, the first-ink skips and the per-shape stone and leaf mixes.
 - `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject. It applies no preset by subject id. Use the v0.1.0 tag for exact historical simulation output.
 - `src/paint/overfit.test.mjs` fails if the general recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
 
@@ -47,16 +47,12 @@ Four groups: flags that V096 ran on every subject, rules that checked a subject 
 | `--recesslayers 2` | `methods/light-to-dark.mjs` | Y1 | Recesses in two dried layers. | `architecture`, v096 | Low: needs `--recesses`. |
 | `--recessshare .75` | `methods/light-to-dark.mjs` | Y1 | Each recess layer carries 0.75 of the demand. | `architecture`, v096 | Low: needs `--recesses`. |
 | `--recessclean 1` | `methods/light-to-dark.mjs` | Y1 | No light wash under recesses. | `architecture`, v096 | Low: needs `--recesses`. |
-| `--texvariety 0.8` | `techniques/shaped-marks.mjs` | Y1 stone, 3T stubble | Varies short texture marks. | `architecture`, v096 | Low: needs `--texshort 1`. |
+| `--texvariety 0.8` | `techniques/shaped-marks.mjs` | Y1 stone, 3T stubble | Varies short texture marks. | `architecture`, v096 | None: the value planner no longer lays texture passages. |
 
 ### Rules that checked a subject id, now behind a preset flag
 
 | Item | Where | Fitted on | What it does | Switched on by | Risk |
 |---|---|---|---|---|---|
-| Lower-face texture zone | `TEX_ZONE` in `tuned/portrait.mjs` | 3T | Stubble box laid as dry brush; `--texshadow` and `--texshare` act in it. | `--portraitrules` (`portrait-3t`) | High off 3T: a fixed box in sheet coordinates. |
-| Jaw ink rule | `JAW_INK` in `tuned/portrait.mjs` | 3T | The first ink leaves out long paths lying in the jaw band. | `--portraitrules` | High off 3T: fixed band. |
-| Texture rules in the style | `src/paint/styles/precise-watercolor.json` | 3T | Band-3 texture for the stubble band. | `--portraitrules` | Low. |
-| Colour trace window | `TRACE_BOX` in `tuned/portrait.mjs` | 3T | Window for the `--colourtrace` diagnostic. Was a check of the image file name. | `--portraitrules` | None: diagnostic only. |
 | Drawing caps for 3T | `tuned/drawing-caps.mjs`, `methods/material-profiles.mjs` | 3T | 18 opening lines at pressure 0.25, 16 closing at 0.32. | `--drawsubject 3T` (`portrait-3t`) | Low. |
 | Drawing caps for 1D | `tuned/drawing-caps.mjs` | 1D | 12 opening lines at 0.28, 20 closing at 0.35. | `--drawsubject 1D` (`dog-1d`) | Low. |
 
