@@ -5,8 +5,8 @@
 //
 // Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4). Stone-block tokens apply to
 // architecture only, palette tokens to Trumbull only, and the base's sepia ink yields to a plan drawn in another ink.
-// Settings the plan asks for that the painter never reads fail the painting (renderVerdict). Base settings a subject
-// has no use for do not.
+// Settings the plan asks for that the painter never reads are noted against the painting (renderVerdict), and fail it
+// under --strict-verdict. Base settings a subject has no use for are never noted.
 //
 // This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins.
 import fs from 'node:fs';
@@ -258,19 +258,23 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
 }
 
 /**
- * The painting's verdict. unused: options the painter read nowhere (every segment counted). A setting the plan chose
- * that nothing read fails the painting, as does a passage with no brush path or an option nobody asked for.
+ * The painting's verdict. unused: options the painter read nowhere (every segment counted). A finished painting
+ * (painting.png, painter exit 0 or 3) counts as painted. Settings the plan chose that nothing read, unused options
+ * nobody asked for and passages with no brush path are kept as notes against the plan. strict (--strict-verdict)
+ * makes those three fail the painting again, as in the published 0.1 results. A painter killed by a signal, any other
+ * painter exit and a missing painting always fail.
  */
-export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true }) {
-  const failures = [], fail = (code, reason) => failures.push({ code, reason });
+export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true, strict = false }) {
+  const failures = [], notes = [], fail = (code, reason) => failures.push({ code, reason });
+  const note = (code, reason) => (strict ? fail(code, reason) : notes.push({ code, reason }));
   const model = new Set([...modelOptions, ...extraOptions]), base = new Set([...baseOptions, ...templateOptions, 'valuefloor']);
   const check = { model: [], base: [], unknown: [] };
   for (const raw of unused) { const k = raw.replace(/^--/, ''); (model.has(k) ? check.model : base.has(k) ? check.base : check.unknown).push(k); }
   if (paintExit === null || paintExit === undefined) fail(137, 'paint process was killed by a signal');
   else if (paintExit !== 0 && paintExit !== 3) fail(paintExit, 'paint process exited ' + paintExit);
-  if (check.model.length) fail(4, 'settings the plan chose were read by nothing: --' + check.model.join(' --'));
-  if (check.unknown.length) fail(4, 'unused options nobody asked for: --' + check.unknown.join(' --'));
-  if (dropped > 0) fail(5, `passages with no executed paths: ${dropped} dropped (${droppedPct.toFixed(1)}% of the planned mass)`);
+  if (check.model.length) note(4, 'settings the plan chose were read by nothing: --' + check.model.join(' --'));
+  if (check.unknown.length) note(4, 'unused options nobody asked for: --' + check.unknown.join(' --'));
+  if (dropped > 0) note(5, `passages with no executed paths: ${dropped} dropped (${droppedPct.toFixed(1)}% of the planned mass)`);
   if (!finished) fail(6, 'no finished painting');
-  return { exit: failures.length ? failures[0].code : 0, failures, optionCheck: check };
+  return { exit: failures.length ? failures[0].code : 0, failures, notes, optionCheck: check, strict };
 }

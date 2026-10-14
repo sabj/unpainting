@@ -37,12 +37,12 @@ test('refusals before painting: unknown tokens, locked options, paths out of the
   assert.equal(bad.length, 2);
 });
 
-test('a setting the plan chose that nothing read fails the painting; an unread base setting does not', () => {
-  assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'] }).exit, 0);
-  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'] });
+test('strict verdict: a setting the plan chose that nothing read fails the painting; an unread base setting does not', () => {
+  assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'], strict: true }).exit, 0);
+  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: true });
   assert.equal(v.exit, 4);
   assert.match(v.failures[0].reason, /read by nothing: --stonewarm/);
-  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5 }).exit, 5);
+  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: true }).exit, 5);
 });
 
 test('TOKENS.md is generated from plan-args.mjs', () => {
@@ -51,9 +51,10 @@ test('TOKENS.md is generated from plan-args.mjs', () => {
 
 test('the V4 and V5 briefs fill every field and name nothing private', () => {
   const subjects = loadSubjects();
-  for (const round of ROUNDS.filter(r => ['V4', 'V5'].includes(r.id))) for (const n of [1, 2]) for (const crop of Object.keys(subjects)) {
-    const t = renderTask({ round, n, tries: 3, spec: subjects[crop] });
+  for (const round of ROUNDS.filter(r => ['V4', 'V5'].includes(r.id))) for (const n of [1, 2]) for (const crop of Object.keys(subjects)) for (const strictVerdict of [false, true]) {
+    const t = renderTask({ round, n, tries: 3, spec: subjects[crop], strictVerdict });
     assert.doesNotMatch(t, /\{[A-Z_]+\}/, `${round.id} try ${n} ${crop}`);
+    assert.match(t, strictVerdict ? /An option nothing reads\s+fails the painting/ : /the painting still counts/);
     assert.doesNotMatch(t, /\/Users\/|cloud GPU|V096|owner/i);
   }
   for (const dir of ['v3', 'v4v5']) for (const f of fs.readdirSync(path.join(BENCH, dir), { recursive: true })) {

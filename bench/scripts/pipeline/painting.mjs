@@ -90,8 +90,8 @@ export class Painting {
 
   kill() { if (this.child) this.child.kill('SIGKILL'); }
 
-  /** The verdict once the painting has ended: the unread-setting rule, dropped passages and the outputs. */
-  verdict() {
+  /** The verdict once the painting has ended: the unread-setting rule, dropped passages and the outputs. strict: --strict-verdict. */
+  verdict({ strict = false } = {}) {
     const last = this.segments.at(-1);
     const readEarlier = new Set(fs.existsSync(this.out) ? fs.readdirSync(this.out).filter(f => /^aware-options-read-\d+\.json$/.test(f)).flatMap(f => readJson(path.join(this.out, f)) || []) : []);
     const uf = path.join(this.out, 'unused-options.txt');
@@ -101,7 +101,7 @@ export class Painting {
     const dm = [...text.matchAll(/(\d+) passages yielded no brush path and were never painted, carrying ([\d.]+)% of the planned mass/g)].at(-1);
     const finished = fs.existsSync(path.join(this.out, 'painting.png'));
     const v = renderVerdict({ paintExit: last.exit, unused, modelOptions: union('modelOptions'), extraOptions: union('extraOptions'), baseOptions: union('baseOptions'),
-      templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished });
+      templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict });
     return { ...v, unused, segments: this.segments.map(s => ({ k: s.k, variant: s.variant, resumed: Boolean(s.resume), exit: s.exit, seconds: s.seconds })), layering: last.plan.layering, args: last.args };
   }
 }
