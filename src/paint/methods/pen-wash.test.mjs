@@ -189,3 +189,15 @@ test('--style penwash names the pen-and-wash recipe; the default recipe is uncha
   assert.ok(!def.includes('--penwash'));
   assert.equal(def[def.lastIndexOf('--touchpoints') + 1], '2');
 });
+
+test('collinear pieces of the same drawing part are joined before speck pruning', () => {
+  // two 1.4-cell (0.7 mm) collinear fragments separated by a 1-cell (0.5 mm) gap; each alone is under minMm 0.8 mm
+  const a = { role: 'contour', points: [{ x: 10, y: 20, weight: 1 }, { x: 10.7, y: 20, weight: 1 }, { x: 11.4, y: 20, weight: 1 }], length: 1.4 };
+  const b = { role: 'contour', points: [{ x: 12.4, y: 20, weight: 1 }, { x: 13.1, y: 20, weight: 1 }, { x: 13.8, y: 20, weight: 1 }], length: 1.4 };
+  const c = { role: 'hatch', points: [{ x: 30, y: 20, weight: 1 }, { x: 30.7, y: 20, weight: 1 }, { x: 31.4, y: 20, weight: 1 }], length: 1.4 };
+  const d = { role: 'contour', points: [{ x: 32.4, y: 20, weight: 1 }, { x: 33.1, y: 20, weight: 1 }, { x: 33.8, y: 20, weight: 1 }], length: 1.4 };
+  const r = prunePenLines([a, b, c, d], { w: W, h: H, mmPerCell: 0.5, seed: 3, options: { keepAbove: -99 } });
+  assert.equal(r.stats.joined, 1, 'same-part collinear pair joined');
+  assert.equal(r.stats.short, 2, 'different-part pair stayed separate and dropped as specks');
+  assert.equal(r.lines.length, 1);
+});

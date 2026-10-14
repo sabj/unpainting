@@ -140,6 +140,8 @@ import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
 import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-registration.mjs';
+import { chooseDrawingStages } from '../src/paint/methods/drawing-stages-auto.mjs';
+import { eraseWeights, erasePrep } from '../src/paint/methods/pencil-erase.mjs';
 import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
 import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
 import { makeInkRes } from '../src/paint/methods/ink-res.mjs';
@@ -1130,11 +1132,16 @@ const SEP = separate(PX_SOURCE, w, h, paperRGB);
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
 // The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
 // come from, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
+// the drawing's stages for this image: planner model, rule and gate (drawing-stages-auto.mjs); the prep pencil's erase
+// weights are made now, before the target is sealed (pencil-erase.mjs)
+const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: SEP.stats.ink / n, log: console.log });
+const PREP_ERASE = num('preperase', 0.85) > 0 ? eraseWeights(PX_SOURCE, w, h) : null;
 const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, log: console.log,
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
 if (DRAWING_REGISTRATION) LINEWORK.registration = DRAWING_REGISTRATION;
+if (DRAWING_CHOICE) LINEWORK.drawingChoice = DRAWING_CHOICE;
 if (LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${LINEWORK_STAGE.source}`, universal:{gate:LINEWORK_STAGE.gate, features:LINEWORK_STAGE.features, lines:LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
@@ -2704,6 +2711,7 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
   console.log(`pen first: source line ${(100 * SOURCE_INK).toFixed(1)}% of cells`);
   const before = thickness(sheet).map(a => Float32Array.from(a));
   await drawPass(null, { first: true });
+  if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet, k: GRAPHITE_AT, weights: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
   INK_THK = thickness(sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
   if (PENWASH_PLAN) {
