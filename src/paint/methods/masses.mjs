@@ -33,7 +33,7 @@ export async function paintMasses(ctx) {
   const hairsFor = r => Math.max(12, Math.min(Math.round(num('mophairs', 40)), Math.ceil(r * 2)));
   log(`masses: up to ${MASSES} broad washes with a mop of radius ${MOP} cells (${(100 * MOP / Math.min(W2, H2)).toFixed(0)}% of the short side)`);
   // --segwash: the regions come from the picture's semantic segments (segment-washes.mjs)
-  const SEG = await segmentWashes({ w, h, n, opt, num, log });
+  const SEG = await segmentWashes({ w, h, n, opt, num, log, subjects: ctx.subjects });
   for (let m = 0; m < MASSES; m++) {
     // what the sheet lacks of each pigment, read off the sheet itself at the plan's resolution
     const th = thickness(sheet), on = new Float32Array(n * K);

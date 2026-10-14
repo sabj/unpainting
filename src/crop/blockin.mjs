@@ -61,6 +61,10 @@ export function blockInPigments(A, k, w, h, {
   reserve = null,
   // per-cell puddle labels (palettewide.mjs) or null: each pass's regions are split by local colour
   puddles = null,
+  // per-cell wash groups (subject-clusters.mjs, --subjectwash) or null: each pass's regions are cut at them as well
+  regions = null,
+  // cells held out of every pass after the first value (each subject's own lights) or null
+  lateHold = null,
   // a pan under this share of a premixed passage's mix is left out of it and stays owed (0 keeps every pan)
   puddleFloor = 0,
   // firstFloor: open with one broad light wash of local colour over cells whose planned total is at least this. 0: off.
@@ -112,7 +116,9 @@ export function blockInPigments(A, k, w, h, {
       for (let i = 0; i < n; i++) m[i] = A[i * k + j] - delivered[i * k + j] >= entry && A[i * k + j] >= level * 0.5 ? 1 : 0;
       m = removeSmall(openMask(close(m, w, h, blurR), w, h, blurR), w, h, small);
       if (hold) for (let i = 0; i < n; i++) if (hold[i]) m[i] = 0;
-      const { labels, areas, count } = puddles ? splitByPuddle(components(m, w, h).labels, puddles, w, h, small) : components(m, w, h);
+      if (lateHold && v > 1) for (let i = 0; i < n; i++) if (lateHold[i]) m[i] = 0;
+      const split = puddles && regions ? Int32Array.from(puddles, (p, i) => p * 65536 + regions[i]) : puddles ?? regions;
+      const { labels, areas, count } = split ? splitByPuddle(components(m, w, h).labels, split, w, h, small) : components(m, w, h);
       // gathered in one pass over the sheet, not one per region
       const want = new Array(count + 1);
       for (let id = 1; id <= count; id++) want[id] = areas[id] >= small ? [] : null;

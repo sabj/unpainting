@@ -13,14 +13,21 @@ export function targetRegions({w,h,rgb,demand,k,density,families=[]}) {
   for(let pass=0;pass<8;pass++){const sums=centers.map(()=>[0,0,0,0]);for(let i=0;i<n;i++){let best=Infinity,id=0;for(let c=0;c<centers.length;c++){const d=distance(i,centers[c]);if(d<best){best=d;id=c;}}labels[i]=id+1;const a=sums[id];for(let q=0;q<3;q++)a[q]+=features[3*i+q];a[3]++;}for(let c=0;c<centers.length;c++)if(sums[c][3])for(let q=0;q<3;q++)centers[c][q]=sums[c][q]/sums[c][3];}
   // Local edge-aware cleanup removes isolated color flecks without bridging target edges.
   for(let pass=0;pass<2;pass++){const next=labels.slice();for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x,votes=new Uint8Array(centers.length+1);for(const j of [i-1,i+1,i-w,i+w]){let d=0;for(let q=0;q<3;q++)d+=(features[i*3+q]-features[j*3+q])**2;if(d<.008)votes[labels[j]]++;}for(let c=1;c<votes.length;c++)if(votes[c]>=3)next[i]=c;}labels=next;}
-  const regions=centers.map((_,c)=>{
-    let area=0;for(const label of labels)if(label===c+1)area++;
-    const scores=families.map(()=>0);for(let i=0;i<n;i++)if(labels[i]===c+1)for(let j=0;j<families.length;j++){const b=families[j].bounds;if(!b)continue;const x=(i%w+.5)/w,y=(Math.floor(i/w)+.5)/h;if(x>=b[0]&&x<b[2]&&y>=b[1]&&y<b[3])scores[j]++;}
-    const overlap=scores.map((v,j)=>{const b=families[j].bounds;return b?v/Math.max(1,area+(b[2]-b[0])*(b[3]-b[1])*n-v):0;});
-    const best=overlap.indexOf(Math.max(...overlap)),f=families[best];
-    return {id:`target-color-${c+1}`,referenceCue:`Target-derived connected color/value shape. ${f?.referenceCue??'Local color and target silhouette.'}`,baseMove:f?.baseMove??'wet on dry',descriptiveFamily:f?.id??null};
-  });
+  const regions=describeRegions(labels,centers.length,families,w,h,d=>`target-color-${d}`);
   return {regions,labels,source:'target color/value clustering with local edge-aware cleanup; crop bounds descriptive only'};
+}
+
+// Each label 1..count described for the plan: the plan family whose bounds overlap it most lends its cue and base
+// move. Bounds describe; they never cut. One pass over the cells. idOf(label) names the region.
+export function describeRegions(labels,count,families,w,h,idOf) {
+  const n=w*h,area=new Float64Array(count+1),hits=Array.from({length:count+1},()=>new Float64Array(families.length));
+  for(let i=0;i<n;i++){const l=labels[i];if(l<1||l>count)continue;area[l]++;const x=(i%w+.5)/w,y=(Math.floor(i/w)+.5)/h;
+    for(let j=0;j<families.length;j++){const b=families[j].bounds;if(b&&x>=b[0]&&x<b[2]&&y>=b[1]&&y<b[3])hits[l][j]++;}}
+  return Array.from({length:count},(_,c)=>{
+    const overlap=families.map((f,j)=>{const b=f.bounds;return b?hits[c+1][j]/Math.max(1,area[c+1]+(b[2]-b[0])*(b[3]-b[1])*n-hits[c+1][j]):0;});
+    const best=overlap.indexOf(Math.max(...overlap)),f=families[best];
+    return {id:idOf(c+1),referenceCue:`Target-derived connected color/value shape. ${f?.referenceCue??'Local color and target silhouette.'}`,baseMove:f?.baseMove??'wet on dry',descriptiveFamily:f?.id??null};
+  });
 }
 
 // Long internal straight boundaries must be supported by the target, within 2 cells.
