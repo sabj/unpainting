@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
 import { createSheet, deposit, step, dry } from './sheet.mjs';
-import { resetChecks, setStrict, continuedSummary } from '../paint/checks.mjs';
+import { resetChecks, setStrict, continuedSummary } from './checks.mjs';
 
 const pigments = [{ K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 }];
 const wetBlock = () => {

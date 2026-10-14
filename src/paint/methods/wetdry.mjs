@@ -2,7 +2,7 @@
 // stroke until its paper is dry or moist enough. No physics overrides.
 import { gaussian } from '../../keyframes/density.mjs';
 import { DEFAULTS } from '../../media/sheet.mjs';
-import { check } from '../checks.mjs';
+import { check } from '../../media/checks.mjs';
 
 export const PAPER_STATE = Object.freeze({ dryWater: 0.004, drySaturation: 0.02,
   moistWater: 0.015, moistSaturation: 0.6, glossyWater: 0.15, moistShare: 0.7 });

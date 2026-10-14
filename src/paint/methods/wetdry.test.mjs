@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setStrict, resetChecks, continuedSummary } from '../checks.mjs';
+import { setStrict, resetChecks, continuedSummary } from '../../media/checks.mjs';
 import { measureBrush, describeLayer, shadowEdges, chooseShadowTechnique, compoundClump, fitMoistStroke, measurePaper, enforcePaper, paperReady, strokeCells } from './wetdry.mjs';
 
 test('reference edges distinguish a hard step from a soft ramp at two resolutions', () => {

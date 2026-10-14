@@ -89,7 +89,7 @@ test('a sheet with little line in it gets few gestures, one with a lot gets them
 
 test('the dry-pen gate draws on paper that would not dry, counts it, and stops only under strict', async () => {
   const { dryPenGate } = await import('./draw.mjs');
-  const { resetChecks, setStrict, continuedSummary } = await import('../paint/checks.mjs');
+  const { resetChecks, setStrict, continuedSummary } = await import('./checks.mjs');
   const wetSheet = () => ({ w: 2, h: 2, W: new Float32Array(4).fill(.5), s: new Float32Array(4), paper: { capacity: new Float32Array(4).fill(1) } });
   const pen = { ink: 1, capacity: 1, drop: .1, conc: [1] };
   resetChecks();

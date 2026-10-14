@@ -6,7 +6,7 @@ import { createBrush, dip, stroke } from './brush.mjs';
 import { createPen, dipPen, penStroke } from './pen.mjs';
 import { createPencil, pencilStroke, wetGraphite, sharpen } from './pencil.mjs';
 import { fromColours, layerRT, renderLayers } from './km.mjs';
-import { setStrict, resetChecks } from '../paint/checks.mjs';
+import { setStrict, resetChecks } from './checks.mjs';
 const pigment = { rho: .05, omega: 1.4, gamma: .15, K: [.35,.49,.66], S: [.06,.025,.014] };
 const sheet = (w = 24, h = w, seed = 1) => createSheet(makePaper(w,h,{seed}), [pigment]);
 const still = { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0, absorb: 0, paperDry: 0, capRate: 0, slide: 0, settle: 0, lift: 0, rewetLift: 0 };

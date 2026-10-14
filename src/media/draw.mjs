@@ -2,7 +2,7 @@
 // point and speed runs the other way. The pen re-dips when it runs low. DOM free.
 import { createPen, dipPen, penStroke, penRect } from './pen.mjs';
 import { step, dry } from './sheet.mjs';
-import { check } from '../paint/checks.mjs';
+import { check } from './checks.mjs';
 import { hessianRidges } from '../crop/layers.mjs';
 import { gaussian } from '../keyframes/density.mjs';
 

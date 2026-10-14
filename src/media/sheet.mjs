@@ -18,7 +18,7 @@
 // - A dried wash becomes a layer: later water can lift a little of it back (by staining power), and optics composite
 //   the layers in order.
 // DOM free.
-import { check } from '../paint/checks.mjs';
+import { check } from './checks.mjs';
 
 export const DEFAULTS = {
   flow: 0.2, flowIters: 2, slope: 0,             // surface water levelling; each face's conductance is capped at 1/4
@@ -848,7 +848,7 @@ export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4
   return dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail });
 }
 // A dry that reaches its step limit with water still on the sheet does not stop the painting (--strict 1 restores the
-// stop): the water left stands where it is and dries there, with no more flow, and the event is counted (src/paint/checks.mjs).
+// stop): the water left stands where it is and dries there, with no more flow, and the event is counted (src/media/checks.mjs).
 // On the GPU the worker does the same when the dry is sent with allowWet; with --strict it throws there instead.
 export const DRY_LIMIT = 'Sheet is still wet after dry() limit';
 function wetness(sheet) {
