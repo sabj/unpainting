@@ -51,6 +51,7 @@ import {productionWaterLoad} from './painter/production-water-load.mjs';
 import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
+import { planCrosshatch } from '../src/paint/methods/crosshatch.mjs';
 import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
 import { loadStats, panelSVG } from './stroke-stats.mjs';
@@ -1384,7 +1385,7 @@ const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSub
 // separator also finds "ink" in dark painted edges (foliage, windows) that were never pen lines. --sourceink 0|1
 // overrides. CLI limits override both.
 const sourceInkDrawing = () => OUTLINE.medium === 'ink' && (opt('sourceink', '') !== '' ? num('sourceink', 0) > 0
-  : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', ''));
+  : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', '') || num('crosshatch', 0) > 0);
 const drawingCapsFor = (stage, graphite = false) => {
  const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,subject:drawSubject(),sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
  return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
@@ -1392,7 +1393,7 @@ const drawingCapsFor = (stage, graphite = false) => {
 };
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
- const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
+ const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:o.state??DRAW_MATERIAL_STATE[stage],caps:o.caps??drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
@@ -1835,6 +1836,15 @@ const PEN_FRAMES = 4;
 let filmLaid = 0, filmNext = 1;
 await shoot();
 
+const CROSSHATCH_PLAN = num('crosshatch', 0) > 0 ? planCrosshatch(SRC, null, w, h, {
+  K: opt('cellscale', '0') !== '0' ? w / 420 : 1,
+  spacing: num('crosshatchspacing', 3.1),
+  hatchFloor: num('crosshatchfloor', 0.18),
+  crossFloor: num('crosshatchcross', 0.36),
+  accentFloor: num('crosshatchaccent', 0.56),
+  deficitGain: num('crosshatchdeficit', 0.65),
+  log: console.log,
+}) : null;
 phaseMark('sheet');
 // Wrap the target and its per-cell maps (--targetguard): planning may read them until TARGET_GUARD.beginPaint()
 // closes them before the first mark. The look gets shape-level means only.
@@ -3666,6 +3676,25 @@ if (num('facedetail', 0) > 0 && opt('draw', '1') !== '0') {
   dry(sheet, 20000, O, { levelMax: 200 });
   console.log(`face detail: ${rl.drawn} lines and ${rf.drawn} flecks laid on the dry sheet in pigment ${dInkPig}`);
   STAGE = { stage: 'ink', step: 'face detail' };
+  await shoot();
+}
+if (CROSSHATCH_PLAN && opt('draw', '1') !== '0') {
+  const Kd = opt('cellscale', '0') !== '0' ? w / 420 : 1;
+  const ch = CROSSHATCH_PLAN;
+  const cInkPig = GRAPHITE && !INK ? GRAPHITE_AT : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0];
+  const cWant = SC === 1 ? ch.field : Float32Array.from({ length: N2 }, (_, i) => ch.field[(((i / W2) | 0) / SC | 0) * w + ((i % W2) / SC | 0)]);
+  const cScale = gs => gs.map(g => ({ weight: g.weight ?? 1, points: g.points.map(q => ({ x: q.x * SC, y: q.y * SC })) }));
+  const pigK = cInkPig < PIGS.length ? (PIGS[cInkPig].K[0] + PIGS[cInkPig].K[1] + PIGS[cInkPig].K[2]) / 3 : 1; const gain = num('crosshatchgain', 1) / Math.max(0.22, pigK);
+  const cPen = { nib: num('crosshatchnib', 0.44) * Kd, flex: 1.4 * Kd, travel: 1.5 * Kd, reach: 14 * Kd, reservoir: 260 * Kd * Kd, feed: 1.15 * Kd };
+  const cInk = c => SHEET_PIGS.map((_, j) => (j === cInkPig ? c * gain : 0));
+  const chCaps = nMax => ({ state: { used: 0 }, caps: { lines: nMax, pressure: 0.9, minLengthMm: 0.25, edgeMin: 0 } });
+  const r1 = penDraw(sheet, cScale(ch.primary), cWant, W2, H2, { ink: cInk(2.2), pen: cPen, O, peak: 1, ...chCaps(1800) });
+  const r2 = penDraw(sheet, cScale(ch.cross), cWant, W2, H2, { ink: cInk(2.7), pen: { ...cPen, nib: cPen.nib * 0.88 }, O, peak: 1, ...chCaps(1200) });
+  const r3 = penDraw(sheet, cScale(ch.accents), cWant, W2, H2, { ink: cInk(3.4), pen: { ...cPen, nib: cPen.nib * 0.95 }, O, peak: 1, ...chCaps(800) });
+  const r4 = ch.ridges.length ? penDraw(sheet, cScale(ch.ridges), cWant, W2, H2, { ink: cInk(3.8), pen: { ...cPen, nib: cPen.nib * 0.82 }, O, peak: 1, ...chCaps(600) }) : { drawn: 0 };
+  dry(sheet, 20000, O, { levelMax: 200 });
+  console.log(`crosshatch laid: ${r1.drawn} contour hatches, ${r2.drawn} cross-hatches, ${r3.drawn} core accents, ${r4.drawn} fine ridges in pigment ${cInkPig}`);
+  STAGE = { stage: 'ink', step: 'crosshatch' };
   await shoot();
 }
 // --smalllights gouache|both: white gouache last where the source has a small light and the painting reads over --gouachemargin denser.
