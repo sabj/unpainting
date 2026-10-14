@@ -132,17 +132,18 @@ export function planLightToDark({smallLightMax=120,detailScale=0,layerLocal=fals
   // litLift (luminous stone): warm stone whose squinted (1 mm) target L* is at least litL is a lit face. It keeps its
   // pale foundation, loses share litLift of the middle layers and every shadow glaze, and stays a thin warm glaze.
   // Lit cells at litReserveL or more are reserved as paper (sun-struck edges). One squinted threshold, cleaned to shapes.
-  if(shaped&&(litLift>0||litWarm)&&rgb){
+  const effLitLift=litLift>0?litLift:trumbullRules?.45:0,effLitWarm=litWarm||trumbullRules,effLitL=litLift>0?litL:84,effLitReserveL=litLift>0?litReserveL:92;
+  if(shaped&&(effLitLift>0||effLitWarm)&&rgb){
     const Lst=Float32Array.from({length:n},(_,i)=>lstarOf(rgb,i)),sm=boxMeanValue(Lst,w,h,Math.max(1,Math.round(1/(sheetWidthMm/w))));
     const warmStone=i=>rgb[i*3]-rgb[i*3+2]>18&&rgb[i*3+1]-rgb[i*3+2]>8;
-    const lit=removeSmall(closeLocal(Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&warmStone(i)&&sm[i]>=litL&&!isRecess(rgb,i)?1:0),w,h,1),w,h,Math.max(12,minShape>>2));
-    const glint=removeSmall(Uint8Array.from({length:n},(_,i)=>lit[i]&&sm[i]>=litReserveL?1:0),w,h,8);
+    const lit=removeSmall(closeLocal(Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&warmStone(i)&&sm[i]>=effLitL&&!isRecess(rgb,i)?1:0),w,h,1),w,h,Math.max(12,minShape>>2));
+    const glint=removeSmall(Uint8Array.from({length:n},(_,i)=>lit[i]&&sm[i]>=effLitReserveL?1:0),w,h,8);
     // litWarm: on a lit face the cool and neutral demand (ultramarine, cerulean, sepia, Payne's grey) goes to yellow
     // ochre, so the face is one clean warm glaze, not an averaged grey. Planning only; mass per cell is unchanged.
     const och=pigments.findIndex(p=>p?.name==='yellow ochre'),cool=pigments.map((p,j)=>/ultramarine|cerulean|sepia|payne/i.test(p?.name??'')?j:-1).filter(j=>j>=0);
-    if(litWarm&&och>=0){demand=demand.slice();}
-    let a=0,g=0;for(let i=0;i<n;i++){if(!lit[i])continue;if(litWarm&&och>=0){let m=0;for(const j of cool){m+=demand[i*k+j];demand[i*k+j]=0;}demand[i*k+och]+=m;}a++;weights[1][i]*=1-litLift;weights[2][i]*=1-litLift;weights[3][i]=weights[4][i]=0;if(glint[i]){protectedCells[i]=1;g++;}}
-    console.log(`lit stone: ${a} cells lit (squinted L* >= ${litL}), ${g} reserved as paper glints (>= ${litReserveL})`);
+    if(effLitWarm&&och>=0){demand=demand.slice();}
+    let a=0,g=0;for(let i=0;i<n;i++){if(!lit[i])continue;if(effLitWarm&&och>=0){let m=0;for(const j of cool){m+=demand[i*k+j];demand[i*k+j]=0;}demand[i*k+och]+=m;}a++;weights[1][i]*=1-effLitLift;weights[2][i]*=1-effLitLift;weights[3][i]=weights[4][i]=0;if(glint[i]){protectedCells[i]=1;g++;}}
+    console.log(`lit stone: ${a} cells lit (squinted L* >= ${effLitL}), ${g} reserved as paper glints (>= ${effLitReserveL})`);
   }
   const regionProfiles=profile?region.regions.map(r=>resolveStyle(subject,r.descriptiveFamily,styleSelection)):[];
   // cellFamilies (whole paintings): colour regions can span the whole sheet, so no region wins a small family box.
@@ -198,20 +199,38 @@ export function planLightToDark({smallLightMax=120,detailScale=0,layerLocal=fals
   const steps=[1,2,3,4,5].map(band=>({band,wt:weights[band-1],tag:''}));
   if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'&&!nestedBands){
     const r=Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w))),sm=boxMeanValue(value.values,w,h,r);
-    const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(sm[i]);live.sort((a,b)=>a-b);
+    const rBroad=Math.max(r,Math.round(2/(sheetWidthMm/w))),smBroad=rBroad>r?boxMeanValue(value.values,w,h,rBroad):sm;
+    const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(smBroad[i]);live.sort((a,b)=>a-b);
     const QF=layerFractions(washLayers);
     const q=QF.map(f=>live[Math.floor(f*(live.length-1))]??0);
     // skyOneLayer: a large open cool plane (sky over 1.5% of the sheet) is one graded wet passage in layer 0. Later
     // layers, cut at a whole-sheet value quantile, would lay hard-edged dark patches over it.
     let skyCells=null;
-    if(skyOneLayer&&rgb){const cool=Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?1:0),cc=components(cool,w,h),sz=new Int32Array(cc.count+1);
+    if((skyOneLayer||layerLocal)&&rgb){const cool=Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?1:0),cc=components(cool,w,h),sz=new Int32Array(cc.count+1);
       for(let i=0;i<n;i++)sz[cc.labels[i]]++;skyCells=Uint8Array.from({length:n},(_,i)=>cc.labels[i]&&sz[cc.labels[i]]>n*.015?1:0);}
-    // layerLocal: the cut levels are the same quantiles of each colour region's own smoothed values (regions of at
-    // least minShape*8 cells), so a form whose values sit inside one whole-sheet step (a sunlit face in a dark
-    // scene) still gets its own light, half and shadow planes instead of one flat plane.
-    const localQ=layerLocal?regionCuts(region.labels,sm,i=>!protectedCells[i]&&weights[1][i]>0,QF,minShape*8):null;
-    const cutAt=(i,j,t)=>{const lq=localQ?.get(region.labels[i]);return lq?lq[j]:t;};
-    const cover=q.map((t,j)=>{if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);return removeSmall(closeLocal(Uint8Array.from(sm,(v,i)=>v>cutAt(i,j,t)&&!skyCells?.[i]?1:0),w,h,layerSmoothMm<2?1:2),w,h,layerSmoothMm<2?minShape:minShape*4);});
+    // layerLocal: the cut levels are the same quantiles of each colour region's own smoothed values (compact, detailed
+    // subject regions of at least minShape*6 cells and at most 14% of the sheet), so a form whose values sit inside one
+    // whole-sheet step (a sunlit face in a dark scene) gets its own light, half and shadow planes while broad skies,
+    // walls and grounds keep the 4 smooth sheet-wide layers.
+    const rawLocalQ=layerLocal?regionCuts(region.labels,sm,i=>!protectedCells[i]&&weights[1][i]>0&&!skyCells?.[i],QF,minShape*6):null;
+    const localQ=rawLocalQ?new Map([...rawLocalQ].filter(([L,cuts])=>{
+      const reg=region.regions[L-1];if(!reg||reg.area>n*.14||cuts[cuts.length-1]-cuts[0]<.13)return false;
+      if(!DETAIL)return true;
+      let dSum=0,cnt=0;for(let i=0;i<n;i++)if(region.labels[i]===L){dSum+=DETAIL[i];cnt++;}
+      return cnt>0&&dSum/cnt>=.15;
+    })):null;
+    const broadStride=washLayers>4?Math.max(1,Math.round(washLayers/4)):1;
+    const cover=q.map((t,j)=>{
+      if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);
+      const mask=Uint8Array.from(sm,(v,i)=>{
+        if(skyCells?.[i])return 0;
+        const lq=localQ?.get(region.labels[i]);
+        if(lq)return v>lq[j]?1:0;
+        if(j%broadStride!==0)return 0;
+        return smBroad[i]>t?1:0;
+      });
+      return removeSmall(closeLocal(mask,w,h,layerSmoothMm<2?1:2),w,h,layerSmoothMm<2?minShape:minShape*4);
+    });
     const count=new Uint8Array(n);for(const c of cover)for(let i=0;i<n;i++)count[i]+=c[i];
     // The layers carry all middle demand; no separate per-region band-3 patchwork.
     // layerIncrement: each layer carries the value step between its threshold and the next layer's, as a painter lays
@@ -278,7 +297,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,layerLocal=fals
           const box={x0:w,y0:h,x1:-1,y1:-1},soft=[],hard=[];let total=0;
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
             const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
-          if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.5,4*(1-detailScale*meanOver(list,DETAIL))):4)){omittedDemand+=total;continue;}
+          if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.1,4*(1-detailScale*meanOver(list,DETAIL))):4)){omittedDemand+=total;continue;}
           if(total<=1e-8)continue;const amount=placed?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
           sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=G;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain}/s${id}`;

@@ -1107,7 +1107,7 @@ const SUBJECT_STYLE=VALUE_CONFIG?.subject&&(VALUE_CONFIG.styleSelection||loadSub
 const STYLE_ON=()=>!!VALUE_PLAN?.style&&VALUE_PLAN.style.name!=='precise-watercolor';
 // The pen's ink load. --closingconc f dilutes the closing pen's ink (default 1): a closing accent restates an edge over
 // dried washes and should not come out darker than the darkest of them.
-const INKLOAD=()=>(STYLE_ON()?num('inkconc',8)*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))*(AREA_DRAW_STAGE==='closing'?num('closingconc',1):1);
+const INKLOAD=()=>(STYLE_ON()?num('inkconc',8)*VALUE_PLAN.style.ink:num('inkconc', !VALUE_CONFIG && OUTLINE.medium === 'ink' ? 8 : VALUE_ENABLED ? 4 : 10))*(AREA_DRAW_STAGE==='closing'?num('closingconc',1):1);
 const STYLE_INK_DEFAULT=SUBJECT_STYLE?.pigment==='black'?'black-ink':'sepia-ink';
 const INK_PROFILE=materialProfile(opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT));
 const GRAPHITE_PROFILE=materialProfile(opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'));
@@ -1118,7 +1118,7 @@ if(!['ink','graphite'].includes(OUTLINE_MEDIUM))materialProfile(OUTLINE_MEDIUM);
 // --inkk r,g,b overrides the profile's absorption; --inkkscale multiplies it.
 const INK_K_DECLARED=opt('inkk','')?opt('inkk','').split(',').map(Number):null;
 if(INK_K_DECLARED&&(INK_K_DECLARED.length!==3||INK_K_DECLARED.some(v=>!(v>0))))throw Error('--inkk needs three positive numbers');
-const INK_FAST=opt('inkfast','auto')==='auto'?!INK_PROFILE.rewets:num('inkfast',0)>0;
+const INK_FAST=opt('inkfast','auto')==='auto'?(!VALUE_CONFIG&&OUTLINE.medium==='ink'?true:!INK_PROFILE.rewets):num('inkfast',0)>0;
 const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
 // --outlinemedium graphite: pen-first outlines in pencil, not ink; graphite is a neutral grey, waterproof and light.
@@ -1385,9 +1385,9 @@ const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSub
 // separator also finds "ink" in dark painted edges (foliage, windows) that were never pen lines. --sourceink 0|1
 // overrides. CLI limits override both.
 const sourceInkDrawing = () => OUTLINE.medium === 'ink' && (opt('sourceink', '') !== '' ? num('sourceink', 0) > 0
-  : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', '') || num('crosshatch', 0) > 0);
+  : !VALUE_CONFIG || VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', '') || num('crosshatch', 0) > 0);
 const drawingCapsFor = (stage, graphite = false) => {
- const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,subject:drawSubject(),sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
+ const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,subject:drawSubject(),sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')||!VALUE_CONFIG),plannedDrawing:!!opt('drawingfile','')});
  return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
   ...(stage==='opening'?{minLengthMm:num('openingminmm',defaults.minLengthMm)}:{edgeMin:num('closingedgemin',defaults.edgeMin)})};
 };
@@ -1990,7 +1990,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
         turn: num('fineturn', 0.92), carry: num('finecarry', 14) * K, scales: [num('finescale', 0.6), 0], tries: 4000 }).gestures
     : planGestures(field, w, h, { seed: 7 + SEED, floor, keep: num('keep', 400), claimRadius: 3 * K, reachShare: num('penreach', 0.12), turn: num('turn', 0.8), carry: num('carry', 8) * K, scales: [1.5, 0], tries: 3000 }).gestures);
   // --pensimplify c: reduce each pen path to the points it needs within c cells, then resample evenly. Default 0, off.
-  const SIMPLIFY = num('pensimplify', 0) * K;
+  const SIMPLIFY = num('pensimplify', !VALUE_CONFIG && sourceInkDrawing() ? 0.55 : 0) * K;
   const simplifyAll = gs => (SIMPLIFY > 0 ? gs.map(g => ({ ...g, points: drawAs(g.points, { tolerance: SIMPLIFY, step: Math.max(1, 2 * K) }) })).filter(g => g.points.length >= 2) : gs);
   const gestures = simplifyAll(clock('paths', () => (opt('penfrom', 'walk') === 'chains' ? chainPen() : walkPen())));
   // the ink is the darkest fluid on the palette, as walnut ink is darker than any wash made from it
@@ -2451,7 +2451,7 @@ const DARK_MASS = await (opt('dogpaint', '') ? dogPaint : darkMass)({
 // both: draw first, wash, ink again. none: no line.
 // --prep 1: a full preparatory drawing: no ink budget, a lower floor so fainter contours are found, and the outline pass.
 const PREP = opt('prep', '0') !== '0';
-const DRAWING = PREP && opt('drawing', 'first') === 'detect' ? 'first' : opt('drawing', 'first');
+const DRAWING = PREP && opt('drawing', 'first') === 'detect' ? 'first' : (!argv0.includes('--drawing') && !VALUE_CONFIG && sourceInkDrawing() ? 'both' : opt('drawing', 'first'));
 if (!['detect', 'first', 'last', 'both', 'none'].includes(DRAWING)) throw new Error(`--drawing: detect, first, last, both or none, not ${DRAWING}`);
 const PEN_FIRST = DRAWING === 'first' || DRAWING === 'both' ? true
   : DRAWING === 'last' || DRAWING === 'none' ? false
@@ -2800,6 +2800,7 @@ const touchCorrections = round => {
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
     if (Math.min(...d) < dmin * 0.75 || lumOf(d) < ymin) return;
+    if (lumOf(Ds) > 0.48 || (lumOf(Dt) > 0 && lumOf(Ds) >= 0.78 * lumOf(Dt))) return;
     const a = unmix(Float32Array.from(d), 1, Ks);
     const mix = Array.from(a, v => (v > 0.004 ? v * gain : 0));
     const amt = mix.reduce((s, v) => s + v, 0);
@@ -3068,7 +3069,10 @@ for (let L = L_START; L < (PRACTICE ? 0 : layers.length); L++) {
   // under --feedback the passage is charged for what the shape still lacks, against what the plan asked of this pass,
   // both as shape means: from none when the sheet already holds the shape's amount, up to twice when it holds far less.
   // A shape too small to squint at (the look returns null) is charged its planned amount.
-  if (ONSHEET && sh._fb == null) sh._fb = LOOK ? shapeCharge(SHAPE_LACK, shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.booked, { mix: colourMix, pigment: layer.pigment })) : 1;
+  if (ONSHEET && sh._fb == null) {
+    sh._fb = LOOK ? shapeCharge(SHAPE_LACK, shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.booked, { mix: colourMix, pigment: layer.pigment })) : 1;
+    if (sh._valuePlan?.phase === 'shadow') sh._fb = Math.min(1.15, sh._fb);
+  }
   // --skipheld f: skip a broad passage the sheet already holds (feedback charge under f). Default 0.
   // --skipheldmin: least share of the sheet for a passage to be skipped (default 0.02); small features are always laid.
   if (ONSHEET && num('skipheld', 0) > 0 && (sh._fb ?? 1) < num('skipheld', 0) && sh.area >= num('skipheldmin', 0.02) * n) { used['held, skipped'] = (used['held, skipped'] || 0) + 1; continue; }

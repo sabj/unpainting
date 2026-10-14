@@ -27,21 +27,26 @@ function tidyLine(g, tolPx, maxSeg) {
   for (let k = 1; k < all.length; k++) cum.push(cum[k - 1] + Math.hypot(all[k].x - all[k - 1].x, all[k].y - all[k - 1].y));
   const arc = cum.at(-1), chord = Math.hypot(all.at(-1).x - all[0].x, all.at(-1).y - all[0].y);
   const straight = arc > 1e-6 ? chord / arc : 1;
-  const tol = tolPx * sw * (chord >= 8 * sw && straight >= 0.86 ? 1.65 : 1);
-  const at = new Map(all.map((q, k) => [q, k])), keep = new Set(simplify(all, tol).map(q => at.get(q)));
+  const tol = tolPx * sw * (chord >= 6 * sw && straight >= 0.85 ? (straight >= 0.92 ? 2.4 : 1.75) : 1);
+  const at = new Map(all.map((q, k) => [q, k])), geoKeep = new Set(simplify(all, tol).map(q => at.get(q))), keep = new Set(geoKeep);
   const ws = all.map(q => q.width).filter(v => v != null).sort((a, b) => a - b), dw = Math.max(0.3, 0.35 * (ws[ws.length >> 1] ?? 0)), dq = 0.15;
   const ks = [...keep].sort((a, b) => a - b), stack = ks.slice(1).map((b, i) => [ks[i], b]);
+  const projected = new Map();
   while (stack.length) {
     const [a, b] = stack.pop(); let far = -1, best = 1;
     for (let i = a + 1; i < b; i++) {
-      const f = (cum[i] - cum[a]) / Math.max(1e-9, cum[b] - cum[a]), P = all[a], Q = all[b], q = all[i];
+      const f = (cum[i] - cum[a]) / Math.max(1e-9, cum[b] - cum[a]), P = projected.get(a) ?? all[a], Q = projected.get(b) ?? all[b], q = all[i];
       const ew = q.width == null || P.width == null || Q.width == null ? 0 : Math.abs(q.width - (P.width + (Q.width - P.width) * f)) / dw;
       const eq = q.weight == null || P.weight == null || Q.weight == null ? 0 : Math.abs(q.weight - (P.weight + (Q.weight - P.weight) * f)) / dq;
       const e = Math.max(ew, eq); if (e > best) { best = e; far = i; }
     }
-    if (far > 0) { keep.add(far); stack.push([a, far], [far, b]); }
+    if (far > 0) {
+      const f = (cum[far] - cum[a]) / Math.max(1e-9, cum[b] - cum[a]), P = projected.get(a) ?? all[a], Q = projected.get(b) ?? all[b];
+      projected.set(far, { ...all[far], x: P.x + (Q.x - P.x) * f, y: P.y + (Q.y - P.y) * f });
+      keep.add(far); stack.push([a, far], [far, b]);
+    }
   }
-  const kept = [...keep].sort((a, b) => a - b).map(i => all[i]);
+  const kept = [...keep].sort((a, b) => a - b).map(i => projected.get(i) ?? all[i]);
   const points = kept.flatMap((q, k) => {
     if (!k) return [q];
     const p = kept[k - 1], n = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / maxSeg), out = [];
