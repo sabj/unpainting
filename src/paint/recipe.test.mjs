@@ -88,3 +88,13 @@ test('combined defaults use general washes and v096 retains fitted settings', ()
     assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
   }
 });
+
+test('the default recipe carries the technique rules: seams on colour edges, small marks, joined washes, no blot charge', () => {
+  const { argv } = expandRecipe({ argv: [] });
+  const value = name => argv[argv.lastIndexOf(name) + 1];
+  assert.equal(value('--subjectseam'), '0.5');
+  assert.equal(value('--smallmarks'), '1');
+  assert.equal(value('--smallmarklights'), '0', 'no small reserved lights: they read as speckle in dark coats');
+  assert.equal(value('--washjoin'), '1');
+  assert.equal(value('--undercover'), '0');
+});

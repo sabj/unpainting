@@ -45,6 +45,28 @@ test('hueChroma: saturated and muted regions of one hue family take separate mid
   assert.ok(split < mixed / 4, `blue on orange in the middle layers ${split} vs ${mixed}`);
 });
 
+test('hueChromaLab: a muted brown with a wide RGB range does not share the saturated orange light wash', () => {
+  const brown = rgb.slice();
+  for (let i = 0; i < n; i++) if (i % w >= w / 2 && Math.floor(i / w) >= TOP && !pale(i)) brown.set([130, 100, 80], i * 3);
+  const opts = { rgb: brown, lightFamilies: true, hueChroma: 30 };
+  const rgbRange = blueOnOrange(plan(opts)).light, lab = blueOnOrange(plan({ ...opts, hueChromaLab: true })).light;
+  assert.ok(lab < rgbRange / 4, `blue light wash on orange ${lab} vs ${rgbRange}`);
+});
+
+test('shadowFamilies: the grey shadow glaze does not pool its blue charge across the orange', () => {
+  const opts = { lightFamilies: true, hueChroma: 30, hueChromaLab: true };
+  const pooled = blueOnOrange(plan(opts)).shadow, split = blueOnOrange(plan({ ...opts, shadowFamilies: true })).shadow;
+  assert.ok(pooled > 0 && split < pooled / 2, `blue shadow glaze on orange ${split} vs ${pooled}`);
+});
+
+test('deepAccentIn: deep accents stay inside the named family bounds', () => {
+  const dark = rgb.slice(); for (let i = 0; i < n; i++) if (Math.floor(i / w) >= h - 6) dark.set([30, 28, 26], i * 3);
+  const families = [{ id: 'left', bounds: [0, 0, .5, 1] }, { id: 'right', bounds: [.5, 0, 1, 1] }];
+  const accentRight = p => { let c = 0; for (const L of p.layers) if (L.value >= 4) for (const sh of L.shapes) for (let i = 0; i < n; i++) if (sh.mask[i] && i % w >= w / 2 && Math.floor(i / w) >= h - 6) c += sh.amount; return c; };
+  const all = accentRight(plan({ rgb: dark, families, deepAccent: 60 })), left = accentRight(plan({ rgb: dark, families, deepAccent: 60, deepAccentIn: ['left'] }));
+  assert.ok(left < all * .97, `shadow charge on the right family darks ${left} vs ${all}`);
+});
+
 test('passCap: a passage charged at its median over-charges fewer cells and still lays the planned mass', () => {
   const over = p => { const per = laidPerCell(p); let o = 0, t = 0; for (let i = 0; i < n * k; i++) { t += demand[i]; if (demand[i] > 0) o += Math.max(0, per[i] - demand[i]); } return o / t; };
   const mass = p => { const per = laidPerCell(p); let a = 0, b = 0; for (let i = 0; i < n * k; i++) { a += per[i]; b += demand[i]; } return a / b; };

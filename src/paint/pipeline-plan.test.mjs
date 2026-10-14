@@ -24,9 +24,12 @@ for (const colour of ['layered', 'family']) {
   const {flags}=pipelineFlags({washes:{colour,charge:.4,carryMm:2,paleLimit:.1}});
   const m=new Map(Array.from({length:flags.length/2},(_,i)=>flags.slice(i*2,i*2+2)));
   const family=colour==='family';
-  assert.equal(m.get('--huechroma'),family?'30':'0');
-  assert.equal(m.get('--lightfamilies'),family?'1':'0');
-  assert.equal(m.get('--passcap'),family?'0.4':'0');
+  // Both modes keep light colour families apart; layered splits them on Lab chroma.
+  assert.equal(m.get('--huechroma'),family?'30':'20');
+  assert.equal(m.get('--lightfamilies'),'1');
+  assert.equal(m.get('--huechromalab'),family?undefined:'1');
+  assert.equal(m.get('--shadowfamilies'),family?undefined:'1');
+  assert.equal(m.get('--passcap'),'0.4');
   assert.equal(m.get('--maskmm'),family?'2':'0');
   assert.equal(m.get('--palelights'),family?'0.1':'0');
  });
@@ -46,4 +49,29 @@ test('fur reserves retain local light groups but reject singleton glints',()=>{
  const R=furLightReserves({D,w,h},{reach:10,drop:.5,dark:.8});
  assert.equal(R[50*w+50],1);assert.equal(R[50*w+51],1);assert.equal(R[20*w+20],0);
  assert.equal(R.reduce((a,b)=>a+b),2);
+});
+
+test('washes.paints names the authored box palette',()=>{
+ const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ assert.equal(m(pipelineFlags({washes:{paints:['sienna','hansa','ultramarine']}})).get('--paints'),'sienna,hansa,ultramarine');
+ assert.equal(m(pipelineFlags({})).get('--paints'),undefined);
+ assert.throws(()=>resolvePipeline({washes:{paints:['vermilion']}}),/washes.paints/);
+ assert.throws(()=>resolvePipeline({washes:{paints:[]}}),/washes.paints/);
+});
+
+test('washes.darkGain scales the shadow glazes when the plan sets it',()=>{
+ const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ assert.equal(m(pipelineFlags({washes:{darkGain:2}})).get('--darkgain'),'2');
+ assert.equal(m(pipelineFlags({})).get('--darkgain'),undefined);
+ assert.throws(()=>resolvePipeline({washes:{darkGain:5}}),/washes.darkGain/);
+});
+
+test('washes.deepAccent restates darks inside named families only',()=>{
+ const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+ const families=[{id:'cat-fur'},{id:'man-skin'}];
+ const f=m(pipelineFlags({families,washes:{deepAccent:{max:75,families:['cat-fur']}}}));
+ assert.equal(f.get('--deepaccent'),'75'); assert.equal(f.get('--deepgrow'),'0'); assert.equal(f.get('--deepaccentin'),'cat-fur');
+ assert.equal(m(pipelineFlags({families})).get('--deepaccent'),undefined);
+ assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:75,families:['dog']}}}),/deepAccent.families/);
+ assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:300,families:['cat-fur']}}}),/deepAccent.max/);
 });

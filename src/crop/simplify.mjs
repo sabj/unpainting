@@ -2,7 +2,7 @@
 // that follows it faithfully draws the wobble. Douglas-Peucker keeps the corners, then an even resample gives the pen
 // a continuous path. DOM free.
 
-/** Douglas-Peucker: the fewest points that keep every other point within `tolerance` of the path. */
+/** Douglas-Peucker: the fewest points that keep every other point within `tolerance` of the segment path. */
 export function simplify(points, tolerance = 2) {
   if (points.length < 3 || tolerance <= 0) return points.slice();
   const keep = new Uint8Array(points.length); keep[0] = keep[points.length - 1] = 1;
@@ -11,11 +11,12 @@ export function simplify(points, tolerance = 2) {
     const [a, b] = stack.pop();
     if (b - a < 2) continue;
     const ax = points[a].x, ay = points[a].y, bx = points[b].x, by = points[b].y;
-    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
     let far = -1, best = tolerance;
     for (let i = a + 1; i < b; i++) {
       const px = points[i].x - ax, py = points[i].y - ay;
-      const d = len > 1e-9 ? Math.abs(px * dy - py * dx) / len : Math.hypot(px, py);
+      const t = len2 > 1e-18 ? Math.max(0, Math.min(1, (px * dx + py * dy) / len2)) : 0;
+      const d = Math.hypot(px - t * dx, py - t * dy);
       if (d > best) { best = d; far = i; }
     }
     if (far > 0) { keep[far] = 1; stack.push([a, far], [far, b]); }

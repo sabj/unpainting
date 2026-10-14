@@ -1,6 +1,7 @@
 // One plan owns drawing, washes and order. Flags are an execution adapter, not a second plan.
 import { drawingFlags } from './drawing-plan.mjs';
 import { readSubjectOrder } from './methods/subject-order.mjs';
+import { BOX } from '../crop/box.mjs';
 
 function object(v, name) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error(`${name}: expected an object`);
@@ -10,6 +11,22 @@ function number(v, fallback, min, max, name) {
   v ??= fallback;
   if (typeof v !== 'number' || !Number.isFinite(v) || v < min || v > max) throw Error(`${name}: expected ${min}..${max}`);
   return v;
+}
+// washes.paints: the authored box palette, by box key. A colour subject names its pans instead of the fit choosing them.
+function paints(v) {
+  if (v == null) return null;
+  const keys = BOX.map(p => p.key);
+  if (!Array.isArray(v) || !v.length || v.some(k => !keys.includes(k))) throw Error(`washes.paints: expected box keys from ${keys.join(", ")}`);
+  return [...v];
+}
+// washes.deepAccent {max, grow, families}: cells whose darkest channel is under max (0..255) inside the named
+// families are restated last as dark accents, two dried layers (nose, eye rims), grown by grow cells.
+function deepAccent(v, families) {
+  if (v == null) return null;
+  object(v, 'washes.deepAccent');
+  const ids = families.map(f => f.id);
+  if (!Array.isArray(v.families) || !v.families.length || v.families.some(id => !ids.includes(id))) throw Error(`washes.deepAccent.families: expected family ids from ${ids.join(', ')}`);
+  return { max: number(v.max, 0, 1, 255, 'washes.deepAccent.max'), grow: number(v.grow, 0, 0, 4, 'washes.deepAccent.grow'), families: [...v.families] };
 }
 function choice(v, fallback, choices, name) {
   v ??= fallback;
@@ -29,6 +46,9 @@ export function resolvePipeline(plan = {}) {
     drawing,
     washes: {
       furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
+      paints: paints(washes.paints),
+      darkGain: washes.darkGain == null ? null : number(washes.darkGain, 1, .5, 3, 'washes.darkGain'),
+      deepAccent: deepAccent(washes.deepAccent, plan.families ?? []),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
       inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
@@ -51,12 +71,26 @@ export function pipelineFlags(plan) {
   const p = resolvePipeline(plan), w = p.washes, flags = drawingFlags(p.drawing);
   const add = (k,v) => flags.push('--'+k,String(v));
   if (w.furReserves) add('furreserves', JSON.stringify(w.furReserves));
+  if (w.paints) add('paints', w.paints.join(','));
+  // washes.darkGain: shadow glazes (bands 4-5) are charged at this multiple of their fitted demand. The physical
+  // wash delivers about 70% of a planned dark, so a dark subject names the gain it needs to reach its value.
+  if (w.darkGain != null) add('darkgain', w.darkGain);
+  if (w.deepAccent) { add('deepaccent', w.deepAccent.max); add('deepgrow', w.deepAccent.grow); add('deepaccentin', w.deepAccent.families.join(',')); }
   add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
-  // Honour the authored wash mode: colour-family splitting changes the passage plan.
-  add('huechroma', w.colour === 'family' ? 30 : 0);
-  add('passcap', w.colour === 'family' ? w.charge : 0);
+  // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
+  // washes still keep light colour families apart, split on perceptual chroma, so a neutral
+  // foundation cannot pool its sepia charge across a saturated orange passage.
+  // Layered washes split at Lab chroma 20: the cat's broad orange (C20-30) then gets its own connected light and
+  // middle washes instead of pooling with muted warm and grey neighbours. Family mode keeps RGB range 30.
+  add('huechroma', w.colour === 'layered' ? 20 : 30);
+  if (w.colour === 'layered') add('huechromalab', 1);
+  // Layered shadow glazes also keep colour families apart: the grey shadow does not pool its blue across the orange.
+  if (w.colour === 'layered') add('shadowfamilies', 1);
+  // Both modes charge each passage at the washes.charge quantile of its demand and carry the rest into the next
+  // band, so the darkest cells of a shadow get a smaller, darker restatement instead of the shape's flat mean.
+  add('passcap', w.charge);
   add('maskmm', w.colour === 'family' ? w.carryMm : 0);
-  add('lightfamilies', w.colour === 'family' ? 1 : 0);
+  add('lightfamilies', 1);
   add('palelights', w.colour === 'family' ? w.paleLimit : 0);
   add('washinkfree', +w.inkAware);
   add('subjectorder', p.order.strength);
