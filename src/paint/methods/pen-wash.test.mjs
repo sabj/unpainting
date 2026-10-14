@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, fitMix, contrastDarks, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
+import { valueGroups, skyMask, planPenWash, paletteRoles, passageAmounts, fitMix, contrastDarks, ladderStrengths, PENWASH_MAX_PASSAGES } from './pen-wash-plan.mjs';
+import { renderLayers } from '../../media/km.mjs';
 import { prunePenLines } from './pen-wash-lines.mjs';
 import { washFootprint } from './pen-wash.mjs';
 import { expandRecipe, styleAlias } from '../recipe.mjs';
@@ -166,6 +167,84 @@ test('the one shadow wash can keep the lights inside it', () => {
   assert.equal(kept.mask[at(70, 50)], 1, 'the shade around it is still glazed');
 });
 
+// L* of the flat plan at one cell: every passage's planned amount there, laid oldest first on the paper.
+const PAPER = [247, 244, 236];
+function flatL(passages, i) {
+  const layers = passages.map(p => { const a = passageAmounts(p, W, H, PIGS.length); return PIGS.map((_, j) => Float32Array.of(a[i * PIGS.length + j])); });
+  const [r, g, b] = renderLayers(layers, PIGS, Uint8ClampedArray.from(PAPER), 1, 1);
+  const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const Y = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return Y > 0.008856 ? 116 * Math.cbrt(Y) - 16 : 903.3 * Y;
+}
+const greyL = v => { const c = v / 255, l = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; return 116 * Math.cbrt(l) - 16; };
+
+// A near-white sky, a sunlit wall (light grey), its shaded side with a hard edge and a dark doorway in it, a sunlit
+// street with a small dark figure on it.
+function stageScene() {
+  const px = new Uint8ClampedArray(N * 3), v = new Uint8ClampedArray(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const wall = y >= 14 && y < 66 && x >= 10 && x < 110, shade = wall && x >= 64, door = shade && x >= 80 && x < 96 && y >= 40;
+    const figure = y >= 74 && y < 78 && x >= 30 && x < 33;
+    v[y * W + x] = door ? 40 : shade ? 120 : wall ? 205 : figure ? 70 : y < 14 ? 245 : 240;
+  }
+  for (let i = 0; i < N; i++) px.fill(v[i], i * 3, i * 3 + 3);
+  return { px, v };
+}
+
+test('the stage planner works lights first: whites kept, one pale first wash, one shadow wash, a few darks', () => {
+  const { px, v } = stageScene(), at = (x, y) => y * W + x;
+  const plan = planPenWash({ planner: 'stages', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, paperRGB: PAPER, options: { whiteMm: 1, fineMm: 1, holeMm2: 10 } });
+  const ids = plan.passages.map(p => p.id);
+  assert.deepEqual(ids.map(id => id.replace(/-\d$/, '')), ['first', 'shadow', 'darks'], ids.join());
+  const under = (x, y) => plan.passages.filter(p => p.mask[at(x, y)]).map(p => p.id);
+  // whites: the sky, the street and the small figure on it stay paper under every wash (the pen draws the figure)
+  for (const [x, y] of [[60, 5], [60, 85], [31, 75]]) assert.deepEqual(under(x, y), [], `paper at ${x},${y}`);
+  // the first wash covers the sunlit wall and everything darker; the shadow wash the shaded side only; darks the door
+  assert.deepEqual(under(30, 40), ['first-1']);
+  assert.deepEqual(under(70, 30), ['first-1', 'shadow']);
+  assert.deepEqual(under(88, 55), ['first-1', 'shadow', 'darks']);
+  const darks = plan.passages.find(p => p.id === 'darks'), share = darks.mask.reduce((a, x) => a + x, 0) / N;
+  assert.ok(share < 0.05, `darks are small: ${share}`);
+  // the value order is the target's, every wash stays lighter than the photo, and the first wash is pale
+  const Lw = flatL(plan.passages, at(30, 40)), Ls = flatL(plan.passages, at(70, 30)), Ld = flatL(plan.passages, at(88, 55));
+  assert.ok(Lw > Ls + 4 && Ls > Ld + 3, `wall ${Lw.toFixed(1)} > shade ${Ls.toFixed(1)} > door ${Ld.toFixed(1)}`);
+  for (const [x, y] of [[30, 40], [70, 30], [88, 55]]) assert.ok(flatL(plan.passages, at(x, y)) > greyL(v[at(x, y)]), `lighter than the photo at ${x},${y}`);
+  assert.ok(flatL([], 0) - flatL([plan.passages[0]], at(30, 40)) <= 9.5, 'the first wash is pale');
+  assert.ok(plan.passages.find(p => p.id === 'shadow').dry, 'the shadow wash goes on dry paper');
+});
+
+test('the stage planner grades the first wash where the target grades and softens a turning edge', () => {
+  // a wall darkening steadily down the sheet, with a shadow whose left edge is a hard cast edge and whose right
+  // edge fades into the wall over about 15 cells
+  const px = new Uint8ClampedArray(N * 3), at = (x, y) => y * W + x;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let v = 225 - Math.round(60 * y / H);
+    if (x >= 40 && x < 100 && y > 20 && y < 70) v = Math.min(v, 60 + (x >= 65 ? Math.round(7 * (x - 65)) : 0));
+    px.fill(Math.min(255, v), at(x, y) * 3, at(x, y) * 3 + 3);
+  }
+  const plan = planPenWash({ planner: 'stages', px, w: W, h: H, pigments: PIGS, mmPerCell: 0.5, paperRGB: PAPER, options: { whiteMm: 1, fineMm: 1, softGrad: 20, softBandMm: 2, softBlurMm: 1 } });
+  const first = plan.passages[0], shadow = plan.passages.find(p => p.id === 'shadow');
+  assert.ok(first.grade && first.grade.to > first.grade.from, `graded darker toward the bottom: ${JSON.stringify(first.grade)}`);
+  assert.ok(shadow.soft, 'the shadow wash carries a soft band');
+  const softNear = x0 => { let c = 0; for (let y = 30; y < 60; y++) for (let x = x0 - 4; x <= x0 + 4; x++) c += shadow.soft[at(x, y)]; return c; };
+  const right = (() => { for (let x = 99; x > 40; x--) if (shadow.mask[at(x, 45)]) return x + 2; return 0; })();
+  assert.ok(softNear(right) > 0, `the fading right edge (near x ${right}) is soft`);
+  assert.equal(softNear(37), 0, 'the hard cast edge on the left stays crisp');
+});
+
+test('ladder strengths cap every wash at its own limit and drop one that would do nothing', () => {
+  const L = new Float32Array(N).fill(30), all = new Uint8Array(N).fill(1), dir = [0.6, 0.1, 0.3];
+  const passages = [{ id: 'a', role: 'local', mask: all, dir, strength: 0.1, ladderC: 0.9, maxDL: 8 }, { id: 'b', role: 'shadow', mask: all, dir, strength: 0.1 }];
+  const out = ladderStrengths(passages, { L, n: N, pigments: PIGS, paperRGB: PAPER, c: 0.9, maxDL: 12, maxStrength: 2 });
+  assert.equal(out.length, 2); assert.notEqual(out[0], passages[0], 'new passages, the input is not changed');
+  assert.equal(passages[0].strength, 0.1);
+  assert.ok(flatL([], 0) - flatL([out[0]], 0) <= 8.5, 'a capped at its own 8 L*');
+  assert.ok(flatL([], 0) - flatL([out[1]], 0) <= 12.5 && flatL([], 0) - flatL([out[1]], 0) > 8.5, 'b capped at the default 12 L*');
+  // a light target under a wash that is already dark enough: the second wash is left out
+  const pale = ladderStrengths(passages.map(p => ({ ...p, ladderC: 0.5, maxDL: 20 })), { L: new Float32Array(N).fill(85), n: N, pigments: PIGS, paperRGB: PAPER });
+  assert.deepEqual(pale.map(p => p.id), ['a']);
+});
+
 test('a wash footprint slips off its shape, breaks its edge and keeps off the border', () => {
   const m = new Uint8Array(N); for (let y = 20; y < 60; y++) for (let x = 30; x < 90; x++) m[y * W + x] = 1;
   const f = washFootprint(m, W, H, { slip: 4, angle: 0, edgeSigma: 1, edgeAmp: 0 });
@@ -183,7 +262,7 @@ test('--style penwash names the pen-and-wash recipe; the default recipe is uncha
   const pen = expandRecipe({ argv: ['--image', 'a.jpg', '--style', 'penwash'] }).argv;
   const at = k => pen[pen.lastIndexOf(k) + 1];
   assert.equal(at('--penwash'), '1'); assert.equal(at('--drawing'), 'first'); assert.equal(at('--touchpoints'), '0');
-  assert.equal(at('--pwallwet'), '1'); assert.equal(at('--pwminlight'), '0.6');
+  assert.equal(at('--pwallwet'), '1'); assert.equal(at('--pwminlight'), '0.6'); assert.equal(at('--penwashplan'), 'stages');
   assert.ok(!pen.includes('--style'));
   const def = expandRecipe({ argv: ['--image', 'a.jpg'] }).argv;
   assert.ok(!def.includes('--penwash'));

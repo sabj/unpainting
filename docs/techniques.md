@@ -37,6 +37,11 @@ Default recipe flags, with the value that turns each off:
 - `--marks 1`: records every stroke to `marks.json`. Off: `0`.
 - `--washsession 1 --huechroma 30 --passcap 0.5 --maskmm 2 --lightfamilies 1 --palelights 0.16`: clean-colour family washes in passage sessions, from the plan's `washes` section (rows below). Off: `--recipe v096`.
 - `--finaldarks 0`, `--sourcelines 0 --linesource none`: final darks and automatic source lines stay off until a plan or flag asks for them.
+- `--subjectseam 0.5`: a wash is cut at a subject edge only where half the cut follows a colour edge. Off: `0`.
+- `--smallmarks 1`: small darks under the minimum shape are laid once, last. Off: `0`.
+- `--smallmarklights 0`: the small-mark rule reserves no small lights (up to 120 read as speckle in dark coats). Old: `120`.
+- `--washjoin 1`: a colour-domain piece under the minimum shape joins the neighbouring wash. Off: `0`.
+- `--undercover 0`: a passage its sweeps only partly cover is not charged up (that charge dried as a blot). Old: `1`.
 
 The default recipe sets no drawing medium, amount or weight. Each subject's plan chooses them in its `drawing` section ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
 
@@ -48,8 +53,10 @@ Modules, with their flags:
 - `run-cache.mjs` (always on): caches slow, input-determined steps on disk.
 - `styles/loader.mjs` (`--valueplan <json>`): loads watercolor style profiles and subject mappings.
 - `methods/brushes.mjs` (`--physical 1`): sizes brushes from real ones and splits strokes where water runs out.
+- `methods/charge-layers.mjs` (`--charge 1`, parked): a region's middle layers laid in one wet session.
 - `methods/colour-budget.mjs` (`--colourbudget 1`, `--fwrepay 1`): defers colour held back from a pale first wash to a later glaze.
 - `methods/crisp-edges.mjs` (`--crisp 1`): wet-on-dry glazes stopped at hard region edges.
+- `methods/detail-scale.mjs` (`--detailscale k`, `--detailseg 1`): the minimum shape shrinks with the target's 1 to 3 mm detail, optionally confined to focal foreground segments.
 - `methods/detail-passes.mjs` (`--detailpasses`, `--detailtrim`): late small passages where the detail is.
 - `methods/drags.mjs` (`--drags 1`, `--dragbox`): nearly dry flat-brush drags inside given boxes.
 - `methods/drawing-file.mjs` (`--drawingfile`, `--drawinglast`): draws a selected line file whole.
@@ -64,6 +71,7 @@ Modules, with their flags:
 - `methods/flecks.mjs` (`--fleckshape 1`): small reserved lights as broken paper flecks.
 - `methods/ink-res.mjs` (`--inkres N`): pens drawn on a finer sheet and averaged down.
 - `methods/ladder-seg.mjs` (`--ladderseg`): leaves glazes on ground segments to the washes.
+- `methods/layer-cuts.mjs` (`--layerlocal 1`, `--midlayers N` above 4): middle-layer cut levels per colour region; evenly spaced cuts for more layers.
 - `methods/lay.mjs` (not reached): one passage from one mixing well, in sweeps.
 - `methods/light-to-dark.mjs` (`--order painter`): five light-to-dark value bands per pigment.
 - `methods/lights-shape.mjs` (`--lightsbreak`): breaks large lights into flecks along the paper relief.
@@ -100,10 +108,14 @@ Modules, with their flags:
 - `methods/shape-local-charge.mjs` (`--modpaintplanes`, refused by the CLI): shares remaining pigment among planned shapes.
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
+- `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
+- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`, parked): clean water past a passage's soft edges before its colour.
 - `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
 - `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
 - `methods/stroke-plan.mjs` (`--strokeplan 1`): a passage as overlapping parallel sweeps.
+- `methods/subject-order.mjs` (`--subjectorder s`, `--subjectseam s`): subject-by-subject order; a wash is cut at a subject edge only along a colour edge.
+- `methods/touch-cover.mjs` (`--touchcover c`, parked): a touch-up whose sweeps touch under share c of its shape is left out.
 - `methods/subject.mjs` (not reached): the subject's big shapes in wash order.
 - `methods/subject-clusters.mjs` (`--subjectwash 1`): SAM regions cut into colour and value clusters, with wash and shadow groups and each subject's own lights.
 - `methods/subject-washes.mjs` (`--subjectwash 1`): cuts the value plan's and the ladder's passes at the wash groups and lays subject lights early.
@@ -111,6 +123,7 @@ Modules, with their flags:
 - `methods/wash-plan-image.mjs` (`--washplanpng 1`): the wash plan as pictures, with the segment boundaries.
 - `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.
 - `methods/wetdry.mjs` (always on): paper wetness, brush load and waiting for the paper to dry.
+- `methods/wash-join.mjs` (`--washjoin 1`): a colour-domain piece under the minimum shape joins the neighbouring passage instead of leaving a bare-paper shard.
 
 `--holefill` and `--holerim` work around a known drying weakness. They are off by default and run on the CPU and the GPU. See [future idea 8](future-ideas.md#8-edge-drying-that-knows-how-much-water-there-is).
 

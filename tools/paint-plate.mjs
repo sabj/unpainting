@@ -21,6 +21,8 @@ import {GROUND} from '../src/paint/tuned/trumbull.mjs';
 import {TEX_ZONE,TRACE_BOX} from '../src/paint/tuned/portrait.mjs';
 import {setTextureVariety,setTextureFlow,flowField} from '../src/paint/techniques/shaped-marks.mjs';
 import {planLightToDark,valueTechnique,selectValueInk,softBoundaryPaths} from '../src/paint/methods/light-to-dark.mjs';
+import {softRing} from '../src/paint/methods/soft-edges.mjs';
+import {leaveTouchUp} from '../src/paint/methods/touch-cover.mjs';
 import {unsupportedAxisEdges} from '../src/paint/methods/target-regions.mjs';
 import {writeValuePreview} from './painter/value-plan-preview.mjs';
 import {removePlannedInk} from '../src/crop/ink-free.mjs';
@@ -61,6 +63,7 @@ import { tapeStats, panelSVG } from './stroke-stats.mjs';
 import { startStrokeLedger } from '../src/paint/stroke-ledger.mjs';
 import { evaluateGate, printGate } from './stroke-gate.mjs';
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { prepareOutputDirectory } from '../src/paint/output-directory.mjs';
@@ -129,6 +132,7 @@ import { layCurls } from '../src/crop/curlpaint.mjs';
 // Optional stages, one module each, off unless their flag is given.
 import { furLightReserves } from '../src/paint/methods/finish-texture.mjs';
 import { sameWash } from '../src/paint/methods/wash-session.mjs';
+import { chargeOrder, sameCharge } from '../src/paint/methods/charge-layers.mjs';
 import { expandRecipe } from '../src/paint/recipe.mjs';
 import { reportUnusedPlanKeys } from '../src/paint/plan-keys.mjs';
 import { versionStamp, versionLine } from '../src/painter-version.mjs';
@@ -1349,7 +1353,8 @@ if(VALUE_ENABLED){
   HOLD=Uint8Array.from(reserves,(v,i)=>v||(HOLD?.[i]??0)?1:0);
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
- const valueOptions={bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
+ const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
+ const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
@@ -1378,12 +1383,19 @@ if(VALUE_ENABLED){
  {const so=num('subjectorder',0);if(!(so>=0&&so<=1))throw Error('--subjectorder: a number from 0 to 1');
   const field=VALUE_CONFIG?.subjectOrder?subjectField({subjectOrder:VALUE_CONFIG.subjectOrder,families:VALUE_CONFIG.families??[],labels:VALUE_PLAN.regions.labels,w,h}):null;
   if(so>0&&!field)console.log('subject order: the plan names no subjectOrder; whole-sheet bands kept');
-  const r=orderBySubject(layers,{field,strength:so,w,n});
+  const r=orderBySubject(layers,{field,strength:so,w,n,seam:num('subjectseam',0)});
   if(r.summary){layers=r.layers;fs.writeFileSync(path.join(out,'subject-order.json'),JSON.stringify({strength:so,overlap:OVERLAP,subjects:r.summary,passes:r.order},null,1));
    {const pal=[[230,159,0],[86,180,233],[0,158,115],[240,228,66],[0,114,178],[213,94,0],[204,121,167],[120,120,120]],img=Buffer.alloc(n*3);for(let i=0;i<n;i++){const c=pal[field.rank[i]%pal.length];img[3*i]=c[0];img[3*i+1]=c[1];img[3*i+2]=c[2];}await sharp(img,{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'subject-order.png'));}
    console.log(`subject order ${so}: ${layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
+ // --charge 1 (src/paint/methods/charge-layers.mjs): a region's middle layers laid in one wet session, darker into lighter.
+ if(num('charge',0)>0){layers=chargeOrder(layers);console.log('charge: middle layers of each region laid wet into its first layer');}
  HOLD=VALUE_PLAN.protectedCells;
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:VALUE_PLAN.value.peak,geometry:VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:VALUE_PLAN.omittedDemand,lights:VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
+ // --valuemaps 1: the value plan as maps for diagnosis (value band per cell, colour region, reserved lights) and every
+ // passage's cells in paint order, to value-maps.json.gz. Read by nothing in the painter.
+ if(num('valuemaps',0)>0){const caps=[.16,.32,.50,.75,1],vv=VALUE_PLAN.value.values,band=Array.from(vv,v=>v<=0?0:caps.findIndex(t=>v<=t)+1||5);
+  const passes=layers.flatMap((l,L)=>l.shapes.map(sh=>{const m=sh.mask,cells=[];if(m)for(let i=0;i<n;i++)if(m[i])cells.push(i);return {L,id:sh._valuePlan?.id??null,phase:l._valuePhase??null,value:l.value,pigment:l.pigment,amount:sh.amount,area:sh.area,cells};}));
+  fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(VALUE_PLAN.regions.labels),protected:Array.from(VALUE_PLAN.protectedCells),passes})));}
  console.log(`target values: ${layers.length} pigment/region passes, ${VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; ${SUBJECTS ? 'washes kept to their wash groups, shadows to their shadow groups' : 'shadows never split by region'}`);
  if(num('valuepreviewonly',0)){
   const preview=await writeValuePreview({plan:VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});
@@ -1904,10 +1916,13 @@ phaseMark('sheet');
 // three-value simplification (--penwashplan values) or, for comparison, from colour regions (--penwashplan colour)
 // replace the value ladder (pen-wash-plan.mjs, pen-wash.mjs). Planned now, before the target guard seals the target.
 const PENWASH = num('penwash', 0) > 0;
-let PENWASH_LINES = null;
+let PENWASH_LINES = null, PENWASH_INK_GROUPS = null;
 const PENWASH_PLAN = PENWASH ? (() => {
-  const plan = planPenWash({ planner: opt('penwashplan', 'values'), px: PX_RAW, w, h, pigments: PIGS, paperRGB, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w,
-    options: { lightness: num('pwlightness', 0.5), minLight: num('pwminlight', 0.45), maxDark: num('pwmaxdark', 0.22), blurMm: num('pwblur', 2.5), minArea: num('pwminarea', 0.006), hueGap: num('pwhuegap', 10), chroma: num('pwchroma', 1), lightChroma: num('pwlightchroma', 0), localMax: num('pwlocalmax', 0.26), capLWeight: num('pwcaplweight', 1), shadowBlurMm: num('pwshadowblur', 0), shadowMaxDark: num('pwshadowmaxdark', 0.3), darkHueGap: num('pwdarkhuegap', 12), foliageGreen: num('pwfoliage', 0), foliageMax: num('pwfoliagemax', 0.3), shadowOneMm: num('pwshadowone', 0), skyStrength: num('pwsky', 0), skyTo: num('pwskyto', 0.3), deepContrast: num('pwdeepcontrast', 0), deepShare: num('pwdeepshare', 0.06), deepRingMm: num('pwdeepring', 2), keepLights: num('pwkeeplights', 0), keepLightsMm2: num('pwkeeplightsmm2', 4), monoLocal: opt('pwmonolocal', '') ? Object.fromEntries(opt('pwmonolocal', '').split(',').map(t => t.split(':')).map(([k, v]) => [k, +v])) : undefined, shadowMin: num('pwshadowmin', 0.12), deepMin: num('pwdeepmin', 0.1), joinMm: num('pwjoin', 2), minPiece: num('pwminpiece', 0.008) } });
+  const planArgs = { px: PX_RAW, w, h, pigments: PIGS, paperRGB, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w,
+    options: { lightness: num('pwlightness', 0.5), minLight: num('pwminlight', 0.45), maxDark: num('pwmaxdark', 0.22), blurMm: num('pwblur', 2.5), minArea: num('pwminarea', 0.006), hueGap: num('pwhuegap', 10), chroma: num('pwchroma', 1), lightChroma: num('pwlightchroma', 0), localMax: num('pwlocalmax', 0.26), capLWeight: num('pwcaplweight', 1), shadowBlurMm: num('pwshadowblur', 0), shadowMaxDark: num('pwshadowmaxdark', 0.3), darkHueGap: num('pwdarkhuegap', 12), foliageGreen: num('pwfoliage', 0), foliageMax: num('pwfoliagemax', 0.3), shadowOneMm: num('pwshadowone', 0), skyStrength: num('pwsky', 0), skyTo: num('pwskyto', 0.3), deepContrast: num('pwdeepcontrast', 0), deepShare: num('pwdeepshare', 0.06), deepRingMm: num('pwdeepring', 2), keepLights: num('pwkeeplights', 0), keepLightsMm2: num('pwkeeplightsmm2', 4), monoLocal: opt('pwmonolocal', '') ? Object.fromEntries(opt('pwmonolocal', '').split(',').map(t => t.split(':')).map(([k, v]) => [k, +v])) : undefined, shadowMin: num('pwshadowmin', 0.12), deepMin: num('pwdeepmin', 0.1), joinMm: num('pwjoin', 2), minPiece: num('pwminpiece', 0.008),
+      whiteMm: num('pwwhitemm', 0.8), fineMm: num('pwfinemm', 0.8), holeMm2: num('pwholemm2', 0), hueSmoothMm: num('pwhuesmooth', 5), shadowPiece: num('pwshadowpiece', 0.004), firstC: num('pwfirstc', 0.35), firstMaxDL: num('pwfirstmax', 9), shadowC: num('pwshadowc', 0.55), shadowMaxDL: num('pwshadowmax', 16), darkC: num('pwdarkc', 0.65), darkMaxDL: num('pwdarkmax', 14), darkShare: num('pwdarkshare', 0.04), darkContrast: num('pwdarkcontrast', 12), darkBrushMm: num('pwdarkbrush', 3), softGrad: num('pwsoftgrad', 0), softBandMm: num('pwsoftband', 1.5), softBlurMm: num('pwsoftblur', 0.8) } };
+  const plan = planPenWash({ planner: opt('penwashplan', 'values'), ...planArgs });
+  PENWASH_INK_GROUPS = opt('penwashplan', 'values') === 'values' ? plan.groups : opt('penwashplan', 'values') === 'stages' ? planPenWash({ planner: 'values', ...planArgs }).groups : null;
   const doc = { planner: opt('penwashplan', 'values'), palette: PIGS.map(p => p.name ?? null), ...describePlan(plan, n, PIGS) };
   fs.writeFileSync(path.join(out, 'penwash-plan.json'), JSON.stringify(doc, null, 2));
   console.log(`pen wash: ${plan.passages.length} passages planned from ${doc.planner}${plan.monochrome ? ', monochrome target, palette roles' : ''}: ${doc.passages.map(q => `${q.id} ${(100 * q.area).toFixed(0)}%`).join(', ')}`);
@@ -2195,7 +2210,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : DARK_MASS ? DARK_MASS.cutPen : PRACTICE_CUT && !first && !fine ? PRACTICE_CUT : g => g;
   // --darkmasscurls walker: the first pass's walker gestures on a dark mass become its curly brush strokes
   if (DARK_MASS && first && !fine) DARK_MASS.takeGestures(drawn);
-  const penWashPrune = PENWASH_PLAN && first && !fine ? lines => { const r = prunePenLines(lines, { w, h, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w, groups: opt('penwashplan', 'values') === 'values' ? PENWASH_PLAN.groups : null, seed: 1 + Math.round(num('seed', 0)), options: { tileInkMm: num('pwtileink', 9), keepAbove: num('pwkeep', 0), minMm: num('pwspeck', 0.8), vary: num('pwpenvary', 0), structMm: num('pwpenstruct', 15) } }); PENWASH_LINES = r.stats; console.log(`pen wash lines: ${r.stats.out} of ${r.stats.in} lines kept (${r.stats.short} specks, ${r.stats.omitted} omitted, ${r.stats.duplicate} repeats, ${r.stats.density} over density), ink ${r.stats.inkMmOut} of ${r.stats.inkMmIn} mm`); return r.lines; } : null;
+  const penWashPrune = PENWASH_PLAN && first && !fine ? lines => { const r = prunePenLines(lines, { w, h, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w, groups: PENWASH_INK_GROUPS, seed: 1 + Math.round(num('seed', 0)), options: { tileInkMm: num('pwtileink', 9), keepAbove: num('pwkeep', 0), minMm: num('pwspeck', 0.8), vary: num('pwpenvary', 0), structMm: num('pwpenstruct', 15) } }); PENWASH_LINES = r.stats; console.log(`pen wash lines: ${r.stats.out} of ${r.stats.in} lines kept (${r.stats.short} specks, ${r.stats.omitted} omitted, ${r.stats.duplicate} repeats, ${r.stats.density} over density), ink ${r.stats.inkMmOut} of ${r.stats.inkMmIn} mm`); return r.lines; } : null;
   const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, walker: drawn, field, style: DRAW_STYLE, prune: penWashPrune }));
   let kept = SELECTED ? SELECTED : cutPen(penKeep ? drawn.filter(penKeep) : drawn);
   // --inkskin x0,y0,x1,y1 (sheet fractions): the closing pen keeps off warm skin interiors of the figure in the box. Default off.
@@ -3128,7 +3143,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation')clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));}
   T=chooseMajorBaseWash(MAJOR_INTENT,T,{value:layer.value,area:sh.area??0,cells:n,semantic:Boolean(sh._semantic)});
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
-  if(sh._valuePlan){T=valueTechnique(sh._valuePlan);VALUE_ACTIVE=sh._valuePlan;VALUE_OWN_CONTACT=new Set();const inSession=WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer)));WASH_LAST={L,layer};if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));fs.appendFileSync(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');if(!base.dry)throw Error('target-value pass needs fully dry base');}}
+  if(sh._valuePlan){T=valueTechnique(sh._valuePlan);VALUE_ACTIVE=sh._valuePlan;VALUE_OWN_CONTACT=new Set();const inSession=(WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer));WASH_LAST={L,layer};if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));fs.appendFileSync(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');if(!base.dry)throw Error('target-value pass needs fully dry base');}}
   if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
   sh.dryAfter = T.dryAfter;
   MAJOR_TECHNIQUE=MAJOR_INTENT?{...T,shapeId:'numeric-L'+L+'-S'+layer.shapes.indexOf(sh),numericalValue:layer.value,shapeArea:sh.area,firstWash:Boolean(sh.firstWash),materialStatus:'existing production technique/profile consumed; actual contact/state recorded before each stroke'}:null;
@@ -3291,6 +3306,10 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     used[FLOOR ? 'floor dab' : 'small brush'] = (used[FLOOR ? 'floor dab' : 'small brush'] || 0) + rescued.length;
     if (!FLOOR) detail = true;
   }
+  // --touchcover c (src/paint/methods/touch-cover.mjs): a touch-up glaze whose sweeps touch under share c of its shape is left.
+  if (layer._touched && num('touchcover', 0) > 0 && paths.length && leaveTouchUp({ touched: layer._touched, cover: sweepCover(paths, up(MASK), W2, H2), minCover: num('touchcover', 0) })) {
+    used['touch-up under-covered, left'] = (used['touch-up under-covered, left'] || 0) + 1; dropped++; droppedMass += sh.amount * sh.area; continue;
+  }
   // under --crisp the bead stops at the passage's own edge, for the clean water and the paint alike
   if (process.env.FW_DUMP && L < num('dumppasses', 3)) { const g = Buffer.alloc(N2); for (const pts of paths) for (let k = 0; k < pts.length; k++) { const a = pts[k], b = pts[Math.min(pts.length - 1, k + 1)], m = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y))); for (let t = 0; t <= m; t++) { const x = Math.round(a.x + (b.x - a.x) * t / m), y = Math.round(a.y + (b.y - a.y) * t / m); if (x >= 0 && y >= 0 && x < W2 && y < H2) g[y * W2 + x] = Math.hypot(b.x - a.x, b.y - a.y) > 6 * SC ? 128 : 255; } } await sharp(g, { raw: { width: W2, height: H2, channels: 1 } }).png().toFile(path.join(process.env.FW_DUMP, `P${L + 1}-s${layer.shapes.indexOf(sh)}.png`)); }
   const crispHere = !!BUDGET || !!shapedPaths || semanticUsesNumericClip(sh._semantic) && CRISP.on && CRISP.wants(T, detail);
@@ -3309,6 +3328,23 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     const c = KO2 ? Uint8Array.from(c0, (v, i) => (v && !KO2[i] ? 1 : 0)) : KO ? Uint8Array.from(c0, (v, i) => (v && !KO[((((i / W2) | 0) / SC) | 0) * w + (((i % W2) / SC) | 0)] ? 1 : 0)) : c0;
     setClip(sheet, c); used['floored brush'] = (used['floored brush'] || 0) + 1; }
   if (detail) used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] = (used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] || 0) + paths.length;
+  let SOFT_RING = null;
+  if (num('softwet', 0) > 0 && crispHere && !BUDGET && !detail && !(sh._strokePlan?.reachCells > 0) && sh._valuePlan && !sh._valuePlan.texture && sh._valuePlan.edges?.softCells?.length && paths.length && opt('softwetphases', 'light,mid,shadow').split(',').includes(sh._valuePlan.phase)) {
+    const rc = num('softwet', 0) / (num('sheetmm', DEFAULT_SHEET_MM) / w);
+    const ring = softRing(brushMask(sh), sh._valuePlan.edges.softCells, sh._valuePlan.edges.hardCells, w, h, rc, VALUE_PLAN?.protectedCells);
+    if (ring.some(v => v)) {
+      setClip(sheet, up(ring));
+      const rad = Math.max(1, rc * SC);
+      for (const arc of softBoundaryPaths(sh._valuePlan.edges.softCells, w, n)) {
+        const pts = arc.map(q => ({ x: q.x * SC, y: q.y * SC, r: rad, p: 0.6 }));
+        const water = createBrush({ flat: false, radius: rad, bristles: Math.max(12, Math.ceil(rad * 2)), capacity: 60, belly: 6, feed: 0.3, give: 0.9, free: 0.4, film: 0.25, stiffness: 6, seed: SEED + laid + 4241 });
+        dip(water, { water: num('softwetwater', 1), conc: SHEET_PIGS.map(() => 0) });
+        stroke(water, sheet, pts, { upright: false, lift: true });
+      }
+      setClip(sheet, up(brushMask(sh)));
+      SOFT_RING = ring; used['soft edge, clean water'] = (used['soft edge, clean water'] || 0) + 1;
+    }
+  }
   // wet on wet means the paper is wet when the paint arrives: clean water first, over the same shape.
   // --prewet 1: dampen a passage laid in more than --prewetlanes lanes first, so lanes do not dry into rims. Default 0.
   // --splwet: optional dampening for stroke lanes. A value plan controls its own wet/dry technique;
@@ -3505,6 +3541,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     else if (PASSFRAMES > 0 && ++shIdx % PASSFRAMES === 0) snap({ stage: 'wash', pass: L + 1, of: layers.length, value: layer.value, laying: true });
   }
   if(FINISH_PLAN&&L===FINISH_START){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-deposition-immediate.png'));coherent(sheet);const after=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0)),commands=AREA_EXEC.records.filter(r=>r.operation==='physical brush stroke'&&r.status==='executed'),command=commands.at(-1);fs.writeFileSync(path.join(out,'finishing-dose-proof.json'),JSON.stringify({kind:'actual all-sheet pigment inventory delta over one finishing pass; per-contact brush loss separately logged',areaId:command?.areaId,passId:command?.passId,commandId:command?.id,commandIds:commands.map(r=>r.id),gestureIds:commands.map(r=>r.geometry?.[0]?.gestureId??null),paperBeforeByContact:commands.map(r=>r.paper),primaryCellsByContact:commands.map(r=>r.primaryCells?.length??0),primaryCells:command?.primaryCells?.length,requestedDepth:sh.amount,requestedMass:sh.amount*commands.reduce((s,r)=>s+(r.primaryCells?.length??0),0),beforePigmentMass:FINISH_MASS_BEFORE,afterPigmentMass:after,depositedPigmentMass:after.map((v,j)=>v-FINISH_MASS_BEFORE[j]),paperBefore:command?.paper,limit:'all-sheet conserved pigment delta, not percell depth/value/coverage proof; ordinary transport remains active'},null,2));}
+  if (SOFT_RING) clock('flow', () => { for (let q = 0; q < num('softwetsteps', 60); q++) step(sheet, O); });
   if (crispHere || FLOOR || layer._darkPass || touchSmall) setClip(sheet, PROBE ? PROBE.clip : null);
   if(!BUDGET&&!sh._valuePlan?.texture&&sh._valuePlan?.edges.softCells.length&&paths.length){
     const softSplit=num('softsplit',0)>0,hardNear=softSplit?(()=>{const near=new Set(),R=Math.ceil(num('softmm',.35)/(num('sheetmm', DEFAULT_SHEET_MM)/w))+1;for(const i of sh._valuePlan.edges.hardCells){const x=i%w,y=(i/w)|0;for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<w&&yy*w+xx<n)near.add(yy*w+xx);}}return near;})():null;
@@ -3570,7 +3607,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const endOfValue = L === layers.length - 1 || layers[L + 1].value !== layer.value;
   // --washsession 2: the next pass is the same band of the same region in another pigment; it is charged into this
   // wash while it is wet, so the passage dries once.
-  const sessionNext = WASH_SESSION > 1 && L < layers.length - 1 && sameWash(layer, layers[L + 1]);
+  const sessionNext = (WASH_SESSION > 1 && L < layers.length - 1 && sameWash(layer, layers[L + 1])) || (num('charge', 0) > 0 && L < layers.length - 1 && sameCharge(layer, layers[L + 1]));
   // A passage that asked to be dried is dried only enough to stop it running; the sheet dries fully at the end of a value.
   // --drypigment 1: dry fully before a pass in a different pigment, so colours do not mix wet on the paper. Default 0.
   // --order painter dries between pans too (--orderdry 0 stops it).
