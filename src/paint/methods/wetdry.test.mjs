@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { setStrict, resetChecks, continuedSummary } from '../checks.mjs';
 import { measureBrush, describeLayer, shadowEdges, chooseShadowTechnique, compoundClump, fitMoistStroke, measurePaper, enforcePaper, paperReady, strokeCells } from './wetdry.mjs';
 
 test('reference edges distinguish a hard step from a soft ramp at two resolutions', () => {
@@ -29,11 +30,15 @@ test('wet blend waits out gloss without drying or silently accepting dry paper',
  const s=sheet();s.W[4]=0.5;s.s[4]=0.8;let steps=0;
  enforcePaper({sheet:s,cells:[4],technique:'wet blend',O:{},step:()=>{steps++;s.W[4]-=0.01;},dry:()=>assert.fail('must not dry')});
  assert.ok(steps>=20);assert.ok(paperReady(measurePaper(s,[4]),'wet blend'));
- assert.throws(()=>enforcePaper({sheet:sheet(),cells:[4],technique:'wet blend',step:()=>{},dry:()=>assert.fail('must not dry')}),/precondition failed/);
+ resetChecks();const log=console.log;console.log=()=>{};try{assert.equal(enforcePaper({sheet:sheet(),cells:[4],technique:'wet blend',step:()=>{},dry:()=>assert.fail('must not dry')}),false);}finally{console.log=log;}
+ assert.equal(continuedSummary().checks['wetdry precondition failed'].count,1);
+ setStrict(true);try{assert.throws(()=>enforcePaper({sheet:sheet(),cells:[4],technique:'wet blend',step:()=>{},dry:()=>assert.fail('must not dry')}),/precondition failed/);}finally{resetChecks();}
 });
-test('dry gate verifies the entire sheet after drying and rejects lingering water',()=>{
+test('dry gate verifies the entire sheet after drying; lingering water returns false, or stops under strict',()=>{
  const s=sheet();s.W[4]=1;
- assert.throws(()=>enforcePaper({sheet:s,cells:[4],technique:'dry layer',dry:()=>{s.W[4]=0;s.s[0]=0.5;}}),/full-sheet drying failed/);
+ resetChecks();const log=console.log;console.log=()=>{};try{assert.equal(enforcePaper({sheet:s,cells:[4],technique:'dry layer',dry:()=>{s.W[4]=0;s.s[0]=0.5;}}),false);}finally{console.log=log;}
+ assert.equal(continuedSummary().checks['wetdry full-sheet drying failed'].count,1);
+ setStrict(true);try{const s3=sheet();s3.W[4]=1;assert.throws(()=>enforcePaper({sheet:s3,cells:[4],technique:'dry layer',dry:()=>{s3.W[4]=0;s3.s[0]=0.5;}}),/full-sheet drying failed/);}finally{resetChecks();}
 });
 test('stroke envelope respects masks and includes interpolated path cells',()=>{
  const s=sheet();s.clip=Uint8Array.from({length:9},(_,i)=>i!==4?1:0);
@@ -79,7 +84,7 @@ test('non-finite water cannot pass a paper gate',()=>{
 });
 test('a wet gate has a finite timeout and records failure instead of painting',()=>{
  const s=sheet();s.W[4]=1;s.s[4]=1;const records=[];
- assert.throws(()=>enforcePaper({sheet:s,cells:[4],technique:'wet blend',step:()=>{},record:e=>records.push(e)}),/precondition failed/);
+ resetChecks();const log=console.log;console.log=()=>{};try{assert.equal(enforcePaper({sheet:s,cells:[4],technique:'wet blend',step:()=>{},record:e=>records.push(e)}),false);}finally{console.log=log;resetChecks();}
  assert.equal(records[0].waits,20000);assert.equal(records[0].passed,false);
 });
 

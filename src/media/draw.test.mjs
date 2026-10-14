@@ -86,3 +86,19 @@ test('a sheet with little line in it gets few gestures, one with a lot gets them
   assert.equal(lineBudget(gestures, 60 * 5).length, 5, 'room for five 40-cell lines at 1.5 cells wide');
   assert.equal(lineBudget(gestures, 1e9).length, 20, 'and every one when the source is all drawing');
 });
+
+test('the dry-pen gate draws on paper that would not dry, counts it, and stops only under strict', async () => {
+  const { dryPenGate } = await import('./draw.mjs');
+  const { resetChecks, setStrict, continuedSummary } = await import('../paint/checks.mjs');
+  const wetSheet = () => ({ w: 2, h: 2, W: new Float32Array(4).fill(.5), s: new Float32Array(4), paper: { capacity: new Float32Array(4).fill(1) } });
+  const pen = { ink: 1, capacity: 1, drop: .1, conc: [1] };
+  resetChecks();
+  const audit = [], log = console.log; console.log = () => {};
+  try { dryPenGate({ audit, drySheet: () => {} })({ sheet: wetSheet(), pen, footprint: [0, 0, 2, 2], index: 3 }); } finally { console.log = log; }
+  assert.equal(audit.length, 1);
+  assert.equal(audit[0].stillWet, true);
+  assert.equal(continuedSummary().checks['Paper still wet before ink gesture'].count, 1);
+  setStrict(true);
+  try { assert.throws(() => dryPenGate({ drySheet: () => {} })({ sheet: wetSheet(), pen, footprint: [0, 0, 2, 2], index: 4 }), /Paper still wet before ink gesture/); }
+  finally { resetChecks(); }
+});

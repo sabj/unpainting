@@ -2,6 +2,7 @@
 // stroke until its paper is dry or moist enough. No physics overrides.
 import { gaussian } from '../../keyframes/density.mjs';
 import { DEFAULTS } from '../../media/sheet.mjs';
+import { check } from '../checks.mjs';
 
 export const PAPER_STATE = Object.freeze({ dryWater: 0.004, drySaturation: 0.02,
   moistWater: 0.015, moistSaturation: 0.6, glossyWater: 0.15, moistShare: 0.7 });
@@ -138,7 +139,7 @@ export function enforcePaper({ sheet, cells, technique, step, dry, O, log, label
     if (!whole.dry) {
       const failure = { label, technique, ...measurePaper(sheet, cells), wholeSheetDry: false, wholeSheet: whole, waits, passed: false };
       record?.(failure); log?.(`technique stroke ${JSON.stringify(failure)}`);
-      throw new Error(`wetdry ${label}: full-sheet drying failed`);
+      return check('wetdry full-sheet drying failed', false, { label, technique, waterMax: whole.waterMax, saturationMax: whole.saturationMax });
     }
     state = measurePaper(sheet, cells);
   }
@@ -158,8 +159,8 @@ export function enforcePaper({ sheet, cells, technique, step, dry, O, log, label
   const entry = { label, technique, ...state, wholeSheetDry: whole?.dry ?? null, waits, passed };
   record?.(entry);
   log?.(`technique stroke ${JSON.stringify(entry)}`);
-  if (!passed) throw new Error(`wetdry ${label}: ${technique} precondition failed (${JSON.stringify(state)})`);
-  return true;
+  // A failed gate skips this stroke (callers treat false as "do not lay it") and the painting goes on; --strict 1 stops.
+  return check('wetdry precondition failed', passed, { label, technique, ...state });
 }
 
 // A small brush-placement correction at a broken canopy edge. Move toward the
