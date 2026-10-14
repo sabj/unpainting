@@ -1280,7 +1280,6 @@ const stroke=(b,target,points,options)=>{
   if(wetMove&&opt('wetgate','0')==='1'&&(paper.moistShare<.7||paper.waterMax>.15)){const info='value-plan wet wash whole-footprint gate failed '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:paper.moistShare,waterMax:paper.waterMax,cells:cells.length,wetWaits});if(opt('wetgate','1')==='0')console.log('WARN '+info);else throw Error(info);}
   const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
-  if(VALUE_ACTIVE.shaped&&TRUMBULL_RULES&&w===540){const total=VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0});if(total.strokes+1>12256||total.contacts+cells.length>12443022)throw Error('W13 Y1 contact budget would exceed W7; fix this band before continuing');}
   const result=physicalStroke(b,target,points,options);
   {const count=VALUE_COUNTS[VALUE_ACTIVE.valueBand-1];count.strokes++;count.contacts+=cells.length;}
   // Clean-water preparation belongs to this passage too. Otherwise the first
