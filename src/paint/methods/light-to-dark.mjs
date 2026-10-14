@@ -132,17 +132,21 @@ export function planLightToDark({smallLightMax=120,detailScale=0,layerLocal=fals
   // litLift (luminous stone): warm stone whose squinted (1 mm) target L* is at least litL is a lit face. It keeps its
   // pale foundation, loses share litLift of the middle layers and every shadow glaze, and stays a thin warm glaze.
   // Lit cells at litReserveL or more are reserved as paper (sun-struck edges). One squinted threshold, cleaned to shapes.
-  const effLitLift=litLift>0?litLift:trumbullRules?.45:0,effLitWarm=litWarm||trumbullRules,effLitL=litLift>0?litL:84,effLitReserveL=litLift>0?litReserveL:92;
+  const hasSunlitStone=layerLocal&&!trumbullRules&&litLift===0&&families.some(f=>/stone/i.test(f.id??'')&&/sunlit/i.test(f.referenceCue??''));
+  const effLitLift=litLift>0?litLift:hasSunlitStone?.55:0,effLitWarm=litWarm||hasSunlitStone,effLitL=litLift>0?litL:hasSunlitStone?82:86,effLitReserveL=litLift>0?litReserveL:hasSunlitStone?89:95;
+  let litStoneMask=null;
   if(shaped&&(effLitLift>0||effLitWarm)&&rgb){
     const Lst=Float32Array.from({length:n},(_,i)=>lstarOf(rgb,i)),sm=boxMeanValue(Lst,w,h,Math.max(1,Math.round(1/(sheetWidthMm/w))));
+    const smBroadL=hasSunlitStone?boxMeanValue(Lst,w,h,Math.max(2,Math.round(3.5/(sheetWidthMm/w)))):null;
     const warmStone=i=>rgb[i*3]-rgb[i*3+2]>18&&rgb[i*3+1]-rgb[i*3+2]>8;
     const lit=removeSmall(closeLocal(Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&warmStone(i)&&sm[i]>=effLitL&&!isRecess(rgb,i)?1:0),w,h,1),w,h,Math.max(12,minShape>>2));
-    const glint=removeSmall(Uint8Array.from({length:n},(_,i)=>lit[i]&&sm[i]>=effLitReserveL?1:0),w,h,8);
+    litStoneMask=lit;
+    const glint=removeSmall(Uint8Array.from({length:n},(_,i)=>lit[i]&&(sm[i]>=effLitReserveL||(smBroadL&&Lst[i]>=84&&Lst[i]-smBroadL[i]>=1.4))?1:0),w,h,8);
     // litWarm: on a lit face the cool and neutral demand (ultramarine, cerulean, sepia, Payne's grey) goes to yellow
     // ochre, so the face is one clean warm glaze, not an averaged grey. Planning only; mass per cell is unchanged.
-    const och=pigments.findIndex(p=>p?.name==='yellow ochre'),cool=pigments.map((p,j)=>/ultramarine|cerulean|sepia|payne/i.test(p?.name??'')?j:-1).filter(j=>j>=0);
+    const och=pigments.findIndex(p=>/yellow ochre|hansa yellow/i.test(p?.name??'')),cool=pigments.map((p,j)=>/ultramarine|cerulean|sepia|payne/i.test(p?.name??'')?j:-1).filter(j=>j>=0);
     if(effLitWarm&&och>=0){demand=demand.slice();}
-    let a=0,g=0;for(let i=0;i<n;i++){if(!lit[i])continue;if(effLitWarm&&och>=0){let m=0;for(const j of cool){m+=demand[i*k+j];demand[i*k+j]=0;}demand[i*k+och]+=m;}a++;weights[1][i]*=1-effLitLift;weights[2][i]*=1-effLitLift;weights[3][i]=weights[4][i]=0;if(glint[i]){protectedCells[i]=1;g++;}}
+    let a=0,g=0;for(let i=0;i<n;i++){if(!lit[i])continue;if(effLitWarm&&och>=0){let m=0;for(const j of cool){m+=demand[i*k+j];demand[i*k+j]=0;}demand[i*k+och]+=m*(hasSunlitStone?.65:1);}a++;if(hasSunlitStone)weights[0][i]*=.62;weights[1][i]*=1-effLitLift;weights[2][i]*=1-effLitLift;weights[3][i]=weights[4][i]=0;if(glint[i]){protectedCells[i]=1;g++;}}
     console.log(`lit stone: ${a} cells lit (squinted L* >= ${effLitL}), ${g} reserved as paper glints (>= ${effLitReserveL})`);
   }
   const regionProfiles=profile?region.regions.map(r=>resolveStyle(subject,r.descriptiveFamily,styleSelection)):[];
@@ -188,7 +192,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,layerLocal=fals
     for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*styleGain:0;}}
   // paleLights v: pale planes (smoothed value at most v, at least a minimum shape) are pale local colour, one clean
   // wash: their whole demand goes to band 1 and no middle layer or glaze crosses them.
-  if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
+  if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]&&!litStoneMask?.[i]?1:0),w,h,1),w,h,minShape);
     for(let i=0;i<n;i++)if(pale[i]){let t=0;for(let b=0;b<5;b++){t+=weights[b][i];weights[b][i]=0;}weights[0][i]=t;}}
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
   const layers=[],instructions=[];let omittedDemand=0;
@@ -245,7 +249,8 @@ export function planLightToDark({smallLightMax=120,detailScale=0,layerLocal=fals
   // stoneBlocks c: sparse irregular ashlar hints on dry warm wall, courses of blocks stoneBlockMm tall, share c kept.
   // Each is a pale single-pigment glaze at stoneBlockAmt of the cell's demand, not marks or dry brush. They are laid
   // wet on dry between the middle layers and the shadow glazes.
-  if(shaped&&stoneBlocks>0&&rgb){const B=makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover:stoneBlocks,mm:stoneBlockMm,pigments,irregular:stoneIrregular,courses:stoneCourses,clusters:stoneClusters});
+  const effStoneBlocks=stoneBlocks>0?stoneBlocks:hasSunlitStone?.55:0;
+  if(shaped&&effStoneBlocks>0&&rgb){const B=makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover:effStoneBlocks,mm:stoneBlocks>0?stoneBlockMm:3.6,pigments,irregular:stoneIrregular||hasSunlitStone,courses:stoneCourses||hasSunlitStone,clusters:stoneClusters||(hasSunlitStone?14:0)});
     if(B){const at=steps.findIndex(s=>s.band>=4);steps.splice(at<0?steps.length:at,0,{band:3,tag:'B',wt:Float32Array.from(B,(v,i)=>v>=0?stoneBlockAmt:0),pig:B});}}
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
@@ -396,7 +401,8 @@ export function estimatePaper(rgb,w,h,density){
 // Sparse stone block hints (see stoneBlocks). Returns Int8Array of pigment index per cell (-1 = none) or null.
 function makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover,mm,pigments,irregular=false,courses=false,clusters=0}){
   const cell=sheetWidthMm/w;let hb=Math.max(6,Math.round(mm/cell));const _u=0,gap=Math.max(1,Math.round(.3/cell)),jit=Math.max(1,Math.round(.35/cell));
-  const idx=STONE_BLOCK_PIGMENTS.map(nm=>pigments.findIndex(p=>p?.name===nm)),probs=STONE_BLOCK_SHARES;
+  const warmFallback=pigments.findIndex(p=>/ochre|sienna|hansa|yellow/i.test(p?.name??''));
+  const idx=STONE_BLOCK_PIGMENTS.map(nm=>{const j=pigments.findIndex(p=>p?.name===nm);return j>=0?j:warmFallback;}),probs=STONE_BLOCK_SHARES;
   if(idx.every(j=>j<0))return null;
   let seed=12345;const rnd=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
   const wall=i=>{const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2],L=.2126*r+.7152*g+.0722*b;return !protectedCells[i]&&!isRecess(rgb,i)&&r-b>STONE_WALL.redOverBlue&&g-b>STONE_WALL.greenOverBlue&&L>STONE_WALL.minL&&L<STONE_WALL.maxL;};
