@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { writeRunCard } from "./run-card.mjs";
+import { check, resetChecks } from "../media/checks.mjs";
 
 test("writeRunCard records input hashes, segments, drawing stages, GPU backend and clean tree state", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-card-test-"));
@@ -15,6 +16,9 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
     fs.writeFileSync(plan, "{\"subject\":\"mittens\"}");
     fs.writeFileSync(paint, "painting-bytes");
 
+    resetChecks();
+    const log = console.log; console.log = () => {};
+    try { check("bare-paper contact", false, { cells: 2 }); } finally { console.log = log; }
     const card = writeRunCard({
       root: tmp,
       out: tmp,
@@ -41,7 +45,10 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
     assert.equal(typeof card.planSHA256, "string");
     assert.equal(typeof card.paintingSHA256, "string");
     assert.equal(fs.existsSync(path.join(tmp, "run-card.json")), true);
+    assert.equal(card.continuedChecks.total, 1);
+    assert.equal(card.continuedChecks.checks["bare-paper contact"].count, 1);
   } finally {
+    resetChecks();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

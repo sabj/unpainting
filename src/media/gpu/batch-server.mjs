@@ -88,7 +88,7 @@ function sheetHandler(sid, port) {
       }
       case 'drainDrys': { if (queuedDrys.length * 6 > rectData.length) throw new Error('Dry metadata queue exceeded shared mailbox'); new Uint32Array(rectData.buffer).set(queuedDrys.flat()); ctrl[1] = queuedDrys.length; queuedDrys.length = 0; break; }
       case 'dry': case 'dryEnd': {
-        if (m.op === 'dry') { gpu.setOptions(m.o); ctrl[1] = await gpu.dry(m.max, m.o, m.params); } else ctrl[1] = await gpu.dryEnd();
+        if (m.op === 'dry') { gpu.setOptions(m.o); ctrl[1] = await gpu.dry(m.max, m.o, m.params); } else ctrl[1] = await gpu.dryEnd(); ctrl[6] = gpu.lastStillWet ?? 0; // wet cells a dry sent with allowWet left to evaporate in place
         const defer = gpu.resident && !framePort;
         const r = await gpu.fix(gpu.hasTop && !defer ? layerData.subarray(0, gpu.K * gpu.n) : null, m.topMask, defer);
         driedMask(r); ctrl[9] = r.archive ?? 0; ctrl[4] = r.hadTop ? 1 : 0; ctrl[5] = r.pushed ? 1 : 0; ctrl[7] = r.topMask ?? 0;

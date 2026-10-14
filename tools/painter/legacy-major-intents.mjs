@@ -1,4 +1,7 @@
 // Registered semantic context for the existing numerical production route. No geometry synthesis or mask.
+import {check} from '../../src/media/checks.mjs';
+// A contact outside every declared family is painted under this record-only family and counted; --strict 1 stops.
+export const UNCLASSIFIED_FAMILY=Object.freeze({id:'unclassified',referenceCue:null,material:null,lights:null});
 export function validateLegacyIntent(p,{imageSHA,loadedContact}){
  if(p.version!==1||p.target.sha256!==imageSHA||p.coordinateSpace!=='normalized-target')throw Error('major target binding mismatch');
  if(p.loadedContact!==1||loadedContact!==1)throw Error('major connected-wash requires explicit loadedcontact1');
@@ -12,7 +15,8 @@ export function validateLegacyIntent(p,{imageSHA,loadedContact}){
 export function legacyIntentFamily(p,points,w,h){
  if(!points.length||w<=0||h<=0)throw Error('major geometry missing');
  const q=points[Math.floor(points.length/2)],x=q.x/w,y=q.y/h;if(!Number.isFinite(x)||!Number.isFinite(y))throw Error('major nonfinite point');
- return p.families.find(f=>x>=f.bounds[0]&&x<=f.bounds[2]&&y>=f.bounds[1]&&y<=f.bounds[3])??p.families.find(f=>f.fallback===true)??(()=>{throw Error('major unclassified contact')})();
+ const found=p.families.find(f=>x>=f.bounds[0]&&x<=f.bounds[2]&&y>=f.bounds[1]&&y<=f.bounds[3])??p.families.find(f=>f.fallback===true);
+ return found??(check('major unclassified contact',false,{x:+x.toFixed(4),y:+y.toFixed(4)}),UNCLASSIFIED_FAMILY);
 }
 
 export function prepareMajorDryBase({paint,technique,continuation=false,preparation,observe,dry,record}){
@@ -20,7 +24,8 @@ export function prepareMajorDryBase({paint,technique,continuation=false,preparat
  if(!paint||!(technique?.name==='dry brush'||technique?.baseWashDecision)||continuation||before.dry)return {paper:before,prepared:false,continuation};
  if(!preparation||preparation.operation!=='ordinary-dry')throw Error('major dry detail needs declared ordinarydry preparation');
  record({status:'ORDINARY_DRY_REQUESTED',paper:before,preparation});dry(preparation);const after=observe();record({status:'ORDINARY_DRY_OBSERVED',paper:after,preparation});
- if(!after.dry)throw Error('major dry detail ordinarydry did not establish actual dry footprint');
+ // paper that did not dry is painted as it is and counted; --strict 1 stops
+ check('major dry detail ordinarydry did not establish actual dry footprint',after.dry,{waterMax:after.waterMax,saturationMax:after.saturationMax});
  return {paper:after,prepared:true,continuation:false};
 }
 export function sameUnliftedMajorGesture(previous,{brush,points,options,shapeId}){

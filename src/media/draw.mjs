@@ -2,6 +2,7 @@
 // point and speed runs the other way. The pen re-dips when it runs low. DOM free.
 import { createPen, dipPen, penStroke, penRect } from './pen.mjs';
 import { step, dry } from './sheet.mjs';
+import { check } from './checks.mjs';
 import { hessianRidges } from '../crop/layers.mjs';
 import { gaussian } from '../keyframes/density.mjs';
 
@@ -94,9 +95,10 @@ export function dryPenGate({ O, audit = [], drySheet = dry } = {}) {
     if(before.water>.001||before.pore>.02){
       drySheet(sheet,20000,O,{level:60,levelMax:90,dt:6});dried=true;after=measure();
     }
-    if(after.water>.001||after.pore>.021) throw Error('Paper still wet before ink gesture '+index);
+    // Ink on paper that would not dry is drawn anyway and counted; --strict 1 stops instead.
+    const stillWet=!check('Paper still wet before ink gesture',!(after.water>.001||after.pore>.021),{index,...after});
     if(!Number.isFinite(pen.ink)||pen.ink<=0) throw Error('Empty/nonfinite pen before ink gesture '+index);
-    audit.push({index,technique:'ink on dry paper',footprint,before,after,dried,
+    audit.push({index,technique:'ink on dry paper',footprint,before,after,dried,...(stillWet?{stillWet}:{}),
       instrument:{ink:pen.ink,capacity:pen.capacity,fill:pen.ink/pen.capacity,drop:pen.drop,concentration:Array.from(pen.conc)}});
   };
 }

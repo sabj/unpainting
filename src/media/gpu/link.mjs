@@ -501,7 +501,7 @@ export class GpuLink {
     this.notPlanning('a dry');
     if(this.resident && process.env.GPU_ASYNC_DRY==='1' && !watch && max>0 && !this.frameWorkerActive){
       if(this.needFullUp)this.fullUp(sheet);this.applyOptions(o);
-      this.post({op:'dryQueued',max,o:this.optPick(o),params,initialTopMask:this.topMask,wait:false});this.queuedDrys++;
+      this.post({op:'dryQueued',max,o:this.optPick(o),params:{...params,allowWet:false},initialTopMask:this.topMask,wait:false});this.queuedDrys++;
       this.stats.maxQueuedDrys=Math.max(this.stats.maxQueuedDrys??0,this.queuedDrys);
       if(this.queuedDrys>=Math.max(1,Math.min(128,Math.floor(this.rectData.length/6))))this.flushDrys(sheet);
       this.stale=true;this.topStale=true;this.fresh.stale();this.stats.drys++;
@@ -530,6 +530,7 @@ export class GpuLink {
       this.call({ op: 'dryEnd', topMask: this.topMask });
     }
     const K = this.K, n = this.n, ctrl = this.ctrl;
+    this.lastStillWet = ctrl[6]; // read by sheet.mjs dry, which records the continued check
     if (ctrl[5]) {
       // the superseded layer comes back for the pigments it holds; the new one gets planes for the pigments it holds and
       // shares the sheet's zero plane for the rest, as sheet.mjs fix does (dried layers are kept for the whole run)

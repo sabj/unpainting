@@ -1,10 +1,11 @@
 // Records every decision and input of a painter run in <out>/run-card.json:
 // drawing stages, segment backend, line source, python and checkpoint versions,
-// GPU backend, input and output SHA-256 hashes, and code cleanliness.
+// GPU backend, input and output SHA-256 hashes, code cleanliness, and the mid-painting checks the run continued past.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { linePaths } from "../crop/lines.mjs";
+import { continuedSummary } from "../media/checks.mjs";
 
 const fileSha256 = file => {
   if (!file || !fs.existsSync(file)) return null;
@@ -73,6 +74,7 @@ function buildRunCard({
         }
       : null,
     phases,
+    continuedChecks: continuedSummary(),
   };
 }
 

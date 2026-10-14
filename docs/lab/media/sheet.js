@@ -19,6 +19,7 @@
 // - A dried wash becomes a layer: later water can lift a little of it back (by staining power), and optics composite
 //   the layers in order.
 // DOM free.
+import { check } from './checks.js';
 
 export const DEFAULTS = {
   flow: 0.2, flowIters: 2, slope: 0,             // surface water levelling; each face's conductance is capped at 1/4
@@ -840,12 +841,23 @@ export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4
   const link = sheet._gpu;
   // A watched dry stays on the GPU too: it stops at the steps the watcher wants, and whatever the watcher reads (a frame's
   // render) comes down then.
-  if (link && !link.paused) return link.dry(sheet, max, o, { level, levelMax, levelTol, dt, analyticTail: analyticTail && !onStep }, onStep ? { onStep, steps } : null);
+  if (link && !link.paused) {
+    const t = link.dry(sheet, max, o, { level, levelMax, levelTol, dt, analyticTail: analyticTail && !onStep, allowWet: true }, onStep ? { onStep, steps } : null);
+    if (link.lastStillWet) { const wetCells = link.lastStillWet; link.lastStillWet = 0; check(DRY_LIMIT, false, { max, wetCells, gpu: true }); }
+    return t;
+  }
   return dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail });
 }
-// Fast-only quiet-film approximation. Never clear a transport-capable cell.
-export function quietDryTail(sheet, o = DEFAULTS) {
-  for (let i = 0; i < sheet.n; i++) if (!(sheet.W[i] <= o.wetEps)) return false;
+// A dry that reaches its step limit with water still on the sheet does not stop the painting (--strict 1 restores the
+// stop): the water left stands where it is and dries there, with no more flow, and the event is counted (src/media/checks.mjs).
+// On the GPU the worker does the same when the dry is sent with allowWet; with --strict it throws there instead.
+const DRY_LIMIT = 'Sheet is still wet after dry() limit';
+function wetness(sheet) {
+  let wetCells = 0, water = 0;
+  for (let i = 0; i < sheet.n; i++) { if (sheet.M[i] || sheet.s[i] > 0.02 * sheet.paper.capacity[i]) wetCells++; water += sheet.W[i] + sheet.s[i]; }
+  return { wetCells, water: +water.toFixed(4) };
+}
+function evaporateInPlace(sheet) {
   for (let i = 0; i < sheet.n; i++) {
     sheet.W[i] = 0; sheet.s[i] = 0; sheet.M[i] = 0;
     for (let k = 0; k < sheet.K; k++) {
@@ -854,6 +866,11 @@ export function quietDryTail(sheet, o = DEFAULTS) {
     }
   }
   sheet.wetDirty = 1;
+}
+// Fast-only quiet-film approximation. Never clear a transport-capable cell.
+export function quietDryTail(sheet, o = DEFAULTS) {
+  for (let i = 0; i < sheet.n; i++) if (!(sheet.W[i] <= o.wetEps)) return false;
+  evaporateInPlace(sheet);
   return true;
 }
 function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail }) {
@@ -869,7 +886,7 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
     // a caller watching the sheet dry (frames of a wash spreading and settling)
     if (onStep) onStep(t);
   }
-  if (bounds(sheet)) throw new Error(`Sheet is still wet after dry() limit of ${max} steps`);
+  if (bounds(sheet)) { check(DRY_LIMIT, false, { max, ...wetness(sheet) }); evaporateInPlace(sheet); }
   fix(sheet);
   return t;
 }

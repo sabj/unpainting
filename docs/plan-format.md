@@ -14,6 +14,28 @@ It writes `result.png` (the dried sheet) and `run.json`. Stroke-size admission w
 
 The full example is [examples/plans/graded-wash.json](../examples/plans/graded-wash.json); its saved output is [examples/output/graded-wash-result.png](../examples/output/graded-wash-result.png).
 
+## Units and resolution
+
+A plan describes a painting in physical and relative units, never in sheet cells, so the same plan paints at any
+resolution:
+
+```
+target image (px)          plan                                   sheet (cells)
+306 × 242   ──lines──▶     line files: target px + image size  ──┐
+                           positions, regions: 0 to 1           ─┼──▶  W × H cells, mmPerCell each
+                           brush widths, contact radii: mm      ──┘    (sheet width fixed in mm)
+```
+
+- Positions in `paths`, region `bounds` and reserve `bounds` are 0 to 1 of the sheet or target.
+- Brush widths (`widthMm`) and contact radii (`rMm`) are millimetres.
+- Line files are in target pixels and carry the image size they were drawn on (`image: {w, h}`); the painter maps them
+  onto the sheet.
+- The sheet's physical width is fixed (`grid` here, `sheet.widthMm` or `--sheetmm` for value plans). The painting width
+  in cells (`grid.w`, or `--width` for value plans) only sets `mmPerCell`.
+
+Painting the same plan at a quarter of the cells (half the width) keeps every stroke in the same place at the same
+physical size; only fine detail below one cell is lost.
+
 ## Top level
 
 | field | type | meaning |

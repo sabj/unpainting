@@ -1,4 +1,5 @@
 import {spline} from '../../src/crop/form.mjs';
+import {check} from '../../src/media/checks.mjs';
 // Authored polylines or existing production splines only: no invented controls, shaping, pressure overshoot or values.
 const finite=x=>typeof x==='number'&&Number.isFinite(x);
 const fail=m=>{throw Error(`authored gestures: ${m}`);};
@@ -51,10 +52,12 @@ export function lowerAuthoredGestures(intent,{target,crop,width,height,sheetWidt
  });
 }
 // Uses the real production contact, not an enclosing disk. Film may protect it; paper and negative
-// paint must avoid primary and eligible lift cells.
+// paint must avoid primary and eligible lift cells. Cells that do not are returned as reservedCells for the caller to
+// clip out of the stroke (tools/painter/reserve-clip.mjs) and counted; --strict 1 stops.
 export function admitAuthoredContact(contact,material,{reserved,film=()=>false}){
  const primary=contact.cells.filter(i=>contact.primaryMask[i]);
  const eligible=material.cells.filter(i=>contact.liftMask[i]&&!contact.primaryMask[i]&&!contact.neighborIndices.includes(i));
- for(const i of [...primary,...eligible])if(reserved(i)&&!film(i))fail(`paper/negative contact cell ${i}`);
- return {primaryCells:primary.length,eligibleLiftCells:eligible.length,declaredHaloCells:contact.neighborIndices.length,conservativeCells:material.conservativeCells.length};
+ const reservedCells=[...primary,...eligible].filter(i=>reserved(i)&&!film(i));
+ check('paper/negative contact cell',!reservedCells.length,{cells:reservedCells.length,first:reservedCells[0]});
+ return {reservedCells,primaryCells:primary.length,eligibleLiftCells:eligible.length,declaredHaloCells:contact.neighborIndices.length,conservativeCells:material.conservativeCells.length};
 }
