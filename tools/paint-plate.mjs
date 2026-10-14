@@ -3368,7 +3368,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
       const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
       productionDip(wet, { water: num('prewetwater', sh._valuePlan?.passageMaterial?.move==='wet on wet'?.55:1), conc: PIGS.map(() => 0) });
-      stroke(wet, sheet, pts, { upright: UPRIGHT, ...(sh._valuePlan?.passageMaterial?.move==='wet on wet'?{lift:false}:{}) });
+      stroke(wet, sheet, pts, { upright: UPRIGHT });
     }
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
