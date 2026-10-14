@@ -46,5 +46,8 @@ test('wet preparation uses whole gestures and refuses an oscillating bed instead
   let p = { moistShare: .5, waterMax: .02 };
   const r = preparePassageBed({ observe: () => p, wet: () => { p = { moistShare: .9, waterMax: .4 }; }, pickup: () => { p = { moistShare: .85, waterMax: .1 }; } });
   assert.deepEqual(r.actions.map(a => a.operation), ['prewet the planned contact', 'pick up excess surface water']);
+  let partial = { moistShare: .55, waterMax: .42 };
+  const r2 = preparePassageBed({ observe: () => partial, wet: () => { partial = { moistShare: .9, waterMax: .42 }; }, pickup: () => { partial = { moistShare: .88, waterMax: .12 }; } });
+  assert.deepEqual(r2.actions.map(a => a.operation), ['prewet the planned contact', 'pick up excess surface water']);
   assert.throws(() => preparePassageBed({ observe: () => ({ moistShare: .5, waterMax: .5 }), wet: () => {}, pickup: () => {}, maxActions: 2 }), /without a pixel correction/);
 });
