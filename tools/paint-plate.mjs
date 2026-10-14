@@ -3725,6 +3725,9 @@ if (CURLS?.area) {
   // read again, so covered and the forms are measured with the curls on the sheet, against the plan that owes them
   mark(layers.length);
   console.log(`curls: ${r.rounds.join(' + ')} crescents, ${r.edge} locks across the outline`);
+} else if (!AWARE_SKIP_POST && marks.length && marks.at(-1)?.pass !== layers.length) {
+  // read the finished washes when the cadence did not land on the last pass, so covered and forms see every pass
+  mark(layers.length);
 }
 // the mask comes off last, and the paper under it is untouched
 if(!AWARE_SKIP_POST&&VALUE_PLAN&&RESIST){dry(sheet,30000,O,{levelMax:140,dt:2});const paper=measurePaper(sheet,Array.from({length:N2},(_,i)=>i));if(!paper.dry)throw Error('value-plan film removal requires dry base');fs.appendFileSync(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'physical-film-remove',paper,operation:'existing real liftResist after final shadow; no white overlay'})+'\n');}
