@@ -6,6 +6,7 @@ import { createBrush, dip, stroke } from './brush.mjs';
 import { createPen, dipPen, penStroke } from './pen.mjs';
 import { createPencil, pencilStroke, wetGraphite, sharpen } from './pencil.mjs';
 import { fromColours, layerRT, renderLayers } from './km.mjs';
+import { setStrict, resetChecks } from '../paint/checks.mjs';
 const pigment = { rho: .05, omega: 1.4, gamma: .15, K: [.35,.49,.66], S: [.06,.025,.014] };
 const sheet = (w = 24, h = w, seed = 1) => createSheet(makePaper(w,h,{seed}), [pigment]);
 const still = { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0, absorb: 0, paperDry: 0, capRate: 0, slide: 0, settle: 0, lift: 0, rewetLift: 0 };
@@ -23,7 +24,7 @@ test('surface diffusion obeys its maximum principle with aligned fibres', () => 
 test('strong transport stays nonnegative and conservative', () => {const s=sheet(9);for(let i=0;i<s.n;i++){deposit(s,i,.4+(i%7)/10,[i%3*.1]);s.P[0][i]=.03;s.s[i]=.12;s.D[0][i]=.02;}const a=totals(s);for(let n=0;n<30;n++)step(s,{...DEFAULTS,evap:0,edgeEvap:0,paperDry:0,wetEps:0,flow:2,diffuse:2,marangoni:3,dt:10});finite(s);near(totals(s).water,a.water,1e-5);near(totals(s).pig[0],a.pig[0],1e-5);});
 test('evaporation removes water but leaves pigment', () => {const s=sheet(5);s.W.fill(1);s.M.fill(1);s.G[0].fill(.1);step(s,{...still,evap:.1,dt:2});near(totals(s).water,20);near(totals(s).pig[0],2.5);});
 test('drying and fixing conserve pigment across repeated glazes', () => {const s=sheet(8);deposit(s,20,.3,[.2]);dry(s,1000,{...DEFAULTS,evap:.1,paperDry:.1},{level:0,levelMax:0});near(totals(s).water,0);near(totals(s).pig[0],.2);assert.equal(s.layers.length,1);deposit(s,20,.3,[.1]);dry(s,1000,{...DEFAULTS,evap:.1,paperDry:.1},{level:0,levelMax:0});near(totals(s).pig[0],.3);assert.equal(s.layers.length,2);});
-test('dry refuses to call a wet wash fixed at its iteration limit', () => {const s=sheet();deposit(s,1,1,[.1]);assert.throws(()=>dry(s,0),/dry|limit/i);assert.equal(s.layers.length,0);near(totals(s).pig[0],.1);});
+test('under --strict dry refuses to call a wet wash fixed at its iteration limit', () => {setStrict(true);try{const s=sheet();deposit(s,1,1,[.1]);assert.throws(()=>dry(s,0),/dry|limit/i);assert.equal(s.layers.length,0);near(totals(s).pig[0],.1);}finally{resetChecks();}});
 test('settling and rewet lifting move mass between compartments', () => {const s=sheet();deposit(s,10,1,[.1]);step(s,{...still,settle:1});assert.ok(s.D[0][10]>0);near(totals(s).pig[0],.1);fix(s);step(s,{...still,rewetLift:1});assert.ok(s.layers[0][0][10]<.001);near(totals(s).pig[0],.1);});
 test('sheet work buffers do not couple same-sized sheets', () => {const a=sheet(),b=sheet();deposit(a,100,1,[1]);deposit(b,100,1,[1]);for(let i=0;i<5;i++){step(a);step(b);}assert.deepEqual(a.W,b.W);assert.deepEqual(a.G,b.G);});
 test('brush gives and picks up material conservatively', () => {for(const water of [.2,1]){const s=sheet(32),b=createBrush();dip(b,{water,conc:[.5]});s.W.fill(.8);s.G[0].fill(.1);s.M.fill(1);const a=brushMass(b),t=totals(s);stroke(b,s,[{x:4,y:16},{x:28,y:16}]);near(brushMass(b).water+totals(s).water,a.water+t.water);near(brushMass(b).pig+totals(s).pig[0],a.pig+t.pig[0]);}});

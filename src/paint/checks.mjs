@@ -7,8 +7,7 @@
 //
 // Every continued check is counted. writeContinuedChecks(dir) writes continued-checks.json next to the painting and
 // logs one closing line, so a painting that only finished thanks to these fallbacks stays visible.
-import fs from 'node:fs';
-import path from 'node:path';
+// No static Node imports: src/media/sheet.mjs uses this module and stays loadable outside Node.
 
 export const CONTINUED_FILE = 'continued-checks.json';
 const EXAMPLES = 5;
@@ -61,6 +60,8 @@ export function continuedLine(summary = continuedSummary()) {
 /** Write continued-checks.json into `dir`, log the closing line, and return the summary. */
 export function writeContinuedChecks(dir) {
   const summary = continuedSummary();
+  const fs = globalThis.process?.getBuiltinModule?.('node:fs'), path = globalThis.process?.getBuiltinModule?.('node:path');
+  if (!fs || !path) throw new Error('writeContinuedChecks needs Node');
   try { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, CONTINUED_FILE), JSON.stringify(summary, null, 1) + '\n'); }
   catch (e) { console.error(`continued checks not written to ${dir}: ${e.message}`); }
   console.log(continuedLine(summary));

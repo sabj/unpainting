@@ -659,10 +659,10 @@ export class GpuSheet {
   // as often as wanted (each runs until t steps have been taken, the sheet is dry or the limit is reached), then dryEnd. The
   // schedule's decisions fall at the same steps however it is split: the level check at multiples of 25 from `level` on and
   // at levelMax, the faster time from then on.
-  dryBegin(max = 40000, O = this.o, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, analyticTail = false } = {}) {
+  dryBegin(max = 40000, O = this.o, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, analyticTail = false, allowWet = false } = {}) {
     const oLevel = O.dt ?? 1; this.setOptions({ dt: oLevel });
     if (analyticTail) dt *= FAST_DRY_DT_SCALE;
-    this.dryS = { analyticTail, t: 0, fast: false, done: false, max, level, levelMax, levelTol, dt, oLevel, fastChunk:fastDryChunk(process.env.GPU_FAST_DRY_CHUNK??50),counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0 };
+    this.dryS = { analyticTail, allowWet, t: 0, fast: false, done: false, max, level, levelMax, levelTol, dt, oLevel, fastChunk:fastDryChunk(process.env.GPU_FAST_DRY_CHUNK??50),counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0 };
   }
   /** Returns { t, done }: steps taken so far, and whether the sheet was found dry (no step after that changes it). */
   async dryAdvance(until = Infinity) {
@@ -703,13 +703,21 @@ export class GpuSheet {
     }
     return { t: S.t, done: S.done };
   }
+  /** sheet.mjs evaporateInPlace: the water left stands where it is and dries there (a dry past its limit, sent with allowWet). */
+  evaporateInPlace() {
+    const e = this.device.createCommandEncoder(), pass = this.timestamps.begin(e, 'quiet-dry-tail');
+    pass.setPipeline(this.p.quiet_dry_tail); pass.setBindGroup(0, this.bg.quiet_dry_tail); pass.dispatchWorkgroups(Math.ceil(this.n / 256)); pass.end();
+    const clear = this.timestamps.begin(e, 'quiet-dry-clear');
+    clear.setPipeline(this.p.quiet_dry_clear); clear.setBindGroup(0, this.bg.quiet_dry_clear); clear.dispatchWorkgroups(Math.ceil(this.n / 256)); clear.end();
+    this.device.queue.submit([e.finish()]); this.epoch++;
+  }
   /** level_k once the last step is done, its maximum into CTR[2] (SheetView pends it behind its batched steps). */
   encodeLevel(){const e=this.device.createCommandEncoder();e.clearBuffer(this.b.CTR,8,4);const pass=this.timestamps.begin(e,'dry-level');pass.setPipeline(this.p.level_k);pass.setBindGroup(0,this.bg.level_k);if(this.persistent)pass.dispatchWorkgroups(this.workers);else pass.dispatchWorkgroupsIndirect(this.b.ARGS,0);pass.end();this.device.queue.submit([e.finish()]);}
   async dryEnd() {
     const S = this.dryS; this.dryS = null;
     if (process.env.DRY_TRACE2) { const z=new Uint32Array(await this.readWords("CTR",64)); console.error(`CUM tileSteps=${z[8]} mTileSteps=${z[9]} steps=${z[10]} wetTileSteps=${z[11]}`); }
     if (process.env.DRY_TRACE2) console.error(`DRYT t=${S.t} fastAt=${S.fastAt} level=${S.level} levelMax=${S.levelMax} dt=${S.dt} tail=${S.analyticTail} tailUsed=${!!S.analyticTailUsed} adaptive=${!!S.adaptiveUsed} damp=${!!S.dampOnly} dampAt=${S.dampAt} cnt=${S.lastCounters?.[0]} hist=${(S.hist??[]).join(",")}`);
-    let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} if (c[1] !== 0) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`);
+    let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} this.lastStillWet = 0; if (c[1] !== 0) { if (!S.allowWet) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`); this.lastStillWet = c[1]; this.evaporateInPlace(); }
     this.setOptions({ dt: S.oLevel });
     const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
     return S.t;
