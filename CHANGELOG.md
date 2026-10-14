@@ -14,6 +14,7 @@ Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publicat
 - Keep the final-dark pass and automatic source-line extraction opt-in after excessive accents and figure blotting in held-out Guardi output. Photo-map smoothing and linked pencil/finish ink remain deliberate planner choices.
 - Preserve small closed contours across Python thinning backends.
 - Add an opt-in universal linework stage (`--linework auto`, plan `drawing.linework`) that every style uses: a geometry-checked image-model sketch, the sketch planner or the target's own lines, one cleanup (specks, shadow outlines, repeated marks) and a per-image gate on drawing, medium and amount.
+- Remove painter code fitted to single benchmark subjects: `--trumbullrules`, `--portraitrules`, `--drawsubject`, the per-subject presets and their subject-id application under `--recipe v096`, the subject-id style lookup (`tuned/subjects.json`), the hash-bound reviewed 3T drawing and the single-photograph architecture passage. A plan's style now comes only from its `styleSelection`.
 
 ## 0.1.0 - 2026-10-10
 
