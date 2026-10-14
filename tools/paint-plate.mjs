@@ -1263,9 +1263,22 @@ const stroke=(b,target,points,options)=>{
     const preparation=preparePassageBed({observe,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>clock('flow',()=>step(target,{...O,dt:2}))});paper=preparation.paper;
     fs.appendFileSync(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }
-  // --wetgate 0: log a wet wash whose footprint is not evenly wet instead of stopping the run. Default 1.
-  if(paint&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(paper.moistShare<.7||paper.waterMax>.15)){const info='value-plan wet wash whole-footprint gate failed '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:paper.moistShare,waterMax:paper.waterMax,cells:cells.length});if(opt('wetgate','1')==='0')console.log('WARN '+info);else throw Error(info);}
-  const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
+  // A wet stroke into a fresh wash waits for the shine to go off while the footprint stays damp, then is laid: a
+  // just-laid wash holds 0.6-0.8 standing water for hundreds of steps, and on a large footprint the edges dry before
+  // the middle's puddle soaks in, so no moment may meet both limits. The stroke is laid when the damp share would drop below 0.7, and the
+  // paper it met is logged; the painting is never stopped for it. --wetgate 1 restores the old stop.
+  let wetWaits=0;
+  const wetMove=paint&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move);
+  if(wetMove&&paper.moistShare>=.7&&paper.waterMax>.15){
+   const fast={...O,dt:2};
+   while(paper.waterMax>.15&&wetWaits<20000){
+    const before=wetWaits;for(let j=0;j<10;j++)step(target,before>=140?fast:O);wetWaits+=10;
+    paper=observe();if(paper.moistShare<.7)break;
+   }
+  }
+  if(wetMove&&(paper.moistShare<.7||paper.waterMax>.15)&&opt('wetgate','0')!=='1')console.log('wet wash laid on uneven paper '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:+paper.moistShare.toFixed(3),waterMax:+paper.waterMax.toFixed(3),cells:cells.length,wetWaits}));
+  if(wetMove&&opt('wetgate','0')==='1'&&(paper.moistShare<.7||paper.waterMax>.15)){const info='value-plan wet wash whole-footprint gate failed '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:paper.moistShare,waterMax:paper.waterMax,cells:cells.length,wetWaits});if(opt('wetgate','1')==='0')console.log('WARN '+info);else throw Error(info);}
+  const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
   if(VALUE_ACTIVE.shaped&&TRUMBULL_RULES&&w===540){const total=VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0});if(total.strokes+1>12256||total.contacts+cells.length>12443022)throw Error('W13 Y1 contact budget would exceed W7; fix this band before continuing');}
   const result=physicalStroke(b,target,points,options);
