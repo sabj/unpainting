@@ -88,3 +88,27 @@ test('combined defaults use general washes and v096 retains fitted settings', ()
     assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
   }
 });
+
+test('a plan sheet section sets --sheetmm, --seed and --targetguard defaults and checks --sheetmm', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sheet-recipe-'));
+  try {
+    const file = path.join(dir, 'plan.json');
+    fs.writeFileSync(file, JSON.stringify({ subject: 'mittens', sheet: { widthMm: 152.4, seed: 0, targetGuard: 'strict' } }));
+    const { argv } = expandRecipe({ argv: ['--valueplan', file] });
+    const value = name => argv[argv.lastIndexOf(name) + 1];
+    assert.equal(value('--sheetmm'), '152.4');
+    assert.equal(value('--seed'), '0');
+    assert.equal(value('--targetguard'), 'strict');
+    const override = expandRecipe({ argv: ['--valueplan', file, '--sheetmm', '152.4', '--seed', '3', '--targetguard', 'gentle'] }).argv;
+    const overVal = name => override[override.lastIndexOf(name) + 1];
+    assert.equal(overVal('--sheetmm'), '152.4');
+    assert.equal(overVal('--seed'), '3');
+    assert.equal(overVal('--targetguard'), 'gentle');
+    assert.throws(() => expandRecipe({ argv: ['--valueplan', file, '--sheetmm', '200'] }), /sheet\.widthMm 152\.4 does not match --sheetmm 200/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

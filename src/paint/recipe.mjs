@@ -70,6 +70,38 @@ function planPresets(plan) {
   return names;
 }
 
+// The sheet settings a value plan declares: widthMm must match --sheetmm when both are given; seed and targetGuard
+// supply defaults that the command line can override.
+function planSheet(plan, argv) {
+  const s = plan?.sheet;
+  if (s == null) return [];
+  if (typeof s !== 'object' || Array.isArray(s)) throw new Error('value plan sheet: expected an object');
+  const out = [];
+  if (s.widthMm != null) {
+    if (typeof s.widthMm !== 'number' || !Number.isFinite(s.widthMm) || s.widthMm <= 0) {
+      throw new Error('value plan sheet.widthMm: expected a positive number');
+    }
+    const at = argv.lastIndexOf('--sheetmm');
+    if (at >= 0) {
+      const given = Number(argv[at + 1]);
+      if (!Number.isFinite(given) || Math.abs(given - s.widthMm) > 1e-6) {
+        throw new Error(`value plan sheet.widthMm ${s.widthMm} does not match --sheetmm ${argv[at + 1]}`);
+      }
+    } else {
+      out.push('--sheetmm', String(s.widthMm));
+    }
+  }
+  if (s.seed != null) {
+    if (!Number.isInteger(s.seed)) throw new Error('value plan sheet.seed: expected an integer');
+    if (!argv.includes('--seed')) out.push('--seed', String(s.seed));
+  }
+  if (s.targetGuard != null) {
+    if (typeof s.targetGuard !== 'string' || !s.targetGuard) throw new Error('value plan sheet.targetGuard: expected a guard mode');
+    if (!argv.includes('--targetguard')) out.push('--targetguard', s.targetGuard);
+  }
+  return out;
+}
+
 // Preset flags, less any flag the command line gives itself, so a typed flag is never repeated by a preset.
 function presetArgv(names, argv) {
   const flags = presetFlags(names), out = [];
@@ -92,7 +124,8 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   if (pipeline) drawing = pipeline.flags;
   const presets = [...new Set([...(name === 'v096' ? v096PresetsFor(plan?.subject ?? null) : []), ...planPresets(plan), ...typed])];
   const extra = presetArgv(presets, argv);
-  const tail = [...extra, ...drawing];
+  const sheet = planSheet(plan, argv);
+  const tail = [...extra, ...sheet, ...drawing];
   const describe = note => [note, presets.length ? `presets ${presets.join(', ')}` : null, plan?.drawing ? 'drawing from the plan' : null].filter(Boolean).join(', ');
   if (name === null) return tail.length ? { argv: [...tail, ...argv], note: describe('no recipe') } : { argv, note: null };
   if (name === 'none') return { argv: [...tail, ...argv], note: describe('recipe none') };

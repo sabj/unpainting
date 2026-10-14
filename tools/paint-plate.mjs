@@ -331,6 +331,7 @@ const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(pa
   return {...c,styleSelection:{...base,regions}};})();
 // value plan keys nothing reads are logged and exit 3 like unused options (src/paint/plan-keys.mjs); --allowunusedplan 1 allows them
 if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
+if(VALUE_CONFIG?.sheet?.widthMm!=null&&Math.abs(num('sheetmm',VALUE_CONFIG.sheet.widthMm)-VALUE_CONFIG.sheet.widthMm)>1e-6)throw Error(`value plan sheet.widthMm ${VALUE_CONFIG.sheet.widthMm} does not match --sheetmm ${num('sheetmm',VALUE_CONFIG.sheet.widthMm)}`);
 const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
 let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
