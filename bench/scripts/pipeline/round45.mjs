@@ -31,26 +31,32 @@ const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|m
 
 export const loadSubjects = () => readJson(path.join(V45, 'subjects.json')).subjects;
 
+// What the brief says about unread settings and dropped passages: kept as notes, or failures under --strict-verdict.
+const VERDICT_TEXT = {
+  notes: { UNREAD_OPTION: 'is recorded against your plan in the result', AFTER_PAINTING: 'Recorded against your plan after painting (the painting still counts): passages that end up with\nno brush path, a setting nobody read.' },
+  strict: { UNREAD_OPTION: 'fails the painting', AFTER_PAINTING: 'Also failed after painting (no score): passages that end\nup with no brush path, a setting nobody read.' },
+};
+
 /** The brief for one try: TASK.md with the round's rules and, in V5 after try 1, the feedback section. */
-export function renderTask({ round, n, tries, spec }) {
+export function renderTask({ round, n, tries, spec, strictVerdict = false }) {
   const bf = f => fs.readFileSync(path.join(V45, f), 'utf8').trim();
   const v5 = round.id === 'V5';
   let rules = !v5 ? bf('round-V4.md').replace('Each of the three V4 tries', `Each of the ${WORDS[tries] ?? tries} V4 tries`)
     : n === 1 ? bf('round-V5-first.md').replace('try 1 of 3', `try 1 of ${tries}`) : bf('round-V5-next.md').replace('{TRY}', String(n)).replace(` of 3:`, ` of ${tries}:`);
   const feedback = v5 && n > 1 ? bf('feedback-section.md').replace('{PREV}', String(n - 1)) : '';
-  const vals = { SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
+  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
   let t = fs.readFileSync(path.join(V45, 'TASK.md'), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
   for (const [k, v] of Object.entries(vals)) t = t.replaceAll(`{${k}}`, v);
   return t;
 }
 
 /** The model's worktree: the brief, the target, the check and paint commands, the skills, the tools and the example. */
-function seed({ ws, crop, spec, round, n, tries, dry }) {
+function seed({ ws, crop, spec, round, n, tries, dry, strictVerdict }) {
   const b = path.join(ws, 'bench');
   for (const d of ['plan', 'paint-io', 'looks', 'tools']) fs.mkdirSync(path.join(b, d), { recursive: true });
   fs.copyFileSync(path.join(V2, 'targets', `${crop}.png`), path.join(b, 'plan', 'target.png'));
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
-  fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec }));
+  fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict }));
   for (const f of ['check.sh', 'TOKENS.md', 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
   for (const f of ['check.mjs', 'plan-args.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
   for (const f of fs.readdirSync(path.join(V45, 'tools'))) fs.copyFileSync(path.join(V45, 'tools', f), path.join(b, 'tools', f));
@@ -77,7 +83,7 @@ function previousTry({ outRoot, round, model, n, crop }) {
 }
 
 /** One try of one target: the model's session, its repair turns, the painting and the record. */
-async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log }) {
+async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict }) {
   const raw = path.join(rawTry, crop);
   fs.mkdirSync(raw, { recursive: true });
   const target = path.join(V2, 'targets', `${crop}.png`);
@@ -85,7 +91,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
   const record = { turns: [], repairTurns: [], tokens: 0, costUSD: 0, wallSeconds: 0 };
   let session = null;
   try {
-    seed({ ws, crop, spec, round, n, tries, dry });
+    seed({ ws, crop, spec, round, n, tries, dry, strictVerdict });
     let feedbackFiles = null;
     if (prev) feedbackFiles = await writeFeedback({ dest: path.join(ws, 'bench', 'feedback'), prev, prevRaw: prev.raw, prevOut: prev.out, target });
     session = new PaintSession({ repo: REPO, ws, raw, spec, target, modelMinutes: MODEL_MINUTES, gpu, log });
@@ -163,7 +169,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
         if (session.started) { session.end(session.ended ?? 'the session ended'); await session.finish(); }
       }
     }
-    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, prev, target });
+    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict });
   } finally {
     if (session?.painting) session.painting.kill();
     keepScripts(ws, path.join(raw, 'scripts'), SEEDED);
@@ -173,9 +179,12 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
   }
 }
 
-/** The painting's outputs for the scorer and the try folder, and its record. */
-async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, prev, target }) {
-  const p = session.painting, v = p && ['done', 'failed'].includes(p.state) ? p.verdict() : null;
+/**
+ * The painting's outputs for the scorer and the try folder, and its record. A finished painting with only notes (unread
+ * settings, dropped passages) is painted and collected; strictVerdict makes those notes fail it.
+ */
+export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false }) {
+  const p = session.painting, v = p && ['done', 'failed'].includes(p.state) ? p.verdict({ strict: strictVerdict }) : null;
   if (p) {
     const last = p.segments.at(-1);
     fs.rmSync(path.join(raw, 'plan-final'), { recursive: true, force: true });
@@ -192,7 +201,7 @@ async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, 
     starts: count('start'), looks: count('look'), revisions: count('revise'), revisionsRefused: count('revise-refused'),
     modelMinutes: +(session.modelS() / 60).toFixed(1), cappedAtModelTime: Boolean(session.capped), sessionEnd: session.ended,
     repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null,
-    optionCheck: v?.optionCheck ?? null, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
+    optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     failure: outcome === 'painted' ? null : { failures: v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason })) },
     feedback: feedbackFiles ? 'FEEDBACK.md' : null, selfReview: fs.existsSync(path.join(raw, 'SELF-REVIEW.md')) || fs.existsSync(path.join(ws, 'bench', 'SELF-REVIEW.md')) ? 'SELF-REVIEW.md' : null,
@@ -216,7 +225,7 @@ async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, 
 }
 
 /** Write a try folder's files for one target and return its crops entry. */
-async function tryEntry({ tryDir, r }) {
+export async function tryEntry({ tryDir, r }) {
   const { crop, spec } = r, planOut = path.join(tryDir, `${crop}-plan`);
   fs.rmSync(planOut, { recursive: true, force: true }); fs.mkdirSync(planOut, { recursive: true });
   const src = fs.existsSync(path.join(r.raw, 'plan-final')) ? path.join(r.raw, 'plan-final') : null;
@@ -237,7 +246,7 @@ async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
-export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1 }) {
+export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false }) {
   const subjects = loadSubjects();
   const log = msg => console.error(`bench:run: ${msg}`);
   for (let n = fromTry; n <= tries; n++) {
@@ -252,7 +261,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       const spec = dry ? { ...subjects[crop], width: dryWidth } : subjects[crop];
       const prev = round.learning && n > 1 ? previousTry({ outRoot, round, model, n, crop }) : null;
       log(`${model.name}, ${round.id}, try ${n} of ${tries}, ${crop}${dry ? ' (dry run)' : ''}`);
-      const r = await paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log });
+      const r = await paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict });
       const e = await tryEntry({ tryDir, r });
       if (e.entry) cropsOut[crop] = e.entry; else unpainted[crop] = e.unpainted;
       tokens += r.record.tokens; cost += r.record.costUSD; wall += r.record.wallSeconds; modelMin += r.pipeline.modelMinutes; guardViolations += r.guardViolations;
@@ -264,7 +273,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
       settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: MODEL_MINUTES, modelMinutesCap: MODEL_MINUTES, lookBudget: null, selfView: 'gentle', targetGuard: 'gentle',
-        crops, learnsBetweenTries: round.learning, paintWidth: Object.fromEntries(crops.map(c => [c, dry ? dryWidth : subjects[c].width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
+        crops, learnsBetweenTries: round.learning, strictVerdict, paintWidth: Object.fromEntries(crops.map(c => [c, dry ? dryWidth : subjects[c].width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
       session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: tokens || null, costUSD: model.runner === 'together' && !dry ? +cost.toFixed(3) : null, exitCode: null, killedAtCap: false },
       guard: { blockedImageReads: guardViolations, kitRejections: 0, auditHits: [] },
       crops: cropsOut, ...(Object.keys(unpainted).length ? { unpainted } : {}),

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run one model through a round under protocol v2, gentle mode, and write its try folders.
 //   npm run bench:run -- --model opus --round V1 --try 1 [--crops <crop,crop>] [--out bench/runs]
-//   npm run bench:run -- --model opus --round V3|V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs]
+//   npm run bench:run -- --model opus --round V3|V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict]
 //   npm run bench:run -- --dry-run [--round V3|V4|V5]   (no model, no keys: a scripted stand-in exercises the whole path)
 // V1 and V2 write one try per run; V3, V4 and V5 write tries 1 to --tries (v3.mjs, pipeline/round45.mjs).
 // A try folder (<out>/<round dir>/<model>/<try>/) gets run.json, <crop>.webp and <crop>-stages.webp. Raw outputs
@@ -60,7 +60,8 @@ if (MULTI) {
   if (!Number.isInteger(tries) || tries < 1 || tries > 9) fail('--tries must be an integer from 1 to 9');
   if (!DRY && round.id === 'V5' && !process.env.TOGETHER_API_KEY) fail('V5 scores each try for the next one\'s feedback: set TOGETHER_API_KEY (the judges run on Together)');
   // --dry-width: the painting width of a dry run (default 96 px; the real widths are in v4v5/subjects.json)
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)) };
+  // --strict-verdict (V4, V5): unread settings and dropped passages fail a finished painting, as in the 0.1 results
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), strictVerdict: has('strict-verdict') };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);

@@ -97,7 +97,7 @@ Each `crops.<crop>` entry:
 
 | Field | Meaning |
 |---|---|
-| `outcome` | `painted`, `no-plan`, `plan-refused` or `render-failed` |
+| `outcome` | `painted`, `no-plan`, `plan-refused` or `render-failed`. A painting is `painted` when the painter wrote `painting.png` and exited 0 or 3. A painter killed by a signal, any other exit code or a missing painting is `render-failed`. |
 | `paintedBy` | the model (it started the painting) or the harness (the session ended first; painted without stops) |
 | `plan` | the `<crop>-plan` folder |
 | `tokens` | the recipe tokens the painting ended with |
@@ -105,8 +105,10 @@ Each `crops.<crop>` entry:
 | `starts`, `looks`, `revisions`, `revisionsRefused` | counts from `CHECKPOINTS.jsonl` |
 | `modelMinutes`, `cappedAtModelTime`, `sessionEnd` | the model's own minutes, whether the cap ended the session, and why it ended |
 | `turns`, `repairTurns` | each model turn `{k, repair, exit, seconds, stoppedBy}`, and the reasons for repair turns |
-| `optionCheck` | settings read by nothing: `model` (fails the painting), `base` (does not), `unknown` (fails) |
-| `droppedPassages` | passages with no brush path (any fails the painting) |
+| `optionCheck` | settings read by nothing: `model` (chosen by the plan), `base` (from the base recipe or template; never noted) and `unknown` (asked for by nobody) |
+| `droppedPassages` | passages with no brush path |
+| `notes` | `[{code, reason}]`: unread `model` settings and `unknown` options (code 4) and dropped passages (code 5). The painting still counts. Under `--strict-verdict` these are failures instead and `notes` is empty. |
+| `strictVerdict` | true when the try ran with `--strict-verdict`, which fails a painting on any note, as the 0.1 results did. Also in `settings.strictVerdict`. |
 | `paintExit`, `segments` | the painter's exit code, and the number of painter processes (one more per revision) |
 | `failure` | `{failures: [{code, reason}]}` when the outcome is not `painted` |
 | `feedback`, `selfReview`, `selfReviewModelMinute` | V5 after try 1: the files given and written, and the model minute at which SELF-REVIEW.md first existed |

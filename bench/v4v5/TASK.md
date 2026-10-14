@@ -68,7 +68,7 @@ All files go in `bench/plan/` unless stated.
    --width --scale --sheetmm --out --targetguard --gpu --mode --seed --frames --marks --video --runcache --valueplan
    --allowunused --physical --paperphysical --wetframes --passframes --pausedir --resumestate --recipe
    --valuepreviewonly`. A value that is a path must name a `.json` file inside `bench/plan/`. An option nothing reads
-   fails the painting. Pigment names: `src/paint/methods/material-profiles.mjs`.
+   {UNREAD_OPTION}. Pigment names: `src/paint/methods/material-profiles.mjs`.
 5. **`bench/PLAN.md` (required): your plan in words.** Reference cues, each region's technique and order, moisture and
    load, protected lights, edges, values, what would show failure, and (V5) what you changed and why. Recorded, not
    executed.
@@ -80,8 +80,7 @@ the refusals before any painting (it prints the painter arguments your plan reso
 skipped, and `"ok": true` or the reasons), then the painter's planning step (value plan, no painting) at the full
 painting width. The last line says ADMITTED or REFUSED with the reason. `bash bench/paint.sh start` runs the same check;
 if it refuses, fix the files and start again. If the painter itself refuses the plan once painting has begun (it says
-why), you may fix it and start once more from a clean sheet. Also failed after painting (no score): passages that end
-up with no brush path, a setting nobody read.
+why), you may fix it and start once more from a clean sheet. {AFTER_PAINTING}
 
 Other tools you may run: the tracers above, and any reading of the code, the skills in `bench/skills/`
 (painting-planner, watercolor-technique) and the worked example. Do not run the painter yourself: `bench/paint.sh` is

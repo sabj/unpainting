@@ -71,6 +71,7 @@ export async function writeFeedback({ dest, prev, prevRaw, prevOut, target }) {
     `This is feedback on the plan you made and painted in try ${prev.n} of this subject. Everything here comes from the harness; nothing in it is a hint about how the judges work beyond what is stated.`, '',
     '## Outcome', '', OUTCOME[prev.outcome] || `State: ${prev.outcome}`, ''];
   if (pipe.failure) L.push('What failed, and why:', ...(pipe.failure.failures || [pipe.failure]).map(f => `- ${f.reason || f}`), '');
+  if (pipe.notes?.length) L.push('Kept against your plan (the painting still counts):', ...pipe.notes.map(f => `- ${f.reason}`), '');
   if (prev.outcome === 'scored') {
     L.push('## The finished painting: score and judge notes', '', ...describeScore(entry.score), '',
       '## How the painting developed (progression judge)', '',
