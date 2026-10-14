@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
 import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
 import {framePolicy} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
@@ -1240,9 +1241,15 @@ const stroke=(b,target,points,options)=>{
   if(VALUE_ACTIVE.shaped)options={...options,upright:VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
   const contactStarted=performance.now(),contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
-  const cells=contact.cells.filter(i=>!target.resist?.[i]),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,[...cells,...neighbors],SPEED_PAPER);
+  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||!target.clip||target.clip[i])),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors],SPEED_PAPER);
   let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),SPEED_PAPER).dry;
   if(paint&&!['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();if(!paper.dry)throw Error('value-plan dry-paper contact gate failed');}
+  if(paint&&VALUE_ACTIVE.passageMaterial&&VALUE_ACTIVE.move==='wet on wet'){
+    const prepOpts={upright:options.upright};
+    const waterStroke=load=>{const p=observe();const clean=createBrush({...b,bristles:b.hairs.length,depositDepth:p.saturationMax>=.5?.1:0,seed:911+VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
+    const preparation=preparePassageBed({observe,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,depositDepth:0,seed:911+VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>clock('flow',()=>step(target,{...O,dt:2}))});paper=preparation.paper;
+    fs.appendFileSync(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
+  }
   // --wetgate 0: log a wet wash whose footprint is not evenly wet instead of stopping the run. Default 1.
   if(paint&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(paper.moistShare<.7||paper.waterMax>.15)){const info='value-plan wet wash whole-footprint gate failed '+JSON.stringify({id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,moistShare:paper.moistShare,waterMax:paper.waterMax,cells:cells.length});if(opt('wetgate','1')==='0')console.log('WARN '+info);else throw Error(info);}
   const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
@@ -3307,11 +3314,14 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       : insetCells > 0
         ? (() => { const M = up(erode(MASK, w, h, insetCells)); if (!M.some(v => v)) return []; return containPaths(brushedWashPaths(M, W2, H2, { pad: 0, minRadius: SC, minLength: 3 * SC, maxRadius: BRUSH, seed: 17 + laid + SEED, overlap: num('overlap', 0.15), walk: false, angle: gradedAngle }), distanceToZero(M, W2, H2), W2, H2, { minRadius: 0.8 * SC, minLength: 2 * SC, slack: 0, segments: FW }); })()
         : paths;
-    for (let pts of wetOver) {
+    const shapeCells = sh._valuePlan?.passageMaterial?.move === 'wet on wet' ? up(MASK).reduce((a, v, i) => (v && !sheet.resist?.[i] && a.push(i), a), []) : null;
+    const shapePaper = shapeCells?.length ? measurePaper(sheet, shapeCells, SPEED_PAPER) : null;
+    const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
+    if (needPrewet) for (let pts of wetOver) {
       if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
       const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
-      const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, seed: 900 + laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
-      productionDip(wet, { water: num('prewetwater', 1), conc: PIGS.map(() => 0) });
+      const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
+      productionDip(wet, { water: num('prewetwater', sh._valuePlan?.passageMaterial?.move==='wet on wet'?.55:1), conc: PIGS.map(() => 0) });
       stroke(wet, sheet, pts, { upright: UPRIGHT });
     }
   }

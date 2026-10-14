@@ -1,3 +1,4 @@
+import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadSubjects,loadStyle} from '../styles/loader.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
@@ -272,7 +273,7 @@ export function planLightToDark({bandRound=false,valueFloor=null,demand,k,densit
             chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
           const texture=shaped&&!step.pig&&(identity?band===3&&((trumbullRules&&warm)||(portraitRules&&box.y0/h>texZone[1]-.02&&box.y1/h<texZone[3]+.02&&box.x0/w>=texZone[0]-.02&&box.x1/w<=texZone[2]+.02)):chosen.textureRules?.some(rule=>(rule.rules==='trumbull'?trumbullRules:rule.rules==='portrait-3t'?portraitRules:false)&&rule.band===band&&(rule.cue==='warm stone'?warm:box.y0/h>rule.minY&&box.y1/h<rule.maxY)));
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
-          const wet=phase==='light'&&touched.every(r=>r.baseMove==='wet on wet');
+          const familyMatch=passageFamily(list,w,h,families),wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
           const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue+(texture?' Fine stone or lower-face stubble is below wash resolution: paper tooth, light dry brush, no individual dark dots.':''),
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',
             shaped,subject,texture,move:texture?'dry on dry':wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
@@ -301,6 +302,11 @@ export function planLightToDark({bandRound=false,valueFloor=null,demand,k,densit
           if(strokePlan&&shaped&&!texture&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!(rgb&&list.length>n*.015&&list.filter(i=>rgb[i*3+2]>rgb[i*3]+10).length>list.length*.6)){
             const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0});
             if(sp){sh._strokePlan=sp;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
+          if(familyMatch||wet){
+            const decision=passageMaterial({phase,family:familyMatch,fallbackMove:wet?'wet on wet':'wet on dry',texture});
+            intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
+            if(familyMatch)intent.referenceCue=familyMatch.referenceCue??intent.referenceCue;
+          }
           sh._valuePlan=intent;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
         }
         if(shapes.length)layers.push({value:band,pigment,shapes,mix:Array.from({length:k},(_,j)=>j===pigment?1:0),amount:shapes.reduce((s,q)=>s+q.amount*q.area,0)/shapes.reduce((s,q)=>s+q.area,0),area:shapes.reduce((s,q)=>s+q.area,0),_order:{phase:phase==='light'?'ground':phase==='shadow'?'dark':'mid',region:typeof domain==='string'?(regionProfiles.findIndex(p=>p.name===domain)+1||0):domain,shoot:true},_valuePhase:phase});
