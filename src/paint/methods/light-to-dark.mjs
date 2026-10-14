@@ -1,5 +1,5 @@
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
-import {resolveStyle,profileTechnique,loadSubjects,loadStyle} from '../styles/loader.mjs';
+import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
@@ -13,8 +13,7 @@ import { targetRegions } from './target-regions.mjs';
 import { subjectCovers, holdSubjectLights, subjectDomain } from './subject-washes.mjs';
 import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
-import { RECESS, SHADOW_GLAZE, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND, FIRST_INK_SKIP } from '../tuned/trumbull.mjs';
-import { TEX_ZONE, JAW_INK } from '../tuned/portrait.mjs';
+import { RECESS, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND } from '../tuned/trumbull.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
 // The q quantile of G over a passage's cells.
@@ -28,13 +27,11 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,trumbullRules=false,recesses=false,portraitRules=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,shadowRaw=false,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,violetShadow=false,shadowWater=0,roseViolet=false,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,texShare=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,texZone=TEX_ZONE,eyeRing=0,texShadow=1,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
+export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
   let coolGroup=null;setRecessMax(recessMax);
-  // shadowRaw: with no burnt sienna in the box, raw sienna is the shadow glaze's warm part, so it is not pure ultramarine.
-  const SHADOW_WARM=shadowRaw&&!pigments.some(p=>p?.name==='burnt sienna')?'raw sienna':'burnt sienna';
-  // A subject with a style mapping reads its decisions from the profile. precise-watercolor is the identity profile
-  // (the shaped planner's own weights, water and texture rules); every other style replaces them from its JSON.
-  const profile=subject&&(styleSelection||loadSubjects()[subject])?resolveStyle(subject,null,styleSelection):null;
+  // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
+  // (the shaped planner's own weights and water); every other style replaces them from its JSON.
+  const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
   const n=w*h;if(demand.length!==n*k||density.length!==n||k<1)throw Error('target/demand grid mismatch');
   if(demand.some(v=>!Number.isFinite(v)||v<0))throw Error('invalid pigment demand');
   // paperLights: a cream target sheet is paper, not paint. Estimate it from the brightest large connected region,
@@ -120,12 +117,6 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
       // restated last in two dried layers, band 4 then band 5, as a painter darkens an eye last.
       if(deepMask&&!recesses&&!protectedCells[i]&&deepMask[i]&&!irisBody[i]){const keep=1-light;weights[1][i]=weights[2][i]=0;weights[3][i]=keep*.75;weights[4][i]=keep*.75;accentCells[i]=1;}
       if(SMALL_DARK&&SMALL_DARK[i]&&!protectedCells[i]&&!accentCells[i]){const keep=1-light;weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=keep;accentCells[i]=1;}
-      // --portraitrules 1 (the portrait-3t preset): texZone, a lower-face stubble box fitted on 3T (docs/overfitting.md). Band 3 is laid there
-      // as short dry-brush marks, so stubble reads as broken texture, not a flat plane.
-      // texShadow s: in texZone the shadow glazes (bands 4-5) keep share s; the rest of their demand moves to band 3.
-      // texShare s: in texZone share s of the band-2 demand moves to band 3.
-      if(texShadow<1&&portraitRules&&!accentCells[i]){const y=Math.floor(i/w)/h,x=(i%w)/w;if(y>texZone[1]&&y<texZone[3]&&x>=texZone[0]&&x<=texZone[2]){const a=(weights[3][i]+weights[4][i])*(1-texShadow);weights[3][i]*=texShadow;weights[4][i]*=texShadow;weights[2][i]+=a;}}
-      if(texShare>0&&portraitRules){const y=Math.floor(i/w)/h,x=(i%w)/w;if(y>texZone[1]&&y<texZone[3]&&x>=texZone[0]&&x<=texZone[2]&&!accentCells[i]){const a=weights[1][i]*texShare;weights[1][i]-=a;weights[2][i]+=a;}}
       // groundGlaze: a cool-neutral ground (road, pavement shadow side) is one blue-violet glaze across
       // the whole ground on dry paint, not separate light washes; share g of its middle demand moves to band 4.
       if(groundGlaze>0&&rgb&&!protectedCells[i]&&Math.floor(i/w)/h>groundFrom&&!isRecess(rgb,i)){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2],L=.2126*r+.7152*g+.0722*b;
@@ -242,7 +233,6 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
     for(let pigment=0;pigment<k;pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,elig=placed&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null;
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        if(shaped&&trumbullRules&&phase==='shadow'&&rgb&&!isRecess(rgb,i)){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];const name=pigments[pigment]?.name;let ub=SHADOW_GLAZE.blueShare;if(violetShadow){const r=rgb[i*3],b=rgb[i*3+2];ub=SHADOW_GLAZE.blueShare+SHADOW_GLAZE.violetLift*Math.max(0,Math.min(1,(b-r+SHADOW_GLAZE.violetOffset)/SHADOW_GLAZE.violetSpan));}fitted=roseViolet?(name==='French ultramarine'?mass*SHADOW_GLAZE.roseBlue:name==='quinacridone rose'?mass*SHADOW_GLAZE.roseRose:0):name==='French ultramarine'?mass*ub:name===SHADOW_WARM?mass*(1-ub):0;}
         G[i]=fitted*step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(coolGain!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?coolGain:1);if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&phase!=='light'&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
@@ -290,24 +280,22 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=G;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
-          const warm=rgb&&list.filter(i=>rgb[i*3]-rgb[i*3+2]>18&&rgb[i*3+1]-rgb[i*3+2]>8).length>list.length*.6;
           const family=profile&&touched.map(r=>r.descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name),
             chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
-          const texture=shaped&&!step.pig&&(identity?band===3&&((trumbullRules&&warm)||(portraitRules&&box.y0/h>texZone[1]-.02&&box.y1/h<texZone[3]+.02&&box.x0/w>=texZone[0]-.02&&box.x1/w<=texZone[2]+.02)):chosen.textureRules?.some(rule=>(rule.rules==='trumbull'?trumbullRules:rule.rules==='portrait-3t'?portraitRules:false)&&rule.band===band&&(rule.cue==='warm stone'?warm:box.y0/h>rule.minY&&box.y1/h<rule.maxY)));
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
           const familyMatch=passageFamily(list,w,h,families),wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
-          const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue+(texture?' Fine stone or lower-face stubble is below wash resolution: paper tooth, light dry brush, no individual dark dots.':''),
+          const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue,
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',
-            shaped,subject,texture,move:texture?'dry on dry':wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
-            brush:{kind:shaped?'flat physical brush; one directional gesture per connected plane':'existing physical wash brush',contact:texture?'light pressure .35; broken tooth contact with flowing load':'side/belly; point for narrow shape',width:'target-fitted physical paths'},
-            resolution:{question:texture?'dry brush':'wash',minimumWashBodyCells:4,estimatedSupportWidthCells:2*list.length/Math.max(1,hard.length+soft.length),estimateMethod:'twice area over boundary length; not a measured lid or mullion width',mmPerCell:sheetWidthMm/w,detail:'sub-four-cell lines belong to the existing ink layer'},layer:band,break:wet?'reference requests a connected soft first wet passage':null,load:{water:texture?.22:wet?.88:phase==='shadow'?(shadowWater>0?shadowWater:.45):.62,pigment:texture?'light texture share (12% of middle demand), calibrated dry-brush delivery':shaped&&trumbullRules&&phase==='shadow'?'ultramarine + burnt sienna 55:45 glaze; dark recesses retain fitted mixture':'fitted target band demand; calibrated delivery',reload:'existing finite instrument route'},
+            shaped,subject,move:wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
+            brush:{kind:shaped?'flat physical brush; one directional gesture per connected plane':'existing physical wash brush',contact:'side/belly; point for narrow shape',width:'target-fitted physical paths'},
+            resolution:{question:'wash',minimumWashBodyCells:4,estimatedSupportWidthCells:2*list.length/Math.max(1,hard.length+soft.length),estimateMethod:'twice area over boundary length; not a measured lid or mullion width',mmPerCell:sheetWidthMm/w,detail:'sub-four-cell lines belong to the existing ink layer'},layer:band,break:wet?'reference requests a connected soft first wet passage':null,load:{water:wet?.88:phase==='shadow'?(shadowWater>0?shadowWater:.45):.62,pigment:'fitted target band demand; calibrated delivery',reload:'existing finite instrument route'},
             edges:{hardCells:hard,softCells:soft,policy:'dry placement; clean damp brush only on selected soft boundaries'},
             protectedLights:reserves.map(r=>r.reason).concat('held target paper whites'),failureSigns:'Lost lights, disconnected value shapes, uniform blur, pale unpainted interiors.',stop:'after band'};
           if(chosen){
             intent.styleName=chosen.name;intent.styleReason=chosen.reason;
             intent.regionStyleDecisions=touched.map(r=>{const q=resolveStyle(subject,r.descriptiveFamily,styleSelection);return {region:r.id,family:r.descriptiveFamily,style:q.name,reason:q.reason};});
             if(!identity){
-              const technique=profileTechnique(chosen,phase,band,texture);
+              const technique=profileTechnique(chosen,phase,band);
               Object.assign(intent,technique,{referenceCue:cue+' '+chosen.reason,styleReason:chosen.reason,break:chosen.name==='atmospheric-wet'?'Reference soft gradients require dark charge in an open wet passage.':null});
               intent.load={...intent.load,water:technique.water};
               intent.brush={...intent.brush,kind:chosen.brushes.join(', ')};
@@ -315,17 +303,17 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
               intent.resolution.minimumWashBodyCells=chosen.detailThresholdCells;
             }
           }
-          if(brushChoice&&identity){intent.brush=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,texture,referenceCue:intent.referenceCue,phase});sh.mask.passageBrush=intent.brush;intent.resolution.brushRadiusCells=intent.brush.sizeMm/(2*sheetWidthMm/w);intent.resolution.supportToBrushRadiusRatio=intent.resolution.estimatedSupportWidthCells/intent.resolution.brushRadiusCells;}
+          if(brushChoice&&identity){intent.brush=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});sh.mask.passageBrush=intent.brush;intent.resolution.brushRadiusCells=intent.brush.sizeMm/(2*sheetWidthMm/w);intent.resolution.supportToBrushRadiusRatio=intent.resolution.estimatedSupportWidthCells/intent.resolution.brushRadiusCells;}
           // strokePlan: the passage is laid as lanes of strokes, each charged by the plan under its own footprint
-          // (stroke-plan.mjs). Large cool skies, dry-brush texture and stone hints keep their own marks. Only passages at
+          // (stroke-plan.mjs). Large cool skies and stone hints keep their own marks. Only passages at
           // least one lane wide and three minimum shapes big are laned, so windows, recesses, mullions and figures keep
           // one fitted gesture and an exact edge.
           const supportMm=2*list.length/Math.max(1,hard.length+soft.length)*(sheetWidthMm/w),laneHere=laneMax>0?Math.min(laneMax,Math.max(laneMm,supportMm*.5)):Math.min(laneMm,Math.max(2,supportMm*.9));
-          if(strokePlan&&shaped&&!texture&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!(rgb&&list.length>n*.015&&list.filter(i=>rgb[i*3+2]>rgb[i*3]+10).length>list.length*.6)){
+          if(strokePlan&&shaped&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!(rgb&&list.length>n*.015&&list.filter(i=>rgb[i*3+2]>rgb[i*3]+10).length>list.length*.6)){
             const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0});
             if(sp){sh._strokePlan=sp;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
           if(familyMatch||wet){
-            const decision=passageMaterial({phase,family:familyMatch,fallbackMove:wet?'wet on wet':'wet on dry',texture});
+            const decision=passageMaterial({phase,family:familyMatch,fallbackMove:wet?'wet on wet':'wet on dry'});
             intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
             if(familyMatch)intent.referenceCue=familyMatch.referenceCue??intent.referenceCue;
           }
@@ -340,16 +328,16 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   return {paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
-  if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:intent.texture?'dry brush':wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
-  const wet=intent.move==='wet on wet';if(intent.texture)return {name:'dry brush',water:.22,wetMix:0,bridge:.35,bridgeSoft:1.2,intoWet:false,dryAfter:true,passes:1,valuePlan:intent};return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
+  if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
+  const wet=intent.move==='wet on wet';return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
 }
-export function selectValueInk(paths,{first,w,h,density,reserves=null,subject=null,shaped=false,styleSelection=null,trumbullRules=false,portraitRules=false,sourceInk=false}){
-  const profile=subject&&(styleSelection||loadSubjects()[subject])?resolveStyle(subject,null,styleSelection):null;
+export function selectValueInk(paths,{first,w,h,density,reserves=null,subject=null,shaped=false,styleSelection=null,sourceInk=false}){
+  const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
   // Pen contours naturally border paper lights. A wash reserve is not a reason
   // to delete the entire source line, and short marks carry faces and capitals.
   if(sourceInk)return paths.filter(g=>g.points?.length>=2);
   if(profile&&profile.name!=='precise-watercolor'&&(first?profile.ink+profile.graphite:profile.ink)===0)return [];
-  return paths.filter(g=>{const pts=g.points;if(!pts?.length)return false;let length=0,contrast=0,count=0,protectedCount=0;for(let j=0;j<pts.length;j++){const p=pts[j],x=Math.max(0,Math.min(w-1,Math.round(p.x))),y=Math.max(0,Math.min(h-1,Math.round(p.y))),i=y*w+x;if(j)length+=Math.hypot(p.x-pts[j-1].x,p.y-pts[j-1].y);if(reserves?.[i])protectedCount++;for(const q of neighbors(i,w,w*h))contrast+=Math.abs(density[i]-density[q]);count+=neighbors(i,w,w*h).length;}const jaw=shaped&&portraitRules&&pts.filter(p=>p.y/h>JAW_INK.yMin&&p.y/h<JAW_INK.yMax).length>pts.length*JAW_INK.share&&length/w>JAW_INK.minLength;const window=shaped&&trumbullRules&&first&&FIRST_INK_SKIP.test(g.object??'');return !jaw&&!window&&!protectedCount&&(first?(g.outline||g.tier==='outline'||length/w>=.035):contrast/Math.max(1,count)>=.06);});
+  return paths.filter(g=>{const pts=g.points;if(!pts?.length)return false;let length=0,contrast=0,count=0,protectedCount=0;for(let j=0;j<pts.length;j++){const p=pts[j],x=Math.max(0,Math.min(w-1,Math.round(p.x))),y=Math.max(0,Math.min(h-1,Math.round(p.y))),i=y*w+x;if(j)length+=Math.hypot(p.x-pts[j-1].x,p.y-pts[j-1].y);if(reserves?.[i])protectedCount++;for(const q of neighbors(i,w,w*h))contrast+=Math.abs(density[i]-density[q]);count+=neighbors(i,w,w*h).length;}return !protectedCount&&(first?(g.outline||g.tier==='outline'||length/w>=.035):contrast/Math.max(1,count)>=.06);});
 }
 
 // Connected soft edge chains only; hard boundaries remain dry placement.

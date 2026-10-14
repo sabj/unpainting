@@ -6,8 +6,12 @@ Some painter settings were fitted by self study on a few benchmark images, mostl
 
 - The default recipe (`src/paint/recipe.mjs`; also `--recipe general` or `combined`) sets only general methods: value planning from light to dark, shaped marks, four middle layers, two touch-up rounds, a drawing first (the plan chooses any closing pass), physical cold-press paper. No value in it was fitted to one image.
 - Fitted settings live in `src/paint/tuned/` and run through the compatibility recipe or a named preset (`src/paint/tuned/presets.mjs`). A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe general+architecture`.
-- No painting code outside `src/paint/tuned/` checks a subject id. Rules fitted to one subject are switched by a flag that only its preset sets (`--trumbullrules`, `--portraitrules`, `--drawsubject`).
-- `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject, and applies the per-subject presets by itself when the plan names `Y1`, `Y4`, `3T` or `1D`, as V096 did. Use the v0.1.0 tag for exact historical simulation output.
+- No painting code outside `src/paint/tuned/` checks a subject id, and no flag turns on a rule fitted to one subject. These per-subject switches were removed:
+  - `--trumbullrules`: the 55:45 ultramarine shadow glaze and its violet lift, warm-stone dry brush, the first-ink skips and the per-shape stone and leaf mixes (Y1).
+  - `--portraitrules`: the lower-face stubble box, the jaw-band ink skip and the colour trace window (3T).
+  - `--drawsubject`: drawing caps fitted on 3T and 1D.
+  - The reviewed 3T drawing (`--revieweddrawingcrop`, `--humaneyesreference`, `--reviewedwholebinding`, `--reviewedfulltrace`, `--shirtreference`, `--catlockreference`): eye strokes kept by trace ordinal, bound by hash to one private portrait.
+- `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject. It applies no preset by subject id. Use the v0.1.0 tag for exact historical simulation output.
 - `src/paint/overfit.test.mjs` fails if the general recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
 
 Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`. `Y4` is a second Trumbull-derived subject. `3T` (a portrait), `1D` (an ink and wash dog), `2W` (a beach scene with a figure and a dog) and `4I` (hills with a figure) are private benchmark images.
@@ -18,16 +22,12 @@ Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbu
 |---|---|---|
 | `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1 --texvariety 0.8` | Buildings under a sky |
 | `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
-| `trumbull` | `--trumbullrules 1 --shadowraw 1 --violetshadow 1 --foliagerefit 1 --paints <seven paints>` | Y1 only |
-| `trumbull-paints` | `--paints <seven paints>` | Y4 |
-| `portrait-3t` | `--portraitrules 1 --drawsubject 3T` | 3T only |
-| `dog-1d` | `--drawsubject 1D` | 1D only |
 
-`examples/plans/trumbull-values.json` names `architecture`, `glaze-gains` and `trumbull`, so `npm run example:architecture` paints as before.
+`examples/plans/trumbull-values.json` names `architecture` and `glaze-gains`, and authors its seven-paint box in `washes.paints`. The per-subject presets `trumbull`, `trumbull-paints`, `portrait-3t` and `dog-1d` were removed.
 
 ## Inventory
 
-47 items: 23 flags that V096 ran on every subject, 11 rules that checked a subject id, 10 opt-in modules and 3 lookups or harnesses. "Where" paths are under `src/paint/` unless they start with `tools/` or `bench/`. Risk is for images the item was not fitted on.
+Three groups: flags that V096 ran on every subject, opt-in modules, and lookups or harnesses. "Where" paths are under `src/paint/` unless they start with `tools/` or `bench/`. Risk is for images the item was not fitted on.
 
 ### V096 default flags, now in presets
 
@@ -51,39 +51,16 @@ Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbu
 | `--recesslayers 2` | `methods/light-to-dark.mjs` | Y1 | Recesses in two dried layers. | `architecture`, v096 | Low: needs `--recesses`. |
 | `--recessshare .75` | `methods/light-to-dark.mjs` | Y1 | Each recess layer carries 0.75 of the demand. | `architecture`, v096 | Low: needs `--recesses`. |
 | `--recessclean 1` | `methods/light-to-dark.mjs` | Y1 | No light wash under recesses. | `architecture`, v096 | Low: needs `--recesses`. |
-| `--texvariety 0.8` | `techniques/shaped-marks.mjs` | Y1 stone, 3T stubble | Varies short texture marks. | `architecture`, v096 | Low: needs `--texshort 1`. |
-| `--violetshadow 1` | `methods/light-to-dark.mjs`, `SHADOW_GLAZE` in `tuned/trumbull.mjs` | Y1 | More ultramarine in the shadow glaze where blue rises. | `trumbull`, v096 | Low: needs `--trumbullrules`. |
-| `--foliagerefit 1` | `tuned/stone-demand.mjs` | Y1 | One mix per connected leaf shape. | `trumbull`, v096 | Low: needs `--trumbullrules`. |
-| `--shadowraw 1` | `methods/light-to-dark.mjs` | Y1 | Raw sienna as the shadow glaze's warm half when there is no burnt sienna. | `trumbull`, v096 | Low: needs `--trumbullrules`. |
-| Seven-paint box | `TRUMBULL_PAINTS` in `tuned/trumbull.mjs` | Y1, Y4 | Ochre, raw sienna, hansa, ultramarine, cerulean, sepia, sap green. | `trumbull`, `trumbull-paints`, v096 on Y1 or Y4 | Low: a typed `--paints` wins. |
-
-### Rules that checked a subject id, now behind a preset flag
-
-| Item | Where | Fitted on | What it does | Switched on by | Risk |
-|---|---|---|---|---|---|
-| Shadow glaze mix | `methods/light-to-dark.mjs` | Y1 | Shadow glazes become ultramarine with a warm earth, 55:45. | `--trumbullrules` (`trumbull`) | High off Y1: replaces the planned colour of every shadow. |
-| First-ink skips | `FIRST_INK_SKIP` in `tuned/trumbull.mjs` | Y1 | The first ink leaves out window, mullion, ground and shadow paths. | `--trumbullrules` | Low: needs object labels. |
-| Warm stone texture | `methods/light-to-dark.mjs` | Y1 | Band 3 on warm cells laid as dry brush. | `--trumbullrules` | Medium. |
-| Stone and leaf colour fit | `tuned/stone-demand.mjs`, `tools/paint-plate.mjs` | Y1 | One box mix per connected stone or leaf shape. | `--trumbullrules` with shaped marks | Medium: warm and leaf tests fitted to Trumbull. |
-| W13 contact budget | `tools/paint-plate.mjs` | Y1 at 540 px | Stops the run if strokes or contacts pass the W7 count. | `--trumbullrules` at 540 px | Low: a guard, not a painting rule. |
-| Lower-face texture zone | `TEX_ZONE` in `tuned/portrait.mjs` | 3T | Stubble box laid as dry brush; `--texshadow` and `--texshare` act in it. | `--portraitrules` (`portrait-3t`) | High off 3T: a fixed box in sheet coordinates. |
-| Jaw ink rule | `JAW_INK` in `tuned/portrait.mjs` | 3T | The first ink leaves out long paths lying in the jaw band. | `--portraitrules` | High off 3T: fixed band. |
-| Texture rules in the style | `src/paint/styles/precise-watercolor.json` | Y1, 3T | Band-3 texture for warm stone and the stubble band. | `--trumbullrules`, `--portraitrules` | Low. |
-| Colour trace window | `TRACE_BOX` in `tuned/portrait.mjs` | 3T | Window for the `--colourtrace` diagnostic. Was a check of the image file name. | `--portraitrules` | None: diagnostic only. |
-| Drawing caps for 3T | `tuned/drawing-caps.mjs`, `methods/material-profiles.mjs` | 3T | 18 opening lines at pressure 0.25, 16 closing at 0.32. | `--drawsubject 3T` (`portrait-3t`) | Low. |
-| Drawing caps for 1D | `tuned/drawing-caps.mjs` | 1D | 12 opening lines at 0.28, 20 closing at 0.35. | `--drawsubject 1D` (`dog-1d`) | Low. |
+| `--texvariety 0.8` | `techniques/shaped-marks.mjs` | Y1 stone, 3T stubble | Varies short texture marks. | `architecture`, v096 | None: the value planner no longer lays texture passages. |
 
 ### Opt-in tuned modules, unchanged
 
 | Item | Where | Fitted on | What it does | Switched on by | Risk |
 |---|---|---|---|---|---|
-| Eye-plane strokes | `EYE_PLANE_ORDINALS` in `tuned/portrait.mjs`, `methods/drawing-logic.mjs` | 3T | Keeps two reviewed under-eye strokes in the opening ink. | A private `work/subjects/portrait.json` | Low: needs that file. |
 | Modulation anatomy | `tuned/modulation-anatomy.mjs` | 3T | Skin and fur regions; cat cells by 3T region id. | `--modulate 1 --modanatomy <file>` | Low: needs a registered file. |
 | Paint-owned residual | `tuned/paint-owned-residual.mjs` | One private image | Moves detail residual into the wash inside authored polygons. | `--modpaintplanes <file>` | Low: needs an authored file. |
 | Dog coats | `tuned/dog-coats.mjs` | 2W, private dry-coat photos | Wet and dry curly coat presets. | `--dogpaint`, `--dogcoat` | Medium: both assume a black curly coat. |
 | Olive families | `tuned/olive-families.mjs` | One olive study, checked on 2W | Colour group rules for the tree layers passage. | `--passages treelayers` | Medium: hard colour rules with no flag. |
-| Architecture clouds | `tuned/architecture-clouds.mjs` | A private architecture photograph | Cirrus lifted with tissue. | `--passages architecture` | High for other skies. |
-| Architecture plan | `tuned/architecture-reference.plan.json` | The same photograph | Polygons and colour filters. | `--architectureplan` | Only useful for that photograph. |
 | Mass plan | `tuned/mass-plan.mjs` | The Mona Lisa layout | Named masses, order and edges for oil. | `--medium oil`, `--massplan 1` | High for other layouts. |
 | Style cuts | `tuned/style-cuts.mjs` | About 40 artworks with benchmark pieces | Thresholds for the practice planner's ink and dry brush. | `--practice 1`, `--modulate 1`, `--drawinglogic 3` | Low to medium. |
 | Sand sizes | `techniques/passages/sand.mjs` | One beach crop | Mark sizes scaled from a 192-cell region. | `--passages sand` | Medium. |
@@ -92,7 +69,6 @@ Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbu
 
 | Item | Where | Fitted on | What it does | Switched on by | Risk |
 |---|---|---|---|---|---|
-| Subject styles | `tuned/subjects.json`, `styles/loader.mjs` | The 15 benchmark subjects | Maps a plan subject to a style profile with per-region overrides. | A value plan whose subject is listed | Low: other subjects get no profile. |
 | Benchmark base tokens | `bench/scripts/pipeline/plan-args.mjs` | Y1 | V4 and V5 base settings, stone tokens for architecture and palette tokens for Trumbull. | The benchmark runner | Medium: every V4 and V5 subject starts from them. |
 | Research subject ids | `tools/research/`, `tools/judge/` | 3T, 1D, 2W, 4I | Fixed subject lists for research and judging scripts. | Those scripts | None for painting. |
 
@@ -101,7 +77,7 @@ The general method defaults (for example the value bands, `--midlayers 4` and `-
 ## Changes for older runs
 
 - A run that relied on the default before 2026-10-10 repeats with `--recipe v096`.
-- A plan that names subject `Y1`, `3T` or `1D` no longer turns on that subject's rules by itself under `--recipe none`, `person` or an area plan. Add the preset to the plan, or use `--recipe v096`.
+- A plan that names subject `Y1`, `3T` or `1D` no longer turns on that subject's rules under any recipe. Those rules were removed.
 
 ## Held-out measurement
 

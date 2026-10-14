@@ -1,10 +1,9 @@
 // Presets: named sets of painter flags whose values were fitted on benchmark subjects. The default recipe uses none of
 // them. A value plan opts in with "presets": [...], or the command line with --recipe default+<preset>[+<preset>].
 // docs/overfitting.md lists every item, what it was fitted on and its risk.
-import { TRUMBULL_PAINTS } from './trumbull.mjs';
 
-// The flags each preset sets. Per-subject presets (trumbull, portrait-3t, dog-1d) turn on rules fitted to one image;
-// the others are general techniques with values fitted mostly on Trumbull (Y1).
+// The flags each preset sets: general techniques whose values were fitted mostly on Trumbull (Y1). No preset is
+// keyed to a subject, and none is applied by subject id.
 export const PRESETS = Object.freeze({
   // Buildings under a sky: sky lanes, cut-stone blocks, dark recesses in two layers, a cool ground glaze, varied texture.
   architecture: [
@@ -16,27 +15,7 @@ export const PRESETS = Object.freeze({
   ].join(' '),
   // Glaze strengths fitted on Y1 and Y4: 30% more paint in shadow glazes and cool cells, lighter touch-up glazes.
   'glaze-gains': '--darkgain 1.3 --coolgain 1.3 --touchgain .6',
-  // Trumbull (Y1): its seven-paint box, the shadow glaze mix, stone and leaf colour fits, the first-ink skips.
-  trumbull: `--trumbullrules 1 --shadowraw 1 --violetshadow 1 --foliagerefit 1 --paints ${TRUMBULL_PAINTS}`,
-  // The second Trumbull-derived subject (Y4): the seven-paint box only.
-  'trumbull-paints': `--paints ${TRUMBULL_PAINTS}`,
-  // The private portrait (3T): the lower-face texture zone, the first-ink jaw rule and its drawing caps.
-  'portrait-3t': '--portraitrules 1 --drawsubject subject-c',
-  // The private ink-and-wash dog (1D): its drawing caps.
-  'dog-1d': '--drawsubject subject-a',
 });
-
-// The presets the V096 recipe (the default before 2026-10-10) applied by itself when a value plan named one of these
-// subjects. Only --recipe v096 reads this map; exact old output also requires the original simulator.
-export const V096_SUBJECT_PRESETS = Object.freeze({
-  Y1: Object.freeze(['architecture', 'trumbull']),
-  'subject-e': Object.freeze(['trumbull-paints']),
-  'subject-c': Object.freeze(['portrait-3t']),
-  'subject-a': Object.freeze(['dog-1d']),
-});
-
-/** The presets V096 applied for a plan subject, or none. */
-export const v096PresetsFor = subject => V096_SUBJECT_PRESETS[subject] ?? [];
 
 /** Every flag name any preset sets, without the leading dashes. */
 export function presetFlagNames() {

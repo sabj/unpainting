@@ -13,19 +13,20 @@ test('the default recipe names each flag once, as flag and value pairs', () => {
   assert.equal(new Set(names).size, names.length);
 });
 
-test('v096 keeps the old default: the tuned flags on every subject, and the subject presets for Y1', () => {
+test('v096 keeps the old tuned flags on every subject and applies no preset by subject id', () => {
   const v096 = expandRecipe({ argv: ['--recipe', 'v096'] }).argv;
-  for (const flag of ['--darkgain', '--stoneblocks', '--skylanes', '--shadowraw']) assert.ok(v096.includes(flag), flag);
+  for (const flag of ['--darkgain', '--stoneblocks', '--skylanes']) assert.ok(v096.includes(flag), flag);
   const y1 = expandRecipe({ argv: ['--recipe', 'v096', '--valueplan', 'examples/plans/trumbull-values.json'] });
-  assert.match(y1.note, /recipe v096, presets architecture, trumbull/);
-  for (const flag of ['--trumbullrules', '--recesses', '--paints']) assert.ok(y1.argv.includes(flag), flag);
+  assert.match(y1.note, /recipe v096, presets architecture, glaze-gains,/);
+  assert.ok(!y1.argv.includes('--trumbullrules'));
 });
 
-test('the historical recipe adds the Trumbull paint box unless --paints is given', () => {
-  const plan = ['--recipe', 'v096', '--valueplan', 'examples/plans/trumbull-values.json'];
-  assert.ok(expandRecipe({ argv: plan }).argv.includes('--paints'));
+test("a plan's washes.paints sets the box unless --paints is given", () => {
+  const plan = ['--valueplan', 'examples/plans/trumbull-values.json'];
+  const box = expandRecipe({ argv: plan }).argv;
+  assert.equal(box[box.lastIndexOf('--paints') + 1], 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen');
   const own = expandRecipe({ argv: [...plan, '--paints', 'ochre'] }).argv;
-  assert.equal(own.filter(a => a === '--paints').length, 1);
+  assert.equal(own[own.lastIndexOf('--paints') + 1], 'ochre');
 });
 
 test('none and areaplan runs add no flags', () => {
@@ -83,7 +84,7 @@ test('final darks require an explicit choice and command-line choices win', () =
 test('combined defaults use general washes and v096 retains fitted settings', () => {
   const flags = args => expandRecipe({argv: args}).argv;
   const base = flags(['--recipe','v096']), general = flags([]);
-  for (const flag of ['--darkgain','--coolgain','--skylanes','--shadowraw']) assert.ok(base.includes(flag), flag);
+  for (const flag of ['--darkgain','--coolgain','--skylanes']) assert.ok(base.includes(flag), flag);
   for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) {
     assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
   }

@@ -15,13 +15,11 @@ import {scaleDrawingGestures} from '../src/paint/methods/drawing-hand.mjs';
 import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
 import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
 import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
-import {materialProfile,drawMaterial,prepareDrawing,drawingCaps,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
+import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
 import {passageBrushPaths} from '../src/paint/methods/passage-brush.mjs';
-import {resolveStyle,loadSubjects} from '../src/paint/styles/loader.mjs';
+import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
-import {shapeStoneDemand} from '../src/paint/tuned/stone-demand.mjs';
 import {GROUND} from '../src/paint/tuned/trumbull.mjs';
-import {TEX_ZONE,TRACE_BOX} from '../src/paint/tuned/portrait.mjs';
 import {setTextureVariety,setTextureFlow,flowField} from '../src/paint/techniques/shaped-marks.mjs';
 import {planLightToDark,valueTechnique,selectValueInk,softBoundaryPaths} from '../src/paint/methods/light-to-dark.mjs';
 import {softRing} from '../src/paint/methods/soft-edges.mjs';
@@ -142,7 +140,6 @@ import { versionStamp, versionLine } from '../src/painter-version.mjs';
 import { pigmentPhysics } from '../src/paint/methods/pigment-physics.mjs';
 import { segmentInk } from '../src/paint/methods/seg-ink.mjs';
 import { mlLines } from '../src/paint/methods/ml-lines.mjs';
-import {prepareReviewedCropDrawing,reviewedOpeningStrategy} from '../src/paint/methods/drawing-logic.mjs';
 import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.mjs';
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
@@ -206,9 +203,8 @@ const STROKE_BUDGET = num('strokebudget', 0);
 for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
 // --texvariety v: how much the short texture marks vary in length and pressure (src/paint/techniques/shaped-marks.mjs)
 setTextureVariety(num('texvariety', 0));
-// Per-subject rules, on only when a preset the plan or --recipe names sets them (src/paint/tuned/presets.mjs):
-// --trumbullrules 1 (trumbull), --portraitrules 1 (portrait-3t), --recesses 1 (architecture).
-const TRUMBULL_RULES = num('trumbullrules', 0) > 0, PORTRAIT_RULES = num('portraitrules', 0) > 0, RECESSES = num('recesses', 0) > 0;
+// --recesses 1: dark recesses as last accents, set by the architecture preset (src/paint/tuned/presets.mjs).
+const RECESSES = num('recesses', 0) > 0;
 const optTrack = {
   start() { OPT_TRACK = []; },
   stop() { const r = OPT_TRACK; OPT_TRACK = null; return r; },
@@ -342,8 +338,8 @@ console.log(`native tracked CPU upload: ${NATIVE_UPLOAD_POLICY.value}; ${NATIVE_
 if (PIPELINE) fs.writeFileSync(path.join(out, 'pipeline-plan.json'), JSON.stringify({plan:PIPELINE, overrides:argv0},null,2));
 const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(path.resolve(root,opt('valueplan','')))):null;
   if (c && PIPELINE) c = {...c, subjectOrder: PIPELINE.order.subjects};
-  // --regionstyle family=style[,family=style]: per-run region style override on top of subjects.json; needs --valueplan.
-  if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection??loadSubjects()[c.subject];if(!base)throw Error('--regionstyle needs a subject style mapping');
+  // --regionstyle family=style[,family=style]: per-run region style override on top of the plan's styleSelection.
+  if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection;if(!base)throw Error('--regionstyle needs a value plan with a styleSelection');
   const regions={...(base.regions??{})};for(const kv of opt('regionstyle','').split(',')){const [family,style]=kv.split('=');if(!family||!style)throw Error('--regionstyle family=style');regions[family]={style,reason:'run override --regionstyle for an A/B test'};}
   return {...c,styleSelection:{...base,regions}};})();
 // value plan keys nothing reads are logged and exit 3 like unused options (src/paint/plan-keys.mjs); --allowunusedplan 1 allows them
@@ -426,8 +422,6 @@ const PAPER_DECLARED = opt('paperrgb', '') === 'source' ? PAPER_PICK.paperRGB : 
 if (PAPER_AUTO) console.log(`paper: auto sheet ${PAPER_AUTO.join('/')} from the largest bright region ${PAPER_EST ? PAPER_EST.rgb.map(v => v.toFixed(0)).join('/') + ' (' + (100 * PAPER_EST.cells / (w * h)).toFixed(1) + '% of the sheet)' : 'none (under 1%)'}`);
 if (PAPER_DECLARED && (PAPER_DECLARED.length !== 3 || PAPER_DECLARED.some(v => !(v > 0 && v <= 255)))) throw Error('--paperrgb needs three values in 1..255');
 const { lightest, white: whitePaper } = PAPER_PICK, paperRGB = PAPER_DECLARED ?? PAPER_PICK.paperRGB;
-if(opt('revieweddrawingcrop',''))await prepareReviewedCropDrawing(opt('revieweddrawingcrop',''),paperRGB);
-if(opt('reviewedwholebinding',''))await prepareReviewedCropDrawing(opt('reviewedwholebinding',''),paperRGB);
 if (whitePaper) console.log(`paper: the lightest tenth reads ${lightest.map(v => v.toFixed(0)).join('/')}, painting on white paper`);
 // --palettefrom file: fit the pans to this artwork and paint the photograph with them; content still comes from the photograph.
 // --washsplat 1: loaded wash brushes (capacity 50+, dip 0.3+) lay soft round splats instead of hairs (src/media/brush.mjs). Default off.
@@ -1178,7 +1172,7 @@ const FACE_INK = () => FACE_INK_CACHE ??= (num('penfacelong', 0) > 0 ? (() => {
 // --inkfast auto|1|0: 1 sets the ink before washes (waterproof); 0 keeps the material's rewetting. auto (default) is
 // waterproof for black ink and soluble for sepia, as a plan's drawing.ink.waterproof defaults. --inkcolour is unused.
 const REQUESTED_DRAW_MEDIUM=OUTLINE_REQUESTED==='auto'?OUTLINE.medium:OUTLINE_REQUESTED;
-const SUBJECT_STYLE=VALUE_CONFIG?.subject&&(VALUE_CONFIG.styleSelection||loadSubjects()[VALUE_CONFIG.subject])?resolveStyle(VALUE_CONFIG.subject,null,VALUE_CONFIG.styleSelection):null;
+const SUBJECT_STYLE=VALUE_CONFIG?.styleSelection?resolveStyle(VALUE_CONFIG.subject,null,VALUE_CONFIG.styleSelection):null;
 // precise-watercolor is the identity profile for the shaped planner; other styles scale ink and graphite by their weights
 const STYLE_ON=()=>!!VALUE_PLAN?.style&&VALUE_PLAN.style.name!=='precise-watercolor';
 // The pen's ink load. --closingconc f dilutes the closing pen's ink (default 1): a closing accent restates an edge over
@@ -1347,21 +1341,21 @@ check('semantic material gate failed',false,{pass:a.key,paper});}
 };
 const pencilDraw=(target,gs,pigment,options)=>{
  const recorded=num('recordgraphite',0)>0||!!opt('preparationbinding','');
- const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,subject:drawSubject(),mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:drawingCapsFor(AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,
+ const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:AREA_DRAW_STAGE,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[AREA_DRAW_STAGE],caps:drawingCapsFor(AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,
   ...(recorded?{graphiteExecute:(sh,paths,k,profileOptions)=>recordGraphiteBatch({sheet:sh,strokes:paths,pigment:k,options:{...profileOptions,seed:options.seed},material:SHEET_PIGS[k],source:{binding:opt('preparationbinding','')||null,target:opt('image',''),guide:opt('penpencil',''),drawing:opt('drawingfile',''),frame:[target.w,target.h],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)},execute:physicalPencilDraw,observe:measurePaper,record:r=>fs.appendFileSync(path.join(out,'preparation-graphite.jsonl'),JSON.stringify(r)+'\n')})}: {})});
  if(!AREA_PLAN)return execute(gs);
  let cells=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,AREA_DRAW_STAGE,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('actual dry graphite',{geometry:g.gesture.points,options,drawingRole:g.area.drawingRole,material:GRAPHITE_PROFILE},()=>execute([g.gesture]));cells+=r.cellsLaid??r.cells??0;}AREA_EXEC.set(null);return {cellsLaid:cells};};
 
 if(VALUE_ENABLED){
  if(MOD||MIXES||FINISH_FILE||opt('curls','0')!=='0'||num('bgfirst',0)>0)throw Error('value planner cannot combine with independent modulation/mixes/finish/curls/bgfirst adapters; use --order legacy-painter for legacy replay');
- const shaped=num('shapedmarks',0)>0;const stone=shaped&&TRUMBULL_RULES?shapeStoneDemand(AL,PIGS.length,px,PIGS,{foliage:num('foliagerefit',0)>0,w,h,minCells:num('stonemincells',64),ochreMin:num('stoneochremin',.45),warm:num('stonewarm',0)>0,split:num('stonesplit',0)}):null;if(stone)fs.writeFileSync(path.join(out,'value-hue-check.json'),JSON.stringify(stone.audit,null,2));
+ const shaped=num('shapedmarks',0)>0;
  if (opt('furreserves','')) {
   const reserves=furLightReserves({D:SRC,w,h},JSON.parse(opt('furreserves')));
   HOLD=Uint8Array.from(reserves,(v,i)=>v||(HOLD?.[i]??0)?1:0);
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
- const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),shadowRaw:num('shadowraw',0)>0,edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),violetShadow:num('violetshadow',0)>0,shadowWater:num('shadowwater',0),roseViolet:num('roseviolet',0)>0,groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),texShadow:num('texshadow',1),texZone:(opt('texzone','')||TEX_ZONE.join(',')).split(',').map(Number),texShare:num('texshare',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,trumbullRules:TRUMBULL_RULES,recesses:RECESSES,portraitRules:PORTRAIT_RULES,styleSelection:VALUE_CONFIG?.styleSelection,demand:stone?.demand??AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
+ const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
@@ -1461,8 +1455,6 @@ const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 const TARGET_DRAW_EDGE=new Float32Array(N2);
 for(let y=1;y<H2-1;y++)for(let x=1;x<W2-1;x++){const i=y*W2+x;const lum=j=>{const sx=Math.min(w-1,Math.floor((j%W2)*w/W2)),sy=Math.min(h-1,Math.floor(Math.floor(j/W2)*h/H2)),k=3*(sy*w+sx);return (px[k]+px[k+1]+px[k+2])/765;};TARGET_DRAW_EDGE[i]=Math.min(1,Math.hypot(lum(i+1)-lum(i-1),lum(i+W2)-lum(i-W2)));}
 const DRAW_MATERIAL_STATE={opening:{used:0},closing:{used:0}};
-// --drawsubject <caps set>: drawing caps fitted on one subject (src/paint/tuned/drawing-caps.mjs), set by its preset.
-const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSubject(),stage);
 // Use one policy in planning and execution. The source's own ink is drawn with its short descriptive marks when the
 // plan says the target is drawn in pen: a pen-and-wash style, an ink medium in its drawing section, or a prepared line
 // file of the target's pen lines (--drawingfile). A painted target with no such plan keeps the sparse caps, since the
@@ -1471,13 +1463,13 @@ const drawSubject=()=>opt('drawsubject','default'),DC=stage=>drawingCaps(drawSub
 const sourceInkDrawing = () => OUTLINE.medium === 'ink' && (opt('sourceink', '') !== '' ? num('sourceink', 0) > 0
   : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', ''));
 const drawingCapsFor = (stage, graphite = false) => {
- const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,subject:drawSubject(),sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
+ const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
  return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
   ...(stage==='opening'?{minLengthMm:num('openingminmm',defaults.minLengthMm)}:{edgeMin:num('closingedgemin',defaults.edgeMin)})};
 };
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
-  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
+  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
@@ -1630,7 +1622,7 @@ if (LOOK) console.log(`look: relief ${LOOK_RELIEF}, papergrain ${LOOK_GRAIN}, mi
 
 // Read-only pigment accounting, including every wet, pore, deposited and fixed reservoir.
 const colourTrace = [];
-const traceBox = PORTRAIT_RULES ? TRACE_BOX : [.12,.50,.35,.64];
+const traceBox = [.12,.50,.35,.64];
 const traceCells=[];
 if(COLOUR_TRACE) for(let y=Math.round(traceBox[1]*h);y<Math.round(traceBox[3]*h);y++)for(let x=Math.round(traceBox[0]*w);x<Math.round(traceBox[2]*w);x++) traceCells.push(y*w+x);
 function colourMass(stage, extra={}) {
@@ -2329,7 +2321,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // goes under the washes as a painter's does. src/paint/methods/ink-dark-skip.mjs
   if (VALUE_PLAN && !first && num('inkdarkskip', 0) > 0) { const before = kept.length; kept = cutInDarkWash(kept, VALUE_PLAN.value.values, w, h, num('inkdarkskip', 0)); console.log(`ink dark skip: ${before} ${first ? 'opening' : 'closing'} gestures cut to ${kept.length} runs outside planned value ${num('inkdarkskip', 0)}`); }
   // A prepared pencil drawing describes the same contours as pen, including paper-light borders.
-  if(VALUE_PLAN)kept=selectValueInk(kept,{first,w,h,sourceInk:sourceInkDrawing()||(first&&graphiteFirst&&!!opt('drawingfile','')) ,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,trumbullRules:TRUMBULL_RULES,portraitRules:PORTRAIT_RULES});
+  if(VALUE_PLAN)kept=selectValueInk(kept,{first,w,h,sourceInk:sourceInkDrawing()||(first&&graphiteFirst&&!!opt('drawingfile','')) ,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection});
   const passName = first ? 'first' : fine ? 'fine' : 'last';
   const inkVerdict = INKFILTER && !SELECTED ? classifyInkPaths(kept, DRAW_SOURCE, w, h, { scale: num('inkfilterscale', K), accent: num('inkfilteraccent', 10) * K }) : null;
   if (inkVerdict) {
@@ -2340,7 +2332,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
   let scaled = scaleDrawingGestures(kept, SC).map((g,i)=>({...g,ml:!!g.ml,draw:!inkVerdict||inkVerdict[i].kept}));
-  scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',subject:drawSubject(),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
+  scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
   const press = penWant !== 'glaze' ? field : Float32Array.from(field, (v, i) => v * Math.max(num('penfloor', 0.2), Math.min(1, (DRAW_SOURCE[i] - planD[i]) / Math.max(1e-3, DRAW_SOURCE[i]))));
@@ -2768,7 +2760,6 @@ if(AREA_PLAN && PEN_FIRST && opt('draw','1')!=='0' && DRAWING!=='none'){
    guide:guide?{path:path.resolve(root,guide),sha256:sha256(path.resolve(root,guide))}:null,
    trace:traceFile&&fs.existsSync(traceFile)?{path:traceFile,sha256:sha256(traceFile)}:null,
    material:PENCIL?'physical dry graphite':'existing production outline material',
-   reviewedStrategy:reviewedOpeningStrategy(base,opt),
    drawingCommands:AREA_EXEC.records.filter(r=>r.operation==='actual dry graphite'||r.operation==='physical pen gesture'),
    prepfadeRequested:num('prepfade',0)>0,closingInkExecuted:false,paintExecuted:false,backend:GPU_INFO
   },null,2));
