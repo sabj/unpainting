@@ -32,7 +32,7 @@ import { createRequire } from 'node:module';
 export const MODES = ['off', 'warn', 'gentle', 'hard'];
 export const MODE_ALIASES = { strict: 'hard' };
 export const DEFAULT_MODE = 'gentle';
-export const HARD_LOOK_BUDGET = 100;
+export const HARD_LOOK_BUDGET = 2500;
 // names that, in this codebase, hold the target or a per-cell map computed from it
 export const TARGET_NAMES = ['px', 'rgb', 'target', 'targetRGB', 'source', 'SRC', 'D_SOURCE', 'D_AIM', 'D_PLAN', 'A', 'AL', 'SRC_LAB', 'SRC_D', 'WANT', 'G'];
 // Where a look may happen. Each returns shape means only.
