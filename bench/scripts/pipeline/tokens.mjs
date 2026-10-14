@@ -6,10 +6,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argsBuilder, optionMap, BASE } from './plan-args.mjs';
 
-const TOKENS = ['onedom', 'nest', 'lay2', 'lay4', 'dk13', 'lf', 'sg12', 'ls10', 'acc3', 'lt', 'cur', 'relonly', 'cg13', 'noslane', 'slane', 'st40', 'mg12', 'vio',
-  'shw45', 'rv', 'dkf', 'rg10', 'blk60', 'bka20', 'bmm40', 'dp80', 'ms120', 'birr', 'dg2', 'ts3', 'rx3', 'bvar', 'tv8', 'rac', 'eye10', 'skyb', 'cpp', 'tsh8', 'tfl8',
-  'novar', 'sk1', 'bcl3', 'leaf', 'fs60', 'fl0', 'sep', 'sep2', 'sep4', 'sep8', 'ink2', 'ink3', 'ink4', 'rec2', 'rec2x', 'rcl', 'swarm', 'ssp2', 'tp2', 'spl6', 'sml30',
-  'wre15', 'lit20', 'shs', 'lad', 'lw', 'sky', 'sky3', 'hue', 'efade', 'stone', 'stub', 'stub2', 'soft', 'softs', 'ol36', 'uncap', 'opp25', 'och30', 'dwg200', 'dwm50',
+const TOKENS = ['onedom', 'nest', 'lay2', 'lay4', 'dk13', 'lf', 'sg12', 'ls10', 'acc3', 'lt', 'cur', 'relonly', 'cg13', 'noslane', 'slane', 'st40', 'mg12',
+  'shw45', 'dkf', 'rg10', 'blk60', 'bka20', 'bmm40', 'dp80', 'ms120', 'birr', 'dg2', 'ts3', 'rx3', 'bvar', 'tv8', 'rac', 'eye10', 'skyb', 'cpp', 'tsh8', 'tfl8',
+  'novar', 'sk1', 'bcl3', 'fs60', 'fl0', 'sep', 'sep2', 'sep4', 'sep8', 'ink2', 'ink3', 'ink4', 'rec2', 'rec2x', 'rcl', 'ssp2', 'tp2', 'spl6', 'sml30',
+  'wre15', 'lit20', 'lad', 'lw', 'sky', 'sky3', 'hue', 'efade', 'stone', 'stub', 'stub2', 'soft', 'softs', 'ol36', 'uncap', 'opp25', 'och30', 'dwg200', 'dwm50',
   'ew5', 'smc4', 'sfa8', 'opk'];
 
 /** The options a token sets or removes against the bare region_w13 template, as text. */

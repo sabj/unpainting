@@ -19,7 +19,7 @@ how much its progress frames look like a person painting.
 ## What is fixed for everyone
 
 - The painter code (`tools/paint-plate.mjs`) and its base recipe. Every painting starts from the base recipe
-  `region_w13_lay4_ink4_rec2x_rcl_sky3_leaf_sep8_cg13_vio_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_pgreen_dwg200_tp2_shs`.
+  `region_w13_lay4_ink4_rec2x_rcl_sky3_sep8_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_pgreen_dwg200_tp2`.
   Your recipe tokens and painter settings are layered on top of it (below).
 - Fast drying mode, seed 0, the recording (progress frames and the stroke log), the target guard in `gentle` mode (the
   painter may look at broad shape averages of the target while painting; cell-level target reads are blocked and
