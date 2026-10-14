@@ -121,14 +121,14 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 
 | Field | Type and meaning | Default if omitted |
 |---|---|---|
-| `subject` | string used for the style lookup in `src/paint/tuned/subjects.json`; it turns on no fitted rule except under `--recipe v096` | no subject mapping |
+| `subject` | string naming the subject; it selects no style and turns on no fitted rule. The style comes from `styleSelection` | none |
 | `presets` | array of preset names from `src/paint/tuned/presets.mjs` (`architecture`, `glaze-gains`); their flags go after the recipe's, and an unknown name stops the run ([overfitting.md](overfitting.md)) | no presets |
 | `name` | string for the preview title | preview fallback title |
 | `photo` | source photo label in the preview; only its basename is used, and no photo is read | `unknown` |
 | `sheet` | optional `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match `--sheetmm` when both are given; `seed` and `targetGuard` set defaults | command-line or painter defaults |
 | `families` | array of descriptive region families, described below | empty array |
 | `reserves` | array of explicit bare-paper highlights, described below | empty array |
-| `styleSelection` | object with `style`, `reason` and optional `regions` | subject mapping, when present |
+| `styleSelection` | object with `style`, `reason` and optional `regions` | no style profile |
 | `view` | optional metadata object; a truthy `wholeOf` enables per-cell family style selection unless `--cellfamilies` overrides it | region-level style selection |
 | `drawing` | drawing choices in the next section | no drawing flags added |
 

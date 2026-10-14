@@ -1,6 +1,10 @@
 {
   "subject": "Y1",
   "name": "Trumbull Hall",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing."
+  },
   "drawing": {
     "medium": "ink",
     "inkColor": "sepia",

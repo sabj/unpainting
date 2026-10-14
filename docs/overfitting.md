@@ -75,7 +75,6 @@ Four groups: flags that V096 ran on every subject, rules that checked a subject 
 
 | Item | Where | Fitted on | What it does | Switched on by | Risk |
 |---|---|---|---|---|---|
-| Subject styles | `tuned/subjects.json`, `styles/loader.mjs` | The 15 benchmark subjects | Maps a plan subject to a style profile with per-region overrides. | A value plan whose subject is listed | Low: other subjects get no profile. |
 | Benchmark base tokens | `bench/scripts/pipeline/plan-args.mjs` | Y1 | V4 and V5 base settings, stone tokens for architecture and palette tokens for Trumbull. | The benchmark runner | Medium: every V4 and V5 subject starts from them. |
 | Research subject ids | `tools/research/`, `tools/judge/` | 3T, 1D, 2W, 4I | Fixed subject lists for research and judging scripts. | Those scripts | None for painting. |
 

@@ -14,8 +14,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const TUNED_DIR = path.join(ROOT, 'src/paint/tuned');
 const names = argv => argv.filter(a => a.startsWith('--')).map(a => a.slice(2));
 
-// Subject ids of the benchmark images: every key of subjects.json.
-const SUBJECT_IDS = Object.keys(JSON.parse(fs.readFileSync(path.join(TUNED_DIR, 'subjects.json'), 'utf8')));
+// Subject ids of the benchmark images.
+const SUBJECT_IDS = ['Cape', 'G1', 'G2', 'G3', 'G4', 'Jones', 'SF', 'Y1', 'Y2', 'Y3', 'subject-a', 'subject-b', 'subject-c', 'subject-d', 'subject-e'];
 // Painting code: everything in src/ but the tuned folder and tests, and the painter command.
 function paintingCode() {
   const files = [path.join(ROOT, 'tools/paint-plate.mjs')];

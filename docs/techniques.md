@@ -193,7 +193,6 @@ Modules:
 - `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
 - `tuned/portrait.mjs` (value plan subject subject-c): constants for the subject-c portrait. subject-c; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
-- `tuned/subjects.json` (value plan subject): the style profile for each benchmark subject. 15 subjects; low.
 - `tuned/trumbull.mjs` (`architecture` preset or compatibility recipe): recess, wall and ground constants. Y1, subject-e; high.
 
 | `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. On in the default recipe; `--recipe v096` leaves it off. | `--huechroma 0` |  |  |

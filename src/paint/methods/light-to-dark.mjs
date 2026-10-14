@@ -1,5 +1,5 @@
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
-import {resolveStyle,profileTechnique,loadSubjects,loadStyle} from '../styles/loader.mjs';
+import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
@@ -29,9 +29,9 @@ function targetValueMap(density) {
 }
 export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
   let coolGroup=null;setRecessMax(recessMax);
-  // A subject with a style mapping reads its decisions from the profile. precise-watercolor is the identity profile
+  // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
-  const profile=subject&&(styleSelection||loadSubjects()[subject])?resolveStyle(subject,null,styleSelection):null;
+  const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
   const n=w*h;if(demand.length!==n*k||density.length!==n||k<1)throw Error('target/demand grid mismatch');
   if(demand.some(v=>!Number.isFinite(v)||v<0))throw Error('invalid pigment demand');
   // paperLights: a cream target sheet is paper, not paint. Estimate it from the brightest large connected region,
@@ -332,7 +332,7 @@ export function valueTechnique(intent) {
   const wet=intent.move==='wet on wet';return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
 }
 export function selectValueInk(paths,{first,w,h,density,reserves=null,subject=null,shaped=false,styleSelection=null,sourceInk=false}){
-  const profile=subject&&(styleSelection||loadSubjects()[subject])?resolveStyle(subject,null,styleSelection):null;
+  const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
   // Pen contours naturally border paper lights. A wash reserve is not a reason
   // to delete the entire source line, and short marks carry faces and capitals.
   if(sourceInk)return paths.filter(g=>g.points?.length>=2);

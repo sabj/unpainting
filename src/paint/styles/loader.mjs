@@ -1,5 +1,5 @@
-// Watercolor style profiles (the JSON files beside this module), the style each subject is mapped to
-// (tuned/subjects.json), and the technique settings a profile gives a phase and value band.
+// Watercolor style profiles (the JSON files beside this module), the style a plan selects (its styleSelection), and
+// the technique settings a profile gives a phase and value band. No style is looked up by subject id.
 import fs from 'node:fs';
 const directory = new URL('./', import.meta.url);
 export const STYLE_NAMES = Object.freeze(['ink-and-wash','precise-watercolor','urban-sketch','atmospheric-wet']);
@@ -9,10 +9,9 @@ export function loadStyle(name) {
   if (profile.name !== name || profile.weights.length !== 5 || profile.water.length !== 5 || Math.abs(profile.weights.reduce((a,b)=>a+b,0)-1)>1e-8) throw Error(`Invalid style profile: ${name}`);
   return profile; // fresh data per plan; callers cannot mutate another subject's defaults
 }
-export function loadSubjects() { return JSON.parse(fs.readFileSync(new URL('../tuned/subjects.json', import.meta.url))); }
 export function resolveStyle(subject, region=null, selection=null) {
-  const mapping = selection ?? loadSubjects()[subject];
-  if (!mapping?.style || !mapping.reason) throw Error(`Subject ${subject} needs an explicit style and reason`);
+  const mapping = selection;
+  if (!mapping?.style || !mapping.reason) throw Error(`Subject ${subject} needs a plan styleSelection with a style and reason`);
   const override = region && mapping.regions?.[region];
   if (override && !override.reason) throw Error(`Region ${region} needs a style reason`);
   return {...loadStyle(override?.style ?? mapping.style), reason:override?.reason ?? mapping.reason};

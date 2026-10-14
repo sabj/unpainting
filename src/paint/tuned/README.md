@@ -8,7 +8,6 @@ Settings fitted to specific benchmark images. They can worsen results on other s
 - `portrait.mjs` and `drawing-caps.mjs`: constants for the private portrait (`subject-c`) and ink-and-wash dog (`subject-a`) subjects.
 - `dog-coats.mjs`, `olive-families.mjs` and `architecture-clouds.mjs`: presets for single techniques and passages (washes or groups of marks with one job).
 - `style-cuts.mjs`: thresholds for the practice planner's ink and dry brush weights.
-- `subjects.json`: the style each benchmark subject maps to.
 
 Code outside this folder never checks a subject id; `src/paint/overfit.test.mjs` enforces it. To paint with no recipe at all:
 
