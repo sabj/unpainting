@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { scaleBrushForDensity } from '../src/media/brush-density.mjs';
 import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
 import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
 import {framePolicy} from './speed/frame-policy.mjs';
@@ -379,7 +380,7 @@ prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: 
 const SUBJECTS = await subjectWashField({ image: opt('image', ''), px, w, h, families: VALUE_CONFIG?.families ?? [], shaped: num('shapedmarks', 0) > 0, opt, num, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
-const createBrush = o => createBrushRaw(gpuHairCap(o));
+const createBrush = o => createBrushRaw(gpuHairCap(scaleBrushForDensity(o, { renderWidth: w * num('scale', 1) })));
 // --mmspacing 0|1: space brush dabs by sheet size, not cells, so marks match at any resolution. Default 1 above 540 px.
 const MM_SPACING_ON = () => { try { return num('mmspacing', w > 540 ? 1 : 0) > 0; } catch { return false; } };
 const dabSpacing = o => { if (!MM_SPACING_ON()) return o; const f = w / 540; return { ...(o ?? {}), spacing: (o?.spacing ?? 0.7) * f }; };
@@ -2813,7 +2814,7 @@ const passageBrush = opts => {
   const f = (280 / 1086) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2), rr = (opts.radius ?? 6) / f;
   const bristles = opts.flat ? Math.max(12, Math.ceil(rr * 2)) : Math.max(8, Math.ceil(rr * 2.5));
   const stiffness = (opts.flat ? 8 : Math.max(2, Math.round(rr * 0.5))) * f;
-  return createBrush({ ...opts, bristles, capacity: (opts.capacity ?? 20) * f * f, stiffness,
+  return createBrush({ ...opts, _densitySized: true, bristles, capacity: (opts.capacity ?? 20) * f * f, stiffness,
     streakLength: (opts.streakLength ?? 14) * f });
 };
 const PASSAGE_HOOK = await passageHook({
