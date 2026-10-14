@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeRunCard } from '../src/paint/run-card.mjs';
 import { scaleBrushForDensity } from '../src/media/brush-density.mjs';
 import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
 import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
@@ -270,7 +271,7 @@ const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
 // the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
-checkCodeState({ root, out, allowDirty: num('allowdirty', 0) > 0 });
+const CODE_STATE = checkCodeState({ root, out, allowDirty: num('allowdirty', 0) > 0 });
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
@@ -375,7 +376,7 @@ if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(o
 let px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
 // Segments before every painting: SAM's regions of the target, cached by its hash; without SAM the run fails (src/crop/segment-prep.mjs)
-prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
+const SEGMENTS_RECORD = prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
 // --subjectwash 1: the washes cut by subject as well as by colour and value (src/paint/methods/subject-washes.mjs)
 const SUBJECTS = await subjectWashField({ image: opt('image', ''), px, w, h, families: VALUE_CONFIG?.families ?? [], shaped: num('shapedmarks', 0) > 0, opt, num, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
@@ -3978,5 +3979,6 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
   }
 }
 
+writeRunCard({ root, out, args: argv0, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'ink'), code: CODE_STATE, segments: SEGMENTS_RECORD, linework: LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
