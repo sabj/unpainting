@@ -1,7 +1,9 @@
 // The pen-and-wash style's wash plan (--style penwash): a confident ink drawing first, then a few simple transparent
 // washes that support it. This module only plans; pen-wash.mjs lays the passages with the ordinary mop and brush.
 //
-// Two planners, chosen with --penwashplan:
+// Three planners, chosen with --penwashplan:
+//   stages (recipe)   the order a pen-and-wash illustrator works in: paper whites kept, one pale unifying first wash,
+//                     one mid-value shadow wash, then a few small darks (planStages below, DIAGNOSIS in the commit).
 //   values (default)  the subject reduced to three values (light, mid, dark). Light stays paper, except a pale sky
 //                     or unifying wash. Mid gets one or two local-colour washes (split only where the hue clearly
 //                     differs), dark one shadow glaze and, where the deepest darks are big enough, one deeper glaze.
@@ -13,7 +15,7 @@ import { gaussian } from '../../keyframes/density.mjs';
 import { components, dilate, erode } from '../../raster.js';
 import { renderLayers } from '../../media/km.mjs';
 
-const PENWASH_PLANNERS = Object.freeze(['values', 'colour']);
+const PENWASH_PLANNERS = Object.freeze(['values', 'colour', 'stages']);
 export const PENWASH_MAX_PASSAGES = 6;
 
 // sRGB 0..255 to CIE L*a*b* (D65), one cell.
@@ -152,6 +154,46 @@ export function fitMix(want, pigments, paperRGB = [247, 244, 236], amounts = FIT
     if (!best || e < best.e) best = { e, dir: dirs[(i / amounts.length) | 0], amount: amounts[i % amounts.length], got: [L, a, b] };
   }
   return { ...best, want };
+}
+
+// L* of a stack of washes laid flat on the paper, oldest first, each { dir, strength }.
+function stackL(stack, pigments, paperRGB) {
+  const layers = stack.map(g => pigments.map((_, j) => Float32Array.of(g.dir[j] * g.strength)));
+  const rgb = renderLayers(layers, pigments, Uint8ClampedArray.from(paperRGB), 1, 1);
+  return lab(rgb[0], rgb[1], rgb[2])[0];
+}
+
+// The largest x in [lo, hi] with ok(x), for ok true at lo and monotone.
+function bisect(ok, lo, hi, steps = 24) {
+  for (let s = 0; s < steps; s++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; }
+  return lo;
+}
+
+/**
+ * Charges solved from the target. A passage's band is its cells under no later passage. Its charge is the one that
+ * makes the flat stack there (the earlier passages covering at least half the band, then this one) render at
+ * paper - c x (paper - the band's median target L*), c being the passage's own `ladderC` (else `c`): a pale copy of
+ * the target's value. No passage may darken bare paper by more than its `maxDL` (else `maxDL`) L* or pass charge
+ * `maxStrength`, and one that would darken its band by less than `minDL` is left out. Returns new passages.
+ */
+export function ladderStrengths(passages, { L, n, pigments, paperRGB = [247, 244, 236], c = 0.5, maxDL = 9, minDL = 1.5, maxStrength = 0.45, minBand = 0.003 }) {
+  const paperL = stackL([], pigments, paperRGB), mean = p => (p.grade ? (p.grade.from + p.grade.to) / 2 : 1);
+  const out = [];
+  passages.forEach((p, k) => {
+    const later = passages.slice(k + 1);
+    let band = []; for (let i = 0; i < n; i++) if (p.mask[i] && !later.some(q => q.mask[i])) band.push(i);
+    if (band.length < minBand * n) { band = []; for (let i = 0; i < n; i++) if (p.mask[i]) band.push(i); }
+    if (!band.length) return;
+    const goal = paperL - (p.ladderC ?? c) * Math.max(0, paperL - quantile(band.map(i => L[i]), 0.5));
+    const under = out.filter(q => band.reduce((a, i) => a + q.mask[i], 0) >= 0.5 * band.length).map(q => ({ dir: q.dir, strength: q.strength * mean(q) }));
+    const own = s => ({ dir: p.dir, strength: s * mean(p) });
+    const cap = bisect(s => paperL - stackL([own(s)], pigments, paperRGB) <= (p.maxDL ?? maxDL), 0, maxStrength);
+    const base = stackL(under, pigments, paperRGB), at = s => stackL([...under, own(s)], pigments, paperRGB);
+    const s = at(cap) >= goal ? cap : bisect(x => at(x) > goal, 0, cap);
+    if (base - at(s) < minDL) return;
+    out.push({ ...p, strength: +s.toFixed(4), ladder: { goal: +goal.toFixed(1), band: band.length / n } });
+  });
+  return out;
 }
 
 // The median L*, a*, b* of a region, its L* taken `lightness` of the way from the paper toward it: the pale wash the
@@ -365,6 +407,148 @@ function consolidate(mask, w, h, r, minArea) {
   return out;
 }
 
+// A square max (or min, with f = Math.min) filter of radius r over a plane, separable.
+function rankFilter(L, w, h, r, f) {
+  const pass = (src, horizontal) => {
+    const out = new Float32Array(src.length);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let v = src[y * w + x];
+      for (let d = -r; d <= r; d++) {
+        const xx = horizontal ? x + d : x, yy = horizontal ? y : y + d;
+        if (xx >= 0 && yy >= 0 && xx < w && yy < h) v = f(v, src[yy * w + xx]);
+      }
+      out[y * w + x] = v;
+    }
+    return out;
+  };
+  return pass(pass(L, true), false);
+}
+
+// The slope of a plane in units per mm (central differences over cells mmPerCell wide).
+function gradientMm(L, w, h, mmPerCell) {
+  const g = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const gx = (L[y * w + Math.min(w - 1, x + 1)] - L[y * w + Math.max(0, x - 1)]) / 2, gy = (L[Math.min(h - 1, y + 1) * w + x] - L[Math.max(0, y - 1) * w + x]) / 2;
+    g[y * w + x] = Math.hypot(gx, gy) / mmPerCell;
+  }
+  return g;
+}
+
+// Holes in a mask (connected unmasked areas not touching the border) smaller than `minCells` filled.
+function fillHoles(mask, w, h, minCells) {
+  if (!(minCells > 0)) return mask;
+  const inv = Uint8Array.from(mask, v => (v ? 0 : 1)), { labels, areas } = components(inv, w, h), edge = new Set();
+  for (let x = 0; x < w; x++) { edge.add(labels[x]); edge.add(labels[(h - 1) * w + x]); }
+  for (let y = 0; y < h; y++) { edge.add(labels[y * w]); edge.add(labels[y * w + w - 1]); }
+  return Uint8Array.from(mask, (v, i) => (v || (labels[i] && !edge.has(labels[i]) && areas[labels[i]] < minCells) ? 1 : 0));
+}
+
+/**
+ * A wash's vertical grade from the target: the target's darkness (paper L* minus L*) over the mask, fitted by a
+ * straight line down the sheet, as charge multipliers at the top and bottom rows (mean 1 at the mask's mean row,
+ * never under `floor`). Null when the two ends differ by less than `min`: a flat wash.
+ */
+function gradeOf(L, mask, w, h, paperL, { min = 0.3, floor = 0.15 } = {}) {
+  let n = 0, sy = 0, sd = 0, syy = 0, syd = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (!mask[i]) continue; const d = Math.max(0, paperL - L[i]); n++; sy += y; sd += d; syy += y * y; syd += y * d; }
+  if (n < 50) return null;
+  const my = sy / n, md = sd / n, vy = syy / n - my * my;
+  if (md <= 0 || vy <= 0) return null;
+  const b = (syd / n - my * md) / vy, at = y => Math.max(floor, (md + b * (y - my)) / md);
+  const from = at(0), to = at(h - 1);
+  return Math.abs(from - to) < min ? null : { from: +from.toFixed(3), to: +to.toFixed(3) };
+}
+
+/**
+ * The stage planner (--penwashplan stages): the order a pen-and-wash illustrator works in, lights first.
+ *   0. whites: paper is kept where the target is in the upper half of its own light mass (sunlit faces, sky lights,
+ *      glints), read at `whiteMm`; holes under `holeMm2` inside a white (a figure on a sunlit street) stay white
+ *      for the pen. No wash covers a white.
+ *   1. first wash: one pale, wet, unifying wash over the rest of the sheet, split in two touching parts only where
+ *      the hue clearly differs (smoothed over `hueSmoothMm`), graded down the sheet where the target grades, at
+ *      `firstC` of the target's value and no more than `firstMaxDL` L*.
+ *   2. shadow wash: one mid-value wash over the darker half of the mid value and the dark (shadow planes and cast
+ *      shadows), read at `fineMm`, pieces under `shadowPiece` of the sheet left to the pen, laid wet on dry so its
+ *      edge is crisp; where no sharp target edge (`softGrad` L* per mm) lies within `softBandMm`, the band outside the
+ *      edge is marked `soft` and wetted first (pen-wash.mjs), so the edge softens where the form turns.
+ *   3. darks: the darkest shapes standing `darkContrast` L* under their surround (windows, recesses, accents), at
+ *      most `darkShare` of the sheet, laid last, dry, with a small brush.
+ * Every charge comes from ladderStrengths at the wash's own share of the target value, so the washes stay lighter
+ * than the photo and the ink carries the darkest structure.
+ */
+function planStages({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
+  const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell), paper = paperRGB ?? [247, 244, 236];
+  const o = { blurMm: 2.5, fineMm: 0.8, whiteMm: 0.8, chroma: 1.25, hueGap: 18, hueSmoothMm: 5, joinMm: 1.5, minPiece: 0.004,
+    whiteMinMm2: 2, holeMm2: 0, shadowPiece: 0.004, firstC: 0.35, firstMaxDL: 9, shadowC: 0.55, shadowMaxDL: 16,
+    darkC: 0.65, darkMaxDL: 14, darkShare: 0.04, darkContrast: 12, darkRingMm: 2, darkBrushMm: 3, softGrad: 0, softBandMm: 1.5,
+    softBlurMm: 0.8, maxStrength: 0.45, minDL: 1.5, ...Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)) };
+  const P0 = labPlanesOf(px, w, h, 1), frame = frameMask(P0.L, w, h), margin = paperMargin(P0.L, w, h, { frame: frame.mask });
+  for (let i = 0; i < n; i++) if (margin[i]) frame.mask[i] = 1;
+  const inside = i => !frame.mask[i], blur = mm => gaussian(Float32Array.from(P0.L, (v, i) => (frame.mask[i] ? 100 : v)), w, h, cells(mm) / 2);
+  const P = { L: blur(o.blurMm), a: gaussian(P0.a, w, h, cells(o.blurMm) / 2), b: gaussian(P0.b, w, h, cells(o.blurMm) / 2) };
+  const Lw = blur(o.whiteMm), Lf = blur(o.fineMm), notes = [];
+  // the target's own three values (3-means on the coarse read, inside the frame) and the centre of its light mass
+  const { light: tLight, dark: tDark } = threeValueThresholds(P.L.filter((_, i) => inside(i)));
+  let ls = 0, lc = 0; for (let i = 0; i < n; i++) if (inside(i) && P.L[i] >= tLight) { ls += P.L[i]; lc++; }
+  const tWhite = (tLight + (lc ? ls / lc : tLight)) / 2, tShadow = (tLight + tDark) / 2, mm2 = a => a / (mmPerCell * mmPerCell);
+  // 0. whites
+  const white0 = Uint8Array.from(Lw, (v, i) => (inside(i) && v >= tWhite ? 1 : 0)), { labels: wl, areas: wa } = components(white0, w, h);
+  const white = fillHoles(Uint8Array.from(white0, (v, i) => (v && wa[wl[i]] >= mm2(o.whiteMinMm2) ? 1 : 0)), w, h, mm2(o.holeMm2));
+  notes.push(`whites kept: ${(100 * share(white, n)).toFixed(0)}% of the sheet (target L* ${tWhite.toFixed(1)} or more; light mass from ${tLight.toFixed(1)})`);
+  let chroma = 0; for (let i = 0; i < n; i++) chroma += Math.hypot(P.a[i], P.b[i]); chroma /= n;
+  const monochrome = chroma < 6, roles = paletteRoles(pigments), paperLab = lab(...paper);
+  const fitOf = (mask, lit) => fitMix(medianLab(P, mask, paperLab, 1, lit, o.chroma), pigments, paper, FIT_AMOUNTS.filter(v => v <= 0.3), 0.3);
+  const passages = [];
+  // the shadow wash's shape: the darker half of the mid value and the dark, pieces under shadowPiece left to the pen
+  const shadow0 = consolidate(Uint8Array.from(Lf, (v, i) => (inside(i) && !white[i] && v < tShadow ? 1 : 0)), w, h, cells(o.joinMm), o.shadowPiece * n);
+  const shadow = Uint8Array.from(fillHoles(shadow0, w, h, mm2(o.holeMm2)), (v, i) => (v && !white[i] ? 1 : 0));
+  // 1. first wash over everything that is not white, in at most two hue parts; graded by the target over its own
+  // band (outside the shadow wash, whose darkness is the shadow wash's job)
+  const first = consolidate(Uint8Array.from({ length: n }, (_, i) => (inside(i) && !white[i] ? 1 : 0)), w, h, cells(o.joinMm), o.minPiece * n);
+  const parts = (() => {
+    const raw = monochrome ? null : hueSplit(P, first, w, h, { minShare: 0.06, minGap: o.hueGap });
+    if (!raw) return null;
+    const lab3 = smoothLabels(Uint8Array.from({ length: n }, (_, i) => (raw[0][i] ? 1 : raw[1][i] ? 2 : 0)), 3, w, h, cells(o.hueSmoothMm));
+    const two = [1, 2].map(k => consolidate(Uint8Array.from(lab3, (v, i) => (v === k && first[i] ? 1 : 0)), w, h, cells(o.joinMm), 0.01 * n));
+    if (!two.every(m => share(m, n) >= 0.06)) return null;
+    // cells the smoothing left out go to the bigger part, so the first wash still covers them
+    const big = share(two[0], n) >= share(two[1], n) ? 0 : 1;
+    return two.map((m, k) => (k === big ? Uint8Array.from(m, (v, i) => (v || (first[i] && !two[1 - k][i]) ? 1 : 0)) : m));
+  })();
+  (parts ?? [first]).forEach((m, k) => {
+    const f = monochrome ? null : fitOf(m, true), dir = f ? f.dir : roleMix(roles, K, { warm: 0.7, cool: 0.15, earth: 0.15 });
+    passages.push(passage(`first-${k + 1}`, 'local', m, dir, 0.1, { fit: f, ladderC: o.firstC, maxDL: o.firstMaxDL, grade: gradeOf(P.L, Uint8Array.from(m, (v, i) => (v && !shadow[i] ? 1 : 0)), w, h, paperLab[0]) ?? undefined, pad: 0 }));
+  });
+  if (parts) notes.push('first wash in 2 touching parts by hue');
+  // 2. one shadow wash over the darker half of the mid value and the dark (its shape read above)
+  if (share(shadow, n) > 0.005) {
+    const f = monochrome ? null : fitOf(shadow, false), base = f ? f.dir : roleMix(roles, K, { cool: 0.6, earth: 0.4 });
+    let soft = null;
+    if (o.softGrad > 0) {
+      const band = Math.max(1, Math.round(cells(o.softBandMm))), ring = Uint8Array.from(dilate(shadow, w, h, band), (v, i) => (v && !shadow[i] ? 1 : 0));
+      const sharp = rankFilter(gradientMm(blur(o.softBlurMm), w, h, mmPerCell), w, h, band, Math.max);
+      soft = Uint8Array.from(ring, (v, i) => (v && sharp[i] < o.softGrad && !white[i] ? 1 : 0));
+      notes.push(`shadow edge soft on ${(100 * share(soft, n) / Math.max(1e-9, share(ring, n))).toFixed(0)}% of its outside band (no target edge of ${o.softGrad} L*/mm within ${o.softBandMm} mm)`);
+    }
+    passages.push(passage('shadow', 'shadow', shadow, base.map((v, j) => 0.75 * v + (j === roles.cool ? 0.25 : 0)), 0.2, { fit: f, ladderC: o.shadowC, maxDL: o.shadowMaxDL, dry: true, pad: 0, soft }));
+    notes.push(`shadow wash: ${(100 * share(shadow, n)).toFixed(0)}% of the sheet (target L* under ${tShadow.toFixed(1)})`);
+  }
+  // 3. darks last: small and few
+  const dk = contrastDarks(Lf, w, h, { share: o.darkShare, minArea: Math.max(4, Math.round(mm2(1))), ring: Math.max(2, Math.round(cells(o.darkRingMm))), contrast: o.darkContrast, close: Math.max(1, Math.round(cells(0.4))) });
+  const darks = Uint8Array.from(dk, (v, i) => (v && inside(i) ? 1 : 0));
+  if (share(darks, n) > 0.001) {
+    const sh = passages.at(-1).dir;
+    passages.push(passage('darks', 'shadow', darks, roleMix(roles, K, { cool: 0.55, earth: 0.45 }).map((v, j) => (monochrome ? v : 0.5 * v + 0.5 * sh[j])), 0.3, { ladderC: o.darkC, maxDL: o.darkMaxDL, dry: true, brushMm: o.darkBrushMm }));
+    notes.push(`darks: ${(100 * share(darks, n)).toFixed(1)}% of the sheet`);
+  }
+  // hairline gaps (0.3 mm) closed in every wash; no piece is dropped here
+  const closed = passages.map(p => ({ ...p, mask: consolidate(p.mask, w, h, cells(0.3), 0) }));
+  const laid = ladderStrengths(closed, { L: P.L, n, pigments, paperRGB: paper, minDL: o.minDL, maxStrength: o.maxStrength });
+  notes.push(`stages: ${laid.map(p => `${p.id} ${p.strength.toFixed(2)}${p.grade ? ` graded ${p.grade.from} to ${p.grade.to}` : ''}`).join(', ')}`);
+  const groups = Uint8Array.from({ length: n }, (_, i) => (white[i] ? 0 : darks[i] || shadow[i] ? 2 : 1));
+  return { passages: laid, groups, frame: frame.mask, sky: null, monochrome, chroma, thresholds: { white: tWhite, light: tLight, shadow: tShadow, dark: tDark }, shares: [share(white, n), 0, share(shadow, n)], roles, notes };
+}
+
 /** The comparison planner: up to `k` colour regions, one flat wash each, light to dark. Light regions stay paper. */
 function planColourRegions({ px, w, h, pigments, mmPerCell, paperRGB, options = {} }) {
   const n = w * h, K = pigments.length, cells = mm => Math.max(1, mm / mmPerCell);
@@ -393,7 +577,7 @@ function planColourRegions({ px, w, h, pigments, mmPerCell, paperRGB, options = 
 /** Either planner by name. */
 export function planPenWash({ planner = 'values', ...args }) {
   if (!PENWASH_PLANNERS.includes(planner)) throw new Error(`--penwashplan: ${PENWASH_PLANNERS.join(' or ')}, not ${planner}`);
-  return planner === 'colour' ? planColourRegions(args) : planValues(args);
+  return planner === 'colour' ? planColourRegions(args) : planner === 'stages' ? planStages(args) : planValues(args);
 }
 
 /** A passage's planned pigment per cell (cells x K): the mix at its strength over its mask, graded if it says so. */

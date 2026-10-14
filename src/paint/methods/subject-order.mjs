@@ -104,7 +104,7 @@ export function subjectField({ subjectOrder, families, labels, w, h }) {
   const rank = labels ? snapToSegments(boxed, labels, w, h, ranks) : boxed;
   const cells = new Array(ranks).fill(0); for (const r of rank) cells[r]++;
   const names = Array.from({ length: ranks }, (_, r) => order.subjects.find(s => s.rank === r)?.id ?? 'rest');
-  return { rank, ranks, names, cells };
+  return { rank, ranks, names, cells, labels: labels ?? null };
 }
 
 const phaseOf = layer => (layer._valuePhase === 'shadow' ? 'shadow' : layer._valuePhase === 'light' ? 'light' : 'mid');
@@ -133,7 +133,25 @@ function partOf(sh, cells, field, id, w) {
  * A passage's parts by subject: [{sh, rank}]. A part under the phase's minimum share (or MIN_CELLS) joins the largest
  * part; a passage with a stroke plan stays whole (its lanes were planned for the whole shape).
  */
-export function cutBySubject(sh, field, nextId, { rank, ranks, w, phase }) {
+// seam s (0..1, 0 off): a passage is cut only when at least share s of the cut runs along an edge of the painter's
+// colour segmentation. A cut through an even area (a pale cheek between two subjects' boxes) would be laid as two
+// passages at different times and dry as a ruled seam, so that passage stays whole with the subject holding most of it.
+export function seamShare(cellsBy, kept, labels, w, n, inside) {
+  const part = new Map();
+  for (const r of kept) for (const i of cellsBy[r]) part.set(i, r);
+  let cut = 0, onEdge = 0;
+  for (const [i, r] of part) {
+    const x = i % w;
+    for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i + w < n ? i + w : -1]) {
+      if (j < 0 || !inside(j)) continue;
+      const rj = part.get(j);
+      if (rj === undefined || rj === r) continue;
+      cut++; if (labels[i] !== labels[j]) onEdge++;
+    }
+  }
+  return cut ? onEdge / cut : 1;
+}
+export function cutBySubject(sh, field, nextId, { rank, ranks, w, phase, seam = 0, labels = null }) {
   const cellsBy = Array.from({ length: ranks }, () => []);
   // read the label field inside the box when there is one, so no full-sheet mask is built per passage
   const f = sh.ids, q = sh.id, m = f ? null : sh.mask, h = rank.length / w;
@@ -145,6 +163,7 @@ export function cutBySubject(sh, field, nextId, { rank, ranks, w, phase }) {
   const kept = cellsBy.map((c, r) => (c.length >= min ? r : -1)).filter(r => r >= 0);
   if (sh._strokePlan || kept.length <= 1) return [{ sh, rank: major }];
   for (let r = 0; r < ranks; r++) if (!kept.includes(r) && cellsBy[r].length) { cellsBy[major].push(...cellsBy[r]); cellsBy[r] = []; }
+  if (seam > 0 && labels && seamShare(cellsBy, kept, labels, w, rank.length, j => (f ? f[j] === q : m[j])) < seam) return [{ sh, rank: major }];
   return kept.map(r => ({ sh: partOf(sh, cellsBy[r], field, nextId(), w), rank: r }));
 }
 
@@ -152,7 +171,7 @@ export function cutBySubject(sh, field, nextId, { rank, ranks, w, phase }) {
  * The value plan's layers reordered subject by subject. field: subjectField(...). Returns {layers, summary, order}.
  * Strength 0 (or no field) returns the layers as they are.
  */
-export function orderBySubject(layers, { field, strength = 0, w, n }) {
+export function orderBySubject(layers, { field, strength = 0, w, n, seam = 0 }) {
   if (!field || !(strength > 0) || field.ranks < 2) return { layers, summary: null, order: null };
   const k = Math.min(1, strength);
   const steps = [...new Set(layers.map(stepOf))];
@@ -161,7 +180,7 @@ export function orderBySubject(layers, { field, strength = 0, w, n }) {
   layers.forEach((layer, li) => {
     const phase = phaseOf(layer), byRank = new Map();
     const ids = new Int32Array(n); let id = 0; const nextId = () => ++id;
-    for (const sh of layer.shapes) for (const p of cutBySubject(sh, ids, nextId, { ...field, w, phase })) {
+    for (const sh of layer.shapes) for (const p of cutBySubject(sh, ids, nextId, { ...field, w, phase, seam })) {
       if (!byRank.has(p.rank)) byRank.set(p.rank, []);
       byRank.get(p.rank).push(p.sh);
     }

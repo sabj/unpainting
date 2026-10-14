@@ -4,9 +4,10 @@
 //
 // default, combined, general: one general process, adjusted through drawing, washes and order.
 // v096: historical fitted recipe. CLI options override plan choices.
-// penwash (also `--style penwash`): pen and wash. A prepared ink drawing first, pruned for line economy, then three to
-// six simple transparent washes from a three-value plan (src/paint/methods/pen-wash-plan.mjs). No value ladder,
-// touch-ups, closing pen or frisket; a limited palette comes from --paints.
+// penwash (also `--style penwash`): pen and wash. A prepared ink drawing first, pruned for line economy, then the
+// washes in an illustrator's order, lights first (src/paint/methods/pen-wash-plan.mjs planStages): paper whites kept,
+// one pale unifying first wash, one mid-value shadow wash, a few small darks. No value ladder, touch-ups, closing pen
+// or frisket; a limited palette comes from --paints.
 import fs from 'node:fs';
 import path from 'node:path';
 import { TUNED_DEFAULT_FLAGS } from './tuned/default-flags.mjs';
@@ -17,7 +18,7 @@ import { drawingFlags } from './drawing-plan.mjs';
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 0 --washjoin 1 --undercover 0';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
@@ -31,13 +32,14 @@ const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skyspli
 // and closer mop lanes with no overhang, so a flooded wash edge is smooth rather than sawtoothed. A deeper sky, one
 // connected shadow wash and a green foliage wash each won an advisor panel A/B
 // (2026-10-13). --pwdeepcontrast and --pwpenvary stay off: judged in both orders they showed no win.
+const PENWASH_STAGE_FLAGS = '--penwashplan stages --pwwhitemm 2.5 --pwfinemm 2.5 --pwholemm2 40 --pwshadowpiece 0.015 --pwdrygain 0.6 --pwsoftgrad 30';
 const PENWASH_FLAGS = '--pwallwet 1 --pwminlight 0.6 --pwlightness 0.7 --pwshadowmin 0.6 --pwdeepmin 1.2 --pwshadowblur 0.8 --pwhuegap 18 --pwdarkhuegap 10 --pwlightchroma 14 --pwlocalmax 0.22 --pwcaplweight 0.3 --pwchroma 1.25 --pwmonolocal warm:0.7,cool:0.15,earth:0.15 --pwtileink 5 --pwkeep 0.4 --pwspeck 1.2 --mopgap 0.6 --mopover 0 --pwsky 0.2 --pwskyto 0.6 --pwshadowone 4 --pwfoliage 5 --pwfoliagemax 0.5 --pwkeeplights 10';
 const RECIPES = {
   general: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   default: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   combined: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   v096: [V096_METHOD_FLAGS, V096_TECHNIQUE_FLAGS, TUNED_DEFAULT_FLAGS].join(' '),
-  penwash: [METHOD_FLAGS, '--drawing first --penwash 1 --penwashplan values --order ladder --touchpoints 0 --finaldarks 0 --paperlights 0 --paperrel 0 --smalllights 0 --midlayers 0 --shapedmarks 0 --palettewide 1 --pwmin 2 --pwmax 3', PENWASH_FLAGS].join(' '),
+  penwash: [METHOD_FLAGS, '--drawing first --penwash 1 --order ladder --touchpoints 0 --finaldarks 0 --paperlights 0 --paperrel 0 --smalllights 0 --midlayers 0 --shapedmarks 0 --palettewide 1 --pwmin 2 --pwmax 3', PENWASH_FLAGS, PENWASH_STAGE_FLAGS].join(' '),
   person: '--masses 8 --masscap 0.15 --massload 0.5 --masswet 99 --mopgap 1.3 --masspaper 0.12 --massfeather 0.4 --massmaxlevel 1 --segwash 1 --segwashes 1 --pigphys 1 --gran 0.08 --skipheld 0.15 --skipheldmin 0.01 --whitefloor 1.0 --resistmin 0.002 --smalllights frisket --drawing both --inkfilter 1 --inktiers 1 --outlinemedium ink --segink 1 --tier3 0.15 --mllines 1 --contain 0 --cutin 0 --maxvalues 4 --minshape 80 --shapes 3 --shapedeep 1.6 --shapequant 0.6 --shapeload 0.7 --ladderseg 0.5 --boxpick 0 --texture 0 --washgrain 0.15 --marks 1',
 };
 

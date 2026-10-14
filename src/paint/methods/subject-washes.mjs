@@ -11,9 +11,10 @@ import path from 'node:path';
 import { hasSegments, loadSegments } from '../../crop/segments.mjs';
 import { closeLocal, removeSmall } from '../../raster.js';
 import { SUBJECT_DEFAULTS, componentsBy, confinedMean, describeField, subjectField } from './subject-clusters.mjs';
+import { layerFractions } from './layer-cuts.mjs';
 
 // The middle layers' value quantiles inside each subject, pale end first (the whole-sheet plan uses the same four).
-const LAYER_QUANTILES = Object.freeze([0, 0.3, 0.55, 0.78]);
+// The middle layers' value quantiles inside each subject, pale end first (layerFractions from layer-cuts.mjs).
 // A subject's layer j is laid only when it sits at least j times this much value over the subject's pale end, so a
 // flat subject is one wash, not four bands cut along noise.
 const MIN_LAYER_STEP = 0.05;
@@ -51,13 +52,13 @@ export function subjectCovers({ subjects, values, weights, protectedCells, skyCe
   // --subjectbands sheet: every subject is cut at the whole sheet's quantiles, still of the value smoothed inside it
   if (subjects.bands === 'sheet') {
     const all = [...live.values()].flat().sort((a, b) => a - b), at = q => all[Math.floor(q * (all.length - 1))] ?? Infinity;
-    const q = LAYER_QUANTILES.slice(0, count).map(at);
+    const q = layerFractions(count).map(at);
     for (const s of live.keys()) cut.set(s, q);
   } else for (const [s, v] of live) {
     if (v.length < 4 * minShape) continue;
     v.sort((a, b) => a - b);
     const at = q => v[Math.floor(q * (v.length - 1))], pale = at(PALE_END);
-    cut.set(s, LAYER_QUANTILES.slice(0, count).map((q, j) => (j && at(q) - pale >= j * MIN_LAYER_STEP ? at(q) : Infinity)));
+    cut.set(s, layerFractions(count).map((q, j) => (j && at(q) - pale >= j * MIN_LAYER_STEP ? at(q) : Infinity)));
   }
   const close = smoothMm < 2 ? 1 : 2, least = smoothMm < 2 ? minShape : minShape * 4;
   return Array.from({ length: count }, (_, j) => {

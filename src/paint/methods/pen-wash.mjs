@@ -8,7 +8,11 @@
 //     dry, the simulated passages broke into mottled dabs (Yale, 2026-10-13); flooded, each is one smooth soft-edged wash;
 //   - otherwise a dry passage is mopped in overlapping lanes (--pwmop 1, default) or brushed in contained sweeps (--pwmop 0);
 //   - the brush is no wider than --pwbrushmm (default 10 mm); contained sweeps keep --pwslack cells of give;
-//   - the sheet dries completely before the next passage, so each wash is its own transparent layer.
+//   - the sheet dries completely before the next passage, so each wash is its own transparent layer;
+//   - a passage may say how it is laid: `dry` (wet on dry for a crisp edge, whatever --pwallwet says), `pad` (mm of
+//     clean water past its shape when flooded; the stage planner's first wash keeps 0 so the whites stay paper),
+//     `brushMm` (its own brush width) and `soft` (a band outside its edge wetted just before the colour goes in,
+//     so the edge softens there and stays crisp against dry paper elsewhere).
 // --pwcharge scales every charge (default 8: on the Flatiron calibration run the dry passages laid 0.99 to 1.01 of
 // their planned amount on average over the footprint and the wet sky 0.68; penwash-run.json records both per passage).
 import { brushedWashPaths, containPaths, sweepCover } from '../../media/wash.mjs';
@@ -65,17 +69,20 @@ export async function paintPenWash(ctx, plan) {
     const M = up(foot), area = foot.reduce((a, v) => a + v, 0);
     if (area < 20) { log(`pen wash ${p.id}: footprint vanished after edge and margin, skipped`); continue; }
     // --pwallwet 1: every passage goes into clean water laid on its shape first (wet in wet), not only the sky
-    const wet = p.wet || num('pwallwet', 0) > 0, T = wet ? WET_ON_WET : WET_ON_DRY;
+    const wet = !p.dry && (p.wet || num('pwallwet', 0) > 0), T = wet ? WET_ON_WET : WET_ON_DRY;
     const sumThk = () => { const th = thickness(sheet); let t = 0, c = 0; for (let i = 0; i < M.length; i++) if (M[i]) { for (let j = 0; j < K; j++) t += th[j][i]; c++; } return t / Math.max(1, c); };
     const before = sumThk();
     // --pwwetgain: a shape flooded wet in wet holds more of the charge than the sky's long lanes (Yale, 2026-10-13:
     // 1.45 times its plan at gain 1), so its charge is scaled down to land near the plan
-    const gain = num('pwcharge', 8) * (CAL[T.name] ?? 1) * (wet && !p.wet ? num('pwwetgain', 0.7) : 1);
+    // --pwdrygain: a passage mopped wet on dry lays about 1.7 times its plan (penwash-run.json, Flatiron and Yale,
+    // 2026-10-13), so its charge is scaled down to land near the plan
+    const gain = num('pwcharge', 8) * (CAL[T.name] ?? 1) * (wet && !p.wet ? num('pwwetgain', 0.7) : 1) * (wet ? 1 : num('pwdrygain', 1));
     let paths, R;
     if (wet) {
       R = Math.round(Math.min(cellsSheet(num(p.wet ? 'pwmopmm' : 'pwwetmm', p.wet ? 11 : 6)), Math.max(cellsSheet(4), 0.5 * Math.sqrt(area * (W2 / w) ** 2 / Math.PI))));
       // clean water first, a little past the shape, so the colour feathers out instead of stopping at a rim
-      const water = mopLanes(up(dilate(foot, w, h, Math.max(1, Math.round(cellsPlan(1.5))))), W2, H2, R, handAngle(2000 + k) + 0.9, 23 + k + SEED);
+      const pad = p.pad ?? 1.5;
+      const water = mopLanes(up(pad > 0 ? dilate(foot, w, h, Math.max(1, Math.round(cellsPlan(pad)))) : foot), W2, H2, R, handAngle(2000 + k) + 0.9, 23 + k + SEED);
       const wb = createBrush({ flat: false, radius: R, bristles: hairs(R), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, seed: 900 + k + SEED });
       const every = flowEvery(water.length);
       for (const pts of water) { dip(wb, { water: 1, conc: PIGS.map(() => 0) }); clock('strokes', () => stroke(wb, sheet, pts.map(q => ({ ...q, r: R })), { upright: UPRIGHT, lift: false, flowEvery: every, between: flow(every) })); }
@@ -83,7 +90,7 @@ export async function paintPenWash(ctx, plan) {
     } else if (num('pwmop', 1) > 0) {
       // --pwmop 1 (default): a dry passage is mopped in overlapping lanes across its whole footprint with one loaded
       // brush, as a painter floods a shape wet on dry; the lanes overhang the edge a little, which the slip already allows
-      R = Math.round(Math.max(cellsSheet(2), cellsSheet(num('pwbrushmm', 10)) / 2));
+      R = Math.round(Math.max(cellsSheet(p.brushMm ? 0.6 : 2), cellsSheet(p.brushMm ?? num('pwbrushmm', 10)) / 2));
       paths = mopLanes(M, W2, H2, R, handAngle(1000 + k), 17 + k + SEED);
     } else {
       R = Math.round(Math.max(cellsSheet(1.5), cellsSheet(num('pwbrushmm', 10)) / 2));
@@ -92,6 +99,17 @@ export async function paintPenWash(ctx, plan) {
     }
     if (!paths.length) { log(`pen wash ${p.id}: no sweep crosses its footprint, skipped`); continue; }
     paths = paths.map(shapePressure);
+    // a `soft` band outside a dry passage's edge takes clean water just before the colour (--pwsoftedge 0 skips it)
+    if (!wet && p.soft && num('pwsoftedge', 1) > 0) {
+      const band = Uint8Array.from(p.soft, (v, i) => (v && !foot[i] ? 1 : 0));
+      if (band.reduce((a, v) => a + v, 0) >= 20) {
+        const Rw = Math.round(Math.max(cellsSheet(1), cellsSheet(1.5)));
+        const lanes = mopLanes(up(band), W2, H2, Rw, handAngle(2500 + k) + 0.7, 29 + k + SEED);
+        const wb = createBrush({ flat: false, radius: Rw, bristles: hairs(Rw), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, seed: 950 + k + SEED });
+        const everyW = flowEvery(lanes.length);
+        for (const pts of lanes) { dip(wb, { water: 1, conc: PIGS.map(() => 0) }); clock('strokes', () => stroke(wb, sheet, pts.map(q => ({ ...q, r: Rw })), { upright: UPRIGHT, lift: false, flowEvery: everyW, between: flow(everyW) })); }
+      }
+    }
     const cover = Math.max(1, sweepCover(paths, M, W2, H2)), every = flowEvery(paths.length);
     const brush = createBrush({ flat: false, radius: R, bristles: hairs(R), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: T.wetMix, bridge: T.bridge, bridgeSoft: T.bridgeSoft, seed: 31 + k + SEED });
     for (const pts of paths) {
