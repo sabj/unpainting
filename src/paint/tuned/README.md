@@ -4,7 +4,7 @@ Settings fitted to specific benchmark images. They can worsen results on other s
 
 - `presets.mjs`: the presets a value plan (`"presets"`) or `--recipe general+<preset>` opts into. The general recipe uses none; the release default keeps the compatibility recipe.
 - `default-flags.mjs`: the tuned flags of the V096 recipe (`--recipe v096`), the default until 2026-10-10, fitted mostly on Trumbull (subject id Y1).
-- `trumbull.mjs`: rules for Trumbull (`Y1`) and a second Trumbull-derived subject (`subject-e`). `stone-demand.mjs` fits stone and leaf mixes for Y1.
+- `trumbull.mjs`: recess, stone wall and ground constants of the `architecture` preset, fitted on Trumbull (`Y1`) and a second Trumbull-derived subject (`subject-e`).
 - `portrait.mjs` and `drawing-caps.mjs`: constants for the private portrait (`subject-c`) and ink-and-wash dog (`subject-a`) subjects.
 - `dog-coats.mjs`, `olive-families.mjs` and `architecture-clouds.mjs`: presets for single techniques and passages (washes or groups of marks with one job).
 - `style-cuts.mjs`: thresholds for the practice planner's ink and dry brush weights.

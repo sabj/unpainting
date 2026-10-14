@@ -2,13 +2,6 @@
  "note": "Findings of tools/guard/lint-target-use.mjs that have been reviewed and allowed. Each entry: key (from --json), file, rule, reason, approvedBy.",
  "allow": [
   {
-   "key": "db5c7b659701",
-   "file": "src/paint/tuned/stone-demand.mjs",
-   "rule": "cell-colour-fit",
-   "reason": "shapeStoneDemand fits one box-pigment mix per shape (a connected stone or leaf run of 64+ cells, smaller runs pooled per class) to the shape's mean colour, at plan time. r,g,b on this line are shape means, not a cell's RGB.",
-   "approvedBy": "anti-cheat review (bench/docs/anti-cheat.md): a shape-level mix choice is allowed"
-  },
-  {
    "key": "774602ebb61f",
    "file": "src/paint/techniques/passages/treelayers.mjs",
    "rule": "fit-score-loop",

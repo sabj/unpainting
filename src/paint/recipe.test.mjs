@@ -15,7 +15,7 @@ test('the default recipe names each flag once, as flag and value pairs', () => {
 
 test('v096 keeps the old tuned flags on every subject and applies no preset by subject id', () => {
   const v096 = expandRecipe({ argv: ['--recipe', 'v096'] }).argv;
-  for (const flag of ['--darkgain', '--stoneblocks', '--skylanes', '--shadowraw']) assert.ok(v096.includes(flag), flag);
+  for (const flag of ['--darkgain', '--stoneblocks', '--skylanes']) assert.ok(v096.includes(flag), flag);
   const y1 = expandRecipe({ argv: ['--recipe', 'v096', '--valueplan', 'examples/plans/trumbull-values.json'] });
   assert.match(y1.note, /recipe v096, presets architecture, glaze-gains,/);
   assert.ok(!y1.argv.includes('--trumbullrules'));
@@ -84,7 +84,7 @@ test('final darks require an explicit choice and command-line choices win', () =
 test('combined defaults use general washes and v096 retains fitted settings', () => {
   const flags = args => expandRecipe({argv: args}).argv;
   const base = flags(['--recipe','v096']), general = flags([]);
-  for (const flag of ['--darkgain','--coolgain','--skylanes','--shadowraw']) assert.ok(base.includes(flag), flag);
+  for (const flag of ['--darkgain','--coolgain','--skylanes']) assert.ok(base.includes(flag), flag);
   for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) {
     assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
   }

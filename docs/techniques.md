@@ -30,7 +30,6 @@ Default recipe flags, with the value that turns each off:
 - `--paperphysical 1`: paper fibre and relief in millimetres, not cells. Off: `0`.
 - `--texture 0`: per-passage dry-brush texture marks stay off.
 - `--touchpoints 2`: two touch-up glaze passes on shapes that read too light. Off: `0`.
-- `--shadowraw 1`: raw sienna as the warm shadow half when there is no burnt sienna. `--recipe v096` only. Off: `0`.
 - `--layerhue 1`: keeps wash layers apart by colour group. Off: `0`.
 - `--drawing first`: the drawing goes down first; the plan's drawing section chooses any closing pass (`--recipe v096` sets `both`). Off: `none`.
 - `--frames 8`: about 8 recorded frames of the washes. Off: `40`.
@@ -170,7 +169,6 @@ Default recipe flags, with the off value, the images they were fitted on and the
 - `--skylanemm 6`: 6 mm sky sweep radius. Off: `3`. Y1, subject-e skies; medium.
 - `--skylanestep .8`: closer, overlapping sky sweeps. Off: `1.5`. Y1, subject-e skies; medium.
 - `--skyfloc .5`: softer, larger sky mottle. Off: `0`. Y1 sky; low.
-- `--violetshadow 1`: more ultramarine in shadows. Off: `0`. Y1 only; low.
 - `--groundglaze 1`: cool low ground as one shadow glaze. Off: `0`. Y1; high.
 - `--stoneblocks 0.6`: pale cut-stone block hints on warm walls. Off: `0`. Y1; high.
 - `--stoneblockamt 0.2`: pigment per stone block glaze. Off: `.18`. Y1; high.
@@ -179,7 +177,6 @@ Default recipe flags, with the off value, the images they were fitted on and the
 - `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1 only; low.
 - `--recessshare .75`: demand per recess layer. Off: `.5`. Y1 only; low.
 - `--recessclean 1`: no light wash under recesses. Off: `0`. Y1 only; low.
-- `--foliagerefit 1`: one leaf mix per connected shape. Off: `0`. Y1 only; low.
 - `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble; none by default.
 - `--touchgain .6`: strength of touch-up glazes. Off: `.8`. Y1, subject-e; medium.
 
@@ -195,10 +192,9 @@ Modules:
 - `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.
 - `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
 - `tuned/portrait.mjs` (value plan subject subject-c): constants for the subject-c portrait. subject-c; low.
-- `tuned/stone-demand.mjs` (`--shapedmarks 1` on Y1): one mix per stone or leaf shape. Y1; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `tuned/subjects.json` (value plan subject): the style profile for each benchmark subject. 15 subjects; low.
-- `tuned/trumbull.mjs` (compatibility recipe or explicit Trumbull preset, value plan subject Y1): Trumbull recess, wall, ground and palette constants. Y1, subject-e; high.
+- `tuned/trumbull.mjs` (`architecture` preset or compatibility recipe): recess, wall and ground constants. Y1, subject-e; high.
 
 | `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. On in the default recipe; `--recipe v096` leaves it off. | `--huechroma 0` |  |  |
 | `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. On in the default recipe; `--recipe v096` leaves it off. | `--passcap 0` |  |  |
