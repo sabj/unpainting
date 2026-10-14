@@ -91,7 +91,9 @@
   "reserves": [],
   "presets": [
     "architecture",
-    "glaze-gains",
-    "trumbull"
-  ]
+    "glaze-gains"
+  ],
+  "washes": {
+    "paints": ["ochre", "rawsienna", "hansa", "ultramarine", "cerulean", "sepia", "sapgreen"]
+  }
 }

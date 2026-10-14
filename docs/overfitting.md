@@ -7,7 +7,7 @@ Some painter settings were fitted by self study on a few benchmark images, mostl
 - The default recipe (`src/paint/recipe.mjs`; also `--recipe general` or `combined`) sets only general methods: value planning from light to dark, shaped marks, four middle layers, two touch-up rounds, a drawing first (the plan chooses any closing pass), physical cold-press paper. No value in it was fitted to one image.
 - Fitted settings live in `src/paint/tuned/` and run through the compatibility recipe or a named preset (`src/paint/tuned/presets.mjs`). A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe general+architecture`.
 - No painting code outside `src/paint/tuned/` checks a subject id. Rules fitted to one subject are switched by a flag that only its preset sets (`--trumbullrules`, `--portraitrules`, `--drawsubject`).
-- `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject, and applies the per-subject presets by itself when the plan names `Y1`, `Y4`, `3T` or `1D`, as V096 did. Use the v0.1.0 tag for exact historical simulation output.
+- `--recipe v096` retains the V096 compatibility recipe. It adds the tuned flags and sky lanes to every subject. It applies no preset by subject id. Use the v0.1.0 tag for exact historical simulation output.
 - `src/paint/overfit.test.mjs` fails if the general recipe sets a tuned flag, or if painting code outside `src/paint/tuned/` names a subject id.
 
 Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`. `Y4` is a second Trumbull-derived subject. `3T` (a portrait), `1D` (an ink and wash dog), `2W` (a beach scene with a figure and a dog) and `4I` (hills with a figure) are private benchmark images.
@@ -18,12 +18,8 @@ Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbu
 |---|---|---|
 | `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1 --texvariety 0.8` | Buildings under a sky |
 | `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
-| `trumbull` | `--trumbullrules 1 --shadowraw 1 --violetshadow 1 --foliagerefit 1 --paints <seven paints>` | Y1 only |
-| `trumbull-paints` | `--paints <seven paints>` | Y4 |
-| `portrait-3t` | `--portraitrules 1 --drawsubject 3T` | 3T only |
-| `dog-1d` | `--drawsubject 1D` | 1D only |
 
-`examples/plans/trumbull-values.json` names `architecture`, `glaze-gains` and `trumbull`, so `npm run example:architecture` paints as before.
+`examples/plans/trumbull-values.json` names `architecture` and `glaze-gains`, and authors its seven-paint box in `washes.paints`. The per-subject presets `trumbull`, `trumbull-paints`, `portrait-3t` and `dog-1d` were removed.
 
 ## Inventory
 
@@ -55,7 +51,6 @@ Subject ids: `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbu
 | `--violetshadow 1` | `methods/light-to-dark.mjs`, `SHADOW_GLAZE` in `tuned/trumbull.mjs` | Y1 | More ultramarine in the shadow glaze where blue rises. | `trumbull`, v096 | Low: needs `--trumbullrules`. |
 | `--foliagerefit 1` | `tuned/stone-demand.mjs` | Y1 | One mix per connected leaf shape. | `trumbull`, v096 | Low: needs `--trumbullrules`. |
 | `--shadowraw 1` | `methods/light-to-dark.mjs` | Y1 | Raw sienna as the shadow glaze's warm half when there is no burnt sienna. | `trumbull`, v096 | Low: needs `--trumbullrules`. |
-| Seven-paint box | `TRUMBULL_PAINTS` in `tuned/trumbull.mjs` | Y1, Y4 | Ochre, raw sienna, hansa, ultramarine, cerulean, sepia, sap green. | `trumbull`, `trumbull-paints`, v096 on Y1 or Y4 | Low: a typed `--paints` wins. |
 
 ### Rules that checked a subject id, now behind a preset flag
 
@@ -101,7 +96,7 @@ The general method defaults (for example the value bands, `--midlayers 4` and `-
 ## Changes for older runs
 
 - A run that relied on the default before 2026-10-10 repeats with `--recipe v096`.
-- A plan that names subject `Y1`, `3T` or `1D` no longer turns on that subject's rules by itself under `--recipe none`, `person` or an area plan. Add the preset to the plan, or use `--recipe v096`.
+- A plan that names subject `Y1`, `3T` or `1D` no longer turns on that subject's rules under any recipe. Those rules were removed.
 
 ## Held-out measurement
 

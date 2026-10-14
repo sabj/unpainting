@@ -7,15 +7,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expandRecipe } from './recipe.mjs';
-import { PRESETS, V096_SUBJECT_PRESETS, presetFlagNames, presetFlags } from './tuned/presets.mjs';
+import { PRESETS, presetFlagNames, presetFlags } from './tuned/presets.mjs';
 import { TUNED_DEFAULT_FLAGS } from './tuned/default-flags.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const TUNED_DIR = path.join(ROOT, 'src/paint/tuned');
 const names = argv => argv.filter(a => a.startsWith('--')).map(a => a.slice(2));
 
-// Subject ids of the benchmark images: every key of subjects.json and every subject a V096 preset names.
-const SUBJECT_IDS = [...new Set([...Object.keys(JSON.parse(fs.readFileSync(path.join(TUNED_DIR, 'subjects.json'), 'utf8'))), ...Object.keys(V096_SUBJECT_PRESETS)])];
+// Subject ids of the benchmark images: every key of subjects.json.
+const SUBJECT_IDS = Object.keys(JSON.parse(fs.readFileSync(path.join(TUNED_DIR, 'subjects.json'), 'utf8')));
 // Painting code: everything in src/ but the tuned folder and tests, and the painter command.
 function paintingCode() {
   const files = [path.join(ROOT, 'tools/paint-plate.mjs')];
@@ -49,10 +49,17 @@ test('no painting code outside src/paint/tuned branches on a subject id', () => 
 
 test('presets apply only when the plan or --recipe names them', () => {
   const plain = expandRecipe({ argv: ['--recipe', 'general', '--valueplan', 'examples/plans/trumbull-values.json', '--presetless'] });
-  assert.match(plain.note, /presets architecture, glaze-gains, trumbull/);
+  assert.match(plain.note, /presets architecture, glaze-gains(,|$)/);
   const typed = expandRecipe({ argv: ['--recipe', 'general+architecture'] }).argv;
   for (const flag of presetFlags(['architecture']).filter(a => a.startsWith('--'))) assert.ok(typed.includes(flag), flag);
   assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+nosuch'] }), /unknown preset nosuch/);
+});
+
+test('no preset names a subject or turns on a per-subject rule', () => {
+  for (const [name, flags] of Object.entries(PRESETS)) {
+    assert.ok(!SUBJECT_IDS.some(id => name === id || flags.split(' ').includes(id)), name);
+    for (const flag of ['--trumbullrules', '--portraitrules', '--drawsubject']) assert.ok(!flags.includes(flag), `${name} ${flag}`);
+  }
 });
 
 test('every preset is flag and value pairs', () => {

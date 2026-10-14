@@ -2,9 +2,7 @@
 // with examples/plans/trumbull-values.json. Limitations: docs/techniques.md.
 
 // The rules below run only through presets (presets.mjs): --recesses 1 (architecture) turns on RECESS, and
-// --trumbullrules 1 (trumbull) the shadow glaze, first-ink and stone mix rules. The trumbull and trumbull-paints
-// presets set this paint box.
-export const TRUMBULL_PAINTS = 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen';
+// --trumbullrules 1 the shadow glaze, first-ink and stone mix rules.
 
 // A dark recess (window, door, deep opening): brightest channel under `dark`, or blue over red by more than
 // `blueOverRed` with the brightest channel under `blue`. Levels 0..255. --recessmax scales `dark` and `blue`.

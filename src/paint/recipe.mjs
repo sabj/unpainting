@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { TUNED_DEFAULT_FLAGS } from './tuned/default-flags.mjs';
-import { presetFlags, v096PresetsFor } from './tuned/presets.mjs';
+import { presetFlags } from './tuned/presets.mjs';
 import { pipelineFlags } from './pipeline-plan.mjs';
 import { drawingFlags } from './drawing-plan.mjs';
 
@@ -124,7 +124,7 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const combined = ['default', 'combined', 'general'].includes(name);
   const pipeline = combined ? pipelineFlags(plan ?? {}) : null;
   if (pipeline) drawing = pipeline.flags;
-  const presets = [...new Set([...(name === 'v096' ? v096PresetsFor(plan?.subject ?? null) : []), ...planPresets(plan), ...typed])];
+  const presets = [...new Set([...planPresets(plan), ...typed])];
   const extra = presetArgv(presets, argv);
   const sheet = planSheet(plan, argv);
   const tail = [...extra, ...sheet, ...drawing];
