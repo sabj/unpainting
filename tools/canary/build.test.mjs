@@ -30,10 +30,15 @@ test('a new comparison source requires the exact candidate target hash',()=>{
   const additions=[{subject:'flatiron',code:'FI',title:'Flatiron, converted source',target,source:{description:'Our converted rendering'}}];
   assert.throws(()=>build({baseline,runs,out,additions}),/target differs/);
   card.targetSHA256=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');write(path.join(p,'run-card.json'),card);
-  build({baseline,runs,out,additions});
+  // A historical render with this name belongs to another source; it must not
+  // be inserted as a baseline or read for the new converted source.
+  const historyRuns=path.join(dir,'historical');
+  write(path.join(historyRuns,'R4/flatiron/p/backend.json'),{commit:'unrelated'});
+  build({baseline,runs,out,additions,historyRuns});
   const data=JSON.parse(fs.readFileSync(path.join(out,'play/play-data.json'),'utf8'));
   assert.deepEqual(Object.keys(data.play),['flatiron-RC6']);assert.equal(data.play['flatiron-RC6'].length,120);
   assert.equal(data.meta.flatiron.RC6.recipe,'penwash');
+  assert.equal(data.meta.flatiron.R4,undefined);
   assert.equal(fs.readFileSync(path.join(out,data.meta.flatiron.P.img),'utf8'),'frozen converted source');
   assert.match(fs.readFileSync(path.join(out,'index.html'),'utf8'),/Our converted rendering/);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}

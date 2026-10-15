@@ -147,6 +147,9 @@ export function build({baseline,runs,out,historyRuns,exclude=[],additions=[]}) {
  }
  for(const s of subjects) {
   if(historyRuns)for(const v of versions.filter(v=>v!=='RC6')) {
+   // A run with the same subject name may use a different target. Only enrich
+   // historical columns already declared by the preserved comparison.
+   if(!data.meta[s][v])continue;
    const p=path.join(historyRuns,v,s,'p');if(!fs.existsSync(path.join(p,'backend.json')))continue;
    const r=renderRecord(p);Object.assign(data.meta[s][v],{commit:r.commit,medium:r.medium,recipe:r.recipe});
    const id=data.meta[s][v].id;if(ids[id])Object.assign(ids[id],{commit:r.commit,medium:r.medium});
