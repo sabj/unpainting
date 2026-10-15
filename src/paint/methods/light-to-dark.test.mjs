@@ -34,3 +34,11 @@ test('bandRound: a cell joins a band only past halfway up its step, so pale cell
   assert.equal(paleCovered(plan(false)), true, 'without rounding the pale half is charged a band step');
   assert.equal(paleCovered(plan(true)), false, 'with rounding the pale half is left as paper');
 });
+
+
+test('sunlit stone never consumes an explicitly reserved highlight',async()=>{
+ const {planLightToDark}=await import('./light-to-dark.mjs');
+ const w=40,h=40,n=w*h,rgb=new Uint8Array(n*3);for(let i=0;i<n;i++)rgb.set([230,205,165],i*3);
+ const p=planLightToDark({w,h,k:1,rgb,shaped:true,layerLocal:true,demand:new Float32Array(n).fill(.2),density:new Float32Array(n).fill(.2),families:[{id:'stone',referenceCue:'sunlit facade',bounds:[0,0,1,1]}],reserves:[{reason:'authored light',bounds:[.25,.25,.5,.5]}],pigments:[{name:'yellow ochre'}],minShapeCells:4});
+ for(let y=10;y<20;y++)for(let x=10;x<20;x++)assert.equal(p.protectedCells[y*w+x],1);
+});

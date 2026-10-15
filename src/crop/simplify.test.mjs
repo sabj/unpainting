@@ -29,3 +29,9 @@ test('drawAs keeps the ends where the edge starts and stops', () => {
   assert.ok(Math.hypot(out[0].x - pts[0].x, out[0].y - pts[0].y) < 1.5);
   assert.ok(Math.hypot(out[out.length - 1].x - pts[pts.length - 1].x, out[out.length - 1].y - pts[pts.length - 1].y) < 3);
 });
+
+
+test('a collinear reversal survives even when it lies on the endpoint line', () => {
+  const points = [{x:0,y:0},{x:20,y:0},{x:10,y:0}];
+  assert.deepEqual(simplify(points, 1), points);
+});

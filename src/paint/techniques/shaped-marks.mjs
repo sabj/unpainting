@@ -1,6 +1,6 @@
 // Geometry of shaped plane marks, shared by planner and executor: one flat-brush gesture per plane, short texture marks
 // and sky lanes. A physical contact clip retains concavities, recesses and reserved lights.
-export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null}={}) {
+export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null,mmPerCell=0,maxBrushMm=38}={}) {
  // An authored per-passage tool choice is shared with every geometry consumer.
  if(mask.passageBrush)return mask.passageBrush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale}))); 
  // lanesR: a large sky plane is one wet passage of overlapping horizontal lanes (a graded band wash with a wide flat),
@@ -21,6 +21,15 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  const points=[];
  for(let j=lo;j<=hi;j++){const bin=bins.get(j);if(!bin)continue;let sum=0,num=0;for(let q=j-3;q<=j+3;q++){const v=bins.get(q);if(v){sum+=(v[0]+v[1])/2;num++;}}const u=sum/num,r=Math.max(1,(bin[1]-bin[0])/2);points.push({x:(cx+dx*j-dy*u)*scale,y:(cy+dy*j+dx*u)*scale,r:r*scale,p:texture?.35:.9});}
  if(points.length<2)return [];
+ // Split against the real mop width; changing native density must not change physical brush selection.
+ const maxRadius=Math.max(...points.map(p=>p.r/scale));
+ if(!texture&&mmPerCell>0&&maxBrushMm>0){
+  const lanes=Math.ceil(2*maxRadius*mmPerCell/maxBrushMm);
+  if(lanes>1)return Array.from({length:lanes},(_,k)=>points.map(p=>{
+   const offset=(k-(lanes-1)/2)*2*p.r/lanes;
+   return {...p,x:p.x-dy*offset,y:p.y+dx*offset,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.18)};
+  }));
+ }
  return [points];
 }
 

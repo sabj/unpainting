@@ -4,15 +4,16 @@
 import { components } from "../../raster.js";
 
 function families(D, n, K, rounds = 8) {
-  const C = [], idx = [];
-  for (let k = 0; k < K; k++) { const i = Math.floor((k + 0.5) * n / K); C.push([D[i * 3], D[i * 3 + 1], D[i * 3 + 2]]); }
+  const C = [[0, 0, 0]], idx = [];
+  for (let i = 0; i < n; i++) if (D[i * 3] + D[i * 3 + 1] + D[i * 3 + 2] > 0.03) idx.push(i);
+  for (let k = 1; k < K; k++) { const i = idx.length ? idx[Math.floor((k - 0.5) * idx.length / (K - 1))] : Math.floor((k + 0.5) * n / K); C.push([D[i * 3], D[i * 3 + 1], D[i * 3 + 2]]); }
   const lab = new Int32Array(n);
   for (let r = 0; r < rounds; r++) {
     const S = C.map(() => [0, 0, 0, 0]);
     for (let i = 0; i < n; i++) { let b = 0, bd = Infinity; for (let k = 0; k < K; k++) { const d = (D[i * 3] - C[k][0]) ** 2 + (D[i * 3 + 1] - C[k][1]) ** 2 + (D[i * 3 + 2] - C[k][2]) ** 2; if (d < bd) { bd = d; b = k; } } lab[i] = b; const s = S[b]; s[0] += D[i * 3]; s[1] += D[i * 3 + 1]; s[2] += D[i * 3 + 2]; s[3]++; }
     S.forEach((s, k) => { if (s[3]) C[k] = [s[0] / s[3], s[1] / s[3], s[2] / s[3]]; });
   }
-  void idx; return lab;
+  return lab;
 }
 
 /** Planning shapes: connected runs of one colour family; runs under minCells pooled into one group per family. */

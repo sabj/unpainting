@@ -35,3 +35,9 @@ test('flags: each stage in its own medium and amount, in any combination', () =>
   assert.deepEqual(stageFlags({ graphitePrep: 'none', inkPrep: 'none', inkFinish: 'none' }), ['--drawing', 'none']);
   assert.throws(() => validChoice({ graphitePrep: 'heavy', inkPrep: 'none', inkFinish: 'none' }), /graphitePrep/);
 });
+
+
+test('observed pen sources keep their source paths instead of the reduced pencil set', () => {
+ const flags=stageFlags({graphitePrep:'full',inkPrep:'ink',inkFinish:'none'},{penSource:true});
+ assert.equal(flags[flags.indexOf('--prepinkfrom')+1],'lines');
+});

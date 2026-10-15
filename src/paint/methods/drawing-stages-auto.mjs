@@ -11,9 +11,11 @@ import { spawnSync } from 'node:child_process';
 import { edgeEvidence } from './line-evidence.mjs';
 import { ruleChoice, gateChoice, stageFlags } from './drawing-choice.mjs';
 import { plannerChoice, PLANNER_MODEL } from './drawing-planner.mjs';
+import { resolveLinePython } from './line-python.mjs';
 
 /** Vanishing-point structure (tools/seg/perspective.py), or null when the python lacks OpenCV. */
 function perspectiveOf(python, root, image, width) {
+  if (!(width >= 64)) return null;
   const ok = spawnSync(python, ['-c', 'import cv2, numpy'], { encoding: 'utf8', timeout: 60000 });
   if (ok.error || ok.status !== 0) return null;
   const r = spawnSync(python, [path.join(root, 'tools/seg/perspective.py'), image, '--width', String(width)], { encoding: 'utf8', timeout: 300000 });
@@ -41,11 +43,12 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   const style = Number(opt('penwash', 0)) > 0 ? 'penwash' : null;
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
   let edges = 0; for (const v of ev.edge) edges += v;
-  const features = { edgeShare: +(edges / (w * h)).toFixed(4), penLine: +penLine.toFixed(4), perspective: perspectiveOf(opt('sketchpython', 'python3'), root, image, w) };
+  const python = resolveLinePython({ flag: opt('sketchpython', '') }).path;
+  const features = { edgeShare: +(edges / (w * h)).toFixed(4), penLine: +penLine.toFixed(4), perspective: perspectiveOf(python, root, image, w) };
   const rule = ruleChoice(features);
   const model = await plannerChoice({ image, root, model: opt('drawingplanner', PLANNER_MODEL), fetcher, log });
   const { final, verdicts } = gateChoice(model.choice ?? null, rule, { style });
-  const flags = stageFlags(final, { style });
+  const flags = stageFlags(final, { style, penSource: penLine >= 0.025 });
   const record = { features, model, rule, style, verdicts, final, flags };
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'drawing-choice.json'), JSON.stringify(record, null, 1) + '\n');

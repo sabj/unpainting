@@ -2,6 +2,17 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
+## 0.2.0-rc.6 - unreleased
+
+Review candidate: painter V099-dev, sim 102, judges J1. Integrates `integration/0.3` and the selective RC5 harvest. Historical comparisons retain the commit that produced each image.
+
+- Keep the integration protections: authored styles and reserves, finished paintings retained with diagnostics, whole-footprint wet checks, physical brush volumes, and neutral transport.
+- Retain source-line cleanup, source pen paths, Python environment resolution and painted-cell cluster initialization. Preserve collinear pen reversals and clean line sets even when few paths remain.
+- Separate sunlit light-wash domains without erasing authored highlights or inventing minimum pigment demand; cover wide wash planes with mop lanes measured in millimeters.
+- Keep pigment experiments opt-in. Flocculation overrides now cover blue, grey, violet, earth and yellow families; unset options preserve each pigment's properties, and explicit zero disables its flocculation. Hue grouping is a fallback heuristic, not chemical pigment identification.
+- Preserve optional crosshatching and an optional paper-colour selection stage. The paper stage changes the substrate colour; it is not a painted wash or drying operation.
+- Retain the preview with synchronized loupe and stage playback. `tools/canary/build.mjs` adds a candidate to the archived controls and derives commit and drawing captions from render records. Saved-stage progress is labeled as such.
+
 ## 0.2.0-rc.1 - unreleased
 
 Local review candidate: painter V097-dev, sim 101, judges J1. No tag or publication.

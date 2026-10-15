@@ -11,11 +11,12 @@ export function simplify(points, tolerance = 2) {
     const [a, b] = stack.pop();
     if (b - a < 2) continue;
     const ax = points[a].x, ay = points[a].y, bx = points[b].x, by = points[b].y;
-    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
     let far = -1, best = tolerance;
     for (let i = a + 1; i < b; i++) {
       const px = points[i].x - ax, py = points[i].y - ay;
-      const d = len > 1e-9 ? Math.abs(px * dy - py * dx) / len : Math.hypot(px, py);
+      const t = len2 > 1e-18 ? Math.max(0, Math.min(1, (px * dx + py * dy) / len2)) : 0;
+      const d = Math.hypot(px - t * dx, py - t * dy);
       if (d > best) { best = d; far = i; }
     }
     if (far > 0) { keep[far] = 1; stack.push([a, far], [far, b]); }

@@ -178,6 +178,8 @@ import { writeState, readState } from './aware/state-io.mjs';
 import { tapeState, restoreTapeState } from '../src/media/brush.mjs';
 import { passDue, markDue } from '../src/paint/pass-cadence.mjs';
 import { resolveLinePython } from '../src/paint/methods/line-python.mjs';
+import { detectSheetTone, fillSheetBase, WHITE_PAPER_RGB } from '../src/paint/methods/sheet-tone.mjs';
+import { planCrosshatch } from '../src/paint/methods/crosshatch.mjs';
 
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
 // Run the physical material diagnostic through the sweep's standard entry point.
@@ -416,8 +418,11 @@ const lum = i => 0.2126 * px[i * 3] + 0.7152 * px[i * 3 + 1] + 0.0722 * px[i * 3
 const PAPER_PICK = paperOf(px, w, h, { margin: num('papermargin', 0.03), mode: opt('paperbase', ['auto', 'source', 'white'].includes(opt('paper', 'coldpress')) ? opt('paper', 'coldpress') : 'auto') });
 // --paperrgb r,g,b|auto|source: declared sheet colour (source uses paperbase). auto keeps a cream target sheet (red 10+ above blue), else bright white 252,251,248.
 // auto reads the sheet from the largest connected bright region (estimatePaper), not the lightest tenth.
+const TONE_MODE = opt('tonestage', '0');
+if (!['0', '1', 'auto'].includes(TONE_MODE)) throw Error('--tonestage: 0, 1 or auto');
+const SHEET_TONE = TONE_MODE === '0' ? { toned: false } : detectSheetTone(px, w, h);
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(px, w, h, new Float32Array(w * h)) : null;
-const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
+const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (SHEET_TONE.toned ? SHEET_TONE.paperRGB : PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
 const PAPER_DECLARED = opt('paperrgb', '') === 'source' ? PAPER_PICK.paperRGB : PAPER_AUTO ?? (opt('paperrgb', '') ? opt('paperrgb', '').split(',').map(Number) : null);
 if (PAPER_AUTO) console.log(`paper: auto sheet ${PAPER_AUTO.join('/')} from the largest bright region ${PAPER_EST ? PAPER_EST.rgb.map(v => v.toFixed(0)).join('/') + ' (' + (100 * PAPER_EST.cells / (w * h)).toFixed(1) + '% of the sheet)' : 'none (under 1%)'}`);
 if (PAPER_DECLARED && (PAPER_DECLARED.length !== 3 || PAPER_DECLARED.some(v => !(v > 0 && v <= 255)))) throw Error('--paperrgb needs three values in 1..255');
@@ -1140,7 +1145,7 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing
 // weights are made now, before the target is sealed (pencil-erase.mjs)
 const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: SEP.stats.ink / n, log: console.log });
 const PREP_ERASE = num('preperase', 0.85) > 0 ? eraseWeights(PX_SOURCE, w, h) : null;
-const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, log: console.log,
+const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, rgb: PX_SOURCE, log: console.log,
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
@@ -1502,7 +1507,8 @@ const GPU_INFO = {...attachGpu(sheet, O, { mode: GPU_MODE }),nativePaintMode:NAT
 console.log(backendLine(GPU_INFO));
 const base = Buffer.alloc(N2 * 3);
 const SHADE = num('papershade', 0.04);
-for (let i = 0; i < N2; i++) { const t = 1 - SHADE + SHADE * paper.height[i]; for (let c = 0; c < 3; c++) base[i * 3 + c] = Math.min(255, paperRGB[c] * t); }
+const TONE_STAGE = TONE_MODE === '1' || (TONE_MODE === 'auto' && SHEET_TONE.toned);
+fillSheetBase(base, paper.height, TONE_STAGE ? WHITE_PAPER_RGB : paperRGB, SHADE);
 // --wetrender (on with --wetframes): wet paper renders darker in frames, showing where the water is.
 const WETRENDER = opt('wetrender', num('wetframes', 0) > 0 ? '1' : '0') !== '0';
 // the white gouache laid last (--smalllights gouache), over the washes and not in them: null until it is laid
@@ -1908,6 +1914,18 @@ const FILM_BY_PAINT = opt('filmby', 'paint') === 'paint';
 const PEN_FRAMES = 4;
 let filmLaid = 0, filmNext = 1;
 await shoot();
+if (TONE_STAGE) {
+  fillSheetBase(base, paper.height, paperRGB, SHADE);
+  RENDER_MEMO = null; LOOK1 = null;
+  if (FRAMER) { await drainFrames(); FRAMER = false; }
+  STAGE = { stage: 'tone', step: 'paper colour selected (no paint applied)' };
+  await shoot();
+}
+const CROSSHATCH_PLAN = num('crosshatch', 0) > 0 ? planCrosshatch(SRC, null, w, h, {
+  K: w / 420, spacing: num('crosshatchspacing', 3.1), hatchFloor: num('crosshatchfloor', .18),
+  crossFloor: num('crosshatchcross', .36), accentFloor: num('crosshatchaccent', .56),
+  deficitGain: num('crosshatchdeficit', .65), log: console.log,
+}) : null;
 
 phaseMark('sheet');
 // --penwash 1 (--style penwash, src/paint/recipe.mjs): pen and wash. The ink drawing is drawn whole from its prepared
@@ -3217,7 +3235,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);return q;});
-  const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB})):null;
+  const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38})):null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
   const gradedAngle = sh.graded && !sh._follow ? (sh._gradedAngle ?? null) : null;
@@ -3775,6 +3793,25 @@ if (num('facedetail', 0) > 0 && opt('draw', '1') !== '0') {
   dry(sheet, 20000, O, { levelMax: 200 });
   console.log(`face detail: ${rl.drawn} lines and ${rf.drawn} flecks laid on the dry sheet in pigment ${dInkPig}`);
   STAGE = { stage: 'ink', step: 'face detail' };
+  await shoot();
+}
+if (CROSSHATCH_PLAN && opt('draw', '1') !== '0') {
+  const Kd = w / 420;
+  const ch = CROSSHATCH_PLAN;
+  const cInkPig = GRAPHITE && !INK ? GRAPHITE_AT : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0];
+  const cWant = SC === 1 ? ch.field : Float32Array.from({ length: N2 }, (_, i) => ch.field[(((i / W2) | 0) / SC | 0) * w + ((i % W2) / SC | 0)]);
+  const cScale = gs => gs.map(g => ({ weight: g.weight ?? 1, points: g.points.map(q => ({ x: q.x * SC, y: q.y * SC })) }));
+  const pigK = cInkPig < PIGS.length ? (PIGS[cInkPig].K[0] + PIGS[cInkPig].K[1] + PIGS[cInkPig].K[2]) / 3 : 1; const gain = num('crosshatchgain', 1) / Math.max(0.22, pigK);
+  const cPen = { nib: num('crosshatchnib', 0.44) * Kd, flex: 1.4 * Kd, travel: 1.5 * Kd, reach: 14 * Kd, reservoir: 260 * Kd * Kd, feed: 1.15 * Kd };
+  const cInk = c => SHEET_PIGS.map((_, j) => (j === cInkPig ? c * gain : 0));
+  const chCaps = nMax => ({ state: { used: 0 }, caps: { lines: nMax, pressure: 0.9, minLengthMm: 0.25, edgeMin: 0 } });
+  const r1 = penDraw(sheet, cScale(ch.primary), cWant, W2, H2, { ink: cInk(2.2), pen: cPen, O, peak: 1, ...chCaps(1800) });
+  const r2 = penDraw(sheet, cScale(ch.cross), cWant, W2, H2, { ink: cInk(2.7), pen: { ...cPen, nib: cPen.nib * 0.88 }, O, peak: 1, ...chCaps(1200) });
+  const r3 = penDraw(sheet, cScale(ch.accents), cWant, W2, H2, { ink: cInk(3.4), pen: { ...cPen, nib: cPen.nib * 0.95 }, O, peak: 1, ...chCaps(800) });
+  const r4 = ch.ridges.length ? penDraw(sheet, cScale(ch.ridges), cWant, W2, H2, { ink: cInk(3.8), pen: { ...cPen, nib: cPen.nib * 0.82 }, O, peak: 1, ...chCaps(600) }) : { drawn: 0 };
+  dry(sheet, 20000, O, { levelMax: 200 });
+  console.log(`crosshatch laid: ${r1.drawn} contour hatches, ${r2.drawn} cross-hatches, ${r3.drawn} core accents, ${r4.drawn} fine ridges in pigment ${cInkPig}`);
+  STAGE = { stage: 'ink', step: 'crosshatch' };
   await shoot();
 }
 // --smalllights gouache|both: white gouache last where the source has a small light and the painting reads over --gouachemargin denser.

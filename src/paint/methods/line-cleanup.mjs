@@ -23,7 +23,7 @@ import { joinThenPrune } from './line-join.mjs';
 
 const CLEANUP = Object.freeze({
   minMm: 0.8, penMinMm: 0.4, sideMm: 0.6, ridge: 0.025, step: 0.07, scaleSpread: 1.3, minChroma: 0.06, shadowShare: 0.6, ridgeShare: 0.25, straightMm: 10, straight: 0.92,
-  detailQuantile: 0.65, detailRadiusMm: 1.7, structMm: 3.4, structStraight: 0.85, lightShare: 0.55, darkShare: 0.15,
+  detailQuantile: 0.65, detailRadiusMm: 1.7, detailStraight: 0.72, structMm: 3.4, structStraight: 0.85, lightShare: 0.55, darkShare: 0.15,
   prune: Object.freeze({ tileInkMm: 9, keepAbove: 0, minMm: 0.8, vary: 0.5, structMm: 15 }),
 });
 
@@ -122,7 +122,8 @@ export function cleanLines(lines, target, { mmPerCell, kind = 'trace', seed = 1,
   });
   if (trace) {
     const detail = detailRegion(kept, target.L, w, h, { radius: Math.max(2, Math.round(cells(o.detailRadiusMm))), quantile: o.detailQuantile });
-    const inDetail = g => g.points.filter(q => at(detail, w, h, q.x, q.y)).length > g.points.length / 2;
+    const inDetail = g => g.points.filter(q => at(detail, w, h, q.x, q.y)).length > g.points.length / 2
+      && (chordShare(g.points) >= o.detailStraight || pathLength(g.points) >= cells(o.structMm));
     kept = kept.filter(g => { if (inDetail(g) || (pathLength(g.points) >= cells(o.structMm) && chordShare(g.points) >= o.structStraight)) return true; stats.structure++; return false; });
   }
   const groups = valueGroups(target.L, o);

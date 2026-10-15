@@ -65,12 +65,12 @@ export function gateChoice(model, rule, { style = null } = {}) {
 }
 
 /** Painter flags (linework-plan.mjs --stages) for the final stages, or --drawing none when nothing is drawn. */
-export function stageFlags(final, { style = null } = {}) {
+export function stageFlags(final, { style = null, penSource = false } = {}) {
   const names = [], flags = [];
   const prep = PREP[final.graphitePrep];
   if (prep) { names.push('prep'); flags.push('--prepamount', String(prep.amount), '--preppressure', String(prep.weight)); }
   // pen and wash inks its whole drawing (its own economy prune follows); otherwise the pen goes over the pencil
-  if (final.inkPrep === 'ink') { names.push('prepink'); flags.push(...(style === 'penwash' || !prep ? ['--prepinkfrom', 'lines', '--prepinkamount', '1', '--prepinkdeviate', '0'] : ['--prepinkfrom', 'prep'])); }
+  if (final.inkPrep === 'ink') { names.push('prepink'); flags.push(...(style === 'penwash' || penSource || !prep ? ['--prepinkfrom', 'lines', '--prepinkamount', '1', '--prepinkdeviate', '0'] : ['--prepinkfrom', 'prep'])); }
   if (final.inkFinish === 'ink') names.push('finishink');
   return names.length ? ['--stages', names.join(','), ...flags] : ['--drawing', 'none'];
 }

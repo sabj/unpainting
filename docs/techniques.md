@@ -193,3 +193,19 @@ Modules:
 | `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. On in the default recipe; `--recipe v096` leaves it off. | `--maskmm 0` |  |  |
 | `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. On in the default recipe; `--recipe v096` leaves it off. | `--palelights 0` |  |  |
 | `--finaldarks 1` | method | After the touch-up passes, lays the picture's small decisive darks: cells among the darkest that are clearly darker than their surroundings, joined and at least 0.5 mm² (`--fdminmm2`), less the pen's cells, cut before painting and grouped by 10 mm tile (`--fdtilemm`). Each group gets one look at its mean colour and one dark glaze with a small brush clipped to the accent (`--fdgain`). Off by default: the held-out Guardi run showed over-heavy accents. | `--finaldarks 0` |  |  |
+
+## RC6 experimental controls and comparison
+
+Pigment physics remains off unless `--pigphys 1` or an explicit flocculation override is supplied. `--flocblue`, `--flocgrey`, `--flocviolet`, `--flocearth` and `--flocyellow` accept 0–1. Unset values preserve the pigment's own `floc`; an explicit zero clears it. These colour families are absorption-channel heuristics for recovered pigments, not measurements of chemical composition. Authored settling and granulation properties are preserved unless overridden. Granulation (`gamma`, scaled by `--gran`) and the `floc` tooth/fibre mixing parameter are separate simulator controls. RC6 does not assign a common nonzero flocculation value to every pigment.
+
+`--crosshatch 1` adds the parked contour-following hatching experiment as a deliberate finishing stage. It is off by default.
+
+`--tonestage 1` records a paper-colour selection before drawing; `--tonestage auto` additionally detects warm source paper. Both are opt-in, with `0` the default. This changes the substrate base colour and deposits no pigment. It must not be described as a physical wash followed by drying.
+
+To retain the old comparison and add new renders:
+
+```sh
+node tools/canary/build.mjs --baseline /path/to/canary-1013 --runs /path/to/RC6 --history-runs /path/to/historical/runs --out /path/to/canary-rc6
+```
+
+The output retains `baseline.html`, image hashes, a synchronized loupe and 120 saved-stage playback positions for each candidate. Inspect final Beach facial values and the opening/closing ink stages alongside R4 and archived RC5 before promoting the candidate. Per-render captions use metadata; drawing counts describe planned paths.

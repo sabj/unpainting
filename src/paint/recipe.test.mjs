@@ -123,3 +123,11 @@ test('the default recipe carries the technique rules: seams on colour edges, sma
   assert.equal(value('--washjoin'), '1');
   assert.equal(value('--undercover'), '0');
 });
+
+
+test('experimental pigment properties and sheet-tone stages require an explicit request',()=>{
+ const {argv}=expandRecipe({argv:[]});
+ for(const key of ['pigphys','gran','flocblue','flocearth','flocyellow','tonestage','crosshatch']) assert.ok(!argv.includes('--'+key),key);
+ const explicit=expandRecipe({argv:['--flocearth','.2','--crosshatch','1']}).argv;
+ assert.equal(explicit[explicit.lastIndexOf('--flocearth')+1],'.2');
+});
