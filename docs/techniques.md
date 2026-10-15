@@ -209,3 +209,11 @@ node tools/canary/build.mjs --baseline /path/to/canary-1013 --runs /path/to/RC6 
 ```
 
 The output retains `baseline.html`, image hashes, a synchronized loupe and 120 saved-stage playback positions for each candidate. Inspect final Beach facial values and the opening/closing ink stages alongside R4 and archived RC5 before promoting the candidate. Per-render captions use metadata; drawing counts describe planned paths.
+
+Pages open paused on finished paintings. Play All restarts completed rows, scrubbing updates the playback controls, and clicking a painting expands the current frame. Escape closes the expanded view. Playback waits for the selected row's images to load; rapid scrubbing cannot replace a newer selection with an older frame. The synchronized loupe works across every column, including RC6.
+
+To repair the older RC5 controls in place while keeping its original page as `original.html`:
+
+```sh
+node tools/canary/build.mjs --repair /path/to/canary-1013
+```

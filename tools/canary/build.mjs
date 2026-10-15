@@ -98,8 +98,9 @@ export function repairPage(dir){
  const file=path.join(dir,'index.html'),source=fs.readFileSync(file,'utf8'),data=read(path.join(dir,'play/play-data.json'));
  if(!data?.play||!data.meta)throw Error('missing playback data');
  if(!fs.existsSync(path.join(dir,'original.html')))fs.writeFileSync(path.join(dir,'original.html'),source);
- const fixed=source.replace(/<script>[\s\S]*?<\/script>/,()=>`<script>${playbackScript(data)}</script>`)
-  .replace('</style>','figure,figcaption,.ctl{min-width:0}figcaption{overflow-wrap:anywhere}.row{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:960px){.row{grid-template-columns:repeat(2,minmax(0,1fr))}body{padding:12px}.ctl{max-width:100%}}a{color:var(--accent)}</style>');
+ const css='figure,figcaption,.ctl{min-width:0}figcaption{overflow-wrap:anywhere}.row{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:960px){.row{grid-template-columns:repeat(2,minmax(0,1fr))}body{padding:12px}.ctl{max-width:100%}}a{color:var(--accent)}';
+ let fixed=source.replace(/<script>[\s\S]*?<\/script>/,()=>`<script>${playbackScript(data)}</script>`);
+ if(!fixed.includes(css))fixed=fixed.replace('</style>',css+'</style>');
  fs.writeFileSync(file,fixed);return {repaired:file};
 }
 export function drawingLabel(card, linework) {

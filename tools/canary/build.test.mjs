@@ -50,9 +50,10 @@ test('repair retains the original page and safely embeds playback text',()=>{
   fs.mkdirSync(path.join(dir,'play'));
   fs.writeFileSync(path.join(dir,'index.html'),original);
   fs.writeFileSync(path.join(dir,'play/play-data.json'),JSON.stringify({meta:{beach:{}},play:{'beach-RC6':[{src:'x.jpg',text:'</script><h1>untrusted'}]}}));
-  repairPage(dir);repairPage(dir);
+  repairPage(dir);const first=fs.readFileSync(path.join(dir,'index.html'),'utf8');repairPage(dir);
   assert.equal(fs.readFileSync(path.join(dir,'original.html'),'utf8'),original);
   const fixed=fs.readFileSync(path.join(dir,'index.html'),'utf8');
+  assert.equal(fixed,first);
   assert.equal((fixed.match(/<\/script>/g)||[]).length,1);
   assert.ok(!fixed.includes('oldPlayer()'));
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
