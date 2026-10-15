@@ -1,0 +1,6 @@
+{"t":"2026-10-14T22:50:56.494Z","kind":"start","modelMinutes":46.18,"variant":"region_w13_lay3_ink4_rec2x_rcl_sky3_leaf_sep8_cg11_mg12_st34_vio_rg0_dp38_dg0_cpp_dk13_tv8_uncap_dwg140_tp2_shs_spl3_sml14_lad_wre20_lit60_softs","stops":"every passage boundary"}
+{"t":"2026-10-14T22:52:35.465Z","kind":"look","modelMinutes":46.43,"n":1,"boundary":"0","strokes":0,"penLines":314,"passesDone":0,"passesPlanned":61}
+{"t":"2026-10-14T22:53:09.923Z","kind":"continue","modelMinutes":47,"boundary":"0","stopAt":12,"strokes":0}
+{"t":"2026-10-14T22:59:29.466Z","kind":"look","modelMinutes":48,"n":2,"boundary":"12","strokes":11810,"penLines":314,"passesDone":12,"passesPlanned":61}
+{"t":"2026-10-14T23:00:42.061Z","kind":"continue","modelMinutes":49.21,"boundary":"12","stopAt":36,"strokes":11810}
+{"t":"2026-10-14T23:51:08.156Z","kind":"session-end","modelMinutes":77.72,"why":"the session ended","looks":2,"revisions":0}

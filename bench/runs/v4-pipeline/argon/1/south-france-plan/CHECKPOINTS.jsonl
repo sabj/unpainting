@@ -1,0 +1,13 @@
+{"t":"2026-10-14T09:45:45.078Z","kind":"start","modelMinutes":29.15,"variant":"region_w13_relonly_ol220_opp55","stops":"every passage boundary"}
+{"t":"2026-10-14T09:46:43.291Z","kind":"look","modelMinutes":29.44,"n":1,"boundary":"0","strokes":0,"penLines":167,"passesDone":0,"passesPlanned":24}
+{"t":"2026-10-14T09:47:11.227Z","kind":"continue","modelMinutes":29.91,"boundary":"0","stopAt":14,"strokes":0}
+{"t":"2026-10-14T09:50:41.730Z","kind":"look","modelMinutes":30.3,"n":2,"boundary":"14","strokes":907,"penLines":167,"passesDone":14,"passesPlanned":24}
+{"t":"2026-10-14T09:57:48.943Z","kind":"revise","modelMinutes":36.89,"boundary":"14","revision":1,"strokes":907,"passesDone":14,"changed":["extra-args.json","variant.txt"],"variant":"region_w13_relonly_ol220_opp55_spl16_sml50_sg11_dk14"}
+{"t":"2026-10-14T10:01:08.303Z","kind":"continue","modelMinutes":38.9,"boundary":"15","stopAt":23,"strokes":1120}
+{"t":"2026-10-14T10:04:01.763Z","kind":"look","modelMinutes":39.14,"n":3,"boundary":"23","strokes":2374,"penLines":167,"passesDone":23,"passesPlanned":24}
+{"t":"2026-10-14T10:10:20.409Z","kind":"revise","modelMinutes":44.92,"boundary":"23","revision":2,"strokes":2374,"passesDone":23,"changed":["extra-args.json","variant.txt"],"variant":"region_w13_relonly_ol220_opp55_spl16_sml50_sg11_dk14_tp2"}
+{"t":"2026-10-14T10:14:00.421Z","kind":"look","modelMinutes":45.32,"n":4,"boundary":"closing","strokes":3952,"penLines":167,"passesDone":35,"passesPlanned":35}
+{"t":"2026-10-14T10:14:49.929Z","kind":"continue","modelMinutes":46.14,"boundary":"closing","stopAt":"end","strokes":3952}
+{"t":"2026-10-14T10:15:02.450Z","kind":"finished","modelMinutes":46.14,"strokes":3952}
+{"t":"2026-10-14T10:15:12.617Z","kind":"look","modelMinutes":46.3,"n":5,"boundary":"final"}
+{"t":"2026-10-14T10:15:56.936Z","kind":"session-end","modelMinutes":47.04,"why":"the session ended","looks":5,"revisions":2}

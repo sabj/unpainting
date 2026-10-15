@@ -1,0 +1,330 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "286e7e9377cbe7a5d8138fd80020617681b7c640",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "argonmed",
+  "name": "Gemini 4 Argon (Medium)",
+  "id": "gemini-4-argon-medium",
+  "effort": "medium",
+  "runner": "agy"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 36.9,
+  "tokens": 1161381,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 1,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 678,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0284,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": "Eliminate rectangular coarse-cell hill blocks in favor of smooth high-chroma yellow-green contour washes, deepen cool slate-blue oak shadows and warm olive crown highlights with reserved light gaps, taper the lower trail with broken bank ticks, and add crinkled ink-and-wash crevice accents.",
+   "score": {
+    "composite": 5.8,
+    "pm": 0.2,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.27,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3.33,
+     "marks_texture": 3.33,
+     "classic_value": 5.61,
+     "classic_edge": 7.23,
+     "classic_landmark": null,
+     "classic_marks": 8.98
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 2.5,
+     "50": 3.5,
+     "75": 4,
+     "100": 4
+    },
+    "earlyMean": 3.75,
+    "mean": 3.8,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "b": 2,
+     "c": 5,
+     "m": 1,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The pencil underdrawing and the later wash stages read like genuine brushwork, but the 25% stage's stair-stepped, scalloped green slabs are digital fill artifacts no brush or pen would leave.",
+     "Qwen/Qwen3.5-9B": "The progression is logical, but the washes appear as flat, blocky slabs rather than fluid brushstrokes."
+    }
+   },
+   "attempt": {
+    "n": 2,
+    "minutes": 18.5,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 812,
+   "minutes": 0.3,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0469,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": "Set brush variety=0 on plane/fill brushes to eliminate onceT0 self-blocking horizontal stripes, shift palette from orange-tan/brown-olive to golden-butter ochre and fresh hansa/sage/forest greens, expand foliage canopy coverage to match the target's dense interlocking crowns, and refine building planes with delicate sepia line work and solid shaded/sunlit wall washes.",
+   "score": {
+    "composite": 5.49,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 6.98,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3.33,
+     "marks_texture": 4,
+     "classic_value": 4.76,
+     "classic_edge": 7.2,
+     "classic_landmark": null,
+     "classic_marks": 8.99
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2.5,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 2,
+    "mean": 2.7,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "g": 1,
+     "m": 5,
+     "c": 4,
+     "d": 1,
+     "f": 2,
+     "b": 3,
+     "j": 1,
+     "e": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The loose washes-then-detail sequence mimics a painter, but the hard straight and stair-stepped wash fronts, flat teal slabs, roofs arriving before their walls, and scalloped blob edges reveal a mask/raster fill rather than brush and pen.",
+     "Qwen/Qwen3.5-9B": "The sequence features unnatural straight-edged color blocks and uniform washes that suggest digital generation rather than manual painting."
+    }
+   },
+   "attempt": {
+    "n": 2,
+    "minutes": 8.9,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 157,
+   "minutes": 0,
+   "smallShare": 0.242,
+   "shortStrokes": 55,
+   "dotStrokes": 0,
+   "copyHF": 0.1094,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": "Neutralize hull blue to slate-grey with tapered ribs and smaller lower-right blue zone, break orange hull trim into hatched dabs, protect anchor crown from dark bottom water, separate right catenary shadow bands, and deepen dark charcoal accents on bow, hawsehole, keel boot, rigging, and pulley block.",
+   "score": {
+    "composite": 5.7,
+    "pm": 0.2,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.07,
+    "criteria": {
+     "composition_values": 6,
+     "edges_detail": 4,
+     "marks_texture": 3.67,
+     "classic_value": 5.17,
+     "classic_edge": 6.77,
+     "classic_landmark": null,
+     "classic_marks": 9.27
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 6
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 4,
+     "50": 3,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 4,
+    "mean": 4,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "d": 1,
+     "c": 1,
+     "a": 2,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The build reads like a genuine watercolor progression from pale washes to dark rigging detail, but the hull's white speckles arrive as a suspiciously regular dotted grid and the water/land texture lands all at once mid-sequence."
+    }
+   },
+   "attempt": {
+    "n": 2,
+    "minutes": 9.5,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 5.66,
+  "partialComposite": null,
+  "cropsScored": 3,
+  "complete": true
+ },
+ "cheat": {
+  "disqualified": true,
+  "readTargetPixels": true,
+  "reason": "1 blocked target read(s) at paint time",
+  "risk": {
+   "score": 0.5,
+   "level": "medium",
+   "parts": {
+    "progression": 0.13,
+    "earlyStageMean": 3.25,
+    "copyHF": {
+     "hills": 0.0284,
+     "south-france": 0.0469,
+     "sargent": 0.1094
+    },
+    "copy": 1,
+    "smallStrokeShare": 0.081,
+    "small": 0,
+    "audit": 1,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.31,
+   "level": "medium"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/argonmed/try-2"
+}

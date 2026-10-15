@@ -1,0 +1,8 @@
+{"t":"2026-10-15T06:42:29.443Z","kind":"start","modelMinutes":43.45,"variant":"region_w13_onedom_lay3_ls30_spl8_lf_rg0_cg12_dk11_mg11_st32_shw55_softs_efade_tp1","stops":"every passage boundary"}
+{"t":"2026-10-15T06:43:12.088Z","kind":"continue","modelMinutes":43.57,"boundary":"0","stopAt":12,"strokes":0}
+{"t":"2026-10-15T06:45:28.098Z","kind":"look","modelMinutes":43.82,"n":1,"boundary":"12","strokes":4082,"penLines":0,"passesDone":12,"passesPlanned":57}
+{"t":"2026-10-15T06:45:57.616Z","kind":"continue","modelMinutes":44.31,"boundary":"12","stopAt":36,"strokes":4082}
+{"t":"2026-10-15T06:49:59.017Z","kind":"look","modelMinutes":44.98,"n":2,"boundary":"36","strokes":10451,"penLines":0,"passesDone":36,"passesPlanned":57}
+{"t":"2026-10-15T06:51:44.305Z","kind":"continue","modelMinutes":46.74,"boundary":"36","stopAt":56,"strokes":10451}
+{"t":"2026-10-15T06:54:43.508Z","kind":"look","modelMinutes":47.01,"n":3,"boundary":"56","strokes":16340,"penLines":0,"passesDone":56,"passesPlanned":57}
+{"t":"2026-10-15T06:55:35.302Z","kind":"session-end","modelMinutes":47.87,"why":"the session ended","looks":3,"revisions":0}

@@ -1,0 +1,12 @@
+[
+  "--shaperefit",
+  "3",
+  "--openinglines",
+  "64",
+  "--openingminmm",
+  "6",
+  "--openingpressure",
+  "0.35",
+  "--splwet",
+  "0"
+]

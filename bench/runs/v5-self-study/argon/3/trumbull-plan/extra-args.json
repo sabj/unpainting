@@ -1,0 +1,8 @@
+[
+  "--touchmincells",
+  "0.05",
+  "--touchfamilies",
+  "6",
+  "--closingpressure",
+  "0.65"
+]

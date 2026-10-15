@@ -1,0 +1,53 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry the curved sail, spars, pulley blocks, and water ripples in pure watercolor with reserved paper lights and no ink.",
+    "regions": {}
+  },
+  "reserves": [
+    {
+      "name": "upper-right-sky-light",
+      "bounds": [0.65, 0.15, 0.69, 0.19],
+      "keep": 0.90,
+      "reason": "preserve bright sunlit sail/sky paper patch at upper right"
+    },
+    {
+      "name": "mid-right-sail-gap",
+      "bounds": [0.72, 0.51, 0.76, 0.55],
+      "keep": 0.90,
+      "reason": "preserve bright white gap between blue wash bands on right sail"
+    }
+  ],
+  "families": [
+    {
+      "id": "sargent.central-blue-sail",
+      "family": "sargent.central-blue-sail",
+      "name": "central-blue-sail",
+      "bounds": [0.24, 0.02, 0.62, 0.92],
+      "notes": "dominant curved blue-grey sail with deep indigo-black top-left rim, warm ochre reef points and right border, pale diagonal folds, and dark base shadow"
+    },
+    {
+      "id": "sargent.upper-right-sails-and-blocks",
+      "family": "sargent.upper-right-sails-and-blocks",
+      "name": "upper-right-sails-and-blocks",
+      "bounds": [0.60, 0.00, 1.00, 0.66],
+      "notes": "sunlit cream paper sails crossed by pale cerulean-grey shadow bands, warm tan top spars, and two dark blue-grey pulley blocks"
+    },
+    {
+      "id": "sargent.right-mast-and-turquoise-water",
+      "family": "sargent.right-mast-and-turquoise-water",
+      "name": "right-mast-and-turquoise-water",
+      "bounds": [0.64, 0.24, 1.00, 0.98],
+      "notes": "diagonal warm ochre-sienna mast/spar on the right with blue-grey shadow rope and turquoise-emerald lower-right water ripples"
+    },
+    {
+      "id": "sargent.left-rigging-and-hull",
+      "family": "sargent.left-rigging-and-hull",
+      "name": "left-rigging-and-hull",
+      "bounds": [0.00, 0.00, 0.28, 0.96],
+      "notes": "pale blue upper-left sky, warm salmon-ochre left mast, olive-grey rigging, mid-dark slate hull/water wash, and warm ochre lower-left rigging highlight"
+    }
+  ]
+}

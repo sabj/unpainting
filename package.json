@@ -18,14 +18,15 @@
     "bench:run": "node bench/scripts/run.mjs",
     "bench:score": "node bench/scripts/score.mjs",
     "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",
-    "bench:test": "node --test bench/scripts/lib.test.mjs bench/scripts/kit-log.test.mjs bench/scripts/rounds.test.mjs bench/scripts/overview-picks.test.mjs bench/scripts/rounds-table.test.mjs",
-    "quick-start": "npm run example:plan"
+    "bench:test": "node --test bench/scripts/lib.test.mjs bench/scripts/kit-log.test.mjs bench/scripts/rounds.test.mjs bench/scripts/overview-picks.test.mjs bench/scripts/rounds-table.test.mjs bench/scripts/runners.test.mjs bench/scripts/link-v4.test.mjs bench/scripts/fairness.test.mjs",
+    "quick-start": "npm run example:plan",
+    "bench:add-target": "node bench/scripts/add-target.mjs"
   },
   "dependencies": {
     "sharp": "^0.35.4",
     "webgpu": "^0.6.1"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sabj/unpainting.git"

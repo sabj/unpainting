@@ -1,0 +1,50 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "target": "bench/plan/target.png",
+  "title": "John Singer Sargent — White Ships (1908), bow and anchor detail",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent's marine watercolor builds form through luminous bare cream paper, directional brush lanes across the curved bow and hull planes, and rich dark accents without ink outlines.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.sunlit-hull",
+      "bounds": [0.58, 0.0, 1.0, 0.67],
+      "baseMove": "wet on wet",
+      "referenceCue": "Sunlit warm-white hull on the right with soft blue-grey horizontal shadow bands"
+    },
+    {
+      "id": "sargent.shadowed-bow",
+      "bounds": [0.18, 0.0, 0.64, 0.78],
+      "baseMove": "wet on wet",
+      "referenceCue": "Sweeping curved ship bow in cool cerulean and ultramarine grey-blue shadow"
+    },
+    {
+      "id": "sargent.hawsepipe-rust",
+      "bounds": [0.35, 0.0, 0.65, 0.58],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark oval hawsehole and warm burnt-sienna rust and chain links curving across the bow"
+    },
+    {
+      "id": "sargent.left-rigging-and-anchor",
+      "bounds": [0.0, 0.0, 0.34, 0.94],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm ochre-sienna masts on upper left, cool blue lower hull shadow, and sunlit cream-ochre foreground anchor"
+    },
+    {
+      "id": "sargent.fenders-and-spar",
+      "bounds": [0.76, 0.12, 1.0, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Two dark hanging round fenders and diagonal golden-ochre and sienna spar on the right hull"
+    },
+    {
+      "id": "sargent.waterline",
+      "bounds": [0.18, 0.66, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Deep navy-sepia waterline shadow under the bow flare and horizontal turquoise-olive ripples on the lower right"
+    }
+  ],
+  "reserves": []
+}

@@ -1,0 +1,63 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Collegiate Gothic architectural watercolor where crisp dry-paper value planes, warm ashlar limestone washes, and selective sepia pen-and-ink carry the form.",
+    "regions": {
+      "Y1.sky": {
+        "style": "precise-watercolor",
+        "reason": "Cerulean and granulating French ultramarine upper sky graded down to reserved cloud whites."
+      },
+      "Y1.sunlit-gable": {
+        "style": "precise-watercolor",
+        "reason": "Broad warm yellow-ochre and raw-sienna ashlar limestone facade and gable planes with crisp Gothic window tracery."
+      },
+      "Y1.shaded-wings": {
+        "style": "precise-watercolor",
+        "reason": "Cooler shaded stone return walls, chimney stacks, and connected ultramarine + raw sienna cast shadows."
+      },
+      "Y1.slate-roofs": {
+        "style": "precise-watercolor",
+        "reason": "Connected cool slate roof slopes and eave shadow lines."
+      },
+      "Y1.courtyard-foliage": {
+        "style": "precise-watercolor",
+        "reason": "Sunlit hansa-yellow, yellow-ochre, ultramarine, and sap-green deciduous courtyard trees and foreground street details."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0.04, 0.0, 1.0, 0.32],
+      "baseMove": "wet on wet",
+      "referenceCue": "Cerulean and French ultramarine upper sky graded into warm cream-white cloud corridors."
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "bounds": [0.26, 0.01, 1.0, 0.34],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cool grey-blue slate roof slopes on the central gable and right wing."
+    },
+    {
+      "id": "Y1.sunlit-gable",
+      "bounds": [0.27, 0.05, 0.74, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit golden-ochre and raw-sienna ashlar limestone central gable, pointed Gothic windows, medallion, and entrance arches."
+    },
+    {
+      "id": "Y1.shaded-wings",
+      "bounds": [0.0, 0.0, 0.32, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left stone wing, flanking chimney stack, and deep vertical cast-shadow recess."
+    },
+    {
+      "id": "Y1.courtyard-foliage",
+      "bounds": [0.60, 0.58, 0.78, 0.99],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit yellow-green deciduous tree in the lower-right courtyard beside the entrance portals."
+    }
+  ],
+  "reserves": []
+}

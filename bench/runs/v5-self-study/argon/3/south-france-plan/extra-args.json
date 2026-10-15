@@ -1,0 +1,9 @@
+[
+  "--splwet", "0",
+  "--drawstroke", "0.35",
+  "--openingminmm", "2.5",
+  "--closingpressure", "0.85",
+  "--closingedgemin", "0.02",
+  "--touchdmin", "0.08",
+  "--touchfamilies", "10"
+]

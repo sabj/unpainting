@@ -1,0 +1,14 @@
+{"t":"2026-10-15T02:45:47.989Z","kind":"start","modelMinutes":24.38,"variant":"region_w15_relonly_lay0_ms360_spl9_sml220_lf_mg12_dk12_cg9_rg0_dwg130_opp85_tp1","stops":"every passage boundary"}
+{"t":"2026-10-15T02:47:13.333Z","kind":"look","modelMinutes":24.87,"n":1,"boundary":"0","strokes":0,"penLines":119,"passesDone":0,"passesPlanned":75}
+{"t":"2026-10-15T02:47:32.831Z","kind":"continue","modelMinutes":25.2,"boundary":"0","stopAt":14,"strokes":0}
+{"t":"2026-10-15T02:49:41.841Z","kind":"look","modelMinutes":25.74,"n":2,"boundary":"14","strokes":954,"penLines":119,"passesDone":14,"passesPlanned":75}
+{"t":"2026-10-15T02:49:54.304Z","kind":"continue","modelMinutes":25.95,"boundary":"14","stopAt":39,"strokes":954}
+{"t":"2026-10-15T02:54:30.336Z","kind":"look","modelMinutes":26.85,"n":3,"boundary":"39","strokes":3042,"penLines":119,"passesDone":39,"passesPlanned":75}
+{"t":"2026-10-15T02:54:40.790Z","kind":"continue","modelMinutes":27.02,"boundary":"39","stopAt":69,"strokes":3042}
+{"t":"2026-10-15T02:59:42.955Z","kind":"look","modelMinutes":27.78,"n":4,"boundary":"69","strokes":5529,"penLines":119,"passesDone":69,"passesPlanned":75}
+{"t":"2026-10-15T02:59:52.392Z","kind":"continue","modelMinutes":27.93,"boundary":"69","stopAt":"closing","strokes":5529}
+{"t":"2026-10-15T03:02:17.535Z","kind":"look","modelMinutes":28.42,"n":5,"boundary":"closing","strokes":7635,"penLines":119,"passesDone":80,"passesPlanned":80}
+{"t":"2026-10-15T03:03:24.615Z","kind":"continue","modelMinutes":29.54,"boundary":"closing","stopAt":"end","strokes":7635}
+{"t":"2026-10-15T03:03:45.678Z","kind":"finished","modelMinutes":29.54,"strokes":7635}
+{"t":"2026-10-15T03:03:57.832Z","kind":"look","modelMinutes":29.73,"n":6,"boundary":"final"}
+{"t":"2026-10-15T03:04:31.280Z","kind":"session-end","modelMinutes":30.29,"why":"the session ended","looks":6,"revisions":0}

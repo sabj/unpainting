@@ -1,0 +1,440 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "e790cb10a99136f5358bc6920c2c85d3b94e173f",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "argonmed",
+  "name": "Gemini 4 Argon (Medium)",
+  "id": "gemini-4-argon-medium",
+  "effort": "medium",
+  "runner": "agy"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 55,
+  "tokens": 998769,
+  "costUSD": null,
+  "exitCode": 0,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 1,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 2,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 641,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0292,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.55,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 7.11,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3.33,
+     "marks_texture": 3.67,
+     "classic_value": 5.36,
+     "classic_edge": 7.04,
+     "classic_landmark": null,
+     "classic_marks": 8.92
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 5,
+     "50": 4,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 4.5,
+    "mean": 4.4,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 2,
+     "a": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Lights and loose underpainting washes come first with faint guiding lines, darks build progressively into the tree masses, and the final pass adds foliage texture — a believable brush-and-pen sequence, with only minor flat-wash slabs and slight spatter along the way."
+    }
+   }
+  },
+  "south-france": {
+   "seed": 2,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 825,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0198,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.45,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 7.22,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3.67,
+     "marks_texture": 4,
+     "classic_value": 4.15,
+     "classic_edge": 8.22,
+     "classic_landmark": null,
+     "classic_marks": 9.28
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 4,
+     "50": 5,
+     "75": 5,
+     "100": 5
+    },
+    "earlyMean": 4.5,
+    "mean": 4.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable pen-and-wash build: subject-describing block-in lines, then a light green underwash, progressive value and colour on forms, with darks and pen detail arriving last."
+    }
+   }
+  },
+  "sargent": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 834,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0386,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.12,
+    "pm": 0.14,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 7.57,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 2,
+     "marks_texture": 1.33,
+     "classic_value": 4.85,
+     "classic_edge": 8.37,
+     "classic_landmark": null,
+     "classic_marks": 9.5
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 2,
+    "mean": 2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "e": 1,
+     "b": 2,
+     "g": 1,
+     "c": 1,
+     "i": 2,
+     "a": 2,
+     "j": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The progression reads as a procedural watercolor filter—uniform faint vertical bands, flat evenly-toned slabs, speckle dumps, and a stray white-arrow/whisker glyph that never describes the subject—ending without the target's drawn rigging linework, so it is not a person's brush order."
+    }
+   }
+  },
+  "mittens": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 734,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.1553,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.12,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 7.23,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 2.67,
+     "marks_texture": 2.67,
+     "classic_value": 5.75,
+     "classic_edge": 6.61,
+     "classic_landmark": null,
+     "classic_marks": 9.33
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 5,
+     "50": 4,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 5,
+    "mean": 4.6,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 1,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable pen-sketch then light-to-dark watercolour build, with only the hair underpainting reading as a slightly flat mottled slab at 50% and the finished hair outrunning the still-untouched facial features at 75%."
+    }
+   }
+  },
+  "trumbull": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 263,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "trumbull-strokes.jsonl.gz",
+   "strokes": 978,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.08,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 7.33,
+    "criteria": {
+     "composition_values": 4,
+     "edges_detail": 2,
+     "marks_texture": 2,
+     "classic_value": 5.38,
+     "classic_edge": 7.33,
+     "classic_landmark": null,
+     "classic_marks": 9.28
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 3,
+     "50": 3,
+     "75": 4,
+     "100": 4
+    },
+    "earlyMean": 3.5,
+    "mean": 3.6,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 3,
+     "i": 2,
+     "f": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The build reads as a genuine human order — pencil underdrawing, pale washes, mid values, then darks and detail with no wipe front — but the mid-stage walls arrive as even vertical streak-slabs that only loosely describe the architecture, and the final stone texture sharpens in one late dump."
+    }
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 5.25,
+  "partialComposite": null,
+  "cropsScored": 5,
+  "complete": true
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.27,
+   "level": "low",
+   "parts": {
+    "progression": 0,
+    "earlyStageMean": 3.9,
+    "copyHF": {
+     "hills": 0.0292,
+     "south-france": 0.0198,
+     "sargent": 0.0386,
+     "mittens": 0.1553,
+     "trumbull": 0.08
+    },
+    "copy": 0.89,
+    "smallStrokeShare": 0,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v2-skill/argonmed/2"
+}

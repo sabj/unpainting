@@ -1,0 +1,99 @@
+{
+  "subject": "south-france",
+  "name": "France",
+  "photo": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "The task specifies urban sketch, pen plus light wash: structural ink line work from the hillside village, cypresses, and olive trees carries the drawing while open light local-color washes and connected shadow glazes state the warm Provençal light.",
+    "regions": {
+      "south-france.distant-valley": {
+        "style": "urban-sketch",
+        "reason": "Cool blue-green distant valley at upper right stays an open light wash without heavy overworking."
+      },
+      "south-france.sunlit-terrace": {
+        "style": "urban-sketch",
+        "reason": "Sunlit warm ochre terrace and upper-left slope retain paper luminosity under a pale warm wash."
+      },
+      "south-france.village-houses": {
+        "style": "urban-sketch",
+        "reason": "Warm ochre stone facades and terracotta roofs rely on crisp pen architecture plus light warm washes."
+      },
+      "south-france.cypress-shadows": {
+        "style": "urban-sketch",
+        "reason": "Dark vertical cypresses and deep foliage recesses combine structural ink with a connected dark glaze."
+      },
+      "south-france.olive-slopes": {
+        "style": "urban-sketch",
+        "reason": "Mid-value olive and yellow-green hillside trees keep fresh light-wash transparency."
+      },
+      "south-france.foreground-tree": {
+        "style": "urban-sketch",
+        "reason": "Prominent lower-left tree canopy and trunk combine calligraphic pen branches with loose green-ochre wash."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "south-france.distant-valley",
+      "bounds": [0.74, 0.02, 0.98, 0.24],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cool blue-green distant valley and horizon at upper right; open light wash."
+    },
+    {
+      "id": "south-france.sunlit-terrace",
+      "bounds": [0.02, 0.02, 0.36, 0.28],
+      "baseMove": "wet on dry",
+      "referenceCue": "Bright sunlit warm ochre and cream terrace at upper left with pale paper highlights."
+    },
+    {
+      "id": "south-france.village-houses",
+      "bounds": [0.38, 0.08, 0.72, 0.32],
+      "baseMove": "wet on dry",
+      "referenceCue": "Clustered Provençal stone houses with warm ochre walls, terracotta roofs, and dark window openings."
+    },
+    {
+      "id": "south-france.cypress-shadows",
+      "bounds": [0.46, 0.28, 0.74, 0.52],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark vertical cypress columns and deep olive-umber shadow masses below the upper village."
+    },
+    {
+      "id": "south-france.olive-slopes",
+      "bounds": [0.52, 0.54, 0.88, 0.82],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit and mid-tone olive-green hillside foliage and lower-right stone buildings."
+    },
+    {
+      "id": "south-france.foreground-tree",
+      "bounds": [0.08, 0.56, 0.44, 0.94],
+      "baseMove": "wet on dry",
+      "referenceCue": "Expressive foreground olive tree at lower left with dark trunk/branch structure and warm green-gold canopy."
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.398, 0.102, 0.426, 0.132],
+      "reason": "Brightest sunlit upper village gable wall highlight"
+    },
+    {
+      "bounds": [0.134, 0.198, 0.164, 0.228],
+      "reason": "Sun-struck pale stone terrace highlight at upper left"
+    },
+    {
+      "bounds": [0.634, 0.134, 0.662, 0.164],
+      "reason": "Sunlit upper-right cottage wall highlight"
+    },
+    {
+      "bounds": [0.054, 0.454, 0.084, 0.486],
+      "reason": "Bright sunlit stone wall glint on middle-left terrace"
+    },
+    {
+      "bounds": [0.344, 0.550, 0.374, 0.582],
+      "reason": "Sunlit central clearing highlight between olive trees"
+    },
+    {
+      "bounds": [0.792, 0.808, 0.820, 0.838],
+      "reason": "Bright sunlit lower-right cottage facade highlight"
+    }
+  ]
+}

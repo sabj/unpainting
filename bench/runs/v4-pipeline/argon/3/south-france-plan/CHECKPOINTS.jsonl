@@ -1,0 +1,4 @@
+{"t":"2026-10-14T12:04:44.844Z","kind":"start","modelMinutes":34.89,"variant":"region_w13_cur","stops":"every passage boundary"}
+{"t":"2026-10-14T12:05:36.570Z","kind":"look","modelMinutes":35.07,"n":1,"boundary":"0","strokes":0,"penLines":65,"passesDone":0,"passesPlanned":57}
+{"t":"2026-10-14T12:05:57.587Z","kind":"continue","modelMinutes":35.43,"boundary":"0","stopAt":11,"strokes":0}
+{"t":"2026-10-14T12:11:10.748Z","kind":"session-end","modelMinutes":40.42,"why":"the painting finished five minutes ago","looks":1,"revisions":0}

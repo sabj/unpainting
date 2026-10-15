@@ -1,0 +1,16 @@
+{"t":"2026-10-14T16:17:32.919Z","kind":"start","modelMinutes":30.27,"variant":"region_w13_lay4_ink4_rec2x_rcl_sep4_cg10_dk11_dwg110_opp45_uncap_cpp_shs_tp2_tv8_softs","stops":"every passage boundary"}
+{"t":"2026-10-14T16:18:50.256Z","kind":"look","modelMinutes":31.01,"n":1,"boundary":"0","strokes":0,"penLines":223,"passesDone":0,"passesPlanned":50}
+{"t":"2026-10-14T16:23:22.638Z","kind":"revise","modelMinutes":35.28,"boundary":"0","revision":1,"strokes":0,"passesDone":0,"changed":["closing-lines.json","closingink4-lines.json"],"variant":"region_w13_lay4_ink4_rec2x_rcl_sep4_cg10_dk11_dwg110_opp45_uncap_cpp_shs_tp2_tv8_softs"}
+{"t":"2026-10-14T16:25:16.619Z","kind":"look","modelMinutes":35.93,"n":2,"boundary":"7","strokes":313,"penLines":223,"passesDone":7,"passesPlanned":50}
+{"t":"2026-10-14T16:25:27.559Z","kind":"continue","modelMinutes":36.11,"boundary":"7","stopAt":28,"strokes":313}
+{"t":"2026-10-14T16:28:15.717Z","kind":"look","modelMinutes":36.74,"n":3,"boundary":"28","strokes":2364,"penLines":223,"passesDone":28,"passesPlanned":50}
+{"t":"2026-10-14T16:28:25.639Z","kind":"continue","modelMinutes":36.91,"boundary":"28","stopAt":35,"strokes":2364}
+{"t":"2026-10-14T16:28:59.365Z","kind":"look","modelMinutes":37.05,"n":4,"boundary":"35","strokes":2846,"penLines":223,"passesDone":35,"passesPlanned":50}
+{"t":"2026-10-14T16:29:10.796Z","kind":"continue","modelMinutes":37.24,"boundary":"35","stopAt":49,"strokes":2846}
+{"t":"2026-10-14T16:31:00.266Z","kind":"look","modelMinutes":37.47,"n":5,"boundary":"49","strokes":4649,"penLines":223,"passesDone":49,"passesPlanned":50}
+{"t":"2026-10-14T16:31:35.295Z","kind":"continue","modelMinutes":38.06,"boundary":"49","stopAt":"closing","strokes":4649}
+{"t":"2026-10-14T16:34:46.043Z","kind":"look","modelMinutes":38.36,"n":6,"boundary":"closing","strokes":8896,"penLines":223,"passesDone":65,"passesPlanned":65}
+{"t":"2026-10-14T16:34:56.473Z","kind":"continue","modelMinutes":38.54,"boundary":"closing","stopAt":"end","strokes":8896}
+{"t":"2026-10-14T16:35:08.012Z","kind":"finished","modelMinutes":38.53,"strokes":8896}
+{"t":"2026-10-14T16:35:20.660Z","kind":"look","modelMinutes":38.73,"n":7,"boundary":"final"}
+{"t":"2026-10-14T16:35:45.890Z","kind":"session-end","modelMinutes":39.15,"why":"the session ended","looks":7,"revisions":1}

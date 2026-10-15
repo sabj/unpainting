@@ -1,0 +1,135 @@
+{
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose ink-and-wash landscape on cold-press paper: a selective, continuous sepia structural drawing of the winding sandy path, hillside crests, and outer meadow-to-treeline silhouettes precedes luminous hansa/sap-green/ochre ground washes, layered olive-and-slate foliage masses, and crisp closing sepia contour accents.",
+    "regions": {
+      "sandy_winding_path": {
+        "style": "ink-and-wash",
+        "moisture": "damp",
+        "load": "glaze",
+        "order": 1,
+        "notes": "Warm cream-ochre and pale hansa/sienna wash along the S-curving sandy track (`litL=85`, `litReserveL=96`, `_lit45_lw`), preserving true center-of-track sunlit paper glints while grading road shoulders into the bordering grass."
+      },
+      "sunlit_meadow_slopes": {
+        "style": "ink-and-wash",
+        "moisture": "wet",
+        "load": "wet",
+        "order": 2,
+        "notes": "Broad luminous hansa yellow, sap green, and yellow ochre washes across the lower-right foreground meadow, central ridge, and upper slopes, laid in cohesive directional strokes before darker foliage overlays."
+      },
+      "midtone_olive_foliage": {
+        "style": "ink-and-wash",
+        "moisture": "damp",
+        "load": "loaded",
+        "order": 3,
+        "notes": "Two-pass textured midtone washes (`_lay2_lt_nest`) in sap green, yellow ochre, and burnt sienna establishing the scalloped oak and scrub-covered hillsides without flat gray-blue sky-lane slabs."
+      },
+      "deep_canopy_shadows": {
+        "style": "ink-and-wash",
+        "moisture": "damp",
+        "load": "loaded",
+        "order": 4,
+        "notes": "Rich ultramarine + sap green + burnt sienna + sepia shadow glazes (`_dk125`, `_st36`, `_rec2x_rcl`) tucked into the cool slate-olive tree cores, valley clefts, and under-canopy cast shadows."
+      },
+      "closing_sepia_contours": {
+        "style": "ink-and-wash",
+        "moisture": "dry",
+        "load": "dry",
+        "order": 5,
+        "notes": "Selective dry-brush sepia contour ink (`_ink4`, `_sep5`, `_dwg115`) reinforcing the winding road shoulders, wheel ruts, hillside ridges, trunks, and major canopy divisions."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "sandy_path_lower",
+      "role": "ground",
+      "technique": "wet-on-dry",
+      "moisture": "damp",
+      "load": "glaze",
+      "order": 1,
+      "bounds": [0.30, 0.54, 0.56, 0.99],
+      "referenceCue": "Lower S-curve of the sunlit sandy road (L=85-97) with warm cream-ochre shoulders and sepia road-edge lines",
+      "notes": "Tinted with light hansa + yellow ochre + sienna wash via lit-stone lift (`litL=85, litReserveL=96`) instead of bleached white paper mask."
+    },
+    {
+      "id": "sandy_path_upper_left",
+      "role": "ground",
+      "technique": "wet-on-dry",
+      "moisture": "damp",
+      "load": "glaze",
+      "order": 1,
+      "bounds": [0.16, 0.16, 0.30, 0.53],
+      "referenceCue": "Upper-left bend of the sandy road climbing between the sunlit ridge and left tree mass",
+      "notes": "Warm ochre-cream wash with crisp sepia shoulder contours."
+    },
+    {
+      "id": "sandy_path_top_right",
+      "role": "ground",
+      "technique": "wet-on-dry",
+      "moisture": "damp",
+      "load": "glaze",
+      "order": 1,
+      "bounds": [0.68, 0.00, 0.80, 0.14],
+      "referenceCue": "Distant upper-right ribbon of the sandy track cresting the far hill",
+      "notes": "Light warm ochre-cream wash flanked by fine sepia track lines."
+    },
+    {
+      "id": "sunlit_meadow_lower_right",
+      "role": "ground",
+      "technique": "wet-on-wet",
+      "moisture": "wet",
+      "load": "wet",
+      "order": 2,
+      "bounds": [0.46, 0.54, 0.96, 0.99],
+      "referenceCue": "Broad sunlit yellow-green grass slope on the lower right with soft directional turf bands and a small dark shrub",
+      "notes": "Kept free of interior ink squiggles; painted with hansa yellow + sap green + yellow ochre washes."
+    },
+    {
+      "id": "sunlit_ridge_upper_left",
+      "role": "ground",
+      "technique": "wet-on-wet",
+      "moisture": "wet",
+      "load": "wet",
+      "order": 2,
+      "bounds": [0.00, 0.08, 0.42, 0.38],
+      "referenceCue": "Sunlit yellow-green hillside crest sweeping down from the upper-left corner alongside the road",
+      "notes": "Warm yellow-green wash meeting the central wooded valley along a crisp sepia ridge contour."
+    },
+    {
+      "id": "sunlit_ridge_upper_right",
+      "role": "ground",
+      "technique": "wet-on-wet",
+      "moisture": "wet",
+      "load": "wet",
+      "order": 2,
+      "bounds": [0.44, 0.00, 0.99, 0.38],
+      "referenceCue": "Upper-right sunlit grassy hills divided by the far road and diagonal tree line",
+      "notes": "Luminous hansa + sap green wash with warm ochre transitions."
+    },
+    {
+      "id": "wooded_valley_center_right",
+      "role": "foliage",
+      "technique": "layered-wash",
+      "moisture": "damp",
+      "load": "loaded",
+      "order": 3,
+      "bounds": [0.34, 0.08, 0.99, 0.72],
+      "referenceCue": "Dense olive and cool slate-green oak canopies filling the central diagonal valley and right-hand slope",
+      "notes": "Unified single-domain washes (`layerHue=0, skySplit=0, _noslane`) built from sap green + ochre midtones into ultramarine + sap green + sepia deep canopy shadows."
+    },
+    {
+      "id": "wooded_hill_left_foreground",
+      "role": "foliage",
+      "technique": "layered-wash",
+      "moisture": "damp",
+      "load": "loaded",
+      "order": 4,
+      "bounds": [0.00, 0.24, 0.46, 0.99],
+      "referenceCue": "Left foreground and mid-ground oak and scrub masses with warm earth under-shadows and cool blue-green crowns",
+      "notes": "Layered midtone and shadow glazes with directional closing sepia accents."
+    }
+  ],
+  "reserves": []
+}

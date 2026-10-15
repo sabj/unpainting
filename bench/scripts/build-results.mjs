@@ -10,7 +10,7 @@ import path from 'node:path';
 import {
   RUNS, RESULTS, RESULTS_SCHEMA, ROUNDS, BUDGET, CROP_ORDER, PUBLIC_CROPS, loadRuns, loadCrops, writeJson, validateRun,
   mean, median, round2, bootstrapMean, paintingScores, tryMean, tryStrokes, roundById, posix, BENCH,
-  inPublishedScope, shortfallReason, TARGET_SELF_SCORE, indexedScore, indexedScores, PAINTER_NOTE, groupByPainter, compareSemver,
+  inPublishedScope, comparedCrops, shortfallReason, TARGET_SELF_SCORE, indexedScore, indexedScores, PAINTER_NOTE, groupByPainter, compareSemver,
 } from './lib.mjs';
 import { findingsData } from './findings-data.mjs';
 
@@ -57,14 +57,14 @@ function modelEntry(entries) {
       best: { try: top.e.run.try, score: top.s, indexed: round2(indexedScore(c, top.s)), image: `${rel(top.e.file)}/${top.e.run.crops[c].images?.final}`, stages: top.e.run.crops[c].images?.stages ? `${rel(top.e.file)}/${top.e.run.crops[c].images.stages}` : null },
     };
   }
-  const pub = eligible.flatMap(e => PUBLIC_CROPS.map(c => e.run.crops[c]?.score?.composite).filter(v => v != null));
+  const pub = eligible.flatMap(e => comparedCrops(e.run).filter(([c]) => PUBLIC_CROPS.includes(c)).map(([, v]) => v.score?.composite).filter(v => v != null));
   const levels = runs.map(worstLevel);
   return {
     model: m.key, name: m.name, id: m.id, effort: m.effort,
     tries: runs.length, scoredTries: eligible.length, paintings: scores.length,
     indexed: { mean: round2(mean(indexed)), ci95: bootstrapMean(indexed), n: indexed.length },
     mean: round2(mean(scores)), ci95: bootstrapMean(scores),
-    fewerTriesReason: shortfallReason(m.key, runs.length),
+    fewerTriesReason: eligible.length < runs.length ? `${eligible.length} scored: ${runs.filter(r => r.cheat.disqualified).map(r => `try ${r.try} disqualified for a blocked target read`).join(", ")}` : shortfallReason(m.key, runs.length),
     best: best ? { try: best.run.try, score: round2(tryMean(best.run)), indexed: round2(tryIndexed(best.run)), crops: paintingScores(best.run).length, path: rel(best.file) } : null,
     perTry: {
       strokes: median(runs.map(tryStrokes).filter(Boolean)),
@@ -107,7 +107,7 @@ function roundEntry(r, inRound, group, label) {
   for (const e of inRound) byModel.set(e.run.painter.key, [...(byModel.get(e.run.painter.key) || []), e]);
   const models = [...byModel.values()].map(es => modelEntry(es.sort((a, b) => a.run.try - b.run.try)))
     .sort((a, b) => ((b.indexed.mean ?? -1) - (a.indexed.mean ?? -1)) || a.model.localeCompare(b.model));
-  const cropKeys = CROP_ORDER.filter(c => inRound.some(e => e.run.crops[c]));
+  const cropKeys = CROP_ORDER.filter(c => inRound.some(e => comparedCrops(e.run).some(([k]) => k === c)));
   for (const m of models) m.missing = missingCrops(byModel.get(m.model), m, cropKeys);
   return {
     id: r.id, label, key: r.key, dir: r.dir, title: r.title,
@@ -141,7 +141,7 @@ const results = {
     perJudge: 'median of its valid calls',
     ci: '95% percentile bootstrap (2,000 resamples, seed 7) of the mean over all scored paintings of a model in a round',
     advisory: 'Treat small differences as noise.',
-    judgeProviders: 'V1 to V3 judges ran on Together. In V4 and V5, later judge calls went through OpenRouter to zero-data-retention providers; each painting lists them under judgeProviders.',
+    judgeProviders: 'V1 to V3 judges ran on Together. V4 and V5 judges ran through OpenRouter on zero-data-retention providers; each painting lists them under judgeProviders.',
   },
   roundCompare: (() => {
     const v = findingsData(runsDir).v1v2;

@@ -46,7 +46,7 @@ A try is flagged for review when either is high. In benchmark version V3, tries 
 
 Stroke logs (see [run-format.md](run-format.md#stroke-log)) record each stroke's order, size, pressure and timing, and show whether a path follows the target's edges or a person's coarse-to-fine order. They are not yet part of the score.
 
-A high score never excludes a try on its own, because weak technique raises the same signals that copying does. Laying darks early, or ending close to the photo, scores higher without any cheating. [Findings](../results/FINDINGS.md#no-run-read-the-targets) lists the tries that scored high and their review status.
+A high score never excludes a try on its own, because weak technique raises the same signals that copying does. Laying darks early, or ending close to the photo, scores higher without any cheating. [Findings](../results/FINDINGS.md#target-reads-and-cheat-risk) lists the tries that scored high and their review status.
 
 Every try the score flagged was reviewed by hand, and none cheated. The flags came from early stages that didn't look like a person's start.
 

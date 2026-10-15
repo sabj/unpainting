@@ -1,5 +1,5 @@
 // The numbers behind results/FINDINGS.md, computed from runs/. Shared by build-findings.mjs and lib.test.mjs.
-import { loadRuns, RUNS, mean, median, round2, bootstrapMean, bootstrapPairedDiff, paintingScores, tryStrokes, inPublishedScope } from './lib.mjs';
+import { loadRuns, RUNS, ROUNDS, mean, median, round2, bootstrapMean, bootstrapPairedDiff, paintingScores, tryStrokes, inPublishedScope } from './lib.mjs';
 
 const scoresOn = (runs, cropKeys) => runs.flatMap(r => (cropKeys || Object.keys(r.crops)).map(c => r.crops[c]?.score?.composite).filter(v => v != null));
 
@@ -29,7 +29,7 @@ export function findingsData(root = RUNS) {
   };
 
   // V3 against V2 on the crops V3 painted, and V3's first trial against its later ones.
-  const v3crops = ['hills', 'south-france', 'sargent'];
+  const v3crops = ROUNDS.find(r => r.id === 'V3').targets;
   const v3 = models('V3').map(m => {
     const tries = of('V3', m);
     const v2 = scoresOn(of('V2', m), v3crops), v3s = scoresOn(tries, v3crops);
@@ -81,6 +81,7 @@ export function findingsData(root = RUNS) {
     tries: all.length,
     blocked: all.reduce((a, r) => a + (r.guard.blockedImageReads || 0), 0),
     disqualified: all.filter(r => r.cheat.disqualified).length,
+    disqualifiedTries: all.filter(r => r.cheat.disqualified).map(r => ({ name: r.painter.name, round: r.round, try: r.try, reason: r.cheat.reason })),
     high: all.filter(r => [r.cheat.risk?.level, r.cheat.progressionRisk?.level].includes('high'))
       .map(r => ({ round: r.round, name: r.painter.name, try: r.try, review: r.cheat.review?.status ?? null })),
   };

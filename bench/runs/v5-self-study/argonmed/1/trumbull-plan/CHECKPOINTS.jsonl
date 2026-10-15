@@ -1,0 +1,16 @@
+{"t":"2026-10-14T11:49:40.339Z","kind":"start","modelMinutes":17.85,"variant":"region_w13_ssp55_bvar","stops":"every passage boundary"}
+{"t":"2026-10-14T11:51:02.190Z","kind":"look","modelMinutes":18.41,"n":1,"boundary":"0","strokes":0,"penLines":176,"passesDone":0,"passesPlanned":81}
+{"t":"2026-10-14T11:51:24.185Z","kind":"continue","modelMinutes":18.77,"boundary":"0","stopAt":16,"strokes":0}
+{"t":"2026-10-14T11:54:15.826Z","kind":"look","modelMinutes":19.05,"n":2,"boundary":"16","strokes":919,"penLines":176,"passesDone":16,"passesPlanned":81}
+{"t":"2026-10-14T11:57:08.851Z","kind":"continue","modelMinutes":21.94,"boundary":"16","stopAt":42,"strokes":919}
+{"t":"2026-10-14T12:01:23.792Z","kind":"look","modelMinutes":22.99,"n":3,"boundary":"42","strokes":2139,"penLines":176,"passesDone":42,"passesPlanned":81}
+{"t":"2026-10-14T12:02:17.364Z","kind":"continue","modelMinutes":23.88,"boundary":"42","stopAt":64,"strokes":2139}
+{"t":"2026-10-14T12:06:58.412Z","kind":"look","modelMinutes":25.01,"n":4,"boundary":"64","strokes":3625,"penLines":176,"passesDone":64,"passesPlanned":81}
+{"t":"2026-10-14T12:08:04.010Z","kind":"continue","modelMinutes":26.1,"boundary":"64","stopAt":80,"strokes":3625}
+{"t":"2026-10-14T12:16:02.701Z","kind":"look","modelMinutes":26.78,"n":5,"boundary":"80","strokes":6090,"penLines":176,"passesDone":80,"passesPlanned":81}
+{"t":"2026-10-14T12:16:27.665Z","kind":"continue","modelMinutes":27.19,"boundary":"80","stopAt":"closing","strokes":6090}
+{"t":"2026-10-14T12:23:05.634Z","kind":"look","modelMinutes":29,"n":6,"boundary":"closing","strokes":13859,"penLines":176,"passesDone":98,"passesPlanned":98}
+{"t":"2026-10-14T12:23:58.205Z","kind":"continue","modelMinutes":29.88,"boundary":"closing","stopAt":"end","strokes":13859}
+{"t":"2026-10-14T12:24:39.341Z","kind":"finished","modelMinutes":29.87,"strokes":13859}
+{"t":"2026-10-14T12:25:05.018Z","kind":"look","modelMinutes":30.29,"n":7,"boundary":"final"}
+{"t":"2026-10-14T12:26:20.622Z","kind":"session-end","modelMinutes":31.55,"why":"the session ended","looks":7,"revisions":0}

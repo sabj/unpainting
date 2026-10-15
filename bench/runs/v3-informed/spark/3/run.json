@@ -1,0 +1,494 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "46c2d3b6c5799e186feb53dd612bb063b2c502e9",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "spark",
+  "name": "Muse Spark 1.3",
+  "id": "muse-spark-1.3",
+  "effort": "xhigh",
+  "runner": "muse"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 15.1,
+  "tokens": 6066246,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 168,
+   "minutes": 0.7,
+   "smallShare": 0,
+   "shortStrokes": 27,
+   "dotStrokes": 0,
+   "copyHF": 0.0161,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": "Attempt 3 changes: pale ochre single-coat trail split into lower/upper/left segments tucked behind the oak instead of an orange slash across the canopy, plus solid dark cores via bridge 1.0 and three dried glaze coats on ridge/oak/bottom-left — because the target's trail is light straw partly hidden by trees and its foliage masses are deep and continuous, not speckled.",
+   "score": {
+    "composite": 4.2,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 1.67,
+    "classic": 6.72,
+    "criteria": {
+     "composition_values": 2.67,
+     "edges_detail": 1.33,
+     "marks_texture": 1.33,
+     "classic_value": 3.04,
+     "classic_edge": 7.91,
+     "classic_landmark": null,
+     "classic_marks": 9.22
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 1
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 5
+    },
+    "earlyMean": 3,
+    "mean": 3,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "e": 1,
+     "a": 1,
+     "b": 3,
+     "c": 3,
+     "f": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The faint contour sketch is a believable start, but the painting then grows by rectangular speckle-edged texture slabs stamped region-by-region rather than brush-shaped washes, a procedural build rather than a hand's order."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 4.5,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 627,
+   "minutes": 2.2,
+   "smallShare": 0.029,
+   "shortStrokes": 423,
+   "dotStrokes": 38,
+   "copyHF": -0.016,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": "Attempt 3: keep attempt 2's loads but give architecture its own space — foliage kept out of the house zone, three separate smaller roof bands with pale shaded walls between, trunks painted after foliage, top-house walls under roofs, sky-hole gaps in the foreground mass, and a bolder slow finishing pen (nib 1.7, speed 0.55) — because attempt 2's houses dissolved into one roof blob with invisible li",
+   "score": {
+    "composite": 4.08,
+    "pm": 0.14,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 5.83,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 2.33,
+     "classic_value": 3.34,
+     "classic_edge": 5.72,
+     "classic_landmark": null,
+     "classic_marks": 8.43
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 3,
+     "50": 2,
+     "75": 3,
+     "100": 5
+    },
+    "earlyMean": 3.5,
+    "mean": 3.4,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "i": 1,
+     "b": 1,
+     "c": 2,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The broad sequence (light pen layout, then broad washes, then darks late) is human-plausible, but the foliage arrives as uniform flat stamped slabs dumped in place and the white building keeps a scalloped mask-like edge, marks a brush-and-pen hand would not leave."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 4.4,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 145,
+   "minutes": 1,
+   "smallShare": 0,
+   "shortStrokes": 35,
+   "dotStrokes": 20,
+   "copyHF": -0.021,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": "Attempt 3: kill the white gutters splitting the hull with overlapped half-length strokes plus a unifying glaze, gray the blue toward the target's periwinkle, and enlarge/warm the anchor — the hull bars and gray-violet anchor are the biggest remaining gaps.",
+   "score": {
+    "composite": 4.12,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 2,
+    "classic": 6.24,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 2.33,
+     "classic_value": 4.46,
+     "classic_edge": 5.24,
+     "classic_landmark": null,
+     "classic_marks": 9.03
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 2,
+     "50": 2,
+     "75": 3,
+     "100": 2
+    },
+    "earlyMean": 3,
+    "mean": 2.6,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 1,
+     "c": 2,
+     "j": 1,
+     "a": 1,
+     "h": 1,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The faint opening washes are believable, but the hull arrives as a flat scalloped slab, its texture is dumped in evenly, details come as speckle-dot trails, and the 100% step barely changes from 75%, marking this as filter-built rather than brushed."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 2.7,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "mittens": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 216,
+   "minutes": 0.2,
+   "smallShare": 0.16,
+   "shortStrokes": 110,
+   "dotStrokes": 0,
+   "copyHF": -0.0069,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": "Attempt 3: close the value gap to the target with a third warm glaze on the cat, a dark junction shadow between cat and man, denser small-arc near-black hair built with the form brush instead of blocky wash strokes, stronger all-over skin tone with jaw stubble, and bolder ear-edge/eyeliner/nose outlines.",
+   "score": {
+    "composite": 4.54,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 6.74,
+    "criteria": {
+     "composition_values": 3.33,
+     "edges_detail": 1.67,
+     "marks_texture": 2,
+     "classic_value": 4.39,
+     "classic_edge": 6.56,
+     "classic_landmark": null,
+     "classic_marks": 9.28
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 3.5,
+    "mean": 2.6,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "c": 8,
+     "b": 1,
+     "g": 1,
+     "m": 6,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The pencil underdrawing is believably human, but every wash afterwards arrives as straight-edged horizontal slabs and zigzag raster rows that never resolve into brush-drawn form, persisting even at 100%.",
+     "Qwen/Qwen3.5-9B": "The sequence depicts a digital block-fill process rather than brushwork, resulting in a final image that differs significantly from the soft-washed target."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 1.4,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "trumbull": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 263,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "trumbull-strokes.jsonl.gz",
+   "strokes": 240,
+   "minutes": 0.3,
+   "smallShare": 0.297,
+   "shortStrokes": 102,
+   "dotStrokes": 4,
+   "copyHF": -0.0263,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "painterNote": "Attempt 3: make the gable triangle stone with thin roof edge strips only, move upper windows below the eaves, and replace the mid-facade shadow band with vertical plane modeling, because a2's gray-filled gable, roof-high windows and banded shadows are its biggest likeness errors.",
+   "score": {
+    "composite": 4.42,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 5.84,
+    "criteria": {
+     "composition_values": 3.33,
+     "edges_detail": 2,
+     "marks_texture": 3,
+     "classic_value": 3.95,
+     "classic_edge": 4.75,
+     "classic_landmark": null,
+     "classic_marks": 8.82
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 2,
+     "50": 3,
+     "75": 3,
+     "100": 3
+    },
+    "earlyMean": 3,
+    "mean": 3,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "a": 1,
+     "b": 2,
+     "c": 4,
+     "m": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The mass-before-detail, light-before-dark sequence is broadly human, but the ziggurat-stepped wash edges, flat even slabs for the towers and walls, and uniform repeated window dashes read as a digital fill rather than brush and pen work."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 1.7,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 4.13,
+  "partialComposite": null,
+  "cropsScored": 3,
+  "complete": true,
+  "extraTargets": [
+   "mittens",
+   "trumbull"
+  ]
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.14,
+   "level": "low",
+   "parts": {
+    "progression": 0.15,
+    "earlyStageMean": 3.2,
+    "copyHF": {
+     "hills": 0.0161,
+     "south-france": -0.016,
+     "sargent": -0.021,
+     "mittens": -0.0069,
+     "trumbull": -0.0263
+    },
+    "copy": 0.27,
+    "smallStrokeShare": 0.097,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.07,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/spark/try-3",
+ "rerun": {
+  "crops": [
+   "trumbull"
+  ],
+  "reason": "Muse subscription quota ran out mid-round; these targets were rerun after the reset",
+  "commit": "46c2d3b6c5799e186feb53dd612bb063b2c502e9"
+ }
+}

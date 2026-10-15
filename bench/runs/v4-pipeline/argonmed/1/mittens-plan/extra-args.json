@@ -1,0 +1,20 @@
+[
+  "--palettecells",
+  "77700",
+  "--paints",
+  "sepia,rawsienna,ultramarine",
+  "--paintsadd",
+  "sienna,ochre,rose",
+  "--openinglines",
+  "24",
+  "--closinglines",
+  "56",
+  "--openingpressure",
+  "0.30",
+  "--closingpressure",
+  "0.42",
+  "--closingedgemin",
+  "0",
+  "--drawwant",
+  "0.68"
+]

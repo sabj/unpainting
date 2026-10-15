@@ -24,12 +24,7 @@
   "progressionJudges": [
    "Qwen/Qwen3.5-9B",
    "zai-org/GLM-5.3-Flash"
-  ],
-  "providers": [
-   "together",
-   "openrouter (zero data retention)"
-  ],
-  "note": null
+  ]
  },
  "try": 2,
  "settings": {
@@ -189,22 +184,7 @@
     },
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0.23,
-    "level": "low",
-    "parts": {
-     "progression": 0.5,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.457,
-    "hfCeiling": 0.645,
-    "flags": [
-     "darks first"
-    ],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "harness (no painting started in the session): no stops",
@@ -387,20 +367,7 @@
     },
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0,
-    "level": "low",
-    "parts": {
-     "progression": 0,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.38,
-    "hfCeiling": 0.645,
-    "flags": [],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "harness (no painting started in the session): no stops",
@@ -577,22 +544,7 @@
     "judgeErrors": null,
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0.23,
-    "level": "low",
-    "parts": {
-     "progression": 0.5,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.412,
-    "hfCeiling": 0.645,
-    "flags": [
-     "darks first"
-    ],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "harness (no painting started in the session): no stops",
@@ -646,12 +598,77 @@
     "feedbackNote": null,
     "linkedFrom": null
    }
-  }
- },
- "unpainted": {
+  },
   "south-france": {
+   "seed": 0,
+   "sheet": {
+    "W": 1216,
+    "H": 996,
+    "mmPerCell": 0.2303
+   },
+   "strokeLog": null,
+   "strokes": null,
+   "minutes": null,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.47,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 8.27,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 2.67,
+     "marks_texture": 2.33,
+     "classic_value": 5.99,
+     "classic_edge": 9.27,
+     "classic_landmark": null,
+     "classic_marks": 9.56
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeRoute": "openrouter",
+    "judgeProviders": {
+     "moonshotai/Kimi-K3": {
+      "Relace": 5
+     },
+     "zai-org/GLM-5.3-Flash": {
+      "Decart": 5
+     },
+     "Qwen/Qwen3.5-9B": {
+      "SiliconFlow": 3,
+      "Venice": 1,
+      "Together": 1
+     }
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 304,
+     "h": 249,
+     "from": [
+      1216,
+      996
+     ],
+     "resize": "Lanczos to the target`s native size"
+    }
+   },
+   "progression": null,
    "pipeline": {
-    "outcome": "render-failed",
+    "outcome": "painted",
     "paintedBy": "harness (no painting started in the session): no stops",
     "plan": "south-france-plan",
     "tokens": "region_w13_lay3_ink4_rec2x_rcl_sky3_leaf_sep8_cg13_vio_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_dwg200_tp2_shs",
@@ -698,14 +715,7 @@
     "droppedPassages": null,
     "paintExit": 3,
     "segments": 1,
-    "failure": {
-     "failures": [
-      {
-       "code": 4,
-       "reason": "options the plan chose were read by nothing: --foliagerefit"
-      }
-     ]
-    },
+    "failure": null,
     "renderRefusal": null,
     "renderRefusalReopened": null,
     "paintRestarts": 0,
@@ -714,9 +724,19 @@
     "selfReview": null,
     "selfReviewModelMinute": null,
     "feedbackNote": null,
-    "linkedFrom": null
-   }
-  },
+    "linkedFrom": null,
+    "warnings": [
+     {
+      "code": 4,
+      "reason": "options the plan chose were read by nothing: --foliagerefit"
+     }
+    ],
+    "recovered": "repainted after the run from its published final plan; the 0.1.0 verdict had thrown it away for unread settings (0.1.1)"
+   },
+   "cheatRisk": null
+  }
+ },
+ "unpainted": {
   "trumbull": {
    "pipeline": {
     "outcome": "plan-refused",
@@ -779,12 +799,9 @@
   "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
   "status": "scored",
   "composite": null,
-  "partialComposite": 5.23,
-  "cropsScored": 3,
-  "complete": false,
-  "compositeOld": null,
-  "partialCompositeOld": 4.4,
-  "note": "Rescored 2026-10-10 at the target's native size: the 1224 px render Lanczos-downscaled to the target crop's pixels, scored by bench-v3-median5 as V1-V3 paintings are. scoreOld is the earlier score of a 720 px upscale-path input."
+  "partialComposite": 5.29,
+  "cropsScored": 4,
+  "complete": false
  },
  "cheat": {
   "disqualified": false,

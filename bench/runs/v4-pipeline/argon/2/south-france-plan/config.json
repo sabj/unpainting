@@ -1,0 +1,87 @@
+{
+  "subject": "south-france",
+  "families": [
+    {
+      "id": "sunlit-terrace",
+      "bounds": [0.00, 0.00, 0.44, 0.48],
+      "note": "Sunlit warm yellow-ochre stone terrace walls, courtyard ground, and bright sandy paths on the upper-left hillside"
+    },
+    {
+      "id": "olive-canopy-light",
+      "bounds": [0.00, 0.22, 0.64, 0.92],
+      "note": "Warm yellow-green sunlit crowns of olive and deciduous trees across the left and central hillside"
+    },
+    {
+      "id": "village-walls-roofs",
+      "bounds": [0.38, 0.00, 0.96, 0.84],
+      "note": "Warm ochre, sienna, and terracotta tiled roofs and sunlit stone facades of the upper village and right-hand houses"
+    },
+    {
+      "id": "valley-and-shaded-stone",
+      "bounds": [0.64, 0.00, 1.00, 0.84],
+      "note": "Distant cool blue-green valley in the upper right and cool violet-taupe shaded stone house faces in the middle right"
+    },
+    {
+      "id": "foliage-mid-green",
+      "bounds": [0.00, 0.14, 1.00, 1.00],
+      "note": "Mid-tone sap and olive green foliage masses linking the terraced slopes and the foreground deciduous tree"
+    },
+    {
+      "id": "cypress-and-deep-shadows",
+      "bounds": [0.02, 0.00, 0.95, 1.00],
+      "note": "Deep blue-green cypress spires, dark tree trunks and branches, architectural window recesses, and deep foliage shadow crevices"
+    }
+  ],
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "Requested urban sketch, pen plus light wash style with waterproof black ink outlines and luminous sunlit washes",
+    "regions": {
+      "sunlit-terrace": {
+        "style": "precise-watercolor",
+        "reason": "Sunlit warm yellow-ochre stone terrace walls and courtyards need multi-layer warm washes so they read as golden stone rather than bare paper"
+      },
+      "olive-canopy-light": {
+        "style": "precise-watercolor",
+        "reason": "Sunlit yellow-green olive crowns build volume through layered warm-green washes"
+      },
+      "village-walls-roofs": {
+        "style": "precise-watercolor",
+        "reason": "Terracotta roofs and village facades build warm mid-tones and shadow glazes beneath the pen lines"
+      },
+      "valley-and-shaded-stone": {
+        "style": "precise-watercolor",
+        "reason": "Cool blue-green valley and shaded stone house faces require layered cool washes and shadow depth"
+      },
+      "foliage-mid-green": {
+        "style": "precise-watercolor",
+        "reason": "Mid-tone hillside olive and deciduous foliage requires progressive multi-layer wash modeling"
+      },
+      "cypress-and-deep-shadows": {
+        "style": "precise-watercolor",
+        "reason": "Deep cypress spires, dark tree trunks, and shadow crevices require full five-band shadow glaze depth"
+      }
+    }
+  },
+  "reserves": [
+    {
+      "id": "upper-terrace-glint",
+      "bounds": [0.068, 0.190, 0.084, 0.206],
+      "reason": "Bright sunlit upper-left terrace wall highlight kept crisp"
+    },
+    {
+      "id": "courtyard-sun-patch",
+      "bounds": [0.146, 0.250, 0.162, 0.266],
+      "reason": "Sun-struck courtyard ground highlight beside the terrace wall"
+    },
+    {
+      "id": "upper-path-crest",
+      "bounds": [0.275, 0.022, 0.291, 0.038],
+      "reason": "Bright sunlit stone path crest at top edge near the upper cypresses"
+    },
+    {
+      "id": "mid-slope-clearing-glint",
+      "bounds": [0.334, 0.396, 0.350, 0.412],
+      "reason": "Sunlit warm stone clearing glint in the central-left terraced slope"
+    }
+  ]
+}

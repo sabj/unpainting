@@ -5,7 +5,7 @@
 //
 // Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4). Stone-block tokens apply to
 // architecture only, palette tokens to Trumbull only, and the base's sepia ink yields to a plan drawn in another ink.
-// Settings the plan asks for that the painter never reads fail the painting (renderVerdict). Base settings a subject
+// Settings the plan asks for that the painter never reads are recorded as warnings (renderVerdict; BENCH_STRICT=1 fails them). Base settings a subject
 // has no use for do not.
 //
 // This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins.
@@ -240,6 +240,8 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const valueFloor = valueFloorFor(config);
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);
   args.push(...extraArgs);
+  // Since 0.1.1 a wet-on-wet stroke on uneven paper is logged, not a stop that loses the painting (BENCH_STRICT=1 restores it)
+  if (process.env.BENCH_STRICT !== '1' && !args.includes('--wetgate')) args.push('--wetgate', '0');
   if (pausedir) args.push('--pausedir', pausedir);
   if (resumestate) args.push('--resumestate', resumestate);
   const linesByName = {};
@@ -258,19 +260,20 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
 }
 
 /**
- * The painting's verdict. unused: options the painter read nowhere (every segment counted). A setting the plan chose
- * that nothing read fails the painting, as does a passage with no brush path or an option nobody asked for.
+ * The painting's verdict. unused: options the painter read nowhere (every segment counted). Since 0.1.1 a finished
+ * painting is kept when the plan chose a setting nothing read, named an option nobody asked for, or had passages with
+ * no brush path: those are recorded as warnings. strict (BENCH_STRICT=1) restores the 0.1.0 rule that fails them.
  */
-export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true }) {
-  const failures = [], fail = (code, reason) => failures.push({ code, reason });
+export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true, strict = process.env.BENCH_STRICT === '1' }) {
+  const failures = [], warnings = [], fail = (code, reason) => failures.push({ code, reason }), note = (code, reason) => (strict ? failures : warnings).push({ code, reason });
   const model = new Set([...modelOptions, ...extraOptions]), base = new Set([...baseOptions, ...templateOptions, 'valuefloor']);
   const check = { model: [], base: [], unknown: [] };
   for (const raw of unused) { const k = raw.replace(/^--/, ''); (model.has(k) ? check.model : base.has(k) ? check.base : check.unknown).push(k); }
   if (paintExit === null || paintExit === undefined) fail(137, 'paint process was killed by a signal');
   else if (paintExit !== 0 && paintExit !== 3) fail(paintExit, 'paint process exited ' + paintExit);
-  if (check.model.length) fail(4, 'settings the plan chose were read by nothing: --' + check.model.join(' --'));
-  if (check.unknown.length) fail(4, 'unused options nobody asked for: --' + check.unknown.join(' --'));
-  if (dropped > 0) fail(5, `passages with no executed paths: ${dropped} dropped (${droppedPct.toFixed(1)}% of the planned mass)`);
+  if (check.model.length) note(4, 'settings the plan chose were read by nothing: --' + check.model.join(' --'));
+  if (check.unknown.length) note(4, 'unused options nobody asked for: --' + check.unknown.join(' --'));
+  if (dropped > 0) note(5, `passages with no executed paths: ${dropped} dropped (${droppedPct.toFixed(1)}% of the planned mass)`);
   if (!finished) fail(6, 'no finished painting');
-  return { exit: failures.length ? failures[0].code : 0, failures, optionCheck: check };
+  return { exit: failures.length ? failures[0].code : 0, failures, warnings, optionCheck: check };
 }

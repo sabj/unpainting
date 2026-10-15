@@ -1,0 +1,44 @@
+{
+  "subject": "mittens",
+  "name": "Mittens Portrait Sketch (Ginger Cat on Left, Man on Right)",
+  "style": "watercolor portrait sketch, fine lines and light washes",
+  "styleSelection": null,
+  "families": [
+    {
+      "id": "paper_light_bg",
+      "descriptiveFamily": "open_paper_background",
+      "referenceCue": "Bright warm-white paper background around the cat and man; left largely unpainted as breathing room with soft wet-edge wash transitions.",
+      "baseMove": "wet on wet",
+      "bounds": [0.0, 0.0, 1.0, 1.0]
+    },
+    {
+      "id": "cat_ginger_coat",
+      "descriptiveFamily": "ginger_tabby_fur",
+      "referenceCue": "Luminous yellow-ochre and burnt-sienna washes across the cat's ears, forehead, bridge of nose, cheek, and lower body on the left half of the sheet, built in translucent layers over reserved white muzzle and chest.",
+      "baseMove": "wet on wet",
+      "bounds": [0.0, 0.0, 0.52, 1.0]
+    },
+    {
+      "id": "cat_eyes_and_muzzle",
+      "descriptiveFamily": "cat_facial_features",
+      "referenceCue": "Pale sap-green irises with vertical dark slit pupils, pink-sienna nose triangle, white muzzle pads, and vertical brow whisker strokes on the upper-left cat head.",
+      "baseMove": "wet on dry",
+      "bounds": [0.02, 0.12, 0.46, 0.58]
+    },
+    {
+      "id": "man_curly_dark_hair",
+      "descriptiveFamily": "dark_curly_hair_mass",
+      "referenceCue": "Loose sepia, Payne's grey, and ultramarine washes forming the dark curly hair mass on the upper-right head, with lively feathered edges and selective outer curl linework.",
+      "baseMove": "wet on dry",
+      "bounds": [0.48, 0.18, 0.99, 0.76]
+    },
+    {
+      "id": "man_warm_skin",
+      "descriptiveFamily": "portrait_skin_planes",
+      "referenceCue": "Soft warm ochre and burnt-sienna washes modeling the man's forehead, brows, eyes, nose, cheeks, and smiling lower face on the lower-right, with paper highlights preserved on the forehead and nose bridge.",
+      "baseMove": "wet on wet",
+      "bounds": [0.48, 0.42, 0.96, 1.0]
+    }
+  ],
+  "reserves": []
+}

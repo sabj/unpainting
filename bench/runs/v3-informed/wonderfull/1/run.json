@@ -1,0 +1,493 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "9b4294a4ad569a9446455109c85ce86e6561d312",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "wonderfull",
+  "name": "Muse Wonder Full",
+  "id": "muse-wonder-full-1.0",
+  "effort": "xhigh",
+  "runner": "muse"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 91.7,
+  "tokens": 13317644,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 574,
+   "minutes": 1.3,
+   "smallShare": 0,
+   "shortStrokes": 214,
+   "dotStrokes": 0,
+   "copyHF": 0.0219,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.58,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 6.83,
+    "criteria": {
+     "composition_values": 4,
+     "edges_detail": 2,
+     "marks_texture": 1.33,
+     "classic_value": 5.01,
+     "classic_edge": 6.6,
+     "classic_landmark": null,
+     "classic_marks": 8.89
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 1.5,
+     "100": 1
+    },
+    "earlyMean": 1.25,
+    "mean": 1.3,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "b": 4,
+     "c": 9,
+     "e": 1,
+     "m": 8,
+     "f": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence is the finished target being uncovered by scalloped rectangular mask blocks that fill in grid-like rows, with no drawn ink lines at any stage and the path plus all fine tree texture arriving complete only at 100%.",
+     "Qwen/Qwen3.5-9B": "The sequence shows digital block textures with stair-step edges rather than loose ink wash brushstrokes."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 21.4,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 568,
+   "minutes": 0.6,
+   "smallShare": 0.169,
+   "shortStrokes": 138,
+   "dotStrokes": 20,
+   "copyHF": -0.0274,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.08,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 6.17,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3,
+     "marks_texture": 5,
+     "classic_value": 3.93,
+     "classic_edge": 6.13,
+     "classic_landmark": null,
+     "classic_marks": 8.45
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 4,
+     "50": 3,
+     "75": 2,
+     "100": 5
+    },
+    "earlyMean": 4,
+    "mean": 3.6,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "m": 1,
+     "c": 3,
+     "b": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The underdrawing and early washes start plausibly, but the pen lines vanish, foliage arrives as uniform scalloped wash slabs, the buildings stay as flat red slabs at 75%, and nearly all fine detail (trunks, windows, cypresses, texture) dumps in at once at 100%."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 9.7,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 87,
+   "minutes": 12.2,
+   "smallShare": 0,
+   "shortStrokes": 23,
+   "dotStrokes": 2,
+   "copyHF": 0.0078,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.05,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 6.11,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3,
+     "marks_texture": 3.33,
+     "classic_value": 4.95,
+     "classic_edge": 4.53,
+     "classic_landmark": null,
+     "classic_marks": 8.85
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 2,
+     "50": 3,
+     "75": 2,
+     "100": 5
+    },
+    "earlyMean": 2.5,
+    "mean": 3,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "c": 2,
+     "h": 1,
+     "f": 2,
+     "a": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The hull sits as an unchanged flat slab from 10% to 25% and finished regions (green wash, anchor, dotted orange trails) pop in beside untouched areas, reading as a staged reveal rather than a brush building the picture, even though the final panel is a convincing watercolor."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 27.7,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "mittens": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 241,
+   "minutes": 2.3,
+   "smallShare": 0,
+   "shortStrokes": 68,
+   "dotStrokes": 10,
+   "copyHF": -0.0074,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.25,
+    "pm": 0.19,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 6.83,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 2.67,
+     "marks_texture": 4,
+     "classic_value": 4.39,
+     "classic_edge": 6.88,
+     "classic_landmark": null,
+     "classic_marks": 9.23
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 2.5,
+     "50": 2,
+     "75": 3.5,
+     "100": 5
+    },
+    "earlyMean": 3.75,
+    "mean": 3.6,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "c": 3,
+     "b": 2,
+     "k": 1,
+     "f": 3
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence follows a believable human order (contour sketch, then washes, then line detail), but the tabby's stripes arrive as flat vertical slabs and the hair lands early as a dark scalloped mass before the face is formed.",
+     "Qwen/Qwen3.5-9B": "The progression of adding elements is logical, but the flat, slab-like washes and abrupt appearances of color indicate digital generation rather than natural brushwork."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 9,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "trumbull": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 263,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "trumbull-strokes.jsonl.gz",
+   "strokes": 1120,
+   "minutes": 6.9,
+   "smallShare": 0.111,
+   "shortStrokes": 655,
+   "dotStrokes": 88,
+   "copyHF": -0.0115,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.54,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 6.09,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 2.67,
+     "marks_texture": 2.33,
+     "classic_value": 4,
+     "classic_edge": 5.49,
+     "classic_landmark": null,
+     "classic_marks": 8.77
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 5
+    },
+    "earlyMean": 3,
+    "mean": 3,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 3,
+     "c": 3,
+     "j": 1,
+     "h": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Only the faint pencil start and the finished image look hand-made; in between, flat scalloped slabs and unchanged floating gray blobs harden into the target like an automated region-fill rather than brush-and-pen decisions."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 20.6,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 4.9,
+  "partialComposite": null,
+  "cropsScored": 3,
+  "complete": true,
+  "extraTargets": [
+   "mittens",
+   "trumbull"
+  ]
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.28,
+   "level": "low",
+   "parts": {
+    "progression": 0.3,
+    "earlyStageMean": 2.9,
+    "copyHF": {
+     "hills": 0.0219,
+     "south-france": -0.0274,
+     "sargent": 0.0078,
+     "mittens": -0.0074,
+     "trumbull": -0.0115
+    },
+    "copy": 0.54,
+    "smallStrokeShare": 0.056,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.15,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/wonderfull/try-1",
+ "rerun": {
+  "crops": [
+   "mittens",
+   "trumbull"
+  ],
+  "reason": "Muse subscription quota ran out mid-round; these targets were rerun after the reset",
+  "commit": "9b4294a4ad569a9446455109c85ce86e6561d312"
+ }
+}

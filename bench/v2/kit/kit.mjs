@@ -32,7 +32,9 @@ import { attachGpu } from '../src/media/gpu/link.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROTOCOL = 'v2';
 export const BUDGET = 2500, MM = 0.259;
-export const TASKS = ['hills', 'south-france', 'sargent', 'trumbull'];
+// the targets of this run: the harness installs one coarse map per target in tasks/ next to the kit
+export const TASKS = fs.existsSync(path.join(HERE, 'tasks'))
+  ? fs.readdirSync(path.join(HERE, 'tasks')).filter(f => f.endsWith('-coarse.json')).map(f => f.slice(0, -'-coarse.json'.length)).sort() : [];
 export const BRUSH_PAINTS = ['ultramarine', 'cerulean', 'hansa', 'ochre', 'sienna', 'umber', 'rose', 'sapgreen'];
 export const INK = ['sepia', 'lampblack'];
 const KEYS = BOX.map(p => p.key);

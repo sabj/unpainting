@@ -1,0 +1,157 @@
+{
+  "subject": "mittens",
+  "name": "Mittens",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The target is a luminous watercolor portrait of a tabby cat and man built from pale warm washes, nested midtone planes, cross-region shadow glazes, and selective sepia line accents.",
+    "regions": {
+      "cat-ears-and-crown": {
+        "style": "precise-watercolor",
+        "reason": "The cat's ears and forehead tabby stripes require pale ochre/sienna base washes followed by nested midtone planes and dry dark ear-interior accents."
+      },
+      "cat-eyes-and-muzzle": {
+        "style": "precise-watercolor",
+        "reason": "The cat's luminous green eyes, terracotta nose leather, and reserved white muzzle require crisp dry-edge control around catchlights and eye rings."
+      },
+      "cat-cheek-and-neck-fur": {
+        "style": "precise-watercolor",
+        "reason": "Warm golden-ochre and burnt-sienna fur planes transition softly across the cheek and neck into the embrace shadow."
+      },
+      "cat-white-chest-and-whiskers": {
+        "style": "precise-watercolor",
+        "reason": "Most of the chest stays clean paper white with delicate warm-grey shadow planes and late closing whisker lines."
+      },
+      "human-dark-hair-crown": {
+        "style": "precise-watercolor",
+        "reason": "Keeping precise-watercolor on the hair ensures Band 1 stays a light wash while Bands 2-5 build the deep Payne's-grey and sepia mass without dumping pigment into Band 1 or creating a warm brown perimeter halo."
+      },
+      "human-forehead-and-brows": {
+        "style": "precise-watercolor",
+        "reason": "Broad warm flesh washes grade around the reserved forehead highlight into crisp dark eyebrows."
+      },
+      "human-eyes-and-nose": {
+        "style": "precise-watercolor",
+        "reason": "The downward-gazing eyes and nose bridge rely on controlled midtone planes, preserved lid catchlights, and late dark accents."
+      },
+      "human-cheeks-and-stubble": {
+        "style": "precise-watercolor",
+        "reason": "Warm sienna/ochre cheek planes transition into cool Payne's-grey and sepia lower-face beard shadow."
+      },
+      "human-moustache-and-mouth": {
+        "style": "precise-watercolor",
+        "reason": "Layered dark-brown and cool-grey washes build the moustache volume before closing ink defines the mouth crease."
+      },
+      "shared-embrace-transition": {
+        "style": "precise-watercolor",
+        "reason": "The core shadow where the cat's head rests against the man's temple is unified by cross-region Band 4 and Band 5 shadow glazes."
+      },
+      "right-shoulder-and-collar": {
+        "style": "precise-watercolor",
+        "reason": "Loose lower-edge washes fade naturally into the unpainted paper vignette."
+      },
+      "open-paper-vignette": {
+        "style": "precise-watercolor",
+        "reason": "Unpainted white paper margin framing the diagonal composition."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "cat-ears-and-crown",
+      "bounds": [0.0, 0.0, 0.46, 0.24],
+      "cue": "Warm sienna and ochre tabby ears with deep sepia/Payne's-grey inner ear hollows and pale ear-tuft highlights."
+    },
+    {
+      "id": "cat-eyes-and-muzzle",
+      "bounds": [0.01, 0.16, 0.38, 0.45],
+      "cue": "Round sap-green and ochre irises with reserved catchlights, dark pupil/lid rings, pink-terracotta nose, and white muzzle pads."
+    },
+    {
+      "id": "cat-cheek-and-neck-fur",
+      "bounds": [0.0, 0.34, 0.56, 0.72],
+      "cue": "Golden ochre, burnt sienna, and olive-brown tabby striping curving across the cheek and neck."
+    },
+    {
+      "id": "cat-white-chest-and-whiskers",
+      "bounds": [0.0, 0.36, 0.48, 0.85],
+      "cue": "Reserved paper-white chest and lower ruff with subtle warm-grey shadow planes."
+    },
+    {
+      "id": "human-dark-hair-crown",
+      "bounds": [0.44, 0.26, 0.99, 0.60],
+      "cue": "Rich neutral-cool dark hair mass built progressively from light foundation through midtone and deep Payne's-grey/sepia shadow glazes."
+    },
+    {
+      "id": "human-forehead-and-brows",
+      "bounds": [0.50, 0.48, 0.95, 0.72],
+      "cue": "Warm sienna-ochre forehead planes surrounding a bright reserved highlight above dark arched eyebrows."
+    },
+    {
+      "id": "human-eyes-and-nose",
+      "bounds": [0.54, 0.62, 0.92, 0.88],
+      "cue": "Downcast human eyes with upper-lid catchlights, dark lash lines, and a warm-shaded nose bridge and nostril wing."
+    },
+    {
+      "id": "human-cheeks-and-stubble",
+      "bounds": [0.45, 0.72, 0.96, 1.0],
+      "cue": "Warm cheek washes transitioning into cool-grey and sepia lower-face beard shadow."
+    },
+    {
+      "id": "human-moustache-and-mouth",
+      "bounds": [0.58, 0.84, 0.90, 1.0],
+      "cue": "Deep sepia and Payne's-grey moustache and lip crease."
+    },
+    {
+      "id": "shared-embrace-transition",
+      "bounds": [0.32, 0.44, 0.62, 0.98],
+      "cue": "Warm-to-cool core shadow uniting the cat's neck/back and the side of the man's face."
+    },
+    {
+      "id": "right-shoulder-and-collar",
+      "bounds": [0.18, 0.68, 0.58, 1.0],
+      "cue": "Soft lower-left wash transition along the cat's lower chest and man's shoulder."
+    },
+    {
+      "id": "open-paper-vignette",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "cue": "Unpainted white paper background in the upper-right and lower-left corners."
+    }
+  ],
+  "reserves": [
+    {
+      "id": "cat-left-eye-catchlight",
+      "bounds": [0.0605, 0.1935, 0.0730, 0.2003],
+      "reason": "preserve bright catchlight glint above cat left eye"
+    },
+    {
+      "id": "cat-right-eye-catchlight",
+      "bounds": [0.2570, 0.1780, 0.2663, 0.1849],
+      "reason": "preserve bright catchlight glint above cat right eye"
+    },
+    {
+      "id": "human-left-eye-catchlight",
+      "bounds": [0.6005, 0.6993, 0.6130, 0.7061],
+      "reason": "preserve bright catchlight highlight on human left upper eyelid"
+    },
+    {
+      "id": "human-right-eye-catchlight",
+      "bounds": [0.8070, 0.6607, 0.8230, 0.6675],
+      "reason": "preserve bright catchlight highlight on human right upper eyelid"
+    },
+    {
+      "id": "human-forehead-highlight",
+      "bounds": [0.650, 0.570, 0.740, 0.615],
+      "reason": "preserve brightest paper-white forehead highlight"
+    },
+    {
+      "id": "upper-right-margin-paper",
+      "bounds": [0.710, 0.000, 1.000, 0.140],
+      "reason": "preserve untouched white paper in upper right corner"
+    },
+    {
+      "id": "lower-left-margin-paper",
+      "bounds": [0.000, 0.860, 0.150, 1.000],
+      "reason": "preserve untouched white paper in lower left corner"
+    }
+  ]
+}

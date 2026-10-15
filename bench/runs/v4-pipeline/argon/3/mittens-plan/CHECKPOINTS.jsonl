@@ -1,0 +1,4 @@
+{"t":"2026-10-14T13:34:45.902Z","kind":"start","modelMinutes":42.45,"variant":"region_w13_lay3_noslane_cg11_dk11","stops":"every passage boundary"}
+{"t":"2026-10-14T13:35:24.639Z","kind":"look","modelMinutes":42.65,"n":1,"boundary":"0","strokes":0,"penLines":115,"passesDone":0,"passesPlanned":37}
+{"t":"2026-10-14T13:36:29.767Z","kind":"continue","modelMinutes":43.73,"boundary":"0","stopAt":6,"strokes":0}
+{"t":"2026-10-14T13:41:33.339Z","kind":"session-end","modelMinutes":48.74,"why":"the painting finished five minutes ago","looks":1,"revisions":0}

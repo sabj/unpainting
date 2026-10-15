@@ -1,0 +1,8 @@
+[
+  "--stoneirregular", "0",
+  "--litreserve", "99",
+  "--drawstroke", "0.35",
+  "--touchfamilies", "6",
+  "--touchmincells", "0.025",
+  "--touchdmin", "0.08"
+]

@@ -1,0 +1,161 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "crop": [
+    0,
+    0,
+    300,
+    263
+  ],
+  "width": 1200,
+  "sheetmm": 280,
+  "method": "light-to-dark",
+  "palette": "ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Trumbull College combines crisp gothic stone courses, slate roofs, a bright blue sky with cloud reserves, sunlit green foliage, and deep window and archway recesses; painted value planes with connected sky and foliage washes, per-stone warm mixes, two-pass recess darks, and selective sepia pen accents preserve both atmospheric freshness and architectural precision.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [
+        0.0,
+        0.0,
+        1.0,
+        0.38
+      ],
+      "referenceCue": "Connected cerulean-ultramarine upper sky with open paper-white cloud corridors.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.sun-main-gable",
+      "bounds": [
+        0.24,
+        0.04,
+        0.65,
+        0.92
+      ],
+      "referenceCue": "Broad warm ochre and raw sienna central gothic gable with sunlit stone trim and pointed window recesses.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.cool-main-return",
+      "bounds": [
+        0.0,
+        0.10,
+        0.28,
+        0.92
+      ],
+      "referenceCue": "Left chimney and shaded stone return wall separated by cool violet-blue shadow glazes.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.right-stone-wing",
+      "bounds": [
+        0.74,
+        0.16,
+        1.0,
+        0.90
+      ],
+      "referenceCue": "Right stone wing and chimney behind the foreground tree crown.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "bounds": [
+        0.0,
+        0.24,
+        0.94,
+        0.48
+      ],
+      "referenceCue": "Connected cool slate roof slopes and dormers flanking the central gable.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.tree-foliage",
+      "bounds": [
+        0.54,
+        0.34,
+        0.85,
+        0.84
+      ],
+      "referenceCue": "Sunlit hansa-sap green deciduous crown transitioning to deeper cool green lower shadow clusters.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.dark-banner",
+      "bounds": [
+        0.49,
+        0.55,
+        0.60,
+        0.95
+      ],
+      "referenceCue": "Deep blue-black banner and street standard anchoring the lower right of the central gable.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.opening-sidewalk",
+      "bounds": [
+        0.0,
+        0.84,
+        1.0,
+        1.0
+      ],
+      "referenceCue": "Arched entrance recess, warm sunlit sidewalk plane, and crisp highlight glints.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "id": "Y1.cloud-upper-right",
+      "bounds": [
+        0.935,
+        0.030,
+        0.958,
+        0.054
+      ],
+      "reason": "Bright paper-white cloud highlight in the upper right sky."
+    },
+    {
+      "id": "Y1.cloud-gable-right",
+      "bounds": [
+        0.642,
+        0.148,
+        0.686,
+        0.178
+      ],
+      "reason": "Open paper-white cloud corridor immediately right of the central gable peak."
+    },
+    {
+      "id": "Y1.cloud-upper-left",
+      "bounds": [
+        0.107,
+        0.099,
+        0.127,
+        0.122
+      ],
+      "reason": "Bright sky highlight to the left of the left chimney."
+    },
+    {
+      "id": "Y1.gable-window-trim",
+      "bounds": [
+        0.428,
+        0.365,
+        0.446,
+        0.380
+      ],
+      "reason": "Sunlit pale stone highlight on the central gable window surround."
+    },
+    {
+      "id": "Y1.sidewalk-glint",
+      "bounds": [
+        0.476,
+        0.935,
+        0.504,
+        0.951
+      ],
+      "reason": "Bright sunlit sidewalk highlight below the main entrance arch."
+    }
+  ]
+}

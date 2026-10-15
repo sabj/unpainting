@@ -1,0 +1,66 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0.0, 0.0, 1.0, 0.42],
+      "referenceCue": "Upper sky dome across the frame, cobalt/ultramarine wash grading into the bright cloud bank upper right and left behind the gables",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.sun-main-gable",
+      "bounds": [0.18, 0.14, 0.62, 0.88],
+      "referenceCue": "Central sunlit warm yellow-ochre and raw-sienna ashlar stone facade and main pediment gable",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.cool-main-return",
+      "bounds": [0.0, 0.14, 0.24, 0.85],
+      "referenceCue": "Left chimney stack and shadow-angled stone return wall in cooler neutral-warm stone",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "bounds": [0.12, 0.1, 0.96, 0.52],
+      "referenceCue": "Steep blue-grey slate roof slopes, dormers, and chimney caps",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.right-wing-and-chimney",
+      "bounds": [0.58, 0.2, 1.0, 0.88],
+      "referenceCue": "Right stone wing, chimney stack, and warm sunlit wall plane",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.foliage-trees",
+      "bounds": [0.5, 0.6, 0.86, 0.9],
+      "referenceCue": "Sunlit yellow-green deciduous tree crown in front of the lower connecting wall",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.left-foliage-and-sign",
+      "bounds": [0.0, 0.48, 0.26, 0.92],
+      "referenceCue": "Lower-left deep green foliage mass, traffic signal, and blue street sign",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.opening-sidewalk",
+      "bounds": [0.0, 0.84, 1.0, 1.0],
+      "referenceCue": "Pale sunlit foreground pavement, curb shadow, and small pedestrian figures at the base",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "id": "Y1.cloud-bright-core",
+      "bounds": [0.78, 0.15, 0.83, 0.2],
+      "reason": "Preserve untouched paper white in the brightest sunlit cumulus cloud crest above the right gable."
+    }
+  ],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sunlit collegiate Gothic stone architecture with crisp masonry edges, multi-layered warm ochre/raw-sienna stone washes, deep arched window recesses, and structural sepia pen work requires precise-watercolor.",
+    "regions": {}
+  }
+}
