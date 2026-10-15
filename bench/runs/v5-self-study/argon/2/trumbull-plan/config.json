@@ -1,0 +1,54 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "image": "bench/plan/target.png",
+  "reserves": [],
+  "families": [
+    {
+      "name": "sky",
+      "bounds": [0, 0, 1, 0.52],
+      "style": "precise-watercolor",
+      "reason": "Cobalt/cerulean and French ultramarine upper sky graded down to reserved cloud whites without artificial rectangular holes."
+    },
+    {
+      "name": "building",
+      "bounds": [0.02, 0.08, 0.98, 0.76],
+      "style": "precise-watercolor",
+      "reason": "Sunlit Collegiate Gothic stone facade, gables, chimneys, and roof slates with crisp ultramarine + burnt sienna cast shadows and architectural ink."
+    },
+    {
+      "name": "foliage",
+      "bounds": [0, 0.20, 1, 0.78],
+      "style": "precise-watercolor",
+      "reason": "Left, center-left, and right deciduous tree masses built from hansa yellow, yellow ochre, and ultramarine greens."
+    },
+    {
+      "name": "ground",
+      "bounds": [0, 0.65, 1, 1],
+      "style": "precise-watercolor",
+      "reason": "Sunlit foreground lawn and path swept by horizontal tree and building cast shadows."
+    }
+  ],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Architectural watercolor requiring crisp dry-paper glazes, clean sunlit stone washes, and registered pen-and-ink articulation.",
+    "regions": {
+      "sky": {
+        "style": "precise-watercolor",
+        "reason": "Smooth wet-in-wet sky wash preserving soft cloud reserves."
+      },
+      "building": {
+        "style": "precise-watercolor",
+        "reason": "Sharp architectural edges, clean ochre/sienna stone washes, and fine Gothic window tracery."
+      },
+      "foliage": {
+        "style": "precise-watercolor",
+        "reason": "Layered foliage masses with directional dry-brush canopy texture."
+      },
+      "ground": {
+        "style": "precise-watercolor",
+        "reason": "Warm sunlit turf crossed by coherent horizontal cast shadows."
+      }
+    }
+  }
+}

@@ -37,7 +37,7 @@ const model = DRY ? { key: 'dry-run', name: 'Scripted dry run', id: 'scripts/dry
   : models.find(m => m.key === opt('model')) || fail(`--model must be one of ${models.map(m => m.key).join(', ')}`);
 
 const cropSpecs = Object.fromEntries(loadCrops().map(c => [c.task, c]));
-const crops = (opt('crops') ? opt('crops').split(',') : PUBLIC_CROPS).map(s => s.trim()).filter(Boolean);
+const crops = (opt('crops') ? opt('crops').split(',') : round.targets ?? PUBLIC_CROPS).map(s => s.trim()).filter(Boolean);
 const PRIVATE = process.env.BENCH_PRIVATE_CROPS ? path.resolve(process.env.BENCH_PRIVATE_CROPS) : null;
 for (const c of crops) {
   if (!CROP_ORDER.includes(c)) fail(`unknown crop ${c}`);
@@ -60,8 +60,19 @@ if (MULTI) {
   if (!Number.isInteger(tries) || tries < 1 || tries > 9) fail('--tries must be an integer from 1 to 9');
   if (!DRY && round.id === 'V5' && !process.env.TOGETHER_API_KEY) fail('V5 scores each try for the next one\'s feedback: set TOGETHER_API_KEY (the judges run on Together)');
   // --dry-width: the painting width of a dry run (default 96 px; the real widths are in v4v5/subjects.json)
-  // --strict-verdict (V4, V5): unread settings and dropped passages fail a finished painting, as in the 0.1 results
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), strictVerdict: has('strict-verdict') };
+  // --from-try: V4 and V5 start at this try (V4 tries are independent, so one damaged try can be rerun alone with --from-try n --tries n)
+  let fromTry = Number(opt('from-try', 1));
+  if (!Number.isInteger(fromTry) || fromTry < 1 || fromTry > tries) fail('--from-try must be an integer from 1 to --tries');
+  if (fromTry > 1 && round.id === 'V3') fail('--from-try applies to V4 and V5; V3 runs every target through all its attempts');
+  // --link-v4-try1 (V5 only, off by default): reuse V4 try 1 as V5 try 1 and run from try 2, as the published models were
+  if (has('link-v4-try1')) {
+    if (round.id !== 'V5' || fromTry !== 1) fail('--link-v4-try1 applies to V5 from try 1');
+    const { linkV4Try1 } = await import('./pipeline/link-v4.mjs');
+    try { linkV4Try1({ outRoot, modelKey: model.key }); } catch (e) { fail(e.message); }
+    console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
+    fromTry = 2;
+  }
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict') };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);

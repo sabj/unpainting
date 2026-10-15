@@ -115,7 +115,7 @@ Each `crops.<crop>` entry:
 | `renderRefusal`, `renderRefusalReopened`, `paintRestarts`, `machineLost` | imported tries: why the painter first refused the plan and whether the model got a repair turn, painter restarts, and cloud machines lost mid-painting |
 | `feedbackNote`, `linkedFrom` | imported tries: a note on the feedback a V5 try got, and for V4 try 1 the V5 try 1 session it shares |
 
-The V4 and V5 tries in `runs/` were painted by an earlier harness on cloud GPUs and imported with `scripts/import-aware.mjs`. Their records add `crops.<crop>.cheatRisk` (the painter's own cheat-risk record; the try's `cheat.risk` is the highest painting), `strokesBasis` (their stroke counts include pen lines), `judgeProviders` in `score` and `progression` (judge calls routed through OpenRouter, by provider; any other call went to Together) and `evaluators.providers`. Their stroke logs are not published (`strokeLog` is null).
+The 0.1.0 V4 and V5 tries in `runs/` were painted by an earlier harness on cloud GPUs and imported with `scripts/import-aware.mjs`. The 0.1.1 Gemini 4 Argon tries were painted locally by `scripts/run.mjs` (`settings.machine: "local"`). Their records add `crops.<crop>.cheatRisk` (the painter's own cheat-risk record; the try's `cheat.risk` is the highest painting), `strokesBasis` (their stroke counts include pen lines), `judgeProviders` in `score` and `progression` (judge calls routed through OpenRouter, by provider; any other call went to Together) and `evaluators.providers`. Their stroke logs are not published (`strokeLog` is null).
 
 `score` for the try:
 

@@ -36,7 +36,7 @@ Paint each target as a person with a brush and pen would, using only the simulat
 
 ## Disqualification
 
-A try is disqualified only for reading target pixels: a blocked read in the guard log, or a script that names the target files or the guard. No published try was disqualified. A high cheat-risk score is not a disqualification; see [anti-cheat.md](anti-cheat.md).
+A try is disqualified only for reading target pixels: a blocked read in the guard log, or a script that names the target files or the guard. One published try was disqualified: Gemini 4 Argon (Medium) V3 try 2, for one blocked target read. A high cheat-risk score is not a disqualification; see [anti-cheat.md](anti-cheat.md).
 
 ## Modes
 

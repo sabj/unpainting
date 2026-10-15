@@ -1,0 +1,50 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Pure watercolor with no ink: broad warm-cream and cool-cerulean value planes carry the curved ship hulls, spars, anchor, and harbor reflections through layered wet-on-dry washes and late dark glazes."
+  },
+  "families": [
+    {
+      "id": "sargent.lit-hull",
+      "bounds": [0.58, 0.0, 1.0, 0.64],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit white hull flank on the right: warm cream paper carries the lit planes while pale cool blue-grey diagonal rigging shadows and crisp dark hawsehole accents sit wet-on-dry over the dry ground."
+    },
+    {
+      "id": "sargent.shadow-hull",
+      "bounds": [0.26, 0.0, 0.72, 0.88],
+      "baseMove": "wet on dry",
+      "referenceCue": "Curving central bow in cool blue-violet and cerulean shadow, graded down to a deeper slate-blue waterline band with a dark port accent and warm sienna-ochre trim along the bow curve."
+    },
+    {
+      "id": "sargent.rigging-and-anchor",
+      "bounds": [0.0, 0.0, 0.36, 0.88],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left-side spars, rigging, and hanging anchor: warm ochre and sienna timber diagonals and reserved pale anchor flukes set against cool blue-grey shadow planes."
+    },
+    {
+      "id": "sargent.hull-shadow-waterline",
+      "bounds": [0.24, 0.72, 0.68, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Deepest umber-ultramarine shadow under the bow and its dark reflections across the lower-center water, built in late dark glazes over the dried underwash."
+    },
+    {
+      "id": "sargent.harbor-water-and-rope",
+      "bounds": [0.60, 0.60, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Lower-right turquoise-green harbor water with broken pale warm ripples, crossed by the diagonal burnt-sienna and ochre mooring line dropping from the right hull into the water."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Brightest sunlit cream hull gleam below the upper rigging cast shadow",
+      "bounds": [0.715, 0.250, 0.745, 0.285]
+    },
+    {
+      "reason": "Upper sunlit cream hull highlight plane on the starboard flank",
+      "bounds": [0.725, 0.125, 0.755, 0.160]
+    }
+  ]
+}

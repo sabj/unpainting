@@ -21,7 +21,7 @@ J2 profiles change only the sampling budget: lite is 1 valid call per judge, sta
 Every profile keeps the same three judges and strict full-image retries. Results record the profile, requested and
 valid call counts, valid samples and attempts. A single call per judge leaves repeatability unmeasured, not zero.
 
-Uses OPENROUTER_API_KEY with zero-data-retention providers when available, otherwise TOGETHER_API_KEY. --no-vision runs the classic part only and needs no key.
+JUDGE_ROUTE explicitly selects together (default) or openrouter (zero-data-retention providers). Each result records the route and serving providers. --no-vision runs the classic part only and needs no key.
 """
 import argparse, base64, io, json, math, os, re, sys, time, urllib.error, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -34,7 +34,10 @@ import classic  # noqa: E402
 from common import Pair, load_rgb  # noqa: E402
 
 RUBRIC_VERSION = "bench-v3-median5"
-PROVIDER = "openrouter" if os.environ.get("OPENROUTER_API_KEY") else "together"
+PROVIDER = os.environ.get("JUDGE_ROUTE", "together")
+if PROVIDER not in ("together", "openrouter"):
+    sys.exit(f"JUDGE_ROUTE must be together or openrouter, not {PROVIDER}")
+KEY = {"together": "TOGETHER_API_KEY", "openrouter": "OPENROUTER_API_KEY"}[PROVIDER]
 URL = "https://openrouter.ai/api/v1/chat/completions" if PROVIDER == "openrouter" else "https://api.together.xyz/v1/chat/completions"
 ROUTER_MODELS = {"moonshotai/Kimi-K3":"moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash":"z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B":"qwen/qwen3.5-9b"}
 JUDGES = ["moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B"]
@@ -126,12 +129,12 @@ def _post(model, messages, max_tokens=8000, timeout=150, retries=3):
     if PROVIDER == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny", "ignore": ["Hyperbolic"]}
     body = json.dumps(payload).encode()
-    hdr = {"Authorization": "Bearer " + os.environ["OPENROUTER_API_KEY" if PROVIDER == "openrouter" else "TOGETHER_API_KEY"], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
+    hdr = {"Authorization": "Bearer " + os.environ[KEY], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
     for i in range(retries):
         try:
             o = json.load(urllib.request.urlopen(urllib.request.Request(URL, body, hdr), timeout=timeout))
-            return o["choices"][0]["message"].get("content") or "", o.get("usage", {})
+            return o["choices"][0]["message"].get("content") or "", {**o.get("usage", {}), "provider": o.get("provider") or PROVIDER}
         except urllib.error.HTTPError as e:
             last = f"HTTP {e.code} {e.read().decode('utf8', 'replace')[:120]}"
             if e.code not in (408, 409, 429, 500, 502, 503, 504):
@@ -169,14 +172,14 @@ def ask(model, content):
         if attempt == 1 and raw:
             msgs = [{"role": "user", "content": "Rewrite the text below as valid JSON only, exactly this shape: " + SHAPE + "\n\n" + raw[-3000:]}]
         try:
-            raw, _ = _post(model, msgs, max_tokens=8000 if attempt != 1 else 1500)
+            raw, usage = _post(model, msgs, max_tokens=8000 if attempt != 1 else 1500)
         except RuntimeError:
             if attempt == 2:
                 raise
             continue
         d = _parse(raw)
         if d:
-            return d
+            return {**d, "_provider": usage.get("provider", PROVIDER)}
     raise RuntimeError("no valid JSON after 3 attempts")
 
 
@@ -186,7 +189,7 @@ def _post_j2(model, messages, max_tokens=J2_MAX_TOKENS, timeout=150, retries=3, 
     if PROVIDER == "openrouter":
         payload["provider"] = {"zdr": True, "data_collection": "deny", "ignore": ["Hyperbolic"]}
     body = json.dumps(payload).encode()
-    hdr = {"Authorization": "Bearer " + os.environ["OPENROUTER_API_KEY" if PROVIDER == "openrouter" else "TOGETHER_API_KEY"], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
+    hdr = {"Authorization": "Bearer " + os.environ[KEY], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     log = [] if log is None else log
     last = None
     for i in range(retries):
@@ -194,7 +197,8 @@ def _post_j2(model, messages, max_tokens=J2_MAX_TOKENS, timeout=150, retries=3, 
             o = json.load(urllib.request.urlopen(urllib.request.Request(URL, body, hdr), timeout=timeout))
             ch, u = (o.get("choices") or [{}])[0], o.get("usage", {})
             log.append({"status": 200, "finish_reason": ch.get("finish_reason"), "maxTokens": max_tokens,
-                        "completionTokens": u.get("completion_tokens")})
+                        "completionTokens": u.get("completion_tokens"), "provider": o.get("provider") or PROVIDER,
+                        "promptTokens": u.get("prompt_tokens"), "costUSD": u.get("cost")})
             if "message" in ch:
                 return ch["message"].get("content") or "", u, ch.get("finish_reason")
             last = "reply without choices"
@@ -218,7 +222,7 @@ def ask_j2(model, content, log=None):
     for attempt in range(1, J2_ATTEMPTS + 1):
         tries = []
         try:
-            raw, _, finish = _post_j2(model, [{"role": "user", "content": content}], max_tokens=budget, log=tries)
+            raw, usage, finish = _post_j2(model, [{"role": "user", "content": content}], max_tokens=budget, log=tries)
         except RuntimeError as e:
             why = str(e)
             continue
@@ -230,7 +234,8 @@ def ask_j2(model, content, log=None):
             continue
         d = _parse(raw)
         if d:
-            return d
+            provider = next((a.get("provider") for a in reversed(tries) if a.get("provider")), PROVIDER)
+            return {**d, "_provider": provider}
         why = f"no valid JSON (finish_reason {finish})"
     raise RuntimeError(f"{why} after {J2_ATTEMPTS} attempts")
 
@@ -249,7 +254,8 @@ def _aggregate(calls, errors, min_valid):
             ov = [d["overall"] for d in ds]
             per[m] = {"overall": round(med(ov), 2), **{c: round(med([d[c] for d in ds]), 2) for c in VCRIT},
                       "calls": len(ds), "sd": round(float(np.std(ov)), 3) if len(ds) > 1 else None}
-    out = {"per_judge": per, "errors": {m: e for m, e in errors.items() if e}, "complete": len(per) == len(JUDGES),
+    providers = {m: {p: sum(d.get("_provider") == p for d in ds) for p in set(d.get("_provider") for d in ds) if p} for m, ds in calls.items()}
+    out = {"providers": providers, "per_judge": per, "errors": {m: e for m, e in errors.items() if e}, "complete": len(per) == len(JUDGES),
            "callCounts": {m: len(ds) for m, ds in calls.items()}, "minValidCalls": min_valid}
     if out["complete"]:
         out["overall"] = round(_mean([r["overall"] for r in per.values()]), 2)
@@ -330,7 +336,8 @@ def score(target, image, style, vision=True, judge=None, profile=None):
         **({"visionAttempts": vi["attempts"]} if "attempts" in vi else {}),
         **({"visionSamples": vi.get("samples", {})} if judge == "J2" else {}),
         "rubric": RUBRIC_VERSION,
-        "judgeVersion": judge, "provider": PROVIDER,
+        "judgeVersion": judge, "provider": PROVIDER, "judgeRoute": PROVIDER if vision else None,
+        **({"judgeProviders": vi.get("providers", {})} if vision and PROVIDER == "openrouter" else {}),
         "judgeProfile": sampling["profile"],
         "sampling": {"judges": list(JUDGES), "requestedCallsPerJudge": sampling["calls"],
                      "requiredValidCallsPerJudge": sampling["minValid"], "aggregation": "mean of per-judge medians"},
@@ -351,8 +358,8 @@ def main():
         sampling_plan(a.judge, a.profile)
     except ValueError as e:
         ap.error(str(e))
-    if not a.no_vision and not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("TOGETHER_API_KEY")):
-        sys.exit("Neither OPENROUTER_API_KEY nor TOGETHER_API_KEY is set; pass --no-vision for the classic part only")
+    if not a.no_vision and not os.environ.get(KEY):
+        sys.exit(f"{KEY} is not set (JUDGE_ROUTE={PROVIDER}); pass --no-vision for the classic part only")
     r = score(a.target, a.image, a.style, not a.no_vision, a.judge, a.profile)
     s = json.dumps(r, indent=1)
     if a.out:

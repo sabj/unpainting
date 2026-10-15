@@ -237,6 +237,8 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const valueFloor = valueFloorFor(config);
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);
   args.push(...extraArgs);
+  // Since 0.1.1 a wet-on-wet stroke on uneven paper is logged, not a stop that loses the painting (tag v0.1.0 has the old rule)
+  if (!args.includes('--wetgate')) args.push('--wetgate', '0');
   if (pausedir) args.push('--pausedir', pausedir);
   if (resumestate) args.push('--resumestate', resumestate);
   const linesByName = {};

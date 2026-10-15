@@ -8,7 +8,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { BENCH, RUN_SCHEMA, VERSION_STAMP, V2, BUDGET, readJson, writeJson, validateRun, posix, loadCrops, auditScripts } from './lib.mjs';
-import { turnCommand, codexThread, usage } from './runners.mjs';
+import { turnCommand, codexThread, agyConversation, usage } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './pipeline/harness.mjs';
 
@@ -69,7 +69,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
   const { ws, cleanup } = makeWorktree();
   const p = readJson(path.join(V3, 'prompts.json'));
   const attempts = [], res = { crop, attempts, tokens: 0, costUSD: 0, done: null };
-  const sessionId = model.runner === 'claude' ? crypto.randomUUID() : null;
+  const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
   let thread = null;
   try {
     seed({ ws, crop, spec, view, tries, dry });
@@ -85,6 +85,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
       console.error(`bench:run: ${model.name}, V3, ${crop}, attempt ${n} of up to ${tries}${dry ? ' (dry run)' : ''}`);
       const turn = await runTurn(c, { cwd: ws, env, events, stderr, capMs: ATTEMPT_MIN * 60000 });
       if (model.runner === 'codex' && !thread) thread = codexThread(events);
+      if (model.runner === 'agy' && !thread) thread = agyConversation(events);
       const u = dry ? { tokens: null, costUSD: null } : usage(model.runner, events);
       res.tokens += u.tokens || 0; res.costUSD += u.costUSD || 0;
       if (n > 1 && fs.existsSync(path.join(ws, 'bench', 'DONE'))) { res.done = { before: n, reason: fs.readFileSync(path.join(ws, 'bench', 'DONE'), 'utf8').trim().slice(0, 400), min: minutes(turn.seconds) }; break; }
@@ -95,7 +96,7 @@ async function session({ model, crop, spec, tries, rawTry, dry }) {
       if (!dry && !sessionId && !thread && model.runner !== 'together') { console.error('bench:run: no session id; the session cannot be resumed, so it stops here'); break; }
       prompt = fill(p.next, { PREV: n, N: n + 1, OF: tries === 2 ? tries : `up to ${tries}`, STROKES: a.stats?.strokes ?? 'no', MIN: a.min }) + (tries === 2 ? '' : p.done);
       // Attach the comparison when supported; otherwise the runner opens it from disk.
-      image = model.runner === 'codex' ? path.join(ws, 'bench', 'attempts', `a${n}`, 'compare.png') : model.runner === 'together' ? view : null;
+      image = ['codex', 'muse', 'agy'].includes(model.runner) ? path.join(ws, 'bench', 'attempts', `a${n}`, 'compare.png') : model.runner === 'together' ? view : null;
       if (image && !fs.existsSync(image)) image = null;
     }
   } finally {

@@ -1,0 +1,12 @@
+{"t":"2026-10-14T12:12:40.594Z","kind":"start","modelMinutes":20.61,"variant":"region_w13_acc8_dp85_dg2_dk14","stops":"every passage boundary"}
+{"t":"2026-10-14T12:15:03.117Z","kind":"continue","modelMinutes":22.5,"boundary":"0","stopAt":15,"strokes":0}
+{"t":"2026-10-14T12:17:17.719Z","kind":"look","modelMinutes":22.92,"n":1,"boundary":"15","strokes":1473,"penLines":0,"passesDone":15,"passesPlanned":95}
+{"t":"2026-10-14T12:17:34.667Z","kind":"continue","modelMinutes":23.2,"boundary":"15","stopAt":67,"strokes":1473}
+{"t":"2026-10-14T12:24:07.204Z","kind":"look","modelMinutes":23.77,"n":2,"boundary":"67","strokes":5870,"penLines":0,"passesDone":67,"passesPlanned":95}
+{"t":"2026-10-14T12:24:22.153Z","kind":"continue","modelMinutes":24.02,"boundary":"67","stopAt":"closing","strokes":5870}
+{"t":"2026-10-14T12:30:45.195Z","kind":"look","modelMinutes":26.21,"n":3,"boundary":"closing","strokes":11412,"penLines":0,"passesDone":108,"passesPlanned":108}
+{"t":"2026-10-14T12:37:53.633Z","kind":"revise-refused","modelMinutes":31.83,"boundary":"closing","strokes":11412,"changed":["config.json","extra-args.json","variant.txt"],"reasons":["palette change"],"palette":{"now":{"palette":["cerulean blue","quinacridone rose","hansa yellow","French ultramarine","Payne's grey","French ultramarine, granulating, for the sky"],"inks":["graphite=graphite HB","ink=sepia ink"]},"revised":{"palette":["hansa yellow","phthalo blue","quinacridone rose","sap green","French ultramarine","Payne's grey","French ultramarine, granulating, for the sky"],"inks":["graphite=graphite HB","ink=sepia ink"]}}}
+{"t":"2026-10-14T12:40:33.200Z","kind":"revise","modelMinutes":33.4,"boundary":"closing","revision":1,"strokes":11412,"passesDone":108,"changed":["config.json","extra-args.json","variant.txt"],"variant":"region_w13_rg0_acc8_dp85_dg2_dk14"}
+{"t":"2026-10-14T12:43:24.342Z","kind":"finished","modelMinutes":34.33,"strokes":11412}
+{"t":"2026-10-14T12:43:35.462Z","kind":"look","modelMinutes":34.51,"n":4,"boundary":"final"}
+{"t":"2026-10-14T12:45:26.491Z","kind":"session-end","modelMinutes":36.36,"why":"the session ended","looks":4,"revisions":1}

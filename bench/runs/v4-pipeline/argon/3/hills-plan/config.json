@@ -1,0 +1,130 @@
+{
+  "subject": "hills",
+  "name": "Hills — Loose Ink and Wash",
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Full 5-band light-to-dark value ladder with multi-layer middle washes and connected shadow glazes, paired with loose structural opening ink and crisp closing ink accents.",
+    "regions": {
+      "sunlit-winding-trail": {
+        "style": "precise-watercolor",
+        "reason": "Hold bare sunlit paper core along the winding dirt path with warm yellow-ochre and pale olive transitions at the grass verges."
+      },
+      "upper-right-grass-slope": {
+        "style": "precise-watercolor",
+        "reason": "Broad sunlit yellow-green hillside wash graded from bright hansa-yellow crest into sap-green midtones."
+      },
+      "upper-left-grass-meadow": {
+        "style": "precise-watercolor",
+        "reason": "Warm sunlit green slope flanking the upper bend of the trail."
+      },
+      "lower-center-grass-slope": {
+        "style": "precise-watercolor",
+        "reason": "Broad sunlit lower hillside sweeping across the foreground beside the winding path."
+      },
+      "top-left-oak-wood": {
+        "style": "precise-watercolor",
+        "reason": "Rounded oak crowns and deep cool slate-olive shadow recesses at the upper left."
+      },
+      "central-overarching-oaks": {
+        "style": "precise-watercolor",
+        "reason": "Billowy oak canopy overarching the middle bend of the trail with warm olive midtones and dark branch recesses."
+      },
+      "diagonal-wooded-ravine": {
+        "style": "precise-watercolor",
+        "reason": "Dense diagonal belt of oak trees and cool blue-slate shadow masses descending from upper center to right-center."
+      },
+      "left-foreground-woods": {
+        "style": "precise-watercolor",
+        "reason": "Deep layered foliage and cool shadow glazes framing the left edge of the trail."
+      },
+      "lower-right-tree-cluster": {
+        "style": "precise-watercolor",
+        "reason": "Dark foliage mass and shadow accents anchoring the lower-right corner."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "top-left-oak-wood",
+      "referenceCue": "Upper-left grove of rounded oak crowns with dark cool-grey and olive shadow hollows.",
+      "baseMove": "wet on dry",
+      "bounds": [0.0, 0.0, 0.45, 0.35]
+    },
+    {
+      "id": "upper-left-grass-meadow",
+      "referenceCue": "Sunlit yellow-green grassy bank between the upper-left woods and the upper trail bend.",
+      "baseMove": "wet on dry",
+      "bounds": [0.0, 0.12, 0.48, 0.55]
+    },
+    {
+      "id": "lower-right-tree-cluster",
+      "referenceCue": "Lower-right cluster of dark oak foliage and shadow accents framing the bottom of the meadow.",
+      "baseMove": "wet on dry",
+      "bounds": [0.72, 0.55, 1.0, 1.0]
+    },
+    {
+      "id": "diagonal-wooded-ravine",
+      "referenceCue": "Broad diagonal mass of oak canopies and deep cool blue-slate shadow recesses across the upper-middle and right.",
+      "baseMove": "wet on dry",
+      "bounds": [0.32, 0.0, 1.0, 0.72]
+    },
+    {
+      "id": "left-foreground-woods",
+      "referenceCue": "Left-side and central wooded slope with dark olive, warm umber, and cool slate-blue shadow glazes.",
+      "baseMove": "wet on dry",
+      "bounds": [0.0, 0.35, 0.55, 1.0]
+    },
+    {
+      "id": "central-overarching-oaks",
+      "referenceCue": "Central billowy oak canopy above the trail bend with warm olive-green foliage planes and dark branch recesses.",
+      "baseMove": "wet on dry",
+      "bounds": [0.18, 0.15, 0.85, 0.78]
+    },
+    {
+      "id": "sunlit-winding-trail",
+      "referenceCue": "Sunlit cream and warm ochre-olive trail verges and grassy transition along the winding dirt path.",
+      "baseMove": "wet on dry",
+      "bounds": [0.15, 0.02, 0.78, 0.98]
+    },
+    {
+      "id": "upper-right-grass-slope",
+      "referenceCue": "Bright sunlit yellow-green hillside on the upper-right and middle slope, graded smoothly toward the tree line.",
+      "baseMove": "wet on dry",
+      "bounds": [0.52, 0.0, 1.0, 0.52]
+    },
+    {
+      "id": "lower-center-grass-slope",
+      "referenceCue": "Broad sunlit yellow-green foreground meadow sweeping across the lower center and right.",
+      "baseMove": "wet on dry",
+      "bounds": [0.18, 0.42, 0.96, 1.0]
+    }
+  ],
+  "reserves": [
+    {
+      "id": "trail-crest-highlight",
+      "bounds": [0.715, 0.055, 0.740, 0.085],
+      "reason": "Bright sunlit bare-paper core where the dirt trail enters at the top crest."
+    },
+    {
+      "id": "trail-upper-bend-highlight",
+      "bounds": [0.194, 0.202, 0.214, 0.228],
+      "reason": "Reserved paper light at the upper-left bend of the winding path."
+    },
+    {
+      "id": "trail-mid-switchback-highlight",
+      "bounds": [0.236, 0.460, 0.258, 0.486],
+      "reason": "Bright sunlit paper core on the middle switchback beneath the overarching oaks."
+    },
+    {
+      "id": "trail-lower-run-highlight",
+      "bounds": [0.476, 0.700, 0.502, 0.732],
+      "reason": "Sunlit bare-paper highlight along the lower-center stretch of the trail."
+    },
+    {
+      "id": "trail-foreground-highlight",
+      "bounds": [0.505, 0.884, 0.531, 0.916],
+      "reason": "Brightest foreground paper reserve on the dirt path before the bottom edge."
+    }
+  ]
+}

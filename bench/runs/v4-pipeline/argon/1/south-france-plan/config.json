@@ -1,0 +1,91 @@
+{
+  "subject": "south-france",
+  "name": "France",
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "The reference depicts a sunlit Provençal hillside village in southern France rendered as an urban sketch: structural graphite and ink line work establishes the clustered stone houses, terracotta roofs, terrace walls, cypress spires, and foreground tree trunks over luminous light washes and concentrated shadow glazes.",
+    "regions": {
+      "village_walls_and_roofs": {
+        "style": "urban-sketch",
+        "reason": "Sunlit limestone facades, stone terrace walls, and terracotta roofs rely on crisp architectural line work over a light warm ochre-sienna wash while preserving sunlit paper highlights."
+      },
+      "warm_terrace_slopes": {
+        "style": "urban-sketch",
+        "reason": "Sunlit ochre-green hillside terraces and warm dry-stone retaining walls keep an open light wash with linear contour accents."
+      },
+      "sunlit_crown_greens": {
+        "style": "urban-sketch",
+        "reason": "Bright yellow-green tree crowns and sunlit lower-center foliage stay fresh and luminous over a single light wash."
+      },
+      "olive_mid_canopy": {
+        "style": "urban-sketch",
+        "reason": "Mid-tone olive foliage and hillside transitions combine light sap-green and warm yellow washes with dark trunk and branch line work."
+      },
+      "shaded_hillside_foliage": {
+        "style": "ink-and-wash",
+        "reason": "Deep shaded olive canopy and under-tree masses need a controlled drier shadow glaze (band 4) alongside dark pen accents so foliage depth reads without muddying the light washes."
+      },
+      "cypress_and_eave_darks": {
+        "style": "ink-and-wash",
+        "reason": "Vertical cypress spires, deep foreground tree trunks, and upper-right roof and valley shadows require concentrated dark glazes and decisive closing ink."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "olive_mid_canopy",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "referenceCue": "Mid-value olive and hillside foliage bridging the terraced slopes and stone walls.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sunlit_crown_greens",
+      "bounds": [0.30, 0.50, 0.50, 0.90],
+      "referenceCue": "Bright sunlit yellow-green tree crowns and grassy terrace slope in the lower-center foreground.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "cypress_and_eave_darks",
+      "bounds": [0.50, 0.0, 1.0, 0.22],
+      "referenceCue": "Dark vertical cypress spires, deep tree trunks, and dark architectural eaves and cast shadows in the upper village.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "village_walls_and_roofs",
+      "bounds": [0.70, 0.30, 1.0, 0.60],
+      "referenceCue": "Sunlit warm limestone house facades, stone terrace walls, and terracotta roofs clustered on the hillside.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "shaded_hillside_foliage",
+      "bounds": [0.0, 0.0, 1.0, 0.78],
+      "referenceCue": "Deep olive-green and cool-umber shadow masses beneath the tree canopy and across the upper-left and central hillside.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "warm_terrace_slopes",
+      "bounds": [0.0, 0.22, 0.70, 1.0],
+      "referenceCue": "Warm sunlit ochre-green foliage and terraced hillside slopes across the left and lower-left middle ground.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Sunlit upper-left limestone terrace wall highlight",
+      "bounds": [0.105, 0.255, 0.145, 0.295]
+    },
+    {
+      "reason": "Sunlit central stone terrace wall and path highlight below the village",
+      "bounds": [0.315, 0.395, 0.350, 0.430]
+    },
+    {
+      "reason": "Sunlit upper village house gable and roof edge highlight",
+      "bounds": [0.440, 0.068, 0.464, 0.112]
+    },
+    {
+      "reason": "Sunlit lower-right stone terrace wall highlight",
+      "bounds": [0.892, 0.542, 0.928, 0.578]
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "subject": "hills",
+  "name": "Hills",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Retain full five-band light-to-dark wash hierarchy and four-layer directional middle-value planes for the sunlit yellow-green hills and warm ochre dirt path while delivering loose ink-and-wash structure through the opening and closing black-ink contour passes."
+  },
+  "drawing": {
+    "order": "both",
+    "medium": "ink",
+    "inkProfile": "black-ink",
+    "amount": 1
+  },
+  "families": [
+    {
+      "id": "sunlit-winding-path",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "hue": "warm",
+      "minL": 72,
+      "maxChroma": 48,
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm cream and yellow-ochre winding dirt path climbing from bottom center through the left-center bend and upper hilltop fork",
+      "lights": "Hold crisp bare paper on the brightest sunlit path ruts and stones; lay a pale warm yellow-ochre wash over the sandy track"
+    },
+    {
+      "id": "sunlit-grassy-slopes",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "hue": "warm",
+      "minL": 44,
+      "baseMove": "wet on dry",
+      "referenceCue": "Bright sunlit yellow-green and sap-green grassy hillside pastures flanking the winding path across upper, middle, and lower slopes",
+      "lights": "Keep pale yellow-green sunlit grass luminous in band 1 before building directional grassy middle-value planes in bands 2 and 3"
+    },
+    {
+      "id": "dark-oak-tree-masses",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "hue": "cool",
+      "maxL": 62,
+      "baseMove": "wet on dry",
+      "referenceCue": "Deep slate-blue, cool olive, and charcoal-green oak and scrub tree canopies massed along the upper-left ridge, center-right grove, and lower gullies",
+      "lights": "Preserve surrounding sunlit grass and path edges against the crisp dark foliage silhouettes; deepen canopies in bands 4 and 5"
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.415, 0.01, 0.445, 0.032],
+      "reason": "Brightest sunlit path crest at top center-left"
+    },
+    {
+      "bounds": [0.725, 0.01, 0.755, 0.032],
+      "reason": "Sunlit upper-right ridge path highlight"
+    },
+    {
+      "bounds": [0.28, 0.21, 0.31, 0.24],
+      "reason": "Sunlit dirt path bend highlight on upper-left slope"
+    },
+    {
+      "bounds": [0.515, 0.88, 0.545, 0.91],
+      "reason": "Brightest lower-center dirt road highlight"
+    }
+  ]
+}

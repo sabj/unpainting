@@ -1,9 +1,10 @@
 {
- "note": "Benchmark crops. One sheet cell per crop pixel at 0.259 mm a cell. Image credits: NOTICE at the repository root.",
+ "note": "Benchmark crops. One sheet cell per crop pixel at 0.259 mm a cell. Image credits: NOTICE at the repository root. name is the display name; selfScore is the composite of the target scored against itself, the 100% mark for indexed scores. Add a target with bench/scripts/add-target.mjs.",
  "mmPerCell": 0.259,
  "crops": [
   {
    "task": "hills",
+   "name": "Hills",
    "width": 306,
    "height": 242,
    "coarse": {
@@ -15,10 +16,12 @@
    "distributed": true,
    "file": "targets/hills.png",
    "coarseFile": "targets/hills-coarse.json",
-   "licence": "noncommercial project use; see NOTICE"
+   "licence": "noncommercial project use; see NOTICE",
+   "selfScore": 8.43
   },
   {
    "task": "south-france",
+   "name": "France",
    "width": 304,
    "height": 249,
    "coarse": {
@@ -30,10 +33,12 @@
    "distributed": true,
    "file": "targets/south-france.png",
    "coarseFile": "targets/south-france-coarse.json",
-   "licence": "noncommercial project use; see NOTICE"
+   "licence": "noncommercial project use; see NOTICE",
+   "selfScore": 8.43
   },
   {
    "task": "sargent",
+   "name": "Ships",
    "width": 300,
    "height": 244,
    "coarse": {
@@ -45,10 +50,12 @@
    "distributed": true,
    "file": "targets/sargent.png",
    "coarseFile": "targets/sargent-coarse.json",
-   "licence": "public domain"
+   "licence": "public domain",
+   "selfScore": 8.76
   },
   {
    "task": "mittens",
+   "name": "Mittens",
    "width": 300,
    "height": 259,
    "coarse": {
@@ -60,10 +67,12 @@
    "distributed": true,
    "file": "targets/mittens.png",
    "coarseFile": "targets/mittens-coarse.json",
-   "licence": "noncommercial project use; see NOTICE"
+   "licence": "noncommercial project use; see NOTICE",
+   "selfScore": 8.76
   },
   {
    "task": "trumbull",
+   "name": "Trumbull",
    "width": 300,
    "height": 263,
    "coarse": {
@@ -75,7 +84,8 @@
    "distributed": true,
    "file": "targets/trumbull.png",
    "coarseFile": "targets/trumbull-coarse.json",
-   "licence": "noncommercial project use; see NOTICE"
+   "licence": "noncommercial project use; see NOTICE",
+   "selfScore": 8.57
   }
  ]
 }

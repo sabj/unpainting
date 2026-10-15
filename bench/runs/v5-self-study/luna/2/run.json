@@ -24,12 +24,7 @@
   "progressionJudges": [
    "Qwen/Qwen3.5-9B",
    "zai-org/GLM-5.3-Flash"
-  ],
-  "providers": [
-   "together",
-   "openrouter (zero data retention)"
-  ],
-  "note": null
+  ]
  },
  "try": 2,
  "settings": {
@@ -177,20 +172,7 @@
     "judgeErrors": null,
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0,
-    "level": "low",
-    "parts": {
-     "progression": 0,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.339,
-    "hfCeiling": 0.645,
-    "flags": [],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "the model",
@@ -369,20 +351,7 @@
     "judgeErrors": null,
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0,
-    "level": "low",
-    "parts": {
-     "progression": 0,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.466,
-    "hfCeiling": 0.645,
-    "flags": [],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "the model",
@@ -560,20 +529,7 @@
     "judgeErrors": null,
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0,
-    "level": "low",
-    "parts": {
-     "progression": 0,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.443,
-    "hfCeiling": 0.645,
-    "flags": [],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "the model",
@@ -763,20 +719,7 @@
     "judgeErrors": null,
     "judgeProviders": {}
    },
-   "cheatRisk": {
-    "score": 0,
-    "level": "low",
-    "parts": {
-     "progression": 0,
-     "copy": 0,
-     "small": 0,
-     "pixelFit": 0
-    },
-    "hfCorr": 0.592,
-    "hfCeiling": 0.645,
-    "flags": [],
-    "guardViolations": 0
-   },
+   "cheatRisk": null,
    "pipeline": {
     "outcome": "painted",
     "paintedBy": "the model",
@@ -829,12 +772,77 @@
     "feedbackNote": null,
     "linkedFrom": null
    }
-  }
- },
- "unpainted": {
+  },
   "trumbull": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 1052,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": null,
+   "minutes": null,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.84,
+    "pm": 0.2,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 8.35,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 2.67,
+     "marks_texture": 2,
+     "classic_value": 6.29,
+     "classic_edge": 9.09,
+     "classic_landmark": null,
+     "classic_marks": 9.68
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeRoute": "openrouter",
+    "judgeProviders": {
+     "moonshotai/Kimi-K3": {
+      "Wafer": 5
+     },
+     "zai-org/GLM-5.3-Flash": {
+      "Near AI": 5
+     },
+     "Qwen/Qwen3.5-9B": {
+      "SiliconFlow": 2,
+      "Parasail": 2,
+      "Venice": 1
+     }
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 263,
+     "from": [
+      1200,
+      1052
+     ],
+     "resize": "Lanczos to the target`s native size"
+    }
+   },
+   "progression": null,
    "pipeline": {
-    "outcome": "render-failed",
+    "outcome": "painted",
     "paintedBy": "the model",
     "plan": "trumbull-plan",
     "tokens": "region_w13_blk15_bka12_sep4_dwg100",
@@ -882,14 +890,7 @@
     "droppedPassages": null,
     "paintExit": 3,
     "segments": 1,
-    "failure": {
-     "failures": [
-      {
-       "code": 4,
-       "reason": "options the plan chose were read by nothing: --ordersubject --ordersubjmax --ordersubjmin --orderregions"
-      }
-     ]
-    },
+    "failure": null,
     "renderRefusal": "options the plan chose were read by nothing: --ordersubject --ordersubjmax --ordersubjmin --orderregions",
     "renderRefusalReopened": true,
     "paintRestarts": 0,
@@ -898,20 +899,25 @@
     "selfReview": null,
     "selfReviewModelMinute": null,
     "feedbackNote": null,
-    "linkedFrom": null
-   }
+    "linkedFrom": null,
+    "warnings": [
+     {
+      "code": 4,
+      "reason": "options the plan chose were read by nothing: --ordersubject --ordersubjmax --ordersubjmin --orderregions"
+     }
+    ],
+    "recovered": "repainted after the run from its published final plan; the 0.1.0 verdict had thrown it away for unread settings (0.1.1)"
+   },
+   "cheatRisk": null
   }
  },
  "score": {
   "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
   "status": "scored",
-  "composite": null,
-  "partialComposite": 5.5,
-  "cropsScored": 4,
-  "complete": false,
-  "compositeOld": null,
-  "partialCompositeOld": 4.9,
-  "note": "Rescored 2026-10-10 at the target's native size: the 1224 px render Lanczos-downscaled to the target crop's pixels, scored by bench-v3-median5 as V1-V3 paintings are. scoreOld is the earlier score of a 720 px upscale-path input."
+  "composite": 5.57,
+  "partialComposite": null,
+  "cropsScored": 5,
+  "complete": true
  },
  "cheat": {
   "disqualified": false,
@@ -935,6 +941,6 @@
   },
   "review": null
  },
- "complete": false,
+ "complete": true,
  "judgeVersion": "J1"
 }

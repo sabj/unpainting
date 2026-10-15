@@ -1,0 +1,6 @@
+[
+  "--midgain", "1.10",
+  "--darkgain", "1.45",
+  "--touchgain", "0.75",
+  "--drawstroke", "0.5"
+]

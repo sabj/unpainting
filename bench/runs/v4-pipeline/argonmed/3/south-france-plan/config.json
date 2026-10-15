@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "subject": "south-france",
+  "title": "France",
+  "width": 304,
+  "height": 249,
+  "families": [
+    {
+      "id": "upper-village-terraces",
+      "role": "support",
+      "bounds": [0.0, 0.0, 1.0, 0.265],
+      "notes": "Sunlit warm ochre stone walls, terracotta roofs, and upper hillside terraces"
+    },
+    {
+      "id": "distant-valley-mist",
+      "role": "support",
+      "bounds": [0.276, 0.0, 0.52, 0.145],
+      "notes": "Cool atmospheric valley glimpse between upper village rooftops"
+    },
+    {
+      "id": "sunlit-stone-walls",
+      "role": "focal",
+      "bounds": [0.132, 0.265, 0.776, 0.747],
+      "notes": "Stepped limestone retaining walls, sunlit facades, and arches descending through the village"
+    },
+    {
+      "id": "right-stone-tower-cluster",
+      "role": "focal",
+      "bounds": [0.724, 0.161, 1.0, 0.783],
+      "notes": "Clustered stone houses, vertical tower facades, and dark window recesses on the right slope"
+    },
+    {
+      "id": "olive-canopy-midground",
+      "role": "support",
+      "bounds": [0.0, 0.221, 0.773, 1.0],
+      "notes": "Broad Mediterranean olive and warm yellow-green foliage masses wrapping the terraced hill"
+    },
+    {
+      "id": "dark-cypress-accents",
+      "role": "accent",
+      "bounds": [0.0, 0.08, 1.0, 1.0],
+      "notes": "Deep cool slate-green cypress spires and dark architectural shadow crevices"
+    },
+    {
+      "id": "foreground-tree-canopy",
+      "role": "accent",
+      "bounds": [0.609, 0.703, 1.0, 1.0],
+      "notes": "Sunlit chartreuse foreground crown and dark trunk/branch armature at lower right"
+    }
+  ],
+  "reserves": [
+    {
+      "id": "upper-terrace-glint",
+      "bounds": [0.191, 0.008, 0.224, 0.032],
+      "reason": "Brightest sunlit limestone parapet highlight at top left-center"
+    },
+    {
+      "id": "upper-arch-crown",
+      "bounds": [0.122, 0.088, 0.151, 0.112],
+      "reason": "Sunlit cream stone lintel above upper left terrace wall"
+    },
+    {
+      "id": "mid-roof-ridge-light",
+      "bounds": [0.408, 0.104, 0.441, 0.129],
+      "reason": "Pale sunlit roof and wall crest near upper center"
+    },
+    {
+      "id": "lower-right-wall-glint",
+      "bounds": [0.852, 0.723, 0.882, 0.751],
+      "reason": "Brightest sunlit stone highlight above the lower-right tree crown"
+    }
+  ],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Use precise-watercolor across the main architectural and foliage regions so all five value bands (light wash, 4 graduated midtone layers, and 2 shadow glazes) remain active, while pairing with urban-sketch in the distant valley and explicit target-registered opening and closing pen lines (_sep8) for an authentic urban sketch pen-and-light-wash build.",
+    "regions": {
+      "distant-valley-mist": {
+        "style": "urban-sketch",
+        "reason": "Keep the small distant valley glimpse between upper roofs as a light single-wash urban-sketch plane."
+      }
+    }
+  }
+}

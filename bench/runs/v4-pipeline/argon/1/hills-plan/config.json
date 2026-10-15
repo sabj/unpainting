@@ -1,0 +1,81 @@
+{
+  "subject": "hills",
+  "name": "Hills",
+  "drawing": {
+    "medium": "ink",
+    "inkColor": "sepia",
+    "amount": 1,
+    "lines": "all",
+    "weight": 1,
+    "closingLines": 1
+  },
+  "families": [
+    {
+      "id": "hills.sunlit-lower-slope",
+      "bounds": [
+        0.32,
+        0.35,
+        1,
+        1
+      ],
+      "referenceCue": "Broad sunlit yellow-green hillside and foreground grass planes; warm hansa yellow and sap green foundation wash keeping open luminous highlights.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "hills.sunlit-upper-ridge",
+      "bounds": [
+        0.22,
+        0,
+        1,
+        0.68
+      ],
+      "referenceCue": "Upper-middle sunlit yellow-green hillside above the diagonal tree line; graded warm green mid-tones meeting the upper path branch.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "hills.winding-ochre-path",
+      "bounds": [
+        0,
+        0.08,
+        0.95,
+        0.92
+      ],
+      "referenceCue": "Winding warm ochre dirt trail bisecting the hills from lower-left to upper-center with a right fork; bright sunlit center track held as bare paper.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "hills.mid-olive-slopes",
+      "bounds": [
+        0,
+        0,
+        0.88,
+        0.96
+      ],
+      "referenceCue": "Mid-value olive and yellow-ochre turf transitions flanking the trail and bridging sunlit slopes into shaded foliage.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "hills.dark-foliage-mass",
+      "bounds": [
+        0,
+        0,
+        0.94,
+        0.98
+      ],
+      "referenceCue": "Dense dark olive-green and sepia foliage masses flanking the left bank, central diagonal ridge, and lower-right trees; connected shadow mass.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "hills.deep-tree-canopy",
+      "bounds": [
+        0,
+        0,
+        0.92,
+        0.9
+      ],
+      "referenceCue": "Deepest cool blue-grey, ultramarine, and charcoal-green tree canopy recesses and trunk shadows; restate dark recess and deep shadow glazes over dry mid-tones.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": []
+}

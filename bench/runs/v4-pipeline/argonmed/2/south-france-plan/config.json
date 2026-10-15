@@ -1,0 +1,78 @@
+{
+  "subject": "south-france",
+  "name": "France",
+  "paper": "white",
+  "palette": [
+    "hansa yellow",
+    "yellow ochre",
+    "quinacridone rose",
+    "cerulean blue"
+  ],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "The reference is a pen-and-wash sketch of a sunlit southern French hillside village whose broad foliage and architectural washes require multi-lane physical mop and flat-brush sweeps across five value bands, paired with full opening and closing sepia-ink linework.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "name": "sunlit-stone-and-roofs",
+      "role": "focal",
+      "description": "Sunlit warm stone facades, terrace walls, terracotta roofs, and sunlit earth paths across the upper terrace and lower-right village cluster",
+      "bounds": [0.0, 0.0, 0.96, 0.85],
+      "hue": "warm ochre and terracotta rose",
+      "value": "light to light-middle"
+    },
+    {
+      "name": "bright-canopy-lights",
+      "role": "focal",
+      "description": "Sun-struck yellow-green deciduous crown in the lower-left foreground and bright olive crests catching direct sunlight",
+      "bounds": [0.06, 0.44, 0.52, 0.98],
+      "hue": "warm hansa yellow-green",
+      "value": "light"
+    },
+    {
+      "name": "warm-olive-slopes",
+      "role": "support",
+      "description": "Warm light-middle olive and golden-green hillside foliage linking the upper terrace to the lower village",
+      "bounds": [0.0, 0.12, 1.0, 1.0],
+      "hue": "warm olive green",
+      "value": "light-middle"
+    },
+    {
+      "name": "mid-olive-foliage",
+      "role": "support",
+      "description": "Main body of Mediterranean olive and scrub foliage across the diagonal hillside",
+      "bounds": [0.0, 0.15, 1.0, 1.0],
+      "hue": "olive green",
+      "value": "middle"
+    },
+    {
+      "name": "shadow-foliage-masses",
+      "role": "shadow",
+      "description": "Cooler deep olive-green and umber shadow undersides within the trees, shrubs, and hillside hollows",
+      "bounds": [0.0, 0.05, 1.0, 1.0],
+      "hue": "deep olive and cool green-umber",
+      "value": "dark-middle"
+    },
+    {
+      "name": "cypress-and-distant-valley",
+      "role": "accent",
+      "description": "Upright dark cypress spires, cast architectural shadows, window openings, foreground trunk crevices, and the cool blue-green distant valley at upper right",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "hue": "cool blue-green and dark sepia-olive",
+      "value": "dark"
+    }
+  ],
+  "reserves": [
+    {
+      "name": "lower-village-sunlit-gable",
+      "bounds": [0.765, 0.445, 0.795, 0.475],
+      "reason": "Brightest sunlit plaster highlight on the central tower facade in the lower-right village cluster"
+    },
+    {
+      "name": "upper-terrace-parapet-light",
+      "bounds": [0.105, 0.055, 0.145, 0.085],
+      "reason": "Sun-bleached stone coping highlight along the upper-left terrace wall"
+    }
+  ]
+}

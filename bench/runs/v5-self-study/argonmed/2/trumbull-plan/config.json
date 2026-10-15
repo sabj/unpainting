@@ -1,0 +1,55 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Trumbull College architectural elevation with crisp Gothic window recesses, sunlit ochre/sienna stone masonry courses, cool blue-violet shadow glazes, and sepia pen linework."
+  },
+  "drawing": {
+    "medium": "ink",
+    "inkColor": "sepia",
+    "amount": 1,
+    "lines": "all",
+    "weight": 1,
+    "closingLines": 1
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0.35, 0.0, 1.0, 0.22],
+      "referenceCue": "Clear cerulean and ultramarine sky wash with open white cloud reserves along the upper gable and roofline.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "bounds": [0.0, 0.02, 1.0, 0.38],
+      "referenceCue": "Connected cool blue-grey slate roofs and dormers with restrained pale tile variations.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.sun-main-gable",
+      "bounds": [0.38, 0.14, 0.82, 0.92],
+      "referenceCue": "Sunlit warm yellow-ochre and raw-sienna stone gable and facade planes; preserve sunlit trim and window surrounds.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.warm-stone-walls",
+      "bounds": [0.15, 0.18, 0.90, 0.90],
+      "referenceCue": "Broad warm ochre and sienna stone masonry courses across the main gable and flanking wings.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.cool-main-return",
+      "bounds": [0.0, 0.12, 0.52, 0.94],
+      "referenceCue": "Cooler shadowed left return wall, chimney, and slate-grey architectural planes separating from the sunlit gable by value.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.shaded-stone-and-foliage",
+      "bounds": [0.05, 0.22, 0.92, 0.94],
+      "referenceCue": "Deeper warm-brown stone courses, green courtyard tree foliage, dark Gothic window recesses, and foreground street.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": []
+}

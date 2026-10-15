@@ -1,0 +1,8 @@
+[
+  "--touchfamilies",
+  "6",
+  "--touchmincells",
+  "0.025",
+  "--touchdmin",
+  "0.08"
+]

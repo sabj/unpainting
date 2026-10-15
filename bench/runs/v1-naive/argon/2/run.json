@@ -1,0 +1,447 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V1",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "bcb4ef5f660b22aacffdf1a1cc0749bed80d0421",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "argon",
+  "name": "Gemini 4 Argon (High)",
+  "id": "gemini-4-argon-high",
+  "effort": "high",
+  "runner": "agy"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 48.9,
+  "tokens": 772453,
+  "costUSD": null,
+  "exitCode": 0,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 2,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 1139,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 3,
+   "dotStrokes": 0,
+   "copyHF": 0.0105,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.61,
+    "pm": 0.23,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 7.55,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3,
+     "marks_texture": 2.67,
+     "classic_value": 5.85,
+     "classic_edge": 7.89,
+     "classic_landmark": null,
+     "classic_marks": 8.91
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 3,
+     "50": 3,
+     "75": 3,
+     "100": 3.5
+    },
+    "earlyMean": 3,
+    "mean": 3.1,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "e": 2,
+     "a": 7,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A credible watercolour order — pale field washes and reserved road first, then darks and dabbed tree masses accumulating over them — with only the uniformly faint first pass and the repeated stamped-looking canopy dabs as mild mechanical tells.",
+     "Qwen/Qwen3.5-9B": "The sequence mimics a painting process but uses digital textures and filters; Panel 2 is a flat wash (tell e) and the trees are uniform dots (tell a), lacking loose brushwork."
+    }
+   }
+  },
+  "south-france": {
+   "seed": 2,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 955,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0768,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 6.1,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4.67,
+    "classic": 7.53,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 4,
+     "marks_texture": 4.33,
+     "classic_value": 5.07,
+     "classic_edge": 8.45,
+     "classic_landmark": null,
+     "classic_marks": 9.07
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 3,
+     "50": 3,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 3,
+    "mean": 3.2,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "b": 4,
+     "e": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence is broadly human (pen boxes first, light-to-dark foliage washes, pen detail last), but the foliage grows by evenly scattered, same-sized round dabs with scalloped edges rather than drawn masses, and the whole sheet fades in at a uniform faint value."
+    }
+   }
+  },
+  "sargent": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 158,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 8,
+   "dotStrokes": 0,
+   "copyHF": 0.0886,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.06,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 6.8,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 3.33,
+     "marks_texture": 2.33,
+     "classic_value": 5.43,
+     "classic_edge": 5.58,
+     "classic_landmark": null,
+     "classic_marks": 9.38
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 2,
+     "75": 3,
+     "100": 4
+    },
+    "earlyMean": 1.5,
+    "mean": 2.4,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "g": 1,
+     "m": 7,
+     "c": 4,
+     "d": 1,
+     "f": 2,
+     "e": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The light-to-dark sequence superficially mimics a painter, but stair-stepped wash edges, flat evenly-toned slab fills, and an anchor fading in as a faint shape before its drawn form reveal a mask-style uncovering rather than genuine brushwork.",
+     "Qwen/Qwen3.5-9B": "The stair-step edges and flat color slabs indicate digital generation, not brushwork."
+    }
+   }
+  },
+  "mittens": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 154,
+   "minutes": 0,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0663,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.75,
+    "pm": 0.12,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 7.49,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3,
+     "marks_texture": 3.33,
+     "classic_value": 5.85,
+     "classic_edge": 7.17,
+     "classic_landmark": null,
+     "classic_marks": 9.45
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 4,
+     "50": 3,
+     "75": 3,
+     "100": 5
+    },
+    "earlyMean": 4.5,
+    "mean": 4,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 1,
+     "j": 1,
+     "m": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable line-then-wash build with forms blocked before detail, but the hair's checkerboard texture arrives fully formed at 50% and reads as a grid dump rather than drawn curls until the final panel resolves it."
+    }
+   }
+  },
+  "trumbull": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 263,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "trumbull-strokes.jsonl.gz",
+   "strokes": 590,
+   "minutes": 0.3,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0333,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.06,
+    "pm": 0.08,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 7.12,
+    "criteria": {
+     "composition_values": 4,
+     "edges_detail": 2.33,
+     "marks_texture": 3.33,
+     "classic_value": 5.24,
+     "classic_edge": 7.26,
+     "classic_landmark": null,
+     "classic_marks": 8.86
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 2,
+     "25": 2,
+     "50": 3,
+     "75": 3,
+     "100": 3
+    },
+    "earlyMean": 2,
+    "mean": 2.6,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "c": 4,
+     "i": 2,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The build-up is a density accumulation of flat straight-edged rectangular slabs that ignore the building's forms, and all fine texture and darks snap in at once between 75% and 100% rather than being brushed in progressively."
+    }
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 5.52,
+  "partialComposite": null,
+  "cropsScored": 5,
+  "complete": true
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.44,
+   "level": "medium",
+   "parts": {
+    "progression": 0.35,
+    "earlyStageMean": 2.8,
+    "copyHF": {
+     "hills": 0.0105,
+     "south-france": 0.0768,
+     "sargent": 0.0886,
+     "mittens": 0.0663,
+     "trumbull": 0.0333
+    },
+    "copy": 1,
+    "smallStrokeShare": 0,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.18,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v1-naive/argon/2"
+}

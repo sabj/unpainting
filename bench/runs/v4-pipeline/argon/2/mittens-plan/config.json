@@ -1,0 +1,122 @@
+{
+  "subject": "mittens-portrait",
+  "name": "Mittens and Owner — Watercolor Portrait Sketch",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Watercolor portrait sketch with fine lines and light washes: preserve bright paper highlights across the background, cat chest, and lit forehead, build transparent warm ochre/sienna and cool grey-sepia planes through five light-to-dark bands, and anchor focal features with delicate opening graphite and crisp closing sepia ink.",
+    "regions": {
+      "open-paper-ground": {
+        "style": "precise-watercolor",
+        "reason": "Leave the upper-center and top-right background as clean bare paper with soft edges around the cat ears and curly hair."
+      },
+      "cat-ginger-crown-ears": {
+        "style": "precise-watercolor",
+        "reason": "Layer pale yellow ochre and burnt sienna washes for the tabby forehead and ear interiors while keeping crisp eye catchlights and green-gold iris tones."
+      },
+      "cat-back-tabby-coat": {
+        "style": "precise-watercolor",
+        "reason": "Build warm ochre, raw sienna, and burnt sienna stripes over a continuous pale warm base wash along the back and shoulder."
+      },
+      "cat-white-muzzle-chest": {
+        "style": "precise-watercolor",
+        "reason": "Preserve the bright white paper of the cat's muzzle, whiskers, and chest bib with only whisper-light warm-cool transitions at the ruff."
+      },
+      "human-curly-hair-mass": {
+        "style": "precise-watercolor",
+        "reason": "Build the dark charcoal-sepia curly hair from a soft grey-brown undertone to connected shadow glazes and directional curl accents."
+      },
+      "human-lit-forehead-cheek": {
+        "style": "precise-watercolor",
+        "reason": "Keep the lit forehead and nose bridge bright while laying translucent warm ochre and sienna blush washes across the temple and cheek."
+      },
+      "human-eyes-brows-nose": {
+        "style": "precise-watercolor",
+        "reason": "Reserve tiny eye catchlights and restate dark brows, upper lash lines, irises, pupils, and nostril shadows on dry paint."
+      },
+      "human-beard-jaw-shadow": {
+        "style": "precise-watercolor",
+        "reason": "Lay soft warm-umber and Payne's-grey washes over the beard, moustache, lower lip, and chin shadow where the head leans against the cat."
+      }
+    }
+  },
+  "drawing": {
+    "medium": "graphite",
+    "inkColor": "sepia"
+  },
+  "reserves": [
+    {
+      "bounds": [0.264, 0.213, 0.273, 0.233],
+      "reason": "cat right eye catchlight glint next to vertical slit pupil"
+    },
+    {
+      "bounds": [0.074, 0.233, 0.083, 0.244],
+      "reason": "cat left eye catchlight highlight"
+    },
+    {
+      "bounds": [0.597, 0.715, 0.606, 0.721],
+      "reason": "human left eye catchlight"
+    },
+    {
+      "bounds": [0.806, 0.677, 0.813, 0.683],
+      "reason": "human right eye catchlight"
+    },
+    {
+      "bounds": [0.195, 0.248, 0.212, 0.262],
+      "reason": "cat nose bridge highlight glint"
+    },
+    {
+      "bounds": [0.305, 0.312, 0.345, 0.326],
+      "reason": "cat upper whisker bright highlight glint"
+    }
+  ],
+  "families": [
+    {
+      "id": "open-paper-ground",
+      "bounds": [0.50, 0.00, 1.00, 0.28],
+      "wetness": "dry",
+      "edge": "soft"
+    },
+    {
+      "id": "cat-ginger-crown-ears",
+      "bounds": [0.00, 0.00, 0.50, 0.36],
+      "wetness": "damp",
+      "edge": "mixed"
+    },
+    {
+      "id": "cat-back-tabby-coat",
+      "bounds": [0.00, 0.30, 0.54, 0.98],
+      "wetness": "damp",
+      "edge": "soft"
+    },
+    {
+      "id": "cat-white-muzzle-chest",
+      "bounds": [0.00, 0.52, 0.44, 1.00],
+      "wetness": "dry",
+      "edge": "soft"
+    },
+    {
+      "id": "human-curly-hair-mass",
+      "bounds": [0.48, 0.20, 0.98, 0.66],
+      "wetness": "damp",
+      "edge": "mixed"
+    },
+    {
+      "id": "human-lit-forehead-cheek",
+      "bounds": [0.54, 0.45, 0.86, 0.78],
+      "wetness": "damp",
+      "edge": "soft"
+    },
+    {
+      "id": "human-eyes-brows-nose",
+      "bounds": [0.55, 0.62, 0.88, 0.84],
+      "wetness": "dry",
+      "edge": "crisp"
+    },
+    {
+      "id": "human-beard-jaw-shadow",
+      "bounds": [0.48, 0.65, 0.96, 1.00],
+      "wetness": "damp",
+      "edge": "soft"
+    }
+  ]
+}

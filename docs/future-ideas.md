@@ -23,7 +23,7 @@ Let a model render a few small previews during one attempt. Each preview is judg
 
 ### 4. Budgets that do not measure the infrastructure
 
-The V4/V5 brief tells models they have 85 minutes of their own time. Waiting for the painter is not counted, and a separate 300-minute wall-clock limit catches hangs.
+The V4/V5 brief tells models they have 85 minutes of their own time. Waiting for the painter is not counted, and a separate 300-minute wall-clock limit catches hangs. A painter call is excused for at most 100 seconds. Past that, a slow machine charges the model. In 0.1.1, Gemini 4 Argon V5 tries run ten at a time on one machine ran out of time before writing a plan. They painted on a rerun with the machine idle.
 - Test: replace the stated number with "a generous safety limit", or a cost budget in dollars, and report tokens and cost per try.
 - Why: a stated time budget can change how a model plans, and token counts differ between vendors.
 
@@ -113,3 +113,25 @@ The painter lays each value band across the whole sheet at once, light to dark, 
 ### 19. A weak judge
 
 Qwen3.5-9B scores most early stages 1 and every target 10, so it adds noise. Replace it with a stronger vision judge, checked against my own picks.
+
+## Benchmark gaps after 0.1.1
+
+### 20. Finish the incomplete tries
+
+Some 0.1.1 tries are missing paintings. Gemini 4 Argon lacks 6 V5 paintings (4 at high, 2 at medium) and 2 V2 paintings at medium. The Muse models have no complete V4 or V5 tries, and Gemini 3.8 Flash stops at V2. Several 0.1.0 V1 and V2 tries also lack targets.
+- To do: rerun them with painter waits fully excused (item 4), at most three tries at once per machine.
+
+### 21. Every round on every target
+
+V3 compares three targets. From the next release, every round should paint all five, at a smaller size so a try stays affordable.
+- Test: compare rankings at the smaller size with the current ones on the shared targets.
+
+### 22. A check for copied targets
+
+The guard blocks reads of target pixels at paint time. A shell copy of a target into the output folder goes unseen, as in MiniMax M3 V2 try 2.
+- To do: after each run, hash every file the session wrote and compare with the targets.
+
+### 23. A planner trained on what paints well
+
+Ask a strong model for several plans per target on held-out images, paint each, and judge the best. The winners become training data for a small vision planner (LoRA). This needs a few thousand scored plans, none on benchmark targets.
+- Test: measure best-of-N planning against single plans on held-out images first. Train only once that gain is real.

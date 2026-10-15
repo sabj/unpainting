@@ -1,0 +1,35 @@
+{
+  "subject": "hills",
+  "view": {
+    "crop": false,
+    "wholeOf": "hills"
+  },
+  "reserves": [],
+  "families": [
+    {
+      "id": "hills.winding-dirt-road",
+      "bounds": [0.16, 0.14, 0.84, 0.98],
+      "note": "Pale warm sandy-cream winding road and sunlit track clearings reserved as lightest paper and pale warm wash."
+    },
+    {
+      "id": "hills.sunlit-grass-slopes",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "note": "Warm yellow-green sunlit rolling hill slopes in hansa yellow and sap green across upper-right and lower-center/right pastures."
+    },
+    {
+      "id": "hills.olive-foliage-groves",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "note": "Mid-value olive and sap-green tree canopies massed along the left slope, central diagonal wooded gully, and right hillside."
+    },
+    {
+      "id": "hills.deep-slate-tree-shadows",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "note": "Cool blue-slate and dark charcoal-indigo shadow masses within dense tree clusters and under-canopy hollows."
+    }
+  ],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Layered yellow-green hillside planes, olive foliage mid-tones, and cool blue-slate tree shadow glazes framed by loose opening and closing ink contour and foliage lines.",
+    "regions": {}
+  }
+}

@@ -1,0 +1,9 @@
+[
+  "--paperrgb", "221,215,199",
+  "--paints", "ochre,sienna,ultramarine,cerulean,sapgreen",
+  "--shaperefit", "3",
+  "--softsplit", "1",
+  "--softmm", "0.6",
+  "--touchdmin", "0.12",
+  "--wetgate", "0"
+]

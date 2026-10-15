@@ -1,0 +1,77 @@
+{
+  "subject": "sargent",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "linework": "none",
+    "reason": "Sargent's White Ships (1908) is a pure transparent watercolor built from luminous warm cream and golden-ochre timber washes, broad cool cerulean-ultramarine turning shadow planes on the curved white hulls, soft turquoise-slate and amber harbor reflections, and crisp dark sienna-ultramarine accents for hawseholes, anchors, and inter-hull crevices, with natural unpainted paper highlights reserved organically and zero ink linework."
+  },
+  "families": [
+    {
+      "id": "warm_hull_light",
+      "name": "Sunlit cream and pale yellow-ochre hull planking, masts, and spar highlights",
+      "order": 1,
+      "hex": "#cec29e",
+      "swatch": [206, 194, 158],
+      "bounds": [0.0, 0.0, 1.0, 0.90],
+      "Role": "broad wet-in-wet light foundation wash across the sunlit hull planking, upper rigging spars, and warm bowsprit timber",
+      "baseMove": "wet on wet",
+      "detail": "none"
+    },
+    {
+      "id": "cool_hull_plane",
+      "name": "Cool cerulean and lavender-grey shadow planes on the white ship hulls",
+      "order": 2,
+      "hex": "#8fa2af",
+      "swatch": [143, 162, 175],
+      "bounds": [0.0, 0.0, 1.0, 0.85],
+      "Role": "broad turning shadow washes across the central and left white hulls and upper-right rigging",
+      "baseMove": "wet on wet",
+      "detail": "light"
+    },
+    {
+      "id": "turquoise_water_wash",
+      "name": "Turquoise-slate and sea-green harbor water and lower hull reflection",
+      "order": 3,
+      "hex": "#648186",
+      "swatch": [100, 129, 134],
+      "bounds": [0.0, 0.55, 1.0, 1.0],
+      "Role": "cool blue-green harbor water washes and reflected light under the bows",
+      "baseMove": "wet on wet",
+      "detail": "light"
+    },
+    {
+      "id": "golden_ochre_timber",
+      "name": "Warm yellow-ochre and raw-sienna deck structures, spars, and sunlit reflections",
+      "order": 4,
+      "hex": "#aa8646",
+      "swatch": [170, 134, 70],
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "Role": "saturated golden-ochre timber bands, deckhouse framing, bow scroll ornament, and warm amber water ripples",
+      "baseMove": "wet on wet",
+      "detail": "medium"
+    },
+    {
+      "id": "sienna_rigging_rust",
+      "name": "Burnt-sienna and mahogany shaded timber, rust streaks, and dark hull bands",
+      "order": 5,
+      "hex": "#754d32",
+      "swatch": [117, 77, 50],
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "Role": "rich warm darks along the left hull shadow, anchor chains, rigging blocks, and lower hull waterline",
+      "baseMove": "wet on wet",
+      "detail": "high"
+    },
+    {
+      "id": "deep_marine_accents",
+      "name": "Deep ultramarine-umber hawseholes, anchor shadows, and inter-hull crevices",
+      "order": 6,
+      "hex": "#33393e",
+      "swatch": [51, 57, 62],
+      "bounds": [0.0, 0.05, 0.98, 1.0],
+      "Role": "crisp darkest transparent accents for the hawseholes, anchors, deep hull clefts, and dark reflection bands",
+      "baseMove": "wet on wet",
+      "detail": "high"
+    }
+  ],
+  "reserves": []
+}

@@ -18,9 +18,10 @@
     "bench:run": "node bench/scripts/run.mjs",
     "bench:score": "node bench/scripts/score.mjs",
     "bench:build": "node bench/scripts/build-results.mjs && node bench/scripts/build-leaderboard.mjs && node bench/scripts/build-findings.mjs && node bench/scripts/build-chart.mjs && node bench/scripts/build-overview.mjs && node bench/scripts/build-rounds-table.mjs",
-    "bench:test": "node --test bench/scripts/lib.test.mjs bench/scripts/kit-log.test.mjs bench/scripts/rounds.test.mjs bench/scripts/verdict.test.mjs bench/scripts/overview-picks.test.mjs bench/scripts/rounds-table.test.mjs",
+    "bench:test": "node --test bench/scripts/*.test.mjs",
     "quick-start": "npm run example:plan",
-    "doctor": "node tools/doctor.mjs"
+    "doctor": "node tools/doctor.mjs",
+    "bench:add-target": "node bench/scripts/add-target.mjs"
   },
   "dependencies": {
     "sharp": "^0.35.4",

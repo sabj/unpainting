@@ -1,0 +1,16 @@
+{"t":"2026-10-14T12:33:36.083Z","kind":"start","modelMinutes":21.04,"variant":"region_w13","stops":"every passage boundary"}
+{"t":"2026-10-14T12:35:25.091Z","kind":"look","modelMinutes":22.7,"n":1,"boundary":"0","strokes":0,"penLines":0,"passesDone":0,"passesPlanned":61}
+{"t":"2026-10-14T12:36:02.617Z","kind":"continue","modelMinutes":23.33,"boundary":"0","stopAt":11,"strokes":0}
+{"t":"2026-10-14T12:37:45.566Z","kind":"look","modelMinutes":23.54,"n":2,"boundary":"11","strokes":1092,"penLines":0,"passesDone":11,"passesPlanned":61}
+{"t":"2026-10-14T12:38:44.707Z","kind":"continue","modelMinutes":24.53,"boundary":"11","stopAt":33,"strokes":1092}
+{"t":"2026-10-14T12:41:31.411Z","kind":"look","modelMinutes":24.83,"n":3,"boundary":"33","strokes":2824,"penLines":0,"passesDone":33,"passesPlanned":61}
+{"t":"2026-10-14T12:42:38.586Z","kind":"continue","modelMinutes":25.94,"boundary":"33","stopAt":60,"strokes":2824}
+{"t":"2026-10-14T12:45:18.782Z","kind":"look","modelMinutes":26.38,"n":4,"boundary":"60","strokes":4402,"penLines":0,"passesDone":60,"passesPlanned":61}
+{"t":"2026-10-14T12:46:55.517Z","kind":"continue","modelMinutes":27.99,"boundary":"60","stopAt":61,"strokes":4402}
+{"t":"2026-10-14T12:48:18.912Z","kind":"look","modelMinutes":29.18,"n":5,"boundary":"62","strokes":4945,"penLines":0,"passesDone":62,"passesPlanned":66}
+{"t":"2026-10-14T12:48:32.357Z","kind":"continue","modelMinutes":29.4,"boundary":"62","stopAt":65,"strokes":4945}
+{"t":"2026-10-14T12:49:12.610Z","kind":"look","modelMinutes":29.63,"n":6,"boundary":"65","strokes":6335,"penLines":0,"passesDone":65,"passesPlanned":66}
+{"t":"2026-10-14T12:49:34.577Z","kind":"continue","modelMinutes":30,"boundary":"65","stopAt":"end","strokes":6335}
+{"t":"2026-10-14T12:50:40.331Z","kind":"finished","modelMinutes":30,"strokes":7512}
+{"t":"2026-10-14T12:51:03.997Z","kind":"look","modelMinutes":30.38,"n":7,"boundary":"final"}
+{"t":"2026-10-14T12:51:34.394Z","kind":"session-end","modelMinutes":30.89,"why":"the session ended","looks":7,"revisions":0}

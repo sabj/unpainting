@@ -1,0 +1,448 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "e790cb10a99136f5358bc6920c2c85d3b94e173f",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "argon",
+  "name": "Gemini 4 Argon (High)",
+  "id": "gemini-4-argon-high",
+  "effort": "high",
+  "runner": "agy"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "trumbull"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 56.9,
+  "tokens": 1446651,
+  "costUSD": null,
+  "exitCode": 0,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 3,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 250,
+   "minutes": 0.1,
+   "smallShare": 0.083,
+   "shortStrokes": 4,
+   "dotStrokes": 0,
+   "copyHF": -0.0003,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.69,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.04,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3.33,
+     "marks_texture": 4.67,
+     "classic_value": 4.52,
+     "classic_edge": 7.53,
+     "classic_landmark": null,
+     "classic_marks": 9.06
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 5,
+     "50": 3,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 5,
+    "mean": 4.4,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "a": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable human sequence—faint contour sketch, then the road and broad light washes, with darks held back until mid-stage—the only recurring tell being the somewhat uniform round foliage dabs at 50–75%."
+    }
+   }
+  },
+  "south-france": {
+   "seed": 3,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 234,
+   "minutes": 0,
+   "smallShare": 0.195,
+   "shortStrokes": 16,
+   "dotStrokes": 0,
+   "copyHF": 0.0638,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.35,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 6.7,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3.33,
+     "marks_texture": 5,
+     "classic_value": 4.11,
+     "classic_edge": 7.03,
+     "classic_landmark": null,
+     "classic_marks": 8.96
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 3,
+     "50": 3,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 3.5,
+    "mean": 3.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "f": 2,
+     "e": 1,
+     "a": 1,
+     "k": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence broadly follows a human watercolour order — faint pencil underdrawing, broad ground wash, foliage masses, then darks and detail last — but the even all-over ochre wash, the stamped-looking repeated foliage dabs, the early saturated teal block and the dark trunk arriving before its canopy are noticeable tells."
+    }
+   }
+  },
+  "sargent": {
+   "seed": 3,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 134,
+   "minutes": 0,
+   "smallShare": 0.09,
+   "shortStrokes": 15,
+   "dotStrokes": 0,
+   "copyHF": 0.0929,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.94,
+    "pm": 0.26,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.55,
+    "criteria": {
+     "composition_values": 6,
+     "edges_detail": 3.67,
+     "marks_texture": 3,
+     "classic_value": 5.21,
+     "classic_edge": 8.27,
+     "classic_landmark": null,
+     "classic_marks": 9.16
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 2.5,
+     "25": 2.5,
+     "50": 3.5,
+     "75": 3.5,
+     "100": 3.5
+    },
+    "earlyMean": 2.5,
+    "mean": 3.1,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "i": 1,
+     "d": 1,
+     "e": 1,
+     "b": 2,
+     "c": 4,
+     "l": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable watercolor build-up — hull blocked in with broad strokes, darks and reserved/scratched lights mid-way, rigging and mast lines last — with only a regular stacked stroke swatch at 10% and the crisp anchor emblem arriving before its surrounding wash as mild tells.",
+     "Qwen/Qwen3.5-9B": "The sequence is AI-generated, evidenced by flat blocky shapes, the premature appearance of an orange arrow not in the target, and a composition that shifts from the target's layout."
+    }
+   }
+  },
+  "mittens": {
+   "seed": 3,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 143,
+   "minutes": 0,
+   "smallShare": 0.133,
+   "shortStrokes": 15,
+   "dotStrokes": 0,
+   "copyHF": 0.1172,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.65,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 7.31,
+    "criteria": {
+     "composition_values": 5.33,
+     "edges_detail": 3,
+     "marks_texture": 4.67,
+     "classic_value": 5.69,
+     "classic_edge": 7.08,
+     "classic_landmark": null,
+     "classic_marks": 9.17
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 4,
+     "25": 4,
+     "50": 4,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 4,
+    "mean": 4.2,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "d": 2,
+     "i": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence builds believably from broad light washes to stripes, features and whisker detail, with only the early green eye colour before the cat's form and the stylized zigzag hair pattern as small tells."
+    }
+   }
+  },
+  "trumbull": {
+   "seed": 3,
+   "sheet": {
+    "W": 300,
+    "H": 263,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "trumbull-strokes.jsonl.gz",
+   "strokes": 171,
+   "minutes": 0,
+   "smallShare": 0.142,
+   "shortStrokes": 46,
+   "dotStrokes": 0,
+   "copyHF": 0.1045,
+   "images": {
+    "final": "trumbull.webp",
+    "stages": "trumbull-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.17,
+    "pm": 0.1,
+    "complete": true,
+    "visionOverall": 3.67,
+    "classic": 6.68,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 3,
+     "marks_texture": 4,
+     "classic_value": 4.69,
+     "classic_edge": 6.54,
+     "classic_landmark": null,
+     "classic_marks": 8.82
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 2,
+     "50": 2.5,
+     "75": 3,
+     "100": 5
+    },
+    "earlyMean": 1.75,
+    "mean": 2.8,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "b": 1,
+     "c": 3,
+     "j": 1,
+     "g": 2,
+     "f": 2,
+     "d": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The broad-to-detail, light-to-dark sequence is plausible, but the marks are flat, evenly-toned region fills with scalloped cut edges rather than varied brush washes, reading as a digital region-by-region rendering rather than hand brushwork.",
+     "Qwen/Qwen3.5-9B": "The sequence appears to be a digital reveal or wipe animation rather than a natural brush progression, with sharp details appearing on flat washes."
+    }
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 5.56,
+  "partialComposite": null,
+  "cropsScored": 5,
+  "complete": true
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.31,
+   "level": "medium",
+   "parts": {
+    "progression": 0.07,
+    "earlyStageMean": 3.35,
+    "copyHF": {
+     "hills": -0.0003,
+     "south-france": 0.0638,
+     "sargent": 0.0929,
+     "mittens": 0.1172,
+     "trumbull": 0.1045
+    },
+    "copy": 0.95,
+    "smallStrokeShare": 0.129,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.04,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v2-skill/argon/3"
+}

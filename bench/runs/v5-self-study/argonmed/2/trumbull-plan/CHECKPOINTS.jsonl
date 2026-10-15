@@ -1,0 +1,10 @@
+{"t":"2026-10-14T22:32:04.631Z","kind":"start","modelMinutes":27.9,"variant":"region_w13_ssp55_bvar_lit15_lw_mg12_lf_ol40_opp24_tp1","stops":"every passage boundary"}
+{"t":"2026-10-14T22:33:42.125Z","kind":"look","modelMinutes":28.14,"n":1,"boundary":"0","strokes":0,"penLines":40,"passesDone":0,"passesPlanned":81}
+{"t":"2026-10-14T22:33:52.045Z","kind":"continue","modelMinutes":28.3,"boundary":"0","stopAt":16,"strokes":0}
+{"t":"2026-10-14T22:37:58.869Z","kind":"look","modelMinutes":28.71,"n":2,"boundary":"16","strokes":922,"penLines":40,"passesDone":16,"passesPlanned":81}
+{"t":"2026-10-14T22:38:10.272Z","kind":"continue","modelMinutes":28.9,"boundary":"16","stopAt":42,"strokes":922}
+{"t":"2026-10-14T22:43:41.466Z","kind":"look","modelMinutes":29.53,"n":3,"boundary":"42","strokes":2161,"penLines":40,"passesDone":42,"passesPlanned":81}
+{"t":"2026-10-14T22:43:53.292Z","kind":"continue","modelMinutes":29.73,"boundary":"42","stopAt":64,"strokes":2161}
+{"t":"2026-10-14T22:50:08.243Z","kind":"look","modelMinutes":31.25,"n":4,"boundary":"64","strokes":3643,"penLines":40,"passesDone":64,"passesPlanned":81}
+{"t":"2026-10-14T22:50:16.600Z","kind":"continue","modelMinutes":31.39,"boundary":"64","stopAt":"closing","strokes":3643}
+{"t":"2026-10-15T00:25:15.428Z","kind":"session-end","modelMinutes":85.06,"why":"85 minutes of your own time are up","looks":4,"revisions":0}

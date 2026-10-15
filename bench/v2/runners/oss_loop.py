@@ -2,12 +2,12 @@
 
   BENCH_CROPS=sargent,trumbull python3 oss_loop.py --model zai-org/GLM-5.2 --cwd <worktree> --brief <file> --log <jsonl> [--usd 2.2] [--minutes 65] [--done paintings|any]
 
-BENCH_CROPS narrows the crops to paint; without it the loop paints all four. The key is read from the
+BENCH_CROPS narrows the crops to paint; without it the loop paints every crop in bench/v2/crops.json. The key is read from the
 TOGETHER_API_KEY environment variable and never printed.
 """
 import argparse, base64, json, os, pathlib, subprocess, sys, time, urllib.request, urllib.error
 
-ALL_CROPS = ('hills', 'south-france', 'sargent', 'trumbull')
+ALL_CROPS = tuple(c['task'] for c in json.loads((pathlib.Path(__file__).resolve().parents[1] / 'crops.json').read_text())['crops'])
 CROPS = tuple(c for c in os.environ.get('BENCH_CROPS', '').split(',') if c) or ALL_CROPS
 if set(CROPS) - set(ALL_CROPS):
     sys.exit(f"unknown crops: {', '.join(sorted(set(CROPS) - set(ALL_CROPS)))}")

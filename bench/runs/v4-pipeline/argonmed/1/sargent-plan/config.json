@@ -1,0 +1,199 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "target": "bench/plan/target.png",
+  "title": "John Singer Sargent — White Ships (1908), bow and anchor detail",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent's watercolor relies on luminous bare paper, crisp value boundaries between sunlit and shadowed hull planes, and decisive brushwork without ink outlines.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.sunlit-hull",
+      "bounds": [0.58, 0.0, 1.0, 0.67],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit warm-white hull on the right with pale blue-grey horizontal shadow bands"
+    },
+    {
+      "id": "sargent.shadowed-bow",
+      "bounds": [0.0, 0.0, 0.64, 0.76],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sweeping curved ship bow in cool cerulean and ultramarine grey-blue shadow"
+    },
+    {
+      "id": "sargent.hawsepipe-rust",
+      "bounds": [0.41, 0.0, 0.65, 0.52],
+      "baseMove": "wet on dry",
+      "referenceCue": "Dark oval hawsehole and warm raw/burnt sienna rust and chain streaks along the stem"
+    },
+    {
+      "id": "sargent.fenders-and-spar",
+      "bounds": [0.76, 0.12, 1.0, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Two dark hanging round fenders and diagonal golden-ochre spar on the right hull"
+    },
+    {
+      "id": "sargent.waterline",
+      "bounds": [0.0, 0.67, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm cream foreground anchor on the left, deep waterline shadow under the bow, and turquoise-olive ripples on the right"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Brightest warm-cream highlight on the foreground anchor arm",
+      "bounds": [0.21, 0.78, 0.25, 0.82]
+    }
+  ],
+  "focalPoints": [
+    {
+      "label": "Hawsepipe and anchor chain on bow",
+      "x": 0.43,
+      "y": 0.19,
+      "w": 0.21,
+      "h": 0.29,
+      "importance": "primary",
+      "treatment": "Crisp dark hawsehole opening with warm raw-sienna and burnt-sienna rust and chain accents against the cool blue-grey bow"
+    },
+    {
+      "label": "Dark round fenders and diagonal mast on right hull",
+      "x": 0.77,
+      "y": 0.12,
+      "w": 0.22,
+      "h": 0.56,
+      "importance": "secondary",
+      "treatment": "Two dark brown-black fenders hanging high on the sunlit hull beside the warm ochre diagonal spar"
+    },
+    {
+      "label": "Left foreground sunlit anchor",
+      "x": 0.09,
+      "y": 0.71,
+      "w": 0.21,
+      "h": 0.22,
+      "importance": "secondary",
+      "treatment": "Warm cream and yellow-ochre anchor fluke emerging from the cool blue-grey shadow of the lower left hull"
+    }
+  ],
+  "regions": [
+    {
+      "id": "sunlit-right-hull",
+      "label": "Sunlit white hull on the right with pale blue-grey horizontal shadow bands",
+      "x": 0.58,
+      "y": 0.0,
+      "w": 0.42,
+      "h": 0.67,
+      "isSky": false,
+      "pigments": ["cerulean", "ochre", "rawsienna"],
+      "washType": "graded",
+      "strokeDirection": "horizontal",
+      "edgeTreatment": "soft",
+      "notes": "Keep luminous paper white with whisper-light horizontal washes of cool grey-blue and warm ochre"
+    },
+    {
+      "id": "shadowed-bow-left",
+      "label": "Sweeping curved ship bow in cool cerulean and ultramarine shadow",
+      "x": 0.0,
+      "y": 0.0,
+      "w": 0.64,
+      "h": 0.78,
+      "isSky": false,
+      "pigments": ["cerulean", "ultramarine", "rawsienna", "paynes"],
+      "washType": "layered",
+      "strokeDirection": "diagonal",
+      "edgeTreatment": "varied",
+      "notes": "Broad sweeping diagonal and curved washes following the flare of the bow, layered from pale cerulean-grey to deeper ultramarine-grey"
+    },
+    {
+      "id": "bow-rust-and-hawsepipe",
+      "label": "Warm sienna rust streak, hawsehole, and upper stem detail",
+      "x": 0.41,
+      "y": 0.0,
+      "w": 0.25,
+      "h": 0.52,
+      "isSky": false,
+      "pigments": ["rawsienna", "sienna", "paynes", "ultramarine"],
+      "washType": "layered",
+      "strokeDirection": "diagonal",
+      "edgeTreatment": "crisp",
+      "notes": "Rich warm orange-sienna accents along the stem edge and below the dark hawsehole"
+    },
+    {
+      "id": "right-fenders-and-spar",
+      "label": "Dark hanging fenders and warm ochre diagonal mast/spar",
+      "x": 0.76,
+      "y": 0.12,
+      "w": 0.24,
+      "h": 0.86,
+      "isSky": false,
+      "pigments": ["rawsienna", "sienna", "sepia", "sapgreen"],
+      "washType": "layered",
+      "strokeDirection": "diagonal",
+      "edgeTreatment": "crisp",
+      "notes": "Compact dark accents for the two round fenders and decisive diagonal strokes for the golden-ochre spar"
+    },
+    {
+      "id": "waterline-and-reflections",
+      "label": "Deep waterline shadow under the bow and turquoise-olive ripples on the right",
+      "x": 0.0,
+      "y": 0.67,
+      "w": 1.0,
+      "h": 0.33,
+      "isSky": false,
+      "pigments": ["sapgreen", "cerulean", "rawsienna", "paynes", "sepia"],
+      "washType": "layered",
+      "strokeDirection": "horizontal",
+      "edgeTreatment": "varied",
+      "notes": "Horizontal turquoise, olive-green, and dark sepia/Paynes grey strokes at the base of the hull with reserved pale ripple bands"
+    }
+  ],
+  "valueGroups": [
+    {
+      "tier": 1,
+      "name": "White paper and sunlit hull highlights",
+      "valMin": 0.84,
+      "valMax": 1.0,
+      "pigments": ["ochre", "rawsienna"],
+      "approach": "Leave mostly bare cream paper on the sunlit right hull, anchor arm, and water ripple gleams"
+    },
+    {
+      "tier": 2,
+      "name": "Pale cool shadow washes and light warm timber",
+      "valMin": 0.66,
+      "valMax": 0.84,
+      "pigments": ["cerulean", "ultramarine", "ochre", "rawsienna"],
+      "approach": "Broad fluid washes establishing the cool blue-grey shadow across the bow and soft horizontal shadow stripes on the sunlit right hull"
+    },
+    {
+      "tier": 3,
+      "name": "Mid-tone blue-grey hull modeling, sienna rust, and green-turquoise water",
+      "valMin": 0.45,
+      "valMax": 0.66,
+      "pigments": ["ultramarine", "cerulean", "rawsienna", "sienna", "sapgreen"],
+      "approach": "Directional strokes following the hull curvature, warm burnt/raw sienna along the bow stem and diagonal spar, and horizontal sap-green/cerulean water bands"
+    },
+    {
+      "tier": 4,
+      "name": "Deep hull shadow, lower left anchor backdrop, and dark water",
+      "valMin": 0.25,
+      "valMax": 0.45,
+      "pigments": ["ultramarine", "paynes", "sienna", "sapgreen", "sepia"],
+      "approach": "Concentrated mid-dark washes under the bow flare, around the foreground anchor, and along the waterline"
+    },
+    {
+      "tier": 5,
+      "name": "Hawsehole, hanging fenders, and deepest waterline accents",
+      "valMin": 0.0,
+      "valMax": 0.25,
+      "pigments": ["paynes", "sepia", "sienna"],
+      "approach": "Crisp, high-pigment darks with a smaller brush for the oval hawsehole, the two round fenders on the right, and the dark base of the bow"
+    }
+  ],
+  "budget": {
+    "targetTotal": 220,
+    "backgroundWash": 35,
+    "midtones": 125,
+    "darkAccents": 45,
+    "closingDetails": 15
+  }
+}

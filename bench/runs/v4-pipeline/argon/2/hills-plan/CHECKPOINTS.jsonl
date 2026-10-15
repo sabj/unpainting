@@ -1,0 +1,14 @@
+{"t":"2026-10-14T13:37:27.468Z","kind":"start","modelMinutes":32.91,"variant":"region_w13","stops":"every passage boundary"}
+{"t":"2026-10-14T13:38:56.348Z","kind":"look","modelMinutes":33.77,"n":1,"boundary":"0","strokes":0,"penLines":410,"passesDone":0,"passesPlanned":61}
+{"t":"2026-10-14T13:39:40.407Z","kind":"continue","modelMinutes":34.5,"boundary":"0","stopAt":10,"strokes":0}
+{"t":"2026-10-14T13:42:18.551Z","kind":"look","modelMinutes":35.53,"n":2,"boundary":"10","strokes":668,"penLines":410,"passesDone":10,"passesPlanned":61}
+{"t":"2026-10-14T13:43:57.778Z","kind":"continue","modelMinutes":37.19,"boundary":"10","stopAt":30,"strokes":668}
+{"t":"2026-10-14T13:47:59.707Z","kind":"look","modelMinutes":38.06,"n":3,"boundary":"30","strokes":1944,"penLines":410,"passesDone":30,"passesPlanned":61}
+{"t":"2026-10-14T13:56:18.857Z","kind":"revise","modelMinutes":45.67,"boundary":"30","revision":1,"strokes":1944,"passesDone":30,"changed":["extra-args.json","variant.txt"],"variant":"region_w13_spl_lad_tp3"}
+{"t":"2026-10-14T14:04:06.544Z","kind":"look","modelMinutes":47.65,"n":4,"boundary":"50","strokes":7291,"penLines":410,"passesDone":50,"passesPlanned":61}
+{"t":"2026-10-14T14:04:53.600Z","kind":"continue","modelMinutes":48.44,"boundary":"50","stopAt":"closing","strokes":7291}
+{"t":"2026-10-14T14:11:12.464Z","kind":"look","modelMinutes":49.56,"n":5,"boundary":"closing","strokes":25096,"penLines":410,"passesDone":78,"passesPlanned":78}
+{"t":"2026-10-14T14:11:33.420Z","kind":"continue","modelMinutes":49.91,"boundary":"closing","stopAt":"end","strokes":25096}
+{"t":"2026-10-14T14:12:07.515Z","kind":"finished","modelMinutes":49.91,"strokes":25096}
+{"t":"2026-10-14T14:12:24.702Z","kind":"look","modelMinutes":50.19,"n":6,"boundary":"final"}
+{"t":"2026-10-14T14:14:05.241Z","kind":"session-end","modelMinutes":51.86,"why":"the session ended","looks":6,"revisions":1}

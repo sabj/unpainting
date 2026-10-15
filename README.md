@@ -107,27 +107,32 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) tests how well AI models paint with these tools. In V1 to V3 each painting gets about 15 minutes and at most 2,500 strokes. In V4 and V5 the model plans and the painter paints, with no stroke limit.
+[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds that give the model more help each time.
 
-The results below were painted with painter V096, sim 100 and judges J1, in release 0.1.0. Results are labelled by round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it. To reproduce, check out tag `v0.1.0` ([versions](docs/versions.md)).
+- **V1 to V3: the model paints.** It writes its own scripts that lay every brush and pen stroke through the toolkit. Each painting gets about 15 minutes and at most 2,500 strokes. V2 adds technique guides; V3 adds the model's own earlier attempts.
+- **V4 and V5: the model directs a painting harness.** It writes a plan (regions, layering, brushes and lines), and the harness's painter turns the plan into strokes, with no stroke limit. At set points the model can stop, look at the painting and revise the rest of the plan. V5 adds feedback from the previous try. These rounds measure how well a model directs the harness, not how well it lays strokes itself. The harness does much of the work, which is why V4 and V5 scores sit closer together.
 
-Across V1–V5, models ran at their highest reasoning setting where available (xhigh); Haiku 4.5, DeepSeek V4.1 Flash and MiniMax M3 have no reasoning setting and show none.
+All results use painter V096, sim 100 and judges J1. Release 0.1.0 holds the original models. Release 0.1.1 adds Gemini 4 Argon, Gemini 3.8 Flash and the Muse models, and changes two harness rules in V4 and V5 (see the [changelog](CHANGELOG.md)). Results are labelled by round, painter, sim, judge version and release. To reproduce, check out tag `v0.1.0` or `v0.1.1` ([versions](docs/versions.md)).
+
+Models ran at their highest reasoning setting: xhigh where offered. Gemini 4 Argon and Gemini 3.8 Flash top out at high; Argon also ran at medium for comparison. Haiku 4.5, DeepSeek V4.1 Flash and MiniMax M3 have no reasoning setting.
 
 | Benchmark version | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|
-| V1 | Tools | 5 | [Codex Astra](bench/models.json) | 61.4% | 5.28 |
-| V2 | Tools and technique guides | 5 | Codex Astra | 60.6% | 5.21 |
+| V1 | Tools | 5 | [Gemini 4 Argon (High)](bench/models.json) | 64.1% | 5.50 |
+| V2 | Tools and technique guides | 5 | Gemini 4 Argon (High) | 64.5% | 5.53 |
 | V3 | Tools, guides, and practice between tries | 3 | Codex Astra | 67.5% | 5.77 |
-| V4 | Full pipeline: planner, painter presets and scoring tools | 5 | Opus 5.5 | 69.9% | 6.00 |
+| V4 | Full pipeline: planner, painter presets and scoring tools | 5 | Gemini 4 Argon (High) | 70.9% | 6.09 |
 | V5 | Full pipeline and practice between tries | 5 | Opus 5.5 | 71.0% | 6.10 |
 
-A try is one model session that paints the requested targets. Scores are a percentage of each target scored against itself. V1 to V5 are benchmark versions with different tools or feedback. V3 excludes Mittens and Trumbull, so compare it with V1 and V2 on the [shared subjects](bench/results/FINDINGS.md).
+A try is one model session that paints the requested targets. Scores are a percentage of each target scored against itself. V1 to V5 are benchmark versions with different tools or feedback. V3 is compared on three subjects, without Mittens and Trumbull, so compare it with V1 and V2 on the [shared subjects](bench/results/FINDINGS.md).
+
+Gemini 4 Argon is the best model at painting on its own: it ranks first in V1 and V2. With the harness it is level with Opus 5.5. Argon leads V4 and Opus narrowly edges it in V5, both within the margin of error. Google cooked.
 
 <p align="center"><a href="bench/results/leaderboard.md"><img src="docs/img/bench-chart.svg" width="800" alt="Mean score per model and round as a percentage of each target's own score, with 95% intervals"></a></p>
 
 <p align="center"><a href="bench/results/gallery.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of paintings. Top: each model's best painting from any round, sorted by score, with the five targets at left. Bottom: each model's best Ships painting from V1 to V3, with the Ships target at left."></a></p>
 
-Interestingly, the harness helped Sonnet, Haiku and Luna the most: they trailed with only the tools and caught up with the full pipeline.
+The harness helped Sonnet, Haiku and Luna the most: they trailed with only the tools and caught up with the full pipeline.
 
 Scores are relative, very coarse, and open to improvement. [Leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md), [scoring](bench/docs/scoring.md).
 

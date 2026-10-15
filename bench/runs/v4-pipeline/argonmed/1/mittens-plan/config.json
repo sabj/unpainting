@@ -1,0 +1,71 @@
+{
+  "subject": "subject-c",
+  "name": "Mittens",
+  "photo": "target.png",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Portrait sketch of a ginger-and-white tabby cat on a bearded man's shoulder, built with fine sepia ink contours and light, transparent layered washes over reserved paper whites."
+  },
+  "drawing": {
+    "medium": "ink",
+    "inkColor": "sepia",
+    "lines": "all",
+    "closingLines": 1
+  },
+  "families": [
+    {
+      "id": "subject-c.cat-head-ears",
+      "bounds": [0.02, 0.03, 0.44, 0.44],
+      "referenceCue": "Ginger-orange tabby cat head, pointed ears, warm burnt-sienna and yellow-ochre brow stripes, pale muzzle, and dark eye rims.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "subject-c.cat-chest-bib",
+      "bounds": [0.03, 0.36, 0.46, 0.78],
+      "referenceCue": "Reserved paper-white chest bib and muzzle meeting soft cool-grey shadow under the dark collar.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "subject-c.cat-back-flank",
+      "bounds": [0.20, 0.28, 0.56, 0.99],
+      "referenceCue": "Warm yellow-ochre and burnt-sienna tabby coat sweeping down the back and lower flank.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "subject-c.human-hair",
+      "bounds": [0.55, 0.31, 0.99, 0.68],
+      "referenceCue": "Dark brown-black hair mass with broken outer contour and directional crown strands.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "subject-c.human-face",
+      "bounds": [0.52, 0.48, 0.89, 0.85],
+      "referenceCue": "Warm peach-sienna forehead, nose bridge, and cheeks with dark brows and crisp eye rims.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "subject-c.human-beard-neck",
+      "bounds": [0.48, 0.72, 0.92, 0.99],
+      "referenceCue": "Dark beard, moustache, lower-face stubble texture, and warm neck and collar.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.075, 0.235, 0.081, 0.241],
+      "reason": "Cat left eye catchlight glint"
+    },
+    {
+      "bounds": [0.264, 0.214, 0.270, 0.220],
+      "reason": "Cat right eye catchlight glint"
+    },
+    {
+      "bounds": [0.600, 0.700, 0.606, 0.705],
+      "reason": "Human left eye catchlight glint"
+    },
+    {
+      "bounds": [0.809, 0.681, 0.814, 0.686],
+      "reason": "Human right eye catchlight glint"
+    }
+  ]
+}

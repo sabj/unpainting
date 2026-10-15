@@ -1,0 +1,183 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Architectural stone, slate roof planes, courtyard trees, and gothic window recesses are carried by 5-band light-to-dark painted washes with dry focal darks and selective sepia drawing.",
+    "regions": {}
+  },
+  "reserves": [
+    {
+      "reason": "bright upper-right cloud crest",
+      "bounds": [0.937, 0.034, 0.959, 0.056]
+    },
+    {
+      "reason": "bright cloud light beside right chimney",
+      "bounds": [0.637, 0.148, 0.661, 0.170]
+    },
+    {
+      "reason": "upper-central gable limestone arch highlight",
+      "bounds": [0.427, 0.365, 0.449, 0.387]
+    },
+    {
+      "reason": "mid-gable sunlit stone mullion highlight",
+      "bounds": [0.457, 0.529, 0.479, 0.551]
+    },
+    {
+      "reason": "foreground sunlit step and paving highlight",
+      "bounds": [0.567, 0.939, 0.589, 0.961]
+    }
+  ],
+  "families": [
+    {
+      "id": "Y1.sky",
+      "name": "sky-cloud-wash",
+      "role": "field",
+      "band": 1,
+      "bounds": [0.00, 0.00, 1.00, 0.30],
+      "hue": "cool",
+      "baseMove": "wet on wet",
+      "edge": "soft",
+      "load": 0.22,
+      "referenceCue": "pale cerulean sky and luminous cloud deck at top"
+    },
+    {
+      "id": "Y1.gable_light",
+      "name": "sunlit-gable-first-wash",
+      "role": "field",
+      "band": 1,
+      "bounds": [0.32, 0.10, 0.68, 0.86],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "crisp",
+      "load": 0.25,
+      "referenceCue": "sunlit warm ochre and hansa first wash on central gable and right chimney"
+    },
+    {
+      "id": "Y1.chimney_left",
+      "name": "sunlit-chimneys-light",
+      "role": "mass",
+      "band": 1,
+      "bounds": [0.06, 0.07, 0.22, 0.35],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "crisp",
+      "load": 0.26,
+      "referenceCue": "left stone chimney stack against upper sky"
+    },
+    {
+      "id": "Y1.gable_warm_stone",
+      "name": "central-gable-warm-stone",
+      "role": "mass",
+      "band": 2,
+      "bounds": [0.33, 0.12, 0.63, 0.84],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "crisp",
+      "load": 0.42,
+      "referenceCue": "sunlit yellow-ochre and raw-sienna ashlar masonry of central gable"
+    },
+    {
+      "id": "Y1.right_wing",
+      "name": "right-courtyard-wing-stone",
+      "role": "mass",
+      "band": 2,
+      "bounds": [0.76, 0.36, 1.00, 0.86],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "crisp",
+      "load": 0.45,
+      "referenceCue": "warm stone wall of right courtyard wing behind tree"
+    },
+    {
+      "id": "Y1.steps_walk",
+      "name": "sunlit-steps-and-sidewalk",
+      "role": "field",
+      "band": 2,
+      "bounds": [0.00, 0.82, 1.00, 1.00],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "crisp",
+      "load": 0.40,
+      "referenceCue": "sunlit warm entrance steps and foreground sidewalk paving"
+    },
+    {
+      "id": "Y1.tree_light",
+      "name": "courtyard-tree-canopy-light",
+      "role": "mass",
+      "band": 2,
+      "bounds": [0.52, 0.36, 0.86, 0.84],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "soft",
+      "load": 0.44,
+      "referenceCue": "sunlit sap-green and hansa-yellow deciduous tree crown"
+    },
+    {
+      "id": "Y1.left_wall",
+      "name": "left-wing-shaded-stone",
+      "role": "mass",
+      "band": 3,
+      "bounds": [0.00, 0.38, 0.34, 0.84],
+      "hue": "warm",
+      "baseMove": "glaze",
+      "edge": "crisp",
+      "load": 0.58,
+      "referenceCue": "mid-tone shaded stone facade on left wing"
+    },
+    {
+      "id": "Y1.slate_roofs",
+      "name": "slate-roof-slopes",
+      "role": "mass",
+      "band": 3,
+      "bounds": [0.00, 0.24, 1.00, 0.44],
+      "hue": "cool",
+      "baseMove": "glaze",
+      "edge": "crisp",
+      "load": 0.58,
+      "referenceCue": "cool grey-violet slate roof slopes left and right of central gable"
+    },
+    {
+      "id": "Y1.foliage_mid",
+      "name": "foliage-mid-canopy-and-shrubs",
+      "role": "mass",
+      "band": 3,
+      "bounds": [0.00, 0.42, 0.86, 0.88],
+      "hue": "warm",
+      "baseMove": "layered wash",
+      "edge": "soft",
+      "load": 0.60,
+      "referenceCue": "deeper green foliage in tree interior and lower-left shrubs"
+    },
+    {
+      "id": "Y1.cast_shadows",
+      "name": "cast-shadows-and-lower-masonry",
+      "role": "haunt",
+      "band": 4,
+      "bounds": [0.00, 0.26, 1.00, 0.96],
+      "hue": "cool",
+      "baseMove": "glaze",
+      "edge": "crisp",
+      "load": 0.72,
+      "referenceCue": "violet-earth cast shadows under eaves, foliage, and across steps"
+    },
+    {
+      "id": "Y1.window_recesses",
+      "name": "gothic-windows-and-arch-recesses",
+      "role": "dark-accent",
+      "band": 5,
+      "bounds": [0.00, 0.16, 1.00, 0.92],
+      "hue": "cool",
+      "baseMove": "drybrush",
+      "edge": "crisp",
+      "load": 0.88,
+      "referenceCue": "crisp dark gothic window openings, doorway recess, and lamppost banner"
+    }
+  ],
+  "budget": {
+    "strokesTotal": 160,
+    "washGroups": 5,
+    "accentGroups": 3
+  },
+  "notes": "Paint strictly light to dark in five value bands on Y1 (Trumbull): (1) wet-on-wet cerulean/ultramarine sky lanes and pale warm ochre/hansa first stone washes holding bright paper reserves; (2) warm ochre/raw-sienna masonry masses on the sunlit central gable, right wing, sunlit sap-green tree crown, and foreground walk; (3) mid-tone shaded left masonry, cool slate roofs, textured ashlar stone blocks, and deeper foliage; (4) split cool-violet and warm-earth shadow glazes across eaves, foliage under-planes, and sidewalk shadows; (5) crisp dry sepia/ultramarine gothic window recesses, banner dark, and doorway accents, finished with selective closing sepia pen lines."
+}

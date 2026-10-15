@@ -9,14 +9,14 @@ A round is a benchmark version with a different set of tools or feedback. A try 
 <!-- rounds-table:start -->
 | Round | What the model gets | Learns between tries | Winning painting (J1) |
 |---|---|---|---|
-| V1 | A painting toolkit and the targets | No | <a href="results/gallery.md"><img src="runs/v1-naive/astra/1/south-france.webp" width="96" alt="Codex Astra, south-france, 68.8% of target"></a> |
-| V2 | V1 plus the technique guides | No | <a href="results/gallery.md"><img src="runs/v2-skill/opus/1/hills.webp" width="96" alt="Opus 5.5, hills, 68.09% of target"></a> |
+| V1 | A painting toolkit and the targets | No | <a href="results/gallery.md"><img src="runs/v1-naive/argonmed/1/hills.webp" width="96" alt="Gemini 4 Argon (Medium), hills, 72.95% of target"></a> |
+| V2 | V1 plus the technique guides | No | <a href="results/gallery.md"><img src="runs/v2-skill/argonmed/3/hills.webp" width="96" alt="Gemini 4 Argon (Medium), hills, 73.43% of target"></a> |
 | V3 | V2 plus its own earlier tries | Yes | <a href="results/gallery.md"><img src="runs/v3-informed/astra/3/south-france.webp" width="96" alt="Codex Astra, south-france, 74.02% of target"></a> |
-| V4 | The full painting pipeline | No | <a href="results/gallery.md"><img src="runs/v4-pipeline/sol/1/sargent.webp" width="96" alt="Codex Sol, sargent, 74.66% of target"></a> |
+| V4 | The full painting pipeline | No | <a href="results/gallery.md"><img src="runs/v4-pipeline/argon/1/mittens.webp" width="96" alt="Gemini 4 Argon (High), mittens, 77.17% of target"></a> |
 | V5 | The full pipeline plus its own earlier tries | Yes | <a href="results/gallery.md"><img src="runs/v5-self-study/astra/3/mittens.webp" width="96" alt="Codex Astra, mittens, 84.13% of target"></a> |
 <!-- rounds-table:end -->
 
-V1 to V5 are published. V3 to V5 ran only the Claude and Codex models: I stopped running the weaker models after V2 because it was wasteful. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
+V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models; V4 and V5 ran the Claude, Codex and Gemini 4 Argon models. Not every model ran every round; the [leaderboard](results/leaderboard.md) lists the tries each model ran. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
 
 ## Subjects
 
@@ -28,11 +28,11 @@ V1 to V5 are published. V3 to V5 ran only the Claude and Codex models: I stopped
 | Mittens | Portrait sketch and light washes | Yes, photo by Sam Jackson, see [NOTICE](../NOTICE) |
 | Trumbull | Architectural watercolor | Yes, third-party photo credited in [NOTICE](../NOTICE) |
 
-V3 painted only Hills, France and Ships; Mittens and Trumbull were not run. V4 and V5 painted all five. One of the painter's preset recipes was tuned on Trumbull, so V4 and V5 Trumbull scores may run high. [Target sizes](crops/README.md) gives the physical scale.
+V3 is compared on Hills, France and Ships. The 0.1.0 V3 runs painted only those three; the 0.1.1 Muse V3 runs painted all five, and their Mittens and Trumbull paintings are shown but not counted. V4 and V5 painted all five. One of the painter's preset recipes was tuned on Trumbull, so V4 and V5 Trumbull scores may run high. [Target sizes](crops/README.md) gives the physical scale.
 
 ## Results
 
-All five rounds were painted with painter V096, sim 100 and judges J1, in release 0.1.0. Each result is labelled with its round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it; the new tries form their own group in that round. To reproduce, check out tag `v0.1.0`; [versions](../docs/versions.md) explains the scheme.
+All five rounds were painted with painter V096, sim 100 and judges J1, in releases 0.1.0 and 0.1.1. Each result is labelled with its round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it; the new tries form their own group in that round. To reproduce, check out the tag a result names, `v0.1.0` or `v0.1.1`; [versions](../docs/versions.md) explains the scheme.
 
 - [Leaderboard](results/leaderboard.md): scores, intervals, cost and time per model and round
 - [Gallery](results/gallery.md): each model's best painting of each target, shown as its 10 to 100% stages
