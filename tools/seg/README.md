@@ -10,7 +10,6 @@ Segmentation divides an image into labeled regions. These scripts identify those
 | `lines.py` | `work/lines/<base>-lines.json`, Informative Drawings line map traced to polylines (paths of connected straight segments) | `src/crop/lines.mjs` |
 | `lines-map.py` | A line file moved from a photograph onto the painting made from it, through a given 2x3 similarity transform (alignment by translation, rotation and uniform scale) | `src/crop/lines.mjs` |
 | `select-drawing.py` | The first pen drawing for the beach painting: its outlines plus the photograph's interior lines | `--drawingfile` |
-| `meta-sam.py` | Named regions from Meta's hosted SAM 3.1 (Model API, text prompts), in the segments format, plus an overlay; a trial against the local SAM | `src/crop/segments.mjs` |
 | `subject-regions.py` | A label map of named regions (person from Mask R-CNN in `pp/models.py`, parts from Segment Anything prompted by boxes or points) and its legend | `ink-lines.mjs` |
 | `ink-lines.mjs` | `<out>-lines.json`, a pen-and-wash target's estimated ink (`src/crop/inkwash.mjs`) traced to polylines, each tagged with its region | `--drawingfile` |
 | `face-mask.py` | A soft face ellipse from Keypoint R-CNN | `--litface` |
