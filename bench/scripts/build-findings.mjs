@@ -60,7 +60,7 @@ if (d.pipeline.length) {
   const failed = ms.reduce((a, m) => a + m.unpainted, 0);
   if (failed) L.push(`- ${failed} planned paintings have no painting: the painter refused the plan or the render failed. Each try's run.json gives the reason under \`unpainted\`.`);
   for (const m of ms.filter(x => x.notRun.length)) L.push(`- ${m.name} has no painting for ${list(m.notRun)}: that session was stopped before it painted so the results could be published.`);
-  if (ms.some(m => m.routed.length)) L.push('- Most judge calls went to Together. Later calls went through OpenRouter to zero-data-retention providers; each painting records them under `judgeProviders`.');
+  if (ms.some(m => m.routed.length)) L.push('- V4 and V5 were judged through OpenRouter, by zero-data-retention providers; V1 to V3 on Together. Each V4 and V5 painting records its providers under `judgeProviders`.');
   L.push('');
 }
 
@@ -88,12 +88,12 @@ L.push('');
 
 const g = d.guard;
 const cleared = g.high.filter(h => h.review === 'cleared'), flagged = g.high.filter(h => h.review !== 'cleared');
-L.push('## No run read the targets', '');
-L.push(`- Over ${g.tries} tries the guard, the check that blocks image reads, blocked ${g.blocked} image reads, and ${g.disqualified} tries were disqualified.`);
+L.push('## Target reads and cheat risk', '');
+L.push(`- Over ${g.tries} tries the guard, the check that blocks image reads, blocked ${g.blocked} image reads, and ${g.disqualified} tries were disqualified${g.disqualifiedTries.length ? `: ${list(g.disqualifiedTries.map(t => `${t.name} ${t.round} try ${t.try} (${t.reason})`))}. The guard stopped the read, so the model never saw the pixels, but any attempt disqualifies the try, and it is left off the leaderboard` : ''}.`);
 const named = hs => list(hs.map(h => `${h.name} ${h.round} try ${h.try}`));
 L.push(flagged.length
   ? `- ${g.high.length} tries had a high cheat-risk level. Review found weak technique in ${cleared.length}: ${named(cleared)}. ${flagged.length} await review: ${named(flagged)}. All stay on the leaderboard.`
-  : `- The cheat-risk score flagged ${g.high.length} tries, and each was reviewed by hand. None cheated. The flags came from early stages that didn't look like a person's start. The tries: ${named(cleared)}. All stay on the leaderboard.`);
+  : `- The cheat-risk score flagged ${g.high.length} tries, and each was reviewed by hand. None of them cheated. The flags came from early stages that didn't look like a person's start. The tries: ${named(cleared)}. All stay on the leaderboard.`);
 const mmCopy = g.high.find(h => h.name.startsWith('MiniMax') && h.round === 'V2' && h.try === 2);
 if (mmCopy) L.push('- MiniMax M3 V2 try 2 copied the target images into its output folder with a shell `cp`. No script opened the copies; the model only looked at them. The guard missed the copy, so it needs a post-run check for copied targets (known gap, not built yet).');
 fs.writeFileSync(out, L.join('\n') + '\n');

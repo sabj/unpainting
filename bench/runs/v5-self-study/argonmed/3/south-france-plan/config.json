@@ -1,0 +1,76 @@
+{
+  "subject": "south-france",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Execute an urban sketch (pen plus light wash) using the 5-band light-to-dark value ladder with multi-lane passage brushes (w15), connected Band 2 base mid-washes plus per-region Band 3 local-colour washes (_lay2_lt), and rectilinear sepia ink linework confined to architecture, cypress spires, and foreground tree trunks.",
+    "regions": {
+      "upper-village-and-terrace": {
+        "style": "precise-watercolor",
+        "reason": "Preserve warm cream-ochre sunlit stone walls and terrace road with crisp sepia pen roof/wall outlines and multi-lane top-edge wash coverage."
+      },
+      "distant-blue-green-ridge": {
+        "style": "precise-watercolor",
+        "reason": "Lay a soft cool cerulean-ochre-sapgreen atmospheric wash across the upper-right valley and ridge."
+      },
+      "lower-right-village-houses": {
+        "style": "precise-watercolor",
+        "reason": "Anchor the main architectural focal cluster with rectilinear sepia pen lines for pitched terracotta roofs, eaves, vertical house walls, windows, and loggia arches over warm sienna/ochre and cool lavender-shadow washes."
+      },
+      "sunlit-hillside-canopy": {
+        "style": "precise-watercolor",
+        "reason": "Paint the sunlit yellow-green tree crowns with loose sap-green, hansa-yellow, and yellow-ochre washes without wiggly pen contour loops."
+      },
+      "shaded-olive-groves-and-cypresses": {
+        "style": "precise-watercolor",
+        "reason": "Build the deep olive-green canopy shadows and vertical cypress spires through Band 3 regional washes and Bands 4-5 ultramarine-sienna-sepia shadow glazes."
+      }
+    }
+  },
+  "drawing": {
+    "medium": "ink",
+    "inkColor": "sepia",
+    "amount": 1,
+    "lines": "all",
+    "weight": 0.55,
+    "closingLines": 1,
+    "maxLines": 150
+  },
+  "families": [
+    {
+      "id": "upper-village-and-terrace",
+      "role": "ground",
+      "bounds": [0.0, 0.0, 0.58, 0.36],
+      "hue": "warm",
+      "edge": "hard"
+    },
+    {
+      "id": "distant-blue-green-ridge",
+      "role": "mass",
+      "bounds": [0.55, 0.0, 1.0, 0.32],
+      "hue": "cool",
+      "edge": "soft"
+    },
+    {
+      "id": "lower-right-village-houses",
+      "role": "focal",
+      "bounds": [0.64, 0.32, 0.98, 0.80],
+      "hue": "warm",
+      "edge": "hard"
+    },
+    {
+      "id": "sunlit-hillside-canopy",
+      "role": "mass",
+      "bounds": [0.0, 0.34, 0.72, 1.0],
+      "hue": "warm",
+      "edge": "soft"
+    },
+    {
+      "id": "shaded-olive-groves-and-cypresses",
+      "role": "structure",
+      "bounds": [0.0, 0.12, 1.0, 1.0],
+      "hue": "cool",
+      "edge": "soft"
+    }
+  ],
+  "reserves": []
+}

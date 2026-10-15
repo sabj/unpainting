@@ -1,0 +1,18 @@
+[
+  "--paints",
+  "ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia",
+  "--touchmincells",
+  "0.06",
+  "--touchfamilies",
+  "6",
+  "--openinglines",
+  "180",
+  "--closinglines",
+  "260",
+  "--openingpressure",
+  "0.42",
+  "--closingpressure",
+  "0.58",
+  "--closingedgemin",
+  "0.05"
+]

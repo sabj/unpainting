@@ -1,0 +1,35 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Trumbull College reference relies on crisp architectural washes, distinct warm sunlit and cool shadowed stone planes, selective dark Gothic window recesses held to the end, and restrained ink line."
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "bounds": [0.0, 0.0, 1.0, 0.38],
+      "baseMove": "wet on dry",
+      "referenceCue": "pale sky and open upper air"
+    },
+    {
+      "id": "Y1.main_gable",
+      "bounds": [0.40, 0.08, 1.0, 0.93],
+      "baseMove": "wet on dry",
+      "referenceCue": "warm stone main gable and sunlit facade"
+    },
+    {
+      "id": "Y1.left_wall",
+      "bounds": [0.0, 0.18, 0.48, 0.95],
+      "baseMove": "wet on dry",
+      "referenceCue": "cooler stone wall, tower, slate roof and recessed bays"
+    },
+    {
+      "id": "Y1.ground",
+      "bounds": [0.0, 0.55, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "foreground street, tree foliage, figures and shadow base"
+    }
+  ],
+  "reserves": []
+}

@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import sharp from 'sharp';
 import { BENCH, REPO, RUN_SCHEMA, VERSION_STAMP, V2, readJson, writeJson, validateRun, posix } from '../lib.mjs';
-import { turnCommand, codexThread, usage } from '../runners.mjs';
+import { turnCommand, codexThread, agyConversation, usage } from '../runners.mjs';
 import { thumb, stageStrip } from '../images.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './harness.mjs';
 import { PaintSession, planSnapshot, variantIn } from './session.mjs';
@@ -89,7 +89,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     let feedbackFiles = null;
     if (prev) feedbackFiles = await writeFeedback({ dest: path.join(ws, 'bench', 'feedback'), prev, prevRaw: prev.raw, prevOut: prev.out, target });
     session = new PaintSession({ repo: REPO, ws, raw, spec, target, modelMinutes: MODEL_MINUTES, gpu, log });
-    const sessionId = model.runner === 'claude' ? crypto.randomUUID() : null;
+    const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
     let thread = null, selfReviewAt = null;
     const selfReview = path.join(ws, 'bench', 'SELF-REVIEW.md');
     const turn = async (text, repair) => {
@@ -108,6 +108,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
         },
       });
       if (model.runner === 'codex' && !thread) thread = codexThread(events);
+      if (model.runner === 'agy' && !thread) thread = agyConversation(events);
       const u = dry ? { tokens: null, costUSD: null } : usage(model.runner, events);
       record.tokens += u.tokens || 0; record.costUSD += u.costUSD || 0; record.wallSeconds += r.seconds;
       record.turns.push({ k, repair, exit: r.code, seconds: Math.round(r.seconds), stoppedBy: r.reason });
@@ -194,6 +195,7 @@ async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, 
     repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null,
     optionCheck: v?.optionCheck ?? null, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
+    warnings: v?.warnings?.length ? v.warnings : undefined,
     failure: outcome === 'painted' ? null : { failures: v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason })) },
     feedback: feedbackFiles ? 'FEEDBACK.md' : null, selfReview: fs.existsSync(path.join(raw, 'SELF-REVIEW.md')) || fs.existsSync(path.join(ws, 'bench', 'SELF-REVIEW.md')) ? 'SELF-REVIEW.md' : null,
     selfReviewModelMinute: selfReviewAt,
@@ -244,7 +246,10 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     const tryDir = path.join(outRoot, round.dir, model.key, String(n));
     if (fs.existsSync(path.join(tryDir, 'run.json')) && !force) throw new Error(`${tryDir} already has a run.json; pass --force to replace it`);
     const rawTry = path.join(BENCH, 'work', 'raw', dry ? 'dry-run' : '', round.dir, model.key, String(n));
-    fs.rmSync(rawTry, { recursive: true, force: true }); fs.mkdirSync(rawTry, { recursive: true });
+    // A run of some targets clears only theirs, so runs of different targets of one try can share its raw folder
+    if (crops.length < Object.keys(subjects).length) for (const c of crops) for (const d of [c, path.join('out', c)]) fs.rmSync(path.join(rawTry, d), { recursive: true, force: true });
+    else fs.rmSync(rawTry, { recursive: true, force: true });
+    fs.mkdirSync(rawTry, { recursive: true });
     fs.rmSync(tryDir, { recursive: true, force: true }); fs.mkdirSync(tryDir, { recursive: true });
     const cropsOut = {}, unpainted = {}, t0 = Date.now();
     let tokens = 0, cost = 0, wall = 0, modelMin = 0, guardViolations = 0;

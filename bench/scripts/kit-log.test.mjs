@@ -66,3 +66,20 @@ test('logging does not change what is painted, and the log is complete', () => {
   assert.equal(on.stats.seed, 7);
   assert.equal(on.stats.strokeLog, 'strokes.jsonl.gz');
 });
+
+test('the kit takes its targets from the coarse maps installed next to it', () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'kittasks-'));
+  try {
+    fs.symlinkSync(path.join(REPO, 'src'), path.join(ws, 'src'));
+    fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
+    fs.copyFileSync(path.join(REPO, 'package.json'), path.join(ws, 'package.json'));
+    const wb = path.join(ws, 'bench'); fs.mkdirSync(path.join(wb, 'tasks'), { recursive: true });
+    for (const f of ['kit.mjs', 'guard.mjs']) fs.copyFileSync(path.join(V2, 'kit', f), path.join(wb, f));
+    // mittens, and a target added later under a new name, installed the way run.mjs installs them
+    fs.copyFileSync(path.join(V2, 'targets', 'mittens-coarse.json'), path.join(wb, 'tasks', 'mittens-coarse.json'));
+    fs.copyFileSync(path.join(V2, 'targets', 'sargent-coarse.json'), path.join(wb, 'tasks', 'harbour-coarse.json'));
+    fs.writeFileSync(path.join(wb, 'tasks.mjs'), "import * as kit from './kit.mjs'; console.log(JSON.stringify(kit.TASKS));");
+    const tasks = JSON.parse(execFileSync('node', ['tasks.mjs'], { cwd: wb }).toString());
+    assert.deepEqual(tasks, ['harbour', 'mittens']);
+  } finally { fs.rmSync(ws, { recursive: true, force: true }); }
+});

@@ -1,0 +1,320 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "286e7e9377cbe7a5d8138fd80020617681b7c640",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "argon",
+  "name": "Gemini 4 Argon",
+  "id": "gemini-4-argon-high",
+  "effort": "high",
+  "runner": "agy"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 31.5,
+  "tokens": 1022086,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 538,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0314,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": "Paint tree base washes before sunlit hillside washes so bright yellow-green slopes stay crisp to the canopy edge, smooth coarse row transitions with sculpted 3D crown/shadow strokes and dark stepping-ridge tree crowns, restore broken ridge paper glints, and tuck fine crinkly ink contours and shorter trunks strictly into canopy boundaries and shadow undersides.",
+   "score": {
+    "composite": 5.71,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.09,
+    "criteria": {
+     "composition_values": 5.67,
+     "edges_detail": 3.67,
+     "marks_texture": 4,
+     "classic_value": 5.73,
+     "classic_edge": 6.75,
+     "classic_landmark": null,
+     "classic_marks": 8.79
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 3,
+     "50": 3.5,
+     "75": 3.5,
+     "100": 4
+    },
+    "earlyMean": 4,
+    "mean": 3.8,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "c": 4,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable painter's sequence - contour underdrawing, then light green/tan washes, mid-tone granulated washes, and darks last - with only the flat, evenly-toned green slabs at 25% as a mild tell.",
+     "Qwen/Qwen3.5-9B": "The intermediate panels display flat, evenly-toned slabs of color that resemble digital fills rather than organic ink washes."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 11,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 609,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0671,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": "Deepen cypresses, canopy crevices, and cast shadows with higher-concentration three-pass dried glazes and pen hatching, brighten sunlit house facades and the upper-left golden slope (fixing the unpainted gap at x=66..96, y=36..58 and splitting the mid-left wall into shaded upper and sunlit lower halves), and add the missing top-edge foliage, upper-right dark valley bands, and bottom-center shrubs.",
+   "score": {
+    "composite": 5.77,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.2,
+    "criteria": {
+     "composition_values": 6,
+     "edges_detail": 3.33,
+     "marks_texture": 4.33,
+     "classic_value": 4.82,
+     "classic_edge": 7.8,
+     "classic_landmark": null,
+     "classic_marks": 8.99
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 3,
+     "50": 3,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 4,
+    "mean": 4,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "c": 2,
+     "b": 2,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable pen-then-wash-to-detail sequence, but the 25% stage shows flat rectangular wash slabs with cut edges and the 50% foliage arrives as uniform scalloped blob clusters rather than brush-drawn masses."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 6.9,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 170,
+   "minutes": 0.1,
+   "smallShare": 0.129,
+   "shortStrokes": 65,
+   "dotStrokes": 23,
+   "copyHF": 0.1222,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": "Glaze the bowsprit triangle with rich golden-ochre, soften the diagonal hull ribs with a pale cool wash, widen the upper-right orange filigree trim and top frieze without white halos, enrich the far-left peachy mast and lower-left mottled water glints, add turquoise and dark reflections at the bottom-right water, and make the hawsehole, pulley blocks, and keel shadow more organic.",
+   "score": {
+    "composite": 5.06,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 6.8,
+    "criteria": {
+     "composition_values": 5.67,
+     "edges_detail": 3.67,
+     "marks_texture": 2,
+     "classic_value": 6.41,
+     "classic_edge": 6.26,
+     "classic_landmark": null,
+     "classic_marks": 7.73
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 3,
+     "50": 2,
+     "75": 4,
+     "100": 5
+    },
+    "earlyMean": 4,
+    "mean": 3.8,
+    "humanOrderVotes": 1,
+    "judgesN": 1,
+    "tells": {
+     "b": 1,
+     "c": 2,
+     "f": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The arc is broadly human — faint washes, then the big hull shape, darks and rigging late — but the hull lands as an evenly-toned scalloped slab, the green water patches and anchor arrive as finished flat cutouts beside untouched paper, and white scratch-marks appear over already-laid blue instead of being reserved."
+    }
+   },
+   "attempt": {
+    "n": 3,
+    "minutes": 13.6,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 5.51,
+  "partialComposite": null,
+  "cropsScored": 3,
+  "complete": true
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.3,
+   "level": "medium",
+   "parts": {
+    "progression": 0,
+    "earlyStageMean": 4,
+    "copyHF": {
+     "hills": 0.0314,
+     "south-france": 0.0671,
+     "sargent": 0.1222
+    },
+    "copy": 1,
+    "smallStrokeShare": 0.043,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/argon/try-3"
+}

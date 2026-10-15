@@ -19,7 +19,9 @@ export const ROUNDS = [
     explained: 'Models paint with the brush and pen tools.' },
   { id: 'V2', key: 'skill', dir: 'v2-skill', title: 'Tools and technique guides', harness: 'Tools and technique guides', tries: 3, learning: false,
     explained: 'Models get the tools and guides to painting techniques.' },
+  // V3 was published on three targets only; a run of more is scored on these three (the rest are kept as extra)
   { id: 'V3', key: 'informed', dir: 'v3-informed', title: 'Technique guides and feedback between attempts', harness: 'Tools and technique guides', tries: 3, learning: true,
+    targets: ['hills', 'south-france', 'sargent'],
     explained: 'Models get the V2 tools and guides, plus their earlier paintings and notes.' },
   { id: 'V4', key: 'pipeline', dir: 'v4-pipeline', title: 'Full painting pipeline', harness: 'Tools, technique guides and full painting pipeline', tries: 3, learning: false,
     explained: 'Models use the planner, painter presets and scoring tools.' },
@@ -27,7 +29,7 @@ export const ROUNDS = [
     explained: 'Models use the full pipeline and can revise their plans using earlier attempts.' },
 ];
 /** What painted the published results (docs/versions.md). */
-export const PAINTER_NOTE = 'Every published result: painter V096 · sim 100 · judges J1 · release 0.1.0. V1-V3 used the models\' own toolkit on this painter\'s simulator; V4/V5 used the V096 pipeline (unpublished benchmark build, same recipe).';
+export const PAINTER_NOTE = 'Every published result: painter V096 · sim 100 · judges J1 · releases 0.1.0 and 0.1.1. V1-V3 used the models\' own toolkit on this painter\'s simulator; V4/V5 used the V096 pipeline (unpublished benchmark build, same recipe).';
 /** What a new run records: release, painterVersion, simVersion and commit of this checkout (src/painter-version.mjs). */
 export const VERSION_STAMP = { ...versionStamp(REPO), judgeVersion: JUDGE_VERSION };
 /** Compare two semver strings, numerically by part; a pre-release sorts before its release. */
@@ -58,22 +60,30 @@ export const roundById = id => ROUNDS.find(r => r.id === String(id).toUpperCase(
 export const BUDGET = { strokes: 2500, minutesPerCrop: 15, sessionCapMin: 85 };
 /** The rounds that paint with the painter (tools/paint-plate.mjs) rather than the toolkit. */
 export const PIPELINE_ROUNDS = new Set(['V4', 'V5']);
-export const CROP_ORDER = ['hills', 'south-france', 'sargent', 'mittens', 'trumbull'];
-export const PUBLIC_CROPS = ['hills', 'south-france', 'sargent', 'mittens', 'trumbull'];
+// Targets come from bench/v2/crops.json, in its order; add one with bench/scripts/add-target.mjs
+const CROPS_SPEC = JSON.parse(fs.readFileSync(path.join(V2, 'crops.json'), 'utf8')).crops;
+export const CROP_ORDER = CROPS_SPEC.map(c => c.task);
+export const PUBLIC_CROPS = CROPS_SPEC.filter(c => c.distributed).map(c => c.task);
+/** The targets a run's composite averages: its round's published targets when the round fixes them, else its own. */
+export const compositeTargets = run => ROUNDS.find(r => r.id === run.round)?.targets ?? run.settings.crops;
 
 export const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 export const writeJson = (f, v) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(v, null, 1) + '\n'); };
 
-/** Crop specs from the frozen v2 snapshot, plus the display names the post uses. */
-const NAMES = { hills: 'Hills', 'south-france': 'France', sargent: 'Ships', mittens: 'Mittens', trumbull: 'Trumbull' };
+/** Crop specs from bench/v2/crops.json, each with its display name. */
 export function loadCrops() {
-  const spec = readJson(path.join(V2, 'crops.json'));
-  return spec.crops.map(c => ({ ...c, name: NAMES[c.task] || c.task }));
+  return readJson(path.join(V2, 'crops.json')).crops.map(c => ({ ...c, name: c.name || c.task }));
 }
 export const loadModels = () => readJson(path.join(BENCH, 'models.json')).models;
 
-/** Best of three uses tries 1 to 3 only, at xhigh where the model supports reasoning effort. */
-export const inPublishedScope = run => run.try <= 3 && (run.painter.effort == null || ['xhigh', 'n/a'].includes(run.painter.effort));
+/** Best of three uses tries 1 to 3 only, at the reasoning effort models.json sets for that model: xhigh where the model
+ *  offers it, otherwise its own setting (Gemini 4 Argon offers high and medium, listed as two models). */
+let configuredEffort = null;
+export const inPublishedScope = run => {
+  configuredEffort ??= Object.fromEntries(loadModels().map(m => [m.key, m.effort]));
+  const effort = run.painter.effort;
+  return run.try <= 3 && (effort == null || ['xhigh', 'n/a'].includes(effort) || effort === configuredEffort[run.painter.key]);
+};
 
 export const shortfallReason = (model, tries) => tries >= 3 ? null : model === 'dsflash'
   ? 'per-run cost cap and API errors' : ['opus', 'sonnet', 'haiku'].includes(model) ? 'third not run' : 'third try not available';
@@ -92,12 +102,14 @@ export const round2 = x => (x == null ? null : Math.round(x * 100) / 100);
  * (docs/scoring.md, the controls table; mean of 3 runs): the realistic ceiling for that subject, shared by every round.
  * The indexed score divides a painting's composite by its target's self-score.
  */
-export const TARGET_SELF_SCORE = { hills: 8.43, 'south-france': 8.43, sargent: 8.76, mittens: 8.76, trumbull: 8.57 };
+export const TARGET_SELF_SCORE = Object.fromEntries(CROPS_SPEC.filter(c => c.selfScore != null).map(c => [c.task, c.selfScore]));
 /** A painting's composite as a percentage of its target's self-score, or null. */
 export const indexedScore = (crop, composite) => (composite == null || !Number.isFinite(composite) || !TARGET_SELF_SCORE[crop]
   ? null : 100 * composite / TARGET_SELF_SCORE[crop]);
 /** The indexed scores of a try's scored paintings. */
-export const indexedScores = run => Object.entries(run.crops || {}).map(([c, v]) => indexedScore(c, v.score?.composite)).filter(v => v != null);
+/** The paintings a round compares: V3 compares its three published targets, even when a 0.1.1 V3 try painted all five. */
+export const comparedCrops = run => { const keep = new Set(compositeTargets(run)); return Object.entries(run.crops || {}).filter(([c]) => keep.has(c)); };
+export const indexedScores = run => comparedCrops(run).map(([c, v]) => indexedScore(c, v.score?.composite)).filter(v => v != null);
 
 /** Small seeded generator (mulberry32) so every rebuild gives the same intervals. */
 export function rng(seed = 7) {
@@ -139,7 +151,7 @@ export function bootstrapPairedDiff(groups, { n = 2000, seed = 7 } = {}) {
 export const riskLevel = s => (s == null ? null : s < 0.3 ? 'low' : s < 0.6 ? 'medium' : 'high');
 
 /** Composite scores of a run's paintings that have one, in crop order. */
-export const paintingScores = run => Object.values(run.crops || {}).map(c => c.score?.composite).filter(v => v != null && Number.isFinite(v));
+export const paintingScores = run => comparedCrops(run).map(([, c]) => c.score?.composite).filter(v => v != null && Number.isFinite(v));
 export const tryMean = run => mean(paintingScores(run));
 export const tryStrokes = run => Object.values(run.crops || {}).reduce((a, c) => a + (c.strokes || 0), 0);
 

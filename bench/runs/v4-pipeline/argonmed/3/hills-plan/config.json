@@ -1,0 +1,72 @@
+{
+  "subject": "Hills",
+  "name": "Hills — loose ink and wash over sunlit yellow-green slopes, winding ochre path, and cool slate-blue tree shadows",
+  "photo": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Preserve the full 5-band light-to-dark value ladder (Band 1 pale wash, Bands 2-3 mid-tone hillside and canopy planes, Bands 4-5 cool slate-blue and deep olive shadow glazes) while traced opening-lines.json and closingink4-lines.json deliver the loose ink-and-wash pen structure."
+  },
+  "reserves": [
+    {
+      "id": "upper-left-path-glint",
+      "bounds": [0.20, 0.25, 0.22, 0.28],
+      "reason": "Brightest sunlit cream-white dirt path bend in the upper-left hillside, held as bare paper alongside --paperlights 1."
+    },
+    {
+      "id": "lower-center-path-glint",
+      "bounds": [0.45, 0.65, 0.47, 0.68],
+      "reason": "Sunlit central-lower switchback of the dirt road where bare warm paper reads as dry dirt glare."
+    },
+    {
+      "id": "bottom-right-path-glint",
+      "bounds": [0.75, 0.95, 0.77, 0.98],
+      "reason": "Bright foreground path exit at the lower right corner."
+    }
+  ],
+  "families": [
+    {
+      "id": "sunlit-grass-slopes",
+      "bounds": [0.00, 0.00, 1.00, 1.00],
+      "region": "Upper-left, central, and right-hand sunlit yellow-green grassy hillsides (target regions 2 and 4)",
+      "P": "Hansa Yellow + Sap Green pale luminous wash on #8 round, high water load (0.76) with 1.3x wash cap",
+      "B": "Dampen open hillside fields and lay continuous wet-on-wet Band 1 yellow-green foundation washes around the reserved dirt path, then place dry-on-dry Band 2 warm yellow-green slope planes after a full dry",
+      "A": "Smooth luminous yellow-green hillside roll with soft internal transitions and crisp dry-edge separation against the pale path",
+      "stop": "Stop once the open grassy slopes carry their warm yellow-green light value without encroaching on the winding path reserves"
+    },
+    {
+      "id": "winding-ochre-path",
+      "bounds": [0.15, 0.00, 0.85, 1.00],
+      "region": "Winding sandy-ochre dirt road and warm dry grass banks from top-right to upper-left and down to bottom-right (target region 5 and paper reserves)",
+      "P": "Hansa Yellow + Quinacridone Rose + touch of Sap Green diluted warm ochre-tan wash on #4 round",
+      "B": "Leave the brightest path core as bare paper (--paperlights 1 and explicit path glint reserves) and lay pale Band 1 and Band 2 warm ochre-buff washes along the road shoulders and ruts",
+      "A": "Sun-bleached cream paper core flanked by warm sandy-ochre verges and crisp opening/closing pen contour lines",
+      "stop": "Stop after the path shoulders are toned warm buff while the central track remains bright bare paper"
+    },
+    {
+      "id": "olive-canopy-masses",
+      "bounds": [0.00, 0.00, 1.00, 0.92],
+      "region": "Mid-tone olive-green and warm grey-green oak and chaparral tree crowns across the left, central, and right ridges (target regions 1 and 6)",
+      "P": "Sap Green + Hansa Yellow + Quinacridone Rose muted olive-green mixture on #4 round",
+      "B": "After the Band 1 hillside base is completely dry, build the rounded tree canopy masses in two dry-on-dry middle passes (Band 2 body and Band 3 darker olive crown structure) using shaped foliage marks (--noslane to avoid horizontal sky striping)",
+      "A": "Distinct layered olive-green tree crowns with crisp outer silhouettes against the bright yellow-green hills",
+      "stop": "Stop when the tree crowns hold clear mid-dark olive separation from the sunlit grass while leaving deep under-canopy pockets for the shadow glazes"
+    },
+    {
+      "id": "cool-slate-tree-shadows",
+      "bounds": [0.00, 0.00, 1.00, 0.90],
+      "region": "Deep slate-blue and dark cool olive-grey under-canopy shadows, trunks, and ravine pockets (target regions 3 and 6)",
+      "P": "Cerulean Blue + Sap Green + Quinacridone Rose concentrated slate-blue/dark-olive glaze on #2 round (--darkcap 1.1), followed by waterproof carbon black pen on 0.35mm nib",
+      "B": "Glaze Band 4 dark mass and Band 5 focused cool slate-blue accents dry-on-dry into the deepest tree shadow cores after mid-layers dry, then restate crisp branch, trunk, and road-edge ink lines in the closing pen pass",
+      "A": "Rich cool slate-blue and deep olive shadow cores that anchor the hillside trees, tied together by calligraphic ink contours",
+      "stop": "Stop after Band 5 accents and closing ink lines establish crisp dark focal structure without over-inked fill"
+    }
+  ],
+  "order": [
+    "Pass 1 (Opening Ink + Prep Fade): Draw structural hillside, road-edge, and tree-canopy contours from bench/plan/opening-lines.json, then fade to 0.55 keep as a preparatory ink under-drawing.",
+    "Pass 2 (Band 1 Light Wash): Wet-on-wet luminous yellow-green and warm sandy-buff foundation washes across all non-reserved hillside and road-verge regions, preserving bare paper along the winding dirt path.",
+    "Pass 3 (Band 2 First Mid Layer): Dry-on-dry warm yellow-green slope modeling and initial olive-tan tree canopy and path-bank planes over the dried Band 1 base.",
+    "Pass 4 (Band 3 Second Mid Layer): Dry-on-dry deeper olive-green tree crown masses and shaded hillside folds.",
+    "Pass 5 (Band 4 Dark Shadow Glaze): Dry-on-dry cool slate-blue and deep olive-grey shadow glaze across the connected under-canopy and ravine shadow regions.",
+    "Pass 6 (Band 5 Focused Accents + Closing Ink): Dry-on-dry concentrated slate-dark accents in the deepest tree pockets, followed by bench/plan/closingink4-lines.json to restate crisp loose ink-and-wash contours."
+  ]
+}

@@ -1,0 +1,323 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.1.1",
+ "painterVersion": "V096",
+ "simVersion": "100",
+ "commit": "286e7e9377cbe7a5d8138fd80020617681b7c640",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "argonmed",
+  "name": "Gemini 4 Argon (Medium)",
+  "id": "gemini-4-argon-medium",
+  "effort": "medium",
+  "runner": "agy"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 74.3,
+  "tokens": 1205895,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 450,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0006,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.64,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 7.28,
+    "criteria": {
+     "composition_values": 5.67,
+     "edges_detail": 3.33,
+     "marks_texture": 3,
+     "classic_value": 5.82,
+     "classic_edge": 7.25,
+     "classic_landmark": null,
+     "classic_marks": 8.76
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 2,
+     "50": 3,
+     "75": 3,
+     "100": 5
+    },
+    "earlyMean": 3.5,
+    "mean": 3.6,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "b": 1,
+     "m": 1,
+     "c": 1,
+     "j": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sketch-first, light-to-dark sequence looks natural, but the stair-stepped and scalloped wash fills, the flat mid-tone slab standing in for the tree mass, and the all-at-once texture dump between 50% and 75% betray digital generation rather than brushwork."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 28,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 621,
+   "minutes": 0.2,
+   "smallShare": 0,
+   "shortStrokes": 0,
+   "dotStrokes": 0,
+   "copyHF": 0.0769,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.76,
+    "pm": 0.15,
+    "complete": true,
+    "visionOverall": 4,
+    "classic": 7.52,
+    "criteria": {
+     "composition_values": 4.67,
+     "edges_detail": 3.33,
+     "marks_texture": 3.33,
+     "classic_value": 4.91,
+     "classic_edge": 8.4,
+     "classic_landmark": null,
+     "classic_marks": 9.26
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 4
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 3,
+     "50": 3,
+     "75": 3.5,
+     "100": 3.5
+    },
+    "earlyMean": 4,
+    "mean": 3.6,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "c": 6,
+     "h": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable sketcher's sequence — pen underdrawing, broad warm ground wash, then mid-green masses and darks/detail last — with only mildly slab-like even washes at the 25% and 50% stages as the small tell.",
+     "Qwen/Qwen3.5-9B": "The sequence follows a logical layering order (lines, background, trees) but the execution features flat, digital-looking color blocks rather than brushstrokes, and the final image lacks the detail of the target."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 20.1,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 148,
+   "minutes": 0,
+   "smallShare": 0.223,
+   "shortStrokes": 50,
+   "dotStrokes": 7,
+   "copyHF": 0.0988,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.71,
+    "pm": 0.17,
+    "complete": true,
+    "visionOverall": 4.33,
+    "classic": 7.08,
+    "criteria": {
+     "composition_values": 6,
+     "edges_detail": 4.33,
+     "marks_texture": 3.67,
+     "classic_value": 5.46,
+     "classic_edge": 6.32,
+     "classic_landmark": null,
+     "classic_marks": 9.47
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 4,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 6
+    },
+    "callsPerModel": 5,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5"
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 2.5,
+     "50": 2.5,
+     "75": 3,
+     "100": 5
+    },
+    "earlyMean": 2.75,
+    "mean": 3.2,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "f": 2,
+     "c": 1,
+     "e": 4
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sequence builds like a real watercolor — pale blocking washes and placement guides first, then broad color masses, then darks, rigging and accents last — with only mild tells of whole regions (hull silhouette, flat green slab) arriving at once beside untouched neighbours.",
+     "Qwen/Qwen3.5-9B": "The sequence shows the target image fading in from a faint overlay rather than being painted stroke by stroke."
+    }
+   },
+   "attempt": {
+    "n": 1,
+    "minutes": 26.2,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 5.7,
+  "partialComposite": null,
+  "cropsScored": 3,
+  "complete": true
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.32,
+   "level": "medium",
+   "parts": {
+    "progression": 0.04,
+    "earlyStageMean": 3.42,
+    "copyHF": {
+     "hills": 0.0006,
+     "south-france": 0.0769,
+     "sargent": 0.0988
+    },
+    "copy": 1,
+    "smallStrokeShare": 0.074,
+    "small": 0,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.02,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/argonmed/try-1"
+}

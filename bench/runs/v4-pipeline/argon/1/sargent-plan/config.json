@@ -1,0 +1,81 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent's White Ships builds form entirely through direct watercolor washes, warm and cool wet-on-dry planes, reserved cream paper lights, and dark painted accents with no ink or graphite line.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.central-hull-midtones",
+      "bounds": [0.05, 0.0, 0.55, 0.95],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cool-neutral blue-grey midtones of the central ship bow, hull planks, and upper rigging background."
+    },
+    {
+      "id": "sargent.sienna-anchor-and-bow-marks",
+      "bounds": [0.20, 0.40, 0.30, 0.55],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm burnt-sienna and yellow-ochre accents on the central bow markings, lower-left anchor, and diagonal right spar."
+    },
+    {
+      "id": "sargent.deep-bow-and-waterline-shadows",
+      "bounds": [0.50, 0.70, 0.75, 0.90],
+      "baseMove": "wet on dry",
+      "referenceCue": "Deep cerulean, ultramarine, and slate shadows under the bow lip, hawsehole, pulley blocks, and green-blue waterline reflections."
+    },
+    {
+      "id": "sargent.warm-buff-spars-and-reflections",
+      "bounds": [0.80, 0.0, 1.0, 0.90],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm buff and ochre reflected light along the diagonal right mast/spar, upper masts, and warm water ripples."
+    },
+    {
+      "id": "sargent.sunlit-right-hull-and-sail",
+      "bounds": [0.65, 0.0, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit cream-white right hull flank and upper sail/rigging plane with reserved paper highlights and pale warm washes."
+    },
+    {
+      "id": "sargent.cool-cerulean-bow-and-water",
+      "bounds": [0.10, 0.0, 0.65, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cool cerulean and blue-green washes across the curved ship bow, lower-left hull, and turquoise water reflections."
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.70, 0.18, 0.75, 0.23],
+      "reason": "Sunlit white hull core gleam on the upper-right flank"
+    },
+    {
+      "bounds": [0.82, 0.05, 0.87, 0.10],
+      "reason": "Upper-right sunlit sail and hull-top paper highlight"
+    },
+    {
+      "bounds": [0.68, 0.50, 0.73, 0.56],
+      "reason": "Lower-right sunlit hull plane core paper white"
+    },
+    {
+      "bounds": [0.80, 0.58, 0.85, 0.63],
+      "reason": "Bright sunlit hull highlight left of the diagonal sienna spar"
+    },
+    {
+      "bounds": [0.66, 0.02, 0.71, 0.07],
+      "reason": "Upper-mid sunlit rigging and bow-top paper glint"
+    },
+    {
+      "bounds": [0.89, 0.16, 0.94, 0.20],
+      "reason": "Sunlit paper gap between upper-right pulley blocks"
+    },
+    {
+      "bounds": [0.40, 0.41, 0.42, 0.43],
+      "reason": "Warm-lit highlight fleck on the central ship bow"
+    },
+    {
+      "bounds": [0.70, 0.84, 0.72, 0.90],
+      "reason": "Vertical bright water reflection glint below the hull"
+    }
+  ]
+}

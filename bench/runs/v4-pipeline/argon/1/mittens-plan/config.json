@@ -1,0 +1,98 @@
+{
+  "subject": "mittens",
+  "name": "mittens",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Builds the portrait sketch from luminous paper reserves, delicate graded light washes, and nested dry middle planes while keeping fine opening and selective closing sepia ink lines crisp.",
+    "regions": {
+      "mittens.cat_ears_crown": {
+        "style": "precise-watercolor",
+        "reason": "Crisp tabby ear contours and delicate warm sienna-ochre washes around pale inner-ear tufts."
+      },
+      "mittens.cat_eyes_muzzle": {
+        "style": "precise-watercolor",
+        "reason": "High-precision pale sap-green irises, dark vertical slit pupils, rich ginger bridge stripes, and reserved white muzzle."
+      },
+      "mittens.cat_chest_fur": {
+        "style": "precise-watercolor",
+        "reason": "Soft graded ginger and warm-brown flank washes framing the broad bare-paper white chest bib."
+      },
+      "mittens.man_curly_hair": {
+        "style": "precise-watercolor",
+        "reason": "Layered Payne's-grey and lamp-black washes with granulating wet-in-wet blooms and fine stray curl lines."
+      },
+      "mittens.man_upper_face_eyes": {
+        "style": "precise-watercolor",
+        "reason": "Paper-white forehead and nose bridge contrasted with warm temple washes, dark arched brows, and deep brown eyes."
+      },
+      "mittens.man_nose_mouth_jaw": {
+        "style": "precise-watercolor",
+        "reason": "Soft warm-grey nose shadow, granulating lower-face stubble wash, and crisp dark smile line."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "mittens.cat_ears_crown",
+      "bounds": [0.0, 0.0, 0.5, 0.22],
+      "baseMove": "wet on dry",
+      "referenceCue": "Ginger and warm-brown tabby ears with pale inner-ear paper lights and fine brow whiskers."
+    },
+    {
+      "id": "mittens.cat_eyes_muzzle",
+      "bounds": [0.0, 0.17, 0.49, 0.48],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale sap-green cat eyes with crisp dark slit pupils, rich sienna-ochre bridge and cheek stripes, and reserved white muzzle."
+    },
+    {
+      "id": "mittens.cat_chest_fur",
+      "bounds": [0.02, 0.44, 0.52, 1.0],
+      "baseMove": "wet in wet",
+      "referenceCue": "Broad reserved paper-white chest bib flanked by soft ginger-ochre left shoulder and warm brown-sienna tabby right flank."
+    },
+    {
+      "id": "mittens.man_curly_hair",
+      "bounds": [0.49, 0.18, 1.0, 0.74],
+      "baseMove": "wet in wet",
+      "referenceCue": "Loose granulating Payne's-grey and lamp-black curly hair mass with soft wet-in-wet blooms and fine stray curl lines."
+    },
+    {
+      "id": "mittens.man_upper_face_eyes",
+      "bounds": [0.51, 0.42, 0.92, 0.79],
+      "baseMove": "wet on dry",
+      "referenceCue": "Paper-white forehead and nose bridge with warm ochre-sienna temple shading, dark arched eyebrows, and deep brown eyes."
+    },
+    {
+      "id": "mittens.man_nose_mouth_jaw",
+      "bounds": [0.51, 0.76, 0.94, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Soft warm-grey nose shadow and nostrils, granulating stubble and mustache wash, and crisp dark smile line."
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "cat right eye bright iris glint beside slit pupil",
+      "bounds": [0.250, 0.215, 0.269, 0.245]
+    },
+    {
+      "reason": "cat left eye bright iris glint",
+      "bounds": [0.066, 0.234, 0.079, 0.258]
+    },
+    {
+      "reason": "cat nose bridge and upper muzzle paper highlight",
+      "bounds": [0.105, 0.272, 0.138, 0.295]
+    },
+    {
+      "reason": "man left eye inner sclera glint",
+      "bounds": [0.626, 0.725, 0.638, 0.742]
+    },
+    {
+      "reason": "man right eye outer sclera glint",
+      "bounds": [0.836, 0.684, 0.848, 0.701]
+    },
+    {
+      "reason": "man nose tip paper highlight above nostrils",
+      "bounds": [0.710, 0.808, 0.748, 0.835]
+    }
+  ]
+}

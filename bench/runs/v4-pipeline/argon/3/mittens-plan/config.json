@@ -1,0 +1,68 @@
+{
+  "subject": "Mittens",
+  "name": "Mittens",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Soft warm value planes and reserved paper lights carry the cat and portrait forms, with delicate contour lines and selective dark accents",
+    "regions": {
+      "Mittens.human-hair": {
+        "style": "ink-and-wash",
+        "reason": "Dark curly hair mass combines neutral washes with crisp directional curl lines"
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "Mittens.cat-head",
+      "bounds": [0.04, 0.01, 0.50, 0.58],
+      "baseMove": "wet on dry",
+      "referenceCue": "warm ginger and brown tabby head planes around green eyes, pink nose and ears"
+    },
+    {
+      "id": "Mittens.cat-chest",
+      "bounds": [0.01, 0.45, 0.48, 0.99],
+      "baseMove": "wet on wet",
+      "referenceCue": "pale warm-grey shadow washes on white muzzle, whiskers and chest ruff"
+    },
+    {
+      "id": "Mittens.human-hair",
+      "bounds": [0.46, 0.18, 0.99, 0.72],
+      "baseMove": "wet on dry",
+      "referenceCue": "dark neutral-cool curly hair mass framing the forehead and temple"
+    },
+    {
+      "id": "Mittens.human-face",
+      "bounds": [0.50, 0.42, 0.94, 0.85],
+      "baseMove": "wet on dry",
+      "referenceCue": "warm skin washes across forehead, nose bridge, cheeks and dark brown eyes"
+    },
+    {
+      "id": "Mittens.human-beard",
+      "bounds": [0.49, 0.70, 0.92, 1.00],
+      "baseMove": "wet on dry",
+      "referenceCue": "cooler grey-brown beard and lower-face shadow planes"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "cat right eye catchlight",
+      "bounds": [0.263, 0.216, 0.271, 0.233]
+    },
+    {
+      "reason": "cat left eye catchlight",
+      "bounds": [0.086, 0.242, 0.092, 0.249]
+    },
+    {
+      "reason": "cat chest ruff bright paper reserve",
+      "bounds": [0.160, 0.560, 0.210, 0.610]
+    },
+    {
+      "reason": "man forehead bright lit plane",
+      "bounds": [0.640, 0.460, 0.700, 0.515]
+    },
+    {
+      "reason": "man nose bridge highlight",
+      "bounds": [0.672, 0.675, 0.702, 0.710]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  "--paints", "ochre,sienna,sapgreen,sepia,ultramarine,paynes",
+  "--shaperefit", "3",
+  "--middomain", "0",
+  "--brushchoice", "1",
+  "--layersmooth", "2.5",
+  "--accentshare", "0.45",
+  "--deepaccent", "85",
+  "--deepgrow", "2",
+  "--openinglines", "26",
+  "--closinglines", "80",
+  "--closingpressure", "0.38",
+  "--closingedgemin", "0.14",
+  "--floorfrom", "2.0",
+  "--touchdmin", "0.08"
+]

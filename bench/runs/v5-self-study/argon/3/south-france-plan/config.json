@@ -1,0 +1,149 @@
+{
+  "subject": "south-france",
+  "name": "France",
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "The reference depicts a sunlit Provençal hillside village in southern France rendered as an urban sketch: structural pen and ink line work establishes the clustered stone houses, terracotta roofs, terrace walls, cypress spires, and foreground tree trunks over luminous light washes, regional mid-value planes, and concentrated shadow glazes.",
+    "regions": {
+      "olive_mid_canopy": {
+        "style": "precise-watercolor",
+        "reason": "Full 4-band light-to-mid-to-dark wash progression and physical passage brush sizing under urban-sketch pen linework."
+      },
+      "sunlit_crown_greens": {
+        "style": "precise-watercolor",
+        "reason": "Full 4-band light-to-mid-to-dark wash progression and physical passage brush sizing under urban-sketch pen linework."
+      },
+      "cypress_and_eave_darks": {
+        "style": "precise-watercolor",
+        "reason": "Full 4-band light-to-mid-to-dark wash progression and physical passage brush sizing under urban-sketch pen linework."
+      },
+      "village_walls_and_roofs": {
+        "style": "precise-watercolor",
+        "reason": "Full 4-band light-to-mid-to-dark wash progression and physical passage brush sizing under urban-sketch pen linework."
+      },
+      "shaded_hillside_foliage": {
+        "style": "precise-watercolor",
+        "reason": "Full 4-band light-to-mid-to-dark wash progression and physical passage brush sizing under urban-sketch pen linework."
+      },
+      "warm_terrace_slopes": {
+        "style": "precise-watercolor",
+        "reason": "Full 4-band light-to-mid-to-dark wash progression and physical passage brush sizing under urban-sketch pen linework."
+      }
+    }
+  },
+  "drawing": {
+    "order": "both",
+    "openingMedium": "black-ink",
+    "inkProfile": "black-ink",
+    "graphiteProfile": "graphite-HB",
+    "amount": 1,
+    "closingMinWeight": 0.6
+  },
+  "families": [
+    {
+      "id": "olive_mid_canopy",
+      "bounds": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "referenceCue": "Mid-value olive and hillside foliage bridging the terraced slopes and stone walls.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sunlit_crown_greens",
+      "bounds": [
+        0.3,
+        0.5,
+        0.5,
+        0.9
+      ],
+      "referenceCue": "Bright sunlit yellow-green tree crowns and grassy terrace slope in the lower-center foreground.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "cypress_and_eave_darks",
+      "bounds": [
+        0.5,
+        0,
+        1,
+        0.22
+      ],
+      "referenceCue": "Dark vertical cypress spires, deep tree trunks, and dark architectural eaves and cast shadows in the upper village.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "village_walls_and_roofs",
+      "bounds": [
+        0.7,
+        0.3,
+        1,
+        0.6
+      ],
+      "referenceCue": "Sunlit warm limestone house facades, stone terrace walls, and terracotta roofs clustered on the hillside.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "shaded_hillside_foliage",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.78
+      ],
+      "referenceCue": "Deep olive-green and cool-umber shadow masses beneath the tree canopy and across the upper-left and central hillside.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "warm_terrace_slopes",
+      "bounds": [
+        0,
+        0.22,
+        0.7,
+        1
+      ],
+      "referenceCue": "Warm sunlit ochre-green foliage and terraced hillside slopes across the left and lower-left middle ground.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "Sunlit upper-left limestone terrace wall highlight",
+      "bounds": [
+        0.105,
+        0.255,
+        0.145,
+        0.295
+      ]
+    },
+    {
+      "reason": "Sunlit central stone terrace wall and path highlight below the village",
+      "bounds": [
+        0.315,
+        0.395,
+        0.35,
+        0.43
+      ]
+    },
+    {
+      "reason": "Sunlit upper village house gable and roof edge highlight",
+      "bounds": [
+        0.44,
+        0.068,
+        0.464,
+        0.112
+      ]
+    },
+    {
+      "reason": "Sunlit lower-right stone terrace wall highlight",
+      "bounds": [
+        0.892,
+        0.542,
+        0.928,
+        0.578
+      ]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "Hills and Winding Path — Loose Ink and Wash",
+  "subject": "hills",
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Loose ink-and-wash landscape combining a full five-band light-to-dark watercolor value architecture (pale buff path, sunlit yellow-green hills, four nested middle foliage layers, cool violet-slate shadow glazes, and deep tree recesses) with light preparatory structure and lively closing dip-pen ink linework on dry paper."
+  },
+  "reserves": [],
+  "families": [
+    {
+      "id": "winding-sandy-path",
+      "bounds": [0.12, 0.0, 0.78, 1.0],
+      "baseMove": "wet on dry",
+      "notes": "Warm buff and pale ochre dirt road curving from the lower right around the central bend up to the upper-left and upper-right forks; brightest glints reserved organically as bare paper while the roadbed receives a dilute warm Band 1 wash and soft track shadows."
+    },
+    {
+      "id": "upper-oak-canopies",
+      "bounds": [0.0, 0.0, 1.0, 0.42],
+      "baseMove": "wet on dry",
+      "notes": "Dense dark olive, cerulean-slate, and cool shadow tree canopies crowning the upper ridge on both sides of the upper forks, anchored by scalloped ink contours and dark interior branch recesses."
+    },
+    {
+      "id": "left-sunlit-hillside",
+      "bounds": [0.0, 0.12, 0.48, 0.72],
+      "baseMove": "wet on dry",
+      "notes": "Sunlit yellow-green grassy slope on the upper-left and middle-left flank of the winding road, graded from bright hansa-yellow/cerulean-green light washes into warm olive midtones."
+    },
+    {
+      "id": "central-knoll-and-oaks",
+      "bounds": [0.22, 0.35, 0.88, 0.78],
+      "baseMove": "wet on dry",
+      "notes": "Central grassy hillside and rounded oak/chaparral foliage masses nestled inside the main S-curve of the path, transitioning from bright sunlit grass to deep cool-green and slate-violet foliage shadows."
+    },
+    {
+      "id": "right-slope-and-trees",
+      "bounds": [0.58, 0.15, 1.0, 0.92],
+      "baseMove": "wet on dry",
+      "notes": "Right-hand hillside pasture and overarching dark tree masses with textured dry-brush foliage accents and strong contour ink along the road cut."
+    },
+    {
+      "id": "foreground-banks-and-scrub",
+      "bounds": [0.0, 0.68, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "notes": "Lower foreground road shoulders, warm sandy ruts, and dark framing chaparral/oak masses in the lower-left and lower-right corners."
+    }
+  ]
+}

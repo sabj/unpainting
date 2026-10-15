@@ -1,0 +1,156 @@
+{
+  "subject": "trumbull",
+  "name": "Y1",
+  "view": {
+    "wholeOf": "Y1"
+  },
+  "families": [
+    {
+      "id": "sky_upper",
+      "bounds": [0.0, 0.0, 1.0, 0.42],
+      "baseMove": "wet on wet",
+      "referenceCue": "Broad luminous sky graded from pale warm horizon to soft cerulean-ultramarine upper sky with soft cloud transitions."
+    },
+    {
+      "id": "gable_peak_lit",
+      "bounds": [0.35, 0.02, 0.64, 0.36],
+      "baseMove": "wet on dry",
+      "referenceCue": "Central Gothic gable peak and twin chimneys in warm sunlit yellow-ochre and raw-sienna ashlar masonry against the sky."
+    },
+    {
+      "id": "left_upper_gable",
+      "bounds": [0.06, 0.20, 0.35, 0.48],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left stepped gable, chimneys, and slate roof ridge in warm ochre-sienna stone with cool-violet cast shadow planes."
+    },
+    {
+      "id": "left_facade_lit",
+      "bounds": [0.06, 0.44, 0.36, 0.80],
+      "baseMove": "wet on dry",
+      "referenceCue": "Left sunlit masonry facade with pointed Gothic windows and continuous warm stone courses."
+    },
+    {
+      "id": "center_facade_lit",
+      "bounds": [0.35, 0.34, 0.65, 0.80],
+      "baseMove": "wet on dry",
+      "referenceCue": "Main central sunlit gable wall with tall traceried Gothic window, rose roundel, and warm continuous stone courses."
+    },
+    {
+      "id": "right_gable_lit",
+      "bounds": [0.64, 0.25, 0.90, 0.64],
+      "baseMove": "wet on dry",
+      "referenceCue": "Right wing gable and turret in warm sunlit stone with cool shadow under the eaves."
+    },
+    {
+      "id": "right_arch_shadow",
+      "bounds": [0.64, 0.56, 0.88, 0.82],
+      "baseMove": "wet on dry",
+      "referenceCue": "Shaded right porch and deep Gothic archway recess in cool ultramarine-sienna shadow."
+    },
+    {
+      "id": "left_arch_recess",
+      "bounds": [0.32, 0.62, 0.44, 0.82],
+      "baseMove": "wet on dry",
+      "referenceCue": "Deep arched portal recess between left and central bays with crisp dark architectural aperture."
+    },
+    {
+      "id": "trees_left",
+      "bounds": [0.0, 0.35, 0.14, 0.82],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm olive-green and burnt-sienna foliage mass framing the left edge of the chapel."
+    },
+    {
+      "id": "trees_center",
+      "bounds": [0.47, 0.58, 0.64, 0.83],
+      "baseMove": "wet on dry",
+      "referenceCue": "Rounded sunlit sap-green and ochre shrub mass at the base of the central gable wall."
+    },
+    {
+      "id": "trees_right",
+      "bounds": [0.82, 0.40, 1.0, 0.82],
+      "baseMove": "wet on dry",
+      "referenceCue": "Foliage mass on the right margin in warm sap-green, ochre, and cool lower shadow."
+    },
+    {
+      "id": "lawn_lit",
+      "bounds": [0.0, 0.78, 1.0, 0.92],
+      "baseMove": "wet on wet",
+      "referenceCue": "Sunlit foreground lawn and path in pale yellow-green and warm ochre-rose washes."
+    },
+    {
+      "id": "foreground_path_shadow",
+      "bounds": [0.0, 0.86, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Horizontal cool violet-umber cast shadow bands across the lower foreground path and lawn."
+    },
+    {
+      "id": "figures_and_bench",
+      "bounds": [0.10, 0.77, 0.82, 0.92],
+      "baseMove": "wet on dry",
+      "referenceCue": "Small foreground figures and bench accents with reserved light touches and crisp dark notes."
+    }
+  ],
+  "reserves": [],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Trumbull architectural watercolor: continuous warm ochre-sienna stone washes built light-to-dark over crisp structural ink, connected violet-ultramarine shadows, and dark window recesses.",
+    "regions": {
+      "sky_upper": {
+        "style": "precise-watercolor",
+        "reason": "Soft wet-in-wet graded sky wash preserving pale warm cloud lights."
+      },
+      "gable_peak_lit": {
+        "style": "precise-watercolor",
+        "reason": "Crisp sunlit gable peak with continuous warm stone wash."
+      },
+      "left_upper_gable": {
+        "style": "precise-watercolor",
+        "reason": "Stepped gable and roof shadow with crisp architectural edges."
+      },
+      "left_facade_lit": {
+        "style": "precise-watercolor",
+        "reason": "Continuous warm stone facade and crisp Gothic window openings."
+      },
+      "center_facade_lit": {
+        "style": "precise-watercolor",
+        "reason": "Focal sunlit central gable and traceried lancet window."
+      },
+      "right_gable_lit": {
+        "style": "precise-watercolor",
+        "reason": "Sunlit right wing masonry and turret."
+      },
+      "right_arch_shadow": {
+        "style": "precise-watercolor",
+        "reason": "Deep connected shadow and dark archway recess on right wing."
+      },
+      "left_arch_recess": {
+        "style": "precise-watercolor",
+        "reason": "Deep arched portal recess with crisp dark opening."
+      },
+      "trees_left": {
+        "style": "precise-watercolor",
+        "reason": "Layered olive and sienna foliage framing left facade."
+      },
+      "trees_center": {
+        "style": "precise-watercolor",
+        "reason": "Sunlit green foliage mass against warm stone wall."
+      },
+      "trees_right": {
+        "style": "precise-watercolor",
+        "reason": "Layered foliage mass at right margin."
+      },
+      "lawn_lit": {
+        "style": "precise-watercolor",
+        "reason": "Connected sunlit lawn and path wash."
+      },
+      "foreground_path_shadow": {
+        "style": "precise-watercolor",
+        "reason": "Connected cast shadow bands across the foreground."
+      },
+      "figures_and_bench": {
+        "style": "precise-watercolor",
+        "reason": "Crisp figure silhouettes and foreground bench details."
+      }
+    }
+  }
+}

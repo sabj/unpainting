@@ -1,0 +1,15 @@
+{"t":"2026-10-14T10:57:17.237Z","kind":"start","modelMinutes":39.36,"variant":"region_w13_noslane","stops":"every passage boundary"}
+{"t":"2026-10-14T10:58:17.543Z","kind":"look","modelMinutes":39.53,"n":1,"boundary":"0","strokes":0,"penLines":160,"passesDone":0,"passesPlanned":61}
+{"t":"2026-10-14T10:58:35.004Z","kind":"continue","modelMinutes":39.83,"boundary":"0","stopAt":10,"strokes":0}
+{"t":"2026-10-14T11:00:44.020Z","kind":"look","modelMinutes":40.2,"n":2,"boundary":"10","strokes":583,"penLines":160,"passesDone":10,"passesPlanned":61}
+{"t":"2026-10-14T11:01:24.034Z","kind":"continue","modelMinutes":40.86,"boundary":"10","stopAt":30,"strokes":583}
+{"t":"2026-10-14T11:05:15.893Z","kind":"look","modelMinutes":41.36,"n":3,"boundary":"30","strokes":1778,"penLines":160,"passesDone":30,"passesPlanned":61}
+{"t":"2026-10-14T11:12:48.374Z","kind":"revise","modelMinutes":48.36,"boundary":"30","revision":1,"strokes":1778,"passesDone":30,"changed":["extra-args.json","variant.txt"],"variant":"region_w13_noslane_spl16_lad_sml60_mg12_dk14"}
+{"t":"2026-10-14T11:18:22.191Z","kind":"look","modelMinutes":49.95,"n":4,"boundary":"50","strokes":5121,"penLines":160,"passesDone":50,"passesPlanned":61}
+{"t":"2026-10-14T11:18:49.174Z","kind":"continue","modelMinutes":50.4,"boundary":"50","stopAt":60,"strokes":5121}
+{"t":"2026-10-14T11:21:05.275Z","kind":"look","modelMinutes":50.55,"n":5,"boundary":"60","strokes":7779,"penLines":160,"passesDone":60,"passesPlanned":61}
+{"t":"2026-10-14T11:21:57.835Z","kind":"continue","modelMinutes":51.43,"boundary":"60","stopAt":"closing","strokes":7779}
+{"t":"2026-10-14T11:24:23.499Z","kind":"look","modelMinutes":51.97,"n":6,"boundary":"closing","strokes":14268,"penLines":160,"passesDone":78,"passesPlanned":78}
+{"t":"2026-10-14T11:26:12.244Z","kind":"revise","modelMinutes":53.25,"boundary":"closing","revision":2,"strokes":14268,"passesDone":78,"changed":["extra-args.json"],"variant":"region_w13_noslane_spl16_lad_sml60_mg12_dk14"}
+{"t":"2026-10-14T11:28:46.300Z","kind":"finished","modelMinutes":53.48,"strokes":14268}
+{"t":"2026-10-14T11:29:09.935Z","kind":"session-end","modelMinutes":53.87,"why":"the session ended","looks":6,"revisions":2}

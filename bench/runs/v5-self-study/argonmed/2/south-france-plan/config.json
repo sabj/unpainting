@@ -1,0 +1,67 @@
+{
+  "subject": "south-france",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Use the full 5-band light-to-dark value ladder (Band 1 <= 28% pale base wash, progressive dry mid-layers in Band 2, connected shadow glazes in Bands 4-5) together with strong sepia pen opening and closing ink so the hilltop village and terraced greenery build progressively without flat single-band slabs or region-boundary seams.",
+    "regions": {
+      "sunlit-upper-terrace": {
+        "style": "precise-watercolor",
+        "reason": "Keep pale warm yellow-ochre and olive washes translucent over the sunlit upper-left terrace and road."
+      },
+      "upper-canopy": {
+        "style": "precise-watercolor",
+        "reason": "Build the upper-right Mediterranean foliage from a light sap-green/ochre ground through layered mid-values into cool shadow glazes."
+      },
+      "hilltop-village-roofs-and-walls": {
+        "style": "precise-watercolor",
+        "reason": "Preserve crisp sepia pen linework for roofs, walls, and windows while glazing warm ochre stone and burnt-sienna tile planes in progressive value steps."
+      },
+      "middle-retaining-walls-and-arches": {
+        "style": "precise-watercolor",
+        "reason": "Model the horizontal stone retaining walls, arches, and shaded recesses with structured washes over opening pen contours."
+      },
+      "lower-foliage-and-cypresses": {
+        "style": "precise-watercolor",
+        "reason": "Layer the foreground cypresses, tree crowns, and shaded slopes from light sap-green and ochre washes into deep ultramarine-sienna shadow glazes."
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "sunlit-upper-terrace",
+      "role": "ground",
+      "bounds": [0.0, 0.0, 0.42, 0.28],
+      "hue": "warm",
+      "edge": "soft"
+    },
+    {
+      "id": "upper-canopy",
+      "role": "mass",
+      "bounds": [0.38, 0.0, 1.0, 0.34],
+      "hue": "neutral",
+      "edge": "soft"
+    },
+    {
+      "id": "hilltop-village-roofs-and-walls",
+      "role": "focal",
+      "bounds": [0.02, 0.18, 0.98, 0.66],
+      "hue": "warm",
+      "edge": "hard"
+    },
+    {
+      "id": "middle-retaining-walls-and-arches",
+      "role": "structure",
+      "bounds": [0.02, 0.56, 0.96, 0.78],
+      "hue": "warm",
+      "edge": "hard"
+    },
+    {
+      "id": "lower-foliage-and-cypresses",
+      "role": "mass",
+      "bounds": [0.0, 0.66, 1.0, 1.0],
+      "hue": "cool",
+      "edge": "soft"
+    }
+  ],
+  "reserves": []
+}

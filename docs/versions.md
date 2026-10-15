@@ -9,7 +9,7 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 - Judges: `judgeVersion`, starting at `J1`. A new panel, rubric or image protocol gets a new J number. Scores from different J versions are not compared. J1 uses Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B, rubric `bench-v3-median5`, five calls per judge with the median, and native-size images. Current calls use OpenRouter zero-data-retention providers. Earlier published calls used Together; all published scores are J1.
 - Sim: a plain number, such as `100`. It covers the physics and simulation of paper, water, pigment, brush and pen (`src/media`). A simulation change takes the next sim number.
 
-`PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions. Release 0.1.0 is painter V096, sim 100 and judges J1.
+`PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions. Releases 0.1.0 and 0.1.1 are painter V096, sim 100 and judges J1.
 
 Sim numbers before this release are an estimate of past simulation revisions. The private history has no sim version number. About 100 commits changed the media modules there (102 commits touching `painter/src/media` and its earlier files, 2026-09-15 to 2026-09-30), so sim starts at 100.
 
@@ -21,8 +21,8 @@ Sim numbers before this release are an estimate of past simulation revisions. Th
 
 | Rounds | Painter | Sim | Judges | Release | How it painted |
 |---|---|---|---|---|---|
-| V1 to V3 | V096 | 100 | J1 | 0.1.0 | The models' own toolkit on this simulator |
-| V4 and V5 | V096 | 100 | J1 | 0.1.0 | The V096 pipeline, from the unpublished benchmark build with the same recipe |
+| V1 to V3 | V096 | 100 | J1 | 0.1.0, 0.1.1 | The models' own toolkit on this simulator |
+| V4 and V5 | V096 | 100 | J1 | 0.1.0, 0.1.1 | The V096 pipeline, from the unpublished benchmark build with the same recipe |
 
 ## Benchmarking a newer painter or sim
 

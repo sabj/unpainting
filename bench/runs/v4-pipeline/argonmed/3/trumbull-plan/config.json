@@ -1,0 +1,97 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull Hall",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Trumbull College's gothic collegiate stone gables, recessed dark mullioned windows, slate roofs, and crisp shadow edges require dry-between architectural washes, shape-fitted stone mixes, held paper highlights, and opening/closing fountain-pen structural line.",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sky",
+      "name": "Y1.sky",
+      "bounds": [0.0, 0.0, 1.0, 0.32],
+      "referenceCue": "Cerulean and French ultramarine sky broken by diagonal cream-white cloud corridors above the roof ridges.",
+      "cue": "Cerulean and French ultramarine sky broken by diagonal cream-white cloud corridors above the roof ridges.",
+      "tint": "cerulean blue, French ultramarine",
+      "baseMove": "wet on wet"
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "name": "Y1.slate-roofs",
+      "bounds": [0.25, 0.01, 1.0, 0.36],
+      "referenceCue": "Cool blue-grey slate roof slopes over the central gable and right wing.",
+      "cue": "Cool blue-grey slate roof slopes over the central gable and right wing.",
+      "tint": "French ultramarine, sepia, yellow ochre",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.main-chimney",
+      "name": "Y1.main-chimney",
+      "bounds": [0.13, 0.0, 0.29, 0.25],
+      "referenceCue": "Sunlit ashlar chimney stack and buttress rising between the shaded left return and central gable.",
+      "cue": "Sunlit ashlar chimney stack and buttress rising between the shaded left return and central gable.",
+      "tint": "yellow ochre, raw sienna, sepia",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.cool-main-return",
+      "name": "Y1.cool-main-return",
+      "bounds": [0.0, 0.12, 0.29, 0.96],
+      "referenceCue": "Cooler shaded left return wall and buttresses pierced by tall mullioned gothic windows.",
+      "cue": "Cooler shaded left return wall and buttresses pierced by tall mullioned gothic windows.",
+      "tint": "yellow ochre, French ultramarine, sepia",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.sun-main-gable",
+      "name": "Y1.sun-main-gable",
+      "bounds": [0.29, 0.02, 0.72, 0.98],
+      "referenceCue": "Focal sunlit gothic stone gable, polygonal turret, dark recessed mullioned windows, entrance arch, and blue banner.",
+      "cue": "Focal sunlit gothic stone gable, polygonal turret, dark recessed mullioned windows, entrance arch, and blue banner.",
+      "tint": "yellow ochre, raw sienna, hansa yellow, sepia",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.right-wing",
+      "name": "Y1.right-wing",
+      "bounds": [0.68, 0.08, 1.0, 0.98],
+      "referenceCue": "Sunlit right stone wing with stepped chimney, recessed casements, and lower stone bay.",
+      "cue": "Sunlit right stone wing with stepped chimney, recessed casements, and lower stone bay.",
+      "tint": "yellow ochre, raw sienna, sepia",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.foliage",
+      "name": "Y1.foliage",
+      "bounds": [0.62, 0.58, 0.78, 0.98],
+      "referenceCue": "Sunlit yellow-green tree crown in front of the right wing with cooler lower-crown shadow turns.",
+      "cue": "Sunlit yellow-green tree crown in front of the right wing with cooler lower-crown shadow turns.",
+      "tint": "hansa yellow, sap green, French ultramarine",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "Y1.opening-sidewalk",
+      "name": "Y1.opening-sidewalk",
+      "bounds": [0.0, 0.80, 1.0, 1.0],
+      "referenceCue": "Sunlit pavement, entrance steps, cast architectural shadows, street signs, and small pedestrians.",
+      "cue": "Sunlit pavement, entrance steps, cast architectural shadows, street signs, and small pedestrians.",
+      "tint": "yellow ochre, raw sienna, French ultramarine, sepia",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.123, 0.080, 0.140, 0.099],
+      "reason": "Hold bare paper in the upper-left cloud corridor core above the shaded return."
+    },
+    {
+      "bounds": [0.630, 0.141, 0.647, 0.160],
+      "reason": "Preserve the bright paper-white cloud core between the sunlit main gable and right wing."
+    },
+    {
+      "bounds": [0.950, 0.110, 0.967, 0.129],
+      "reason": "Hold the upper-right cloud highlight at the sky edge."
+    }
+  ]
+}

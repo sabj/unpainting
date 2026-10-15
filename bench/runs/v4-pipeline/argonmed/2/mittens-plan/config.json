@@ -1,0 +1,129 @@
+{
+  "subject": "mittens",
+  "name": "Mittens",
+  "photo": "bench/plan/target.png",
+  "families": [
+    {
+      "id": "cat-head-ears",
+      "bounds": [0.04, 0.08, 0.44, 0.43],
+      "description": "Cat head, ginger-striped ears, green eyes, pink-brown nose, and white muzzle"
+    },
+    {
+      "id": "cat-body-chest",
+      "bounds": [0.02, 0.40, 0.50, 0.99],
+      "description": "Cat ginger back, shoulder stripes, and white chest ruff"
+    },
+    {
+      "id": "man-curly-hair",
+      "bounds": [0.48, 0.20, 0.99, 0.65],
+      "description": "Dark charcoal-brown curly hair mass framing the man's upper head and temple"
+    },
+    {
+      "id": "man-eyes-brow-nose",
+      "bounds": [0.53, 0.62, 0.89, 0.87],
+      "description": "Man's eyebrows, eyes with dark iris rims and sclera lights, and nose bridge/tip"
+    },
+    {
+      "id": "man-beard-lower-face",
+      "bounds": [0.54, 0.82, 0.90, 0.99],
+      "description": "Man's cheeks, moustache/beard stubble, and mouth shadow"
+    },
+    {
+      "id": "open-paper-ground",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "description": "Unpainted bright watercolor paper ground surrounding the portrait pair"
+    }
+  ],
+  "reserves": [
+    {
+      "id": "cat-right-eye-catchlight",
+      "bounds": [0.272, 0.206, 0.290, 0.220],
+      "protectBrightBelow": 0.08,
+      "reason": "Crisp specular catchlight on the viewer-right side of the cat's right iris"
+    },
+    {
+      "id": "cat-left-eye-catchlight",
+      "bounds": [0.081, 0.237, 0.094, 0.245],
+      "protectBrightBelow": 0.08,
+      "reason": "Bright iris highlight inside the cat's viewer-left eye"
+    },
+    {
+      "id": "cat-muzzle-white",
+      "bounds": [0.168, 0.338, 0.202, 0.362],
+      "protectBrightBelow": 0.06,
+      "reason": "Bright white whisker-pad highlight below the cat's nose"
+    },
+    {
+      "id": "cat-chest-white",
+      "bounds": [0.315, 0.545, 0.350, 0.580],
+      "protectBrightBelow": 0.05,
+      "reason": "Reserved paper-white fur on the cat's chest ruff"
+    },
+    {
+      "id": "man-left-eye-sclera",
+      "bounds": [0.626, 0.721, 0.643, 0.732],
+      "protectBrightBelow": 0.08,
+      "reason": "Sclera highlight on the outer corner of the man's viewer-left eye"
+    },
+    {
+      "id": "man-left-brow-light",
+      "bounds": [0.588, 0.676, 0.618, 0.689],
+      "protectBrightBelow": 0.06,
+      "reason": "Lit upper-eyelid and brow-bone plane above the man's viewer-left eye"
+    },
+    {
+      "id": "man-right-eye-sclera",
+      "bounds": [0.770, 0.695, 0.786, 0.705],
+      "protectBrightBelow": 0.08,
+      "reason": "Inner sclera highlight of the man's viewer-right eye"
+    },
+    {
+      "id": "man-nose-bridge-highlight",
+      "bounds": [0.668, 0.738, 0.692, 0.772],
+      "protectBrightBelow": 0.06,
+      "reason": "Paper-white highlight along the bridge of the man's nose"
+    },
+    {
+      "id": "man-cheek-highlight",
+      "bounds": [0.585, 0.768, 0.615, 0.800],
+      "protectBrightBelow": 0.06,
+      "reason": "Lit cheekbone highlight to viewer-left of the man's nose"
+    },
+    {
+      "id": "upper-paper-ground",
+      "bounds": [0.430, 0.045, 0.510, 0.135],
+      "protectBrightBelow": 0.04,
+      "reason": "Open unpainted paper between the cat's ears and the top of the man's head"
+    }
+  ],
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Watercolor portrait sketch with fine sepia ink lines, light transparent washes, and over half the sheet held as bare paper",
+    "regions": {
+      "cat-head-ears": {
+        "style": "precise-watercolor",
+        "reason": "Crisp eye rims, ear contours, and warm ginger tabby stripes over reserved white fur"
+      },
+      "cat-body-chest": {
+        "style": "precise-watercolor",
+        "reason": "Light warm orange-sienna washes grading softly into the white chest ruff"
+      },
+      "man-curly-hair": {
+        "style": "precise-watercolor",
+        "reason": "Layered cool-charcoal washes and energetic curl accents with interstitial paper gaps"
+      },
+      "man-eyes-brow-nose": {
+        "style": "precise-watercolor",
+        "reason": "Fine pen definition on eyelids, irises, and nostrils with delicate warm skin washes"
+      },
+      "man-beard-lower-face": {
+        "style": "precise-watercolor",
+        "reason": "Light warm skin wash with broken stubble texture and subtle lip/beard shadow"
+      },
+      "open-paper-ground": {
+        "style": "precise-watercolor",
+        "reason": "Clean bare cold-press watercolor paper around the portrait silhouette"
+      }
+    }
+  }
+}

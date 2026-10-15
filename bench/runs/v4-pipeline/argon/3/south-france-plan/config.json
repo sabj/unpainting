@@ -1,0 +1,67 @@
+{
+  "subject": "south-france",
+  "name": "South of France Hillside Village",
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Multi-layer light-to-dark watercolor wash progression with luminous warm stone bases, four middle-value foliage and architectural plane layers, coherent cross-region shadow glazes, and selective opening and dark-backed closing sepia pen drawing."
+  },
+  "families": [
+    {
+      "id": "sunlit-stone-terraces",
+      "role": "warm stone walls, parapet and sandy hillside paths",
+      "bounds": [0.0, 0.0, 0.65, 0.52],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm yellow-ochre and buff stone terrace walls and sloped sunlit paths across the upper-left and middle hillside."
+    },
+    {
+      "id": "upper-village-roofs",
+      "role": "clustered hillside houses, terracotta roofs and dark window openings",
+      "bounds": [0.36, 0.0, 0.80, 0.28],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm stone facades and terracotta-pink roof planes crowned by a dark cypress and punctuated by crisp window recesses."
+    },
+    {
+      "id": "distant-cool-valley",
+      "role": "distant blue-green valley and horizon hills at upper right",
+      "bounds": [0.76, 0.0, 1.0, 0.18],
+      "baseMove": "wet on wet",
+      "referenceCue": "Soft cool blue-green and lavender-grey atmospheric distance receding behind the upper-right hillside."
+    },
+    {
+      "id": "middle-right-houses",
+      "role": "lower-right stone cottages, tiled roofs and sunlit garden walls",
+      "bounds": [0.64, 0.32, 1.0, 0.84],
+      "baseMove": "wet on dry",
+      "referenceCue": "Sunlit ochre facades, warm rose-sienna roof tiles, and dark doorway/window accents nestled among olive trees."
+    },
+    {
+      "id": "sunlit-foliage-canopy",
+      "role": "bright yellow-green sunlit tree crowns and foreground scrub",
+      "bounds": [0.0, 0.45, 0.72, 1.0],
+      "baseMove": "wet on wet",
+      "referenceCue": "Warm hansa-gold and sap-green sunlit foliage masses across the lower slope and foreground."
+    },
+    {
+      "id": "olive-cypress-shadows",
+      "role": "deep olive-green foliage shadows, cypress columns and foreground tree trunk",
+      "bounds": [0.0, 0.12, 1.0, 1.0],
+      "baseMove": "glazed",
+      "referenceCue": "Deep olive-green and cool sepia-blue shadow masses uniting the cypresses, under-canopy hollows, and foreground tree."
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.196, 0.010, 0.207, 0.020],
+      "reason": "Brightest sunlit parapet glint at upper-left stone wall crest"
+    },
+    {
+      "bounds": [0.132, 0.097, 0.139, 0.105],
+      "reason": "Sunlit stone highlight on upper-left terrace wall"
+    },
+    {
+      "bounds": [0.410, 0.110, 0.427, 0.123],
+      "reason": "Brightest sunlit gable wall highlight in upper village cluster"
+    }
+  ]
+}

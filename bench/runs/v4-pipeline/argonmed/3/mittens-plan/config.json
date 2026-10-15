@@ -1,0 +1,76 @@
+{
+  "name": "Mittens",
+  "subject": "mittens",
+  "target": "bench/plan/target.png",
+  "width": 1200,
+  "sheetWidthMm": 280,
+  "trumbull": false,
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Portrait watercolor sketch with fine graphite and ink lines over light translucent washes; hold crisp eye catchlights and bare paper whites while building warm tabby fur, pale facial skin, and charcoal curls from light to dark."
+  },
+  "families": [
+    {
+      "id": "paper-and-white-fur",
+      "bounds": [0.0, 0.0, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "Bare white watercolor paper background, cat's bright white muzzle, bib, and chest, and bright lit forehead plane."
+    },
+    {
+      "id": "ginger-fur-accents",
+      "bounds": [0.22, 0.12, 0.42, 0.60],
+      "baseMove": "wet on dry",
+      "referenceCue": "Saturated warm ginger-orange tabby patches along the cat's crown, cheek, ear base, and back."
+    },
+    {
+      "id": "warm-tabby-and-facial-shading",
+      "bounds": [0.30, 0.35, 0.62, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm ochre-sienna mid-dark tabby markings on the cat and warm shaded modelling along the man's temple, nose, and cheek."
+    },
+    {
+      "id": "charcoal-hair-and-dark-features",
+      "bounds": [0.50, 0.22, 0.98, 0.75],
+      "baseMove": "wet on dry",
+      "referenceCue": "Neutral charcoal-grey curly hair mass, dark eyebrows, eyelids, pupils, and lower-face beard/stubble darks."
+    },
+    {
+      "id": "amber-fur-midtones",
+      "bounds": [0.12, 0.05, 0.48, 0.65],
+      "baseMove": "wet on dry",
+      "referenceCue": "Soft golden-amber fur washes across the cat's forehead, cheek, and left shoulder."
+    },
+    {
+      "id": "pale-warm-skin-and-cream-fur",
+      "bounds": [0.02, 0.20, 0.92, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Translucent pale warm skin wash across the man's forehead, nose bridge, and cheeks, plus cream-buff fur transitions on the cat."
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.262, 0.214, 0.274, 0.230],
+      "reason": "Cat right eye catchlight and bright upper-iris glint"
+    },
+    {
+      "bounds": [0.093, 0.312, 0.104, 0.324],
+      "reason": "Cat left eye catchlight on the 3/4 turned cornea"
+    },
+    {
+      "bounds": [0.594, 0.712, 0.606, 0.722],
+      "reason": "Man right eye catchlight beside pupil"
+    },
+    {
+      "bounds": [0.806, 0.676, 0.816, 0.686],
+      "reason": "Man left eye catchlight beside pupil"
+    },
+    {
+      "bounds": [0.112, 0.336, 0.132, 0.356],
+      "reason": "Bright white bridge highlight between cat's nose and muzzle"
+    },
+    {
+      "bounds": [0.68, 0.49, 0.71, 0.52],
+      "reason": "Bright paper highlight on the centre of the man's forehead"
+    }
+  ]
+}

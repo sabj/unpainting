@@ -1,0 +1,85 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent's Ships is built from bold, luminous painted value planes and wet-on-dry local colour washes over warm cream paper reserves, with crisp dark hull accents and no ink line work.",
+    "regions": {}
+  },
+  "drawing": {
+    "medium": "graphite",
+    "inkColor": "sepia",
+    "amount": 0,
+    "lines": "all",
+    "weight": 0.2,
+    "closingLines": 0
+  },
+  "families": [
+    {
+      "id": "sargent.upper-sail-light",
+      "bounds": [0.50, 0.00, 1.00, 0.42],
+      "referenceCue": "Sunlit warm cream sail and rigging planes in the upper right; preserve open paper reserves and soft warm ochre transitions.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sargent.central-hull",
+      "bounds": [0.12, 0.04, 0.85, 0.62],
+      "referenceCue": "Broad curving cool slate and cerulean hull sweeping across the center, punctuated by warm ochre/sienna rust accents and the dark hawsehole and anchor assembly.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sargent.left-masts-rigging",
+      "bounds": [0.00, 0.00, 0.30, 0.68],
+      "referenceCue": "Warm yellow-ochre and sienna vertical masts, spars, and diagonal rigging planes on the left against pale warm paper.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sargent.lower-left-bow-anchor",
+      "bounds": [0.00, 0.55, 0.48, 1.00],
+      "referenceCue": "Lower-left hull curve, warm ochre anchor and timber planes, and cool slate shadow washes descending to the lower-left margin.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sargent.waterline-shadow",
+      "bounds": [0.26, 0.58, 0.72, 0.96],
+      "referenceCue": "Deep blue-slate and dark neutral waterline shadow and hull reflection in the lower center, built in layered dark glazes.",
+      "baseMove": "wet on dry"
+    },
+    {
+      "id": "sargent.green-water-reflections",
+      "bounds": [0.45, 0.44, 1.00, 1.00],
+      "referenceCue": "Turquoise-green, sap-green, and warm olive water planes with diagonal spar reflections and reserved sunlit hull planks on the lower right.",
+      "baseMove": "wet on dry"
+    }
+  ],
+  "reserves": [
+    {
+      "bounds": [0.825, 0.055, 0.855, 0.085],
+      "reason": "Sunlit upper-right sail canvas highlight"
+    },
+    {
+      "bounds": [0.700, 0.190, 0.735, 0.220],
+      "reason": "Brightest cream canvas reserve in upper-right sail plane"
+    },
+    {
+      "bounds": [0.790, 0.338, 0.815, 0.360],
+      "reason": "Horizontal sunlit spar and boom highlight"
+    },
+    {
+      "bounds": [0.685, 0.525, 0.720, 0.555],
+      "reason": "Sunlit white hull plank and gunwale plane"
+    },
+    {
+      "bounds": [0.805, 0.585, 0.835, 0.615],
+      "reason": "Bright right-side hull highlight beside green water"
+    },
+    {
+      "bounds": [0.024, 0.115, 0.036, 0.150],
+      "reason": "Vertical paper glint along left mast"
+    },
+    {
+      "bounds": [0.701, 0.855, 0.716, 0.885],
+      "reason": "Bright water reflection glint in lower right"
+    }
+  ]
+}

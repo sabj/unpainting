@@ -1,0 +1,19 @@
+{"t":"2026-10-14T14:50:54.061Z","kind":"start","modelMinutes":34.78,"variant":"region_w13_lay4_ink4_rec2x_rcl_sky3_leaf_cg13_vio_rg10_skyb_cpp_dk13_tv8_uncap_dwg200_tp2_shs_opp55","stops":"every passage boundary"}
+{"t":"2026-10-14T14:51:53.847Z","kind":"look","modelMinutes":35.06,"n":1,"boundary":"0","strokes":0,"penLines":95,"passesDone":0,"passesPlanned":51}
+{"t":"2026-10-14T14:52:12.823Z","kind":"continue","modelMinutes":35.38,"boundary":"0","stopAt":11,"strokes":0}
+{"t":"2026-10-14T14:54:25.861Z","kind":"look","modelMinutes":35.79,"n":2,"boundary":"11","strokes":787,"penLines":95,"passesDone":11,"passesPlanned":51}
+{"t":"2026-10-14T14:56:29.188Z","kind":"revise-refused","modelMinutes":37.83,"boundary":"11","strokes":787,"changed":["config.json","extra-args.json","variant.txt"],"reasons":["unknown recipe token \"lan6\": it maps to no painter option, so nothing would read it","unknown recipe token \"rch1\": it maps to no painter option, so nothing would read it"]}
+{"t":"2026-10-14T14:57:33.925Z","kind":"revise","modelMinutes":38.39,"boundary":"11","revision":1,"strokes":787,"passesDone":11,"changed":["config.json","extra-args.json"],"variant":"region_w13_lay4_ink4_rec2x_rcl_sky3_leaf_cg13_vio_rg10_skyb_cpp_dk13_tv8_uncap_dwg200_tp2_shs_opp55"}
+{"t":"2026-10-14T14:59:43.992Z","kind":"look","modelMinutes":39.38,"n":3,"boundary":"12","strokes":1442,"penLines":95,"passesDone":12,"passesPlanned":57}
+{"t":"2026-10-14T15:00:23.512Z","kind":"continue","modelMinutes":40.04,"boundary":"12","stopAt":21,"strokes":1442}
+{"t":"2026-10-14T15:02:51.094Z","kind":"look","modelMinutes":40.39,"n":4,"boundary":"21","strokes":6321,"penLines":95,"passesDone":21,"passesPlanned":57}
+{"t":"2026-10-14T15:04:15.264Z","kind":"revise","modelMinutes":41.29,"boundary":"21","revision":2,"strokes":6321,"passesDone":21,"changed":["extra-args.json"],"variant":"region_w13_lay4_ink4_rec2x_rcl_sky3_leaf_cg13_vio_rg10_skyb_cpp_dk13_tv8_uncap_dwg200_tp2_shs_opp55"}
+{"t":"2026-10-14T15:07:56.630Z","kind":"look","modelMinutes":42.2,"n":5,"boundary":"41","strokes":7225,"penLines":95,"passesDone":41,"passesPlanned":57}
+{"t":"2026-10-14T15:08:33.151Z","kind":"continue","modelMinutes":42.8,"boundary":"41","stopAt":48,"strokes":7225}
+{"t":"2026-10-14T15:09:41.491Z","kind":"look","modelMinutes":43.05,"n":6,"boundary":"48","strokes":7630,"penLines":95,"passesDone":48,"passesPlanned":57}
+{"t":"2026-10-14T15:11:05.669Z","kind":"revise","modelMinutes":43.95,"boundary":"48","revision":3,"strokes":7630,"passesDone":48,"changed":["extra-args.json"],"variant":"region_w13_lay4_ink4_rec2x_rcl_sky3_leaf_cg13_vio_rg10_skyb_cpp_dk13_tv8_uncap_dwg200_tp2_shs_opp55"}
+{"t":"2026-10-14T15:15:38.178Z","kind":"look","modelMinutes":44.57,"n":7,"boundary":"closing","strokes":10919,"penLines":95,"passesDone":66,"passesPlanned":66}
+{"t":"2026-10-14T15:16:36.752Z","kind":"continue","modelMinutes":45.55,"boundary":"closing","stopAt":"end","strokes":10919}
+{"t":"2026-10-14T15:16:50.801Z","kind":"finished","modelMinutes":45.54,"strokes":10919}
+{"t":"2026-10-14T15:17:12.476Z","kind":"look","modelMinutes":45.9,"n":8,"boundary":"final"}
+{"t":"2026-10-14T15:18:16.408Z","kind":"session-end","modelMinutes":46.96,"why":"the session ended","looks":8,"revisions":3}

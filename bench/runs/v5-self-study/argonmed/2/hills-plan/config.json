@@ -1,0 +1,78 @@
+{
+  "name": "Hills and Winding Path — Loose Ink and Wash",
+  "subject": "hills",
+  "target": "bench/plan/target.png",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Loose ink-and-wash landscape combining a full five-band light-to-dark watercolor value architecture (pale buff path with reserved glints, sunlit yellow-green hills, nested middle foliage layers, regional Band 3 modeling, cool ultramarine-sepia shadow glazes, and deep tree recesses) with preparatory structural ink and comprehensive closing dip-pen ink linework on dry paper."
+  },
+  "reserves": [],
+  "families": [
+    {
+      "id": "winding-sandy-path",
+      "bounds": [
+        0.06,
+        0.02,
+        0.78,
+        0.98
+      ],
+      "baseMove": "wet on dry",
+      "notes": "Warm sandy buff and pale sienna dirt road curving from the lower right around the left-center bend to the upper forks; brightest glints reserved as bare cream paper while the roadbed holds a dilute warm Band 1 glaze protected by litLift from middle and shadow foliage washes."
+    },
+    {
+      "id": "upper-oak-canopies",
+      "bounds": [
+        0,
+        0,
+        1,
+        0.45
+      ],
+      "baseMove": "wet on dry",
+      "notes": "Dense rounded oak canopies crowning the upper ridge on both sides of the upper forks, built from sap-green and olive middle washes into ultramarine-sepia shadow glazes and scalloped closing ink contours."
+    },
+    {
+      "id": "left-sunlit-hillside",
+      "bounds": [
+        0,
+        0.12,
+        0.48,
+        0.72
+      ],
+      "baseMove": "wet on dry",
+      "notes": "Sunlit yellow-green grassy slope on the upper-left and middle-left flank of the winding road, graded from bright hansa-yellow and sap-green light washes into warm olive midtones."
+    },
+    {
+      "id": "central-knoll-and-oaks",
+      "bounds": [
+        0.22,
+        0.32,
+        0.88,
+        0.82
+      ],
+      "baseMove": "wet on dry",
+      "notes": "Central grassy hillside and rounded oak/chaparral foliage masses nestled inside the main S-curve of the path, transitioning from bright sunlit grass to deep cool-green and slate-sepia foliage shadows."
+    },
+    {
+      "id": "right-slope-and-trees",
+      "bounds": [
+        0.55,
+        0.15,
+        1,
+        0.92
+      ],
+      "baseMove": "wet on dry",
+      "notes": "Right-hand hillside pasture and overarching dark tree masses with regional Band 3 foliage modeling and bold contour ink along the road cut."
+    },
+    {
+      "id": "foreground-banks-and-scrub",
+      "bounds": [
+        0,
+        0.68,
+        1,
+        1
+      ],
+      "baseMove": "wet on dry",
+      "notes": "Lower foreground road shoulders, warm sandy ruts, and dark framing chaparral/oak masses in the lower-left and lower-right corners."
+    }
+  ]
+}
