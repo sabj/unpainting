@@ -217,3 +217,5 @@ To repair the older RC5 controls in place while keeping its original page as `or
 ```sh
 node tools/canary/build.mjs --repair /path/to/canary-1013
 ```
+
+The active comparison can retire a source with `--exclude bermuda,barn` while the archived page and assets remain available. `--additions /path/to/sources.json` accepts a list of `{subject, code, title, target, source: {description}}` records. Freeze the exact target file used by the candidate: the builder checks its hash against the run card. Converted simulator outputs must be identified as converted references. A new source shows only versions actually rendered against that source; historical paintings from another target are never substituted. Captions include each recorded recipe.

@@ -4,10 +4,39 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
-import {drawingLabel,renderRecord,playbackScript,repairPage} from './build.mjs';
+import crypto from 'node:crypto';
+import {drawingLabel,renderRecord,playbackScript,repairPage,selectSubjects,build} from './build.mjs';
 test('drawing labels describe linked stages instead of the default ink medium',()=>{
  assert.equal(drawingLabel({drawing:{medium:'ink',order:'first'}},{stages:{prep:{lines:12},prepInk:{lines:0}}}),'graphite preparation (12 planned paths)');
  assert.equal(drawingLabel({drawing:{medium:'ink',order:'none'}},null),'none');
+});
+test('active subjects can retire reviewed cases and add a converted source without invented baselines',()=>{
+ const addition={subject:'flatiron',code:'FI',title:'Flatiron, converted source',target:'/frozen/flatiron.png'};
+ const selected=selectSubjects({beach:{},bermuda:{},barn:{}},{exclude:['bermuda','barn'],additions:[addition]});
+ assert.deepEqual(Object.keys(selected),['beach','flatiron']);
+ assert.equal(selected.flatiron.R4,undefined);
+ assert.throws(()=>selectSubjects({beach:{}},{exclude:['typo']}),/unknown excluded/);
+ assert.throws(()=>selectSubjects({beach:{}},{additions:[{...addition,subject:'beach'}]}),/duplicate/);
+});
+test('a new comparison source requires the exact candidate target hash',()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'canary-source-'));
+ const write=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,typeof value==='string'?value:JSON.stringify(value));};
+ try{
+  const baseline=path.join(dir,'baseline'),runs=path.join(dir,'runs'),out=path.join(dir,'out'),target=path.join(dir,'converted.png'),p=path.join(runs,'flatiron/p');
+  write(target,'frozen converted source');write(path.join(baseline,'index.html'),'<style></style>');write(path.join(baseline,'ids.json'),{});write(path.join(baseline,'play/play-data.json'),{meta:{},play:{}});
+  write(path.join(p,'painting.png'),'candidate');write(path.join(p,'f0001.jpg'),'frame');
+  write(path.join(p,'backend.json'),{commit:'aaa',release:'0.2.0-rc.6'});write(path.join(p,'frames.json'),{commit:'aaa',frames:[{src:'f0001.jpg',stage:'finished'}]});
+  const card={codeSHA:'aaa',targetSHA256:'wrong',args:['--style','penwash']};write(path.join(p,'run-card.json'),card);
+  const additions=[{subject:'flatiron',code:'FI',title:'Flatiron, converted source',target,source:{description:'Our converted rendering'}}];
+  assert.throws(()=>build({baseline,runs,out,additions}),/target differs/);
+  card.targetSHA256=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');write(path.join(p,'run-card.json'),card);
+  build({baseline,runs,out,additions});
+  const data=JSON.parse(fs.readFileSync(path.join(out,'play/play-data.json'),'utf8'));
+  assert.deepEqual(Object.keys(data.play),['flatiron-RC6']);assert.equal(data.play['flatiron-RC6'].length,120);
+  assert.equal(data.meta.flatiron.RC6.recipe,'penwash');
+  assert.equal(fs.readFileSync(path.join(out,data.meta.flatiron.P.img),'utf8'),'frozen converted source');
+  assert.match(fs.readFileSync(path.join(out,'index.html'),'utf8'),/Our converted rendering/);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 function playerFixture(){
  const versions=['V01','R4','RC5','RC6'],r={value:0,dataset:{s:'beach'}},b={textContent:'Pause',dataset:{s:'beach'}},elements={

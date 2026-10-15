@@ -109,6 +109,16 @@ export function drawingLabel(card, linework) {
  const d=card?.drawing;
  return d?.order==='none'?'none':d?`${d.medium}, drawing ${d.order} (legacy record)`:'not recorded';
 }
+export function selectSubjects(meta,{exclude=[],additions=[]}={}){
+ const selected={...meta};
+ for(const s of exclude){if(!selected[s])throw Error(`unknown excluded subject: ${s}`);delete selected[s];}
+ for(const a of additions){
+  if(!a.subject||!a.code||!a.title||!a.target)throw Error('added source needs subject, code, title and target');
+  if(!/^[a-z0-9-]+$/.test(a.subject)||selected[a.subject])throw Error(`invalid or duplicate added subject: ${a.subject}`);
+  selected[a.subject]={code:a.code,title:a.title,source:a.source??null,P:{}};
+ }
+ return selected;
+}
 export function renderRecord(pdir) {
  const card=read(path.join(pdir,'run-card.json')),backend=read(path.join(pdir,'backend.json')),frames=read(path.join(pdir,'frames.json'));
  if(!backend||!frames) throw Error(`missing render metadata: ${pdir}`);
@@ -118,22 +128,31 @@ export function renderRecord(pdir) {
  if(code?.dirty||commits[0]?.endsWith('-dirty'))throw Error(`dirty render: ${pdir}`);
  const painting=path.join(pdir,'painting.png');
  if(card?.paintingSHA256&&card.paintingSHA256!==sha(painting))throw Error(`painting hash mismatch: ${pdir}`);
- return {commit:commits[0],release:backend.release,medium:drawingLabel(card,read(path.join(pdir,'linework.json'))),frames:frames.frames,
+ const args=card?.args??[],option=flag=>{const i=args.lastIndexOf(flag);return i<0?null:args[i+1];};
+ return {commit:commits[0],release:backend.release,recipe:option('--recipe')??(option('--style')==='penwash'?'penwash':card?'default':'not recorded'),targetSHA256:card?.targetSHA256,medium:drawingLabel(card,read(path.join(pdir,'linework.json'))),frames:frames.frames,
   strokes:read(path.join(pdir,'cheat-risk.json'))?.strokes,metrics:read(path.join(pdir,'stroke-stats.json'))?.metrics,gate:read(path.join(pdir,'stroke-gate.json'))};
 }
-export function build({baseline,runs,out,historyRuns}) {
+export function build({baseline,runs,out,historyRuns,exclude=[],additions=[]}) {
  baseline=path.resolve(baseline);out=path.resolve(out);runs=path.resolve(runs);
  if(out===baseline||baseline.startsWith(out+path.sep)||out.startsWith(baseline+path.sep))throw Error('candidate output must be separate from the preserved baseline');
  const source=fs.readFileSync(path.join(baseline,'index.html'),'utf8'),data=read(path.join(baseline,'play/play-data.json')),ids=read(path.join(baseline,'ids.json'));
- fs.mkdirSync(out,{recursive:true});fs.cpSync(baseline,out,{recursive:true});fs.writeFileSync(path.join(out,'baseline.html'),source);
+ data.meta=selectSubjects(data.meta,{exclude,additions});
+ fs.mkdirSync(out,{recursive:true});fs.cpSync(baseline,out,{recursive:true,mode:fs.constants.COPYFILE_FICLONE});fs.writeFileSync(path.join(out,'baseline.html'),source);
  const versions=['V01','R4','RC5','RC6'],subjects=Object.keys(data.meta),D={...data.play};
+ for(const key of Object.keys(D))if(!subjects.some(s=>key.startsWith(s+'-')))delete D[key];
+ for(const a of additions){
+  const dst=`img/p/${a.subject}${path.extname(a.target)}`;fs.mkdirSync(path.join(out,'img/p'),{recursive:true});fs.copyFileSync(a.target,path.join(out,dst));
+  const hash=sha(a.target),id=`${a.code}-P_${hash.slice(0,4)}`;
+  data.meta[a.subject].P={id,img:dst,source:a.source};ids[id]={subject:a.subject,version:'P',file:dst,imageSHA256:hash,source:a.source};
+ }
  for(const s of subjects) {
   if(historyRuns)for(const v of versions.filter(v=>v!=='RC6')) {
    const p=path.join(historyRuns,v,s,'p');if(!fs.existsSync(path.join(p,'backend.json')))continue;
-   const r=renderRecord(p);Object.assign(data.meta[s][v],{commit:r.commit,medium:r.medium});
+   const r=renderRecord(p);Object.assign(data.meta[s][v],{commit:r.commit,medium:r.medium,recipe:r.recipe});
    const id=data.meta[s][v].id;if(ids[id])Object.assign(ids[id],{commit:r.commit,medium:r.medium});
   }
   const pdir=path.join(runs,s,'p'),r=renderRecord(pdir),png=path.join(pdir,'painting.png');
+  const added=additions.find(a=>a.subject===s);if(added&&r.targetSHA256!==sha(added.target))throw Error(`candidate target differs from added source: ${s}`);
   const dst=`img/rc6/${s}.png`;fs.mkdirSync(path.join(out,'img/rc6'),{recursive:true});fs.copyFileSync(png,path.join(out,dst));
   const id=`${data.meta[s].code}-RC6_${sha(png).slice(0,4)}`;
   data.meta[s].RC6={...r,frames:undefined,id,img:dst};ids[id]={subject:s,version:'RC6',commit:r.commit,release:r.release,medium:r.medium,file:dst,imageSHA256:sha(png)};
@@ -145,17 +164,17 @@ export function build({baseline,runs,out,historyRuns}) {
    return {src,text:`saved stage ${index+1}/${r.frames.length} | ${f.stage??''} | ${f.step??''}`};
   });
  }
- const info=m=>`commit: ${esc(m.commit)} · ${esc(m.release??'historical')} · ${esc(m.medium)}${m.strokes!=null?` · ${m.strokes} strokes`:''}`;
+ const info=m=>`commit: ${esc(m.commit)} · ${esc(m.release??'historical')} · recipe: ${esc(m.recipe??'not recorded')} · ${esc(m.medium)}${m.strokes!=null?` · ${m.strokes} strokes`:''}`;
  const figure=(s,v,play)=>{
   const m=data.meta[s][v];if(!m)return '';
   const key=s+'-'+v,src=play?D[key]?.at(-1)?.src??m.img:m.img;
   return `<figure data-col-label="${esc(m.id)}"><span class="pid">${esc(m.id)}</span><a href="${esc(m.img)}" data-lb><img ${play?`id="img-${key}"`:''} src="${esc(src)}" alt="${esc(m.id)}"></a><figcaption>${v} · ${info(m)}</figcaption>${play?`<pre class="term" id="txt-${key}"></pre>`:''}</figure>`;
  };
- const target=s=>{const m=data.meta[s].P;return `<figure data-col-label="${esc(m.id)}"><span class="pid">${esc(m.id)}</span><a href="${esc(m.img)}" data-lb><img src="${esc(m.img)}" alt="Reference ${esc(s)}"></a><figcaption>Reference</figcaption></figure>`;};
- const rows=subjects.map(s=>`<section class="subject-block" id="play-${s}"><div class="subj-head"><h2>${esc(data.meta[s].title)}</h2><div class="ctl"><button class="play-btn" data-s="${s}">Play</button><input type="range" min="0" max="1000" value="1000" data-s="${s}" aria-label="${esc(s)} saved-stage progress"><span id="pct-${s}">100%</span></div></div><div class="row" data-sync-row="play-${s}">${target(s)}${versions.map(v=>figure(s,v,true)).join('')}</div><details><summary>Final images and candidate measurements</summary><div class="row" data-sync-row="static-${s}">${target(s)}${versions.map(v=>figure(s,v,false)).join('')}</div><pre>${esc(JSON.stringify({metrics:data.meta[s].RC6.metrics,gate:data.meta[s].RC6.gate},null,2))}</pre></details></section>`).join('\n');
+ const target=s=>{const m=data.meta[s].P;return `<figure data-col-label="${esc(m.id)}"><span class="pid">${esc(m.id)}</span><a href="${esc(m.img)}" data-lb><img src="${esc(m.img)}" alt="Reference ${esc(s)}"></a><figcaption>Reference${m.source?.description?` · ${esc(m.source.description)}`:''}</figcaption></figure>`;};
+ const rows=subjects.map(s=>{const columns=1+versions.filter(v=>data.meta[s][v]).length;return `<section class="subject-block" id="play-${s}" style="--columns:${columns}"><div class="subj-head"><h2>${esc(data.meta[s].title)}</h2><div class="ctl"><button class="play-btn" data-s="${s}">Play</button><input type="range" min="0" max="1000" value="1000" data-s="${s}" aria-label="${esc(s)} saved-stage progress"><span id="pct-${s}">100%</span></div></div>${columns<5?'<p>New source: earlier versions have no render for this target. Source and RC6 are shown together.</p>':''}<div class="row" data-sync-row="play-${s}">${target(s)}${versions.map(v=>figure(s,v,true)).join('')}</div><details><summary>Final images and candidate measurements</summary><div class="row" data-sync-row="static-${s}">${target(s)}${versions.map(v=>figure(s,v,false)).join('')}</div><pre>${esc(JSON.stringify({metrics:data.meta[s].RC6.metrics,gate:data.meta[s].RC6.gate},null,2))}</pre></details></section>`;}).join('\n');
  const css=source.match(/<style>([\s\S]*?)<\/style>/)?.[1]??'';
  const script=playbackScript({...data,play:D});
- const page=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>0.2.0-rc.6 canary</title><style>${css}\nbody{max-width:2000px}.row{grid-template-columns:repeat(5,minmax(0,1fr))}figure,figcaption,.ctl{min-width:0}figcaption{overflow-wrap:anywhere}a{color:var(--accent)}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:960px){.row{grid-template-columns:1fr 1fr}}</style></head><body><div class="topbar"><h1>0.2.0-rc.6 · preserved controls + new candidate</h1><div class="global-ctl"><button id="btn-loupe">Loupe: OFF</button><label>Zoom <select id="loupe-zoom"><option value="2">2x</option><option value="3" selected>3x</option><option value="4">4x</option></select></label><button id="btn-all">Play All</button><label>Speed <select id="speed-sel"><option value="160">0.5x</option><option value="80" selected>1x</option><option value="40">2x</option></select></label><label><input type="checkbox" id="chk-loop" checked>Loop</label></div></div><p><a href="baseline.html">Original archived comparison</a> · <a href="ids.json">Image provenance</a>. Candidate playback advances through saved stages; it is not a count of individual strokes. Captions read each render's recorded commit and drawing stages. Historical media records may be incomplete. Candidate pigment physics and paper-colour stage are opt-in; the latter selects substrate colour without depositing paint.</p>${rows}<div id="lb" onclick="this.style.display='none'"><img alt="Expanded painting"></div><script>${script}</script></body></html>`;
+ const page=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>0.2.0-rc.6 canary</title><style>${css}\nbody{max-width:2000px}.row{grid-template-columns:repeat(var(--columns,5),minmax(0,1fr))}figure,figcaption,.ctl{min-width:0}figcaption{overflow-wrap:anywhere}a{color:var(--accent)}pre{white-space:pre-wrap;overflow-wrap:anywhere}@media(max-width:960px){.row{grid-template-columns:1fr 1fr}}</style></head><body><div class="topbar"><h1>0.2.0-rc.6 · preserved controls + new candidate</h1><div class="global-ctl"><button id="btn-loupe">Loupe: OFF</button><label>Zoom <select id="loupe-zoom"><option value="2">2x</option><option value="3" selected>3x</option><option value="4">4x</option></select></label><button id="btn-all">Play All</button><label>Speed <select id="speed-sel"><option value="160">0.5x</option><option value="80" selected>1x</option><option value="40">2x</option></select></label><label><input type="checkbox" id="chk-loop" checked>Loop</label></div></div><p><a href="baseline.html">Original archived comparison</a> · <a href="ids.json">Image provenance</a>. Candidate playback advances through saved stages; it is not a count of individual strokes. Captions read each render's recorded commit and drawing stages. Historical media records may be incomplete. Candidate pigment physics and paper-colour stage are opt-in; the latter selects substrate colour without depositing paint.</p>${rows}<div id="lb" onclick="this.style.display='none'"><img alt="Expanded painting"></div><script>${script}</script></body></html>`;
  fs.writeFileSync(path.join(out,'index.html'),page);fs.writeFileSync(path.join(out,'ids.json'),JSON.stringify(ids,null,2)+'\n');fs.writeFileSync(path.join(out,'play/play-data.json'),JSON.stringify({...data,play:D})+'\n');
  return {subjects:subjects.length,candidateFrames:subjects.length*120,out};
 }
@@ -163,5 +182,5 @@ if(process.argv[1]&&fileURLToPath(import.meta.url)===path.resolve(process.argv[1
  const args=Object.fromEntries(process.argv.slice(2).reduce((a,v,i,all)=>(i%2===0&&a.push([v.slice(2),all[i+1]]),a),[]));
  if(args.repair){console.log(JSON.stringify(repairPage(args.repair)));process.exit(0);}
  if(!args.baseline||!args.runs||!args.out)throw Error('--baseline, --runs and --out are required');
- console.log(JSON.stringify(build({...args,historyRuns:args['history-runs']})));
+ console.log(JSON.stringify(build({...args,historyRuns:args['history-runs'],exclude:(args.exclude??'').split(',').filter(Boolean),additions:args.additions?read(args.additions):[]})));
 }
