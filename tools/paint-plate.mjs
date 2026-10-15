@@ -348,7 +348,7 @@ const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(pa
 if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 if(VALUE_CONFIG?.sheet?.widthMm!=null&&Math.abs(num('sheetmm',VALUE_CONFIG.sheet.widthMm)-VALUE_CONFIG.sheet.widthMm)>1e-6)throw Error(`value plan sheet.widthMm ${VALUE_CONFIG.sheet.widthMm} does not match --sheetmm ${num('sheetmm',VALUE_CONFIG.sheet.widthMm)}`);
 const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
-let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
+let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_PIGMENT_CONTACT=new Set(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
 // pigments, charged into the same wet wash. 0 (default): every value-plan shape starts on a dry sheet.
@@ -1244,7 +1244,7 @@ if(FINISH_FILE){
 }
 const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DRY_VALUE,value:0,fullBoundary:false});if(EARLY_DRY_VALUE&&AREA_PLAN)throw Error('earlydryvalue supports original numeric boundaries only');
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));let EARLY_DRY_CAPTURED=false;
-const dry=(...args)=>{const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);return AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>physicalDry(...args)):physicalDry(...args);};
+const dry=(...args)=>{VALUE_PIGMENT_CONTACT.clear();const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);return AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>physicalDry(...args)):physicalDry(...args);};
 const dip=(b,o)=>{const a=AREA_EXEC.active,paint=o.conc.some(v=>v>0),load=a&&!a.productionLegacyDetail?{...o,water:(paint?a.pass.load.water:(a.pass.load.prewetWater??1))*a.pass.load.waterQuantityMm3/a.pass.load.capacityMm3,conc:o.conc.map(v=>v*(paint?a.pass.load.pigmentScale:1))}:o;const padded=(INK||GRAPHITE)&&load.conc.length<SHEET_PIGS.length?{...load,conc:[...load.conc,...new Array(SHEET_PIGS.length-load.conc.length).fill(0)]}:load;if(!AREA_PLAN)return dipBrush(b,padded);const before=measureBrush(b);const value=AREA_EXEC.command('physical brush dip/refill',{load:padded,brushBefore:before,passIntent:a?.pass??null},()=>dipBrush(b,padded));AREA_LOADS.set(b,{load:padded,waterMass:measureBrush(b).waterMass});return value;};
 // Opt-in actual numeric production loads only: calibration and pen loads stay unchanged.
 const PRODUCTION_WATER=num('productionwater',1);productionWaterLoad({water:1,conc:[0]},PRODUCTION_WATER);
@@ -1262,22 +1262,25 @@ const stroke=(b,target,points,options)=>{
   const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors],SPEED_PAPER);
   let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),SPEED_PAPER).dry;
   if(paint&&!['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
-  if(paint&&VALUE_ACTIVE.passageMaterial&&VALUE_ACTIVE.move==='wet on wet'){
+  const freshCells=paint&&VALUE_ACTIVE.passageMaterial?cells.filter(i=>!VALUE_PIGMENT_CONTACT.has(i)):cells;
+  const intoOwnWash=paint&&freshCells.length<cells.length*.3;
+  const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER);
+  if(paint&&!intoOwnWash&&VALUE_ACTIVE.passageMaterial&&VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
     const waterStroke=load=>{const p=observe();const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
-    const preparation=preparePassageBed({observe,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>clock('flow',()=>step(target,{...O,dt:2}))});paper=preparation.paper;
+    const preparation=preparePassageBed({observe:observeBed,maxActions:16,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>clock('flow',()=>step(target,{...O,dt:2}))});paper=preparation.paper;
     fs.appendFileSync(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }
   // A wet stroke into a fresh wash waits for the shine to go off, then is laid; uneven paper is counted, not a stop (tools/painter/wet-bed-wait.mjs).
   let wetWaits=0;
-  if(paint&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move))({paper,wetWaits}=layIntoWetBed({paper,observe,step:o=>step(target,o),O,info:{id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,cells:cells.length}}));
+  if(paint&&!intoOwnWash&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move))({paper,wetWaits}=layIntoWetBed({paper,observe,step:o=>step(target,o),O,info:{id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,cells:cells.length}}));
   const id='value-contact-'+(++VALUE_COMMAND),record={id,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
   const result=physicalStroke(b,target,points,options);
   {const count=VALUE_COUNTS[VALUE_ACTIVE.valueBand-1];count.strokes++;count.contacts+=cells.length;}
   // Clean-water preparation belongs to this passage too. Otherwise the first
   // pigment stroke dries away the very wet bed prepared for merging its lanes.
-  for(const i of contact.cells)VALUE_OWN_CONTACT.add(i);
+  for(const i of contact.cells){VALUE_OWN_CONTACT.add(i);if(paint)VALUE_PIGMENT_CONTACT.add(i);}
   fs.appendFileSync(path.join(out,'value-commands.jsonl'),JSON.stringify({...record,status:'EXECUTED',brushAfter:measureBrush(b)})+'\n');return result;
  }
 
@@ -2988,7 +2991,7 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
-    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
+    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state);
@@ -3020,7 +3023,7 @@ const awareRestore = () => {
   }
   const j = st.js;
   FRAME_POLICY.restore(j.framePolicy);
-  ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET, WASH_BASE } = j);
+  ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET, WASH_BASE } = j);
   const refill = (a, b) => { a.length = 0; for (const v of b) a.push(v); };
   refill(FRAMES, j.FRAMES); refill(marks, j.marks); refill(TECHS, j.TECHS); refill(colourTrace, j.colourTrace);
   expected.set(j.expected); LAST.set(j.LAST);
