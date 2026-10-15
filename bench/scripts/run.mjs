@@ -83,7 +83,7 @@ if (MULTI) {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
   } catch (e) { fail(e.stack || e.message); }
-  process.exit(0);
+  process.exit(process.exitCode ?? 0);
 }
 const tryDir = path.join(outRoot, round.dir, model.key, String(tryNo));
 const raw = path.join(BENCH, 'work', 'raw', DRY ? 'dry-run' : '', round.dir, model.key, String(tryNo));

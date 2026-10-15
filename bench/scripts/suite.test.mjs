@@ -50,6 +50,20 @@ test('the routine suite fixes five targets and six models; all remains opt-in', 
   assert.ok(suitePlan({ selection: 'all' }).models.length > 6);
 });
 
+test('the run CLI preserves failure status after a model exits without delivering a plan', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-no-plan-'));
+  let raw;
+  try {
+    const bin = path.join(root, 'bin'); fs.mkdirSync(bin);
+    const cli = path.join(bin, 'claude'); fs.writeFileSync(cli, `#!${process.execPath}\nprocess.exit(0);\n`); fs.chmodSync(cli, 0o755);
+    const result = spawnSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--round', 'V4', '--model', 'opus', '--crops', 'hills', '--out', root, '--gpu', 'off'],
+      { encoding: 'utf8', timeout: 30000, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    assert.equal(result.status, 1, result.stderr);
+    const r = readJson(path.join(root, 'v4-pipeline', 'opus', '1', 'run.json')); raw = path.join(BENCH, r.raw);
+    assert.equal(r.complete, false); assert.equal(r.unpainted.hills.pipeline.outcome, 'no-plan');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
+});
+
 test('scoring caches exact inputs, but missing progression stages and failed judges cannot complete a lite try', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-score-'));
   try {
