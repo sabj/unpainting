@@ -118,10 +118,10 @@ Models ran at their highest reasoning setting: xhigh where offered. Gemini 4 Arg
 
 | Benchmark version | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|
-| V1 | Tools | 5 | [Gemini 4 Argon](bench/models.json) | 64.1% | 5.50 |
-| V2 | Tools and technique guides | 5 | Gemini 4 Argon | 64.5% | 5.53 |
+| V1 | Tools | 5 | [Gemini 4 Argon (High)](bench/models.json) | 64.1% | 5.50 |
+| V2 | Tools and technique guides | 5 | Gemini 4 Argon (High) | 64.5% | 5.53 |
 | V3 | Tools, guides, and practice between tries | 3 | Codex Astra | 67.5% | 5.77 |
-| V4 | Full pipeline: planner, painter presets and scoring tools | 5 | Gemini 4 Argon | 70.9% | 6.09 |
+| V4 | Full pipeline: planner, painter presets and scoring tools | 5 | Gemini 4 Argon (High) | 70.9% | 6.09 |
 | V5 | Full pipeline and practice between tries | 5 | Opus 5.5 | 71.0% | 6.10 |
 
 A try is one model session that paints the requested targets. Scores are a percentage of each target scored against itself. V1 to V5 are benchmark versions with different tools or feedback. V3 is compared on three subjects, without Mittens and Trumbull, so compare it with V1 and V2 on the [shared subjects](bench/results/FINDINGS.md).

@@ -118,7 +118,7 @@ Qwen3.5-9B scores most early stages 1 and every target 10, so it adds noise. Rep
 
 ### 20. Finish the incomplete tries
 
-Some 0.1.1 tries are missing paintings. Gemini 4 Argon lacks 6 V5 paintings and 2 in V2. The Muse models have no complete V4 or V5 tries, and Gemini 3.8 Flash stops at V2. Several 0.1.0 V1 and V2 tries also lack targets.
+Some 0.1.1 tries are missing paintings. Gemini 4 Argon lacks 6 V5 paintings (4 at high, 2 at medium) and 2 V2 paintings at medium. The Muse models have no complete V4 or V5 tries, and Gemini 3.8 Flash stops at V2. Several 0.1.0 V1 and V2 tries also lack targets.
 - To do: rerun them with painter waits fully excused (item 4), at most three tries at once per machine.
 
 ### 21. Every round on every target

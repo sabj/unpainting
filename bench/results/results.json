@@ -48,7 +48,7 @@
  "roundCompare": {
   "method": "Paired by model. Each model scores the mean of all its scored paintings in a round; the difference is skill minus naive per model, averaged with each model weighted equally. 95% CI: percentile bootstrap over models (10,000 resamples). Models need at least 5 scored paintings in both rounds.",
   "models": [
-   "Gemini 4 Argon",
+   "Gemini 4 Argon (High)",
    "Gemini 4 Argon (Medium)",
    "Codex Astra",
    "Gemini 3.8 Flash",
@@ -108,7 +108,7 @@
     "nNaive": 5,
     "nSkill": 5
    },
-   "Gemini 4 Argon": {
+   "Gemini 4 Argon (High)": {
     "naive": 5.5,
     "skill": 5.53,
     "diff": 0.03,
@@ -247,7 +247,7 @@
    "models": [
     {
      "model": "argon",
-     "name": "Gemini 4 Argon",
+     "name": "Gemini 4 Argon (High)",
      "id": "gemini-4-argon-high",
      "effort": "high",
      "tries": 3,
@@ -2237,7 +2237,7 @@
    "models": [
     {
      "model": "argon",
-     "name": "Gemini 4 Argon",
+     "name": "Gemini 4 Argon (High)",
      "id": "gemini-4-argon-high",
      "effort": "high",
      "tries": 3,
@@ -4535,7 +4535,7 @@
     },
     {
      "model": "argon",
-     "name": "Gemini 4 Argon",
+     "name": "Gemini 4 Argon (High)",
      "id": "gemini-4-argon-high",
      "effort": "high",
      "tries": 3,
@@ -5379,7 +5379,7 @@
    "models": [
     {
      "model": "argon",
-     "name": "Gemini 4 Argon",
+     "name": "Gemini 4 Argon (High)",
      "id": "gemini-4-argon-high",
      "effort": "high",
      "tries": 3,
@@ -6739,7 +6739,7 @@
     },
     {
      "model": "argon",
-     "name": "Gemini 4 Argon",
+     "name": "Gemini 4 Argon (High)",
      "id": "gemini-4-argon-high",
      "effort": "high",
      "tries": 3,
