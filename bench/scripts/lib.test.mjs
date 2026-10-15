@@ -270,6 +270,19 @@ test('judge versions validate and never share a result group', () => {
   assert.deepEqual(groups.map(g => [g.judgeVersion, g.entries.length]), [['J1', 2], ['J2', 1]]);
 });
 
+test('explicit benchmark budgets, density, route and judge profiles never share a result group', () => {
+  const source = runs.find(e => e.run.round === 'V4').run;
+  const base = { ...source, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', settings: { ...source.settings, benchmarkProfile: 'lite-v1', modelMinutesCap: 5, paintWidth: { hills: 540 } } };
+  const variants = [base,
+    { ...base, judgeProfile: 'J2-full' },
+    { ...base, judgeRoute: 'openrouter' },
+    { ...base, settings: { ...base.settings, paintWidth: { hills: 1200 } } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'full-v1', modelMinutesCap: 85 } }];
+  const groups = groupByPainter(variants.map(run => ({ run })));
+  assert.equal(groups.length, 5);
+  assert.ok(groups.every(g => g.entries.length === 1 && g.evaluation));
+});
+
 test('Mittens is public with the native self-score, and the CPU Ships rerender is scored', () => {
   assert.equal(TARGET_SELF_SCORE.mittens, 8.76);
   assert.ok(loadCrops().find(c => c.task === 'mittens').distributed);

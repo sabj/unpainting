@@ -54,26 +54,42 @@ export function keepScripts(ws, dest, skip) {
  * Run one model turn. c: {cmd, args, stdinFile?, env?} (runners.turnCommand). capMs: wall-clock limit. tick(ctl) runs
  * every tickMs while the turn lasts; ctl.stop(reason) ends it. Resolves to {code, killed, reason, seconds}.
  */
-export function runTurn(c, { cwd, env = {}, events, stderr, capMs, tick = null, tickMs = 500 }) {
+export function runTurn(c, { cwd, env = {}, events, stderr, capMs, tick = null, tickMs = 500, killGraceMs = 20000, cleanupGroup = false }) {
   return new Promise(resolve => {
     const out = fs.openSync(events, 'a'), err = fs.openSync(stderr, 'a');
     const stdin = c.stdinFile ? fs.openSync(c.stdinFile, 'r') : 'ignore';
     const t0 = Date.now();
     const child = spawn(c.cmd, c.args, { cwd, env: { ...process.env, ...env, ...(c.env || {}) }, stdio: [stdin, out, err], detached: true });
     trap(); LIVE.turns.add(child.pid);
-    let reason = null, done = false;
+    let reason = null, done = false, exited = false, cleaning = false, cleaned = false, exitCode = null, exitAt = null;
+    const finish = () => {
+      if (done || !exited || (cleaning && !cleaned)) return;
+      done = true; LIVE.turns.delete(child.pid);
+      for (const fd of [out, err, ...(typeof stdin === 'number' ? [stdin] : [])]) try { fs.closeSync(fd); } catch { /* closed */ }
+      resolve({ code: exitCode, killed: Boolean(reason), reason, seconds: (exitAt - t0) / 1000, cleanupSeconds: (Date.now() - exitAt) / 1000 });
+    };
+    const clean = () => {
+      if (cleaning) return;
+      cleaning = true;
+      try { process.kill(-child.pid, 'SIGTERM'); } catch { cleaned = true; finish(); return; }
+      // Keep this timer referenced and do not resolve while local tool descendants can still be running.
+      // A remote provider daemon is outside this process group; this is not a claim of provider-side cancellation.
+      setTimeout(() => {
+        try { process.kill(-child.pid, 'SIGKILL'); } catch { /* gone */ }
+        cleaned = true; finish();
+      }, killGraceMs);
+    };
     const stop = why => {
       if (reason || done) return; reason = why;
-      try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ }
-      setTimeout(() => { if (!done) try { process.kill(-child.pid, 'SIGKILL'); } catch { /* gone */ } }, 20000).unref();
+      clean();
     };
     const timer = setTimeout(() => stop('the wall-clock limit'), capMs);
     const ticker = tick ? setInterval(() => { try { tick({ stop }); } catch (e) { fs.appendFileSync(stderr, `harness tick: ${e.stack || e}\n`); } }, tickMs) : null;
     const end = code => {
-      if (done) return; done = true; LIVE.turns.delete(child.pid);
+      if (exited) return; exited = true; exitCode = code; exitAt = Date.now();
       clearTimeout(timer); if (ticker) clearInterval(ticker);
-      for (const fd of [out, err, ...(typeof stdin === 'number' ? [stdin] : [])]) try { fs.closeSync(fd); } catch { /* closed */ }
-      resolve({ code, killed: Boolean(reason), reason, seconds: (Date.now() - t0) / 1000 });
+      if (cleanupGroup && child.pid) clean();
+      finish();
     };
     child.on('exit', code => end(code));
     child.on('error', e => { fs.appendFileSync(stderr, String(e) + '\n'); end(-1); });

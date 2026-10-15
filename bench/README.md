@@ -56,7 +56,20 @@ npm run bench:test                                   # check every run record, t
 npm run bench:build                                  # rebuild results/ from runs/
 npm run bench:run -- --dry-run                       # a scripted painter runs V1, no keys needed
 npm run bench:run -- --dry-run --round V5            # a scripted planner runs V5 at a small size, no keys needed
-npm run bench:run -- --round V4 --model opus         # one model, three tries of V4 on the five targets
+npm run bench:run -- --round V4 --model opus         # one model, one lite planning try on the five targets
+npm run bench:run -- --round V4 --model opus --profile full  # three full self-view tries
 ```
 
 V5 try 1 reuses V4 try 1 (the same session), out of laziness.
+
+## Routine development benchmark
+
+`npm run bench:lite -- --plan` shows the offline allocation before any model calls.
+`npm run bench:lite -- --gpu off` runs all five targets with Astra, Sol, Opus, Sonnet, Argon-high and Gemini Flash.
+Use `--models all` or explicit keys such as `--models core,wonderfull,spark` to include other registered models.
+Nothing was removed from the registry.
+
+Lite is a separate planning screen: one five-minute plan per target, one harness check and render after the model exits,
+no automatic repairs, at most 540 native cells across, and J2-lite judging. Full mode keeps three tries and model
+self-view. Both preserve physical paper sizes, guards and all required stages. Their results are grouped separately;
+a cheap screen does not establish full-resolution painting quality. See [profiles and measurements](docs/profiles.md).

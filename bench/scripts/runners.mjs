@@ -118,7 +118,7 @@ export function command(model, { ws, viewDir, raw, crops, text, sessionCapMin })
 /** Return {cmd, args, stdinFile?, env?} for a benchmark turn. Resume preserves context where supported.
  * images contains PNG attachments; done is 'paintings' (requires every final.png) or 'any'.
  * Runners without resume use briefFile and saved work for each turn. */
-export function turnCommand(model, { ws, raw, text, images = [], sessionId = null, resume = false, turn = 1, briefFile = null, crops = [], logFile, minutes = 30, done = 'paintings' }) {
+export function turnCommand(model, { ws, raw, text, images = [], sessionId = null, resume = false, turn = 1, briefFile = null, crops = [], logFile, minutes = 30, done = 'paintings', budget = null }) {
   const effort = model.effort && model.effort !== 'n/a' ? model.effort : null;
   if (model.runner === 'claude') {
     const common = ['--output-format', 'stream-json', '--verbose', '--model', model.id, ...(effort ? ['--effort', effort] : []), '--disable-slash-commands', '--dangerously-skip-permissions'];
@@ -141,11 +141,15 @@ export function turnCommand(model, { ws, raw, text, images = [], sessionId = nul
   }
   if (model.runner === 'agy') {
     const args = agyArgs(model, effort, text + agyImageNote(images), images.map(f => path.dirname(f)));
+    if (budget?.planOnly) args[args.indexOf('--print-timeout') + 1] = `${Math.ceil(budget.wallMinutes * 60)}s`;
     return { cmd: 'agy', args: resume ? [...args, '--conversation', sessionId] : args };
   }
   if (model.runner === 'muse') {
     if (!resume) fs.writeFileSync(path.join(raw, 'muse-session.txt'), sessionId + '\n');
-    return { cmd: 'muse', args: [...museArgs(model, ws, effort, sessionId), ...images.flatMap(f => ['--image', f]), text] };
+    return { cmd: 'muse', args: [...museArgs(model, ws, effort, sessionId),
+      ...(budget?.maxModelSteps ? ['--max-model-steps', String(budget.maxModelSteps)] : []),
+      ...(budget?.maxToolOutputBytes ? ['--max-tool-output-bytes', String(budget.maxToolOutputBytes)] : []),
+      ...images.flatMap(f => ['--image', f]), text] };
   }
   if (model.runner === 'together') {
     const brief = path.join(raw, `turn-${turn}.md`);
@@ -218,7 +222,7 @@ export function usage(runner, eventsFile) {
 /** Muse Code keeps token counts in its own session log, not in the --json stream. Sum every provider usage record,
  * subagents included, for the session id the runner chose. A resumed session logs every turn in one file, so the
  * total already reported is kept in muse-tokens.txt and each call returns only the tokens added since. */
-export function museUsage(raw, root = path.join(os.homedir(), '.local', 'share', 'muse', 'sessions')) {
+export function museUsage(raw, root = path.join(os.homedir(), '.local', 'share', 'muse', 'sessions'), consume = true) {
   const idFile = path.join(raw, 'muse-session.txt');
   if (!fs.existsSync(idFile) || !fs.existsSync(root)) return { tokens: null, costUSD: null };
   const id = fs.readFileSync(idFile, 'utf8').trim();
@@ -238,14 +242,21 @@ export function museUsage(raw, root = path.join(os.homedir(), '.local', 'share',
     const rec = d.payload?.event?.kind === 'goal_usage_attribution' ? d.payload.event.record : null;
     if (rec?.usage_family === 'provider') tokens += (rec.quantity?.input_tokens || 0) + (rec.quantity?.output_tokens || 0);
   }
-  return { tokens: sinceLast(raw, 'muse-tokens.txt', tokens), costUSD: null };
+  return { tokens: consume ? sinceLast(raw, 'muse-tokens.txt', tokens) : tokens || null, costUSD: null };
 }
 
 /** agy's final result carries the conversation's running usage; thinking tokens are counted apart from output. */
-export function agyUsage(eventsFile) {
+export function agyUsage(eventsFile, consume = true) {
   let last = null;
   for (const d of lines(eventsFile)) if (d.event === 'result' && d.result?.usage) last = d.result.usage;
   if (!last) return { tokens: null, costUSD: null };
   const total = (last.input_tokens || 0) + (last.output_tokens || 0) + (last.thinking_tokens || 0);
-  return { tokens: sinceLast(path.dirname(eventsFile), 'agy-tokens.txt', total), costUSD: null };
+  return { tokens: consume ? sinceLast(path.dirname(eventsFile), 'agy-tokens.txt', total) : total, costUSD: null };
+}
+
+/** Observed usage only: a provider may report it after a request, or only at session end. Never a reservation. */
+export function peekUsage(runner, eventsFile) {
+  if (runner === 'muse') return museUsage(path.dirname(eventsFile), undefined, false);
+  if (runner === 'agy') return agyUsage(eventsFile, false);
+  return usage(runner, eventsFile);
 }

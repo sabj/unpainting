@@ -10,7 +10,7 @@ import path from 'node:path';
 import {
   RUNS, RESULTS, RESULTS_SCHEMA, ROUNDS, BUDGET, CROP_ORDER, PUBLIC_CROPS, loadRuns, loadCrops, writeJson, validateRun,
   mean, median, round2, bootstrapMean, paintingScores, tryMean, tryStrokes, roundById, posix, BENCH,
-  inPublishedScope, comparedCrops, shortfallReason, TARGET_SELF_SCORE, indexedScore, indexedScores, PAINTER_NOTE, groupByPainter, compareSemver,
+  inPublishedScope, comparedCrops, compositeTargets, shortfallReason, TARGET_SELF_SCORE, indexedScore, indexedScores, PAINTER_NOTE, groupByPainter, compareSemver,
 } from './lib.mjs';
 import { findingsData } from './findings-data.mjs';
 
@@ -46,7 +46,12 @@ function modelEntry(entries) {
   const eligible = entries.filter(e => !e.run.cheat.disqualified && paintingScores(e.run).length);
   const scores = eligible.flatMap(e => paintingScores(e.run));
   const indexed = eligible.flatMap(e => indexedScores(e.run));
-  const best = bestTry(eligible);
+  const explicit = Boolean(runs[0].settings.benchmarkProfile);
+  const plannedTries = runs[0].settings.budget?.tries ?? roundById(runs[0].round).tries;
+  const plannedPaintings = plannedTries * compositeTargets(runs[0]).length;
+  const complete = runs.length === plannedTries && scores.length === plannedPaintings && runs.every(r => r.complete && r.score?.complete && !r.cheat.disqualified);
+  const ranked = !explicit || complete;
+  const best = ranked ? bestTry(eligible) : null;
   const perCrop = {};
   for (const c of CROP_ORDER) {
     const xs = eligible.map(e => ({ e, s: e.run.crops[c]?.score?.composite })).filter(x => x.s != null);
@@ -61,10 +66,12 @@ function modelEntry(entries) {
   const levels = runs.map(worstLevel);
   return {
     model: m.key, name: m.name, id: m.id, effort: m.effort,
-    tries: runs.length, scoredTries: eligible.length, paintings: scores.length,
-    indexed: { mean: round2(mean(indexed)), ci95: bootstrapMean(indexed), n: indexed.length },
-    mean: round2(mean(scores)), ci95: bootstrapMean(scores),
-    fewerTriesReason: eligible.length < runs.length ? `${eligible.length} scored: ${runs.filter(r => r.cheat.disqualified).map(r => `try ${r.try} disqualified for a blocked target read`).join(", ")}` : shortfallReason(m.key, runs.length),
+    tries: runs.length, scoredTries: explicit ? runs.filter(r => r.score?.complete && !r.cheat.disqualified).length : eligible.length, paintings: scores.length,
+    ...(explicit ? { completion: { complete, plannedTries, recordedTries: runs.length, plannedPaintings, paintedPaintings: runs.reduce((n, r) => n + Object.keys(r.crops).length, 0), scoredPaintings: scores.length } } : {}),
+    indexed: { mean: ranked ? round2(mean(indexed)) : null, ci95: ranked ? bootstrapMean(indexed) : null, n: indexed.length },
+    mean: ranked ? round2(mean(scores)) : null, ci95: ranked ? bootstrapMean(scores) : null,
+    fewerTriesReason: explicit ? complete ? null : `${scores.length} of ${plannedPaintings} planned paintings scored; every target and try must complete before ranking`
+      : eligible.length < runs.length ? `${eligible.length} scored: ${runs.filter(r => r.cheat.disqualified).map(r => `try ${r.try} disqualified for a blocked target read`).join(", ")}` : shortfallReason(m.key, runs.length),
     best: best ? { try: best.run.try, score: round2(tryMean(best.run)), indexed: round2(tryIndexed(best.run)), crops: paintingScores(best.run).length, path: rel(best.file) } : null,
     perTry: {
       strokes: median(runs.map(tryStrokes).filter(Boolean)),
@@ -73,7 +80,7 @@ function modelEntry(entries) {
       costUSD: round2(median(runs.map(r => r.session?.costUSD))),
       estCostUSD: round2(median(runs.map(r => r.session?.estCostUSD))),
     },
-    publicCrops: { mean: round2(mean(pub)), ci95: bootstrapMean(pub), n: pub.length },
+    publicCrops: { mean: ranked ? round2(mean(pub)) : null, ci95: ranked ? bootstrapMean(pub) : null, n: pub.length },
     perCrop,
     cheat: {
       disqualified: runs.filter(r => r.cheat.disqualified).length,
@@ -82,7 +89,7 @@ function modelEntry(entries) {
       flagged: runs.filter(r => r.cheat.review?.status === 'flagged').length,
       cleared: runs.filter(r => r.cheat.review?.status === 'cleared').length,
     },
-    tryList: runs.map(r => ({ try: r.try, mean: round2(tryMean(r)), indexed: round2(tryIndexed(r)), crops: paintingScores(r).length, complete: r.complete, risk: worstLevel(r), path: rel(entries.find(e => e.run === r).file) })),
+    tryList: runs.map(r => ({ try: r.try, mean: explicit && !r.score?.complete ? null : round2(tryMean(r)), indexed: explicit && !r.score?.complete ? null : round2(tryIndexed(r)), crops: paintingScores(r).length, complete: r.complete, risk: worstLevel(r), path: rel(entries.find(e => e.run === r).file) })),
   };
 }
 
@@ -98,7 +105,7 @@ function missingCrops(entries, m, cropKeys) {
   return out;
 }
 
-const scored = all.filter(({ run }) => isScored(run));
+const scored = all.filter(({ run }) => isScored(run) || (run.settings.benchmarkProfile && run.score?.status !== 'dry-run'));
 const unscored = all.filter(({ run }) => !isScored(run)).map(({ file, run }) => ({ path: rel(file), round: run.round, model: run.painter.key, try: run.try, status: run.score?.status ?? 'unscored' }));
 
 /** One results entry: a round's scored tries from one painter and sim version (empty while the round runs). */
@@ -110,8 +117,8 @@ function roundEntry(r, inRound, group, label) {
   const cropKeys = CROP_ORDER.filter(c => inRound.some(e => comparedCrops(e.run).some(([k]) => k === c)));
   for (const m of models) m.missing = missingCrops(byModel.get(m.model), m, cropKeys);
   return {
-    id: r.id, label, key: r.key, dir: r.dir, title: r.title,
-    painterVersion: group?.painterVersion ?? null, simVersion: group?.simVersion ?? null, judgeVersion: group?.judgeVersion ?? null, releases: group?.releases ?? [], harness: r.harness, plannedTries: r.tries, learnsBetweenTries: r.learning, explained: r.explained,
+    id: r.id, label, ...(group?.evaluation ? { evaluation: group.evaluation } : {}), key: r.key, dir: r.dir, title: r.title,
+    painterVersion: group?.painterVersion ?? null, simVersion: group?.simVersion ?? null, judgeVersion: group?.judgeVersion ?? null, releases: group?.releases ?? [], harness: r.harness, plannedTries: group?.evaluation?.plannedTries ?? r.tries, learnsBetweenTries: r.learning, explained: r.explained,
     status: inRound.length ? 'published' : 'running', crops: cropKeys, models,
   };
 }
@@ -119,10 +126,10 @@ function roundEntry(r, inRound, group, label) {
 const rounds = ROUNDS.flatMap(r => {
   const groups = groupByPainter(scored.filter(({ run }) => roundById(run.round)?.id === r.id));
   if (!groups.length) return [roundEntry(r, [], null, r.id)];
-  return groups.map(g => roundEntry(r, g.entries, g, groups.length > 1 ? `${r.id} (painter ${g.painterVersion} · sim ${g.simVersion} · judges ${g.judgeVersion})` : r.id));
+  return groups.map(g => roundEntry(r, g.entries, g, groups.length > 1 ? `${r.id} (painter ${g.painterVersion} · sim ${g.simVersion} · judges ${g.judgeVersion}${g.evaluation ? ` · ${g.evaluation.benchmarkProfile} · ${g.evaluation.judgeProfile}` : ''})` : r.id));
 });
 const releases = [...new Set(scored.map(({ run }) => run.release))].sort(compareSemver);
-const versions = groupByPainter(scored).map(({ painterVersion, simVersion, judgeVersion, releases: rs }) => ({ painterVersion, simVersion, judgeVersion, releases: rs }));
+const versions = groupByPainter(scored).map(({ painterVersion, simVersion, judgeVersion, releases: rs, evaluation }) => ({ painterVersion, simVersion, judgeVersion, releases: rs, ...(evaluation ? { evaluation } : {}) }));
 
 const results = {
   schema: RESULTS_SCHEMA,

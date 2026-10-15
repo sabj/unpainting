@@ -77,7 +77,7 @@ test('later turns resume the same session', () => {
 
 const dryRun = (round, extra) => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), `dry-${round}-`));
-  execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--dry-run', '--round', round, '--crops', 'hills', '--out', out, ...extra], { stdio: ['ignore', 'ignore', 'pipe'] });
+  execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--dry-run', '--round', round, '--profile', 'full', '--crops', 'hills', '--out', out, ...extra], { stdio: ['ignore', 'ignore', 'pipe'] });
   return out;
 };
 const runOf = (out, dir, n) => readJson(path.join(out, dir, 'dry-run', String(n), 'run.json'));

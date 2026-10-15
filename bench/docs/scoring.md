@@ -32,7 +32,7 @@ The judge version identifies the rules; the profile identifies the sampling budg
 python3 bench/scorer/score_painting.py --target target.png --image painting.png --judge J2 --profile lite --out score.json
 ```
 
-Omitting `--profile` retains full J2 unless `BENCH_SCORE_CALLS` explicitly selects 1, 3 or 5 calls, which now records the corresponding profile. A conflicting explicit profile and environment override is refused. Other J2 call counts are refused. J1 retains its historical default and call-count overrides; J2 profiles cannot be applied to J1. The benchmark's default judge remains J1.
+Omitting `--profile` retains full J2 unless `BENCH_SCORE_CALLS` explicitly selects 1, 3 or 5 calls, which now records the corresponding profile. A conflicting explicit profile and environment override is refused. Other J2 call counts are refused. J1 retains its historical default and call-count overrides; J2 profiles cannot be applied to J1. Historical toolkit runs retain J1. New explicit V4 benchmark profiles select J2-lite or J2-full; see [profiles](profiles.md).
 
 Every profile requires all three judges. A missing judge leaves the composite incomplete; it never produces a score from a smaller panel. Failed, truncated and malformed responses use the existing bounded J2 retries with both images: up to three judgement attempts, each with up to three HTTP attempts, followed by at most two top-up rounds for still-missing samples. A top-up round requests only the missing samples. Lite reduces initial calls by 80% versus full; actual cost and latency depend on retries and provider behavior.
 
@@ -81,3 +81,19 @@ The tells it names include speckle trails, cut or scalloped wash edges, flat sla
 ## The cheat-risk score
 
 See [anti-cheat.md](anti-cheat.md#the-cheat-risk-score). A high score means a person reviews the try. It does not exclude it.
+
+## Explicit benchmark profiles
+
+The scoring CLI reads the requested judge version/profile and route from the run record, unless explicitly overridden.
+Final-score caches require identical target and native-size image hashes, style, rubric, judge version/profile and route.
+Progression caches also require identical stage sheets, style and declared panel. `--force` bypasses caches.
+
+For explicit profiles, both progression judges must each supply all five valid stage scores. The wrapper retains each
+judge's response; a missing stage or judge leaves progression incomplete and its aggregate empty. A run is complete
+only when every planned target has complete final and progression scores. Failed/incomplete scoring is saved before
+the CLI returns failure. `--judges-only` preserves progression and still requires it for a complete result.
+
+Explicit profiles with missing targets or tries keep their planned denominator and receive no aggregate ranking.
+Partial per-target scores remain inspectable. Historical J1 aggregation and published artifacts are unchanged.
+Sampling profiles preserve the existing artistic rubric: the current progression rubric is not yet technique-aware
+enough for an automatic ink-first promotion gate. Human process review remains necessary for RC7 decisions.

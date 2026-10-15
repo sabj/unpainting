@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { museUsage, agyUsage, agyConversation, command, turnCommand } from './runners.mjs';
+import { benchmarkProfile } from './profiles.mjs';
 
 const usageLine = (input, output, family = 'provider') => JSON.stringify({
   payload: { event: { kind: 'goal_usage_attribution', record: { usage_family: family, quantity: { input_tokens: input, output_tokens: output } } } },
@@ -36,6 +37,13 @@ test('museUsage returns only tokens added since the last call on a resumed sessi
   assert.equal(museUsage(f.raw, f.root).tokens, null);
 });
 
+test('observing Muse usage does not consume the final accounting delta', () => {
+  const f = fixture(); f.append([usageLine(100, 20)]);
+  assert.equal(museUsage(f.raw, f.root, false).tokens, 120);
+  assert.equal(museUsage(f.raw, f.root, false).tokens, 120);
+  assert.equal(museUsage(f.raw, f.root).tokens, 120);
+});
+
 test('museUsage is null without a session id or a matching log', () => {
   const f = fixture();
   assert.deepEqual(museUsage(f.raw, path.join(f.root, 'missing')), { tokens: null, costUSD: null });
@@ -64,6 +72,20 @@ test('agy: a later turn resumes the conversation', () => {
   assert.ok(first.args.includes('/raw/view'));
   const next = turnCommand(agy, { ws: '/ws', raw: '/raw', text: 'again', images: [], sessionId: 'c-1', resume: true });
   assert.deepEqual(next.args.slice(-2), ['--conversation', 'c-1']);
+});
+
+test('lite applies supported provider controls without silently reducing model effort', () => {
+  const raw = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-controls-'));
+  try {
+    const budget = benchmarkProfile('lite');
+    const a = turnCommand(agy, { ws: '/ws', raw, text: 'plan', budget });
+    assert.equal(a.args[a.args.indexOf('--print-timeout') + 1], '300s');
+    assert.equal(a.args[a.args.indexOf('--effort') + 1], 'high');
+    const m = turnCommand({ id: 'muse-wonder-full-1.0', effort: 'xhigh', runner: 'muse' }, { ws: '/ws', raw, sessionId: 'lite', text: 'plan', budget });
+    assert.equal(m.args[m.args.indexOf('--max-model-steps') + 1], '24');
+    assert.equal(m.args[m.args.indexOf('--max-tool-output-bytes') + 1], '12000');
+    assert.equal(m.args[m.args.indexOf('--effort') + 1], 'xhigh');
+  } finally { fs.rmSync(raw, { recursive: true, force: true }); }
 });
 
 test('agy: conversation id from init; tokens counted once across resumed turns', () => {

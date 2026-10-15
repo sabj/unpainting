@@ -27,6 +27,7 @@ export class Painting {
     this.state = 'idle';     // running | saved | done | failed
     this.released = new Set();
     this.planningRefused = null;
+    this.deadline = spec.renderTimeoutMs ? Date.now() + spec.renderTimeoutMs : null;
   }
 
   /** Start segment k from a plan folder (a copy the harness owns). resume: the saved state folder, or null. */
@@ -39,7 +40,9 @@ export class Painting {
     const log = fs.openSync(seg.log, 'w');
     const child = spawn(process.execPath, plan.args, { cwd: this.repo, env: { ...process.env, ...this.env }, stdio: ['ignore', log, log] });
     this.child = child;
+    const timer = this.deadline ? setTimeout(() => { seg.timedOut = true; child.kill('SIGKILL'); }, Math.max(1, this.deadline - Date.now())) : null;
     child.on('close', code => {
+      if (timer) clearTimeout(timer);
       fs.closeSync(log);
       seg.exit = code; seg.seconds = (Date.now() - seg.start) / 1000;
       this.child = null;

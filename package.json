@@ -21,7 +21,9 @@
     "bench:test": "node --test bench/scripts/*.test.mjs",
     "quick-start": "npm run example:plan",
     "doctor": "node tools/doctor.mjs",
-    "bench:add-target": "node bench/scripts/add-target.mjs"
+    "bench:add-target": "node bench/scripts/add-target.mjs",
+    "bench:suite": "node bench/scripts/suite.mjs",
+    "bench:lite": "node bench/scripts/suite.mjs --profile lite"
   },
   "dependencies": {
     "sharp": "^0.35.4",

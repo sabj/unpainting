@@ -42,14 +42,15 @@ async function lookImages(sheetPng, target, dir, n) {
 
 export class PaintSession {
   /** raw: the try's raw folder for this target; spec: {width, sheetmm, trumbull}; modelMinutes: the model-time cap. */
-  constructor({ repo, ws, raw, spec, target, modelMinutes = 85, gpu = 'auto', log = () => {} }) {
-    Object.assign(this, { repo, ws, raw, spec, target, gpu, log });
+  constructor({ repo, ws, raw, spec, target, modelMinutes = 85, gpu = 'auto', log = () => {}, planOnly = false }) {
+    Object.assign(this, { repo, ws, raw, spec, target, gpu, log, planOnly });
     this.io = path.join(ws, 'bench', 'paint-io');
     this.looksDir = path.join(ws, 'bench', 'looks');
     for (const d of [this.io, this.looksDir, raw]) fs.mkdirSync(d, { recursive: true });
     this.ckpt = path.join(raw, 'CHECKPOINTS.jsonl');
     this.limitS = modelMinutes * 60;
     this.t0 = now(); this.waitS = 0; this.blockedUntil = 0;
+    this.usedBefore = 0; this.endedModelS = null; this.planReady = false;
     this.pending = new Map(); this.handled = new Set();
     this.painting = null; this.started = false; this.restarts = 0; this.rev = 0; this.looks = 0; this.checks = 0;
     this.revising = []; this.ended = null; this.capped = false; this.palette = null; this.planHash = null; this.startCheck = null;
@@ -58,13 +59,14 @@ export class PaintSession {
 
   addBlocked(a, b) { const s = Math.max(a, this.blockedUntil); if (b > s) this.waitS += b - s; this.blockedUntil = Math.max(this.blockedUntil, b); }
   modelS() {
+    if (this.endedModelS !== null) return this.endedModelS;
     let extra = 0, bu = this.blockedUntil; const t = now();
     for (const p of [...this.pending.values()].sort((x, y) => x.t - y.t)) {
       if (!p.blocking) continue;
       const a = Math.max(p.t, bu), b = Math.min(t, p.t + CLIENT_WAIT);
       if (b > a) { extra += b - a; bu = b; }
     }
-    return Math.max(0, t - this.t0 - this.waitS - extra);
+    return this.usedBefore + Math.max(0, t - this.t0 - this.waitS - extra);
   }
   overTime() { return this.modelS() >= this.limitS; }
   record(kind, fields = {}) { fs.appendFileSync(this.ckpt, JSON.stringify({ t: new Date().toISOString(), kind, modelMinutes: +(this.modelS() / 60).toFixed(2), ...fields }) + '\n'); }
@@ -131,6 +133,13 @@ export class PaintSession {
   handle(seq, r) {
     const { cmd } = r, args = r.args || [];
     if (this.ended) return this.answer(seq, `The session has ended (${this.ended}). Stop now.`, 1);
+    if (this.planOnly) {
+      if (cmd === 'start' || cmd === 'finish') {
+        this.planReady = true;
+        return this.answer(seq, 'Lite plan received. Stop now; the harness checks and renders it after your model session ends.');
+      }
+      return this.answer(seq, 'Lite is planning only. Save your plan and stop; the harness renders without model review.', 1);
+    }
     if (cmd === 'status') return this.answer(seq, this.statusText());
     const busy = [...this.pending.values()].some(q => q.phase === 'check') || this.revising.length;
     if (['start', 'revise', 'next', 'run', 'finish'].includes(cmd) && busy) return this.answer(seq, 'A check or a revision is still under way; run `bash bench/paint.sh wait` first.', 1);
@@ -326,6 +335,7 @@ export class PaintSession {
   /** The model's session is over: the painter finishes the current plan without stopping again. */
   end(why) {
     if (this.ended) return;
+    this.endedModelS = this.modelS();
     this.ended = why;
     if (this.painting && this.painting.state === 'running') this.painting.noMoreStops();
     for (const seq of [...this.pending.keys()]) this.answer(seq, `The session has ended (${why}). The painter finishes your current plan without stopping. Stop now.`, 1);
@@ -333,7 +343,7 @@ export class PaintSession {
   }
 
   /** A repair turn after the painter refused the plan: the model's clock starts again and one fresh start is allowed. */
-  reopen() { this.ended = null; this.capped = false; this.t0 = now(); this.waitS = 0; this.blockedUntil = 0; this.record('reopen', { why: 'repair turn' }); }
+  reopen() { this.usedBefore = this.modelS(); this.endedModelS = null; this.ended = null; this.t0 = now(); this.waitS = 0; this.blockedUntil = 0; this.record('reopen', { why: 'repair turn' }); }
 
   /** After the model's process exited: let a start or revise whose check is still running finish. */
   async settle(limitS = 900) {

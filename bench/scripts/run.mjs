@@ -17,6 +17,7 @@ import {
 } from './lib.mjs';
 import { brief, prompt, command, usage, KEYS, installSkills } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
+import { profileForRound } from './profiles.mjs';
 
 const argv = process.argv.slice(2);
 const has = n => argv.includes('--' + n);
@@ -26,6 +27,8 @@ const fail = msg => { console.error(`bench:run: ${msg}`); process.exit(2); };
 const DRY = has('dry-run');
 const round = roundById(opt('round', 'V1'));
 if (!round) fail('--round must be one of V1 to V5');
+let profile;
+try { profile = profileForRound(round.id, opt('profile')); } catch (e) { fail(e.message); }
 const MULTI = ['V3', 'V4', 'V5'].includes(round.id);
 const mode = opt('mode', 'gentle');
 if (mode !== 'gentle') fail('only gentle mode is implemented; hard mode needs a look counter per runner (see docs/anti-cheat.md)');
@@ -33,7 +36,9 @@ const tryNo = Number(opt('try', 1));
 if (!Number.isInteger(tryNo) || tryNo < 1) fail('--try must be an integer from 1');
 
 const models = loadModels();
-const model = DRY ? { key: 'dry-run', name: 'Scripted dry run', id: 'scripts/dry-painter.mjs', effort: 'n/a', runner: 'dry-run' }
+const dryKey = opt('dry-key', 'dry-run');
+if (opt('dry-key') && (!DRY || !models.some(m => m.key === dryKey))) fail('--dry-key requires --dry-run and a registered model key');
+const model = DRY ? { key: dryKey, name: 'Scripted dry run', id: 'scripts/dry-painter.mjs', effort: 'n/a', runner: 'dry-run' }
   : models.find(m => m.key === opt('model')) || fail(`--model must be one of ${models.map(m => m.key).join(', ')}`);
 
 const cropSpecs = Object.fromEntries(loadCrops().map(c => [c.task, c]));
@@ -54,9 +59,10 @@ if (!DRY) {
   if (model.runner === 'together' && !process.env.TOGETHER_API_KEY) fail('the together runner needs TOGETHER_API_KEY in the environment');
 }
 
-const outRoot = path.resolve(opt('out', DRY ? path.join(BENCH, 'work', 'dry-run', 'runs') : RUNS));
+const outRoot = path.resolve(opt('out', ['V4', 'V5'].includes(round.id) ? path.join(BENCH, 'work', DRY ? 'dry-run' : 'profile-runs', profile.id, 'runs') : DRY ? path.join(BENCH, 'work', 'dry-run', 'runs') : RUNS));
 if (MULTI) {
-  const tries = Number(opt('tries', DRY ? (round.id === 'V4' ? 1 : 2) : 3));
+  const tries = Number(opt('tries', profile.planOnly ? 1 : DRY ? (round.id === 'V4' ? 1 : 2) : 3));
+  if (profile.planOnly && tries !== 1) fail('lite uses one try; select --profile full for repeated trials');
   if (!Number.isInteger(tries) || tries < 1 || tries > 9) fail('--tries must be an integer from 1 to 9');
   if (!DRY && round.id === 'V5' && !process.env.TOGETHER_API_KEY) fail('V5 scores each try for the next one\'s feedback: set TOGETHER_API_KEY (the judges run on Together)');
   // --dry-width: the painting width of a dry run (default 96 px; the real widths are in v4v5/subjects.json)
@@ -72,7 +78,7 @@ if (MULTI) {
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict') };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), profile };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);

@@ -47,13 +47,23 @@ const vNum = v => Number(String(v).replace(/^[VJ]/, ''));
 export function groupByPainter(entries) {
   const groups = new Map();
   for (const e of entries) {
-    const key = `${e.run.painterVersion}|${e.run.simVersion}|${e.run.judgeVersion}`;
+    const key = `${e.run.painterVersion}|${e.run.simVersion}|${e.run.judgeVersion}|${JSON.stringify(comparisonProtocol(e.run))}`;
     groups.set(key, [...(groups.get(key) || []), e]);
   }
   return [...groups.values()].map(es => ({
     painterVersion: es[0].run.painterVersion, simVersion: es[0].run.simVersion, judgeVersion: es[0].run.judgeVersion,
     releases: [...new Set(es.map(e => e.run.release))].sort(compareSemver), entries: es,
+    ...(comparisonProtocol(es[0].run) ? { evaluation: comparisonProtocol(es[0].run) } : {}),
   })).sort((a, b) => (vNum(a.painterVersion) - vNum(b.painterVersion)) || (vNum(a.simVersion) - vNum(b.simVersion)) || (vNum(a.judgeVersion) - vNum(b.judgeVersion)));
+}
+/** Historical records retain their published grouping. Explicit protocols never share means. */
+export function comparisonProtocol(run) {
+  if (!run.settings?.benchmarkProfile && !run.judgeProfile) return null;
+  return { benchmarkProfile: run.settings?.benchmarkProfile ?? 'legacy', judgeProfile: run.judgeProfile ?? run.settings?.judgeProfile,
+    judgeRoute: run.judgeRoute ?? run.settings?.judgeRoute, scoreProtocol: run.settings?.scoreProtocol ?? 'native-v1',
+    paintWidth: run.settings?.paintWidth ?? null, modelMinutesCap: run.settings?.modelMinutesCap ?? null,
+    ...(run.settings?.benchmarkProfile ? { targets: run.settings.crops, plannedTries: run.settings.budget?.tries ?? null } : {}),
+    strictVerdict: run.settings?.strictVerdict ?? false };
 }
 export const roundById = id => ROUNDS.find(r => r.id === String(id).toUpperCase() || r.key === id || r.dir === id) || null;
 
