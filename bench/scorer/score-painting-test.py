@@ -134,7 +134,7 @@ class J2Profiles(Base):
                 self.assertEqual(r['sampling']['requestedCallsPerJudge'], calls)
                 self.assertEqual(r['sampling']['aggregation'], 'mean of per-judge medians')
                 self.assertEqual(r['composite'], 5.5)
-                self.assertEqual(r['visionSamples'], {m: [sp._parse(GOOD)] * calls for m in sp.JUDGES})
+                self.assertEqual(r['visionSamples'], {m: [{**sp._parse(GOOD), '_provider': sp.PROVIDER}] * calls for m in sp.JUDGES})
 
     def test_default_j2_is_full(self):
         r, _ = self.run_score('J2', lambda m, n, msg: (GOOD, 'stop'))
