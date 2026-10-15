@@ -18,6 +18,28 @@ Judge version: `J1`. All published scores are J1. A new panel, rubric or image p
 
 The judges are told not to reward pixel similarity, and that blur and smear are failures. "5 is a competent amateur; 9-10 is close to the target's quality."
 
+### J2 sampling profiles
+
+The judge version identifies the rules; the profile identifies the sampling budget. These profiles keep the existing J2 panel, prompt, image preparation, median aggregation and strict response validation:
+
+| Profile | Required valid calls per judge | Initial panel calls | Use |
+|---|---:|---:|---|
+| `J2-lite` | 1 | 3 | Routine development screening |
+| `J2-standard` | 3 | 9 | Closer comparisons |
+| `J2-full` | 5 | 15 | Release decisions; the existing J2 default |
+
+```sh
+python3 bench/scorer/score_painting.py --target target.png --image painting.png --judge J2 --profile lite --out score.json
+```
+
+Omitting `--profile` retains full J2 unless `BENCH_SCORE_CALLS` explicitly selects 1, 3 or 5 calls, which now records the corresponding profile. A conflicting explicit profile and environment override is refused. Other J2 call counts are refused. J1 retains its historical default and call-count overrides; J2 profiles cannot be applied to J1. The benchmark's default judge remains J1.
+
+Every profile requires all three judges. A missing judge leaves the composite incomplete; it never produces a score from a smaller panel. Failed, truncated and malformed responses use the existing bounded J2 retries with both images: up to three judgement attempts, each with up to three HTTP attempts, followed by at most two top-up rounds for still-missing samples. A top-up round requests only the missing samples. Lite reduces initial calls by 80% versus full; actual cost and latency depend on retries and provider behavior.
+
+Results record `judgeProfile`, the requested and required counts and panel in `sampling`, actual valid counts in `callCounts`, valid scores in `visionSamples`, and HTTP attempts in `visionAttempts` (including top-up round and sample slot). Retain those samples for paired lite/full calibration without paying for the same responses again. Different profiles must remain distinguishable in comparisons; neither ranking agreement nor interchangeable scores have been established.
+
+With one valid call per judge, repeatability is unmeasured: `pm` is null and `repeatabilityMeasured` is false. `judgeSpread` is the range of the judges' overall scores and measures panel disagreement, not repeatability. Repeated profiles retain the existing `pm` dispersion calculation; it is not a calibrated confidence interval. Escalate both sides of an ambiguous comparison to the same profile. Changes to the artistic rubric or image protocol require a new judge version, rather than a cheaper J2 profile.
+
 Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the 1224 px V4 and V5 renders are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. The V4 and V5 scores published before 2026-10-10 came from a 720 px upscale path; each `run.json` keeps them as `scoreOld`.
 
 Score from the toolkit's own `final.png`, not from a compressed thumbnail. The marks metric is sensitive to compression: a 600 px WebP of a published painting gave a marks score 2.4 points lower than the PNG it was made from.

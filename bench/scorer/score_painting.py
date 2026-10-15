@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Score one painting against its target, 0 to 10 (rubric bench-v3-median5, the one behind the published runs).
 
-  python3 score_painting.py --target T.png --image P.png --style "pure watercolor, no ink" [--judge J1|J2] [--out result.json]
+  python3 score_painting.py --target T.png --image P.png --style "pure watercolor, no ink" [--judge J1|J2] [--profile lite|standard|full] [--out result.json]
 
 classic:   value, edge and marks metrics from classic.py, each normalized to 0-10; their mean.
 vision:    Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B on Together see the target and the painting, blind, and give 0-10 on
@@ -17,7 +17,9 @@ Judge versions (--judge, or BENCH_JUDGE_VERSION; the default is J1, the publishe
       at the token limit or does not parse is made again with both images (up to 3 calls per judgement, then up to
       2 top-up rounds); there is no text-only repair. Every attempt is kept under visionAttempts with its HTTP status
       and finish_reason. J2 scores are not compared with J1 scores.
-Every result records judgeVersion, minValidCalls and callCounts (valid calls per judge).
+J2 profiles change only the sampling budget: lite is 1 valid call per judge, standard 3, full 5 (default).
+Every profile keeps the same three judges and strict full-image retries. Results record the profile, requested and
+valid call counts, valid samples and attempts. A single call per judge leaves repeatability unmeasured, not zero.
 
 Uses OPENROUTER_API_KEY with zero-data-retention providers when available, otherwise TOGETHER_API_KEY. --no-vision runs the classic part only and needs no key.
 """
@@ -36,10 +38,9 @@ PROVIDER = "openrouter" if os.environ.get("OPENROUTER_API_KEY") else "together"
 URL = "https://openrouter.ai/api/v1/chat/completions" if PROVIDER == "openrouter" else "https://api.together.xyz/v1/chat/completions"
 ROUTER_MODELS = {"moonshotai/Kimi-K3":"moonshotai/kimi-k3", "zai-org/GLM-5.3-Flash":"z-ai/glm-5.3-flash", "Qwen/Qwen3.5-9B":"qwen/qwen3.5-9b"}
 JUDGES = ["moonshotai/Kimi-K3", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.5-9B"]
-CALLS = int(os.environ.get("BENCH_SCORE_CALLS", "5"))
-MIN_VALID = min(3, CALLS)  # J1
 JUDGE_VERSIONS = ("J1", "J2")
 DEFAULT_JUDGE = os.environ.get("BENCH_JUDGE_VERSION", "J1")
+J2_PROFILES = {"lite": 1, "standard": 3, "full": 5}
 J2_ATTEMPTS, J2_TOPUP_ROUNDS = 3, 2
 J2_MAX_TOKENS, J2_MAX_TOKENS_CAP = 8000, 16000
 VCRIT = ["composition_values", "edges_detail", "marks_texture"]
@@ -53,6 +54,34 @@ Then give one overall score from 0 to 10 for the attempt as a painting, also wei
 Do not reward pixel similarity. Blur and smear are failures, not a safe middle. 5 is a competent amateur; 9-10 is close to the target's quality.
 Reply with JSON only, no prose: {{"composition_values":n,"edges_detail":n,"marks_texture":n,"overall":n}}"""
 SHAPE = '{"composition_values":n,"edges_detail":n,"marks_texture":n,"overall":n}'
+
+
+def sampling_plan(judge, profile=None):
+    """Resolve a budget before doing any scoring or network work. Preserve J1's legacy call-count override."""
+    if judge not in JUDGE_VERSIONS:
+        raise ValueError(f"unknown judge version {judge}; known: {', '.join(JUDGE_VERSIONS)}")
+    raw = os.environ.get("BENCH_SCORE_CALLS")
+    try:
+        calls = int(raw) if raw is not None else 5
+    except ValueError:
+        raise ValueError("BENCH_SCORE_CALLS must be a positive integer") from None
+    if calls < 1:
+        raise ValueError("BENCH_SCORE_CALLS must be a positive integer")
+    if judge == "J1":
+        if profile is not None:
+            raise ValueError("--profile applies only to J2; J1 retains its historical sampling")
+        label = "J1-full" if calls == 5 else "J1-custom"
+        return {"profile": label, "calls": calls, "minValid": min(3, calls)}
+    if profile is None:
+        profile = next((name for name, count in J2_PROFILES.items() if count == calls), None)
+        if profile is None:
+            raise ValueError("J2 supports 1, 3 or 5 calls per judge; use --profile lite, standard or full")
+    if profile not in J2_PROFILES:
+        raise ValueError(f"unknown J2 profile {profile}; choose lite, standard or full")
+    requested = J2_PROFILES[profile]
+    if raw is not None and calls != requested:
+        raise ValueError(f"BENCH_SCORE_CALLS={calls} conflicts with J2-{profile} ({requested} calls per judge)")
+    return {"profile": "J2-" + profile, "calls": requested, "minValid": requested}
 
 
 def _mean(xs):
@@ -219,17 +248,19 @@ def _aggregate(calls, errors, min_valid):
         if len(ds) >= min_valid:
             ov = [d["overall"] for d in ds]
             per[m] = {"overall": round(med(ov), 2), **{c: round(med([d[c] for d in ds]), 2) for c in VCRIT},
-                      "calls": len(ds), "sd": round(float(np.std(ov)), 3)}
+                      "calls": len(ds), "sd": round(float(np.std(ov)), 3) if len(ds) > 1 else None}
     out = {"per_judge": per, "errors": {m: e for m, e in errors.items() if e}, "complete": len(per) == len(JUDGES),
            "callCounts": {m: len(ds) for m, ds in calls.items()}, "minValidCalls": min_valid}
     if out["complete"]:
         out["overall"] = round(_mean([r["overall"] for r in per.values()]), 2)
         out["criteria"] = {c: round(_mean([r[c] for r in per.values()]), 2) for c in VCRIT}
-        out["pm"] = round(math.sqrt(sum(r["sd"] ** 2 for r in per.values())) / len(per), 2)
+        out["repeatabilityMeasured"] = all(r["sd"] is not None for r in per.values())
+        out["pm"] = round(math.sqrt(sum(r["sd"] ** 2 for r in per.values())) / len(per), 2) if out["repeatabilityMeasured"] else None
+        out["judgeSpread"] = round(max(r["overall"] for r in per.values()) - min(r["overall"] for r in per.values()), 2)
     return out
 
 
-def vision_scores(target, image, style):
+def vision_scores(target, image, style, calls=5):
     """J1: 5 calls per judge, a judge counts with at least 3 valid calls."""
     content = _content(target, image, style)
 
@@ -239,17 +270,17 @@ def vision_scores(target, image, style):
         except Exception as e:
             return {"error": str(e)[:200]}
 
-    jobs = [m for m in JUDGES for _ in range(CALLS)]
+    jobs = [m for m in JUDGES for _ in range(calls)]
     with ThreadPoolExecutor(min(9, len(jobs))) as ex:
         got = list(ex.map(run, jobs))
-    calls = {m: [] for m in JUDGES}; errors = {m: [] for m in JUDGES}
+    samples = {m: [] for m in JUDGES}; errors = {m: [] for m in JUDGES}
     for m, d in zip(jobs, got):
-        (errors[m] if "error" in d else calls[m]).append(d.get("error") if "error" in d else d)
-    return _aggregate(calls, errors, MIN_VALID)
+        (errors[m] if "error" in d else samples[m]).append(d.get("error") if "error" in d else d)
+    return _aggregate(samples, errors, min(3, calls))
 
 
-def vision_scores_j2(target, image, style):
-    """J2: every judge needs CALLS valid calls; failed judgements are retried, then topped up in extra rounds."""
+def vision_scores_j2(target, image, style, calls=5):
+    """J2: every judge needs the profile's valid calls; the existing bounded retry policy applies to every profile."""
     content = _content(target, image, style)
 
     def run(job):
@@ -261,43 +292,48 @@ def vision_scores_j2(target, image, style):
             d = {"error": str(e)[:200]}
         return d, [{"judge": m, "slot": slot, **x} for x in log]
 
-    calls = {m: [] for m in JUDGES}; errors = {m: [] for m in JUDGES}; attempts = []
+    samples = {m: [] for m in JUDGES}; errors = {m: [] for m in JUDGES}; attempts = []
     for _round in range(1 + J2_TOPUP_ROUNDS):
-        jobs = [(m, len(calls[m]) + i) for m in JUDGES for i in range(CALLS - len(calls[m]))]
+        jobs = [(m, len(samples[m]) + i) for m in JUDGES for i in range(calls - len(samples[m]))]
         if not jobs:
             break
         with ThreadPoolExecutor(min(9, len(jobs))) as ex:
             got = list(ex.map(run, jobs))
         for (m, _), (d, log) in zip(jobs, got):
-            attempts += log
-            (errors[m] if "error" in d else calls[m]).append(d.get("error") if "error" in d else d)
-    out = _aggregate(calls, errors, CALLS)
-    out["attempts"] = attempts
+            attempts += [{"round": _round, **a} for a in log]
+            (errors[m] if "error" in d else samples[m]).append(d.get("error") if "error" in d else d)
+    out = _aggregate(samples, errors, calls)
+    out.update(attempts=attempts, samples=samples)
     return out
 
 
-def score(target, image, style, vision=True, judge=None):
+def score(target, image, style, vision=True, judge=None, profile=None):
     judge = judge or DEFAULT_JUDGE
-    if judge not in JUDGE_VERSIONS:
-        raise ValueError(f"unknown judge version {judge}; known: {', '.join(JUDGE_VERSIONS)}")
+    sampling = sampling_plan(judge, profile)
     cl = classic_scores(target, image)
-    vi = (vision_scores_j2 if judge == "J2" else vision_scores)(target, image, style) if vision else \
+    vi = (vision_scores_j2 if judge == "J2" else vision_scores)(target, image, style, calls=sampling["calls"]) if vision else \
         {"per_judge": {}, "errors": {}, "complete": False, "callCounts": {}, "minValidCalls": None}
     complete = vi.get("complete", False) and cl["mean"] is not None
     return {
         "composite": round((vi["overall"] + cl["mean"]) / 2, 2) if complete else None,
-        "pm": round(vi["pm"] / 2, 2) if complete else None,
+        "pm": round(vi["pm"] / 2, 2) if complete and vi.get("pm") is not None else None,
+        "repeatabilityMeasured": vi.get("repeatabilityMeasured", False),
+        "judgeSpread": vi.get("judgeSpread"),
         "complete": complete,
         "visionOverall": vi.get("overall"),
         "classic": cl["mean"],
         "criteria": {**vi.get("criteria", {}), **{"classic_" + k: v for k, v in cl["metrics"].items()}},
         "judgeScores": {m: r["overall"] for m, r in vi["per_judge"].items()},
-        "callsPerModel": CALLS if vision else 0,
+        "callsPerModel": sampling["calls"] if vision else 0,
         "callCounts": vi["callCounts"], "minValidCalls": vi["minValidCalls"],
         "visionErrors": {m: len(e) for m, e in vi["errors"].items()},
         **({"visionAttempts": vi["attempts"]} if "attempts" in vi else {}),
+        **({"visionSamples": vi.get("samples", {})} if judge == "J2" else {}),
         "rubric": RUBRIC_VERSION,
         "judgeVersion": judge, "provider": PROVIDER,
+        "judgeProfile": sampling["profile"],
+        "sampling": {"judges": list(JUDGES), "requestedCallsPerJudge": sampling["calls"],
+                     "requiredValidCallsPerJudge": sampling["minValid"], "aggregation": "mean of per-judge medians"},
     }
 
 
@@ -308,17 +344,22 @@ def main():
     ap.add_argument("--style", default="watercolor and ink")
     ap.add_argument("--no-vision", action="store_true")
     ap.add_argument("--judge", choices=JUDGE_VERSIONS, default=DEFAULT_JUDGE, help="judge version (default %(default)s)")
+    ap.add_argument("--profile", choices=J2_PROFILES, help="J2 sampling budget: lite=1, standard=3, full=5 calls per judge (default full)")
     ap.add_argument("--out")
     a = ap.parse_args()
+    try:
+        sampling_plan(a.judge, a.profile)
+    except ValueError as e:
+        ap.error(str(e))
     if not a.no_vision and not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("TOGETHER_API_KEY")):
         sys.exit("Neither OPENROUTER_API_KEY nor TOGETHER_API_KEY is set; pass --no-vision for the classic part only")
-    r = score(a.target, a.image, a.style, not a.no_vision, a.judge)
+    r = score(a.target, a.image, a.style, not a.no_vision, a.judge, a.profile)
     s = json.dumps(r, indent=1)
     if a.out:
         open(a.out, "w").write(s)
     print(s)
-    counts = " ".join(f"{m.split('/')[-1]} {n}/{CALLS}" for m, n in r["callCounts"].items())
-    print(f"{r['judgeVersion']} composite {r['composite']} (valid calls: {counts or 'none'})", file=sys.stderr)
+    counts = " ".join(f"{m.split('/')[-1]} {n}/{r['callsPerModel']}" for m, n in r["callCounts"].items())
+    print(f"{r['judgeProfile']} composite {r['composite']} (valid calls: {counts or 'none'})", file=sys.stderr)
 
 
 if __name__ == "__main__":
