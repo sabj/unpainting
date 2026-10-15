@@ -88,7 +88,7 @@ function canaryPlayer(D, SUBJS) {
  globalButton.onclick=()=>{if(timers.size)SUBJS.forEach(stop);else SUBJS.forEach(start);};
  document.getElementById('speed-sel').onchange=function(){speedMs=Number(this.value)||80;};
  document.getElementById('chk-loop').onchange=function(){autoLoop=this.checked;};
- SUBJS.forEach(s=>show(s,1));syncButton();
+ SUBJS.forEach(s=>{stop(s);show(s,1);});syncButton();
 }
 export function playbackScript(data){
  const json=v=>JSON.stringify(v).replaceAll('<','\\u003c');

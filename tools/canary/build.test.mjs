@@ -10,7 +10,7 @@ test('drawing labels describe linked stages instead of the default ink medium',(
  assert.equal(drawingLabel({drawing:{medium:'ink',order:'none'}},null),'none');
 });
 function playerFixture(){
- const versions=['V01','R4','RC5','RC6'],r={value:0,dataset:{s:'beach'}},b={textContent:'Play',dataset:{s:'beach'}},elements={
+ const versions=['V01','R4','RC5','RC6'],r={value:0,dataset:{s:'beach'}},b={textContent:'Pause',dataset:{s:'beach'}},elements={
   'btn-all':{},'btn-loupe':{},'loupe-zoom':{},'speed-sel':{},'chk-loop':{checked:false},'pct-beach':{},lb:{style:{},querySelector:()=>({})}
  };
  for(const v of versions){elements['img-beach-'+v]={};elements['txt-beach-'+v]={};}
@@ -29,6 +29,7 @@ test('canary opens on final paintings, restarts Play All, and synchronizes contr
  const f=playerFixture();await f.loaded();
  assert.equal(f.r.value,1000);assert.equal(f.elements['img-beach-RC6'].src,'RC6-last.jpg');
  assert.equal(f.elements['btn-all'].textContent,'Play All');
+ assert.equal(f.b.textContent,'Play');
  f.elements['btn-all'].onclick();await f.loaded();
  assert.equal(f.r.value,0);assert.equal(f.elements['img-beach-RC6'].src,'RC6-first.jpg');
  assert.equal(f.b.textContent,'Pause');assert.equal(f.elements['btn-all'].textContent,'Pause All');
