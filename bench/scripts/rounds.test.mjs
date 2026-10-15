@@ -37,20 +37,16 @@ test('refusals before painting: unknown tokens, locked options, paths out of the
   assert.equal(bad.length, 2);
 });
 
-test('a finished painting is kept when the plan chose settings nothing read or dropped passages; strict fails it', () => {
+test('a finished painting is kept when the plan chose settings nothing read or dropped passages', () => {
   assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'] }).exit, 0);
-  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: false });
+  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'] });
   assert.equal(v.exit, 0);
   assert.match(v.warnings[0].reason, /read by nothing: --stonewarm/);
-  const d = renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: false });
+  const d = renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5 });
   assert.equal(d.exit, 0);
   assert.match(d.warnings[0].reason, /2 dropped/);
-  const s = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: true });
-  assert.equal(s.exit, 4);
-  assert.match(s.failures[0].reason, /read by nothing: --stonewarm/);
-  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: true }).exit, 5);
-  assert.equal(renderVerdict({ paintExit: 1, strict: false }).exit, 1, 'a paint process that fails still fails');
-  assert.equal(renderVerdict({ paintExit: 0, finished: false, strict: false }).exit, 6, 'no finished painting still fails');
+  assert.equal(renderVerdict({ paintExit: 1 }).exit, 1, 'a paint process that fails still fails');
+  assert.equal(renderVerdict({ paintExit: 0, finished: false }).exit, 6, 'no finished painting still fails');
 });
 
 test('TOKENS.md is generated from plan-args.mjs', () => {
