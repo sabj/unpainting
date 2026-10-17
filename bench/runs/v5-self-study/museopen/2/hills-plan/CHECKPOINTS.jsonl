@@ -1,0 +1,18 @@
+{"t":"2026-10-16T20:53:59.673Z","kind":"start","modelMinutes":37.49,"variant":"region_w13_lay2_softs_efade_lt_tfl8_tsh8_sml30_wre15_spl6_mg12_dk12","stops":"every passage boundary"}
+{"t":"2026-10-16T20:55:02.490Z","kind":"look","modelMinutes":37.67,"n":1,"boundary":"0","strokes":0,"penLines":12,"passesDone":0,"passesPlanned":28}
+{"t":"2026-10-16T20:55:20.975Z","kind":"continue","modelMinutes":37.98,"boundary":"0","stopAt":1,"strokes":0}
+{"t":"2026-10-16T20:55:43.623Z","kind":"look","modelMinutes":38.07,"n":2,"boundary":"1","strokes":280,"penLines":12,"passesDone":1,"passesPlanned":28}
+{"t":"2026-10-16T20:55:47.573Z","kind":"continue","modelMinutes":38.13,"boundary":"1","stopAt":5,"strokes":280}
+{"t":"2026-10-16T20:56:48.853Z","kind":"look","modelMinutes":38.17,"n":3,"boundary":"5","strokes":1424,"penLines":12,"passesDone":5,"passesPlanned":28}
+{"t":"2026-10-16T20:56:52.286Z","kind":"continue","modelMinutes":38.23,"boundary":"5","stopAt":10,"strokes":1424}
+{"t":"2026-10-16T20:57:59.609Z","kind":"look","modelMinutes":38.28,"n":4,"boundary":"10","strokes":2817,"penLines":12,"passesDone":10,"passesPlanned":28}
+{"t":"2026-10-16T20:58:03.045Z","kind":"continue","modelMinutes":38.34,"boundary":"10","stopAt":15,"strokes":2817}
+{"t":"2026-10-16T20:59:16.893Z","kind":"look","modelMinutes":38.38,"n":5,"boundary":"15","strokes":4243,"penLines":12,"passesDone":15,"passesPlanned":28}
+{"t":"2026-10-16T20:59:20.823Z","kind":"continue","modelMinutes":38.45,"boundary":"15","stopAt":20,"strokes":4243}
+{"t":"2026-10-16T21:00:25.636Z","kind":"look","modelMinutes":38.48,"n":6,"boundary":"20","strokes":5789,"penLines":12,"passesDone":20,"passesPlanned":28}
+{"t":"2026-10-16T21:00:29.065Z","kind":"continue","modelMinutes":38.54,"boundary":"20","stopAt":25,"strokes":5789}
+{"t":"2026-10-16T21:01:39.911Z","kind":"look","modelMinutes":38.58,"n":7,"boundary":"25","strokes":7563,"penLines":12,"passesDone":25,"passesPlanned":28}
+{"t":"2026-10-16T21:01:42.830Z","kind":"continue","modelMinutes":38.63,"boundary":"25","stopAt":"end","strokes":7563}
+{"t":"2026-10-16T21:06:50.499Z","kind":"finished","modelMinutes":38.75,"strokes":13769}
+{"t":"2026-10-16T21:07:11.666Z","kind":"look","modelMinutes":39.1,"n":8,"boundary":"final"}
+{"t":"2026-10-16T21:11:50.628Z","kind":"session-end","modelMinutes":43.75,"why":"the painting finished five minutes ago","looks":8,"revisions":0}

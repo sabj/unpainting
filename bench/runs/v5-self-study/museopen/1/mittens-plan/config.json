@@ -1,0 +1,24 @@
+{
+  "subject": "mittens",
+  "name": "Mittens",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "watercolor portrait sketch with fine lines and light washes; value planes carry form with dry focal details",
+    "regions": {}
+  },
+  "families": [],
+  "reserves": [
+    {
+      "reason": "cat left eye catchlight",
+      "bounds": [0.26, 0.18, 0.28, 0.20]
+    },
+    {
+      "reason": "cat right eye catchlight",
+      "bounds": [0.10, 0.18, 0.12, 0.20]
+    },
+    {
+      "reason": "person eye catchlight",
+      "bounds": [0.50, 0.54, 0.52, 0.56]
+    }
+  ]
+}

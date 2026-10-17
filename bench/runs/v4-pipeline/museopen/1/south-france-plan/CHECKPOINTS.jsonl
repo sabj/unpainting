@@ -1,0 +1,16 @@
+{"t":"2026-10-16T17:03:48.878Z","kind":"start","modelMinutes":9.02,"variant":"region_w13_lay2_dk11_sep4","stops":"every passage boundary"}
+{"t":"2026-10-16T17:04:44.651Z","kind":"look","modelMinutes":9.19,"n":1,"boundary":"0","strokes":0,"penLines":59,"passesDone":0,"passesPlanned":36}
+{"t":"2026-10-16T17:04:59.126Z","kind":"continue","modelMinutes":9.43,"boundary":"0","stopAt":1,"strokes":0}
+{"t":"2026-10-16T17:05:17.257Z","kind":"look","modelMinutes":9.47,"n":2,"boundary":"1","strokes":139,"penLines":59,"passesDone":1,"passesPlanned":36}
+{"t":"2026-10-16T17:05:20.196Z","kind":"continue","modelMinutes":9.52,"boundary":"1","stopAt":6,"strokes":139}
+{"t":"2026-10-16T17:06:10.443Z","kind":"look","modelMinutes":9.56,"n":3,"boundary":"6","strokes":488,"penLines":59,"passesDone":6,"passesPlanned":36}
+{"t":"2026-10-16T17:06:15.376Z","kind":"continue","modelMinutes":9.64,"boundary":"6","stopAt":12,"strokes":488}
+{"t":"2026-10-16T17:07:21.671Z","kind":"look","modelMinutes":9.68,"n":4,"boundary":"12","strokes":952,"penLines":59,"passesDone":12,"passesPlanned":36}
+{"t":"2026-10-16T17:07:28.113Z","kind":"continue","modelMinutes":9.79,"boundary":"12","stopAt":20,"strokes":952}
+{"t":"2026-10-16T17:08:56.989Z","kind":"look","modelMinutes":9.83,"n":5,"boundary":"20","strokes":1652,"penLines":59,"passesDone":20,"passesPlanned":36}
+{"t":"2026-10-16T17:09:02.432Z","kind":"continue","modelMinutes":9.92,"boundary":"20","stopAt":30,"strokes":1652}
+{"t":"2026-10-16T17:10:38.876Z","kind":"look","modelMinutes":10.01,"n":6,"boundary":"30","strokes":2271,"penLines":59,"passesDone":30,"passesPlanned":36}
+{"t":"2026-10-16T17:10:45.309Z","kind":"continue","modelMinutes":10.12,"boundary":"30","stopAt":"end","strokes":2271}
+{"t":"2026-10-16T17:17:07.135Z","kind":"finished","modelMinutes":10.32,"strokes":15114}
+{"t":"2026-10-16T17:17:10.240Z","kind":"look","modelMinutes":10.36,"n":7,"boundary":"final"}
+{"t":"2026-10-16T17:18:03.973Z","kind":"session-end","modelMinutes":11.26,"why":"the session ended","looks":7,"revisions":0}

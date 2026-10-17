@@ -1,0 +1,48 @@
+{
+  "subject": "Y1",
+  "name": "Trumbull",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Painted value planes carry form; dry focal details and selective closing drawing for warm stone architecture under clear sky",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "Y1.sun-main-gable",
+      "bounds": [0.32, 0.02, 0.72, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "Warm sunlit ochre limestone gable and tower faces; broad connected stone planes with subtle block variation, arched windows in shadow"
+    },
+    {
+      "id": "Y1.cool-main-return",
+      "bounds": [0.02, 0.12, 0.34, 0.96],
+      "baseMove": "wet on dry",
+      "referenceCue": "Cooler left-facing stone wall in shadow; darker value, blue-grey mortar, vertical window bays"
+    },
+    {
+      "id": "Y1.slate-roofs",
+      "bounds": [0.02, 0.02, 0.98, 0.38],
+      "baseMove": "wet on dry",
+      "referenceCue": "Connected cool slate roofs; restrained pale tile variation, chimney stacks, gable coping"
+    },
+    {
+      "id": "Y1.sky",
+      "bounds": [0, 0, 1, 0.22],
+      "baseMove": "wet on dry",
+      "referenceCue": "Pale graded sky with soft white cloud corridors; keep open, no hard banding, lifted lights"
+    },
+    {
+      "id": "Y1.foliage-street",
+      "bounds": [0, 0.58, 1, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Foreground foliage, small trees and street furniture; sap green and olive washes, traffic lights and signage subordinate"
+    },
+    {
+      "id": "Y1.whole-physical-fringe",
+      "bounds": [0.02, 0.02, 0.98, 0.98],
+      "baseMove": "wet on dry",
+      "referenceCue": "Registered facade/sky/grounds surrounding actual on-sheet brush overhang; descriptive classification only, no ownership or geometry expansion"
+    }
+  ],
+  "reserves": []
+}

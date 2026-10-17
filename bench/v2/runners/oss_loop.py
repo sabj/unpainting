@@ -5,7 +5,7 @@
 BENCH_CROPS narrows the crops to paint; without it the loop paints every crop in bench/v2/crops.json. The key is read from the
 TOGETHER_API_KEY environment variable and never printed.
 """
-import argparse, base64, json, os, pathlib, subprocess, sys, time, urllib.request, urllib.error
+import argparse, base64, http.client, json, os, pathlib, re, subprocess, sys, time, urllib.request, urllib.error
 
 ALL_CROPS = tuple(c['task'] for c in json.loads((pathlib.Path(__file__).resolve().parents[1] / 'crops.json').read_text())['crops'])
 CROPS = tuple(c for c in os.environ.get('BENCH_CROPS', '').split(',') if c) or ALL_CROPS
@@ -16,6 +16,7 @@ PRICES = {
     'MiniMaxAI/MiniMax-M3': (0.3, 1.2),  # USD per million tokens (input, output), from Together's model list
     'zai-org/GLM-5.2': (1.4, 4.4),
     'deepseek-ai/DeepSeek-V4-Pro-0813': (1.32, 3.96),
+    'meta-models/Muse-Spark-Open-816B-A42B-promo': (0.0, 0.0),  # Together free promo endpoint, until 2026-10-18
 }
 TOOLS = [
     {'type': 'function', 'function': {'name': 'bash', 'description': 'Run a shell command in the worktree (zsh, cwd = worktree root, 600 s timeout). Returns exit code and the last 8,000 characters of output.', 'parameters': {'type': 'object', 'properties': {'command': {'type': 'string'}}, 'required': ['command']}}},
@@ -38,10 +39,11 @@ def call(model, messages, k):
             return json.load(urllib.request.urlopen(req, timeout=600))
         except urllib.error.HTTPError as e:
             msg = e.read().decode()[:500]
-            if e.code in (429, 500, 502, 503) and attempt < 3:
+            if e.code in (429, 500, 502, 503, 504) and attempt < 3:
                 time.sleep(10 * (attempt + 1)); continue
             raise RuntimeError(f'HTTP {e.code}: {msg}')
-        except (urllib.error.URLError, TimeoutError) as e:
+        # A reset or a cut-off body while reading the response raises ConnectionError or http.client errors, not URLError.
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
             if attempt < 3: time.sleep(10); continue
             raise
 
@@ -70,9 +72,12 @@ def run_tool(cwd, name, args):
     return 'unknown tool'
 
 
-KEEP_TURNS = 8
+# Context kept per call. Defaults match the published runs; BENCH_OSS_KEEP_TURNS / BENCH_OSS_TOOL_CHARS raise them for long-context models.
+KEEP_TURNS = int(os.environ.get('BENCH_OSS_KEEP_TURNS', 8))
 IMAGES = []
-TOOL_CHARS = 2500
+TOOL_CHARS = int(os.environ.get('BENCH_OSS_TOOL_CHARS', 2500))
+# Some endpoints leak channel markers (to=bash, to=commentary) as message text; feeding them back makes the model repeat them.
+LEAKED = re.compile(r'^(?:\s*to=\w+)+\s*$')
 
 
 def short(text, n):
@@ -81,8 +86,13 @@ def short(text, n):
     return text[:n // 3] + f'\n[... {len(text) - n} characters cut ...]\n' + text[-(2 * n) // 3:]
 
 
-def state(cwd):
+def state(cwd, used=None, cap=None):
     lines = []
+    if used is not None: lines.append(f'time: {used:.0f} of {cap:.0f} minutes used')
+    # V4/V5 plans: the turn window drops older turns, so show which deliverables exist.
+    if (cwd / 'bench' / 'plan').is_dir():
+        files = ['bench/plan/config.json', 'bench/variant.txt', 'bench/PLAN.md']
+        lines.append('plan files: ' + ', '.join(f + (' written' if (cwd / f).exists() else ' missing') for f in files))
     for t in CROPS:
         o = cwd / 'bench' / 'out' / t
         st = o / 'stats.json'
@@ -94,8 +104,8 @@ def state(cwd):
     return '\n'.join(lines)
 
 
-def build(base, summary, turns, cwd):
-    ctx = 'Earlier turns, summarized (oldest first):\n' + ('\n'.join(summary[-60:]) or '(none yet)') + '\n\nCurrent painting state:\n' + state(cwd)
+def build(base, summary, turns, cwd, used=None, cap=None):
+    ctx = 'Earlier turns, summarized (oldest first):\n' + ('\n'.join(summary[-60:]) or '(none yet)') + '\n\nCurrent painting state:\n' + state(cwd, used, cap)
     first = base[1]['content'] + '\n\n---\n' + ctx
     msgs = [base[0], {'role': 'user', 'content': [{'type': 'text', 'text': first}] + IMAGES if IMAGES else first}]
     for t in turns[-KEEP_TURNS:]: msgs += t
@@ -123,7 +133,7 @@ def main():
         if time.time() - t0 > a.minutes * 60: end = f'time cap {a.minutes} min'; break
         n += 1
         try:
-            r = call(a.model, build(base, summary, turns, cwd), k)
+            r = call(a.model, build(base, summary, turns, cwd, (time.time() - t0) / 60, a.minutes), k)
         except Exception as e:
             end = f'api error: {e}'; break
         u = r.get('usage') or {}; tin += u.get('prompt_tokens', 0); tout += u.get('completion_tokens', 0)
@@ -131,7 +141,8 @@ def main():
         usd = tin / 1e6 * pin + tout / 1e6 * pout
         msg = r['choices'][0]['message']
         if msg.get('reasoning') or msg.get('reasoning_content'): reasoning_seen = True
-        keep = {'role': 'assistant', 'content': msg.get('content') or ''}
+        text = msg.get('content') or ''
+        keep = {'role': 'assistant', 'content': '' if LEAKED.match(text) else text}
         if msg.get('tool_calls'): keep['tool_calls'] = msg['tool_calls']
         turn = [keep]
         log.write(json.dumps({'t': round(time.time() - t0), 'turn': n, 'content': (msg.get('content') or '')[:2000], 'tools': [tc['function']['name'] + ' ' + tc['function']['arguments'][:300] for tc in msg.get('tool_calls') or []], 'usd': round(usd, 4), 'prompt_tokens': u.get('prompt_tokens')}) + '\n'); log.flush()
@@ -146,8 +157,11 @@ def main():
             if name == 'view_image':
                 try:
                     f = safe(cwd, args.get('path', ''))
-                    mime = 'image/png' if f.suffix.lower() == '.png' else 'image/jpeg'
-                    images.append({'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,' + base64.b64encode(f.read_bytes()).decode()}})
+                    data = f.read_bytes()
+                    # Check the bytes, not the suffix: a non-image sent as an image fails the whole API call.
+                    mime = 'image/png' if data[:8] == b'\x89PNG\r\n\x1a\n' else 'image/jpeg' if data[:3] == b'\xff\xd8\xff' else None
+                    if mime is None: raise ValueError(f'{args.get("path")} is not a PNG or JPEG')
+                    images.append({'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,' + base64.b64encode(data).decode()}})
                     result = f'image {args.get("path")} attached below'
                 except Exception as e: result = f'error: {e}'
             elif name == 'done':
@@ -164,7 +178,7 @@ def main():
         turns.append(turn)
         summary.append(f'turn {n}: ' + ('; '.join(notes))[:400])
         if finished: end = 'done'; break
-    stats = {'model': a.model, 'turns': n, 'input_tokens': tin, 'output_tokens': tout, 'reasoning_tokens': rtok, 'reasoning_returned': reasoning_seen, 'reasoning_param_sent': None, 'vision': True, 'usd': round(usd, 3), 'seconds': round(time.time() - t0), 'end': end}
+    stats = {'model': a.model, 'turns': n, 'input_tokens': tin, 'output_tokens': tout, 'reasoning_tokens': rtok, 'reasoning_returned': reasoning_seen, 'reasoning_param_sent': None, 'vision': True, 'usd': round(usd, 3), 'seconds': round(time.time() - t0), 'end': end, 'keep_turns': KEEP_TURNS, 'tool_chars': TOOL_CHARS}
     log.write(json.dumps({'final': stats}) + '\n'); log.close()
     print(json.dumps(stats))
 

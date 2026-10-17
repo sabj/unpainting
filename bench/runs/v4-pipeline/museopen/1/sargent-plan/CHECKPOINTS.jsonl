@@ -1,0 +1,13 @@
+{"t":"2026-10-16T18:23:01.707Z","kind":"start","modelMinutes":64.34,"variant":"region_w13_soft_ew5_mg12_lf_sg12","stops":"every passage boundary"}
+{"t":"2026-10-16T18:23:42.433Z","kind":"look","modelMinutes":64.39,"n":1,"boundary":"0","strokes":0,"penLines":5,"passesDone":0,"passesPlanned":62}
+{"t":"2026-10-16T18:23:55.395Z","kind":"continue","modelMinutes":64.61,"boundary":"0","stopAt":12,"strokes":0}
+{"t":"2026-10-16T18:25:39.341Z","kind":"look","modelMinutes":64.71,"n":2,"boundary":"12","strokes":1556,"penLines":5,"passesDone":12,"passesPlanned":62}
+{"t":"2026-10-16T18:25:49.799Z","kind":"continue","modelMinutes":64.89,"boundary":"12","stopAt":30,"strokes":1556}
+{"t":"2026-10-16T18:28:07.854Z","kind":"look","modelMinutes":64.99,"n":3,"boundary":"30","strokes":3673,"penLines":5,"passesDone":30,"passesPlanned":62}
+{"t":"2026-10-16T18:29:39.127Z","kind":"revise","modelMinutes":65.91,"boundary":"30","revision":1,"strokes":3673,"passesDone":30,"changed":["config.json"],"variant":"region_w13_soft_ew5_mg12_lf_sg12"}
+{"t":"2026-10-16T18:30:51.403Z","kind":"continue","modelMinutes":66.05,"boundary":"31","stopAt":45,"strokes":3874}
+{"t":"2026-10-16T18:32:14.799Z","kind":"look","modelMinutes":66.09,"n":4,"boundary":"45","strokes":5289,"penLines":5,"passesDone":45,"passesPlanned":62}
+{"t":"2026-10-16T18:32:23.253Z","kind":"continue","modelMinutes":66.23,"boundary":"45","stopAt":"end","strokes":5289}
+{"t":"2026-10-16T18:35:38.989Z","kind":"finished","modelMinutes":66.34,"strokes":9802}
+{"t":"2026-10-16T18:35:42.583Z","kind":"look","modelMinutes":66.39,"n":5,"boundary":"final"}
+{"t":"2026-10-16T18:37:07.291Z","kind":"session-end","modelMinutes":67.8,"why":"the session ended","looks":5,"revisions":1}

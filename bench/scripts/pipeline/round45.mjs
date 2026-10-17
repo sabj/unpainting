@@ -285,7 +285,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     // V5: the next try's feedback needs this try's judges
     if (round.learning && n < tries) {
       log(`scoring try ${n} for the next try's feedback`);
-      execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'score.mjs'), tryDir, ...(dry ? ['--dry-run'] : [])], { stdio: 'inherit' });
+      execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'score.mjs'), tryDir, ...(dry ? ['--dry-run'] : []), ...(process.env.BENCH_SCORE_PYTHON ? ['--python', process.env.BENCH_SCORE_PYTHON] : [])], { stdio: 'inherit' });
     }
   }
 }

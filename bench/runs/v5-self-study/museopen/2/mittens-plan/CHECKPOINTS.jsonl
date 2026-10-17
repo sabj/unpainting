@@ -1,0 +1,16 @@
+{"t":"2026-10-17T01:03:57.879Z","kind":"start","modelMinutes":61.12,"variant":"region_w13_soft_sml30_wre15_acc3_mg12_st40_lit20_sg12","stops":"every passage boundary"}
+{"t":"2026-10-17T01:04:34.624Z","kind":"look","modelMinutes":61.16,"n":1,"boundary":"0","strokes":0,"penLines":81,"passesDone":0,"passesPlanned":65}
+{"t":"2026-10-17T01:04:37.621Z","kind":"look","modelMinutes":61.21,"n":2,"boundary":"0","strokes":0,"penLines":81,"passesDone":0,"passesPlanned":65}
+{"t":"2026-10-17T01:04:48.569Z","kind":"continue","modelMinutes":61.39,"boundary":"0","stopAt":1,"strokes":0}
+{"t":"2026-10-17T01:04:57.602Z","kind":"continue","modelMinutes":61.43,"boundary":"1","stopAt":10,"strokes":16}
+{"t":"2026-10-17T01:05:52.377Z","kind":"look","modelMinutes":61.47,"n":3,"boundary":"10","strokes":147,"penLines":81,"passesDone":10,"passesPlanned":65}
+{"t":"2026-10-17T01:05:59.835Z","kind":"continue","modelMinutes":61.6,"boundary":"10","stopAt":25,"strokes":147}
+{"t":"2026-10-17T01:07:28.736Z","kind":"look","modelMinutes":61.64,"n":4,"boundary":"25","strokes":705,"penLines":81,"passesDone":25,"passesPlanned":65}
+{"t":"2026-10-17T01:07:39.196Z","kind":"continue","modelMinutes":61.81,"boundary":"25","stopAt":40,"strokes":705}
+{"t":"2026-10-17T01:08:59.110Z","kind":"look","modelMinutes":61.86,"n":5,"boundary":"40","strokes":1564,"penLines":81,"passesDone":40,"passesPlanned":65}
+{"t":"2026-10-17T01:09:07.033Z","kind":"continue","modelMinutes":61.99,"boundary":"40","stopAt":55,"strokes":1564}
+{"t":"2026-10-17T01:10:19.886Z","kind":"look","modelMinutes":62.04,"n":6,"boundary":"55","strokes":2476,"penLines":81,"passesDone":55,"passesPlanned":65}
+{"t":"2026-10-17T01:10:26.833Z","kind":"continue","modelMinutes":62.15,"boundary":"55","stopAt":"end","strokes":2476}
+{"t":"2026-10-17T01:16:21.723Z","kind":"finished","modelMinutes":62.32,"strokes":8465}
+{"t":"2026-10-17T01:16:25.346Z","kind":"look","modelMinutes":62.37,"n":7,"boundary":"final"}
+{"t":"2026-10-17T01:21:21.807Z","kind":"session-end","modelMinutes":67.31,"why":"the painting finished five minutes ago","looks":7,"revisions":0}

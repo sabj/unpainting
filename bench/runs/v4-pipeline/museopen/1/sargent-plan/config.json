@@ -1,0 +1,41 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent harbour study: transparent layered washes carry form; granulating blues and warm rust accents need precise value planes, dry focal edges and reserved paper lights",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "sargent.hull",
+      "bounds": [0.22, 0.0, 0.66, 0.92],
+      "baseMove": "wet on dry",
+      "referenceCue": "large central blue-grey hull, granulating wash, warm rust rivets, dark porthole, soft turning edge"
+    },
+    {
+      "id": "sargent.foreground",
+      "bounds": [0.0, 0.68, 0.66, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "anchor, keel shadow and lower hull, warm ochre, deep indigo, dry-brush texture"
+    },
+    {
+      "id": "sargent.mast-right",
+      "bounds": [0.62, 0.0, 1.0, 1.0],
+      "baseMove": "wet on dry",
+      "referenceCue": "right mast, its blue shadow, pale sky and turquoise sea, dotted washes, lost edges"
+    },
+    {
+      "id": "sargent.sky",
+      "bounds": [0.0, 0.0, 1.0, 0.32],
+      "baseMove": "wet in wet",
+      "referenceCue": "pale sky, reserved paper, faint blue-grey washes, soft horizon"
+    }
+  ],
+  "reserves": [],
+  "drawing": {
+    "medium": "none",
+    "amount": 0,
+    "closingLines": 0
+  }
+}

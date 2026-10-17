@@ -1,0 +1,43 @@
+{
+  "subject": "hills",
+  "name": "Hills",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "loose ink and wash: directional ink carries tree structure over few connected value washes",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "hills.distant",
+      "bounds": [0, 0, 1, 0.32],
+      "baseMove": "wet in wet",
+      "referenceCue": "distant wooded ridge, dark green canopy, soft merging"
+    },
+    {
+      "id": "hills.midslope",
+      "bounds": [0, 0.28, 1, 0.68],
+      "baseMove": "wet on dry",
+      "referenceCue": "mid slope with scattered trees, upper sandy path, broken greens"
+    },
+    {
+      "id": "hills.foreground",
+      "bounds": [0, 0.62, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "sunlit meadow foreground, winding pale path, tree shadows and tufts"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "upper path highlight",
+      "bounds": [0.16, 0.22, 0.22, 0.30]
+    },
+    {
+      "reason": "middle path sunlit bend",
+      "bounds": [0.47, 0.53, 0.53, 0.59]
+    },
+    {
+      "reason": "lower path near bottom",
+      "bounds": [0.72, 0.80, 0.78, 0.86]
+    }
+  ]
+}

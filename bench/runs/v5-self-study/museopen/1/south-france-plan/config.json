@@ -1,0 +1,39 @@
+{
+  "subject": "south-france",
+  "name": "France",
+  "styleSelection": {
+    "style": "urban-sketch",
+    "reason": "pen structure carries form with light flat washes; dominant white paper, confident connected pen junctions",
+    "regions": {}
+  },
+  "families": [
+    {
+      "id": "south-france.sky",
+      "bounds": [0, 0, 1, 0.32],
+      "baseMove": "wet on dry",
+      "referenceCue": "pale distant hills and sky, very light wash, paper white dominant"
+    },
+    {
+      "id": "south-france.village",
+      "bounds": [0.12, 0.08, 0.92, 0.68],
+      "baseMove": "wet on dry",
+      "referenceCue": "clustered stone houses with terracotta roofs, ochre walls, pen defines edges and windows"
+    },
+    {
+      "id": "south-france.foliage",
+      "bounds": [0, 0.35, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "foreground tree and midground foliage, varied sap green and ochre washes, pen for branches"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "lit wall of central house",
+      "bounds": [0.66, 0.38, 0.72, 0.46]
+    },
+    {
+      "reason": "lit wall upper village",
+      "bounds": [0.54, 0.22, 0.59, 0.29]
+    }
+  ]
+}

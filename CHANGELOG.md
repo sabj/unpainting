@@ -2,6 +2,16 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
+## 0.1.2 - 2026-10-17
+
+Benchmark patch on painter V096, sim 100, judges J1. The painter is unchanged, so 0.1.0, 0.1.1 and 0.1.2 scores compare directly. Tag `v0.1.2`.
+
+- Adds Muse Spark Open (`meta-models/Muse-Spark-Open-816B-A42B-promo`, Together's free promo endpoint) for V1 to V5: one try each of V1 to V4 and two of V5. V1 and V4 painted all five targets, V2 two of five, V3 two of three, and V5 seven of ten across its two tries. Its V4 and V5 paintings were judged through the same OpenRouter route as the other models in those rounds.
+- The Together runner keeps more context when asked: `BENCH_OSS_KEEP_TURNS` and `BENCH_OSS_TOOL_CHARS` set the turns kept in full and the characters kept from each tool output. The defaults (8 and 2,500) match every earlier run. Muse Spark Open's V4 and V5 used 20 and 30,000; with the defaults it wrote no V4 plan. `run.json` does not record these settings.
+- The Together runner retries a connection reset or a cut-off response and HTTP 504, drops replies that are only leaked channel markers (`to=bash`), and shows the minutes used and which plan files exist in its state line. `view_image` checks a file's bytes rather than its suffix.
+- V5 self-scoring between tries takes the scorer's Python from `BENCH_SCORE_PYTHON`.
+- The findings build no longer fails for a model with fewer than three V5 tries.
+
 ## 0.1.1 - 2026-10-15
 
 Benchmark patch on painter V096, sim 100, judges J1. The painter is unchanged, so 0.1.0 and 0.1.1 scores compare directly. Tag `v0.1.1`.
