@@ -1,0 +1,14 @@
+{
+  "subject": "hills",
+  "name": "Hills",
+  "styleSelection": {
+    "style": "ink-and-wash",
+    "reason": "Loose ink and wash: ink carries hill contours, path and tree structure; few connected value washes for greens and sky",
+    "regions": {}
+  },
+  "families": [],
+  "reserves": [
+    {"reason": "brightest sky hole near top right", "bounds": [0.70, 0.06, 0.73, 0.10]},
+    {"reason": "brightest path highlight centre", "bounds": [0.44, 0.52, 0.47, 0.56]}
+  ]
+}

@@ -1,0 +1,12 @@
+{"t":"2026-10-16T16:31:45.742Z","kind":"start","modelMinutes":21.78,"variant":"region_w13_lay2_ink4_sep4_noslane","stops":"every passage boundary"}
+{"t":"2026-10-16T16:32:29.465Z","kind":"look","modelMinutes":21.84,"n":1,"boundary":"0","strokes":0,"penLines":59,"passesDone":0,"passesPlanned":16}
+{"t":"2026-10-16T16:37:23.405Z","kind":"revise-refused","modelMinutes":24.82,"boundary":"0","strokes":0,"changed":["closing-lines.json","closingink4-lines.json","extra-args.json"],"reasons":["palette change"],"palette":{"now":{"palette":["hansa yellow","quinacridone rose","cerulean blue","cerulean blue, granulating, for the sky"],"inks":["graphite=graphite HB","ink=black ink"]},"revised":{"palette":["yellow ochre","raw sienna","burnt sienna","French ultramarine","cerulean blue","sap green","sepia","hansa yellow","French ultramarine, granulating, for the sky"],"inks":["graphite=graphite HB","ink=black ink"]}}}
+{"t":"2026-10-16T16:38:02.123Z","kind":"revise","modelMinutes":25.01,"boundary":"0","revision":1,"strokes":0,"passesDone":0,"changed":["closing-lines.json","closingink4-lines.json"],"variant":"region_w13_lay2_ink4_sep4_noslane"}
+{"t":"2026-10-16T16:39:00.902Z","kind":"look","modelMinutes":25.06,"n":2,"boundary":"1","strokes":143,"penLines":59,"passesDone":1,"passesPlanned":16}
+{"t":"2026-10-16T16:40:11.564Z","kind":"revise","modelMinutes":25.81,"boundary":"1","revision":2,"strokes":143,"passesDone":1,"changed":["extra-args.json"],"variant":"region_w13_lay2_ink4_sep4_noslane"}
+{"t":"2026-10-16T16:41:16.254Z","kind":"continue","modelMinutes":25.91,"boundary":"2","stopAt":"closing","strokes":224}
+{"t":"2026-10-16T16:47:12.459Z","kind":"look","modelMinutes":26.11,"n":3,"boundary":"closing","strokes":8355,"penLines":59,"passesDone":25,"passesPlanned":25}
+{"t":"2026-10-16T16:47:29.311Z","kind":"continue","modelMinutes":26.39,"boundary":"closing","stopAt":"end","strokes":8355}
+{"t":"2026-10-16T16:47:34.825Z","kind":"finished","modelMinutes":26.38,"strokes":8355}
+{"t":"2026-10-16T16:47:37.411Z","kind":"look","modelMinutes":26.42,"n":4,"boundary":"final"}
+{"t":"2026-10-16T16:52:35.111Z","kind":"session-end","modelMinutes":31.38,"why":"the painting finished five minutes ago","looks":4,"revisions":2}

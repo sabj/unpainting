@@ -69,7 +69,7 @@ export function findingsData(root = RUNS) {
     const unpainted = rs => rs.reduce((a, r) => a + Object.keys(r.unpainted || {}).length, 0);
     return {
       name: name(m), v4: round2(mean(v4s)), v4ci: bootstrapMean(v4s), v4n: v4s.length, v5: round2(mean(v5s)), v5ci: bootstrapMean(v5s), v5n: v5s.length,
-      v5tries: [1, 2, 3].map(n => round2(mean(paintingScores(v5.find(r => r.try === n) || {})))),
+      v5tries: [1, 2, 3].map(n => { const t = v5.find(r => r.try === n); return t ? round2(mean(paintingScores(t))) : null; }),
       unpainted: unpainted(v4) + unpainted(v5),
       notRun: [...v4, ...v5].flatMap(r => Object.keys(r.notPainted || {}).map(c => `${r.round} try ${r.try}, ${c}`)),
       routed: [...v4, ...v5].filter(r => (r.evaluators.providers || []).length > 1).map(r => `${r.round} try ${r.try}`),

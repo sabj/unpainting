@@ -4,7 +4,7 @@ Generated from the run records by `scripts/build-findings.mjs`. Scores are autom
 
 ## Technique guides made no clear difference on average (V1 and V2)
 
-- 13 models have at least five scored paintings in both rounds: Gemini 4 Argon (High), Gemini 4 Argon (Medium), Codex Astra, Gemini 3.8 Flash, Haiku 4.5, Codex Luna, MiniMax M3, Opus 5.5, Codex Sol, Sonnet 5.5, Muse Spark 1.3, Muse Wonder and Muse Wonder Full. DeepSeek V4.1 Flash is left out because it has fewer than five scored V2 paintings.
+- 13 models have at least five scored paintings in both rounds: Gemini 4 Argon (High), Gemini 4 Argon (Medium), Codex Astra, Gemini 3.8 Flash, Haiku 4.5, Codex Luna, MiniMax M3, Opus 5.5, Codex Sol, Sonnet 5.5, Muse Spark 1.3, Muse Wonder and Muse Wonder Full. DeepSeek V4.1 Flash and Muse Spark Open is left out because it has fewer than five scored V2 paintings.
 - Paired by model over all scored paintings of tries 1–3, V1 averaged 4.36 and V2 4.28. The difference is −0.08, 95% confidence interval (CI) −0.26 to +0.11.
 - Each model counts once. The interval comes from repeatedly resampling model means (a percentile bootstrap, 10,000 resamples).
 
@@ -57,11 +57,12 @@ In V4 and V5 each model writes a painting plan for each target, paints it with t
 | Codex Luna | 5.73 | 5.47 to 5.95 | 15 | 5.71 | 5.57 | 5.76 | 5.68 | 15 |
 | Codex Sol | 5.70 | 5.29 to 6.03 | 15 | 5.67 | 5.29 | 6.02 | 5.69 | 14 |
 | Sonnet 5.5 | 5.68 | 5.44 to 5.92 | 15 | 5.75 | 6.17 | 6.05 | 5.99 | 15 |
+| Muse Spark Open | 5.64 | 5.19 to 6.13 | 5 | 5.52 | 5.75 | – | 5.58 | 7 |
 | Haiku 4.5 | 5.49 | 5.25 to 5.72 | 14 | 5.35 | 5.58 | 5.64 | 5.52 | 14 |
 
 - A try mean covers the targets painted in that try, so a try with a failed painting averages fewer targets.
-- 5 of 8 models scored higher on V5 try 3 than on V5 try 1: Codex Astra (5.83 to 6.20), Codex Luna (5.71 to 5.76), Codex Sol (5.67 to 6.02), Sonnet 5.5 (5.75 to 6.05) and Haiku 4.5 (5.35 to 5.64).
-- 8 planned paintings have no painting: the painter refused the plan or the render failed. Each try's run.json gives the reason under `unpainted`.
+- 5 of 9 models scored higher on V5 try 3 than on V5 try 1: Codex Astra (5.83 to 6.20), Codex Luna (5.71 to 5.76), Codex Sol (5.67 to 6.02), Sonnet 5.5 (5.75 to 6.05) and Haiku 4.5 (5.35 to 5.64).
+- 11 planned paintings have no painting: the painter refused the plan or the render failed. Each try's run.json gives the reason under `unpainted`.
 - Haiku 4.5 has no painting for V5 try 3, trumbull: that session was stopped before it painted so the results could be published.
 - V4 and V5 were judged through OpenRouter, by zero-data-retention providers; V1 to V3 on Together. Each V4 and V5 painting records its providers under `judgeProviders`.
 
@@ -88,6 +89,6 @@ In V1 to V3, each painting may use 2,500 strokes. These models used a median of 
 
 ## Target reads and cheat risk
 
-- Over 136 tries the guard, the check that blocks image reads, blocked 1 image reads, and 1 tries were disqualified: Gemini 4 Argon (Medium) V3 try 2 (1 blocked target read(s) at paint time). The guard stopped the read, so the model never saw the pixels, but any attempt disqualifies the try, and it is left off the leaderboard.
+- Over 142 tries the guard, the check that blocks image reads, blocked 2 image reads, and 2 tries were disqualified: Gemini 4 Argon (Medium) V3 try 2 (1 blocked target read(s) at paint time) and Muse Spark Open V3 try 1 (1 blocked target read(s) at paint time). The guard stopped the read, so the model never saw the pixels, but any attempt disqualifies the try, and it is left off the leaderboard.
 - The cheat-risk score flagged 8 tries, and each was reviewed by hand. None of them cheated. The flags came from early stages that didn't look like a person's start. The tries: Haiku 4.5 V1 try 2, Codex Astra V2 try 3, MiniMax M3 V2 try 2, Codex Astra V3 try 1, Codex Astra V3 try 3, Codex Sol V3 try 1, Codex Sol V3 try 2 and Codex Sol V3 try 3. All stay on the leaderboard.
 - MiniMax M3 V2 try 2 copied the target images into its output folder with a shell `cp`. No script opened the copies; the model only looked at them. The guard missed the copy, so it needs a post-run check for copied targets (known gap, not built yet).

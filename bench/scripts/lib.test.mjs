@@ -60,8 +60,8 @@ test('two painter versions in one round build two results entries and never shar
     const R = readJson(out);
     const v4Entries = R.rounds.filter(r => r.id === 'V4');
     assert.deepEqual(v4Entries.map(r => [r.painterVersion, r.simVersion, r.releases, r.label]),
-      [['V096', '100', ['0.1.0', '0.1.1'], 'V4 (painter V096 · sim 100 · judges J1)'], ['V097', '100', ['0.2.0'], 'V4 (painter V097 · sim 100 · judges J1)']]);
-    assert.deepEqual(R.painter.releases, ['0.1.0', '0.1.1', '0.2.0']);
+      [['V096', '100', ['0.1.0', '0.1.1', '0.1.2'], 'V4 (painter V096 · sim 100 · judges J1)'], ['V097', '100', ['0.2.0'], 'V4 (painter V097 · sim 100 · judges J1)']]);
+    assert.deepEqual(R.painter.releases, ['0.1.0', '0.1.1', '0.1.2', '0.2.0']);
     const meanOf = es => Math.round(mean(es.flatMap(({ run }) => paintingScores(run))) * 100) / 100;
     const [oldEntry, newEntry] = v4Entries.map(r => r.models.find(m => m.model === model));
     assert.equal(newEntry.tries, newer.length);
@@ -88,8 +88,8 @@ test('the bootstrap is seeded and brackets the mean', () => {
 
 test('published runs use only tries 1–3 at each model\'s configured effort', () => {
   for (const { run } of runs) assert.ok(inPublishedScope(run));
-  assert.equal(runs.length, 136);
-  assert.equal(runs.reduce((n, { run }) => n + Object.keys(run.crops).length, 0), 616);
+  assert.equal(runs.length, 142);
+  assert.equal(runs.reduce((n, { run }) => n + Object.keys(run.crops).length, 0), 637);
 });
 
 test('V4 and V5 tries keep a plan folder per target and name no local path', () => {
@@ -125,7 +125,7 @@ test('subscription estimates match their own token split and API prices', () => 
 test('the paired-by-model V1 and V2 comparison is stable', () => {
   const v = findingsData().v1v2;
   assert.equal(v.models.length, 13);
-  assert.deepEqual(v.excluded, ['DeepSeek V4.1 Flash']);
+  assert.deepEqual(v.excluded, ['DeepSeek V4.1 Flash', 'Muse Spark Open']);
   assert.deepEqual([v.v1, v.v2, v.diff, v.ci], [4.36, 4.28, -0.08, [-0.26, 0.11]]);
   assert.match(v.method, /bootstrap over models \(10,000 resamples\)/);
 });
@@ -273,7 +273,7 @@ test('judge versions validate and never share a result group', () => {
 test('Mittens is public with the native self-score, and the CPU Ships rerender is scored', () => {
   assert.equal(TARGET_SELF_SCORE.mittens, 8.76);
   assert.ok(loadCrops().find(c => c.task === 'mittens').distributed);
-  assert.equal(runs.filter(({ run }) => run.crops.mittens).length, 109);
+  assert.equal(runs.filter(({ run }) => run.crops.mittens).length, 113);
   // 0.1.0 painted V3 on three targets; from 0.1.1 V3 paints them all, and its composite still averages the three
   assert.equal(runs.filter(({ run }) => run.round === 'V3' && run.release === '0.1.0' && run.crops.mittens).length, 0);
   const ships = runs.find(({ run }) => run.round === 'V5' && run.painter.key === 'sonnet' && run.try === 2).run.crops.sargent;

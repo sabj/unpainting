@@ -1,0 +1,44 @@
+{
+  "subject": "sargent",
+  "name": "Ships",
+  "styleSelection": {
+    "style": "precise-watercolor",
+    "reason": "Sargent Ships is pure watercolor with layered transparent washes, reserved lights and crisp dry edges; value planes carry hull, mast and water without ink",
+    "regions": {
+      "sargent.sky": {
+        "style": "atmospheric-wet",
+        "reason": "soft graded sky with lifted lights requires wet-on-wet passage"
+      }
+    }
+  },
+  "families": [
+    {
+      "id": "sargent.sky",
+      "bounds": [0, 0, 1, 0.35],
+      "baseMove": "wet on wet",
+      "referenceCue": "pale sky and upper background, warm ochre masts and soft blue washes, graded wet passage"
+    },
+    {
+      "id": "sargent.hull",
+      "bounds": [0.18, 0.02, 0.72, 0.92],
+      "baseMove": "wet on dry",
+      "referenceCue": "central blue hull in ultramarine/cerulean with orange stitching, dark anchor shadow and warm underpainting, crisp dry edges"
+    },
+    {
+      "id": "sargent.water",
+      "bounds": [0, 0.68, 1, 1],
+      "baseMove": "wet on dry",
+      "referenceCue": "lower water and foreground, turquoise sap-green and ochre washes with dark hull reflection, dry brush texture"
+    }
+  ],
+  "reserves": [
+    {
+      "reason": "hull highlight and rigging sparkle",
+      "bounds": [0.38, 0.42, 0.43, 0.48]
+    },
+    {
+      "reason": "sky paper and distant light",
+      "bounds": [0.68, 0.12, 0.73, 0.18]
+    }
+  ]
+}

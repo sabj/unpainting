@@ -32,7 +32,7 @@ V3 is compared on Hills, France and Ships. The 0.1.0 V3 runs painted only those 
 
 ## Results
 
-All five rounds were painted with painter V096, sim 100 and judges J1, in releases 0.1.0 and 0.1.1. Each result is labelled with its round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it; the new tries form their own group in that round. To reproduce, check out the tag a result names, `v0.1.0` or `v0.1.1`; [versions](../docs/versions.md) explains the scheme.
+All five rounds were painted with painter V096, sim 100 and judges J1, in releases 0.1.0, 0.1.1 and 0.1.2. Each result is labelled with its round, painter version, sim version, judge version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it; the new tries form their own group in that round. To reproduce, check out the tag a result names, `v0.1.0`, `v0.1.1` or `v0.1.2`; [versions](../docs/versions.md) explains the scheme.
 
 - [Leaderboard](results/leaderboard.md): scores, intervals, cost and time per model and round
 - [Gallery](results/gallery.md): each model's best painting of each target, shown as its 10 to 100% stages
