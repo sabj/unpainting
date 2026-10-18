@@ -200,6 +200,13 @@ const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
 let OPT_TRACK = null;
 const opt = (n, d) => { OPTS_READ.add(n); const i = argv.lastIndexOf('--' + n); if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; }, num = (n, d) => Number(opt(n, d));
+// Caller drawing inputs and stage intent, captured before registration and line-source planning append generated files.
+const DRAWING_STAGE_INTENT = Object.freeze({
+  explicitStages: argv.includes('--stages'),
+  explicitAuto: argv.includes('--drawingstages') && opt('drawingstages', '') === 'auto',
+  authoredOpening: Boolean(opt('drawingfile', '')),
+  authoredClosing: Boolean(opt('drawinglast', '')),
+});
 // An explicit budget changes planning only; absent/zero preserves every default.
 const STROKE_BUDGET = num('strokebudget', 0);
 for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
@@ -1143,7 +1150,7 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing
 // come from, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
 // the drawing's stages for this image: planner model, rule and gate (drawing-stages-auto.mjs); the prep pencil's erase
 // weights are made now, before the target is sealed (pencil-erase.mjs)
-const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: SEP.stats.ink / n, log: console.log });
+const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: SEP.stats.ink / n, log: console.log, intent: DRAWING_STAGE_INTENT });
 const PREP_ERASE = num('preperase', 0.85) > 0 ? eraseWeights(PX_SOURCE, w, h) : null;
 const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, rgb: PX_SOURCE, log: console.log,
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),

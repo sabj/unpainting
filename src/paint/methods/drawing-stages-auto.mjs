@@ -29,17 +29,20 @@ const said = c => `graphite prep ${c.graphitePrep}, ink prep ${c.inkPrep}, ink f
  * Choose and push the stages. `rgb` is the target on the plan grid (w x h, 3 bytes a cell); `penLine` the separator's
  * pen-line share. Returns the record (also in drawing-choice.json), or null when the choice does not run.
  */
-export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w, h, penLine, log = () => {}, fetcher = fetch }) {
+export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w, h, penLine, log = () => {}, fetcher = fetch, intent = {} }) {
   const mode = opt('drawingstages', 'auto');
   if (!['auto', 'off'].includes(mode)) throw new Error(`--drawingstages: auto or off, not ${mode}`);
-  if (mode === 'off' || opt('drawing', 'first') === 'none' || argv.includes('--stages')) return null;
   const choiceFile = path.join(out, 'drawing-choice.json');
-  if (opt('resumestate', '')) {
+  const resumestate = opt('resumestate', '');
+  if (resumestate) {
     if (!fs.existsSync(choiceFile)) return null;
     const record = JSON.parse(fs.readFileSync(choiceFile, 'utf8'));
     argv.push(...record.flags);
     return record;
   }
+  const hasStages = intent.explicitStages ?? argv.includes('--stages');
+  const hasAuthoredFile = (intent.authoredOpening ?? false) || (intent.authoredClosing ?? false);
+  if (mode === 'off' || opt('drawing', 'first') === 'none' || hasStages || (!intent.explicitAuto && hasAuthoredFile)) return null;
   const style = Number(opt('penwash', 0)) > 0 ? 'penwash' : null;
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
   let edges = 0; for (const v of ev.edge) edges += v;
