@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { chooseDrawingStages, drawingStageIntent } from './drawing-stages-auto.mjs';
+import { selectedDrawing } from './drawing-file.mjs';
 
 async function fixture(t, raw = [], expanded = raw) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-stages-auto-'));
@@ -45,6 +47,37 @@ test('default auto respects caller-supplied opening or closing files and leaves 
     if (raw.includes('--drawingfile')) assert.equal(f.opt('drawingfile'), raw[raw.indexOf('--drawingfile') + 1]);
     if (raw.includes('--drawinglast')) assert.equal(f.opt('drawinglast'), raw[raw.indexOf('--drawinglast') + 1]);
   }
+});
+
+test('auto skip leaves authored opening and closing geometry for the real pen consumer', async t => {
+  const opening = [[1, 1], [2, 1], [2, 2]], closing = [[5, 4], [6, 4], [6, 5]];
+  const raw = [];
+  const f = await fixture(t);
+  const drawingArgs = ['--drawingfile', path.join(f.dir, 'opening'), '--drawinglast', path.join(f.dir, 'closing'), '--drawing', 'both'];
+  raw.push(...drawingArgs);
+  const intent = drawingStageIntent({ argv0: raw, expandedArgv: raw });
+  const args = [...raw];
+  const opt = (name, fallback) => { const at = args.lastIndexOf(`--${name}`); return at < 0 ? fallback : args[at + 1] ?? fallback; };
+  const sha = crypto.createHash('sha256').update(fs.readFileSync(f.image)).digest('hex');
+  for (const [name, points] of [['opening', opening], ['closing', closing]]) {
+    fs.writeFileSync(`${path.join(f.dir, name)}-lines.json`, JSON.stringify({
+      image: { w: 8, h: 8 }, targetSHA256: sha,
+      lines: [{ points, weights: points.map(() => 1), weight: 1 }],
+    }));
+  }
+  const before = [...args];
+  const record = await chooseDrawingStages({ opt, argv: args, image: f.image, root: f.dir, out: f.dir,
+    rgb: Buffer.alloc(8 * 8 * 3, 240), w: 8, h: 8, penLine: 0,
+    fetcher: async () => { throw new Error('unexpected model call'); }, intent });
+  assert.equal(record, null);
+  assert.deepEqual(args, before);
+
+  const num = (name, fallback) => name === 'drawstroke' ? 100 : fallback;
+  const paths = pass => selectedDrawing({ first: pass === 'opening', w: 8, h: 8, opt, num, log: () => {}, walked: 0 })
+    .map(stroke => stroke.points.map(({ x, y }) => [x, y]));
+  assert.deepEqual(paths('opening'), [opening]);
+  assert.deepEqual(paths('closing'), [closing]);
+  assert.equal(fs.existsSync(path.join(f.dir, 'drawing-choice.json')), false);
 });
 
 test('registration replacement of a caller drawing remains authored', async t => {
