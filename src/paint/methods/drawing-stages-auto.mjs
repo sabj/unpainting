@@ -25,6 +25,28 @@ function perspectiveOf(python, root, image, width) {
 
 const said = c => `graphite prep ${c.graphitePrep}, ink prep ${c.inkPrep}, ink finish ${c.inkFinish}`;
 
+const argValue = (args, name) => {
+  const prefix = `--${name}=`;
+  let value;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === `--${name}`) value = args[i + 1] ?? '';
+    else if (args[i].startsWith(prefix)) value = args[i].slice(prefix.length);
+  }
+  return value;
+};
+
+/** Caller-owned drawing inputs, separated from recipe/plan and generated arguments. */
+export function drawingStageIntent({ argv0 = [], expandedArgv = argv0 }) {
+  const lineworkAuto = argValue(expandedArgv, 'linework') === 'auto';
+  return {
+    explicitStages: expandedArgv.some(a => a === '--stages' || a.startsWith('--stages=')),
+    explicitAuto: argValue(argv0, 'drawingstages') === 'auto',
+    // Universal linework replaces the opening source; a closing file remains independently caller-authored.
+    authoredOpening: !lineworkAuto && Boolean(argValue(argv0, 'drawingfile')),
+    authoredClosing: Boolean(argValue(argv0, 'drawinglast')),
+  };
+}
+
 /**
  * Choose and push the stages. `rgb` is the target on the plan grid (w x h, 3 bytes a cell); `penLine` the separator's
  * pen-line share. Returns the record (also in drawing-choice.json), or null when the choice does not run.
@@ -32,6 +54,7 @@ const said = c => `graphite prep ${c.graphitePrep}, ink prep ${c.inkPrep}, ink f
 export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w, h, penLine, log = () => {}, fetcher = fetch, intent = {} }) {
   const mode = opt('drawingstages', 'auto');
   if (!['auto', 'off'].includes(mode)) throw new Error(`--drawingstages: auto or off, not ${mode}`);
+  if (mode === 'off' || opt('drawing', 'first') === 'none' || (intent.explicitStages ?? argv.includes('--stages'))) return null;
   const choiceFile = path.join(out, 'drawing-choice.json');
   const resumestate = opt('resumestate', '');
   if (resumestate) {
@@ -40,9 +63,8 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
     argv.push(...record.flags);
     return record;
   }
-  const hasStages = intent.explicitStages ?? argv.includes('--stages');
   const hasAuthoredFile = (intent.authoredOpening ?? false) || (intent.authoredClosing ?? false);
-  if (mode === 'off' || opt('drawing', 'first') === 'none' || hasStages || (!intent.explicitAuto && hasAuthoredFile)) return null;
+  if (!intent.explicitAuto && hasAuthoredFile) return null;
   const style = Number(opt('penwash', 0)) > 0 ? 'penwash' : null;
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
   let edges = 0; for (const v of ev.edge) edges += v;

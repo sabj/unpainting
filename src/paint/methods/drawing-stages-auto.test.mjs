@@ -4,73 +4,106 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { chooseDrawingStages } from './drawing-stages-auto.mjs';
+import { chooseDrawingStages, drawingStageIntent } from './drawing-stages-auto.mjs';
 
-async function fixture(t) {
+async function fixture(t, raw = [], expanded = raw) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-stages-auto-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const image = path.join(dir, 'target.png');
   await sharp(Buffer.alloc(8 * 8 * 3, 240), { raw: { width: 8, height: 8, channels: 3 } }).png().toFile(image);
-  const values = { drawingstages: 'auto', drawing: 'first', resumestate: '', penwash: 0, sketchpython: '', drawingplanner: 'test-model' };
-  const opt = (name, fallback) => values[name] ?? fallback;
-  const argv = [];
-  const choose = (intent = {}, options = {}) => chooseDrawingStages({ opt, argv, image, root: dir, out: dir,
-    rgb: Buffer.alloc(8 * 8 * 3, 240), w: 8, h: 8, penLine: 0, fetcher: async () => { throw new Error('unexpected model call'); }, intent, ...options });
-  return { dir, image, values, argv, choose };
+  const invocation = [...expanded], intent = drawingStageIntent({ argv0: raw, expandedArgv: expanded });
+  const opt = (name, fallback) => {
+    const at = invocation.lastIndexOf(`--${name}`);
+    return at < 0 ? fallback : invocation[at + 1] ?? fallback;
+  };
+  const fetcher = async () => { throw new Error('unexpected model call'); };
+  const choose = () => chooseDrawingStages({ opt, argv: invocation, image, root: dir, out: dir,
+    rgb: Buffer.alloc(8 * 8 * 3, 240), w: 8, h: 8, penLine: 0, fetcher, intent });
+  return { dir, image, invocation, intent, opt, choose };
 }
 
-test('default auto respects caller supplied opening and closing files', async t => {
-  const f = await fixture(t);
-  assert.equal(await f.choose({ authoredOpening: true }), null);
-  assert.equal(await f.choose({ authoredClosing: true }), null);
-});
-
-test('explicit auto opts back into planning with caller supplied files', async t => {
-  const f = await fixture(t);
+async function withoutModelKey(fn) {
   const oldKey = process.env.OPENROUTER_API_KEY;
   delete process.env.OPENROUTER_API_KEY;
-  try {
-    const record = await f.choose({ authoredOpening: true, authoredClosing: true, explicitAuto: true });
-    assert(record);
-    assert.equal(record.model.unavailable, 'no OPENROUTER_API_KEY and no cached answer');
-  } finally {
+  try { return await fn(); }
+  finally {
     if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY;
     else process.env.OPENROUTER_API_KEY = oldKey;
   }
-});
+}
 
-test('generated line source files do not look authored to the chooser', async t => {
-  const f = await fixture(t);
-  const oldKey = process.env.OPENROUTER_API_KEY;
-  delete process.env.OPENROUTER_API_KEY;
-  try {
-    assert(await f.choose({ authoredOpening: false, authoredClosing: false }));
-  } finally {
-    if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY;
-    else process.env.OPENROUTER_API_KEY = oldKey;
+test('default auto respects caller-supplied opening or closing files and leaves references untouched', async t => {
+  for (const raw of [
+    ['--drawingfile', 'opening'],
+    ['--drawinglast', 'closing'],
+    ['--drawingfile', 'opening', '--drawinglast', 'closing'],
+  ]) {
+    const f = await fixture(t, raw);
+    const before = [...f.invocation];
+    assert.equal(await f.choose(), null);
+    assert.deepEqual(f.invocation, before);
+    if (raw.includes('--drawingfile')) assert.equal(f.opt('drawingfile'), raw[raw.indexOf('--drawingfile') + 1]);
+    if (raw.includes('--drawinglast')) assert.equal(f.opt('drawinglast'), raw[raw.indexOf('--drawinglast') + 1]);
   }
 });
 
-test('explicit stages and drawing none or off continue to bypass auto planning', async t => {
-  const f = await fixture(t);
-  f.argv.push('--stages', 'prepink');
-  assert.equal(await f.choose(), null);
-  f.argv.length = 0;
-  f.values.drawing = 'none';
-  assert.equal(await f.choose(), null);
-  f.values.drawing = 'first';
-  f.values.drawingstages = 'off';
-  assert.equal(await f.choose(), null);
+test('explicit CLI auto opts back into planning while recipe or plan auto does not', async t => {
+  await withoutModelKey(async () => {
+    const explicit = await fixture(t, ['--drawingstages', 'auto', '--drawingfile', 'opening']);
+    assert.equal(explicit.intent.explicitAuto, true);
+    assert(await explicit.choose());
+
+    const expandedByRecipeOrPlan = await fixture(t, ['--drawingfile', 'opening'], ['--drawingstages', 'auto', '--drawingfile', 'opening']);
+    assert.equal(expandedByRecipeOrPlan.intent.explicitAuto, false);
+    assert.equal(await expandedByRecipeOrPlan.choose(), null);
+  });
 });
 
-test('resume reapplies its saved flags without a model call even when auto would otherwise be bypassed', async t => {
-  const f = await fixture(t);
-  const record = { final: { graphitePrep: 'light', inkPrep: 'none', inkFinish: 'none' }, flags: ['--stages', 'prep'] };
+test('linework auto replaces the opening source and generated files are not caller-authored', async t => {
+  await withoutModelKey(async () => {
+    const f = await fixture(t, ['--linework', 'auto'], ['--linework', 'auto', '--drawingfile', 'generated-lines']);
+    assert.equal(f.intent.authoredOpening, false);
+    assert(await f.choose());
+
+    const suppliedThenSuperseded = await fixture(t, ['--linework', 'auto', '--drawingfile', 'old-opening'], ['--linework', 'auto', '--drawingfile', 'old-opening']);
+    assert.equal(suppliedThenSuperseded.intent.authoredOpening, false);
+    assert(await suppliedThenSuperseded.choose());
+  });
+});
+
+test('explicit stages none, drawing none and drawingstages off remain authoritative', async t => {
+  const authored = ['--drawingfile', 'opening', '--drawinglast', 'closing'];
+  for (const flags of [
+    [...authored, '--stages', 'none'],
+    [...authored, '--drawing', 'none'],
+    [...authored, '--drawingstages', 'off'],
+  ]) {
+    const f = await fixture(t, flags);
+    const before = [...f.invocation];
+    assert.equal(await f.choose(), null);
+    assert.deepEqual(f.invocation, before);
+    assert.equal(f.opt('drawingfile'), 'opening');
+    assert.equal(f.opt('drawinglast'), 'closing');
+  }
+});
+
+test('normal resume replays saved flags without a model call; a missing record is a quiet no-op', async t => {
+  const f = await fixture(t, ['--resumestate', 'saved']);
+  const record = { flags: ['--stages', 'prep'] };
   fs.writeFileSync(path.join(f.dir, 'drawing-choice.json'), JSON.stringify(record));
-  f.values.resumestate = 'saved';
-  f.values.drawingstages = 'off';
-  f.values.drawing = 'none';
-  f.argv.push('--stages', 'finishink');
-  assert.deepEqual(await f.choose({ authoredOpening: true }), record);
-  assert.deepEqual(f.argv.slice(-2), record.flags);
+  assert.deepEqual(await f.choose(), record);
+  assert.deepEqual(f.invocation.slice(-2), record.flags);
+
+  const missing = await fixture(t, ['--resumestate', 'saved']);
+  assert.equal(await missing.choose(), null);
+});
+
+test('resume does not override explicit off, none or stage choices', async t => {
+  for (const extra of [['--drawingstages', 'off'], ['--drawing', 'none'], ['--stages', 'finishink']]) {
+    const f = await fixture(t, ['--resumestate', 'saved', ...extra]);
+    fs.writeFileSync(path.join(f.dir, 'drawing-choice.json'), JSON.stringify({ flags: ['--stages', 'prep'] }));
+    const before = [...f.invocation];
+    assert.equal(await f.choose(), null);
+    assert.deepEqual(f.invocation, before);
+  }
 });

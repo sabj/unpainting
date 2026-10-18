@@ -144,7 +144,7 @@ import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
 import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-registration.mjs';
-import { chooseDrawingStages } from '../src/paint/methods/drawing-stages-auto.mjs';
+import { chooseDrawingStages, drawingStageIntent } from '../src/paint/methods/drawing-stages-auto.mjs';
 import { eraseWeights, erasePrep } from '../src/paint/methods/pencil-erase.mjs';
 import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
 import { planLines as planLineChoice } from '../src/paint/drawing-plan.mjs';
@@ -200,13 +200,8 @@ const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
 let OPT_TRACK = null;
 const opt = (n, d) => { OPTS_READ.add(n); const i = argv.lastIndexOf('--' + n); if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; }, num = (n, d) => Number(opt(n, d));
-// Caller drawing inputs and stage intent, captured before registration and line-source planning append generated files.
-const DRAWING_STAGE_INTENT = Object.freeze({
-  explicitStages: argv.includes('--stages'),
-  explicitAuto: argv.includes('--drawingstages') && opt('drawingstages', '') === 'auto',
-  authoredOpening: Boolean(opt('drawingfile', '')),
-  authoredClosing: Boolean(opt('drawinglast', '')),
-});
+// Caller-owned drawing inputs and stage intent, separated from recipe/plan and generated arguments.
+const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv });
 // An explicit budget changes planning only; absent/zero preserves every default.
 const STROKE_BUDGET = num('strokebudget', 0);
 for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
