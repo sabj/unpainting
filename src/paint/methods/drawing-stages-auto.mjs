@@ -26,20 +26,15 @@ function perspectiveOf(python, root, image, width) {
 const said = c => `graphite prep ${c.graphitePrep}, ink prep ${c.inkPrep}, ink finish ${c.inkFinish}`;
 
 const argValue = (args, name) => {
-  const prefix = `--${name}=`;
-  let value;
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === `--${name}`) value = args[i + 1] ?? '';
-    else if (args[i].startsWith(prefix)) value = args[i].slice(prefix.length);
-  }
-  return value;
+  const at = args.lastIndexOf(`--${name}`);
+  return at < 0 ? undefined : args[at + 1] ?? '';
 };
 
 /** Caller-owned drawing inputs, separated from recipe/plan and generated arguments. */
 export function drawingStageIntent({ argv0 = [], expandedArgv = argv0 }) {
   const lineworkAuto = argValue(expandedArgv, 'linework') === 'auto';
   return {
-    explicitStages: expandedArgv.some(a => a === '--stages' || a.startsWith('--stages=')),
+    explicitStages: expandedArgv.includes('--stages'),
     explicitAuto: argValue(argv0, 'drawingstages') === 'auto',
     // Universal linework replaces the opening source; a closing file remains independently caller-authored.
     authoredOpening: !lineworkAuto && Boolean(argValue(argv0, 'drawingfile')),

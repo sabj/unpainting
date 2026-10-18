@@ -47,6 +47,17 @@ test('default auto respects caller-supplied opening or closing files and leaves 
   }
 });
 
+test('registration replacement of a caller drawing remains authored', async t => {
+  const raw = ['--drawingfile', 'original-opening'];
+  const expanded = ['--drawingfile', 'registered-opening'];
+  const f = await fixture(t, raw, expanded);
+  assert.equal(f.intent.authoredOpening, true);
+  const before = [...f.invocation];
+  assert.equal(await f.choose(), null);
+  assert.deepEqual(f.invocation, before);
+  assert.equal(f.opt('drawingfile'), 'registered-opening');
+});
+
 test('explicit CLI auto opts back into planning while recipe or plan auto does not', async t => {
   await withoutModelKey(async () => {
     const explicit = await fixture(t, ['--drawingstages', 'auto', '--drawingfile', 'opening']);
@@ -68,6 +79,22 @@ test('linework auto replaces the opening source and generated files are not call
     const suppliedThenSuperseded = await fixture(t, ['--linework', 'auto', '--drawingfile', 'old-opening'], ['--linework', 'auto', '--drawingfile', 'old-opening']);
     assert.equal(suppliedThenSuperseded.intent.authoredOpening, false);
     assert(await suppliedThenSuperseded.choose());
+  });
+});
+
+test('equals-form options are not recognized as provenance inputs by the split-only CLI parser', async t => {
+  const lineworkEquals = await fixture(t, ['--linework=auto', '--drawingfile', 'opening']);
+  assert.equal(lineworkEquals.intent.authoredOpening, true);
+  assert.equal(await lineworkEquals.choose(), null);
+
+  const autoEquals = await fixture(t, ['--drawingstages=auto', '--drawingfile', 'opening']);
+  assert.equal(autoEquals.intent.explicitAuto, false);
+  assert.equal(await autoEquals.choose(), null);
+
+  await withoutModelKey(async () => {
+    const stagesEquals = await fixture(t, ['--stages=none']);
+    assert.equal(stagesEquals.intent.explicitStages, false);
+    assert(await stagesEquals.choose());
   });
 });
 
