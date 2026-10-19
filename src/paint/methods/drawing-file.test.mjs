@@ -46,3 +46,27 @@ test('an empty opening file the linked stages marked as meant lays no ink and do
     assert.match(logs.at(-1), /no opening ink, since the plan has a prep pencil/);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a pure-watercolor drawing explicitly declaring no medium lays no opening or closing ink', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    const base = path.join(dir, 'watercolor');
+    fs.writeFileSync(`${base}-lines.json`, JSON.stringify({ image: { w: 300, h: 244 }, lines: [], medium: 'none' }));
+    for (const first of [true, false]) {
+      const flags = flagsOf([first ? '--drawingfile' : '--drawinglast', base]);
+      assert.deepEqual(selectedDrawing({ first, w: 540, h: 439, ...flags, log: () => {}, walked: 7 }), []);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a no-medium declaration cannot hide malformed or filtered-out drawing paths', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    const base = path.join(dir, 'invalid');
+    for (const lines of [[{ points: [[0, 0]] }], [{ role: 'detail', points: [[0, 0], [50, 50]] }]]) {
+      fs.writeFileSync(`${base}-lines.json`, JSON.stringify({ image: { w: 100, h: 100 }, lines, medium: 'none' }));
+      const flags = flagsOf(['--drawingfile', base, '--drawingskip', 'detail']);
+      assert.throws(() => selectedDrawing({ first: true, w: 100, h: 100, ...flags, log: () => {}, walked: 7 }), /selected 0 of 0 lines/);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

@@ -39,9 +39,11 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (all.length < candidates.length) log(`drawing: ${all.length} of ${candidates.length} lines kept (--drawshare ${num('drawshare', 1)}, --drawregions ${num('drawregions', 0)}, --drawmax ${num('drawmax', Infinity)})`);
   const lines = first ? all : all.filter(g => (g.weight ?? 1) >= min);
   const file = linePaths(b).lines;
-  // an empty opening file marked by the linked stages (a prep pencil and no prepInk stage) is meant: the pencil is the
-  // opening drawing. A first pen that selects nothing from any other drawing is a broken input or plan.
-  const empty = first && !candidates.length ? JSON.parse(fs.readFileSync(file, 'utf8')).empty : null;
+  // Linked stages can explicitly omit prep ink; pure-watercolor plans declare medium none.
+  // Recognize medium none only for an empty source file, not malformed or filtered-out paths.
+  const doc = first && !candidates.length ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+  const empty = doc?.empty || (doc?.medium === 'none' && Array.isArray(doc.lines) && doc.lines.length === 0
+    ? 'the drawing explicitly declares medium none' : null);
   if (empty) { log(`drawing: no opening ink, since ${empty}; the walker's ${walked} gestures are not used`); return []; }
   if (first && !lines.length) throw new Error(`drawing: the first pen selected 0 of ${candidates.length} lines from ${file}${skip.size ? ` (roles left out: ${[...skip].join(', ')})` : ''}`);
   log(first ? `drawing: ${lines.length} selected lines from ${file}, drawn whole; the walker's ${walked} gestures are not used`
