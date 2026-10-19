@@ -2601,12 +2601,18 @@ if (num('texflow', 0) > 0) {
 const SKY_WARM_RB = opt('skywarm', '') !== '' ? Float32Array.from({ length: n }, (_, i) => PX_RAW[i * 3] - PX_RAW[i * 3 + 2]) : null;
 // each passage's technique, read off the source inside it, is chosen here for the whole plan (planning, before the
 // first mark), not when the brush reaches it
-for (const L2 of layers) for (const sh of L2.shapes) if (sh.mask) techniqueOf(sh);
+for (const L2 of layers) for (const sh of L2.shapes) {
+  if (sh.mask) techniqueOf(sh);
+  // Label-backed passages rebuild the same mask on demand. Keeping every expanded
+  // mask here costs one full sheet per shape, even before the first stroke.
+  if (sh.ids) dropMask(sh);
+}
 // a graded wash's sweep direction and its prewet reach (onto paper as pale as its own pale end) are read off the plan
 // and the source here, before painting, not when the brush reaches the passage
-for (const L2 of layers) for (const sh of L2.shapes) if (sh.mask && sh.graded && !sh._follow) {
+for (const L2 of layers) for (const sh of L2.shapes) if (sh.graded && !sh._follow && sh.mask) {
   sh._gradedAngle = gradientSweepAngle(sh.graded, sh.mask, w, h);
   sh._prewet = prewetArea(sh.mask, SRC, w, h, { reach: Math.round(num('gradedprewet', 0.03) * Math.min(w, h)) });
+  if (sh.ids) dropMask(sh);
 }
 // From here to phaseMark('painting') the target and its per-cell maps are closed (--targetguard, default gentle). The
 // only way back to the reference is TARGET_GUARD.look: shape-level means at a peek, a review or a passage.
