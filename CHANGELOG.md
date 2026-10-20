@@ -2,9 +2,9 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## 0.2.0 - 2026-10-17
+## 0.2.0 - 2026-10-20
 
-Painter V099, sim 102, judges J1. Tag `v0.2.0`. This release is the accepted `0.2.0-rc.6` candidate. The painter and sim versions both change, so 0.2.0 paintings and scores do not share a mean with 0.1.x results ([docs/versions.md](docs/versions.md)). Benchmark rounds V1 to V5 keep their published 0.1.x scores.
+Painter V099, sim 102, judges J1. Tag `v0.2.0`. The painter and sim versions both change, so 0.2.0 paintings and scores do not share a mean with 0.1.x results ([docs/versions.md](docs/versions.md)). Benchmark rounds V1 to V5 keep their published 0.1.x scores.
 
 ### Painting plans and styles
 
@@ -53,6 +53,8 @@ Painter V099, sim 102, judges J1. Tag `v0.2.0`. This release is the accepted `0.
 
 ### Performance
 
+- Same plans, both releases: the published Opus 5.5 V5 winning plans (try 1, all five targets), replayed at their published width, sheet and seed on the same GPU type. Mean J1 is 6.36 on 0.2.0 against 5.93 on 0.1.1. 0.2.0 scores higher on Mittens (+0.72), South France (+0.99) and Hills (+0.50), level on Ships (+0.22, within judge noise) and lower on Trumbull (-0.27). It renders the same plans 1.7x to 2.0x faster. Fixed-plan suites over ten subjects agree: 0.2.0 is higher on average by about 0.25 J1. See [docs/release-performance-0.2.0.md](docs/release-performance-0.2.0.md).
+- One full-resolution South France replay took 328.57 s on 0.2.0 versus 824.10 s on 0.1.1 on the same M4 Mac mini (2.51x faster). Hills is the exception in the fixed-plan speed pairs: 0.2.0 was 1.18x slower there and peaked at 27.8 GB against 15.8 GB.
 - Exact GPU paths and speed switches are on by default without changing the Full solver physics. Optics, palette fitting and clip masks share or cache their work, and the wet frontier scan is fused with cell finalization on capable GPUs.
 - Passage checkpoints for still renders, compact timing artifacts, and on-demand profiling of the GPU, the main thread and plan setup.
 - Mark tapes and command logs are streamed instead of being held as one large JSON string.
