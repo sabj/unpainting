@@ -16,6 +16,8 @@ test('a native CPU canary stops after one real paint pass', () => {
       '--recipe', 'none', '--mode', 'fast', '--gpu', 'off',
       '--drawing', 'none', '--draw', '0', '--video', '0', '--frames', '1',
       '--targetguard', 'strict', '--canarystop', '1',
+      // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
+      '--segments', 'off',
     ], { cwd: root, encoding: 'utf8', timeout: 60_000 });
     assert.equal(run.status, 0, run.stderr || run.stdout);
     assert.match(run.stdout, /canary checkpoint after pass 1/);

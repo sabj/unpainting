@@ -4,11 +4,43 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { aspectGap, registerDrawingFile } from './drawing-registration.mjs';
+import { aspectGap, registerDrawingFile, lineTargetOf } from './drawing-registration.mjs';
+import { selectedDrawing } from './drawing-file.mjs';
+import { bindLineTarget, lineTargetMismatch } from '../../crop/lines.mjs';
 
 test('aspect gap: rounding between grids is nothing, another page shape is a share', () => {
   assert.ok(aspectGap({ w: 540, h: 442 }, 304, 249) < 0.002);
   assert.ok(Math.abs(aspectGap({ w: 1080, h: 1620 }, 817, 1024) - 0.197) < 0.002);
+});
+
+test('an empty no-medium drawing of another shape or image is bound to the target without a fit and stays declared', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-registration-'));
+  try {
+    const W = 200, H = 150, image = path.join(dir, 'target.png');
+    await sharp(Buffer.alloc(W * H * 3, 240), { raw: { width: W, height: H, channels: 3 } }).png().toFile(image);
+    for (const [name, doc] of [
+      ['aspect', { image: { w: 300, h: 300 }, lines: [], medium: 'none' }],
+      ['other', { image: { w: 400, h: 300 }, targetSHA256: 'f'.repeat(64), lines: [], medium: 'none' }],
+    ]) {
+      fs.writeFileSync(path.join(dir, `${name}-lines.json`), JSON.stringify(doc));
+      const argv = [], stem = path.join(dir, `${name}-registered`);
+      const rec = await registerDrawingFile({ base: path.join(dir, name), image, out: dir, stem, width: W, argv });
+      assert.equal(rec.noLines, 'the drawing declares medium none');
+      assert.deepEqual(argv, ['--drawingfile', stem]);
+      const reg = JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8'));
+      assert.deepEqual(reg.lines, []);
+      assert.equal(reg.medium, 'none');
+      assert.deepEqual(reg.image, { w: W, h: H });
+      const t = await lineTargetOf(image);
+      assert.equal(reg.targetSHA256, t.sha256);
+      bindLineTarget(t);
+      try {
+        assert.equal(lineTargetMismatch(reg), null);
+        const flags = { opt: (n, d) => (n === 'drawingfile' ? stem : d), num: (n, d) => Number(d) };
+        assert.deepEqual(selectedDrawing({ first: true, w: W, h: H, ...flags, log: () => {}, walked: 0 }), []);
+      } finally { bindLineTarget(null); }
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('a drawing from a page of another shape is registered to the target and the pens are pointed at it', async () => {

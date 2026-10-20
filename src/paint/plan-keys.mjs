@@ -26,7 +26,7 @@ const TEXTURE = { bounds: ANY, budget: ANY, spacing: ANY, minDensity: ANY, reser
 
 // src/paint/drawing-plan.mjs drawingFlags
 const DRAWING = {
-  medium: ANY, inkColor: ANY, ink: { color: ANY, waterproof: ANY }, source: ANY, amount: ANY, lines: ANY, maxLines: ANY,
+  medium: ANY, inkColor: ANY, ink: { color: ANY, waterproof: ANY }, linework: ANY, source: ANY, amount: ANY, lines: ANY, maxLines: ANY,
   weight: ANY, closingLines: ANY, resolution: ANY, map: ANY, mapSmoothing: ANY,
   stages: {
     prep: { amount: ANY, weight: ANY, fade: ANY, frames: ANY },

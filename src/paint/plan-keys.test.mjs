@@ -33,6 +33,15 @@ test('the Mittens colour5 deep-accent keys the painter never read are caught', (
   assert.deepEqual(unusedPlanKeys({ subject: 'mittens', washes }, { pipeline: true }), ['washes.deepAccent.relative', 'washes.deepAccent.minCells']);
 });
 
+test('every drawing key drawingFlags reads counts as read, including linework', async () => {
+  const { drawingFlags } = await import('./drawing-plan.mjs');
+  const drawing = { medium: 'ink', inkColor: 'black', ink: { waterproof: true }, linework: 'auto', source: 'source-ink', amount: 0.5,
+    lines: 'contours', maxLines: 40, weight: 0.5, closingLines: 0.5, resolution: 1, map: 'lines.png', mapSmoothing: 1 };
+  assert(drawingFlags(drawing).includes('--linework'));
+  assert.deepEqual(unusedPlanKeys({ subject: 'x', drawing }, { pipeline: true }), []);
+  assert.deepEqual(unusedPlanKeys({ subject: 'x', drawing: { linework: 'auto' } }, { pipeline: false }), []);
+});
+
 test('the bundled value plans use only keys the painter reads', () => {
   const dir = path.join(root, 'examples/plans');
   const plans = fs.readdirSync(dir).filter(f => f.endsWith('.json')).map(f => [f, JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))])
@@ -49,7 +58,8 @@ test('the painter exits 3 on a plan key it never reads, unless --allowunusedplan
     const plan = path.join(dir, 'plan.json');
     fs.writeFileSync(plan, JSON.stringify({ subject: 'x', families: [{ id: 'a', bounds: [0, 0, 1, 1], looseness: 1 }] }));
     const run = (out, extra = []) => spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--width', '48',
-      '--mode', 'fast', '--video', '0', '--gpu', 'off', '--valueplan', plan, '--valuepreviewonly', '1', '--allowdirty', '1', '--out', path.join(dir, out), ...extra],
+      // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
+      '--mode', 'fast', '--video', '0', '--gpu', 'off', '--segments', 'off', '--valueplan', plan, '--valuepreviewonly', '1', '--allowdirty', '1', '--out', path.join(dir, out), ...extra],
     { cwd: root, encoding: 'utf8', timeout: 120000 });
     const strict = run('strict');
     assert.equal(strict.status, 3, strict.stderr);

@@ -15,6 +15,7 @@ import sharp from 'sharp';
 import { linePaths } from '../../crop/lines.mjs';
 import { registerLines, applyRegistration } from '../../crop/register-lines.mjs';
 import { edgeEvidence } from './line-evidence.mjs';
+import { noDrawingDeclared } from './drawing-file.mjs';
 
 const ASPECT_LIMIT = 0.02;
 
@@ -43,6 +44,16 @@ export async function registerDrawingFile({ base, image, root = '.', out, stem =
   const t = await lineTargetOf(image), gap = aspectGap(doc.image, t.w, t.h);
   const otherImage = !!doc.targetSHA256 && doc.targetSHA256 !== t.sha256;
   if (!force && !(gap > ASPECT_LIMIT) && !otherImage) return null;
+  // An empty file declaring medium none has no lines to fit: it is bound to the target as it stands (its image box and
+  // target replaced), so no reader refuses it and the pens see the declaration (drawing-file.mjs noDrawingDeclared).
+  if (noDrawingDeclared(doc, { first: true }) && doc.medium === 'none') {
+    const record = { file, aspectGap: +gap.toFixed(4), sourceSHA256: doc.targetSHA256 ?? null, targetSHA256: t.sha256, targetGrid: { w: t.w, h: t.h }, noLines: 'the drawing declares medium none' };
+    fs.mkdirSync(path.dirname(path.resolve(stem)), { recursive: true });
+    fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ ...doc, image: { w: t.w, h: t.h }, targetSHA256: t.sha256, registration: record }) + '\n');
+    argv.push('--drawingfile', stem);
+    log(`drawing registration: ${path.basename(file)} declares medium none and has no lines; bound to the target without a fit`);
+    return record;
+  }
   const { data, info } = await sharp(image).removeAlpha().resize({ width }).raw().toBuffer({ resolveWithObject: true });
   const r = registerLines(doc.lines, doc.image, edgeEvidence(data, info.width, info.height));
   const grid = { w: info.width, h: info.height };

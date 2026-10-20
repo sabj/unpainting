@@ -238,6 +238,8 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);
   args.push(...extraArgs);
   if (spec.recordingMarks != null) args.push('--marks', String(spec.recordingMarks));
+  // the harness's segmentation backend (dry runs: off); absent, the painter's own default (SAM) applies
+  if (spec.segments != null) args.push('--segments', String(spec.segments));
   // Since 0.1.1 a wet-on-wet stroke on uneven paper is logged, not a stop that loses the painting (tag v0.1.0 has the old rule)
   if (!args.includes('--wetgate')) args.push('--wetgate', '0');
   if (pausedir) args.push('--pausedir', pausedir);

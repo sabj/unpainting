@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { inkHand, selectedDrawing } from './drawing-file.mjs';
+import { inkHand, selectedDrawing, noDrawingDeclared } from './drawing-file.mjs';
+import { bindLineTarget } from '../../crop/lines.mjs';
 
 const line = pts => ({ weight: 1, points: pts.map(([x, y]) => ({ x, y, s: 0.6, nw: 2 })) });
 
@@ -57,6 +58,45 @@ test('a pure-watercolor drawing explicitly declaring no medium lays no opening o
       assert.deepEqual(selectedDrawing({ first, w: 540, h: 439, ...flags, log: () => {}, walked: 7 }), []);
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a no-medium declaration wins over the drawing logic, the closing scribble and the target check, for both pens', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    const base = path.join(dir, 'watercolor');
+    fs.writeFileSync(`${base}-lines.json`, JSON.stringify({ image: { w: 300, h: 244 }, targetSHA256: 'f'.repeat(64), lines: [], medium: 'none' }));
+    const w = 64, h = 52, D = new Float32Array(w * h).fill(2); // a dark field the closing scribble would state
+    bindLineTarget({ sha256: '0'.repeat(64), w: 100, h: 100 }); // another target and aspect: the loader would refuse it
+    try {
+      for (const args of [
+        ['--drawingfile', base, '--drawinglogic', '3'],
+        ['--drawingfile', base, '--drawinglogic', '2'],
+        ['--drawingfile', base],
+      ]) {
+        const logs = [];
+        assert.deepEqual(selectedDrawing({ first: true, w, h, ...flagsOf(args), log: m => logs.push(m), walked: 7, D }), [], args.join(' '));
+        assert.match(logs.at(-1), /no opening ink, since the drawing explicitly declares medium none/);
+      }
+      for (const args of [
+        ['--drawinglast', base, '--drawinglastlogic', '3'],
+        ['--drawinglast', base, '--drawinglogic', '3'],
+        ['--drawinglast', base, '--finishmasses', '1'],
+      ]) {
+        const logs = [];
+        assert.deepEqual(selectedDrawing({ first: false, w, h, ...flagsOf(args), log: m => logs.push(m), walked: 7, D }), [], args.join(' '));
+        assert.match(logs.at(-1), /closing pen: no closing ink, since the drawing explicitly declares medium none/);
+      }
+    } finally { bindLineTarget(null); }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('noDrawingDeclared counts only files with no lines; the stage marker only for the opening pen', () => {
+  assert.equal(noDrawingDeclared({ lines: [], medium: 'none' }, { first: false }), 'the drawing explicitly declares medium none');
+  assert.equal(noDrawingDeclared({ lines: [], empty: 'pencil only' }, { first: true }), 'pencil only');
+  assert.equal(noDrawingDeclared({ lines: [], empty: 'pencil only' }, { first: false }), null);
+  assert.equal(noDrawingDeclared({ lines: [{ points: [[0, 0]] }], medium: 'none' }), null);
+  assert.equal(noDrawingDeclared({ lines: [] }), null);
+  assert.equal(noDrawingDeclared({ medium: 'none' }), null);
 });
 
 test('a no-medium declaration cannot hide malformed or filtered-out drawing paths', () => {

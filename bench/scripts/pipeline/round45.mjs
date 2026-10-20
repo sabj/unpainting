@@ -305,7 +305,9 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     const cropsOut = {}, unpainted = {}, t0 = Date.now();
     let tokens = 0, cost = 0, wall = 0, modelMin = 0, renderSeconds = 0, usageComplete = true, costComplete = true, budgetStopped = false, guardViolations = 0;
     for (const crop of crops) {
-      const spec = profileSubject(subjects[crop], profile, dry ? dryWidth : null);
+      // A dry run checks the harness, not segmentation: it paints with --segments off, so it needs no SAM python or
+      // checkpoint (src/crop/segment-prep.mjs). Real runs keep the painter's default (SAM) and add nothing.
+      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off' } : {}) };
       const prev = round.learning && n > 1 ? previousTry({ outRoot, round, model, n, crop }) : null;
       log(`${model.name}, ${round.id}, try ${n} of ${tries}, ${crop}${dry ? ' (dry run)' : ''}`);
       let r, e;

@@ -15,6 +15,17 @@ import { gaussian } from '../../keyframes/density.mjs';
 // so contact = (W - 0.3) / 0.72 = 1.39 W - 0.42 cells.
 const GAIN = 1.39, MARGIN = 0.42;
 
+/**
+ * Why a line file says nothing is drawn, or null. Only a file with no lines at all counts: medium "none" (a
+ * pure-watercolor plan) for either pen, or, for the opening pen, the linked stages' `empty` marker (linework-plan.mjs).
+ * Malformed or filtered-out paths never count, so they still fail the first pen.
+ */
+export function noDrawingDeclared(doc, { first = true } = {}) {
+  if (!doc || !Array.isArray(doc.lines) || doc.lines.length) return null;
+  if (doc.medium === 'none') return 'the drawing explicitly declares medium none';
+  return first && doc.empty ? doc.empty : null;
+}
+
 // The selected drawing as tier-1 strokes, or null when no file applies to this pen. `walked` is for the log only.
 // --drawinglast <base>: the closing pen (--drawing both|last, over the dry sheet) draws only lines of weight at least
 // --drawinglastmin, so the darks and features stay crisp over the glazes.
@@ -25,6 +36,13 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const b = first ? opt('drawingfile', '') : opt('drawinglast', '');
   if (!hasLines(b)) throw new Error(`drawing: no work/lines/${b}-lines.json`);
   if (first && opt('preparationbinding','')) return boundPreparation({bindingFile:opt('preparationbinding',''),base:b,image:opt('image',''),guide:opt('penpencil',''),w,h,num,log});
+  // A declared no-drawing file is read before the logic branch and the line loader, for both pens, so --drawinglogic,
+  // --drawinglastlogic, --finishmasses and the loader's target check of an empty file add or refuse nothing.
+  const declared = noDrawingDeclared(JSON.parse(fs.readFileSync(linePaths(b).lines, 'utf8')), { first });
+  if (declared) {
+    log(first ? `drawing: no opening ink, since ${declared}; the walker's ${walked} gestures are not used` : `drawing, closing pen: no closing ink, since ${declared}`);
+    return [];
+  }
   // --drawinglogic 1: rank, budget, filter, connect and shape the file's lines (drawing-logic.mjs)
   // --drawinglastlogic: the closing pen's own logic (default --drawinglogic); linked stages set it to 0, since the
   // finish-ink file is already the closing drawing

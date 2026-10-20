@@ -29,3 +29,31 @@ test('reused observation matches independent masks, halos and continuation over 
     }
   }
 });
+
+// Parity with the copy the speed change removed: before it, candidateContact handed every brush's scratch sheet a copy of
+// sheet.contactStrength; now only a tuft's gets one. A non-tuft (row) brush plans through strokeGpu, which never reads
+// contact strength, so its candidate footprint must not depend on the live strengths at all, including during a
+// same-brush continuation with recent stamps. Identical results for absent, zero, full and arbitrary strengths are the
+// old behaviour (any copy) and the new (no copy). The live array is never written.
+test('a non-tuft candidate footprint is independent of contact strength, as with the old copy', () => {
+  const w = 72, h = 60;
+  const sheet = createSheet(makePaper(w, h, { seed: 5, fibres: 0 }), [{ K: [1, .5, .2], S: [.1, .1, .1], rho: .1, omega: .2, gamma: .1 }]);
+  sheet.touched = Int32Array.from({ length: sheet.n }, (_, i) => i % 5 ? -1e9 : 8);
+  sheet.clock = 9;
+  const strengths = [undefined, new Float32Array(sheet.n), new Float32Array(sheet.n).fill(1), Float32Array.from({ length: sheet.n }, (_, i) => (i * 37 % 101) / 50)];
+  for (const flat of [true, false]) for (const lift of [false, true]) for (const neighborRadius of [0, 2]) {
+    const brush = createBrush({ flat, radius: 9, bristles: 15, seed: 2 });
+    dip(brush, { water: .9, conc: [1] });
+    assert.notEqual(brush.model, 'tuft');
+    const path = [{ x: 6, y: 8, p: .6 }, { x: 40, y: 30, p: 1 }, { x: 60, y: 22, p: .4 }];
+    let expected = null;
+    for (const s of strengths) {
+      sheet.contactStrength = s?.slice();
+      sheet._contactBrush = brush; // a continuation: recent stamps are the brush's own
+      const live = sheet.contactStrength?.slice();
+      const got = candidateContact(brush, sheet, path, { lift, neighborRadius });
+      if (expected === null) expected = got; else assert.deepEqual(got, expected, `strengths ${s ? s[3] : 'absent'}`);
+      assert.deepEqual(sheet.contactStrength, live);
+    }
+  }
+});

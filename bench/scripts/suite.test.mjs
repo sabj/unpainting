@@ -27,6 +27,17 @@ test('offline lite completes one plan/check/render with no self-view or repair, 
   } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
 });
 
+test('only a harness spec chooses the segmentation backend: dry runs paint with --segments off, real runs add nothing', async () => {
+  const { resolvePlan } = await import('./pipeline/plan-args.mjs');
+  const ex = path.join(BENCH, 'v4v5', 'example');
+  const frozen = readJson(path.join(ex, 'frozen.json'));
+  const plan = spec => resolvePlan({ spec, planDir: path.join(ex, 'plan'), variant: 'region_w13_lay2_noslane', target: path.join(ex, 'plan', 'target.png'), out: 'out' });
+  const real = plan(frozen), dry = plan({ ...frozen, segments: 'off' });
+  assert.equal(real.args.includes('--segments'), false);
+  assert.equal(dry.args[dry.args.lastIndexOf('--segments') + 1], 'off');
+  assert.deepEqual(dry.args.filter((_, i) => dry.args[i] !== '--segments' && dry.args[i - 1] !== '--segments'), real.args);
+});
+
 test('a model launch failure is saved as an unpainted target and returns failure without a retry', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-failure-'));
   let raw;
