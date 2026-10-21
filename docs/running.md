@@ -89,6 +89,12 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--canarystop` | `0`, or a planned pass number N: save `canary-pass-N.png` and `canary.json` after pass N and stop before `painting.png` | `0` | same |
 | `--notargetlooks` | `0`, `1`: paint with the charges frozen at planning and no painting-time reference look ([plan-format.md](plan-format.md)) | `0` | same |
 | `--washinkfile` | line-file base: the target's own ink removed from wash demand under `--washinkfree 1`, when the pen draws a different (cleaner) file | the `--drawingfile` | same |
+| `--paintguard` | dE00 threshold; `0` is off. A paint box forced with `--paints` or `washes.paints` that fits the target more than this much worse than the painter's own pick gets the own pick's missing paints, or is replaced | `0` | same |
+| `--paintguardmode` | `add` (add the own pick's paints; merge if that cannot close the gap), `merge` (the own pick plus the forced paints that still fit), `replace` (the own pick) | `add` | same |
+| `--paintguardmax` | most paints after `add` or `merge` | `8` | same |
+| `--techcal` | `0`, `1`: charge each technique in the dark bands for what the sheet showed it lays | `0` | same |
+| `--techcalfrom`, `--techcalmax`, `--techcalmin` | first value band calibrated; factor clamp | `4`, `2.5`, `0.8` | same |
+| `--deliveryreport` | `0`, `1`: write `delivery-by-band.json`, pigment delivered over booked by booked amount | `0` | same |
 
 `fast` approximates the final part of ordinary drying; `full` keeps the full drying schedule. They need not produce the same pixels. [techniques.md](techniques.md) lists the other recipe flags and off switches. There is no complete reference for every experimental flag. Unknown recipe names add no recipe flags.
 
