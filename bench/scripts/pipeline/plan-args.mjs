@@ -5,6 +5,7 @@
 //
 // Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4). Stone-block tokens apply to
 // architecture only, palette tokens to Trumbull only, and the base's sepia ink yields to a plan drawn in another ink.
+// With spec.basePalette false, the base adds no paint box at all: only a plan's own palette token or --paints does.
 // Settings the plan asks for that the painter never reads are noted against the painting (renderVerdict), and fail it
 // under --strict-verdict. Base settings a subject has no use for are never noted.
 //
@@ -26,10 +27,12 @@ const hundredth = (v, re) => String(Number(m(v, re)[1]) / 100);
  * The paint-plate command for a variant, as [script, --option, value, ...]. ctx: {planDir, target, width, sheetmm,
  * trumbull, out, compile, gpu, linesExist}. The regular expressions are the recipe tokens; bench/v4v5/TOKENS.md lists them.
  */
-export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true }) {
+export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false, basePalette = true, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true }) {
   return v => {
     const shaped = v.startsWith('region_w13') || v.startsWith('region_w15');
-    const paints = !trumbull ? [] : ['--paints', /_rv/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,rose'
+    // basePalette false: Trumbull gets a box only when the variant names a palette token; otherwise the painter picks
+    const named = variantParts(v).tokens.some(t => PALETTE.test(t));
+    const paints = !trumbull || (!basePalette && !named) ? [] : ['--paints', /_rv/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,rose'
       : /_pgreen/.test(v) ? (/_pbs/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,sapgreen' : 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen')
         : /_pwarm/.test(v) ? 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia' : /_pgold/.test(v) ? 'ochre,hansa,ultramarine,cerulean,sepia'
           : 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia'];
@@ -112,13 +115,14 @@ function delta(build, prefix, token) {
  * The base recipe under the plan's own tokens. Returns the args to run and an account of the layers.
  * architecture: stone blocks apply; trumbull: palette tokens apply; sepiaInk: false when the plan draws in another ink.
  */
-export function layerBase({ variant, build, architecture = false, trumbull = false, sepiaInk = true, linesExist = () => true, base = BASE }) {
+export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
   const { prefix, tokens: mt } = variantParts(variant), { tokens: bt } = variantParts(base);
   const modelArgs = build(variant), modelSlots = new Set(mt.map(slotOf)), skipped = {}, applied = [];
   for (const b of bt) {
     if (modelSlots.has(slotOf(b))) { skipped[b] = 'plan chose ' + mt.filter(t => slotOf(t) === slotOf(b)).join(','); continue; }
     if (!architecture && ARCHITECTURE_ONLY.test(b)) { skipped[b] = 'architecture only'; continue; }
     if (!trumbull && PALETTE.test(b)) { skipped[b] = 'Trumbull only'; continue; }
+    if (!basePalette && PALETTE.test(b)) { skipped[b] = 'base palette off; the plan names none'; continue; }
     if (!sepiaInk && slotOf(b) === 'sep') { skipped[b] = 'plan draws in another ink'; continue; }
     applied.push(b);
   }
@@ -227,12 +231,14 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   problems.push(...checkExtraArgs(extra, planDir));
   const extraArgs = Array.isArray(extra) ? extra.map(String) : [];
   const targetPixels = pngSize(target);
-  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, out, compile, gpu, targetPixels, linesExist });
+  // spec.basePalette false: no paint box from the base tokens; a plan's own palette token or --paints still applies
+  const basePalette = spec.basePalette !== false;
+  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, basePalette, out, compile, gpu, targetPixels, linesExist });
   problems.push(...unknownTokens(safeVariant, build).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
-  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, sepiaInk, linesExist });
+  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, sepiaInk, linesExist });
   const args = [...layered.args];
   const valueFloor = valueFloorFor(config);
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);
@@ -253,7 +259,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (config) problems.push(...checkPlanLimits(config, spec.sheetmm, linesByName, targetPixels));
   return {
     args, problems, variant: safeVariant, extraArgs,
-    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor },
+    layering: { base: BASE, basePalette, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor },
     modelOptions: layered.modelOptions, baseOptions: layered.baseOptions, extraOptions: extraArgs.filter(a => a.startsWith('--')).map(a => a.slice(2)),
     templateOptions: [...optionMap(build(variantParts(safeVariant).prefix)).keys()],
   };
