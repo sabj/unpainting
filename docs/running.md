@@ -88,7 +88,7 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--canarystop` | `0`, or a planned pass number N: save `canary-pass-N.png` and `canary.json` after pass N and stop before `painting.png` | `0` | same |
 | `--notargetlooks` | `0`, `1`: paint with the charges frozen at planning and no painting-time reference look ([plan-format.md](plan-format.md)) | `0` | same |
 | `--washinkfile` | line-file base: the target's own ink removed from wash demand under `--washinkfree 1`, when the pen draws a different (cleaner) file | the `--drawingfile` | same |
-| `--paintguard` | dE00 threshold; `0` is off. A paint box forced with `--paints` or `washes.paints` that fits the target more than this much worse than the painter's own pick gets the own pick's missing paints, or is replaced | `0` | same |
+| `--paintguard` | dE00 threshold; `0` is off. It checks a box forced with `--paints` or `washes.paints`. A box this much worse than the painter's own pick is changed as `--paintguardmode` says. `run-card.json` records the decision | `0` | same |
 | `--paintguardmode` | `add` (add the own pick's paints; merge if that cannot close the gap), `merge` (the own pick plus the forced paints that still fit), `replace` (the own pick) | `add` | same |
 | `--paintguardmax` | most paints after `add` or `merge` | `8` | same |
 | `--techcal` | `0`, `1`: charge each technique in the dark bands for what the sheet showed it lays | `0` | same |
