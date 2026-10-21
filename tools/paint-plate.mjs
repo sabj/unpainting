@@ -85,6 +85,7 @@ import { paperOf, pickPalette, paletteOptions } from '../src/crop/palettepick.mj
 import { widePalette, puddleLabels } from '../src/crop/palettewide.mjs';
 import { paintGuardOptions } from '../src/crop/paint-guard.mjs';
 import { deliveryByBand, deliveryNote } from '../src/paint/methods/delivery-report.mjs';
+import { createTechniqueCal } from '../src/paint/methods/technique-cal.mjs';
 import { channelDensity, unmix } from '../src/crop/pigments.mjs';
 import { accentCells, accentFamilies } from '../src/paint/methods/final-darks.mjs';
 import { blockInPigments, gradeSmoothPassages, dropMask } from '../src/crop/blockin.mjs';
@@ -1729,6 +1730,17 @@ const expected = new Float32Array(n * PIGS.length);
 // ledger only. --deliverycalmax caps the factor (default 1.8). Default 0.
 const DELIVERY = num('deliverycal', 0) > 0 ? createDeliveryCal(PIGS.length, { max: num('deliverycalmax', 1.8) }) : null;
 const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
+// --techcal 1: the same, per technique (graded or not): between two reads of the sheet, what it gained over what the
+// brush was charged for sets the charge factor of the technique that laid that window (src/paint/methods/technique-cal.mjs).
+// Detail marks are left alone. --techcalfrom v: only passages at value band v or darker (default 4, the shadow glazes).
+// --techcalmax and --techcalmin clamp the factor (default 2.5 and 0.8). Default 0.
+const TECH_CAL = num('techcal', 0) > 0 ? createTechniqueCal({ max: num('techcalmax', 2.5), min: num('techcalmin', 0.8) }) : null;
+const TECH_CAL_FROM = num('techcalfrom', 4);
+const TCAL = (sh, T, detail, value) => {
+  if (!TECH_CAL || detail || !(value >= TECH_CAL_FROM)) return 1;
+  sh._tkey ??= `${T.name}${sh.graded ? ' graded' : ''}`;
+  return (sh._tcal ??= TECH_CAL.factor(sh._tkey));
+};
 // the plan in the sheet's units: the planned layers over the sheet before the first wash (src/eval/plan-optics.mjs)
 let WASH_BASE = null;
 const planDensity = () => planDensityOver(expected, PIGS, paperRGB, n, WASH_BASE);
@@ -3133,6 +3145,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     else for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = ((y / SC) | 0) * w + ((x / SC) | 0), k = y * W2 + x; for (let j = 0; j < PIGS.length; j++) ONSHEET[i * PIGS.length + j] += th[j][k] / (SC * SC); }
     feedbackStats.read++; FEEDBACK_FRESH = false;
     if (DELIVERY) { const P = PIGS.length, held = new Float64Array(P); for (let k = 0; k < n; k++) for (let j = 0; j < P; j++) held[j] += ONSHEET[k * P + j]; DELIVERY.observe(held); }
+    if (TECH_CAL) { let held = 0; for (let k = 0; k < ONSHEET.length; k++) held += ONSHEET[k]; TECH_CAL.observe(held); }
     if (FEEDBACK_LAG) FEEDBACK_BASE = { onsheet: ONSHEET.slice(), booked: expected.slice() };
     if (REMIX) REMIX.refresh(th.map(t => { const c = new Float32Array(n); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) c[((y / SC) | 0) * w + ((x / SC) | 0)] += t[y * W2 + x] / (SC * SC); return c; }));
     }
@@ -3515,7 +3528,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       CHARGE_CAL=NUMERIC_TUFT_CAL.get(key).gain;fs.appendFileSync(path.join(out,'numeric-tuft-consumed.jsonl'),JSON.stringify({shapeId:MAJOR_TECHNIQUE.shapeId,radius:r,calibration:CHARGE_CAL,water:WET(T),passes:T.passes,originalGeometry:true,profile:semanticBrushObservation(brush)})+'\n');
     }
 
-    productionDip(brush, { water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) });
+    productionDip(brush, { water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) });
     const cadence=nativeBodyCadence({mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),detail,instructionBound:!!sh._semantic,technique:T.name,radiusCells:r,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/W2,every:flowEvery(paths.length),spacing:FAST_BODY_SPACING});
     if(cadence.approximated)BODY_CADENCE_RECORD.sourceSweepsSelected++;
     const every=cadence.every;
@@ -3554,7 +3567,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
         return count ? sum / count : (MASK[sy * w + sx] ? readField(sy*w+sx) : sh.amount);
       };
       const f = LOADS.map(ch => { if (!F&&!chargeField) return 1; let a = 0; for (const q of ch) a += readLoad(q); return Math.max(lo, Math.min(hi, a / ch.length / Math.max(1e-4, sh.amount))); });
-      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       const extra=LOADS.map((ch,k)=>{
         if(!chargeField&&!componentField)return {factor:1};
         const contact=candidateContact(brush,{...sheet,clip:null},ch,{upright:UPRIGHT,spacing:cadence.spacing});
@@ -3571,7 +3584,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
       // One amount per shape: the chunks carry the passage's amount, not a per-cell field.
       const f = chunks.map(() => 1), mean = 1;
-      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       // The water moves on the sweep's clock, counted across its chunks, so the sheet flows while a chunked sweep is laid.
       let st = 0;
       clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: base.map(v => v * f[k] / mean) }); numericalStroke(brush, sheet, ch, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(sheet, O)); } }); }); });
@@ -3727,6 +3740,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       void gr; void amt;
       for (let j = 0; j < P; j++) expected[i * P + j] += mix[j] * share;
       if (DELIVERY) for (let j = 0; j < P; j++) DELIVERY.book(j, mix[j] * share * (sh._fb ?? 1) * DCAL(sh, j));
+      if (TECH_CAL && sh._tkey) for (let j = 0; j < P; j++) TECH_CAL.book(sh._tkey, mix[j] * share * (sh._fb ?? 1) * (sh._dcal?.[j] ?? 1) * sh._tcal);
     }
   }
   if(VALUE_PLAN){const next=layers[L+1];if(!next||next.value!==layer.value){VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png'));}}
@@ -3757,6 +3771,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   }
   await awareBoundary({ kind: 'pass', L });
 }
+if (TECH_CAL) { console.log(`technique calibration: ${TECH_CAL.history().length} reads; charge factors ${JSON.stringify(Object.fromEntries(Object.entries(TECH_CAL.factors()).map(([k, v]) => [k, +v.toFixed(2)])))}`); fs.writeFileSync(path.join(out, 'technique-cal.json'), JSON.stringify({ kind: 'sheet gain against ledger charge, per technique; no target reads', history: TECH_CAL.history() }, null, 1)); }
 if (DELIVERY) { const hst = DELIVERY.history(); console.log(`delivery calibration: ${hst.length} reads; kept of charge ${JSON.stringify(hst.at(-1)?.kept ?? [])}; charge factors ${DELIVERY.factors().map(v => v.toFixed(2)).join(', ')}`); fs.writeFileSync(path.join(out, 'delivery-cal.json'), JSON.stringify({ kind: 'sheet against ledger, per pigment; no target reads', history: hst }, null, 1)); }
 if (FEEDBACK_LAG) console.log(`feedback: ${feedbackStats.read} passes read the sheet, ${feedbackStats.predicted} predicted it from the last read and the ledger`);
 if(AREA_PLAN)AREA_EXEC.set(null);
