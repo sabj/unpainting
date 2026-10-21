@@ -306,7 +306,7 @@ const LINEWORK_JOIN = num('linejoin', 0) > 0;
 if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
   if (!['auto', 'file'].includes(opt('linework'))) throw Error(`--linework: auto, file or off, not ${opt('linework')}`);
   if (opt('linework') === 'file' && !opt('drawingfile','')) throw Error('--linework file needs --drawingfile');
-  const om = argv.includes('--outlinemedium') ? opt('outlinemedium','auto') : 'auto';
+  const om = argv.includes('--outlinemedium') ? opt('outlinemedium','graphite') : 'graphite';
   const requested = opt('linemedium','') || (om === 'auto' ? null : /graphite/.test(om) ? 'graphite' : 'ink');
   const r = await planUniversalLinework({ image: path.resolve(root, opt('image','')), out, root, width: num('width', 700), sheetMm: num('sheetmm', DEFAULT_SHEET_MM),
     requested, style: num('penwash',0) > 0 ? 'penwash' : 'default', ...LINEWORK_SOURCES, join: LINEWORK_JOIN, drawingFile: opt('linework') === 'file' ? path.resolve(root, opt('drawingfile','')) : null,
@@ -1158,7 +1158,8 @@ fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null,
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. auto (default) is ink when the source shows
 // --penfirst per cent of line or more, else graphite.
-const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
+// 0.2.0: the drawing is pencil unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked.
+const OUTLINE_REQUESTED = opt('outlinemedium', 'graphite');
 const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : materialProfile(OUTLINE_REQUESTED).kind, share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
 console.log(describeOutlineMedium(OUTLINE));
 // --penfacelong e: face rule and face-detail walks read only line-shaped ink marks (longest side squared over area >= e). Default 0.

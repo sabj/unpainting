@@ -75,7 +75,7 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
 | `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first` (`--recipe v096`: `both`) |
-| `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `auto` | same; plan may override |
+| `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` (0.2.0: pencil drawing; ink on request) | same; plan may override |
 | `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |
 | `--inkk`, `--inkkscale` | three positive comma-separated absorption values; scale factor | profile absorption; scale 1 | same; plan may override |
 | `--sheetmm` | physical width in mm | 152.4; physical brushes fit to postcard if omitted | postcard fit if omitted |

@@ -94,7 +94,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (measured) log(`drawing: per-point widths and darkness from the file, contact = width x ${gain} - ${margin} cells, pressure share = ${base} x darkness`);
   let strokes = lines.flatMap(strokesOf).map(g => (measured ? { ...g, points: g.points.map(perPoint) } : g));
   // --inkhand 1 (ink only): each stroke as a hand draws it (inkHand)
-  if (num('inkhand', 0) > 0 && !/graphite/.test(opt('outlinemedium', 'auto'))) { strokes = strokes.map(g => inkHand(g, { base })); log(`drawing: ${strokes.length} strokes set down, tapered and slowed on curves (--inkhand)`); }
+  if (num('inkhand', 0) > 0 && !/graphite/.test(opt('outlinemedium', 'graphite'))) { strokes = strokes.map(g => inkHand(g, { base })); log(`drawing: ${strokes.length} strokes set down, tapered and slowed on curves (--inkhand)`); }
   // --finishmasses 1 (plan finishInk.masses "scribble"): the closing pen also states the dark masses of the plan-time
   // source density as looping scribble with the lights left open (drawing-scribble.mjs), for black or curly coats and
   // dark hair. Off by default: a dark surface is paint's job, not the pen's.

@@ -77,8 +77,8 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_opp(\d+)/, () => ['--openingpressure', hundredth(v, /_opp(\d+)/)]),       ...t(/_dwg(\d+)/, () => ['--drawwidthgain', hundredth(v, /_dwg(\d+)/)]), ...t(/_dwm(\d+)/, () => ['--drawwidthmin', hundredth(v, /_dwm(\d+)/)]),
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
-      '--drawing', 'both', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
-      '--outlinemedium', 'ink', '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
+      '--drawing', 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
+      '--outlinemedium', 'graphite', '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
       '--out', out, '--targetguard', 'gentle', ...(compile ? ['--valuepreviewonly', '1'] : ['--gpu', gpu])];
   };
 }
