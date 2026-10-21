@@ -8,3 +8,4 @@ Browser demos, published to GitHub Pages by `tools/lab/build-site.mjs` and `.git
 - [mushrooms/](mushrooms/): redirects the older `/mushrooms/` address to `/fungi/`.
 
 Serve the folder locally with `python3 -m http.server 8000 --directory demos`.
+- `demos/`: the index of all demos, published at /demos/, with /demos/fungi/, /demos/layers/ and /demos/lab/ redirecting to the demo itself.
