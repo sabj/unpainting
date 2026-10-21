@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 /** The painter version: planning, recipe, methods and techniques (src/paint). The internal V number. Bump it when they change. */
-export const PAINTER_VERSION = 'V100';
+export const PAINTER_VERSION = 'V101-dev';
 /** Simulation version for paper, water, pigment, brush and pen. Bump when src/media behavior changes.
  * The initial value is documented in docs/versions.md. */
 export const SIM_VERSION = '102';

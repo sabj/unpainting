@@ -54,6 +54,31 @@ Black opening ink sets before the washes by default; sepia stays soluble. `drawi
 
 Three flags shape the closing pen. `--closingshare c` gives the opening and closing pens one line budget, with `c` of it for the closing pass. `--inkdarkskip v` cuts closing lines where the plan's value is above `v`, since the wash already states those edges. `--closingconc f` dilutes the closing ink, so accents stay lighter than the darkest wash.
 
+## Holding ink to the target
+
+In painter V101, five flags hold the pen to the target's own lines. Each is off by default, so without them V101 draws as V100 does. Before painting, the painter reads the opening (`--drawingfile`) and closing (`--drawinglast`) line files against the target (`src/paint/methods/ink-lines.mjs`).
+
+- `--linesupport t` keeps only the parts of a line where the target shows a line. Along the path, the target must be at least `t` L* darker than the mean of both sides, 1 to 2.25 target pixels out. Plain paper, a light line such as a white whisker, and a path along a tonal edge with no line fail. Default 0, off.
+- `--linesmooth mm` smooths traced lines that step from pixel to pixel. Corners sharper than `--linesmoothcorner` degrees (default 50) stay sharp. Default 0, off.
+- `--inkwidthfloor f` draws no ink line thinner than `f` target pixels on the sheet. The nib's widest contact rises to the floor when it must. Default 0, off.
+- `--inkdarkcap c` sets the ink load from a test line on a scrap of the same paper (`src/paint/methods/ink-scrap.mjs`). On blank paper, the pen's line is then `c` times as dark as the target's lines are against what is beside them. Darkness is compared as absorbance. The cap only lightens the ink. Each pen stage is capped from its own line file. Default 0, off.
+- `--inkdamp d` makes the pen find the paper at least `d` damp (0 to 1), as on a sheet not yet quite dry. At 0.3 a line spreads to about twice its contact width with soft edges. Default 0, dry paper.
+
+`--linesupport` and `--linesmooth` write `ink-opening-lines.json` and `ink-closing-lines.json` next to the painting, and the pens draw those. Any of the five writes the target's line measures to `ink-lines.json`. `--inkdarkcap` also writes `ink-dark-cap.json`.
+
+`--inkrecipe v2` sets all of them at once. A flag given on the command line wins over the recipe.
+
+| Flag | Ink v2 | Off |
+|---|---|---|
+| `--linesupport` | 5 | 0 |
+| `--linesmooth` | 1 | 0 |
+| `--linesmoothcorner` | 50 | 50 |
+| `--inkwidthfloor` | 1 | 0 |
+| `--inkdarkcap` | 1 | 0 |
+| `--inkdamp` | 0.3 | 0 |
+
+The recipe does not turn ink on. Add `--outlinemedium ink --drawing both` for an opening ink drawing with closing accents.
+
 See [Choosing linework](linework.md) for the short job-to-tool guide and its defaults.
 
 ## Linework stages
