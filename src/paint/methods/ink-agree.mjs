@@ -8,7 +8,7 @@ import { dilate } from '../../raster.js';
 const lum = (b, i) => 0.2126 * b[i * 3] + 0.7152 * b[i * 3 + 1] + 0.0722 * b[i * 3 + 2];
 
 /** Paper colour: the mean of the lightest tenth of the picture. */
-export function lightestTenth(rgb, n) {
+function lightestTenth(rgb, n) {
   const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => lum(rgb, b) - lum(rgb, a)).slice(0, Math.max(1, (n / 10) | 0));
   return [0, 1, 2].map(c => idx.reduce((s, i) => s + rgb[i * 3 + c], 0) / idx.length);
 }

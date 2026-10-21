@@ -1,0 +1,37 @@
+{
+  "note": "The legibility test (tools/judge/ink-legibility.mjs): four sources, three named feature crops each (boxes in features.json). A crop is shown to a vision model alone, first with no hint (what is it), then with its parts list. It is recognised when the name matches `says` and at least `need` of the parts are seen.",
+  "subjects": {
+    "guardi-colonnade": {
+      "image": "bench/ink-heavy/targets/guardi-colonnade.jpg",
+      "crops": {
+        "arches": { "says": "arch|vault|colonnade|arcade|portico|ruin", "parts": ["a round arch", "a moulded band along the arch", "columns or piers under the arch", "a second arch behind"], "need": 3 },
+        "capitals": { "says": "capital|column|pillar|entablature|cornice|colonnade", "parts": ["column shafts", "capitals with leaf shapes on top", "a flat entablature above the capitals", "gaps of paper between neighbouring columns"], "need": 3 },
+        "figures": { "says": "figure|person|people|man|beggar|child|kneeling|bowl", "parts": ["a bent or kneeling person", "a head", "an arm held out", "a second person or a bowl on the ground"], "need": 3 }
+      }
+    },
+    "tiepolo-punchinello-camel": {
+      "image": "examples/targets/tiepolo-punchinello-camel.jpg",
+      "crops": {
+        "camel-head": { "says": "camel|llama|horse|animal|head", "parts": ["an animal head with a muzzle", "an eye", "a curved neck", "a plume or tassel on the head"], "need": 3 },
+        "punchinello-face-hat": { "says": "hat|cone|clown|figure|person|man|rider|face|head", "parts": ["a tall conical hat", "a face", "a body in loose white clothes", "an arm"], "need": 3 },
+        "camel-legs": { "says": "leg|camel|animal|horse|hoof|hooves", "parts": ["more than one leg", "knee joints", "hooves or feet", "a belly line or body above the legs"], "need": 3 }
+      }
+    },
+    "rembrandt-woman-reading": {
+      "image": "examples/targets/rembrandt-woman-reading.jpg",
+      "crops": {
+        "eyes-nose": { "says": "face|woman|person|head|portrait|profile", "parts": ["a nose", "a downcast eye or eyes", "a mouth or chin", "a cap or hair above the face"], "need": 3 },
+        "ruff": { "says": "collar|ruff|shoulder|neck|bodice|dress|clothing|woman|figure", "parts": ["a neckline or collar", "folds in the cloth", "a shoulder or sleeve", "the line of the chest"], "need": 3 },
+        "hands": { "says": "hand|hands|arm|finger|book|reading", "parts": ["a hand", "separate fingers", "a wrist or cuff", "a book or page edge under it"], "need": 3 }
+      }
+    },
+    "h36-a": {
+      "image": "demos/lab/examples/h36-a/h36-a.png",
+      "crops": {
+        "main-building-edge": { "says": "arch|archway|gate|doorway|gothic|stone|building|wall|entrance", "parts": ["a pointed arch", "a moulding around the arch", "an iron gate or door in the arch", "joints between the stones"], "need": 3 },
+        "roofline-tower": { "says": "tower|window|building|gothic|facade|stone|wall|tracery", "parts": ["tall windows with panes", "pointed window heads", "a corner or buttress edge", "joints between the stones"], "need": 3 },
+        "branches": { "says": "branch|tree|leaf|leaves|foliage|plant|bush|vine", "parts": ["a trunk or main branch", "smaller branches splitting off", "leaf shapes", "a building edge behind"], "need": 2 }
+      }
+    }
+  }
+}
