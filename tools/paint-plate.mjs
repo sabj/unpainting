@@ -1250,8 +1250,9 @@ const INK_K_DECLARED=opt('inkk','')?opt('inkk','').split(',').map(Number):null;
 if(INK_K_DECLARED&&(INK_K_DECLARED.length!==3||INK_K_DECLARED.some(v=>!(v>0))))throw Error('--inkk needs three positive numbers');
 const INK_FAST=opt('inkfast','auto')==='auto'?!INK_PROFILE.rewets:num('inkfast',0)>0;
 // --inkhue source: the ink takes the hue of the target's own pen lines (src/paint/methods/ink-hue.mjs); --inkk wins.
+// --inkhuegain g (default 1): raises each channel's share of that hue to the power g, so g > 1 is browner.
 if(!['profile','source'].includes(opt('inkhue','profile')))throw Error('--inkhue: profile or source');
-const INK_HUE=opt('inkhue','profile')==='source'&&!INK_K_DECLARED?inkKFromSource(PX_SOURCE,SEP.ink,paperRGB,INK_PROFILE.pigment.K):null;
+const INK_HUE=opt('inkhue','profile')==='source'&&!INK_K_DECLARED?inkKFromSource(PX_SOURCE,SEP.ink,paperRGB,INK_PROFILE.pigment.K,{gain:num('inkhuegain',1)}):null;
 if(opt('inkhue','profile')==='source')console.log(INK_HUE?`ink hue from the target's lines: K ${INK_HUE.K.join(',')} over ${INK_HUE.cells} line cells (profile ${INK_PROFILE.pigment.K.join(',')})`:'ink hue: too few target line cells, profile hue kept');
 const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_HUE?.K??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));

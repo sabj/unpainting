@@ -35,4 +35,7 @@ test('a brown target line turns the ink toward brown and keeps its absorption su
   assert.ok(r.K[2] > r.K[1] && r.K[1] > r.K[0], `K ${r.K}`);
   assert.ok(Math.abs(r.K.reduce((a, v) => a + v, 0) - 1.5) < 0.01);
   assert.equal(inkKFromSource(rgb, new Uint8Array(n), [240, 235, 220], base), null);
+  const g = inkKFromSource(rgb, mask, [240, 235, 220], base, { gain: 1.5 });
+  assert.ok(g.K[2] / g.K[0] > r.K[2] / r.K[0], `gain ${g.K} vs ${r.K}`);
+  assert.ok(Math.abs(g.K.reduce((a, v) => a + v, 0) - 1.5) < 0.01);
 });

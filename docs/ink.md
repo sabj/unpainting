@@ -90,8 +90,8 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 - No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line. The source then gets washes only.
 - Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 1.2 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
 - Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
-- Darkness. `--inkdarkmatch 1` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are as dark as the source's. It raises the load as well as lowering it, within 1/8 to 4 times.
-- Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral.
+- Darkness. `--inkdarkmatch 2` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are twice the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times. At 1 the drawn lines come out lighter than the source's, about 0.46 against 0.70 on Guardi at 540 px.
+- Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral. `--inkhuegain 1.5` raises each channel's share to the power 1.5, because dense ink renders less brown than its absorption direction.
 - Wet lines. `--inkbleed 0.35` draws a line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines are dry and crisp.
 
 | Flag | Wash | Off |
@@ -108,8 +108,8 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--linegapmm`, `--lineminmm` | 0.6, 1.2 | 2 and 3 file pixels |
 | `--inkwidthfloor` | 1 | 0 |
 | `--linemeasure` | 1 | 0 |
-| `--inkdarkmatch` | 1 | 0 |
-| `--inkhue` | `source` | `profile` |
+| `--inkdarkmatch` | 2 | 0 |
+| `--inkhue`, `--inkhuegain` | `source`, 1.5 | `profile`, 1 |
 | `--inkdamp`, `--inkbleed` | 0, 0.35 | 0, 0 |
 
 With `--linemeasure`, a line file drawn on a finer grid than the painting's is read on the painting's grid. `--inkdarkmatch` writes `ink-dark-match.json`. A flag given on the command line wins over the recipe.

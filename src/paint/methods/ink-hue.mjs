@@ -13,9 +13,10 @@ const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.
  * @param mask  1 where the target shows pen line
  * @param paper the paper colour [r, g, b] 0..255
  * @param baseK the profile's absorption; its sum is kept
+ * gain: each channel's density is raised to this power before the sum is shared out (1 keeps the source's direction)
  * @returns { K, density, cells } or null when fewer than `minCells` line cells carry density
  */
-export function inkKFromSource(rgb, mask, paper, baseK, { minCells = 50 } = {}) {
+export function inkKFromSource(rgb, mask, paper, baseK, { minCells = 50, gain = 1 } = {}) {
   const P = paper.map(lin), sum = [0, 0, 0];
   let cells = 0;
   for (let i = 0; i < mask.length; i++) {
@@ -26,7 +27,9 @@ export function inkKFromSource(rgb, mask, paper, baseK, { minCells = 50 } = {}) 
     cells++;
   }
   if (cells < minCells) return null;
-  const total = sum[0] + sum[1] + sum[2], baseSum = baseK[0] + baseK[1] + baseK[2];
-  const K = sum.map(v => Math.round(1000 * baseSum * v / total) / 1000);
+  // gain > 1 pushes the absorption further along the source's direction: dense ink renders less coloured than its
+  // direction, as the strongest channel saturates first
+  const pow = sum.map(v => v ** gain), total = pow[0] + pow[1] + pow[2], baseSum = baseK[0] + baseK[1] + baseK[2];
+  const K = pow.map(v => Math.round(1000 * baseSum * v / total) / 1000);
   return { K, density: sum.map(v => v / cells), cells };
 }
