@@ -86,11 +86,11 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101-dev from after 0.2.1-rc.1, and it is off by default. It turns ink on by itself.
 
 - Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
-- Agreement. The tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each traced line to the parts within 2 cells of what the ink separator reads as pen line. On Guardi, at 540 px, this keeps 507 lines whole, cuts 989 and drops 1871.
+- Agreement. The tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each traced line to the parts within 2 cells of what the ink separator reads as pen line.
 - No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line. The source then gets washes only.
-- Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 1.2 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
+- Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 0.3 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
 - Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
-- Darkness. `--inkdarkmatch 2` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are twice the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times. At 1 the drawn lines come out lighter than the source's, about 0.46 against 0.70 on Guardi at 540 px.
+- Darkness. `--inkdarkmatch 2` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are twice the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times.
 - Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral. `--inkhuegain 1.5` raises each channel's share to the power 1.5, because dense ink renders less brown than its absorption direction.
 - Wet lines. `--inkbleed 0.35` draws a line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines are dry and crisp.
 
@@ -105,7 +105,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--prepinkfrom`, `--prepinkamount`, `--prepinkkeep`, `--prepinkadd`, `--prepinkdeviate` | `lines`, 1, 1, 0, 0 | stage defaults |
 | `--openingpressure` | 0.75 | 0.3 on a staged run |
 | `--linesupport`, `--linesmooth`, `--linesmoothcorner` | 5, 0.3, 50 | 0, 0, 50 |
-| `--linegapmm`, `--lineminmm` | 0.6, 1.2 | 2 and 3 file pixels |
+| `--linegapmm`, `--lineminmm` | 0.6, 0.3 | 2 and 3 file pixels |
 | `--inkwidthfloor` | 1 | 0 |
 | `--linemeasure` | 1 | 0 |
 | `--inkdarkmatch` | 2 | 0 |
