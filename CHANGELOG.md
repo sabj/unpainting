@@ -2,6 +2,20 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
+## Unreleased, after 0.2.1-rc.1
+
+Painter V101-dev, sim 102, judges J1. Defaults still match 0.2.0.
+
+### Ink on ink-heavy works
+
+- `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). It draws the source's own pen lines whole, with no pencil, and follows the source's line width and darkness along each stroke. It also matches the ink's darkness and hue to the source's lines. It turns ink on by itself.
+- New flags, each off by default: `--linemeasure`, `--inkdarkmatch`, `--inkhue source`, `--inkbleed`, `--linegapmm`, `--lineminmm`, `--lineinkonly`, `--copylinesmin` and `--linecleanup 0`.
+- Fix: the ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) now reach the line files that the linked drawing stages write. In 0.2.1-rc.1, a run whose stages came from the automatic stage choice drew those files unchanged. There, `--inkrecipe v2` applied only `--inkwidthfloor` and `--inkdamp`.
+- `tools/judge/ink-lines-report.mjs` measures a painting's pen lines against its source's: placement, darkness at the source's lines, hue and crops.
+- `bench/ink-heavy/` holds an eight-target ink set with sources, licences and the A/B commands.
+
+The set was painted locally at 720 px in fast mode, 2 seeds per configuration, each painting scored 3 times with J1. Mean J1: the wash recipe 5.68, 0.2.1-rc.1 with `--inkrecipe v2` 5.28, 0.2.0 ink 5.12, and the default pencil 5.08. The wash recipe gained 0.5 to 0.75 over rc.1 v2 on Guardi, Tiepolo's Bacchus and Ariadne and both Yale sketches, on both seeds. On the other four targets it moved within the 0.33 judge noise. The full-size A/B is not yet run.
+
 ## 0.2.1-rc.1 - unreleased
 
 Painter V101-dev, sim 102, judges J1. Release candidate 1. Ink and colour changes are opt-in flags. Defaults match 0.2.0. On the published Opus 5.5 V5 plans, neither moved J1 beyond judge noise. Ink v2 scored +0.05 and colour v2 +0.06 against the same build.
