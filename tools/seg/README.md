@@ -2,13 +2,13 @@
 
 Segmentation divides an image into labeled regions. These scripts identify those regions and lines, once per source image. The painter reads their output files, and the pen still makes every mark.
 
-The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs` runs `segments.py --mode regions` on the target, unless a map for the same target bytes and script version is already in `work/segments/by-hash/`. Segment Anything (SAM) must run: when the python or the checkpoint is missing, or SAM fails, the painting stops with an error and does not fall back to k-means. Every run logs a line such as `segments: SAM vit_b on mps (132 masks, 13 laid), 12 regions, 9 inside the frame; from the cache` and writes `segments.json` in its output folder. SAM takes about 20 seconds per image on an M4's GPU.
+The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs` runs `segments.py --mode regions` on the target, unless a map for the same target bytes and script version is already in `work/segments/by-hash/`. Segment Anything (SAM) must run: when the python or the checkpoint is missing, or SAM fails, the painting stops with an error and does not fall back to k-means. Every run logs a line such as `segments: SAM vit_b on mps (132 masks, 13 laid), 12 regions, 9 inside the frame; from the cache` and writes `segments.json` in its output folder. SAM takes about 20 seconds per image on an Apple M4 GPU.
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--segments` | `sam` | `sam`, `kmeans` (Lab clusters, logged as such) or `off` |
-| `--segpython` | `$PAINTER_SEG_PYTHON`, then `.venv-seg/bin/python`, `~/painter-strategy/.venv-seg/bin/python`, `.venv/bin/python` | a python with numpy, opencv, torch and segment_anything |
-| `--samcheckpoint` | `$PAINTER_SAM_CHECKPOINT`, then `~/painter-models/`, then `work/models/` | `sam_vit_b_01ec64.pth` |
+| `--segpython` | `$PAINTER_SEG_PYTHON`, then the repository's `.venv-seg/bin/python`, then its `.venv/bin/python` | a python with numpy, opencv, torch and segment_anything |
+| `--samcheckpoint` | `$PAINTER_SAM_CHECKPOINT`, then `work/models/` | `sam_vit_b_01ec64.pth` |
 | `--segcache` | `work/segments/by-hash` | where the maps are kept |
 
 `--mode regions` names no parts: each region is `r1`, `r2` and so on, largest first, with its area, box, mean and spread of Lab color and the share of the frame it touches. A region that touches the frame along less than 12% of its outline is marked foreground. Hooks that look up parts by name, such as `--passages sky` or `--fleckoff sky,sea`, find nothing in these maps and keep their fallbacks; the hooks that use every region or the foreground flag (`--locallights`, `--segwash`, `--segink`, `--practice`, `--darkmass auto`) use them.
@@ -45,7 +45,6 @@ separating dark wash texture and faint ink from a flattened image remains imperf
 
 ```sh
 python3 tools/seg/copy-lines.py drawing.png --out work/lines/copy --width 1080
-# Painter arguments to submit through the GPU sweep service:
 node tools/paint-plate.mjs --image drawing.png --drawingfile work/lines/copy \
   --width 1080 --mode fast --drawing first --outlinemedium ink \
   --inkprofile drawing-ink --inkconc 12 --drawstroke .35 --drawingonly 1 \
@@ -61,9 +60,7 @@ preparation; the painter deposits ink through the physical pen. The existing
 wash pipeline's strict guard still permits aggregate, shape-level reference looks.
 
 `tools/judge/line-fidelity.py` produces registered overlays, native crops, and
-pixel/continuity/width diagnostics after rendering. See
-[`work/lines/FIDELITY.md`](../../work/lines/FIDELITY.md) for the five-subject study,
-the source-mask limitation, exact run cards and the extraction-only ablation.
+pixel/continuity/width diagnostics after rendering.
 
 ### Continuous sketch planning
 
@@ -85,8 +82,7 @@ node tools/paint-plate.mjs --image photo.jpg --drawingfile work/lines/photo \
   --inkconc 12 --drawstroke .35 --drawingonly 1 --out work/photo-pen
 ```
 
-Use the shared GPU sweep service for paintings. The example documents painter
-arguments, not a recommendation to render large paintings on the laptop.
+Large paintings run faster on a GPU; [docs/CLOUD.md](../../docs/CLOUD.md) covers batch rendering on rented machines.
 Omit `--drawingonly 1` for pen plus wash; use `--outlinemedium graphite` for the
 same prepared geometry at pencil pressure. `drawing-opening.png` records the
 actual dried opening drawing in a full painting. A drawing-only run also writes
@@ -95,20 +91,18 @@ actual dried opening drawing in a full painting. A drawing-only run also writes
 Alternatively `--linesource photo-sketch --sketchpython work/line-env/bin/python
 --sketchmap work/lines/maps/photo.png` (a plan's `drawing.source: "photo-sketch"`) runs this planner automatically
 before painting; `--linesource auto` runs it on a target with little pen line when the python has numpy and OpenCV.
-Without `--sketchpython` the painter picks the line python itself: `PAINTER_LINES_PYTHON`, else `~/painter-lines` or
-`/opt/painter-lines` (`tools/cloud/setup-lines.sh` installs either), else `python3`. `paint.log` and `linework.json`
+Without `--sketchpython` the painter picks the line python itself: `PAINTER_LINES_PYTHON`, else
+`$PAINTER_LINES_VENV/bin/python`, else the repository's `.venv-lines/bin/python`, else `python3`.
+`tools/cloud/setup-lines.sh` installs the venv at `PAINTER_LINES_VENV`, by default `.venv-lines`. `paint.log` and `linework.json`
 record the python and its numpy, OpenCV and scikit-image versions.
 An explicit `--drawingfile` takes precedence. Without a model, the JSON explicitly reports the geometric/ridge
-fallback. `--map FILE.png` / painter `--sketchmap FILE.png` accepts another dark-on-white structural map. Weights and reference images must remain outside git. The older
-ensemble's missing `run_models.py` is not needed by this route.
+fallback. `--map FILE.png` / painter `--sketchmap FILE.png` accepts another dark-on-white structural map. Weights and reference images must remain outside git.
 
 Run geometry regressions with `work/line-env/bin/python tools/seg/sketch-lines-test.py`.
 Geometry PNGs are planning diagnostics; only the simulator's drawing checkpoint
 is evidence of the executed pen. Evaluate line extraction and pen rendering separately.
 
-The preferred study route, `sketch-map.py`, runs the
-published ControlNet fine/coarse lineart pair directly, without the missing
-linebench runner. It writes both maps and a fused map in which the fine model
+`sketch-map.py` runs the published ControlNet fine/coarse lineart pair directly. It writes both maps and a fused map in which the fine model
 must support every coarse suggestion:
 
 ```sh
@@ -140,13 +134,13 @@ Model licences are listed in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.
 
 The optional `--model PATH.onnx` / `--sketchmodel PATH.onnx` route requires
 `onnxruntime onnx`. `lines.fetch_model()` downloads the MIT contour export into
-`~/.cache/painter-lines/`; it is less selective than the paired models in this study.
+`~/.cache/painter-lines/`. It is less selective than the paired ControlNet models.
 
 The planner bounds local openings and ornament separately, simplifies ornament
 into rounded suggestions, and reserves heavy weight for straight or smooth
 structural contours. Faded sources use a contrast-relative flat-area threshold.
 Neither these heuristics nor a learned map replaces a visual review of the dry
-pen checkpoint. See `work/lines/REPORT.md` for the comparison and limitations.
+pen checkpoint.
 
 ### Declared learned line maps
 

@@ -50,7 +50,7 @@ The promotion check requires a guarded run, no target reads and a risk score. Hi
 
 - Overlapping shape looks could recover finer detail. Gentle mode does not detect that; hard mode limits looks.
 - The painter guard covers its own process. External agents must follow the same rules. The [benchmark guard](../bench/docs/anti-cheat.md) covers Node scripts that import the guard or painting toolkit given to models. The benchmark runner configures Python scripts through `PYTHONPATH`; separate Node processes are not automatically guarded.
-- A detailed plan can carry target edges into every stroke. Zero blocked reads does not prove good technique. The image painter defaults to light-to-dark value planning with five bands. `--planmasses 0 --maskblur 1 --maxvalues 24` are the current image-planning defaults. Plans still need visual review. `npm run example` uses the bundled stroke plan.
+- A detailed plan can carry target edges into every stroke. Zero blocked reads does not prove good technique. The image painter defaults to light-to-dark value planning with five bands. `--planmasses 0 --maskblur 1 --maxvalues 24` are the image-planning defaults. Plans still need visual review. `npm run example` uses the bundled stroke plan.
 - The guard blocks experimental flags that read the target. Ink color comes from `--inkprofile`, `--inkk` and `--inkkscale`, not `--inkcolour`. Optional gouache, opaque white paint, is applied outside the pigment model.
 - Some [diagnostic measures](judging.md) compare pixels. Do not use them to steer painting.
 

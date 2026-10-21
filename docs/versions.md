@@ -6,27 +6,28 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 
 - Release: plain semver in `package.json`, such as `0.1.0`. Each release gets an annotated git tag, `v<release>`, on the main commit that ships it. [CHANGELOG.md](../CHANGELOG.md) lists what each release changed.
 - Painter: the internal V number, such as `V096`. It covers planning, the recipe, methods and techniques (`src/paint`). A painter change takes the next V number. Development candidates may append `-dev`, such as `V097-dev`.
-- Judges: `judgeVersion`, starting at `J1`. A new panel, rubric or image protocol gets a new J number. Scores from different J versions are not compared. J1 uses Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B, rubric `bench-v3-median5`, five calls per judge with the median, and native-size images. Current calls use OpenRouter zero-data-retention providers. Earlier published calls used Together; all published scores are J1. J2 is for internal gates only: the J1 panel, rubric and images, but every judge needs all five calls valid and no reply repaired from text alone counts ([scoring](../bench/docs/scoring.md)). No published score is J2.
+- Judges: `judgeVersion`, starting at `J1`. A new panel, rubric or image protocol gets a new J number. Scores from different J versions are not compared. J1 uses Kimi-K3, GLM-5.3-Flash and Qwen3.5-9B, rubric `bench-v3-median5`, five calls per judge with the median, and native-size images. All published scores are J1. J2 keeps the J1 panel, rubric and images, but every judge needs all five calls valid, and a reply repaired from text does not count ([scoring](../bench/docs/scoring.md)). J2 is used for test gates; no published score is J2.
 - Sim: a plain number, such as `100`. It covers the physics and simulation of paper, water, pigment, brush and pen (`src/media`). A simulation change takes the next sim number.
 
-`PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions. Releases 0.1.0 and 0.1.1 are painter V096, sim 100 and judges J1. Release 0.2.0 is painter V099, sim 102 and judges J1.
+`PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions.
 
-Release 0.2.0 is painter `V100`, sim `102` and judges `J1`. V100 is the benchmarked V099 build (commit `06174e8f`) with the drawing set to pencil by default and ink only on request. An unreleased internal build also carried the V100 label; it is not this release. Sim 102 records the integrated physical brush-volume and wet-bed corrections. Earlier 0.2.0 candidates used V097-dev / sim 101 (rc.1) and V098-dev / sim 101 (rc.2). `integration/0.3` is an integration branch name; it does not identify a published 0.3 release.
+| Release | Painter | Sim | Judges |
+|---|---|---|---|
+| 0.1.0, 0.1.1 | V096 | 100 | J1 |
+| 0.2.0 | V100 | 102 | J1 |
 
-Candidate render metadata and the canary manifest name the actual producing commit. Archived comparison columns can mix renders from several commits, so read each render's own record rather than one commit for the column. Existing benchmark scores retain their original version stamps.
-
-Sim numbers before this release are an estimate of past simulation revisions. The private history has no sim version number. About 100 commits changed the media modules there (102 commits touching `painter/src/media` and its earlier files, 2026-09-15 to 2026-09-30), so sim starts at 100.
+V100 draws in pencil by default and uses ink only on request. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
 
 ## What each result records
 
-- `tools/paint-plate.mjs` prints `painter V096 · sim 100 · release 0.1.0 at <commit>`. It writes `release`, `painterVersion`, `simVersion` and `commit` into `frames.json` and `backend.json`. The commit ends in `-dirty` when tracked files differ from it, and is null outside a git checkout.
-- Every benchmark run.json records the same four fields plus `judgeVersion`. The published runs record `commit: null`, because private builds painted them outside this repo. V4 and V5 came from the unpublished benchmark build.
+- `tools/paint-plate.mjs` prints `painter V100 · sim 102 · release 0.2.0 at <commit>`. It writes `release`, `painterVersion`, `simVersion` and `commit` into `frames.json` and `backend.json`. The commit ends in `-dirty` when tracked files differ from it, and is null outside a git checkout.
+- Every benchmark run.json records the same four fields plus `judgeVersion`. The published runs record `commit: null`, because they were painted outside this repository.
 - results.json groups each round's tries by painter, sim and judge version and labels each group with its release. Two painter, sim or judge versions never share a mean. The leaderboard and gallery show all four versions for each round.
 
 | Rounds | Painter | Sim | Judges | Release | How it painted |
 |---|---|---|---|---|---|
 | V1 to V3 | V096 | 100 | J1 | 0.1.0, 0.1.1 | The models' own toolkit on this simulator |
-| V4 and V5 | V096 | 100 | J1 | 0.1.0, 0.1.1 | The V096 pipeline, from the unpublished benchmark build with the same recipe |
+| V4 and V5 | V096 | 100 | J1 | 0.1.0, 0.1.1 | The V096 pipeline and recipe |
 
 ## Benchmarking a newer painter or sim
 

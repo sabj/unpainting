@@ -1,6 +1,6 @@
 # Benchmark profiles and measurement
 
-The default V4 run is `lite-v1`; V5 and the historical toolkit rounds retain full behavior. Lite cannot run as V5,
+The default V4 run is `lite-v1`. V5 and the V1 to V3 toolkit rounds run in full. Lite cannot run as V5,
 because it has no feedback or repair loop. Both profiles preserve all requested targets, paper dimensions in mm,
 brush widths in mm, the painter recipe, target guards and essential stage evidence. Native density changes.
 
@@ -60,4 +60,4 @@ cost is not yet available across all providers, so the suite cannot currently ce
 objective. A large reduction in allocated minutes or judge calls does not establish actual quota savings.
 
 Results keep budget, native density, judge sampling/route and strict-verdict groups separate, and withhold aggregate
-rankings until the planned targets and tries are complete. Historical J1 records and published outputs are preserved.
+rankings until the planned targets and tries are complete. Published J1 records are kept as they are.

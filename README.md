@@ -14,7 +14,7 @@ Want to help? The [open problems](docs/future-ideas.md) need work: linework, was
 
 <a href="https://sabj.github.io/unpainting/layers/"><img src="docs/img/layers-thumb.webp" width="200" align="right" alt="The Trumbull painting and its layers as small tiles"></a>
 
-Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/layers/). This is just a side experiment, so caveat emptor. And apologies for some Git repo slop, stale claims, or weird overfittings -- this is 99.9% AI code and 99% AI documentation so, you know, good luck.
+Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/layers/). This is a side experiment, so caveat emptor. The code is 99.9% AI-written and the docs 99%, so expect some slop and odd overfitting.
 
 ## Why model paint drying
 
@@ -58,7 +58,7 @@ unpainting/
 
 The pipeline has seven steps: instructions, planning tools, plan execution, tool preparation, tool use, judgment and practice between attempts. It takes a painting-style image and prepares paper, colors and brushes. It plans the painting, executes the plan, then judges the result and improves on it.
 
-A drawing goes down first, in pencil or ink, and dries before any wash, a layer of diluted paint. Washes then build from light to dark, and a closing pen can sharpen the lines at the end. Each subject's plan chooses the drawing's medium and weight.
+A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. In 0.2.0 the drawing is pencil unless a plan or `--outlinemedium ink` asks for ink.
 
 <p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run"></a></p>
 
@@ -96,7 +96,7 @@ node tools/paint-plate.mjs --image path/to/painting.jpg --width 540 --mode fast 
 
 Sargent's White Ships, left, and Sol's benchmark painting, right. The outline is the brush; paint shows up at the next saved frame.
 
-Unless told otherwise, the painter runs its default recipe, a preset of painter settings (`src/paint/recipe.mjs`). [Methods, techniques and tuned settings](docs/techniques.md) lists every part of the painter, which settings were fitted to benchmark images, and how to turn each one off. The default has some known overfitting risks; making it generalize is on the [to-do list](docs/future-ideas.md#5-making-the-default-generalize). When does a harness become an overfitting machine? Good question.
+Unless told otherwise, the painter runs its default recipe, a preset of painter settings (`src/paint/recipe.mjs`). [Methods, techniques and tuned settings](docs/techniques.md) lists every part of the painter, which settings were fitted to benchmark images, and how to turn each one off.
 
 [Running the painter](docs/running.md) covers the recipe, sheet size, saved stages, animations and Paint Lab. Supporting tools need more:
 
@@ -109,12 +109,12 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 [unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds that give the model more help each time.
 
-- **V1 to V3: the model paints.** It writes its own scripts that lay every brush and pen stroke through the toolkit. Each painting gets about 15 minutes and at most 2,500 strokes. V2 adds technique guides; V3 adds the model's own earlier attempts.
-- **V4 and V5: the model directs a painting harness.** It writes a plan (regions, layering, brushes and lines), and the harness's painter turns the plan into strokes, with no stroke limit. At set points the model can stop, look at the painting and revise the rest of the plan. V5 adds feedback from the previous try. These rounds measure how well a model directs the harness, not how well it lays strokes itself. The harness does much of the work, which is why V4 and V5 scores sit closer together.
+- V1 to V3, the model paints. It writes scripts that lay every brush and pen stroke through the toolkit. Each painting gets about 15 minutes and at most 2,500 strokes. V2 adds technique guides; V3 adds the model's own earlier attempts.
+- V4 and V5, the model directs a painting harness. It writes a plan (regions, layering, brushes and lines), and the painter turns it into strokes with no stroke limit. At set points the model can look at the painting and revise the rest of the plan. V5 adds feedback from the previous try. The harness does much of the work, so V4 and V5 scores sit closer together.
 
-All leaderboard results use painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1. 0.2.0 has not been re-run through every round; it was compared with 0.1.1 by replaying the published Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)). Release 0.1.0 holds the original models. Release 0.1.1 adds Gemini 4 Argon, Gemini 3.8 Flash and the Muse models, and changes two harness rules in V4 and V5 (see the [changelog](CHANGELOG.md)). Results are labelled by round, painter, sim, judge version and release. To reproduce, check out tag `v0.1.0` or `v0.1.1` ([versions](docs/versions.md)).
+All leaderboard results use painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1. Release 0.1.1 adds Gemini 4 Argon, Gemini 3.8 Flash and the Muse models, and changes two V4 and V5 harness rules ([changelog](CHANGELOG.md)). Release 0.2.0 (painter V100, sim 102) replayed the published Opus 5.5 V5 plans instead of rerunning every round ([0.2.0 comparison](docs/release-performance-0.2.0.md)). To reproduce, check out tag `v0.1.0` or `v0.1.1` ([versions](docs/versions.md)).
 
-Models ran at their highest reasoning setting: xhigh where offered. Gemini 4 Argon and Gemini 3.8 Flash top out at high; Argon also ran at medium for comparison. Haiku 4.5, DeepSeek V4.1 Flash and MiniMax M3 have no reasoning setting.
+Models ran at their highest reasoning setting, xhigh where offered. Gemini 4 Argon and Gemini 3.8 Flash top out at high; Argon also ran at medium. Haiku 4.5, DeepSeek V4.1 Flash and MiniMax M3 have no reasoning setting.
 
 | Benchmark version | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|
@@ -124,17 +124,17 @@ Models ran at their highest reasoning setting: xhigh where offered. Gemini 4 Arg
 | V4 | Full pipeline: planner, painter presets and scoring tools | 5 | Gemini 4 Argon (High) | 70.9% | 6.09 |
 | V5 | Full pipeline and practice between tries | 5 | Opus 5.5 | 71.0% | 6.10 |
 
-A try is one model session that paints the requested targets. Scores are a percentage of each target scored against itself. V1 to V5 are benchmark versions with different tools or feedback. V3 is compared on three subjects, without Mittens and Trumbull, so compare it with V1 and V2 on the [shared subjects](bench/results/FINDINGS.md).
+A try is one model session that paints the requested targets. Scores are a percentage of each target scored against itself. V3 uses three subjects, without Mittens and Trumbull; compare it with V1 and V2 on the [shared subjects](bench/results/FINDINGS.md).
 
-Gemini 4 Argon is the best model at painting on its own: it ranks first in V1 and V2. With the harness it is level with Opus 5.5. Argon leads V4 and Opus narrowly edges it in V5, both within the margin of error. Google cooked.
+Gemini 4 Argon paints best on its own: it ranks first in V1 and V2. With the harness it is level with Opus 5.5. Argon leads V4 and Opus edges V5, both within the margin of error.
 
 <p align="center"><a href="bench/results/leaderboard.md"><img src="docs/img/bench-chart.svg" width="800" alt="Mean score per model and round as a percentage of each target's own score, with 95% intervals"></a></p>
 
 <p align="center"><a href="bench/results/gallery.md"><img src="docs/img/benchmark-overview.webp" width="1200" alt="Two rows of paintings. Top: each model's best painting from any round, sorted by score, with the five targets at left. Bottom: each model's best Ships painting from V1 to V3, with the Ships target at left."></a></p>
 
-The harness helped Sonnet, Haiku and Luna the most: they trailed with only the tools and caught up with the full pipeline.
+The harness helped Sonnet, Haiku and Luna most: they trailed with only the tools and caught up with the full pipeline.
 
-Scores are relative, very coarse, and open to improvement. [Leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md), [scoring](bench/docs/scoring.md).
+Scores are relative and coarse. [Leaderboard](bench/results/leaderboard.md), [gallery](bench/results/gallery.md), [scoring](bench/docs/scoring.md).
 
 ## Credits and references
 

@@ -1,6 +1,6 @@
 // Presets: named sets of painter flags whose values were fitted on benchmark subjects. The default recipe uses none of
 // them. A value plan opts in with "presets": [...], or the command line with --recipe default+<preset>[+<preset>].
-// docs/overfitting.md lists every item, what it was fitted on and its risk.
+// docs/techniques.md (Tuned settings) lists every item, what it was fitted on and its risk.
 
 // The flags each preset sets: general techniques whose values were fitted mostly on Trumbull (Y1). No preset is
 // keyed to a subject, and none is applied by subject id.

@@ -4,9 +4,9 @@ The painter's code in `src/paint/` is grouped by purpose. This page is an index:
 
 - [General methods](#general-methods) (`src/paint/methods/`) are generic watercolor methods: paper, palette, paint order, washes, glazes, layers and the drawing.
 - [Targeted techniques](#targeted-techniques) (`src/paint/techniques/`) handle one kind of feature or surface: faces, dark fur, curly dog coats, foliage, skies, sea, sand and buildings. Most are off unless a flag turns them on.
-- [Tuned settings](#tuned-settings) (`src/paint/tuned/`) were fitted to specific benchmark images. They can help those images and hurt others. [src/paint/tuned/README.md](../src/paint/tuned/README.md) covers the overfitting risk.
+- [Tuned settings](#tuned-settings) (`src/paint/tuned/`) were fitted to specific benchmark images. They can help those images and hurt others.
 
-The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The default, `--recipe general` and `--recipe combined` are one general process: the painting plan chooses the drawing, washes and order ([combined-painter.md](combined-painter.md)), and the washes are the clean-colour family washes below. Fitted settings require an explicit preset. `--recipe v096` restores the V096 compatibility recipe and its tuned flags. See [overfitting.md](overfitting.md) and [linework.md](linework.md) for preset and drawing-stage choices.
+The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The default, `--recipe general` and `--recipe combined` are the same general process. The painting plan chooses the drawing, washes and order ([plan format](plan-format.md#value-plan-input)). Fitted settings need an explicit preset. See [linework.md](linework.md) for drawing-stage choices.
 
 Subject ids name benchmark images. `Y1` is `examples/targets/trumbull.jpg` with `examples/plans/trumbull-values.json`, and `subject-e` is a second Trumbull-derived subject. subject-b, subject-c, subject-d, subject-a and the architecture photograph are private benchmark images.
 
@@ -31,18 +31,26 @@ Default recipe flags, with the value that turns each off:
 - `--texture 0`: per-passage dry-brush texture marks stay off.
 - `--touchpoints 2`: two touch-up glaze passes on shapes that read too light. Off: `0`.
 - `--layerhue 1`: keeps wash layers apart by colour group. Off: `0`.
-- `--drawing first`: the drawing goes down first; the plan's drawing section chooses any closing pass (`--recipe v096` sets `both`). Off: `none`.
+- `--drawing first`: the drawing goes down first, in pencil unless the plan asks for ink. The plan's drawing section chooses any closing pass. Off: `none`.
 - `--frames 8`: about 8 recorded frames of the washes. Off: `40`.
 - `--marks 1`: records every stroke to `marks.json`. Off: `0`.
-- `--washsession 1 --huechroma 30 --passcap 0.5 --maskmm 2 --lightfamilies 1 --palelights 0.16`: clean-colour family washes in passage sessions, from the plan's `washes` section (rows below). Off: `--recipe v096`.
 - `--finaldarks 0`, `--sourcelines 0 --linesource none`: final darks and automatic source lines stay off until a plan or flag asks for them.
 - `--subjectseam 0.5`: a wash is cut at a subject edge only where half the cut follows a colour edge. Off: `0`.
 - `--smallmarks 1`: small darks under the minimum shape are laid once, last. Off: `0`.
-- `--smallmarklights 0`: the small-mark rule reserves no small lights (up to 120 read as speckle in dark coats). Old: `120`.
+- `--smallmarklights 0`: the small-mark rule reserves no small lights. A value such as `120` keeps lights up to that many cells.
 - `--washjoin 1`: a colour-domain piece under the minimum shape joins the neighbouring wash. Off: `0`.
-- `--undercover 0`: a passage its sweeps only partly cover is not charged up (that charge dried as a blot). Old: `1`.
+- `--undercover 0`: a passage its sweeps only partly cover is not charged up. `1` charges it up.
 
-The default recipe sets no drawing medium, amount or weight. Each subject's plan chooses them in its `drawing` section ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
+The plan's `washes` section adds the wash flags ([plan format](plan-format.md#the-washes-section)):
+
+- `--washsession 1`: passages laid in wet sessions; `connected` sessions set `2`. Off: `0`.
+- `--huechroma 30`: splits the cool, green and warm families into saturated and muted halves. An orange coat and a grey wall get separate mixes. Off: `0`.
+- `--passcap 0.5`: charges each passage at the median of its cells' demand and carries what each cell still needs to the next band. Off: `0`.
+- `--maskmm 2`: a carried glaze goes where the demand left, averaged over 2 mm, says it should. Off: `0`.
+- `--lightfamilies 1`: light washes laid by colour family. Off: `0`.
+- `--palelights 0.16`: pale planes get one clean first wash, and no middle layer or glaze crosses them. Off: `0`.
+
+The default recipe sets no drawing amount or weight. Each subject's plan chooses them in its `drawing` section ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
 
 Modules, with their flags:
 
@@ -123,16 +131,15 @@ Modules, with their flags:
 - `methods/wetdry.mjs` (always on): paper wetness, brush load and waiting for the paper to dry.
 - `methods/wash-join.mjs` (`--washjoin 1`): a colour-domain piece under the minimum shape joins the neighbouring passage instead of leaving a bare-paper shard.
 
-`--holefill` and `--holerim` work around a known drying weakness. They are off by default and run on the CPU and the GPU. See [future idea 8](future-ideas.md#8-edge-drying-that-knows-how-much-water-there-is).
+`--holefill` and `--holerim` work around a known drying weakness. They are off by default and run on the CPU and the GPU. See [open problems](future-ideas.md#edge-drying-that-knows-how-much-water-there-is).
 
 ## Targeted techniques
 
-Default recipe flags:
+Default recipe flag:
 
 - `--shapedmarks 1`: each value plane as one flat-brush stroke. Off: `0`.
-- `--skylanes 1`: large cool planes as horizontal wet sweeps. Off: `0`.
-- `--skyblue 1`: a mottled second blue for the sky. Off: `0`.
-- `--skysplit 1`: the sky's pale wash laid apart from warm ground. Off: `0`.
+
+The `architecture` preset adds three sky flags. `--skylanes 1` lays large cool planes as horizontal wet sweeps. `--skyblue 1` adds a mottled second blue. `--skysplit 1` lays the sky's pale wash apart from warm ground.
 
 Modules:
 
@@ -159,63 +166,59 @@ Modules:
 
 ## Tuned settings
 
-Default recipe flags, with the off value, the images they were fitted on and the overfitting risk for other subjects:
+Some settings were fitted by self study on a few benchmark images, mostly Trumbull (`Y1`). On those images they help. On other images they can hurt: heavy darks, pale washes, stone blocks on skin.
+
+They are contained this way:
+
+- The default recipe sets only general methods. No value in it was fitted to one image.
+- Fitted values live in `src/paint/tuned/`. They run only through a named preset or the `v096` recipe.
+- A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe default+architecture`.
+- No painting code outside `src/paint/tuned/` checks a subject id. `src/paint/overfit.test.mjs` fails if it does, or if the default recipe sets a tuned flag.
+- `--recipe v096` runs the V096 recipe: the general methods with sky lanes and every tuned flag below, on every subject.
+
+| Preset | Flags | For |
+|---|---|---|
+| `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1 --texvariety 0.8` | Buildings under a sky |
+| `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
+
+`examples/plans/trumbull-values.json` names both presets.
+
+Preset flags, with the off value, the images they were fitted on and the risk for other subjects:
 
 - `--darkgain 1.3`: 30% more paint in shadow glazes. Off: `1`. Y1, subject-e; high.
 - `--coolgain 1.3`: 30% more paint in cool cells. Off: `1`. Y1, subject-e; high.
+- `--touchgain .6`: strength of touch-up glazes. Off: `.8`. Y1, subject-e; medium.
 - `--skylanemm 6`: 6 mm sky sweep radius. Off: `3`. Y1, subject-e skies; medium.
 - `--skylanestep .8`: closer, overlapping sky sweeps. Off: `1.5`. Y1, subject-e skies; medium.
 - `--skyfloc .5`: softer, larger sky mottle. Off: `0`. Y1 sky; low.
-- `--groundglaze 1`: cool low ground as one shadow glaze. Off: `0`. Y1; high.
-- `--stoneblocks 0.6`: pale cut-stone block hints on warm walls. Off: `0`. Y1; high.
+- `--groundglaze 1`: cool low ground as one shadow glaze. Off: `0`. Y1; high, since any cool lower third turns into shadow.
+- `--stoneblocks 0.6`: pale cut-stone block hints on warm walls. Off: `0`. Y1; high, since the wall test also matches skin, sand, wood and fur.
 - `--stoneblockamt 0.2`: pigment per stone block glaze. Off: `.18`. Y1; high.
 - `--stoneblockmm 4`: stone block row height. Off: `2.6`. Y1; high.
 - `--stoneirregular 1`: irregular stone corners. Off: `0`. Y1; high.
-- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1 only; low.
-- `--recessshare .75`: demand per recess layer. Off: `.5`. Y1 only; low.
-- `--recessclean 1`: no light wash under recesses. Off: `0`. Y1 only; low.
-- `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble; inert since the value planner lays no texture passages.
-- `--touchgain .6`: strength of touch-up glazes. Off: `.8`. Y1, subject-e; medium.
+- `--recesses 1`: dark windows and doors as last accents on the dried wall. Off: `0`. Y1; medium, since any dark cell counts.
+- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1; low.
+- `--recessshare .75`: demand per recess layer. Off: `.5`. Y1; low.
+- `--recessclean 1`: no light wash under recesses. Off: `0`. Y1; low.
+- `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble. It has no effect, since the value planner lays no texture passages.
 
 Modules:
 
-- `tuned/default-flags.mjs` (`--recipe default|v096` and explicit presets): the tuned flags above. Mostly Y1.
-- `tuned/dog-coats.mjs` (`--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium.
+- `tuned/default-flags.mjs` (`--recipe v096`): the tuned flags of the V096 recipe.
+- `tuned/presets.mjs` (`"presets"` or `--recipe default+<preset>`): the presets above.
+- `tuned/trumbull.mjs` (`architecture` preset or `--recipe v096`): recess, wall and ground constants. Y1, subject-e; high.
+- `tuned/dog-coats.mjs` (`--dogpaint`, `--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium, since both assume a black curly coat.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
-- `tuned/modulation-anatomy.mjs` (`--modanatomy <file>`): skin and fur regions for modulation. subject-c; low.
+- `tuned/modulation-anatomy.mjs` (`--modulate 1 --modanatomy <file>`): skin and fur regions for modulation. subject-c; low.
 - `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.
 - `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
-- `tuned/trumbull.mjs` (`architecture` preset or compatibility recipe): recess, wall and ground constants. Y1, subject-e; high.
+- `techniques/passages/sand.mjs` (`--passages sand`): mark sizes scaled from one beach crop; medium.
 
-| `--huechroma 30` | method | Splits the colour families that middle wash layers are mixed in (cool, green, warm) into saturated and muted halves by each region's colour spread (max minus min channel at least 30), so an orange coat and a grey wall are not charged from one mean mix. On in the default recipe; `--recipe v096` leaves it off. | `--huechroma 0` |  |  |
-| `--passcap 0.5` | method | Charges each passage at the median of its cells' demand instead of the mean, so one charge does not overshoot its paler cells, and carries what each cell still needs (or got too much of) to that pigment's next band. On in the default recipe; `--recipe v096` leaves it off. | `--passcap 0` |  |  |
-| `--maskmm 2` | method | With `--passcap`, decides where a carried glaze goes from the demand left averaged over 2 mm, not cell by cell, so glazes follow areas a brush can lay. On in the default recipe; `--recipe v096` leaves it off. | `--maskmm 0` |  |  |
-| `--palelights 0.16` | method | Keeps pale planes (smoothed value at most 0.16 of the darkest, at least a minimum shape) to one clean first wash: no middle layer or glaze crosses them. On in the default recipe; `--recipe v096` leaves it off. | `--palelights 0` |  |  |
-| `--finaldarks 1` | method | After the touch-up passes, lays the picture's small decisive darks: cells among the darkest that are clearly darker than their surroundings, joined and at least 0.5 mm² (`--fdminmm2`), less the pen's cells, cut before painting and grouped by 10 mm tile (`--fdtilemm`). Each group gets one look at its mean colour and one dark glaze with a small brush clipped to the accent (`--fdgain`). Off by default: the held-out Guardi run showed over-heavy accents. | `--finaldarks 0` |  |  |
+Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 base settings, with stone and palette tokens fitted on Y1. The research and judging scripts in `tools/research/` and `tools/judge/` list fixed subjects; they do not paint.
 
-## RC6 experimental controls and comparison
+## Opt-in experimental controls
 
-Pigment physics remains off unless `--pigphys 1` or an explicit flocculation override is supplied. `--flocblue`, `--flocgrey`, `--flocviolet`, `--flocearth` and `--flocyellow` accept 0–1. Unset values preserve the pigment's own `floc`; an explicit zero clears it. These colour families are absorption-channel heuristics for recovered pigments, not measurements of chemical composition. Authored settling and granulation properties are preserved unless overridden. Granulation (`gamma`, scaled by `--gran`) and the `floc` tooth/fibre mixing parameter are separate simulator controls. RC6 does not assign a common nonzero flocculation value to every pigment.
-
-`--crosshatch 1` adds the parked contour-following hatching experiment as a deliberate finishing stage. It is off by default.
-
-`--tonestage 1` records a paper-colour selection before drawing; `--tonestage auto` additionally detects warm source paper. Both are opt-in, with `0` the default. This changes the substrate base colour and deposits no pigment. It must not be described as a physical wash followed by drying.
-
-To retain the old comparison and add new renders:
-
-```sh
-node tools/canary/build.mjs --baseline /path/to/canary-1013 --runs /path/to/RC6 --history-runs /path/to/historical/runs --out /path/to/canary-rc6
-```
-
-The output retains `baseline.html`, image hashes, a synchronized loupe and 120 saved-stage playback positions for each candidate. Inspect final Beach facial values and the opening/closing ink stages alongside R4 and archived RC5 before promoting the candidate. Per-render captions use metadata; drawing counts describe planned paths.
-
-Pages open paused on finished paintings. Play All restarts completed rows, scrubbing updates the playback controls, and clicking a painting expands the current frame. Escape closes the expanded view. Playback waits for the selected row's images to load; rapid scrubbing cannot replace a newer selection with an older frame. The synchronized loupe works across every column, including RC6.
-
-To repair the older RC5 controls in place while keeping its original page as `original.html`:
-
-```sh
-node tools/canary/build.mjs --repair /path/to/canary-1013
-```
-
-The active comparison can retire a source with `--exclude bermuda,barn` while the archived page and assets remain available. `--additions /path/to/sources.json` accepts a list of `{subject, code, title, target, source: {description}}` records. Freeze the exact target file used by the candidate: the builder checks its hash against the run card. Converted simulator outputs must be identified as converted references. A new source shows only versions actually rendered against that source; historical paintings from another target are never substituted. Captions include each recorded recipe.
+- `--pigphys 1`: settling, granulation and flocculation per pigment. `--flocblue`, `--flocgrey`, `--flocviolet`, `--flocearth` and `--flocyellow` take 0 to 1 and override one colour family. An unset value keeps the pigment's own `floc`; an explicit 0 clears it. The families are absorption-channel heuristics, not chemical measurements.
+- `--crosshatch 1`: contour-following hatching as a finishing stage.
+- `--tonestage 1`: records a paper-colour choice before drawing. `auto` also detects warm source paper. It changes the paper colour and lays no pigment, so it is not a wash.

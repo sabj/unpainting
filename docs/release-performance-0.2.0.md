@@ -11,10 +11,10 @@
 | Trumbull | 6.20 | 5.93 | -4% | 50% | 2.0x |
 | All five | 5.93 | 6.36 | +7% | 46% | 1.9x |
 
-Gaps under 0.2 J1 (about 3%) are judge noise. Fixed plans on ten more subjects agree: 0.2.0 is 4 to 6% higher on average. Times come from shared machines and are approximate. The scores were measured with ink on; 0.2.0 ships with pencil drawing and no ink by default.
+Gaps under 0.2 J1 (about 3%) are judge noise. Fixed plans on ten more subjects agree: 0.2.0 is 4 to 6% higher on average. Times are approximate because the machines were shared. The scores were measured with ink on; 0.2.0 ships with pencil drawing and no ink by default.
 
-## Where this leaves us
+## Why it changed, and known limits
 
-- The painter now carries out more of each plan. It covers more of the planned area and finishes washes that 0.1.1 dropped. That is most of the quality gain.
-- The weak points are ink and colour. Plans ask for lines the target does not have. The pen draws them too thin and too dark, so ink is off by default for now. Plans that force their own paint box lose colour strength and flatten values.
-- 0.2.1 is planned to improve ink: lines that match the target, drawn wider and lighter, with smoothed paths. It will also let the painter pick its own palette and score the pencil default. From 0.2.1 the Yale studies replace Trumbull in the benchmark. A change is kept only if it raises J1 on these same plans.
+- The painter carries out more of each plan. It covers more of the planned area and finishes washes that 0.1.1 dropped. That is most of the quality gain.
+- Ink and colour are the weak points. Plans ask for lines the target does not have, and the pen draws them too thin and too dark. Ink is off by default in 0.2.0 for that reason.
+- Plans that force their own paint box lose colour strength and flatten values.

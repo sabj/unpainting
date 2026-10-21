@@ -1,4 +1,4 @@
-// Containment of overfit settings (docs/overfitting.md): the general recipe sets no fitted flag, and painting code
+// Containment of overfit settings (docs/techniques.md, Tuned settings): the general recipe sets no fitted flag, and painting code
 // never branches on a benchmark subject id. Fitted rules live in src/paint/tuned/ and run only through a preset that
 // the plan or --recipe names.
 import test from 'node:test';
