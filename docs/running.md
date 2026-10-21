@@ -114,11 +114,9 @@ python3 -m http.server 8000 --directory demos
 # Open the server address printed in the terminal.
 ```
 
-The shipped examples have no animation entries. Picking an example or loading your own picture makes a quick sketch with the browser planner in `demos/lab/targets/target.js`. You can continue painting on that sheet. Your picture is never uploaded. If an example manifest supplies an animation, its final image becomes the background of a fresh sheet. That handoff preserves appearance but does not restore pigment or water, so the old paint cannot lift or mix. `?example=<id>` opens an example. `?nowebgpu=1` forces the CPU fallback.
+Paint Lab opens with recorded paintings that replay stroke by stroke; `demos/lab/examples/recorded.json` lists them. Loading your own picture makes a quick sketch with the browser planner in `demos/lab/targets/targets.js`, and you can keep painting on that sheet. Your picture is never uploaded. `?example=<id>` opens an example. `?nowebgpu=1` forces the CPU fallback.
 
-The example list, with each one's paper and palette, is in `tools/lab/examples.json`. Paint Lab paints with the painter's own paper, sheet, brush, pen and pencil: `node tools/lab/sync-site-media.mjs` copies them from `src/media/` into `demos/lab/media/`. Run it after changing `src/media/`; `npm test` fails while the copy is stale.
-
-To rebuild the example animations, run `sh tools/lab/paint-examples.sh`. It clears `work/paint-lab/` and paints each example at 540 px with the full drying schedule. Then run `node tools/lab/build-examples.mjs`, which samples evenly spaced frames up to its `FILM_FRAMES` cap and updates `demos/lab/examples/`. The painter's stroke records are not shipped.
+Paint Lab paints with the painter's own paper, sheet, brush, pen and pencil: `node tools/lab/sync-site-media.mjs` copies them from `src/media/` into `demos/lab/media/`. Run it after changing `src/media/`; `npm test` fails while the copy is stale.
 
 ## Unused-code checks
 
