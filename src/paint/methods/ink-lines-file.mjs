@@ -61,8 +61,8 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   const doc0 = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (!Array.isArray(doc0.lines) || !doc0.lines.length) return null;
   if (!(doc0.image?.w && doc0.image?.h)) throw new Error(`ink lines: ${path.basename(file)} has no image box, so its lines cannot be read against the target`);
-  // with --linemeasure, a file drawn on a finer grid than the painting's is read on the painting's grid, so the support
-  // test's one to two pixels beside a line are the painting's pixels, as wide as the pen line it will draw
+  // with --linemeasure, a file drawn on a finer grid than the pen's is read on the pen's grid (the painting's, or with
+  // --inkres N, N times as fine), so the support test's one to two pixels beside a line are as wide as the pen line it will draw
   const doc = flags.lineMeasure > 0 && gridW > 0 && doc0.image.w > 1.25 * gridW ? onGrid(doc0, gridW) : doc0, im = doc.image;
   const L = await lPlane(image, im.w, im.h), pxMm = sheetMm / im.w;
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this
@@ -99,7 +99,7 @@ export async function holdInkLines({ opt, num, argv, image, root = '.', out, she
   const targetW = (await sharp(image).metadata()).width, res = { flags };
   for (const [stage, key] of [['opening', 'drawingfile'], ['closing', 'drawinglast']]) {
     const base = opt(key, '');
-    res[stage] = base ? await holdLineFile({ stage, base, image, root, out, sheetMm, flags, targetW, gridW: num('width', 0), log }) : null;
+    res[stage] = base ? await holdLineFile({ stage, base, image, root, out, sheetMm, flags, targetW, gridW: num('width', 0) * Math.max(1, Math.round(num('inkres', 1))), log }) : null;
     if (res[stage]?.out) argv.push('--' + key, res[stage].out);
   }
   res.pixelMm = sheetMm / targetW;

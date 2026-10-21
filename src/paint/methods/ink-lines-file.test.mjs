@@ -83,3 +83,16 @@ test('--inkrecipe wash turns ink on and picks the source lines, and the command 
   assert.ok(!add.includes('--inkbleed'));
   assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');
 });
+
+test('--inkres keeps a finer file on its own grid, up to the fine sheet', async () => {
+  const dir = await setup(), w = 60, h = 40, k = 3;
+  const fine = y => ({ points: Array.from({ length: 11 }, (_, i) => [k * (5 + 5 * i), k * y]) });
+  fs.writeFileSync(path.join(dir, 'fine-lines.json'), JSON.stringify({ image: { w: w * k, h: h * k }, lines: [fine(10.5), fine(30.5)] }));
+  const f = flags(['--drawingfile', path.join(dir, 'fine'), '--linesupport', '6', '--linemeasure', '1', '--width', String(w), '--inkres', String(k)]);
+  await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8')).image, { w: w * k, h: h * k });
+});
+
+test('the wash recipe draws on a sheet 3 times as fine', () => {
+  assert.equal(INK_RECIPES.wash.inkres, '3');
+});

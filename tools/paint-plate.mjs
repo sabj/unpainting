@@ -5,7 +5,7 @@ import { reservedContact, withReserveClip } from './painter/reserve-clip.mjs';
 import { layIntoWetBed } from './painter/wet-bed-wait.mjs';
 import { scaleBrushForDensity } from '../src/media/brush-density.mjs';
 import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
-import { drawFineMaterial } from '../src/paint/methods/fine-material.mjs';
+import { drawFineMaterial, drawOnFineSheet, fineGestures } from '../src/paint/methods/fine-material.mjs';
 import {framePolicy} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
 import {runSpeedSequence} from './speed/sequence.mjs';
@@ -1218,7 +1218,8 @@ const INKLOAD=()=>INKLOAD_PLANNED()*inkDarkCap(AREA_DRAW_STAGE);
 // --inkwidthfloor f (default 0 off): no ink line is thinner than f target pixels on the sheet (the nib's widest contact
 // rises to it too). --inkdamp d (0..1, default 0): the pen finds the paper at least d damp, so the line feathers a
 // little, as on a sheet not yet quite dry (src/media/pen.mjs).
-const INK_WIDTH_FLOOR_MM=num('inkwidthfloor',0)*(INK_LINES?.pixelMm??0), INK_DAMP=num('inkdamp',0);
+// with --inkres N the floor is at most one fine cell, so the finer sheet can draw the finer line
+const INK_WIDTH_FLOOR_MM=Math.min(num('inkwidthfloor',0)*(INK_LINES?.pixelMm??0), num('inkres',1)>1 ? num('sheetmm', DEFAULT_SHEET_MM)/(w*Math.round(num('inkres',1))) : Infinity), INK_DAMP=num('inkdamp',0);
 if(!(INK_DAMP>=0&&INK_DAMP<=1))throw Error('--inkdamp: a dampness from 0 to 1');
 if(num('inkwidthfloor',0)>0&&!INK_LINES)console.log('ink width floor: no target measured (no --image or --drawing none), so no floor');
 // --inkdarkcap c (default 0 off): before each pen stage, a test line on a scrap of the same paper sets the ink load so
@@ -1545,7 +1546,11 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
  const A=INK_LINES?.[stage]?.stats?.peakAbsorbance;
  if(!(A>0)){INK_MATCH[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark match, ${stage}: no measured target lines, load unchanged`);return 1;}
  const sample=sampleGestures(gs,60);
- const measure=f=>{const scrap=createSheet(makePaper(w,h,PAPER_OPTS),SHEET_PIGS);drawMaterial(scrap,sample,want,w,h,optionsAt(f));
+ const measure=f=>{
+  // with --inkres the sample is drawn on a blank sheet N times as fine, as the pens will draw it, and read there
+  if(INKRES){const N=INKRES.N,fw=w*N,fh=h*N,scrap=createSheet(makePaper(fw,fh,{...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N}),SHEET_PIGS);drawOnFineSheet(scrap,N,sample,{w,h,...optionsAt(f)});
+   return strokesPeakAbsorbance(inkLPlane(renderLayers(layersOf(scrap),SHEET_PIGS,new Uint8ClampedArray(fw*fh*3).fill(255),fw*fh,1),fw*fh),fw,fh,fineGestures(sample,N));}
+  const scrap=createSheet(makePaper(w,h,PAPER_OPTS),SHEET_PIGS);drawMaterial(scrap,sample,want,w,h,optionsAt(f));
   return strokesPeakAbsorbance(inkLPlane(renderLayers(layersOf(scrap),SHEET_PIGS,new Uint8ClampedArray(w*h*3).fill(255),w*h,1),w*h),w,h,sample);};
  const r=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
  INK_MATCH[stage]={...r,target:A,sample:sample.length};
@@ -1556,7 +1561,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
 const penDraw = (sh,gs,want,w,h,o0) => {
  const stage=AREA_DRAW_STAGE, graphite=o0.ink?.[GRAPHITE_AT]>0, inkAt=PIGS.length;
  const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
- const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0&&!INKRES;
+ const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0;
  const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
   const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
@@ -2846,7 +2851,7 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
   await drawPass(null, { first: true });
   if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet, k: GRAPHITE_AT, weights: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
   INK_THK = thickness(sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
-  await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
+  await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
   if (PENWASH_PLAN) {
     // the flat plan over the actual dry ink, multiplied as a transparent wash would sit on it
     const ink = render(), flat = penWashFlat(), mix = Buffer.alloc(N2 * 3);
