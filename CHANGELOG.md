@@ -6,81 +6,39 @@ Releases are plain semver, with a git tag per release. Each release names its pa
 
 Painter V100, sim 102, judges J1. Tag `v0.2.0`.
 
-### Drawing: pencil by default
+On the published Opus 5.5 V5 plans, 0.2.0 scores 7% higher than 0.1.1 (J1 6.36 against 5.93) and paints them in 46% less time. It is better on four of five targets, from +4% on White Ships to +18% on South France, and 4% lower on Trumbull. See the [comparison](docs/release-performance-0.2.0.md).
 
-- The drawing is pencil (graphite) by default and there is no closing pen. Ink is off unless asked for with `--outlinemedium ink` (and `--drawing both` for the closing pen). The 0.2.0 ink draws too thin, too dark and too even, and is being reworked. The bench harness no longer forces ink on every plan. The painter and sim versions both change, so 0.2.0 paintings and scores do not share a mean with 0.1.x results ([docs/versions.md](docs/versions.md)). Benchmark rounds V1 to V5 keep their published 0.1.x scores.
+### Drawing
 
-### Painting plans and styles
+- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
+- Opt-in universal linework stage (`--linework auto`) for every style, with one cleanup for specks, shadow outlines and repeated marks.
+- A drawing made for another image must be registered first.
 
-- One painting plan now sets the drawing, the washes and their order. A plan's style comes only from its `styleSelection`, never from a subject id.
-- New pen and wash style (`--style penwash`): line weight follows structure and light, passages flood wet in wet, and one connected shadow wash keeps the lights inside it. About 60% of the picture stays light.
-- Opt-in subject ordering (`--subjectorder`, plan `subjectOrder`). Zero keeps whole-sheet ordering.
-- Every target is segmented with SAM before planning. SAM regions become general regions, and `--subjectwash 1` cuts washes by subject as well as by colour and value. Region boundaries settle onto the picture's own edges.
-- Plans are resolution independent. The plan's sheet settings are read and `widthMm` is checked against `--sheetmm`. Plan keys the painter never reads are reported.
-- Per-image drawing stages, a lit-edge erase during preparation, and lights-first stages for pen and wash.
-- `--recipe v096` keeps the V096 compatibility recipe. Use the `v0.1.0` tag for the exact historical simulation.
+### Plans, washes and colour
 
-### Linework and ink
-
-- An opt-in universal linework stage (`--linework auto`, plan `drawing.linework`) that every style uses. It takes an image-model sketch, the sketch planner or the target's own lines. One cleanup removes specks, shadow outlines and repeated marks, and a per-image gate checks drawing, medium and amount.
-- A pen source is drawn from its own lines first and keeps its own widths and weights. Broken contours are joined before pruning, but only pieces of the same drawing part. Collinear reversals and small closed contours survive cleanup.
-- Late closing-pen lines can be chosen from a dense traced drawing, and a structure filter keeps its structural lines by rule.
-- Drawing dynamics are preserved: pen speed, pauses, pressure calibrated to the nib, and one dip across split hand continuations. Drawing paper is estimated inside scanned sheet borders.
-- A drawing made for another image must be registered, and unregistered drawings are refused. A first pen that selects no lines fails the run.
-- Automatic source-line extraction and the final-dark pass stay opt-in planner choices.
-
-### Washes and colour
-
-- Clean-colour family washes, median charges with carried demand, pale-plane washes and connected wet sessions. The default recipe uses these general washes through the plan's `washes` section. `--recipe v096` turns them off.
-- Layered washes split at Lab chroma 20 and keep colour families apart in shadow glazes. Key target hues survive palette fitting.
-- New plan fields: `washes.paints` names the box palette, `washes.charge` sets the charge quantile, `washes.darkGain` sets the shadow glaze gain, and `washes.deepAccent` restates darks inside named families.
-- Sunlit light washes are separated without erasing authored highlights. Wide wash planes are covered with mop lanes measured in millimetres.
-- Dry brush is used only where a passage's bare paper is strongly broken.
-- `--washinkfile` names target ink to remove from wash demand. `--notargetlooks 1` replays frozen passage charges with no looks at the target. `--locallights` now reaches the frisket on value-plan paintings.
+- One plan sets the drawing, the washes and their order. Plans are resolution independent, and unread plan keys are reported.
+- Every target is segmented with SAM before planning. Regions follow the picture's own edges.
+- Clean-colour family washes, connected wet sessions and pale-plane washes are the default. `--recipe v096` turns them off.
+- New pen and wash style (`--style penwash`) and opt-in subject ordering (`--subjectorder`).
 
 ### Simulation (sim 102)
 
-- Brush water volume stays physically consistent across resolution.
-- Wet beds are prepared properly: dry cells are prewet first, a smooth thirsty brush picks up, and clean preparation strokes leave no lift-off bead. Wet-in-wet passage moves are normalized, and wet passage contact holds across overlapping lanes.
-- Hole rims, Marangoni flow and slope run on the GPU. These physics options stay off by default.
-- Pigment experiments stay opt-in. Flocculation overrides cover blue, grey, violet, earth and yellow families. Unset options keep each pigment's properties, and an explicit zero turns flocculation off.
-- Optional crosshatching, and an optional paper-colour stage that selects the substrate colour without depositing paint.
+- Brush water volume is consistent across resolution, and wet beds are prepared properly before wet-in-wet passages.
+- Extra physics (hole rims, Marangoni flow, flocculation) runs on the GPU and stays off by default.
 
-### Checks and run safety
+### Speed
 
-- A failed mid-painting check no longer throws the painting away. One module decides whether a check continues or stops, and the run card records each continued check. Wet-on-wet strokes on wet paper are laid instead of stopping the painting, and `dry()` can finish past its step limit.
-- A GPU device error stops the run instead of painting from a broken device. A CPU fallback is loud and recorded, and cross-backend comparisons are refused.
-- The painter records its code state and refuses a dirty tree unless `--allowdirty 1` is given.
-- Frame capture no longer changes the painting.
-- The stroke gate measures every run, including broad washes inside detailed plans, and flags back-and-forth filling of broad washes. An unverified stroke gate is never reported as passing. Tiny-dab plans and runs get a warning.
-- `npm run doctor` runs a preflight check. A run-card recorder documents each stage.
+- Exact GPU paths are on by default, and optics, palette fitting and clip masks share their work. The same plans paint 1.7x to 2.0x faster.
 
-### Performance
+### Safety and checks
 
-- Same plans, both releases: mean J1 6.36 on 0.2.0 against 5.93 on 0.1.1, painted 1.7x to 2.0x faster ([comparison](docs/release-performance-0.2.0.md)).
-- Exact GPU paths and speed switches are on by default without changing the Full solver physics. Optics, palette fitting and clip masks share or cache their work, and the wet frontier scan is fused with cell finalization on capable GPUs.
-- Passage checkpoints for still renders, compact timing artifacts, and on-demand profiling of the GPU, the main thread and plan setup.
-- Mark tapes and command logs are streamed instead of being held as one large JSON string.
-- An adaptive pore drying timestep was tried and rejected after image review.
-
-### Benchmark and judging
-
-- Judge version J2 for internal gates. It uses the J1 panel, rubric and images, but every judge needs all five calls valid. Explicit J2 sampling profiles are available. No published score is J2.
-- A bounded lite suite and comparison records that keep provider provenance.
-- V4 and V5 keep finished paintings that ignored plan settings, and drop plan tokens whose painter flags were removed.
-- An incomplete planning run now fails the CLI.
+- A failed mid-painting check no longer discards the painting. A GPU device error stops the run, and a CPU fallback is recorded.
+- The painter records its commit and refuses a dirty tree unless `--allowdirty 1` is given.
+- `npm run doctor` checks the setup before a run.
 
 ### Removed
 
-- Painter code fitted to single benchmark subjects: `--trumbullrules`, `--portraitrules`, `--drawsubject`, the per-subject presets and their automatic use, the subject-id style lookup (`tuned/subjects.json`), the hash-bound reviewed portrait drawing, the single-photograph architecture passage, and the Trumbull-only stroke budget stop.
-- Dead Paint Lab files and unused exports. `knip` now checks for them.
-
-### Tools and tests
-
-- `npm test` runs the Python line-tool tests. GPU parity tests skip visibly when there is no GPU.
-- The preview page has a synchronized loupe and stage playback. `tools/canary/build.mjs` reads commit and stage captions from each render's own record.
-- `--canarystop N` stops a candidate painting after pass N.
-- The painter finds the line-tools Python by itself.
+- Painter code fitted to single benchmark subjects (`--trumbullrules`, `--portraitrules`, per-subject presets) and dead Paint Lab files.
 
 ## 0.1.1 - 2026-10-15
 
