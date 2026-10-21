@@ -9127,9 +9127,8 @@ export const nativePlateSeed=(genome,scene)=>hashSeed(JSON.stringify([genome.pro
 // gestures with their loads, flows and drying, all in sheet cells. Paint Lab
 // validates it and paints it again with its own pen, brushes and operations.
 export const PAINT_LAB_PLAN=Object.freeze({format:'unpainting-paint-plan',version:1,storageKey:'unpainting:paint-lab-import',maxChars:4500000,inkStep:2,inkPigment:'walnut',inkMix:Object.freeze({indigo:5})});
-// Paint Lab is demos/index.html, the site root. The plates live one level down
-// in demos/fungi/, so the lab is always the parent folder's index.html.
-export const PAINT_LAB_PAGE='index.html?import=mushroom';
+// Paint Lab is demos/lab/, a sibling of demos/fungi/.
+export const PAINT_LAB_PAGE='lab/?import=mushroom';
 export function paintLabUrl(pageUrl){return new URL('../'+PAINT_LAB_PAGE,pageUrl).href;}
 // The lab pen at this sheet's cell size: a fine walnut nib with a short wick.
 const PAINT_LAB_PEN=Object.freeze({nib:.6,flex:.5,reach:3,travel:1,reservoir:250,drop:1,strength:.8});

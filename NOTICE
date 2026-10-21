@@ -43,7 +43,7 @@ credits: THIRD_PARTY_NOTICES.md.
    docs/img/hero-trumbull.webp
    docs/img/example-trumbull.webp
    docs/img/progress-trumbull.webp
-   docs/img/layers-thumb.webp
+   demos/thumbs/layers.webp
    demos/layers/data/*
    bench/v2/targets/trumbull.png
    bench/crops/img/trumbull.webp

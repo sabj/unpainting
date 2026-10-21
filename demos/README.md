@@ -1,11 +1,10 @@
-# demos
+# Demos
 
-Browser demos, published to GitHub Pages by `tools/lab/build-site.mjs` and `.github/workflows/pages.yml`. The site keeps these paths:
+Live at <https://sabj.github.io/unpainting/demos/>.
 
-- [Paint Lab](index.html), with its code in [lab/](lab/): paint by hand with the painter's paper, brushes, pen and pencil. Served at the site root.
-- [layers/](layers/): a painting taken apart layer by layer. Served at `/layers/`.
-- [fungi/](fungi/): Spore Studies, procedural mushroom plates drawn in ink and painted with the lab's paper, pigments and pen. A plate opens in Paint Lab to paint again. Served at `/fungi/`; see [fungi/README.md](fungi/README.md).
-- [mushrooms/](mushrooms/): redirects the older `/mushrooms/` address to `/fungi/`.
+| [Spore Studies](https://sabj.github.io/unpainting/demos/fungi/) | [Paint Lab](https://sabj.github.io/unpainting/demos/lab/) | [Layers](https://sabj.github.io/unpainting/demos/layers/) |
+| --- | --- | --- |
+| [<img src="fungi/plates/amanita.webp" width="260" alt="Fly agaric">](https://sabj.github.io/unpainting/demos/fungi/) | [<img src="thumbs/lab.webp" width="260" alt="A heart painted in Paint Lab">](https://sabj.github.io/unpainting/demos/lab/) | [<img src="thumbs/layers.webp" width="260" alt="A painting split into its layers">](https://sabj.github.io/unpainting/demos/layers/) |
+| Mushroom plates, drawn and painted live. | Paint by hand with simulated paper, brushes and pens. | One painting taken apart, layer by layer. |
 
-Serve the folder locally with `python3 -m http.server 8000 --directory demos`.
-- `demos/`: the index of all demos, published at /demos/, with /demos/fungi/, /demos/layers/ and /demos/lab/ redirecting to the demo itself.
+Run locally: `python3 -m http.server 8000 --directory demos`, then open <http://localhost:8000/>.

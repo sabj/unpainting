@@ -12,9 +12,9 @@ Want to help? The [open problems](docs/future-ideas.md) need work: linework, was
 <p align="center"><img src="docs/img/hero-trumbull.webp" alt="Trumbull College: original photo, stylized target, and the painting building from blank paper to the finished painting"></p>
 
 
-<a href="https://sabj.github.io/unpainting/layers/"><img src="docs/img/layers-thumb.webp" width="200" align="right" alt="The Trumbull painting and its layers as small tiles"></a>
+<a href="https://sabj.github.io/unpainting/demos/layers/"><img src="demos/thumbs/layers.webp" width="200" align="right" alt="The Trumbull painting and its layers as small tiles"></a>
 
-Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/layers/). This is a side experiment, so caveat emptor. The code is 99.9% AI-written and the docs 99%, so expect some slop and odd overfitting.
+Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/demos/lab/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/demos/layers/). This is a side experiment, so caveat emptor. The code is 99.9% AI-written and the docs 99%, so expect some slop and odd overfitting.
 
 ## Why model paint drying
 
@@ -25,7 +25,7 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 <table>
 <tr>
 <td align="center" width="33%"><a href="https://samjackson.org/writing/whats-a-painting-anyway-part-1/"><img src="docs/img/thumb-blog.webp" width="220" alt="The Mona Lisa painted several ways, from the blog post's header"><br>Blog post on the motivations</a></td>
-<td align="center" width="33%"><a href="https://sabj.github.io/unpainting/"><img src="docs/img/thumb-heart.webp" width="220" alt="A heart with an arrow through it, painted in Paint Lab"><br>Paint Lab, to try it</a></td>
+<td align="center" width="33%"><a href="https://sabj.github.io/unpainting/demos/lab/"><img src="demos/thumbs/lab.webp" width="220" alt="A heart with an arrow through it, painted in Paint Lab"><br>Paint Lab, to try it</a></td>
 <td align="center" width="33%"><a href="docs/reading-list.md"><img src="docs/img/thumb-reading.webp" width="220" alt="Titles of papers from the literature review"><br>Literature review, to see more</a></td>
 </tr>
 </table>

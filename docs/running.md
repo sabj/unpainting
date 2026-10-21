@@ -107,7 +107,7 @@ CI runs the Node suite and `npm run bench:test`. Both fail on any test failure.
 
 ## Paint Lab
 
-Paint Lab is the browser version of the paper, brushes, pen and pencil. It is a static page at [demos/index.html](../demos/index.html), with code in [demos/lab/](../demos/lab/). Serve `demos/` with any static server:
+Paint Lab is the browser version of the paper, brushes, pen and pencil. It is a static page in [demos/lab/](../demos/lab/), live at <https://sabj.github.io/unpainting/demos/lab/>. Serve `demos/` with any static server:
 
 ```sh
 python3 -m http.server 8000 --directory demos

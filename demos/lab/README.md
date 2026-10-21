@@ -1,6 +1,6 @@
 # demos/lab
 
-Paint Lab, the browser version of the paper, brushes, pen and pencil. [demos/index.html](../index.html) is the page. `lab.js` and `worker.js` stay at the top of this folder, and the modules they import sit in folders by role.
+Paint Lab, the browser version of the paper, brushes, pen and pencil. [index.html](index.html) is the page. `lab.js` and `worker.js` stay at the top of this folder, and the modules they import sit in folders by role.
 
 - `lab.js`: the page, with pointer input, controls and frames from the worker.
 - `worker.js`: the simulation, run off the page's thread.
