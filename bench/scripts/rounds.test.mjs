@@ -26,6 +26,17 @@ test('a model token replaces the base token in its slot; architecture and palett
   assert.match(optionMap(t.args).get('paints'), /sapgreen/);
 });
 
+test('basePalette false: Trumbull gets no paint box from the base, only from its own palette token', () => {
+  const tb = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true, basePalette: false });
+  const off = layerBase({ variant: 'region_w13', build: tb, architecture: true, trumbull: true, basePalette: false });
+  assert.equal(optionMap(off.args).has('paints'), false);
+  assert.match(off.skipped.pgreen, /base palette off/);
+  assert.ok(off.applied.includes('blk60'));
+  const own = layerBase({ variant: 'region_w13_pwarm', build: tb, architecture: true, trumbull: true, basePalette: false });
+  assert.equal(optionMap(own.args).get('paints'), 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia');
+  assert.equal(optionMap(layerBase({ variant: 'region_w13', build }).args).has('paints'), false);
+});
+
 test('refusals before painting: unknown tokens, locked options, paths out of the plan folder, plan limits', () => {
   assert.deepEqual(unknownTokens('region_w13_lay2_bogus', build), ['bogus']);
   assert.deepEqual(unknownTokens('region_w13_pwarm', build), ['pwarm']);

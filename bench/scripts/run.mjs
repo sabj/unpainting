@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run one model through a round under protocol v2, gentle mode, and write its try folders.
 //   npm run bench:run -- --model opus --round V1 --try 1 [--crops <crop,crop>] [--out bench/runs]
-//   npm run bench:run -- --model opus --round V3|V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict]
+//   npm run bench:run -- --model opus --round V3|V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict] [--no-base-palette]
 //   npm run bench:run -- --dry-run [--round V3|V4|V5]   (no model, no keys: a scripted stand-in exercises the whole path)
 // V1 and V2 write one try per run; V3, V4 and V5 write tries 1 to --tries (v3.mjs, pipeline/round45.mjs).
 // A try folder (<out>/<round dir>/<model>/<try>/) gets run.json, <crop>.webp and <crop>-stages.webp. Raw outputs
@@ -78,7 +78,7 @@ if (MULTI) {
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), profile };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), profile };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
