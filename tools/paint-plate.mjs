@@ -319,14 +319,15 @@ if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','
 }
 const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
   ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
+// --inkrecipe v2: the ink flags below as one switch (src/paint/methods/ink-recipe.mjs); flags given on the command line win.
+argv.push(...inkRecipeArgs(opt('inkrecipe','none'), argv));
 // Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
 // --linesupport t (L*, default 0 off): keep only the parts of the opening and closing lines along which the target
 // shows a line at least t L* darker than beside it. --linesmooth mm (default 0 off): smooth stepped traces at mm,
 // keeping corners sharper than --linesmoothcorner degrees (default 50). Either writes <out>/ink-<stage>-lines.json and
-// points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too.
-// --inkrecipe v2: the ink settings above and below as one switch (src/paint/methods/ink-recipe.mjs); flags given win.
-argv.push(...inkRecipeArgs(opt('inkrecipe','none'), argv));
-const INK_LINES = !opt('resumestate','') && opt('drawing','first') !== 'none' && opt('image','')
+// points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too. It runs
+// again in a process that takes over a saved painting (--resumestate), on the line files as they now stand.
+const INK_LINES = opt('drawing','first') !== 'none' && opt('image','')
   ? await holdInkLines({ opt, num, argv, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';
