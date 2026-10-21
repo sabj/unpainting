@@ -1,0 +1,34 @@
+{
+  "note": "Named feature windows a person checks in a pen drawing, as fractions of the picture [x0, y0, x1, y1].",
+  "guardi-colonnade": {
+    "colonnade-whole": [0.0, 0.12, 1.0, 0.88],
+    "arch-mouldings": [0.38, 0.12, 0.90, 0.45],
+    "capitals-entablature": [0.30, 0.38, 0.58, 0.56],
+    "receding-columns": [0.30, 0.45, 1.0, 0.86],
+    "figures": [0.04, 0.77, 0.38, 0.97]
+  },
+  "tiepolo-punchinello-camel": {
+    "camel-whole": [0.22, 0.12, 0.66, 0.80],
+    "camel-head": [0.49, 0.22, 0.66, 0.46],
+    "punchinello-rider": [0.30, 0.06, 0.52, 0.48]
+  },
+  "rembrandt-woman-reading": {
+    "face": [0.46, 0.12, 0.72, 0.46],
+    "ruffs-collar": [0.48, 0.28, 0.86, 0.62],
+    "hands-book": [0.25, 0.48, 0.70, 0.86]
+  },
+  "tiepolo-bacchus-ariadne": {
+    "ariadne-face": [0.30, 0.05, 0.50, 0.22],
+    "bacchus-face": [0.40, 0.45, 0.58, 0.62],
+    "putto-faces": [0.53, 0.01, 0.76, 0.23]
+  },
+  "h36-a": {
+    "arch-gate": [0.33, 0.28, 0.66, 0.72],
+    "upper-windows": [0.36, 0.0, 0.64, 0.20],
+    "left-windows-wall": [0.08, 0.0, 0.36, 0.50]
+  },
+  "h34-a": {
+    "chapel-facade": [0.28, 0.0, 0.58, 0.62],
+    "right-building": [0.62, 0.28, 0.86, 0.52]
+  }
+}

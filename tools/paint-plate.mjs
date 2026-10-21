@@ -1163,7 +1163,7 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(SRC, w, h, gaussian, { s
 // line budget and the gate on the pen all use it.
 const SEP = separate(PX_SOURCE, w, h, paperRGB);
 // the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
-if (opt('inkrecipe','none') === 'wash' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
+if (opt('inkrecipe','none') === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
 // The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines

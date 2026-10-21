@@ -145,14 +145,17 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
 
 // --copylinesagree <cells>: cut the traced lines to the parts within that many cells of the separator's pen line
 // (ink-agree.mjs); --copylinesgap points off it a run may cross, --copylinesrun the shortest run kept, in points.
-// --copylinesfloor <per cent>: a source the separator reads as less pen line than this gets no pen lines at all.
+// --copylinesfloor <per cent>: a source the separator reads, at 540 px wide, as less pen line than this gets no pen lines.
 // --copylinesfill 1: the separator's pen line that no kept trace covers is filled from the narrow-ridge lines
 // (ink-lines-file.mjs), cut the same way; copy-lines misses pale and broad pen lines.
 async function agreeWithSeparator(file, image, { near, gap, minRun, floor, fill = null, log }) {
   const doc = JSON.parse(fs.readFileSync(file, 'utf8')), { w, h } = doc.image;
   const meta = await sharp(image).metadata();
   const rgb = await sharp(image).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer();
-  const { mask, ink, share } = agreeMask(rgb, w, h, { near });
+  const { mask, ink } = agreeMask(rgb, w, h, { near });
+  // the share is read at 540 px wide whatever the painting's width, as the separator's ridge scales are in cells
+  const fw = 540, fh = Math.max(1, Math.round(h * fw / w));
+  const share = floor > 0 ? agreeMask(await sharp(image).removeAlpha().resize(fw, fh, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer(), fw, fh, { near: 0 }).share : 1;
   if (100 * share < floor) {
     fs.writeFileSync(file, JSON.stringify({ ...doc, lines: [], agree: { near, floor, share } }) + '\n');
     log(`line source source-ink: no pen lines, the separator reads ${(100 * share).toFixed(2)}% pen line, under --copylinesfloor ${floor}%`);
