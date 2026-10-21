@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import {pointOnPath} from '../../docs/lab/targets/film.js';
-const lab = new URL('../../docs/lab/', import.meta.url);
+import {pointOnPath} from '../../demos/lab/targets/film.js';
+const lab = new URL('../../demos/lab/', import.meta.url);
 const json = p => JSON.parse(fs.readFileSync(new URL(p, lab)));
 test('published paintings ship complete budgeted live paintings, materials and saved recordings', () => {
   for (const ex of json('examples/recorded.json').examples) {

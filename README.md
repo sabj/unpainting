@@ -36,7 +36,8 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 ```text
 unpainting/
-├── docs/           guides, plan format, and the browser Paint Lab
+├── docs/           guides and plan format
+├── demos/          Paint Lab, the layers page and other browser demos
 ├── bench/          unpaint-bench: protocol, run records, scores, gallery
 ├── examples/       public-domain targets and runnable stroke plans
 ├── src/

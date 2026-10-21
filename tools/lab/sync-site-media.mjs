@@ -3,8 +3,8 @@
 // with the painter's own paper, sheet, brush, pen, pencil and optics. The painter repo is the source; the lab's copy is
 // generated. It follows each module's relative imports, so a helper the brush comes to need is copied with it; a
 // module that imports Node (node:*, sharp) stops the copy, since the browser could not load it.
-//   node tools/lab/sync-site-media.mjs                 write docs/lab/media
-//   node tools/lab/sync-site-media.mjs --check         exit 1 if docs/lab/media differs from src/media
+//   node tools/lab/sync-site-media.mjs                 write demos/lab/media
+//   node tools/lab/sync-site-media.mjs --check         exit 1 if demos/lab/media differs from src/media
 //   node tools/lab/sync-site-media.mjs --out DIR       write somewhere else (a scratch copy to test first)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,7 +35,7 @@ export function generate() {
 
 if (import.meta.main ?? process.argv[1] === import.meta.filename) {
   const argv = process.argv.slice(2), oi = argv.indexOf('--out'), check = argv.includes('--check');
-  const dest = oi >= 0 ? path.resolve(argv[oi + 1] ?? '') : path.join(ROOT, 'docs', 'lab', 'media');
+  const dest = oi >= 0 ? path.resolve(argv[oi + 1] ?? '') : path.join(ROOT, 'demos', 'lab', 'media');
   const files = generate();
   let stale = 0;
   for (const [rel, code] of files) {

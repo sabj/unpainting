@@ -12,7 +12,7 @@
 //
 // --run is a paint-plate output directory with frames.json, its saved frames and painting.png; frames already resized
 // to WebP under the same names are used in their place. --target is the image that run painted from (default: the
-// run directory's target.webp, target.png or source.jpg). The default run, docs/lab/examples/white-ships-run/, is the
+// run directory's target.webp, target.png or source.jpg). The default run, demos/lab/examples/white-ships-run/, is the
 // current painter's White Ships render with a drawing plan written by hand, its saved frames and source.jpg resized to
 // the panel size. Render with:
 //   node tools/paint-plate.mjs --image examples/targets/white-ships.jpg --width 720 --mode full --threads 4
@@ -39,7 +39,7 @@ import { ghostSvg } from './brush-ghost.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const arg = (name, fallback) => { const k = process.argv.indexOf(name); return k > 0 ? path.resolve(process.cwd(), process.argv[k + 1]) : fallback; };
 const OUT = arg('--out', path.join(ROOT, 'docs/img'));
-const RUN = arg('--run', path.join(ROOT, 'docs/lab/examples/white-ships-run'));
+const RUN = arg('--run', path.join(ROOT, 'demos/lab/examples/white-ships-run'));
 const TARGET = arg('--target', ['target.webp', 'target.png', 'source.jpg'].map(f => path.join(RUN, f)).find(f => fs.existsSync(f)));
 const NAME = 'cheat-white-ships.webp';
 

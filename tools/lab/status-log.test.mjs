@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {statusKey,statusText,recordedStatus,handStatus,createStatusLog} from '../../docs/lab/ui/status-log.js';
+import {statusKey,statusText,recordedStatus,handStatus,createStatusLog} from '../../demos/lab/ui/status-log.js';
 
 test('stroke progress and pigment changes reuse a line; phase, tool and operations separate it',()=>{
  const paint={phase:'Painting',tool:'Round brush',done:1281,total:2500,pigments:['Raw sienna']};

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {runTape} from '../../docs/lab/worker/live-tape.js';
-import {applyHandOperation,footprint,watchContact} from '../../docs/lab/worker/operations.js';
-import {makePaper} from '../../docs/lab/media/paper.js';
-import {createSheet,liftResist} from '../../docs/lab/media/sheet.js';
-import {PIGMENTS} from '../../docs/lab/media/pigments.js';
-import {GpuPhysics} from '../../docs/lab/gpu/gpu-physics.js';
+import {runTape} from '../../demos/lab/worker/live-tape.js';
+import {applyHandOperation,footprint,watchContact} from '../../demos/lab/worker/operations.js';
+import {makePaper} from '../../demos/lab/media/paper.js';
+import {createSheet,liftResist} from '../../demos/lab/media/sheet.js';
+import {PIGMENTS} from '../../demos/lab/media/pigments.js';
+import {GpuPhysics} from '../../demos/lab/gpu/gpu-physics.js';
 const fresh=()=>createSheet(makePaper(64,48,{seed:9}),[PIGMENTS[5]]);
 const recording=marks=>({w:64,h:48,scale:10,brushes:[0],pens:[],brushOpts:[{radius:2,flat:true,capacity:20,variety:0}],penOpts:[],pigments:[PIGMENTS[5]],marks});
 const api=sheet=>({sheet:()=>sheet,ready:async()=>true,begin:()=>{},end:()=>{},touch:async(p,r,fn)=>fn(),present:()=>{},progress:()=>{},mutate:async fn=>fn(),flow:()=>{}});
@@ -66,7 +66,7 @@ test('hand masking persists across strokes; removal, blotting and lifting change
 
 test('complete shipped studies preserve masks and their actual removal',()=>{
  for(const name of ['h36-a','white-ships']){
-  const tape=JSON.parse(gunzipSync(fs.readFileSync(new URL(`../../docs/lab/examples/${name}/live-2500.json.gz`,import.meta.url))));
+  const tape=JSON.parse(gunzipSync(fs.readFileSync(new URL(`../../demos/lab/examples/${name}/live-2500.json.gz`,import.meta.url))));
   assert.equal(tape.complete,true);
   assert.ok(tape.marks.some(m=>m.k==='c'&&m.r?.length));
   assert.ok(tape.marks.some(m=>m.k==='R'),'the complete run includes physical mask removal');

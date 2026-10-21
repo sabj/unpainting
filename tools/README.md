@@ -9,7 +9,7 @@ Command-line tools. Run each from the repository root with `node tools/<path>`. 
 | `aware/` | stops at passage boundaries (`--pausedir`) and the take-over of a saved painting by a fresh process (`--resumestate`), used by benchmark versions V4 and V5 | `pause.mjs` (the pause folder's files), `aware.test.mjs` |
 | `guard/` | the target guard (a check that blocks target-pixel reads), the cheat-risk score, the deliberate-cheat test and the source lint | `cheat-test.mjs`, `promote-check.mjs RUNDIR` |
 | `judge/` | classic measures against a target, stage checks, the wash scorer, and blind evaluations of saved stages with model judges in `rounds/` | `judge-plate.mjs`, `stage-check.mjs`, `wash-score.mjs --dir DUMP` |
-| `lab/` | builds the Paint Lab example animations in `docs/lab/examples/`, copies `src/media/` into the lab, and records a demo animation to `work/` | `paint-examples.sh`, then `build-examples.mjs`; `sync-site-media.mjs`; `record-demo.mjs` |
+| `lab/` | builds the Paint Lab example animations in `demos/lab/examples/`, copies `src/media/` into the lab, and records a demo animation to `work/` | `paint-examples.sh`, then `build-examples.mjs`; `sync-site-media.mjs`; `record-demo.mjs` |
 | `readme/` | builds the README figures | `build-readme-media.mjs` |
 | `gpu/` | the batch painter (many sheets on one GPU) and CPU-against-GPU checks | `paint-batch.mjs --config FILE`, `step-check.mjs` |
 | `cloud/` | render batches on rented machines (optional; needs a paid account) | `render-batch.py`; see [docs/CLOUD.md](../docs/CLOUD.md) |

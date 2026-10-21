@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createBrush,dip,stroke,recordMarks,BRUSHES,BRUSHOPTS,PENS,PENOPTS} from '../../docs/lab/media/brush.js';
-import {tapeSheet,tapeFlow,tapePixels,tapeRenderBase} from '../../docs/lab/worker/tape-sheet.js';
-import {tapeSheet as recordSheet,step,dry,DEFAULTS,liftResist} from '../../docs/lab/media/sheet.js';
-import {pencilDraw} from '../../docs/lab/media/graphite.js';
-import {runTape} from '../../docs/lab/worker/live-tape.js';
-import {PIGMENTS} from '../../docs/lab/media/pigments.js';
+import {createBrush,dip,stroke,recordMarks,BRUSHES,BRUSHOPTS,PENS,PENOPTS} from '../../demos/lab/media/brush.js';
+import {tapeSheet,tapeFlow,tapePixels,tapeRenderBase} from '../../demos/lab/worker/tape-sheet.js';
+import {tapeSheet as recordSheet,step,dry,DEFAULTS,liftResist} from '../../demos/lab/media/sheet.js';
+import {pencilDraw} from '../../demos/lab/media/graphite.js';
+import {runTape} from '../../demos/lab/worker/live-tape.js';
+import {PIGMENTS} from '../../demos/lab/media/pigments.js';
 test('complete tape reproduces native brush, graphite, within-stroke flows and fixed dry layers',async()=>{
  const t={version:2,w:48,h:32,scale:10,paper:{seed:9,mmPerCell:.8,coldPress:{mmPerCell:.8}},paperRGB:[250,248,240],paperShade:.04,pigments:[PIGMENTS[5]],opts:{...DEFAULTS,gran:.25,fixedBed:1}};
  const native=tapeSheet(t);native._tape=1;const marks=recordMarks(true);recordSheet(marks);
@@ -23,8 +23,8 @@ test('complete tape reproduces native brush, graphite, within-stroke flows and f
 });
 
 test('native checkpoint resumes an unlifted, partly depleted brush without resetting its contact history',async()=>{
- const {encodeState,decodeState}=await import('../../docs/lab/worker/history.js');
- const {SHEET_FIELDS}=await import('../../docs/lab/worker/live-tape.js');
+ const {encodeState,decodeState}=await import('../../demos/lab/worker/history.js');
+ const {SHEET_FIELDS}=await import('../../demos/lab/worker/live-tape.js');
  const tape={version:2,w:48,h:32,scale:10,paper:{seed:9},pigments:[PIGMENTS[5]],brushes:[0],brushOpts:[{radius:3,flat:true,capacity:3,variety:.8,seed:19}],pens:[],penOpts:[],strokeCount:2,marks:[{k:'d',b:0,w:.6,c:[.4]},{k:'s',b:0,lf:0,points:[{x:4,y:10,p:.6},{x:21,y:16,p:.7}]},{k:'s',b:0,points:[{x:21,y:16,p:.7},{x:39,y:21,p:.3}]},{k:'y',m:30000,lm:90,dt:14,at:true}]};
  const api=s=>({sheet:()=>s,ready:async()=>true,begin:()=>{},end:()=>{},touch:async(p,r,fn)=>fn(),present:()=>{},progress:()=>{},mutate:async fn=>fn(),flow:async(d,m)=>tapeFlow(tape,s,d,m)});
  const a=tapeSheet(tape);let bytes;

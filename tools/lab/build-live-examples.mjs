@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {gzipSync,gunzipSync} from 'node:zlib';
-const root=path.resolve(import.meta.dirname,'../../docs/lab');
+const root=path.resolve(import.meta.dirname,'../../demos/lab');
 const runs=process.argv.slice(2);
 if(runs.length!==4)throw Error('Supply h36-250 h36-2500 ships-250 ships-2500 run directories');
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'examples/recorded.json')));

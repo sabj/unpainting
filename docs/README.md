@@ -30,4 +30,4 @@ The [project README](../README.md) has the quick start.
 - [Prior work and credits](reading-list.md): the papers and projects the painter builds on
 - [Future ideas to test](future-ideas.md): untested ideas for judging, planning and search
 
-Paint Lab, the browser version, is [index.html](index.html) with its code in [lab/](lab/). Images are in [img/](img/), with rights in [NOTICE](../NOTICE).
+Paint Lab, the browser version, is [demos/index.html](../demos/index.html) with its code in [demos/lab/](../demos/lab/). Images are in [img/](img/), with rights in [NOTICE](../NOTICE).

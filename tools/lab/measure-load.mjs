@@ -2,8 +2,8 @@
 import {makePaper} from '../../src/media/paper.mjs';
 import {createSheet} from '../../src/media/sheet.mjs';
 import {createBrush,dip,stroke} from '../../src/media/brush.mjs';
-import {handBrushOptions,brushWater} from '../../docs/lab/brush-load.js';
-import {paperOptions} from '../../docs/lab/media/papers.js';
+import {handBrushOptions,brushWater} from '../../demos/lab/brush-load.js';
+import {paperOptions} from '../../demos/lab/media/papers.js';
 export const pigment={K:[.4,.6,.9],S:[.01,.01,.01],rho:.05,omega:1.4,gamma:.15};
 export function measureLoad({dpi=60,water=3,tool='round',feed,seed=149}={}) {
  const options=handBrushOptions({tool,sizeMm:25,water},{dpi,seed});

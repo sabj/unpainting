@@ -5,8 +5,8 @@
     "bench/scripts/*.mjs",
     "bench/scripts/pipeline/*.mjs",
     "bench/v4v5/**/*.mjs",
-    "docs/lab/lab.js",
-    "docs/lab/worker.js",
+    "demos/lab/lab.js",
+    "demos/lab/worker.js",
     "src/paint/techniques/passages/*.mjs",
     "src/media/gpu/batch-server.mjs",
     "src/media/gpu/web-brush.mjs"
@@ -15,7 +15,7 @@
     "src/**/*.mjs",
     "tools/**/*.mjs",
     "bench/**/*.mjs",
-    "docs/lab/**/*.js"
+    "demos/lab/**/*.js"
   ],
   "ignore": [
     "bench/v2/kit/**",
@@ -29,10 +29,10 @@
     "src/media/sheet-size.mjs": [
       "duplicates"
     ],
-    "docs/lab/media/**": [
+    "demos/lab/media/**": [
       "exports"
     ],
-    "docs/lab/media/sheet.js": [
+    "demos/lab/media/sheet.js": [
       "exports",
       "unresolved"
     ]
