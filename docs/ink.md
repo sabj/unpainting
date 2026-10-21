@@ -56,7 +56,7 @@ Three flags shape the closing pen. `--closingshare c` gives the opening and clos
 
 ## Holding ink to the target
 
-In painter V101, five flags hold the pen to the target's own lines. Each is off by default, so without them V101 draws as V100 does. Before painting, the painter reads the opening (`--drawingfile`) and closing (`--drawinglast`) line files against the target (`src/paint/methods/ink-lines.mjs`).
+In painter V101, five flags hold the pen to the target's own lines. Each is off by default, so without them V101 draws as V100 does. Before painting, the painter reads the opening (`--drawingfile`) and closing (`--drawinglast`) line files against the target (`src/paint/methods/ink-lines.mjs`). That includes the files the linked drawing stages write (`stage-prepink-lines.json`, `stage-finishink-lines.json`).
 
 - `--linesupport t` keeps only the parts of a line where the target shows a line. Along the path, the target must be at least `t` L* darker than the mean of both sides, 1 to 2.25 target pixels out. Plain paper, a light line such as a white whisker, and a path along a tonal edge with no line fail. Default 0, off.
 - `--linesmooth mm` smooths traced lines that step from pixel to pixel. Corners sharper than `--linesmoothcorner` degrees (default 50) stay sharp. Default 0, off.
@@ -80,6 +80,40 @@ In painter V101, five flags hold the pen to the target's own lines. Each is off 
 The recipe does not turn ink on. Add `--outlinemedium ink --drawing both` for an opening ink drawing with closing accents.
 
 See [Choosing linework](linework.md) for the short job-to-tool guide and its defaults.
+
+## Pen and wash ink
+
+`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101-dev from after 0.2.1-rc.1, and it is off by default. It turns ink on by itself.
+
+- Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
+- Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 1.2 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
+- Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
+- Darkness. `--inkdarkmatch 1` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are as dark as the source's. It raises the load as well as lowering it, within 1/8 to 4 times.
+- Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral.
+- Wet lines. `--inkbleed 0.35` draws a line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines are dry and crisp.
+
+| Flag | Wash | Off |
+|---|---|---|
+| `--outlinemedium`, `--drawing` | `ink`, `both` | `graphite`, `first` |
+| `--linesource` | `source-ink` | `none` |
+| `--copylinesmin` | 0.005 | 0.025 |
+| `--drawingstages` | `off` | `auto` |
+| `--stages` | `prepink,finishink` | none |
+| `--prepinkfrom`, `--prepinkamount`, `--prepinkkeep`, `--prepinkadd`, `--prepinkdeviate` | `lines`, 1, 1, 0, 0 | stage defaults |
+| `--openingpressure` | 0.75 | 0.3 on a staged run |
+| `--linesupport`, `--linesmooth`, `--linesmoothcorner` | 5, 0.3, 50 | 0, 0, 50 |
+| `--linegapmm`, `--lineminmm` | 0.6, 1.2 | 2 and 3 file pixels |
+| `--inkwidthfloor` | 1 | 0 |
+| `--linemeasure` | 1 | 0 |
+| `--inkdarkmatch` | 1 | 0 |
+| `--inkhue` | `source` | `profile` |
+| `--inkdamp`, `--inkbleed` | 0, 0.35 | 0, 0 |
+
+With `--linemeasure`, a line file drawn on a finer grid than the painting's is read on the painting's grid. `--inkdarkmatch` writes `ink-dark-match.json`. A flag given on the command line wins over the recipe.
+
+`--lineinkonly 1` also keeps a line only within a pixel of cells the ink separator reads as pen line. On the ink-led sketches it drops the brush marks in foliage that the tracer reads as lines. On a Guardi it also drops arch mouldings drawn beside wash, so the recipe leaves it off.
+
+The recipe is not for photographs or brush-only works. On a target with less pen line than `--penfirst` (0.5%) the painter warns. On Fragonard's brush-and-wash Rinaldo, with 0.2% pen line, it adds pen marks the source lacks.
 
 ## Linework stages
 
