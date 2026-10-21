@@ -45,7 +45,7 @@ Connect adjacent regions when the target shows one wash or continuous shadow. Ke
 ## Order
 
 1. Optional light preparatory pencil sketch where placement is hard. Ink only is usually best.
-2. Drawing: silhouettes, landmarks, structure and selected texture lines. Ink where the source shows line; light graphite where it shows none.
+2. Drawing: silhouettes, landmarks, structure and selected texture lines. Ink where the source shows line; light graphite where it shows none. Write the choice into the plan: the painter's medium defaults to graphite, and without `drawing.stages` its automatic stage choice may add ink.
 3. Let the ink dry and set, then inspect the executed drawing.
 4. Reserve lights and lay broad pale washes.
 5. Dry as the next layer needs, then mid-values and shadow glazes.

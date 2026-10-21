@@ -1,6 +1,6 @@
 # Painting sequences
 
-These are recorded paintings. Each animation plays the saved sheet states in order, from blank paper through the drawing and the washes to the finish. The row below it shows five saved states for a closer look.
+These are recorded paintings, made with release 0.1.0 (painter V096, sim 100). Each animation plays the saved sheet states in order, from blank paper through the drawing and the washes to the finish. The row below it shows five saved states for a closer look.
 
 ## Trumbull College
 
@@ -8,7 +8,7 @@ These are recorded paintings. Each animation plays the saved sheet states in ord
 
 ![Trumbull: five saved stages from drawing to finish](img/progress-trumbull.webp)
 
-The ink drawing sets out the building first. Pale walls and sky follow, then the deeper roof, window and road values.
+The Trumbull plan asks for ink, so a sepia ink drawing sets out the building first. Pale walls and sky follow, then the deeper roof, window and road values.
 
 ## Luce Hall
 

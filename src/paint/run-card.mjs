@@ -21,7 +21,7 @@ function buildRunCard({
   planFile = null,
   drawingFile = null,
   drawingOrder = "first",
-  drawingMedium = "ink",
+  drawingMedium = "graphite",
   code = null,
   segments = null,
   linework = null,

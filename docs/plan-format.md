@@ -12,7 +12,7 @@ It writes `result.png` (the dried sheet) and `run.json`. Stroke-size admission w
 
 ![The graded-wash plan's stroke paths over its dried result](img/graded-wash.webp)
 
-The full example is [examples/plans/graded-wash.json](../examples/plans/graded-wash.json); its saved output is [examples/output/graded-wash-result.png](../examples/output/graded-wash-result.png).
+The full example is [examples/plans/graded-wash.json](../examples/plans/graded-wash.json); its saved output is [examples/output/graded-wash-result.png](../examples/output/graded-wash-result.png). The figure and the saved output were made with sim 100 (release 0.1.0).
 
 ## Units and resolution
 
@@ -191,7 +191,7 @@ Without `stages`, the ordinary bounded drawing runs. A stage left out is not dra
 
 The finish runs after every wash passage and the final dry gate, so it follows each subject's last wash. Graphite then finish ink is `prep` plus `finishInk: {"from": "prep"}` with no `prepInk`. `--drawing first|last|none` overrides stage timing. [ink.md](ink.md#linework-stages) says which stage and method fits which job. Code: `src/paint/methods/drawing-stages.mjs` and `linework-plan.mjs`.
 
-A field left out, or set to `auto`, adds no flag. The painter's own default applies: the drawing is graphite, with sparse construction-sketch limits. Ink needs `medium: "ink"` or `--outlinemedium ink`; source ink keeps the source line budget and short marks. A plan with no `drawing` section uses these defaults. A recipe is a preset of painter settings. The plan's flags go after the recipe's and before the command line's, so a flag on the command line still wins. Code: `src/paint/drawing-plan.mjs`.
+A field left out, or set to `auto`, adds no flag. The painter's own default applies: the drawing is graphite, with sparse construction-sketch limits. Ink needs `medium: "ink"`, `--outlinemedium ink` or an ink stage; source ink keeps the source line budget and short marks. Without `stages` or a `--drawingfile`, the [automatic stage choice](ink.md#automatic-drawing-stages) runs and can add ink stages. A plan with no `drawing` section uses these defaults. A recipe is a preset of painter settings. The plan's flags go after the recipe's and before the command line's, so a flag on the command line still wins. Code: `src/paint/drawing-plan.mjs`.
 
 For a pen-and-wash target, `tools/seg/ink-lines.mjs` takes the candidates from the target's own pen lines. The separator in `src/crop/inkwash.mjs` estimates the ink, which is traced to center lines and joined where pieces continue. With `--regions` it tags each line with its region, from the label map that `tools/seg/subject-regions.py` writes (Mask R-CNN for the person, Segment Anything for named parts). A plan uses them with `lines: "regions"` and `maxLines`.
 

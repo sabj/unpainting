@@ -13,7 +13,7 @@
 // --run is a paint-plate output directory with frames.json, its saved frames and painting.png; frames already resized
 // to WebP under the same names are used in their place. --target is the image that run painted from (default: the
 // run directory's target.webp, target.png or source.jpg). The default run, demos/lab/examples/white-ships-run/, is the
-// current painter's White Ships render with a drawing plan written by hand, its saved frames and source.jpg resized to
+// release 0.1.0 (painter V096) White Ships render with a drawing plan written by hand, its saved frames and source.jpg resized to
 // the panel size. Render with:
 //   node tools/paint-plate.mjs --image examples/targets/white-ships.jpg --width 720 --mode full --threads 4
 //     --valueplan examples/plans/white-ships.json --drawingfile white-ships-all --drawinglast white-ships-closing

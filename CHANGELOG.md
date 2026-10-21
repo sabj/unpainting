@@ -10,7 +10,7 @@ On the published Opus 5.5 V5 plans, 0.2.0 scores 7% higher than 0.1.1 (J1 6.36 a
 
 ### Drawing
 
-- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
+- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. On a run with no prepared drawing, the automatic stage choice (`--drawingstages auto`) can still add ink stages; `--drawingstages off` turns it off. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
 - Opt-in universal linework stage (`--linework auto`) for every style, with one cleanup for specks, shadow outlines and repeated marks.
 - A drawing made for another image must be registered first.
 
