@@ -1,7 +1,20 @@
-// --inkrecipe v2: one switch for the ink settings that hold the pen to the target (docs/ink.md). It sets each flag
-// only when the command line does not, so any of them can still be changed on its own.
+// --inkrecipe: one switch for a set of ink flags (docs/ink.md). It sets each flag only when the command line does not,
+// so any of them can still be changed on its own.
+//   v2    holds the pen to the target's lines (support filter, smoothing, width floor, darkness cap, damp pen). It does
+//         not turn ink on.
+//   wash  pen-and-wash: ink on, the target's own pen lines traced whole (copy-lines) and drawn first with no pencil,
+//         held to the target, with the width and darkness of the source's line along each stroke, the ink load
+//         matched to the source's line darkness on a scrap, the ink's hue taken from the source, and pale spread lines
+//         drawn on damp paper. For pen drawings and pen-and-wash sources; not for photographs.
 export const INK_RECIPES = Object.freeze({
   v2: Object.freeze({ linesupport: '5', linesmooth: '1', linesmoothcorner: '50', inkwidthfloor: '1', inkdarkcap: '1', inkdamp: '0.3' }),
+  wash: Object.freeze({
+    outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', copylinesmin: '0.005',
+    drawingstages: 'off', stages: 'prepink,finishink', prepinkfrom: 'lines', prepinkamount: '1', prepinkkeep: '1', prepinkadd: '0', prepinkdeviate: '0',
+    openingpressure: '0.75',
+    linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '1.2', inkwidthfloor: '1',
+    linemeasure: '1', inkdarkmatch: '1', inkhue: 'source', inkdamp: '0', inkbleed: '0.35',
+  }),
 });
 
 /** The flags --inkrecipe adds to argv: each of the recipe's flags that argv does not already set. */

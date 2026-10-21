@@ -149,6 +149,8 @@ import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
 import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-registration.mjs';
 import { holdInkLines } from '../src/paint/methods/ink-lines-file.mjs';
 import { inkCapOnScrap } from '../src/paint/methods/ink-scrap.mjs';
+import { inkKFromSource } from '../src/paint/methods/ink-hue.mjs';
+import { matchInkLoad, sampleGestures, strokesPeakAbsorbance, lPlane as inkLPlane } from '../src/paint/methods/ink-match.mjs';
 import { inkRecipeArgs } from '../src/paint/methods/ink-recipe.mjs';
 import { chooseDrawingStages, drawingStageIntent } from '../src/paint/methods/drawing-stages-auto.mjs';
 import { eraseWeights, erasePrep } from '../src/paint/methods/pencil-erase.mjs';
@@ -290,6 +292,10 @@ if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) t
 // written to continued-checks.json at exit (src/media/checks.mjs).
 setStrict(opt('strict', '0') === '1' || opt('wetgate', '0') === '1'); process.on('exit', () => writeContinuedChecks(out));
 const CODE_STATE = checkCodeState({ root, out, allowDirty: num('allowdirty', 0) > 0 });
+// --inkrecipe v2|wash: ink flags as one switch (src/paint/methods/ink-recipe.mjs); flags typed on the command line win,
+// and the recipe's flags win over the --recipe preset's. Added before the line source is prepared, since the wash
+// recipe picks it.
+argv.push(...inkRecipeArgs(opt('inkrecipe','none'), argv0));
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
@@ -322,16 +328,15 @@ if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','
 }
 const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
   ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
-// --inkrecipe v2: the ink flags below as one switch (src/paint/methods/ink-recipe.mjs); flags given on the command line win.
-argv.push(...inkRecipeArgs(opt('inkrecipe','none'), argv));
 // Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
 // --linesupport t (L*, default 0 off): keep only the parts of the opening and closing lines along which the target
 // shows a line at least t L* darker than beside it. --linesmooth mm (default 0 off): smooth stepped traces at mm,
 // keeping corners sharper than --linesmoothcorner degrees (default 50). Either writes <out>/ink-<stage>-lines.json and
 // points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too. It runs
 // again in a process that takes over a saved painting (--resumestate), on the line files as they now stand.
-const INK_LINES = opt('drawing','first') !== 'none' && opt('image','')
-  ? await holdInkLines({ opt, num, argv, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
+const holdInk = () => opt('drawing','first') !== 'none' && opt('image','')
+  ? holdInkLines({ opt, num, argv, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
+let INK_LINES = await holdInk();
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';
 const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -1157,6 +1162,8 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(SRC, w, h, gaussian, { s
 // The separator's reading of the source: which cells are pen line, which are wash. Read once; the ink's colour, the
 // line budget and the gate on the pen all use it.
 const SEP = separate(PX_SOURCE, w, h, paperRGB);
+// the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
+if (opt('inkrecipe','none') === 'wash' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
 // The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
@@ -1168,6 +1175,9 @@ const PREP_ERASE = num('preperase', 0.85) > 0 ? eraseWeights(PX_SOURCE, w, h) : 
 const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: SEP.stats.ink / n, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, rgb: PX_SOURCE, log: console.log,
   edges: () => edgeChains(SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
+// Linked stages write new opening and closing files after the hold above; hold those too, so the ink flags reach the
+// pens on a staged run as they do on a run with a prepared line file.
+if (LINEWORK.files?.prepInk || LINEWORK.files?.finishInk) INK_LINES = (await holdInk()) ?? INK_LINES;
 if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
 if (DRAWING_REGISTRATION) LINEWORK.registration = DRAWING_REGISTRATION;
 if (DRAWING_CHOICE) LINEWORK.drawingChoice = DRAWING_CHOICE;
@@ -1239,7 +1249,11 @@ if(!['ink','graphite'].includes(OUTLINE_MEDIUM))materialProfile(OUTLINE_MEDIUM);
 const INK_K_DECLARED=opt('inkk','')?opt('inkk','').split(',').map(Number):null;
 if(INK_K_DECLARED&&(INK_K_DECLARED.length!==3||INK_K_DECLARED.some(v=>!(v>0))))throw Error('--inkk needs three positive numbers');
 const INK_FAST=opt('inkfast','auto')==='auto'?!INK_PROFILE.rewets:num('inkfast',0)>0;
-const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
+// --inkhue source: the ink takes the hue of the target's own pen lines (src/paint/methods/ink-hue.mjs); --inkk wins.
+if(!['profile','source'].includes(opt('inkhue','profile')))throw Error('--inkhue: profile or source');
+const INK_HUE=opt('inkhue','profile')==='source'&&!INK_K_DECLARED?inkKFromSource(PX_SOURCE,SEP.ink,paperRGB,INK_PROFILE.pigment.K):null;
+if(opt('inkhue','profile')==='source')console.log(INK_HUE?`ink hue from the target's lines: K ${INK_HUE.K.join(',')} over ${INK_HUE.cells} line cells (profile ${INK_PROFILE.pigment.K.join(',')})`:'ink hue: too few target line cells, profile hue kept');
+const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:(INK_K_DECLARED??INK_HUE?.K??INK_PROFILE.pigment.K).map(v=>v*num('inkkscale',1))};
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
 // --outlinemedium graphite: pen-first outlines in pencil, not ink; graphite is a neutral grey, waterproof and light.
 // only on a sheet that will be drawn first (the same test as PEN_FIRST below), so a sheet washed first carries no unused pigment
@@ -1520,8 +1534,29 @@ const drawingCapsFor = (stage, graphite = false) => {
  return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
   ...(stage==='opening'?{minLengthMm:num('openingminmm',defaults.minLengthMm)}:{edgeMin:num('closingedgemin',defaults.edgeMin)})};
 };
-const penDraw = (sh,gs,want,w,h,o) => {
- const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
+// --inkdarkmatch c (default 0 off): before a pen stage's first ink, a sample of its real strokes is drawn on a blank
+// sheet of the painting's size and read as the target's lines were read; the ink load is then scaled, up or down, so
+// they come out c times as dark as the target's lines (src/paint/methods/ink-match.mjs). Planning reads only the
+// target's measures from ink-lines.json, never its pixels. Written to ink-dark-match.json.
+const INK_MATCH={};
+function inkDarkMatch(stage,gs,optionsAt,want,w,h){
+ if(INK_MATCH[stage])return INK_MATCH[stage].factor;
+ const A=INK_LINES?.[stage]?.stats?.peakAbsorbance;
+ if(!(A>0)){INK_MATCH[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark match, ${stage}: no measured target lines, load unchanged`);return 1;}
+ const sample=sampleGestures(gs,60);
+ const measure=f=>{const scrap=createSheet(makePaper(w,h,PAPER_OPTS),SHEET_PIGS);drawMaterial(scrap,sample,want,w,h,optionsAt(f));
+  return strokesPeakAbsorbance(inkLPlane(renderLayers(layersOf(scrap),SHEET_PIGS,new Uint8ClampedArray(w*h*3).fill(255),w*h,1),w*h),w,h,sample);};
+ const r=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
+ INK_MATCH[stage]={...r,target:A,sample:sample.length};
+ console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${r.before.toFixed(2)}, so the load is scaled by ${r.factor.toFixed(3)} (now ${r.after.toFixed(2)})`);
+ fs.writeFileSync(path.join(out,'ink-dark-match.json'),JSON.stringify(INK_MATCH,null,1)+'\n');
+ return r.factor;
+}
+const penDraw = (sh,gs,want,w,h,o0) => {
+ const stage=AREA_DRAW_STAGE, graphite=o0.ink?.[GRAPHITE_AT]>0, inkAt=PIGS.length;
+ const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
+ const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0&&!INKRES;
+ const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
   const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};

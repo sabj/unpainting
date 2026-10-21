@@ -14,6 +14,8 @@
 //
 // Pure: arrays in, arrays out. Coordinates are the line file's image pixels; L is CIE L* (0..100) on that grid.
 
+import { measureAlong, weightsFrom } from './ink-measure.mjs';
+
 const SIDE_RADII = [1, 1.5, 2, 2.25], ON_HALF = 0.35;
 
 /** Bilinear sample of a plane at (x, y), pixel centres at integer + 0.5, clamped to the edge. */
@@ -154,6 +156,11 @@ const fromPoints = (g, pts) => {
   return out;
 };
 const pathLen = pts => arcLengths(pts).at(-1) ?? 0;
+function nearInk(mask, w, h, x, y) {
+  const cx = Math.floor(x), cy = Math.floor(y);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = cx + dx, yy = cy + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h && mask[yy * w + xx]) return true; }
+  return false;
+}
 const quantile = (v, q) => { if (!v.length) return null; const s = Float64Array.from(v).sort(); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
 const Y = Lstar => (Lstar > 8 ? ((Lstar + 16) / 116) ** 3 : Lstar / 903.3);
 
@@ -163,8 +170,9 @@ const Y = Lstar => (Lstar > 8 ? ((Lstar + 16) / 116) ** 3 : Lstar / 903.3);
  * @returns { lines, stats } with stats { lines, kept, pieces, lengthPx, keptPx, turnBefore, turnAfter,
  *   supportedShare, lineL, sideL, absorbance } where absorbance is the median -ln(Y on-path / Y sides) over supported points
  */
-export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, threshold = 0, minRunPx = 3, gapPx = 2 } = {}) {
+export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, threshold = 0, minRunPx = 3, gapPx = 2, measure = false, inkMask = null } = {}) {
   const out = [], abs = [], onL = [], sideL = []; let lengthPx = 0, keptPx = 0, tb = 0, ta = 0, supportedPx = 0, kept = 0;
+  const measured = []; // with `measure`: [line, points carrying width and absorbance]
   const step = 0.5;
   for (const g of lines) {
     const raw = toPoints(g); if (raw.length < 2) continue;
@@ -172,18 +180,48 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
     const smooth = sigma > 0 ? smoothPath(raw, { sigma, cornerDeg }) : raw;
     ta += turning(smooth) * pathLen(smooth);
     const R = resample(smooth, step), { support, on, side } = pathSupport(R, L, w, h);
+    // `inkMask` (0/1 on the grid): a point with no ink cell within a pixel has no support, so a trace along a wash
+    // edge or a coloured brush mark is cut where the separator does not read pen line
+    if (inkMask) R.forEach((q, k) => { if (!nearInk(inkMask, w, h, q.x, q.y)) support[k] = Math.min(support[k], 0); });
+    if (measure) { const m = measureAlong(R, L, w, h, on, side, { spacing: step }); R.forEach((q, k) => { q.width = m.width[k]; q.absorb = m.absorbance[k]; }); }
     const { runs } = supportedRuns(support, { threshold: Math.max(threshold, 1e-6), window: 1 / step, gap: Math.round(gapPx / step), minRun: Math.round(minRunPx / step) });
     for (const [a, b] of runs) { supportedPx += (b - a) * step; for (let k = a; k <= b; k++) { abs.push(-Math.log(Math.max(1e-4, Y(on[k])) / Math.max(1e-4, Y(side[k])))); onL.push(on[k]); sideL.push(side[k]); } }
-    if (!(threshold > 0)) { out.push(sigma > 0 ? fromPoints(g, smooth) : g); keptPx += len0; kept++; continue; }
+    if (!(threshold > 0)) {
+      if (measure) measured.push([g, simplify(R, 0.1)]); else out.push(sigma > 0 ? fromPoints(g, smooth) : g);
+      keptPx += len0; kept++; continue;
+    }
     if (runs.length) kept++;
     for (const [a, b] of runs) {
-      const piece = sigma > 0 || runs.length > 1 || a > 0 || b < R.length - 1 ? simplify(R.slice(a, b + 1), 0.1) : raw;
+      const piece = measure || sigma > 0 || runs.length > 1 || a > 0 || b < R.length - 1 ? simplify(R.slice(a, b + 1), 0.1) : raw;
       if (piece.length < 2) continue;
-      keptPx += pathLen(piece); out.push(fromPoints(g, piece));
+      keptPx += pathLen(piece);
+      if (measure) measured.push([g, piece]); else out.push(fromPoints(g, piece));
     }
   }
+  if (measure) out.push(...measuredLines(measured));
   return { lines: out, stats: { lines: lines.length, kept, pieces: out.length, lengthPx, keptPx, turnBefore: lengthPx ? tb / lengthPx : 0, turnAfter: lengthPx ? ta / lengthPx : 0,
     supportedShare: lengthPx ? supportedPx / lengthPx : 0, lineL: quantile(onL, 0.5), sideL: quantile(sideL, 0.5), absorbance: quantile(abs, 0.5) } };
+}
+
+/**
+ * Measured pieces as line-file lines with per-point `widths` (pixels) and `weights` (0.45..1, each point's absorbance
+ * over the 85th percentile of the file's, from a floor of 0.45). A point with no width reading takes its piece's median, else the file's.
+ * A width is held to 1.6 times its piece's median, so a line crossing a dark wash does not swell into a blot.
+ * A piece spread wide and pale is marked `soft` (--inkbleed draws it on damp paper).
+ */
+function measuredLines(measured) {
+  const r = v => Math.round(v * 100) / 100, all = [], allW = [];
+  for (const [, pts] of measured) for (const q of pts) { if (q.absorb > 0) all.push(q.absorb); if (Number.isFinite(q.width)) allW.push(q.width); }
+  const ref = quantile(all, 0.85) ?? 0, fileW = quantile(allW, 0.5) ?? 1;
+  return measured.map(([g, pts]) => {
+    const own = pts.map(q => q.width).filter(Number.isFinite), pieceW = quantile(own, 0.5) ?? fileW;
+    const weights = weightsFrom(pts.map(q => q.absorb ?? 0), ref);
+    // soft: spread at least half again as wide as the file's typical line and no darker than 60% of its strong line,
+    // as a line drawn into a wet wash
+    const pieceA = quantile(pts.map(q => q.absorb ?? 0), 0.5) ?? 0, soft = pieceW >= 1.5 * fileW && pieceA <= 0.6 * ref;
+    const { widths: _w, weights: _g, soft: _s, ...rest } = g;
+    return { ...rest, points: pts.map(p => [r(p.x), r(p.y)]), widths: pts.map(q => r(Number.isFinite(q.width) ? Math.min(q.width, 1.6 * pieceW) : pieceW)), weights: weights.map(r), ...(soft ? { soft: true } : {}) };
+  });
 }
 
 /** The share (0..1] the ink load is scaled by so the pen's line absorbance on blank paper is `cap` times the target's. */

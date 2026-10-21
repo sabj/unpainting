@@ -66,7 +66,10 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (first && !lines.length) throw new Error(`drawing: the first pen selected 0 of ${candidates.length} lines from ${file}${skip.size ? ` (roles left out: ${[...skip].join(', ')})` : ''}`);
   log(first ? `drawing: ${lines.length} selected lines from ${file}, drawn whole; the walker's ${walked} gestures are not used`
     : `drawing, closing pen: ${lines.length} of ${all.length} lines of ${file} at weight ${min} or more, over the dry sheet`);
-  const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1 })); };
+  // --inkbleed d: a line the target shows soft and spread (ink-lines.mjs marks it `soft`) is drawn on paper d damp
+  const bleed = num('inkbleed', 0);
+  if (!(bleed >= 0 && bleed <= 1)) throw new Error('--inkbleed: a dampness from 0 to 1');
+  const strokesOf = g => { const L = num('drawstroke', 0.12) * Math.min(w, h), out = []; let cur = [g.points[0]], d = 0; for (let k = 1; k < g.points.length; k++) { const s = Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); d += s; cur.push(g.points[k]); if (d >= L && k < g.points.length - 1) { out.push(cur); cur = [g.points[k]]; d = 0; } } if (cur.length >= 2) out.push(cur); return out.map(points => ({ points, length: pathLength(points), tier: 1, weight: g.weight ?? 1, ...(g.soft && bleed > 0 ? { damp: bleed } : {}) })); };
   // Per-point `width` (px) and `weight` (0..1) set the pen along the stroke: contact = width x --drawwidthgain
   // - --drawwidthmargin cells (see GAIN), pressure = weight x --drawwant. Points without them are unchanged.
   // The flexible drawing nib's high-concentration dry line is approximately

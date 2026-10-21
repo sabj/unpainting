@@ -75,6 +75,7 @@ export function scaleLines(doc, w, h, { keepOrder = false, file = null } = {}) {
       if (g.kind) out.kind = g.kind;
       if (g.object) out.object = g.object;
       if (g.region) out.region = g.region;
+      if (g.soft) out.soft = true;
       return out;
     })
     .filter(g => g.points.length >= 2);

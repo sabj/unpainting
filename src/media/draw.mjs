@@ -34,7 +34,7 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     v.sort((a, b) => a - b);
     peak = v.length ? Math.max(1e-4, v[Math.floor(v.length * 0.95)]) : 1;
   }
-  const pen = createPen(penOpts);
+  const pen = createPen(penOpts), dryDamp = pen.damp;
   let dips = 0, drawn = 0;
   for (const g of gestures) {
     if (g.points.length < 2) continue;
@@ -51,6 +51,8 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
       if (p.dwell) q.dwell = p.dwell;
       return q;
     });
+    // `damp` on a gesture: the paper under this stroke is that damp at least (a line drawn into a wet wash)
+    pen.damp = g.damp != null ? Math.max(0, Math.min(1, g.damp)) : dryDamp;
     if (beforeStroke) beforeStroke({ sheet, pen, path, gesture: g, footprint: penRect(pen, sheet, path), index: drawn });
     const startDips = dips;
     penStroke(pen, sheet, path, { refillBelow, refill: p => { dipPen(p, ink); dips++; }, gpuBetween: true, flowEvery: O ? flowEvery : 0, between: n => { if (O && n % flowEvery === 0) step(sheet, O); } });

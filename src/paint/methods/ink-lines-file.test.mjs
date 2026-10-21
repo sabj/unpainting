@@ -59,3 +59,27 @@ test('--inkrecipe v2 adds only the flags the command line leaves unset', () => {
   assert.deepEqual(inkRecipeArgs('none', []), []);
   assert.throws(() => inkRecipeArgs('v3', []), /--inkrecipe/);
 });
+
+test('--linemeasure reads a finer file on the painting grid and writes per-point widths, weights and line cores', async () => {
+  const dir = await setup(), w = 60, h = 40, k = 3;
+  const fine = y => ({ points: Array.from({ length: 11 }, (_, i) => [k * (5 + 5 * i), k * y]) });
+  fs.writeFileSync(path.join(dir, 'fine-lines.json'), JSON.stringify({ image: { w: w * k, h: h * k }, lines: [fine(10.5), fine(30.5)] }));
+  const f = flags(['--drawingfile', path.join(dir, 'fine'), '--linesupport', '6', '--linemeasure', '1', '--inkdarkmatch', '1', '--width', String(w)]);
+  const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
+  const open = JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8'));
+  assert.deepEqual(open.image, { w, h });
+  assert.equal(open.lines.length, 1);
+  const g = open.lines[0];
+  assert.equal(g.widths.length, g.points.length);
+  assert.ok(g.weights.every(v => v >= 0.45 && v <= 1));
+  assert.ok(r.opening.stats.peakAbsorbance > 0);
+});
+
+test('--inkrecipe wash turns ink on and picks the source lines, and the command line still wins', () => {
+  const add = inkRecipeArgs('wash', ['--inkbleed', '0']), opt = n => add[add.indexOf('--' + n) + 1];
+  assert.equal(opt('outlinemedium'), 'ink');
+  assert.equal(opt('linesource'), 'source-ink');
+  assert.equal(opt('inkdarkmatch'), '1');
+  assert.ok(!add.includes('--inkbleed'));
+  assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');
+});
