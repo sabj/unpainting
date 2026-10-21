@@ -1,4 +1,5 @@
 // Generated from src/media/pen.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+// Pipeline: inking, stage 6 (the pen physics).
 // A dip pen with walnut ink, after Kim et al., "Hydrodynamics of Writing with Ink" (PRL 107, 2011): the paper pulls
 // ink from the nib by capillary imbibition, so slow strokes are wide and dark and fast ones thin. The nib carries a
 // drop after a dip, feeds through the slit, wicks along fibres, and skips on the paper's hills as it empties. DOM free.
