@@ -13,13 +13,16 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const REPO_VENV = '.venv-lines';
-// exits 0 only when numpy and OpenCV import; prints the versions it found either way
+// exits 0 only when numpy and OpenCV import; prints the versions it found either way, and whether torch and controlnet_aux
+// (the lineart models of tools/seg/sketch-map.py) are installed
 const PROBE = [
   'import json, sys',
   'v = {"python": sys.version.split()[0]}',
   'for mod, name in (("numpy", "numpy"), ("cv2", "opencv"), ("skimage", "scikit-image")):',
   '    try: v[name] = __import__(mod).__version__',
   '    except Exception: v[name] = None',
+  'import importlib.util as u',
+  'v["model"] = all(u.find_spec(m) is not None for m in ("torch", "controlnet_aux"))',
   'print(json.dumps(v))',
   'sys.exit(0 if v["numpy"] and v["opencv"] else 3)',
 ].join('\n');
@@ -47,6 +50,7 @@ function probe(python, run) {
   try { v = JSON.parse(String(r.stdout ?? '').trim().split('\n').at(-1)); } catch { v = {}; }
   const out = {
     ready: !r.error && r.status === 0,
+    model: v.model === true,
     python: v.python ?? null, numpy: v.numpy ?? null, opencv: v.opencv ?? null, 'scikit-image': v['scikit-image'] ?? null,
     ...(r.error || r.status !== 0 ? { error: r.error?.message ?? (String(r.stderr ?? '').trim().split('\n').at(-1) || `exit ${r.status}`) } : {}),
   };
@@ -57,8 +61,9 @@ function probe(python, run) {
 const loud = (warn, warned, key, text) => { if (warned.has(key)) return; warned.add(key); warn(`!!! line python: ${text}`); };
 
 /**
- * The resolved line python with its versions, logged. `ready` says whether numpy and OpenCV import.
- * @returns {{ path, from, ready, python, numpy, opencv, 'scikit-image', fallback?, error? }}
+ * The resolved line python with its versions, logged. `ready` says whether numpy and OpenCV import, `model` whether the
+ * lineart models' packages (torch, controlnet_aux) are installed.
+ * @returns {{ path, from, ready, model, python, numpy, opencv, 'scikit-image', fallback?, error? }}
  */
 export function linePython({ flag = '', env = process.env, root = REPO_ROOT, exists = fs.existsSync, run = spawnSync, log = console.log, warn = console.warn, warned = WARNED } = {}) {
   const choice = resolveLinePython({ flag, env, root, exists });

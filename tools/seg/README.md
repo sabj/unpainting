@@ -18,7 +18,7 @@ The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs
 | `segment.py` | `work/masks/<base>.png`, a figure-and-ground mask from u2net | `segments.py` |
 | `segments.py` | `work/segments/<base>.png` label map, `.json` legend and `-contours.json` outlines. `--mode scene` (default) names beach-scene parts by rule; `--mode regions` is SAM's masks as general regions (`sam_regions.py`) | `src/crop/segments.mjs`, `src/crop/segment-prep.mjs` |
 | `sam-points.py` | One named region from Segment Anything, prompted by points, in the segments format | `src/crop/segments.mjs` |
-| `sketch-map.py` | published fine/coarse structural maps and fusion, with source hashes | `sketch-lines.py` |
+| `sketch-map.py` | published fine/coarse structural maps and fusion, with source hashes | `sketch-lines.py`, and the wash recipe's line source (`src/paint/methods/line-model.mjs`) |
 | `sketch-lines.py` | continuous hierarchical pre-paint strokes, optional sky exclusion | `--drawingfile` / `--sketchlines 1` |
 | `sketch-target.mjs` | `<cache>/<target SHA-256>.png`, an image model's pen sketch of a target (one fixed prompt, OpenRouter), and its record | `--sketchcache`, checked by `src/paint/methods/sketch-check.mjs` |
 | `perspective.py` | JSON: vanishing points and the share of long edges that converge on them | the linework gate, `src/paint/methods/line-gate.mjs` |
@@ -61,6 +61,19 @@ wash pipeline's strict guard still permits aggregate, shape-level reference look
 
 `tools/judge/line-fidelity.py` produces registered overlays, native crops, and
 pixel/continuity/width diagnostics after rendering.
+
+### Lineart models for the wash recipe
+
+`--inkrecipe wash` takes its lines from the fused `sketch-map.py` map. It needs a python with NumPy, OpenCV, torch and controlnet_aux, and the published `lllyasviel/Annotators` weights (`sk_model.pth`, `sk_model2.pth`). The painter finds that python as it finds the line python (`--sketchpython`, `PAINTER_LINES_PYTHON`, `PAINTER_LINES_VENV`, then `.venv-lines`). A repository-local venv works:
+
+```sh
+python3 -m venv .venv-lines
+.venv-lines/bin/pip install numpy opencv-python-headless scikit-image torch torchvision controlnet_aux pillow
+```
+
+CPU torch is enough. The weights download once into `work/line-models/hf`. `--linemodeloffline 1` requires them to be there already. `--linemodelcache` moves the fused maps. The fused maps are kept in `work/line-maps/<target SHA-256>-<width>x<side>-<script hash>/`, so a source is mapped once. All of `work/` is untracked.
+
+When the packages or weights are missing, the wash recipe logs a `!!!` line and falls back to `copy-lines.py` on the source's own ink; `--linemodel strict` stops instead. The painter's `paint.log` and `linework.json` record which one ran (`extractor`).
 
 ### Continuous sketch planning
 

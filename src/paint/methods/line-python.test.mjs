@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { resolveLinePython, linePython } from './line-python.mjs';
+import sharp from 'sharp';
 import { prepareLineSource } from './linework-plan.mjs';
 
 const flags = argv => ({ argv, opt: (n, d) => { const i = argv.lastIndexOf('--' + n); return i >= 0 ? argv[i + 1] : d; }, num: (n, d) => Number(flags(argv).opt(n, d)) });
@@ -54,4 +55,52 @@ test('source-ink uses PAINTER_LINES_PYTHON without --sketchpython and records it
     if (saved === undefined) delete process.env.PAINTER_LINES_PYTHON; else process.env.PAINTER_LINES_PYTHON = saved;
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// a fake python: the probe says torch and controlnet_aux are there (or not); the two tools write what the real ones would
+function fakeModelPython(dir, model) {
+  const py = path.join(dir, 'fake.py'), python = path.join(dir, 'python');
+  fs.writeFileSync(py, [
+    'import sys, json, os',
+    'a = sys.argv[1:]; out = a[a.index("--out") + 1]',
+    'if a[0].endswith("sketch-map.py"):',
+    '    os.makedirs(out, exist_ok=True); stem = os.path.splitext(os.path.basename(a[1]))[0]',
+    '    open(os.path.join(out, stem + ".png"), "w").write("m"); open(os.path.join(out, stem + ".json"), "w").write(json.dumps({"width": 100, "height": 80}))',
+    'else:',
+    '    open(out + "-lines.json", "w").write(json.dumps({"image": {"w": 100, "h": 80}, "lines": []}))',
+    '    print(sys.argv[1].split("/")[-1], a[a.index("--kind") + 1] if "--kind" in a else "ink")',
+  ].join('\n'));
+  fs.writeFileSync(python, `#!/bin/sh\nif [ "$1" = "-c" ]; then echo '{"python": "3.9.6", "numpy": "2.0.2", "opencv": "4.11.0", "scikit-image": null, "model": ${model}}'; exit 0; fi\nexec python3 "${py}" "$@"\n`);
+  fs.chmodSync(python, 0o755);
+  fs.mkdirSync(path.join(dir, 'tools/seg'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'tools/seg/sketch-map.py'), '#');
+  return python;
+}
+
+test('--linemodel 1 traces the lineart map and does not cut it against the separator', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'line-model-plan-')), logs = [];
+  try {
+    const python = fakeModelPython(dir, 'true');
+    await sharp({ create: { width: 100, height: 80, channels: 3, background: '#fff' } }).png().toFile(path.join(dir, 'drawing.png'));
+    const f = flags(['--linesource', 'source-ink', '--image', 'drawing.png', '--copylinesmin', '0', '--linemodel', '1', '--copylinesagree', '2', '--copylinesfloor', '0', '--sketchpython', python]);
+    const info = await prepareLineSource({ ...f, out: dir, root: dir, inkShare: 0.02, log: s => logs.push(s) });
+    assert.equal(info.extractor, 'lineart-models');
+    assert.ok(logs.some(l => /lineart models, fused map computed/.test(l)));
+    assert.ok(!logs.some(l => /cut and .* dropped against the separator/.test(l)), 'no agreement cut on model lines');
+    assert.ok(f.argv.includes('--drawingfile'));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('without torch the models are skipped loudly and copy-lines traces the target, or --linemodel strict stops', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'line-model-plan-')), logs = [];
+  try {
+    const python = fakeModelPython(dir, 'false');
+    await sharp({ create: { width: 100, height: 80, channels: 3, background: '#fff' } }).png().toFile(path.join(dir, 'drawing.png'));
+    const f = flags(['--linesource', 'source-ink', '--image', 'drawing.png', '--copylinesmin', '0', '--linemodel', '1', '--sketchpython', python]);
+    const info = await prepareLineSource({ ...f, out: dir, root: dir, inkShare: 0.02, log: s => logs.push(s) });
+    assert.equal(info.extractor, 'copy-lines');
+    assert.ok(logs.some(l => /^!!! line source source-ink: lineart models skipped, .*no torch or controlnet_aux/.test(l)));
+    const strict = flags(['--linesource', 'source-ink', '--image', 'drawing.png', '--copylinesmin', '0', '--linemodel', 'strict', '--sketchpython', python]);
+    await assert.rejects(prepareLineSource({ ...strict, out: dir, root: dir, inkShare: 0.02, log: () => {} }), /--linemodel strict/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

@@ -85,9 +85,10 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 
 `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101-dev from after 0.2.1-rc.1, and it is off by default. It turns ink on by itself.
 
-- Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
-- Agreement. The tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each traced line to the parts within 2 cells of what the ink separator reads as pen line.
-- Fill. `--copylinesfill 1` fills the separator's pen line that no kept trace covers with the separator's own narrow-ridge lines, cut the same way. The tracer misses some pale and broad pen lines, as in Rembrandt's Woman Reading.
+- Lines. The pen draws the lines of the fused lineart map, traced whole, first and with no pencil. `tools/seg/sketch-map.py` runs the fine and coarse lineart models on the source at up to 1080 px wide and 1620 px tall (`--linemodelwidth`, `--linemodelside`) and fuses them. `tools/seg/copy-lines.py --kind line-map` traces the fused map. The map is cached by the source's SHA-256 in `work/line-maps` (`--linemodelcache`). It runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy, OpenCV, torch and controlnet_aux, and the published weights. See `tools/seg/README.md`.
+- Models missing. When torch, controlnet_aux or the weights are missing, the run logs a `!!!` line, and `copy-lines.py` traces the source's own ink instead. `--linemodel strict` stops the run instead. `--linemodel 0` turns the models off.
+- Agreement. The fallback tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each of its lines to the parts within 2 cells of what the ink separator reads as pen line. The model lines are not cut.
+- Fill. `--copylinesfill 1` fills the separator's pen line that no kept fallback trace covers with the separator's own narrow-ridge lines, cut the same way. It applies to the fallback only.
 - No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line, read at 540 px wide. The source then gets washes only.
 - Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 0.3 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
 - Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
@@ -99,6 +100,8 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 |---|---|---|
 | `--outlinemedium`, `--drawing` | `ink`, `both` | `graphite`, `first` |
 | `--linesource` | `source-ink` | `none` |
+| `--linemodel` | 1 | 0 |
+| `--inkres` | 3 | 1 |
 | `--copylinesmin` | 0.005 | 0.025 |
 | `--copylinesagree`, `--copylinesfloor`, `--copylinesfill` | 2, 0.6, 1 | 0, 0, 0 |
 | `--drawingstages` | `off` | `auto` |
@@ -113,7 +116,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--inkhue`, `--inkhuegain` | `source`, 1.5 | `profile`, 1 |
 | `--inkdamp`, `--inkbleed` | 0, 0.35 | 0, 0 |
 
-With `--linemeasure`, a line file drawn on a finer grid than the painting's is read on the painting's grid. `--inkdarkmatch` writes `ink-dark-match.json`. A flag given on the command line wins over the recipe.
+With `--linemeasure`, a line file drawn on a finer grid than the pen's is read on the pen's grid. The pen's grid is the painting's, or with `--inkres N` it is N times as fine. `--inkdarkmatch` writes `ink-dark-match.json`; with `--inkres` it draws and reads its sample on a fine sheet. A flag given on the command line wins over the recipe.
 
 `--lineinkonly 1` also keeps a line only within a pixel of cells the ink separator reads as pen line. On the ink-led sketches it drops the brush marks in foliage that the tracer reads as lines. On a Guardi it also drops arch mouldings drawn beside wash, so the recipe leaves it off.
 

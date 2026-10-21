@@ -25,6 +25,7 @@ import { edgeEvidence } from './line-evidence.mjs';
 import { cleanLines } from './line-cleanup.mjs';
 import { DEFAULT_SHEET_MM } from '../../media/sheet-size.mjs';
 import { agreeMask, agreeLines, uncovered } from './ink-agree.mjs';
+import { traceLineModel } from './line-model.mjs';
 import sharp from 'sharp';
 
 const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -89,7 +90,33 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
       // copy-lines traces a pen drawing whole; a painted source with only a little pen line gets the narrow-ridge
       // tracer. --copylinesmin sets the pen line share that counts as a pen drawing (default 0.025)
       const penDrawing = !observed || observed.inkCells / (observed.w * observed.h) >= num('copylinesmin', 0.025);
-      if (lp.ready && penDrawing) {
+      const wantModel = num('linemodel', 0) > 0 || opt('linemodel', '') === 'strict';
+      if (wantModel && lp.ready && lp.model && penDrawing) {
+        // a source the separator reads as (nearly) bare of pen line gets no pen lines, as with the narrow-ridge tracer
+        if (num('copylinesfloor', 0) > 0 && 100 * await separatorShare(image) < num('copylinesfloor', 0)) {
+          log(`line source source-ink: no pen lines, the separator reads under --copylinesfloor ${num('copylinesfloor', 0)}% pen line`);
+          argv.push('--drawing', 'none');
+          info.source = 'none';
+          return info;
+        }
+        try {
+          const t = traceLineModel({ python, root, image, stem, cacheDir: path.resolve(root, opt('linemodelcache', 'work/line-maps')),
+            width: num('linemodelwidth', 1080), maxside: num('linemodelside', 1620), tolerance: num('mapsmoothing', 0.25), offline: num('linemodeloffline', 0) > 0 });
+          info.extractor = 'lineart-models';
+          info.lineMap = { map: t.map, cached: t.cached };
+          if (!opt('inkprofile', '')) argv.push('--inkprofile', 'drawing-ink');
+          log(`line source source-ink: lineart models, fused map ${t.cached ? 'from the cache' : 'computed'}, traced whole (${t.summary})`);
+        } catch (e) {
+          if (opt('linemodel', '') === 'strict') throw e;
+          info.warning = `lineart models fallback: ${e.message}`;
+          log(`!!! line source source-ink: ${e.message}; falling back to copy-lines on the target's own ink (run tools/cloud/setup-lines.sh, see tools/seg/README.md)`);
+        }
+      } else if (wantModel) {
+        const why = !lp.ready ? `${python} cannot import numpy and OpenCV` : !lp.model ? `${python} has no torch or controlnet_aux` : 'the source has less pen line than --copylinesmin';
+        if (opt('linemodel', '') === 'strict') throw new Error(`--linemodel strict: ${why}`);
+        log(`!!! line source source-ink: lineart models skipped, ${why}`);
+      }
+      if (info.extractor !== 'lineart-models' && lp.ready && penDrawing) {
         const r = spawnSync(python, [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(num('width', 1080))],
           { encoding: 'utf8', timeout: 900000, env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' } });
         if (r.error || r.status !== 0) throw new Error(`source-ink copy failed: ${r.error?.message ?? r.stderr}`);
@@ -101,6 +128,8 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
           info.source = 'none';
           return info;
         }
+      } else if (info.extractor === 'lineart-models') {
+        // traced above from the models' fused map; nothing cuts it against the separator
       } else if (observed && lp.ready) {
         info.extractor = 'ink-lines';
         log(`line source source-ink: ${observed.lines.length} narrow-ridge lines (painted source)`);
@@ -143,6 +172,13 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
   return info;
 }
 
+// The share (0..1) of the picture the separator reads as pen line, at 540 px wide whatever the painting's width, as the
+// separator's ridge scales are in cells.
+async function separatorShare(image) {
+  const meta = await sharp(image).metadata(), fw = 540, fh = Math.max(1, Math.round(meta.height * fw / meta.width));
+  return agreeMask(await sharp(image).removeAlpha().resize(fw, fh, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer(), fw, fh, { near: 0 }).share;
+}
+
 // --copylinesagree <cells>: cut the traced lines to the parts within that many cells of the separator's pen line
 // (ink-agree.mjs); --copylinesgap points off it a run may cross, --copylinesrun the shortest run kept, in points.
 // --copylinesfloor <per cent>: a source the separator reads, at 540 px wide, as less pen line than this gets no pen lines.
@@ -153,9 +189,7 @@ async function agreeWithSeparator(file, image, { near, gap, minRun, floor, fill 
   const meta = await sharp(image).metadata();
   const rgb = await sharp(image).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer();
   const { mask, ink } = agreeMask(rgb, w, h, { near });
-  // the share is read at 540 px wide whatever the painting's width, as the separator's ridge scales are in cells
-  const fw = 540, fh = Math.max(1, Math.round(h * fw / w));
-  const share = floor > 0 ? agreeMask(await sharp(image).removeAlpha().resize(fw, fh, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer(), fw, fh, { near: 0 }).share : 1;
+  const share = floor > 0 ? await separatorShare(image) : 1;
   if (100 * share < floor) {
     fs.writeFileSync(file, JSON.stringify({ ...doc, lines: [], agree: { near, floor, share } }) + '\n');
     log(`line source source-ink: no pen lines, the separator reads ${(100 * share).toFixed(2)}% pen line, under --copylinesfloor ${floor}%`);
