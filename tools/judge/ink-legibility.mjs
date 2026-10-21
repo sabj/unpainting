@@ -3,6 +3,7 @@
 // cuts the named feature crops (bench/ink-heavy/features.json) from drawing-opening.png, and asks a vision model about
 // each crop alone: first what it is, with no hint, then which listed parts it can see (bench/ink-heavy/legibility.json).
 //   node tools/judge/ink-legibility.mjs --label <name> [--only <subject,..>] [--render 1] [--vision 1] [--note <text>]
+//   --judge codex   ask the codex CLI (codex exec -i) instead of agy
 //   --render 0 --runs <label> --from <file>   cut crops from another label's renders, or another file of the run
 // Output under work/ink-legibility/<label>/: runs/<subject>/ (the render), crops/<subject>__<crop>/crop.png (the crop
 // alone, in a folder of its own), pairs/<subject>__<crop>.jpg (source | drawing), verdicts.json. --note adds a row to
@@ -17,7 +18,8 @@ import { cropBox, showSize, parseReply, verdict, tally } from './legibility-core
 const root = path.resolve(new URL('../..', import.meta.url).pathname);
 const argv = process.argv.slice(2), opt = (k, d) => { const i = argv.lastIndexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
 const label = opt('label');
-if (!label) { console.error('usage: ink-legibility.mjs --label <name> [--only subject,..] [--render 1] [--vision 1] [--note text]'); process.exit(2); }
+if (!label) { console.error('usage: ink-legibility.mjs --label <name> [--only subject,..] [--render 1] [--vision 1] [--judge agy|codex] [--note text]'); process.exit(2); }
+const JUDGE = opt('judge', 'agy'), CODEX = opt('codex', process.env.CODEX_BIN || 'codex');
 const AGY = opt('agy', process.env.AGY_BIN || 'agy'), MODEL = opt('model', 'gemini-4-argon-high');
 const spec = JSON.parse(fs.readFileSync(path.join(root, 'bench/ink-heavy/legibility.json'), 'utf8')).subjects;
 const boxes = JSON.parse(fs.readFileSync(path.join(root, 'bench/ink-heavy/features.json'), 'utf8'));
@@ -62,9 +64,13 @@ async function cut(name, out) {
 function ask(dir, prompt) {
   const file = path.join(dir, 'crop.png');
   const text = `Open the image file ${file} with your file-viewing tool (do not run shell commands). It is a crop of a pen drawing; you have no other context. ${prompt}`;
+  // codex takes the image itself (-i), read-only, outside any repository; agy opens the file from its folder
+  const [bin, args] = JUDGE === 'codex'
+    ? [CODEX, ['exec', '-i', file, '--sandbox', 'read-only', '--skip-git-repo-check', `This image is a crop of a pen drawing; you have no other context. ${prompt}`]]
+    : [AGY, ['-p', text, '--model', MODEL, '--mode', 'plan', '--add-dir', dir]];
   return new Promise(resolve => {
     const run = tries => {
-      const p = spawn(AGY, ['-p', text, '--model', MODEL, '--mode', 'plan', '--add-dir', dir], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const p = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'], cwd: JUDGE === 'codex' ? dir : undefined });
       let out = ''; const timer = setTimeout(() => p.kill(), 240000);
       p.stdout.on('data', d => { out += d; }); p.stderr.on('data', () => {});
       p.on('close', () => { clearTimeout(timer); const j = parseReply(out); if (j || tries <= 0) resolve({ json: j, raw: out.trim().slice(0, 600) }); else run(tries - 1); });
@@ -102,15 +108,15 @@ if (opt('vision', '1') === '1') {
   const t = tally(verdicts), silent = Object.entries(verdicts).filter(([, v]) => v.unanswered).map(([k]) => k);
   if (silent.length) {
     // a reply that never came is not a verdict: say so, write nothing to the log, and stop with an error
-    console.error(`${label}: ${silent.length} of ${t.total} crops got no reply from ${AGY} (is it signed in? try: ${AGY} models). No verdicts written. Re-run with --render 0 --runs ${label}.`);
+    console.error(`${label}: ${silent.length} of ${t.total} crops got no reply from ${JUDGE === 'codex' ? CODEX : AGY} (is it signed in?). No verdicts written. Re-run with --render 0 --runs ${label}.`);
     process.exit(3);
   }
-  fs.writeFileSync(path.join(base, 'verdicts.json'), JSON.stringify({ label, model: MODEL, ...t, verdicts }, null, 1) + '\n');
+  fs.writeFileSync(path.join(base, `verdicts-${JUDGE}.json`), JSON.stringify({ label, judge: JUDGE, model: JUDGE === 'codex' ? 'codex' : MODEL, ...t, verdicts }, null, 1) + '\n');
   console.log(`${label}: ${t.recognised} of ${t.total} crops recognised`);
   if (opt('note', '')) {
     const log = path.join(root, 'work/ink-legibility/LOG.md');
     if (!fs.existsSync(log)) fs.writeFileSync(log, '# Ink legibility log\n\nBlind vision check of 12 named crops of the pen drawing alone (drawing-opening.png). Recognised = named right with no hint and enough parts seen.\n');
     const rows = Object.entries(verdicts).map(([k, v]) => `  - ${k}: ${v.recognised ? 'recognised' : 'no'} — said "${v.object}", ${v.seen}/${v.of} parts`).join('\n');
-    fs.appendFileSync(log, `\n## ${label}: ${t.recognised} of ${t.total} recognised\n\n${opt('note')}\n\n${rows}\n`);
+    fs.appendFileSync(log, `\n## ${label} (${JUDGE}): ${t.recognised} of ${t.total} recognised\n\n${opt('note')}\n\n${rows}\n`);
   }
 }
