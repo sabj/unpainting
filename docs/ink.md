@@ -86,6 +86,8 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101-dev from after 0.2.1-rc.1, and it is off by default. It turns ink on by itself.
 
 - Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
+- Agreement. The tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each traced line to the parts within 2 cells of what the ink separator reads as pen line. On Guardi, at 540 px, this keeps 507 lines whole, cuts 989 and drops 1871.
+- No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line. The source then gets washes only.
 - Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 1.2 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
 - Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
 - Darkness. `--inkdarkmatch 1` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are as dark as the source's. It raises the load as well as lowering it, within 1/8 to 4 times.
@@ -97,6 +99,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--outlinemedium`, `--drawing` | `ink`, `both` | `graphite`, `first` |
 | `--linesource` | `source-ink` | `none` |
 | `--copylinesmin` | 0.005 | 0.025 |
+| `--copylinesagree`, `--copylinesfloor` | 2, 0.6 | 0, 0 |
 | `--drawingstages` | `off` | `auto` |
 | `--stages` | `prepink,finishink` | none |
 | `--prepinkfrom`, `--prepinkamount`, `--prepinkkeep`, `--prepinkadd`, `--prepinkdeviate` | `lines`, 1, 1, 0, 0 | stage defaults |
@@ -113,7 +116,7 @@ With `--linemeasure`, a line file drawn on a finer grid than the painting's is r
 
 `--lineinkonly 1` also keeps a line only within a pixel of cells the ink separator reads as pen line. On the ink-led sketches it drops the brush marks in foliage that the tracer reads as lines. On a Guardi it also drops arch mouldings drawn beside wash, so the recipe leaves it off.
 
-The recipe is not for photographs or brush-only works. On a target with less pen line than `--penfirst` (0.5%) the painter warns. On Fragonard's brush-and-wash Rinaldo, with 0.2% pen line, it adds pen marks the source lacks.
+The recipe is not for photographs. On a target with less pen line than `--penfirst` (0.5%) the painter warns. Fragonard's brush-and-wash Rinaldo reads as 0.41% pen line at 540 px, under `--copylinesfloor`, so it gets no pen lines.
 
 ## Linework stages
 

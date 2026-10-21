@@ -9,7 +9,7 @@
 export const INK_RECIPES = Object.freeze({
   v2: Object.freeze({ linesupport: '5', linesmooth: '1', linesmoothcorner: '50', inkwidthfloor: '1', inkdarkcap: '1', inkdamp: '0.3' }),
   wash: Object.freeze({
-    outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', copylinesmin: '0.005',
+    outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', copylinesmin: '0.005', copylinesagree: '2', copylinesfloor: '0.6',
     drawingstages: 'off', stages: 'prepink,finishink', prepinkfrom: 'lines', prepinkamount: '1', prepinkkeep: '1', prepinkadd: '0', prepinkdeviate: '0',
     openingpressure: '0.75',
     linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '1.2', inkwidthfloor: '1',

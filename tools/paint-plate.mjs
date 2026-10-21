@@ -2857,9 +2857,12 @@ if (!RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none') {
 // An actual dry-pen checkpoint, using the same planned strokes and physics as
 // the full painting. The process exit hook still writes the strict guard report.
 if (num('drawingonly', 0) > 0) {
-  if (RESUMING || !PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none') throw new Error('--drawingonly requires an opening drawing');
+  // --copylinesfloor can leave a source with no pen lines; its dry opening is the bare sheet
+  const noPenLines = DRAWING === 'none' && EARLY_LINES?.source === 'none' && EARLY_LINES?.requested === 'source-ink';
+  if (RESUMING || (!noPenLines && (!PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none'))) throw new Error('--drawingonly requires an opening drawing');
   assertDeviceHealthy(sheet);
-  fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
+  if (noPenLines) await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'painting.png'));
+  else fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
   fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
   fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: drawnCount, backend: GPU_INFO }));
   await drainFrames(); if (FRAMER) FRAMER.close(); sheet._gpu?.close();

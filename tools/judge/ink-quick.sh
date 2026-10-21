@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 label=${1:?usage: ink-quick.sh <label> [painter flags...]}; shift
 width=${INK_QUICK_WIDTH:-540}
-targets=${INK_QUICK_TARGETS:-"bench/ink-heavy/targets/guardi-colonnade.jpg bench/ink-heavy/targets/tiepolo-bacchus-ariadne.jpg bench/ink-heavy/targets/h36-a.jpg"}
+targets=${INK_QUICK_TARGETS:-"bench/ink-heavy/targets/guardi-colonnade.jpg bench/ink-heavy/targets/tiepolo-bacchus-ariadne.jpg demos/lab/examples/h36-a/h36-a.png"}
 start=$(date +%s)
 for t in $targets; do
   name=$(basename "$t" | sed 's/\.[a-z]*$//')
