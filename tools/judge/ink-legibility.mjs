@@ -99,7 +99,12 @@ if (opt('vision', '1') === '1') {
       console.log(`${j.name}/${j.crop}: ${v.recognised ? 'recognised' : 'not recognised'} (said "${v.object}", ${v.seen}/${v.of} parts)${v.unanswered ? ' [no reply]' : ''}`);
     }
   }));
-  const t = tally(verdicts);
+  const t = tally(verdicts), silent = Object.entries(verdicts).filter(([, v]) => v.unanswered).map(([k]) => k);
+  if (silent.length) {
+    // a reply that never came is not a verdict: say so, write nothing to the log, and stop with an error
+    console.error(`${label}: ${silent.length} of ${t.total} crops got no reply from ${AGY} (is it signed in? try: ${AGY} models). No verdicts written. Re-run with --render 0 --runs ${label}.`);
+    process.exit(3);
+  }
   fs.writeFileSync(path.join(base, 'verdicts.json'), JSON.stringify({ label, model: MODEL, ...t, verdicts }, null, 1) + '\n');
   console.log(`${label}: ${t.recognised} of ${t.total} crops recognised`);
   if (opt('note', '')) {
