@@ -2,7 +2,7 @@
 // New ink is averaged down onto the painting's sheet as pigment, so later glazes lie over it. The fine sheet has no
 // water flow. Output: paint upsampled, each pixel scaled by fine over coarse ink reflectance per channel. DOM free.
 import { makePaper } from '../../media/paper.mjs';
-import { createSheet, fix } from '../../media/sheet.mjs';
+import { createSheet, fix, coherent } from '../../media/sheet.mjs';
 import { drawGestures } from '../../media/draw.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { TAPE } from '../../media/brush.mjs';
@@ -55,6 +55,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
   // (pen.mjs dampOf). Pores hold the same share of their capacity. Cleared again on settle.
   function wet() {
     if (TAPE && fine._tape) TAPE.push({ k: 'W', r: N });
+    coherent(main); // the painting's sheet may live on the GPU; read its water from there
     const cf = paper.capacity, cm = main.paper.capacity;
     let any = false;
     for (let i = 0; i < nL; i++) if (main.M[i] || main.s[i] > 0) { any = true; break; }
@@ -71,15 +72,19 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
   // the new fine ink, averaged over each coarse cell, deposited on the painting's sheet: settled where the painting's
   // sheet is dry, suspended in the water where a wash stands wet, so it moves with that wash as the pen's ink did
   function carry() {
+    coherent(main); // bring the GPU's copy down first, so what is written here is added to the real state
+    let wrote = false;
     for (let k = 0; k < K; k++) {
       const T = fineTotal(k), S = seen[k], add = new Float32Array(nL);
       let any = false;
       for (let y = 0; y < HH; y++) { const yl = (y / N) | 0; for (let x = 0; x < WH; x++) { const i = y * WH + x, d = T[i] - S[i]; if (d !== 0) { add[yl * W2 + ((x / N) | 0)] += d; any = true; } } }
       if (!any) continue;
       S.set(T);
+      wrote = true;
       const inv = 1 / (N * N), D = main.D[k], G = main.G[k], L = inkLo[k];
       for (let i = 0; i < nL; i++) if (add[i]) { const a = add[i] * inv; if (main.M[i]) G[i] += a; else D[i] += a; L[i] += a; }
     }
+    if (wrote) main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
   }
 
   /** The fine sheet dried: its water gone and its pigment fixed, as the painting's sheet is at the end of a pass. */

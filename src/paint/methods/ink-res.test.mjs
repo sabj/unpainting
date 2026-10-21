@@ -38,3 +38,13 @@ test('compose is N times the size and darker on the line than beside it', () => 
   const at = (x, y) => out[(y * R.width + x) * 3];
   assert.ok(at(90, 31) < at(90, 45));
 });
+
+test('on a GPU sheet the carry reads the sheet down first and tells the GPU it wrote', () => {
+  const { main, R } = setup();
+  const calls = [];
+  main._gpu = { syncAll: () => calls.push('syncAll'), cpuWroteAll: () => calls.push('cpuWroteAll') };
+  R.draw([line], new Float32Array(W * H).fill(1), W, H, { ink: [10], peak: 1 });
+  assert.ok(calls.includes('cpuWroteAll'));
+  assert.ok(calls.indexOf('syncAll') < calls.lastIndexOf('cpuWroteAll'));
+  assert.equal(calls.at(-1), 'cpuWroteAll');
+});
