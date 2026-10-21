@@ -78,6 +78,7 @@ export function lineBudget(gestures, cells, { width = 1.5 } = {}) {
 }
 
 
+// `drySheet(sheet, max, O, options, footprint)` dries the paper under the nib; the default dries the whole sheet.
 // Optional gate for crisp ink, off unless used. Numeric readings are taken between the dip and contact.
 export function dryPenGate({ O, audit = [], drySheet = dry } = {}) {
   return ({ sheet, pen, footprint, index }) => {
@@ -95,7 +96,7 @@ export function dryPenGate({ O, audit = [], drySheet = dry } = {}) {
     };
     const before=measure(); let after=before, dried=false;
     if(before.water>.001||before.pore>.02){
-      drySheet(sheet,20000,O,{level:60,levelMax:90,dt:6});dried=true;after=measure();
+      drySheet(sheet,20000,O,{level:60,levelMax:90,dt:6},footprint);dried=true;after=measure();
     }
     // Ink on paper that would not dry is drawn anyway and counted; --strict 1 stops instead.
     const stillWet=!check('Paper still wet before ink gesture',!(after.water>.001||after.pore>.021),{index,...after});

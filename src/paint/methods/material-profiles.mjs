@@ -48,11 +48,11 @@ export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeSt
  }
  return out;
 }
-export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,dropSize=.1,...opts}){
+export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,dropSize=.1,drySheet,...opts}){
  const profile=materialProfile(medium),k=sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
  if(k<0)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
  const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,w,h,state,caps,sourceInk,widthFloorMm});
- const dryGate=dryPenGate({O,audit});
+ const dryGate=dryPenGate({O,audit,...(drySheet?{drySheet}:{})});
  const gate=event=>{
   if(dryInk||profile.kind==='graphite')dryGate(event);
   else{

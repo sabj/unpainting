@@ -22,7 +22,23 @@ export const fineDrop=N=>.1*N*N;
 export function drawOnFineSheet(sheet, N, gestures, {w,h,edgeStrength,...options}) {
  const fw=w*N, fh=h*N;
  const edge=edgeStrength&&Float32Array.from({length:fw*fh},(_,i)=>edgeStrength[Math.floor(Math.floor(i/fw)/N)*w+Math.floor(i%fw/N)]);
- return drawMaterial(sheet,fineGestures(gestures,N),new Float32Array(1),fw,fh,{...options,pen:finePen(options.pen,N),dropSize:fineDrop(N),mmPerCell:options.mmPerCell/N,edgeStrength:edge});
+ return drawMaterial(sheet,fineGestures(gestures,N),new Float32Array(1),fw,fh,{...options,pen:finePen(options.pen,N),dropSize:fineDrop(N),drySheet:dryFootprint,mmPerCell:options.mmPerCell/N,edgeStrength:edge});
+}
+
+/**
+ * Dry the fine sheet under the nib, and only there. The fine sheet has no water flow: wet ink in a cell is settled where it
+ * lies, as the whole-sheet dry would settle it, but without that dry's full-sheet pass and its new full-size layer, which
+ * a hand's run of neighbouring strokes would otherwise pay on every stroke. The sheet is fixed once, by settle().
+ */
+export function dryFootprint(sheet,max,o,opts,footprint){
+ const [x0,y0,fw,fh]=footprint;
+ for(let y=y0;y<y0+fh;y++)for(let x=x0;x<x0+fw;x++){
+  const i=y*sheet.w+x;
+  sheet.W[i]=0;sheet.s[i]=0;sheet.M[i]=0;
+  for(let k=0;k<sheet.K;k++){sheet.D[k][i]+=sheet.G[k][i]+sheet.P[k][i];sheet.G[k][i]=0;sheet.P[k][i]=0;}
+ }
+ sheet.wetDirty=1;
+ return 0;
 }
 
 export function drawFineMaterial(fineInk, gestures, options) {

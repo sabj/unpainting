@@ -27,3 +27,13 @@ test('fine gestures keep the cell centre, widths and speeds N times as large',()
  const [g]=fineGestures([{points:[{x:0,y:0,nw:.5,v:1},{x:2,y:1}]}],3);
  assert.deepEqual(g.points[0],{x:1,y:1,nw:1.5,v:3});assert.equal(g.points[1].x,7);assert.equal(g.points[1].y,4);
 });
+
+import { dryFootprint } from './fine-material.mjs';
+test('the fine sheet dries under the nib only, without pushing a layer',()=>{
+ const w=10,h=10,pigments=[materialProfile('drawing-ink').pigment],s=createSheet(makePaper(w,h),pigments);
+ for(const i of [11,88]){s.W[i]=1;s.s[i]=1;s.M[i]=1;s.G[0][i]=2;}
+ dryFootprint(s,20000,DEFAULTS,{},[0,0,5,5]);
+ assert.equal(s.W[11],0);assert.equal(s.M[11],0);assert.equal(s.G[0][11],0);assert.equal(s.D[0][11],2);
+ assert.equal(s.W[88],1);assert.equal(s.G[0][88],2);
+ assert.equal(s.layers.length,0);
+});
