@@ -2427,3 +2427,33 @@ test('scattered and gregarious finds: at most 3 members, none overlapping the ma
  }
 });
 
+
+test('paint playback tool: each stroke maps to its instrument, tinted by its pigment',async()=>{
+ const m=await import('./mushrooms.mjs');
+ assert.equal(m.nativeToolFor({phase:'ink',role:'cap-contour'}),'pen');
+ assert.equal(m.nativeToolFor({phase:'ink',role:'gills'}),'pen');
+ assert.equal(m.nativeToolFor({phase:'ink',role:'cap-outline-2'}),'pencil');
+ assert.equal(m.nativeToolFor({phase:'wash',role:'cap'}),'brush');
+ assert.equal(m.nativeToolFor({phase:'glaze',role:'cap-glaze'}),'brush');
+ assert.equal(m.nativeToolFor({phase:'accent',role:'pit-shadow'}),'brush');
+ assert.match(m.pigmentSwatch({alizarin:.6,sienna:.4}),/^#[0-9a-f]{6}$/);
+ assert.notEqual(m.pigmentSwatch({alizarin:1}),m.pigmentSwatch({ochre:1}));
+ assert.equal(m.pigmentSwatch({}),m.TOOL_OVERLAY.ink);
+ const pts=Array.from({length:100},(_,i)=>[i*2,50+Math.sin(i/9)*20]);
+ const s=m.nativeToolStroke({id:'w3',phase:'wash',role:'cap',points:pts,width:18,palette:{ochre:1},progress:.4});
+ assert.equal(s.kind,'brush');assert.ok(s.path.length<=m.TOOL_OVERLAY.pathPoints+1);assert.deepEqual(s.path.at(-1),[198,+pts.at(-1)[1].toFixed(1)]);assert.equal(s.progress,.4);
+ const mid=m.toolPathPoint([[0,0],[10,0],[10,10]],.5);assert.ok(Math.abs(mid.x-10)<1e-9&&Math.abs(mid.y)<1e-9);
+});
+
+test('paint playback tool: shown only while painting, follows strokes, fades at completion, hides on pause',async()=>{
+ const m=await import('./mushrooms.mjs'),st=new m.ToolOverlayState();
+ const stroke=(id,progress)=>({id,kind:'pen',path:[[0,0],[100,0]],width:2,colour:'#000000',progress});
+ assert.equal(st.visible(0),false);st.update(stroke('a',0),0);assert.equal(st.visible(0),false,'no tool before playback starts');
+ st.start(0);assert.equal(st.visible(0),false,'nothing to show until a stroke arrives');
+ st.update(stroke('a',0),0);assert.equal(st.visible(1),true);
+ const p0=st.pose(16);st.update(stroke('a',.5),100);const p1=st.pose(200);assert.ok(p1.x>p0.x,'moves along the stroke');assert.equal(p1.kind,'pen');
+ st.update({...stroke('b',0),path:[[0,500],[50,500]]},300);const lifted=st.pose(316);assert.ok(lifted.lift>0,'lifts while travelling to the next stroke');
+ for(let t=330;t<1200;t+=16)st.pose(t);assert.ok(st.pose(1216).lift<.05,'lands on the new stroke');
+ st.finish(1300);assert.ok(st.alpha(1300+m.TOOL_OVERLAY.fadeMs/2)>0&&st.alpha(1300+m.TOOL_OVERLAY.fadeMs/2)<1,'fades out');assert.equal(st.visible(1300+m.TOOL_OVERLAY.fadeMs+1),false);
+ st.start(2000);st.update(stroke('c',.2),2000);assert.equal(st.visible(2001),true);st.hide();assert.equal(st.visible(2002),false,'pause hides it');
+});
