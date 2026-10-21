@@ -26,12 +26,22 @@ test('add mode adds the own pick\'s missing paints, best first, until the gap cl
   assert.match(guardNote(decision), /added/);
 });
 
-test('add mode falls back to the own pick when the cap stops it', () => {
+test('add mode merges when the cap stops it: the own pick keeps the forced paints that fit', () => {
   const forced = [P('sepia'), P('ochre')], own = [P('hansa'), P('cerulean')];
-  const { paints, decision } = guardForcedBox({ forced, own, score: scoreFor(['hansa', 'cerulean']), threshold: 1, max: 3 });
-  assert.equal(decision.action, 'replaced');
-  assert.deepEqual(paints.map(p => p.key), ['hansa', 'cerulean']);
+  const { paints, decision } = guardForcedBox({ forced, own, score: scoreFor(['hansa', 'cerulean']), threshold: 0.15, max: 3 });
+  assert.equal(decision.action, 'merged');
+  assert.deepEqual(paints.map(p => p.key), ['hansa', 'cerulean', 'sepia']);
   assert.match(decision.reason, /gap/);
+  assert.match(guardNote(decision), /with sepia kept/);
+});
+
+test('a bigger box can fit worse: add stops when no paint helps, then merges', () => {
+  // every paint past three costs 1, so adding to a four-paint forced box never helps
+  const score = ps => (ps.some(p => p.key === 'rose') ? 0 : 5) + Math.max(0, ps.length - 3);
+  const forced = [P('a'), P('b'), P('c'), P('d')], own = [P('rose'), P('a')];
+  const { decision } = guardForcedBox({ forced, own, score, threshold: 1 });
+  assert.equal(decision.action, 'merged');
+  assert.deepEqual(decision.paints, ['rose', 'a', 'b', 'c']);
 });
 
 test('replace mode takes the own pick', () => {
@@ -47,7 +57,7 @@ test('bad settings fail loudly', () => {
   const opts = o => [(k, d) => o[k] ?? d, (k, d) => Number(o[k] ?? d)];
   assert.equal(paintGuardOptions(...opts({})), null);
   assert.deepEqual(paintGuardOptions(...opts({ paintguard: '2' })), { threshold: 2, mode: 'add', max: 8 });
-  assert.throws(() => paintGuardOptions(...opts({ paintguard: '2', paintguardmode: 'x' })), /add or replace/);
+  assert.throws(() => paintGuardOptions(...opts({ paintguard: '2', paintguardmode: 'x' })), /add, merge, replace/);
   assert.throws(() => paintGuardOptions(...opts({ paintguard: '-1' })), /0 or more/);
 });
 
