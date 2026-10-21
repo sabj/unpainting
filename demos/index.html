@@ -13,11 +13,14 @@ main { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
 header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 h1 { font: 600 28px/1.1 Georgia, serif; margin: 0; }
 header a { color: var(--muted); font-size: 14px; }
-.demos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.demo { display: block; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; color: inherit; text-decoration: none; }
-.demo img { display: block; width: 100%; aspect-ratio: 6 / 5; object-fit: cover; background: #f6f3eb; }
-.demo span { display: block; padding: 10px 12px; font-weight: 600; }
-.demo:hover span, .demo:focus-visible span { text-decoration: underline; }
+.demo { display: grid; gap: 10px; }
+h2 { font: 600 20px/1.2 Georgia, serif; margin: 0; }
+h2 a { color: inherit; }
+.media { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 40%), 1fr)); gap: 12px; }
+.media a { display: block; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; color: var(--muted); text-decoration: none; font-size: 13px; }
+.media img { display: block; width: 100%; aspect-ratio: 6 / 5; object-fit: contain; background: #f6f3eb; }
+.media span { display: block; padding: 6px 10px; }
+@media (prefers-reduced-motion: reduce) { .media .moving { display: none; } }
 .plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .plates a { display: block; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
 .plates img { display: block; width: 100%; aspect-ratio: 6 / 5; object-fit: cover; }
@@ -26,10 +29,28 @@ header a { color: var(--muted); font-size: 14px; }
 <body>
 <main>
   <header><h1>Unpainting demos</h1><a href="https://github.com/sabj/unpainting">Source</a></header>
-  <section class="demos" aria-label="Demos">
-    <a class="demo" href="fungi/"><img src="fungi/plates/amanita.webp" alt="A fly agaric painted in ink and watercolour"><span>Spore Studies</span></a>
-    <a class="demo" href="lab/"><img src="thumbs/lab.webp" alt="A heart painted in Paint Lab"><span>Paint Lab</span></a>
-    <a class="demo" href="layers/"><img src="thumbs/layers.webp" alt="A painting split into its layers"><span>Layers</span></a>
+  <section class="demo" aria-labelledby="fungi">
+    <h2 id="fungi"><a href="fungi/">Spore Studies</a></h2>
+    <div class="media">
+      <a href="fungi/"><img src="fungi/plates/amanita.webp" alt="A fly agaric plate in ink and watercolour"><span>Plate</span></a>
+      <a href="fungi/" class="moving"><img src="thumbs/fungi-paint.webp" alt="The plate painting itself from blank paper: ink line by line, then washes under the brush" loading="lazy"><span>Painting</span></a>
+      <a href="fungi/" class="moving"><img src="thumbs/fungi-turn.webp" alt="The plate turning a full circle in 3D" loading="lazy"><span>Turning</span></a>
+      <a href="fungi/" class="moving"><img src="thumbs/fungi-morph.webp" alt="A fly agaric morphing into a field mushroom and back" loading="lazy"><span>Morphing</span></a>
+    </div>
+  </section>
+  <section class="demo" aria-labelledby="lab">
+    <h2 id="lab"><a href="lab/">Paint Lab</a></h2>
+    <div class="media">
+      <a href="lab/"><img src="thumbs/lab.webp" alt="A heart with an arrow through it, painted in Paint Lab"><span>Painting</span></a>
+      <a href="lab/" class="moving"><img src="thumbs/lab-paint.webp" alt="The heart painted wet in rose, then the arrow glazed over it" loading="lazy"><span>Painting it</span></a>
+    </div>
+  </section>
+  <section class="demo" aria-labelledby="layers">
+    <h2 id="layers"><a href="layers/">Layers</a></h2>
+    <div class="media">
+      <a href="layers/"><img src="thumbs/layers.webp" alt="The Trumbull painting and its layers as small tiles"><span>Painting</span></a>
+      <a href="layers/" class="moving"><img src="thumbs/layers-spread.webp" alt="The Trumbull painting tilting into its layers and spreading apart" loading="lazy"><span>Taken apart</span></a>
+    </div>
   </section>
   <section class="plates" aria-label="Spore Studies plates">
     <a href="fungi/?type=morel-1"><img src="fungi/plates/morel.webp" alt="Morel" loading="lazy"></a>

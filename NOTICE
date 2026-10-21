@@ -44,6 +44,7 @@ credits: THIRD_PARTY_NOTICES.md.
    docs/img/example-trumbull.webp
    docs/img/progress-trumbull.webp
    demos/thumbs/layers.webp
+   demos/thumbs/layers-spread.webp
    demos/layers/data/*
    bench/v2/targets/trumbull.png
    bench/crops/img/trumbull.webp
