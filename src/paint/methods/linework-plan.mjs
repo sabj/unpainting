@@ -84,7 +84,9 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
     if (choice === 'source-ink') {
       const stem = path.join(out, 'lines-source-ink');
       const observed = fs.existsSync(image) ? await writeInkLines(image, stem) : null;
-      const penDrawing = !observed || observed.inkCells / (observed.w * observed.h) >= 0.025;
+      // copy-lines traces a pen drawing whole; a painted source with only a little pen line gets the narrow-ridge
+      // tracer. --copylinesmin sets the pen line share that counts as a pen drawing (default 0.025)
+      const penDrawing = !observed || observed.inkCells / (observed.w * observed.h) >= num('copylinesmin', 0.025);
       if (lp.ready && penDrawing) {
         const r = spawnSync(python, [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(num('width', 1080))],
           { encoding: 'utf8', timeout: 900000, env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' } });
@@ -157,7 +159,9 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
     const stem = path.join(out, 'lines-source-ink'), r = await writeInkLines(image, stem);
     if (r.lines.length >= MIN_STAGE_LINES) {
       doc = JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8'));
-      if (rgb && grid?.w && grid?.h) {
+      // --linecleanup 0 keeps every traced line; the pen-and-wash recipe does, since --linesupport drops what the
+      // target does not show as a line
+      if (rgb && grid?.w && grid?.h && num('linecleanup', 1) > 0) {
         const w = grid.w, h = grid.h, n = w * h, mmPerCell = num('sheetmm', DEFAULT_SHEET_MM) / w;
         const raw = scaleLines(doc, w, h, { keepOrder: true });
         const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
