@@ -15,6 +15,7 @@ Rules:
 - One target per session, one session per try. The model has 85 minutes of its own time. Time it waits in `bench/paint.sh` is not counted.
 - Looks are unlimited (gentle self-view). The target guard stays on in the painter.
 - A finished painting counts. A setting the plan asks for that the painter never reads, an option nobody asked for and a passage with no brush path are recorded in the try's `pipeline.notes` and `optionCheck`, not failed. `npm run bench:run -- ... --strict-verdict` fails the painting on them instead, as the published 0.1 results did; use it when comparing with those. A painter killed by a signal, any other painter exit than 0 or 3, and no finished painting still fail.
+- In 0.2.1, Trumbull gets a fixed seven-paint box from the harness's base tokens unless its plan names a palette token. `npm run bench:run -- ... --no-base-palette` drops that box, so the painter picks its own paints unless the plan asks for a box.
 - If the session ends without a painting, the harness checks the plan and paints it without stops. A missing or refused plan gets one repair turn in the same session. So does a plan the painter refuses at full size.
 - The pigments cannot change once painting has started.
 - V5 tries after the first get `bench/feedback/`: the previous try's painting, plan, stops and judges. The model is asked to write `bench/SELF-REVIEW.md` before it reads the judges. The order is asked for, not enforced.

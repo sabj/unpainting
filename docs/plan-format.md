@@ -216,7 +216,7 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 | `charge` | 0 to 1, default 0.5 | each passage is charged at this quantile of its demand; what a cell still needs carries into the next band |
 | `carryMm` | 0 to 10 mm, default 2 | in `family` mode, the carried mask is averaged over this brush-sized area. Prefer 0 in new plans: 2 mm dilutes saturated colour and paints over lit areas |
 | `paleLimit` | 0 to 1, default 0.16 | pale planes up to this value get one clean first wash that no later layer crosses |
-| `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them |
+| `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |
 | `darkGain` | 0.5 to 3 | charges shadow glazes above their fitted demand, since a physical wash delivers about 70% of a planned dark |
 | `deepAccent` | `{max, grow, families}` | restates cells darker than `max` (0 to 255, darkest channel) as last accents, only inside the named families |
 | `furReserves` | `{bounds, reach, drop, dark, maxDensity, minCells}` | keeps sheen and glints open inside a dark coat before the washes |
