@@ -87,10 +87,11 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 
 - Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
 - Agreement. The tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each traced line to the parts within 2 cells of what the ink separator reads as pen line.
+- Fill. `--copylinesfill 1` fills the separator's pen line that no kept trace covers with the separator's own narrow-ridge lines, cut the same way. The tracer misses some pale and broad pen lines, as in Rembrandt's Woman Reading.
 - No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line. The source then gets washes only.
 - Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 0.3 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
 - Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
-- Darkness. `--inkdarkmatch 2` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are twice the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times.
+- Darkness. `--inkdarkmatch 1.6` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are 1.6 times the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times.
 - Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral. `--inkhuegain 1.5` raises each channel's share to the power 1.5, because dense ink renders less brown than its absorption direction.
 - Wet lines. `--inkbleed 0.35` draws a line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines are dry and crisp.
 
@@ -99,7 +100,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--outlinemedium`, `--drawing` | `ink`, `both` | `graphite`, `first` |
 | `--linesource` | `source-ink` | `none` |
 | `--copylinesmin` | 0.005 | 0.025 |
-| `--copylinesagree`, `--copylinesfloor` | 2, 0.6 | 0, 0 |
+| `--copylinesagree`, `--copylinesfloor`, `--copylinesfill` | 2, 0.6, 1 | 0, 0, 0 |
 | `--drawingstages` | `off` | `auto` |
 | `--stages` | `prepink,finishink` | none |
 | `--prepinkfrom`, `--prepinkamount`, `--prepinkkeep`, `--prepinkadd`, `--prepinkdeviate` | `lines`, 1, 1, 0, 0 | stage defaults |
@@ -108,7 +109,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--linegapmm`, `--lineminmm` | 0.6, 0.3 | 2 and 3 file pixels |
 | `--inkwidthfloor` | 1 | 0 |
 | `--linemeasure` | 1 | 0 |
-| `--inkdarkmatch` | 2 | 0 |
+| `--inkdarkmatch` | 1.6 | 0 |
 | `--inkhue`, `--inkhuegain` | `source`, 1.5 | `profile`, 1 |
 | `--inkdamp`, `--inkbleed` | 0, 0.35 | 0, 0 |
 

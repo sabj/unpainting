@@ -39,3 +39,13 @@ test('runs shorter than minRun are dropped', () => {
   const r = agreeLines([line(range(6, 14))], mask, w, h, { gap: 0, minRun: 3 });
   assert.equal(r.lines.length, 0);
 });
+
+test('uncovered pen line is the ink no line passes near', async () => {
+  const { uncovered } = await import('./ink-agree.mjs');
+  const ink = new Uint8Array(w * h);
+  for (let x = 0; x < 20; x++) ink[2 * w + x] = 1;
+  const r = uncovered([line(range(0, 8))], ink, w, h, 2);
+  assert.equal(r.count, 10);
+  assert.equal(r.mask[2 * w + 15], 1);
+  assert.equal(r.mask[2 * w + 3], 0);
+});

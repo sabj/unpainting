@@ -24,7 +24,7 @@ import { gaussian } from '../../keyframes/density.mjs';
 import { edgeEvidence } from './line-evidence.mjs';
 import { cleanLines } from './line-cleanup.mjs';
 import { DEFAULT_SHEET_MM } from '../../media/sheet-size.mjs';
-import { agreeMask, agreeLines } from './ink-agree.mjs';
+import { agreeMask, agreeLines, uncovered } from './ink-agree.mjs';
 import sharp from 'sharp';
 
 const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -96,7 +96,7 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
         info.extractor = 'copy-lines';
         if (!opt('inkprofile', '')) argv.push('--inkprofile', 'drawing-ink');
         log(`line source source-ink: observed paths and optical widths (${r.stdout.trim()})`);
-        if (num('copylinesagree', 0) > 0 && !await agreeWithSeparator(stem + '-lines.json', image, { near: num('copylinesagree', 0), gap: num('copylinesgap', 2), minRun: num('copylinesrun', 3), floor: num('copylinesfloor', 0), log })) {
+        if (num('copylinesagree', 0) > 0 && !await agreeWithSeparator(stem + '-lines.json', image, { near: num('copylinesagree', 0), gap: num('copylinesgap', 2), minRun: num('copylinesrun', 3), floor: num('copylinesfloor', 0), fill: num('copylinesfill', 0) > 0 ? observed : null, log })) {
           argv.push('--drawing', 'none');
           info.source = 'none';
           return info;
@@ -146,17 +146,29 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
 // --copylinesagree <cells>: cut the traced lines to the parts within that many cells of the separator's pen line
 // (ink-agree.mjs); --copylinesgap points off it a run may cross, --copylinesrun the shortest run kept, in points.
 // --copylinesfloor <per cent>: a source the separator reads as less pen line than this gets no pen lines at all.
-async function agreeWithSeparator(file, image, { near, gap, minRun, floor, log }) {
+// --copylinesfill 1: the separator's pen line that no kept trace covers is filled from the narrow-ridge lines
+// (ink-lines-file.mjs), cut the same way; copy-lines misses pale and broad pen lines.
+async function agreeWithSeparator(file, image, { near, gap, minRun, floor, fill = null, log }) {
   const doc = JSON.parse(fs.readFileSync(file, 'utf8')), { w, h } = doc.image;
+  const meta = await sharp(image).metadata();
   const rgb = await sharp(image).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer();
-  const { mask, share } = agreeMask(rgb, w, h, { near });
+  const { mask, ink, share } = agreeMask(rgb, w, h, { near });
   if (100 * share < floor) {
     fs.writeFileSync(file, JSON.stringify({ ...doc, lines: [], agree: { near, floor, share } }) + '\n');
     log(`line source source-ink: no pen lines, the separator reads ${(100 * share).toFixed(2)}% pen line, under --copylinesfloor ${floor}%`);
     return false;
   }
   const r = agreeLines(doc.lines, mask, w, h, { gap, minRun });
-  fs.writeFileSync(file, JSON.stringify({ ...doc, lines: r.lines, agree: { near, gap, minRun, kept: r.kept, cut: r.cut, dropped: r.dropped } }) + '\n');
+  let lines = r.lines, filled = 0;
+  if (fill?.lines?.length) {
+    const left = uncovered(lines, ink, w, h, near), sx = w / meta.width, sy = h / meta.height;
+    const scaled = fill.lines.map(l => ({ ...l, points: l.points.map(([x, y]) => [x * sx, y * sy]), length: l.length * sx, role: 'separator ink' }));
+    const extra = left.count ? agreeLines(scaled, left.mask, w, h, { gap, minRun }).lines : [];
+    lines = [...lines, ...extra];
+    filled = extra.length;
+    log(`line source source-ink: ${left.count} pen line cells uncovered, ${filled} narrow-ridge pieces added`);
+  }
+  fs.writeFileSync(file, JSON.stringify({ ...doc, lines, agree: { near, gap, minRun, kept: r.kept, cut: r.cut, dropped: r.dropped, filled } }) + '\n');
   log(`line source source-ink: ${r.kept} lines kept whole, ${r.cut} cut and ${r.dropped} dropped against the separator's pen line (within ${near} cells)`);
   return true;
 }

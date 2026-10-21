@@ -16,7 +16,26 @@ export function lightestTenth(rgb, n) {
 /** The separator's pen cells for an RGB picture, grown by `near` cells, and the share of cells it reads as pen line. */
 export function agreeMask(rgb, w, h, { near = 2, separator = {} } = {}) {
   const S = separate(rgb, w, h, lightestTenth(rgb, w * h), separator);
-  return { mask: near > 0 ? dilate(S.ink, w, h, near) : S.ink, share: S.stats.ink / (w * h) };
+  return { mask: near > 0 ? dilate(S.ink, w, h, near) : S.ink, ink: S.ink, share: S.stats.ink / (w * h) };
+}
+
+/** Cells of `ink` (w x h) more than `near` cells from every point of `lines`, grown by `near`: pen line no line covers. */
+export function uncovered(lines, ink, w, h, near = 2) {
+  const drawn = new Uint8Array(w * h);
+  for (const l of lines) {
+    const P = l.points;
+    for (let k = 0; k < P.length; k++) {
+      const a = P[k], b = P[Math.min(k + 1, P.length - 1)], steps = Math.max(1, Math.ceil(2 * Math.hypot(b[0] - a[0], b[1] - a[1])));
+      for (let s = 0; s <= steps; s++) {
+        const x = Math.round(a[0] + (b[0] - a[0]) * s / steps), y = Math.round(a[1] + (b[1] - a[1]) * s / steps);
+        if (x >= 0 && y >= 0 && x < w && y < h) drawn[y * w + x] = 1;
+      }
+    }
+  }
+  const near1 = dilate(drawn, w, h, near), left = new Uint8Array(w * h);
+  let count = 0;
+  for (let i = 0; i < w * h; i++) if (ink[i] && !near1[i]) { left[i] = 1; count++; }
+  return { mask: dilate(left, w, h, near), count };
 }
 
 /**
