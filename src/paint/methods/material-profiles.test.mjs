@@ -80,3 +80,13 @@ test('explicit pencil controls reach dry graphite execution',()=>{
  drawMaterial(sh,g,new Float32Array(600),30,20,{medium:'graphite-HB',mmPerCell:.5,O:DEFAULTS,graphiteOptions:{amount:.12,vary:.35,seed:7},graphiteExecute:(_s,_g,_k,o)=>{seen=o;return {drawn:1};}});
  assert.equal(seen.amount,.12);assert.equal(seen.vary,.35);assert.equal(seen.seed,7);
 });
+
+test('an ink width floor widens every contact, past the nib\'s widest when it must', () => {
+ const gestures=[{points:[{x:1,y:1,s:.2},{x:9,y:1,s:.2,nw:.1}]},{points:[{x:1,y:3,s:1,nw:20},{x:9,y:3,s:1,nw:20}]}];
+ const plain=prepareDrawing(gestures,{medium:'sepia-ink',stage:'closing',mmPerCell:.25,w:10,h:10,state:{used:0},caps:{pressure:1,edgeMin:0}});
+ const floored=prepareDrawing(gestures,{medium:'sepia-ink',stage:'closing',mmPerCell:.25,w:10,h:10,state:{used:0},caps:{pressure:1,edgeMin:0},widthFloorMm:.6});
+ assert.ok(plain[0].points.every(p=>p.nw*.25<.6));
+ assert.ok(floored[0].points.every(p=>Math.abs(p.nw*.25-.6)<1e-9),'thin contacts rise to the floor');
+ assert.ok(Math.abs(floored[1].points[0].nw*.25-.6)<1e-9,'the widest contact is the floor when it is above the nib');
+ assert.ok(Math.abs(plain[1].points[0].nw*.25-.45)<1e-9);
+});

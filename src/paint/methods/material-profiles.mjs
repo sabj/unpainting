@@ -28,8 +28,10 @@ export function sourceDrawingCaps({medium,stage='opening',sourceInk=false,planne
   ? {...sparse,lines:100000,pressure:stage==='closing'?CLOSING_PRESSURE_MAX:.75,minLengthMm:0,edgeMin:0}
   : {...sparse};
 }
-export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeStrength,w,h,state={used:0},caps,sourceInk=false}){
- const profile=materialProfile(medium),cap={...sourceDrawingCaps({medium,stage,sourceInk}),...caps};
+// `widthFloorMm` (--inkwidthfloor): no contact narrower than this, and the nib's widest contact rises to it. Default 0.
+export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeStrength,w,h,state={used:0},caps,sourceInk=false,widthFloorMm=0}){
+ const base=materialProfile(medium),cap={...sourceDrawingCaps({medium,stage,sourceInk}),...caps};
+ const profile=widthFloorMm>0?{...base,widthMm:[Math.max(base.widthMm[0],widthFloorMm),Math.max(base.widthMm[1],widthFloorMm)]}:base;
  if(!cap||!['opening','closing'].includes(stage)||!(mmPerCell>0)||!Number.isFinite(cap.lines)||cap.lines<0||!Number.isFinite(cap.pressure)||cap.pressure<0||cap.pressure>1)throw Error('Invalid drawing stage/physical scale');
  const at=p=>edgeStrength?.[Math.max(0,Math.min(h-1,Math.round(p.y)))*w+Math.max(0,Math.min(w-1,Math.round(p.x)))];
  const out=[];
@@ -46,10 +48,10 @@ export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeSt
  }
  return out;
 }
-export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},...opts}){
+export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,...opts}){
  const profile=materialProfile(medium),k=sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
  if(k<0)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
- const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,w,h,state,caps,sourceInk});
+ const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,w,h,state,caps,sourceInk,widthFloorMm});
  const dryGate=dryPenGate({O,audit});
  const gate=event=>{
   if(dryInk||profile.kind==='graphite')dryGate(event);
