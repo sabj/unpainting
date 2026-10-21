@@ -1,7 +1,7 @@
 // The plan's drawing section: whether the painter draws, in what medium, how much, which lines and how heavily.
 // Line models (tools/seg/lines.py) and tools/seg/ink-lines.mjs only extract candidate lines; this section chooses among
 // them. Each field becomes painter flags. An omitted field, or "auto", adds no flag, so the painter's own defaults
-// apply: --outlinemedium auto picks graphite or ink from the image, with the default caps and pressure.
+// apply: --outlinemedium graphite (a pencil drawing), with the default caps and pressure.
 // docs/plan-format.md describes the fields.
 
 const MEDIA = Object.freeze(['none', 'graphite', 'ink', 'auto']);

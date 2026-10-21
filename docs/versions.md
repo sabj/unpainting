@@ -16,11 +16,11 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 | 0.1.0, 0.1.1 | V096 | 100 | J1 |
 | 0.2.0 | V100 | 102 | J1 |
 
-V100 draws in pencil by default and uses ink only on request. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
+V100 sets the drawing medium to pencil by default. Ink comes from a plan, `--outlinemedium ink`, or the automatic stage choice on a run with no prepared drawing. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
 
 ## What each result records
 
-- `tools/paint-plate.mjs` prints `painter V100 · sim 102 · release 0.2.0 at <commit>`. It writes `release`, `painterVersion`, `simVersion` and `commit` into `frames.json` and `backend.json`. The commit ends in `-dirty` when tracked files differ from it, and is null outside a git checkout.
+- `tools/paint-plate.mjs` prints `painter V100 · sim 102 · release 0.2.0 at <commit>`. It writes `release`, `painterVersion`, `simVersion` and `commit` into `frames.json` and `backend.json`. The commit ends in `-dirty` when tracked files differ from it, and is null outside a git checkout. The painter refuses uncommitted source changes unless `--allowdirty 1` is given, and writes `code-state.json` either way.
 - Every benchmark run.json records the same four fields plus `judgeVersion`. The published runs record `commit: null`, because they were painted outside this repository.
 - results.json groups each round's tries by painter, sim and judge version and labels each group with its release. Two painter, sim or judge versions never share a mean. The leaderboard and gallery show all four versions for each round.
 

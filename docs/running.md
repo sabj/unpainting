@@ -16,7 +16,7 @@ Each image example needs an empty output folder. On a repeat run, move the previ
 
 The image planner is experimental. The stroke plan is the small, reproducible demonstration of brushwork and drying. The paintings in the README come from separate whole-painting plans; see [Painting sequences](examples.md).
 
-The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
+The default recipe, a preset of painter settings, opens with a light pencil drawing. On a run with no prepared drawing, `--drawingstages auto` (the default) can add ink stages, usually closing accents ([ink.md](ink.md#automatic-drawing-stages)). `--drawingstages off` keeps the pencil drawing only. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
 
 Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
 
@@ -54,11 +54,11 @@ node tools/paint-plate.mjs --image path/to/picture.jpg --width 540 \
   --mode fast --out work/my-picture --video 0
 ```
 
-Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. To save an animation too, install ffmpeg and remove `--video 0`.
+Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. The painter refuses to run from uncommitted source changes unless you pass `--allowdirty 1`. To save an animation too, install ffmpeg and remove `--video 0`.
 
-The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a pencil drawing first, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture`, `glaze-gains` and `trumbull`, which also picks its fixed palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is painter V096's recipe, which runs the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [Tuned settings](techniques.md#tuned-settings) lists every preset and fitted item.
+The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a pencil drawing first, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture` and `glaze-gains`. Its `washes.paints` fixes a palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is painter V096's recipe, which runs the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [Tuned settings](techniques.md#tuned-settings) lists every preset and fitted item.
 
-`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with an earlier painter than V100, which paints them differently.
+`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with release 0.1.0 (painter V096, sim 100). Painter V100 paints them differently.
 
 ## Main command-line controls
 
@@ -70,12 +70,13 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--out` | output directory | `work/plate` | same |
 | `--width` | planning width in cells | 700 | same |
 | `--mode` | `fast`, `full` | `fast` | same |
-| `--recipe` | `default`, `v096`, `person`, `none`, each optionally followed by `+<preset>` | omitted selects `default` | `default` |
+| `--recipe` | `default`, `penwash`, `v096`, `person`, `none`, each optionally followed by `+<preset>` | omitted selects `default` | `default` |
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
 | `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first`; `--recipe v096` uses `both` |
 | `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` | same; plan may override |
+| `--drawingstages` | `auto`, `off`: per-image pencil and ink stages when there is no prepared drawing | `auto` | same |
 | `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |
 | `--inkk`, `--inkkscale` | three positive comma-separated absorption values; scale factor | profile absorption; scale 1 | same; plan may override |
 | `--sheetmm` | physical width in mm | 152.4; physical brushes fit to postcard if omitted | postcard fit if omitted |
@@ -114,11 +115,11 @@ python3 -m http.server 8000 --directory demos
 # Open the server address printed in the terminal.
 ```
 
-The shipped examples have no animation entries. Picking an example or loading your own picture makes a quick sketch with the browser planner in `demos/lab/targets/target.js`. You can continue painting on that sheet. Your picture is never uploaded. If an example manifest supplies an animation, its final image becomes the background of a fresh sheet. That handoff preserves appearance but does not restore pigment or water, so the old paint cannot lift or mix. `?example=<id>` opens an example. `?nowebgpu=1` forces the CPU fallback.
+The picker offers blank paper, technique demonstrations and two recorded paintings, the Yale gateway (h36-a) and White Ships, listed in `demos/lab/examples/recorded.json`. Live mode re-runs a recording's material events in the simulator, and Carry on painting keeps that sheet. No image upload is offered. `?example=<id>` opens an example. `?physics=cpu` or `?nowebgpu=1` uses the CPU sheet instead of WebGPU.
 
-The example list, with each one's paper and palette, is in `tools/lab/examples.json`. Paint Lab paints with the painter's own paper, sheet, brush, pen and pencil: `node tools/lab/sync-site-media.mjs` copies them from `src/media/` into `demos/lab/media/`. Run it after changing `src/media/`; `npm test` fails while the copy is stale.
+Paint Lab paints with the painter's own paper, sheet, brush, pen and pencil: `node tools/lab/sync-site-media.mjs` copies them from `src/media/` into `demos/lab/media/`. Run it after changing `src/media/`; `npm test` fails while the copy is stale.
 
-To rebuild the example animations, run `sh tools/lab/paint-examples.sh`. It clears `work/paint-lab/` and paints each example at 540 px with the full drying schedule. Then run `node tools/lab/build-examples.mjs`, which samples evenly spaced frames up to its `FILM_FRAMES` cap and updates `demos/lab/examples/`. The painter's stroke records are not shipped.
+`node tools/lab/build-recorded-examples.mjs` cuts the White Ships recording excerpts from `demos/lab/examples/white-ships-run/`. The full live tapes are rebuilt as described below.
 
 ## Unused-code checks
 

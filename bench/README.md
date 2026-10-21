@@ -49,7 +49,7 @@ All five rounds were painted with painter V096, sim 100 and judges J1, in releas
 
 ## Reproduce
 
-You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 paint on your GPU or CPU with the public painter, so scores can differ from the published ones. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
+You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 paint on your GPU or CPU with painter V100 from release 0.2.0. Scores can differ from the published V096 ones. The V100 harness draws a plan's opening lines in pencil and runs no closing pen unless the plan's `extra-args.json` asks for ink. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
 
 ```sh
 npm run bench:test                                   # check every run record, that results/ regenerates unchanged, and dry runs of V3 to V5

@@ -9,11 +9,11 @@ Paint Lab, the browser version of the paper, brushes, pen and pencil. [demos/ind
 - `targets/`: one picker for recorded paintings and technique demonstrations. `worker/live-tape.js` re-runs the original recorded material events, including dips, in the simulator. Live is the default; 250 and 2,500 are early-stroke studies, not shortened recreations of a finished picture. Timeline seeks rebuild the physical state, and Carry on painting keeps it. Replay explicitly shows a recording, stepping saved frames without blending. No image upload is offered.
 - `ui/`: pointer contact, the cursor and the move queue on the page side.
 - `worker/`: the worker's helpers: demonstrations, pacing, undo history, autosave, sheet state and self-checks.
-- `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. `node tools/lab/build-recorded-examples.mjs` extracts early White Ships frames and paths into `examples/recorded.json`. It preserves the original frame numbers, tool shapes and coordinates. The full live tapes retain pigment recipes, tools, dip events and early strokes. Rebuild them with `node tools/lab/build-live-examples.mjs H36_RUN WHITE_SHIPS_RUN`; the older compact path logs are used only by recording mode.
+- `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. `node tools/lab/build-recorded-examples.mjs` extracts early White Ships frames and paths into `examples/recorded.json`. It preserves the original frame numbers, tool shapes and coordinates. The full live tapes retain pigment recipes, tools, dip events and early strokes. Rebuild them with `node tools/lab/build-live-examples.mjs H36_250 H36_2500 SHIPS_250 SHIPS_2500`, four run directories; the older compact path logs are used only by recording mode.
 
 Serve it with `python3 -m http.server 8000 --directory demos` and open the server address printed in the terminal.
 
-[Running the painter](../running.md#paint-lab) covers the examples and how to rebuild their animations. `tools/lab/build-site.mjs` copies this folder into the static site.
+[Running the painter](../../docs/running.md#paint-lab) covers the examples and how to rebuild their animations. `tools/lab/build-site.mjs` copies this folder into the static site.
 
 Manual brush and pen loads survive lifting. Use Re-dip brush / pen for a fresh load. Changing a material or tool loads that choice. Surface and pore water evaporate through the normal CPU or WebGPU physics; scratch marks use separate disposable paper.
 
@@ -39,11 +39,9 @@ but no `R` removal, so the fluid stays on until a later recorded removal or the
 user removes it. Dry contact and depleted load can also leave broken marks;
 they are not substitutes for the explicit recorded masks.
 
-The previous live indicator drew a nominal circle regardless of blocked contact.
-It also used the default brush radius for WebGPU read/write bounds, although
-both first washes record larger per-point radii (h36: up to 358.8 versus
-135.4 source cells; White Ships: 257.3 versus 96.1). Replay now includes those radii
-in the upload bounds and outlines only cells whose water or pigment actually
-changed in that application. The indicator is presented with the completed paint
-frame and cleared between strokes and operations; there is no interpolated
-travel animation across untouched paper. Overlays do not enter image exports.
+Replay uses each point's recorded radius for the WebGPU read and write bounds.
+The first washes record radii up to 358.8 source cells in h36 and 257.3 in White
+Ships. The live indicator outlines only cells whose water or pigment changed in
+that application. It appears with the finished paint frame and clears between
+strokes and operations. It does not animate travel across untouched paper.
+Overlays do not enter image exports.

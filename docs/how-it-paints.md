@@ -1,10 +1,10 @@
 # How it paints
 
-The painter starts with blank paper. It draws in ink, lets the drawing dry, then builds the painting from light to dark in washes, layers of diluted paint. The painter saves the sheet as it goes, so you can stop or rewind anywhere between blank paper and the finished painting.
+The painter starts with blank paper. It draws in pencil, lets the drawing dry, then builds the painting from light to dark in washes, layers of diluted paint. Ink comes only from a plan, `--outlinemedium ink` or the automatic stage choice ([Ink](ink.md#automatic-drawing-stages)). The painter saves the sheet as it goes, so you can stop or rewind anywhere between blank paper and the finished painting.
 
 ![Trumbull College: photograph, target, and the painting building from blank paper](img/hero-trumbull.webp)
 
-The [README diagram](../README.md#how-does-it-work) shows the whole loop on one screen.
+The [README diagram](../README.md#how-does-it-work) shows the whole loop on one screen. The paintings and swatches on this page were made with release 0.1.0 (painter V096, sim 100). The Trumbull plan asks for ink, so its drawing is sepia ink.
 
 ## 1. Paper
 
@@ -28,9 +28,9 @@ By default the sheet fits the target inside a 6 x 4 in postcard turned to match 
 
 Code: `src/media/paper.mjs` builds the surface and `src/media/sheet.mjs` moves the water and pigment. [Pigments and paper](pigments-and-paper.md) has the details.
 
-## 2. Ink
+## 2. Pencil and ink
 
-The ink goes down first as a drawing and dries before the washes. Sepia ink can rewet and lift under them; black ink resists lifting better. A plan can add closing ink accents after the washes.
+The drawing goes down first and dries before the washes. In 0.2.0 the drawing medium defaults to pencil (graphite), which does not move under water. On a run with no prepared drawing, the automatic stage choice can still add ink. It adds closing accents on most pictures, and an ink drawing for pen sources and buildings. When a run draws in ink, sepia ink can rewet and lift under the washes; black ink resists lifting better. A plan can also add closing ink accents after the washes.
 
 The pen is a dip pen with a finite load of walnut ink. Four things change its line:
 
@@ -43,7 +43,7 @@ The pen is a dip pen with a finite load of walnut ink. Four things change its li
 
 ![A pen line that changes pressure and speed, fresh ink pulled with clean water, and ink drawn over a dried wash](img/technique-inking.webp)
 
-The default, `--outlinemedium auto`, draws in ink when the source shows at least 0.5% line and in graphite below that. `--outlinemedium graphite` forces the lighter pencil drawing. Code: `src/media/pen.mjs` and `src/paint/methods/pencil-line.mjs`. The command line does not use the separate `src/media/pencil.mjs` API, which models wear, dust and movable graphite. [Ink](ink.md) covers how the lines are chosen and the other drawing orders.
+The default is `--outlinemedium graphite`, a light pencil drawing. `--outlinemedium ink` draws in ink. `--outlinemedium auto` draws in ink when the source shows at least 0.5% line, and in graphite below that. Code: `src/media/pen.mjs` and `src/paint/methods/pencil-line.mjs`. The command line does not use the separate `src/media/pencil.mjs` API, which models wear, dust and movable graphite. [Ink](ink.md) covers how the lines are chosen and the other drawing orders.
 
 ## 3. Paint
 
@@ -86,7 +86,7 @@ flowchart TD
 
     subgraph S[2. Prepare the sheet]
         S1[Initialize paper texture and absorbency] --> S2[Reserve lights]
-        S2 --> S3[Draw selected paths in ink]
+        S2 --> S3[Draw selected paths: pencil, or ink if asked]
         S3 --> S4[Let the drawing dry]
     end
 
@@ -121,7 +121,7 @@ A [stroke plan](plan-format.md) can supply all of these decisions. The image pai
 
 ### Prepare the sheet
 
-The painter lays fresh paper, reserves the lights that must stay white, and draws the selected paths in ink. Then it dries the drawing.
+The painter lays fresh paper, reserves the lights that must stay white, and draws the selected paths. The drawing is pencil unless the plan or the stage choice asks for ink. Then it dries the drawing.
 
 ### Paint
 

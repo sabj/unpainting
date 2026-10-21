@@ -4,15 +4,17 @@ Pen and wash is an ink drawing with watercolor over or under it. The painter kee
 
 ![Two rows, Guardi's A Colonnade, Partly Ruined, with Figures and Tiepolo's Bacchus and Ariadne. Each row: the target, the painting's estimated ink, the pen drawing, the washes, and the finished painting](img/ink.webp)
 
-Two pen-and-wash paintings. Both targets are almost all pen line. Each row: the target, the estimated ink, the pen drawing before any paint, the washes before the closing ink, and the finish. The estimated ink is worked out from the saved frames; the painter doesn't save it as a layer.
+Two pen-and-wash paintings. Both targets are almost all pen line. Each row: the target, the estimated ink, the pen drawing before any paint, the washes before the closing ink, and the finish. The estimated ink is worked out from the saved frames; the painter doesn't save it as a layer. Both were painted with release 0.1.0 (painter V096, sim 100).
 
 In the third image of each row, the pen drawing is thin, brown and hard-edged. In the fourth, the washes are broad and soft and settle into the shapes the pen set. The ink gives the structure and the wash gives the light.
 
 ## Ink or pencil
 
-The painter first looks for pen line in the target. If at least 0.5% of the picture reads as ink line, the source was a pen drawing, and the painter draws in ink. Below that, it draws a light pencil underdrawing. Ink on a target without line would add marks the original lacks. Pencil is light, neutral and does not move under water, so the washes cover it.
+In 0.2.0 `--outlinemedium` defaults to graphite, a light pencil underdrawing, while ink is reworked. On a run with no prepared drawing, the [automatic stage choice](#automatic-drawing-stages) can still add ink stages. Pencil is light, neutral and does not move under water, so the washes cover it.
 
-A plan can set this itself. Its `drawing` section sets the medium, the ink color, how many lines and how heavy ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
+`--outlinemedium ink` draws in ink. `--outlinemedium auto` chooses from the target. It draws in ink if at least 0.5% of the picture reads as ink line (`--penfirst`), and in pencil below that. Ink on a target without line would add marks the original lacks.
+
+A plan can set this itself. `drawing.medium: "ink"` asks for ink. The `drawing` section also sets the ink color, how many lines and how heavy ([plan-format.md](plan-format.md#value-plans-the-drawing-section)).
 
 ## Where the lines come from
 
@@ -22,7 +24,8 @@ A plan picks the line set with `drawing.source`:
 |---|---|---|
 | `source-ink` | pen drawings and pen-and-wash masters: the target's own pen lines, traced | photographs (it traces dark ridges, not structure) |
 | `photo-sketch` | architecture photographs: continuous structural lines with a width hierarchy (`tools/seg/sketch-lines.py`) | portraits and loose landscapes, where it is weaker; it needs python3 with numpy and OpenCV |
-| `auto` (default) | anything: `source-ink` when at least 0.5% of the target reads as pen line, else `photo-sketch` when it can run, else the pen finds its own lines | |
+| `auto` | anything: `source-ink` when at least 0.5% of the target reads as pen line, else `photo-sketch` when it can run, else the pen finds its own lines | |
+| `none` (default) | a plan with no source: the pen finds its own lines, or draws a `--drawingfile` | |
 
 Under the plan's choice, the painter's tools are:
 
@@ -80,17 +83,29 @@ Ink is waterproof (`drawing.ink.waterproof`) by default for black and soluble fo
 
 Each run with stages writes `stage-prep.jpg`, `stage-prepink.jpg` and `stage-finishink.jpg`, the sheet after each stage. It also writes `layer-*.jpg`, what each stage laid on its own, with the stage line files and `linework.json`.
 
+## Automatic drawing stages
+
+`--drawingstages auto`, the default, chooses the linked stages for each picture (`src/paint/methods/drawing-stages-auto.mjs`). It does not run when the command line names a `--drawingfile` or `--drawinglast`, or the run has a plan with `drawing.stages`, `--drawing none` or `--drawingstages off`.
+
+The rule in `src/paint/methods/drawing-choice.mjs` reads the picture before painting:
+
+- `prep`: a light pencil placement, or a fuller one for built structure. A picture with under 0.5% of its cells on an edge gets none.
+- `prepInk`: ink over the pencil, for a pen source or built structure. A pen source shows at least 2.5% pen line. Built structure has two or more vanishing points carrying 12% of the long edges.
+- `finishInk`: closing ink accents when at least 2% of the cells lie on an edge, which is most pictures.
+
+Any ink stage sets `--outlinemedium ink`. An ink finish adds a closing pass, `--drawing both`, or `last` when there is no opening stage. With no stage at all the run draws nothing. A typed `--drawing first` drops the finish. The pen-and-wash style always gets `prepInk` and no `finishInk`. With `OPENROUTER_API_KEY` set, a vision model proposes the stages first; it can drop an ink stage but cannot add one the rule refuses. The choice is written to `drawing-choice.json`. `--drawingstages off` keeps the plain pencil drawing.
+
 ## Drawing order
 
-The default recipe (`--drawing first`) draws first, lets the drawing dry, then paints the washes. A plan can add closing ink accents with a `finishInk` stage or `closingLines`. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The pen keeps one reservoir across marks and dips again when it runs low, so a long line does not run dry. The washes soften and partly cover the lines. The closing pass adds a few dark accents where the target has strong edges.
+The default recipe sets `--drawing first`: the drawing goes down first and dries, then the washes. A closing pass needs `--drawing both`, a plan's `finishInk` stage or `closingLines`, or an ink finish from the automatic stage choice. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The pen keeps one reservoir across marks and dips again when it runs low, so a long line does not run dry. The washes soften and partly cover the lines. A closing pass, when asked for, adds a few dark accents where the target has strong edges.
 
 | `--drawing` | Before paint | After paint |
 |---|---|---|
 | `both` | drawing | ink accents |
-| `first` (default recipe) | ink or pencil, chosen from the target | closing ink only if the plan asks (`finishInk` or `closingLines`) |
+| `first` (default) | pencil, or ink if asked | nothing; an ink finish stage or a plan's `closingLines` switches to `both` |
 | `last` | nothing | ink |
 | `none` | nothing | nothing |
-| `detect` | ink if the target shows pen line | ink if it does not |
+| `detect` | the drawing, if the target shows pen line (`--penfirst`) | ink, if it does not |
 
 Each image run writes `ink.jpg` and `wash.jpg` next to `painting.jpg`.
 
@@ -98,9 +113,10 @@ Each image run writes `ink.jpg` and `wash.jpg` next to `painting.jpg`.
 
 ```sh
 npm run example:drawing
+node tools/paint-plate.mjs --image <target> --outlinemedium ink
+node tools/paint-plate.mjs --image <target> --outlinemedium ink --drawing both
+node tools/paint-plate.mjs --image <target> --outlinemedium ink --inkprofile black-ink
 node tools/paint-plate.mjs --image <target> --drawing last
-node tools/paint-plate.mjs --image <target> --outlinemedium graphite
-node tools/paint-plate.mjs --image <target> --inkprofile black-ink
 ```
 
 For a value plan that selects `ink-and-wash`, the default recipe keeps the target's paper tone (`--paperrgb source`), a lean fitted palette, nested light-to-dark value masses and planned stroke lanes (`--strokeplan 1 --laneadapt 1`).

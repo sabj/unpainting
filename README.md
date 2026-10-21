@@ -11,6 +11,8 @@ Want to help? The [open problems](docs/future-ideas.md) need work: linework, was
 
 <p align="center"><img src="docs/img/hero-trumbull.webp" alt="Trumbull College: original photo, stylized target, and the painting building from blank paper to the finished painting"></p>
 
+<p align="center">Trumbull College, painted with release 0.1.0 (painter V096, sim 100).</p>
+
 
 <a href="https://sabj.github.io/unpainting/layers/"><img src="docs/img/layers-thumb.webp" width="200" align="right" alt="The Trumbull painting and its layers as small tiles"></a>
 
@@ -59,15 +61,19 @@ unpainting/
 
 The pipeline has seven steps: instructions, planning tools, plan execution, tool preparation, tool use, judgment and practice between attempts. It takes a painting-style image and prepares paper, colors and brushes. It plans the painting, executes the plan, then judges the result and improves on it.
 
-A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. In 0.2.0 the drawing is pencil unless a plan or `--outlinemedium ink` asks for ink.
+A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. In 0.2.0 the drawing medium defaults to pencil. A plan, `--outlinemedium ink` or the [automatic stage choice](docs/ink.md#automatic-drawing-stages) can add ink.
 
-<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run"></a></p>
+<p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run with a pencil drawing"></a></p>
+
+<p align="center">Card 2 is a White Ships run from release 0.1.0 (painter V096, sim 100).</p>
 
 The Part 1 post walks through the [full painting pipeline](https://samjackson.org/writing/whats-a-painting-anyway-part-1/#suffering-xl-pipeline) with pictures of each stage. Locally, [how it paints](docs/how-it-paints.md) covers the materials, and [the plan format](docs/plan-format.md) defines the commands a planner can issue. While a painting runs, the guard blocks reads of the target's pixels. The painter works from its plan and what it sees on the sheet.
 
 [Rules, records and limits](docs/honesty.md).
 
 <p align="center"><img src="docs/img/cheat-white-ships.webp" width="912" alt="Sargent's White Ships four times: the target; cheat #1, a hill-climber that keeps random dabs only when they match the photo better; cheat #2, the painter's own strokes replayed with their paint taken from the photo's pixels, with an inset heat map of where it read the photo; and the painter's run building up stroke by stroke. The same brush outline moves over cheat #2 and the painter, and rings mark each new hill-climb dab. Both cheats get a red X near the end."></p>
+
+<p align="center">The painter's run in the last panel was made with release 0.1.0 (painter V096, sim 100).</p>
 
 More recorded paintings are in the [painting sequences](docs/examples.md).
 
@@ -95,7 +101,7 @@ node tools/paint-plate.mjs --image path/to/painting.jpg --width 540 --mode fast 
 
 <p align="center"><img src="docs/img/build-white-ships.webp" width="560" alt="Sargent's White Ships beside a benchmark painting by Sol, built from blank paper with the brush outline following each recorded stroke, then rewound"></p>
 
-Sargent's White Ships, left, and Sol's benchmark painting, right. The outline is the brush; paint shows up at the next saved frame.
+Sargent's White Ships, left, and Sol's benchmark painting, right, made with painter V096 and sim 100 (release 0.1.0). The outline is the brush; paint shows up at the next saved frame.
 
 Unless told otherwise, the painter runs its default recipe, a preset of painter settings (`src/paint/recipe.mjs`). [Methods, techniques and tuned settings](docs/techniques.md) lists every part of the painter, which settings were fitted to benchmark images, and how to turn each one off.
 

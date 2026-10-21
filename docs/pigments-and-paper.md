@@ -15,7 +15,7 @@ Paints mixed in one wash (a layer of diluted paint) average their K and S, weigh
 
 ![Three dried glazes of hansa yellow, cerulean blue and quinacridone rose](img/glazes.webp)
 
-For that reason a glaze, a transparent wash over dried paint, looks different from the same two paints stirred together. The picture is the glaze demonstration in Paint Lab. [examples/plans/glazes.json](../examples/plans/glazes.json) paints glazes from the command line:
+For that reason a glaze, a transparent wash over dried paint, looks different from the same two paints stirred together. The picture is the glaze demonstration in Paint Lab. It and the drying figure below were made with sim 100 (release 0.1.0). [examples/plans/glazes.json](../examples/plans/glazes.json) paints glazes from the command line:
 
 ```sh
 node tools/run-plan.mjs examples/plans/glazes.json
@@ -57,7 +57,7 @@ Granulation follows the paper. Settling pigment is pushed toward the hollows, an
 
 Water evaporates faster at the pinned edge of a wash, where the water's edge has stopped moving. Water flows out to replace it and carries pigment, so the edge dries darker. Damp pores can rewet the surface next to standing water. That rewetting makes backruns, blooms where wetter paint flows into a drying wash.
 
-`dry()` steps the sheet until it is dry, then fixes the settled pigment as a new layer. New water can lift a little of the top layer back, and lifts more of unfixed pigment. The default sepia ink is rewettable. Black ink resists lifting better.
+`dry()` steps the sheet until it is dry, then fixes the settled pigment as a new layer. New water can lift a little of the top layer back, and lifts more of unfixed pigment. When the painter draws in ink, sepia is the default and is rewettable. Black ink resists lifting better. The default pencil drawing does not lift.
 
 ## Why drying matters
 

@@ -9,12 +9,12 @@ A passage is a wash or group of marks with one job. Value is how light or dark a
 
 Choose each technique from the target, then check that the simulator executed it. Calibrations hold only for the engine version that measured them.
 
-## Default order: optional pencil, ink, dry, then wash
+## Default order: drawing, dry, then wash
 
-Draw first. The painter's default is `--drawing first --outlinemedium auto`. It measures how much line the source shows: visible line gets ink, a source with no line gets a light graphite drawing. `--inkfast` (on by default) sets dry ink so later washes do not lift it.
+Draw first. The painter's defaults are `--drawing first --outlinemedium graphite`, a light pencil drawing. Without a prepared drawing or `drawing.stages`, `--drawingstages auto` picks stages per image and can add ink, usually closing accents. Write the drawing into the plan: `drawing.medium: "ink"` or `--outlinemedium ink` for ink, `drawing.stages` to fix the stages, `--drawingstages off` for pencil only. A closing pass needs `--drawing both`. `--outlinemedium auto` gives ink to a source with visible line and graphite to one without. `--inkfast auto` (the default) sets black ink before the washes and leaves sepia soluble.
 
 1. Optional: a light preparatory pencil sketch, only where placement is hard to get right in one ink pass. Keep it sparse; the ink follows it.
-2. Choose the drawing medium from the source. If the target shows line, draw silhouettes, landmarks, structural junctions and selected texture lines in ink; ink alone is usually best. If the target shows no line, draw the same structure lightly in graphite so it disappears under the washes.
+2. Choose the drawing medium from the source, and write it in the plan. If the target shows line, draw silhouettes, landmarks, structural junctions and selected texture lines in ink; ink alone is usually best. If the target shows no line, draw the same structure lightly in graphite so it disappears under the washes.
 3. Let the ink dry and set. Inspect the executed drawing on the sheet; planned paths do not prove that ink reached the paper.
 4. Reserve lights, then paint broad, pale, connected washes over the drawing.
 5. Dry to the state the next layer needs. Develop mid-values and shadow glazes.

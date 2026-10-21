@@ -46,8 +46,9 @@ All files go in `bench/plan/` unless stated.
      axis-aligned seams": a straight side longer than about 8% of the sheet's short side). Rectangular reserves and
      region styles create such edges unless they follow real edges in the target or stay small. The check below runs
      the painter's planning step and catches this.
-2. **Drawing paths: `opening-lines.json` (pen/pencil lines drawn before the washes) and `closing-lines.json` (lines drawn
-   last).** Optional extra files `closingink-lines.json` (used as the closing lines by tokens `_ink2`/`_ink3`) and
+2. **Drawing paths: `opening-lines.json` (lines drawn before the washes) and `closing-lines.json` (lines drawn
+   last).** The harness draws `opening-lines.json` in pencil and runs no closing pen. To draw in ink, put `--outlinemedium
+   ink` in `extra-args.json`; to also draw the closing lines, add `--drawing both`. Optional extra files `closingink-lines.json` (used as the closing lines by tokens `_ink2`/`_ink3`) and
    `closingink4-lines.json` (used by `_ink4`, which is in the base recipe: if this file is absent, `closing-lines.json` is
    used). Without a drawing file the painter draws from its own reading of the target. Schema:
    `{"image":{"w":W,"h":H}, "lines":[{"points":[[x,y],...], "width":1, "weight":1, ...}], "medium":"ink"}` with

@@ -31,7 +31,7 @@ Default recipe flags, with the value that turns each off:
 - `--texture 0`: per-passage dry-brush texture marks stay off.
 - `--touchpoints 2`: two touch-up glaze passes on shapes that read too light. Off: `0`.
 - `--layerhue 1`: keeps wash layers apart by colour group. Off: `0`.
-- `--drawing first`: the drawing goes down first, in pencil unless the plan asks for ink. The plan's drawing section chooses any closing pass. Off: `none`.
+- `--drawing first`: the drawing goes down first, in pencil unless the plan or the automatic stage choice asks for ink. Either can add a closing pass. Off: `none`.
 - `--frames 8`: about 8 recorded frames of the washes. Off: `40`.
 - `--marks 1`: records every stroke to `marks.json`. Off: `0`.
 - `--finaldarks 0`, `--sourcelines 0 --linesource none`: final darks and automatic source lines stay off until a plan or flag asks for them.
@@ -72,6 +72,7 @@ Modules, with their flags:
 - `methods/drawing-logic.mjs` (`--drawinglogic 1|2|3`): inking logic run over a selected drawing file.
 - `methods/drawing-rank.mjs` (helper): ranks a dense drawing file's lines into tiers.
 - `methods/drawing-scribble.mjs` (helper): long open lines with dark masses as looping scribble.
+- `methods/drawing-stages-auto.mjs` and `methods/drawing-choice.mjs` (`--drawingstages auto`, the default): pencil prep, ink prep and ink finish chosen per picture. Off: `off`.
 - `methods/drawing.mjs` (not reached): pencil drawing of the figure's edge and big darks.
 - `methods/final-darks.mjs` (`--finaldarks 1`, `--fdminmm2`, `--fdtilemm`, `--fdgain`): finds the final-dark cells and groups them into families for one shape-level look each. Off by default.
 - `methods/first-wash.mjs` (`--firstwash 1`): a paler opening wash split at the subject mask.
@@ -91,7 +92,7 @@ Modules, with their flags:
 - `methods/ml-lines.mjs` (`--mllines 1`): inner lines from a trained line model.
 - `methods/modulate.mjs` (`--modulate 1`): thins washes in highlight and detail areas.
 - `methods/mop-lanes.mjs` (helper): a mop's overlapping, slightly curved sweeps.
-- `methods/outline-medium.mjs` (always on): chooses ink or pencil for the drawing.
+- `methods/outline-medium.mjs` (always on): resolves `--outlinemedium`, graphite by default; `auto` chooses ink or pencil from the target.
 - `methods/painter-order.mjs` (`--order legacy-painter`): reorders passes into a painter's order.
 - `methods/painter.mjs` (not reached): a look, decide, paint loop.
 - `methods/palette.mjs` (not reached): mixtures in wells reused at several dilutions.
