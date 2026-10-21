@@ -1,6 +1,6 @@
 // Records every decision and input of a painter run in <out>/run-card.json:
 // drawing stages, segment backend, line source, python and checkpoint versions,
-// GPU backend, input and output SHA-256 hashes, code cleanliness, and the mid-painting checks the run continued past.
+// GPU backend, box palette and paint-guard decision, input and output SHA-256 hashes, code cleanliness, and the mid-painting checks the run continued past.
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,6 +26,7 @@ function buildRunCard({
   segments = null,
   linework = null,
   gpu = null,
+  palette = null,
   phases = [],
   seconds = 0,
   exitCode = 0,
@@ -73,6 +74,8 @@ function buildRunCard({
           device: gpu.device ?? null,
         }
       : null,
+    // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)
+    palette,
     phases,
     continuedChecks: continuedSummary(),
   };
