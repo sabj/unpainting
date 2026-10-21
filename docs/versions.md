@@ -11,7 +11,7 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 
 `PAINTER_VERSION`, `SIM_VERSION` and `JUDGE_VERSION` in [src/painter-version.mjs](../src/painter-version.mjs) hold the painter, sim and judge versions. Releases 0.1.0 and 0.1.1 are painter V096, sim 100 and judges J1. Release 0.2.0 is painter V099, sim 102 and judges J1.
 
-Release 0.2.0 is painter `V099`, sim `102` and judges `J1`. It is the accepted `0.2.0-rc.6` candidate with the `-dev` suffix dropped; the painter and simulation code are unchanged from that candidate. Sim 102 records the integrated physical brush-volume and wet-bed corrections. Earlier 0.2.0 candidates used V097-dev / sim 101 (rc.1) and V098-dev / sim 101 (rc.2). `integration/0.3` is an integration branch name; it does not identify a published 0.3 release.
+Release 0.2.0 is painter `V100`, sim `102` and judges `J1`. V100 is the benchmarked V099 build (commit `06174e8f`) with the drawing set to pencil by default and ink only on request. An unreleased internal build also carried the V100 label; it is not this release. Sim 102 records the integrated physical brush-volume and wet-bed corrections. Earlier 0.2.0 candidates used V097-dev / sim 101 (rc.1) and V098-dev / sim 101 (rc.2). `integration/0.3` is an integration branch name; it does not identify a published 0.3 release.
 
 Candidate render metadata and the canary manifest name the actual producing commit. Archived comparison columns can mix renders from several commits, so read each render's own record rather than one commit for the column. Existing benchmark scores retain their original version stamps.
 

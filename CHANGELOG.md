@@ -4,7 +4,12 @@ Releases are plain semver, with a git tag per release. Each release names its pa
 
 ## 0.2.0 - 2026-10-20
 
-Painter V099, sim 102, judges J1. Tag `v0.2.0`. The painter and sim versions both change, so 0.2.0 paintings and scores do not share a mean with 0.1.x results ([docs/versions.md](docs/versions.md)). Benchmark rounds V1 to V5 keep their published 0.1.x scores.
+Painter V100, sim 102, judges J1. Tag `v0.2.0`.
+
+### Drawing: pencil by default
+
+- The drawing is pencil (graphite) by default and there is no closing pen. Ink is off unless asked for with `--outlinemedium ink` (and `--drawing both` for the closing pen). The 0.2.0 ink draws too thin, too dark and too even, and is being reworked. The bench harness no longer forces ink on every plan.
+- The benchmark scores below were measured on the V099 build with ink. The pencil default was checked by eye on the same five published plans; its J1 scores are not yet measured. The painter and sim versions both change, so 0.2.0 paintings and scores do not share a mean with 0.1.x results ([docs/versions.md](docs/versions.md)). Benchmark rounds V1 to V5 keep their published 0.1.x scores.
 
 ### Painting plans and styles
 
