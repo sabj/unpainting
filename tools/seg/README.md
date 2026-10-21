@@ -73,6 +73,8 @@ python3 -m venv .venv-lines
 
 CPU torch is enough. The weights download once into `work/line-models/hf`. `--linemodeloffline 1` requires them to be there already. `--linemodelcache` moves the fused maps. The fused maps are kept in `work/line-maps/<target SHA-256>-<width>x<side>-<script hash>/`, so a source is mapped once. All of `work/` is untracked.
 
+The trace keeps small features. Components of two cells or more stay. The fine model's own marks above 0.28 join the mask inside busy detail regions, where the fused map is damped. Tight curves are traced with a three-pixel tangent window. Only a short stub (two cells or less) off a fork is pruned, so a short mark of its own stays. Polylines are simplified at 0.15 cells.
+
 When the packages or weights are missing, the wash recipe logs a `!!!` line and falls back to `copy-lines.py` on the source's own ink; `--linemodel strict` stops instead. The painter's `paint.log` and `linework.json` record which one ran (`extractor`).
 
 ### Continuous sketch planning

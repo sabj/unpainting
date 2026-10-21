@@ -41,9 +41,12 @@ export function lineModelMap({ python, root, image, cacheDir, width = 1080, maxs
  * The lines are the map's own: nothing here cuts them against the target.
  * @returns {{ map, cached, summary }} summary is copy-lines.py's stage counts line
  */
-export function traceLineModel({ python, root, image, stem, cacheDir, width, maxside, tolerance = 0.25, offline = false, weights, run = spawnSync }) {
+export function traceLineModel({ python, root, image, stem, cacheDir, width, maxside, tolerance = null, offline = false, weights, run = spawnSync }) {
   const m = lineModelMap({ python, root, image, cacheDir, width, maxside, offline, weights, run });
-  const r = run(python, [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map', '--map-tolerance', String(tolerance)],
+  // the fine model's own map: its marks in busy detail regions join the mask (copy-lines.py --fine)
+  const fine = m.map.replace(/\.png$/, '-fine.png');
+  const r = run(python, [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map',
+    ...(fs.existsSync(fine) ? ['--fine', fine] : []), ...(tolerance == null ? [] : ['--map-tolerance', String(tolerance)])],
     { cwd: root, encoding: 'utf8', timeout: 900000, env: { ...process.env, ...ENV } });
   if (r.error || r.status !== 0) throw new Error(`copy-lines on the lineart map failed: ${r.error?.message ?? r.stderr}`);
   // the line file is the target's own: its hash and size, not the map's

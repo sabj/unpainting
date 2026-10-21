@@ -31,10 +31,10 @@ def at(field, points):
     return field[np.clip(p[:, 1], 0, h-1), np.clip(p[:, 0], 0, w-1)]
 
 
-def trace(skel, min_points=4):
+def trace(skel, min_points=4, window=5):
     """Continue through junctions along the incoming tangent; retain side branches.
 
-    Diagonal shortcuts at right-angle corners are excluded. Unlike a degree-2
+    Diagonal shortcuts at right-angle corners are excluded. `window` is the tangent span in pixels. Unlike a degree-2
     branch walker, one pixel of tooth or a crossing does not end a long line.
     """
     h, w = skel.shape
@@ -61,7 +61,7 @@ def trace(skel, min_points=4):
                 if not options:
                     break
                 if len(path) > 1:
-                    v = np.subtract(cur, path[max(0, len(path)-5)]).astype(float)
+                    v = np.subtract(cur, path[max(0, len(path)-window)]).astype(float)
                     v /= max(1e-9, np.linalg.norm(v))
                     def turn(p):
                         d = np.subtract(p, cur)

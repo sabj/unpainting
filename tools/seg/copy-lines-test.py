@@ -80,5 +80,42 @@ class LineMap(unittest.TestCase):
         cv2.line(observed, (10, 40), (120, 40), (30,)*3, 3)
         self.assertTrue(any(w > 2.4 for g in copy.plan(observed)[0] for w in g['widths']))
 
+    def test_a_two_cell_mark_survives_in_a_line_map(self):
+        im = np.full((60, 100, 3), 255, 'uint8')
+        im[30, 50:52] = 40
+        mask = copy.plan(im, 'line-map')[1]
+        self.assertTrue(mask[30, 50])
+        self.assertTrue(copy.line_map_mask(im, min_area=5)[0][30, 50] == 0)
+
+    def test_fine_marks_in_a_busy_region_join_the_map_and_elsewhere_do_not(self):
+        h, w = 120, 200
+        fused = np.full((h, w, 3), 255, 'uint8')
+        fine = np.zeros((h, w), np.float32)
+        for x in range(10, 90, 4):                       # a busy block of strong fused lines
+            cv2.line(fused, (x, 10), (x, 100), (60,)*3, 1)
+        fine[50:52, 40:44] = .5                           # a fine mark inside the block, between the lines
+        fine[50:52, 150:154] = .5                         # and one in empty paper
+        mask = copy.line_map_mask(fused, fine)[0]
+        self.assertTrue(mask[50, 41])
+        self.assertFalse(mask[50, 151])
+        self.assertFalse(copy.line_map_mask(fused)[0][50, 41])
+
+    def test_a_stub_off_a_fork_goes_and_a_standalone_short_mark_stays(self):
+        im = np.full((80, 120, 3), 255, 'uint8')
+        cv2.line(im, (10, 40), (110, 40), (20,)*3, 1)
+        cv2.line(im, (60, 40), (60, 38), (20,)*3, 1)      # a 2-cell stub off the line
+        cv2.line(im, (20, 10), (24, 10), (20,)*3, 1)      # a short mark of its own
+        lines = copy.plan(im, 'line-map')[0]
+        self.assertTrue(any(g['length'] > 95 for g in lines))
+        self.assertEqual(sum(1 for g in lines if g['length'] < 8), 1)
+        self.assertTrue(any(np.linalg.norm(np.array(g['points']).mean(0)-[22, 10]) < 1.5 for g in lines))
+
+    def test_a_tight_ring_is_one_closed_path(self):
+        im = np.full((60, 60, 3), 255, 'uint8')
+        cv2.circle(im, (30, 30), 4, (20,)*3, 1)
+        lines = copy.plan(im, 'line-map')[0]
+        self.assertEqual(len(lines), 1)
+        self.assertLess(np.linalg.norm(np.array(lines[0]['points'][0])-lines[0]['points'][-1]), 1.5)
+
 
 if __name__ == '__main__': unittest.main()

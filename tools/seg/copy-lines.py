@@ -11,7 +11,7 @@ from pathlib import Path
 import importlib.util
 import cv2
 import numpy as np
-from lines import thin, arc_length
+from lines import thin, arc_length, prune_spurs
 
 spec = importlib.util.spec_from_file_location('sketch', Path(__file__).with_name('sketch-lines.py'))
 sketch = importlib.util.module_from_spec(spec)
@@ -39,24 +39,45 @@ def ink_mask(bgr):
     return strong[labels].astype('uint8'), contrast
 
 
-def line_map_mask(bgr):
+def detail_region(confidence, radius=6, quantile=.8):
+    """Cells whose map is both busy (mean confidence) and varied (spread) at least as much as the sheet's quantile."""
+    k = 2*radius+1
+    mean = cv2.blur(confidence, (k, k))
+    spread = np.sqrt(np.maximum(0, cv2.blur(confidence*confidence, (k, k))-mean*mean))
+    return ((mean >= np.quantile(mean, quantile)) & (spread >= np.quantile(spread, quantile)) & (spread > 1e-6)).astype('uint8')
+
+
+def line_map_mask(bgr, fine=None, min_area=2):
     # A declared line map encodes confidence, not reflectance. Applying the
     # photographed-ink darkness gate erases its pale but connected architecture.
+    # Small components are kept (min_area cells): an eye, a pupil or a dot is a line too.
+    # With the fine model's own map, fine marks above .28 inside the busy detail regions join the mask,
+    # since the fused map is damped where the coarse model sees no structure.
     confidence = 1-cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
     weak = (confidence > .08).astype('uint8')
     n, labels, stats, _ = cv2.connectedComponentsWithStats(weak, 8)
     strong = np.bincount(labels.ravel(), weights=(confidence > .22).ravel(), minlength=n) > 0
-    strong &= stats[:, cv2.CC_STAT_AREA] >= 5
+    strong &= stats[:, cv2.CC_STAT_AREA] >= min_area
     strong[0] = False
-    return strong[labels].astype('uint8'), confidence
+    mask = strong[labels].astype('uint8')
+    if fine is not None:
+        peaks = ((fine > .28) & (detail_region(confidence) > 0)).astype('uint8')
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(peaks, 8)
+        keep = stats[:, cv2.CC_STAT_AREA] >= min_area
+        keep[0] = False
+        mask |= keep[labels].astype('uint8')
+    return mask, confidence
 
 
-def plan(bgr, kind='ink', map_tolerance=.25):
+def plan(bgr, kind='ink', map_tolerance=.25, fine=None):
     if not np.isfinite(map_tolerance) or not 0 <= map_tolerance <= 2:
         raise ValueError('map tolerance must be finite and between 0 and 2 cells')
-    mask, contrast = line_map_mask(bgr) if kind == 'line-map' else ink_mask(bgr)
+    mask, contrast = line_map_mask(bgr, fine) if kind == 'line-map' else ink_mask(bgr)
     skeleton, _ = thin(mask)
-    paths = sketch.trace(skeleton, min_points=2)
+    if kind == 'line-map':
+        # a stub off a fork cuts a line in two; a standalone short mark is not a stub and stays
+        skeleton, _ = prune_spurs(skeleton, 2)
+    paths = sketch.trace(skeleton, min_points=2, window=3 if kind == 'line-map' else 5)
     distance = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
     lines = []
     for p in paths:
@@ -95,8 +116,9 @@ def main():
     ap.add_argument('image'); ap.add_argument('--out', required=True)
     ap.add_argument('--width', type=int, default=1080)
     ap.add_argument('--kind', choices=['ink', 'line-map'], default='ink', help='line-map is explicit pre-paint model evidence, never a photograph')
-    ap.add_argument('--map-tolerance', type=float, default=.25,
-                    help='explicit line-map simplification bound in planning cells (0–2); observed ink stays at .25')
+    ap.add_argument('--map-tolerance', type=float, default=None,
+                    help='explicit line-map simplification bound in planning cells (0–2), default .15; observed ink stays at .25')
+    ap.add_argument('--fine', help="the fine model's own map (dark on white): its marks above .28 in busy detail regions join a line map")
     args = ap.parse_args()
     bgr = cv2.imread(args.image)
     if bgr is None or args.width < 64:
@@ -104,9 +126,18 @@ def main():
     H, W = bgr.shape[:2]
     w = args.width; h = round(H*w/W)
     bgr = cv2.resize(bgr, (w, h), interpolation=cv2.INTER_AREA)
-    if not np.isfinite(args.map_tolerance) or not 0 <= args.map_tolerance <= 2:
+    tolerance = .15 if args.map_tolerance is None else args.map_tolerance
+    if not np.isfinite(tolerance) or not 0 <= tolerance <= 2:
         ap.error('--map-tolerance must be finite and between 0 and 2')
-    lines, mask, skeleton, stats = plan(bgr, args.kind, args.map_tolerance)
+    fine = None
+    if args.fine:
+        if args.kind != 'line-map':
+            ap.error('--fine goes with --kind line-map')
+        grey = cv2.imread(args.fine, cv2.IMREAD_GRAYSCALE)
+        if grey is None:
+            ap.error('cannot read '+args.fine)
+        fine = 1-cv2.resize(grey, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32)/255
+    lines, mask, skeleton, stats = plan(bgr, args.kind, tolerance, fine)
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
     doc = {'source': 'copy-lines: '+('prepared learned line map' if args.kind == 'line-map' else 'observed source ink')+', pre-paint only',
            'inputKind': args.kind,

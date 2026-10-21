@@ -101,7 +101,7 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
         }
         try {
           const t = traceLineModel({ python, root, image, stem, cacheDir: path.resolve(root, opt('linemodelcache', 'work/line-maps')),
-            width: num('linemodelwidth', 1080), maxside: num('linemodelside', 1620), tolerance: num('mapsmoothing', 0.25), offline: num('linemodeloffline', 0) > 0 });
+            width: num('linemodelwidth', 1080), maxside: num('linemodelside', 1620), tolerance: opt('mapsmoothing', '') === '' ? null : num('mapsmoothing', 0.15), offline: num('linemodeloffline', 0) > 0 });
           info.extractor = 'lineart-models';
           info.lineMap = { map: t.map, cached: t.cached };
           if (!opt('inkprofile', '')) argv.push('--inkprofile', 'drawing-ink');
