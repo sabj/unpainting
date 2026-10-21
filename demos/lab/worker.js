@@ -668,13 +668,14 @@ const lab = {
   setPerturb: v => { perturb = v; }, setDryer: on => { dryer = on; }, wetNow: () => locked(wetNow), lastWet: () => lastWet, frame: () => frameLocked(false, true),
 };
 
-let playbackRequest = 0, livePaused=false, liveCarry=false, liveSpeed=1, replayPoint=null;
+let playbackRequest = 0, livePaused=false, liveCarry=false, liveSpeed=1, replayPoint=null, liveOptions=null;
 async function liveTape(data,current){
   const tape=data.tape;livePaused=false;liveCarry=false;demoPlaying='live';
   const saved=data.checkpoint?await decodeState(data.checkpoint):null;if(!current())return;
   await locked(async()=>{
     if(!current())return;
-    await newSheet({paperW:tape.w/60,paperH:tape.h/60,dpi:60,seed:tape.paper?.seed??9});
+    // An imported plan (lab.js, ?import=) states its real size; recorded tapes are 60 dpi.
+    await newSheet({paperW:tape.paperIn?.[0]??tape.w/60,paperH:tape.paperIn?.[1]??tape.h/60,dpi:tape.dpi??60,seed:tape.paper?.seed??9});
     demoPlaying='live';
     PIGS=tape.pigments;NAMES=PIGS.map((_,i)=>`recorded-${i}`);
     paper=makePaper(W,H,tape.paper);
@@ -683,12 +684,16 @@ async function liveTape(data,current){
     paused=false;masksDirty=true;strokes=saved?.tape.done||0;await render();
     postMessage({type:'live-ready',liveRun:data.liveRun,done:strokes,total:tape.strokeCount});
   });
+  // An import's pen drawing (its first data.fastStrokes strokes) is laid without per-stroke frames or waits; a frame is
+  // shown about four times a second. Recorded tapes have no fastStrokes and replay as before.
+  const fast=done=>done<(data.fastStrokes||0);let fastNow=false,fastDrawn=0;
+  const fastFrame=async()=>{if(performance.now()-fastDrawn<250)return false;fastDrawn=performance.now();await locked(async()=>{if(current()){await render();dirty=false;}});return true;};
   let completed=saved?.tape.done||0,deadline=performance.now(),strokeStart=0,lastPresent=0,presentTravelMs=0,sawWash=tape.marks.slice(0,saved?.tape.index||0).some(m=>m.k==='s');
   try{await runTape(tape,{
     sheet:()=>sheet,
     ready:async done=>{while(livePaused&&current()&&!liveCarry)await sleep(30);return current()&&!liveCarry;},
     begin:(tool,isPen,{mark,done,total})=>{operation=null;active=isPen?{kind:'pen',pen:tool}:{kind:'brush',brush:tool};
-      strokeStart=deadline=performance.now();lastPresent=0;presentTravelMs=0;
+      strokeStart=deadline=performance.now();lastPresent=0;presentTravelMs=0;fastNow=fast(done);if(fastNow&&done>0)return;
       const conc=isPen?tool.conc:tape.pigments.map((_,i)=>(tool.resP?.[i]||0)+tool.hairs.reduce((n,h)=>n+(h.pig?.[i]||0),0)),phase=isPen?(sawWash?'Closing ink':'Drawing'):mark.wt?'Rewetting the paper':tool.radius>4?'Washes':'Darks & detail';
       if(!isPen&&!mark.wt)sawWash=true;
       postMessage({type:'operation',liveRun:data.liveRun,kind:mark.wt?'water':'paint',label:phase,done,total});
@@ -696,7 +701,7 @@ async function liveTape(data,current){
     },
     end:async()=>{if(current()){
       // Flush the last deposited point before lifting, including very short strokes.
-      if(presentTravelMs>0)await locked(()=>render());
+      if(presentTravelMs>0&&!fastNow)await locked(()=>render());
       presentTravelMs=0;active=null;replayPoint=null;
     }},
     touch:(pts,reach,fn)=>locked(async()=>{
@@ -713,6 +718,7 @@ async function liveTape(data,current){
     }),
     present:async(pt,r,done,distance,contact)=>{
       if(!current())return;
+      if(fastNow){replayPoint=null;await fastFrame();return;}
       // The indicator and the paint are presented in the same frame, only after
       // deposition. An empty contact never displays an invented brush footprint.
       replayPoint=contact?.mask.some(Boolean)?{...pt,r,contact}:null;
@@ -729,6 +735,7 @@ async function liveTape(data,current){
     operation:async(event,apply)=>{
       if(!current())return;
       active=null;replayPoint=null;
+      if(['dip','ink'].includes(event.kind)&&fast(event.done)){if(!liveCarry)await apply();return;}
       let mask=event.mask;
       if(event.kind==='dry'||event.kind==='flow')await locked(async()=>{if(phys)await phys.syncAll(sheet);mask=Uint8Array.from(sheet.W,(v,i)=>v>0||sheet.s[i]>0?1:0);});
       operation={...event,mask};postMessage({type:'operation',liveRun:data.liveRun,...operation});
@@ -738,16 +745,21 @@ async function liveTape(data,current){
       await sleep(Math.max(20,hold/liveSpeed));
       while(livePaused&&current()&&!liveCarry)await sleep(30);
       if(!current()||liveCarry)return;
-      await apply();if(!current())return;masksDirty=true;
+      // An imported event may carry its own transport options (o) for flow and drying.
+      liveOptions=tape.marks[event.index]?.o??null;try{await apply();}finally{liveOptions=null;}if(!current())return;masksDirty=true;
       await locked(()=>current()?render():undefined);await sleep(Math.max(20,hold/liveSpeed));
       if(current())operation=null;
+      // An import pauses once its pen drawing is down and dry, and offers the washes.
+      if(current()&&data.pauseAfter===event.index){livePaused=true;await locked(()=>current()?render():undefined);postMessage({type:'live-paused',liveRun:data.liveRun,done:event.done,total:event.total});}
     },
-    progress:async(done,total)=>{if(!current())return;strokes=completed=done;await locked(async()=>{await render();dirty=false;});
+    progress:async(done,total)=>{if(!current())return;strokes=completed=done;
+      if(fastNow){if(await fastFrame()||done===data.fastStrokes)postMessage({type:'progress',liveRun:data.liveRun,done,total,phase:'painting'});return;}
+      await locked(async()=>{await render();dirty=false;});
       postMessage({type:'progress',liveRun:data.liveRun,done,total,phase:'painting'});
       await sleep(Math.max(30/liveSpeed,280/liveSpeed-(performance.now()-strokeStart)));},
     mutate:fn=>locked(async()=>{if(!current())return;if(phys)await phys.syncAll(sheet);fn();if(phys)await phys.load(sheet,baseR,graphite);dirty=baseDirty=true;}),
     flow:(dry,m)=>locked(async()=>{if(!current())return;
-      if(phys)await phys.syncAll(sheet);tapeFlow(tape,sheet,dry,m);if(phys)await phys.load(sheet,baseR,graphite);baseDirty=true;
+      if(phys)await phys.syncAll(sheet);tapeFlow(liveOptions?{...tape,opts:{...tape.opts,...liveOptions}}:tape,sheet,dry,m);if(phys)await phys.load(sheet,baseR,graphite);baseDirty=true;
       lastDt=null;ticks++;dirty=true;})
   },saved?.tape);}finally{if(current()){active=null;replayPoint=null;operation=null;demoPlaying=null;paused=false;await locked(async()=>{await render();await checkpoint();});postMessage({type:'played',liveRun:data.liveRun,name:'live',example:true,wet:sheet.W.some(v=>v>0)||sheet.s.some(v=>v>0),strokes:completed});}}
 }

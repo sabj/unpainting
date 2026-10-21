@@ -1,21 +1,402 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fungi</title>
-<style>
-:root{--paper:#f6f3eb;--ink:#39362f}
-@media (prefers-color-scheme:dark){:root{--paper:#1f1d1a;--ink:#ece6da}}
-body{margin:0;background:var(--paper);color:var(--ink);font:18px/1.5 Georgia,'Times New Roman',serif}
-main{max-width:640px;margin:0 auto;padding:48px 16px}
-a{color:inherit;text-underline-offset:.18em}
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#efede5"><title>Fungi</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%23854c36' d='M4 27C4 4 44 4 44 27Z'/%3E%3Cpath fill='%238a7c60' d='M20 28h8l3 16H17Z'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    [hidden]{display:none!important}
+    .masthead{height:60px;border:0}.wordmark{font-style:italic;font-size:26px}.source-link{font-size:18px}
+    main{max-width:1700px;grid-template-columns:220px minmax(0,1fr);gap:34px;padding-top:12px;align-items:center}
+    .studio{align-self:center;padding-bottom:60px}.family-options{display:flex;flex-direction:column;gap:3px}
+    .family-options{display:grid;grid-template-columns:1fr 1fr;gap:4px}.family-options button{align-items:flex-start;font-family:var(--serif);font-size:13px;padding:9px 8px;white-space:normal}.reference-shelf{margin-top:16px;font-size:11px;color:var(--muted)}.reference-shelf summary{cursor:pointer}.reference-shelf a{display:block;margin-top:9px;line-height:1.5}
+    .seed-section{border:0;margin-top:24px;padding:0}.seed-section label,.destination label{display:block;font-size:10px;color:var(--muted);margin:12px 0 5px}.destination{display:block}.destination input{width:100%}.motion-section{margin-top:18px;padding-top:15px}.motion-section .play-row{margin-top:8px}.section-label{display:flex;justify-content:space-between;gap:12px;font-size:11px}.tempo label{white-space:nowrap;min-width:66px}.random-mushroom{width:100%;margin-top:14px}.plate-bottom{display:flex;align-items:center;gap:14px}.plate-bottom .button{flex:none;white-space:nowrap}#render-state{flex:0 1 220px;min-width:100px}#drawing-progress{appearance:none;flex:1;min-width:80px;width:100%;height:3px;accent-color:#59634a;border:0;background:#dfded3}#drawing-progress::-webkit-progress-bar{background:#dfded3}#drawing-progress::-webkit-progress-value{background:#59634a}.seed-caption{font-family:var(--sans);font-size:10px;overflow-wrap:anywhere;color:var(--muted);margin-top:12px}.seed-caption b{font-weight:400;color:var(--ink)}.impact{font-size:11px;line-height:1.8;color:var(--muted);margin-top:8px}.trait output{min-width:55px;font-size:9px}.tempo{margin-top:12px}.genome{margin-top:14px}.seed-row input{font-size:11px;padding:8px}.dice{width:36px;font-size:23px}
+    .play-row{margin-top:14px}.button{font-size:12px}.studio-bottom{margin-top:12px}.save{font-size:20px}.trait[hidden]{display:none}
+    .gallery{max-width:none;position:static;padding:0}.paper{border:0;box-shadow:0 6px 36px #444b2f09}
+    .plate-top{display:none}.plate-bottom{margin-top:12px;min-height:16px;font-size:11px;letter-spacing:.4px}
+    .options{margin-top:14px}.options>summary{cursor:pointer;color:var(--muted);font-size:23px;list-style:none}
+    .options>summary::-webkit-details-marker{display:none}.options .motion-section{border:0;margin-top:10px;padding:0}
+    .options .play-row{flex-direction:column}.genome{font-size:11px}.options a{font-size:11px}
+    .source-list{margin-top:24px;display:flex;flex-wrap:wrap;gap:14px}.source-list a{font-size:10px;color:var(--muted)}
+    @media(max-width:760px){main{display:flex;gap:16px;padding-top:4px}.studio{display:block;order:2;width:100%;padding:0}.gallery{order:1}.family-options{display:grid;grid-template-columns:repeat(2,1fr)}.family-options button{align-items:center;font-size:13px}.seed-section{margin-top:14px}.options .play-row{flex-direction:row}.masthead{height:52px}.plate-bottom{font-size:10px}.paper{aspect-ratio:1.2}.studio-bottom{margin-top:4px}.source-list{margin-top:16px}}
+    .catalog select{font:12px var(--sans);color:var(--ink);width:100%;min-height:42px;padding:9px 24px 9px 9px;border:1px solid #babdad;border-radius:2px;background:#f4f2e9}.catalog select:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.catalog-count{font-size:10px;color:var(--muted);margin:6px 0 12px}.catalog .impact{font-size:10px;line-height:1.7;margin:9px 0 0}.hybrid-options{margin-top:12px;font-size:11px;color:var(--muted)}.hybrid-options summary{cursor:pointer}.hybrid-options label{display:block;font-size:10px;margin:12px 0 6px}.hybrid-options button{width:100%;margin-top:9px}.hybrid-note{border-left:2px solid #b7bda4;padding-left:9px}.hybrid-note[hidden]{display:none}.specimen-heading{display:flex;align-items:baseline;gap:12px;justify-content:space-between;margin-bottom:12px}.specimen-heading h1{font:italic 22px/1.3 var(--serif);letter-spacing:0;margin:0}.specimen-heading span{font-size:9px;white-space:nowrap;color:var(--muted)}.trait{grid-template-columns:minmax(0,1fr) 45px 55px;gap:7px}.trait meter{width:45px}
+    @media(max-width:760px){.specimen-heading{align-items:flex-start;gap:8px}.specimen-heading h1{font-size:18px}.specimen-heading span{font-size:8px;padding-top:5px}.catalog select{font-size:14px;min-height:44px}.catalog .impact{font-size:11px}.studio{padding-bottom:16px}}
+    .scene-control{margin-top:16px}.scene-control label{display:block;font-size:10px;color:var(--muted);margin-bottom:6px}
+    .debug-toggle{display:flex;align-items:center;gap:5px;white-space:nowrap;font:11px var(--sans);cursor:pointer}.debug-toggle input{accent-color:#59634a}
+    body[data-debug="true"] main{align-items:start}body[data-debug="true"] .studio{align-self:start}
+    .drawing-workspace{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}body[data-debug="true"] .drawing-workspace{grid-template-columns:minmax(0,1fr) 350px}
+    .plate-view{min-width:0}.morph-debug{min-width:0;border-top:1px solid #b8b9ac;padding-top:12px;font:11px/1.5 var(--sans)}.morph-debug[hidden]{display:none}
+    .debug-heading{display:flex;justify-content:space-between;gap:10px}.debug-heading strong{font-weight:500}.debug-heading>span{color:var(--muted);font-size:10px}
+    .debug-seeds{margin-top:9px;color:var(--muted)}.debug-seeds code{color:var(--ink);font-size:10px;overflow-wrap:anywhere}.debug-position{font-variant-numeric:tabular-nums;margin:10px 0 5px}.debug-note{color:var(--muted);font-size:10px;margin:0 0 10px;line-height:1.6}
+    .debug-table-scroll{max-height:62vh;overflow:auto;scrollbar-gutter:stable}.debug-table{width:100%;border-collapse:collapse;table-layout:fixed;font-variant-numeric:tabular-nums}.debug-table th,.debug-table td{padding:6px 3px;border-bottom:1px solid #dcdcd2;text-align:right;font:10px/1.4 ui-monospace,SFMono-Regular,monospace;white-space:nowrap}.debug-table th:first-child{width:42%;text-align:left;white-space:normal;font-family:var(--sans)}.debug-table thead th{position:sticky;top:0;background:#efede5;color:var(--muted);font-size:9px}.debug-table td:nth-child(3){font-weight:600;background:#e4e7dc}.debug-table tr[data-direction="up"] td:last-child{color:#386045}.debug-table tr[data-direction="down"] td:last-child{color:#8d5039}.debug-table tr[hidden]{display:none}.debug-table small{display:block;font:8px var(--sans);color:var(--muted)}
+    @media(max-width:1150px){body[data-debug="true"] .drawing-workspace{grid-template-columns:minmax(0,1fr)}.morph-debug{max-width:600px}.debug-table-scroll{max-height:400px}.debug-table th:first-child{width:48%}}
+    @media(max-width:760px){.specimen-heading{flex-wrap:wrap}.debug-toggle{font-size:12px;margin-left:auto}.debug-table th,.debug-table td{font-size:11px}.debug-table-scroll{max-height:360px}}
+    .plate-viewport{position:relative;overflow:hidden;aspect-ratio:1.2;touch-action:none;overscroll-behavior:contain;user-select:none}
+    .plate-viewport canvas{display:block;width:100%;height:100%;transform-origin:0 0;will-change:transform}
+    .plate-viewport.is-zoomed{cursor:grab}.plate-viewport.is-panning{cursor:grabbing}
+    .plate-viewport:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .viewport-toolbar{display:flex;align-items:center;gap:6px;margin:0 0 8px;font:11px var(--sans);color:var(--muted)}
+    .viewport-toolbar button{min-width:34px;min-height:34px;padding:5px 9px;font:13px var(--sans);border:1px solid #c7c7b8;background:#f4f2e9;color:var(--ink);border-radius:2px;cursor:pointer}
+    .viewport-toolbar button:disabled{opacity:.38;cursor:default}.viewport-toolbar button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .viewport-toolbar output{min-width:44px;text-align:center;font-variant-numeric:tabular-nums}.viewport-hint{margin-left:auto;font-size:10px}
+    @media(max-width:760px){.viewport-toolbar button{min-width:42px;min-height:42px}.viewport-hint{font-size:9px}}
+
+    /* The plate remains first on phones; controls precede the optional data. */
+    .viewport-toolbar{flex-wrap:wrap}
+    .viewport-modes{display:flex;gap:4px;margin-left:auto}
+    .viewport-modes button[aria-pressed="true"]{background:#dce2cf;border-color:#737e60;color:#34402a}
+    .viewport-hint{flex-basis:100%;margin:2px 0 0;line-height:1.5}
+    .plate-viewport[data-viewport-mode="rotate"]{cursor:grab}
+    .plate-viewport.is-orbiting{cursor:grabbing}
+    .anatomy-table-scroll,#intrinsic-panel{max-width:100%;overflow-x:auto}
+    .tempo input{min-width:0}
+    .tempo output{min-width:44px;white-space:nowrap}
+    @media(max-width:760px){
+      main{gap:18px;padding:8px 5% 28px;align-items:stretch}
+      .gallery,body[data-debug="true"] .drawing-workspace,.drawing-workspace{display:contents}
+      .specimen-heading{order:0;margin-bottom:0;align-items:center}
+      .specimen-heading h1{flex:1 1 100%;font-size:22px;line-height:1.25}
+      .specimen-heading span{font-size:12px;white-space:normal;max-width:62%;padding:0}
+      .debug-toggle{font-size:13px;min-height:44px;gap:8px}
+      .debug-toggle input,.scene-control input[type="checkbox"]{width:20px;height:20px;flex:none;margin:0}
+      .plate-view{order:1;width:100%}
+      .studio,body[data-debug="true"] .studio{order:2;align-self:stretch;width:100%;padding-bottom:0}
+      .morph-debug{order:3;width:100%;max-width:none;padding-top:18px;margin-top:8px}
+      .viewport-toolbar{gap:6px;font-size:13px}
+      .viewport-toolbar button{min-width:44px;min-height:44px;font-size:14px;padding:8px 10px}
+      .viewport-toolbar output{min-width:43px}
+      .viewport-hint{font-size:12px}
+      .plate-bottom{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;font-size:12px}
+      #render-state{grid-column:1/-1;min-width:0;min-height:18px;font-size:12px}
+      #drawing-progress{min-width:0;height:5px}
+      .seed-caption{font-size:12px;line-height:1.5;margin-top:8px}
+      .button,.dice,.save{min-height:44px;min-width:44px;font-size:14px}
+      .dice{font-size:26px}.save{padding:10px;font-size:24px}
+      .catalog select,.seed-row input,.destination input{font-size:16px;min-height:44px;line-height:1.4}
+      .seed-row{height:48px}.destination input{padding:10px 0}
+      .section-label,.seed-section label,.destination label,.hybrid-options label,.scene-control label{font-size:14px}
+      .catalog-count,.catalog .impact,.impact,.debug-note,.debug-heading>span,.debug-seeds code{font-size:12px;line-height:1.6}
+      .scene-control label:has(input){min-height:44px;gap:10px!important;font-size:14px!important;margin:0}
+      .scene-control label:not(:has(input)){margin:10px 0 6px}
+      .tempo{font-size:14px;gap:12px;margin-top:8px;min-height:44px}
+      .tempo label{min-width:78px}
+      input[type="range"]{height:44px;touch-action:pan-y}
+      input[type="range"]::-webkit-slider-thumb{width:22px;height:22px;margin-top:-10px;border-width:3px}
+      input[type="range"]::-moz-range-thumb{width:18px;height:18px;border-width:3px}
+      .reference-shelf summary,.hybrid-options summary,#individual-details summary{display:flex;align-items:center;min-height:44px;font-size:14px;cursor:pointer}
+      .reference-shelf a,.source-list a{font-size:13px;min-height:44px;display:flex;align-items:center;line-height:1.5}
+      .source-list{gap:4px 16px}.source-link{min-width:44px;min-height:44px;justify-content:center}
+      .morph-debug{font-size:13px}.debug-heading strong{font-size:14px}
+      .debug-table{min-width:380px}.debug-table th,.debug-table td{font-size:11px;padding:8px 4px}
+      .debug-table th:first-child{width:42%}.debug-table-scroll{max-height:360px;overflow:auto}
+      .studio-bottom>span{font-size:12px}
+    }
+    @media(max-width:360px){.viewport-modes{margin-left:0}.viewport-toolbar{gap:5px}.plate-bottom .button{padding-inline:10px}}
+    @media(pointer:coarse) and (min-width:761px){button,.catalog select,.seed-row,.debug-toggle,summary{min-height:44px}input[type="range"]{height:44px}.viewport-toolbar button,.dice,.save{min-width:44px;min-height:44px}}
+
+    /* Quiet app controls: the illustration, a scrub line, and four actions. */
+    main{align-items:start}.studio{align-self:start;padding-top:52px}
+    .specimen-heading h1{font-size:clamp(22px,2.3vw,30px)}
+    #specimen-kind,.catalog-count,.catalog>.impact,.seed-caption{display:none}
+    body[data-debug="true"] #specimen-kind,body[data-debug="true"] .seed-caption{display:block}
+    .catalog .hybrid-options{margin-top:12px}
+    .quick-seed{margin:16px 0}.quick-seed>label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    .quick-seed .seed-row{height:46px}
+    .more-controls{border-top:1px solid var(--line);margin-top:16px}
+    .more-controls>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;font-size:14px;list-style:none}
+    .more-controls>summary::after{content:'+'}.more-controls[open]>summary::after{content:'−'}
+    .more-controls>summary::-webkit-details-marker{display:none}
+    .advanced-content{padding-bottom:16px}.advanced-content>.debug-toggle{margin:16px 0 4px}
+    .advanced-content>.impact,.advanced-content .source-list,.advanced-content .reference-shelf{font-size:11px}
+    .art-tools{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:-4px 0 6px;min-height:44px}
+    .art-tools .save{width:44px;height:44px;justify-content:center;padding:0;font-size:22px}
+    /* Quiet corner icons: ink at 60%, full on hover or focus, no box; 44 px hit area. */
+    .art-tools .save{display:inline-flex;align-items:center;border:0;background:none;box-shadow:none;color:var(--ink);opacity:.6;cursor:pointer}
+    .art-tools .save:hover,.art-tools .save:focus-visible{opacity:1}
+    .art-tools .save:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .view-controls{margin:4px 0 12px}.view-controls .viewport-toolbar{flex-wrap:wrap;margin-top:6px}
+    .view-options{position:relative}.view-options>summary{display:flex;align-items:center;justify-content:center;min-width:56px;min-height:44px;cursor:pointer;font-size:13px;list-style:none}
+    .view-options[open] .viewport-toolbar{position:absolute;right:0;top:100%;width:260px;z-index:5;padding:12px;border:1px solid #c7c7b8;background:#f4f2e9;box-shadow:0 5px 18px #373d3015}
+    .art-sheet{position:relative}
+    #drawing-progress{position:absolute;bottom:0;left:0;display:block;height:2px;width:100%;min-width:0;margin:0;pointer-events:none}
+    .morph-scrubber{position:relative;height:44px;margin-top:-22px;display:flex;align-items:center}
+    .morph-scrubber input{height:44px;margin:0;touch-action:pan-y;background:transparent}
+    .morph-scrubber input::-webkit-slider-runnable-track{height:2px;background:transparent}
+    .morph-scrubber input::-moz-range-track{height:2px;background:transparent}
+    .morph-scrubber input::-webkit-slider-thumb{width:10px;height:10px;margin-top:-4px;border:2px solid var(--bg);opacity:.6}
+    .morph-scrubber input::-moz-range-thumb{width:7px;height:7px;border:2px solid var(--bg);opacity:.6}
+    .morph-scrubber input:disabled::-webkit-slider-thumb{opacity:0}
+    .morph-scrubber input:disabled::-moz-range-thumb{opacity:0}
+    .morph-scrubber input:focus-visible::-webkit-slider-thumb,.morph-scrubber input:active::-webkit-slider-thumb{opacity:1}
+    .morph-scrubber input:focus-visible::-moz-range-thumb,.morph-scrubber input:active::-moz-range-thumb{opacity:1}
+    .plate-actions{display:flex;gap:8px;align-items:stretch}
+    .plate-actions .button{min-width:44px;min-height:44px;flex:1;font-size:13px;padding:8px 6px;margin:0}
+    .plate-actions .primary{flex:1.15}
+    .app-status{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:8px}
+    .app-status:empty{display:none}
+    #morph-support{font-size:12px;line-height:1.5;margin:10px 0 0}
+    @media(max-width:760px){
+      main{gap:10px;padding-top:2px}.masthead{height:48px}
+      .specimen-heading{margin:0}.specimen-heading h1{font-size:22px;line-height:1.2}
+      .studio,body[data-debug="true"] .studio{padding-top:8px}
+      .art-tools{margin:-6px 0 2px;min-height:40px}.view-options>summary{min-height:44px}
+      .plate-actions{gap:6px}.plate-actions .button{font-size:13px}
+      .quick-seed{margin:12px 0}.catalog .hybrid-options{display:none}
+      .more-controls .hybrid-options{display:block}
+      .catalog>.section-label{margin-bottom:6px}.catalog .section-label label{font-size:12px}
+      .catalog select{font-size:16px}
+      .more-controls{margin-top:12px}
+      .viewport-hint{font-size:12px}.viewport-toolbar .viewport-modes{margin-left:0}
+    }
+
+    /* Fit the art to the window. On desktop the wordmark sits over the
+       controls column, so the plate height is the viewport minus one tool row,
+       the scrub line and one action row. Short landscape screens move the
+       tools and actions into a narrow column beside the plate. Phones keep the
+       plate first, then four actions, then collapsed options. */
+    body{--gutter:clamp(16px,2.2vw,40px);--chrome:146px;--plate-w:min(100%,max(320px,calc((100dvh - var(--chrome))*1.2)))}
+    .specimen-heading{align-items:center;margin-bottom:6px;min-height:44px}
+    .specimen-heading h1{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .specimen-heading .art-tools{margin:0 0 0 auto;flex:none}
+    .catalog select{min-height:44px}.quick-seed .dice{min-width:44px}
+    .plate-actions{margin-top:0}
+    @media(min-width:761px){
+      .masthead{position:absolute;top:0;left:0;box-sizing:border-box;width:calc(220px + var(--gutter));height:56px;margin:0;padding:0 0 0 var(--gutter);border:0}
+      main{max-width:none;grid-template-columns:220px minmax(0,1fr);gap:clamp(20px,2.6vw,48px);padding:10px var(--gutter) 8px;align-items:start}
+      .studio{padding-top:58px;align-self:start}
+      .gallery{max-width:none}
+      .plate-view,.specimen-heading{width:var(--plate-w);margin-inline:auto}
+      body[data-debug="true"] .plate-view,body[data-debug="true"] .specimen-heading{width:auto}
+    }
+    @media(min-width:761px) and (max-width:1100px) and (orientation:portrait){
+      body{--chrome:236px}
+      .masthead{position:static;width:auto;height:52px;padding:0 var(--gutter)}
+      main{grid-template-columns:minmax(0,1fr);padding-top:2px}
+      .gallery{order:1}.studio{order:2;padding-top:0;max-width:640px;width:100%;margin-inline:auto}
+    }
+    @media(min-width:761px) and (max-height:560px){
+      .masthead{display:none}
+      main{grid-template-columns:200px minmax(0,1fr);gap:16px;padding:8px var(--gutter)}
+      .studio{padding-top:0}
+      .gallery{display:grid;grid-template-columns:auto 112px;column-gap:12px;align-content:start;justify-content:center}
+      .drawing-workspace,.plate-view{display:contents}
+      .specimen-heading{grid-column:2;grid-row:1;width:auto;margin:0;min-height:0;flex-direction:column;align-items:stretch}
+      .specimen-heading h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+      .specimen-heading .art-tools{margin:0;justify-content:space-between;min-height:44px}
+      .art-sheet{grid-column:1;grid-row:1/span 2;width:min(calc(100vw - 2*var(--gutter) - 340px),calc((100dvh - 40px)*1.2))}
+      .morph-scrubber{grid-column:1;grid-row:3}
+      .plate-actions{grid-column:2;grid-row:2;flex-direction:column;align-self:start;margin-top:8px}
+      .plate-actions .button{flex:none}
+      .gallery>*,.plate-view>*{min-width:0}
+      #morph-support,.seed-caption,#morph-debug{grid-column:1/-1}
+    }
+    @media(max-width:760px){
+      body{--chrome:236px}
+      main{padding:2px 10px 24px}
+      .masthead{margin:0 10px}
+      .specimen-heading{flex-wrap:nowrap;order:0}
+      .specimen-heading h1{flex:1 1 auto;font-size:20px}
+      .plate-view{width:var(--plate-w);margin-inline:auto}
+    }
+
+    /* UX pass: one Options panel, five icon actions, debug under the plate. */
+    .sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+    .more-controls{border-top:0;margin-top:0}
+    .more-controls>summary{justify-content:flex-start;gap:8px;font-size:14px}
+    .more-controls>summary::after{content:none}
+    .more-controls>summary .options-label{flex:1}
+    .wrench{flex:none;color:var(--ink);transition:transform .15s}
+    .more-controls[open]>summary .wrench{transform:rotate(-35deg)}
+    .advanced-content{display:flex;flex-direction:column;gap:12px;padding:6px 0 16px}
+    .advanced-content .field{margin:0}
+    .advanced-content .field>label,.advanced-content .control-label,.motion-section .section-label{display:block;font-size:11px;color:var(--muted);margin:0 0 5px}
+    .studio select,.studio input[type="text"],.studio .destination input{box-sizing:border-box;width:100%;max-width:100%;min-height:44px;font:12px var(--sans);color:var(--ink);padding:9px 9px;border:1px solid #babdad;border-radius:2px;background:#f4f2e9}
+    .studio select{padding-right:24px}
+    .studio select:focus-visible,.studio input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .quick-seed{margin:0}.quick-seed .seed-row{height:44px}
+    .check{display:flex;align-items:center;gap:8px;font-size:12px;min-height:32px;cursor:pointer}
+    .check input{width:18px;height:18px;margin:0;flex:none}
+    .motion-section{margin:0;padding:0;border:0}
+    .studio,.studio *{min-width:0}.studio{overflow-wrap:anywhere}
+    .reference-shelf{margin-top:0}
+    /* Zoom row on one line, the drag mode pair on its own line. */
+    .view-controls{margin:0}
+    .view-controls .viewport-toolbar{display:grid;grid-template-columns:repeat(4,auto) 1fr;align-items:center;gap:6px;margin:0}
+    .view-controls .viewport-modes{grid-column:1/-1;margin:0;display:flex;gap:6px}
+    .view-controls .viewport-modes button{flex:1}
+    .view-controls .viewport-hint{grid-column:1/-1;margin:0}
+    /* Five icon actions. Icon and a short label on wide screens. */
+    .plate-actions{display:grid;grid-template-columns:repeat(5,minmax(44px,1fr));gap:6px}
+    .plate-actions .action{display:flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 6px;margin:0}
+    .plate-actions .icon{flex:none}
+    .plate-actions .icon-pause{display:none}
+    .plate-actions .action[data-pause="true"] .icon:not(.icon-pause){display:none}
+    .plate-actions .action[data-pause="true"] .icon-pause{display:block}
+    .plate-actions .action[aria-pressed="true"]:not(.primary){background:#dce2cf;border-color:#737e60;color:#34402a}
+    @media(max-width:760px){.plate-actions .label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+    /* Debug sits under the plate and its actions, full plate width. */
+    .drawing-workspace,body[data-debug="true"] .drawing-workspace{grid-template-columns:minmax(0,1fr)}
+    body[data-debug="true"] .plate-view,body[data-debug="true"] .specimen-heading{width:var(--plate-w)}
+    .morph-debug{width:var(--plate-w);max-width:100%;margin-inline:auto;box-sizing:border-box;border-top:1px solid #b8b9ac;padding-top:12px}
+    .debug-heading{align-items:center}
+    .debug-copy{min-height:32px;padding:4px 10px;font:11px var(--sans);border:1px solid #c7c7b8;background:#f4f2e9;color:var(--ink);border-radius:2px;cursor:pointer}
+    .debug-record{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;margin:10px 0;font:11px/1.5 var(--sans)}
+    .debug-record dt{color:var(--muted)}.debug-record dd{margin:0;overflow-wrap:anywhere}
+    .debug-table-scroll{max-height:none;overflow-x:auto;max-width:100%;margin-top:12px}
+    .morph-debug .debug-table{min-width:360px}
+    @media(min-width:761px) and (max-width:1100px) and (orientation:portrait){
+      .gallery,.drawing-workspace{display:contents}
+      .specimen-heading{order:0;width:var(--plate-w);margin-inline:auto}
+      .plate-view{order:1;width:var(--plate-w);margin-inline:auto}
+      .morph-debug{order:2}
+      .studio{order:3}
+    }
+    @media(max-width:760px){
+      .plate-view{order:1}.morph-debug{order:2;width:100%}.studio,body[data-debug="true"] .studio{order:3}
+      .debug-table-scroll{-webkit-overflow-scrolling:touch}
+      .check{min-height:44px;font-size:14px}
+      .advanced-content .field>label,.advanced-content .control-label,.motion-section .section-label{font-size:13px}
+      .studio select,.studio .destination input{font-size:16px}
+    }
+    /* Touch targets: 44 px for every control. */
+    .wordmark,.source-link{display:inline-flex;align-items:center;min-height:44px;min-width:44px}
+    .quick-seed .seed-row{height:auto}.quick-seed .seed-row input,.quick-seed .dice{min-height:44px}
+    .view-controls .viewport-toolbar button{min-width:44px;min-height:44px}
+    .reference-shelf>summary{display:flex;align-items:center;min-height:44px;cursor:pointer}
+    .reference-shelf a{display:flex;align-items:center;min-height:44px;margin-top:0}
+    .debug-copy{min-height:44px}
+    @media(min-width:761px) and (max-height:560px){
+      .plate-actions{grid-template-columns:1fr}
+      .morph-debug{grid-column:1/-1;width:100%}
+    }
+    /* Wikipedia line under the title: one quiet line, ellipsis when narrow. */
+    .specimen-title{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;justify-content:center}
+    .specimen-title h1{line-height:1.15}
+    .specimen-link{margin:1px 0 0;font:12px/1.3 var(--sans);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:16px 0;margin-block:-16px}
+    .specimen-link[hidden]{display:none}
+    .specimen-link a{display:inline-block;padding:16px 0;margin:-16px 0;color:inherit;text-decoration:underline;text-decoration-color:#c9cbbd;text-underline-offset:2px}
+    .specimen-link a:hover,.specimen-link a:focus-visible{color:var(--ink);text-decoration-color:currentColor}
+    @media(max-width:760px){.specimen-link{font-size:11px}}
+    @media(min-width:761px) and (max-height:560px){.specimen-title{flex:none}.specimen-link{white-space:normal;font-size:10px}}
+  
+    /* Dense debug panel: collapsible sections, multi-column record, compact
+       monospace trait rows; Shape and Painting side by side on wide screens. */
+    .morph-debug .debug-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .debug-line{display:flex;flex-wrap:wrap;gap:2px 14px;margin:6px 0 4px;color:var(--muted);font:11px/1.5 var(--sans);font-variant-numeric:tabular-nums}
+    .debug-line span:empty{display:none}
+    .debug-section{border-top:1px solid #dcdccf;padding:2px 0}
+    .debug-section>summary{display:flex;align-items:baseline;gap:8px;min-height:44px;align-items:center;cursor:pointer;font:600 11px/1.3 var(--sans);color:var(--ink);list-style:none}
+    .debug-section>summary::-webkit-details-marker{display:none}
+    .debug-section>summary::before{content:'▸';font-size:9px;color:var(--muted)}.debug-section[open]>summary::before{content:'▾'}
+    .debug-sum{font-weight:400;color:var(--muted)}
+    .morph-debug .debug-record{display:grid;grid-template-columns:repeat(4,max-content minmax(0,1fr));gap:1px 10px;margin:2px 0 6px;font:11px/1.45 var(--sans)}
+    .morph-debug .debug-seeds{display:flex;flex-wrap:wrap;gap:2px 14px;margin:2px 0 6px}
+    .debug-trait-groups{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 18px}
+    .morph-debug .debug-table-scroll{max-height:none;overflow:visible;margin:0}
+    .morph-debug .debug-table{min-width:0;width:100%;table-layout:auto}
+    .morph-debug .debug-table th,.morph-debug .debug-table td{padding:0 4px;height:20px;line-height:20px;font:10.5px/20px ui-monospace,SFMono-Regular,Menlo,monospace;border-bottom:1px solid #ebebe1;white-space:nowrap}
+    .morph-debug .debug-table th[scope=row]{font:11px/20px var(--sans);overflow:hidden;text-overflow:ellipsis;max-width:0;width:44%}
+    .morph-debug .debug-table thead th{font:600 10px/20px var(--sans);color:var(--muted)}
+    .morph-debug .debug-table th small{margin-left:4px;color:var(--muted)}
+    @media(max-width:900px){.debug-trait-groups{grid-template-columns:minmax(0,1fr)}.morph-debug .debug-record{grid-template-columns:repeat(2,max-content minmax(0,1fr))}}
+    @media(max-width:760px){.debug-section>summary{min-height:44px;font-size:13px}.morph-debug .debug-table th,.morph-debug .debug-table td{font-size:11px}}
+
+    /* Trait rows as a grid: Shape in two columns beside Painting on wide screens. */
+    .debug-trait-groups{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+    .morph-debug .trait-table{display:block}
+    .morph-debug .trait-table thead,.morph-debug .trait-table tbody{display:grid;grid-template-columns:minmax(0,1fr);column-gap:16px}
+    .morph-debug [data-section=shape] .trait-table thead,.morph-debug [data-section=shape] .trait-table tbody{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .morph-debug .trait-table tr{display:grid;grid-template-columns:minmax(0,1fr) 50px 50px 50px 56px;align-items:center}
+    .morph-debug .trait-table tr[hidden]{display:none}
+    .morph-debug .trait-table th,.morph-debug .trait-table td{width:auto;max-width:none;overflow:hidden;text-overflow:ellipsis;text-align:right}
+    .morph-debug .trait-table th:first-child{text-align:left}
+    .morph-debug .trait-table th small{display:none}
+    .morph-debug .trait-table th[scope=row]{max-width:none;width:auto}
+    @media(max-width:900px){.debug-trait-groups{grid-template-columns:minmax(0,1fr)}.morph-debug [data-section=shape] .trait-table tbody,.morph-debug [data-section=shape] .trait-table thead{grid-template-columns:minmax(0,1fr)}.morph-debug [data-section=shape] .trait-table thead tr+tr{display:none}}
 </style>
 </head>
-<body>
-<main>
-<h1>Fungi</h1>
-<p>The fungi watercolor demos, mushroom paintings made with Unpainting, will be published here.</p>
-<p><a href="../">Paint Lab</a></p>
-</main>
+<body data-debug="false">
+  <header class="masthead"><a class="wordmark" href="./">Fungi</a><a class="source-link" href="https://github.com/sabj/unpainting" aria-label="Source code">↗</a></header>
+  <main>
+    <aside id="drawing-controls" class="studio" aria-label="Drawing controls">
+      <details id="more-controls" class="more-controls"><summary aria-label="Options"><svg class="wrench" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M21.7 6.3a5.5 5.5 0 0 1-7.4 6.9L6.6 21a2.1 2.1 0 0 1-3-3l7.8-7.7a5.5 5.5 0 0 1 6.9-7.4l-3.4 3.4 2.6 2.6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="options-label">Options</span></summary>
+        <div class="advanced-content">
+          <div class="field catalog"><label for="type-profile">Mushroom</label><select id="type-profile"></select></div>
+          <div class="field quick-seed"><label for="seed">Seed</label><div class="seed-row"><input id="seed" value="woodland-042" maxlength="64" spellcheck="false" autocomplete="off"><button id="random" type="button" class="dice" aria-label="New seed" title="New seed">⚄</button></div></div>
+          <div class="field destination catalog"><label for="next-type-profile">Morph to</label><select id="next-type-profile"></select></div>
+          <div class="field destination"><label for="next-seed">Target seed</label><input id="next-seed" value="woodland-108" maxlength="64" spellcheck="false" autocomplete="off"></div>
+          <div class="field hybrid-options"><label for="donor-profile">Cross with</label><select id="donor-profile"><option value="">None</option></select></div>
+          <div class="field scene-control catalog"><label for="scene">Habitat</label><select id="scene"><option value="plain">None</option><option value="woodland">Natural habitat</option><option value="leaf-litter">Leaf litter</option><option value="moss-bank">Moss bank</option><option value="fallen-log">Fallen log</option></select></div>
+          <label class="check" for="field-plate"><input id="field-plate" type="checkbox"> Field studies</label>
+          <section class="motion-section" aria-label="3D view"><div class="section-label">3D view</div>
+            <div class="tempo"><label for="view-yaw">Turn</label><input id="view-yaw" type="range" min="-3.14" max="3.14" step=".01" value=".12"><output id="view-yaw-value">7°</output></div>
+            <div class="tempo"><label for="view-pitch">View angle</label><input id="view-pitch" type="range" min="-.12" max=".85" step=".01" value=".36"><output id="view-pitch-value">21°</output></div>
+            <div class="tempo"><label for="shape-depth">Cap depth</label><input id="shape-depth" type="range" min=".65" max="1.4" step=".01" value="1"><output id="shape-depth-value">1×</output></div>
+            <div class="tempo"><label for="shape-bend">Stem bend</label><input id="shape-bend" type="range" min="-50" max="50" step="1" value="0"><output id="shape-bend-value">0 px</output></div>
+            <div class="tempo"><label for="duration">Morph time</label><input id="duration" type="range" min="3" max="20" step="1" value="5"><output id="duration-value" for="duration">5s</output></div>
+            <div class="tempo"><label for="loop-pause">Loop pause</label><input id="loop-pause" type="range" min="2" max="20" step="1" value="6"><output id="loop-pause-value" for="loop-pause">6s</output></div>
+          </section>
+          <div class="view-controls"><span class="control-label">View</span>
+            <div class="viewport-toolbar" role="group" aria-label="Artwork zoom">
+              <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out (−)" disabled>−</button><output id="zoom-value" aria-label="Zoom level">100%</output><button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zoom-fit" type="button" title="Fit whole plate (0)">Fit</button>
+              <div class="viewport-modes" role="group" aria-label="Drag action"><button id="viewport-rotate" type="button" aria-pressed="true">Rotate</button><button id="viewport-pan" type="button" aria-pressed="true">Pan</button></div>
+              <span id="zoom-help" class="viewport-hint">Drag to turn. Scroll or pinch to zoom.</span>
+            </div>
+          </div>
+          <label class="check" for="include-alpha"><input id="include-alpha" type="checkbox"> Include experimental forms</label>
+          <details class="reference-shelf"><summary>References</summary>
+            <a href="https://archive.org/details/illustrationsfu00pric/page/n41/mode/2up">Sarah Price · Fungi of our fields and woods, 1864</a>
+            <a href="https://www.pictureboxblue.com/fungi-and-mushroom-drawings/">James Sowerby · Coloured figures of English fungi</a>
+            <a href="https://lloydlibrary.org/women-and-nature/">Lloyd Library · Price and Anna Maria Hussey</a>
+            <a href="https://nysm.nysed.gov/research-collections/collections/mary-banning-fungi-maryland">Mary Banning · The Fungi of Maryland, 1889</a>
+            <a href="https://www2.muse.it/bresadola/iconographia.asp?lang=eng">Giacomo Bresadola · Iconographia Mycologica</a>
+            <a href="https://www.huh.harvard.edu/book/illustrations-fungi-our-fields-and-woods-1860">Harvard Farlow Library · History of mycological illustration</a>
+            <a href="https://pdimagearchive.org/galleries/tags/mushrooms/random/desc">Public Domain Image Archive · Mushroom collection</a>
+            <a href="https://www.mushroomexpert.com/">Michael Kuo · MushroomExpert (morphology)</a>
+            <a href="https://github.com/LingDong-/nonflowers">Lingdong Huang · Nonflowers (procedural plants)</a>
+            <a href="https://github.com/d-0-s-t/vector-bloom">Vector Bloom (procedural watercolour)</a>
+          </details>
+        </div>
+      </details>
+      <span id="status" class="sr-only" role="status" aria-live="polite"></span>
+    </aside>
+    <section class="gallery" aria-label="Mushroom drawing">
+      <div class="specimen-heading"><div class="specimen-title"><h1 id="specimen-name"></h1><p id="specimen-link" class="specimen-link" hidden></p></div>
+          <div class="art-tools">
+            <button id="paint-lab" class="save" type="button" aria-label="Open in Paint Lab" title="Open in Paint Lab"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1 0 1.5-.8 1.2-1.6-.4-1 .3-1.9 1.3-1.9h2a4 4 0 0 0 4-4c0-5-3.9-9.5-8.5-9.5z"/><circle cx="7.6" cy="11" r="1.1"/><circle cx="10.4" cy="7.4" r="1.1"/><circle cx="15" cy="7.6" r="1.1"/></svg></button>
+            <button id="save" class="save" type="button" aria-label="Save PNG" title="Save drawing"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg></button>
+          </div>
+      </div>
+      <div class="drawing-workspace">
+        <div class="plate-view">
+          <div class="art-sheet"><div id="plate-viewport" class="paper plate-viewport" tabindex="0" role="group" aria-label="Zoomable mushroom drawing" aria-describedby="zoom-help" data-viewport-zoom="1"><canvas id="painting" width="1200" height="1000" role="img" aria-label="Mushroom drawing"></canvas></div><progress id="drawing-progress" max="1" value="0" aria-label="Drawing progress"></progress></div>
+          <div class="morph-scrubber"><label class="sr-only" for="blend">Morph progress</label><input id="blend" type="range" min="0" max="1" step="0.001" value="0"><output id="blend-value" for="blend" class="sr-only">0%</output></div>
+          <div class="plate-actions"><button id="random-mushroom" class="button primary action" type="button" aria-label="Random" title="Random"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.3" fill="currentColor"/><circle cx="15" cy="15" r="1.3" fill="currentColor"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/><circle cx="9" cy="15" r="1.3" fill="currentColor"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/></svg><span class="label">Random</span></button><button id="morph" class="button secondary action" type="button" aria-label="Morph" title="Morph"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 14a4.5 4.5 0 0 1 9 0z"/><path d="M6 14v6"/><path d="M13.5 9.5q4.5 1.8 9 0"/><path d="M13.5 9.5c1.8 1.3 3 3 3.2 5.8V20M22.5 9.5c-1.8 1.3-3 3-3.2 5.8V20"/><path d="M7.5 6.5Q11.5 2.2 15.6 5.4" stroke-dasharray="0.1 2.5"/><path d="M15.6 5.4l-2.3.1M15.6 5.4l-.8 2.1"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/></svg><span class="label">Morph</span></button><button id="evolve" class="button secondary action" type="button" aria-label="Loop" title="Loop" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M5 11a7 7 0 0 1 12-4.9L19 8M19 4v4h-4M19 13a7 7 0 0 1-12 4.9L5 16M5 20v-4h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/></svg><span class="label">Loop</span></button><button id="draw" class="button secondary action" type="button" aria-label="Paint" title="Paint" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M14.5 4.5l5 5-8 8-5-5zM6.5 12.5c-2 .5-3 2-3 4.5 0 1-.5 2-1.5 2.5 3 .5 6-.5 7-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/></svg><span class="label">Paint</span></button><button id="debug-toggle" class="button secondary action" type="button" aria-label="Debug" title="Debug" aria-pressed="false" aria-controls="morph-debug"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><rect x="7.5" y="7" width="9" height="12" rx="4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 11v8M9 5l1.5 2M15 5l-1.5 2M4 10h3.5M16.5 10H20M4 15h3.5M16.5 15H20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="icon icon-pause" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M9 6v12M15 6v12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/></svg><span class="label">Debug</span></button></div>
+          <p id="morph-support" class="impact" hidden>These two forms can't morph.</p><progress id="morph-progress" hidden aria-label="Morph progress"></progress>
+          <span id="render-state" class="sr-only" role="status"></span>
+        </div>
+      <section id="morph-debug" hidden class="morph-debug" aria-label="Debug values">
+        <div class="debug-heading"><strong>Debug</strong><button id="debug-copy" class="debug-copy" type="button">Copy JSON</button></div>
+        <p class="debug-line"><span id="debug-body-plan"></span><span id="debug-camera"></span><span id="debug-habitat-line"></span><span id="debug-position"></span></p>
+        <details class="debug-section" data-section="specimen" open><summary>Specimen <span class="debug-sum" id="sum-specimen"></span></summary>
+          <dl id="debug-record" class="debug-record"></dl>
+          <div class="debug-seeds"><span>A <code id="debug-type-a"></code> · <code id="debug-seed-a"></code></span><span>B <code id="debug-type-b"></code> · <code id="debug-seed-b"></code></span><span>Now <code id="debug-current-id"></code></span></div>
+        </details>
+        <div class="debug-trait-groups">
+          <details class="debug-section" data-section="shape" open><summary>Shape traits <span class="debug-sum" id="sum-shape"></span></summary><div class="debug-table-scroll" tabindex="0" role="region" aria-label="Shape traits"><table class="debug-table trait-table"><thead><tr><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr><tr aria-hidden="true"><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="traits"></tbody></table></div></details>
+          <details class="debug-section" data-section="painting" open><summary>Painting traits <span class="debug-sum" id="sum-painting"></span></summary><div class="debug-table-scroll" tabindex="0" role="region" aria-label="Painting traits"><table class="debug-table trait-table"><thead><tr><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="traits-painting"></tbody></table></div></details>
+        </div>
+        <details class="debug-section" data-section="measures"><summary>Drawing measures <span class="debug-sum" id="sum-measures"></span></summary>
+          <section id="intrinsic-panel" hidden><div class="debug-table-scroll" tabindex="0" role="region" aria-label="Model sizes"><table class="debug-table" aria-label="Model sizes"><thead><tr><th scope="col">Size</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="intrinsic-values"></tbody></table></div><p id="view-values" class="debug-position"></p></section>
+          <div class="debug-table-scroll anatomy-table-scroll" tabindex="0" role="region" aria-label="Drawing measurements"><table class="debug-table" aria-label="Drawing measurements"><thead><tr><th scope="col">Drawing</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="anatomy-values"></tbody></table></div>
+        </details>
+        <details class="debug-section" data-section="ecology"><summary>Ecology <span class="debug-sum" id="sum-ecology"></span></summary><dl id="debug-ecology-record" class="debug-record"></dl><p id="debug-ecology" class="debug-note"></p></details>
+        <p id="native-paint-stats" class="debug-note" hidden aria-live="polite"></p>
+      </section>
+      </div>
+    </section>
+  </main>
+  <noscript><p class="no-script">JavaScript is required.</p></noscript><script type="module" src="./mushrooms.mjs?v=20261020-final5"></script>
 </body>
 </html>
