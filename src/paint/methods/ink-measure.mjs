@@ -31,9 +31,10 @@ function smoothAlong(v, radius) {
 /**
  * Width (pixels) and absorbance of the target's line under each point of `pts` ({x, y}, evenly spaced `spacing`
  * pixels apart). `on` and `side` are the on-path and beside-path L* per point (ink-lines.mjs pathSupport). Where the
- * target shows no darker line (side - on under `minSupport` L*) width is NaN and absorbance 0.
+ * target shows no darker line (side - on under `minSupport` L*) width is NaN and absorbance 0. The probe walks at most
+ * `reach` pixels each way, so a width is at most 2 x reach + the step.
  */
-export function measureAlong(pts, L, w, h, on, side, { spacing = 0.5, minSupport = 1 } = {}) {
+export function measureAlong(pts, L, w, h, on, side, { spacing = 0.5, minSupport = 1, reach = REACH } = {}) {
   const n = pts.length, width = new Float32Array(n), absorb = new Float32Array(n);
   for (let k = 0; k < n; k++) {
     const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
@@ -43,7 +44,7 @@ export function measureAlong(pts, L, w, h, on, side, { spacing = 0.5, minSupport
     let sum = 0;
     for (const sg of [1, -1]) {
       let d = 0;
-      while (d < REACH && sample(L, w, h, p.x + sg * (d + STEP) * nx, p.y + sg * (d + STEP) * ny) < half) d += STEP;
+      while (d < reach && sample(L, w, h, p.x + sg * (d + STEP) * nx, p.y + sg * (d + STEP) * ny) < half) d += STEP;
       sum += d + STEP / 2;
     }
     width[k] = sum;

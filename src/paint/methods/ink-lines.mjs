@@ -171,7 +171,7 @@ const Y = Lstar => (Lstar > 8 ? ((Lstar + 16) / 116) ** 3 : Lstar / 903.3);
  * @returns { lines, stats } with stats { lines, kept, pieces, lengthPx, keptPx, turnBefore, turnAfter,
  *   supportedShare, lineL, sideL, absorbance } where absorbance is the median -ln(Y on-path / Y sides) over supported points
  */
-export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, threshold = 0, minRunPx = 3, gapPx = 2, measure = false, inkMask = null, contour = false } = {}) {
+export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, threshold = 0, minRunPx = 3, gapPx = 2, measure = false, inkMask = null, contour = false, reach = undefined, widthPx = null } = {}) {
   const out = [], abs = [], onL = [], sideL = []; let lengthPx = 0, keptPx = 0, tb = 0, ta = 0, supportedPx = 0, kept = 0;
   const measured = []; // with `measure`: [line, points carrying width and absorbance]
   const step = 0.5;
@@ -184,7 +184,7 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
     // `inkMask` (0/1 on the grid): a point with no ink cell within a pixel has no support, so a trace along a wash
     // edge or a coloured brush mark is cut where the separator does not read pen line
     if (inkMask) R.forEach((q, k) => { if (!nearInk(inkMask, w, h, q.x, q.y)) support[k] = Math.min(support[k], 0); });
-    if (measure) { const m = measureAlong(R, L, w, h, on, side, { spacing: step }); R.forEach((q, k) => { q.width = m.width[k]; q.absorb = m.absorbance[k]; }); }
+    if (measure) { const m = measureAlong(R, L, w, h, on, side, { spacing: step, reach }); R.forEach((q, k) => { q.mapWidth = q.width; q.width = m.width[k]; q.absorb = m.absorbance[k]; }); }
     const { runs } = supportedRuns(support, { threshold: Math.max(threshold, 1e-6), window: 1 / step, gap: Math.round(gapPx / step), minRun: Math.round(minRunPx / step) });
     for (const [a, b] of runs) { supportedPx += (b - a) * step; for (let k = a; k <= b; k++) { abs.push(-Math.log(Math.max(1e-4, Y(on[k])) / Math.max(1e-4, Y(side[k])))); onL.push(on[k]); sideL.push(side[k]); } }
     if (!(threshold > 0)) {
@@ -199,7 +199,7 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
       if (measure) measured.push([g, piece]); else out.push(fromPoints(g, piece));
     }
   }
-  if (measure) out.push(...measuredLines(measured, { soft: !contour }));
+  if (measure) out.push(...measuredLines(measured, { soft: !contour, widthPx: contour ? widthPx : null }));
   return { lines: out, stats: { lines: lines.length, kept, pieces: out.length, lengthPx, keptPx, turnBefore: lengthPx ? tb / lengthPx : 0, turnAfter: lengthPx ? ta / lengthPx : 0,
     supportedShare: lengthPx ? supportedPx / lengthPx : 0, lineL: quantile(onL, 0.5), sideL: quantile(sideL, 0.5), absorbance: quantile(abs, 0.5) } };
 }
@@ -208,10 +208,12 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
  * Measured pieces as line-file lines with per-point `widths` (pixels) and `weights` (0.45..1, each point's absorbance
  * over the 85th percentile of the file's, from a floor of 0.45). A point with no width reading takes its piece's median, else the file's.
  * A width is held to 1.6 times its piece's median, so a line crossing a dark wash does not swell into a blot.
+ * `widthPx` { min, max, detail, shortPx, curvedDegPerPx } (a lineart map's contours): a width is also held to the map's own
+ * width (`mapWidth`) and to min..max, or min..detail on a short or tightly curved piece.
  * A piece spread wide and pale is marked `soft` (--inkbleed draws it on damp paper), unless `soft` is off: a contour
  * line of a lineart map is always drawn dry.
  */
-function measuredLines(measured, { soft: allowSoft = true } = {}) {
+function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}) {
   const r = v => Math.round(v * 100) / 100, all = [], allW = [];
   for (const [, pts] of measured) for (const q of pts) { if (q.absorb > 0) all.push(q.absorb); if (Number.isFinite(q.width)) allW.push(q.width); }
   const ref = quantile(all, 0.85) ?? 0, fileW = quantile(allW, 0.5) ?? 1;
@@ -222,7 +224,16 @@ function measuredLines(measured, { soft: allowSoft = true } = {}) {
     // as a line drawn into a wet wash
     const pieceA = quantile(pts.map(q => q.absorb ?? 0), 0.5) ?? 0, soft = allowSoft && pieceW >= 1.5 * fileW && pieceA <= 0.6 * ref;
     const { widths: _w, weights: _g, soft: _s, ...rest } = g;
-    return { ...rest, points: pts.map(p => [r(p.x), r(p.y)]), widths: pts.map(q => r(Number.isFinite(q.width) ? Math.min(q.width, 1.6 * pieceW) : pieceW)), weights: weights.map(r), ...(soft ? { soft: true } : {}) };
+    let widths = pts.map(q => (Number.isFinite(q.width) ? Math.min(q.width, 1.6 * pieceW) : pieceW)), kept = weights;
+    if (widthPx) {
+      // a lineart map's contour: the source's width, held to the map's own width where the map gives one, and to the
+      // pen's range; a short or tightly curved piece (an eye, a pupil, a nostril) is held to the detail width
+      const detail = pathLen(pts) < widthPx.shortPx || turning(pts) > widthPx.curvedDegPerPx, hi = detail ? widthPx.detail : widthPx.max;
+      widths = pts.map((q, k) => Math.max(widthPx.min, Math.min(hi, Number.isFinite(q.mapWidth) ? Math.min(widths[k], q.mapWidth) : widths[k])));
+      // the map's confidence adds to the source's darkness: a line both agree on is drawn firmest
+      kept = weights.map((v, k) => (pts[k].weight != null ? (v + pts[k].weight) / 2 : v));
+    }
+    return { ...rest, points: pts.map(p => [r(p.x), r(p.y)]), widths: widths.map(r), weights: kept.map(r), ...(soft ? { soft: true } : {}) };
   });
 }
 

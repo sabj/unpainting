@@ -17,11 +17,15 @@ import { separate } from '../../crop/inkwash.mjs';
 export function inkLineFlags(num) {
   const f = { support: num('linesupport', 0), smoothMm: num('linesmooth', 0), cornerDeg: num('linesmoothcorner', 50),
     darkCap: num('inkdarkcap', 0), widthFloor: num('inkwidthfloor', 0), lineMeasure: num('linemeasure', 0), darkMatch: num('inkdarkmatch', 0),
-    gapMm: num('linegapmm', 0), minMm: num('lineminmm', 0), inkOnly: num('lineinkonly', 0) };
+    gapMm: num('linegapmm', 0), minMm: num('lineminmm', 0), inkOnly: num('lineinkonly', 0),
+    widthMinMm: num('linewidthmin', 0.06), widthMaxMm: num('linewidthmax', 0.35), detailMm: num('linedetailmm', 0.15), probeMm: num('lineprobemm', 0.2) };
   for (const [k, v] of Object.entries(f)) if (!Number.isFinite(v) || v < 0) throw new Error(`ink lines: ${k} must be a number of 0 or more, not ${v}`);
   if (f.cornerDeg > 180) throw new Error('--linesmoothcorner: degrees from 0 to 180');
   return { ...f, measure: f.support > 0 || f.smoothMm > 0 || f.darkCap > 0 || f.widthFloor > 0 || f.lineMeasure > 0 || f.darkMatch > 0 };
 }
+
+// a contour piece shorter than this, or turning faster than this, is detail (an eye, a pupil, a nostril)
+const SHORT_MM = 6, CURVED_DEG_PER_MM = 25;
 
 const lPlaneCache = new Map();
 async function lPlane(image, w, h) {
@@ -73,7 +77,10 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   const opts = { sigma: flags.smoothMm / pxMm, cornerDeg: flags.cornerDeg, threshold: support,
     ...(flags.gapMm > 0 ? { gapPx: flags.gapMm / pxMm } : {}), ...(flags.minMm > 0 ? { minRunPx: flags.minMm / pxMm } : {}) };
   const inkMask = flags.inkOnly > 0 && support > 0 ? await inkCells(image, im.w, im.h) : null;
-  const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model });
+  // a map's contours: widths held to the pen's range (--linewidthmin, --linewidthmax, --linedetailmm for short or curved
+  // pieces), read with a probe of --lineprobemm either way so a wash beside the line is not taken for the line
+  const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: flags.widthMaxMm / pxMm, detail: flags.detailMm / pxMm, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
+  const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
   // the target's line cores, as --inkdarkmatch reads the pen's strokes on its scrap
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));
   const stats = flags.darkMatch > 0 ? { ...r.stats, peakAbsorbance: strokesPeakAbsorbance(L, im.w, im.h, gestures) } : r.stats;

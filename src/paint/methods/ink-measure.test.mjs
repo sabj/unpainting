@@ -42,3 +42,29 @@ test('holding with measure writes per-point widths and weights, and marks a wide
   assert.equal(pale.soft, true);
   assert.equal(crisp.soft, undefined);
 });
+
+test('a shorter probe stops at its reach, so a wash beside a line does not widen it', () => {
+  // a 2 px line with a dark wash on one side: the wash is darker than the line's half-contrast level, so a long probe walks into it
+  const w = 80, h = 40, L = new Float32Array(w * h).fill(90);
+  for (let x = 0; x < w; x++) { for (let y = 20; y <= 21; y++) L[y * w + x] = 40; for (let y = 22; y < 34; y++) L[y * w + x] = 45; }
+  const R = resample([{ x: 4, y: 21 }, { x: 76, y: 21 }], 0.5), { on, side } = pathSupport(R, L, w, h);
+  const long = measureAlong(R, L, w, h, on, side), short = measureAlong(R, L, w, h, on, side, { reach: 1.5 });
+  const mid = R.findIndex(q => q.x >= 40);
+  assert.ok(long.width[mid] > 4, `default probe ${long.width[mid]}`);
+  assert.ok(short.width[mid] <= 2 * 1.5 + 0.25 + 1e-6, `short probe ${short.width[mid]}`);
+});
+
+test('a lineart map contour is held to the map width, the pen range and the detail width, and is never soft', () => {
+  const w = 120, h = 80, L = new Float32Array(w * h).fill(90);
+  for (let x = 0; x < w; x++) for (let y = 14; y <= 17; y++) L[y * w + x] = 40; // a 4 px line
+  for (let x = 20; x < 30; x++) for (let y = 54; y <= 57; y++) L[y * w + x] = 40; // a 4 px mark, short
+  const long = { points: [[5, 16], [115, 16]], widths: [2, 2], weights: [0.6, 0.6] };
+  const mark = { points: [[20, 56], [30, 56]], widths: [3, 3], weights: [1, 1] };
+  const widthPx = { min: 0.5, max: 3, detail: 1.2, shortPx: 15, curvedDegPerPx: 3 };
+  const r = holdLinesToTarget([long, mark], L, w, h, { threshold: 0, measure: true, contour: true, reach: 2.5, widthPx });
+  const lineW = r.lines.find(g => g.points[0][1] < 30).widths, markW = r.lines.find(g => g.points[0][1] > 30).widths;
+  assert.ok(lineW.every(v => v <= 2 + 1e-9), `held to the map's 2 px, got ${lineW}`);
+  assert.ok(markW.every(v => v <= 1.2 + 1e-9), `a short mark is held to the detail width, got ${markW}`);
+  assert.ok(r.lines.every(g => g.soft === undefined && g.widths.every(v => v >= 0.5 - 1e-9)));
+  assert.ok(r.lines[0].weights.every(v => v > 0.6 && v <= 1), 'map confidence and source darkness are combined');
+});

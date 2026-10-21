@@ -76,7 +76,10 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // contact + 0.3 cells. The legacy K=1 calibration above over-widens observed
   // thick marks when copying with this instrument. Explicit calibration wins.
   const copyingNib = opt('inkprofile', '') === 'drawing-ink';
-  const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', copyingNib ? .3 : MARGIN), gain = num('drawwidthgain', copyingNib ? .95 : GAIN), minNib = num('drawwidthmin', 0.3);
+  // The margin and the least contact are cell effects of the painting's grid (a pen on a cell floors its line to a cell). On
+  // a fine ink sheet (--inkres N) a cell is N times smaller, and so are they.
+  const inkN = Math.max(1, Math.round(num('inkres', 1)));
+  const base = num('drawwant', num('tier1want', 0.6)), margin = num('drawwidthmargin', (copyingNib ? .3 : MARGIN) / inkN), gain = num('drawwidthgain', copyingNib ? .95 : GAIN), minNib = num('drawwidthmin', 0.3 / inkN);
   if (num('drawinghand', 0) > 0) {
     const handScale=w/1080*152.4/num('sheetmm',152.4);
     const r = handDrawing(lines, { gap: num('drawjoingap', 4) * handScale,
