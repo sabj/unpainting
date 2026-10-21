@@ -90,11 +90,11 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 - Agreement. The fallback tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each of its lines to the parts within 2 cells of what the ink separator reads as pen line. The model lines are not cut.
 - Fill. `--copylinesfill 1` fills the separator's pen line that no kept fallback trace covers with the separator's own narrow-ridge lines, cut the same way. It applies to the fallback only.
 - No pen line. `--copylinesfloor 0.6` draws no pen lines when the separator reads under 0.6% of the source as pen line, read at 540 px wide. The source then gets washes only.
-- Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 0.3 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
+- Placement. On the fallback lines, the support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 0.3 mm. On the model lines the filter only measures: every line is kept whole, with its width and darkness read from the source. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
 - Width and pressure. `--linemeasure 1` reads the source's line under each point of each stroke: its width, and its darkness against what is beside it. The pen then follows both, so a line swells and fades where the source's does.
 - Darkness. `--inkdarkmatch 1.6` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are 1.6 times the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times.
 - Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral. `--inkhuegain 1.5` raises each channel's share to the power 1.5, because dense ink renders less brown than its absorption direction.
-- Wet lines. `--inkbleed 0.35` draws a line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines are dry and crisp.
+- Wet lines. `--inkbleed 0.35` draws a fallback line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines, and every model line, are dry and crisp.
 
 | Flag | Wash | Off |
 |---|---|---|

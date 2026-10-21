@@ -166,11 +166,12 @@ const Y = Lstar => (Lstar > 8 ? ((Lstar + 16) / 116) ** 3 : Lstar / 903.3);
 
 /**
  * A line file's lines smoothed and filtered against the target's L* plane (on the file's image grid).
- * `sigma` smoothing in pixels (0 off); `threshold` support in L* (0: measure only, keep every line).
+ * `sigma` smoothing in pixels (0 off); `threshold` support in L* (0: measure only, keep every line); `contour`: the lines
+ * are a lineart map's contours, none is marked soft.
  * @returns { lines, stats } with stats { lines, kept, pieces, lengthPx, keptPx, turnBefore, turnAfter,
  *   supportedShare, lineL, sideL, absorbance } where absorbance is the median -ln(Y on-path / Y sides) over supported points
  */
-export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, threshold = 0, minRunPx = 3, gapPx = 2, measure = false, inkMask = null } = {}) {
+export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, threshold = 0, minRunPx = 3, gapPx = 2, measure = false, inkMask = null, contour = false } = {}) {
   const out = [], abs = [], onL = [], sideL = []; let lengthPx = 0, keptPx = 0, tb = 0, ta = 0, supportedPx = 0, kept = 0;
   const measured = []; // with `measure`: [line, points carrying width and absorbance]
   const step = 0.5;
@@ -198,7 +199,7 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
       if (measure) measured.push([g, piece]); else out.push(fromPoints(g, piece));
     }
   }
-  if (measure) out.push(...measuredLines(measured));
+  if (measure) out.push(...measuredLines(measured, { soft: !contour }));
   return { lines: out, stats: { lines: lines.length, kept, pieces: out.length, lengthPx, keptPx, turnBefore: lengthPx ? tb / lengthPx : 0, turnAfter: lengthPx ? ta / lengthPx : 0,
     supportedShare: lengthPx ? supportedPx / lengthPx : 0, lineL: quantile(onL, 0.5), sideL: quantile(sideL, 0.5), absorbance: quantile(abs, 0.5) } };
 }
@@ -207,9 +208,10 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
  * Measured pieces as line-file lines with per-point `widths` (pixels) and `weights` (0.45..1, each point's absorbance
  * over the 85th percentile of the file's, from a floor of 0.45). A point with no width reading takes its piece's median, else the file's.
  * A width is held to 1.6 times its piece's median, so a line crossing a dark wash does not swell into a blot.
- * A piece spread wide and pale is marked `soft` (--inkbleed draws it on damp paper).
+ * A piece spread wide and pale is marked `soft` (--inkbleed draws it on damp paper), unless `soft` is off: a contour
+ * line of a lineart map is always drawn dry.
  */
-function measuredLines(measured) {
+function measuredLines(measured, { soft: allowSoft = true } = {}) {
   const r = v => Math.round(v * 100) / 100, all = [], allW = [];
   for (const [, pts] of measured) for (const q of pts) { if (q.absorb > 0) all.push(q.absorb); if (Number.isFinite(q.width)) allW.push(q.width); }
   const ref = quantile(all, 0.85) ?? 0, fileW = quantile(allW, 0.5) ?? 1;
@@ -218,7 +220,7 @@ function measuredLines(measured) {
     const weights = weightsFrom(pts.map(q => q.absorb ?? 0), ref);
     // soft: spread at least half again as wide as the file's typical line and no darker than 60% of its strong line,
     // as a line drawn into a wet wash
-    const pieceA = quantile(pts.map(q => q.absorb ?? 0), 0.5) ?? 0, soft = pieceW >= 1.5 * fileW && pieceA <= 0.6 * ref;
+    const pieceA = quantile(pts.map(q => q.absorb ?? 0), 0.5) ?? 0, soft = allowSoft && pieceW >= 1.5 * fileW && pieceA <= 0.6 * ref;
     const { widths: _w, weights: _g, soft: _s, ...rest } = g;
     return { ...rest, points: pts.map(p => [r(p.x), r(p.y)]), widths: pts.map(q => r(Number.isFinite(q.width) ? Math.min(q.width, 1.6 * pieceW) : pieceW)), weights: weights.map(r), ...(soft ? { soft: true } : {}) };
   });

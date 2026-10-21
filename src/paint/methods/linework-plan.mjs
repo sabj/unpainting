@@ -274,7 +274,7 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
     // a prep pencil with no prepInk stage: an empty opening file, marked so the opening pen knows it is meant
     // (drawing-file.mjs), while every other reader of the opening file sees no lines, as before
     const empty = r[key] ? null : 'the plan has a prep pencil and no prepInk stage; the pencil is the opening drawing';
-    fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ ...stageDoc(r[key] ?? [], { image: imageSize, stage: key, source: setName }), ...(empty ? { empty } : {}) }) + '\n');
+    fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ ...stageDoc(r[key] ?? [], { image: imageSize, stage: key, source: setName }), ...(empty ? { empty } : {}), ...(doc.inputKind ? { inputKind: doc.inputKind } : {}) }) + '\n');
     info.files[key] = stem;
   }
   if (info.files.prepInk) argv.push('--drawingfile', info.files.prepInk);

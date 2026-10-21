@@ -96,3 +96,20 @@ test('--inkres keeps a finer file on its own grid, up to the fine sheet', async 
 test('the wash recipe draws on a sheet 3 times as fine', () => {
   assert.equal(INK_RECIPES.wash.inkres, '3');
 });
+
+test('lineart map lines are measured and never cut or marked soft, whatever --linesupport says', async () => {
+  const dir = await setup();
+  for (const name of ['open', 'close']) {
+    const doc = JSON.parse(fs.readFileSync(path.join(dir, `${name}-lines.json`), 'utf8'));
+    fs.writeFileSync(path.join(dir, `${name}-lines.json`), JSON.stringify({ ...doc, inputKind: 'line-map' }));
+  }
+  const f = flags(['--drawingfile', path.join(dir, 'open'), '--linesupport', '6', '--linemeasure', '1', '--linesmooth', '0.5', '--lineminmm', '3', '--linegapmm', '1']);
+  const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
+  const open = JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8'));
+  assert.equal(open.lines.length, 2, 'the line over bare paper stays');
+  assert.equal(open.inputKind, 'line-map');
+  assert.ok(open.lines.every(g => g.soft === undefined));
+  assert.ok(r.opening.model);
+  assert.ok(Math.abs(r.opening.stats.keptPx / r.opening.stats.lengthPx - 1) < 1e-9, 'every pixel of the length is kept');
+  assert.equal(open.inkLines.support, 0);
+});
