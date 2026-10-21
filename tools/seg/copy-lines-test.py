@@ -117,5 +117,13 @@ class LineMap(unittest.TestCase):
         self.assertEqual(len(lines), 1)
         self.assertLess(np.linalg.norm(np.array(lines[0]['points'][0])-lines[0]['points'][-1]), 1.5)
 
+    def test_long_contours_are_tier_one_and_short_marks_tier_two(self):
+        im = np.full((60, 200, 3), 255, 'uint8')
+        cv2.line(im, (5, 20), (190, 20), (20,)*3, 1)
+        cv2.line(im, (10, 45), (20, 45), (20,)*3, 1)
+        lines = copy.plan(im, 'line-map')[0]
+        self.assertEqual(sorted(g['tier'] for g in lines), [1, 2])
+        self.assertTrue(all('tier' not in g for g in copy.plan(im)[0]))
+
 
 if __name__ == '__main__': unittest.main()

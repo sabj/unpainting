@@ -93,8 +93,10 @@ test('--inkres keeps a finer file on its own grid, up to the fine sheet', async 
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8')).image, { w: w * k, h: h * k });
 });
 
-test('the wash recipe draws on a sheet 3 times as fine', () => {
+test('the wash recipe draws on a sheet 3 times as fine, by a hand that chains strokes', () => {
   assert.equal(INK_RECIPES.wash.inkres, '3');
+  assert.equal(INK_RECIPES.wash.drawinghand, '1');
+  assert.equal(INK_RECIPES.wash.drawstroke, '0.35');
 });
 
 test('lineart map lines are measured and never cut or marked soft, whatever --linesupport says', async () => {

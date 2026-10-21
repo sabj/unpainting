@@ -12,7 +12,7 @@ export const INK_RECIPES = Object.freeze({
   wash: Object.freeze({
     outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', linemodel: '1', copylinesmin: '0.005', copylinesagree: '2', copylinesfloor: '0.6', copylinesfill: '1',
     drawingstages: 'off', stages: 'prepink,finishink', prepinkfrom: 'lines', prepinkamount: '1', prepinkkeep: '1', prepinkadd: '0', prepinkdeviate: '0',
-    openingpressure: '0.75', inkres: '3',
+    openingpressure: '0.75', inkres: '3', drawinghand: '1', drawstroke: '0.35',
     linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '0.3', inkwidthfloor: '1',
     linemeasure: '1', inkdarkmatch: '1.6', inkhue: 'source', inkhuegain: '1.5', inkdamp: '0', inkbleed: '0.35',
   }),

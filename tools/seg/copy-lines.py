@@ -69,6 +69,10 @@ def line_map_mask(bgr, fine=None, min_area=2):
     return mask, confidence
 
 
+# a contour this long (cells of a 1080 px wide map, about 8 mm on a 152 mm sheet) is structure, not detail
+LONG_CELLS = 57
+
+
 def plan(bgr, kind='ink', map_tolerance=.25, fine=None):
     if not np.isfinite(map_tolerance) or not 0 <= map_tolerance <= 2:
         raise ValueError('map tolerance must be finite and between 0 and 2 cells')
@@ -78,6 +82,7 @@ def plan(bgr, kind='ink', map_tolerance=.25, fine=None):
         # a stub off a fork cuts a line in two; a standalone short mark is not a stub and stays
         skeleton, _ = prune_spurs(skeleton, 2)
     paths = sketch.trace(skeleton, min_points=2, window=3 if kind == 'line-map' else 5)
+    q_scale = bgr.shape[1]/1080
     distance = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
     lines = []
     for p in paths:
@@ -104,7 +109,9 @@ def plan(bgr, kind='ink', map_tolerance=.25, fine=None):
         lines.append({'points': np.round(q, 3).tolist(),
                       'widths': np.round(widths, 3).tolist(),
                       'weights': np.round(weights, 3).tolist(), 'weight': float(np.mean(weights)), 'role': 'map contour' if kind == 'line-map' else 'observed ink',
-                      'length': arc_length(q)})
+                      'length': arc_length(q),
+                      # a line map's long contours are the outlines and structure, drawn first (tier 1); the rest are detail (tier 2)
+                      **({'tier': 1 if arc_length(q) >= LONG_CELLS * q_scale else 2} if kind == 'line-map' else {})})
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()),
         'skeletonPixels': int(skeleton.sum()), 'tracedPaths': len(paths),
         'selectedPaths': len(lines), 'joins': 0, 'budgetDrops': 0,
