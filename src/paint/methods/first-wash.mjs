@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 3 (washes).
 // --firstwash 1: the opening wash laid as a painter lays it: paler, split at the subject (--fwmask <png>, white subject,
 // any size), sweeps cut where a segment leaves the passage, and wide passages softened at the edge while wet.
 // Without a mask the first wash is only paler. DOM free apart from the one image read.

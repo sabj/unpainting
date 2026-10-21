@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 3 (washes).
 // --subjectwash 1: the washes are cut by subject as well as by colour and value. The field itself (SAM subjects,
 // their colour and value clusters, wash and shadow groups, subject lights) is subject-clusters.mjs; this module builds
 // it for a painting and gives each consumer its part:

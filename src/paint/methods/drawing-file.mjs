@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 4 (hand plan: strokes from the line file).
 // --drawingfile <base>: the first pen draws exactly the lines of work/lines/<base>-lines.json (tools/seg/select-drawing.py),
 // whole, in file order, at the outline tier's pressure; no walker gestures, ink filter or silhouette pass.
 // Each line is split into strokes of --drawstroke (share of the short side), one dip each, so the pen does not run dry.

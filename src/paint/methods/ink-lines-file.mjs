@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 2 (hold and measure the lines).
 // The ink line files held to the target before painting (ink-lines.mjs): the opening (--drawingfile) and closing
 // (--drawinglast) files are smoothed (--linesmooth mm) and cut to where the target shows a line (--linesupport L*),
 // written to <out>/ink-opening-lines.json and <out>/ink-closing-lines.json, and the pens pointed at them. The target's

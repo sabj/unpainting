@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 5 (ink load).
 // --inkdarkmatch c: the ink load set so the pen's own strokes come out c times as dark as the target's lines, raising
 // the load as well as lowering it. --inkdarkcap tests one straight line of fixed width on a scrap; this tests a sample
 // of the stage's real strokes, with their widths, pressures and speeds, on a blank sheet of the painting's size, and

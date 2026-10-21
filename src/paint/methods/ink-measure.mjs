@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 2 (hold and measure the lines).
 // The target's own line, read point by point along a pen path (--linemeasure): how wide it is and how dark it is
 // against what is beside it. The pen then follows both along the stroke, so a line swells and fades where the
 // source's does, instead of one even hairline.

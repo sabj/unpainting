@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 4 (hand plan: chain, order and taper).
 // --drawinglogic 1: lays the lines drawing-rank.mjs chose as a hand would: joins continuing lines into gestures,
 // orders them tier by tier from where the pen last lifted, and tapers pressure and width at both ends.
 // DOM free, no file IO.

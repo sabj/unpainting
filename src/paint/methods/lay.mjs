@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 3 (one act of laying paint).
 // One act of laying paint: a mop charged from one well at one dilution, taken over one passage in sweeps.
 // In the older standalone painter, this module lays brush paint passage by passage. Brush settings per technique
 // follow chooseTechnique (src/crop/technique.mjs); which technique to use is the painter's choice.

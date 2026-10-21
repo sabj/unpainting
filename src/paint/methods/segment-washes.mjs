@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 3 (washes).
 // --segwash: the mop's regions come from the picture's semantic segments (tools/seg/segments.py) instead of a colour
 // and value cut. Each background region gets its own puddle, least washed then largest first, until its pale end is
 // satisfied. Foreground regions are left to the shapes; masses.mjs's own cut is the fallback without segments.

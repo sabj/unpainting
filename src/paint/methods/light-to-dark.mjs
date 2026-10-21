@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 5 (glazes and darks).
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';

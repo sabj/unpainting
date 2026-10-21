@@ -2,6 +2,19 @@
 
 The painter's decisions: what to paint, in what order, with which brush and mix. The physics it calls lives in [src/media](../media/).
 
+## Inking
+
+The pen drawing, in `methods/` unless noted ([pipelines](../../docs/pipelines.md)):
+
+- `linework-plan.mjs`, `line-model.mjs`, `line-python.mjs`: the line source, with `tools/seg/sketch-map.py` and `copy-lines.py`.
+- `ink-lines-file.mjs`, `ink-lines.mjs`, `ink-measure.mjs`, `ink-recipe.mjs`: holding and measuring the lines, and the `--inkrecipe` flags.
+- `drawing-stages.mjs`, `drawing-file.mjs`, `drawing-hand.mjs`: the opening and closing files, and the hand plan.
+- `ink-match.mjs`, `ink-res.mjs`, `fine-material.mjs`, `material-profiles.mjs`: the ink load and the pen on the fine sheet.
+
+## Painting
+
+The washes:
+
 - [methods/](methods/): generic watercolor methods that work the same on any subject.
 - [techniques/](techniques/): fixes for one kind of problem, such as faces, dark fur, skies or buildings.
 - [tuned/](tuned/): values fitted to specific benchmark images, run only through presets a plan or `--recipe` names ([tuned settings](../../docs/techniques.md#tuned-settings)).

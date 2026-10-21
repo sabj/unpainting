@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pipeline: inking, stage 1 (line source: the fused lineart map).
 """Optional published fine/coarse lineart maps for pre-paint sketch planning.
 
 No linebench runner, HED, or ArtLine dependency. pip install controlnet_aux torch

@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 1 (line source) and stage 3 (stages).
 // The painter's linework planning step, before the first mark: where the line set comes from (--linesource) and how
 // the plan's linked stages are cut from it (--stages, drawing-stages.mjs). The plan's drawing section writes these
 // flags (src/paint/drawing-plan.mjs); a run without them draws as before.

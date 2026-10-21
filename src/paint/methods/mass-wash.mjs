@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 3 (washes).
 // --massplan 1: the shared mass planner (mass-plan.mjs) driving the watercolour's washes. A painter decides a few
 // masses first (background, figure, face) and mixes a few colours for each, so a pass does not break into a lace.
 // Each mass-colour piece is a puddle label; passages are laid mass by mass (MASS_ORDER) and melt by MASS_EDGES.

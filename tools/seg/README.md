@@ -4,6 +4,12 @@ Segmentation divides an image into labeled regions. These scripts identify those
 
 The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs` runs `segments.py --mode regions` on the target, unless a map for the same target bytes and script version is already in `work/segments/by-hash/`. Segment Anything (SAM) must run: when the python or the checkpoint is missing, or SAM fails, the painting stops with an error and does not fall back to k-means. Every run logs a line such as `segments: SAM vit_b on mps (132 masks, 13 laid), 12 regions, 9 inside the frame; from the cache` and writes `segments.json` in its output folder. SAM takes about 20 seconds per image on an Apple M4 GPU.
 
+## Index
+
+Inking (the pen drawing, [pipelines](../../docs/pipelines.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `select-drawing.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
+
+Painting (regions for the washes): `segments.py`, `sam_regions.py`, `sam-points.py`, `segment.py`, `subject-regions.py`, `face-mask.py`, `check-sheet.mjs`.
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `--segments` | `sam` | `sam`, `kmeans` (Lab clusters, logged as such) or `off` |

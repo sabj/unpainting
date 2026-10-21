@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 2 (hold and measure the lines).
 // Ink lines held to the target: a line file's paths smoothed (--linesmooth) and cut to where the target shows a line
 // (--linesupport), with the target's own line darkness and pixel size measured for the pen (ink-lines-file.mjs).
 //

@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 5 (glazes and darks).
 // Final darks: the last few small, decisive darks a painter puts in once the washes are down (pupils, the gap under a
 // door, the shadow side of a window bar, the deepest fold). The value ladder cannot carry them: its glazes are cut
 // from broad value bands, small dark flecks are filtered out of the glaze list, and the touch-up rounds compare whole

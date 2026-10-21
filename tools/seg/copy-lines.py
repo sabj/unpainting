@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Pipeline: inking, stage 1 (line source: trace a lineart map, or the target's own ink as the fallback).
 """Preserve prepared line evidence before painting: observed ink or an explicit learned line map.
 
 Requires numpy/OpenCV. Emits the ordinary drawingfile JSON, a reviewable ink mask,

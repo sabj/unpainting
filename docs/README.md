@@ -11,6 +11,7 @@ The [project README](../README.md) has the quick start.
 
 ## How it paints
 
+- [Pipelines](pipelines.md): the inking and painting pipelines, stage by stage, and where they meet
 - [Overview](how-it-paints.md): paper, ink, paint, and the pipeline from plan to review
   - [Pigments and paper](pigments-and-paper.md): pigment optics and layers, the paint box, water and drying
   - [Ink](ink.md): the dip pen, pencil, line finding and drawing order

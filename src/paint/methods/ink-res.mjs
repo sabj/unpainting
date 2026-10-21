@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 6 (pen on the fine sheet).
 // --inkres N: the pens draw on their own sheet at N times the painting's resolution, so thin lines keep their taper.
 // New ink is averaged down onto the painting's sheet as pigment, so later glazes lie over it. The fine sheet has no
 // water flow. Output: paint upsampled, each pixel scaled by fine over coarse ink reflectance per channel. DOM free.

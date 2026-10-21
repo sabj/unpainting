@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
 // "Computer-Generated Watercolor" (SIGGRAPH 97): water with suspended pigment above the paper, pigment adsorbed
 // onto and desorbed from the paper by density, staining power and granulation, water absorbed into the paper's

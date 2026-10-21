@@ -1,3 +1,4 @@
+// Pipeline: painting, stage 1 (regions).
 // Segmentation before every painting. The target's region map (tools/seg/segments.py --mode regions) is looked up in
 // a cache keyed by the target's SHA-256 and made when it is missing. It is then registered under the target's own
 // name (registerSegments in segments.mjs), so every segment reader in the painter finds it, even when two targets share

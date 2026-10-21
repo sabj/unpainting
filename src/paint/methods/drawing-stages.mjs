@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 3 (opening and closing files).
 // Linked linework stages from one line set (the plan's drawing.stages):
 //
 //   prep       a light pencil placement: the big structural lines of the set, ranked (big shapes, features, detail)

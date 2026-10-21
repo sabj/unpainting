@@ -1,3 +1,4 @@
+// Pipeline: inking, stage 6 (gestures drawn with the pen).
 // Planned gestures drawn with the pen on the wash sheet. Pressure follows how much ink the plan wants under the
 // point and speed runs the other way. The pen re-dips when it runs low. DOM free.
 import { createPen, dipPen, penStroke, penRect } from './pen.mjs';
