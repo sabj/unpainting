@@ -174,7 +174,7 @@ test('URL state handles invalid forms, non-finite numbers, long seeds and bounds
   assert.equal(parseState('?blend=12&pace=-5').duration, 3);
   assert.equal(parseState('?seed=' + 'a'.repeat(200)).seed.length, 64);
   const s = parseState('?form=morel&seed=rain&next=moss&blend=.25&pace=12');
-  assert.deepEqual(s, {compositionAnchors:null,compositionSeed:'rain',compositionCount:0,yaw:.12,pitch:.36,capDepth:1,stemBend:0,fieldPlate:false, family: 'morel', typeId:'morel-1', donorId:null, nextTypeId:chooseMorphTargetTop('morel-1','moss'), nextDonorId:null, selectedScene:'woodland', background:false, scene:'plain', seed: 'rain', next: 'moss', includeAlpha:false, blend: .25, duration: 12, loopPause: 6 });
+  assert.deepEqual(s, {compositionAnchors:null,compositionSeed:'rain',compositionCount:0,yaw:.12,pitch:.36,capDepth:1,stemBend:0,fieldPlate:false, family: 'morel', typeId:'morel-1', donorId:null, nextTypeId:chooseMorphTargetTop('morel-1','moss'), nextDonorId:null, selectedScene:'auto', background:false, paint:'full', scene:'plain', seed: 'rain', next: 'moss', includeAlpha:false, blend: .25, duration: 12, loopPause: 6 });
 });
 
 test('the material is reproducibly painted by Unpainting, with actual pigment mass', () => {
@@ -822,10 +822,12 @@ const tinyNativeStudy=()=>({washes:[
 ]});
 
 test('native transport reaches zero water and fixes distinct wash and glaze layers', async () => {
-  const {simulateNativePassages}=await import('./mushrooms.mjs');const checkpoints=[];
+  const {simulateNativePassages,nativeWashPasses,nativeBrushGestures}=await import('./mushrooms.mjs');const checkpoints=[];
   const result=await simulateNativePassages(tinyNativeStudy(),{width:48,seed:17,yieldWork:async()=>{},onCheckpoint:async p=>checkpoints.push({stage:p.stage,complete:p.complete,...p.metrics})});
   assert.equal(result.complete,true);assert.equal(result.water,0);assert.equal(result.fixedLayers,2);
-  assert.equal(result.strokes,2);assert.ok(result.steps>50);assert.ok(result.pig.every(n=>n>0));
+  // The 600-wide cap wash goes on as brush-wide passes; each pass is a stroke.
+  const passes=tinyNativeStudy().washes.map(mark=>nativeWashPasses(nativeBrushGestures(mark),mark).length);
+  assert.ok(passes[0]>1&&passes[1]>=1);assert.equal(result.strokes,passes[0]+passes[1]);assert.ok(result.steps>50);assert.ok(result.pig.every(n=>n>0));
   assert.ok(checkpoints.some(p=>p.stage.includes('wet pigment')&&p.water>0));
   assert.ok(checkpoints.some(p=>p.stage.includes('flow and pooling')&&p.water>0));
   assert.ok(checkpoints.filter(p=>p.stage.endsWith('dry')).every(p=>p.water===0));
@@ -877,15 +879,16 @@ test('looser native painting preserves structural ink and a connected pale cap b
   for(const mark of study.washes.filter(m=>m.role==='cap'&&m.surface?.rails)){const gestures=nativeBrushGestures(mark);assert.equal(gestures.length,1);assert.deepEqual(gestures[0].path.map(q=>[q.x,q.y]),mark.points);assert.ok(gestures[0].path.every(q=>q.r===mark.width/2));assert.ok(gestures[0].path[0].p<gestures[0].path.at(-1).p);}
 });
 
-import {clampPlateViewport,zoomPlateViewport,panPlateViewport,mountPlateViewport} from './mushrooms.mjs';
+import {clampPlateViewport,zoomPlateViewport,centredPlateViewport,mountPlateViewport} from './mushrooms.mjs';
 
-test('plate zoom keeps the pointer anchor and clamps scale and pan to the paper',()=>{
+test('plate zoom keeps the plate centred and clamps scale to the paper',()=>{
   const size={width:800,height:600},anchor={x:230,y:180};
   const a={scale:1,x:0,y:0},b=zoomPlateViewport(a,3,anchor,size);
   assert.equal(b.scale,3);assert.equal((anchor.x-b.x)/b.scale,anchor.x);assert.equal((anchor.y-b.y)/b.scale,anchor.y);
   assert.deepEqual(zoomPlateViewport(b,1,anchor,size),a);
   assert.deepEqual(clampPlateViewport({scale:20,x:-99999,y:99999},size),{scale:6,x:-4000,y:0});
-  assert.deepEqual(panPlateViewport(b,{x:99999,y:-99999},size),{scale:3,x:0,y:-1200});
+  assert.deepEqual(centredPlateViewport(3,size),{scale:3,x:-800,y:-600});assert.deepEqual(centredPlateViewport(1,size),{scale:1,x:0,y:0});
+  assert.deepEqual(centredPlateViewport(20,size),{scale:6,x:-2000,y:-1500});assert.deepEqual(centredPlateViewport(NaN,size),{scale:1,x:0,y:0});
 });
 
 function zoomFixture(options={}){
@@ -895,36 +898,43 @@ function zoomFixture(options={}){
     setAttribute(key,value){(this.attributes??={})[key]=value;}
     setPointerCapture(id){this.captured.add(id);}hasPointerCapture(id){return this.captured.has(id);}releasePointerCapture(id){this.captured.delete(id);}focus(){}
   }
-  const root=new Element(),viewport=new Element(),canvas=new Element(),zoomIn=new Element(),zoomOut=new Element(),fit=new Element(),output=new Element(),rotate=new Element(),pan=new Element(),help=new Element();
+  const root=new Element(),viewport=new Element(),canvas=new Element();
   canvas.width=1200;canvas.height=1000;canvas.getContext=()=>{throw new Error('Display zoom must never repaint');};
-  const controller=mountPlateViewport({viewport,canvas,zoomIn,zoomOut,fit,output,rotate,pan,help,root,...options});
+  const controller=mountPlateViewport({viewport,canvas,root,...options});
   const event=(target,type,props={})=>{const e=Object.assign(new Event(type,{cancelable:true}),props);target.dispatchEvent(e);return e;};
-  return {root,viewport,canvas,zoomIn,zoomOut,fit,output,rotate,pan,help,controller,event};
+  return {root,viewport,canvas,controller,event};
 }
-test('plate zoom handles wheel, captured pan, Fit and local keyboard without repainting',()=>{
-  const f=zoomFixture();
-  assert.equal(f.viewport.dataset.viewportZoom,'1');assert.equal(f.zoomOut.disabled,true);
+test('plate zoom: wheel and keys zoom about the centre, a drag never pans, a double click fits, without repainting',()=>{
+  let taps=0;const f=zoomFixture({onTap:()=>taps++});
+  assert.equal(f.viewport.dataset.viewportZoom,'1');
   assert.equal(f.event(f.root,'wheel',{deltaY:-100,clientX:400,clientY:300}).defaultPrevented,false);
-  assert.equal(f.event(f.viewport,'wheel',{deltaY:-100,deltaMode:0,clientX:300,clientY:200}).defaultPrevented,true);
-  assert.ok(f.controller.getState().scale>1);assert.match(f.canvas.style.transform,/scale\(/);
+  assert.equal(f.event(f.viewport,'wheel',{deltaY:-100,deltaMode:0,clientX:30,clientY:20}).defaultPrevented,true);
+  const zoomed=f.controller.getState();assert.ok(zoomed.scale>1);assert.match(f.canvas.style.transform,/scale\(/);
+  assert.deepEqual(zoomed,centredPlateViewport(zoomed.scale,{width:800,height:600}),'zoom ignores the pointer and stays centred');
   f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:1,clientX:200,clientY:200});
-  assert.equal(f.viewport.hasPointerCapture(1),true);const before=f.controller.getState();
-  f.event(f.viewport,'pointermove',{pointerId:1,clientX:150,clientY:160});assert.ok(f.controller.getState().x<before.x);
-  f.event(f.viewport,'pointerup',{pointerId:1});assert.equal(f.viewport.hasPointerCapture(1),false);
-  f.event(f.root,'keydown',{key:'+'});assert.ok(f.controller.getState().scale>before.scale);
+  assert.equal(f.viewport.hasPointerCapture(1),true);
+  f.event(f.viewport,'pointermove',{pointerId:1,clientX:150,clientY:160});assert.deepEqual(f.controller.getState(),zoomed);
+  f.event(f.viewport,'pointerup',{pointerId:1});assert.equal(f.viewport.hasPointerCapture(1),false);assert.equal(taps,0,'a drag is not a tap');
+  f.event(f.root,'keydown',{key:'+'});assert.ok(f.controller.getState().scale>zoomed.scale);assert.deepEqual(f.controller.getState(),centredPlateViewport(f.controller.getState().scale,{width:800,height:600}));
   f.event(f.root,'keydown',{key:'0'});assert.deepEqual(f.controller.getState(),{scale:1,x:0,y:0});
-  f.event(f.zoomIn,'click');f.event(f.fit,'click');assert.equal(f.output.value,'100%');
+  f.event(f.root,'keydown',{key:'+'});f.event(f.viewport,'dblclick');assert.deepEqual(f.controller.getState(),{scale:1,x:0,y:0});
+  f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:2,clientX:300,clientY:300});f.event(f.viewport,'pointerup',{pointerId:2,clientX:300,clientY:300});
+  assert.equal(taps,1,'a click on the plate is a tap');
   assert.equal(f.canvas.width,1200);assert.equal(f.canvas.height,1000);f.controller.destroy();
 });
-test('plate pinch uses its centroid and keeps the whole canvas as the export source',()=>{
+test('plate pinch scales about the plate centre and keeps the whole canvas as the export source',()=>{
   const f=zoomFixture();
   f.event(f.viewport,'pointerdown',{pointerType:'touch',pointerId:1,clientX:300,clientY:300});
   f.event(f.viewport,'pointerdown',{pointerType:'touch',pointerId:2,clientX:500,clientY:300});
   f.event(f.viewport,'pointermove',{pointerId:1,clientX:200,clientY:300});
   f.event(f.viewport,'pointermove',{pointerId:2,clientX:600,clientY:300});
   assert.deepEqual(f.controller.getState(),{scale:2,x:-400,y:-300});
+  // An off-centre pinch that drifts sideways still zooms about the centre.
+  f.event(f.viewport,'pointermove',{pointerId:1,clientX:50,clientY:100});f.event(f.viewport,'pointermove',{pointerId:2,clientX:250,clientY:100});
+  assert.deepEqual(f.controller.getState(),centredPlateViewport(1,{width:800,height:600}));
+  f.event(f.viewport,'pointermove',{pointerId:2,clientX:650,clientY:100});assert.deepEqual(f.controller.getState(),centredPlateViewport(3,{width:800,height:600}));
   f.event(f.viewport,'pointercancel',{pointerId:2});assert.equal(f.viewport.hasPointerCapture(2),false);
-  f.event(f.fit,'click');assert.equal(f.canvas.dataset.viewportZoom,'1');assert.equal(f.canvas.width*f.canvas.height,1200000);f.controller.destroy();
+  f.event(f.viewport,'dblclick');assert.equal(f.canvas.dataset.viewportZoom,'1');assert.equal(f.canvas.width*f.canvas.height,1200000);f.controller.destroy();
 });
 
 
@@ -1152,8 +1162,7 @@ test('field studies do not substitute a generic connected cap for other family a
 test('direct 3D drag defaults to rotate, changes clamped camera coordinates and leaves display zoom independent',async()=>{
   const {orbitPlateCamera,ORBIT_YAW_PER_WIDTH}=await import('./mushrooms.mjs');let camera={yaw:.12,pitch:.36},starts=0,ends=[];
   const f=zoomFixture({onOrbitStart:()=>starts++,onOrbit:(delta,size)=>{camera=orbitPlateCamera(camera,delta,size)},onOrbitEnd:value=>ends.push(value)});
-  assert.equal(f.rotate.hidden,true);f.controller.setOrbitEnabled(true);assert.equal(f.rotate.hidden,false);assert.equal(f.rotate.attributes['aria-pressed'],'true');
-  assert.equal(f.controller.getMode(),'rotate');assert.match(f.help.textContent,/Drag to turn/);
+  assert.equal(f.controller.getMode(),'none');f.controller.setOrbitEnabled(true);assert.equal(f.controller.getMode(),'rotate');assert.equal(f.viewport.dataset.viewportMode,'rotate');
   f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:1,clientX:200,clientY:300});
   f.event(f.viewport,'pointermove',{pointerId:1,clientX:400,clientY:200});
   assert.equal(starts,1);assert.ok(Math.abs(camera.yaw-(.12+200*ORBIT_YAW_PER_WIDTH/f.viewport.clientWidth))<1e-12);assert.ok(Math.abs(camera.pitch-(.36+1.4/6))<1e-12);
@@ -1165,19 +1174,22 @@ test('direct 3D drag defaults to rotate, changes clamped camera coordinates and 
   assert.equal(orbitPlateCamera(bounded,{x:-10000,y:10000},{width:320,height:266}).pitch,-.12);f.controller.destroy();
 });
 
-test('Pan, Shift drag and middle mouse move the viewport without rotating any camera',()=>{
+test('there is no pan: Shift drag turns, other mouse buttons and a turn-less field plate leave the zoomed view where it is',()=>{
   let starts=0,moves=0;const f=zoomFixture({onOrbitStart:()=>starts++,onOrbit:()=>moves++});f.controller.setOrbitEnabled(true);
-  f.event(f.viewport,'wheel',{deltaY:-240,deltaMode:0,clientX:400,clientY:300});
-  for(const [i,props] of [{shiftKey:true,button:0},{button:1},{button:2}].entries()){
-    const before=f.controller.getState();f.event(f.viewport,'pointerdown',{pointerType:'mouse',pointerId:i+1,clientX:400,clientY:300,...props});
+  f.event(f.viewport,'wheel',{deltaY:-240,deltaMode:0,clientX:100,clientY:100});const zoomed=f.controller.getState();assert.ok(zoomed.scale>1);
+  for(const [i,props] of [{button:1},{button:2}].entries()){
+    f.event(f.viewport,'pointerdown',{pointerType:'mouse',pointerId:i+1,clientX:400,clientY:300,...props});
     f.event(f.viewport,'pointermove',{pointerId:i+1,clientX:380,clientY:280});f.event(f.viewport,'pointerup',{pointerId:i+1});
-    assert.equal(f.controller.getState().x,before.x-20);assert.equal(f.controller.getState().y,before.y-20);
+    assert.deepEqual(f.controller.getState(),zoomed);
   }
-  f.event(f.pan,'click');assert.equal(f.controller.getMode(),'pan');assert.equal(f.pan.attributes['aria-pressed'],'true');
+  assert.equal(starts,0);assert.equal(moves,0);
+  f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,shiftKey:true,pointerId:5,clientX:400,clientY:300});
+  f.event(f.viewport,'pointermove',{pointerId:5,shiftKey:true,clientX:380,clientY:280});f.event(f.viewport,'pointerup',{pointerId:5});
+  assert.equal(starts,1);assert.ok(moves>0);assert.deepEqual(f.controller.getState(),zoomed);
+  f.controller.setOrbitEnabled(false);assert.equal(f.controller.getMode(),'none');
   f.event(f.viewport,'pointerdown',{pointerType:'touch',pointerId:7,clientX:400,clientY:300});
-  f.event(f.viewport,'pointermove',{pointerId:7,clientX:390,clientY:290});f.event(f.viewport,'pointerup',{pointerId:7});
-  assert.equal(starts,0);assert.equal(moves,0);f.event(f.rotate,'click');assert.equal(f.controller.getMode(),'rotate');
-  f.controller.setOrbitEnabled(false);assert.equal(f.rotate.hidden,true);assert.equal(f.controller.getMode(),'pan');f.controller.destroy();
+  f.event(f.viewport,'pointermove',{pointerId:7,clientX:360,clientY:260});f.event(f.viewport,'pointerup',{pointerId:7});
+  assert.equal(starts,1);assert.deepEqual(f.controller.getState(),zoomed);f.controller.destroy();
 });
 
 test('orbit to two-finger pinch keeps refinement held until the whole gesture ends and never resumes rotation midgesture',async()=>{
@@ -1190,7 +1202,7 @@ test('orbit to two-finger pinch keeps refinement held until the whole gesture en
   f.event(f.viewport,'pointerdown',{pointerType:'touch',pointerId:2,clientX:500,clientY:260});
   f.event(f.viewport,'pointermove',{pointerId:2,clientX:600,clientY:300});assert.equal(f.viewport.dataset.viewportGesture,'pinch');assert.ok(f.controller.getState().scale>1);
   f.event(f.viewport,'pointerup',{pointerId:2});assert.equal(q.held,true);assert.equal(f.controller.isOrbitHolding(),true);flush();assert.equal(paint.length,0);
-  f.event(f.viewport,'pointermove',{pointerId:1,clientX:270,clientY:240});assert.deepEqual(camera,heldCamera);assert.equal(rotations,1);assert.equal(f.viewport.dataset.viewportGesture,'pan');
+  f.event(f.viewport,'pointermove',{pointerId:1,clientX:270,clientY:240});assert.deepEqual(camera,heldCamera);assert.equal(rotations,1);assert.equal(f.viewport.dataset.viewportGesture,'still');
   f.event(f.viewport,'pointerup',{pointerId:1});assert.equal(q.held,false);flush();assert.deepEqual(paint,[heldCamera]);assert.deepEqual(preview.at(-1),heldCamera);f.controller.destroy();
 });
 
@@ -1205,11 +1217,11 @@ test('pointer cancellation, capture loss and recipe invalidation release orbit e
   }
   const clock=sketchClock(),paint=[];let deltaCount=0;const q=new SketchScheduler({...clock,preview:()=>{},refine:v=>paint.push(v)});
   const f=zoomFixture({onOrbitStart:()=>{q.hold();q.input({recipe:'old'});},onOrbit:()=>deltaCount++,onOrbitEnd:({settle})=>settle?q.release():q.cancel()});f.controller.setOrbitEnabled(true);
-  f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:1,clientX:200,clientY:200});const stalePreview=[...clock.frames.values()][0];
+  f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:1,clientX:200,clientY:200});f.event(f.viewport,'pointermove',{pointerId:1,clientX:210,clientY:200});const stalePreview=[...clock.frames.values()][0];
   f.controller.cancelGesture({settle:false});q.input({recipe:'new'});stalePreview();
   f.event(f.viewport,'pointermove',{pointerId:1,clientX:240,clientY:220});f.event(f.viewport,'pointerup',{pointerId:1});
   for(let i=0;i<4;i++){clock.runFrames();clock.runTimers();}
-  assert.equal(deltaCount,0);assert.equal(q.held,false);assert.deepEqual(paint,[{recipe:'new'}]);f.controller.destroy();
+  assert.equal(deltaCount,1);assert.equal(q.held,false);assert.deepEqual(paint,[{recipe:'new'}]);f.controller.destroy();
 });
 
 
@@ -1377,7 +1389,7 @@ test('dense connected background masks retain every intersecting polygon and use
 // assert.ok(gestures[1].load>0&&gestures[1].depositDepth>.4);
 
 test('native form shadows prewet a wider footprint before charging real pigment',async()=>{
-  const {nativeBrushGestures,simulateNativePassages}=await import('./mushrooms.mjs');
+  const {nativeBrushGestures,nativeWashPasses,simulateNativePassages}=await import('./mushrooms.mjs');
   const shape=[[300,180],[850,180],[850,820],[300,820]];
   const mark={role:'stem-shadow',shape,points:[[650,200],[650,800]],width:160,palette:{umber:1},load:.12,wetness:.6,granulation:.5,pooling:.4,softness:.7,variation:.3,
     surface:{kind:'stem',rails:Array.from({length:17},(_,i)=>[[500,220+i*35],[750,220+i*35]])}};
@@ -1387,7 +1399,10 @@ test('native form shadows prewet a wider footprint before charging real pigment'
   assert.ok(gestures[0].path.every((p,i)=>p.r>gestures[1].path[i].r));
   assert.ok(gestures.every(g=>g.depositDepth>.4),'loaded water stands above pore capacity');
   let final;const result=await simulateNativePassages({washes:[mark]},{width:48,seed:42,yieldWork:async()=>{},onCheckpoint:async q=>{if(q.complete)final=q.sheet;}});
-  assert.equal(result.clearWaterStrokes,1);assert.equal(result.strokes,2);assert.equal(result.brushDips,2);
+  // Both gestures are wider than a brush, so each goes on as passes: clear water first, then pigment.
+  const passes=nativeWashPasses(gestures,mark),wet=passes.filter(g=>g.prewet).length;
+  assert.ok(wet>1&&passes.length>wet);assert.ok(passes.slice(0,wet).every(g=>g.prewet&&g.load===0));
+  assert.equal(result.clearWaterStrokes,wet);assert.equal(result.strokes,passes.length);assert.equal(result.brushDips,passes.length);
   assert.equal(result.water,0);assert.equal(result.fixedLayers,1);assert.ok(final.layers[0][0].some(x=>x>0));
 });
 
@@ -1744,7 +1759,7 @@ test('construction preview strokes at the target canvas resolution',async()=>{
 
 test('plate viewport reports view changes without repainting the canvas',()=>{
   const seen=[];const f=zoomFixture({onView:(view,size)=>seen.push({view,size})});
-  f.event(f.zoomIn,'click');
+  f.controller.zoomIn();
   assert.ok(seen.length>=2);assert.equal(seen.at(-1).view.scale,1.25);assert.deepEqual(seen.at(-1).size,{width:800,height:600});
   seen.at(-1).view.scale=99;assert.equal(f.controller.getState().scale,1.25,'callers receive a copy');
   assert.equal(f.canvas.width,1200);f.controller.destroy();
@@ -2428,13 +2443,81 @@ test('scattered and gregarious finds: at most 3 members, none overlapping the ma
 });
 
 
-test('Paint playback pacing stays inside its ink and wash bounds', async () => {
+test('a live painting\'s paced waits and shown frames do not count against the drying time limit', async () => {
+  const {simulateNativePassages,NATIVE_PAINT_LIMITS}=await import('./mushrooms.mjs');
+  // The brush's pace alone (2.5 s) and slow frames run past a 1 s limit; the work itself does not.
+  const result=await simulateNativePassages(tinyNativeStudy(),{width:48,seed:17,yieldWork:async()=>{},travelMs:2500,checkpointIntervalMs:0,
+    onCheckpoint:async()=>new Promise(r=>setTimeout(r,2)),limits:{...NATIVE_PAINT_LIMITS,maxMs:1000}});
+  assert.equal(result.complete,true);assert.equal(result.water,0);assert.ok(result.elapsedMs>2500);
+});
+
+test('Paint playback pacing follows brush travel and stays inside its bounds', async () => {
   const {nativePlaybackPacing,PLAYBACK}=await import('./mushrooms.mjs');
   assert.deepEqual(nativePlaybackPacing({}),{inkMs:PLAYBACK.ink.minMs,washMs:PLAYBACK.wash.minMs});
-  assert.deepEqual(nativePlaybackPacing({inkLength:1e9,washMarks:1e6}),{inkMs:PLAYBACK.ink.maxMs,washMs:PLAYBACK.wash.maxMs});
-  const mid=nativePlaybackPacing({inkLength:12500,washMarks:15});
-  assert.equal(mid.inkMs,5000);assert.equal(mid.washMs,6000);
-  assert.ok(PLAYBACK.ink.maxMs+PLAYBACK.wash.maxMs<=25000,'longest Paint plays in about 25 s of pacing');
+  assert.deepEqual(nativePlaybackPacing({inkLength:1e9,washMm:1e9}),{inkMs:PLAYBACK.ink.maxMs,washMs:PLAYBACK.wash.maxMs});
+  const mid=nativePlaybackPacing({inkLength:12500,washMm:7200});
+  assert.equal(mid.inkMs,5000);assert.equal(mid.washMs,16000);
+  assert.ok(PLAYBACK.ink.minMs+PLAYBACK.wash.minMs>=15000&&PLAYBACK.ink.maxMs+PLAYBACK.wash.maxMs<=32000,'a plate plays in roughly 20 to 40 s with drying');
+});
+
+test('wide washes are laid as overlapping brush-wide passes, top to bottom, turning back each time', async () => {
+  const {nativeWashPasses,WASH_PASSES}=await import('./mushrooms.mjs');
+  const narrow={path:[{x:0,y:0,r:20},{x:100,y:0,r:20}]};
+  assert.deepEqual(nativeWashPasses([narrow]),[narrow],'a brush-sized stroke is untouched');
+  const wide={load:.4,path:[{x:0,y:500,r:200},{x:400,y:500,r:200},{x:800,y:500,r:200}]},passes=nativeWashPasses([wide]);
+  assert.ok(passes.length>=4);
+  for(const pass of passes){assert.equal(pass.load,.4);assert.ok(pass.path.every(q=>q.r<=WASH_PASSES.maxRadius));}
+  const ys=passes.map(p=>p.path[0].y);assert.deepEqual([...ys].sort((a,b)=>a-b),ys,'top to bottom');
+  assert.equal(ys[0],500-(200-WASH_PASSES.maxRadius));assert.equal(ys.at(-1),500+(200-WASH_PASSES.maxRadius));
+  for(let k=1;k<ys.length;k++)assert.ok(ys[k]-ys[k-1]<=2*WASH_PASSES.maxRadius*(1-WASH_PASSES.overlap)+1e-9,'neighbouring passes overlap');
+  assert.ok(passes[0].path[0].x<passes[0].path.at(-1).x&&passes[1].path[0].x>passes[1].path.at(-1).x,'each pass turns back');
+  // Passes are trimmed to the shape's box.
+  const shape=[[300,300],[500,300],[500,700],[300,700]],trimmed=nativeWashPasses([wide],{shape});
+  for(const pass of trimmed)assert.ok(pass.path.length<wide.path.length+1&&pass.path.some(q=>q.x>=300-q.r&&q.x<=500+q.r));
+});
+
+test('Paint playback paces the brush and a skip lands on the same sheet', async () => {
+  const {simulateNativePassages,nativeWashTravel,planNativePassages}=await import('./mushrooms.mjs');
+  const finals=[];const run=async opts=>{let layers;const started=performance.now();await simulateNativePassages(tinyNativeStudy(),{width:48,seed:23,yieldWork:async()=>{},onCheckpoint:async p=>{if(p.complete)layers=p.sheet.layers.map(l=>l.map(a=>Array.from(a)));},...opts});finals.push(layers);return performance.now()-started;};
+  assert.ok(nativeWashTravel(planNativePassages(tinyNativeStudy()))>0);
+  const fast=await run({});const paced=await run({travelMs:600});let calls=0;const skipped=await run({travelMs:60000,skipPacing:()=>++calls>3});
+  assert.ok(paced>=fast+400,`paced ${paced} vs ${fast}`);assert.ok(skipped<10000,'a skip drops the waits');
+  assert.deepEqual(finals[1],finals[0]);assert.deepEqual(finals[2],finals[0]);
+});
+
+test('live painting starts from blank paper: the first checkpoint holds no pigment', async () => {
+  const {simulateNativePassages}=await import('./mushrooms.mjs');const {totals}=await import('../lab/media/sheet.js');
+  const pig=[];await simulateNativePassages(tinyNativeStudy(),{width:48,seed:29,yieldWork:async()=>{},travelMs:100,checkpointIntervalMs:0,onBrush:({sheet})=>pig.push(totals(sheet).pig.reduce((a,b)=>a+b,0))});
+  assert.ok(pig.length>4);assert.ok(pig[0]<pig.at(-1)*.5,'the wash builds up pass by pass');
+});
+
+test('Full painting is the default and persists; Fast is opt in', () => {
+  assert.equal(parseState('').paint,'full');assert.equal(parseState('?paint=fast').paint,'fast');assert.equal(parseState('?paint=bogus').paint,'full');
+});
+
+test('habitat Auto is the default scene choice and suits each mushroom', async () => {
+  const m=await import('./mushrooms.mjs');
+  assert.equal(m.HABITAT_CHOICES[0],'auto');
+  for(const [id,scene] of [['oyster-1','fallen-log'],['agaric-4','fallen-log'],['bracket-1','fallen-log'],['tooth-1','fallen-log'],['waxcap-1','woodland'],['amanita-1','woodland'],['chanterelle-1','moss-bank'],['hedgehog-1','moss-bank'],['puffball-1','woodland']])
+    assert.equal(m.autoHabitatScene(id),scene,id);
+  for(const type of MUSHROOM_TYPES)assert.ok(BACKGROUND_SCENES.includes(m.autoHabitatScene(type.id))&&m.autoHabitatScene(type.id)!=='plain');
+  const off=parseState('?type=oyster-1');assert.equal(off.selectedScene,'auto');assert.equal(off.background,false);assert.equal(off.scene,'plain');
+  const on=parseState('?type=oyster-1&scene=auto&background=1');assert.equal(on.scene,'fallen-log');
+  assert.equal(parseState('?type=oyster-1&scene=auto').scene,'fallen-log','a bookmarked Auto turns the background on');
+  assert.equal(parseState('?type=oyster-1&scene=moss-bank&background=1').scene,'moss-bank','a fixed scene still wins');
+  // Auto follows the plate a morph lands on.
+  const landed=m.advanceMorphState({...parseState('?type=amanita-1&nextType=oyster-1&scene=auto&background=1')},'next-seed');
+  assert.equal(landed.typeId,'oyster-1');assert.equal(landed.scene,'fallen-log');
+  const plain=m.advanceMorphState({...parseState('?type=amanita-1&nextType=oyster-1')},'next-seed');assert.equal(plain.scene,'plain');
+});
+
+test('the page has no view controls; the habitat select offers Auto first; the painting toggle is there', async () => {
+  const {readFileSync}=await import('node:fs');const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
+  for(const id of ['zoom-in','zoom-out','zoom-fit','zoom-value','zoom-help','viewport-rotate','viewport-pan','view-yaw','view-pitch'])assert.ok(!html.includes(`id="${id}"`),id);
+  assert.ok(!/>View</.test(html)&&!/>Turn</.test(html)&&!/>View angle</.test(html));
+  for(const id of ['shape-depth','shape-bend','duration','loop-pause','paint-full','paint-fast'])assert.ok(html.includes(`id="${id}"`),id);
+  const options=[...html.match(/<select id="scene">(.*?)<\/select>/)[1].matchAll(/value="([^"]+)"/g)].map(m=>m[1]);
+  assert.deepEqual(options,['plain','auto','woodland','leaf-litter','moss-bank','fallen-log']);
 });
 
 test('Paint cursor maps ink marks to Paint Lab pen and pencil states', async () => {

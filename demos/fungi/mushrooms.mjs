@@ -4048,6 +4048,16 @@ export function buildBackgroundStudy(genome,scene='plain',foregroundShapes=[],{s
 
 
 export const BACKGROUND_SCENES=Object.freeze(['plain','leaf-litter','moss-bank','fallen-log','woodland']);
+// Habitat choices: Auto (the default) picks the scene that suits the type's
+// ecology record; the others are fixed scenes. 'plain' is the background off.
+export const HABITAT_CHOICES=Object.freeze(['auto','woodland','leaf-litter','moss-bank','fallen-log']);
+export function autoHabitatScene(typeId){
+  const type=TYPES_BY_ID.get(typeId),kind=type?habitatFor({profileId:typeId,phenotype:type}).kind:'litter';
+  if(WOOD_SUBSTRATES.has(kind))return 'fallen-log';
+  if(kind==='moss')return 'moss-bank';
+  return 'woodland';
+}
+export function resolveHabitat(choice,typeId){return choice==='auto'?autoHabitatScene(typeId):choice;}
 const lamellarSurfaces=new WeakMap();
 // The same body constructors stop before microscopic detail, surface normals,
 // pigment meshes and transport. Motion never invokes the full study planner.
@@ -8423,6 +8433,41 @@ export function nativeReloadedPath(path,widths=3){
   return parts.filter(part=>part.length>1);
 }
 
+// A wash wider than a brush is laid as a painter lays it: overlapping
+// brush-wide passes across the shape, top to bottom, each turning back the
+// way the last one came, so the bead is carried down the wash. A pass keeps
+// the gesture's load, water and pressure; it is trimmed to the shape's box.
+export const WASH_PASSES=Object.freeze({maxRadius:60,overlap:.35});
+export function nativeWashPasses(gestures,mark=null,{maxRadius=WASH_PASSES.maxRadius,overlap=WASH_PASSES.overlap}={}){
+  const shape=Array.isArray(mark?.shape)&&mark.shape.length>2?bounds(mark.shape):null,out=[];
+  for(const gesture of gestures){
+    const path=gesture.path??[],R=Math.max(0,...path.map(q=>q.r??1));
+    if(!(R>maxRadius)||path.length<2){out.push(gesture);continue;}
+    const step=2*maxRadius*(1-overlap),n=1+Math.ceil((2*R-2*maxRadius)/step);
+    const normals=path.map((q,i)=>{const a=path[Math.max(0,i-1)],b=path[Math.min(path.length-1,i+1)],dx=b.x-a.x,dy=b.y-a.y,l=Math.hypot(dx,dy)||1;return {x:-dy/l,y:dx/l};});
+    const passes=[];
+    for(let k=0;k<n;k++){
+      const u=n>1?-1+2*k/(n-1):0;
+      let pass=path.map((q,i)=>{const r=Math.min(q.r??1,maxRadius),off=u*Math.max(0,(q.r??1)-r);return {...q,x:q.x+normals[i].x*off,y:q.y+normals[i].y*off,r};});
+      if(shape){
+        const touches=q=>q.x+q.r>=shape.x&&q.x-q.r<=shape.x+shape.w&&q.y+q.r>=shape.y&&q.y-q.r<=shape.y+shape.h;
+        const first=pass.findIndex(touches),last=pass.findLastIndex(touches);
+        pass=first<0?[]:pass.slice(Math.max(0,first-1),Math.min(pass.length,last+2));
+      }
+      if(pass.length>1)passes.push(pass);
+    }
+    const meanY=pass=>pass.reduce((sum,q)=>sum+q.y,0)/pass.length;
+    passes.sort((a,b)=>meanY(a)-meanY(b));
+    passes.forEach((pass,k)=>out.push({...gesture,path:k%2?[...pass].reverse():pass,pass:k,passes:passes.length}));
+  }
+  return out;
+}
+// The brush's whole travel over a plan's passes, in plate units.
+export function nativeWashTravel(passages){
+  let total=0;
+  for(const passage of passages)for(const mark of passage.marks)for(const gesture of nativeWashPasses(nativeBrushGestures(mark),mark))total+=pathLength((gesture.path??[]).map(q=>[q.x,q.y]));
+  return total;
+}
 // Contiguous subpaths share the endpoint. stroke(lift:false) retains its carry,
 // heading, stroke key, contact stamps and finite reservoir; only the last lifts.
 export function nativeStrokeSegments(points,maxLength=12){
@@ -8523,11 +8568,16 @@ export function nativeGestureMaterial(passage,mark,gesture,{keys,scale,seed,stro
 // spreading under the brush, with the Paint Lab's own brush, nib and pencil
 // cursor drawn from the real tool state. Load, Random, prepared plates and
 // morph landings keep the fast path. The finished plate is the same bytes.
-export const PLAYBACK=Object.freeze({frameMs:33,fullFrameMs:350,refreshMs:1000,ink:Object.freeze({perUnitMs:.4,minMs:4000,maxMs:6500}),wash:Object.freeze({perMarkMs:400,minMs:4500,maxMs:10000}),plateMm:240,inkColour:'#2b241d'});
-export function nativePlaybackPacing({inkLength=0,washMarks=0}={}){
+export const PLAYBACK=Object.freeze({frameMs:33,fullFrameMs:350,refreshMs:1000,ink:Object.freeze({perUnitMs:.4,minMs:4000,maxMs:6500}),wash:Object.freeze({mmPerS:450,minMs:12000,maxMs:20000}),liftMs:40,lagMs:750,plateMm:240,inkColour:'#2b241d'});
+// Ink by its drawn length; washes by the brush's travel in millimetres at a
+// steady hand speed, held between the bounds so a plate plays in 20 to 40 s.
+export function nativePlaybackPacing({inkLength=0,washMm=0}={}){
   const P=PLAYBACK;
-  return {inkMs:Math.round(clamp(inkLength*P.ink.perUnitMs,P.ink.minMs,P.ink.maxMs)),washMs:Math.round(clamp(washMarks*P.wash.perMarkMs,P.wash.minMs,P.wash.maxMs))};
+  return {inkMs:Math.round(clamp(inkLength*P.ink.perUnitMs,P.ink.minMs,P.ink.maxMs)),washMs:Math.round(clamp(washMm/P.wash.mmPerS*1000,P.wash.minMs,P.wash.maxMs))};
 }
+// A tap on the plate finishes a live painting at full speed (the worker's
+// 'native-skip' message); the bytes are those of the paced painting.
+const nativePlaybackSkip={on:false};
 // Paint Lab's cursor works in sheet pixels and millimetres; the plate is
 // 1200 units across a sheet PLAYBACK.plateMm wide.
 export const PLAYBACK_CURSOR=Object.freeze({w:1200,dpi:1200/(PLAYBACK.plateMm/25.4)});
@@ -8586,7 +8636,7 @@ export function nativePatchRect({x0,y0,x1,y1},sw,sh,W,H){
   const px0=Math.max(0,Math.floor(x0*W/sw)),py0=Math.max(0,Math.floor(y0*H/sh)),px1=Math.min(W,Math.ceil((x1+1)*W/sw)),py1=Math.min(H,Math.ceil((y1+1)*H/sh));
   return {x:px0,y:py0,w:Math.max(0,px1-px0),h:Math.max(0,py1-py0)};
 }
-export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,limits=NATIVE_PAINT_LIMITS}={}){
+export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,travelMs=0,skipPacing=()=>false,limits=NATIVE_PAINT_LIMITS}={}){
   const started=performance.now(),passages=planNativePassages(study),keys=nativePalette(passages);
   width=nativeSheetWidth(width,keys,limits);
   const height=Math.round(width/1.2),n=width*height,scale=width/1200,mmPerCell=.2/scale;
@@ -8598,15 +8648,25 @@ export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.wi
   const flow=options=>{const t=performance.now(),active=step(sheet,options);timings.transportMs+=performance.now()-t;steps++;return active;};
   const check=()=>{if(isCancelled())throw new DOMException('Cancelled','AbortError');};
   const stats=()=>({nativeWidth:width,nativeHeight:height,nativeCells:n,channels:keys,strokes,strokeSegments,brushDips,brushLifts,clearWaterStrokes,steps,fixedLayers:sheet.layers.length,...totals(sheet),elapsedMs:performance.now()-started,timings:{...timings},paperReused,ink:'custom variable-pressure vector ink',drying:'accelerated native transport',previewOptics:'sharp 1200px ink; 4x4 native mass average + RGB multiply paint preview; final exact layered KM'});
-  const publish=async(stage,progress,complete=false,force=false)=>{check();if(!complete&&!force&&performance.now()-lastCheckpoint<checkpointIntervalMs)return;checkpoints++;await onCheckpoint({sheet,stage,progress,complete,force,metrics:stats()});lastCheckpoint=performance.now();check();};
+  // The time limit counts the simulation's own work, not the time spent
+  // showing frames or waiting for the live brush's pace (idleMs).
+  let idleMs=0;const overBudget=()=>performance.now()-started-idleMs>limits.maxMs;
+  const publish=async(stage,progress,complete=false,force=false)=>{check();if(!complete&&!force&&performance.now()-lastCheckpoint<checkpointIntervalMs)return;checkpoints++;const shownAt=performance.now();await onCheckpoint({sheet,stage,progress,complete,force,metrics:stats()});lastCheckpoint=performance.now();idleMs+=lastCheckpoint-shownAt;check();};
   const markCount=passages.reduce((n,p)=>n+p.marks.length,0);
+  // Live painting (travelMs): the brush moves at one speed over every pass,
+  // so the plate's whole travel takes travelMs; a pause at each lift. The
+  // work of painting and showing frames runs inside that time: behind it,
+  // the brush catches up, but never by more than PLAYBACK.lagMs, and each
+  // passage starts afresh after its drying. skipPacing drops the waits.
+  const travelTotal=travelMs>0?nativeWashTravel(passages)*scale:0;let deadline=performance.now();
+  const travelWait=async ms=>{if(skipPacing()){deadline=performance.now();return;}deadline+=ms;const wait=deadline-performance.now();if(wait>0){const at=performance.now();await new Promise(r=>setTimeout(r,Math.min(120,wait)));idleMs+=performance.now()-at;}else deadline=Math.max(deadline,performance.now()-PLAYBACK.lagMs);};
   for(let pi=0;pi<passages.length;pi++){
-    const passage=passages[pi],start=pi/passages.length,span=1/passages.length;
+    const passage=passages[pi],start=pi/passages.length,span=1/passages.length;deadline=performance.now();
     const transport=nativePassageTransport(passage);
     for(let mi=0;mi<passage.marks.length;mi++){
       const mark=passage.marks[mi];check();
       const maskAt=performance.now();setClip(sheet,maskFor?await maskFor(mark,{width,height,scale,paper}):null);timings.maskMs+=performance.now()-maskAt;
-      const gestures=nativeBrushGestures(mark);
+      const gestures=nativeWashPasses(nativeBrushGestures(mark),mark);
       for(let gi=0;gi<gestures.length;gi++){
       const gesture=gestures[gi],material=nativeGestureMaterial(passage,mark,gesture,{keys,scale,seed,strokes});
       const brush=createBrush(material.brush);
@@ -8617,10 +8677,12 @@ export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.wi
         const depositAt=performance.now();stroke(brush,sheet,segments[si],{spacing:1.5,lift:si===segments.length-1});timings.depositMs+=performance.now()-depositAt;strokeSegments++;
         onBrush?.({brush,segment:segments[si],lifted:si===segments.length-1,palette:mark.palette,sheet});
         await publish(`${gesture.prewet?'Wetting the paper':passage.id} · stroke ${mi+1} of ${passage.marks.length}`, .22+.78*(start+span*.4*(mi+(gi+(si+1)/segments.length)/gestures.length)/passage.marks.length));
-        const due=markStarted+depositDurationMs/Math.max(1,markCount)/gestures.length*(si+1)/segments.length;
-        if(due>performance.now())await new Promise(r=>setTimeout(r,Math.min(33,due-performance.now())));
+        if(travelTotal>0)await travelWait(travelMs*pathLength(segments[si].map(q=>[q.x,q.y]))/travelTotal);
+        else{const due=markStarted+depositDurationMs/Math.max(1,markCount)/gestures.length*(si+1)/segments.length;
+        if(due>performance.now())await new Promise(r=>setTimeout(r,Math.min(33,due-performance.now())));}
         await yieldWork();check();
       }
+      if(travelTotal>0)await travelWait(PLAYBACK.liftMs);
       strokes++;brushLifts++;if(gesture.prewet)clearWaterStrokes++;if(!passage.flat&&(!mark.batchedFlow||gi===gestures.length-1))flow(transport);
       }
     }
@@ -8632,7 +8694,7 @@ export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.wi
     let dryDone=false;
     for(let j=0;j<limits.maxSteps;j++){
       dryDone=!flow({...transport,dt:j<16?.6:2});if(dryDone)break;
-      if((j&3)===3){await publish(`${passage.id} · flow and pooling`,.22+.78*(start+span*(.4+.58*(1-Math.exp(-j/90)))));await yieldWork();check();if(performance.now()-started>limits.maxMs)break;}
+      if((j&3)===3){await publish(`${passage.id} · flow and pooling`,.22+.78*(start+span*(.4+.58*(1-Math.exp(-j/90)))));await yieldWork();check();if(overBudget())break;}
     }
     if(!dryDone)throw new Error('Native wash is still wet at the time limit; painting remains incomplete');
     // The dried last pass streams once before it is fixed: the same pigment as
@@ -9193,7 +9255,7 @@ export function paintLabPlan(payload,{title=payload.genome?.title??'Mushroom pla
   const planned=passages.map(passage=>{
     const transport=nativePassageTransport(passage);
     const marks=passage.marks.map(mark=>{
-      const gestures=nativeBrushGestures(mark);
+      const gestures=nativeWashPasses(nativeBrushGestures(mark),mark);
       return {role:mark.role??'',clip:clipRuns(maskFor(mark,{width,height,scale})),gestures:gestures.map((gesture,gi)=>{
         const material=nativeGestureMaterial(passage,mark,gesture,{keys,scale,seed,strokes});strokes++;
         return {prewet:!!gesture.prewet,brush:material.brush,water:material.water,load:widen(material.conc),spacing:1.5,flowAfter:!passage.flat&&(!mark.batchedFlow||gi===gestures.length-1),
@@ -9248,13 +9310,13 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
   const inkMarks=handChainMarks(nativePlateInk(study));
   const weights=inkMarks.map(m=>Math.max(6,pathLength(m.points))),total=weights.reduce((a,b)=>a+b,0),inkStarted=performance.now();let index=0,done=0;
   // Paint playback: an artist's pace, the tool's state with every frame.
-  const playback=!!payload.playback,pacing=playback?nativePlaybackPacing({inkLength:total,washMarks:planNativePassages(nativePlateWashes(study)).reduce((n,p)=>n+p.marks.length,0)}):null;
+  const playback=!!payload.playback,pacing=playback?nativePlaybackPacing({inkLength:total,washMm:nativeWashTravel(planNativePassages(nativePlateWashes(study)))*PLAYBACK.plateMm/1200}):null;
   const inkMs=playback?pacing.inkMs:NATIVE_PACING.inkMs;let cursorNow=null;
   const drawBatches=(context,batches)=>drawNativeInkBatches(context,painter,batches);
   // Fixed groups make overlapping alpha exactly independent of frame cadence.
   // Completed groups are rasterized once; only the current group is transient.
   while(index<inkMarks.length){
-    const frameAt=performance.now(),budget=total*Math.min(1,(frameAt-inkStarted)/inkMs);
+    const frameAt=performance.now(),budget=total*Math.min(1,playback&&nativePlaybackSkip.on?1:(frameAt-inkStarted)/inkMs);
     while(index<inkMarks.length){
       const end=Math.min(inkMarks.length,index+16),weight=weights.slice(index,end).reduce((a,b)=>a+b,0);if(budget<total&&done+weight>budget+1e-7)break;
       const batches=new Map();for(let i=index;i<end;i++)painter.inkStroke(inkMarks[i],1,batches);drawBatches(ic,batches);done+=weight;index=end;if(performance.now()-frameAt>22)break;
@@ -9267,7 +9329,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     }
     finishNativeInk(pc,painter);drawNativeLabels(pc,study,genome);renderTimings.inkMs+=performance.now()-frameAt;
     if(playback&&index>=inkMarks.length)cursorNow=null;
-    await send('Ink',.22*Math.min(1,budget/Math.max(1,total)),false,playback?{cursor:cursorNow}:{});
+    await send('Ink',.22*Math.min(1,budget/Math.max(1,total)),false,playback?{cursor:nativePlaybackSkip.on?null:cursorNow}:{});
     await new Promise(r=>setTimeout(r,Math.max(0,33-(performance.now()-frameAt))));
   }
   c.clearRect(0,0,1200,1000);c.drawImage(committed,0,0,1200,1000);finishNativeInk(c,painter,'high');const ink=c.getImageData(0,0,W,H);painter.ctx=c;
@@ -9286,7 +9348,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     const transferAt=performance.now();renderTimings.transferMs+=performance.now()-transferAt;
     emit({revision,native:true,index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob,elapsed:performance.now()-started,bitmap,metrics:{...metrics,renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
   };
-  const frameMetrics=metrics=>({...metrics,inkHash,inkMarksPlanned:study.ink.length,inkMarksRendered:inkMarks.length,outputScale:scale,outputWidth:W,outputHeight:H,...(playback?{cursor:cursorNow}:{})});
+  const frameMetrics=metrics=>({...metrics,inkHash,inkMarksPlanned:study.ink.length,inkMarksRendered:inkMarks.length,outputScale:scale,outputWidth:W,outputHeight:H,...(playback?{cursor:nativePlaybackSkip.on?null:cursorNow}:{})});
   // Live patches (playback): the part of the plate the brush and the wet wash
   // changed since the last frame, composed exactly as the settled plate is,
   // posted at display cadence. Cells outside it keep their last fields.
@@ -9334,7 +9396,9 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     const bitmap=patch.transferToImageBitmap();
     emit({revision,native:true,patch:{x:rect.x,y:rect.y,w:rect.w,h:rect.h},index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob:null,elapsed:performance.now()-started,bitmap,metrics:{...frameMetrics(metrics),renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
   };
-  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?pacing.washMs:NATIVE_PACING.depositMs,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
+  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?0:NATIVE_PACING.depositMs,travelMs:playback?pacing.washMs:0,skipPacing:()=>nativePlaybackSkip.on,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
+    const live=playback&&!nativePlaybackSkip.on;
+    if(playback&&!live&&!complete&&!force&&performance.now()-lastFullAt<PLAYBACK.refreshMs)return;
     lastFrame=performance.now();
     const opticsAt=performance.now();
     if(complete){
@@ -9352,8 +9416,8 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     }
     // While a brush is moving, patches carry the frames; a full frame every
     // refreshMs picks up the wash that has run beyond the brush.
-    if(playback&&!force&&dirty&&performance.now()-lastFullAt<PLAYBACK.refreshMs){if(inFlight||patchInFlight)return;await livePatch(sheet,stage,progress,metrics);return;}
-    if(playback&&!force&&performance.now()-lastFullAt<PLAYBACK.fullFrameMs)return;
+    if(live&&!force&&dirty&&performance.now()-lastFullAt<PLAYBACK.refreshMs){if(inFlight||patchInFlight)return;await livePatch(sheet,stage,progress,metrics);return;}
+    if(live&&!force&&performance.now()-lastFullAt<PLAYBACK.fullFrameMs)return;
     if(playback){if(!force&&(inFlight||patchInFlight))return;lastFullAt=performance.now();dirty=null;}
     if(composer){
       // One frame in flight; a newer checkpoint replaces a frame not yet started.
@@ -9590,8 +9654,9 @@ if(typeof document==='undefined'&&typeof self!=='undefined'&&typeof self.postMes
         catch(error){self.postMessage({nativeDetail:true,requestId,revision,detailError:error.message});}
         return;
       }
+      if(event.data.kind==='native-skip'){nativePlaybackSkip.on=true;return;}
       if(event.data.kind==='settle'){
-        await renderNativePainting(event.data,(message,transfer)=>{if(message.bitmap)nativeOutstanding++;self.postMessage(message,transfer);},waitForFrame);return;
+        nativePlaybackSkip.on=false;await renderNativePainting(event.data,(message,transfer)=>{if(message.bitmap)nativeOutstanding++;self.postMessage(message,transfer);},waitForFrame);return;
       }
       await renderMorph(event.data,frame=>self.postMessage(frame),()=>true);self.postMessage({done:true});
     }catch(error){self.postMessage({error:error.message,revision:event.data.revision});}
@@ -9610,10 +9675,11 @@ export function parseState(search) {
   const includeAlpha=q.get('alpha')==='1',nextTypeId=TYPES_BY_ID.has(q.get('nextType'))?q.get('nextType'):chooseMorphTarget(typeId,next,{includeAlpha});
   const nextDonor=q.get('nextDonor'),nextDonorId=TYPES_BY_ID.has(nextDonor)&&compatibleHybrid(nextTypeId,nextDonor).ok?nextDonor:null;
   const amount = Number(q.get('blend') || 0), pace = Number(q.get('pace') || MORPH_DEFAULT_SECONDS);
-  const selectedScene=BACKGROUND_SCENES.includes(q.get('scene'))&&q.get('scene')!=='plain'?q.get('scene'):'woodland';
-  const background=q.get('background')==='0'?false:q.get('background')==='1'||(BACKGROUND_SCENES.includes(q.get('scene'))&&q.get('scene')!=='plain');
+  const selectedScene=HABITAT_CHOICES.includes(q.get('scene'))?q.get('scene'):'auto';
+  const background=q.get('background')==='0'?false:q.get('background')==='1'||HABITAT_CHOICES.includes(q.get('scene'));
+  const paint=q.get('paint')==='fast'?'fast':'full';
   const param=(key,value,min,max)=>{const n=Number(q.get(key)??value);return Number.isFinite(n)?clamp(n,min,max):value;};
-  return { compositionAnchors:decodeCompositionAnchors(q.get('anchors')),compositionSeed:(q.get('layout')||seed).slice(0,64),compositionCount:Math.round(param('members',0,0,5)),yaw:param('yaw',.12,-Math.PI,Math.PI),pitch:param('pitch',.36,-.12,.85),capDepth:param('depth',1,.65,1.4),stemBend:param('bend',0,-50,50),seed, next, family: profile.family, typeId, donorId,nextTypeId,nextDonorId, selectedScene, background, fieldPlate:q.get('plate')==='1', scene:background?selectedScene:'plain',
+  return { compositionAnchors:decodeCompositionAnchors(q.get('anchors')),compositionSeed:(q.get('layout')||seed).slice(0,64),compositionCount:Math.round(param('members',0,0,5)),yaw:param('yaw',.12,-Math.PI,Math.PI),pitch:param('pitch',.36,-.12,.85),capDepth:param('depth',1,.65,1.4),stemBend:param('bend',0,-50,50),seed, next, family: profile.family, typeId, donorId,nextTypeId,nextDonorId, selectedScene, background, paint, fieldPlate:q.get('plate')==='1', scene:background?resolveHabitat(selectedScene,typeId):'plain',
     includeAlpha,blend: Number.isFinite(amount) ? clamp(amount) : 0,
     duration: Number.isFinite(pace) ? clamp(pace, 3, 20) : 8, loopPause: param('dwell', LOOP_PAUSE_DEFAULT_SECONDS, 2, 20) };
 }
@@ -9650,8 +9716,8 @@ export function createPromotedMorphPair(pair,next,{fieldPlate=!!pair.fieldPlate}
   return withFieldPlatePair(promoted,fieldPlate,{composition});
 }
 export function advanceMorphState(state,nextSeed){
-  const typeId=state.nextTypeId??state.typeId;
-  return {...state,typeId,family:getMushroomType(typeId).family,donorId:state.nextDonorId??null,seed:state.next,
+  const typeId=state.nextTypeId??state.typeId,scene=state.background&&state.selectedScene?resolveHabitat(state.selectedScene,typeId):state.scene;
+  return {...state,typeId,scene,family:getMushroomType(typeId).family,donorId:state.nextDonorId??null,seed:state.next,
     next:nextSeed,nextTypeId:chooseMorphTarget(typeId,nextSeed,{includeAlpha:!!state.includeAlpha}),nextDonorId:null,blend:0};
 }
 
@@ -9673,8 +9739,11 @@ export function zoomPlateViewport(view,nextScale,anchor,size){
   const ratio=scale/view.scale;
   return clampPlateViewport({scale,x:anchor.x-(anchor.x-view.x)*ratio,y:anchor.y-(anchor.y-view.y)*ratio},size);
 }
-export function panPlateViewport(view,delta,size){
-  return clampPlateViewport({...view,x:view.x+delta.x,y:view.y+delta.y},size);
+// The plate zooms about its centre only, so it never sits off-centre and
+// there is nothing to pan.
+export function centredPlateViewport(scale,size){
+  const s=Math.max(1,Math.min(6,Number.isFinite(scale)?scale:1));
+  return {scale:s,x:Math.max(0,size.width)*(1-s)/2,y:Math.max(0,size.height)*(1-s)/2};
 }
 // Display zoom is independent of model-space camera rotation.
 export const ORBIT_YAW_PER_WIDTH=3.2;
@@ -9683,53 +9752,39 @@ export function orbitPlateCamera(camera,delta,size){
   return {yaw:Number.isFinite(wrapped)?wrapped:camera.yaw,
     pitch:clamp(camera.pitch-delta.y*1.4/Math.max(1,size.height),-.12,.85)};
 }
-// Touch on the plate: travel before a one-finger turn starts, and the
-// double-tap window and slop that fit the plate.
-export const PLATE_TOUCH=Object.freeze({turnSlop:6,tapMs:250,doubleTapMs:320,doubleTapSlop:28});
-export function mountPlateViewport({viewport,canvas,zoomIn,zoomOut,fit,output,rotate=null,pan=null,help=null,onOrbitStart=()=>{},onOrbit=()=>{},onOrbitEnd=()=>{},onFit=()=>{},onView=()=>{},root=viewport.parentElement}){
+// The plate's gestures: a drag turns it once it has travelled a few pixels
+// (so a tap stays a tap), scroll or pinch zooms about the centre, a double
+// click or double tap fits, and a single tap or click calls onTap.
+export const PLATE_TOUCH=Object.freeze({turnSlop:6,mouseSlop:3,tapMs:350,doubleTapMs:320,doubleTapSlop:28});
+export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=()=>{},onOrbitEnd=()=>{},onFit=()=>{},onView=()=>{},onTap=()=>{},root=viewport.parentElement}){
   let view={scale:1,x:0,y:0},size={width:viewport.clientWidth,height:viewport.clientHeight},pinch=null;
-  let orbitEnabled=false,mode='pan',gestureMode=null,orbitHeld=false,pending=null,lastTap=null,tapStart=null;
+  let orbitEnabled=false,gestureMode=null,orbitHeld=false,pending=null,lastTap=null;
   const pointers=new Map(),events=new AbortController();
   const listen=(el,type,fn,options={})=>el?.addEventListener(type,fn,{...options,signal:events.signal});
   const sync=()=>{
-    viewport.dataset.viewportMode=mode;viewport.dataset.viewportGesture=gestureMode??'none';
+    viewport.dataset.viewportMode=orbitEnabled?'rotate':'none';viewport.dataset.viewportGesture=gestureMode??'none';
     viewport.classList.toggle('is-orbiting',gestureMode==='rotate');
-    viewport.classList.toggle('is-panning',pointers.size>0&&gestureMode!=='rotate');
-    if(rotate){rotate.hidden=!orbitEnabled;rotate.disabled=!orbitEnabled;rotate.setAttribute?.('aria-pressed',String(orbitEnabled&&mode==='rotate'));}
-    pan?.setAttribute?.('aria-pressed',String(mode==='pan'));
-    if(help)help.textContent=orbitEnabled
-      ?mode==='rotate'?'Drag to turn. Scroll or pinch to zoom. Shift-drag, right-drag or two fingers to pan.':'Drag to pan. Pinch to zoom.'
-      :'Scroll or pinch to zoom. Drag to pan when zoomed in.';
   };
-  const apply=next=>{
-    view=clampPlateViewport(next,size);
+  const apply=scale=>{
+    view=centredPlateViewport(scale,size);
     canvas.style.transform=`translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
     viewport.dataset.viewportZoom=canvas.dataset.viewportZoom=String(view.scale);
     viewport.dataset.viewportX=String(view.x);viewport.dataset.viewportY=String(view.y);
     viewport.classList.toggle('is-zoomed',view.scale>1);
-    zoomOut.disabled=view.scale<=1;zoomIn.disabled=view.scale>=6;
-    output.value=output.textContent=`${Math.round(view.scale*100)}%`;
     onView({...view},{...size});
     return view;
   };
-  const center=()=>({x:size.width/2,y:size.height/2});
-  const zoom=(factor,anchor=center())=>apply(zoomPlateViewport(view,view.scale*factor,anchor,size));
+  const zoom=factor=>apply(view.scale*factor);
   const endOrbit=settle=>{if(!orbitHeld)return;orbitHeld=false;onOrbitEnd({settle});};
   const cancelGesture=({settle=false}={})=>{
     const ids=[...pointers.keys()];pointers.clear();pinch=null;gestureMode=null;pending=null;
     for(const id of ids)if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id);
     endOrbit(settle);sync();
   };
-  const reset=()=>{cancelGesture({settle:true});const result=apply({scale:1,x:0,y:0});onFit();return result;};
-  const setMode=next=>{
-    cancelGesture({settle:true});mode=next==='rotate'&&orbitEnabled?'rotate':'pan';sync();
-  };
+  const reset=()=>{cancelGesture({settle:true});const result=apply(1);onFit();return result;};
   const local=event=>{const r=viewport.getBoundingClientRect();return {x:event.clientX-r.left,y:event.clientY-r.top};};
-  const gesture=()=>{
-    const [a,b]=[...pointers.values()];if(!a||!b)return null;
-    return {center:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))};
-  };
-  const beginPinch=()=>{const g=gesture();pinch=g?{...g,view:{...view}}:null;};
+  const spread=()=>{const [a,b]=[...pointers.values()];return a&&b?Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)):null;};
+  const beginPinch=()=>{const distance=spread();pinch=distance?{distance,scale:view.scale}:null;};
   listen(viewport,'contextmenu',event=>event.preventDefault());
   // Safari's own pinch-zoom of the page never starts on the plate.
   for(const type of ['gesturestart','gesturechange','gestureend'])listen(viewport,type,event=>event.preventDefault(),{passive:false});
@@ -9737,67 +9792,47 @@ export function mountPlateViewport({viewport,canvas,zoomIn,zoomOut,fit,output,ro
     event.preventDefault();
     const unit=event.deltaMode===1?16:event.deltaMode===2?size.height:1;
     const delta=Math.max(-240,Math.min(240,event.deltaY*unit));
-    zoom(Math.exp(-delta*.002),local(event));
+    zoom(Math.exp(-delta*.002));
   },{passive:false});
+  listen(viewport,'dblclick',event=>{event.preventDefault?.();reset();});
   listen(viewport,'pointerdown',event=>{
-    if(event.pointerType==='mouse'&&event.button!==0&&event.button!==1&&event.button!==2)return;
+    if(event.pointerType==='mouse'&&event.button!==0)return;
     event.preventDefault();viewport.focus({preventScroll:true});
     pointers.set(event.pointerId,local(event));viewport.setPointerCapture(event.pointerId);
-    tapStart=event.pointerType==='touch'&&pointers.size===1?{id:event.pointerId,start:local(event),time:event.timeStamp,moved:false}:null;
-    if(pointers.size>=2){
-      // A second finger turns any one-finger gesture into pinch and pan. A
-      // turn that had begun stays held (and settles when every finger lifts);
-      // one that had not begun never fires.
-      pending=null;gestureMode='pinch';beginPinch();
-    }else{
-      const turn=orbitEnabled&&mode==='rotate'&&!event.shiftKey&&event.button!==1&&event.button!==2;
-      // Touch waits for a few pixels of travel before turning, so two fingers
-      // landing a moment apart start a pinch, not a turn.
-      if(turn&&event.pointerType==='touch'){gestureMode='pending';pending={id:event.pointerId,start:local(event)};}
-      else{gestureMode=turn?'rotate':'pan';if(gestureMode==='rotate'){orbitHeld=true;onOrbitStart();}}
-    }
+    // A second finger makes the gesture a pinch. A turn that had begun stays
+    // held (and settles when every finger lifts); one that had not never fires.
+    if(pointers.size>=2){pending=null;gestureMode='pinch';beginPinch();}
+    else{gestureMode='pending';pending={id:event.pointerId,start:local(event),time:event.timeStamp,touch:event.pointerType==='touch'};}
     sync();
   });
   listen(viewport,'pointermove',event=>{
     const previous=pointers.get(event.pointerId);if(!previous)return;
     const current=local(event);pointers.set(event.pointerId,current);
-    if(tapStart?.id===event.pointerId&&Math.hypot(current.x-tapStart.start.x,current.y-tapStart.start.y)>=PLATE_TOUCH.turnSlop)tapStart.moved=true;
-    if(pointers.size>=2){
-      if(!pinch)beginPinch();const g=gesture(),scale=Math.max(1,Math.min(6,pinch.view.scale*g.distance/pinch.distance)),ratio=scale/pinch.view.scale;
-      apply({scale,x:g.center.x-(pinch.center.x-pinch.view.x)*ratio,y:g.center.y-(pinch.center.y-pinch.view.y)*ratio});
-    }else{
-      if(gestureMode==='pending'){
-        if(Math.hypot(current.x-pending.start.x,current.y-pending.start.y)<PLATE_TOUCH.turnSlop)return;
-        gestureMode='rotate';orbitHeld=true;onOrbitStart();onOrbit({x:current.x-pending.start.x,y:current.y-pending.start.y},size);pending=null;sync();return;
-      }
-      if(event.shiftKey)gestureMode='pan';
-      const delta={x:current.x-previous.x,y:current.y-previous.y};
-      if(gestureMode==='rotate'&&orbitEnabled)onOrbit(delta,size);
-      else if(view.scale>1)apply(panPlateViewport(view,delta,size));
-    }
+    if(pointers.size>=2){if(!pinch)beginPinch();const distance=spread();if(pinch&&distance)apply(pinch.scale*distance/pinch.distance);}
+    else if(gestureMode==='pending'){
+      if(Math.hypot(current.x-pending.start.x,current.y-pending.start.y)<(pending.touch?PLATE_TOUCH.turnSlop:PLATE_TOUCH.mouseSlop))return;
+      const start=pending.start;pending=null;
+      if(!orbitEnabled){gestureMode='still';sync();return;}
+      gestureMode='rotate';orbitHeld=true;onOrbitStart();onOrbit({x:current.x-start.x,y:current.y-start.y},size);
+    }else if(gestureMode==='rotate'&&orbitEnabled)onOrbit({x:current.x-previous.x,y:current.y-previous.y},size);
     sync();
   });
   const release=event=>{
     if(!pointers.has(event.pointerId))return;
-    // A double tap (two quick touches without travel) fits the plate.
-    if(event.type==='pointerup'&&event.pointerType==='touch'&&pointers.size===1&&tapStart?.id===event.pointerId&&!tapStart.moved&&event.timeStamp-tapStart.time<PLATE_TOUCH.tapMs){
-      const at=local(event),now=event.timeStamp;tapStart=null;
-      if(lastTap&&now-lastTap.time<PLATE_TOUCH.doubleTapMs&&Math.hypot(at.x-lastTap.x,at.y-lastTap.y)<PLATE_TOUCH.doubleTapSlop){
-        lastTap=null;pointers.delete(event.pointerId);if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);
-        pending=null;gestureMode=null;endOrbit(true);reset();sync();return;
-      }
-      lastTap={...at,time:now};
-    }
+    const tap=event.type==='pointerup'&&pointers.size===1&&gestureMode==='pending'&&pending?.id===event.pointerId&&event.timeStamp-pending.time<PLATE_TOUCH.tapMs;
+    const touch=!!pending?.touch,at=local(event);
     pointers.delete(event.pointerId);
     if(viewport.hasPointerCapture(event.pointerId))viewport.releasePointerCapture(event.pointerId);
     if(pointers.size>=2){gestureMode='pinch';beginPinch();}
-    else if(pointers.size){pinch=null;if(gestureMode==='pinch')gestureMode='pan';}
+    else if(pointers.size){pinch=null;if(gestureMode==='pinch')gestureMode='still';}
     else{pinch=null;pending=null;gestureMode=null;endOrbit(true);}
     sync();
+    if(!tap)return;
+    // A double tap fits the plate; a mouse double click arrives as dblclick.
+    if(touch&&lastTap&&event.timeStamp-lastTap.time<PLATE_TOUCH.doubleTapMs&&Math.hypot(at.x-lastTap.x,at.y-lastTap.y)<PLATE_TOUCH.doubleTapSlop){lastTap=null;reset();return;}
+    lastTap=touch?{...at,time:event.timeStamp}:null;onTap();
   };
   for(const type of ['pointerup','pointercancel','lostpointercapture'])listen(viewport,type,release);
-  listen(rotate,'click',()=>setMode('rotate'));listen(pan,'click',()=>setMode('pan'));
-  listen(zoomIn,'click',()=>zoom(1.25));listen(zoomOut,'click',()=>zoom(1/1.25));listen(fit,'click',reset);
   listen(root,'keydown',event=>{
     if(event.ctrlKey||event.metaKey||event.altKey||event.target?.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName??''))return;
     if(!['+','=','-','_','0'].includes(event.key))return;
@@ -9806,16 +9841,14 @@ export function mountPlateViewport({viewport,canvas,zoomIn,zoomOut,fit,output,ro
   const resize=()=>{
     const next={width:viewport.clientWidth,height:viewport.clientHeight};
     if(!next.width||!next.height||next.width===size.width&&next.height===size.height)return;
-    const u=size.width?(size.width/2-view.x)/(size.width*view.scale):.5,v=size.height?(size.height/2-view.y)/(size.height*view.scale):.5;
-    cancelGesture({settle:true});size=next;
-    apply({scale:view.scale,x:size.width/2-u*size.width*view.scale,y:size.height/2-v*size.height*view.scale});
+    cancelGesture({settle:true});size=next;apply(view.scale);
   };
   const observer=typeof ResizeObserver==='function'?new ResizeObserver(resize):null;
   if(observer)observer.observe(viewport);else if(globalThis.addEventListener)listen(globalThis,'resize',resize);
   if(globalThis.addEventListener)listen(globalThis,'blur',()=>cancelGesture({settle:true}));
-  apply(view);sync();
-  return {getState:()=>({...view}),getMode:()=>mode,isOrbitHolding:()=>orbitHeld,cancelGesture,
-    setOrbitEnabled:enabled=>{enabled=!!enabled;if(enabled!==orbitEnabled){cancelGesture({settle:false});orbitEnabled=enabled;mode=enabled?'rotate':'pan';}sync();},
+  apply(1);sync();
+  return {getState:()=>({...view}),getMode:()=>orbitEnabled?'rotate':'none',isOrbitHolding:()=>orbitHeld,cancelGesture,
+    setOrbitEnabled:enabled=>{enabled=!!enabled;if(enabled!==orbitEnabled){cancelGesture({settle:false});orbitEnabled=enabled;}sync();},
     fit:reset,zoomIn:()=>zoom(1.25),zoomOut:()=>zoom(1/1.25),
     destroy:()=>{cancelGesture({settle:false});events.abort();observer?.disconnect();}};
 }
@@ -9826,7 +9859,7 @@ async function mount() {
   const retired=new Map(),$ = id => document.getElementById(id)??(retired.get(id)??retired.set(id,document.createElement('input')).get(id)), state = parseState(location.search),colonyParam=new URLSearchParams(location.search).get('colony');
   if(colonyParam==='0'||colonyParam==='1')setHabitColonyAtRest(colonyParam==='1');
   const canvas = $('painting'), status = $('status');
-  const plateViewport=$('plate-viewport')?mountPlateViewport({viewport:$('plate-viewport'),canvas,zoomIn:$('zoom-in'),zoomOut:$('zoom-out'),fit:$('zoom-fit'),output:$('zoom-value'),rotate:$('viewport-rotate'),pan:$('viewport-pan'),help:$('zoom-help'),
+  const plateViewport=$('plate-viewport')?mountPlateViewport({viewport:$('plate-viewport'),canvas,onTap:()=>skipLivePainting(),
     onOrbitStart:()=>{dropZoomCache();cancelPrepared();pause({settle:false,fromOrbit:true});if(!morphPair?.connectedAnatomy&&state.blend>0&&state.blend<1){state.blend=state.blend<.5?0:1;}sketchQueue.hold();requestSketch();},
     onOrbit:(delta,size)=>{Object.assign(state,orbitPlateCamera(state,delta,size));applyView();update3DControls();requestSketch();},
     onOrbitEnd:({settle})=>{if(settle){sketchQueue.release();persist();}else sketchQueue.cancel();},
@@ -10150,7 +10183,7 @@ async function mount() {
     return snapshotOf(pair,ga,gb,0,st);
   }
   function randomChoiceState(choice){
-    return {...state,...DEFAULT_ORBIT_VIEW,typeId:choice.typeId,family:choice.family,donorId:choice.donorId,seed:choice.seed,next:choice.next,nextTypeId:choice.nextTypeId,nextDonorId:null,compositionSeed:choice.compositionSeed,compositionCount:0,compositionAnchors:null,blend:0};
+    return {...state,...DEFAULT_ORBIT_VIEW,scene:state.background?resolveHabitat(state.selectedScene,choice.typeId):'plain',typeId:choice.typeId,family:choice.family,donorId:choice.donorId,seed:choice.seed,next:choice.next,nextTypeId:choice.nextTypeId,nextDonorId:null,compositionSeed:choice.compositionSeed,compositionCount:0,compositionAnchors:null,blend:0};
   }
   const pageIdle=()=>!playing&&!replaying&&!preparing&&!settledBusy&&!plateViewport?.isOrbitHolding()&&!document.hidden&&renderMode==='painted';
   function queuePreparation(){
@@ -10164,6 +10197,8 @@ async function mount() {
           plannedNextSeed??=randomSeed();const value=finishedSnapshot(plannedNextSeed),key=preparedPlateKey(preparedRequest(value));
           if(!preparedJobs.has(key)&&!(prefetch&&prefetch.key===nativeKey(value))){startPrepared(value);return;}
         }
+        // Full painting plays a Random plate live, so only Fast prepares one.
+        if(livePainting())return;
         if(nextRandomChoice&&nextRandomChoice.includeAlpha!==!!state.includeAlpha)nextRandomChoice=null;
         nextRandomChoice??=pickRandomChoice(false);
         const value=plannedPlate(randomChoiceState(nextRandomChoice));
@@ -10222,7 +10257,7 @@ async function mount() {
   // Every settled plate goes through the pair so the Worker reuses the captured page frame.
   function bridgeRecipe(value){if(value.morph.orbitRest)return {a:value.morph.a,b:value.morph.a,blend:0,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers,orbitRest:true};return {a:value.morph.a,b:value.morph.b,blend:value.blend,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers};}
   function cancelRefinement(){
-    showCursor(null);hideDetail();settledRevision++;settledWorker?.terminate();settledWorker=null;
+    showCursor(null);canvas.dataset.livePainting='false';hideDetail();settledRevision++;settledWorker?.terminate();settledWorker=null;
     if(nativeBuilding){nativeBuilding.resolve(null);nativeBuilding=null;}
     settledBusy=false;replaying=false;canvas.dataset.refining='false';endReveal();
   }
@@ -10411,7 +10446,7 @@ async function mount() {
       nativeBuilding?.resolve(null);nativeBuilding=null;
     };
     if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined'||!OffscreenCanvas.prototype.convertToBlob){fail('Native painting needs module Workers and OffscreenCanvas');return promise;}
-    retireDetailWorker();setBacking(targetBaseScale());const outputScale=baseScale;startReveal(value,revision);
+    retireDetailWorker();setBacking(targetBaseScale());const outputScale=baseScale;if(!rerun)startReveal(value,revision);
     try{
       settledWorker=paintingWorker();settledBusy=true;canvas.dataset.refining='true';canvas.dataset.nativeComplete='false';controls();
       settledWorker.onmessage=event=>{
@@ -10422,7 +10457,7 @@ async function mount() {
         if(!message.native||!message.bitmap)return;
         // Paint playback: the tool's cursor, and live patches of the plate.
         if('cursor' in (message.metrics??{}))showCursor(message.metrics.cursor);
-        if(message.complete)showCursor(null);
+        if(message.complete){showCursor(null);canvas.dataset.livePainting='false';}
         if(message.patch){
           if(current()){const c=painter.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(message.bitmap,message.patch.x,message.patch.y);}
           message.bitmap.close();settledWorker?.postMessage({kind:'native-frame-ack'});
@@ -10629,7 +10664,7 @@ async function mount() {
       blend: String(state.blend), pace: String(state.duration), dwell: String(state.loopPause) });
     if (state.donorId) q.set('donor', state.donorId);if(state.nextDonorId)q.set('nextDonor',state.nextDonorId);
     if(state.compositionAnchors)q.set('anchors',JSON.stringify(state.compositionAnchors));q.set('layout',state.compositionSeed);q.set('members',String(state.compositionCount));for(const [key,value] of [['yaw',state.yaw],['pitch',state.pitch],['depth',state.capDepth],['bend',state.stemBend]])q.set(key,String(value));
-    q.set('scene',state.selectedScene);q.set('background',state.background?'1':'0');if(state.fieldPlate)q.set('plate','1');if(state.includeAlpha)q.set('alpha','1');if(!HABIT_COLONY_AT_REST)q.set('colony','0');if($('debug-toggle').getAttribute?.('aria-pressed')==='true')q.set('debug','1');
+    q.set('scene',state.selectedScene);q.set('background',state.background?'1':'0');q.set('paint',state.paint);if(state.fieldPlate)q.set('plate','1');if(state.includeAlpha)q.set('alpha','1');if(!HABIT_COLONY_AT_REST)q.set('colony','0');if($('debug-toggle').getAttribute?.('aria-pressed')==='true')q.set('debug','1');
     history.replaceState(null, '', `${location.pathname}?${q}`);
   }
   function regenerate({preview=true,promoteFrom=null}={}) {
@@ -10637,6 +10672,7 @@ async function mount() {
     const recipeKey=JSON.stringify([state.typeId,state.donorId,state.seed]);
     if(lastRecipeKey!==null&&recipeKey!==lastRecipeKey&&!promoteFrom)Object.assign(state,DEFAULT_ORBIT_VIEW);
     lastRecipeKey=recipeKey;
+    state.scene=state.background?resolveHabitat(state.selectedScene,state.typeId):'plain';
     cancelImplicitPreparation();
     plateViewport?.cancelGesture({settle:false});
     sketchQueue.cancel();cancelRefinement();
@@ -10653,7 +10689,7 @@ async function mount() {
     const active=[...new Set([...activeTraitsFor(a),...activeTraitsFor(b)])],labels=currentTraitLabels(),labelsB=currentTraitLabels(state.nextTypeId);
     describeRecipe();
     $('debug-body-plan').textContent=a.phenotype.grammar===b.phenotype.grammar?`Body plan: ${a.phenotype.grammar}`:`Body plan: ${a.phenotype.grammar} → ${b.phenotype.grammar}`;
-    $('debug-habitat-line').textContent=`Habitat: ${state.background?state.selectedScene:'off'}`;
+    $('debug-habitat-line').textContent=`Habitat: ${state.background?state.selectedScene==='auto'?`auto (${state.scene})`:state.selectedScene:'off'}`;
     $('debug-type-a').textContent=`${a.profileId}${a.donorId?' × '+a.donorId+' — '+a.hybridLine:''}`;if($('debug-ecology'))$('debug-ecology').textContent=ecologyLabel(a);$('debug-type-b').textContent=`${b.profileId}${b.donorId?' × '+b.donorId:''}`;
     for(const {row,label,endpointA,endpointB,i} of traitElements){
       row.hidden=!active.includes(i)||false;const nameA=labels[i]??TRAITS[i],nameB=labelsB[i]??TRAITS[i];label.textContent=morphPair.sameRecipe||nameA===nameB?nameA:`${nameA} → ${nameB}`;
@@ -10861,7 +10897,7 @@ async function mount() {
     hiddenAt=0;metrics={preparationMs:cached?0:metrics.preparationMs,cached,delivered:0,skipped:0,intervals:[],playbackStarted:performance.now()};
     dirty=false;controls();queueFrame();status.textContent=continuous?'Looping':'Playing morph';
   }
-  function applyInputs({keepLayout=false}={}) {
+  function applyInputs({keepLayout=false,live=false}={}) {
     clearTimeout(seedEditTimer);pause({settle:false});
     const previousSeed=state.seed;state.seed = $('seed').value.trim().slice(0, 64) || 'woodland-042';
     // A seed typed or rolled by hand is a new plate: its own layout and member
@@ -10869,7 +10905,8 @@ async function mount() {
     if(!keepLayout&&state.seed!==previousSeed){state.compositionSeed=state.seed;state.compositionCount=0;state.compositionAnchors=null;}
     state.next = $('next-seed').value.trim().slice(0, 64) || 'woodland-108';
     $('seed').value = state.seed; $('next-seed').value = state.next; state.blend = 0;
-    regenerate(); persist(); showFinished();
+    const paintLive=live&&livePainting();regenerate({preview:!paintLive}); persist();
+    if(paintLive)beginDrawing();else showFinished();
   }
   let seedEditTimer;
   for (const id of ['seed', 'next-seed']) {
@@ -10884,7 +10921,7 @@ async function mount() {
     state.blend = 0; regenerate(); persist(); showFinished();
   }
   function changeBackground(enabled,scene=state.selectedScene) {
-    pause({settle:false});cache.reset();state.selectedScene=scene;state.background=enabled;state.scene=enabled?scene:'plain';
+    pause({settle:false});cache.reset();state.selectedScene=scene;state.background=enabled;state.scene=enabled?resolveHabitat(scene,state.typeId):'plain';
     $('background').checked=enabled;$('scene').value=enabled?state.selectedScene:'plain';persist();showFinished();
   }
   $('scene').addEventListener('change',()=>{const scene=$('scene').value;changeBackground(scene!=='plain',scene==='plain'?state.selectedScene:scene);});
@@ -10893,7 +10930,7 @@ async function mount() {
     pause({settle:false});cache.reset();state.fieldPlate=$('field-plate').checked;
     regenerate({preview:false});persist();showFinished();
   });
-  const viewBindings=[['view-yaw','yaw'],['view-pitch','pitch'],['shape-depth','capDepth'],['shape-bend','stemBend']];
+  const viewBindings=[['shape-depth','capDepth'],['shape-bend','stemBend']];
   function update3DControls(){
     const enabled=!!morphPair&&!(state.fieldPlate&&morphPair.fieldPlate?.supported&&!morphPair.connectedAnatomy);
     plateViewport?.setOrbitEnabled(enabled);
@@ -10914,13 +10951,13 @@ async function mount() {
   }
   $('next-type-profile').addEventListener('change',()=>chooseTarget());$('random-target').addEventListener('click',()=>chooseTarget(true));
   $('donor-profile').addEventListener('change', () => chooseRecipe(state.typeId, $('donor-profile').value || null));
-  $('random').addEventListener('click', () => { $('seed').value = randomSeed(); applyInputs(); });
+  $('random').addEventListener('click', () => { $('seed').value = randomSeed(); applyInputs({live:true}); });
   function randomRecipe(hybrid) {
     const choice=!hybrid&&nextRandomChoice&&nextRandomChoice.includeAlpha===!!state.includeAlpha?nextRandomChoice:null;nextRandomChoice=null;
     if(choice){
       state.compositionSeed=choice.compositionSeed;state.compositionCount=0;state.compositionAnchors=null;
       state.typeId=choice.typeId;state.family=choice.family;state.donorId=choice.donorId;
-      $('seed').value=choice.seed;$('next-seed').value=choice.next;state.nextTypeId=choice.nextTypeId;state.nextDonorId=null;applyInputs({keepLayout:true});
+      $('seed').value=choice.seed;$('next-seed').value=choice.next;state.nextTypeId=choice.nextTypeId;state.nextDonorId=null;applyInputs({keepLayout:true,live:true});
       status.textContent='A new mushroom';return;
     }
     const n = crypto.getRandomValues(new Uint32Array(2));
@@ -10931,7 +10968,7 @@ async function mount() {
     state.compositionSeed=randomSeed();state.compositionCount=0;state.compositionAnchors=null;
     state.typeId = host.id; state.family = host.family;
     state.donorId = donors.length ? donors[n[1] % donors.length].id : null;
-    $('seed').value = randomSeed(); $('next-seed').value = randomSeed();state.nextTypeId=chooseMorphTarget(state.typeId,$('next-seed').value,{includeAlpha:state.includeAlpha});state.nextDonorId=null;applyInputs({keepLayout:true});
+    $('seed').value = randomSeed(); $('next-seed').value = randomSeed();state.nextTypeId=chooseMorphTarget(state.typeId,$('next-seed').value,{includeAlpha:state.includeAlpha});state.nextDonorId=null;applyInputs({keepLayout:true,live:true});
     status.textContent = state.donorId ? 'A fictional hybrid' : 'A new mushroom';
   }
   $('random-mushroom').addEventListener('click', () => randomRecipe(false));
@@ -10950,11 +10987,28 @@ async function mount() {
     pause();state.duration = Number($('duration').value);cache.reset(); $('duration-value').value = `${state.duration}s`; persist();
   });
   function showFinished() { drawingStage=1;replaying=false;dirty=false;sketchQueue.cancel();requestSketch(true);controls(); }
+  // Full painting: a new plate (first load, Random) paints itself live from
+  // blank paper; Fast shows the finished plate at once.
+  function livePainting(){return state.paint!=='fast'&&!reducedMotion.matches;}
+  // A tap on the plate finishes a live painting at once.
+  function skipLivePainting(){
+    if(!replaying||!settledWorker||canvas.dataset.livePainting!=='true')return false;
+    settledWorker.postMessage({kind:'native-skip'});showCursor(null);canvas.dataset.paintSkipped='true';return true;
+  }
+  function setPaintSpeed(speed){
+    state.paint=speed==='fast'?'fast':'full';
+    $('paint-full').setAttribute('aria-pressed',String(state.paint==='full'));$('paint-fast').setAttribute('aria-pressed',String(state.paint==='fast'));
+    if(state.paint==='fast')skipLivePainting();persist();
+  }
+  $('paint-full').addEventListener('click',()=>setPaintSpeed('full'));$('paint-fast').addEventListener('click',()=>setPaintSpeed('fast'));
   function beginDrawing() {
     pause({settle:false});playing=continuous=false;last=0;
+    // The plate's layout anchors are fixed now, as a settle would fix them.
+    if(morphPair?.implicitMorph&&!morphPair.composition.implicitAnchors&&!orbitRestFor(smooth(state.blend))){morphPair.composition=implicitAnchoredComposition(morphPair.a,morphPair.composition,{view:morphPair.view,shapeModifiers:morphPair.shapeModifiers}).composition;state.compositionAnchors=morphPair.composition.implicitAnchors;persist();}
+    canvas.dataset.livePainting='true';canvas.dataset.paintSkipped='false';
     const value=snapshot();replaying=true;drawingStage=0;renderMode='painting';nativePhase='Preparing ink';status.textContent='Preparing ink';
     const c=painter.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(painter.paper,0,0,canvas.width,canvas.height);
-    refinePreview(value,()=>nativeKey(snapshot())===nativeKey(value),{rerun:true});controls();
+    refinePreview(value,()=>nativeKey(snapshot())===nativeKey(value),{rerun:true});canvas.dataset.livePainting=String(replaying);controls();
   }
   $('draw').addEventListener('click',()=>{if(replaying){pause({settle:false});return;}beginDrawing();});
   function start(loop) {
@@ -11017,9 +11071,11 @@ async function mount() {
   // Show the lightweight geometry immediately; the Worker owns native paint state.
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   try {
-    setBacking(targetBaseScale());painter = new Painter(canvas);watchDeviceRatio(); regenerate(); showFinished();
+    setBacking(targetBaseScale());painter = new Painter(canvas);watchDeviceRatio();
+    $('paint-full').setAttribute('aria-pressed',String(state.paint==='full'));$('paint-fast').setAttribute('aria-pressed',String(state.paint==='fast'));
+    if(livePainting()){regenerate({preview:false});beginDrawing();}else{regenerate();showFinished();}
     // Narrow inspection API for determinism, geometry and real browser checks.
-    window.sporeStudy = { getViewport:()=>plateViewport?.getState(), fitViewport:()=>plateViewport?.fit(), getState: () => ({ ...state, playing, continuous, replaying, drawingStage, preparing,renderMode,sketchPlaying }),
+    window.sporeStudy = { getViewport:()=>plateViewport?.getState(), fitViewport:()=>plateViewport?.fit(), skipPainting:()=>skipLivePainting(), getState: () => ({ ...state, playing, continuous, replaying, drawingStage, preparing,renderMode,sketchPlaying }),
       getPerformance: () => ({ frames: painter.frames, renderMs: painter.lastRenderMs,previewFrames:painter.previewFrames??0,previewMs:painter.lastPreviewMs??0 }),
       getMorphPerformance: () => ({...metrics,prepared:cache.blobs.length,uniqueArtworkFrames:new Set(cache.fingerprints).size,cacheBytes:cache.bytes,decodedFrames:cache.decoded.size,decodedBytes:cache.decoded.size*720*600*4,ready:cache.ready,key:cache.key,epoch:cache.epoch}),
       getMorphFrame: index => cache.blobs[index],
