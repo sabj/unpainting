@@ -1,8 +1,9 @@
 // A paint plan handed over by another page (the mushroom plates' "Open in Paint Lab"), checked field by field and turned
 // into a live tape (live-tape.js) so the lab's own replay paints it: pen strokes, brush dips and strokes, passage clips,
 // flows and drying, all at the plan's native sheet size. Only lab.js loads this, and only with ?import=. DOM free.
-export const PLAN_FORMAT = 'unpainting-paint-plan', PLAN_VERSION = 1, PLAN_STORAGE_KEY = 'unpainting:paint-lab-import';
-export const PLAN_LIMITS = Object.freeze({ chars: 4500000, cells: 600000, side: 2000, pigments: 16, inkStrokes: 20000, points: 4000, gestures: 5000, steps: 20000 });
+const PLAN_FORMAT = 'unpainting-paint-plan', PLAN_VERSION = 1;
+export const PLAN_STORAGE_KEY = 'unpainting:paint-lab-import';
+const PLAN_LIMITS = Object.freeze({ chars: 4500000, cells: 600000, side: 2000, pigments: 16, inkStrokes: 20000, points: 4000, gestures: 5000, steps: 20000 });
 const MM = 25.4;
 
 const fail = (path, why) => { throw new TypeError(`${path} ${why}`); };
@@ -49,7 +50,7 @@ function dry(v, path) {
 function transport(v, path) { options(v, path, 0); if (v.dt !== undefined) num(v.dt, `${path}.dt`, 0, 10); return v; }
 
 /** Throws a TypeError naming the first field that does not fit; returns the plan otherwise. */
-export function validatePlan(plan, knownPigment) {
+function validatePlan(plan, knownPigment) {
   only(obj(plan, 'plan'), 'plan', ['format', 'version', 'source', 'title', 'sheet', 'pigments', 'ink', 'passages']);
   if (plan.format !== PLAN_FORMAT) fail('plan.format', `must be "${PLAN_FORMAT}"`);
   if (plan.version !== PLAN_VERSION) fail('plan.version', `must be ${PLAN_VERSION}`);

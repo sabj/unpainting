@@ -167,13 +167,13 @@ test('study variation follows both seed changes and continuous within-family mor
 });
 
 test('URL state handles invalid forms, non-finite numbers, long seeds and bounds', () => {
-  assert.equal(parseState('?form=__proto__').family, 'amanita');
+  assert.equal(parseState('?type=__proto__').family, 'amanita');
   assert.equal(parseState('?blend=NaN').blend, 0);
   assert.equal(parseState('?blend=Infinity').blend, 0);
   assert.equal(parseState('?blend=12&pace=-5').blend, 1);
   assert.equal(parseState('?blend=12&pace=-5').duration, 3);
   assert.equal(parseState('?seed=' + 'a'.repeat(200)).seed.length, 64);
-  const s = parseState('?form=morel&seed=rain&next=moss&blend=.25&pace=12');
+  const s = parseState('?type=morel-1&seed=rain&next=moss&blend=.25&pace=12');
   assert.deepEqual(s, {compositionAnchors:null,compositionSeed:'rain',compositionCount:0,yaw:.12,pitch:.36,capDepth:1,stemBend:0,fieldPlate:false, family: 'morel', typeId:'morel-1', donorId:null, nextTypeId:chooseMorphTargetTop('morel-1','moss'), nextDonorId:null, selectedScene:'auto', background:false, paint:'full', scene:'plain', seed: 'rain', next: 'moss', includeAlpha:false, blend: .25, duration: 12, loopPause: 6 });
 });
 
@@ -305,7 +305,7 @@ test('optional botanical scenes remain behind specimen reserves and preserve see
     const full=buildStudy(a,{scene});assert.equal(full.scene,scene);assert.ok(full.ink[0].role.startsWith('background'));
   }
   assert.throws(()=>buildBackgroundStudy(a,'unknown'),RangeError);
-  assert.equal(parseState('?scene=woodland').scene,'woodland');assert.equal(parseState('?scene=__proto__').scene,'plain');
+  assert.equal(parseState('?scene=woodland&background=1').scene,'woodland');assert.equal(parseState('?scene=__proto__&background=1').scene,'woodland');
 });
 
 // Surface coordinates must meet the ink silhouette and remain stable during seed morphs.
@@ -568,15 +568,6 @@ test('default morph budget reserves decoded window and pending decode within 96 
   for(let i=0;i<20;i++){cache.reset('repeat');assert.equal(cache.bytes,0);assert.equal(cache.decoded.size,0);}
 });
 
- test('background visibility preserves scene choice and legacy bookmarks',()=>{
-  assert.equal(parseState('').background,false);
-  for(const scene of BACKGROUND_SCENES.slice(1)){
-    const on=parseState('?scene='+scene);assert.equal(on.background,true);assert.equal(on.scene,scene);
-    const off=parseState('?scene='+scene+'&background=0');assert.equal(off.scene,'plain');assert.equal(off.selectedScene,scene);
-    assert.equal(parseState('?scene='+off.selectedScene+'&background=1').scene,scene);
-  }
-  assert.equal(parseState('?scene=invalid&background=1').scene,'woodland');
- });
 
 
 test('free lamellar roots preserve physical stipe clearance across cap azimuths',()=>{
@@ -2503,7 +2494,7 @@ test('habitat Auto is the default scene choice and suits each mushroom', async (
   for(const type of MUSHROOM_TYPES)assert.ok(BACKGROUND_SCENES.includes(m.autoHabitatScene(type.id))&&m.autoHabitatScene(type.id)!=='plain');
   const off=parseState('?type=oyster-1');assert.equal(off.selectedScene,'auto');assert.equal(off.background,false);assert.equal(off.scene,'plain');
   const on=parseState('?type=oyster-1&scene=auto&background=1');assert.equal(on.scene,'fallen-log');
-  assert.equal(parseState('?type=oyster-1&scene=auto').scene,'fallen-log','a bookmarked Auto turns the background on');
+  assert.equal(parseState('?type=oyster-1&scene=woodland').scene,'plain','a scene alone leaves the background off');
   assert.equal(parseState('?type=oyster-1&scene=moss-bank&background=1').scene,'moss-bank','a fixed scene still wins');
   // Auto follows the plate a morph lands on.
   const landed=m.advanceMorphState({...parseState('?type=amanita-1&nextType=oyster-1&scene=auto&background=1')},'next-seed');

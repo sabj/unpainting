@@ -215,7 +215,7 @@ Modules:
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `techniques/passages/sand.mjs` (`--passages sand`): mark sizes scaled from one beach crop; medium.
 
-Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 base settings, with stone and palette tokens fitted on Y1. The research and judging scripts in `tools/research/` and `tools/judge/` list fixed subjects; they do not paint.
+Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 base settings, with stone and palette tokens fitted on Y1. The judging scripts in `tools/judge/` list fixed subjects; they do not paint.
 
 ## Opt-in experimental controls
 

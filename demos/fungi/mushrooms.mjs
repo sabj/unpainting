@@ -6309,7 +6309,7 @@ export function previewWashLut(palette){
   previewLutCache.set(key,lut);return lut;
 }
 // Pigment amount at (u,v) of a wash bounding box, calibrated against the
-// mean colour of settled native plates (tools/calib.mjs in the morph work).
+// mean colour of settled native plates.
 export function previewWashAmount(mark,u,v){
   // Native passages lay each region in fairly evenly and let glazes carry
   // the form, so one soft light model serves every role; glaze and shadow
@@ -9667,8 +9667,7 @@ function shortSeed(seed) { return seed.length > 21 ? seed.slice(0, 18) + '…' :
 
 export function parseState(search) {
   const q = new URLSearchParams(search);
-  const legacyFamily = Object.hasOwn(FAMILIES, q.get('form')) ? q.get('form') : 'amanita';
-  const typeId = TYPES_BY_ID.has(q.get('type')) ? q.get('type') : `${legacyFamily}-1`;
+  const typeId = TYPES_BY_ID.has(q.get('type')) ? q.get('type') : 'amanita-1';
   const profile = getMushroomType(typeId), donor = q.get('donor');
   const donorId = TYPES_BY_ID.has(donor) && compatibleHybrid(typeId, donor).ok ? donor : null;
   const seed = (q.get('seed') || 'woodland-042').slice(0, 64), next = (q.get('next') || 'woodland-108').slice(0, 64);
@@ -9676,7 +9675,7 @@ export function parseState(search) {
   const nextDonor=q.get('nextDonor'),nextDonorId=TYPES_BY_ID.has(nextDonor)&&compatibleHybrid(nextTypeId,nextDonor).ok?nextDonor:null;
   const amount = Number(q.get('blend') || 0), pace = Number(q.get('pace') || MORPH_DEFAULT_SECONDS);
   const selectedScene=HABITAT_CHOICES.includes(q.get('scene'))?q.get('scene'):'auto';
-  const background=q.get('background')==='0'?false:q.get('background')==='1'||HABITAT_CHOICES.includes(q.get('scene'));
+  const background=q.get('background')==='1';
   const paint=q.get('paint')==='fast'?'fast':'full';
   const param=(key,value,min,max)=>{const n=Number(q.get(key)??value);return Number.isFinite(n)?clamp(n,min,max):value;};
   return { compositionAnchors:decodeCompositionAnchors(q.get('anchors')),compositionSeed:(q.get('layout')||seed).slice(0,64),compositionCount:Math.round(param('members',0,0,5)),yaw:param('yaw',.12,-Math.PI,Math.PI),pitch:param('pitch',.36,-.12,.85),capDepth:param('depth',1,.65,1.4),stemBend:param('bend',0,-50,50),seed, next, family: profile.family, typeId, donorId,nextTypeId,nextDonorId, selectedScene, background, paint, fieldPlate:q.get('plate')==='1', scene:background?resolveHabitat(selectedScene,typeId):'plain',
@@ -9854,9 +9853,7 @@ export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=
 }
 
 async function mount() {
-  // Retired controls (removed from the page) resolve to a detached stub, so
-  // their old wiring stays harmless.
-  const retired=new Map(),$ = id => document.getElementById(id)??(retired.get(id)??retired.set(id,document.createElement('input')).get(id)), state = parseState(location.search),colonyParam=new URLSearchParams(location.search).get('colony');
+  const $ = id => document.getElementById(id), state = parseState(location.search),colonyParam=new URLSearchParams(location.search).get('colony');
   if(colonyParam==='0'||colonyParam==='1')setHabitColonyAtRest(colonyParam==='1');
   const canvas = $('painting'), status = $('status');
   const plateViewport=$('plate-viewport')?mountPlateViewport({viewport:$('plate-viewport'),canvas,onTap:()=>skipLivePainting(),
@@ -10526,7 +10523,7 @@ async function mount() {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   $('seed').value = state.seed; $('next-seed').value = state.next;
   $('scene').value=state.background?state.selectedScene:'plain';
-  $('background').checked=state.background;$('field-plate').checked=state.fieldPlate;
+  $('field-plate').checked=state.fieldPlate;
   $('duration').value = state.duration; $('duration-value').value = `${state.duration}s`;
   $('loop-pause').value = state.loopPause; $('loop-pause-value').value = `${state.loopPause}s`;
   $('loop-pause').addEventListener('input',()=>{state.loopPause=Number($('loop-pause').value);$('loop-pause-value').value=`${state.loopPause}s`;persist();});
@@ -10543,34 +10540,7 @@ async function mount() {
       alpha.append(option);
     }
   }
-  $('catalog-count').textContent = `${betaHere.length} field-guide forms · ${MUSHROOM_TYPES.length-betaHere.length} experimental · ${new Set(MUSHROOM_TYPES.map(type=>type.grammar)).size} growth plans`;
   if($('include-alpha')){$('include-alpha').checked=!!state.includeAlpha;$('include-alpha').addEventListener('change',()=>{state.includeAlpha=$('include-alpha').checked;persist();});}
-  const anatomy = {
-    amanita: 'Veil remnants, free gills and a distinct cap and stipe',
-    bolete: 'A cushioned cap over a porous, sponge-like underside',
-    chanterelle: 'A funnel with blunt folds descending the stipe',
-    morel: 'A pitted head formed by an irregular network of ridges',
-    parasol: 'A broad cap, free gills and a ringed stipe',
-    inkcap: 'A pleated or shaggy cap with a dark, dissolving edge',
-    oyster: 'Lateral shelves with gills flowing toward their attachment',
-    bracket: 'Fans growing from a lateral attachment',
-    puffball: 'An enclosed fruiting body opening at its apex',
-    coral: 'Fleshy branches growing from a united base',
-    agaric: 'An open cap with attached gills',
-    bonnet: 'A small bell cap carried by a fine stipe',
-    waxcap: 'A cap with thick, widely spaced gills',
-    milkcap: 'A depressed cap with gills running toward the stipe',
-    hedgehog: 'A cap bearing hanging teeth beneath its rim',
-    cup: 'An open cup with its fertile surface on the inside',
-    trumpet: 'A hollow horn with a flared opening',
-    earthstar: 'An enclosed spore sac above spreading outer rays',
-    nest: 'An open nest containing small lentil-like spore cases',
-    club: 'Upright clubs or spindles arising from a narrow base',
-    jelly: 'Folded, soft lobes joined at their base',
-    tooth: 'A mass of hanging teeth or branched icicles',
-    saddle: 'A folded, lobed cap borne by a stipe',
-    stinkhorn: 'An elongated horn emerging from an egg-like base',
-  };
   const profileLabels = {
     agaric:{15:'Gill density',16:'Gill curve'}, bonnet:{0:'Bell span',1:'Bell rise',15:'Gill density'},
     waxcap:{0:'Cap span',1:'Cone rise',15:'Gill spacing'}, milkcap:{1:'Funnel depth',15:'Gill density',16:'Gill curve'},
@@ -10609,12 +10579,8 @@ async function mount() {
       option.disabled = !!option.value && !compatibleHybrid(state.typeId, option.value).ok;
     }
     $('donor-profile').value = state.donorId || '';
-    $('type-note').textContent = `${anatomy[profile.grammar]}. ${profile.surface} surface; ${profile.growthHabit} habit.`;
-    $('hybrid-note').hidden = !donor;
-    $('hybrid-note').textContent = donor ? `Fictional hybrid: ${a.hybridLine}.` : '';
     $('specimen-name').textContent = a.title;
     showSpecimenLink(a);
-    $('specimen-kind').textContent = donor ? 'Fictional hybrid' : `Morphology study · ${profile.growthHabit} habit`;
   }
   const anatomyElements=ANATOMY_MEASURES.map(([key,label,unit])=>{
     const row=document.createElement('tr'),heading=document.createElement('th');heading.scope='row';heading.textContent=`${label}${unit?' · '+unit:''}`;
@@ -10635,7 +10601,7 @@ async function mount() {
   });
   function updateTraitCounts(){
     const shown=traitElements.filter(item=>!item.row.hidden),painting=shown.filter(item=>item.i>=21&&item.i<=29).length;
-    $('trait-count').textContent=`${shown.length} inputs`;$('sum-shape').textContent=`${shown.length-painting} traits`;$('sum-painting').textContent=`${painting} traits`;
+    $('sum-shape').textContent=`${shown.length-painting} traits`;$('sum-painting').textContent=`${painting} traits`;
   }
   // Debug sections remember being open or closed for this session.
   {
@@ -10653,14 +10619,8 @@ async function mount() {
   });
   if(new URLSearchParams(location.search).get('debug')==='1')setDebug(true);
   if(globalThis.matchMedia?.('(min-width:1101px)').matches)$('more-controls').open=true;
-  $('debug-appearance').addEventListener('change',()=>{
-    refreshNativeDiagnostics();if(!a||!b)return;const active=[...new Set([...activeTraitsFor(a),...activeTraitsFor(b)])];
-    for(const {row,i} of traitElements)row.hidden=!active.includes(i)||false;
-    updateTraitCounts();
-    updateTraits(snapshot().genome,performance.now(),true);
-  });
   function persist() {
-    const q = new URLSearchParams({ type: state.typeId, form: state.family, seed: state.seed, next: state.next,nextType:state.nextTypeId,
+    const q = new URLSearchParams({ type: state.typeId, seed: state.seed, next: state.next,nextType:state.nextTypeId,
       blend: String(state.blend), pace: String(state.duration), dwell: String(state.loopPause) });
     if (state.donorId) q.set('donor', state.donorId);if(state.nextDonorId)q.set('nextDonor',state.nextDonorId);
     if(state.compositionAnchors)q.set('anchors',JSON.stringify(state.compositionAnchors));q.set('layout',state.compositionSeed);q.set('members',String(state.compositionCount));for(const [key,value] of [['yaw',state.yaw],['pitch',state.pitch],['depth',state.capDepth],['bend',state.stemBend]])q.set(key,String(value));
@@ -10699,18 +10659,10 @@ async function mount() {
     updateTraitCounts();
     $('debug-seed-a').textContent=state.seed;$('debug-seed-b').textContent=state.next;
     for (const el of document.querySelectorAll('[data-family]')) el.setAttribute('aria-pressed', String(el.dataset.family === state.family));
-    $('plate-number').textContent = profile.group;
     $('field-plate').checked=state.fieldPlate;
-    $('field-plate-note').hidden=true;
     dirty = false;if(preview)requestSketch();
   }
-  function refreshNativeDiagnostics(){
-    const note=$('native-paint-stats'),m=nativeResult?.metrics;if(!note)return;
-    note.hidden=!$('debug-appearance').checked;
-    note.textContent=m?.nativeCells?`${m.nativeWidth} × ${m.nativeHeight} native cells · ${m.channels.length} pigments · ${m.steps} steps · water ${m.water.toFixed(4)} · ${m.fixedLayers} dry layers · ${(m.totalMs/1000).toFixed(2)} s. Pressure-shaped vector ink; accelerated native drying. Moving preview uses approximate multiply optics; final uses exact layered KM.`:'Native painting measurements appear as the wash reaches the paper.';
-  }
   function controls() {
-    refreshNativeDiagnostics();
     const supported=morphPair?.supportedMotion!==false;for(const id of ['blend','morph','evolve'])$(id).disabled=!supported;$('morph-support').hidden=supported;
     $('blend').value = state.blend; $('blend-value').value = `${Math.round(state.blend * 100)}%`;
     const setAction=(id,label,paused)=>{const el=$(id),span=el.querySelector?.('.label');if(span)span.textContent=label;else el.textContent=label;el.setAttribute('aria-label',label);el.title=label;el.dataset.pause=String(!!paused);};
@@ -10726,8 +10678,6 @@ async function mount() {
     $('paint-lab').disabled=playing;
     $('drawing-progress').value = drawingStage;
     $('drawing-progress').setAttribute('aria-valuetext', `${Math.round(drawingStage*100)} percent drawn`);
-    $('current-seed').textContent = `${state.typeId} · ${state.seed}`;
-    $('target-seed').textContent = `${state.nextTypeId} · ${state.next}`;
   }
   function pause({settle=true,fromOrbit=false}={}) {
     stopLoopPause();cancelImplicitPreparation();
@@ -10809,13 +10759,7 @@ async function mount() {
           $('debug-current-id').textContent=state.blend===0?a.profileId:state.blend===1?b.profileId:`${a.profileId} → ${b.profileId} @ ${smooth(state.blend).toFixed(3)}`;
           $('debug-position').textContent=`Morph ${(state.blend*100).toFixed(1)}% · shape ${(smooth(state.blend)*100).toFixed(1)}%`;
         }
-        const labels=currentTraitLabels(),indices=activeTraitsFor(g).filter(i=>i<23).slice(0,4);
-        if($('trait-impact'))$('trait-impact').textContent=g.correspondence?'Invented in-between shape':indices.map(i=>`${labels[i]??TRAITS[i]} ${Math.round(g.values[i]*100)}%`).join(' · ');
-        $('specimen-name').textContent=g.title;showSpecimenLink(g);$('specimen-kind').textContent=g.correspondence?'Invented in-between shape':g.fictional?'Fictional hybrid':'Morphology study';
-        const members=(painter.previewPlan?.individuals??painter.plan?.individuals??[]).map((_,i,all)=>individualGenome(g,i,all.length));
-        $('individual-details').hidden=members.length<2;
-        $('individual-count').textContent=`${members.length} distinct specimens`;
-        $('individual-traits').replaceChildren(...members.map((member,i)=>{const row=document.createElement('p');row.style.margin='7px 0';row.textContent=`${i+1}. Span ${Math.round(member.values[0]*100)}% · rise ${Math.round(member.values[1]*100)}% · lean ${Math.round(member.values[6]*100)}%`;return row;}));
+        $('specimen-name').textContent=g.title;showSpecimenLink(g);
         lastTraits = now;
       }
   }
@@ -10922,10 +10866,9 @@ async function mount() {
   }
   function changeBackground(enabled,scene=state.selectedScene) {
     pause({settle:false});cache.reset();state.selectedScene=scene;state.background=enabled;state.scene=enabled?resolveHabitat(scene,state.typeId):'plain';
-    $('background').checked=enabled;$('scene').value=enabled?state.selectedScene:'plain';persist();showFinished();
+    $('scene').value=enabled?state.selectedScene:'plain';persist();showFinished();
   }
   $('scene').addEventListener('change',()=>{const scene=$('scene').value;changeBackground(scene!=='plain',scene==='plain'?state.selectedScene:scene);});
-  $('background').addEventListener('change',()=>{changeBackground($('background').checked);$('scene').value=state.selectedScene;});
   $('field-plate').addEventListener('change',()=>{
     pause({settle:false});cache.reset();state.fieldPlate=$('field-plate').checked;
     regenerate({preview:false});persist();showFinished();
@@ -10943,36 +10886,30 @@ async function mount() {
     for(const event of ['change','keyup','blur'])$(id).addEventListener(event,()=>{sketchQueue.release();persist();});
   }
   $('type-profile').addEventListener('change', () => chooseRecipe($('type-profile').value, state.donorId));
-  function chooseTarget(random=false){
+  function chooseTarget(){
     clearTimeout(seedEditTimer);pause({settle:false});
-    if(random){state.next=randomSeed();state.nextTypeId=chooseMorphTarget(state.typeId,state.next,{includeAlpha:state.includeAlpha});$('next-seed').value=state.next;}
-    else state.nextTypeId=$('next-type-profile').value;
+    state.nextTypeId=$('next-type-profile').value;
     state.nextDonorId=null;state.blend=0;regenerate();persist();showFinished();
   }
-  $('next-type-profile').addEventListener('change',()=>chooseTarget());$('random-target').addEventListener('click',()=>chooseTarget(true));
+  $('next-type-profile').addEventListener('change',()=>chooseTarget());
   $('donor-profile').addEventListener('change', () => chooseRecipe(state.typeId, $('donor-profile').value || null));
   $('random').addEventListener('click', () => { $('seed').value = randomSeed(); applyInputs({live:true}); });
-  function randomRecipe(hybrid) {
-    const choice=!hybrid&&nextRandomChoice&&nextRandomChoice.includeAlpha===!!state.includeAlpha?nextRandomChoice:null;nextRandomChoice=null;
+  function randomRecipe() {
+    const choice=nextRandomChoice&&nextRandomChoice.includeAlpha===!!state.includeAlpha?nextRandomChoice:null;nextRandomChoice=null;
     if(choice){
       state.compositionSeed=choice.compositionSeed;state.compositionCount=0;state.compositionAnchors=null;
       state.typeId=choice.typeId;state.family=choice.family;state.donorId=choice.donorId;
       $('seed').value=choice.seed;$('next-seed').value=choice.next;state.nextTypeId=choice.nextTypeId;state.nextDonorId=null;applyInputs({keepLayout:true,live:true});
       status.textContent='A new mushroom';return;
     }
-    const n = crypto.getRandomValues(new Uint32Array(2));
-    const pool=randomTypePool(state.includeAlpha);
-    const hosts=hybrid?pool.filter(host=>pool.some(donor=>compatibleHybrid(host.id,donor.id).ok)):pool;
-    const host = hosts[n[0] % hosts.length];
-    const donors = hybrid ? pool.filter(type => compatibleHybrid(host.id, type.id).ok) : [];
+    const pool=randomTypePool(state.includeAlpha),host=pool[crypto.getRandomValues(new Uint32Array(1))[0]%pool.length];
     state.compositionSeed=randomSeed();state.compositionCount=0;state.compositionAnchors=null;
     state.typeId = host.id; state.family = host.family;
-    state.donorId = donors.length ? donors[n[1] % donors.length].id : null;
+    state.donorId = null;
     $('seed').value = randomSeed(); $('next-seed').value = randomSeed();state.nextTypeId=chooseMorphTarget(state.typeId,$('next-seed').value,{includeAlpha:state.includeAlpha});state.nextDonorId=null;applyInputs({keepLayout:true,live:true});
-    status.textContent = state.donorId ? 'A fictional hybrid' : 'A new mushroom';
+    status.textContent = 'A new mushroom';
   }
-  $('random-mushroom').addEventListener('click', () => randomRecipe(false));
-  $('random-hybrid').addEventListener('click', () => randomRecipe(true));
+  $('random-mushroom').addEventListener('click', () => randomRecipe());
   $('blend').addEventListener('pointerdown',()=>{pause({settle:false});sketchQueue.hold();});
   $('blend').addEventListener('input', () => {
     const value=Number($('blend').value),held=sketchQueue.held;

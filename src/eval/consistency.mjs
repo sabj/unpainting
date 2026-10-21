@@ -2,10 +2,10 @@
 //
 // Given the original, a proposed wash (the planned sheet without ink) and a proposed line drawing (the pen paths
 // rendered at their contact widths), ask: once the wash is divided out of the original, does what is left look like
-// the drawing? The division is Part 1's split (the checkpoint comparator in the old painter, tools/checkpoint/index.html
-// composite()): ink transmittance is ONE number per cell, read from lightness, original lightness over wash lightness,
-// capped at 1, ratios within 4% of 1 treated as no ink, floored at 0.02. Ink is near neutral; dividing channel by
-// channel turns a multi-pigment wash into rainbow speckle. Lightness is Rec. 709 luma on the encoded values, as there.
+// the drawing? The division is Part 1's split (the old painter's checkpoint comparator): ink transmittance is ONE
+// number per cell, read from lightness, original lightness over wash lightness, capped at 1, ratios within 4% of 1
+// treated as no ink, floored at 0.02. Ink is near neutral; dividing channel by channel turns a multi-pigment wash into
+// rainbow speckle. Lightness is Rec. 709 luma on the encoded values, as there.
 //
 // Everything here is pure arithmetic on typed arrays so it can be unit-tested on hand-drawn buffers.
 
