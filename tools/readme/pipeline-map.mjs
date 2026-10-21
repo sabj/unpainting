@@ -10,7 +10,7 @@
 //           (the first "paper" frame), its reserved lights (the frisket, laid over the run's
 //           source.jpg; see tapeReserve), and its drawing (the last "pen" or "prep" frame before any wash).
 // --fonts   a folder with eb-garamond-normal.woff2 and eb-garamond-normal-600.woff2 for the titles (default
-//           demos/lab/fonts, which has only the regular face; samjackson.org's site/fonts has both).
+//           demos/lab/fonts, which has only the regular face).
 // --playwright  a folder whose node_modules holds playwright, when this repository has none installed.
 //
 // Only resizing, cropping and the reserve overlay are applied. No painting frame is recoloured or generated.

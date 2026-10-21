@@ -217,7 +217,7 @@
       "preset": {
         "surface": "cold"
       },
-      "source": "docs/lab/examples/white-ships-run/frames.json",
+      "source": "demos/lab/examples/white-ships-run/frames.json",
       "film": {
         "frames": [
           "examples/white-ships-run/f0000.jpg",

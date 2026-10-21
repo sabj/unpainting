@@ -3,7 +3,7 @@
 // the one read.
 //
 // default, combined, general: one general process, adjusted through drawing, washes and order.
-// v096: historical fitted recipe. CLI options override plan choices.
+// v096: the V096 compatibility recipe. CLI options override plan choices.
 // penwash (also `--style penwash`): pen and wash. A prepared ink drawing first, pruned for line economy, then the
 // washes in an illustrator's order, lights first (src/paint/methods/pen-wash-plan.mjs planStages): paper whites kept,
 // one pale unifying first wash, one mid-value shadow wash, a few small darks. No value ladder, touch-ups, closing pen
@@ -26,12 +26,12 @@ const TECHNIQUE_FLAGS = '--shapedmarks 1';
 const V096_METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --layerhue 1 --drawing both --frames 8 --markcadence 8 --marks 1';
 const V096_TECHNIQUE_FLAGS = '--shapedmarks 1 --skylanes 1 --skyblue 1 --skysplit 1';
 
-// The pen-and-wash washes as tuned by eye on Flatiron and Yale (2026-10-13): every passage flooded wet in wet, 60% of
+// The pen-and-wash washes as tuned by eye on Flatiron and Yale: every passage flooded wet in wet, 60% of
 // the picture kept as light, strong shadow (0.6) and deep (1.2) glazes read from a finer value map, coloured lights in the local
 // wash, a capped local mix fitted for hue (pen-wash-plan.mjs, pen-wash.mjs), sparser small marks (pen-wash-lines.mjs)
 // and closer mop lanes with no overhang, so a flooded wash edge is smooth rather than sawtoothed. A deeper sky, one
-// connected shadow wash and a green foliage wash each won an advisor panel A/B
-// (2026-10-13). --pwdeepcontrast and --pwpenvary stay off: judged in both orders they showed no win.
+// connected shadow wash and a green foliage wash each won an advisor panel A/B.
+// --pwdeepcontrast and --pwpenvary stay off: judged in both orders they showed no win.
 const PENWASH_STAGE_FLAGS = '--penwashplan stages --pwwhitemm 2.5 --pwfinemm 2.5 --pwholemm2 40 --pwshadowpiece 0.015 --pwdrygain 0.6 --pwsoftgrad 30';
 const PENWASH_FLAGS = '--pwallwet 1 --pwminlight 0.6 --pwlightness 0.7 --pwshadowmin 0.6 --pwdeepmin 1.2 --pwshadowblur 0.8 --pwhuegap 18 --pwdarkhuegap 10 --pwlightchroma 14 --pwlocalmax 0.22 --pwcaplweight 0.3 --pwchroma 1.25 --pwmonolocal warm:0.7,cool:0.15,earth:0.15 --pwtileink 5 --pwkeep 0.4 --pwspeck 1.2 --mopgap 0.6 --mopover 0 --pwsky 0.2 --pwskyto 0.6 --pwshadowone 4 --pwfoliage 5 --pwfoliagemax 0.5 --pwkeeplights 10';
 const RECIPES = {
