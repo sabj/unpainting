@@ -10,7 +10,7 @@ In the third image of each row, the pen drawing is thin, brown and hard-edged. I
 
 ## Ink or pencil
 
-In 0.2.0 `--outlinemedium` defaults to graphite, a light pencil underdrawing, while ink is reworked. On a run with no prepared drawing, the [automatic stage choice](#automatic-drawing-stages) can still add ink stages. Pencil is light, neutral and does not move under water, so the washes cover it.
+`--outlinemedium` defaults to graphite, a light pencil underdrawing, while ink is reworked. Ink is drawn only when asked for. Pencil is light, neutral and does not move under water, so the washes cover it.
 
 `--outlinemedium ink` draws in ink. `--outlinemedium auto` chooses from the target. It draws in ink if at least 0.5% of the picture reads as ink line (`--penfirst`), and in pencil below that. Ink on a target without line would add marks the original lacks.
 
@@ -118,11 +118,11 @@ The rule in `src/paint/methods/drawing-choice.mjs` reads the picture before pain
 - `prepInk`: ink over the pencil, for a pen source or built structure. A pen source shows at least 2.5% pen line. Built structure has two or more vanishing points carrying 12% of the long edges.
 - `finishInk`: closing ink accents when at least 2% of the cells lie on an edge, which is most pictures.
 
-Any ink stage sets `--outlinemedium ink`. An ink finish adds a closing pass, `--drawing both`, or `last` when there is no opening stage. With no stage at all the run draws nothing. A typed `--drawing first` drops the finish. The pen-and-wash style always gets `prepInk` and no `finishInk`. With `OPENROUTER_API_KEY` set, a vision model proposes the stages first; it can drop an ink stage but cannot add one the rule refuses. The choice is written to `drawing-choice.json`. `--drawingstages off` keeps the plain pencil drawing.
+The choice keeps ink stages only when ink is asked for (`--outlinemedium` other than graphite). Otherwise it keeps the pencil prep alone. A kept ink stage sets `--outlinemedium ink`. An ink finish adds a closing pass, `--drawing both`, or `last` when there is no opening stage. With no stage at all the run draws nothing. A typed `--drawing first` drops the finish. The pen-and-wash style always gets `prepInk` and no `finishInk`. With `OPENROUTER_API_KEY` set, a vision model proposes the stages first; it can drop an ink stage but cannot add one the rule refuses. The choice is written to `drawing-choice.json`. `--drawingstages off` keeps the plain pencil drawing.
 
 ## Drawing order
 
-The default recipe sets `--drawing first`: the drawing goes down first and dries, then the washes. A closing pass needs `--drawing both`, a plan's `finishInk` stage or `closingLines`, or an ink finish from the automatic stage choice. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The pen keeps one reservoir across marks and dips again when it runs low, so a long line does not run dry. The washes soften and partly cover the lines. A closing pass, when asked for, adds a few dark accents where the target has strong edges.
+The default recipe sets `--drawing first`: the drawing goes down first and dries, then the washes. A closing pass needs `--drawing both`, a plan's `finishInk` stage or `closingLines`, or an ink finish from the automatic stage choice when ink is asked for. The opening drawing places the forms for the washes to fill. Sepia ink can rewet, so a wash over wet ink would smear it. The pen keeps one reservoir across marks and dips again when it runs low, so a long line does not run dry. The washes soften and partly cover the lines. A closing pass, when asked for, adds a few dark accents where the target has strong edges.
 
 | `--drawing` | Before paint | After paint |
 |---|---|---|

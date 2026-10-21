@@ -8,7 +8,9 @@ Painter V101-dev, sim 102, judges J1. Release candidate 1. Ink and colour change
 
 ### Ink
 
-These are off by default. Ink still needs `--outlinemedium ink`.
+- The automatic stage choice now adds ink stages only when ink is asked for. In 0.2.0 it could add ink on most pictures. The default drawing is now pencil only.
+
+The ink v2 flags below are off by default. Ink still needs `--outlinemedium ink`.
 
 - `--inkrecipe v2` turns on all of the following.
 - `--linesupport 5` keeps only the line parts the target shows.
@@ -34,7 +36,7 @@ On the published Opus 5.5 V5 plans, 0.2.0 scores 7% higher than 0.1.1 (J1 6.36 a
 
 ### Drawing
 
-- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. On a run with no prepared drawing, the automatic stage choice (`--drawingstages auto`) can still add ink stages; `--drawingstages off` turns it off. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
+- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. On a run with no prepared drawing, the automatic stage choice (`--drawingstages auto`) can still add ink stages; `--drawingstages off` turns it off. 0.2.1 fixes this. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
 - Opt-in universal linework stage (`--linework auto`) for every style, with one cleanup for specks, shadow outlines and repeated marks.
 - A drawing made for another image must be registered first.
 

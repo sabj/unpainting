@@ -30,7 +30,7 @@ Code: `src/media/paper.mjs` builds the surface and `src/media/sheet.mjs` moves t
 
 ## 2. Pencil and ink
 
-The drawing goes down first and dries before the washes. In 0.2.0 the drawing medium defaults to pencil (graphite), which does not move under water. On a run with no prepared drawing, the automatic stage choice can still add ink. It adds closing accents on most pictures, and an ink drawing for pen sources and buildings. When a run draws in ink, sepia ink can rewet and lift under the washes; black ink resists lifting better. A plan can also add closing ink accents after the washes.
+The drawing goes down first and dries before the washes. The drawing medium defaults to pencil (graphite), which does not move under water. Ink is drawn only when asked for, with `--outlinemedium ink` or a plan's ink medium. When a run draws in ink, sepia ink can rewet and lift under the washes; black ink resists lifting better. A plan can also add closing ink accents after the washes.
 
 The pen is a dip pen with a finite load of walnut ink. Four things change its line:
 
@@ -121,7 +121,7 @@ A [stroke plan](plan-format.md) can supply all of these decisions. The image pai
 
 ### Prepare the sheet
 
-The painter lays fresh paper, reserves the lights that must stay white, and draws the selected paths. The drawing is pencil unless the plan or the stage choice asks for ink. Then it dries the drawing.
+The painter lays fresh paper, reserves the lights that must stay white, and draws the selected paths. The drawing is pencil unless the plan or the command line asks for ink. Then it dries the drawing.
 
 ### Paint
 
