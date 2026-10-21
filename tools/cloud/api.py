@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Tiny provider client. Keys come from the environment, or from the .env file named by UNPAINTING_ENV_FILE
-(default: .env at the repository root, which git ignores). They never go on argv.
-  api.py hc METHOD /path [json-body]        archive Cloud
+"""Tiny RunPod client. RUNPOD_API_KEY comes from the environment, or from the .env file named by UNPAINTING_ENV_FILE
+(default: .env at the repository root, which git ignores). It never goes on argv.
   api.py rp-gql "<graphql query>"            RunPod GraphQL
   api.py rp METHOD /path [json-body]        RunPod REST (rest.runpod.io/v1)
 """
@@ -24,15 +23,12 @@ def call(url, method="GET", body=None, headers=None):
     except urllib.error.HTTPError as e: t=e.read().decode()
     try: return json.loads(t)
     except Exception: return t
-def hc(method, path, body=None):
-    return call("https://api.archive.cloud/v1"+path, method, body, {"Authorization":"Bearer "+env("HCLOUD_TOKEN")})
 def rp(method, path, body=None):
     return call("https://rest.runpod.io/v1"+path, method, body, {"Authorization":"Bearer "+env("RUNPOD_API_KEY")})
 def rpgql(q):
     return call("https://api.runpod.io/graphql", "POST", {"query":q}, {"Authorization":"Bearer "+env("RUNPOD_API_KEY")})
 if __name__=="__main__":
     a=sys.argv[1:]
-    if a[0]=="hc": out=hc(a[1],a[2],json.loads(a[3]) if len(a)>3 else None)
-    elif a[0]=="rp": out=rp(a[1],a[2],json.loads(a[3]) if len(a)>3 else None)
+    if a[0]=="rp": out=rp(a[1],a[2],json.loads(a[3]) if len(a)>3 else None)
     else: out=rpgql(a[1])
     print(json.dumps(out,indent=1))

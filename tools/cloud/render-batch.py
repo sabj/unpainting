@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""render-batch.py TREE JOBS [options]: run one shell command per line of JOBS on cloud boxes, pull outputs back.
+"""render-batch.py TREE JOBS [options]: run one shell command per line of JOBS on rented RunPod GPU pods, pull outputs back.
 
 TREE  source tree on this machine (working tree, uncommitted files included). Bundled without work/ task/ node_modules/ .git/ data/refs/.
 JOBS  text file, one command per line, run from the tree root on the box (blank lines and # lines skipped).
 Options:
-  --pods K          boxes to launch (default 4, cap 8, never more than jobs)
-  --per-pod N       jobs run at once on one box (default 2)
+  --pods K          pods to launch (default 4, cap 8, never more than jobs)
+  --per-pod N       jobs run at once on one pod (default 2)
   --input PATH      extra file or dir, relative to TREE, shipped with the bundle (repeatable)
-  --provider P      runpod (default; falls back to archive), archive or runpod-only
-  --hard-limit MIN  kill everything and delete all boxes after MIN minutes (default 45)
+  --hard-limit MIN  kill everything and delete all pods after MIN minutes (default 45)
   --gpus LIST       override the GPU ladder (default order is LADDER in this file)
-The tree is mirrored at the same absolute path on the box, so absolute paths inside recipes keep working.
+  --image NAME      pod image (default RUNPOD_IMAGE, else RP_IMAGE in this file)
+The tree is mirrored at the same absolute path on the pod, so absolute paths inside recipes keep working.
+Environment: RUNPOD_API_KEY (required), UNPAINTING_ENV_FILE, UNPAINTING_SSH_KEY, RUNPOD_IMAGE.
 Keys are read in-process by api.py and never printed.
 """
 import argparse, atexit, io, json, os, queue, re, shlex, signal, subprocess, sys, tarfile, threading, time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from api import rp, hc
+from api import rp
 
 KEY = os.environ.get("UNPAINTING_SSH_KEY", str(Path.home() / ".ssh/id_ed25519"))
 SSH = ["-i", KEY, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "BatchMode=yes",
        "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=20"]
-RP_IMAGE = "runpod/base:0.6.2-cuda12.4.1"
+RP_IMAGE = os.environ.get("RUNPOD_IMAGE", "runpod/base:0.6.2-cuda12.4.1")
 IP_WAIT = 240
 # fallback order per box: 4090 community, 4090 secure, then Vulkan-capable alternatives by price
 LADDER = [("NVIDIA GeForce RTX 4090", "COMMUNITY"), ("NVIDIA GeForce RTX 4090", "SECURE"),
@@ -29,13 +30,11 @@ LADDER = [("NVIDIA GeForce RTX 4090", "COMMUNITY"), ("NVIDIA GeForce RTX 4090", 
           ("NVIDIA RTX 6000 Ada Generation", "COMMUNITY"), ("NVIDIA RTX 6000 Ada Generation", "SECURE"),
           ("NVIDIA A100 80GB PCIe", "COMMUNITY"), ("NVIDIA A100-SXM4-80GB", "SECURE"),
           ("NVIDIA H100 80GB HBM3", "COMMUNITY"), ("NVIDIA H100 80GB HBM3", "SECURE")]
-HZ_TYPE = "cx43"
-HZ_RATE = 0.03
 NODE_URL = "https://nodejs.org/dist/v26.7.0/node-v26.7.0-linux-x64.tar.xz"
 SKIP_TOP = {"work", "task", "node_modules", ".git", "refs", ".claude", ".agents"}
 BATCH = time.strftime("%m%d%H%M%S") + f"-{os.getpid() % 1000:03d}"  # two batches started in one second stay apart
 lock = threading.Lock()
-boxes = {}  # name -> (provider, id)
+boxes = {}  # name -> pod id
 results = []
 T0 = time.time()
 SHA, DIRTY = "0" * 40, 0
@@ -102,18 +101,18 @@ node -e 'import("sharp").then(()=>console.log("sharp ok"))'
 
 class Box:
     def __init__(self, name):
-        self.name, self.provider, self.id, self.ip, self.port, self.rate, self.t0 = name, None, None, None, 22, 0.0, None
+        self.name, self.id, self.ip, self.port, self.rate, self.t0 = name, None, None, 22, 0.0, None
 
     def ssh(self, cmd, timeout=3600, stdin=None):
         return run(["ssh", "-p", str(self.port), *SSH, f"root@{self.ip}", cmd], timeout=timeout, stdin=stdin)
 
     # RunPod: walk the GPU ladder; every create and every wait is bounded, failures are logged and skipped
-    def create_runpod(self):
+    def create(self, image):
         pub = Path(KEY + ".pub").read_text().strip()
         for gpu, cloud in LADDER:
             tag = f"{gpu.replace('NVIDIA ', '').replace('GeForce ', '')}/{cloud}"
             try:
-                r = rp("POST", "/pods", {"name": self.name, "imageName": RP_IMAGE, "gpuTypeIds": [gpu], "gpuCount": 1,
+                r = rp("POST", "/pods", {"name": self.name, "imageName": image, "gpuTypeIds": [gpu], "gpuCount": 1,
                                          "cloudType": cloud, "containerDiskInGb": 30, "volumeInGb": 0, "ports": ["22/tcp"],
                                          "supportPublicIp": True, "env": {"PUBLIC_KEY": pub, "NVIDIA_DRIVER_CAPABILITIES": "all"}})
             except Exception as e:
@@ -122,9 +121,9 @@ class Box:
             if not (isinstance(r, dict) and r.get("id")):
                 log(self.name, tag, "create failed:", str(r)[:140])
                 continue
-            self.provider, self.id, self.t0, self.gpu = "runpod", r["id"], time.time(), gpu
+            self.id, self.t0, self.gpu = r["id"], time.time(), gpu
             with lock:
-                boxes[self.name] = ("runpod", self.id)
+                boxes[self.name] = self.id
             self.rate = float(r.get("costPerHr") or r.get("adjustedCostPerHr") or 0.34)
             log(self.name, tag, f"created ${self.rate}/h, waiting for ssh port (max {IP_WAIT}s)")
             end = time.time() + IP_WAIT
@@ -143,27 +142,6 @@ class Box:
             self.id = None
         raise RuntimeError("no GPU pod available on the whole ladder")
 
-    # archive
-    def create_archive(self):
-        for loc in ("fsn1", "nbg1", "hel1", "ash", "hil"):
-            r = hc("POST", "/servers", {"name": self.name, "server_type": HZ_TYPE, "image": "ubuntu-24.04", "location": loc,
-                                        "ssh_keys": [os.environ.get("HCLOUD_SSH_KEY", "painter-render")], "labels": {"purpose": "render-batch"}})
-            if isinstance(r, dict) and "server" in r:
-                break
-            log(self.name, loc, "archive create failed:", str((r.get("error") if isinstance(r, dict) else r))[:120])
-        else:
-            raise RuntimeError("no archive location worked")
-        self.provider, self.id, self.t0, self.rate = "archive", r["server"]["id"], time.time(), HZ_RATE
-        with lock:
-            boxes[self.name] = ("archive", self.id)
-        for _ in range(60):
-            s = hc("GET", f"/servers/{self.id}")["server"]
-            if s["status"] == "running":
-                self.ip = s["public_net"]["ipv4"]["ip"]
-                return
-            time.sleep(3)
-        raise RuntimeError("server never running")
-
     def wait_ssh(self):
         for _ in range(60):
             if self.ssh("true", timeout=30).returncode == 0:
@@ -174,23 +152,16 @@ class Box:
     def delete(self):
         if not self.id:
             return
-        delete_box(self.provider, self.id, self.name)
+        rp("DELETE", f"/pods/{self.id}")
         with lock:
             boxes.pop(self.name, None)
         log(self.name, "deleted")
 
 
-def delete_box(prov, bid, name):
-    if prov == "runpod":
-        rp("DELETE", f"/pods/{bid}")
-    else:
-        hc("DELETE", f"/servers/{bid}")
-
-
 def delete_all():
-    for name, (prov, bid) in list(boxes.items()):
+    for name, bid in list(boxes.items()):
         try:
-            delete_box(prov, bid, name)
+            rp("DELETE", f"/pods/{bid}")
             boxes.pop(name, None)
             print("cleanup deleted", name, flush=True)
         except Exception as e:
@@ -198,21 +169,14 @@ def delete_all():
 
 
 def provision(box, args, bundle, tree):
-    order = {"runpod": ["runpod", "archive"], "archive": ["archive"], "runpod-only": ["runpod"]}[args.provider]
-    err = None
-    for prov in order:
-        try:
-            {"runpod": box.create_runpod, "archive": box.create_archive}[prov]()
-            box.wait_ssh()
-            break
-        except Exception as e:
-            err = e
-            log(box.name, prov, "unavailable:", e)
-            box.delete()
-            box.id = None
-    else:
-        raise RuntimeError(f"no provider worked: {err}")
-    log(box.name, box.provider, box.ip, box.port, f"${box.rate}/h up")
+    try:
+        box.create(args.image)
+        box.wait_ssh()
+    except Exception as e:
+        box.delete()
+        box.id = None
+        raise RuntimeError(f"no pod came up: {e}")
+    log(box.name, box.ip, box.port, f"${box.rate}/h up")
     with open(bundle, "rb") as f:
         r = box.ssh("tar -xzf - -C /", stdin=f)
     if r.returncode:
@@ -242,7 +206,7 @@ def run_job(box, idx, cmd, tree, outdir):
         pulled = len(run(["tar", "-tzf", str(tarpath)]).stdout.splitlines()) if x.returncode == 0 else 0
     tarpath.unlink(missing_ok=True)
     cost = wall / 3600 * box.rate
-    row = {"idx": idx, "cmd": cmd, "box": box.name, "provider": box.provider, "exit": code, "wall_s": round(wall, 1),
+    row = {"idx": idx, "cmd": cmd, "box": box.name, "exit": code, "wall_s": round(wall, 1),
            "cost_usd": round(cost, 5), "files_pulled": pulled}
     log(f"job {idx} exit={code} wall={wall:.1f}s files={pulled} ${cost:.4f}  {cmd}")
     with lock:
@@ -287,7 +251,7 @@ def main():
     ap.add_argument("--pods", type=int, default=4)
     ap.add_argument("--per-pod", type=int, default=2)
     ap.add_argument("--input", action="append", default=[])
-    ap.add_argument("--provider", default="runpod", choices=["runpod", "archive", "runpod-only"])
+    ap.add_argument("--image", default=RP_IMAGE)
     ap.add_argument("--hard-limit", type=float, default=45)
     ap.add_argument("--gpus", default="", help="override ladder: 'GPU id:COMMUNITY|SECURE,...'")
     args = ap.parse_args()
@@ -310,7 +274,7 @@ def main():
     atexit.register(delete_all)
     for s in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(s, lambda *_: (delete_all(), os._exit(130)))
-    threading.Timer(args.hard_limit * 60 + 120, lambda: (print("HARD LIMIT: deleting boxes", flush=True), delete_all(), os._exit(124))).start()
+    threading.Timer(args.hard_limit * 60 + 120, lambda: (print("HARD LIMIT: deleting pods", flush=True), delete_all(), os._exit(124))).start()
     q = queue.Queue()
     for i, c in enumerate(jobs, 1):
         q.put((i, c))
