@@ -22,7 +22,7 @@ import { readTape, tapeStrokes, ghostSvg } from './brush-ghost.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const i = process.argv.indexOf('--out');
 const OUT = path.resolve(ROOT, i > 0 ? process.argv[i + 1] : 'docs/img');
-const LAB = path.join(ROOT, 'docs/lab/examples');
+const LAB = path.join(ROOT, 'demos/lab/examples');
 const arg = name => { const k = process.argv.indexOf(name); return k > 0 ? path.resolve(process.cwd(), process.argv[k + 1]) : null; };
 const MAX_BYTES = 3_000_000, QUALITY = 82;
 const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 }, CAPTION_FILL = '#768390', EDGE = [0xd0, 0xd7, 0xde];

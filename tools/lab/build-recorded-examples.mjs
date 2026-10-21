@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '../..');
-const dir = path.join(root, 'docs/lab/examples');
+const dir = path.join(root, 'demos/lab/examples');
 const run = 'examples/white-ships-run/';
 const recording = JSON.parse(fs.readFileSync(path.join(dir, 'white-ships-run/frames.json')));
 const tape = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(dir, 'white-ships-run/strokes.json.gz'))));
@@ -16,7 +16,7 @@ const examples = [[10, 'first-marks', 'White Ships: first 19 strokes', 8], [20, 
   const excerpt = `white-ships-${id}-strokes.json`;
   fs.writeFileSync(path.join(dir, excerpt), JSON.stringify({...tape, strokes: paths}) + '\n');
   return {id, title, kind: 'Recorded early strokes', target: `${run}source.jpg`, thumb: `${run}${last.src}`, credit,
-    preset: {surface:'cold'}, source: 'docs/lab/examples/white-ships-run/frames.json',
+    preset: {surface:'cold'}, source: 'demos/lab/examples/white-ships-run/frames.json',
     film: {frames:frames.map(f => run + f.src), frameNumbers:frames.map(f => Number(f.src.match(/\d+/)[0])),
       final:run + last.src, aspect:recording.width / recording.height, seconds, strokes:last.strokes,
       paths:`examples/${excerpt}`}};

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPointerSampler} from '../../docs/lab/ui/contact.js';
-import {makePaper} from '../../docs/lab/media/paper.js';
-import {createSheet} from '../../docs/lab/media/sheet.js';
-import {createBrush,dip,stroke} from '../../docs/lab/media/brush.js';
-import {handBrushOptions} from '../../docs/lab/brush-load.js';
+import {createPointerSampler} from '../../demos/lab/ui/contact.js';
+import {makePaper} from '../../demos/lab/media/paper.js';
+import {createSheet} from '../../demos/lab/media/sheet.js';
+import {createBrush,dip,stroke} from '../../demos/lab/media/brush.js';
+import {handBrushOptions} from '../../demos/lab/brush-load.js';
 const rect={left:0,top:0,width:480,height:180};
 const event=(x,t,pressure=.5,pointerType='mouse')=>({clientX:x,clientY:90,timeStamp:t,pressure,pointerType});
 const sample=(sampler,e,options={})=>sampler.sample(e,rect,480,180,.8,{dpi:60,...options});

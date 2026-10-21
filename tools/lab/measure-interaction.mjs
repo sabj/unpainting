@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 const root=process.cwd();
-const server=createServer(async(req,res)=>{try{let p=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(p.endsWith('/'))p+='index.html';let body=await readFile(path.join(root,p));if(p==='/docs/lab/worker.js'){
+const server=createServer(async(req,res)=>{try{let p=decodeURIComponent(new URL(req.url,'http://localhost').pathname);if(p.endsWith('/'))p+='index.html';let body=await readFile(path.join(root,p));if(p==='/demos/lab/worker.js'){
  let s=body.toString();for(const name of ['render','frame']){s=s.replace(`async function ${name}(`,`async function ${name}Measured(`);s+=`\nasync function ${name}(...args){const t=performance.now();try{return await ${name}Measured(...args);}finally{postMessage({type:'timing',name:'${name}',ms:performance.now()-t});}}\n`;}
  s=s.replace('const changed=watchContact(sheet,rect);fn();const contact=changed();','const ct=performance.now();const changed=watchContact(sheet,rect);fn();const contact=changed();postMessage({type:"timing",name:"contact",ms:performance.now()-ct});');body=Buffer.from(s);
  }res.setHeader('Content-Type',p.endsWith('.js')?'text/javascript':p.endsWith('.html')?'text/html':p.endsWith('.css')?'text/css':'application/octet-stream');res.end(body);}catch{res.statusCode=404;res.end();}}).listen(8767,'127.0.0.1');
@@ -14,7 +14,7 @@ const results={};
 try{for(const backend of ['cpu','webgpu']){
  const page=await browser.newPage({viewport:{width:1280,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{window.samples=[];window.phase='init';const NativeWorker=Worker;window.Worker=class extends NativeWorker{constructor(...args){super(...args);this.addEventListener('message',({data})=>{if(data.type==='timing')samples.push({...data,phase,at:performance.now()});if(data.type==='frame')samples.push({name:'post',phase,at:performance.now(),main:window.__lab?.mainMs,stepMs:data.stepMs,stepCount:data.stepCount});});}};});
- await page.goto(`http://127.0.0.1:8767/docs/?intro=0&dpi=60&physics=${backend}`);await page.waitForFunction(()=>window.__lab?.frames>0,null,{timeout:15000});const actual=await page.evaluate(()=>({physics:__lab.physics,render:__lab.render}));if(actual.physics!==backend)throw Error(`Requested ${backend}, got ${actual.physics}`);textLog(backend,actual);
+ await page.goto(`http://127.0.0.1:8767/demos/?intro=0&dpi=60&physics=${backend}`);await page.waitForFunction(()=>window.__lab?.frames>0,null,{timeout:15000});const actual=await page.evaluate(()=>({physics:__lab.physics,render:__lab.render}));if(actual.physics!==backend)throw Error(`Requested ${backend}, got ${actual.physics}`);textLog(backend,actual);
  await page.evaluate(()=>{phase='stroke';__lab.send({type:'pause',on:true});__lab.send({type:'down',pt:{x:40,y:150,p:.8},tool:{tool:'round',pigment:'ultramarine',sizeMm:15,water:2,amount:.5,model:'row'}});});
  for(let x=44;x<=420;x+=4){await page.evaluate(x=>__lab.send({type:'move',pts:[{x,y:150,p:.8}],t:performance.timeOrigin+performance.now()}),x);await page.waitForTimeout(12);}
  await page.evaluate(()=>__lab.send({type:'up',pt:{x:420,y:150,p:0}}));await page.waitForTimeout(500);

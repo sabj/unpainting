@@ -1,6 +1,6 @@
-# docs/lab
+# demos/lab
 
-Paint Lab, the browser version of the paper, brushes, pen and pencil. [docs/index.html](../index.html) is the page. `lab.js` and `worker.js` stay at the top of this folder, and the modules they import sit in folders by role.
+Paint Lab, the browser version of the paper, brushes, pen and pencil. [demos/index.html](../index.html) is the page. `lab.js` and `worker.js` stay at the top of this folder, and the modules they import sit in folders by role.
 
 - `lab.js`: the page, with pointer input, controls and frames from the worker.
 - `worker.js`: the simulation, run off the page's thread.
@@ -11,7 +11,7 @@ Paint Lab, the browser version of the paper, brushes, pen and pencil. [docs/inde
 - `worker/`: the worker's helpers: demonstrations, pacing, undo history, autosave, sheet state and self-checks.
 - `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. `node tools/lab/build-recorded-examples.mjs` extracts early White Ships frames and paths into `examples/recorded.json`. It preserves the original frame numbers, tool shapes and coordinates. The full live tapes retain pigment recipes, tools, dip events and early strokes. Rebuild them with `node tools/lab/build-live-examples.mjs H36_RUN WHITE_SHIPS_RUN`; the older compact path logs are used only by recording mode.
 
-Serve it with `python3 -m http.server 8000 --directory docs` and open the server address printed in the terminal.
+Serve it with `python3 -m http.server 8000 --directory demos` and open the server address printed in the terminal.
 
 [Running the painter](../running.md#paint-lab) covers the examples and how to rebuild their animations. `tools/lab/build-site.mjs` copies this folder into the static site.
 

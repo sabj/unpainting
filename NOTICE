@@ -44,7 +44,7 @@ credits: THIRD_PARTY_NOTICES.md.
    docs/img/example-trumbull.webp
    docs/img/progress-trumbull.webp
    docs/img/layers-thumb.webp
-   docs/layers/data/*
+   demos/layers/data/*
    bench/v2/targets/trumbull.png
    bench/crops/img/trumbull.webp
    bench/runs/*/*/*/trumbull*.webp
@@ -131,7 +131,7 @@ credits: THIRD_PARTY_NOTICES.md.
 
 4. Yale gateway (h36-a), Paint Lab
 
-   docs/lab/examples/h36-a/h36.jpg: Carol M. Highsmith / Library of
+   demos/lab/examples/h36-a/h36.jpg: Carol M. Highsmith / Library of
    Congress, public domain. Source SHA-256:
    059a25da04a07b9f18fe343fe9007e16d5e2622d04f42f8001aa343f1a767418.
    h36-a.png is a stylised target made with an image model; h36-a.json

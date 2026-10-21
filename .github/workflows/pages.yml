@@ -1,8 +1,15 @@
-# Builds the Paint Lab site (tools/lab/build-site.mjs) and deploys it to GitHub Pages.
-# Manual only: a Pages site is public, so run it after Pages is turned on in the repository settings.
+# Builds the demos site (tools/lab/build-site.mjs reads demos/) and deploys it to GitHub Pages.
+# Runs on push to main when demos/ or the site build changes, and by hand.
+# Needs Settings > Pages > Build and deployment > Source set to "GitHub Actions".
 name: pages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'demos/**'
+      - 'tools/lab/build-site.mjs'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:

@@ -6,12 +6,12 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import sharp from 'sharp';
 import {gunzipSync} from 'node:zlib';
-import {runTape} from '../../docs/lab/worker/live-tape.js';
-import {tapeSheet,tapePixels,tapeFlow} from '../../docs/lab/worker/tape-sheet.js';
-import {makePaper} from '../../docs/lab/media/paper.js';
-import {createSheet,step,DEFAULTS,setThreads} from '../../docs/lab/media/sheet.js';
-import {paperReflectance} from '../../docs/lab/media/papers.js';
-import {layerRT} from '../../docs/lab/media/km.js';
+import {runTape} from '../../demos/lab/worker/live-tape.js';
+import {tapeSheet,tapePixels,tapeFlow} from '../../demos/lab/worker/tape-sheet.js';
+import {makePaper} from '../../demos/lab/media/paper.js';
+import {createSheet,step,DEFAULTS,setThreads} from '../../demos/lab/media/sheet.js';
+import {paperReflectance} from '../../demos/lab/media/papers.js';
+import {layerRT} from '../../demos/lab/media/km.js';
 const [run,out]=process.argv.slice(2),legacy=process.argv.includes('--legacy');
 await fs.mkdir(out,{recursive:true});
 let raw;try{raw=await fs.readFile(path.join(run,'marks.json'));}catch{raw=gunzipSync(await fs.readFile(path.join(run,'marks.json.gz')));}
@@ -20,7 +20,7 @@ if(legacy)await setThreads(4,()=>import('../../src/media/sheet-par.mjs'));
 const sheet=legacy?createSheet({...makePaper(tape.w,tape.h,{seed:9,scale:1,toothScale:.2,fibres:.5,tooth:.5,proudBlur:1}),mmPerCell:25.4/60},tape.pigments):tapeSheet(tape);
 let execute=runTape;
 if(legacy){
- const base=new URL('../../docs/lab/worker/live-tape.js',import.meta.url);
+ const base=new URL('../../demos/lab/worker/live-tape.js',import.meta.url);
  const source=execFileSync('git',['show','9ee54395c0fc:docs/lab/worker/live-tape.js'],{encoding:'utf8'}).replace(/from '([^']+)'/g,(_,p)=>`from '${new URL(p,base).href}'`);
  execute=(await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))).runTape;
 }

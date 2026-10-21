@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {runTape,SHEET_FIELDS} from '../../docs/lab/worker/live-tape.js';
-import {encodeState,decodeState} from '../../docs/lab/worker/history.js';
-import {makePaper} from '../../docs/lab/media/paper.js';
-import {createSheet,step,DEFAULTS} from '../../docs/lab/media/sheet.js';
-import {PIGMENTS} from '../../docs/lab/media/pigments.js';
+import {runTape,SHEET_FIELDS} from '../../demos/lab/worker/live-tape.js';
+import {encodeState,decodeState} from '../../demos/lab/worker/history.js';
+import {makePaper} from '../../demos/lab/media/paper.js';
+import {createSheet,step,DEFAULTS} from '../../demos/lab/media/sheet.js';
+import {PIGMENTS} from '../../demos/lab/media/pigments.js';
 const tape={w:64,h:48,scale:10,strokeCount:5,pigments:[PIGMENTS[5]],brushes:[0],pens:[0],brushOpts:[{radius:3,seed:17,capacity:.25}],penOpts:[{reservoir:8,reach:2}],marks:[
  {k:'c',r:[0,16*64,17*64,31*64]},
  {k:'r',m:Array.from({length:64*48},(_,i)=>i%64===31?1:0)},
@@ -38,7 +38,7 @@ test('a scaled dry brush samples whole paper cells even with fractional stiffnes
  assert.ok([...sheet.P,...sheet.G,...sheet.D].some(a=>a.some(v=>v>0)),'the dry brush still lays real pigment');
 });
 test('shipped seek points contain finite physical states at the advertised stroke, with previews',async()=>{
- const fs=await import('node:fs/promises'),{gunzipSync}=await import('node:zlib'),root=new URL('../../docs/lab/',import.meta.url);
+ const fs=await import('node:fs/promises'),{gunzipSync}=await import('node:zlib'),root=new URL('../../demos/lab/',import.meta.url);
  const manifest=JSON.parse(await fs.readFile(new URL('examples/recorded.json',root)));
  for(const ex of manifest.examples)for(const [limit,stops]of Object.entries(ex.checkpoints)){
   const recording=JSON.parse(gunzipSync(await fs.readFile(new URL(ex.live[limit],root))));

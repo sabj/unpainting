@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Builds the two README figures from one painting's film: a folder of saved frames f000.webp, f001.webp, ... and
-// final.webp, as tools/lab/build-examples.mjs writes them to docs/lab/examples/<id>/.
+// final.webp, as tools/lab/build-examples.mjs writes them to demos/lab/examples/<id>/.
 //   hero.webp             animated: the target on the left; on the right the finished painting runs back to the first
 //                         drawn frame, holds, and runs forward again (ping-pong, looping)
 //   unpainting-steps.webp a 3x3 grid of nine saved frames, from the finished painting back to the first frame
 // Every tile is a frame the painter saved while it painted. Nothing is drawn or blended here.
 //
 //   node tools/readme/hero.mjs            (reads film, target, first and steps from tools/readme/hero.json)
-//   node tools/readme/hero.mjs --film docs/lab/examples/<id> --target docs/lab/examples/<id>.webp [--out docs/img]
+//   node tools/readme/hero.mjs --film demos/lab/examples/<id> --target demos/lab/examples/<id>.webp [--out docs/img]
 //     [--first f001.webp] [--steps steps.json]
 // --first is the frame the animation stops at (the drawing, or the first wash). --steps is a JSON list of nine
 // [file, caption] pairs, finished first; without it the nine frames are evenly spaced and captioned by number.

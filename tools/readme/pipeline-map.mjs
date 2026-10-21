@@ -10,7 +10,7 @@
 //           (the first "paper" frame), its reserved lights (the frisket, laid over the run's
 //           source.jpg; see tapeReserve), and its drawing (the last "pen" or "prep" frame before any wash).
 // --fonts   a folder with eb-garamond-normal.woff2 and eb-garamond-normal-600.woff2 for the titles (default
-//           docs/lab/fonts, which has only the regular face; samjackson.org's site/fonts has both).
+//           demos/lab/fonts, which has only the regular face; samjackson.org's site/fonts has both).
 // --playwright  a folder whose node_modules holds playwright, when this repository has none installed.
 //
 // Only resizing, cropping and the reserve overlay are applied. No painting frame is recoloured or generated.
@@ -172,7 +172,7 @@ try {
     paper: url(frames.paper), reserve: url(reserveFile), pen: url(frames.pen), reserveH, paperTone,
   };
   const page = path.join(tmp, 'map.html');
-  const fontDir = path.resolve(flag('fonts') ?? path.join(ROOT, 'docs/lab/fonts'));
+  const fontDir = path.resolve(flag('fonts') ?? path.join(ROOT, 'demos/lab/fonts'));
   need(path.join(fontDir, 'eb-garamond-normal.woff2'), 'font');
   const bold = fs.existsSync(path.join(fontDir, 'eb-garamond-normal-600.woff2'));
   if (!bold) console.warn(`${fontDir} has no eb-garamond-normal-600.woff2: the titles fall back to a synthesised bold`);

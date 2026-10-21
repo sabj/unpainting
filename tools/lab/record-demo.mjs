@@ -8,7 +8,7 @@
 // again without painting it. --rewind N, after the hold on the finished picture, plays every Nth frame backwards to
 // the blank paper (N times as fast), and the loop starts again; 0 turns it off. If the image is over --maxmb, the
 // rewind takes every (N+1)th frame before the quality drops.
-// It serves docs/ itself and drives the lab through its worker messages (the same ones a pointer sends). Each frame is
+// It serves demos/ itself and drives the lab through its worker messages (the same ones a pointer sends). Each frame is
 // the sheet's canvas at one screen pixel per cell, so an 8 x 6 inch sheet at 240 dpi gives 1920 px with no scaling.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,14 +25,14 @@ if (!(WIDTH >= 200 && WIDTH <= 4000) || ![60, 90, 120, 150, 200, 240, 300].inclu
   throw new Error('usage: --width 200..4000, --dpi 60|90|120|150|200|240|300, --maxmb above 0, --physics webgpu|cpu, --rewind 0 or more');
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg' };
-const DOCS = path.join(ROOT, 'docs');
+const DEMOS = path.join(ROOT, 'demos');
 const ORIGIN = 'https://paint-lab.invalid';
 async function serve(context) {
   await context.route(`${ORIGIN}/**`, async route => {
     let rel = decodeURIComponent(new URL(route.request().url()).pathname);
     if (rel.endsWith('/')) rel += 'index.html';
-    const file = path.resolve(DOCS, '.' + rel);
-    if (!file.startsWith(DOCS + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    const file = path.resolve(DEMOS, '.' + rel);
+    if (!file.startsWith(DEMOS + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       await route.fulfill({ status: 404, body: '' }); return;
     }
     await route.fulfill({ path: file, contentType: TYPES[path.extname(file)] ?? 'application/octet-stream' });

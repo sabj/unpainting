@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Copy Paint Lab's example pictures into the GitHub Pages folder: a target (at most 720 px on its long side) and a
-// thumbnail for each entry of tools/lab/examples.json, and docs/lab/examples/examples.json with each credit line taken
+// thumbnail for each entry of tools/lab/examples.json, and demos/lab/examples/examples.json with each credit line taken
 // from examples/SOURCES.md. With the painter's runs present (tools/lab/paint-examples.sh writes them to
 // work/paint-lab/<id>/), each example also gets its film: the painter's frames as WebP, the finished painting, and the
 // stroke count from the painter's mark tape. Run from the repository root:
@@ -10,7 +10,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
-const OUT = path.join(ROOT, 'docs/lab/examples');
+const OUT = path.join(ROOT, 'demos/lab/examples');
 const TARGET_PX = 720, THUMB_PX = 240, FILM_PX = 720, FILM_FRAMES = 80, RUNS = path.join(ROOT, 'work/paint-lab');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/lab/examples.json'), 'utf8'));

@@ -7,8 +7,8 @@ This file lists third-party code in this repository, the dependencies it install
 ### EB Garamond (font)
 
 - Copyright 2017 The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12)
-- Licence: SIL Open Font License 1.1. The full text is in `docs/lab/fonts/OFL.txt`.
-- Files: `docs/lab/fonts/eb-garamond-normal.woff2`, `docs/lab/fonts/eb-garamond-italic.woff2`, the typeface of Paint Lab (`docs/`).
+- Licence: SIL Open Font License 1.1. The full text is in `demos/lab/fonts/OFL.txt`.
+- Files: `demos/lab/fonts/eb-garamond-normal.woff2`, `demos/lab/fonts/eb-garamond-italic.woff2`, the typeface of Paint Lab (`demos/`).
 
 ## Dependencies
 
