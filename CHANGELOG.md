@@ -2,11 +2,24 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## 0.2.1 - unreleased
+## 0.2.1-rc.1 - unreleased
+
+Painter V101-dev, sim 102, judges J1. Release candidate 1. Ink and colour changes are opt-in flags. Defaults match 0.2.0. On the published Opus 5.5 V5 plans, neither moved J1 beyond judge noise. Ink v2 scored +0.05 and colour v2 +0.06 against the same build.
+
+### Ink
+
+These are off by default. Ink still needs `--outlinemedium ink`.
+
+- `--inkrecipe v2` turns on all of the following.
+- `--linesupport 5` keeps only the line parts the target shows.
+- `--linesmooth 1` smooths stepped traces.
+- `--inkwidthfloor 1` sets a minimum line width.
+- `--inkdarkcap 1` caps ink darkness at the target's own lines.
+- `--inkdamp 0.3` feathers the pen.
 
 ### Colour
 
-These are off by default in 0.2.1.
+These are off by default.
 
 - `--paintguard dE` checks a paint box forced with `--paints` or `washes.paints`. It acts when the box fits the target more than dE (CIEDE2000) worse than the painter's own pick. It then adds the own pick's paints, or takes the own pick and keeps the forced paints that still fit (`--paintguardmode add|merge|replace`). `run-card.json` records the decision.
 - `--techcal 1` charges passages in value band 4 and darker for what their technique lays on the sheet. In 0.2.0 the graded shadow glazes lay about half of their booked pigment. The swatch calibration measures one wide brush on a small square, which the sheet does not match. On Hills and South France at 540 px, delivery in the darkest 5% of cells rises from 0.80 to 0.98 and from 0.83 to 0.90.
