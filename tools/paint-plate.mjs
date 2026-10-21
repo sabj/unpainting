@@ -84,6 +84,7 @@ import { createBrush as createBrushRaw, dip as dipBrush, stroke as physicalStrok
 import { paperOf, pickPalette, paletteOptions } from '../src/crop/palettepick.mjs';
 import { widePalette, puddleLabels } from '../src/crop/palettewide.mjs';
 import { paintGuardOptions } from '../src/crop/paint-guard.mjs';
+import { deliveryByBand, deliveryNote } from '../src/paint/methods/delivery-report.mjs';
 import { channelDensity, unmix } from '../src/crop/pigments.mjs';
 import { accentCells, accentFamilies } from '../src/paint/methods/final-darks.mjs';
 import { blockInPigments, gradeSmoothPassages, dropMask } from '../src/crop/blockin.mjs';
@@ -3172,7 +3173,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     figureShare = subject / Math.max(1, total);
   }
   const FIGURE_SHAPE = FIG_MASK && figureShare >= num('figureshare', 0.25);
-  const TRACE_MASS = opt('trace', '0') !== '0' ? thickness(sheet)[layer.pigment].reduce((a, v) => a + v, 0) : null;
+  // --trace: every pigment's mass on the sheet before the passage, so a mixed passage is counted whole
+  const TRACE_MASS = opt('trace', '0') !== '0' ? thickness(sheet).map(t => t.reduce((a, v) => a + v, 0)) : null;
   // what this passage asks for, read off the source inside it (techniqueOf, above)
   let T = techniqueOf(sh);
   if (num('masswet',0)>0 && MASS_BUDGET?.owns(MASK, MB)) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
@@ -3627,9 +3629,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   }
   // --trace: also what the passage put on the sheet of its pigment against its booking.
   if (opt('trace', '0') !== '0' && TRACE_MASS != null) {
-    const th = thickness(sheet)[layer.pigment]; let now = 0; for (let i = 0; i < N2; i++) now += th[i];
-    let booked = 0; for (let i = 0; i < n; i++) if (MASK[i] && !(sh._skip && sh._skip[i])) booked += sh.amount * (sh.laidShare ?? 1);
-    console.log(`trace pass ${L + 1} laid ${((now - TRACE_MASS) / Math.max(1e-6, booked * SC * SC)).toFixed(2)} of its booked mass${sh.graded ? ' (graded)' : ''}`);
+    const now = thickness(sheet).reduce((a, t, j) => a + t.reduce((x, v) => x + v, 0) - TRACE_MASS[j], 0), mixed = sh.mix.reduce((a, v) => a + v, 0);
+    let booked = 0; for (let i = 0; i < n; i++) if (MASK[i] && !(sh._skip && sh._skip[i])) booked += mixed * (sh.laidShare ?? 1);
+    console.log(`trace pass ${L + 1} laid ${(now / Math.max(1e-6, booked * SC * SC)).toFixed(2)} of its booked mass${sh.graded ? ' (graded)' : ''}`);
   }
   // --texture 1: a pass of short dry-brush texture marks. Default 0; --washgrain alone does not enable it.
   // Off by default: many tiny random marks do not read as dry brush; texture comes from paper, settling and chosen passages.
@@ -3893,6 +3895,12 @@ for (const f of judged.flags) console.log(`  ! ${f}`);
   const th = thickness(sheet), rows = [];
   for (let j = 0; j < PIGS.length; j++) { let planned = 0, got = 0; for (let i = 0; i < n; i++) planned += expected[i * PIGS.length + j]; for (let i = 0; i < N2; i++) got += th[j][i]; rows.push(`${j} ${(got / Math.max(1e-6, planned * SC * SC)).toFixed(2)}`); }
   console.log(`pigment delivered over planned: ${rows.join(', ')}`);
+  // --deliveryreport 1: the same ratio split by how much paint the ledger booked per cell (delivery-by-band.json)
+  if (num('deliveryreport', 0) > 0) {
+    const report = deliveryByBand({ expected, held: th, n, P: PIGS.length, SC, w, W2 });
+    console.log(deliveryNote(report));
+    fs.writeFileSync(path.join(out, 'delivery-by-band.json'), JSON.stringify({ kind: 'sheet over ledger by booked amount; no target reads', pigments: PIGS.map(p => p.name ?? null), ...report }, null, 1));
+  }
 }
 if (marks.length) {
   // covered: of the cells the plan washes, the share holding at least half of it by tone. Both sides through the same
