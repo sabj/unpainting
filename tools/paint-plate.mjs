@@ -144,6 +144,9 @@ import { selectedDrawing, drawingWant } from '../src/paint/methods/drawing-file.
 import { prepareLineSource, planLinework } from '../src/paint/methods/linework-plan.mjs';
 import { planUniversalLinework } from '../src/paint/methods/linework-stage.mjs';
 import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-registration.mjs';
+import { holdInkLines } from '../src/paint/methods/ink-lines-file.mjs';
+import { inkCapOnScrap } from '../src/paint/methods/ink-scrap.mjs';
+import { inkRecipeArgs } from '../src/paint/methods/ink-recipe.mjs';
 import { chooseDrawingStages, drawingStageIntent } from '../src/paint/methods/drawing-stages-auto.mjs';
 import { eraseWeights, erasePrep } from '../src/paint/methods/pencil-erase.mjs';
 import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
@@ -316,6 +319,15 @@ if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','
 }
 const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
   ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
+// Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
+// --linesupport t (L*, default 0 off): keep only the parts of the opening and closing lines along which the target
+// shows a line at least t L* darker than beside it. --linesmooth mm (default 0 off): smooth stepped traces at mm,
+// keeping corners sharper than --linesmoothcorner degrees (default 50). Either writes <out>/ink-<stage>-lines.json and
+// points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too.
+// --inkrecipe v2: the ink settings above and below as one switch (src/paint/methods/ink-recipe.mjs); flags given win.
+argv.push(...inkRecipeArgs(opt('inkrecipe','none'), argv));
+const INK_LINES = !opt('resumestate','') && opt('drawing','first') !== 'none' && opt('image','')
+  ? await holdInkLines({ opt, num, argv, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';
 const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -1185,7 +1197,31 @@ const SUBJECT_STYLE=VALUE_CONFIG?.styleSelection?resolveStyle(VALUE_CONFIG.subje
 const STYLE_ON=()=>!!VALUE_PLAN?.style&&VALUE_PLAN.style.name!=='precise-watercolor';
 // The pen's ink load. --closingconc f dilutes the closing pen's ink (default 1): a closing accent restates an edge over
 // dried washes and should not come out darker than the darkest of them.
-const INKLOAD=()=>(STYLE_ON()?num('inkconc',8)*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))*(AREA_DRAW_STAGE==='closing'?num('closingconc',1):1);
+const INKLOAD_PLANNED=()=>(STYLE_ON()?num('inkconc',8)*VALUE_PLAN.style.ink:num('inkconc', VALUE_ENABLED ? 4 : 10))*(AREA_DRAW_STAGE==='closing'?num('closingconc',1):1);
+const INKLOAD=()=>INKLOAD_PLANNED()*inkDarkCap(AREA_DRAW_STAGE);
+// --inkwidthfloor f (default 0 off): no ink line is thinner than f target pixels on the sheet (the nib's widest contact
+// rises to it too). --inkdamp d (0..1, default 0): the pen finds the paper at least d damp, so the line feathers a
+// little, as on a sheet not yet quite dry (src/media/pen.mjs).
+const INK_WIDTH_FLOOR_MM=num('inkwidthfloor',0)*(INK_LINES?.pixelMm??0), INK_DAMP=num('inkdamp',0);
+if(!(INK_DAMP>=0&&INK_DAMP<=1))throw Error('--inkdamp: a dampness from 0 to 1');
+if(num('inkwidthfloor',0)>0&&!INK_LINES)console.log('ink width floor: no target measured (no --image or --drawing none), so no floor');
+// --inkdarkcap c (default 0 off): before each pen stage, a test line on a scrap of the same paper sets the ink load so
+// the pen's line on blank paper is c times as dark (in absorbance) as the target's own lines are against what is beside
+// them (src/paint/methods/ink-scrap.mjs). It only ever thins the ink. Measured on the stage's line file; a stage with
+// no file keeps its load.
+const INK_DARK_CAPS={};
+function inkDarkCap(stage){
+ const c=num('inkdarkcap',0);if(!(c>0))return 1;
+ if(INK_DARK_CAPS[stage])return INK_DARK_CAPS[stage].factor;
+ const A=INK_LINES?.[stage]?.stats?.absorbance;
+ if(!(A>0)){INK_DARK_CAPS[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark cap, ${stage}: no measured target lines, load unchanged`);return 1;}
+ const mmPerCell=(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,p=INK_PROFILE,widthMm=Math.max(INK_WIDTH_FLOOR_MM,p.widthMm[0]+(p.widthMm[1]-p.widthMm[0])*.5**p.pressureExponent);
+ const r=inkCapOnScrap({targetAbsorbance:A,cap:c,conc:INKLOAD_PLANNED(),pigment:INK,mmPerCell,widthMm,pen:{damp:INK_DAMP},paperOpts:PAPER_OPTS});
+ INK_DARK_CAPS[stage]={...r,target:A,widthMm,load:INKLOAD_PLANNED()};
+ console.log(`ink dark cap, ${stage}: target lines ${A.toFixed(2)} absorbance against what is beside them; a ${widthMm.toFixed(2)} mm scrap line at load ${INKLOAD_PLANNED().toFixed(2)} reads ${r.before.toFixed(2)}, so the load is scaled by ${r.factor.toFixed(3)} (scrap ${r.after.toFixed(2)})`);
+ fs.writeFileSync(path.join(out,'ink-dark-cap.json'),JSON.stringify(INK_DARK_CAPS,null,1)+'\n');
+ return r.factor;
+}
 const STYLE_INK_DEFAULT=SUBJECT_STYLE?.pigment==='black'?'black-ink':'sepia-ink';
 const INK_PROFILE=materialProfile(opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT));
 const GRAPHITE_PROFILE=materialProfile(opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'));
@@ -1480,7 +1516,7 @@ const drawingCapsFor = (stage, graphite = false) => {
 };
 const penDraw = (sh,gs,want,w,h,o) => {
  const stage=AREA_DRAW_STAGE, graphite=o.ink?.[GRAPHITE_AT]>0;
-  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
+  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
