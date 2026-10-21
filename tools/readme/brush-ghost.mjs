@@ -1,6 +1,6 @@
 // The brush ghost for README films: the outline of the brush that is laying a stroke, drawn at its place along the
 // stroke's recorded path, with a faint trail of the path behind it. Everything comes from the painter's mark tape
-// (marks.json): nothing is inferred from the pictures. The outline matches the Mona player on samjackson.org: a white
+// (marks.json): nothing is inferred from the pictures. The outline matches the Mona player in the Part 1 post: a white
 // 3 px line under a 1 px #863d2c line.
 import fs from 'node:fs';
 import zlib from 'node:zlib';

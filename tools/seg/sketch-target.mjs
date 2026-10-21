@@ -35,7 +35,7 @@ export const SKETCH_PROMPT_VERSION = 'v1';
 
 // The image endpoint's aspect ratios; the one nearest the target's is asked for, so the sketch can register by scale.
 const ASPECTS = Object.freeze({ '1:1': 1, '3:2': 1.5, '2:3': 2 / 3 });
-const PROVIDER = Object.freeze({ ignore: ['Hyperbolic'], data_collection: 'deny', zdr: true });
+const PROVIDER = Object.freeze({ data_collection: 'deny', zdr: true });
 
 /** The supported aspect ratio nearest w / h, on a log scale. */
 export function nearestAspect(w, h) {

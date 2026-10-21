@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Run committed archives sequentially on one sweep box and prune frame payloads.
+"""Run committed archives one after another on one machine and prune frame payloads.
 
-Config: {root, nodeModules, inputs, width, runs:[{name, archive, commit, args:[]}]}.
-Inputs is a sweep job's in/ directory, containing target, plan.json and segments/.
+Config: {root, nodeModules, inputs, image, width, runs:[{name, archive, commit, args:[]}]}.
+Inputs is a folder holding the target, plan.json and optional segments/.
 """
 import hashlib
 import json
@@ -37,7 +37,7 @@ for run in cfg['runs']:
     started = time.perf_counter()
     with (out.parent / 'paint.log').open('w') as log:
         result = subprocess.run(args, cwd=work, stdout=log, stderr=subprocess.STDOUT,
-                                env=dict(os.environ, DAWN_FLAGS='backend=vulkan', PAINTER_TARGET_GUARD='strict'))
+                                env=dict(os.environ, PAINTER_TARGET_GUARD='strict'))
     seconds = time.perf_counter() - started
     cpu_end = resource.getrusage(resource.RUSAGE_CHILDREN)
     frames = list(out.glob('f[0-9]*.jpg'))

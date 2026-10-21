@@ -7,9 +7,9 @@
 //   --segments sam|kmeans|off  sam (default): Segment Anything must run; a run without it fails, it never falls back
 //                              to k-means. kmeans: Lab clusters only. off: no segments, and the log says so.
 //   --segpython <path>         a python with numpy, opencv, torch and segment_anything; else $PAINTER_SEG_PYTHON,
-//                              else the repo's .venv-seg, else ~/painter-strategy/.venv-seg, else the repo's .venv
+//                              else the repo's .venv-seg, else the repo's .venv
 //   --samcheckpoint <path>     the SAM vit_b checkpoint; else $PAINTER_SAM_CHECKPOINT, else
-//                              ~/painter-models/sam_vit_b_01ec64.pth, else work/models/sam_vit_b_01ec64.pth
+//                              work/models/sam_vit_b_01ec64.pth
 //   --segcache <dir>           where the maps are kept (default work/segments/by-hash)
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -30,7 +30,7 @@ const sha = buf => crypto.createHash('sha256').update(buf).digest('hex');
 const firstExisting = paths => paths.find(p => p && fs.existsSync(p)) ?? null;
 
 /** The python that runs segments.py: an explicit choice must exist; otherwise the first known venv that does. */
-export function resolveSegPython({ given = '', env = process.env, root, home = os.homedir() }) {
+export function resolveSegPython({ given = '', env = process.env, root }) {
   if (given) {
     if (!fs.existsSync(given)) throw new Error(`segments: --segpython ${given} does not exist`);
     return given;
@@ -41,13 +41,12 @@ export function resolveSegPython({ given = '', env = process.env, root, home = o
   }
   return firstExisting([
     path.join(root, '.venv-seg', 'bin', 'python'),
-    path.join(home, 'painter-strategy', '.venv-seg', 'bin', 'python'),
     path.join(root, '.venv', 'bin', 'python'),
   ]);
 }
 
 /** The SAM checkpoint: an explicit choice must exist; otherwise the first known place that holds one. */
-export function resolveSamCheckpoint({ given = '', env = process.env, root, home = os.homedir() }) {
+export function resolveSamCheckpoint({ given = '', env = process.env, root }) {
   if (given) {
     if (!fs.existsSync(given)) throw new Error(`segments: --samcheckpoint ${given} does not exist`);
     return given;
@@ -56,7 +55,7 @@ export function resolveSamCheckpoint({ given = '', env = process.env, root, home
     if (!fs.existsSync(env.PAINTER_SAM_CHECKPOINT)) throw new Error(`segments: PAINTER_SAM_CHECKPOINT ${env.PAINTER_SAM_CHECKPOINT} does not exist`);
     return env.PAINTER_SAM_CHECKPOINT;
   }
-  return firstExisting([path.join(home, 'painter-models', CHECKPOINT), path.join(root, 'work', 'models', CHECKPOINT)]);
+  return firstExisting([path.join(root, 'work', 'models', CHECKPOINT)]);
 }
 
 /** The cache name: the target's bytes, the backend and the segmentation code, so a changed script makes a new map. */
@@ -100,13 +99,13 @@ function runSegments({ python, image, backend, checkpoint, root, stem }) {
  * null under --segments off, else { stem, backend, regions, foreground, cached, seconds }. Throws when the backend
  * asked for cannot run.
  */
-export function prepareSegments({ image, root, out = null, opt, log, env = process.env, home = os.homedir() }) {
+export function prepareSegments({ image, root, out = null, opt, log, env = process.env }) {
   const backend = opt('segments', 'sam');
   if (!BACKENDS.includes(backend)) throw new Error(`--segments: one of ${BACKENDS.join(', ')}, not ${backend}`);
   if (backend === 'off') { log('segments: off (--segments off); every segment-aware step cuts by colour and value alone'); return null; }
-  const python = resolveSegPython({ given: opt('segpython', ''), env, root, home });
+  const python = resolveSegPython({ given: opt('segpython', ''), env, root });
   if (!python) throw new Error('segments: no python for tools/seg/segments.py; pass --segpython or set PAINTER_SEG_PYTHON (or --segments off)');
-  const checkpoint = backend === 'sam' ? resolveSamCheckpoint({ given: opt('samcheckpoint', ''), env, root, home }) : null;
+  const checkpoint = backend === 'sam' ? resolveSamCheckpoint({ given: opt('samcheckpoint', ''), env, root }) : null;
   if (backend === 'sam' && !checkpoint) {
     throw new Error(`segments: SAM is required and no ${CHECKPOINT} was found; pass --samcheckpoint or set PAINTER_SAM_CHECKPOINT (or --segments kmeans)`);
   }

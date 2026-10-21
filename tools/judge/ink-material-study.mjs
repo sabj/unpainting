@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Executed material controls at the study's physical sheet size. Render on the sweep service.
+// Executed material controls at the study's physical sheet size. Runs on the GPU; docs/CLOUD.md covers renting one.
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';

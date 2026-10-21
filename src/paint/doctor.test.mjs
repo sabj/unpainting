@@ -21,7 +21,6 @@ test("runDoctor fails loudly on dirty git, fallback python or low disk", () => {
   const report = runDoctor({
     root: "/repo",
     env: {},
-    home: "/nonexistent",
     exists: () => false,
     state: { commit: "deadbeef1234", git: true, dirty: true, tracked: ["tools/paint-plate.mjs"], untracked: [], diffSha256: "abc" },
     statfs: () => ({ bavail: 10 * 1024, bsize: 1024 ** 2 }),
