@@ -3,7 +3,7 @@
 // bands by their booked total, so a shortfall in the darks shows apart from the lights. Ledger and sheet only.
 
 /** Band edges as shares of the painted cells, lightest first: the lightest half, then 30%, 15% and the darkest 5%. */
-export const BAND_SHARES = Object.freeze([0.5, 0.8, 0.95, 1]);
+const BAND_SHARES = Object.freeze([0.5, 0.8, 0.95, 1]);
 
 /**
  * @param {{ expected: Float32Array, held: Float32Array[], n: number, P: number, SC?: number, w: number, W2?: number,
