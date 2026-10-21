@@ -3,6 +3,7 @@
 // cuts the named feature crops (bench/ink-heavy/features.json) from drawing-opening.png, and asks a vision model about
 // each crop alone: first what it is, with no hint, then which listed parts it can see (bench/ink-heavy/legibility.json).
 //   node tools/judge/ink-legibility.mjs --label <name> [--only <subject,..>] [--render 1] [--vision 1] [--note <text>]
+//   --render 0 --runs <label> --from <file>   cut crops from another label's renders, or another file of the run
 // Output under work/ink-legibility/<label>/: runs/<subject>/ (the render), crops/<subject>__<crop>/crop.png (the crop
 // alone, in a folder of its own), pairs/<subject>__<crop>.jpg (source | drawing), verdicts.json. --note adds a row to
 // work/ink-legibility/LOG.md. The vision check runs the agy CLI (--agy or AGY_BIN names it when it is not on PATH); the render needs PAINTER_SEG_PYTHON and
@@ -21,22 +22,23 @@ const AGY = opt('agy', process.env.AGY_BIN || 'agy'), MODEL = opt('model', 'gemi
 const spec = JSON.parse(fs.readFileSync(path.join(root, 'bench/ink-heavy/legibility.json'), 'utf8')).subjects;
 const boxes = JSON.parse(fs.readFileSync(path.join(root, 'bench/ink-heavy/features.json'), 'utf8'));
 const only = opt('only', '') ? opt('only').split(',') : Object.keys(spec);
-const base = path.join(root, 'work/ink-legibility', label);
-for (const d of ['runs', 'crops', 'pairs']) fs.mkdirSync(path.join(base, d), { recursive: true });
+const base = path.join(root, 'work/ink-legibility', label), FROM = opt('from', 'drawing-opening.png'), RUNS = path.join(root, 'work/ink-legibility', opt('runs', label), 'runs');
+for (const d of ['crops', 'pairs']) fs.mkdirSync(path.join(base, d), { recursive: true });
+fs.mkdirSync(RUNS, { recursive: true });
 
 async function render(name) {
-  const out = path.join(base, 'runs', name);
-  if (fs.existsSync(path.join(out, 'drawing-opening.png')) && opt('render', '1') === '0') return out;
+  const out = path.join(RUNS, name);
+  if (opt('render', '1') === '0') { if (!fs.existsSync(path.join(out, FROM))) throw new Error(`no ${FROM} in ${out}`); return out; }
   fs.rmSync(out, { recursive: true, force: true });
   const args = ['tools/paint-plate.mjs', '--image', spec[name].image, '--width', '540', '--inkrecipe', 'wash', '--inkres', '3', '--drawingonly', '1', '--seed', '0', '--video', '0', '--out', out];
   const r = spawnSync('node', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
-  fs.writeFileSync(path.join(base, 'runs', `${name}.log`), r.stdout + r.stderr);
-  if (r.status !== 0 || !fs.existsSync(path.join(out, 'drawing-opening.png'))) throw new Error(`render of ${name} failed; see ${path.join(base, 'runs', name + '.log')}`);
+  fs.writeFileSync(path.join(RUNS, `${name}.log`), r.stdout + r.stderr);
+  if (r.status !== 0 || !fs.existsSync(path.join(out, 'drawing-opening.png'))) throw new Error(`render of ${name} failed; see ${path.join(RUNS, name + '.log')}`);
   return out;
 }
 
 async function cut(name, out) {
-  const drawing = path.join(out, 'drawing-opening.png'), { width: w, height: h } = await sharp(drawing).metadata();
+  const drawing = path.join(out, FROM), { width: w, height: h } = await sharp(drawing).metadata();
   const flat = f => sharp(f).flatten({ background: '#fff' }).removeAlpha();
   const srcMeta = await sharp(path.join(root, spec[name].image)).metadata();
   const key = path.basename(spec[name].image).replace(/\.[a-z]+$/i, '');
@@ -83,8 +85,8 @@ const verdicts = {}, jobs = [];
 for (const name of only) {
   if (!spec[name]) throw new Error(`no subject ${name}`);
   const out = await render(name);
-  const { width } = await sharp(path.join(out, 'drawing-opening.png')).metadata();
-  console.log(`${name}: drawing-opening.png ${width} px wide`);
+  const { width } = await sharp(path.join(out, FROM)).metadata();
+  console.log(`${name}: ${FROM} ${width} px wide`);
   for (const m of await cut(name, out)) jobs.push({ name, ...m });
 }
 if (opt('vision', '1') === '1') {
