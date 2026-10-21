@@ -2428,32 +2428,79 @@ test('scattered and gregarious finds: at most 3 members, none overlapping the ma
 });
 
 
-test('paint playback tool: each stroke maps to its instrument, tinted by its pigment',async()=>{
- const m=await import('./mushrooms.mjs');
- assert.equal(m.nativeToolFor({phase:'ink',role:'cap-contour'}),'pen');
- assert.equal(m.nativeToolFor({phase:'ink',role:'gills'}),'pen');
- assert.equal(m.nativeToolFor({phase:'ink',role:'cap-outline-2'}),'pencil');
- assert.equal(m.nativeToolFor({phase:'wash',role:'cap'}),'brush');
- assert.equal(m.nativeToolFor({phase:'glaze',role:'cap-glaze'}),'brush');
- assert.equal(m.nativeToolFor({phase:'accent',role:'pit-shadow'}),'brush');
- assert.match(m.pigmentSwatch({alizarin:.6,sienna:.4}),/^#[0-9a-f]{6}$/);
- assert.notEqual(m.pigmentSwatch({alizarin:1}),m.pigmentSwatch({ochre:1}));
- assert.equal(m.pigmentSwatch({}),m.TOOL_OVERLAY.ink);
- const pts=Array.from({length:100},(_,i)=>[i*2,50+Math.sin(i/9)*20]);
- const s=m.nativeToolStroke({id:'w3',phase:'wash',role:'cap',points:pts,width:18,palette:{ochre:1},progress:.4});
- assert.equal(s.kind,'brush');assert.ok(s.path.length<=m.TOOL_OVERLAY.pathPoints+1);assert.deepEqual(s.path.at(-1),[198,+pts.at(-1)[1].toFixed(1)]);assert.equal(s.progress,.4);
- const mid=m.toolPathPoint([[0,0],[10,0],[10,10]],.5);assert.ok(Math.abs(mid.x-10)<1e-9&&Math.abs(mid.y)<1e-9);
+test('Paint playback pacing stays inside its ink and wash bounds', async () => {
+  const {nativePlaybackPacing,PLAYBACK}=await import('./mushrooms.mjs');
+  assert.deepEqual(nativePlaybackPacing({}),{inkMs:PLAYBACK.ink.minMs,washMs:PLAYBACK.wash.minMs});
+  assert.deepEqual(nativePlaybackPacing({inkLength:1e9,washMarks:1e6}),{inkMs:PLAYBACK.ink.maxMs,washMs:PLAYBACK.wash.maxMs});
+  const mid=nativePlaybackPacing({inkLength:12500,washMarks:15});
+  assert.equal(mid.inkMs,5000);assert.equal(mid.washMs,6000);
+  assert.ok(PLAYBACK.ink.maxMs+PLAYBACK.wash.maxMs<=25000,'longest Paint plays in about 25 s of pacing');
 });
 
-test('paint playback tool: shown only while painting, follows strokes, fades at completion, hides on pause',async()=>{
- const m=await import('./mushrooms.mjs'),st=new m.ToolOverlayState();
- const stroke=(id,progress)=>({id,kind:'pen',path:[[0,0],[100,0]],width:2,colour:'#000000',progress});
- assert.equal(st.visible(0),false);st.update(stroke('a',0),0);assert.equal(st.visible(0),false,'no tool before playback starts');
- st.start(0);assert.equal(st.visible(0),false,'nothing to show until a stroke arrives');
- st.update(stroke('a',0),0);assert.equal(st.visible(1),true);
- const p0=st.pose(16);st.update(stroke('a',.5),100);const p1=st.pose(200);assert.ok(p1.x>p0.x,'moves along the stroke');assert.equal(p1.kind,'pen');
- st.update({...stroke('b',0),path:[[0,500],[50,500]]},300);const lifted=st.pose(316);assert.ok(lifted.lift>0,'lifts while travelling to the next stroke');
- for(let t=330;t<1200;t+=16)st.pose(t);assert.ok(st.pose(1216).lift<.05,'lands on the new stroke');
- st.finish(1300);assert.ok(st.alpha(1300+m.TOOL_OVERLAY.fadeMs/2)>0&&st.alpha(1300+m.TOOL_OVERLAY.fadeMs/2)<1,'fades out');assert.equal(st.visible(1300+m.TOOL_OVERLAY.fadeMs+1),false);
- st.start(2000);st.update(stroke('c',.2),2000);assert.equal(st.visible(2001),true);st.hide();assert.equal(st.visible(2002),false,'pause hides it');
+test('Paint cursor maps ink marks to Paint Lab pen and pencil states', async () => {
+  const {nativeInkCursor,cursorSizeForWidthMm,PLAYBACK,PLAYBACK_CURSOR}=await import('./mushrooms.mjs');
+  const mark={role:'cap-contour',width:2,points:[[100,200],[300,200],[300,400]]};
+  const half=nativeInkCursor(mark,.5);
+  assert.equal(half.tool,'pen');assert.deepEqual([half.x,half.y],[300,200]);assert.deepEqual([half.hx,half.hy],[1,0]);
+  const late=nativeInkCursor(mark,.75);assert.deepEqual([late.x,late.y,late.hx,late.hy],[300,300,0,1]);
+  assert.deepEqual([nativeInkCursor(mark,0).x,nativeInkCursor(mark,1).y],[100,400]);
+  assert.equal(late.w,1200);assert.equal(late.dpi,PLAYBACK_CURSOR.dpi);assert.ok(Math.abs(1200/late.dpi*25.4-PLAYBACK.plateMm)<1e-9);
+  assert.equal(nativeInkCursor({...mark,role:'construction'},.5).tool,'pencil');
+  assert.equal(nativeInkCursor({points:[]},.5),null);
+  // Paint Lab's nib and point sums (ui/cursor.js) turn the size back into the mark's width.
+  const nibMm=s=>((0.6+(s/2/25.4)*60*0.08)/60)*25.4,pointMm=s=>((0.5+(s/2/25.4)*60*0.05)*2/60)*25.4;
+  for(const mm of [.5,.8,1.5]){assert.ok(Math.abs(nibMm(cursorSizeForWidthMm('pen',mm))-mm)<1e-9);assert.ok(Math.abs(pointMm(cursorSizeForWidthMm('pencil',mm))-mm)<1e-9);}
+  assert.ok(Math.abs(nibMm(half.sizeMm)-2*PLAYBACK.plateMm/1200)<1e-9,'nib is the mark width on the plate');
+});
+
+test('Paint cursor maps the brush in hand to Paint Lab brush state, and fades wide brushes', async () => {
+  const {nativeBrushCursor,pigmentSwatch,paintCursorOpacity,PLAYBACK,PLAYBACK_CURSOR}=await import('./mushrooms.mjs');
+  const {createBrush,dip}=await import('../lab/media/brush.js');
+  const brush=createBrush({radius:6,bristles:20,capacity:20});dip(brush,{water:.7,conc:[.15]});
+  const c=nativeBrushCursor(brush,{x:150,y:60,p:.6},{x:0,y:1},{sheetW:300,palette:{ochre:1}});
+  assert.equal(c.tool,'round');assert.equal(c.model,'row');assert.equal(c.flat,false);
+  assert.deepEqual([c.x,c.y,c.hx,c.hy,c.p],[600,240,0,1,.6]);
+  assert.equal(c.w,PLAYBACK_CURSOR.w);assert.ok(Math.abs(c.sizeMm-12*PLAYBACK.plateMm/300)<1e-9);
+  assert.ok(Math.abs((c.sizeMm/2/25.4)*c.dpi-6*1200/300)<1e-9,'cursor radius is the brush radius in plate units');
+  assert.equal(c.sat.length,brush.hairs.length);assert.ok(c.sat.every(s=>s>=0&&s<=1.0001));
+  assert.equal(c.colour,pigmentSwatch({ochre:1}));assert.equal(pigmentSwatch({}),PLAYBACK.inkColour);
+  assert.equal(nativeBrushCursor(null,{x:0,y:0},null,{sheetW:300}),null);
+  assert.equal(paintCursorOpacity(0),1);assert.equal(paintCursorOpacity(10),1);
+  assert.ok(paintCursorOpacity(48)<paintCursorOpacity(20));assert.equal(paintCursorOpacity(1000),.35);
+});
+
+test('Paint playback streams partial strokes: the sheet changes segment by segment', async () => {
+  const {simulateNativePassages,nativeBrushCursor}=await import('./mushrooms.mjs');
+  const {totals}=await import('../lab/media/sheet.js');
+  const seen=[];
+  const result=await simulateNativePassages(tinyNativeStudy(),{width:48,seed:17,yieldWork:async()=>{},onBrush:({brush,segment,lifted,palette,sheet})=>{
+    seen.push({lifted,len:segment.length,pig:totals(sheet).pig.reduce((a,b)=>a+b,0),cursor:nativeBrushCursor(brush,segment.at(-1),{x:1,y:0},{sheetW:sheet.w,palette})});
+  }});
+  assert.equal(result.complete,true);
+  const strokes=seen.filter(s=>s.lifted).length;
+  assert.equal(strokes,result.strokes);assert.ok(seen.length>2*strokes,'each stroke reaches the page in several segments');
+  assert.ok(seen.every(s=>s.len>0&&s.cursor&&s.cursor.tool==='round'));
+  // Pigment goes down progressively within the first stroke, before it lifts.
+  const first=seen.slice(0,seen.findIndex(s=>s.lifted)+1);
+  assert.ok(first.length>2);assert.ok(first[0].pig>0&&first[0].pig<first.at(-1).pig);
+});
+
+test('Paint playback patches compose the same fields as the whole sheet', async () => {
+  const {simulateNativePassages,nativeWindowLayers,nativeOpticalFields,nativeReconstructFields,nativePatchRect}=await import('./mushrooms.mjs');
+  let checked=0;
+  await simulateNativePassages(tinyNativeStudy(),{width:48,seed:17,yieldWork:async()=>{},onBrush:({sheet})=>{
+    if(checked++!==3)return;
+    const n=sheet.n??sheet.w*sheet.h,whole=nativeOpticalFields([...sheet.layers,sheet.pigments.map((_,k)=>Float32Array.from({length:n},(_,i)=>sheet.G[k][i]+sheet.D[k][i]+sheet.P[k][i]))],sheet.pigments,n);
+    const full=nativeReconstructFields(whole,sheet.w,sheet.h);
+    const win={x0:9,y0:7,x1:30,y1:25},ww=22,wh=19,part=nativeOpticalFields(nativeWindowLayers(sheet,win),sheet.pigments,ww*wh);
+    for(let y=0;y<wh;y++)for(let x=0;x<ww;x++)for(const key of ['R','B','T'])for(let c=0;c<3;c++)
+      assert.ok(Math.abs(part[key][(y*ww+x)*3+c]-whole[key][((win.y0+y)*sheet.w+win.x0+x)*3+c])<1e-6);
+    const recon=nativeReconstructFields(part,ww,wh);
+    for(let y=1;y<wh-1;y++)for(let x=1;x<ww-1;x++)for(const key of ['R','B','T'])for(let c=0;c<3;c++)
+      assert.ok(Math.abs(recon[key][(y*ww+x)*3+c]-full[key][((win.y0+y)*sheet.w+win.x0+x)*3+c])<1e-6,'window interior matches the whole sheet');
+  }});
+  assert.ok(checked>3);
+  assert.deepEqual(nativePatchRect({x0:0,y0:0,x1:9,y1:4},100,50,1200,600),{x:0,y:0,w:120,h:60});
+  assert.deepEqual(nativePatchRect({x0:95,y0:45,x1:120,y1:60},100,50,1200,600),{x:1140,y:540,w:60,h:60});
+  assert.deepEqual(nativePatchRect({x0:3,y0:2,x1:3,y1:2},7,5,10,10),{x:4,y:4,w:2,h:2});
 });

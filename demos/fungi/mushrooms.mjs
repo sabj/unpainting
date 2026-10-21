@@ -13,6 +13,7 @@ import { createBrush, dip, stroke } from '../lab/media/brush.js';
 import { layerRT, renderLayers, renderLayersCached } from '../lab/media/km.js';
 import { BY_KEY } from '../lab/media/pigments.js';
 import { createPen, dipPen, penStroke } from '../lab/media/pen.js';
+import { createCursor } from '../lab/ui/cursor.js';
 
 export const DRAW_DURATION_MS = 7800;
 
@@ -8517,104 +8518,75 @@ export function nativeGestureMaterial(passage,mark,gesture,{keys,scale,seed,stro
   return {brush,water,conc,points};
 }
 
-// Tool overlay (Paint playback). The worker reports the stroke it is laying
-// down; the page draws the instrument over the plate on its own layer.
-// Ink lines are a dip pen, pencilled guide lines a pencil, washes and glazes
-// a brush.
-export const TOOL_OVERLAY=Object.freeze({chaseMs:55,liftUnits:60,fadeMs:450,pathPoints:24,ink:'#2b241d'});
+// Paint playback (the Paint button): the plate is painted at an artist's
+// pace and streamed as it goes, ink lines growing from the nib and washes
+// spreading under the brush, with the Paint Lab's own brush, nib and pencil
+// cursor drawn from the real tool state. Load, Random, prepared plates and
+// morph landings keep the fast path. The finished plate is the same bytes.
+export const PLAYBACK=Object.freeze({frameMs:33,fullFrameMs:350,refreshMs:1000,ink:Object.freeze({perUnitMs:.4,minMs:4000,maxMs:6500}),wash:Object.freeze({perMarkMs:400,minMs:4500,maxMs:10000}),plateMm:240,inkColour:'#2b241d'});
+export function nativePlaybackPacing({inkLength=0,washMarks=0}={}){
+  const P=PLAYBACK;
+  return {inkMs:Math.round(clamp(inkLength*P.ink.perUnitMs,P.ink.minMs,P.ink.maxMs)),washMs:Math.round(clamp(washMarks*P.wash.perMarkMs,P.wash.minMs,P.wash.maxMs))};
+}
+// Paint Lab's cursor works in sheet pixels and millimetres; the plate is
+// 1200 units across a sheet PLAYBACK.plateMm wide.
+export const PLAYBACK_CURSOR=Object.freeze({w:1200,dpi:1200/(PLAYBACK.plateMm/25.4)});
+// Paint Lab's brush is 10 mm by default; a wider wash brush keeps its true
+// footprint but the preview fades with its size, so it never hides the wash.
+export function paintCursorOpacity(sizeMm){return clamp(Math.sqrt(12/Math.max(12,Number(sizeMm)||0)),.35,1);}
 export function nativeToolFor({phase,role=''}={}){
   if(phase==='ink')return /pencil|graphite|construction|guide|cap-outline/.test(role)?'pencil':'pen';
-  return 'brush';
+  return 'round';
 }
 // A pigment mix as one display colour: the palette swatches weighted by load.
 export function pigmentSwatch(palette){
   let r=0,g=0,b=0,w=0;
   for(const [key,amount] of Object.entries(palette??{})){const hex=BY_KEY[key]?.swatch;if(!hex||!(amount>0))continue;const n=parseInt(hex.slice(1),16);r+=(n>>16&255)*amount;g+=(n>>8&255)*amount;b+=(n&255)*amount;w+=amount;}
-  if(!w)return TOOL_OVERLAY.ink;
+  if(!w)return PLAYBACK.inkColour;
   const h=v=>Math.round(v/w).toString(16).padStart(2,'0');return `#${h(r)}${h(g)}${h(b)}`;
 }
-// The stroke as the overlay needs it: plate units, a few points, its width.
-export function nativeToolStroke({id,phase,role,points,width,palette,colour,progress=0}){
-  const n=points.length,k=Math.max(1,Math.ceil(n/TOOL_OVERLAY.pathPoints)),path=[];
-  for(let i=0;i<n;i+=k)path.push([+points[i][0].toFixed(1),+points[i][1].toFixed(1)]);
-  if(n&&(n-1)%k)path.push([+points[n-1][0].toFixed(1),+points[n-1][1].toFixed(1)]);
-  return {id,kind:nativeToolFor({phase,role}),path,width:+(width||1).toFixed(2),colour:colour??pigmentSwatch(palette),progress:clamp(progress)};
+// The nominal size that Paint Lab's pen (nib) or pencil (point) turns into a
+// mark of this width in millimetres (the inverse of its nibMm / pointMm).
+export function cursorSizeForWidthMm(tool,mm){
+  const MM=25.4,REF=60;
+  const size=tool==='pencil'?((mm/MM*REF)/2-.5)/(REF*.05)*2*MM:((mm/MM*REF)-.6)/(REF*.08)*2*MM;
+  return Math.max(0,size);
 }
-// Point and heading at a fraction of a polyline's length.
-export function toolPathPoint(path,t){
-  if(!path?.length)return {x:0,y:0,dx:1,dy:0};
-  if(path.length===1)return {x:path[0][0],y:path[0][1],dx:1,dy:0};
-  const seg=[];let total=0;for(let i=1;i<path.length;i++){const l=Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]);seg.push(l);total+=l;}
-  let target=clamp(t)*total;
-  for(let i=1;i<path.length;i++){const l=seg[i-1];if(target<=l||i===path.length-1){const f=l?clamp(target/l):0,a=path[i-1],b=path[i],dl=l||1;return {x:a[0]+(b[0]-a[0])*f,y:a[1]+(b[1]-a[1])*f,dx:(b[0]-a[0])/dl,dy:(b[1]-a[1])/dl};}target-=l;}
-  const a=path.at(-1);return {x:a[0],y:a[1],dx:1,dy:0};
+// Cursor state for an ink mark drawn to fraction f: where the nib is, its
+// heading and the mark's width, in Paint Lab's cursor terms.
+export function nativeInkCursor(mark,f){
+  const pts=mark?.points;if(!pts?.length)return null;
+  const tool=nativeToolFor({phase:'ink',role:mark.role??''}),n=pts.length,len=pathLength(pts),target=clamp(f)*len;
+  let at=pts[0],hx=1,hy=0,walked=0;
+  for(let i=1;i<n;i++){const a=pts[i-1],b=pts[i],l=Math.hypot(b[0]-a[0],b[1]-a[1]);if(l>0){hx=(b[0]-a[0])/l;hy=(b[1]-a[1])/l;}
+    if(walked+l>=target){const t=l?(target-walked)/l:0;at=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];break;}walked+=l;at=b;}
+  const mm=Math.max(.05,(mark.width??1))*PLAYBACK.plateMm/1200;
+  return {tool,x:at[0],y:at[1],hx,hy,w:PLAYBACK_CURSOR.w,dpi:PLAYBACK_CURSOR.dpi,sizeMm:cursorSizeForWidthMm(tool,mm)};
 }
-// Where the tool is, frame by frame: it chases the reported stroke point,
-// rises when it has far to travel (between strokes), and fades out once the
-// painting is complete. Pure state; the page draws it.
-// Instrument glyphs for the corner chip (the Paint Lab's own outlines).
-export const TOOL_GLYPHS=Object.freeze({
-  brush:'m14 11 5-7c1-2-1-3-2-1l-6 6m0 0 3 3-2 2-3-3zM9 12c-4-1-2 6-6 7 4 2 10-1 9-5',
-  pen:'m13 3 8 8-7 8-11 2L5 10zM3 21l8-8m2-6 4 4',
-  pencil:'m15 3 6 6-11 11-7 1 1-7zM4 14l6 6M13 5l6 6M7 17l9-9'});
-// Draw the instrument with its tip at (x, y) CSS px, heading (dx, dy), lifted
-// by `lift` (0 on the paper, 1 well above it), tip `tipPx` wide.
-export function drawToolGlyph(c,{x,y,dx,dy,lift=0,kind='brush',colour='#2b241d',tipPx=4,size=64,alpha=1}){
-  const n=Math.hypot(dx,dy)||1,ux=dx/n,uy=dy/n;
-  // The handle leans into the stroke's direction of travel and up off the page.
-  let ax=.6*ux+.4*.45,ay=.6*uy-.4*.9;const an=Math.hypot(ax,ay)||1;ax/=an;ay/=an;
-  const rise=lift*14,tx=x,ty=y-rise,L=size;
-  const halo=(w,colourLine)=>{c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=w+3;c.stroke();c.strokeStyle=colourLine;c.lineWidth=w;c.stroke();};
-  const line=(a,b,w,colourLine)=>{c.beginPath();c.moveTo(tx+ax*a,ty+ay*a);c.lineTo(tx+ax*b,ty+ay*b);c.lineCap='round';halo(w,colourLine);};
-  c.save();c.globalAlpha=alpha;
-  // Contact: a soft shadow where the tool meets the paper, fading as it lifts.
-  const contact=Math.min(14,Math.max(2,tipPx/2));c.beginPath();c.ellipse(x,y,contact+2,contact/2+1,0,0,Math.PI*2);c.fillStyle=`rgba(40,36,30,${(.16*(1-lift)).toFixed(3)})`;c.fill();
-  const px=-ay,py=ax;
-  if(kind==='brush'){
-    const b=Math.max(8,Math.min(26,tipPx*1.5+6)),w=Math.max(2.5,Math.min(9,tipPx/2+1.5));
-    line(b+9,L,4,'#8a5a32');line(b,b+10,w*1.15+1,'#8d8d86');
-    c.beginPath();c.moveTo(tx,ty);c.quadraticCurveTo(tx+ax*b*.35+px*w,ty+ay*b*.35+py*w,tx+ax*b+px*w*.8,ty+ay*b+py*w*.8);
-    c.lineTo(tx+ax*b-px*w*.8,ty+ay*b-py*w*.8);c.quadraticCurveTo(tx+ax*b*.35-px*w,ty+ay*b*.35-py*w,tx,ty);c.closePath();
-    c.fillStyle=colour;c.fill();c.lineWidth=1;c.strokeStyle='rgba(40,36,30,.8)';c.stroke();
-  }else if(kind==='pen'){
-    const b=12;line(b,L,3.5,'#2f2a25');
-    c.beginPath();c.moveTo(tx,ty);c.lineTo(tx+ax*b+px*3.2,ty+ay*b+py*3.2);c.lineTo(tx+ax*b-px*3.2,ty+ay*b-py*3.2);c.closePath();
-    c.fillStyle='#4a443c';c.fill();c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=1;c.stroke();
-    c.beginPath();c.moveTo(tx+ax*2,ty+ay*2);c.lineTo(tx+ax*b*.7,ty+ay*b*.7);c.strokeStyle='#ddd6c6';c.lineWidth=.8;c.stroke();
-    c.beginPath();c.arc(tx,ty,Math.max(1.2,tipPx/2),0,Math.PI*2);c.fillStyle=colour;c.fill();
-  }else{
-    const b=10;line(b,L,6,'#d6a62c');
-    c.beginPath();c.moveTo(tx,ty);c.lineTo(tx+ax*b+px*3,ty+ay*b+py*3);c.lineTo(tx+ax*b-px*3,ty+ay*b-py*3);c.closePath();c.fillStyle='#e2c39a';c.fill();c.strokeStyle='rgba(40,36,30,.7)';c.lineWidth=.8;c.stroke();
-    c.beginPath();c.moveTo(tx,ty);c.lineTo(tx+ax*3.5+px*1.1,ty+ay*3.5+py*1.1);c.lineTo(tx+ax*3.5-px*1.1,ty+ay*3.5-py*1.1);c.closePath();c.fillStyle='#4b4b4b';c.fill();
-  }
-  c.restore();
+// Cursor state for the brush in hand (media/brush.js state), at the hand
+// point q (sheet cells) heading (hx, hy): the tuft's tip and bend, each hair's
+// length and the water it holds, as the lab's worker reports them.
+export function nativeBrushCursor(brush,q,heading,{sheetW,palette}){
+  if(!brush||!q)return null;const k=PLAYBACK_CURSOR.w/sheetW,mmPerCell=PLAYBACK.plateMm/sheetW;
+  return {tool:'round',model:brush.model??'tuft',flat:!!brush.flat,x:q.x*k,y:q.y*k,hx:heading?.x??1,hy:heading?.y??0,p:q.p??1,
+    tip:brush.tip?{x:brush.tip.x*k,y:brush.tip.y*k}:null,bend:brush.bend??0,len:(brush.model??'tuft')==='tuft'?brush.hairs.map(h=>h.len):null,
+    sat:brush.hairs.map(h=>h.water/(brush.capacity*h.len||1)),w:PLAYBACK_CURSOR.w,dpi:PLAYBACK_CURSOR.dpi,sizeMm:2*brush.radius*mmPerCell,colour:pigmentSwatch(palette)};
 }
-export class ToolOverlayState{
-  constructor(){this.hide();}
-  hide(){this.active=false;this.stroke=null;this.pos=null;this.recvP=0;this.recvAt=0;this.rate=0;this.shownP=0;this.finishedAt=null;this.lastAt=0;}
-  start(now){this.hide();this.active=true;this.lastAt=now;}
-  update(tool,now){
-    if(!this.active||!tool?.path?.length)return;
-    if(!this.stroke||tool.id!==this.stroke.id){this.stroke=tool;this.recvP=tool.progress;this.recvAt=now;this.rate=0;this.shownP=tool.progress;return;}
-    const dt=now-this.recvAt;if(dt>0&&tool.progress>this.recvP)this.rate=(tool.progress-this.recvP)/dt;
-    this.stroke={...this.stroke,...tool};this.recvP=tool.progress;this.recvAt=now;
-  }
-  finish(now){if(this.active&&this.finishedAt==null)this.finishedAt=now;}
-  alpha(now){if(!this.active||!this.stroke)return 0;if(this.finishedAt==null)return 1;return Math.max(0,1-(now-this.finishedAt)/TOOL_OVERLAY.fadeMs);}
-  visible(now){return this.alpha(now)>0;}
-  pose(now){
-    if(!this.stroke)return null;
-    const p=Math.min(1,this.recvP+this.rate*Math.max(0,now-this.recvAt));this.shownP=Math.max(this.shownP,p);
-    const target=toolPathPoint(this.stroke.path,this.shownP),dt=Math.max(0,now-this.lastAt);this.lastAt=now;
-    if(!this.pos)this.pos={x:target.x,y:target.y};
-    const k=1-Math.exp(-dt/TOOL_OVERLAY.chaseMs),mx=(target.x-this.pos.x)*k,my=(target.y-this.pos.y)*k;
-    this.pos={x:this.pos.x+mx,y:this.pos.y+my};
-    const far=Math.hypot(target.x-this.pos.x,target.y-this.pos.y),lift=clamp(far/TOOL_OVERLAY.liftUnits);
-    const moving=Math.hypot(mx,my)>.5&&lift>.2;
-    return {x:this.pos.x,y:this.pos.y,dx:moving?mx:target.dx,dy:moving?my:target.dy,lift,kind:this.stroke.kind,width:this.stroke.width,colour:this.stroke.colour};
-  }
+// The window of a sheet (cell rect, inclusive) as layers for nativeOpticalFields:
+// every fixed layer and the wet top (G + D + P), cut to the window.
+export function nativeWindowLayers(sheet,{x0,y0,x1,y1}){
+  const w=sheet.w,ww=x1-x0+1,wh=y1-y0+1,K=sheet.K??sheet.pigments.length;
+  const cut=arrays=>arrays.map(src=>{const out=new Float32Array(ww*wh);for(let y=0;y<wh;y++)out.set(src.subarray((y0+y)*w+x0,(y0+y)*w+x1+1),y*ww);return out;});
+  const layers=sheet.layers.map(cut);
+  const top=Array.from({length:K},(_,k)=>{const o=new Float32Array(ww*wh);for(let y=0;y<wh;y++)for(let x=0;x<ww;x++){const i=(y0+y)*w+x0+x;o[y*ww+x]=sheet.G[k][i]+sheet.D[k][i]+sheet.P[k][i];}return o;});
+  return [...layers,top];
 }
-export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onTool=null,limits=NATIVE_PAINT_LIMITS}={}){
+// Output pixels covered by a cell rect (inclusive), on a W x H raster.
+export function nativePatchRect({x0,y0,x1,y1},sw,sh,W,H){
+  const px0=Math.max(0,Math.floor(x0*W/sw)),py0=Math.max(0,Math.floor(y0*H/sh)),px1=Math.min(W,Math.ceil((x1+1)*W/sw)),py1=Math.min(H,Math.ceil((y1+1)*H/sh));
+  return {x:px0,y:py0,w:Math.max(0,px1-px0),h:Math.max(0,py1-py0)};
+}
+export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.width,seed=301,maskFor,onCheckpoint=async()=>{},isCancelled=()=>false,yieldWork=nativeYield,depositDurationMs=0,checkpointIntervalMs=0,paperTemplate=null,onPaper=()=>{},onBrush=null,limits=NATIVE_PAINT_LIMITS}={}){
   const started=performance.now(),passages=planNativePassages(study),keys=nativePalette(passages);
   width=nativeSheetWidth(width,keys,limits);
   const height=Math.round(width/1.2),n=width*height,scale=width/1200,mmPerCell=.2/scale;
@@ -8641,10 +8613,9 @@ export async function simulateNativePassages(study,{width=NATIVE_PAINT_LIMITS.wi
       dip(brush,{water:material.water,conc:material.conc});brushDips++;
       const points=material.points;
       const segments=nativeStrokeSegments(points),markStarted=performance.now();
-      onTool?.({id:`w${strokes}`,phase:passage.kind,role:mark.role??'',points:gesture.path.map(q=>[q.x,q.y]),width:2*Math.max(...gesture.path.map(q=>q.r||0)),palette:mark.palette,progress:0});
       for(let si=0;si<segments.length;si++){
         const depositAt=performance.now();stroke(brush,sheet,segments[si],{spacing:1.5,lift:si===segments.length-1});timings.depositMs+=performance.now()-depositAt;strokeSegments++;
-        onTool?.({progress:(si+1)/segments.length});
+        onBrush?.({brush,segment:segments[si],lifted:si===segments.length-1,palette:mark.palette,sheet});
         await publish(`${gesture.prewet?'Wetting the paper':passage.id} · stroke ${mi+1} of ${passage.marks.length}`, .22+.78*(start+span*.4*(mi+(gi+(si+1)/segments.length)/gestures.length)/passage.marks.length));
         const due=markStarted+depositDurationMs/Math.max(1,markCount)/gestures.length*(si+1)/segments.length;
         if(due>performance.now())await new Promise(r=>setTimeout(r,Math.min(33,due-performance.now())));
@@ -9277,14 +9248,14 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
   painter.ctx=ic;painter.inkShapeIds=new WeakMap();painter.inkShapeCount=0;
   const inkMarks=handChainMarks(nativePlateInk(study));
   const weights=inkMarks.map(m=>Math.max(6,pathLength(m.points))),total=weights.reduce((a,b)=>a+b,0),inkStarted=performance.now();let index=0,done=0;
-  // The stroke the overlay shows: the ink mark being drawn, then each brush gesture.
-  let toolNow=null;
-  const setInkTool=(i,f)=>{const m=inkMarks[i];if(!m?.points?.length)return;toolNow={phase:'ink',stroke:nativeToolStroke({id:`i${i}`,phase:'ink',role:m.role??'',points:m.points,width:m.width??1,colour:TOOL_OVERLAY.ink,progress:f})};};
+  // Paint playback: an artist's pace, the tool's state with every frame.
+  const playback=!!payload.playback,pacing=playback?nativePlaybackPacing({inkLength:total,washMarks:planNativePassages(nativePlateWashes(study)).reduce((n,p)=>n+p.marks.length,0)}):null;
+  const inkMs=playback?pacing.inkMs:NATIVE_PACING.inkMs;let cursorNow=null;
   const drawBatches=(context,batches)=>drawNativeInkBatches(context,painter,batches);
   // Fixed groups make overlapping alpha exactly independent of frame cadence.
   // Completed groups are rasterized once; only the current group is transient.
   while(index<inkMarks.length){
-    const frameAt=performance.now(),budget=total*Math.min(1,(frameAt-inkStarted)/NATIVE_PACING.inkMs);
+    const frameAt=performance.now(),budget=total*Math.min(1,(frameAt-inkStarted)/inkMs);
     while(index<inkMarks.length){
       const end=Math.min(inkMarks.length,index+16),weight=weights.slice(index,end).reduce((a,b)=>a+b,0);if(budget<total&&done+weight>budget+1e-7)break;
       const batches=new Map();for(let i=index;i<end;i++)painter.inkStroke(inkMarks[i],1,batches);drawBatches(ic,batches);done+=weight;index=end;if(performance.now()-frameAt>22)break;
@@ -9292,12 +9263,12 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     pc.globalCompositeOperation='source-over';pc.globalAlpha=1;pc.clearRect(0,0,1200,1000);pc.drawImage(committed,0,0,1200,1000);
     if(index<inkMarks.length){
       painter.ctx=pc;pc.save();const batches=new Map();let available=Math.max(0,budget-done);
-      for(let i=index;i<Math.min(inkMarks.length,index+16)&&available>0;i++){const f=clamp(available/weights[i]);painter.inkStroke(inkMarks[i],f,batches);available-=weights[i];if(f<1)setInkTool(i,f);}
+      for(let i=index;i<Math.min(inkMarks.length,index+16)&&available>0;i++){const f=clamp(available/weights[i]);painter.inkStroke(inkMarks[i],f,batches);available-=weights[i];if(playback&&f<1)cursorNow=nativeInkCursor(inkMarks[i],f);}
       drawBatches(pc,batches);pc.restore();painter.ctx=ic;
     }
     finishNativeInk(pc,painter);drawNativeLabels(pc,study,genome);renderTimings.inkMs+=performance.now()-frameAt;
-    if(index>0&&(!toolNow||toolNow.phase!=='ink'||index>=inkMarks.length))setInkTool(index-1,1);
-    await send('Ink',.22*Math.min(1,budget/Math.max(1,total)),false,{tool:toolNow?.stroke});
+    if(playback&&index>=inkMarks.length)cursorNow=null;
+    await send('Ink',.22*Math.min(1,budget/Math.max(1,total)),false,playback?{cursor:cursorNow}:{});
     await new Promise(r=>setTimeout(r,Math.max(0,33-(performance.now()-frameAt))));
   }
   c.clearRect(0,0,1200,1000);c.drawImage(committed,0,0,1200,1000);finishNativeInk(c,painter,'high');const ink=c.getImageData(0,0,W,H);painter.ctx=c;
@@ -9316,8 +9287,55 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     const transferAt=performance.now();renderTimings.transferMs+=performance.now()-transferAt;
     emit({revision,native:true,index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob,elapsed:performance.now()-started,bitmap,metrics:{...metrics,renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
   };
-  const frameMetrics=metrics=>({...metrics,inkHash,inkMarksPlanned:study.ink.length,inkMarksRendered:inkMarks.length,outputScale:scale,outputWidth:W,outputHeight:H,tool:toolNow?.stroke});
-  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onTool:info=>{toolNow=info.points?{phase:info.phase,stroke:nativeToolStroke(info)}:toolNow&&{...toolNow,stroke:{...toolNow.stroke,progress:clamp(info.progress)}};},depositDurationMs:NATIVE_PACING.depositMs,checkpointIntervalMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
+  const frameMetrics=metrics=>({...metrics,inkHash,inkMarksPlanned:study.ink.length,inkMarksRendered:inkMarks.length,outputScale:scale,outputWidth:W,outputHeight:H,...(playback?{cursor:cursorNow}:{})});
+  // Live patches (playback): the part of the plate the brush and the wet wash
+  // changed since the last frame, composed exactly as the settled plate is,
+  // posted at display cadence. Cells outside it keep their last fields.
+  let liveFields=null,dirty=null,lastFullAt=0,patchInFlight=null;
+  // Lettering lies in the top and bottom bands and under each figure's foot;
+  // a patch elsewhere leaves it alone (the next full frame restores any).
+  const letterBoxes=[{x:0,y:0,w:1200,h:125},{x:0,y:815,w:1200,h:185},...plateFigureBoxes(study).map(f=>({x:f.box.x-30,y:f.box.y+f.box.h-30,w:f.box.w+60,h:80}))];
+  const grow=(r,x0,y0,x1,y1)=>r?{x0:Math.min(r.x0,x0),y0:Math.min(r.y0,y0),x1:Math.max(r.x1,x1),y1:Math.max(r.y1,y1)}:{x0,y0,x1,y1};
+  const onBrush=playback?({brush,segment,lifted,palette,sheet})=>{
+    const r=brush.radius*1.5+8;let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const q of segment){x0=Math.min(x0,q.x);y0=Math.min(y0,q.y);x1=Math.max(x1,q.x);y1=Math.max(y1,q.y);}
+    dirty=grow(dirty,Math.floor(x0-r),Math.floor(y0-r),Math.ceil(x1+r),Math.ceil(y1+r));
+    const a=segment[0],b=segment.at(-1),l=Math.hypot(b.x-a.x,b.y-a.y)||1;
+    cursorNow=lifted?null:nativeBrushCursor(brush,b,{x:(b.x-a.x)/l,y:(b.y-a.y)/l},{sheetW:sheet.w,palette});
+  }:null;
+  const livePatch=async(sheet,stage,progress,metrics)=>{
+    const sw=sheet.w,sh=sheet.h,n=sw*sh;
+    if(!liveFields)liveFields={R:new Float32Array(n*3),B:new Float32Array(n*3),T:new Float32Array(n*3).fill(1)};
+    // The brush's own footprint since the last patch (and the one before, for
+    // the wash still settling there). Wider flow between strokes and while a
+    // passage dries arrives with the full frames.
+    const cells=dirty;dirty=null;
+    if(!cells)return false;
+    const m=3,win={x0:Math.max(0,cells.x0-m),y0:Math.max(0,cells.y0-m),x1:Math.min(sw-1,cells.x1+m),y1:Math.min(sh-1,cells.y1+m)},ww=win.x1-win.x0+1,wh=win.y1-win.y0+1;
+    const t0=performance.now(),optical=nativeOpticalFields(nativeWindowLayers(sheet,win),sheet.pigments,ww*wh),recon=nativeReconstructFields(optical,ww,wh);
+    // Keep the window's interior (its edge cells lack neighbours outside it).
+    const ix0=win.x0>0?win.x0+1:0,iy0=win.y0>0?win.y0+1:0,ix1=win.x1<sw-1?win.x1-1:sw-1,iy1=win.y1<sh-1?win.y1-1:sh-1;
+    for(const key of ['R','B','T'])for(let y=iy0;y<=iy1;y++)liveFields[key].set(recon[key].subarray(((y-win.y0)*ww+(ix0-win.x0))*3,((y-win.y0)*ww+(ix1-win.x0)+1)*3),(y*sw+ix0)*3);
+    const rect=nativePatchRect(cells,sw,sh,W,H);if(!rect.w||!rect.h)return;
+    const pr={x:rect.x/scale,y:rect.y/scale,w:rect.w/scale,h:rect.h/scale},letters=letterBoxes.some(b=>pr.x<b.x+b.w&&pr.x+pr.w>b.x&&pr.y<b.y+b.h&&pr.y+pr.h>b.y);
+    if(composer){
+      const inner={x0:ix0,y0:iy0,x1:ix1,y1:iy1},R=recon.R,B=recon.B,T=recon.T,frame={...frameMetrics(metrics)};
+      patchInFlight=composer.patch({sw,sh,win,inner,rect,letters,R,B,T},[R.buffer,B.buffer,T.buffer]).then(async({bitmap,ms})=>{
+        renderTimings.livePatches=(renderTimings.livePatches??0)+1;renderTimings.livePatchMs=(renderTimings.livePatchMs??0)+ms;
+        await awaitFrame();if(frameCompleted){bitmap.close();return;}renderTimings.frames++;
+        emit({revision,native:true,patch:{x:rect.x,y:rect.y,w:rect.w,h:rect.h},index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob:null,elapsed:performance.now()-started,bitmap,metrics:{...frame,renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
+      }).catch(error=>console.warn('Live patch not composed',error)).finally(()=>{patchInFlight=null;});
+      return;
+    }
+    const sub=(src,channels,Type)=>{const o=new Type(rect.w*rect.h*channels);for(let y=0;y<rect.h;y++)o.set(src.subarray(((rect.y+y)*W+rect.x)*channels,((rect.y+y)*W+rect.x+rect.w)*channels),y*rect.w*channels);return o;};
+    const pixels=composeNativePixels(sub(ink.data,4,Uint8ClampedArray),rect.w,rect.h,liveFields,sw,sh,{x:rect.x/scale,y:rect.y/scale,w:rect.w/scale,h:rect.h/scale},{coverage:sub(frameCoverage,1,frameCoverage.constructor),settling:nativePaperSettling(),regions:sub(frameRegions,1,frameRegions.constructor)});
+    const patch=newCanvas(rect.w,rect.h),pctx=patch.getContext('2d',{willReadFrequently:true});pctx.putImageData(new ImageData(pixels,rect.w,rect.h),0,0);
+    if(letters){pctx.setTransform(scale,0,0,scale,-rect.x,-rect.y);drawNativeLabels(pctx,study,genome);}
+    renderTimings.livePatches=(renderTimings.livePatches??0)+1;renderTimings.livePatchMs=(renderTimings.livePatchMs??0)+performance.now()-t0;
+    await awaitFrame();if(frameCompleted)return;renderTimings.frames++;
+    const bitmap=patch.transferToImageBitmap();
+    emit({revision,native:true,patch:{x:rect.x,y:rect.y,w:rect.w,h:rect.h},index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob:null,elapsed:performance.now()-started,bitmap,metrics:{...frameMetrics(metrics),renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
+  };
+  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?pacing.washMs:NATIVE_PACING.depositMs,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
     lastFrame=performance.now();
     const opticsAt=performance.now();
     if(complete){
@@ -9327,16 +9345,22 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
       nativeDetailState={painter,inkMarks,fields,sheetW:sheet.w,sheetH:sheet.h,study,genome,revision,scale,coverageWashes:grounded.washes};
       const finalPixels=c.getImageData(0,0,W,H).data;
       // The last streamed frame is on screen before the settled plate arrives.
-      if(inFlight)await inFlight;frameCompleted=true;await awaitFrame();
+      if(patchInFlight)await patchInFlight;if(inFlight)await inFlight;frameCompleted=true;await awaitFrame();
       // How far the settled plate is from the last streamed frame (0 = no snap).
       const snap=composer?await composer.snap(finalPixels):lastStreamed?nativeSnapDiff(finalPixels,lastStreamed):null;composer?.close();
       await send(stage,progress,true,{...frameMetrics(metrics),...(snap??{}),finalPixelHash:pixelHash(finalPixels)});
       return;
     }
+    // While a brush is moving, patches carry the frames; a full frame every
+    // refreshMs picks up the wash that has run beyond the brush.
+    if(playback&&!force&&dirty&&performance.now()-lastFullAt<PLAYBACK.refreshMs){if(inFlight||patchInFlight)return;await livePatch(sheet,stage,progress,metrics);return;}
+    if(playback&&!force&&performance.now()-lastFullAt<PLAYBACK.fullFrameMs)return;
+    if(playback){if(!force&&(inFlight||patchInFlight))return;lastFullAt=performance.now();dirty=null;}
     if(composer){
       // One frame in flight; a newer checkpoint replaces a frame not yet started.
-      if(inFlight&&!force)return;if(inFlight)await inFlight;
+      if(inFlight&&!force)return;if(inFlight)await inFlight;if(patchInFlight)await patchInFlight;
       const fields=nativeReconstructFields(nativeOpticalFields(layersOf(sheet),sheet.pigments,sheet.n),sheet.w,sheet.h);renderTimings.opticsMs+=performance.now()-opticsAt;
+      if(playback)liveFields={R:fields.R.slice(),B:fields.B.slice(),T:fields.T.slice()};
       const record=!!payload.recordFrames&&performance.now()-lastRecordedWash>=PREPARED_PLATE.recordEveryMs;if(record)lastRecordedWash=performance.now();
       const frame=frameMetrics(metrics);
       inFlight=composer.compose(fields,sheet.w,sheet.h,record).then(async({bitmap,frameBlob,ms})=>{
@@ -9373,6 +9397,7 @@ function nativeFrameComposer({ink,W,H,scale,coverage,regions,study,genome}){
   worker.postMessage({kind:'frame-init',ink:ink.data.slice(),W,H,scale,coverage,regions,labels,contact,quality:PREPARED_PLATE.frameQuality});
   const ask=(message,transfer=[])=>new Promise(resolve=>{const id=++next;waiting.set(id,resolve);worker.postMessage({...message,id},transfer);});
   return {
+    patch:async(message,transfer)=>{const reply=await ask({kind:'frame-patch',...message},transfer);if(reply.error)throw new Error(reply.error);return reply;},
     compose:async(fields,w,h,record)=>{const R=fields.R.slice(),B=fields.B.slice(),T=fields.T.slice(),reply=await ask({kind:'frame-compose',w,h,R,B,T,record},[R.buffer,B.buffer,T.buffer]);if(reply.error)throw new Error(reply.error);return reply;},
     snap:async pixels=>{const copy=pixels.slice(),reply=await ask({kind:'frame-snap',pixels:copy},[copy.buffer]);return reply.error?null:reply.snap;},
     close:()=>worker.terminate()
@@ -9411,10 +9436,21 @@ async function nativeComposerMessage(data){
     composeNativePixels(st.inkImage.data,st.W,st.H,fields,data.w,data.h,undefined,{coverage:st.coverage,settling:nativePaperSettling(),regions:st.regions,rows:[0,cut(1)],target:st.target});
     for(const band of await Promise.all(pending))st.target.set(band.pixels,band.rows[0]*st.W*4);
     const image=new ImageData(st.target,st.W,st.H);
-    st.c.putImageData(image,0,0);drawNativeLabels(st.c,st.labels.study,st.labels.genome);
+    st.c.putImageData(image,0,0);drawNativeLabels(st.c,st.labels.study,st.labels.genome);st.live={R:data.R.slice(),B:data.B.slice(),T:data.T.slice()};
     const frameBlob=data.record?await st.canvas.convertToBlob({type:'image/webp',quality:st.quality}):null;
     st.last=st.c.getImageData(0,0,st.W,st.H).data;
     const bitmap=st.canvas.transferToImageBitmap();return {id:data.id,bitmap,frameBlob,ms:performance.now()-t,transfer:[bitmap]};
+  }
+  if(data.kind==='frame-patch'){
+    // Paint playback: write the window's fields, compose only the patch.
+    const t=performance.now(),{sw,sh,inner,win,rect,letters}=data,ww=win.x1-win.x0+1;
+    st.live??={R:new Float32Array(sw*sh*3),B:new Float32Array(sw*sh*3),T:new Float32Array(sw*sh*3).fill(1)};
+    for(const key of ['R','B','T'])for(let y=inner.y0;y<=inner.y1;y++)st.live[key].set(data[key].subarray(((y-win.y0)*ww+(inner.x0-win.x0))*3,((y-win.y0)*ww+(inner.x1-win.x0)+1)*3),(y*sw+inner.x0)*3);
+    const sub=(src,channels,Type)=>{const o=new Type(rect.w*rect.h*channels);for(let y=0;y<rect.h;y++)o.set(src.subarray(((rect.y+y)*st.W+rect.x)*channels,((rect.y+y)*st.W+rect.x+rect.w)*channels),y*rect.w*channels);return o;};
+    const pixels=composeNativePixels(sub(st.inkImage.data,4,Uint8ClampedArray),rect.w,rect.h,st.live,sw,sh,{x:rect.x/st.scale,y:rect.y/st.scale,w:rect.w/st.scale,h:rect.h/st.scale},{coverage:sub(st.coverage,1,st.coverage.constructor),settling:nativePaperSettling(),regions:sub(st.regions,1,st.regions.constructor)});
+    const patch=newCanvas(rect.w,rect.h),pctx=patch.getContext('2d',{willReadFrequently:true});pctx.putImageData(new ImageData(pixels,rect.w,rect.h),0,0);
+    if(letters){pctx.setTransform(st.scale,0,0,st.scale,-rect.x,-rect.y);drawNativeLabels(pctx,st.labels.study,st.labels.genome);}
+    const bitmap=patch.transferToImageBitmap();return {id:data.id,bitmap,ms:performance.now()-t,transfer:[bitmap]};
   }
   if(data.kind==='frame-snap')return {id:data.id,snap:st.last?nativeSnapDiff(data.pixels,st.last,st.W):null};
   return {id:data.id,error:'unknown composer message'};
@@ -9541,7 +9577,7 @@ if(typeof document==='undefined'&&typeof self!=='undefined'&&typeof self.postMes
   const waitForFrame=()=>nativeOutstanding<2?Promise.resolve():new Promise(resolve=>{frameWaiter=resolve;});
   self.onmessage=async event=>{
     if(event.data.kind==='native-frame-ack'){nativeOutstanding=Math.max(0,nativeOutstanding-1);if(nativeOutstanding<2&&frameWaiter){const resolve=frameWaiter;frameWaiter=null;resolve();}return;}
-    if(/^(frame-(init|compose|snap)|band-(init|compose)|detail-band)$/.test(event.data.kind??'')){
+    if(/^(frame-(init|compose|snap|patch)|band-(init|compose)|detail-band)$/.test(event.data.kind??'')){
       try{const reply=await nativeComposerMessage(event.data);if(reply){const {transfer=[],...message}=reply;self.postMessage(message,transfer);}}
       catch(error){self.postMessage({id:event.data.id,error:error.message});}
       return;
@@ -9840,35 +9876,19 @@ async function mount() {
   const detailCanvas=document.createElement('canvas');detailCanvas.className='plate-detail';detailCanvas.setAttribute('aria-hidden','true');
   Object.assign(detailCanvas.style,{position:'absolute',left:'0',top:'0',width:'100%',height:'100%',pointerEvents:'none',transformOrigin:'0 0',display:'none'});
   $('plate-viewport')?.append(detailCanvas);
-  // Paint playback shows the instrument at work on its own layer above the
-  // plate; it never draws into the painting, the PNG or the zoom cache.
-  const toolLayer=document.createElement('canvas');toolLayer.className='tool-overlay';toolLayer.setAttribute('aria-hidden','true');
-  Object.assign(toolLayer.style,{position:'absolute',left:'0',top:'0',width:'100%',height:'100%',pointerEvents:'none',display:'none',zIndex:'3'});
-  const toolChip=document.createElement('div');toolChip.className='tool-chip';toolChip.setAttribute('aria-hidden','true');
-  Object.assign(toolChip.style,{position:'absolute',left:'8px',top:'8px',display:'none',alignItems:'center',gap:'5px',padding:'4px 6px',borderRadius:'12px',background:'rgba(244,242,233,.86)',boxShadow:'0 1px 3px rgba(55,61,48,.18)',pointerEvents:'none',zIndex:'4',color:'#3d3127'});
-  toolChip.innerHTML='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path/></svg><span style="width:12px;height:12px;border-radius:50%;border:1px solid rgba(61,49,39,.45);display:inline-block"></span>';
-  $('plate-viewport')?.append(toolLayer,toolChip);
-  const toolState=new ToolOverlayState(),toolCost={n:0,sum:0,max:0};let toolFrame=0,toolChipKey='';
-  const toolDraw=now=>{
-    toolFrame=0;const alpha=toolState.alpha(now),vp=$('plate-viewport');
-    if(alpha<=0||!vp){toolLayer.style.display='none';toolChip.style.display='none';canvas.dataset.toolOverlay='off';if(toolState.active&&toolState.finishedAt!=null)toolState.hide();return;}
-    const w=vp.clientWidth,h=vp.clientHeight,dpr=deviceRatio();
-    if(toolLayer.width!==Math.round(w*dpr)||toolLayer.height!==Math.round(h*dpr)){toolLayer.width=Math.round(w*dpr);toolLayer.height=Math.round(h*dpr);}
-    const drawStart=performance.now();toolLayer.style.display='block';const c=toolLayer.getContext('2d');c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,toolLayer.width,toolLayer.height);c.setTransform(dpr,0,0,dpr,0,0);
-    const pose=toolState.pose(now);
-    if(pose){
-      // Plate units to the zoomed, panned view in CSS px.
-      const view=plateViewport?.getState()??{scale:1,x:0,y:0},k=w/1200*view.scale;
-      drawToolGlyph(c,{x:view.x+pose.x*k,y:view.y+pose.y*k,dx:pose.dx,dy:pose.dy,lift:pose.lift,kind:pose.kind,colour:pose.colour,tipPx:pose.width*k,size:Math.max(40,Math.min(86,Math.min(w,h)*.16)),alpha});
-      const key=pose.kind+pose.colour;if(key!==toolChipKey){toolChipKey=key;toolChip.querySelector('path').setAttribute('d',TOOL_GLYPHS[pose.kind]??TOOL_GLYPHS.brush);toolChip.querySelector('span').style.background=pose.colour;toolChip.dataset.tool=pose.kind;}
-      toolChip.style.display='flex';toolChip.style.opacity=String(alpha);
-      const ms=performance.now()-drawStart;toolCost.n++;toolCost.sum+=ms;toolCost.max=Math.max(toolCost.max,ms);
-      Object.assign(canvas.dataset,{toolOverlay:'on',toolKind:pose.kind,toolDrawMs:(toolCost.sum/toolCost.n).toFixed(3),toolDrawMaxMs:toolCost.max.toFixed(3)});
-    }
-    toolFrame=requestAnimationFrame(toolDraw);
-  };
-  const toolKick=()=>{if(!toolFrame)toolFrame=requestAnimationFrame(toolDraw);};
-  const toolHide=()=>{toolState.hide();if(toolFrame){cancelAnimationFrame(toolFrame);toolFrame=0;}toolLayer.style.display='none';toolChip.style.display='none';canvas.dataset.toolOverlay='off';};
+  // Paint playback cursor: Paint Lab's own brush, nib and pencil preview, on a
+  // layer of its own that follows the plate's zoom and pan.
+  const cursorLayer=document.createElement('canvas');cursorLayer.className='paint-cursor';cursorLayer.setAttribute('aria-hidden','true');
+  Object.assign(cursorLayer.style,{position:'absolute',left:'0',top:'0',width:'100%',height:'100%',pointerEvents:'none',transformOrigin:'0 0',display:'none',zIndex:'3'});
+  $('plate-viewport')?.append(cursorLayer);
+  const paintCursor=createCursor(cursorLayer);
+  function showCursor(state){
+    if(!state){cursorLayer.style.display='none';canvas.dataset.paintCursor='off';return;}
+    const vp=$('plate-viewport'),w=vp?.clientWidth||canvas.clientWidth,h=vp?.clientHeight||canvas.clientHeight,dpr=clamp(Number(globalThis.devicePixelRatio)||1,1,3);
+    if(cursorLayer.width!==Math.round(w*dpr)||cursorLayer.height!==Math.round(h*dpr))paintCursor.size(w,h,dpr);
+    cursorLayer.style.transform=canvas.style.transform;cursorLayer.style.opacity=String(paintCursorOpacity(state.sizeMm));cursorLayer.style.display='block';
+    paintCursor.clear();paintCursor.draw(state);canvas.dataset.paintCursor=state.tool;
+  }
   const deviceRatio=()=>clamp(Number(globalThis.devicePixelRatio)||1,1,3);
   const viewportSize=()=>{const v=$('plate-viewport');return v?{width:v.clientWidth,height:v.clientHeight}:{width:canvas.clientWidth,height:canvas.clientHeight};};
   const targetBaseScale=()=>plateBackingScale(canvas.clientWidth||viewportSize().width,deviceRatio());
@@ -10203,7 +10223,7 @@ async function mount() {
   // Every settled plate goes through the pair so the Worker reuses the captured page frame.
   function bridgeRecipe(value){if(value.morph.orbitRest)return {a:value.morph.a,b:value.morph.a,blend:0,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers,orbitRest:true};return {a:value.morph.a,b:value.morph.b,blend:value.blend,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers};}
   function cancelRefinement(){
-    toolHide();hideDetail();settledRevision++;settledWorker?.terminate();settledWorker=null;
+    showCursor(null);hideDetail();settledRevision++;settledWorker?.terminate();settledWorker=null;
     if(nativeBuilding){nativeBuilding.resolve(null);nativeBuilding=null;}
     settledBusy=false;replaying=false;canvas.dataset.refining='false';endReveal();
   }
@@ -10395,15 +10415,20 @@ async function mount() {
     retireDetailWorker();setBacking(targetBaseScale());const outputScale=baseScale;startReveal(value,revision);
     try{
       settledWorker=paintingWorker();settledBusy=true;canvas.dataset.refining='true';canvas.dataset.nativeComplete='false';controls();
-      if(!quiet)toolState.start(performance.now());else toolHide();
       settledWorker.onmessage=event=>{
         const message=event.data;
         if(!current()||message.revision!==revision){message.bitmap?.close();return;}
         if(message.error){fail(message.error);return;}
         if(message.nativeMaterial){nativePaperTemplate=message.paper;return;}
         if(!message.native||!message.bitmap)return;
-        if(!quiet&&message.metrics?.tool){toolState.update(message.metrics.tool,performance.now());toolKick();}
-        if(message.complete)toolState.finish(performance.now());
+        // Paint playback: the tool's cursor, and live patches of the plate.
+        if('cursor' in (message.metrics??{}))showCursor(message.metrics.cursor);
+        if(message.complete)showCursor(null);
+        if(message.patch){
+          if(current()){const c=painter.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(message.bitmap,message.patch.x,message.patch.y);}
+          message.bitmap.close();settledWorker?.postMessage({kind:'native-frame-ack'});
+          drawingStage=message.progress;nativePhase=message.stage;canvas.dataset.livePatches=String(message.metrics?.renderTimings?.livePatches??0);return;
+        }
         const result=nativeResult;
         if(message.complete&&message.blob.size>NATIVE_PAINT_LIMITS.cacheBytes){message.bitmap.close();fail('Native final image memory limit reached');return;}
         result.streamedFrames++;result.metrics=message.metrics;
@@ -10435,7 +10460,7 @@ async function mount() {
       nativeInkPaperRaster??=painter.paper.getContext('2d').getImageData(0,0,painter.paper.width,painter.paper.height);
       // Structured clone keeps immutable template arrays in the main thread;
       // cancellation can terminate the entire Worker without losing material.
-      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale});
+      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale,playback:!!rerun});
     }catch(error){fail(error.message);}
     return promise;
   }
