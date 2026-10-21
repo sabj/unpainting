@@ -1,6 +1,6 @@
-// The tuned flags of the compatibility recipe (--recipe default or v096). Their values were fitted by
-// self study on benchmark subjects, mostly Trumbull (Y1), and V096 ran them on every subject. The general recipe no
-// longer sets them under --recipe general; presets.mjs groups them into explicit presets. docs/overfitting.md lists them.
+// The tuned flags of the V096 recipe (--recipe v096). Their values were fitted by self study on benchmark subjects,
+// mostly Trumbull (Y1), and V096 ran them on every subject. The default recipe sets none of them; presets.mjs groups
+// them into explicit presets. docs/techniques.md (Tuned settings) lists them.
 export const TUNED_DEFAULT_FLAGS = [
   '--darkgain 1.3 --coolgain 1.3',
   '--skylanemm 6 --skylanestep .8 --skyfloc .5',

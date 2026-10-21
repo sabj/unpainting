@@ -16,7 +16,7 @@ A round is a benchmark version with a different set of tools or feedback. A try 
 | V5 | The full pipeline plus its own earlier tries | Yes | <a href="results/gallery.md"><img src="runs/v5-self-study/astra/3/mittens.webp" width="96" alt="Codex Astra, mittens, 84.13% of target"></a> |
 <!-- rounds-table:end -->
 
-V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models; V4 and V5 ran the Claude, Codex and Gemini 4 Argon models. Not every model ran every round; the [leaderboard](results/leaderboard.md) lists the tries each model ran. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
+V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models. V4 and V5 ran the Claude, Codex and Gemini 4 Argon models. Not every model ran every round. The [leaderboard](results/leaderboard.md) lists the tries each model ran. In V4 and V5 the first try is shared: V5 try 1 has no feedback yet, so it is also V4 try 1.
 
 ## Subjects
 
@@ -28,7 +28,7 @@ V1 to V5 are published. V3 ran the Claude, Codex, Gemini 4 Argon and Muse models
 | Mittens | Portrait sketch and light washes | Yes, photo by Sam Jackson, see [NOTICE](../NOTICE) |
 | Trumbull | Architectural watercolor | Yes, third-party photo credited in [NOTICE](../NOTICE) |
 
-V3 is compared on Hills, France and Ships. The 0.1.0 V3 runs painted only those three; the 0.1.1 Muse V3 runs painted all five, and their Mittens and Trumbull paintings are shown but not counted. V4 and V5 painted all five. One of the painter's preset recipes was tuned on Trumbull, so V4 and V5 Trumbull scores may run high. [Target sizes](crops/README.md) gives the physical scale.
+V3 is compared on Hills, France and Ships. The 0.1.1 Muse V3 runs painted all five targets; their Mittens and Trumbull paintings are shown but not counted. V4 and V5 painted all five. One of the painter's preset recipes was tuned on Trumbull, so V4 and V5 Trumbull scores may run high. [Target sizes](crops/README.md) gives the physical scale.
 
 ## Results
 
@@ -49,7 +49,7 @@ All five rounds were painted with painter V096, sim 100 and judges J1, in releas
 
 ## Reproduce
 
-You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 paint on your GPU or CPU instead of rented cloud machines, with the public painter instead of the private build the original runs used, so their scores will differ. A V3 session offers `--tries` attempts (default 3); the published sessions offered up to five.
+You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 paint on your GPU or CPU with the public painter, so scores can differ from the published ones. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
 
 ```sh
 npm run bench:test                                   # check every run record, that results/ regenerates unchanged, and dry runs of V3 to V5
@@ -60,14 +60,13 @@ npm run bench:run -- --round V4 --model opus         # one model, one lite plann
 npm run bench:run -- --round V4 --model opus --profile full  # three full self-view tries
 ```
 
-V5 try 1 reuses V4 try 1 (the same session), out of laziness.
+V5 try 1 reuses V4 try 1 (the same session).
 
 ## Routine development benchmark
 
 `npm run bench:lite -- --plan` shows the offline allocation before any model calls.
 `npm run bench:lite -- --gpu off` runs all five targets with Astra, Sol, Opus, Sonnet, Argon-high and Gemini Flash.
 Use `--models all` or explicit keys such as `--models core,wonderfull,spark` to include other registered models.
-Nothing was removed from the registry.
 
 Lite is a separate planning screen: one five-minute plan per target, one harness check and render after the model exits,
 no automatic repairs, at most 540 native cells across, and J2-lite judging. Full mode keeps three tries and model

@@ -21,14 +21,14 @@ The painter refuses to paint from uncommitted changes. Each run writes `code-sta
 
 ## Worktrees
 
-A git worktree has no `node_modules` of its own. Link the main checkout's install, which survives a reboot, never another worktree's link:
+A git worktree has no `node_modules` of its own. Link the main checkout's install, never another worktree's link:
 
 ```sh
 git worktree add ../unpainting-fix -b fix/name
 ln -sfn "$PWD/node_modules" ../unpainting-fix/node_modules
 ```
 
-Run this from the main checkout. Use `ln -sfn`: a plain `ln -s` onto an existing link writes the new link inside the linked folder. Run `npm ci` in the main checkout when `package-lock.json` changes. A worktree whose `package-lock.json` differs from the main checkout's needs its own `npm ci`. Worktrees under `/private/tmp` are deleted by a reboot, links and all.
+Run this from the main checkout. Use `ln -sfn`: a plain `ln -s` onto an existing link writes the new link inside the linked folder. Run `npm ci` in the main checkout when `package-lock.json` changes. A worktree whose `package-lock.json` differs from the main checkout's needs its own `npm ci`.
 
 ## Images and licenses
 

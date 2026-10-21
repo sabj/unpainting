@@ -107,7 +107,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
       // a smaller darker plane only where the target is darker. Each plane holds a narrow value
       // range, so its single wash value matches the target.
       if(nested){const share=Math.min(1,.32/Math.max(1e-6,v));weights[1][i]=middle*share;weights[2][i]=middle*(1-share);}
-      // --recesses 1 (the architecture preset): hard dark architectural recesses are last paint accents on the dried wall (fitted on Y1; docs/overfitting.md).
+      // --recesses 1 (the architecture preset): hard dark architectural recesses are last paint accents on the dried wall (fitted on Y1; docs/techniques.md, Tuned settings).
       if(recesses&&rgb&&isRecess(rgb,i)){weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=1-light;if(recessAccent)accentCells[i]=1;
         // Darks build in two dried layers, as a painter restates a window: band 4 then band 5.
         if(recessLayers>1){const keep=recessClean?1:1-light;if(recessClean)weights[0][i]=0;weights[3][i]=keep*recessShare;weights[4][i]=keep*recessShare;}}

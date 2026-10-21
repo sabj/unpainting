@@ -20,7 +20,7 @@ for(const [i,row] of rows.entries()) {
  catch(e) {
   if(!row.archivedStats || (e.code!=='ENOENT'&&!e.message.startsWith('run has no mark tape')))throw e;
   stats=JSON.parse(fs.readFileSync(row.archivedStats,'utf8'));
-  if(!stats.composition?.broadAreasMeasured){stats.composition=null;stats.measurementUnavailable='Original stroke tape and command log were pruned by sweepd for low disk space; weighted broad-area metrics cannot be recomputed from archived counts.';}
+  if(!stats.composition?.broadAreasMeasured){stats.composition=null;stats.measurementUnavailable='Original stroke tape and command log were pruned for low disk space; weighted broad-area metrics cannot be recomputed from archived counts.';}
   else {stats.composition.depositMeasured=stats.composition.attributedVisibleShare>0;stats.measurementCache=row.archivedStats;}
  }
  const gate=evaluateGate(stats);

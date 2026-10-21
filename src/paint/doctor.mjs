@@ -1,7 +1,6 @@
 // Pre-flight environment check (npm run doctor). Fails loudly if any required tool,
 // model checkpoint, clean checkout or disk floor is missing before a run starts.
 import fs from "node:fs";
-import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { codeState } from "./code-state.mjs";
 import { linePython } from "./methods/line-python.mjs";
@@ -39,7 +38,6 @@ function probeSegPython(python, run) {
 export function runDoctor({
   root,
   env = process.env,
-  home = os.homedir(),
   exists = fs.existsSync,
   run = spawnSync,
   statfs = p => fs.statfsSync(p),
@@ -49,16 +47,16 @@ export function runDoctor({
 } = {}) {
   const code = state ?? codeState(root);
   const gitOk = Boolean(code.git && !code.dirty);
-  const lp = linePython({ env, home, exists, run, log: () => {}, warn: () => {} });
+  const lp = linePython({ env, root, exists, run, log: () => {}, warn: () => {} });
   const lineOk = Boolean(lp.ready && !lp.fallback && lp["scikit-image"]);
   let segPath = segPythonPath;
   if (segPath === undefined) {
-    try { segPath = resolveSegPython({ env, root, home }); } catch { segPath = null; }
+    try { segPath = resolveSegPython({ env, root }); } catch { segPath = null; }
   }
   const seg = probeSegPython(segPath, run);
   let samPath = samCheckpointPath;
   if (samPath === undefined) {
-    try { samPath = resolveSamCheckpoint({ env, root, home }); } catch { samPath = null; }
+    try { samPath = resolveSamCheckpoint({ env, root }); } catch { samPath = null; }
   }
   const samOk = Boolean(samPath && exists(samPath));
   const fsInfo = statfs(root);

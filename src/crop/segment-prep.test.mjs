@@ -46,30 +46,29 @@ cp "${fixture}.png" "$out/$base.png"; cp "${fixture}.json" "$out/$base.json"; ec
 }
 const runs = root => (fs.existsSync(path.join(root, 'runs')) ? fs.readFileSync(path.join(root, 'runs'), 'utf8').split('\n').filter(Boolean).length : 0);
 
-test('the seg python: --segpython, then PAINTER_SEG_PYTHON, then the repo and home venvs; a named path must exist', t => {
-  const root = temp(t), home = temp(t);
-  assert.equal(resolveSegPython({ root, home, env: {} }), null);
-  const homeVenv = touch(path.join(home, 'painter-strategy/.venv-seg/bin/python'));
+test('the seg python: --segpython, then PAINTER_SEG_PYTHON, then the repo venvs; a named path must exist', t => {
+  const root = temp(t);
+  assert.equal(resolveSegPython({ root, env: {} }), null);
   const plain = touch(path.join(root, '.venv/bin/python'));
-  assert.equal(resolveSegPython({ root, home, env: {} }), homeVenv, 'a seg venv beats a plain .venv');
+  assert.equal(resolveSegPython({ root, env: {} }), plain);
   const repoVenv = touch(path.join(root, '.venv-seg/bin/python'));
-  assert.equal(resolveSegPython({ root, home, env: {} }), repoVenv);
-  assert.equal(resolveSegPython({ root, home, env: { PAINTER_SEG_PYTHON: plain } }), plain);
-  assert.equal(resolveSegPython({ given: homeVenv, root, home, env: { PAINTER_SEG_PYTHON: plain } }), homeVenv);
-  assert.throws(() => resolveSegPython({ given: '/no/such/python', root, home, env: {} }), /does not exist/);
-  assert.throws(() => resolveSegPython({ root, home, env: { PAINTER_SEG_PYTHON: '/no/such/python' } }), /PAINTER_SEG_PYTHON/);
+  assert.equal(resolveSegPython({ root, env: {} }), repoVenv, 'a seg venv beats a plain .venv');
+  assert.equal(resolveSegPython({ root, env: { PAINTER_SEG_PYTHON: plain } }), plain);
+  assert.equal(resolveSegPython({ given: repoVenv, root, env: { PAINTER_SEG_PYTHON: plain } }), repoVenv);
+  assert.throws(() => resolveSegPython({ given: '/no/such/python', root, env: {} }), /does not exist/);
+  assert.throws(() => resolveSegPython({ root, env: { PAINTER_SEG_PYTHON: '/no/such/python' } }), /PAINTER_SEG_PYTHON/);
 });
 
-test('the SAM checkpoint: --samcheckpoint, then PAINTER_SAM_CHECKPOINT, then ~/painter-models, then work/models', t => {
-  const root = temp(t), home = temp(t);
-  assert.equal(resolveSamCheckpoint({ root, home, env: {} }), null);
+test('the SAM checkpoint: --samcheckpoint, then PAINTER_SAM_CHECKPOINT, then work/models', t => {
+  const root = temp(t), elsewhere = temp(t);
+  assert.equal(resolveSamCheckpoint({ root, env: {} }), null);
   const work = touch(path.join(root, 'work/models/sam_vit_b_01ec64.pth'));
-  assert.equal(resolveSamCheckpoint({ root, home, env: {} }), work);
-  const models = touch(path.join(home, 'painter-models/sam_vit_b_01ec64.pth'));
-  assert.equal(resolveSamCheckpoint({ root, home, env: {} }), models);
-  assert.equal(resolveSamCheckpoint({ root, home, env: { PAINTER_SAM_CHECKPOINT: work } }), work);
-  assert.equal(resolveSamCheckpoint({ given: work, root, home, env: { PAINTER_SAM_CHECKPOINT: models } }), work);
-  assert.throws(() => resolveSamCheckpoint({ given: '/no/sam.pth', root, home, env: {} }), /does not exist/);
+  assert.equal(resolveSamCheckpoint({ root, env: {} }), work);
+  const models = touch(path.join(elsewhere, 'sam_vit_b_01ec64.pth'));
+  assert.equal(resolveSamCheckpoint({ root, env: { PAINTER_SAM_CHECKPOINT: models } }), models);
+  assert.equal(resolveSamCheckpoint({ given: work, root, env: { PAINTER_SAM_CHECKPOINT: models } }), work);
+  assert.throws(() => resolveSamCheckpoint({ given: '/no/sam.pth', root, env: {} }), /does not exist/);
+  assert.throws(() => resolveSamCheckpoint({ root, env: { PAINTER_SAM_CHECKPOINT: '/no/sam.pth' } }), /PAINTER_SAM_CHECKPOINT/);
 });
 
 test('the cache key changes with the target bytes, the backend and the segmentation code', async t => {
@@ -108,8 +107,8 @@ test('a map is made once per target, registered under the target name, logged wi
 test('SAM is required by default: no checkpoint, a failing script or a k-means map all stop the run', async t => {
   const { root, image } = await repo(t);
   const python = await fakePython(root, { backend: 'kmeans' });
-  const log = () => {}, home = temp(t);
-  assert.throws(() => prepareSegments({ image, root, opt: options({ segpython: python }), log, env: {}, home }), /SAM is required and no sam_vit_b_01ec64.pth was found/);
+  const log = () => {};
+  assert.throws(() => prepareSegments({ image, root, opt: options({ segpython: python }), log, env: {} }), /SAM is required and no sam_vit_b_01ec64.pth was found/);
   const checkpoint = touch(path.join(root, 'sam.pth'));
   assert.throws(() => prepareSegments({ image, root, opt: options({ segpython: python, samcheckpoint: checkpoint }), log, env: {} }), /asked for sam, the map .* was made by kmeans/);
   const failing = await fakePython(temp(t), { fail: true });

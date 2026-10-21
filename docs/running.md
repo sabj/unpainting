@@ -16,7 +16,7 @@ Each image example needs an empty output folder. On a repeat run, move the previ
 
 The image planner is experimental. The stroke plan is the small, reproducible demonstration of brushwork and drying. The paintings in the README come from separate whole-painting plans; see [Painting sequences](examples.md).
 
-The default recipe, a preset of painter settings, includes an opening drawing and closing ink accents. The opening medium follows the source: ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`), a light pencil drawing when it does not. `--outlinemedium ink|graphite` sets the medium, and `--drawing first|last|both|none|detect` sets the order.
+The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
 
 Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
 
@@ -56,9 +56,9 @@ node tools/paint-plate.mjs --image path/to/picture.jpg --width 540 \
 
 Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. To save an animation too, install ffmpeg and remove `--video 0`.
 
-The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a drawing first and last in the medium and weight the plan chooses, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture`, `glaze-gains` and `trumbull`, which also picks its fixed palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is the default before 2026-10-10, which ran the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [overfitting.md](overfitting.md) lists every preset and fitted item.
+The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a pencil drawing first, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture`, `glaze-gains` and `trumbull`, which also picks its fixed palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is painter V096's recipe, which runs the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [Tuned settings](techniques.md#tuned-settings) lists every preset and fitted item.
 
-`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with an earlier version of the painter (2026-10-06). Today's commands paint differently.
+`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with an earlier painter than V100, which paints them differently.
 
 ## Main command-line controls
 
@@ -74,8 +74,8 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
-| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first` (`--recipe v096`: `both`) |
-| `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` (0.2.0: pencil drawing; ink on request) | same; plan may override |
+| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first`; `--recipe v096` uses `both` |
+| `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` | same; plan may override |
 | `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |
 | `--inkk`, `--inkkscale` | three positive comma-separated absorption values; scale factor | profile absorption; scale 1 | same; plan may override |
 | `--sheetmm` | physical width in mm | 152.4; physical brushes fit to postcard if omitted | postcard fit if omitted |
@@ -90,6 +90,8 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--washinkfile` | line-file base: the target's own ink removed from wash demand under `--washinkfree 1`, when the pen draws a different (cleaner) file | the `--drawingfile` | same |
 
 `fast` approximates the final part of ordinary drying; `full` keeps the full drying schedule. They need not produce the same pixels. [techniques.md](techniques.md) lists the other recipe flags and off switches. There is no complete reference for every experimental flag. Unknown recipe names add no recipe flags.
+
+Source-line extraction is an explicit choice (`--linesource auto` or `source-ink`), and final darks need `--finaldarks 1`. Without a prepared drawing or these options, the bounded drawing path runs.
 
 ## Agent skills
 
@@ -124,13 +126,11 @@ Run `npx knip` from the repository root. The configuration includes benchmark co
 
 Paint Lab copies `src/media` through `tools/lab/sync-site-media.mjs`. The source `permeability` export is used by the browser GPU sheet through that copy. Generated `cpu-stroke-dirty.js` keeps the source exports for synchronization. The generated sheet's optional `sheet-par.mjs` import is Node-only; Paint Lab does not enable CPU threads. `ffmpeg` and `codex` are external executables, not npm dependencies.
 
-In 0.2.0-rc.1, source-line extraction is an explicit choice (`--linesource auto` or `source-ink`), and final darks require `--finaldarks 1`. The held-out Guardi run exposed over-heavy marks when these ran automatically. Without a prepared drawing or these options, the bounded drawing path remains in use.
-
 ### Complete stroke-budget studies
 
 `--strokebudget 250` (or `2500`) plans a complete picture within that many
 physical brush, pen and graphite strokes, including clean-water brush marks.
-The default is `0` (off); ordinary renders keep their existing settings.
+The default is `0` (off).
 Budgets must be integers of at least 25. Use `--marks 1 --video 0` to save the
 full material tape and stage frames without encoding a movie.
 

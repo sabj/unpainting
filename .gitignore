@@ -4,6 +4,8 @@ task/
 output/
 node_modules
 .venv/
+.venv-seg/
+.venv-lines/
 *.pre-damp-runs
 __pycache__/
 *.pyc

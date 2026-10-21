@@ -31,10 +31,9 @@ export async function runSpeedSequence(argv, script) {
       let code;
       try {
         code = await new Promise((resolve, reject) => {
-          // The sweep service enables replay tapes by default. They are not
-          // retained by this timing runner, and their final JSON string can
-          // exceed V8's string limit at twice density. Disable recording before
-          // execution rather than creating and then deleting the tape.
+          // This timing runner keeps no replay tape, and a tape's final JSON
+          // string can exceed V8's string limit at twice density. Disable
+          // recording before execution rather than creating and then deleting the tape.
           const child = spawn(process.execPath, [script, ...childArgs, ...runs[i], '--marks', '0'], { stdio: ['ignore', fd, fd], env: { ...process.env, W2_CACHE_DIR: cache } });
           child.once('error', reject); child.once('close', resolve);
         });

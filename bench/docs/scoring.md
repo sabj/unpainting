@@ -4,7 +4,7 @@ A try is one model session that paints the requested targets. Each painting gets
 
 The painting toolkit given to models writes each final image.
 
-Judge version: `J1`. All published scores are J1. A new panel, rubric or image protocol gets a new J number; scores from different J versions are not compared. Current judge calls use OpenRouter zero-data-retention providers; earlier published calls used Together. Results group by painter, sim and judge version. See [versions](../../docs/versions.md).
+Judge version: `J1`. All published scores are J1. A new panel, rubric or image protocol gets a new J number; scores from different J versions are not compared. `JUDGE_ROUTE` picks the judge route: `together` (default, needs `TOGETHER_API_KEY`) or `openrouter` (zero-data-retention providers, needs `OPENROUTER_API_KEY`). Results group by painter, sim and judge version. See [versions](../../docs/versions.md).
 
 ## The finished painting
 
@@ -32,7 +32,7 @@ The judge version identifies the rules; the profile identifies the sampling budg
 python3 bench/scorer/score_painting.py --target target.png --image painting.png --judge J2 --profile lite --out score.json
 ```
 
-Omitting `--profile` retains full J2 unless `BENCH_SCORE_CALLS` explicitly selects 1, 3 or 5 calls, which now records the corresponding profile. A conflicting explicit profile and environment override is refused. Other J2 call counts are refused. J1 retains its historical default and call-count overrides; J2 profiles cannot be applied to J1. Historical toolkit runs retain J1. New explicit V4 benchmark profiles select J2-lite or J2-full; see [profiles](profiles.md).
+Omitting `--profile` retains full J2 unless `BENCH_SCORE_CALLS` explicitly selects 1, 3 or 5 calls, which records the corresponding profile. A conflicting explicit profile and environment override is refused. Other J2 call counts are refused. J1 keeps its own default and call-count overrides. J2 profiles cannot be applied to J1. The V1 to V3 toolkit runs use J1. New explicit V4 benchmark profiles select J2-lite or J2-full; see [profiles](profiles.md).
 
 Every profile requires all three judges. A missing judge leaves the composite incomplete; it never produces a score from a smaller panel. Failed, truncated and malformed responses use the existing bounded J2 retries with both images: up to three judgement attempts, each with up to three HTTP attempts, followed by at most two top-up rounds for still-missing samples. A top-up round requests only the missing samples. Lite reduces initial calls by 80% versus full; actual cost and latency depend on retries and provider behavior.
 
@@ -40,7 +40,7 @@ Results record `judgeProfile`, the requested and required counts and panel in `s
 
 With one valid call per judge, repeatability is unmeasured: `pm` is null and `repeatabilityMeasured` is false. `judgeSpread` is the range of the judges' overall scores and measures panel disagreement, not repeatability. Repeated profiles retain the existing `pm` dispersion calculation; it is not a calibrated confidence interval. Escalate both sides of an ambiguous comparison to the same profile. Changes to the artistic rubric or image protocol require a new judge version, rather than a cheaper J2 profile.
 
-Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the 1224 px V4 and V5 renders are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. The V4 and V5 scores published before 2026-10-10 came from a 720 px upscale path; each `run.json` keeps them as `scoreOld`.
+Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the 1224 px V4 and V5 renders are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. Some V4 and V5 records keep an older 720 px upscaled score as `scoreOld`; results do not use it.
 
 Score from the toolkit's own `final.png`, not from a compressed thumbnail. The marks metric is sensitive to compression: a 600 px WebP of a published painting gave a marks score 2.4 points lower than the PNG it was made from.
 
@@ -61,7 +61,7 @@ The published scorer has these checks.
 | Ships | 8.76 | 9.04, 8.70, 8.54 | 3.74 | 4.77 |
 | Trumbull | 8.57 | 8.57, 8.57, 8.57 | 3.31 | 5.08 |
 
-The Blurred and Posterized columns are from the original controls run (one call per judge), kept as the check that each target beats its degraded copies. The earlier Target values (9.21, 6.88, 9.04, 8.90) came from that run and are replaced.
+The Blurred and Posterized columns come from a controls run with one call per judge. They check that each target beats its degraded copies.
 
 - Retest: 10 paintings scored twice differed by 0.14 on average and 0.34 at most.
 - Cost: scoring the published runs took 4,189 judge calls and $19.95.
@@ -94,6 +94,6 @@ only when every planned target has complete final and progression scores. Failed
 the CLI returns failure. `--judges-only` preserves progression and still requires it for a complete result.
 
 Explicit profiles with missing targets or tries keep their planned denominator and receive no aggregate ranking.
-Partial per-target scores remain inspectable. Historical J1 aggregation and published artifacts are unchanged.
-Sampling profiles preserve the existing artistic rubric: the current progression rubric is not yet technique-aware
-enough for an automatic ink-first promotion gate. Human process review remains necessary for RC7 decisions.
+Partial per-target scores remain inspectable. J1 aggregation and published runs use their own rules.
+Sampling profiles keep the artistic rubric. The progression rubric does not judge technique well enough to gate
+an ink-first painting automatically, so a person reviews the process before a release.

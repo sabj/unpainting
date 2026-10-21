@@ -4,7 +4,7 @@
 //
 //   node tools/readme/pipeline-map.mjs --site DIR --run DIR [--out docs/img/pipeline-map.png] [--fonts DIR] [--playwright DIR]
 //
-// --site    the Part 1 post's images/pipeline folder (samjackson.org), which holds the pictures for cards 01, 03 and 04:
+// --site    the Part 1 post's images/pipeline folder, which holds the pictures for cards 01, 03 and 04:
 //           the beach study's regions, palette, stroke samples, saved stages and review.
 // --run     a painter run (tools/paint-plate.mjs --out DIR) with frames.json. Card 02 shows its blank paper
 //           (the first "paper" frame), its reserved lights (the frisket, laid over the run's

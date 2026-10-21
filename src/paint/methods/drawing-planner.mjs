@@ -23,7 +23,7 @@ const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 /** The OpenRouter request body for a target (PNG bytes). */
 function plannerRequest(png, model = PLANNER_MODEL) {
   return { model, temperature: 0, max_tokens: 2000, reasoning: { effort: 'minimal', exclude: true }, response_format: { type: 'json_object' },
-    provider: { zdr: true, data_collection: 'deny', ignore: ['Hyperbolic'] }, usage: { include: true },
+    provider: { zdr: true, data_collection: 'deny' }, usage: { include: true },
     messages: [{ role: 'user', content: [{ type: 'text', text: PLANNER_PROMPT }, { type: 'image_url', image_url: { url: 'data:image/png;base64,' + png.toString('base64') } }] }] };
 }
 

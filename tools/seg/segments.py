@@ -218,7 +218,6 @@ def find_checkpoint(explicit):
     if explicit:
         return explicit if os.path.exists(explicit) else None
     for p in (os.environ.get('PAINTER_SAM_CHECKPOINT', ''), os.environ.get('SAM_CHECKPOINT', ''),
-              os.path.join(os.path.expanduser('~'), 'painter-models', 'sam_vit_b_01ec64.pth'),
               'work/models/sam_vit_b_01ec64.pth'):
         if p and os.path.exists(p):
             return p
@@ -489,7 +488,7 @@ def segment_regions(path, args):
         try:
             if checkpoint is None:
                 raise RuntimeError('no SAM checkpoint found (--checkpoint, PAINTER_SAM_CHECKPOINT, SAM_CHECKPOINT, '
-                                   '~/painter-models, work/models)')
+                                   'work/models)')
             masks, info = sam_regions.sam_masks(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), checkpoint, args.model, args.points)
             field, used = sam_regions.sam_partition(masks, lab)
             backend = {**info, 'laid': used, 'checkpoint': os.path.basename(checkpoint)}

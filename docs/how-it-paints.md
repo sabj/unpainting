@@ -30,7 +30,7 @@ Code: `src/media/paper.mjs` builds the surface and `src/media/sheet.mjs` moves t
 
 ## 2. Ink
 
-The ink goes down first as a drawing and dries before the washes. Default sepia ink can rewet and lift under them; black ink resists lifting better. The default recipe, a preset of painter settings, also adds closing ink accents.
+The ink goes down first as a drawing and dries before the washes. Sepia ink can rewet and lift under them; black ink resists lifting better. A plan can add closing ink accents after the washes.
 
 The pen is a dip pen with a finite load of walnut ink. Four things change its line:
 

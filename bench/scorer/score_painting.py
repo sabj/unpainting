@@ -127,7 +127,7 @@ def data_uri(img, max_side=768):
 def _post(model, messages, max_tokens=8000, timeout=150, retries=3):
     payload = {"model": ROUTER_MODELS[model] if PROVIDER == "openrouter" else model, "messages": messages, "max_tokens": max_tokens, "temperature": 0}
     if PROVIDER == "openrouter":
-        payload["provider"] = {"zdr": True, "data_collection": "deny", "ignore": ["Hyperbolic"]}
+        payload["provider"] = {"zdr": True, "data_collection": "deny"}
     body = json.dumps(payload).encode()
     hdr = {"Authorization": "Bearer " + os.environ[KEY], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     last = None
@@ -187,7 +187,7 @@ def _post_j2(model, messages, max_tokens=J2_MAX_TOKENS, timeout=150, retries=3, 
     """J2: _post that also returns the finish_reason and appends every HTTP attempt to log (a list)."""
     payload = {"model": ROUTER_MODELS[model] if PROVIDER == "openrouter" else model, "messages": messages, "max_tokens": max_tokens, "temperature": 0}
     if PROVIDER == "openrouter":
-        payload["provider"] = {"zdr": True, "data_collection": "deny", "ignore": ["Hyperbolic"]}
+        payload["provider"] = {"zdr": True, "data_collection": "deny"}
     body = json.dumps(payload).encode()
     hdr = {"Authorization": "Bearer " + os.environ[KEY], "User-Agent": "unpaint-bench-judge/1", "Content-Type": "application/json"}
     log = [] if log is None else log

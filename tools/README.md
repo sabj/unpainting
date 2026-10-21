@@ -39,12 +39,14 @@ The space around and between panels is transparent, and captions are mid grey, s
 node tools/readme/animations.mjs
 ```
 
-`readme/pipeline-map.mjs` builds the pipeline map, `docs/img/pipeline-map.png`. The planning, painting and review cards (01, 03 and 04) use the beach study pictures from the Part 1 post's `images/pipeline` folder on samjackson.org. The preparation card (02) uses one painter run: its blank paper frame, its frisket (the watercolor term for masking fluid) laid over the target, and its last drawing frame before any wash. Paint the run with `--marks 1` so the frisket comes from the stroke record. Rendering needs Playwright and Chrome.
+`readme/pipeline-map.mjs` builds the pipeline map, `docs/img/pipeline-map.png`. The planning, painting and review cards (01, 03 and 04) use the beach study pictures from the [Part 1 post](https://samjackson.org/writing/whats-a-painting-anyway-part-1/)'s `images/pipeline` folder. The preparation card (02) uses one painter run: its blank paper frame, its frisket (the watercolor term for masking fluid) laid over the target, and its last drawing frame before any wash. Paint the run with `--marks 1` so the frisket comes from the stroke record. Rendering needs Playwright and Chrome.
 
 ```sh
-node tools/readme/pipeline-map.mjs --site /path/to/samjackson.org/site/writing/posts/2026/09/whats-a-painting-anyway-part-1/images/pipeline \
-  --run /path/to/run --fonts /path/to/samjackson.org/site/fonts --playwright /path/to/samjackson.org
+node tools/readme/pipeline-map.mjs --site /path/to/images/pipeline \
+  --run /path/to/run --fonts /path/to/fonts --playwright /path/to/playwright-project
 ```
+
+`--site` is the Part 1 post's `images/pipeline` folder. `--fonts` is a fonts folder with regular and italic faces. `--playwright` is a folder with Playwright installed.
 
 `readme/paper-figure.mjs` builds `docs/img/paper-texture.webp`: a flat wash and a graded wash painted and dried on the painter's default cold-press paper, beside a crop of a real wash by Winslow Homer at the same 0.08 mm a pixel. Each simulated pixel is one sheet cell. The header gives the reference crop's URL and scale. It runs the sheet physics on the CPU for about a minute.
 
