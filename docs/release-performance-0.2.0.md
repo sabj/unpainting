@@ -63,12 +63,8 @@ The painting phase accounts for **90.8% of the net saving**; plan construction a
 
 The command records match after normalizing `--out`. Both completed renders exited with code 3 for recorded unused options, retained their painting outputs, and were not interrupted by a resource guard. The candidate log records a segmentation-cache hit. Peak sampled process-tree RSS was 11,669 MiB for 0.1.1 and 10,075 MiB for 0.2.0; these are diagnostic samples, not a memory guarantee.
 
-Evidence is retained on the benchmark Mini under `~/unpainting-release-score-20261019/`:
+The command lines, phase logs and wall-time and memory records are kept in the private benchmark archive.
 
-- Candidate command and phase log: `fresh-native-pilot-20261019/memory11/preflight-0.2.0-command.json` and `preflight-0.2.0.log` in the same directory.
-- Baseline command and phase log: `fresh-native-pilot-20261019/memory-pressure/preflight-0.1.1-command.json` and `preflight-0.1.1.log` in the same directory.
-- Completed wall-time and RSS records: `fresh-native-pilot-20261019/memory-pressure/preflight-results.json`.
-- Input files: `matched-540/plans/1/south-france/`.
 
 Input SHA-256 values checked when recording this note:
 
@@ -123,8 +119,8 @@ Painter lifetime includes pauses and resume/output work. Its pause-adjusted valu
 
 Qwen HTTP 503 responses left the first V5/2 evaluation incomplete. Scoring alone was retried under the same J1 protocol; the painting was retained. Both evaluation attempts are preserved. Provider failures, queue idle time and scoring retries must remain separate from renderer speed in release claims.
 
-Fresh-pilot evidence is under `fresh-native-pilot-20261019-r2/`: `protocol.json`, `scoreboard.json`, `runs/sol-high/<release>/`, `score-retry-candidate-v5-2/`, and `queue-priority-change.json`. Harness corrections made for this pilot belong to benchmark infrastructure, not to the measured 0.2.0 engine SHA.
+Fresh-pilot evidence (kept in the private benchmark archive): `protocol.json`, `scoreboard.json`, `runs/sol-high/<release>/`, `score-retry-candidate-v5-2/`, and `queue-priority-change.json`. Harness corrections made for this pilot belong to benchmark infrastructure, not to the measured 0.2.0 engine SHA.
 
-The candidate commit alone cannot reproduce this exact pilot: it requires the archived common harness in `fresh-native-pilot-20261019-r2/harness/`. Its `protocol.json` freezes the file hashes and records seven corrections shared by both arms: engine/version routing; managed runner approvals; J1 run labels; harness-owned flag handling and disabled run cache; epoch timestamps in the controller; self-checks against the assigned clean engine; and progression-response retries with a larger token limit after truncation. These corrections were not applied to either measured engine checkout. The longer progression replies explain part of the scoring-time difference; that difference is not an engine-performance result.
+The candidate commit alone cannot reproduce this exact pilot: it requires the archived common harness. Its `protocol.json` freezes the file hashes and records seven corrections shared by both arms: engine/version routing; managed runner approvals; J1 run labels; harness-owned flag handling and disabled run cache; epoch timestamps in the controller; self-checks against the assigned clean engine; and progression-response retries with a larger token limit after truncation. These corrections were not applied to either measured engine checkout. The longer progression replies explain part of the scoring-time difference; that difference is not an engine-performance result.
 
 The first V4 pair is complete; remaining V5 and model comparisons must be reported separately as they finish. Keep the fixed-plan replay result scoped to this image until repeated or broader measurements support a general speed claim.
