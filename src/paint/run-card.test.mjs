@@ -31,6 +31,7 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
       code: { commit: "abc12345", git: true, dirty: false, tracked: [], untracked: [] },
       segments: { backend: "sam", model: { backend: "sam", model: "vit_b" }, regions: 42, foreground: 18, cached: true },
       gpu: { backend: "gpu", adapter: "apple-m4", device: "Metal" },
+      palette: { keys: ["hansa", "cerulean"], guard: { action: "replaced", forced: ["sepia"], own: ["hansa", "cerulean"] } },
       phases: ["load 0.2s", "paint 12.1s"],
       seconds: 12.3,
       exitCode: 0,
@@ -44,6 +45,7 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
     assert.equal(typeof card.targetSHA256, "string");
     assert.equal(typeof card.planSHA256, "string");
     assert.equal(typeof card.paintingSHA256, "string");
+    assert.equal(card.palette.guard.action, "replaced");
     assert.equal(fs.existsSync(path.join(tmp, "run-card.json")), true);
     assert.equal(card.continuedChecks.total, 1);
     assert.equal(card.continuedChecks.checks["bare-paper contact"].count, 1);

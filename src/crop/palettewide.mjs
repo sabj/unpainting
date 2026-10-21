@@ -12,6 +12,7 @@ import { chromaOf } from './palette.mjs';
 import { channelDensity, unmix } from './pigments.mjs';
 import { renderLayers } from '../media/km.mjs';
 import { labPlanes, deltaE2000 } from '../eval/colour.mjs';
+import { guardForcedBox, guardNote } from './paint-guard.mjs';
 
 const hueChroma = (L, a1, b1, a2, b2) => deltaE2000([L, a1, b1], [L, a2, b2]);
 
@@ -118,7 +119,7 @@ export function coverKeyHues(sample, colours, paints, { max = 6, library = BOX, 
  * recovered lean palette; a monochrome lean palette is returned unchanged.
  * @returns { palette, note }
  */
-export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, min = 3, max = 6, K = 8, minShare = 0.005, minChroma = 8, keys = null, add = null } = {}) {
+export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, min = 3, max = 6, K = 8, minShare = 0.005, minChroma = 8, keys = null, add = null, guard = null } = {}) {
   if (!keys && (lean.monochrome || lean.pigments.length < 2)) return { palette: lean, note: `palette wide: the picture is one fluid (chroma ${lean.chroma.toFixed(3)}), kept ${lean.pigments.length} (lean)` };
   const sample = sampleSource(px, w, h, paperRGB, { stride: 3 });
   const colours = localColours(sample, { K, minChroma, minShare });
@@ -129,17 +130,24 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
     : chooseBox(px, w, h, paperRGB, { min, max, gain, score });
   // --paintsadd a,b,c: the fitted pans stay and these are added for passages that need them, so the figure keeps its
   // colours
-  const covered = keys ? { paints: chosen.paints, added: [], coverage: null } : coverKeyHues(sample, colours, chosen.paints, { max });
+  // --paintguard dE: a forced box that fits more than dE worse than the painter's own pick is extended or replaced
+  // (paint-guard.mjs). The own pick is the same fit the painter makes without --paints.
+  const guarded = keys && guard?.threshold > 0
+    ? guardForcedBox({ forced: chosen.paints, own: coverKeyHues(sample, colours, chooseBox(px, w, h, paperRGB, { min, max, gain, score }).paints, { max }).paints, score, threshold: guard.threshold, mode: guard.mode, max: guard.max })
+    : null;
+  const covered = keys ? { paints: guarded ? guarded.paints : chosen.paints, added: [], coverage: null } : coverKeyHues(sample, colours, chosen.paints, { max });
   const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !covered.paints.some(q => q.key === p.key));
-  const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length;
+  const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length || (guarded && guarded.decision.action !== 'kept');
   const e = changed ? score(paints) : chosen.e, trail = changed ? [...chosen.trail, e] : chosen.trail;
   const n = w * h, chroma = chromaOf(channelDensity(px, n, paperRGB), n);
   const loc = localError(sample, colours, paints);
   const palette = { pigments: paints.map(p => boxPigment(p)), ink: 0, chroma, paintChroma: chroma, inkApart: 0, monochrome: false, wide: true, box: { keys: paints.map(p => p.key), sampleError: e, trail } };
+  if (guarded) palette.box.guard = guarded.decision;
   if (covered.added.length || covered.coverage?.loss > 1e-6) palette.hueCoverage = covered.coverage;
   const cols = colours.map((r, q) => `${r.grey ? 'greys ' : ''}h ${r.h.toFixed(0)} C ${r.C.toFixed(0)} ${(100 * r.share).toFixed(1)}% off ${loc.per[q].toFixed(1)}`).join('; ');
   const coverageNote = palette.hueCoverage ? `; key hues ${covered.coverage.loss < 1e-6 ? 'covered' : `gap ${covered.coverage.loss.toFixed(1)} at palette limit`}${covered.added.length ? `, added ${covered.added.join(', ')}` : ''}` : '';
-  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}` };
+  const guardLine = guarded ? `\n${guardNote(guarded.decision)}` : '';
+  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${guardLine}` };
 }
 
 /**
