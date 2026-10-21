@@ -23,8 +23,10 @@ export function createPen(opts = {}) {
   if (PENS) pen._tapeId = penId(opts);
   return pen;
 }
-function makePen({ nib = 0.8, flex = 1.5, reservoir = 250, wick = 0.15, feed = 1.2, drop = 2, starve = 0.45, depth = 0.4, travel = 1.5, sizing = 1.5, patchy = 0.3, reach = 12, strength = 1, pad = 0 } = {}) {
-  return { pad, nib, flex, capacity: reservoir, ink: 0, wick, feed, dropSize: drop, drop: 0, starve, depth, travel, sizing, patchy, reach, strength, conc: null, clock: 0 };
+// `damp` (0..1, default 0): the least dampness the pen finds in the paper it touches, as on a sheet not yet quite dry
+// after a wash (--inkdamp). Ink on damp paper feathers along the fibres (touch below).
+function makePen({ nib = 0.8, flex = 1.5, reservoir = 250, wick = 0.15, feed = 1.2, drop = 2, starve = 0.45, depth = 0.4, travel = 1.5, sizing = 1.5, patchy = 0.3, reach = 12, strength = 1, pad = 0, damp = 0 } = {}) {
+  return { damp: Math.max(0, Math.min(1, damp)), pad, nib, flex, capacity: reservoir, ink: 0, wick, feed, dropSize: drop, drop: 0, starve, depth, travel, sizing, patchy, reach, strength, conc: null, clock: 0 };
 }
 
 /** Dip: fill the reservoir with ink at `conc` (pigment per unit of water, per pigment); `amount` is how full (0..1). */
@@ -55,7 +57,7 @@ function touch(pen, sheet, x, y, p, dt, nw) {
   // the paper pulls against the suction in the slit, which grows as the meniscus draws back
   const pull = pen.drop > 0 ? 1 : smooth((fill - 0.01) / pen.starve);
   const dropR = pen.drop > 0 ? Math.min(2, 0.6 * Math.sqrt(pen.drop)) : 0, rc = (nw == null ? (pen.nib + pen.flex * p) / 2 : nw / 2) + dropR + pen.pad;
-  const dampOf = j => Math.min(1, (sheet.ever[j] ? s[j] / capacity[j] : 0) + (M[j] ? 1 : 0));
+  const dampOf = j => Math.min(1, Math.max(pen.damp, (sheet.ever[j] ? s[j] / capacity[j] : 0) + (M[j] ? 1 : 0)));
   const refresh = j => { if (pen.seen[j] < clock - stale) { pen.A[j] = 0; pen.given[j] = 0; } pen.seen[j] = clock; };
   const cells = []; // [cell, water wanted, path distance]
 

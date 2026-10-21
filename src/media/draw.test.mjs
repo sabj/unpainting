@@ -102,3 +102,17 @@ test('the dry-pen gate draws on paper that would not dry, counts it, and stops o
   try { assert.throws(() => dryPenGate({ drySheet: () => {} })({ sheet: wetSheet(), pen, footprint: [0, 0, 2, 2], index: 4 }), /Paper still wet before ink gesture/); }
   finally { resetChecks(); }
 });
+
+test('a pen on damp paper lays a wider, feathered line', () => {
+  const profile = damp => {
+    const w = 120, h = 31, y = 15, sheet = createSheet(makePaper(w, h, { seed: 5 }), [pigment]);
+    drawGestures(sheet, [{ points: Array.from({ length: 9 }, (_, k) => ({ x: 10 + 100 * k / 8, y, nw: 1.7, s: 0.6 })) }], new Float32Array(w * h).fill(0.6), w, h, { ink: [1], peak: 1, pen: { nib: 1.7, flex: 0, drop: 0.1, damp } });
+    const t = thickness(sheet)[0], rows = [];
+    for (let yy = 0; yy < h; yy++) { let s = 0; for (let x = 30; x < 90; x++) s += t[yy * w + x]; rows.push(s / 60); }
+    const peak = Math.max(...rows);
+    return { peak, fwhm: rows.filter(v => v >= peak / 2).length };
+  };
+  const dry = profile(0), damp = profile(0.5);
+  assert.equal(dry.fwhm, profile(0).fwhm, 'damp 0 is the dry pen');
+  assert.ok(damp.fwhm > dry.fwhm, `half-height width ${dry.fwhm} dry, ${damp.fwhm} damp`);
+});
