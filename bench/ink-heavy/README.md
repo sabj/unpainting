@@ -42,11 +42,12 @@ On a staged run the pen layer is `layer-prepink.jpg` times `layer-finishink.jpg`
 
 ## Full-size A/B
 
-Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and three configurations:
+Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and these configurations:
 
-- `pencil`: the default drawing.
-- `rc1v2`: `--outlinemedium ink --drawing both --inkrecipe v2`. Paint it from tag `v0.2.1-rc.1` for the release candidate as tagged.
-- `wash`: `--inkrecipe wash`, from this branch.
+- `d020`: the default painter at tag `v0.2.0`.
+- `pencil`: `--inkrecipe none`, the pencil drawing, from this branch.
+- `auto`: the default painter from this branch. It chooses the pen-and-wash recipe or pencil from the pen line in the target.
+- `wash`: `--inkrecipe wash`, to force the recipe.
 
 Run `npm run doctor` first. The wash recipe traces lines with `copy-lines.py`. That needs the line python (`PAINTER_LINES_PYTHON` or `.venv-lines`) with NumPy and OpenCV; without it, the run logs a `!!!` fallback line and traces less.
 
@@ -69,10 +70,11 @@ paint() { # paint <config> <flags...>
     done
   done
 }
-paint pencil
+paint pencil --inkrecipe none
+paint auto
 paint wash --inkrecipe wash
-# in a checkout of v0.2.1-rc.1, with the same T and paint():
-#   paint rc1v2 --outlinemedium ink --drawing both --inkrecipe v2
+# in a checkout of v0.2.0, with the same T and paint(), and with the h36-a image given by an absolute path:
+#   paint d020
 ```
 
 Score each painting three times with J1. J1 on one painting moves by up to 0.33 with nothing changed.
@@ -80,7 +82,7 @@ Score each painting three times with J1. J1 on one painting moves by up to 0.33 
 ```sh
 for row in $(echo "$T"); do
   name=${row%%:*}; rest=${row#*:}; img=${rest%%:*}
-  for cfg in pencil rc1v2 wash; do for seed in 0 1 2; do for rep in 1 2 3; do
+  for cfg in d020 pencil auto wash; do for seed in 0 1 2; do for rep in 1 2 3; do
     python3 bench/scorer/score_painting.py --target "$img" --image "work/ink-heavy/$cfg/$name-s$seed/painting.jpg" \
       --style "pen and ink with wash" --judge J1 --out "work/ink-heavy/$cfg/$name-s$seed/j1-$rep.json"
   done; done; done

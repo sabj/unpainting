@@ -2,45 +2,43 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## 0.2.1-rc.2 - unreleased
+## 0.2.1 - unreleased
 
-Painter V101, sim 102, judges J1. Release candidate 2. Defaults still match 0.2.0.
+Painter V101, sim 102, judges J1. Tag `v0.2.1`.
 
-### Ink on ink-heavy works
+By default, 0.2.1 scores 6% higher than 0.2.0 on pen-and-wash works (J1 5.94 against 5.58 over eight targets) and the same within judge noise on the published Opus 5.5 V5 plans (6.37 against 6.32 with ink, 6.18 against 6.15 with pencil). See the [comparison](docs/release-performance-0.2.1.md).
 
-- `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). It draws the source's own pen lines whole, with no pencil, and follows the source's line width and darkness along each stroke. It also matches the ink's darkness and hue to the source's lines. It turns ink on by itself.
-- New flags, each off by default: `--linemeasure`, `--inkdarkmatch`, `--inkhue source`, `--inkbleed`, `--linegapmm`, `--lineminmm`, `--lineinkonly`, `--copylinesmin` and `--linecleanup 0`.
-- Fix: the ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) now reach the line files that the linked drawing stages write. In 0.2.1-rc.1, a run whose stages came from the automatic stage choice drew those files unchanged. There, `--inkrecipe v2` applied only `--inkwidthfloor` and `--inkdamp`.
-- `tools/judge/ink-lines-report.mjs` measures a painting's pen lines against its source's: placement, darkness at the source's lines, hue and crops.
-- `bench/ink-heavy/` holds an eight-target ink set with sources, licences and the A/B commands.
-
-The set was painted locally at 720 px in fast mode, 2 seeds per configuration, each painting scored 3 times with J1. Mean J1: the wash recipe 5.68, 0.2.1-rc.1 with `--inkrecipe v2` 5.28, 0.2.0 ink 5.12, and the default pencil 5.08. The wash recipe gained 0.5 to 0.75 over rc.1 v2 on Guardi, Tiepolo's Bacchus and Ariadne and both Yale sketches, on both seeds. On the other four targets it moved within the 0.33 judge noise. The full-size A/B is not yet run.
-
-## 0.2.1-rc.1 - unreleased
-
-Painter V101-dev, sim 102, judges J1. Release candidate 1. Ink and colour changes are opt-in flags. Defaults match 0.2.0. On the published Opus 5.5 V5 plans, neither moved J1 beyond judge noise. Ink v2 scored +0.05 and colour v2 +0.06 against the same build.
+| Target | 0.2.0 J1 | 0.2.1 J1 | Score change |
+|---|---:|---:|---:|
+| Yale gateway (h36-a) | 5.91 | 6.71 | +13.6% |
+| Yale (h34-a) | 5.99 | 6.64 | +10.9% |
+| Tiepolo, Punchinello on a camel | 5.67 | 6.18 | +9.0% |
+| Tiepolo, Bacchus and Ariadne | 5.19 | 5.56 | +7.2% |
+| Tiepolo, Burial of Punchinello | 5.35 | 5.71 | +6.6% |
+| Guardi, A Colonnade | 6.01 | 6.27 | +4.4% |
+| Fragonard, Rinaldo (brush only) | 4.76 | 4.92 | +3.4% |
+| Rembrandt, Woman Reading | 5.79 | 5.53 | -4.5% |
+| All eight | 5.58 | 5.94 | +6.3% |
 
 ### Ink
 
-- The automatic stage choice now adds ink stages only when ink is asked for. In 0.2.0 it could add ink on most pictures. The default drawing is now pencil only.
-
-The ink v2 flags below are off by default. Ink still needs `--outlinemedium ink`.
-
-- `--inkrecipe v2` turns on all of the following.
-- `--linesupport 5` keeps only the line parts the target shows.
-- `--linesmooth 1` smooths stepped traces.
-- `--inkwidthfloor 1` sets a minimum line width.
-- `--inkdarkcap 1` caps ink darkness at the target's own lines.
-- `--inkdamp 0.3` feathers the pen.
+- `--inkrecipe auto` is the default. It reads how much of the source is pen line, scaled to 1200 px wide. At 0.5% or more (`--penfirst`) it uses the pen-and-wash recipe below. Otherwise it uses no recipe, and the drawing is pencil only. A run that sets `--drawing`, `--drawingfile`, `--drawinglast`, `--outlinemedium`, `--linesource`, `--drawingstages` or `--stages` keeps what it set, so a plan's drawing is never replaced. The log says what auto chose and why. `--inkrecipe none` turns it off.
+- `--inkrecipe wash` is the pen-and-wash recipe ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). It draws the source's own pen lines whole, with no pencil, and follows the source's line width and darkness along each stroke. It matches the ink's darkness and hue to the source's lines and turns ink on by itself. Against 0.2.1's own pencil drawing it scores +9.9% over the eight-target set.
+- The automatic stage choice adds ink stages only when ink is asked for. 0.2.0 could add ink on most pictures. The default drawing is pencil only.
+- `--inkrecipe v2` is an opt-in set of ink flags: `--linesupport 5`, `--linesmooth 1`, `--inkwidthfloor 1`, `--inkdarkcap 1` and `--inkdamp 0.3`. It scored below the pen-and-wash recipe on every pen target. It still needs `--outlinemedium ink`.
+- New flags, each off unless a recipe sets it: `--linemeasure`, `--inkdarkmatch`, `--inkhue source`, `--inkbleed`, `--linegapmm`, `--lineminmm`, `--lineinkonly`, `--copylinesmin` and `--linecleanup 0`.
+- The ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) reach the line files that the linked drawing stages write.
+- `tools/judge/ink-lines-report.mjs` measures a painting's pen lines against its source's: placement, darkness at the source's lines, hue and crops.
+- `bench/ink-heavy/` holds the eight-target ink set with sources, licences and the A/B commands.
 
 ### Colour
 
-These are off by default.
+These are off by default. None was positive beyond noise against 0.2.0, so none is on.
 
-- `--paintguard dE` checks a paint box forced with `--paints` or `washes.paints`. It acts when the box fits the target more than dE (CIEDE2000) worse than the painter's own pick. It then adds the own pick's paints, or takes the own pick and keeps the forced paints that still fit (`--paintguardmode add|merge|replace`). `run-card.json` records the decision.
-- `--techcal 1` charges passages in value band 4 and darker for what their technique lays on the sheet. In 0.2.0 the graded shadow glazes lay about half of their booked pigment. The swatch calibration measures one wide brush on a small square, which the sheet does not match. On Hills and South France at 540 px, delivery in the darkest 5% of cells rises from 0.80 to 0.98 and from 0.83 to 0.90.
+- `--paintguard dE` checks a paint box forced with `--paints` or `washes.paints`. It acts when the box fits the target more than dE (CIEDE2000) worse than the painter's own pick, and then adds or swaps in the own pick's paints (`--paintguardmode add|merge|replace`). `run-card.json` records the decision. Mean J1 change over the five plan targets: 0.00. Trumbull: -2.8%.
+- `--techcal 1` charges passages in value band 4 and darker for what their technique lays on the sheet. Mean J1 change over seven targets: +0.4%. Hills +3.3%, South France -3.8%.
 - `--deliveryreport 1` writes `delivery-by-band.json`: pigment delivered over booked, by how much paint each cell was booked.
-- `npm run bench:run -- ... --no-base-palette` stops the harness forcing Trumbull's seven-paint box. A plan's own palette token or `--paints` still applies.
+- `npm run bench:run -- ... --no-base-palette` stops the harness forcing Trumbull's seven-paint box. Trumbull scores 4.8% lower without it.
 
 ## 0.2.0 - 2026-10-20
 

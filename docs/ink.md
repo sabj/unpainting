@@ -10,7 +10,7 @@ In the third image of each row, the pen drawing is thin, brown and hard-edged. I
 
 ## Ink or pencil
 
-`--outlinemedium` defaults to graphite, a light pencil underdrawing, while ink is reworked. Ink is drawn only when asked for. Pencil is light, neutral and does not move under water, so the washes cover it.
+`--outlinemedium` defaults to graphite, a light pencil underdrawing. Ink is drawn when asked for, and by the pen-and-wash recipe when the source is a pen drawing (see [Pen and wash ink](#pen-and-wash-ink)). Pencil is light, neutral and does not move under water, so the washes cover it.
 
 `--outlinemedium ink` draws in ink. `--outlinemedium auto` chooses from the target. It draws in ink if at least 0.5% of the picture reads as ink line (`--penfirst`), and in pencil below that. Ink on a target without line would add marks the original lacks.
 
@@ -83,7 +83,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 
 ## Pen and wash ink
 
-`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101 from 0.2.1-rc.2. It turns ink on by itself.
+`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101. It turns ink on by itself.
 
 `--inkrecipe` is `auto` by default. Auto reads the source first, scaled to 1200 px wide, whatever `--width` is. If the ink separator finds at least `--penfirst` (0.5%) of it to be pen line, the run uses the `wash` recipe. Otherwise it uses no recipe, and the drawing is pencil only. A run that sets `--drawing`, `--drawingfile`, `--drawinglast`, `--outlinemedium`, `--linesource`, `--drawingstages` or `--stages` is left as it set it, so a plan's drawing is never replaced. A resumed painting keeps the recipe it started with. The log says which recipe auto chose and why. `--inkrecipe none` turns the recipe off.
 

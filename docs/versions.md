@@ -15,8 +15,9 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 |---|---|---|---|
 | 0.1.0, 0.1.1 | V096 | 100 | J1 |
 | 0.2.0 | V100 | 102 | J1 |
+| 0.2.1 | V101 | 102 | J1 |
 
-V100 sets the drawing medium to pencil by default. Ink comes from a plan, `--outlinemedium ink`, or the automatic stage choice on a run with no prepared drawing. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
+V100 sets the drawing medium to pencil by default. Ink comes from a plan, `--outlinemedium ink`, or the automatic stage choice on a run with no prepared drawing. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. V101 adds `--inkrecipe auto`, which draws a pen drawing with the pen-and-wash recipe and leaves other works on pencil, and fixes the automatic stage choice so it adds ink stages only when ink is asked for. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
 
 ## What each result records
 
