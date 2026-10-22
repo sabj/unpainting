@@ -10308,7 +10308,9 @@ async function mount() {
     },0);
   }
   function captureReprojection(value,painted){
-    if(ORBIT_DRAG_DISPLAY!=='reproject'){pinPageFrame(value);warmOrbitLines(value);return;}
+    // The turned bodies are prepared after the settle crossfade, when nothing
+    // on the page moves; at completion this froze the last frames for ~0.6 s.
+    if(ORBIT_DRAG_DISPLAY!=='reproject'){const pair=morphPair;setTimeout(()=>{if(pair!==morphPair)return;pinPageFrame(value);warmOrbitLines(value);},REPROJECTION.fadeMs+80);return;}
     const source=reprojectSource(value,{anyView:true});if(!source||!painter)return;
     let key,view;
     try{key=reprojectionKey(source.pair,source.t,value.scene);view={...source.pair.view};}catch(error){console.warn('Reprojection capture skipped',error);return;}
