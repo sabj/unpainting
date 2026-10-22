@@ -12,7 +12,8 @@ This is `--inkrecipe wash`. Each stage names its module and file.
       v
  1. line source          src/paint/methods/linework-plan.mjs (prepareLineSource)
       |   lineart maps   tools/seg/sketch-map.py        fine + coarse models, fused, cached by target SHA-256
-      |   trace          src/paint/methods/line-model.mjs -> tools/seg/copy-lines.py --kind line-map
+      |   trace          src/paint/methods/line-model.mjs -> tools/seg/copy-lines.py --kind stroke --gate <map>
+      |                  the source's own pen strokes, centreline and width, where the map sees a line
       |   fallback       tools/seg/copy-lines.py on the target's own ink (logged with !!!)
       v
  2. decide, hold, measure   src/paint/methods/ink-lines-file.mjs -> ink-decide-file.mjs, ink-decide.mjs, line-class.mjs, ink-labels.mjs
