@@ -1688,6 +1688,18 @@ test('capped types show their gills, pores or teeth at the default view and at e
 // Starting a turn must not rescale the plate: each figure keeps its size and
 // place from the rest plate to the first frame of the drag and to the plate
 // painted after it.
+test('the death cap stands in a drawn cup volva that hides the stipe base',async()=>{
+ for(const seed of ['927027159','1517235776']){
+  const study=buildStudy(generateSpecimen(seed,'amanita-3'));
+  const stem=study.washes.find(w=>w.role==='stem'),cup=study.washes.find(w=>w.role==='veil-shadow'&&w.individual===stem.individual&&stem.reserves.includes(w.shape))?.shape;
+  assert.ok(cup,'the cup\'s front wall hides the stipe pigment');
+  const outline=study.ink.filter(k=>k.role==='veil'&&k.nativeSelected&&k.individual===stem.individual);
+  assert.ok(outline.length>0,'the cup outline is always drawn');
+  const xs=cup.map(p=>p[0]),sw=Math.max(...stem.shape.map(p=>p[0]))-Math.min(...stem.shape.map(p=>p[0]));
+  assert.ok(Math.max(...xs)-Math.min(...xs)<sw*1.7,'about 1.5 stipe widths across, not twice');
+ }
+});
+
 test('a turn keeps every figure the size and place it has on the rest plate',async()=>{
  const m=await import('./mushrooms.mjs');
  const skip=/shadow|ground|habitat|background|glaze|accent|spore|deposit|cast|contact|wood|log|litter|moss/;

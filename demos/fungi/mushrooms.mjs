@@ -3812,14 +3812,19 @@ function decorateCatalog(study,genome,sketch=false){
   // hides the stipe base.
   if(['sac','boot'].includes(p.veil)||stemType==='amanita-3')for(const m of study.washes.filter(m=>m.role==='stem')){
     selectIndividual(m);
-    const death=stemType==='amanita-3',b=bounds(m.shape),cx=b.x+b.w*.5,y=b.y+b.h*(death?.96:.9)-(death?29:0),r=b.w*(death?1:.55),hgt=death?b.h*.25:54,top=y+29-hgt;
+    const death=stemType==='amanita-3',b=bounds(m.shape),cx=b.x+b.w*.5,y=death?b.y+b.h-25:b.y+b.h*.9,r=b.w*(death?.76:.55),hgt=death?b.h*.22:54,top=y+29-hgt;
     const lobes=death?3:1,rim=Array.from({length:25},(_,i)=>{const t=i/24,x=mix(cx-r,cx+r,t);return [x,top+(death?hgt*.12*Math.abs(Math.sin(t*Math.PI*lobes+sample(m.individual??0,431)*2))-hgt*.06:(t*(1-t))*-8+5)];});
     const sack=death?[...curve([cx-r,top],[cx-r*1.12,top+hgt*.55],[cx-r*.7,y+31],[cx,y+29],18),...curve([cx,y+29],[cx+r*.8,y+30],[cx+r*1.15,top+hgt*.5],[cx+r,top],18),...rim.slice().reverse()]
       :[...curve([cx-r,y-25],[cx-r*1.2,y+8],[cx-r*.6,y+31],[cx,y+29],18),...curve([cx,y+29],[cx+r*.8,y+28],[cx+r*1.2,y+4],[cx+r,y-20],18)];
-    if(death)for(const k of study.ink)if(k.individual===m.individual&&/stem|fibres|stipe/.test(k.role??''))k.exclude=[...(k.exclude??[]),sack];
-    add(death?sack.slice(0,37):sack,'veil',1,.65,null,m.reserves);
+    if(death)for(const k of study.ink)if(k.individual===m.individual&&/stem|fibres|stipe|ring|relief/.test(k.role??''))k.exclude=[...(k.exclude??[]),sack];
+    const inkFrom=study.ink.length;add(death?sack:sack,'veil',1,death?.78:.65,null,m.reserves);
+    // The cup's own outline is always drawn, and its front wall hides the stipe's pigment.
+    if(death){for(let k=inkFrom;k<study.ink.length;k++)study.ink[k].nativeSelected=true;m.reserves=[...(m.reserves??[]),sack];}
     add(death?rim:curve([cx-r,y-25],[cx-r*.3,y-12],[cx+r*.5,y-5],[cx+r,y-20],18),'veil',.8,.55,null,m.reserves);
-    wash(sack,death?{ochre:.35,umber:.25,paynes:.4}:{ochre:.3,umber:.3,paynes:.4},death?.045:.06,'veil-shadow');
+    wash(sack,death?{ochre:.35,umber:.25,paynes:.4}:{ochre:.3,umber:.3,paynes:.4},death?.07:.06,'veil-shadow');
+    // The cup's mouth: the stipe goes down into shadow inside the torn rim.
+    if(death){const mouth=[...rim,...rim.slice().reverse().map(([x,yy],i)=>[x,yy+hgt*(.16+.08*Math.sin(i*.7))])];wash(mouth,{umber:.4,paynes:.45,sienna:.15},.09,'veil-shadow');
+      for(let k=0;k<4;k++){const x=mix(cx-r*.7,cx+r*.7,(k+.5)/4)+(sample(k+(m.individual??0)*7,433)-.5)*r*.2;add(curve([x,top+hgt*.3],[x-2,top+hgt*.55],[x+1,top+hgt*.75],[x-1,y+24],8),'veil',.45,.4,sack,m.reserves);}}
   }
   // Form hatching: strokes run parallel to each body's own silhouette on the
   // side turned from the light, in broken, pressure-varying contacts with a
