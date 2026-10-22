@@ -107,14 +107,14 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds that give the model more help each time.
+[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds with more help each time.
 
-- V1 to V3, the model paints. It writes scripts that lay every brush and pen stroke through the toolkit. Each painting gets about 15 minutes and at most 2,500 strokes. V2 adds technique guides; V3 adds the model's own earlier attempts.
-- V4 and V5, the model directs a painting harness. It writes a plan (regions, layering, brushes and lines), and the painter turns it into strokes with no stroke limit. At set points the model can look at the painting and revise the rest of the plan. V5 adds feedback from the previous try. The harness does much of the work, so V4 and V5 scores sit closer together.
+- V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
+- V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try.
 
-All leaderboard results use painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1. Release 0.1.1 adds Gemini 4 Argon, Gemini 3.8 Flash and the Muse models, and changes two V4 and V5 harness rules ([changelog](CHANGELOG.md)). Release 0.2.0 (painter V100, sim 102) replayed the published Opus 5.5 V5 plans instead of rerunning every round ([0.2.0 comparison](docs/release-performance-0.2.0.md)). To reproduce, check out tag `v0.1.0` or `v0.1.1` ([versions](docs/versions.md)).
+The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.2.0 or 0.2.1: those releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
 
-Models ran at their highest reasoning setting, xhigh where offered. Gemini 4 Argon and Gemini 3.8 Flash top out at high; Argon also ran at medium. Haiku 4.5, DeepSeek V4.1 Flash and MiniMax M3 have no reasoning setting.
+Models ran at their highest reasoning setting.
 
 | Benchmark version | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|
