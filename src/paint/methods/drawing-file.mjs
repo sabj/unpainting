@@ -92,7 +92,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
     log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
     // --inkhand 1: the hand's speed along each stroke (slower on curves, which lays a wider, darker line, faster on straights)
     // without a second taper or a blot at the nib's first touch: the gestures are already tapered
-    if (num('inkhand', 0) > 0) return r.strokes.map(g => inkHand(g, { base, inLen: 0, outLen: 0, dwell: 0, pull: { x: 0.42, y: 0.91 }, speedWidth: 0.3 }));
+    if (num('inkhand', 0) > 0) return r.strokes.map(g => inkHand(g, { base, inLen: 0, outLen: 0, dwell: 0, pull: { x: 0.42, y: 0.91 }, speedWidth: 0.15 }));
     return r.strokes;
   }
   const perPoint = q => (q.width == null && q.weight == null ? q : {
@@ -149,7 +149,7 @@ export function inkHand(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.35, en
     if (q.nw != null && speedWidth > 0) out.nw *= (c > 0.05 ? 1 - slow * c : fast) ** -speedWidth;
     if (q.nw != null && pull) {
       const a = P[Math.max(0, k - 2)], b = P[Math.min(n - 1, k + 2)], dl = Math.hypot(b.x - a.x, b.y - a.y) || 1, dot = ((b.x - a.x) * pull.x + (b.y - a.y) * pull.y) / dl;
-      out.nw *= 0.75 + 0.5 * Math.max(0, dot);
+      out.nw *= 0.85 + 0.3 * Math.max(0, dot);
     }
     if (k === 0) out.dwell = dwell;
     return out;
