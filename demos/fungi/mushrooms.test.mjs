@@ -2473,6 +2473,12 @@ test('a live painting\'s paced waits and shown frames do not count against the d
   assert.equal(result.complete,true);assert.equal(result.water,0);assert.ok(result.elapsedMs>2500);
 });
 
+test('the repaint after a turn lays its ink almost at once and its washes unpaced',async()=>{
+  const {settlePacing,NATIVE_PACING}=await import('./mushrooms.mjs');
+  assert.deepEqual(settlePacing(),{inkMs:NATIVE_PACING.inkMs,depositMs:NATIVE_PACING.depositMs});
+  const turned=settlePacing({turned:true});assert.equal(turned.depositMs,0);assert.ok(turned.inkMs<=NATIVE_PACING.inkMs/4);
+});
+
 test('Paint playback pacing follows brush travel and stays inside its bounds', async () => {
   const {nativePlaybackPacing,PLAYBACK}=await import('./mushrooms.mjs');
   assert.deepEqual(nativePlaybackPacing({}),{inkMs:PLAYBACK.ink.minMs,washMs:PLAYBACK.wash.minMs});

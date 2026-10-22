@@ -7946,7 +7946,10 @@ export const NATIVE_COMPOSED_FRAME_MS=400;
 // only spaces frames in time; the transported pigment and final pixels do not
 // depend on it. Shortened from 1500/750 ms to pay for the 512-cell wash grid,
 // form glazes and cast shadows while keeping a full settle under ~8 s.
-export const NATIVE_PACING=Object.freeze({inkMs:1100,depositMs:450});
+export const NATIVE_PACING=Object.freeze({inkMs:1100,depositMs:450,turnedInkMs:250});
+// The settle stream's pacing. After a turn the drawing's lines are already on
+// screen, so the repaint lays its ink almost at once and its washes unpaced.
+export function settlePacing({turned=false}={}){return turned?{inkMs:NATIVE_PACING.turnedInkMs,depositMs:0}:{inkMs:NATIVE_PACING.inkMs,depositMs:NATIVE_PACING.depositMs};}
 export const NATIVE_PAINT_LIMITS=Object.freeze({width:512,maxCells:218624,maxChannels:14,maxCheckpoints:12,cacheBytes:24*1024*1024,maxSteps:5000,maxMs:30000});
 export const NATIVE_TRANSPORT=Object.freeze({dt:.6,flowIters:1,evap:.01,paperDry:.006,edgeEvap:.009,gran:2});
 
@@ -9319,7 +9322,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
   const weights=inkMarks.map(m=>Math.max(6,pathLength(m.points))),total=weights.reduce((a,b)=>a+b,0),inkStarted=performance.now();let index=0,done=0;
   // Paint playback: an artist's pace, the tool's state with every frame.
   const playback=!!payload.playback,pacing=playback?nativePlaybackPacing({inkLength:total,washMm:nativeWashTravel(planNativePassages(nativePlateWashes(study)))*PLAYBACK.plateMm/1200}):null;
-  const inkMs=playback?pacing.inkMs:NATIVE_PACING.inkMs;let cursorNow=null;
+  const settle=settlePacing({turned:!playback&&!!payload.turned}),inkMs=playback?pacing.inkMs:settle.inkMs;let cursorNow=null;
   const drawBatches=(context,batches)=>drawNativeInkBatches(context,painter,batches);
   // Fixed groups make overlapping alpha exactly independent of frame cadence.
   // Completed groups are rasterized once; only the current group is transient.
@@ -9404,7 +9407,7 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
     const bitmap=patch.transferToImageBitmap();
     emit({revision,native:true,patch:{x:rect.x,y:rect.y,w:rect.w,h:rect.h},index:frameIndex++,stage,progress,complete:false,blob:null,frameBlob:null,elapsed:performance.now()-started,bitmap,metrics:{...frameMetrics(metrics),renderTimings:{...renderTimings},totalMs:performance.now()-started,fictionalConstruction:!!genome.correspondence}},[bitmap]);
   };
-  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?0:NATIVE_PACING.depositMs,travelMs:playback?pacing.washMs:0,skipPacing:()=>nativePlaybackSkip.on,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
+  const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?0:settle.depositMs,travelMs:playback?pacing.washMs:0,skipPacing:()=>nativePlaybackSkip.on,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
     const live=playback&&!nativePlaybackSkip.on;
     if(playback&&!live&&!complete&&!force&&performance.now()-lastFullAt<PLAYBACK.refreshMs)return;
     lastFrame=performance.now();
@@ -10390,7 +10393,7 @@ async function mount() {
     cancelRefinement();dirty=false;if(!painter||!a||!b)return;
     // keepFrame: the last morph frame already shows this plate's geometry in
     // colour, so it stays until the native painting crossfades over it.
-    const value=snapshot();if(keepFrame){value.keepFrame=true;value.landing=true;}
+    const value=snapshot();if(keepFrame){value.keepFrame=true;value.landing=true;}if(plateViewport?.isOrbitHolding())value.turned=true;
     sketchQueue.input(value);if(settle)sketchQueue.release();
   }
   function drawPreview(value){
@@ -10499,7 +10502,7 @@ async function mount() {
       nativeInkPaperRaster??=painter.paper.getContext('2d').getImageData(0,0,painter.paper.width,painter.paper.height);
       // Structured clone keeps immutable template arrays in the main thread;
       // cancellation can terminate the entire Worker without losing material.
-      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale,playback:!!rerun});
+      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale,playback:!!rerun,turned:!!value.turned});
     }catch(error){fail(error.message);}
     return promise;
   }
