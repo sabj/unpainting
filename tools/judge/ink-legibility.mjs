@@ -3,6 +3,7 @@
 // cuts the named feature crops (bench/ink-heavy/features.json) from drawing-opening.png, and asks a vision model about
 // each crop alone: first what it is, with no hint, then which listed parts it can see (bench/ink-heavy/legibility.json).
 //   node tools/judge/ink-legibility.mjs --label <name> [--only <subject,..>] [--render 1] [--vision 1] [--note <text>]
+//   --paintflags "--inkhatch 1"   more flags for the painter
 //   --judge codex   ask the codex CLI (codex exec -i) instead of agy
 //   --render 0 --runs <label> --from <file>   cut crops from another label's renders, or another file of the run
 // Output under work/ink-legibility/<label>/: runs/<subject>/ (the render), crops/<subject>__<crop>/crop.png (the crop
@@ -32,7 +33,7 @@ async function render(name) {
   const out = path.join(RUNS, name);
   if (opt('render', '1') === '0') { if (!fs.existsSync(path.join(out, FROM))) throw new Error(`no ${FROM} in ${out}`); return out; }
   fs.rmSync(out, { recursive: true, force: true });
-  const args = ['tools/paint-plate.mjs', '--image', spec[name].image, '--width', '540', '--inkrecipe', 'wash', '--inkres', '3', '--drawingonly', '1', '--seed', '0', '--video', '0', '--out', out];
+  const args = ['tools/paint-plate.mjs', '--image', spec[name].image, '--width', '540', '--inkrecipe', 'wash', '--inkres', '3', '--drawingonly', '1', '--seed', '0', '--video', '0', ...opt('paintflags', '').split(' ').filter(Boolean), '--out', out];
   const r = spawnSync('node', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
   fs.writeFileSync(path.join(RUNS, `${name}.log`), r.stdout + r.stderr);
   if (r.status !== 0 || !fs.existsSync(path.join(out, 'drawing-opening.png'))) throw new Error(`render of ${name} failed; see ${path.join(RUNS, name + '.log')}`);

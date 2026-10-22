@@ -9,6 +9,7 @@ import { labelRegions, shadowMassMask, INK_RULES, LABELS } from './ink-labels.mj
 import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
 import { geometrise, GEOM_DEFAULTS } from './line-geometry.mjs';
 import { foliageMask } from './line-foliage.mjs';
+import { hatchShadows, HATCH_DEFAULTS } from './line-hatch.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import sharp from 'sharp';
 
@@ -23,7 +24,7 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, foliage = false }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, foliage = false, hatch = null }) {
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   registerSegments(base, segments.stem);
   const seg = await loadSegments(base, w, h), segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
@@ -45,6 +46,9 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     const gres = geometrise(kept, { L, w, h, pxMm, isFeature }, geomOptions);
     kept = gres.lines; geometry = gres.stats;
   }
+  // --inkhatch 1 (pure ink only, off by default): shadow masses as cross-hatching, by tone, at a hand angle or along the form
+  let hatched = 0;
+  if (hatch) { const hs = hatchShadows(shadow, L, w, h, pxMm, { ...HATCH_DEFAULTS, angleDeg: hatch.angle, fromForm: hatch.form }); kept = [...kept, ...hs]; hatched = hs.length; }
   const lines = kept.map(g => fromPoints(g, g.points));
   let shadowCells = 0; for (let i = 0; i < shadow.length; i++) shadowCells += shadow[i];
   const record = {
@@ -54,6 +58,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     ...(foliageCells ? { foliageShare: foliageCells.reduce((s, v) => s + v, 0) / foliageCells.length } : {}),
     stats: r.stats,
     ...(geometry ? { geometry } : {}),
+    ...(hatch ? { hatchStrokes: hatched } : {}),
   };
   fs.writeFileSync(path.join(out, `ink-labels${stage === 'opening' ? '' : '-' + stage}.json`), JSON.stringify(record, null, 1) + '\n');
   const pct = v => `${(100 * v).toFixed(0)}%`, s = r.stats;
