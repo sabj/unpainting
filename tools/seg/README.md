@@ -70,7 +70,7 @@ pixel/continuity/width diagnostics after rendering.
 
 ### Lineart models for the wash recipe
 
-`--inkrecipe wash` takes its lines from the fused `sketch-map.py` map. It needs a python with NumPy, OpenCV, torch and controlnet_aux, and the published `lllyasviel/Annotators` weights (`sk_model.pth`, `sk_model2.pth`). The painter finds that python as it finds the line python (`--sketchpython`, `PAINTER_LINES_PYTHON`, `PAINTER_LINES_VENV`, then `.venv-lines`). A repository-local venv works:
+`--inkrecipe wash` traces the source's own pen strokes (`copy-lines.py --kind stroke --gate <map>`), kept where the fused `sketch-map.py` map also sees a line. `--kind stroke` writes each stroke's centreline with its own width; `--gate` drops strokes the map does not see. It needs a python with NumPy, OpenCV, torch and controlnet_aux, and the published `lllyasviel/Annotators` weights (`sk_model.pth`, `sk_model2.pth`). The painter finds that python as it finds the line python (`--sketchpython`, `PAINTER_LINES_PYTHON`, `PAINTER_LINES_VENV`, then `.venv-lines`). A repository-local venv works:
 
 ```sh
 python3 -m venv .venv-lines

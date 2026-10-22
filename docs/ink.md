@@ -85,7 +85,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 
 `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in 0.2.1-rc.2 (painter V101-dev), and it is off by default. It turns ink on by itself.
 
-- Lines. The pen draws the lines of the fused lineart map, traced whole, first and with no pencil. `tools/seg/sketch-map.py` runs the fine and coarse lineart models on the source at up to 1080 px wide and 1620 px tall (`--linemodelwidth`, `--linemodelside`) and fuses them. `tools/seg/copy-lines.py --kind line-map` traces the fused map. The trace keeps components of two cells or more and the fine model's marks inside busy detail regions, prunes only short stubs off forks, and simplifies at 0.15 cells (`--mapsmoothing`). The map is cached by the source's SHA-256 in `work/line-maps` (`--linemodelcache`). It runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy, OpenCV, torch and controlnet_aux, and the published weights. See `tools/seg/README.md`.
+- Lines. The pen draws the source's own pen strokes, first and with no pencil (`--linestroke 1`). `tools/seg/copy-lines.py --kind stroke` finds them with a black top-hat: a dark mark narrower than 1 mm against whatever is around it, which a wash mass or its edge is not. Each stroke is traced along its centre with its own width, and kept only where the fused lineart map also sees a line, which drops watercolour texture. A lineart model draws a thick stroke's two sides as two lines, so its own contours are used only with `--linestroke 0`. `tools/seg/sketch-map.py` runs the fine and coarse lineart models on the source at up to 1080 px wide and 1620 px tall (`--linemodelwidth`, `--linemodelside`) and fuses them. `tools/seg/copy-lines.py --kind line-map` traces the fused map. The trace keeps components of two cells or more and the fine model's marks inside busy detail regions, prunes only short stubs off forks, and simplifies at 0.15 cells (`--mapsmoothing`). The map is cached by the source's SHA-256 in `work/line-maps` (`--linemodelcache`). It runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy, OpenCV, torch and controlnet_aux, and the published weights. See `tools/seg/README.md`.
 - Models missing. When torch, controlnet_aux or the weights are missing, the run logs a `!!!` line, and `copy-lines.py` traces the source's own ink instead. `--linemodel strict` stops the run instead. `--linemodel 0` turns the models off.
 - Agreement. The fallback tracer takes any narrow dark mark, so it also traces wash edges and the rims of dark brush masses. `--copylinesagree 2` cuts each of its lines to the parts within 2 cells of what the ink separator reads as pen line. The model lines are not cut.
 - Fill. `--copylinesfill 1` fills the separator's pen line that no kept fallback trace covers with the separator's own narrow-ridge lines, cut the same way. It applies to the fallback only.
@@ -99,8 +99,9 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 - Foliage. `--inkfoliage 1` also marks cells as foliage where the source is green and busy: a green cast smoothed over a millimetre and a spread of L* within it. Leaves are wash. A trunk's own region stays a trunk, and a long smooth stroke through leaves is a branch and stays.
 - Shadows. In pen and wash a shadow is wash: its shape and its edges are never drawn, and only a pen line of its own, strong against both sides, stays on it. `--inkhatch 1` is for pure ink and is off by default. It hatches each shadow mass in strokes of 0.1 mm, spaced by tone (1.5, 0.75 and 0.5 mm as the shadow deepens) at a hand angle (`--hatchangle`, 45 degrees) or along the lines of equal tone (`--hatchform 1`), and crosses them where the shadow is deep.
 - Salience. `--inksalience 1` keeps what makes a subject read first: connected and closed geometry. Pieces whose ends meet within 0.6 mm form a set. A set stays when it is at least 6 mm long (or as long as the ground's own minimum), closed, or a face or hand feature. An isolated short piece is texture and is left to the wash. Sets that are long (20 mm) or closed are drawn first.
-- Model line widths. A model line's width is the narrower of the source's line and the lineart map's, held to 0.05 to 0.28 mm (`--linewidthmin`, `--linewidthmax`). A short or tightly curved piece, such as an eye or a pupil, is drawn 0.75 times as wide (`--linedetailratio`). The source's line is read with a probe of 0.2 mm either way (`--lineprobemm`), so a wash beside a line does not widen it. Pressure is the mean of the source's darkness and the map's confidence. With `--inkres N` the margin and the least contact of `--drawwidthmargin` and `--drawwidthmin` are N times smaller, as a fine cell is.
-- Darkness. `--inkdarkmatch 1.6` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are 1.6 times the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times.
+- Stroke widths. A traced stroke keeps its own width, up to 0.5 mm (`--linestrokemax`), and the pen's contact is 0.75 of it (`--drawwidthgain`), a little finer than the source. The hand varies it along the stroke: it lands light and lifts to a hairline over 0.56 mm and 2 mm (`--drawtaperin 4`, `--drawtaperout 14`, in steps of 0.14 mm on a 152 mm sheet; `--drawtaperstart 0.5`, `--drawtaperend 0.3`), slows and swells in curves, swells on strokes pulled down and to the right and thins on pushed ones (`--inkhand 1`), and sets a mark under 1.5 mm down in one motion, finer (`--drawflickmm`). Detail strokes are drawn at 0.75 of the pressure (`--drawdetailscale`). With `--inkres` of 2 or more there is no width floor, so a hairline can be finer than a painting pixel.
+- Model line widths (`--linestroke 0`). A model line's width is the narrower of the source's line and the lineart map's, held to 0.05 to 0.28 mm (`--linewidthmin`, `--linewidthmax`). A short or tightly curved piece, such as an eye or a pupil, is drawn 0.75 times as wide (`--linedetailratio`). The source's line is read with a probe of 0.2 mm either way (`--lineprobemm`), so a wash beside a line does not widen it. Pressure is the mean of the source's darkness and the map's confidence. With `--inkres N` the margin and the least contact of `--drawwidthmargin` and `--drawwidthmin` are N times smaller, as a fine cell is.
+- Darkness. `--inkdarkmatch 1.3` draws 60 of the stage's real strokes on a blank sheet and scales the ink load until their line cores are 1.3 times the source's absorbance. It raises the load as well as lowering it, within 1/8 to 4 times.
 - Colour. `--inkhue source` turns the ink's absorption to the colour of the source's own line cells, so a bistre line stays brown and a black ink sketch stays neutral. `--inkhuegain 1.5` raises each channel's share to the power 1.5, because dense ink renders less brown than its absorption direction.
 - Wet lines. `--inkbleed 0.35` draws a fallback line the source shows wide and pale on paper 0.35 damp, so it feathers. Other lines, and every model line, are dry and crisp.
 
@@ -108,11 +109,15 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 |---|---|---|
 | `--outlinemedium`, `--drawing` | `ink`, `both` | `graphite`, `first` |
 | `--linesource` | `source-ink` | `none` |
-| `--linemodel` | 1 | 0 |
-| `--inkres` | 1620 over the width, from 1 to 3 | 1 |
-| `--drawinghand`, `--drawstroke` | 1, 0.1 | 0, 0.12 |
+| `--linemodel`, `--linestroke`, `--linestrokemax` | 1, 1, 0.5 | 0, 0, 0.5 |
+| `--inkres` | 2160 over the width, from 1 to 4 | 1 |
+| `--inkwidthfloor` | 0 with `--inkres` 2 or more, else 1 | 0 |
+| `--drawinghand`, `--drawstroke`, `--inkhand` | 1, 0.1, 1 | 0, 0.12, 0 |
+| `--drawtaperin`, `--drawtaperout`, `--drawtaperstart`, `--drawtaperend` | 4, 14, 0.5, 0.3 | 3, 5, 0.45, 0.3 |
+| `--drawdetailscale`, `--drawflickmm`, `--drawwidthgain` | 0.75, 1.5, 0.75 | 1, 0, 0.95 |
 | `--inkdecide`, `--inkshadowmask`, `--inkdropfaint`, `--inklabeljudge` | 1, 0, 0, `simple` | 0, 1, 1, `codex` |
-| `--inkgeom`, `--inkfoliage`, `--inksalience`, `--inkhatch` | off | off |
+| `--inkdarkrule`, `--inkjoin`, `--inkfoliage` | 1, 2.5, 1 | 0, 0, 0 |
+| `--inkgeom`, `--inksalience`, `--inkhatch` | off | off |
 | `--copylinesmin` | 0.005 | 0.025 |
 | `--copylinesagree`, `--copylinesfloor`, `--copylinesfill` | 2, 0.6, 1 | 0, 0, 0 |
 | `--drawingstages` | `off` | `auto` |
@@ -121,13 +126,12 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 | `--openingpressure` | 0.75 | 0.3 on a staged run |
 | `--linesupport`, `--linesmooth`, `--linesmoothcorner` | 5, 0.3, 50 | 0, 0, 50 |
 | `--linegapmm`, `--lineminmm` | 0.6, 0.3 | 2 and 3 file pixels |
-| `--inkwidthfloor` | 1 | 0 |
 | `--linemeasure` | 1 | 0 |
-| `--inkdarkmatch` | 1.6 | 0 |
+| `--inkdarkmatch` | 1.3 | 0 |
 | `--inkhue`, `--inkhuegain` | `source`, 1.5 | `profile`, 1 |
 | `--inkdamp`, `--inkbleed` | 0, 0.35 | 0, 0 |
 
-With `--linemeasure`, a line file drawn on a finer grid than the pen's is read on the pen's grid. The pen's grid is the painting's, or with `--inkres N` it is N times as fine. The wash recipe sets N to 1620 over the painting's width, from 1 to 3, so the pen sheet is near 1620 px wide: 3 at 540 px, 2 at 800 px, 1 from 1080 px. The saved `drawing-opening.png`, `painting.png` and frames are N times the painting's width. `--paperscan` cannot be used with `--inkres`. `--inkdarkmatch` writes `ink-dark-match.json`; with `--inkres` it draws and reads its sample on a fine sheet. A flag given on the command line wins over the recipe.
+With `--linemeasure`, a line file drawn on a finer grid than the pen's is read on the pen's grid. The pen's grid is the painting's, or with `--inkres N` it is N times as fine. The wash recipe sets N to 2160 over the painting's width, from 1 to 4, so the pen sheet is near 2160 px wide: 4 at 540 px, 3 at 720 px, 2 at 1080 px, 1 from 2400 px. The saved `drawing-opening.png`, `painting.png` and frames are N times the painting's width. `--paperscan` cannot be used with `--inkres`. `--inkdarkmatch` writes `ink-dark-match.json`; with `--inkres` it draws and reads its sample on a fine sheet. A flag given on the command line wins over the recipe.
 
 `--lineinkonly 1` also keeps a line only within a pixel of cells the ink separator reads as pen line. On the ink-led sketches it drops the brush marks in foliage that the tracer reads as lines. On a Guardi it also drops arch mouldings drawn beside wash, so the recipe leaves it off.
 
