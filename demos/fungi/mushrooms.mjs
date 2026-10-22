@@ -6243,6 +6243,22 @@ function connectedPlateStudy(pair,t,{scene='plain'}={}){
 // No raster paint, alpha blend, unmatched-part collapse or biological claim.
 const implicitBoxOf=paths=>{let x=Infinity,y=Infinity,r=-Infinity,b=-Infinity;for(const path of paths)for(const p of path){x=Math.min(x,p[0]);y=Math.min(y,p[1]);r=Math.max(r,p[0]);b=Math.max(b,p[1]);}return {x,y,w:r-x,h:b-y};};
 const implicitIgnored=/ground|habitat|bark|wood|section|cap-turn|cap-glaze|stem-shadow|fissure/;
+// A genome's catalog sketch and study depend on the genome alone, so the
+// first plate, the turned rest bodies and the morph share one build.
+const IMPLICIT_STUDIES=new WeakMap();
+function implicitStudyOf(genome){
+  let entry=IMPLICIT_STUDIES.get(genome);
+  if(!entry){entry={sketch:buildSketch(genome),full:buildStudy(genome)};IMPLICIT_STUDIES.set(genome,entry);}
+  return entry;
+}
+// A member beyond the drawn figures is its own grown individual of the find.
+const IMPLICIT_EXTRA_STUDIES=new WeakMap();
+function implicitExtraStudyOf(genome,index,members){
+  let byMember=IMPLICIT_EXTRA_STUDIES.get(genome);if(!byMember)IMPLICIT_EXTRA_STUDIES.set(genome,byMember=new Map());
+  const key=`${index}/${members}`;
+  if(!byMember.has(key)){const extra=extraMemberGenome(individualGenome(genome,index,members),index);byMember.set(key,{genome:extra,...implicitStudyOf(extra)});}
+  return byMember.get(key);
+}
 function implicitEndpointMember(genome,index,composition,cache,options={}){
   // Every endpoint is its own 3D body, so a resting plate and the first
   // morph frame share one drawing and one placement.
@@ -6250,11 +6266,11 @@ function implicitEndpointMember(genome,index,composition,cache,options={}){
   let entry=cache.get(genome);
   if(!entry){
     if(chart){const pair=createConnectedAnatomyPair(genome,genome,composition,options);const full=buildConnectedAnatomyPaintPlan(pair,0,{paletteA:seedShadePalette(genome.profileId,TYPE_PALETTES[genome.phenotype.palette],genome.values),paletteB:seedShadePalette(genome.profileId,TYPE_PALETTES[genome.phenotype.palette],genome.values)});entry={sketch:full,full,slots:typeof connectedCompositionAt==='function'?connectedCompositionAt(pair,0):pair.composition.members};}
-    else entry={sketch:buildSketch(genome),full:buildStudy(genome)};
+    else entry=implicitStudyOf(genome);
     cache.set(genome,entry);
   }
   let {sketch,full}=entry,count=Math.max(1,full.specimenCount||1);
-  if(index>=count){genome=extraMemberGenome(individualGenome(genome,index,composition.members.length),index);sketch=buildSketch(genome);full=buildStudy(genome);}
+  if(index>=count)({genome,sketch,full}=implicitExtraStudyOf(genome,index,composition.members.length));
   const owner=figureOwner(sketch,count,composition.members.length,index,genome.seed),owned=mark=>mark.individual===owner||count===1&&!Number.isInteger(mark.individual);
   let bodies=(full.washes??sketch.bodies).filter(mark=>owned(mark)&&!implicitIgnored.test(mark.role??''));
   if(!bodies.length)bodies=(full.washes??sketch.bodies).filter(mark=>!implicitIgnored.test(mark.role??''));

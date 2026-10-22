@@ -1670,6 +1670,20 @@ test('settled rest repaint keeps the dragged preview geometry, placement and was
 // Field-guide plates show a cap from a little below its rim, so the gills,
 // pores or teeth are in view. The default plate does; a turn must too, at
 // every yaw, rather than flipping to a view of the cap's top.
+test('the page builds each genome study once, and the shared build draws exactly what a fresh one does',async()=>{
+ const m=await import('./mushrooms.mjs'),{createHash}=await import('node:crypto');
+ const digest=value=>createHash('sha256').update(JSON.stringify(value,(k,v)=>ArrayBuffer.isView(v)?Array.from(v):v)).digest('hex');
+ const draw=(a,b)=>{
+  const morph=m.createImplicitMorph(a,b),{preparationMs,...stable}=morph,comp=m.orbitRestComposition(a,morph.composition);
+  return [digest(stable),digest(comp),digest(m.orbitRestStudy(a,comp,{view:{yaw:1.1,pitch:.3},shapeModifiers:{capDepth:1,stemBend:0}}))];
+ };
+ for(const [from,to] of [['agaric-4','bolete-1'],['bolete-1','amanita-1'],['amanita-1','parasol-1']]){
+  const a=generateSpecimen('woodland-042',from),b=generateSpecimen('woodland-042',to),first=draw(a,b);
+  assert.deepEqual(draw(a,b),first,`${from} -> ${to}: drawn again from the shared studies`);
+  assert.deepEqual(draw(generateSpecimen('woodland-042',from),generateSpecimen('woodland-042',to)),first,`${from} -> ${to}: drawn from new genomes`);
+ }
+});
+
 test('capped types show their gills, pores or teeth at the default view and at every turn',async()=>{
  const m=await import('./mushrooms.mjs');
  const area=poly=>{let a=0;for(let i=0;i<poly.length;i++){const q=poly[i],r=poly[(i+1)%poly.length];a+=q[0]*r[1]-r[0]*q[1];}return Math.abs(a)/2;};
