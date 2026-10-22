@@ -5075,6 +5075,8 @@ const caChartTopologies=new Map();
 // depend on the camera, so a drag re-projects it instead of rebuilding it.
 // Keyed by the member's full parameters; drag frames only (ink, interactive).
 const caWorldCache=new Map(),CA_WORLD_CACHE_LIMIT=24;
+const caResolution=(p,interactive)=>{const radial=Math.max(3,Math.round(p.radialRings??5));return {N:interactive?48:96,R:interactive?Math.max(3,Math.round(radial*.6)):radial,H:p.body3d?(interactive?8:20):(interactive?5:8)};};
+const caWorldKey=(p,slot)=>{const {N,R,H}=caResolution(p,true);return `${N}:${R}:${H}:${slot.id}:${JSON.stringify(slot.barkClip??null)}:${JSON.stringify(p)}`;};
 export function clearOrbitWorldCache(){caWorldCache.clear();}
 function caProjectCachedWorld(w,p,slot,project){
   const vertices=w.worldVertices.map(project);
@@ -5435,7 +5437,7 @@ function caMemberChart(p,slot,view={yaw:.12,pitch:.36},{chartOnly=false,inkOnly=
     return [slot.x+slot.scale*(lx*stretch-ly*shear)*(slot.fitX??1),slot.y+slot.scale*ly*(slot.fitY??1),depth*slot.scale+(slot.depth??0)];
   };
   if(chartOnly)return {chart:{lower,upper,stem,project}};
-  const worldKey=inkOnly&&interactive&&!meshOnly?`${N}:${R}:${H}:${slot.id}:${JSON.stringify(slot.barkClip??null)}:${JSON.stringify(p)}`:null,cachedWorld=worldKey?caWorldCache.get(worldKey):null;
+  const worldKey=inkOnly&&interactive&&!meshOnly?caWorldKey(p,slot):null,cachedWorld=worldKey?caWorldCache.get(worldKey):null;
   if(cachedWorld)return caProjectCachedWorld(cachedWorld,p,slot,project);
   const parts=p.body3d?caBodyParts(p,{lower,upper,stem,radius,bend,interactive}):[];
   const key=`${N}:${R}:${H}|${parts.map(part=>part.signature).join(',')}`,caChartTopology=caChartTopologies.get(key),vertices=[],worldVertices=[],faces=[],paths=[],edges=caChartTopology?.edges??new Map();
@@ -5594,11 +5596,15 @@ function caSmoothProjectedCurve(points,steps=2){
 }
 // Smooth value noise on a 3D lattice. Hand-drawn wander is sampled at world
 // positions on the body, so strokes turn with it instead of boiling on screen.
+// (Written out without closures: it runs for every sample of every drag frame.)
 function caNoise3(x,y,z,seed){
   const xi=Math.floor(x),yi=Math.floor(y),zi=Math.floor(z),fx=caSmooth(x-xi),fy=caSmooth(y-yi),fz=caSmooth(z-zi);
-  const h=(a,b,c)=>caNoise(Math.imul(a,73856093)^Math.imul(b,19349663)^Math.imul(c,83492791),seed);
-  const lerp2=(c)=>caMix(caMix(h(xi,yi,c),h(xi+1,yi,c),fx),caMix(h(xi,yi+1,c),h(xi+1,yi+1,c),fx),fy);
-  return caMix(lerp2(zi),lerp2(zi+1),fz);
+  const x0=Math.imul(xi,73856093),x1=Math.imul(xi+1,73856093),y0=Math.imul(yi,19349663),y1=Math.imul(yi+1,19349663);
+  let c=Math.imul(zi,83492791);
+  const near=caMix(caMix(caNoise(x0^y0^c,seed),caNoise(x1^y0^c,seed),fx),caMix(caNoise(x0^y1^c,seed),caNoise(x1^y1^c,seed),fx),fy);
+  c=Math.imul(zi+1,83492791);
+  const far=caMix(caMix(caNoise(x0^y0^c,seed),caNoise(x1^y0^c,seed),fx),caMix(caNoise(x0^y1^c,seed),caNoise(x1^y1^c,seed),fx),fy);
+  return caMix(near,far,fz);
 }
 const CA_CONTOUR_ROLES=new Set(['cap-contour','stem-contour','ring']);
 // The 2D plates' hand: lateral wander along each line, contours laid down as
@@ -5611,11 +5617,11 @@ function caHandInk(mark,visibility,p){
   const pts=mark.points.map((q,i)=>[q[0],q[1],q[2]??0,...(world[i]??[0,0,0])]),fragments=[];let current=[];
   const flush=()=>{if(current.length>1)fragments.push(current);current=[];};
   for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],count=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/step));
-    for(let j=0;j<count;j++){const q=a.map((v,k)=>v+(b[k]-v)*j/count);if(visibility.visible(q))current.push(q);else flush();}}
+    for(let j=0;j<count;j++){const q=[];for(let k=0;k<a.length;k++)q.push(a[k]+(b[k]-a[k])*j/count);if(visibility.visible(q))current.push(q);else flush();}}
   if(pts.length&&visibility.visible(pts.at(-1)))current.push(pts.at(-1));flush();
   const seed=caHash(mark.hand??mark.id),wander=(p?.handWander??1)*(contour?.6:.32),lam=contour?34:20;
   const field=(q,scale,salt)=>caNoise3(q[3]/scale,q[4]/scale,q[5]/scale,seed+salt);
-  const drift=(f,salt,amp)=>f.map((q,i)=>{const a=f[Math.max(0,i-1)],b=f[Math.min(f.length-1,i+1)],dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1,d=amp*(2*(field(q,lam,salt)-.5)+.7*(field(q,lam*.33,salt+5)-.5));return [q[0]-dy/l*d,q[1]+dx/l*d,...q.slice(2)];});
+  const drift=(f,salt,amp)=>f.map((q,i)=>{const a=f[Math.max(0,i-1)],b=f[Math.min(f.length-1,i+1)],dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1,d=amp*(2*(field(q,lam,salt)-.5)+.7*(field(q,lam*.33,salt+5)-.5)),r=[q[0]-dy/l*d,q[1]+dx/l*d];for(let k=2;k<q.length;k++)r.push(q[k]);return r;});
   const strokes=[];
   for(const f of fragments){
     const shaped=drift(f,0,wander);
@@ -5727,6 +5733,14 @@ export function connectedIntrinsicValues(pair,t){
 }
 // The camera a body is drawn with; the reprojection mesh uses the same one.
 const caBodyView=(pair,dimensions,view,t)=>dimensions[0]?.body3d?{...view,pitch:caBodyPitch(view.pitch,t<.5?pair.a:pair.b)}:view;
+// One step per body: the world geometry a drag frame re-projects (the
+// inkOnly, interactive members of buildConnectedAnatomySurface at t=0), so a
+// page can build it ahead in tasks a phone runs well inside a frame.
+export function orbitWorldWarmers(pair,{missing=false}={}){
+  const view={yaw:caClamp(pair.view?.yaw??.12,-Math.PI,Math.PI),pitch:caClamp(pair.view?.pitch??.36,-.25,1.2)},dimensions=connectedDimensionsAt(pair,0),bodyView=caBodyView(pair,dimensions,view,0),steps=[];
+  dimensions.forEach((p,i)=>{const slot=pair.habit?pair.composition.members[i]:habitFree(pair.composition.members[i]);if(!missing||!caWorldCache.has(caWorldKey(p,slot)))steps.push(()=>{caMemberChart(p,slot,bodyView,{inkOnly:true,interactive:true});});});
+  return steps;
+}
 export function buildConnectedAnatomySurface(pair,t,{inkOnly=false,interactive=false}={}){
   const view={yaw:caClamp(pair.view?.yaw??.12,-Math.PI,Math.PI),pitch:caClamp(pair.view?.pitch??.36,-.25,1.2)};
   if(![view.yaw,view.pitch].every(Number.isFinite))throw new RangeError('Non-finite 3D parameter');
@@ -5878,14 +5892,18 @@ export const CONNECTED_MORPH_GRAMMARS=Object.freeze(['oyster','chanterelle']);
 // frame: the page frame of the catalog drawing this body replaces, so the
 // turned body is framed exactly like the drawing it was fitted to.
 const caOwnFrames=new WeakMap();
+function orbitRestOwnFrame(genome,composition,scene){
+  const cached=caOwnFrames.get(composition)??{};
+  if(!cached[scene]){const {pageFrame:_carried,...bare}=composition,ref={...createConnectedAnatomyPair(genome,genome,bare,{view:{yaw:.12,pitch:.36,body3d:true},body3d:true}),sameRecipe:true,supportedMotion:true,orbitRest:true};caOwnFrames.set(composition,{...cached,[scene]:fitPageFrame(pageEndpointBounds(ref,0,scene))});}
+  return caOwnFrames.get(composition)[scene];
+}
 export function createOrbitRestPair(genome,composition=createSpecimenComposition(genome),options={},{frame=null,scene='plain'}={}){
   const {pageFrame:_carried,...bare}=composition;
   const pair={...createConnectedAnatomyPair(genome,genome,bare,{...options,body3d:true,habit:true}),sameRecipe:true,supportedMotion:true,orbitRest:true};
   // A body that fits its own page is framed once, at the default camera, and
   // that frame is kept for every turn: no per-frame refit and no zoom pumping.
   let held=frame??_carried?.a;
-  if(bare.ownFrame){const cached=caOwnFrames.get(composition)??{};held=cached[scene];
-    if(!held){const ref={...createConnectedAnatomyPair(genome,genome,bare,{view:{yaw:.12,pitch:.36,body3d:true},body3d:true}),sameRecipe:true,supportedMotion:true,orbitRest:true};held=fitPageFrame(pageEndpointBounds(ref,0,scene));caOwnFrames.set(composition,{...cached,[scene]:held});}}
+  if(bare.ownFrame)held=orbitRestOwnFrame(genome,composition,scene);
   if(held)pair.composition={...bare,pageFrame:Object.freeze({version:1,key:pageFrameKey(pair,scene),scene,aId:pageEndpointId(pair,0,scene),bId:pageEndpointId(pair,1,scene),a:held,b:held})};
   return pair;
 }
@@ -5980,6 +5998,23 @@ export function orbitRestComposition(genome,composition=null,{habit=false}={}){
   });
   return {...base,id:`${base.id}-catalog-fit`,members,catalogFit:true,...(ownFrame?{ownFrame:true}:{})};
 }
+// The rest composition is plain data, so a Worker prepares it while the
+// plate paints and the first turn of the plate only re-projects its bodies.
+export function orbitRestPreparationKey(genome,composition,habit=false){
+  return JSON.stringify([genome.seed,genome.profileId,genome.donorId??null,composition?.id??null,composition?.members??null,composition?.implicitAnchors??null,!!habit]);
+}
+// The page frame of the plate a turn starts from: pagePairFrame of the pair
+// the page builds from this recipe (as the painting Worker does).
+export function orbitRestPageFrame({recipe,fieldPlate=false,scene='plain'}){
+  const {a,b,composition,view,shapeModifiers}=recipe;
+  return pagePairFrame(withFieldPlatePair(createMorphPair(a,b,{composition,view,shapeModifiers}),fieldPlate,{composition}),scene);
+}
+export function prepareOrbitRest({genome,composition,habit=false,frame=null,scene='plain'}){
+  const rest=orbitRestComposition(genome,composition,{habit});
+  return {restKey:orbitRestPreparationKey(genome,composition,habit),composition:rest,scene,ownFrame:rest.ownFrame?orbitRestOwnFrame(genome,rest,scene):null,pageFrame:frame?orbitRestPageFrame(frame):null};
+}
+// A prepared rest composition arrives with the frame it fits on its own.
+function adoptOrbitRestOwnFrame({composition,scene,ownFrame}){if(ownFrame)caOwnFrames.set(composition,{...(caOwnFrames.get(composition)??{}),[scene]:ownFrame});}
 export function orbitRestStudy(genome,composition,{view,shapeModifiers,scene='plain'}={}){
   const pair=createOrbitRestPair(genome,composition,{view,shapeModifiers},{scene});
   return framePagePlan(connectedPlateStudy(pair,0,{scene}),pair,0,scene);
@@ -6795,7 +6830,7 @@ export function applyCompositionAnchors(composition,anchors){
 // One bounded preparation job. New recipes supersede queued callbacks and
 // terminate obsolete work; pointer movement only changes the eventual blend.
 export class MorphPreparation {
- constructor(createWorker){this.createWorker=createWorker;this.revision=0;this.worker=null;this.key=null;this.cached=null;this.pending=null;}
+ constructor(createWorker,{kind='implicit-prepare',ready='implicit-ready'}={}){this.createWorker=createWorker;this.kind=kind;this.readyKind=ready;this.revision=0;this.worker=null;this.key=null;this.cached=null;this.pending=null;}
  cancel(){this.revision++;this.worker?.terminate();this.worker=null;this.pending=null;this.key=null;}
  prepare(key,payload,ready,error){
   if(this.cached?.key===key){ready(this.cached.data);return;}
@@ -6803,9 +6838,9 @@ export class MorphPreparation {
   this.cancel();const revision=this.revision;this.key=key;this.pending={ready,error};
   try{
    const worker=this.worker=this.createWorker();
-   worker.onmessage=event=>{if(revision!==this.revision||worker!==this.worker)return;const callbacks=this.pending;if(event.data.error){this.cancel();callbacks.error(new Error(event.data.error));return;}if(event.data.kind!=='implicit-ready')return;this.cached={key,data:event.data.data};this.worker=null;this.pending=null;worker.terminate();callbacks.ready(this.cached.data);};
+   worker.onmessage=event=>{if(revision!==this.revision||worker!==this.worker)return;const callbacks=this.pending;if(event.data.error){this.cancel();callbacks.error(new Error(event.data.error));return;}if(event.data.kind!==this.readyKind)return;this.cached={key,data:event.data.data};this.worker=null;this.pending=null;worker.terminate();callbacks.ready(this.cached.data);};
    worker.onerror=event=>{event.preventDefault?.();if(revision!==this.revision)return;const callbacks=this.pending;this.cancel();callbacks.error(new Error(event.message||'Shape preparation failed'));};
-   worker.postMessage({...payload,kind:'implicit-prepare',revision});
+   worker.postMessage({...payload,kind:this.kind,revision});
   }catch(cause){const callbacks=this.pending;this.cancel();callbacks?.error(cause);}
  }
 }
@@ -7602,7 +7637,9 @@ export class Painter {
     this.lastPreviewGeometryMs=performance.now()-started;
     const c=this.ctx,w=this.canvas.width,h=this.canvas.height,kx=w/1200,ky=h/1000;
     c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';
-    c.imageSmoothingEnabled=true;c.drawImage(this.paper,0,0,w,h);
+    // The paper is scaled to the canvas once, so each drag frame copies it 1:1.
+    if(this.orbitPaper?.source!==this.paper||this.orbitPaper.canvas.width!==w||this.orbitPaper.canvas.height!==h){const sheet=newCanvas(w,h),k=sheet.getContext('2d');k.imageSmoothingEnabled=true;k.drawImage(this.paper,0,0,w,h);this.orbitPaper={source:this.paper,canvas:sheet};}
+    c.drawImage(this.orbitPaper.canvas,0,0);
     c.setTransform(kx,0,0,ky,0,0);c.strokeStyle=ORBIT_LINES.ink;c.lineCap='round';c.lineJoin='round';
     const groups={contour:new Path2D(),feature:new Path2D(),hatch:new Path2D()};
     for(const mark of plan.ink){const points=mark.points;if(!points||points.length<2)continue;
@@ -9583,6 +9620,33 @@ export const MORPH_DEFAULT_SECONDS=5,MORPH_FADE_MS=320,MORPH_SETTLE_FADE_MS=480;
 // Zoom cache: the settled plate re-rastered at factor x the backing scale,
 // at most maxWidth px wide (maxWidthLowMemory on devices reporting < 4 GB).
 export const ZOOM_CACHE=Object.freeze({factor:2,maxWidth:5000,maxWidthLowMemory:3000,idleMs:600,pinchRedrawMs:90});
+// Every settled plate goes through the pair so the Worker reuses the captured page frame.
+export function bridgeRecipe(value){if(value.morph.orbitRest)return {a:value.morph.a,b:value.morph.a,blend:0,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers,orbitRest:true};return {a:value.morph.a,b:value.morph.b,blend:value.blend,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers};}
+const nativeRecipeKey=recipe=>recipe?.composition?.pageFrame?{...recipe,composition:{...recipe.composition,pageFrame:undefined}}:recipe;
+export function nativePlateKey(value){return JSON.stringify([value.genome,nativeRecipeKey(bridgeRecipe(value)),value.scene,value.fieldPlate]);}
+// A plate painted ahead while the page is idle (the next Random plate or the
+// Morph destination), planned from plain data so a Worker can do it: anchoring
+// a field pair's composition can take most of a second on a phone. Valid for
+// the default camera without a resting colony, where the page's own snapshot
+// is this endpoint plate.
+export function planPreparedPlate(plan){
+  const st=plan.state,ga=generateSpecimen(st.seed,st.typeId,st.donorId),gb=generateSpecimen(st.next,st.nextTypeId,st.nextDonorId);
+  let pair;
+  if(plan.type==='destination')pair=createPromotedMorphPair(plan.from,gb,{fieldPlate:plan.fieldPlate});
+  else{
+    const count=st.compositionCount||seedSpecimenCount(ga,buildSketch(ga).specimenCount);
+    const composition=applyCompositionAnchors(createSpecimenComposition({...ga,seed:st.compositionSeed},{count}),st.compositionAnchors);
+    pair=withFieldPlatePair(createMorphPair(ga,gb,{composition,...orbitViewOptions(st)}),st.fieldPlate);
+  }
+  if(pair.implicitMorph&&!pair.composition.implicitAnchors)pair.composition=implicitAnchoredComposition(pair.a,pair.composition,{view:pair.view,shapeModifiers:pair.shapeModifiers}).composition;
+  return {genome:morphGenome(pair,0),morph:pair,blend:0,scene:st.scene,fieldPlate:st.fieldPlate};
+}
+// What a Worker sends back for a planned plate, and the snapshot the page
+// rebuilds from it: same recipe, same identity (nativePlateKey).
+export function plannedPlateData(value){return {genome:value.genome,scene:value.scene,fieldPlate:value.fieldPlate,recipe:bridgeRecipe(value)};}
+export function plannedPlateSnapshot({genome,scene,fieldPlate,recipe}){const {a,b,blend,composition,view,shapeModifiers}=recipe;return {genome,scene,fieldPlate,blend,morph:{a,b,composition,view,shapeModifiers}};}
+// The parts of a pair createPromotedMorphPair reads.
+export function promotionSource(pair){return {b:pair.b,composition:pair.composition,sameRecipe:!!pair.sameRecipe,implicitMorph:!!pair.implicitMorph,connectedAnatomy:!!pair.connectedAnatomy,view:pair.view,shapeModifiers:pair.shapeModifiers,fieldPlate:!!pair.fieldPlate};}
 export const PREPARED_PLATE=Object.freeze({limit:2,idleMs:700,recordEveryMs:180,frameQuality:.94,replayMs:3600,version:2});
 // Full identity of a prepared painting: plate (genome, recipe, composition,
 // view, scene, field study), raster scale and paper sheet. Any difference means
@@ -9699,6 +9763,8 @@ if(typeof document==='undefined'&&typeof self!=='undefined'&&typeof self.postMes
       return;
     }
     try {
+      if(event.data.kind==='plan-plate'){self.postMessage({kind:'plate-planned',data:plannedPlateData(planPreparedPlate(event.data.plan)),revision:event.data.revision});return;}
+      if(event.data.kind==='orbit-rest-prepare'){self.postMessage({kind:'orbit-rest-ready',data:prepareOrbitRest(event.data),revision:event.data.revision});return;}
       if(event.data.kind==='implicit-prepare'){const {a,b,composition,view,shapeModifiers,nativeTargets}=event.data;const data=createImplicitMorph(a,b,composition,{view,shapeModifiers,nativeTargets:!!nativeTargets});self.postMessage({kind:'implicit-ready',data:serializableImplicitMorph(data),revision:event.data.revision});return;}
       if(event.data.kind==='native-detail'){
         const state=nativeDetailState,{region,requestId,revision}=event.data;
@@ -9808,6 +9874,17 @@ export function orbitPlateCamera(camera,delta,size){
 // (so a tap stays a tap), scroll or pinch zooms about the centre, a double
 // click or double tap fits, and a single tap or click calls onTap.
 export const PLATE_TOUCH=Object.freeze({turnSlop:6,mouseSlop:3,tapMs:350,doubleTapMs:320,doubleTapSlop:28});
+// A turn begins from the painting on screen. A copy of the settled painting
+// lies over the drag drawing and fades out with the angle turned (radians of
+// yaw and pitch together, from `start` to `end`); a release within `detent` of
+// the painted camera eases back to it over `returnMs` and keeps that painting.
+// The copy's opacity moves at most `step` a frame, so a fast flick still fades.
+export const ORBIT_REST_FADE=Object.freeze({start:.03,end:.35,detent:.12,returnMs:180,fadeMs:240,step:.12});
+export function orbitRestDistance(camera,rest){
+  const yaw=((camera.yaw-rest.yaw+Math.PI)%CA_TAU+CA_TAU)%CA_TAU-Math.PI;
+  return Math.hypot(yaw,camera.pitch-rest.pitch);
+}
+export function orbitRestOpacity(camera,rest){const F=ORBIT_REST_FADE;return 1-smooth(clamp((orbitRestDistance(camera,rest)-F.start)/(F.end-F.start)));}
 export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=()=>{},onOrbitEnd=()=>{},onFit=()=>{},onView=()=>{},onTap=()=>{},root=viewport.parentElement}){
   let view={scale:1,x:0,y:0},size={width:viewport.clientWidth,height:viewport.clientHeight},pinch=null;
   let orbitEnabled=false,gestureMode=null,orbitHeld=false,pending=null,lastTap=null;
@@ -9862,10 +9939,14 @@ export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=
     const current=local(event);pointers.set(event.pointerId,current);
     if(pointers.size>=2){if(!pinch)beginPinch();const distance=spread();if(pinch&&distance)apply(pinch.scale*distance/pinch.distance);}
     else if(gestureMode==='pending'){
-      if(Math.hypot(current.x-pending.start.x,current.y-pending.start.y)<(pending.touch?PLATE_TOUCH.turnSlop:PLATE_TOUCH.mouseSlop))return;
-      const start=pending.start;pending=null;
+      const slop=pending.touch?PLATE_TOUCH.turnSlop:PLATE_TOUCH.mouseSlop,dx=current.x-pending.start.x,dy=current.y-pending.start.y,moved=Math.hypot(dx,dy);
+      if(moved<slop)return;
+      pending=null;
       if(!orbitEnabled){gestureMode='still';sync();return;}
-      gestureMode='rotate';orbitHeld=true;onOrbitStart();onOrbit({x:current.x-start.x,y:current.y-start.y},size);
+      // The turn starts where the pointer left the slop circle, so its first
+      // frame continues from the resting camera instead of jumping by the slop.
+      const k=1-slop/moved;
+      gestureMode='rotate';orbitHeld=true;onOrbitStart();onOrbit({x:dx*k,y:dy*k},size);
     }else if(gestureMode==='rotate'&&orbitEnabled)onOrbit({x:current.x-previous.x,y:current.y-previous.y},size);
     sync();
   });
@@ -9899,7 +9980,7 @@ export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=
   if(observer)observer.observe(viewport);else if(globalThis.addEventListener)listen(globalThis,'resize',resize);
   if(globalThis.addEventListener)listen(globalThis,'blur',()=>cancelGesture({settle:true}));
   apply(1);sync();
-  return {getState:()=>({...view}),getMode:()=>orbitEnabled?'rotate':'none',isOrbitHolding:()=>orbitHeld,cancelGesture,
+  return {getState:()=>({...view}),getMode:()=>orbitEnabled?'rotate':'none',isOrbitHolding:()=>orbitHeld,isPointerDown:()=>pointers.size>0,cancelGesture,
     setOrbitEnabled:enabled=>{enabled=!!enabled;if(enabled!==orbitEnabled){cancelGesture({settle:false});orbitEnabled=enabled;}sync();},
     fit:reset,zoomIn:()=>zoom(1.25),zoomOut:()=>zoom(1/1.25),
     destroy:()=>{cancelGesture({settle:false});events.abort();observer?.disconnect();}};
@@ -9910,9 +9991,21 @@ async function mount() {
   if(colonyParam==='0'||colonyParam==='1')setHabitColonyAtRest(colonyParam==='1');
   const canvas = $('painting'), status = $('status');
   const plateViewport=$('plate-viewport')?mountPlateViewport({viewport:$('plate-viewport'),canvas,onTap:()=>skipLivePainting(),
-    onOrbitStart:()=>{dropZoomCache();cancelPrepared();pause({settle:false,fromOrbit:true});if(!morphPair?.connectedAnatomy&&state.blend>0&&state.blend<1){state.blend=state.blend<.5?0:1;}sketchQueue.hold();requestSketch();},
+    onOrbitStart:()=>{
+      // A turn from a finished painting starts under a copy of it; a turn
+      // begun while that copy is still up (easing back) keeps it.
+      // The morph field prepared for this camera is kept: a turn that eases
+      // back to it needs no new preparation (returnToRest).
+      const from=orbitFrom??(restPaintingShown()?{yaw:state.yaw,pitch:state.pitch,field:{pair:morphPair,composition:morphPair?.composition,implicitData:morphPair?.implicitData??null,previewData:morphPair?.previewData??null}}:null);cancelRestReturn();
+      dropZoomCache();cancelPrepared();pause({settle:false,fromOrbit:true});if(!morphPair?.connectedAnatomy&&state.blend>0&&state.blend<1){state.blend=state.blend<.5?0:1;}
+      if(from&&!orbitFrom){orbitFrom=from;showRestLayer();}
+      turning=true;sketchQueue.hold();requestSketch();},
     onOrbit:(delta,size)=>{Object.assign(state,orbitPlateCamera(state,delta,size));applyView();update3DControls();requestSketch();},
-    onOrbitEnd:({settle})=>{if(settle){sketchQueue.release();persist();}else sketchQueue.cancel();},
+    onOrbitEnd:({settle})=>{
+      const from=orbitFrom;turning=false;
+      if(settle&&from&&orbitRestDistance(state,from)<ORBIT_REST_FADE.detent){returnToRest(from);return;}
+      if(settle){sketchQueue.release();persist();}else sketchQueue.cancel();
+      if(from)hideRestLayer({fade:true});},
     onFit:()=>{if(!morphPair||isDefaultOrbitView(state))return;pause({settle:false});Object.assign(state,DEFAULT_ORBIT_VIEW);applyView();update3DControls();persist();showFinished();},
     onView:(view,size)=>queueMicrotask(()=>onPlateView(view,size))
   }):null;
@@ -9958,6 +10051,51 @@ async function mount() {
   const detailCanvas=document.createElement('canvas');detailCanvas.className='plate-detail';detailCanvas.setAttribute('aria-hidden','true');
   Object.assign(detailCanvas.style,{position:'absolute',left:'0',top:'0',width:'100%',height:'100%',pointerEvents:'none',transformOrigin:'0 0',display:'none'});
   $('plate-viewport')?.append(detailCanvas);
+  // The painting a turn started from, over the drag drawing (ORBIT_REST_FADE).
+  const restLayer=document.createElement('canvas');restLayer.className='plate-rest';restLayer.setAttribute('aria-hidden','true');
+  Object.assign(restLayer.style,{position:'absolute',left:'0',top:'0',width:'100%',height:'100%',pointerEvents:'none',transformOrigin:'0 0',display:'none'});
+  canvas.after(restLayer);
+  let orbitFrom=null,restReturn=0,restWatch=0,restToken=0,restShown=1,restRamp=0,turning=false;
+  function showRestLayer(){
+    restToken++;if(restLayer.width!==canvas.width||restLayer.height!==canvas.height){restLayer.width=canvas.width;restLayer.height=canvas.height;}
+    const c=restLayer.getContext('2d');c.clearRect(0,0,restLayer.width,restLayer.height);c.drawImage(canvas,0,0);
+    Object.assign(restLayer.style,{transform:canvas.style.transform,transition:'none',opacity:'1',display:'block'});canvas.dataset.restLayer='shown';canvas.dataset.restOpacity='1';restShown=1;
+  }
+  function setRestOpacity(k){restShown=k;restLayer.style.opacity=String(k);canvas.dataset.restOpacity=k.toFixed(3);}
+  // Another frame while the copy is still easing toward its opacity, or while
+  // the turned bodies are still being built under it.
+  function requestRestFrame(){if(!restRamp)restRamp=requestAnimationFrame(()=>{restRamp=0;if(orbitFrom&&!restReturn)requestSketch();});}
+  function hideRestLayer({fade=false}={}){
+    cancelAnimationFrame(restWatch);restWatch=0;cancelRestReturn();orbitFrom=null;
+    if(restLayer.style.display==='none')return;
+    const token=++restToken,done=()=>{if(token!==restToken)return;restLayer.style.display='none';canvas.dataset.restLayer='hidden';canvas.dataset.restOpacity='0';};
+    if(!fade||reducedMotion.matches){done();return;}
+    canvas.dataset.restLayer='fading';restLayer.style.transition=`opacity ${ORBIT_REST_FADE.fadeMs}ms ease-out`;restLayer.style.opacity='0';setTimeout(done,ORBIT_REST_FADE.fadeMs+40);
+  }
+  function cancelRestReturn(){if(restReturn)cancelAnimationFrame(restReturn);restReturn=0;}
+  // A release near the painted camera eases back to it and settles on the same
+  // painting (same key, no repaint); the copy stays up until it is back.
+  function returnToRest(from){
+    const start={yaw:state.yaw,pitch:state.pitch},yaw=((from.yaw-start.yaw+Math.PI)%CA_TAU+CA_TAU)%CA_TAU-Math.PI,t0=performance.now(),ms=reducedMotion.matches?0:ORBIT_REST_FADE.returnMs;
+    canvas.dataset.restReturn='running';
+    const step=now=>{
+      const k=ms?smooth(clamp((now-t0)/ms)):1;
+      if(k<1){state.yaw=start.yaw+yaw*k;state.pitch=start.pitch+(from.pitch-start.pitch)*k;applyView();update3DControls();requestSketch();restReturn=requestAnimationFrame(step);return;}
+      restReturn=0;state.yaw=from.yaw;state.pitch=from.pitch;applyView();update3DControls();canvas.dataset.restReturn='done';
+      // Same pair and layout (a page frame may have been added in between).
+      const field=from.field,c=morphPair?.composition,same=field&&morphPair===field.pair&&c?.id===field.composition?.id&&c.members===field.composition.members&&c.implicitAnchors===field.composition.implicitAnchors;
+      if(same){if(!morphPair.implicitData&&field.implicitData){morphPair.implicitData=field.implicitData;morphPair.implicitData.composition=c;}morphPair.previewData??=field.previewData;}
+      requestSketch(true);persist();
+      const until=performance.now()+3000,check=()=>{
+        restWatch=0;if(orbitFrom!==from)return;
+        if(renderMode==='painted'&&canvas.dataset.settleFade!=='running'){hideRestLayer();return;}
+        if(performance.now()>until||renderMode==='painting'||renderMode==='error'){hideRestLayer({fade:true});return;}
+        restWatch=requestAnimationFrame(check);
+      };
+      restWatch=requestAnimationFrame(check);
+    };
+    restReturn=requestAnimationFrame(step);
+  }
   // Paint playback cursor: Paint Lab's own brush, nib and pencil preview, on a
   // layer of its own that follows the plate's zoom and pan.
   const cursorLayer=document.createElement('canvas');cursorLayer.className='paint-cursor';cursorLayer.setAttribute('aria-hidden','true');
@@ -9995,6 +10133,7 @@ async function mount() {
     detailCanvas.style.transform=`translate(${view.x-detailShown.view.x*r}px, ${view.y-detailShown.view.y*r}px) scale(${r})`;
   }
   function onPlateView(view,size){
+    if(restLayer.style.display!=='none')restLayer.style.transform=canvas.style.transform;
     if(!(view.scale>1)){hideDetail();return;}
     positionDetail(view);clearTimeout(detailTimer);
     // While two fingers are moving, the shown detail just follows the view;
@@ -10096,8 +10235,7 @@ async function mount() {
   if(typeof ResizeObserver==='function')new ResizeObserver(()=>syncResolution()).observe(canvas);
   // The page frame is derived from the pair and recorded on its composition
   // lazily (first sketch or paint); it must not change the plate's identity.
-  const nativeRecipeKey=recipe=>recipe?.composition?.pageFrame?{...recipe,composition:{...recipe.composition,pageFrame:undefined}}:recipe;
-  const nativeKey=value=>JSON.stringify([value.genome,nativeRecipeKey(bridgeRecipe(value)),value.scene,value.fieldPlate]);
+  const nativeKey=nativePlateKey;
   const sketchQueue=new SketchScheduler({preview:drawPreview,refine:refinePreview,phase:mode=>{
     renderMode=mode;canvas.dataset.renderMode=mode;
     status.textContent=mode==='refining'?'Painting…':'Shape preview';controls();
@@ -10117,20 +10255,47 @@ async function mount() {
     }
     return habitFrames.get(key);
   }
+  // The plate's rest composition is prepared in a Worker while it paints, so
+  // the first turn never builds it on the main thread.
+  const turnPreparation=new MorphPreparation(()=>new Worker(import.meta.url,{type:'module'}),{kind:'orbit-rest-prepare',ready:'orbit-rest-ready'});
+  function prepareTurn(){
+    const blend=smooth(state.blend),pair=morphPair;
+    if(typeof Worker==='undefined'||!pair||pair.connectedAnatomy||(blend>0&&blend<1)||(state.fieldPlate&&pair.fieldPlate?.supported))return;
+    const genome=blend>=1?b:a,colony=habitRestPreferred(genome,state.scene);
+    if(restCache?.genome===genome&&restCache.anchors===pair.composition.implicitAnchors)return;
+    // The frame of the painted plate comes along when it is not captured yet.
+    const recipe=bridgeRecipe({morph:pair,blend,genome}),frame={recipe,fieldPlate:state.fieldPlate,scene:state.scene};
+    const key=JSON.stringify([orbitRestPreparationKey(genome,pair.composition,colony),pageGenomeId(pair.a),pageGenomeId(pair.b),state.scene,!!state.fieldPlate]);
+    const done=()=>{const waiting=turnWaiters.splice(0);for(const f of waiting)f();};
+    turnPreparation.prepare(key,{genome,composition:pair.composition,habit:colony,frame,scene:state.scene},data=>{
+      adoptOrbitRestOwnFrame(data);const held=pair.composition.pageFrame,next=data.pageFrame;
+      if(pair===morphPair&&next&&next.key===pageFrameKey(pair,state.scene)&&!(held?.version===1&&held.key===next.key)){pair.composition={...pair.composition,pageFrame:next};if(pair.implicitData)pair.implicitData.composition=pair.composition;}
+      done();
+    },error=>{console.warn('Turn not prepared',error);done();});
+  }
+  // Runs f once a turn preparation in flight has landed (or at once).
+  const turnWaiters=[];
+  function whenTurnPrepared(f){if(!turnPreparation.pending){f();return;}let ran=false;const once=()=>{if(!ran){ran=true;f();}};turnWaiters.push(once);setTimeout(once,8000);}
+  const restPaintingShown=()=>renderMode==='painted'&&!playing&&!!nativeResult?.complete&&canvas.dataset.settleFade!=='running'&&nativeResult.key===nativeKey(snapshot());
   function orbitRestFor(blend,pair=morphPair,ga=a,gb=b,st=state,{anyView=false}={}){
     const colony=habitRestPreferred(blend>=1?gb:ga,st.scene);
     if(!pair||!anyView&&isDefaultOrbitView(st)&&!colony||pair.connectedAnatomy||(blend>0&&blend<1)||(st.fieldPlate&&pair.fieldPlate?.supported))return null;
     const genome=blend>=1?gb:ga,options=connectedViewOptions(st),frame=colony?habitRestFrame(genome,pair,st):pageFrameAt(pagePairFrame(pair,st.scene),blend>=1?1:0);
     const key=JSON.stringify([genome.seed,genome.profileId,genome.donorId,pair.composition.id,pair.composition.members,frame,st.scene,options]);
-    if(restCache?.key!==key){if(restCache?.genome!==genome||restCache.anchors!==pair.composition.implicitAnchors)restCache={genome,anchors:pair.composition.implicitAnchors,composition:orbitRestComposition(genome,pair.composition,{habit:colony})};restCache={...restCache,key,pair:createOrbitRestPair(genome,restCache.composition,options,{frame,scene:st.scene})};}
+    if(restCache?.key!==key){if(restCache?.genome!==genome||restCache.anchors!==pair.composition.implicitAnchors){const ready=turnPreparation.cached,prepared=ready&&ready.data.restKey===orbitRestPreparationKey(genome,pair.composition,colony)?ready.data.composition:null;restCache={genome,anchors:pair.composition.implicitAnchors,composition:prepared??orbitRestComposition(genome,pair.composition,{habit:colony})};canvas.dataset.turnPrepared=String(!!prepared);}restCache={...restCache,key,pair:createOrbitRestPair(genome,restCache.composition,options,{frame,scene:st.scene})};}
     return restCache.pair;
   }
   // A fictional field morph is prepared from 3D endpoints at one camera, so a
   // new camera discards it; the next morph re-prepares from the turned bodies.
   let lastRecipeKey=null;
-  function applyView(){Object.assign(morphPair,orbitViewOptions(state));if(morphPair.implicitMorph&&morphPair.implicitData){cancelImplicitPreparation();morphPair.implicitData=null;}if(morphPair.previewData){cancelImplicitPreparation();morphPair.previewData=null;}}
-  function snapshotOf(pair,ga,gb,position,st){const blend=smooth(position),rest=orbitRestFor(blend,pair,ga,gb,st);return {genome:morphGenome(pair,blend),morph:rest??pair,blend:rest?0:blend,scene:st.scene,fieldPlate:rest?false:st.fieldPlate};}
-  function snapshot(){return snapshotOf(morphPair,a,b,state.blend,state);}  // Playback draws every frame, endpoints included, from the morph's own
+  // A camera that has not moved (a turn's first zero step, or yaw wrapping to
+  // .120000000000001) keeps the prepared field.
+  const viewKey=o=>JSON.stringify([o.view?.yaw,o.view?.pitch,o.view?.body3d,o.shapeModifiers?.capDepth,o.shapeModifiers?.stemBend].map(v=>typeof v==='number'?Math.round(v*1e9):v??null));
+  function applyView(){const next=orbitViewOptions(state);if(viewKey(morphPair)===viewKey(next))return;Object.assign(morphPair,next);if(morphPair.implicitMorph&&morphPair.implicitData){cancelImplicitPreparation();morphPair.implicitData=null;}if(morphPair.previewData){cancelImplicitPreparation();morphPair.previewData=null;}}
+  function snapshotOf(pair,ga,gb,position,st,{anyView=false}={}){const blend=smooth(position),rest=orbitRestFor(blend,pair,ga,gb,st,{anyView});return {genome:morphGenome(pair,blend),morph:rest??pair,blend:rest?0:blend,scene:st.scene,fieldPlate:rest?false:st.fieldPlate};}
+  // While a turn is held every frame is the 3D bodies, the default camera
+  // included: a drag through it does not flash the catalog drawing.
+  function snapshot(){return snapshotOf(morphPair,a,b,state.blend,state,{anyView:turning});}  // Playback draws every frame, endpoints included, from the morph's own
   // coloured preview so the first and last frames share its visual language.
   function playbackSnapshot(){
     if(!morphPreviewKind(morphPair))return snapshot();
@@ -10179,6 +10344,7 @@ async function mount() {
   // when the requested plate's full identity matches, and are discarded on any
   // interaction that could change what they show.
   const preparedJobs=new Map();let preparedTimer=0,nextRandomChoice=null;
+  const planPreparation=new MorphPreparation(()=>new Worker(import.meta.url,{type:'module'}),{kind:'plan-plate',ready:'plate-planned'});let preparationEpoch=0;
   const preparedRequest=value=>({plateKey:nativeKey(value),outputScale:targetBaseScale(),sheet:plateSheetSeed(value)});
   function takePrepared(value){
     const request=preparedRequest(value),key=preparedPlateKey(request),job=preparedJobs.get(key);
@@ -10188,7 +10354,7 @@ async function mount() {
   }
   function dropPrepared(job){job.cancelled=true;job.worker?.terminate();job.worker=null;job.waiters.splice(0).forEach(f=>f(null));}
   function cancelPrepared({keepComplete=true}={}){
-    clearTimeout(preparedTimer);preparedTimer=0;
+    clearTimeout(preparedTimer);preparedTimer=0;preparationEpoch++;planPreparation.cancel();
     for(const [key,job] of preparedJobs)if(!keepComplete||!job.complete){dropPrepared(job);preparedJobs.delete(key);}
   }
   function startPrepared(value,{record=false}={}){
@@ -10241,20 +10407,36 @@ async function mount() {
     preparedTimer=setTimeout(()=>{
       preparedTimer=0;if(!pageIdle()){queuePreparation();return;}
       if([...preparedJobs.values()].some(job=>!job.complete))return;
-      try{
-        // One background painting at a time: Morph destination first, then Random.
-        if(!state.fieldPlate&&morphPair?.supportedMotion!==false&&!(state.blend>0&&state.blend<1)){
-          plannedNextSeed??=randomSeed();const value=finishedSnapshot(plannedNextSeed),key=preparedPlateKey(preparedRequest(value));
-          if(!preparedJobs.has(key)&&!(prefetch&&prefetch.key===nativeKey(value))){startPrepared(value);return;}
-        }
-        // Full painting plays a Random plate live, so only Fast prepares one.
+      const epoch=preparationEpoch,plate=nativeResult?.key,later=ready=>value=>{if(epoch!==preparationEpoch||plate!==nativeResult?.key)return;if(!pageIdle()){queuePreparation();return;}try{ready(value);}catch(error){console.warn('Next plate not prepared',error);}};
+      // Full painting plays a Random plate live, so only Fast prepares one.
+      const random=()=>{
         if(livePainting())return;
         if(nextRandomChoice&&nextRandomChoice.includeAlpha!==!!state.includeAlpha)nextRandomChoice=null;
         nextRandomChoice??=pickRandomChoice(false);
-        const value=plannedPlate(randomChoiceState(nextRandomChoice));
-        if(!preparedJobs.has(preparedPlateKey(preparedRequest(value))))startPrepared(value,{record:true});
+        planAhead({type:'random',state:randomChoiceState(nextRandomChoice)},later(value=>{if(!preparedJobs.has(preparedPlateKey(preparedRequest(value))))startPrepared(value,{record:true});}));
+      };
+      try{
+        // One background painting at a time: Morph destination first, then Random.
+        if(!state.fieldPlate&&morphPair?.supportedMotion!==false&&!(state.blend>0&&state.blend<1)){
+          plannedNextSeed??=randomSeed();
+          planAhead({type:'destination',state:advanceMorphState(state,plannedNextSeed),seed:plannedNextSeed},later(value=>{
+            if(!preparedJobs.has(preparedPlateKey(preparedRequest(value)))&&!(prefetch&&prefetch.key===nativeKey(value))){startPrepared(value);return;}
+            random();
+          }));
+          return;
+        }
+        random();
       }catch(error){console.warn('Next plate not prepared',error);}
     },PREPARED_PLATE.idleMs);
+  }
+  // Plans a plate to paint ahead in a Worker (planPreparedPlate) at the default
+  // camera, so idle preparation never blocks a touch; a turned or colony plate
+  // is planned here as before.
+  function planAhead(plan,ready){
+    const st=plan.state,worker=typeof Worker!=='undefined'&&isDefaultOrbitView(st)&&(!HABIT_COLONY_AT_REST||st.scene==='plain');
+    if(!worker){ready(plan.type==='destination'?finishedSnapshot(plan.seed):plannedPlate(st));return;}
+    const message=plan.type==='destination'?{type:'destination',state:st,from:promotionSource(morphPair),fieldPlate:state.fieldPlate}:{type:'random',state:st};
+    planPreparation.prepare(JSON.stringify(message),{plan:message},data=>ready(plannedPlateSnapshot(data)),error=>console.warn('Next plate not planned',error));
   }
   // Replays a prepared painting's recorded stages at natural pace, then shows
   // its final; the plate is then exactly the native painting.
@@ -10304,8 +10486,6 @@ async function mount() {
     };
     step(start);
   }
-  // Every settled plate goes through the pair so the Worker reuses the captured page frame.
-  function bridgeRecipe(value){if(value.morph.orbitRest)return {a:value.morph.a,b:value.morph.a,blend:0,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers,orbitRest:true};return {a:value.morph.a,b:value.morph.b,blend:value.blend,composition:value.morph.composition,view:value.morph.view,shapeModifiers:value.morph.shapeModifiers};}
   function cancelRefinement(){
     showCursor(null);canvas.dataset.livePainting='false';hideDetail();settledRevision++;settledWorker?.terminate();settledWorker=null;
     if(nativeBuilding){nativeBuilding.resolve(null);nativeBuilding=null;}
@@ -10340,19 +10520,29 @@ async function mount() {
   }
   // Build the turned body's world geometry once the plate is settled, so the
   // first frame of a drag only re-projects it.
+  let warmedRest=null;
   function warmOrbitLines(value){
+    const build=(pair,scene)=>{try{buildMorphSketch(pair,0,{inkOnly:true,interactive:true,scene});}catch(error){console.warn('Orbit drawing not prepared',error);}};
     setTimeout(()=>{
-      try{
-        const morph=value?.morph,rest=morph?.orbitRest?morph:morph&&!morph.connectedAnatomy&&!value.fieldPlate?orbitRestFor(value.blend,morphPair,a,b,state,{anyView:true}):null;
-        // Twice: the second build takes the cached re-projection path.
-        if(rest)for(let i=0;i<2;i++)buildMorphSketch(rest,0,{inkOnly:true,interactive:true,scene:value.scene});
-      }catch(error){console.warn('Orbit drawing not prepared',error);}
+      let rest=null;
+      try{const morph=value?.morph;rest=morph?.orbitRest?morph:morph&&!morph.connectedAnatomy&&!value.fieldPlate?orbitRestFor(value.blend,morphPair,a,b,state,{anyView:true}):null;}
+      catch(error){console.warn('Orbit drawing not prepared',error);}
+      if(!rest||rest===warmedRest)return;warmedRest=rest;
+      // One task per body for its world geometry, then three drag frames'
+      // re-projections at turned cameras (so the first real frame runs warm
+      // code), each well inside a frame on a phone.
+      let steps=[];try{steps=orbitWorldWarmers(rest);}catch(error){console.warn('Orbit drawing not prepared',error);}
+      for(const turn of [.05,.1,.15])steps.push(()=>build({...rest,view:{...rest.view,yaw:rest.view.yaw+turn}},value.scene));
+      // A finger already on the plate turns it soon: the drag builds lazily
+      // rather than queue a step behind its first frames.
+      const next=()=>{if(warmedRest!==rest)return;if(plateViewport?.isPointerDown()){warmedRest=null;return;}const step=steps.shift();if(!step)return;try{step();}catch(error){console.warn('Orbit drawing not prepared',error);}setTimeout(next,0);};
+      setTimeout(next,0);
     },0);
   }
   function captureReprojection(value,painted){
     // The turned bodies are prepared after the settle crossfade, when nothing
     // on the page moves; at completion this froze the last frames for ~0.6 s.
-    if(ORBIT_DRAG_DISPLAY!=='reproject'){const pair=morphPair;setTimeout(()=>{if(pair!==morphPair)return;pinPageFrame(value);warmOrbitLines(value);},REPROJECTION.fadeMs+80);return;}
+    if(ORBIT_DRAG_DISPLAY!=='reproject'){const pair=morphPair;setTimeout(()=>whenTurnPrepared(()=>{if(pair!==morphPair)return;pinPageFrame(value);warmOrbitLines(value);}),REPROJECTION.fadeMs+80);return;}
     const source=reprojectSource(value,{anyView:true});if(!source||!painter)return;
     let key,view;
     try{key=reprojectionKey(source.pair,source.t,value.scene);view={...source.pair.view};}catch(error){console.warn('Reprojection capture skipped',error);return;}
@@ -10433,7 +10623,7 @@ async function mount() {
       cancelRefinement();dirty=false;if(!painter||!a||!b)return;
       const value=snapshot();value.skipPreview=true;sketchQueue.input(value);sketchQueue.release();return;
     }
-    if(fieldPending(morphPair)&&!orbitRestFor(restBlend)){implicitSettle||=settle;ensureImplicitReady(()=>{const refine=implicitSettle;implicitSettle=false;requestSketch(refine,{keepFrame});});return;}
+    if(fieldPending(morphPair)&&!orbitRestFor(restBlend,morphPair,a,b,state,{anyView:turning})){implicitSettle||=settle;ensureImplicitReady(()=>{const refine=implicitSettle;implicitSettle=false;requestSketch(refine,{keepFrame});});return;}
     cancelRefinement();dirty=false;if(!painter||!a||!b)return;
     // keepFrame: the last morph frame already shows this plate's geometry in
     // colour, so it stays until the native painting crossfades over it.
@@ -10443,16 +10633,29 @@ async function mount() {
   function drawPreview(value){
     if(!painter||!value)return;
     // Painting starts immediately; the native ink stream is the first thing shown.
-    if(value.skipPreview){canvas.dataset.renderMode=renderMode='sketch';return;}const frameStarted=performance.now();hideDetail();
+    if(value.skipPreview){canvas.dataset.renderMode=renderMode='sketch';return;}const frameStarted=performance.now();
+    // Under a fully opaque copy of the painting a turn started from, the frame
+    // is not drawn: the first frames of a drag cost nothing and show the plate.
+    let rest=null;
+    if(orbitFrom){
+      const target=orbitRestOpacity(state,orbitFrom);rest=clamp(target,restShown-ORBIT_REST_FADE.step,restShown+ORBIT_REST_FADE.step);
+      // A plate turned before its bodies were warmed builds them one per
+      // frame here, under the painting, instead of in one long first frame.
+      let pending=[];if(rest<1&&value.morph?.orbitRest)try{pending=orbitWorldWarmers(value.morph,{missing:true});}catch(error){console.warn('Orbit drawing not prepared',error);}
+      if(pending.length){try{pending[0]();}catch(error){console.warn('Orbit drawing not prepared',error);}rest=restShown;}
+      if(pending.length||rest!==target)requestRestFrame();
+    }
+    const covered=rest!==null&&rest>=1;
+    if(!covered)hideDetail();
     if(painter.useSheet(plateSheetSeed(value)))nativeInkPaperRaster=null;
-    const keep=value.keepFrame&&painter.previewColoured;value.keepFrame=false;
+    const keep=value.keepFrame&&painter.previewColoured||covered;value.keepFrame=false;if(rest!==null)setRestOpacity(rest);
     if(!keep){fadeToken++;if(drawReprojectedPreview(value))painter.previewColoured=false;else{painter.sketch(value.genome,{morph:value.morph,blend:value.blend,scene:value.scene,coloured:playbackColouring({playing,sketchPlaying}),interactive:playing||!!plateViewport?.isOrbitHolding()});canvas.dataset.reprojected='false';}}renderMode='sketch';canvas.dataset.renderMode=renderMode;
     if(morphFrom&&playing){const c=painter.ctx,k=clamp(morphFrom.until-performance.now(),0,MORPH_FADE_MS)/MORPH_FADE_MS;if(k>0){c.setTransform(1,0,0,1,0,0);c.globalAlpha=smooth(k);c.drawImage(morphFrom.canvas,0,0);c.globalAlpha=1;}else morphFrom=null;}
     canvas.dataset.previewColoured=String(!!painter.previewColoured);
-    canvas.dataset.previewGeometryMs=painter.lastPreviewGeometryMs.toFixed(2);canvas.dataset.previewDrawMs=painter.lastPreviewDrawMs.toFixed(2);canvas.dataset.previewMs=painter.lastPreviewMs.toFixed(2);canvas.dataset.previewFrame=String(painter.previewFrames);
+    if(!covered){canvas.dataset.previewGeometryMs=painter.lastPreviewGeometryMs.toFixed(2);canvas.dataset.previewDrawMs=painter.lastPreviewDrawMs.toFixed(2);canvas.dataset.previewMs=painter.lastPreviewMs.toFixed(2);canvas.dataset.previewFrame=String(painter.previewFrames);}
     canvas.dataset.previewBlend=String(state.blend);canvas.dataset.sourceType=state.typeId;canvas.dataset.targetType=state.nextTypeId;canvas.dataset.orbitRest=String(!!value.morph.orbitRest);canvas.dataset.morphKind=value.morph.orbitRest?'rest-3d':value.morph.connectedAnatomy?'connected-3d':value.morph.implicitMorph?'fictional-2d':value.morph.sameRecipe?'seed':'unsupported';canvas.dataset.cameraYaw=String(state.yaw);canvas.dataset.cameraPitch=String(state.pitch);controls();updateTraits(value.genome,performance.now());
     canvas.dataset.previewFrameMs=(performance.now()-frameStarted).toFixed(2);
-    previewSamples.push(painter.lastPreviewMs);if(previewSamples.length>120)previewSamples.shift();
+    if(!covered){previewSamples.push(painter.lastPreviewMs);if(previewSamples.length>120)previewSamples.shift();}
     if(!playing||painter.previewFrames%15===0)publishPreviewMetrics();
     canvas.setAttribute('aria-label',`Shape preview of ${value.genome.title}. ${Math.round(state.blend*100)} percent toward ${state.next}; ink and wash return when movement stops.`);
   }
@@ -10473,6 +10676,7 @@ async function mount() {
     publishPreviewMetrics();
   }
   function refinePreview(value,isCurrent,{rerun=false}={}){
+    prepareTurn();
     if(!isCurrent()||playing||replaying&&!rerun)return Promise.resolve(null);
     const key=nativeKey(value);
     if(!rerun&&nativeResult?.key===key&&nativeResult.complete){drawingStage=1;nativeReplayIndex=-1;presentNativeStage(1);return Promise.resolve(nativeResult);}
@@ -10736,7 +10940,7 @@ async function mount() {
   }
   function pause({settle=true,fromOrbit=false}={}) {
     stopLoopPause();cancelImplicitPreparation();
-    if(!fromOrbit)plateViewport?.cancelGesture({settle:false});
+    if(!fromOrbit){plateViewport?.cancelGesture({settle:false});hideRestLayer();}
     playbackEpoch++;const restoreDetail=playing||renderMode!=='painted';
     if(playing)publishMotionMetrics();
     sketchQueue.cancel();cancelRefinement();cancelPrefetch();fadeToken++;morphFrom=null;

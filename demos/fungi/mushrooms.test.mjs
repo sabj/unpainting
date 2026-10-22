@@ -1164,12 +1164,14 @@ test('field studies do not substitute a generic connected cap for other family a
 });
 
 test('direct 3D drag defaults to rotate, changes clamped camera coordinates and leaves display zoom independent',async()=>{
-  const {orbitPlateCamera,ORBIT_YAW_PER_WIDTH}=await import('./mushrooms.mjs');let camera={yaw:.12,pitch:.36},starts=0,ends=[];
+  const {orbitPlateCamera,ORBIT_YAW_PER_WIDTH,PLATE_TOUCH}=await import('./mushrooms.mjs');let camera={yaw:.12,pitch:.36},starts=0,ends=[];
   const f=zoomFixture({onOrbitStart:()=>starts++,onOrbit:(delta,size)=>{camera=orbitPlateCamera(camera,delta,size)},onOrbitEnd:value=>ends.push(value)});
   assert.equal(f.controller.getMode(),'none');f.controller.setOrbitEnabled(true);assert.equal(f.controller.getMode(),'rotate');assert.equal(f.viewport.dataset.viewportMode,'rotate');
   f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:1,clientX:200,clientY:300});
   f.event(f.viewport,'pointermove',{pointerId:1,clientX:400,clientY:200});
-  assert.equal(starts,1);assert.ok(Math.abs(camera.yaw-(.12+200*ORBIT_YAW_PER_WIDTH/f.viewport.clientWidth))<1e-12);assert.ok(Math.abs(camera.pitch-(.36+1.4/6))<1e-12);
+  // The turn starts where the pointer left the mouse slop circle.
+  const k=1-PLATE_TOUCH.mouseSlop/Math.hypot(200,100);
+  assert.equal(starts,1);assert.ok(Math.abs(camera.yaw-(.12+200*k*ORBIT_YAW_PER_WIDTH/f.viewport.clientWidth))<1e-12);assert.ok(Math.abs(camera.pitch-(.36+100*k*1.4/600))<1e-12);
   assert.equal(f.viewport.dataset.viewportGesture,'rotate');assert.deepEqual(f.controller.getState(),{scale:1,x:0,y:0});
   f.event(f.viewport,'pointerup',{pointerId:1});assert.deepEqual(ends,[{settle:true}]);assert.equal(f.viewport.dataset.viewportGesture,'none');
   // Yaw is a full turn that wraps; pitch stays clamped above and below the body.
@@ -1564,6 +1566,93 @@ test('shape preparation coalesces inputs, terminates obsolete work, and rejects 
  workers[1].onmessage({data:{kind:'implicit-ready',data:'ready'}});assert.deepEqual(seen,[['second','ready']]);assert.ok(workers[1].terminated);
  queue.prepare('two',{},data=>seen.push(['cache',data]),fail);assert.equal(workers.length,2);assert.deepEqual(seen.at(-1),['cache','ready']);
  queue.prepare('three',{},data=>seen.push(data),fail);const pending=workers[2].onmessage;queue.cancel();pending({data:{kind:'implicit-ready',data:'cancelled'}});assert.equal(seen.length,2);
+});
+
+test('a Worker prepares the rest composition: same bodies as the main thread, keyed by plate',async()=>{
+ const m=await import('./mushrooms.mjs'),workers=[],seen=[];
+ const queue=new m.MorphPreparation(()=>{const w={postMessage(value){this.value=value;},terminate(){this.terminated=true;}};workers.push(w);return w;},{kind:'orbit-rest-prepare',ready:'orbit-rest-ready'});
+ queue.prepare('k',{genome:'g'},data=>seen.push(data),e=>{throw e;});assert.equal(workers[0].value.kind,'orbit-rest-prepare');
+ workers[0].onmessage({data:{kind:'implicit-ready',data:'other'}});assert.deepEqual(seen,[]);workers[0].onmessage({data:{kind:'orbit-rest-ready',data:'rest'}});assert.deepEqual(seen,['rest']);
+ for(const type of ['amanita-1','oyster-1','bracket-6','tooth-1']){
+  const genome=generateSpecimen('woodland-042',type),composition=m.createSpecimenComposition(genome);
+  // What the page receives: the Worker's result after two structured clones.
+  const local=m.orbitRestComposition(genome,composition),remote=structuredClone(m.orbitRestComposition(structuredClone(genome),structuredClone(composition)));
+  assert.deepEqual(remote,local,type);
+  const view=m.connectedViewOptions({yaw:.5,pitch:.3}),ink=c=>m.buildMorphSketch(m.createOrbitRestPair(genome,c,view),0,{inkOnly:true,interactive:true}).ink.map(x=>x.points);
+  assert.deepEqual(ink(remote),ink(local),type);
+  const key=m.orbitRestPreparationKey(genome,composition);assert.equal(key,m.orbitRestPreparationKey(structuredClone(genome),structuredClone(composition)));
+  assert.notEqual(key,m.orbitRestPreparationKey(genome,composition,true));assert.notEqual(key,m.orbitRestPreparationKey(genome,{...composition,implicitAnchors:[{x:1,y:2}]}));
+  // The frame of the plate the turn starts from, as the page's own pair captures it.
+  const next=generateSpecimen('woodland-108','agaric-1'),pair=m.createMorphPair(genome,next,{composition}),recipe=m.bridgeRecipe({morph:pair,blend:0,genome});
+  const prepared=structuredClone(m.prepareOrbitRest(structuredClone({genome,composition,frame:{recipe,fieldPlate:false,scene:'plain'}})));
+  assert.equal(prepared.restKey,key);assert.deepEqual(prepared.composition,local);assert.deepEqual(prepared.pageFrame,structuredClone(m.pagePairFrame(pair,'plain')),type);
+  // An anchored plate's body fits its own frame; the Worker sends that too.
+  const anchored=m.implicitAnchoredComposition(genome,composition,{}).composition,own=structuredClone(m.prepareOrbitRest(structuredClone({genome,composition:anchored,scene:'plain'})));
+  if(own.composition.ownFrame)assert.deepEqual(own.ownFrame,structuredClone(m.createOrbitRestPair(genome,m.orbitRestComposition(genome,anchored),{},{scene:'plain'}).composition.pageFrame.a),type);
+  else assert.equal(own.ownFrame,null);
+ }
+ {
+  // A field pair anchored at rest (as the page does) gives amanita-3 a body framed on its own.
+  const genome=generateSpecimen('woodland-042','amanita-3'),pair=m.createMorphPair(genome,generateSpecimen('woodland-108','agaric-1'),{composition:m.createSpecimenComposition(genome),...m.orbitViewOptions({yaw:.12,pitch:.36})});
+  const anchored=m.implicitAnchoredComposition(pair.a,pair.composition,{view:pair.view,shapeModifiers:pair.shapeModifiers}).composition,own=structuredClone(m.prepareOrbitRest(structuredClone({genome,composition:anchored,scene:'plain'})));
+  assert.equal(own.composition.ownFrame,true);assert.ok(own.ownFrame.scale>0);
+  assert.deepEqual(own.ownFrame,structuredClone(m.createOrbitRestPair(genome,m.orbitRestComposition(genome,anchored),{},{scene:'plain'}).composition.pageFrame.a));
+ }
+});
+
+test('a plate painted ahead is planned in a Worker with the same recipe and identity as on the page',async()=>{
+ const m=await import('./mushrooms.mjs');
+ const viaWorker=plan=>m.plannedPlateSnapshot(structuredClone(m.plannedPlateData(m.planPreparedPlate(structuredClone(plan)))));
+ for(const [type,next] of [['amanita-1','oyster-1'],['oyster-1','chanterelle-1'],['bracket-6','agaric-4'],['tooth-1','morel-1']]){
+  const st=parseState(`?type=${type}&seed=plan-a&nextType=${next}&next=plan-b`),local=m.planPreparedPlate({type:'random',state:st}),remote=viaWorker({type:'random',state:st});
+  assert.equal(m.nativePlateKey(remote),m.nativePlateKey(local),type);assert.deepEqual(m.bridgeRecipe(remote),m.bridgeRecipe(local));assert.equal(m.plateSheetSeed(remote),m.plateSheetSeed(local));
+  // The Morph destination: promotion reads only promotionSource(pair).
+  const a=generateSpecimen(st.seed,type),b=generateSpecimen(st.next,next),pair=m.createMorphPair(a,b,{composition:m.createSpecimenComposition(a)}),dest=m.advanceMorphState(st,'plan-c');
+  const full=m.planPreparedPlate({type:'destination',state:dest,from:pair,fieldPlate:false}),light=viaWorker({type:'destination',state:dest,from:m.promotionSource(pair),fieldPlate:false});
+  assert.equal(m.nativePlateKey(light),m.nativePlateKey(full),`${type} destination`);assert.equal(light.genome.seed,b.seed);
+ }
+});
+
+test('a touch turns only past its slop, and the turn starts at the slop circle',async()=>{
+ const {PLATE_TOUCH}=await import('./mushrooms.mjs');let starts=0;const deltas=[];
+ const f=zoomFixture({onOrbitStart:()=>starts++,onOrbit:delta=>deltas.push(delta)});f.controller.setOrbitEnabled(true);
+ f.event(f.viewport,'pointerdown',{pointerType:'touch',pointerId:1,clientX:300,clientY:300});
+ for(const x of [302,303.5,305.9])f.event(f.viewport,'pointermove',{pointerId:1,clientX:x,clientY:300});
+ assert.equal(starts,0);assert.deepEqual(deltas,[]);assert.deepEqual(f.controller.getState(),{scale:1,x:0,y:0});
+ f.event(f.viewport,'pointermove',{pointerId:1,clientX:300+PLATE_TOUCH.turnSlop+2,clientY:300});
+ assert.equal(starts,1);assert.equal(deltas.length,1);assert.ok(Math.abs(deltas[0].x-2)<1e-9&&deltas[0].y===0,'only the travel past the slop turns');
+ f.event(f.viewport,'pointermove',{pointerId:1,clientX:300+PLATE_TOUCH.turnSlop+5,clientY:301});assert.deepEqual(deltas[1],{x:3,y:1});
+ f.event(f.viewport,'pointerup',{pointerId:1});
+ // Exactly at the slop the first turn is zero: the drag continues from the rest view.
+ f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:2,clientX:100,clientY:100});
+ f.event(f.viewport,'pointermove',{pointerId:2,clientX:100,clientY:100+PLATE_TOUCH.mouseSlop});assert.equal(starts,2);assert.deepEqual(deltas.at(-1),{x:0,y:0});
+ f.controller.destroy();
+});
+
+test('the painting a turn started from fades with the angle turned and holds a release detent',async()=>{
+ const {ORBIT_REST_FADE:F,orbitRestOpacity,orbitRestDistance}=await import('./mushrooms.mjs'),rest={yaw:.12,pitch:.36};
+ assert.equal(orbitRestOpacity(rest,rest),1);assert.equal(orbitRestOpacity({yaw:.12+F.start*.9,pitch:.36},rest),1,'the first pixels of a drag show the painting unchanged');
+ assert.equal(orbitRestOpacity({yaw:.12+F.end,pitch:.36},rest),0);assert.equal(orbitRestOpacity({yaw:.12,pitch:.36-F.end-.01},rest),0);
+ let last=1;for(let d=0;d<=F.end+.05;d+=.005){const k=orbitRestOpacity({yaw:.12+d*.8,pitch:.36+d*.6},rest);assert.ok(k<=last+1e-12&&k>=0&&k<=1);assert.ok(last-k<.05,'no step in the fade');last=k;}
+ assert.ok(Math.abs(orbitRestDistance({yaw:Math.PI-.01,pitch:0},{yaw:-Math.PI+.01,pitch:0})-.02)<1e-9,'yaw wraps');
+ assert.ok(F.start<F.detent&&F.detent<F.end,'a release in the detent still shows most of the painting');
+ assert.ok(orbitRestOpacity({yaw:.12+F.detent,pitch:.36},rest)>.5);
+ assert.ok(F.step>0&&F.step<.5,'the copy never vanishes in one frame');
+});
+
+test('a turned plate\'s bodies can be built one per step, and a built body is not built again',async()=>{
+ const m=await import('./mushrooms.mjs');
+ for(const type of ['amanita-1','bracket-6']){
+  const genome=generateSpecimen('woodland-042',type),rest=m.createOrbitRestPair(genome,m.orbitRestComposition(genome),m.connectedViewOptions({yaw:.4,pitch:.3}));
+  m.clearOrbitWorldCache();const reference=m.buildMorphSketch(rest,0,{inkOnly:true,interactive:true});
+  assert.equal(m.orbitWorldWarmers(rest,{missing:true}).length,0,'a drawn frame leaves nothing to build');
+  m.clearOrbitWorldCache();const steps=m.orbitWorldWarmers(rest,{missing:true});assert.equal(steps.length,rest.composition.members.length);
+  steps[0]();assert.equal(m.orbitWorldWarmers(rest,{missing:true}).length,steps.length-1);for(const step of steps.slice(1))step();
+  assert.equal(m.orbitWorldWarmers(rest,{missing:true}).length,0);
+  // A turned camera reuses the same bodies, and the drawing is the same as building in one frame.
+  assert.equal(m.orbitWorldWarmers({...rest,view:{...rest.view,yaw:1.2}},{missing:true}).length,0);
+  assert.deepEqual(m.buildMorphSketch({...rest},0,{inkOnly:true,interactive:true}).ink,reference.ink,type);
+ }
 });
 
 test('carried colony anchors survive URL decoding and destination promotion',async()=>{
