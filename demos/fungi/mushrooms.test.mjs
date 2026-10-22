@@ -2527,6 +2527,7 @@ test('the repaint after a turn lays its ink almost at once and its washes unpace
   const {settlePacing,NATIVE_PACING}=await import('./mushrooms.mjs');
   assert.deepEqual(settlePacing(),{inkMs:NATIVE_PACING.inkMs,depositMs:NATIVE_PACING.depositMs});
   const turned=settlePacing({turned:true});assert.equal(turned.depositMs,0);assert.ok(turned.inkMs<=NATIVE_PACING.inkMs/4);
+  assert.equal(turned.passageFramesOnly,true,'a turned repaint shows each dried passage, not every stroke');
 });
 
 test('Paint playback pacing follows brush travel and stays inside its bounds', async () => {

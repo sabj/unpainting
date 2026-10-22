@@ -7975,8 +7975,9 @@ export const NATIVE_COMPOSED_FRAME_MS=400;
 // form glazes and cast shadows while keeping a full settle under ~8 s.
 export const NATIVE_PACING=Object.freeze({inkMs:1100,depositMs:450,turnedInkMs:250});
 // The settle stream's pacing. After a turn the drawing's lines are already on
-// screen, so the repaint lays its ink almost at once and its washes unpaced.
-export function settlePacing({turned=false}={}){return turned?{inkMs:NATIVE_PACING.turnedInkMs,depositMs:0}:{inkMs:NATIVE_PACING.inkMs,depositMs:NATIVE_PACING.depositMs};}
+// screen, so the repaint lays its ink almost at once and its washes unpaced,
+// and streams a frame per dried passage rather than per stroke.
+export function settlePacing({turned=false}={}){return turned?{inkMs:NATIVE_PACING.turnedInkMs,depositMs:0,passageFramesOnly:true}:{inkMs:NATIVE_PACING.inkMs,depositMs:NATIVE_PACING.depositMs};}
 export const NATIVE_PAINT_LIMITS=Object.freeze({width:512,maxCells:218624,maxChannels:14,maxCheckpoints:12,cacheBytes:24*1024*1024,maxSteps:5000,maxMs:30000});
 export const NATIVE_TRANSPORT=Object.freeze({dt:.6,flowIters:1,evap:.01,paperDry:.006,edgeEvap:.009,gran:2});
 
@@ -9437,11 +9438,14 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
   const result=await simulateNativePassages(grounded,{seed:nativePlateSeed(genome,scene),maskFor:nativeMaskRasterizer(),paperTemplate:payload.paperTemplate,onPaper:paper=>emit({revision,nativeMaterial:true,paper}),onBrush,depositDurationMs:playback?0:settle.depositMs,travelMs:playback?pacing.washMs:0,skipPacing:()=>nativePlaybackSkip.on,checkpointIntervalMs:playback?PLAYBACK.frameMs:composer?NATIVE_COMPOSED_FRAME_MS:NATIVE_FULL_FRAME_MS,onCheckpoint:async({sheet,stage,progress,complete,force,metrics})=>{
     const live=playback&&!nativePlaybackSkip.on;
     if(playback&&!live&&!complete&&!force&&performance.now()-lastFullAt<PLAYBACK.refreshMs)return;
+    // After a turn the line drawing is already up: show each passage as it
+    // dries, not the strokes in between, so the plate is finished sooner.
+    if(settle.passageFramesOnly&&!complete&&!force)return;
     lastFrame=performance.now();
     const opticsAt=performance.now();
     if(complete){
       const fields=nativeReconstructFields(nativeOpticalFields(layersOf(sheet),sheet.pigments,sheet.n),sheet.w,sheet.h);renderTimings.finalOpticsMs+=performance.now()-opticsAt;renderTimings.opticsMs+=performance.now()-opticsAt;
-      const t=performance.now(),coverage=nativeCoverageMask(grounded.washes,undefined,W,H),regions=nativeRegionIds(planNativePassages(grounded).flatMap(p=>p.marks),undefined,W,H);c.putImageData(composeNativePainting(ink,fields,sheet.w,sheet.h,undefined,{coverage,settling:nativePaperSettling(),regions}),0,0);renderTimings.composeMs+=performance.now()-t;
+      const t=performance.now(),coverage=frameCoverage,regions=frameRegions;c.putImageData(composeNativePainting(ink,fields,sheet.w,sheet.h,undefined,{coverage,settling:nativePaperSettling(),regions}),0,0);renderTimings.composeMs+=performance.now()-t;
       drawNativeLabels(c,study,genome);
       nativeDetailState={painter,inkMarks,fields,sheetW:sheet.w,sheetH:sheet.h,study,genome,revision,scale,coverageWashes:grounded.washes};
       const finalPixels=c.getImageData(0,0,W,H).data;
