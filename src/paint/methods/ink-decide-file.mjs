@@ -12,6 +12,7 @@ import { foliageMask } from './line-foliage.mjs';
 import { hatchShadows, HATCH_DEFAULTS } from './line-hatch.mjs';
 import { salience } from './line-salience.mjs';
 import { joinCollinear } from './line-geometry.mjs';
+import { prunePenLines } from './pen-wash-lines.mjs';
 import { estimateInkDark } from './line-class.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import sharp from 'sharp';
@@ -27,7 +28,7 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0 }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false }) {
   let o = o0;
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   registerSegments(base, segments.stem);
@@ -54,6 +55,15 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
   }
   // --inkjoin mm: pieces that continue one another in a straight line join across a gap of up to mm (nothing is dropped)
   if (joinMm > 0) kept = joinCollinear(kept, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm });
+  // --inkeconomy 1: a draughtsman's economy (pen-wash-lines.mjs) without its random omission. Specks under 0.8 mm go; a
+  // small mark that nearly repeats a neighbour goes; no 4 mm square carries more than 9 mm of small marks, longest kept
+  // first; every mark 3 mm across or more stays.
+  let economyStats = null;
+  if (economy) {
+    const withLength = kept.map(g => { let s = 0; for (let k = 1; k < g.points.length; k++) s += Math.hypot(g.points[k].x - g.points[k - 1].x, g.points[k].y - g.points[k - 1].y); return { ...g, length: s }; });
+    const e = prunePenLines(withLength, { w, h, mmPerCell: pxMm, options: { keepAbove: -Infinity, joinMm: 0 } });
+    kept = e.lines; economyStats = e.stats;
+  }
   // --inksalience 1: connected and closed geometry first; a short isolated piece that belongs to no form is left to the wash
   let sal = null;
   if (salient) {
@@ -73,6 +83,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     stats: r.stats,
     ...(geometry ? { geometry } : {}),
     ...(hatch ? { hatchStrokes: hatched } : {}),
+    ...(economyStats ? { economy: economyStats } : {}),
     ...(sal ? { salience: sal } : {}),
   };
   fs.writeFileSync(path.join(out, `ink-labels${stage === 'opening' ? '' : '-' + stage}.json`), JSON.stringify(record, null, 1) + '\n');

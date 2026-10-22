@@ -22,7 +22,7 @@ export function inkLineFlags(num) {
   const f = { support: num('linesupport', 0), smoothMm: num('linesmooth', 0), cornerDeg: num('linesmoothcorner', 50),
     darkCap: num('inkdarkcap', 0), widthFloor: num('inkwidthfloor', 0), lineMeasure: num('linemeasure', 0), darkMatch: num('inkdarkmatch', 0),
     gapMm: num('linegapmm', 0), minMm: num('lineminmm', 0), inkOnly: num('lineinkonly', 0),
-    decide: num('inkdecide', 0), inkDarkRule: num('inkdarkrule', 0), joinMm: num('inkjoin', 0), shadowMask: num('inkshadowmask', 1), dropFaint: num('inkdropfaint', 1), geom: num('inkgeom', 0), foliage: num('inkfoliage', 0), salience: num('inksalience', 0), hatch: num('inkhatch', 0), hatchAngle: num('hatchangle', 45), hatchForm: num('hatchform', 0), widthMinMm: num('linewidthmin', 0.05), widthMaxMm: num('linewidthmax', 0.28), detailRatio: num('linedetailratio', 0.75), strokeMaxMm: num('linestrokemax', 0.5), probeMm: num('lineprobemm', 0.2) };
+    decide: num('inkdecide', 0), inkDarkRule: num('inkdarkrule', 0), joinMm: num('inkjoin', 0), economy: num('inkeconomy', 0), shadowMask: num('inkshadowmask', 1), dropFaint: num('inkdropfaint', 1), geom: num('inkgeom', 0), foliage: num('inkfoliage', 0), salience: num('inksalience', 0), hatch: num('inkhatch', 0), hatchAngle: num('hatchangle', 45), hatchForm: num('hatchform', 0), widthMinMm: num('linewidthmin', 0.05), widthMaxMm: num('linewidthmax', 0.28), detailRatio: num('linedetailratio', 0.75), strokeMaxMm: num('linestrokemax', 0.5), probeMm: num('lineprobemm', 0.2) };
   for (const [k, v] of Object.entries(f)) if (!Number.isFinite(v) || v < 0) throw new Error(`ink lines: ${k} must be a number of 0 or more, not ${v}`);
   if (f.cornerDeg > 180) throw new Error('--linesmoothcorner: degrees from 0 to 180');
   return { ...f, measure: f.decide > 0 || f.support > 0 || f.smoothMm > 0 || f.darkCap > 0 || f.widthFloor > 0 || f.lineMeasure > 0 || f.darkMatch > 0 };
@@ -81,7 +81,7 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   // the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made from decided lines is not decided again.
   let decided = doc.inkDecided === true;
   if (decide && MODEL_KINDS.includes(doc0.inputKind) && !decided) {
-    const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
+    const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
     doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
   }
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this

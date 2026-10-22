@@ -146,5 +146,13 @@ class Strokes(unittest.TestCase):
         self.assertTrue(lines)
         self.assertTrue(all(all(abs(p[1]-30) < 3 for p in g['points']) for g in lines))
 
+    def test_a_stroke_of_another_colour_than_the_ink_is_not_pen_line(self):
+        im = np.full((100, 200, 3), 235, 'uint8')
+        for y in (20, 40): cv2.line(im, (20, y), (180, y), (30, 30, 30), 2)      # black ink, the strongest strokes
+        cv2.line(im, (20, 70), (180, 70), (60, 150, 200), 2)                     # an ochre mark (BGR)
+        lines = copy.plan(im, 'stroke', stroke_opts={'ink_colour': 10})[0]
+        self.assertTrue(any(all(abs(p[1]-20) < 3 for p in g['points']) for g in lines))
+        self.assertFalse(any(any(abs(p[1]-70) < 3 for p in g['points']) for g in lines))
+
 
 if __name__ == '__main__': unittest.main()

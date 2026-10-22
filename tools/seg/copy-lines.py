@@ -74,7 +74,7 @@ def line_map_mask(bgr, fine=None, min_area=2):
 LONG_CELLS = 57
 
 
-def stroke_mask(bgr, pxmm=152.4/1080, rmm=.5, gate=None, lo_frac=.5, close=0):
+def stroke_mask(bgr, pxmm=152.4/1080, rmm=.5, gate=None, lo_frac=.5, close=0, ink_colour=0):
     """The source's own pen strokes: dark marks narrower than 2 x rmm against whatever is around them.
 
     A black top-hat (closing minus image) with a disc of radius rmm answers to a stroke of any width up to the disc and
@@ -92,6 +92,19 @@ def stroke_mask(bgr, pxmm=152.4/1080, rmm=.5, gate=None, lo_frac=.5, close=0):
     strong &= stats[:, cv2.CC_STAT_AREA] >= 4
     strong[0] = False
     mask = strong[labels].astype('uint8')
+    if ink_colour > 0:
+        # the source's pen ink has one colour: that of its strongest strokes. A mark of another colour (an ochre or blue
+        # wash's dark edge, coloured texture) is not pen line. A stroke is kept when most of it is within ink_colour
+        # (CIELAB a*b* units) of the ink, or near black.
+        lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+        Lc, A, B = lab[..., 0]*100/255, lab[..., 1]-128, lab[..., 2]-128
+        core = bh > np.percentile(bh, 99.5)
+        a0, b0 = float(np.median(A[core])), float(np.median(B[core]))
+        inky = ((np.hypot(A-a0, B-b0) < ink_colour) | (Lc < 25)).astype(np.float32)
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
+        keep = np.bincount(labels.ravel(), weights=inky.ravel(), minlength=n)/np.maximum(1, stats[:, cv2.CC_STAT_AREA]) > .6
+        keep[0] = False
+        mask = keep[labels].astype('uint8')
     if close > 1:
         # bridge the pixel breaks a dry pen leaves along a stroke, so one stroke is traced as one line
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close, close)))
@@ -164,6 +177,7 @@ def main():
                     help='explicit line-map simplification bound in planning cells (0–2), default .15; observed ink stays at .25')
     ap.add_argument('--stroke-lo', type=float, default=.5, help='--kind stroke: weak support as a share of the strong level')
     ap.add_argument('--stroke-close', type=int, default=0, help='--kind stroke: close breaks of up to this many pixels before tracing')
+    ap.add_argument('--stroke-colour', type=float, default=0, help='--kind stroke: keep strokes within this a*b* distance of the ink colour (0 off)')
     ap.add_argument('--gate', help="a lineart map (dark on white): a --kind stroke stroke is kept only where it also sees a line")
     ap.add_argument('--fine', help="the fine model's own map (dark on white): its marks above .28 in busy detail regions join a line map")
     args = ap.parse_args()
@@ -190,7 +204,7 @@ def main():
         if grey is None:
             ap.error('cannot read '+args.gate)
         gate = 1-cv2.resize(grey, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32)/255
-    lines, mask, skeleton, stats = plan(bgr, args.kind, tolerance, fine, gate, {'lo_frac': args.stroke_lo, 'close': args.stroke_close})
+    lines, mask, skeleton, stats = plan(bgr, args.kind, tolerance, fine, gate, {'lo_frac': args.stroke_lo, 'close': args.stroke_close, 'ink_colour': args.stroke_colour})
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
     doc = {'source': 'copy-lines: '+('prepared learned line map' if args.kind == 'line-map' else 'observed source ink')+', pre-paint only',
            'inputKind': args.kind,

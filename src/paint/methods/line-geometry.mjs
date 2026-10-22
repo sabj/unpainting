@@ -170,3 +170,4 @@ export function joinCollinear(lines, { pxMm }, o = GEOM_DEFAULTS) {
   for (let i = 0; i < n; i++) if (!done[i]) out.push(items[i].g);
   return out;
 }
+

@@ -13,7 +13,7 @@ export const INK_RECIPES = Object.freeze({
   wash: Object.freeze({
     outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', linemodel: '1', linestroke: '1', inkdecide: '1', inkshadowmask: '0', inkdropfaint: '0', inklabeljudge: 'simple', copylinesmin: '0.005', copylinesagree: '2', copylinesfloor: '0.6', copylinesfill: '1',
     drawingstages: 'off', stages: 'prepink,finishink', prepinkfrom: 'lines', prepinkamount: '1', prepinkkeep: '1', prepinkadd: '0', prepinkdeviate: '0',
-    openingpressure: '0.75', drawinghand: '1', drawstroke: '0.1', inkhand: '1', drawtaperin: '2', drawtaperout: '6', drawtaperstart: '0.7', drawtaperend: '0.45', drawdetailscale: '0.75', drawflickmm: '1.5', drawwidthgain: '0.75', inkdarkrule: '1', inkjoin: '2.5', inkfoliage: '1',
+    openingpressure: '0.75', drawinghand: '1', drawstroke: '0.1', inkhand: '1', drawtaperin: '2', drawtaperout: '6', drawtaperstart: '0.7', drawtaperend: '0.45', drawdetailscale: '0.75', drawflickmm: '1.5', drawwidthgain: '0.75', inkdarkrule: '1', inkjoin: '2.5', inkeconomy: '1', inkfoliage: '1',
     linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '0.3',
     linemeasure: '1', inkdarkmatch: '1.3', inkhue: 'source', inkhuegain: '1.5', inkdamp: '0', inkbleed: '0.35',
   }),
