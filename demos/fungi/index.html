@@ -279,18 +279,14 @@
     @media(max-width:900px){.debug-trait-groups{grid-template-columns:minmax(0,1fr)}.morph-debug .debug-record{grid-template-columns:repeat(2,max-content minmax(0,1fr))}}
     @media(max-width:760px){.debug-section>summary{min-height:44px;font-size:13px}.morph-debug .debug-table th,.morph-debug .debug-table td{font-size:11px}}
 
-    /* Trait rows as a grid: Shape in two columns beside Painting on wide screens. */
-    .debug-trait-groups{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
-    .morph-debug .trait-table{display:block}
-    .morph-debug .trait-table thead,.morph-debug .trait-table tbody{display:grid;grid-template-columns:minmax(0,1fr);column-gap:16px}
-    .morph-debug [data-section=shape] .trait-table thead,.morph-debug [data-section=shape] .trait-table tbody{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .morph-debug .trait-table tr{display:grid;grid-template-columns:minmax(0,1fr) 50px 50px 50px 56px;align-items:center}
-    .morph-debug .trait-table tr[hidden]{display:none}
-    .morph-debug .trait-table th,.morph-debug .trait-table td{width:auto;max-width:none;overflow:hidden;text-overflow:ellipsis;text-align:right}
-    .morph-debug .trait-table th:first-child{text-align:left}
-    .morph-debug .trait-table th small{display:none}
-    .morph-debug .trait-table th[scope=row]{max-width:none;width:auto}
-    @media(max-width:900px){.debug-trait-groups{grid-template-columns:minmax(0,1fr)}.morph-debug [data-section=shape] .trait-table tbody,.morph-debug [data-section=shape] .trait-table thead{grid-template-columns:minmax(0,1fr)}.morph-debug [data-section=shape] .trait-table thead tr+tr{display:none}}
+    /* Trait tables: one table per section, stacked; full trait names; a narrow screen scrolls sideways. */
+    .debug-trait-groups{grid-template-columns:minmax(0,1fr)}
+    .morph-debug .trait-table-scroll{overflow-x:auto;max-width:100%}
+    .morph-debug .trait-table{width:100%;min-width:360px;table-layout:auto}
+    .morph-debug .trait-table th[scope=row]{min-width:9.5em;max-width:none;width:auto;overflow:visible;text-overflow:clip;text-align:left}
+    .morph-debug .trait-table th[scope=row] small{margin-left:4px}
+    .morph-debug .trait-table td,.morph-debug .trait-table thead th:not(:first-child){width:64px;text-align:right}
+    .morph-debug .trait-table thead th:first-child{text-align:left}
 </style>
 </head>
 <body data-debug="false">
@@ -353,8 +349,8 @@
           <div class="debug-seeds"><span>A <code id="debug-type-a"></code> · <code id="debug-seed-a"></code></span><span>B <code id="debug-type-b"></code> · <code id="debug-seed-b"></code></span><span>Now <code id="debug-current-id"></code></span></div>
         </details>
         <div class="debug-trait-groups">
-          <details class="debug-section" data-section="shape" open><summary>Shape traits <span class="debug-sum" id="sum-shape"></span></summary><div class="debug-table-scroll" tabindex="0" role="region" aria-label="Shape traits"><table class="debug-table trait-table"><thead><tr><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr><tr aria-hidden="true"><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="traits"></tbody></table></div></details>
-          <details class="debug-section" data-section="painting" open><summary>Painting traits <span class="debug-sum" id="sum-painting"></span></summary><div class="debug-table-scroll" tabindex="0" role="region" aria-label="Painting traits"><table class="debug-table trait-table"><thead><tr><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="traits-painting"></tbody></table></div></details>
+          <details class="debug-section" data-section="shape" open><summary>Shape traits <span class="debug-sum" id="sum-shape"></span></summary><div class="debug-table-scroll trait-table-scroll" tabindex="0" role="region" aria-label="Shape traits"><table class="debug-table trait-table"><thead><tr><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="traits"></tbody></table></div></details>
+          <details class="debug-section" data-section="painting" open><summary>Painting traits <span class="debug-sum" id="sum-painting"></span></summary><div class="debug-table-scroll trait-table-scroll" tabindex="0" role="region" aria-label="Painting traits"><table class="debug-table trait-table"><thead><tr><th scope="col">Trait</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="traits-painting"></tbody></table></div></details>
         </div>
         <details class="debug-section" data-section="measures"><summary>Drawing measures <span class="debug-sum" id="sum-measures"></span></summary>
           <section id="intrinsic-panel" hidden><div class="debug-table-scroll" tabindex="0" role="region" aria-label="Model sizes"><table class="debug-table" aria-label="Model sizes"><thead><tr><th scope="col">Size</th><th scope="col">A</th><th scope="col">Now</th><th scope="col">B</th><th scope="col">Δ</th></tr></thead><tbody id="intrinsic-values"></tbody></table></div><p id="view-values" class="debug-position"></p></section>

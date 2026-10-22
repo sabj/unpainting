@@ -10761,9 +10761,11 @@ async function mount() {
         if(!$('morph-debug').hidden){
           renderSpecimenRecord(g);
           for(const {i,row,current,delta} of traitElements){
+            // Now: the value the plate is drawn with this frame; Δ: how far it has moved from A.
             if(row.hidden)continue;const change=g.values[i]-a.values[i];
-            current.textContent=morphPair.sameRecipe?g.values[i].toFixed(4):'—';
-            delta.textContent=!morphPair.sameRecipe?'—':Math.abs(change)<.00005?'0.0000':`${change>0?'+':'−'}${Math.abs(change).toFixed(4)}`;
+            current.textContent=g.values[i].toFixed(4);
+            delta.textContent=Math.abs(change)<.00005?'0.0000':`${change>0?'+':'−'}${Math.abs(change).toFixed(4)}`;
+            row.dataset.direction=change>=.00005?'up':change<=-.00005?'down':'same';
           }
           const chart=morphPair.connectedAnatomy?morphPair:morphPair.sourceConnected?{...morphPair.sourceConnected,view:morphPair.view,shapeModifiers:morphPair.shapeModifiers}:null;
           $('intrinsic-panel').hidden=!chart;
