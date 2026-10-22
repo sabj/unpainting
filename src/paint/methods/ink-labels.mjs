@@ -94,7 +94,7 @@ function askJudge(judge, png, ids, { run = spawnSync, env = process.env } = {}) 
     const prompt = PROMPT(ids);
     const r = judge === 'codex'
       ? run(env.CODEX_BIN || 'codex', ['exec', '-i', file, '--sandbox', 'read-only', '--skip-git-repo-check', prompt], { cwd: dir, encoding: 'utf8', timeout: 600000 })
-      : run(env.AGY_BIN || 'agy', ['-p', `Open the image file ${file} with your file-viewing tool (do not run shell commands). ${prompt}`, '--model', env.INK_LABEL_MODEL || 'gemini-3.8-flash-high', '--mode', 'plan', '--add-dir', dir], { encoding: 'utf8', timeout: 600000 });
+      : run(env.AGY_BIN || 'agy', ['-p', `Open the image file ${file} with your file-viewing tool (do not run shell commands). ${prompt}`, '--model', env.INK_LABEL_MODEL || 'claude-sonnet-4-6', '--mode', 'plan', '--add-dir', dir], { encoding: 'utf8', timeout: 600000 });
     if (r.error || r.status !== 0) throw new Error(r.error?.message ?? (String(r.stderr ?? '').trim().split('\n').at(-1) || `exit ${r.status}`));
     const labels = parseLabelReply(r.stdout, ids);
     if (!labels) throw new Error(`no labels in the reply: ${String(r.stdout).slice(0, 200)}`);

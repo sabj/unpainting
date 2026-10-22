@@ -21,7 +21,7 @@ const argv = process.argv.slice(2), opt = (k, d) => { const i = argv.lastIndexOf
 const label = opt('label');
 if (!label) { console.error('usage: ink-legibility.mjs --label <name> [--only subject,..] [--render 1] [--vision 1] [--judge agy|codex] [--note text]'); process.exit(2); }
 const JUDGE = opt('judge', 'agy'), CODEX = opt('codex', process.env.CODEX_BIN || 'codex');
-const AGY = opt('agy', process.env.AGY_BIN || 'agy'), MODEL = opt('model', 'gemini-3.8-flash-high');
+const AGY = opt('agy', process.env.AGY_BIN || 'agy'), MODEL = opt('model', 'claude-sonnet-4-6');
 const spec = JSON.parse(fs.readFileSync(path.join(root, 'bench/ink-heavy/legibility.json'), 'utf8')).subjects;
 const boxes = JSON.parse(fs.readFileSync(path.join(root, 'bench/ink-heavy/features.json'), 'utf8'));
 const only = opt('only', '') ? opt('only').split(',') : Object.keys(spec);

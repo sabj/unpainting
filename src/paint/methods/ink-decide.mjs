@@ -25,6 +25,8 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
   const labelAt = (x, y) => {
     const xi = Math.max(0, Math.min(w - 1, x)), yi = Math.max(0, Math.min(h - 1, y));
     const base = ctx.cellLabel(xi, yi), i = yi * w + xi;
+    // a face or a hand is never taken for a shadow or for leaves by the tone and colour passes
+    if (base === 'face' || base === 'hands') return base;
     // leaves found by colour and texture are wash even where a region's label missed them; a trunk's own region stays a trunk
     if (ctx.foliage && ctx.foliage[i] && base !== 'tree_trunk') return 'foliage';
     return ctx.shadow && ctx.shadow[i] ? 'shadow_mass' : base;
