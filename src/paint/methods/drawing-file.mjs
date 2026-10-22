@@ -88,7 +88,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
       strokeLength: num('drawstroke', .35) * Math.min(w, h),
       base, gain, margin:margin*handScale, minNib:minNib*handScale, inLen: num('drawtaperin', 3) * handScale,
       outLen: num('drawtaperout', 5) * handScale, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
-      detailScale: num('drawdetailscale', 1), flickCells: num('drawflickmm', 0) / (num('sheetmm', 152.4) / w), D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
+      detailScale: num('drawdetailscale', 1), detailWidth: num('drawdetailwidth', 1), flickCells: num('drawflickmm', 0) / (num('sheetmm', 152.4) / w), D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
     log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
     // --inkhand 1: the hand's speed along each stroke (slower on curves, which lays a wider, darker line, faster on straights)
     // without a second taper or a blot at the nib's first touch: the gestures are already tapered

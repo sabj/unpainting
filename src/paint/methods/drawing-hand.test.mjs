@@ -25,6 +25,6 @@ test('a flick is set down and lifted in one motion and drawn finer, and a detail
   assert.ok(flick.points[0].nw / flick.points[1].nw > 0.95, 'no landing taper on a flick');
   assert.ok(long.points[0].nw / long.points[20].nw < 0.7, 'a long stroke lands light');
   assert.ok(flick.points[1].nw < long.points[20].nw, 'and finer than a full stroke');
-  const detail = handDrawing([mk(40, 2)], { gap: 0, w: 100, h: 100, strokeLength: 1000, detailScale: 0.75 }).strokes[0];
+  const detail = handDrawing([mk(40, 2)], { gap: 0, w: 100, h: 100, strokeLength: 1000, detailScale: 0.75, detailWidth: 0.75 }).strokes[0];
   assert.ok(detail.points[20].nw < long.points[20].nw);
 });

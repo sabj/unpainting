@@ -22,7 +22,7 @@ export function inkLineFlags(num) {
   const f = { support: num('linesupport', 0), smoothMm: num('linesmooth', 0), cornerDeg: num('linesmoothcorner', 50),
     darkCap: num('inkdarkcap', 0), widthFloor: num('inkwidthfloor', 0), lineMeasure: num('linemeasure', 0), darkMatch: num('inkdarkmatch', 0),
     gapMm: num('linegapmm', 0), minMm: num('lineminmm', 0), inkOnly: num('lineinkonly', 0),
-    decide: num('inkdecide', 0), inkDarkRule: num('inkdarkrule', 0), joinMm: num('inkjoin', 0), shadowMask: num('inkshadowmask', 1), dropFaint: num('inkdropfaint', 1), geom: num('inkgeom', 0), foliage: num('inkfoliage', 0), salience: num('inksalience', 0), hatch: num('inkhatch', 0), hatchAngle: num('hatchangle', 45), hatchForm: num('hatchform', 0), widthMinMm: num('linewidthmin', 0.05), widthMaxMm: num('linewidthmax', 0.28), detailRatio: num('linedetailratio', 0.75), probeMm: num('lineprobemm', 0.2) };
+    decide: num('inkdecide', 0), inkDarkRule: num('inkdarkrule', 0), joinMm: num('inkjoin', 0), shadowMask: num('inkshadowmask', 1), dropFaint: num('inkdropfaint', 1), geom: num('inkgeom', 0), foliage: num('inkfoliage', 0), salience: num('inksalience', 0), hatch: num('inkhatch', 0), hatchAngle: num('hatchangle', 45), hatchForm: num('hatchform', 0), widthMinMm: num('linewidthmin', 0.05), widthMaxMm: num('linewidthmax', 0.28), detailRatio: num('linedetailratio', 0.75), strokeMaxMm: num('linestrokemax', 0.5), probeMm: num('lineprobemm', 0.2) };
   for (const [k, v] of Object.entries(f)) if (!Number.isFinite(v) || v < 0) throw new Error(`ink lines: ${k} must be a number of 0 or more, not ${v}`);
   if (f.cornerDeg > 180) throw new Error('--linesmoothcorner: degrees from 0 to 180');
   return { ...f, measure: f.decide > 0 || f.support > 0 || f.smoothMm > 0 || f.darkCap > 0 || f.widthFloor > 0 || f.lineMeasure > 0 || f.darkMatch > 0 };
@@ -92,7 +92,9 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   const inkMask = flags.inkOnly > 0 && support > 0 ? await inkCells(image, im.w, im.h) : null;
   // a map's contours: widths held to the pen's range (--linewidthmin, --linewidthmax, --linedetailmm for short or curved
   // pieces), read with a probe of --lineprobemm either way so a wash beside the line is not taken for the line
-  const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: flags.widthMaxMm / pxMm, detail: flags.detailRatio, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
+  // a traced pen stroke carries its own width: up to --linestrokemax mm, no detail ratio, no darkness shrink
+  const stroke = doc0.inputKind === 'stroke';
+  const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: (stroke ? flags.strokeMaxMm : flags.widthMaxMm) / pxMm, detail: stroke ? 1 : flags.detailRatio, darkWidth: !stroke, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
   const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
   // the target's line cores, as --inkdarkmatch reads the pen's strokes on its scrap
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));

@@ -35,7 +35,7 @@ export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength =
   const ordered = handOrder(gestures);
   const broken = lit > 0 && D ? ordered.flatMap(g => breakOnLights(g, D, w, h, { lit, reach, minPts: 2 })) : ordered;
   return { joined, gestures: ordered.length, runs: broken.length,
-    strokes: broken.map(g => shapeGesture(g, { ...shape, scale: (shape.scale ?? 1) * (g.tier === 2 ? (shape.detailScale ?? 1) : 1), widthScale: g.tier === 2 ? (shape.detailScale ?? 1) : 1 })).flatMap(g => personStrokes(g, strokeLength)) };
+    strokes: broken.map(g => shapeGesture(g, { ...shape, scale: (shape.scale ?? 1) * (g.tier === 2 ? (shape.detailScale ?? 1) : 1), widthScale: g.tier === 2 ? (shape.detailWidth ?? 1) : 1 })).flatMap(g => personStrokes(g, strokeLength)) };
 }
 
 /** Join lines that continue one another. `gap` in cells. Loose gates: a segmenter breaks contours at every junction. */
@@ -87,7 +87,7 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
   for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
   const L = s[n - 1] || 1, tin = Math.min(inLen, 0.25 * L), tout = Math.min(outLen, 0.3 * L);
   // a flick (a mark under `flickCells` long) is set down and lifted in one motion: no landing taper, and finer
-  const flick = flickCells > 0 && L < flickCells, ws = widthScale * (flick ? 0.6 : 1);
+  const flick = flickCells > 0 && L < flickCells, ws = widthScale * (flick ? 0.8 : 1);
   const ease = u => u * u * (3 - 2 * u);
   const env = d => {
     const a = !flick && tin > 0 && d < tin ? start + (1 - start) * ease(d / tin) : 1;
