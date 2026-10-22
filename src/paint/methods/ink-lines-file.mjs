@@ -13,16 +13,18 @@ import { labPlanes } from './line-evidence.mjs';
 import { holdLinesToTarget } from './ink-lines.mjs';
 import { strokesPeakAbsorbance } from './ink-match.mjs';
 import { separate } from '../../crop/inkwash.mjs';
+import { decideFile } from './ink-decide-file.mjs';
+import { prepareSegments } from '../../crop/segment-prep.mjs';
 
 /** The ink-line flags: { support (L*), smoothMm, cornerDeg, measure } where measure is whether anything reads the target. */
 export function inkLineFlags(num) {
   const f = { support: num('linesupport', 0), smoothMm: num('linesmooth', 0), cornerDeg: num('linesmoothcorner', 50),
     darkCap: num('inkdarkcap', 0), widthFloor: num('inkwidthfloor', 0), lineMeasure: num('linemeasure', 0), darkMatch: num('inkdarkmatch', 0),
     gapMm: num('linegapmm', 0), minMm: num('lineminmm', 0), inkOnly: num('lineinkonly', 0),
-    widthMinMm: num('linewidthmin', 0.06), widthMaxMm: num('linewidthmax', 0.35), detailMm: num('linedetailmm', 0.15), probeMm: num('lineprobemm', 0.2) };
+    decide: num('inkdecide', 0), widthMinMm: num('linewidthmin', 0.06), widthMaxMm: num('linewidthmax', 0.35), detailMm: num('linedetailmm', 0.15), probeMm: num('lineprobemm', 0.2) };
   for (const [k, v] of Object.entries(f)) if (!Number.isFinite(v) || v < 0) throw new Error(`ink lines: ${k} must be a number of 0 or more, not ${v}`);
   if (f.cornerDeg > 180) throw new Error('--linesmoothcorner: degrees from 0 to 180');
-  return { ...f, measure: f.support > 0 || f.smoothMm > 0 || f.darkCap > 0 || f.widthFloor > 0 || f.lineMeasure > 0 || f.darkMatch > 0 };
+  return { ...f, measure: f.decide > 0 || f.support > 0 || f.smoothMm > 0 || f.darkCap > 0 || f.widthFloor > 0 || f.lineMeasure > 0 || f.darkMatch > 0 };
 }
 
 // a contour piece shorter than this, or turning faster than this, is detail (an eye, a pupil, a nostril)
@@ -60,7 +62,7 @@ function onGrid(doc, gridW) {
  * Hold one line file to the target. Returns the stage record { file, out, stats, pixelMm } (out null when the file
  * is passed through unchanged), or null for a file with no lines.
  */
-async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flags, targetW, gridW = 0, log = () => {} }) {
+async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flags, targetW, gridW = 0, log = () => {}, decide = null }) {
   const file = path.resolve(root, linePaths(base).lines);
   if (!fs.existsSync(file)) return null;
   const doc0 = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -68,8 +70,15 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   if (!(doc0.image?.w && doc0.image?.h)) throw new Error(`ink lines: ${path.basename(file)} has no image box, so its lines cannot be read against the target`);
   // with --linemeasure, a file drawn on a finer grid than the pen's is read on the pen's grid (the painting's, or with
   // --inkres N, N times as fine), so the support test's one to two pixels beside a line are as wide as the pen line it will draw
-  const doc = flags.lineMeasure > 0 && gridW > 0 && doc0.image.w > 1.25 * gridW ? onGrid(doc0, gridW) : doc0, im = doc.image;
-  const L = await lPlane(image, im.w, im.h), pxMm = sheetMm / im.w;
+  let doc = flags.lineMeasure > 0 && gridW > 0 && doc0.image.w > 1.25 * gridW ? onGrid(doc0, gridW) : doc0;
+  const im = doc.image, L = await lPlane(image, im.w, im.h), pxMm = sheetMm / im.w;
+  // --inkdecide 1: a lineart map's candidate lines are drawn only where the ink rule of the ground under them allows it and
+  // the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made from decided lines is not decided again.
+  let decided = doc.inkDecided === true;
+  if (decide && doc0.inputKind === 'line-map' && !decided) {
+    const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, log });
+    doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
+  }
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this
   // (defaults 2 and 3 of the file's pixels)
   // A lineart map's contours (copy-lines --kind line-map) are measured, never cut: the map says where the line is, and the
@@ -86,9 +95,9 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));
   const stats = flags.darkMatch > 0 ? { ...r.stats, peakAbsorbance: strokesPeakAbsorbance(L, im.w, im.h, gestures) } : r.stats;
   const record = { file, out: null, stats, pixelMm: sheetMm / targetW, filePixelMm: pxMm, ...(model ? { model: true } : {}) };
-  const changed = support > 0 || flags.smoothMm > 0 || flags.lineMeasure > 0;
+  const changed = support > 0 || flags.smoothMm > 0 || flags.lineMeasure > 0 || decided;
   if (changed) {
-    const stem = path.join(out, `ink-${stage}`), next = { ...doc, lines: r.lines, inkLines: { source: file, support, smoothMm: flags.smoothMm, cornerDeg: flags.cornerDeg, measured: flags.lineMeasure > 0 } };
+    const stem = path.join(out, `ink-${stage}`), next = { ...doc, lines: r.lines, ...(decided ? { inkDecided: true } : {}), inkLines: { source: file, support, smoothMm: flags.smoothMm, cornerDeg: flags.cornerDeg, measured: flags.lineMeasure > 0 } };
     if (!r.lines.length) next.empty = `no line of ${path.basename(file)} follows a line in the target (--linesupport ${support})`;
     fs.writeFileSync(`${stem}-lines.json`, JSON.stringify(next) + '\n');
     record.out = stem;
@@ -107,10 +116,12 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
 export async function holdInkLines({ opt, num, argv, image, root = '.', out, sheetMm, log = () => {} }) {
   const flags = inkLineFlags(num);
   if (!flags.measure) return null;
+  // the regions the ink decision reads: SAM's, cached by the target's hash (the painter asks for them again later)
+  const decide = flags.decide > 0 ? { segments: prepareSegments({ image, root, out, opt, log }), judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')) } : null;
   const targetW = (await sharp(image).metadata()).width, res = { flags };
   for (const [stage, key] of [['opening', 'drawingfile'], ['closing', 'drawinglast']]) {
     const base = opt(key, '');
-    res[stage] = base ? await holdLineFile({ stage, base, image, root, out, sheetMm, flags, targetW, gridW: num('width', 0) * Math.max(1, Math.round(num('inkres', 1))), log }) : null;
+    res[stage] = base ? await holdLineFile({ stage, base, image, root, out, sheetMm, flags, targetW, gridW: num('width', 0) * Math.max(1, Math.round(num('inkres', 1))), log, decide }) : null;
     if (res[stage]?.out) argv.push('--' + key, res[stage].out);
   }
   res.pixelMm = sheetMm / targetW;

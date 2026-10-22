@@ -96,6 +96,7 @@ test('--inkres keeps a finer file on its own grid, up to the fine sheet', async 
 test('the wash recipe draws on a sheet 3 times as fine, by a hand that chains strokes', () => {
   assert.equal(INK_RECIPES.wash.inkres, '3');
   assert.equal(INK_RECIPES.wash.drawinghand, '1');
+  assert.equal(INK_RECIPES.wash.inkdecide, '1');
   assert.equal(INK_RECIPES.wash.drawstroke, '0.1');
 });
 
