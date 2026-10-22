@@ -2898,3 +2898,32 @@ test('ux12: a Morph destination planned while idle is reused only while its iden
   assert.equal(plannedDestinationFor(planned,{...now,[k]:v}),null,`a changed ${k} rebuilds it`);
  assert.equal(plannedDestinationFor(null,now),null);
 });
+
+test('a field region that reaches the grid edge still closes (a morph never empties a member there)',async()=>{
+ const m=await import('./mushrooms.mjs');
+ // The old trace, kept here as the reference for regions clear of the edge.
+ const reference=(values,g,offset=0)=>{
+  const w=g.width,h=g.height,horizontal=(w-1)*h,coords=new Map(),next=new Map(),valuesAt=(x,y)=>values[y*w+x]-offset,mix=(a,b,t)=>a+(b-a)*t,clamp=x=>Math.max(0,Math.min(1,x));
+  const edge=(x,y,k,vs)=>{const ids=[y*(w-1)+x,horizontal+y*w+x+1,(y+1)*(w-1)+x,horizontal+y*w+x],id=ids[k];if(coords.has(id))return id;
+   const corners=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]],[i,j]=[[0,1],[1,2],[3,2],[0,3]][k],a=vs[i],b=vs[j],t=clamp(a/(a-b||1e-12)),p=corners[i],q=corners[j];coords.set(id,[g.x+mix(p[0],q[0],t)*g.step,g.y+mix(p[1],q[1],t)*g.step]);return id;};
+  const table={1:[[0,3]],2:[[1,0]],3:[[1,3]],4:[[2,1]],6:[[2,0]],7:[[2,3]],8:[[3,2]],9:[[0,2]],11:[[1,2]],12:[[3,1]],13:[[0,1]],14:[[3,0]]};
+  for(let y=0;y<h-1;y++)for(let x=0;x<w-1;x++){const vs=[valuesAt(x,y),valuesAt(x+1,y),valuesAt(x+1,y+1),valuesAt(x,y+1)],code=vs.reduce((n,v,i)=>n|(v<0?1<<i:0),0);if(code===0||code===15)continue;
+   const center=vs.reduce((a,b)=>a+b,0)*.25,segments=code===5?(center<0?[[0,1],[2,3]]:[[0,3],[2,1]]):code===10?(center<0?[[3,0],[1,2]]:[[1,0],[3,2]]):table[code];for(const [a,b] of segments)next.set(edge(x,y,a,vs),edge(x,y,b,vs));}
+  const seen=new Set(),paths=[];for(const start of next.keys())if(!seen.has(start)){const points=[];let at=start;while(!seen.has(at)&&next.has(at)){seen.add(at);points.push(coords.get(at));at=next.get(at);}if(at===start&&points.length>=3){points.push(points[0]);paths.push(points);}}
+  return paths;
+ };
+ const g={x:10,y:20,step:3,width:40,height:30},blobs=(cx,cy,r)=>{const v=new Float32Array(g.width*g.height);for(let y=0;y<g.height;y++)for(let x=0;x<g.width;x++)v[y*g.width+x]=Math.min(...cx.map((c,i)=>Math.hypot(x-c,y-cy[i])-r[i]));return v;};
+ for(const [cx,cy,r] of [[[12,28],[15,12],[6,4]],[[20],[15],[9]],[[8,30,22],[8,20,14],[3,5,2.5]]])assert.deepEqual(m.fieldContours(blobs(cx,cy,r),g),reference(blobs(cx,cy,r),g),'regions clear of the edge trace exactly as before');
+ // A body inflated past the grid edge: the old trace loses it entirely.
+ const edgeBody=blobs([3],[15],[9]);
+ assert.equal(reference(edgeBody,g).length,0);
+ const loops=m.fieldContours(edgeBody,g);assert.equal(loops.length,1,'one closed region');
+ const loop=loops[0];assert.deepEqual(loop.at(-1),loop[0]);assert.ok(loop.every(([x,y])=>x>=g.x&&y>=g.y&&x<=g.x+(g.width-1)*g.step&&y<=g.y+(g.height-1)*g.step),'clipped at the grid edge');
+ assert.ok(loop.some(([x])=>x===g.x),'it runs along the edge');
+ // The page state that froze mid-morph (oyster-1 -> agaric-1, member 2 emptied near t = .47).
+ const st=m.parseState('?type=oyster-1&seed=woodland-042&next=woodland-108&nextType=agaric-1&blend=0&anchors=%5B%7B%22x%22%3A549.7912226023132%2C%22y%22%3A693.431018099522%2C%22scale%22%3A1.0686945976111792%2C%22rotation%22%3A-0.027216843767607784%7D%2C%7B%22x%22%3A607.2592160595253%2C%22y%22%3A749.9902770104795%2C%22scale%22%3A1.1616706051562613%2C%22rotation%22%3A-0.047435616287969905%7D%2C%7B%22x%22%3A714.2424616146001%2C%22y%22%3A808.2584353285512%2C%22scale%22%3A1.3%2C%22rotation%22%3A0.04041649127505172%7D%5D&layout=woodland-042&members=3&yaw=0.12&pitch=0.36&background=0');
+ const ga=generateSpecimen(st.seed,st.typeId),gb=generateSpecimen(st.next,st.nextTypeId);
+ const composition=m.applyCompositionAnchors(m.createSpecimenComposition({...ga,seed:st.compositionSeed},{count:st.compositionCount}),st.compositionAnchors);
+ const data=m.prepareImplicitPair(m.withFieldPlatePair(m.createMorphPair(ga,gb,{composition,...m.orbitViewOptions(st)}),st.fieldPlate));
+ for(const t of [.4,.4675,.47,.48,.49,.5,.55])assert.equal(m.sampleImplicitMorph(data,t).bodies.length,3,`every member present at ${t}`);
+});

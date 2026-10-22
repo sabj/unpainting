@@ -6476,14 +6476,20 @@ function implicitMixField(a,b,t,targetCount,out,band){
  return offset;
 }
 export function fieldContours(values,g,offset=0){
- const w=g.width,h=g.height,horizontal=(w-1)*h,coords=new Map(),next=new Map(),valuesAt=(x,y)=>values[y*w+x]-offset;
+ const w=g.width,h=g.height;
+ // A region reaching the grid edge would leave an open chain and be lost:
+ // only then is the scan widened by one cell of "outside" all round, so the
+ // region closes along the edge. Otherwise the scan is the grid itself.
+ let pad=0;for(let x=0;x<w&&!pad;x++)if(values[x]-offset<0||values[(h-1)*w+x]-offset<0)pad=1;for(let y=0;y<h&&!pad;y++)if(values[y*w]-offset<0||values[y*w+w-1]-offset<0)pad=1;
+ const W=w+2*pad,horizontal=(W-1)*(h+2*pad),coords=new Map(),next=new Map();
+ const valuesAt=pad?(x,y)=>x<0||y<0||x>=w||y>=h?Infinity:values[y*w+x]-offset:(x,y)=>values[y*w+x]-offset;
  const edge=(x,y,k,vs)=>{
-  const ids=[y*(w-1)+x,horizontal+y*w+x+1,(y+1)*(w-1)+x,horizontal+y*w+x],id=ids[k];if(coords.has(id))return id;
-  const corners=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]],ends=[[0,1],[1,2],[3,2],[0,3]][k],[i,j]=ends,a=vs[i],b=vs[j],t=clamp(a/(a-b||1e-12)),p=corners[i],q=corners[j];
+  const X=x+pad,Y=y+pad,ids=[Y*(W-1)+X,horizontal+Y*W+X+1,(Y+1)*(W-1)+X,horizontal+Y*W+X],id=ids[k];if(coords.has(id))return id;
+  const corners=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]],ends=[[0,1],[1,2],[3,2],[0,3]][k],[i,j]=ends,a=vs[i],b=vs[j],t=a===Infinity?1:b===Infinity?0:clamp(a/(a-b||1e-12)),p=corners[i],q=corners[j];
   coords.set(id,[g.x+mix(p[0],q[0],t)*g.step,g.y+mix(p[1],q[1],t)*g.step]);return id;
  };
  const table={1:[[0,3]],2:[[1,0]],3:[[1,3]],4:[[2,1]],6:[[2,0]],7:[[2,3]],8:[[3,2]],9:[[0,2]],11:[[1,2]],12:[[3,1]],13:[[0,1]],14:[[3,0]]};
- for(let y=0;y<h-1;y++)for(let x=0;x<w-1;x++){
+ for(let y=-pad;y<h-1+pad;y++)for(let x=-pad;x<w-1+pad;x++){
   const vs=[valuesAt(x,y),valuesAt(x+1,y),valuesAt(x+1,y+1),valuesAt(x,y+1)],code=vs.reduce((n,v,i)=>n|(v<0?1<<i:0),0);if(code===0||code===15)continue;
   const center=vs.reduce((a,b)=>a+b,0)*.25,segments=code===5?(center<0?[[0,1],[2,3]]:[[0,3],[2,1]]):code===10?(center<0?[[3,0],[1,2]]:[[1,0],[3,2]]):table[code];
   for(const [a,b] of segments)next.set(edge(x,y,a,vs),edge(x,y,b,vs));
@@ -11034,13 +11040,20 @@ async function mount() {
     if(settle&&restoreDetail)showFinished();
   }
   function queueFrame() { if (!frame && painter) frame = requestAnimationFrame(tick); }
+  // A morph frame that cannot be built stops playback where it is and says
+  // so, instead of leaving the plate frozen under "Morphing".
+  function playbackFailed(error){
+    console.error(error);pause({settle:false});
+    renderMode='error';canvas.dataset.renderMode='error';nativePhase='Morph stopped';status.textContent=`Morph stopped: ${error.message}`;controls();
+  }
   function tick(now) {
     frame = 0;
     if(playing&&sketchPlaying){
       if(!playStart){playStart=now+(morphFrom?MORPH_FADE_MS:0);playBlend=state.blend;if(morphFrom)morphFrom.until=playStart;}
       state.blend=Math.min(1,playBlend+Math.max(0,now-playStart)/(state.duration*1000));
       if(!lastSketchAt||now-lastSketchAt>=1000/30||state.blend===1){
-        drawPreview(playbackSnapshot());lastSketchAt=lastSketchAt?now-(now-lastSketchAt)%(1000/30):now;metrics.delivered++;
+        try{drawPreview(playbackSnapshot());}catch(error){playbackFailed(error);return;}
+        lastSketchAt=lastSketchAt?now-(now-lastSketchAt)%(1000/30):now;metrics.delivered++;
         if(metrics.delivered%15===0)publishMotionMetrics();
         if(state.blend===1)finishMorph();
       }
