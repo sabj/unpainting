@@ -214,7 +214,8 @@ test('ten distinct forms preserve their anatomy, habitat and finite drawing plan
     assert.deepEqual(plan.morphology,{underside,capAttachment,ring});
     assert.equal(plan.habitat.substrate,substrate);
     assert.ok(plan.specimenCount>=2 && plan.specimenCount<=5);
-    assert.ok(plan.washes.length<=40);
+    // Five bracket shelves carry one pore-margin wash each (42 at most); paint time is unchanged.
+    assert.ok(plan.washes.length<=45);
     for(const mark of [...plan.ink,...plan.washes]){
       assert.ok(mark.points.length>=2&&Number.isFinite(mark.width)&&mark.width>0);
       for(const p of mark.points)assert.ok(p.every(Number.isFinite)&&p[0]>=0&&p[0]<=1200&&p[1]>=0&&p[1]<=1000,`${family}: ${p}`);
@@ -2789,4 +2790,15 @@ test('the hedgehog cap margin is cap tissue down to the spines, with no bare pap
   assert.deepEqual(Object.keys(rim.palette).sort(),Object.keys(cap.palette).sort(),'the margin is painted in the cap colour');
  }
  const bolete=buildStudy(generateSpecimen('woodland-042','bolete-1')).washes;assert.equal(bolete.filter(w=>w.role==='flesh'||w.role==='gill-face').length,0,'the bolete keeps its own margin');
+});
+
+test('bracket shelves show a painted thick margin over the pores, not a doubled outline',async()=>{
+ const {buildStudy}=await import('./mushrooms.mjs');
+ for(const [type,seed] of [['bracket-1','257048932'],['bracket-1','815892273'],['bracket-6','457071754']]){
+  const study=buildStudy(generateSpecimen(seed,type));
+  assert.equal(study.ink.filter(m=>m.role==='cap-flesh').length,0,`${type}: no extra line inset inside the rim`);
+  assert.ok(study.washes.filter(w=>w.role==='underside').length>=1,`${type}: the band between rim and pore edge is painted`);
+ }
+ // Oyster fans keep their own gill sides.
+ const oyster=buildStudy(generateSpecimen('woodland-042','oyster-1'));assert.ok(oyster.washes.length>0);
 });

@@ -1429,9 +1429,11 @@ function buildVarietyStudy(genome,sketch=false) {
         // lower edge, a band of pore surface with tube mouths.
         const lower=[...curve(rim.at(-1),[w*.55,h*.36],[origin[0]+18,origin[1]+12],origin,16),...curve(origin,[origin[0]-18,origin[1]+12],[-w*.6,h*.35],rim[0],16)],th=h*.14;
         const poreBand=[...lower,...lower.slice().reverse().map(([x,y],q)=>[x,y+th*Math.sin(Math.PI*(1-q/(lower.length-1)))**.4])].map(tr);
+        // The thick margin over the pore surface is painted, so its two edges
+        // read as the shelf's depth rather than a doubled outline.
+        addWash(poreBand,{ochre:.5,umber:.3,paynes:.2},.12,'underside',later);
         addInk(lower.map(([x,y],q)=>[x,y+th*Math.sin(Math.PI*q/(lower.length-1))**.4]).map(tr),'cap-contour',.9,.6,null,later);
         for(let i=0;i<70;i++){const q=Math.floor(S(i+index*13,54)*(lower.length-1)),[x,y]=lower[q],d=th*Math.sin(Math.PI*q/(lower.length-1))**.4*S(i,55);addInk([[x,y+d],[x+.6,y+d+.5]].map(tr),'pores',.7,.5,poreBand,later);}
-        addInk(rim.slice(4,96).map(([x,y])=>[x*.985,y*.985+1]).map(tr),'cap-flesh',.5,.35,shape,later);
         for(let i=0;i<180;i++){
           const p=rim[Math.min(99,Math.floor(S(i,52)*100))],r=.3+S(i,53)*.65,q=[mix(origin[0],p[0],r),mix(origin[1],p[1],r)],e=[mix(origin[0],p[0],r+.025),mix(origin[1],p[1],r+.025)];
           addInk([q,e].map(tr),'fibres',.45,.3,shape,later);
