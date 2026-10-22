@@ -1,5 +1,6 @@
 // Pre-flight environment check (npm run doctor). Fails loudly if any required tool,
 // model checkpoint, clean checkout or disk floor is missing before a run starts.
+import path from "node:path";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { codeState } from "./code-state.mjs";
@@ -64,6 +65,12 @@ export function runDoctor({
   const freeGiB = +(freeBytes / 1024 ** 3).toFixed(2);
   const diskOk = freeBytes >= MIN_DISK_BYTES;
 
+  // the wash recipe's line source: the lineart models (torch, controlnet_aux and the published weights). Without them the
+  // recipe falls back to copy-lines on the source's own ink, logged with !!!, so this warns and does not fail
+  const modelWeights = exists(path.join(root, "work/line-models/hf"));
+  const warnings = [];
+  if (!lp.model) warnings.push("line models: torch or controlnet_aux missing in the line python; --inkrecipe wash falls back to copy-lines on the source's own ink (tools/seg/README.md)");
+  else if (!modelWeights) warnings.push("line models: the weights are not downloaded yet (work/line-models/hf); the first --inkrecipe wash run downloads them");
   const failures = [];
   if (!gitOk) failures.push(!code.git ? "git metadata missing" : `working tree is dirty (${code.tracked.length} tracked, ${code.untracked.length} untracked)`);
   if (!lineOk) failures.push(lp.fallback ? `line python fell back (${lp.fallback})` : !lp.ready ? `line python missing numpy/opencv (${lp.error ?? "not ready"})` : "line python missing scikit-image");
@@ -74,9 +81,10 @@ export function runDoctor({
   return {
     ok: failures.length === 0,
     failures,
+    warnings,
     checks: {
       code: { ok: gitOk, commit: code.commit, dirty: code.dirty, tracked: code.tracked.length, untracked: code.untracked.length },
-      linePython: { ok: lineOk, path: lp.path, from: lp.from, python: lp.python, numpy: lp.numpy, opencv: lp.opencv, scikitImage: lp["scikit-image"] },
+      linePython: { ok: lineOk, model: lp.model, modelWeights, path: lp.path, from: lp.from, python: lp.python, numpy: lp.numpy, opencv: lp.opencv, scikitImage: lp["scikit-image"] },
       segPython: { ok: seg.ready, ...seg },
       samCheckpoint: { ok: samOk, path: samPath },
       disk: { ok: diskOk, freeGiB, floorGiB: 20 },

@@ -29,3 +29,17 @@ test("runDoctor fails loudly on dirty git, fallback python or low disk", () => {
   assert.equal(report.ok, false);
   assert.equal(report.failures.length >= 4, true);
 });
+
+test("runDoctor warns, and does not fail, when the lineart models are missing", () => {
+  const base = {
+    root: "/repo", env: { PAINTER_LINES_PYTHON: "/venv/lines/bin/python" }, segPythonPath: "/venv/seg/bin/python", samCheckpointPath: "/models/sam_vit_b_01ec64.pth",
+    exists: p => !String(p).includes("line-models"), state: { commit: "deadbeef1234", git: true, dirty: false, tracked: [], untracked: [], diffSha256: null }, statfs: () => ({ bavail: 25 * 1024, bsize: 1024 ** 2 }),
+  };
+  const probe = model => () => ({ status: 0, stdout: JSON.stringify({ python: "3.12.0", numpy: "2.0.2", opencv: "4.11.0", "scikit-image": "0.24.0", torch: "2.6.0", segment_anything: "1.0", model }) });
+  const without = runDoctor({ ...base, run: probe(false) });
+  assert.equal(without.ok, true);
+  assert.match(without.warnings[0], /torch or controlnet_aux missing/);
+  const noWeights = runDoctor({ ...base, run: probe(true) });
+  assert.match(noWeights.warnings[0], /weights are not downloaded/);
+  assert.deepEqual(runDoctor({ ...base, exists: () => true, run: probe(true) }).warnings, []);
+});

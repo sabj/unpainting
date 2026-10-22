@@ -93,8 +93,12 @@ test('--inkres keeps a finer file on its own grid, up to the fine sheet', async 
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8')).image, { w: w * k, h: h * k });
 });
 
-test('the wash recipe draws on a sheet 3 times as fine, by a hand that chains strokes', () => {
-  assert.equal(INK_RECIPES.wash.inkres, '3');
+test('the wash recipe draws on a fine sheet by width, by a hand that chains strokes', () => {
+  const opt = (argv, n) => { const a = inkRecipeArgs('wash', argv); return a[a.indexOf('--' + n) + 1]; };
+  assert.equal(opt(['--width', '540'], 'inkres'), '3');
+  assert.equal(opt(['--width', '1200'], 'inkres'), '1');
+  assert.equal(opt(['--width', '800'], 'inkres'), '2');
+  assert.ok(!inkRecipeArgs('wash', ['--width', '540', '--inkres', '2']).includes('--inkres'), 'a flag on the command line wins');
   assert.equal(INK_RECIPES.wash.drawinghand, '1');
   assert.equal(INK_RECIPES.wash.drawstroke, '0.1');
   for (const k of ['inkdecide', 'inkgeom', 'inkfoliage', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);

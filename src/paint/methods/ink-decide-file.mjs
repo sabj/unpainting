@@ -25,13 +25,13 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, foliage = false, hatch = null, salient = false }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false }) {
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   registerSegments(base, segments.stem);
   const seg = await loadSegments(base, w, h), segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
   const regions = segDoc.regions.map(r => ({ ...r, id: Number(r.id) }));
   const lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}) });
-  const shadow = shadowMassMask(L, w, h, pxMm);
+  const shadow = shadowMask ? shadowMassMask(L, w, h, pxMm) : new Uint8Array(w * h);
   // --inkfoliage 1: green, busy cells are leaves, wash only (line-foliage.mjs), whatever the regions' labels say
   let foliageCells = null;
   if (foliage) {
