@@ -107,7 +107,7 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds with more help each time.
+[unpaint-bench](bench/README.md) tests how well AI models paint, in five tiers with more help each time.
 
 - V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
 - V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try.
@@ -116,7 +116,7 @@ The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 an
 
 Models ran at their highest reasoning setting.
 
-| Benchmark version | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
+| Benchmark tier | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|
 | V1 | Tools | 5 | [Gemini 4 Argon (High)](bench/models.json) | 64.1% | 5.50 |
 | V2 | Tools and technique guides | 5 | Gemini 4 Argon (High) | 64.5% | 5.53 |
