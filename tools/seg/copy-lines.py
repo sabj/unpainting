@@ -94,13 +94,22 @@ def stroke_mask(bgr, pxmm=152.4/1080, rmm=.5, gate=None, lo_frac=.5, close=0, in
     mask = strong[labels].astype('uint8')
     if ink_colour > 0:
         # the source's pen ink has one colour: that of its strongest strokes. A mark of another colour (an ochre or blue
-        # wash's dark edge, coloured texture) is not pen line. A stroke is kept when most of it is within ink_colour
-        # (CIELAB a*b* units) of the ink, or near black.
+        # wash's dark edge, coloured texture) is not pen line. For a black or grey ink a stroke must be near neutral (chroma
+        # under ink_colour + 4) or less coloured than the wash around it; for a coloured ink (a bistre, a sepia) its hue must be within 3 x ink_colour degrees of the
+        # ink's, at any strength. Near black always passes. A stroke is kept when most of it passes.
         lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
         Lc, A, B = lab[..., 0]*100/255, lab[..., 1]-128, lab[..., 2]-128
         core = bh > np.percentile(bh, 99.5)
         a0, b0 = float(np.median(A[core])), float(np.median(B[core]))
-        inky = ((np.hypot(A-a0, B-b0) < ink_colour) | (Lc < 25)).astype(np.float32)
+        chroma = np.hypot(A, B)
+        if np.hypot(a0, b0) < 8:
+            # a black line drawn over a coloured wash takes some of the wash's colour, but less than the wash around it has
+            around = cv2.GaussianBlur(chroma, (0, 0), max(2, 1/pxmm))
+            inky = (chroma < ink_colour + 4) | (chroma < .8*around)
+        else:
+            dh = np.abs((np.degrees(np.arctan2(B, A) - np.arctan2(b0, a0)) + 180) % 360 - 180)
+            inky = (dh < 3*ink_colour) | (chroma < 4)
+        inky = (inky | (Lc < 25)).astype(np.float32)
         n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
         keep = np.bincount(labels.ravel(), weights=inky.ravel(), minlength=n)/np.maximum(1, stats[:, cv2.CC_STAT_AREA]) > .6
         keep[0] = False
