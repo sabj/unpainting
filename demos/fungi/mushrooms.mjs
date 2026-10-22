@@ -11242,15 +11242,39 @@ async function mount() {
     if(state.paint==='fast')skipLivePainting();persist();
   }
   $('paint-full').addEventListener('click',()=>setPaintSpeed('full'));$('paint-fast').addEventListener('click',()=>setPaintSpeed('fast'));
+  // The plate's layout anchors are fixed before it paints, as a settle would
+  // fix them. The plan Worker computes them (planPreparedPlate runs the same
+  // code as regenerate) when the plate state allows, so the first ink waits on
+  // no long main-thread task; otherwise they are computed here.
+  // Its own queue: cancelling idle preparation must never strand a painting.
+  const anchorPreparation=new MorphPreparation(()=>new Worker(import.meta.url,{type:'module'}),{kind:'plan-plate',ready:'plate-planned'});
+  let anchorToken=0;
+  function withAnchors(then){
+    const token=++anchorToken,pair=morphPair;
+    if(!(pair?.implicitMorph&&!pair.composition.implicitAnchors&&!orbitRestFor(smooth(state.blend)))){then();return;}
+    const fix=composition=>{pair.composition=composition;state.compositionAnchors=composition.implicitAnchors;persist();};
+    const here=()=>fix(implicitAnchoredComposition(pair.a,pair.composition,{view:pair.view,shapeModifiers:pair.shapeModifiers}).composition);
+    const st={...state},base=pair.composition,worker=typeof Worker!=='undefined'&&isDefaultOrbitView(st)&&(!HABIT_COLONY_AT_REST||st.scene==='plain');
+    if(!worker){here();then();return;}
+    const plan={type:'random',state:st};canvas.dataset.anchors='planning';
+    anchorPreparation.prepare(JSON.stringify(plan),{plan},data=>{
+      if(token!==anchorToken||pair!==morphPair)return;
+      const c=data.recipe.composition,same=c?.implicitAnchors&&c.id===base.id&&c.members.length===base.members.length&&data.recipe.a.seed===pair.a.seed&&data.recipe.a.profileId===pair.a.profileId;
+      if(same)fix(c);else here();canvas.dataset.anchors=same?'worker':'main';then();
+    },error=>{console.warn('Layout anchors not planned',error);if(token!==anchorToken||pair!==morphPair)return;here();canvas.dataset.anchors='main';then();});
+  }
   function beginDrawing() {
     pause({settle:false});playing=continuous=false;last=0;
-    // The plate's layout anchors are fixed now, as a settle would fix them.
-    if(morphPair?.implicitMorph&&!morphPair.composition.implicitAnchors&&!orbitRestFor(smooth(state.blend))){morphPair.composition=implicitAnchoredComposition(morphPair.a,morphPair.composition,{view:morphPair.view,shapeModifiers:morphPair.shapeModifiers}).composition;state.compositionAnchors=morphPair.composition.implicitAnchors;persist();}
     canvas.dataset.livePainting='true';canvas.dataset.paintSkipped='false';
-    const value=snapshot();replaying=true;drawingStage=0;renderMode='painting';nativePhase='Preparing ink';status.textContent='Preparing ink';
+    replaying=true;drawingStage=0;renderMode='painting';nativePhase='Preparing ink';status.textContent='Preparing ink';
     const c=painter.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';
     if(painter.hasPaper())c.drawImage(painter.paper,0,0,canvas.width,canvas.height);else{c.fillStyle=`rgb(${PAPER_TONE.base.join(',')})`;c.fillRect(0,0,canvas.width,canvas.height);}
-    refinePreview(value,()=>nativeKey(snapshot())===nativeKey(value),{rerun:true});canvas.dataset.livePainting=String(replaying);controls();
+    controls();
+    withAnchors(()=>{
+      if(!replaying||renderMode!=='painting')return;
+      const value=snapshot();
+      refinePreview(value,()=>nativeKey(snapshot())===nativeKey(value),{rerun:true});canvas.dataset.livePainting=String(replaying);controls();
+    });
   }
   $('draw').addEventListener('click',()=>{if(replaying){pause({settle:false});return;}beginDrawing();});
   function start(loop) {
