@@ -210,7 +210,7 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
  * over the 85th percentile of the file's, from a floor of 0.45). A point with no width reading takes its piece's median, else the file's.
  * A width is held to 1.6 times its piece's median, so a line crossing a dark wash does not swell into a blot.
  * `widthPx` { min, max, detail, shortPx, curvedDegPerPx } (a lineart map's contours): a width is also held to the map's own
- * width (`mapWidth`, at most twice it) and to min..max, or min..detail on a short or tightly curved piece.
+ * width (`mapWidth`, at most twice it) and to min..max; a short or tightly curved piece is scaled by `detail` (a ratio).
  * A piece spread wide and pale is marked `soft` (--inkbleed draws it on damp paper), unless `soft` is off: a contour
  * line of a lineart map is always drawn dry.
  */
@@ -221,7 +221,7 @@ function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}
   return measured.map(([g, pts]) => {
     const own = pts.map(q => q.width).filter(Number.isFinite), pieceW = quantile(own, 0.5) ?? fileW;
     // a contour of a lineart map may fade lighter than a line of the source's own tracing: its pressure floor is lower
-    const weights = weightsFrom(pts.map(q => q.absorb ?? 0), ref, widthPx ? { floor: 0.3 } : undefined);
+    const weights = weightsFrom(pts.map(q => q.absorb ?? 0), ref, widthPx ? { floor: 0.4 } : undefined);
     // soft: spread at least half again as wide as the file's typical line and no darker than 60% of its strong line,
     // as a line drawn into a wet wash
     const pieceA = quantile(pts.map(q => q.absorb ?? 0), 0.5) ?? 0, soft = allowSoft && pieceW >= 1.5 * fileW && pieceA <= 0.6 * ref;
@@ -230,8 +230,10 @@ function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}
     if (widthPx) {
       // a lineart map's contour: the source's width, held to the map's own width where the map gives one, and to the
       // pen's range; a short or tightly curved piece (an eye, a pupil, a nostril) is held to the detail width
-      const detail = pathLen(pts) < widthPx.shortPx || turning(pts) > widthPx.curvedDegPerPx, hi = detail ? widthPx.detail : widthPx.max;
-      widths = pts.map((q, k) => Math.max(widthPx.min, Math.min(hi, Number.isFinite(q.mapWidth) ? Math.min(widths[k], 2 * q.mapWidth) : widths[k])));
+      const detail = pathLen(pts) < widthPx.shortPx || turning(pts) > widthPx.curvedDegPerPx;
+      // a detail piece (an eye, a pupil, a short mark) is drawn finer by the same ratio, not held to one width, so its own
+      // swell and thin stay: a hard cap would make every short piece one width
+      widths = pts.map((q, k) => Math.max(widthPx.min, (detail ? widthPx.detail : 1) * Math.min(widthPx.max, Number.isFinite(q.mapWidth) ? Math.min(widths[k], 2 * q.mapWidth) : widths[k])));
       // the map's confidence adds to the source's darkness: a line both agree on is drawn firmest
       kept = weights.map((v, k) => (pts[k].weight != null ? (v + pts[k].weight) / 2 : v));
     }

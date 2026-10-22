@@ -79,7 +79,7 @@ test('--inkrecipe wash turns ink on and picks the source lines, and the command 
   const add = inkRecipeArgs('wash', ['--inkbleed', '0']), opt = n => add[add.indexOf('--' + n) + 1];
   assert.equal(opt('outlinemedium'), 'ink');
   assert.equal(opt('linesource'), 'source-ink');
-  assert.equal(opt('inkdarkmatch'), '1');
+  assert.equal(opt('inkdarkmatch'), '1.3');
   assert.ok(!add.includes('--inkbleed'));
   assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');
 });

@@ -60,11 +60,11 @@ test('a lineart map contour is held to the map width, the pen range and the deta
   for (let x = 20; x < 30; x++) for (let y = 54; y <= 57; y++) L[y * w + x] = 40; // a 4 px mark, short
   const long = { points: [[5, 16], [115, 16]], widths: [1, 1], weights: [0.6, 0.6] };
   const mark = { points: [[20, 56], [30, 56]], widths: [3, 3], weights: [1, 1] };
-  const widthPx = { min: 0.5, max: 3, detail: 1.2, shortPx: 15, curvedDegPerPx: 3 };
+  const widthPx = { min: 0.5, max: 3, detail: 0.5, shortPx: 15, curvedDegPerPx: 3 };
   const r = holdLinesToTarget([long, mark], L, w, h, { threshold: 0, measure: true, contour: true, reach: 2.5, widthPx });
   const lineW = r.lines.find(g => g.points[0][1] < 30).widths, markW = r.lines.find(g => g.points[0][1] > 30).widths;
   assert.ok(lineW.every(v => v <= 2 + 1e-9), `held to twice the map's 1 px, got ${lineW}`);
-  assert.ok(markW.every(v => v <= 1.2 + 1e-9), `a short mark is held to the detail width, got ${markW}`);
+  assert.ok(markW.every(v => v <= 1.5 + 1e-9), `a short mark is drawn half as wide (of at most 3 px), got ${markW}`);
   assert.ok(r.lines.every(g => g.soft === undefined && g.widths.every(v => v >= 0.5 - 1e-9)));
   assert.ok(r.lines[0].weights.every(v => v > 0.6 && v <= 1), 'map confidence and source darkness are combined');
 });
