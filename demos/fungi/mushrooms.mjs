@@ -7573,10 +7573,18 @@ export class Painter {
   constructor(canvas,{paper=null}={}) {
     this.canvas=canvas;this.ctx=canvas.getContext('2d');
     if(!this.ctx)throw new Error('Canvas 2D unavailable');
-    this.paper=paper??makePaperTexture();this.sheetKey=paper?null:'cream:';this.materials=null;this.inkPaper=makeInkContactTexture();this.inkPattern='#30251c';
+    this._paper=paper;this.sheetKey=paper?null:'cream:';this.materials=null;this.inkPattern='#30251c';
     this.paintLayer=null;this.surfaceLayer=null;this.frames=0;this.lastRenderMs=0;
     this.lamellarMasks=new WeakMap();this.granuleCache=new Map();this.paths=new WeakMap();this.cutouts=new WeakMap();this.shapeBounds=new WeakMap();this.textureCache=new Map();this.visibleInk=new WeakMap();
   }
+  // The paper raster is built on first use. A page adopts the identical
+  // raster from its painting Worker instead (adoptPaper), so its startup
+  // never builds it on the main thread.
+  get paper(){return this._paper??=makePaperTexture();}
+  get inkPaper(){return this._inkPaper??=makeInkContactTexture();}
+  set paper(value){this._paper=value;}
+  hasPaper(){return !!this._paper;}
+  adoptPaper(image){if(this._paper||this.sheetKey!=='cream:')return false;const copy=newCanvas(image.width,image.height);copy.getContext('2d').drawImage(image,0,0);this._paper=copy;return true;}
   // One sheet per plate: rebuild the paper raster when the plate seed picks
   // a different stock or foxing.
   useSheet(seed){const sheet=PLATE_PASSES.value?paperSheetFor(seed):PAPER_SHEETS[0],key=`${sheet.id}:${sheet.foxing?seed:''}`;if(this.sheetKey===key)return false;this.paper=makePaperTexture(sheet,seed);this.sheetKey=key;return true;}
@@ -9396,6 +9404,9 @@ async function renderNativePainting(payload,emit,waitForFrame=async()=>{}){
   let inkPaper=null;
   if(payload.inkPaperRaster){const raster=payload.inkPaperRaster;inkPaper=newCanvas(raster.width,raster.height);inkPaper.getContext('2d').putImageData(raster,0,0);}
   const canvas=newCanvas(W,H);canvas.getContext('2d',{willReadFrequently:true});const painter=new Painter(canvas,{paper:inkPaper}),c=painter.ctx;
+  // No raster from the page: this Worker built the default sheet, and the
+  // page takes an identical copy rather than building its own.
+  if(!inkPaper&&payload.sendPaper&&typeof createImageBitmap==='function'){const bitmap=await createImageBitmap(painter.paper);emit({kind:'paper-ready',revision,paperBitmap:bitmap},[bitmap]);}
   // Stream sharp ink at output resolution; only the wet pigment optics remain
   // downsampled. The existing two-bitmap acknowledgement budget is unchanged.
   const preview=newCanvas(W,H),pc=preview.getContext('2d'),committed=newCanvas(W,H),ic=committed.getContext('2d',{willReadFrequently:true});
@@ -10059,6 +10070,9 @@ async function mount() {
   }
   let nativeResult=null,nativeBuilding=null,nativePhase='',nativeReplayIndex=-1,nativeDecodeBusy=false;
   let nativePaperTemplate=null,nativeInkPaperRaster=null;
+  // The page sends its paper raster with a painting job only once it has one;
+  // a Worker without it builds the same default sheet (Painter.paper).
+  const paperRaster=()=>painter.hasPaper()?(nativeInkPaperRaster??=painter.paper.getContext('2d').getImageData(0,0,painter.paper.width,painter.paper.height)):null;
   // Display resolution. The backing store follows CSS size × devicePixelRatio;
   // a zoomed, settled view gets a device-resolution re-raster of exactly the
   // visible plate rectangle from the Worker that holds the settled painting.
@@ -10354,8 +10368,8 @@ async function mount() {
         if(message.complete){job.blob=message.blob;job.metrics=message.metrics;finish(true);}
       };
       worker.onerror=event=>{event.preventDefault();if(prefetch===job)finish(false);};
-      nativeInkPaperRaster??=painter.paper.getContext('2d').getImageData(0,0,painter.paper.width,painter.paper.height);
-      worker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale:targetBaseScale()});
+      const inkPaperRaster=paperRaster();
+      worker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster,outputScale:targetBaseScale()});
     }catch{job.worker?.terminate();prefetch=null;canvas.dataset.prefetch='failed';}
   }
   // Prepared plates: the next Morph destination and the next Random plate are
@@ -10395,8 +10409,8 @@ async function mount() {
         if(message.complete){job.blob=message.blob;job.metrics=message.metrics;job.elapsed=message.elapsed;finish(true);}
       };
       worker.onerror=event=>{event.preventDefault();finish(false);};
-      nativeInkPaperRaster??=painter.paper.getContext('2d').getImageData(0,0,painter.paper.width,painter.paper.height);
-      worker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale:request.outputScale,recordFrames:record});
+      const inkPaperRaster=paperRaster();
+      worker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision:0,paperTemplate:nativePaperTemplate,inkPaperRaster,outputScale:request.outputScale,recordFrames:record});
       return job;
     }catch{job.worker?.terminate();preparedJobs.delete(key);return null;}
   }
@@ -10729,6 +10743,7 @@ async function mount() {
         if(!current()||message.revision!==revision){message.bitmap?.close();return;}
         if(message.error){fail(message.error);return;}
         if(message.nativeMaterial){nativePaperTemplate=message.paper;return;}
+        if(message.kind==='paper-ready'){painter.adoptPaper(message.paperBitmap);message.paperBitmap.close();return;}
         if(!message.native||!message.bitmap)return;
         // Paint playback: the tool's cursor, and live patches of the plate.
         if('cursor' in (message.metrics??{}))showCursor(message.metrics.cursor);
@@ -10766,10 +10781,10 @@ async function mount() {
       };
       settledWorker.onerror=event=>{event.preventDefault();fail(event.message||'Native painting failed');};
       if(painter.useSheet(plateSheetSeed(value)))nativeInkPaperRaster=null;
-      nativeInkPaperRaster??=painter.paper.getContext('2d').getImageData(0,0,painter.paper.width,painter.paper.height);
+      const inkPaperRaster=paperRaster();
       // Structured clone keeps immutable template arrays in the main thread;
       // cancellation can terminate the entire Worker without losing material.
-      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster:nativeInkPaperRaster,outputScale,playback:!!rerun,turned:!!value.turned});
+      settledWorker.postMessage({kind:'settle',genome:value.genome,scene:value.scene,morph:bridgeRecipe(value),fieldPlate:value.fieldPlate,composition:value.morph.composition,revision,paperTemplate:nativePaperTemplate,inkPaperRaster,sendPaper:!inkPaperRaster,outputScale,playback:!!rerun,turned:!!value.turned});
     }catch(error){fail(error.message);}
     return promise;
   }
@@ -11224,7 +11239,8 @@ async function mount() {
     if(morphPair?.implicitMorph&&!morphPair.composition.implicitAnchors&&!orbitRestFor(smooth(state.blend))){morphPair.composition=implicitAnchoredComposition(morphPair.a,morphPair.composition,{view:morphPair.view,shapeModifiers:morphPair.shapeModifiers}).composition;state.compositionAnchors=morphPair.composition.implicitAnchors;persist();}
     canvas.dataset.livePainting='true';canvas.dataset.paintSkipped='false';
     const value=snapshot();replaying=true;drawingStage=0;renderMode='painting';nativePhase='Preparing ink';status.textContent='Preparing ink';
-    const c=painter.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(painter.paper,0,0,canvas.width,canvas.height);
+    const c=painter.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';
+    if(painter.hasPaper())c.drawImage(painter.paper,0,0,canvas.width,canvas.height);else{c.fillStyle=`rgb(${PAPER_TONE.base.join(',')})`;c.fillRect(0,0,canvas.width,canvas.height);}
     refinePreview(value,()=>nativeKey(snapshot())===nativeKey(value),{rerun:true});canvas.dataset.livePainting=String(replaying);controls();
   }
   $('draw').addEventListener('click',()=>{if(replaying){pause({settle:false});return;}beginDrawing();});

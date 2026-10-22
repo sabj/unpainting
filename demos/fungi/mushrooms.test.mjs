@@ -2815,3 +2815,12 @@ test('milkcap gills run from the margin to the stem instead of meeting in one po
   assert.equal(gills.filter(m=>m.role==='gills'&&m.points.length<12).length,0,'no stray fork lines');
  }
 });
+
+test('a painter builds its paper and ink textures only when first used',async()=>{
+ const {Painter}=await import('./mushrooms.mjs');
+ const canvas={getContext:()=>({})},lazy=new Painter(canvas);
+ assert.equal(lazy.hasPaper(),false,'no paper raster on construction (the page adopts the Worker\'s copy)');
+ assert.equal(Object.hasOwn(lazy,'_inkPaper'),false,'no ink texture on construction');
+ const sheet={width:1200,height:1000},given=new Painter(canvas,{paper:sheet});
+ assert.equal(given.hasPaper(),true);assert.equal(given.paper,sheet);assert.equal(given.adoptPaper({width:1,height:1}),false,'a painter keeps the paper it has');
+});
