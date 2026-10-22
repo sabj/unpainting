@@ -9804,7 +9804,11 @@ if(typeof document==='undefined'&&typeof self!=='undefined'&&typeof self.postMes
     try {
       if(event.data.kind==='plan-plate'){self.postMessage({kind:'plate-planned',data:plannedPlateData(planPreparedPlate(event.data.plan)),revision:event.data.revision});return;}
       if(event.data.kind==='orbit-rest-prepare'){self.postMessage({kind:'orbit-rest-ready',data:prepareOrbitRest(event.data),revision:event.data.revision});return;}
-      if(event.data.kind==='implicit-prepare'){const {a,b,composition,view,shapeModifiers,nativeTargets}=event.data;const data=createImplicitMorph(a,b,composition,{view,shapeModifiers,nativeTargets:!!nativeTargets});self.postMessage({kind:'implicit-ready',data:serializableImplicitMorph(data),revision:event.data.revision});return;}
+      if(event.data.kind==='implicit-prepare'){const {a,b,composition,view,shapeModifiers,nativeTargets}=event.data;const data=createImplicitMorph(a,b,composition,{view,shapeModifiers,nativeTargets:!!nativeTargets}),out=serializableImplicitMorph(data);
+        // The page's endpoint samples come with the field, sampled from the
+        // same serialized data it receives.
+        if(!nativeTargets){const source=sampleImplicitMorph(out,0),target=sampleImplicitMorph(out,1);out.samples={source,target,measuresA:measureSketch(source),measuresB:measureSketch(target)};}
+        self.postMessage({kind:'implicit-ready',data:out,revision:event.data.revision});return;}
       if(event.data.kind==='native-detail'){
         const state=nativeDetailState,{region,requestId,revision}=event.data;
         if(!state||state.revision!==revision){self.postMessage({nativeDetail:true,requestId,revision,unavailable:true});return;}
@@ -10072,7 +10076,7 @@ async function mount() {
     implicitPreparation.prepare(key,{a:pair.a,b:pair.b,composition:pair.composition,view:pair.view,shapeModifiers:pair.shapeModifiers,nativeTargets:!pair.implicitMorph},data=>{
       if(pair!==morphPair)return;
       if(!pair.implicitMorph){pair.previewData=data;canvas.dataset.preparingShapes='false';canvas.dataset.shapePreparationMs=data.preparationMs.toFixed(2);const callback=implicitReadyIntent;implicitReadyIntent=null;preparing=false;callback?.();return;}
-      pair.implicitData=data;pair.composition=data.composition;syncImplicitPlateIdentity(pair);pair.source=sampleImplicitMorph(data,0);pair.target=sampleImplicitMorph(data,1);pair.measuresA=measureSketch(pair.source);pair.measuresB=measureSketch(pair.target);
+      pair.implicitData=data;pair.composition=data.composition;syncImplicitPlateIdentity(pair);const samples=data.samples;pair.source=samples?.source??sampleImplicitMorph(data,0);pair.target=samples?.target??sampleImplicitMorph(data,1);pair.measuresA=samples?.measuresA??measureSketch(pair.source);pair.measuresB=samples?.measuresB??measureSketch(pair.target);
       state.compositionAnchors=data.composition.implicitAnchors;canvas.dataset.preparingShapes='false';canvas.dataset.shapePreparationMs=data.preparationMs.toFixed(2);
       const callback=implicitReadyIntent;implicitReadyIntent=null;preparing=false;persist();callback?.();
     },error=>{canvas.dataset.preparingShapes='false';preparing=false;status.textContent=error.message;controls();});

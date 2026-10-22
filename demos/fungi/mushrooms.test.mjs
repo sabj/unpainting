@@ -2836,3 +2836,14 @@ test('the morel head hangs from the stem at a broad lower rim, not an egg in a c
  const other=buildGeometry(generateSpecimen('woodland-042','morel-2'));
  assert.ok(Math.abs(other.cap[80][0]-other.cap[81][0])<2*other.halfAt(1));
 });
+
+test('morph field endpoint samples taken in the Worker equal the page\'s own samples',async()=>{
+ const m=await import('./mushrooms.mjs');
+ const a=generateSpecimen('woodland-042','amanita-1'),b=generateSpecimen('woodland-108','agaric-1');
+ const pair=m.createMorphPair(a,b,{composition:m.createSpecimenComposition(a),...m.orbitViewOptions({yaw:.12,pitch:.36})});
+ const out=m.serializableImplicitMorph(m.createImplicitMorph(pair.a,pair.b,pair.composition,{view:pair.view,shapeModifiers:pair.shapeModifiers}));
+ const source=m.sampleImplicitMorph(out,0),target=m.sampleImplicitMorph(out,1);
+ const received=structuredClone({...out,samples:{source,target,measuresA:m.measureSketch(source),measuresB:m.measureSketch(target)}});
+ assert.deepEqual(received.samples.source,m.sampleImplicitMorph(received,0));assert.deepEqual(received.samples.target,m.sampleImplicitMorph(received,1));
+ assert.deepEqual(received.samples.measuresA,m.measureSketch(m.sampleImplicitMorph(received,0)));
+});
