@@ -2010,6 +2010,12 @@ function buildLegacyStudy(genome,sketch=false) {
         const topT=.97,sx=g.centerAt(topT),sw=g.halfAt(topT),sy=g.stemYAt(topT);
         for(let i=0;i<24;i++){const u=-1.6+i/23*3.2,x=sx+u*sw,y=sy+2+Math.abs(u)*1.5;outline([[x,y],[x+.4,y+3+sample(i,238)*3]],'pores',.4,.45,g.underside,[g.stem]);}
       }
+      // Hydnum's rolled margin is cap tissue to the edge of the spines
+      // (refs-lib), not a band of bare paper between cap and underside.
+      // The spines are darkest up under the cap, so the underside's own wash
+      // also runs to the rim instead of leaving a pale strip below it.
+      if(profile?.grammar==='hedgehog'&&profile.variant===0){surface(g.flesh,g.lower.slice().reverse(),18,capPalette,(1)*(.16+v[21]*.16),'flesh');
+        surface(g.underside,Array.from({length:30},(_,i)=>{const u=-.98+i/29*1.96;return[g.cx+u*g.w,mix(rimY(u),floorY(u),.14)];}),26,{ochre:.5,sienna:.3,umber:.2},.14,'gill-face',[g.stem,g.cap]);}
     }
     if(family!=='morel') {
       for(let i=0;i<(family==='amanita'?0:190);i++){

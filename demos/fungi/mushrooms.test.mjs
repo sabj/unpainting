@@ -2779,3 +2779,14 @@ test('the hedgehog stem runs up into its cap instead of stopping short in a flat
  // The bolete keeps its own stem top.
  const bolete=buildGeometry(generateSpecimen('woodland-042','bolete-1'));assert.equal(new Set(bolete.stem.filter(p=>p[1]<Math.min(...bolete.stem.map(q=>q[1]))+.5).map(p=>p[1])).size,1);
 });
+
+test('the hedgehog cap margin is cap tissue down to the spines, with no bare paper band',async()=>{
+ const {buildStudy}=await import('./mushrooms.mjs');
+ for(const seed of ['1354655151','812471376','woodland-042']){
+  const washes=buildStudy(generateSpecimen(seed,'hedgehog-1')).washes,count=role=>washes.filter(w=>w.role===role).length;
+  assert.ok(count('flesh')>=1,`${seed}: the margin band takes a wash`);assert.ok(count('gill-face')>=1,`${seed}: the underside wash runs up to the rim`);
+  const rim=washes.find(w=>w.role==='flesh'),cap=washes.find(w=>w.role==='cap');
+  assert.deepEqual(Object.keys(rim.palette).sort(),Object.keys(cap.palette).sort(),'the margin is painted in the cap colour');
+ }
+ const bolete=buildStudy(generateSpecimen('woodland-042','bolete-1')).washes;assert.equal(bolete.filter(w=>w.role==='flesh'||w.role==='gill-face').length,0,'the bolete keeps its own margin');
+});
