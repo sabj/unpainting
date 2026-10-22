@@ -83,7 +83,7 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 
 ## Pen and wash ink
 
-`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101-dev from after 0.2.1-rc.1, and it is off by default. It turns ink on by itself.
+`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101 from 0.2.1-rc.2, and it is off by default. It turns ink on by itself.
 
 - Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
 - Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 1.2 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.

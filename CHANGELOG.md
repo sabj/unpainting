@@ -2,9 +2,9 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## Unreleased, after 0.2.1-rc.1
+## 0.2.1-rc.2 - unreleased
 
-Painter V101-dev, sim 102, judges J1. Defaults still match 0.2.0.
+Painter V101, sim 102, judges J1. Release candidate 2. Defaults still match 0.2.0.
 
 ### Ink on ink-heavy works
 
