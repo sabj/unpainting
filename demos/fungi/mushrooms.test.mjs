@@ -2847,3 +2847,44 @@ test('morph field endpoint samples taken in the Worker equal the page\'s own sam
  assert.deepEqual(received.samples.source,m.sampleImplicitMorph(received,0));assert.deepEqual(received.samples.target,m.sampleImplicitMorph(received,1));
  assert.deepEqual(received.samples.measuresA,m.measureSketch(m.sampleImplicitMorph(received,0)));
 });
+
+test('ux11: preview pen widths under a page frame are the framed plan widths',async()=>{
+ const m=await import('./mushrooms.mjs');
+ const old=w=>Math.max(.3,Math.round((w??.6)*1.1*5)/5);
+ for(const w of [.25,.6,.9,1.4,null])assert.equal(m.previewPenWidth(w),old(w),'no frame: the sheet rounding is unchanged');
+ for(const s of [.8,1.3,2.2])for(const w of [.25,.6,.9,1.4,null]){
+  const framed=Number.isFinite(w)?w*(s>1?Math.sqrt(s):s):w;
+  assert.ok(Math.abs(m.previewPenWidth(w,{scale:s,tx:0,ty:0})*s-old(framed))<1e-12,`scale ${s} width ${w}`);
+ }
+ const frame={scale:1.6,tx:-140,ty:-90},cover=m.previewCover(frame);
+ assert.ok(cover.x*frame.scale+frame.tx<=0&&cover.y*frame.scale+frame.ty<=0,'the cutout reaches the sheet corner');
+ assert.ok((cover.x+cover.w)*frame.scale+frame.tx>=1200&&(cover.y+cover.h)*frame.scale+frame.ty>=1000,'and the far corner');
+ assert.equal(m.previewCover(null),null);
+});
+
+test('ux11: a morph preview frame is drawn unframed under its page frame',async()=>{
+ const m=await import('./mushrooms.mjs');const saved=globalThis.Path2D;
+ globalThis.Path2D=class{constructor(){this.ops=[];}moveTo(x,y){this.ops.push(['M',x,y]);}lineTo(x,y){this.ops.push(['L',x,y]);}closePath(){}rect(...a){this.ops.push(['R',...a]);}addPath(p){this.ops.push(...p.ops);}};
+ try{
+  const transforms=[],strokes=[],covers=[];
+  const c={globalAlpha:1,lineWidth:1,setTransform(){transforms.length=0;},transform(...a){transforms.push(a);},clearRect(){},drawImage(){},save(){},restore(){},clip(){},fillText(){},stroke(path){strokes.push({width:this.lineWidth,path,transform:transforms.slice()});}};
+  const painter=new m.Painter({width:1200,height:1000,getContext:()=>c}),paper={width:1200,height:1000};
+  Object.assign(painter,{_paper:paper,previewPaper:{width:1200,height:1000},previewPaperSource:paper,previewFieldWash:(ctx,plan,cover)=>covers.push(cover)});
+  const pair=m.createMorphPair(generateSpecimen('woodland-042','amanita-1'),generateSpecimen('x7','agaric-1'));
+  assert.ok(m.morphPreviewKind(pair));
+  painter.morphPreview(pair,.5);
+  const frame=painter.previewPageFrame;assert.ok(frame,'this pair is page-framed');
+  assert.deepEqual(frame,m.pageFrameAt(m.pagePairFrame(pair),.5));
+  assert.ok(strokes.length>0);
+  for(const s of strokes)assert.deepEqual(s.transform,[[frame.scale,0,0,frame.scale,frame.tx,frame.ty]],'every stroke is under the page frame');
+  assert.deepEqual(covers,[m.previewCover(frame)],'the wash occluders cover the sheet in unframed space');
+  // In page space the preview is exactly the framed sketch the page used to build per frame.
+  const framed=painter.framedPreviewPlan(),expected=m.buildMorphSketch(pair,.5,{inkOnly:true,interactive:true});
+  assert.equal(framed.ink.length,expected.ink.length);
+  assert.deepEqual(framed.ink.map(mark=>mark.points),expected.ink.map(mark=>mark.points));
+  assert.deepEqual(framed.ink.map(mark=>mark.width),expected.ink.map(mark=>mark.width));
+  // Pen widths on the sheet are the old rounding of the framed widths.
+  const sheet=new Set(expected.ink.filter(mark=>mark.points?.length>=2).map(mark=>Math.max(.3,Math.round((mark.width??.6)*1.1*5)/5)));
+  for(const s of strokes)assert.ok([...sheet].some(w=>Math.abs(w-s.width*frame.scale)<1e-9),`sheet width ${s.width*frame.scale}`);
+ }finally{globalThis.Path2D=saved;}
+});

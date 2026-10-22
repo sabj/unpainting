@@ -7559,6 +7559,18 @@ function inkTexture() {
 }
 
 const PREVIEW_INK='rgb(44,36,27)',PREVIEW_SPARSE_INK=new Set(['fibres','habitat','spines','lamella-shadow']);
+// Preview pen width in the drawing space of an unframed plan under its page
+// frame: the framed plan's width (applyPageFrame's ink scale), rounded on the
+// sheet as before, then divided back by the frame scale the context applies.
+export function previewPenWidth(width,frame=null){
+  const s=frame?.scale??1,k=frame?(s>1?Math.sqrt(s):s):1,w=Number.isFinite(width)?width*k:width;
+  return Math.max(.3,Math.round((w??.6)*1.1*5)/5)/s;
+}
+// The plate sheet (0,0,1200,1000) in the unframed space under a page frame.
+export function previewCover(frame){
+  if(!frame)return null;const s=frame.scale;
+  return {x:-frame.tx/s-1,y:-frame.ty/s-1,w:1200/s+2,h:1000/s+2};
+}
 // Which coloured preview a morph pair gets: 'field' for the transported body
 // field between unlike recipes, 'study' for the native constructor between
 // seeds of one recipe, null where the existing ink-only sketch still applies.
@@ -7641,7 +7653,7 @@ export class Painter {
     if(plan.fieldPlate){c.globalAlpha=.65;c.fillStyle='#51483a';c.textAlign='center';c.font='italic 13px Georgia, serif';for(const note of plan.annotations??[])c.fillText(fieldFigureLabel(note),note.x,note.y);}
     const target=this.ctx;target.setTransform(1,0,0,1,0,0);target.globalAlpha=1;target.globalCompositeOperation='source-over';target.filter='none';
     target.clearRect(0,0,this.canvas.width,this.canvas.height);target.drawImage(layer,0,0,this.canvas.width,this.canvas.height);
-    this.previewPlan=plan;this.previewFrames=(this.previewFrames??0)+1;this.lastPreviewMs=performance.now()-started;this.lastPreviewDrawMs=this.lastPreviewMs-this.lastPreviewGeometryMs;
+    this.previewPlan=plan;this.previewPageFrame=null;this.previewFrames=(this.previewFrames??0)+1;this.lastPreviewMs=performance.now()-started;this.lastPreviewDrawMs=this.lastPreviewMs-this.lastPreviewGeometryMs;
     return plan;
   }
   // A coloured morph frame in the plate's visual language: paper, a fast
@@ -7649,20 +7661,23 @@ export class Painter {
   // Every frame is drawn from geometry alone, so playback and scrubbing agree.
   morphPreview(morph,blend,{scene='plain'}={}){
     const started=performance.now(),t=clamp(blend);
-    const plan=morph.implicitMorph?buildMorphSketch(morph,t,{inkOnly:true,interactive:true,scene}):framePagePlan(sampleImplicitMorph(morphPreviewData(morph),t),morph,t,scene);
+    // The page frame is one uniform scale and shift: the sketch is drawn under
+    // it as a canvas transform instead of copying every point through it.
+    const plan=morph.implicitMorph?rawMorphSketch(morph,t,{inkOnly:true,interactive:true}):sampleImplicitMorph(morphPreviewData(morph),t);
+    const frame=plan.fieldPlate||plan.fieldPlateTransform?null:pageFrameAt(pagePairFrame(morph,scene),t);
     this.lastPreviewGeometryMs=performance.now()-started;
     const c=this.ctx;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';
     // Paper is resampled once per canvas size, then copied 1:1 each frame.
     const W=this.canvas.width,H=this.canvas.height;
     if(this.previewPaper?.width!==W||this.previewPaper?.height!==H||this.previewPaperSource!==this.paper){this.previewPaper=newCanvas(W,H);this.previewPaper.getContext('2d').drawImage(this.paper,0,0,W,H);this.previewPaperSource=this.paper;}
     c.clearRect(0,0,W,H);c.drawImage(this.previewPaper,0,0);
-    c.setTransform(W/1200,0,0,H/1000,0,0);
+    c.setTransform(W/1200,0,0,H/1000,0,0);if(frame)c.transform(frame.scale,0,0,frame.scale,frame.tx,frame.ty);
     // Coloured preview wash disabled: it fell out of register with the ink (ghost washes).
-    if(PREVIEW_FIELD_WASH)this.previewFieldWash(c,plan);
-    this.previewInk(c,plan);
+    if(PREVIEW_FIELD_WASH)this.previewFieldWash(c,plan,previewCover(frame));
+    this.previewInk(c,plan,frame);
     if(plan.fieldPlate){c.globalAlpha=.65;c.fillStyle='#51483a';c.textAlign='center';c.font='italic 13px Georgia, serif';for(const note of plan.annotations??[])c.fillText(fieldFigureLabel(note),note.x,note.y);c.globalAlpha=1;}
     c.setTransform(1,0,0,1,0,0);
-    this.previewPlan=plan;this.previewColoured=true;this.previewFrames=(this.previewFrames??0)+1;this.lastPreviewMs=performance.now()-started;this.lastPreviewDrawMs=this.lastPreviewMs-this.lastPreviewGeometryMs;
+    this.previewPlan=plan;this.previewPageFrame=frame;this.previewColoured=true;this.previewFrames=(this.previewFrames??0)+1;this.lastPreviewMs=performance.now()-started;this.lastPreviewDrawMs=this.lastPreviewMs-this.lastPreviewGeometryMs;
     return plan;
   }
   // A turning 3D body as clean pen work: hidden-line-removed contours, the
@@ -7682,10 +7697,12 @@ export class Painter {
       const path=groups[orbitLineClass(mark.role)];path.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)path.lineTo(points[i][0],points[i][1]);}
     for(const name of ['hatch','feature','contour']){const pen=ORBIT_LINES[name];c.globalAlpha=pen.alpha;c.lineWidth=pen.width;c.stroke(groups[name]);}
     c.globalAlpha=1;c.setTransform(1,0,0,1,0,0);
-    this.previewPlan=plan;this.previewFrames=(this.previewFrames??0)+1;this.lastPreviewMs=performance.now()-started;this.lastPreviewDrawMs=this.lastPreviewMs-this.lastPreviewGeometryMs;
+    this.previewPlan=plan;this.previewPageFrame=null;this.previewFrames=(this.previewFrames??0)+1;this.lastPreviewMs=performance.now()-started;this.lastPreviewDrawMs=this.lastPreviewMs-this.lastPreviewGeometryMs;
     return plan;
   }
-  previewFieldWash(c,plan){
+  // The last preview in page space (a morph preview keeps its plan unframed).
+  framedPreviewPlan(){return this.previewPlan&&this.previewPageFrame?applyPageFrame(this.previewPlan,this.previewPageFrame):this.previewPlan;}
+  previewFieldWash(c,plan,cover=null){
     this.washRasters??=new Map();
     for(const body of plan.bodies??[]){
       const w=body.previewWash;if(!w||!Number.isInteger(body.individual))continue;
@@ -7702,7 +7719,7 @@ export class Painter {
         d[o]=(a[k]+(b[k]-a[k])*t)*dark;d[o+1]=(a[k+1]+(b[k+1]-a[k+1])*t)*dark;d[o+2]=(a[k+2]+(b[k+2]-a[k+2])*t)*dark;d[o+3]=cov*255;
       }
       r.ctx.putImageData(r.image,0,0);
-      c.save();this.outside(c,plan.bodies.slice(body.individual+1).flatMap(other=>other.islands??[]),bounds(body.shape));
+      c.save();this.outside(c,plan.bodies.slice(body.individual+1).flatMap(other=>other.islands??[]),bounds(body.shape),cover);
       if(clipped)c.clip(this.regionPath(body.islands));
       // The wash field lives in the unframed member space; follow the page fit.
       const frame=plan.pageFrame;if(frame)c.transform(frame.scale,0,0,frame.scale,frame.tx,frame.ty);
@@ -7712,8 +7729,10 @@ export class Painter {
   }
   // Batched vector ink. Clip and occlusion are set once per group (one per
   // member for a field morph); inside it, one stroke per opacity/width bucket.
-  previewInk(c,plan){
-    this.inkShapeIds??=new WeakMap();this.inkShapeCount??=0;
+  // frame: the page frame the context is already transformed by (unframed
+  // plan). Pen widths stay those of the framed plan (previewPenWidth).
+  previewInk(c,plan,frame=null){
+    this.inkShapeIds??=new WeakMap();this.inkShapeCount??=0;const cover=previewCover(frame),pad=2/(frame?.scale??1);
     const id=shape=>{if(!shape)return 0;let n=this.inkShapeIds.get(shape);if(!n){n=++this.inkShapeCount;this.inkShapeIds.set(shape,n);}return n;};
     const memberExclude=new Map(),excludeFor=mark=>{
       if(!plan.implicitMorph||!Number.isInteger(mark.individual))return mark.exclude??[];
@@ -7725,7 +7744,7 @@ export class Painter {
       const mark=plan.ink[index],pts=mark.points;if(!pts||pts.length<2)continue;
       if(PREVIEW_SPARSE_INK.has(mark.role)&&index%2)continue;
       const strong=['cap-contour','stem-contour','ring'].includes(mark.role),alpha=Math.round(clamp((mark.opacity??.6)*(strong?1.6:1.5))*16)/16;if(alpha<=0)continue;
-      const width=Math.max(.3,Math.round((mark.width??.6)*1.1*5)/5),exclude=excludeFor(mark);
+      const width=previewPenWidth(mark.width,frame),exclude=excludeFor(mark);
       const groupKey=`${id(mark.clip)}:${id(mark.clipRegions)}:${plan.implicitMorph?'m'+mark.individual:exclude.map(id).join(',')}`;
       let group=groups.get(groupKey);if(!group){group={clip:mark.clip,clipRegions:mark.clipRegions,exclude,batches:new Map(),x:Infinity,y:Infinity,r:-Infinity,b:-Infinity};groups.set(groupKey,group);}
       const key=`${alpha}:${width}`;let batch=group.batches.get(key);if(!batch){batch={path:new Path2D(),alpha,width};group.batches.set(key,batch);}
@@ -7737,19 +7756,20 @@ export class Painter {
     c.strokeStyle=PREVIEW_INK;c.lineCap='round';c.lineJoin='round';
     for(const group of groups.values()){
       c.save();if(group.clip)c.clip(this.path(group.clip));if(group.clipRegions)c.clip(this.regionPath(group.clipRegions));
-      if(group.exclude.length)this.outside(c,group.exclude,{x:group.x-2,y:group.y-2,w:group.r-group.x+4,h:group.b-group.y+4});
+      if(group.exclude.length)this.outside(c,group.exclude,{x:group.x-pad,y:group.y-pad,w:group.r-group.x+2*pad,h:group.b-group.y+2*pad},cover);
       for(const batch of group.batches.values()){c.globalAlpha=batch.alpha;c.lineWidth=batch.width;c.stroke(batch.path);}
       c.restore();
     }
     c.globalAlpha=1;
   }
-  outside(c,shapes,region){
+  outside(c,shapes,region,cover=null){
     // Subtract each occluder separately. A single even-odd path would turn
     // overlapping shelves or veil fragments into accidental transparent holes.
+    // cover: the sheet in the current drawing space when it is not the plate's.
     for(const shape of shapes??[]){
       let b=this.shapeBounds.get(shape);if(!b){b=bounds(shape);this.shapeBounds.set(shape,b);}
       if(b.x>region.x+region.w||b.x+b.w<region.x||b.y>region.y+region.h||b.y+b.h<region.y)continue;
-      let p=this.cutouts.get(shape);if(!p){p=new Path2D();p.rect(0,0,1200,1000);p.addPath(this.path(shape));this.cutouts.set(shape,p);}
+      let p=cover?null:this.cutouts.get(shape);if(!p){p=new Path2D();if(cover)p.rect(cover.x,cover.y,cover.w,cover.h);else p.rect(0,0,1200,1000);p.addPath(this.path(shape));if(!cover)this.cutouts.set(shape,p);}
       c.clip(p,'evenodd');
     }
   }
@@ -8014,7 +8034,7 @@ export class Painter {
   }
   draw(genome,{stage=1,moving=false,scene='plain',study=null}={}) {
     if(stage>.64)throw new Error('Finished paintings must use the native Worker pipeline');
-    this.previewPlan=null;
+    this.previewPlan=null;this.previewPageFrame=null;
     const started=performance.now(),c=this.ctx,key=JSON.stringify([genome.family,genome.profileId,genome.donorId,genome.values,scene]);
     if(study||key!==this.planKey){this.plan=study??buildStudy(genome,{scene});this.planKey=key;this.paths=new WeakMap();this.inkShapeIds=new WeakMap();this.inkShapeCount=0;this.weights=this.plan.ink.map(s=>Math.max(6,pathLength(s.points)));this.totalWeight=this.weights.reduce((a,b)=>a+b,0);}
     c.setTransform(this.canvas.width/1200,0,0,this.canvas.height/1000,0,0);
@@ -11062,7 +11082,7 @@ async function mount() {
             
             $('view-values').textContent=`Camera: yaw ${(state.yaw*180/Math.PI).toFixed(1)}° · pitch ${(state.pitch*180/Math.PI).toFixed(1)}°`;
           }
-          const measure=measureSketch(painter.previewPlan??buildMorphSketch(morphPair,smooth(state.blend),{scene:state.scene}));
+          const measure=measureSketch(painter.framedPreviewPlan()??buildMorphSketch(morphPair,smooth(state.blend),{scene:state.scene}));
           for(const {key,cells} of anatomyElements){const av=morphPair.measuresA[key],bv=morphPair.measuresB[key],now=measure[key],delta=now-av;[av,now,bv,delta].forEach((n,i)=>cells[i].textContent=n.toFixed(1));}
           $('debug-current-id').textContent=state.blend===0?a.profileId:state.blend===1?b.profileId:`${a.profileId} → ${b.profileId} @ ${smooth(state.blend).toFixed(3)}`;
           $('debug-position').textContent=`Morph ${(state.blend*100).toFixed(1)}% · shape ${(smooth(state.blend)*100).toFixed(1)}%`;
