@@ -17,7 +17,8 @@ export const LABELS = Object.freeze(['architecture', 'figure', 'face', 'hands', 
 /**
  * What each label allows. `ink`: 'none' (wash only), 'structure' (edges and openings, not shading), 'outline' (outline
  * and key folds), 'features' (every pen line, small ones too), 'elongated' (trunks and branches: long, connected strokes).
- * `minMm`: a piece of line shorter than this is not drawn there, unless it is a feature.
+ * `minMm`: a piece of line shorter than this is not drawn there, unless it is a feature. `penContrast`: only a point
+ * whose own contrast (L*) is at least this is drawn there.
  */
 export const INK_RULES = Object.freeze({
   architecture: { ink: 'structure', minMm: 2 },
@@ -30,7 +31,8 @@ export const INK_RULES = Object.freeze({
   sky: { ink: 'none' },
   water: { ink: 'none' },
   ground: { ink: 'structure', minMm: 6 },
-  shadow_mass: { ink: 'none' },
+  // a shadow is wash: its shape and its edges are never drawn. A pen line of its own, strong against both sides, stays.
+  shadow_mass: { ink: 'structure', minMm: 3, penContrast: 10 },
 });
 
 const sha = b => createHash('sha256').update(b).digest('hex');

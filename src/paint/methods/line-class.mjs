@@ -41,11 +41,15 @@ export function crossProfile(L, w, h, p, nx, ny, pxMm, o = MASS_DEFAULTS) {
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
 
 /** Per point class (CLASS) of a path resampled every pixel, smoothed by majority within `smoothMm`. */
-export function classifyPath(R, L, w, h, pxMm, o = MASS_DEFAULTS) {
-  const n = R.length, raw = new Uint8Array(n);
+export function classifyPath(R, L, w, h, pxMm, o = MASS_DEFAULTS) { return classifyPathDetail(R, L, w, h, pxMm, o).cls; }
+
+/** classifyPath with each point's own contrast (L*) too: { cls, contrast }. */
+export function classifyPathDetail(R, L, w, h, pxMm, o = MASS_DEFAULTS) {
+  const n = R.length, raw = new Uint8Array(n), contrast = new Float32Array(n);
   for (let k = 0; k < n; k++) {
     const a = R[Math.max(0, k - 2)], b = R[Math.min(n - 1, k + 2)], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const c = crossProfile(L, w, h, R[k], -(b.y - a.y) / tl, (b.x - a.x) / tl, pxMm, o);
+    contrast[k] = c.contrast;
     raw[k] = c.contrast >= o.penContrast ? CLASS.pen : c.step >= o.stepContrast ? CLASS.mass : CLASS.faint;
   }
   const half = Math.max(1, Math.round(o.smoothMm / pxMm)), out = new Uint8Array(n);
@@ -53,7 +57,7 @@ export function classifyPath(R, L, w, h, pxMm, o = MASS_DEFAULTS) {
     const c = [0, 0, 0]; for (let j = Math.max(0, k - half); j <= Math.min(n - 1, k + half); j++) c[raw[j]]++;
     out[k] = c[CLASS.mass] > c[CLASS.pen] && c[CLASS.mass] >= c[CLASS.faint] ? CLASS.mass : c[CLASS.pen] >= c[CLASS.faint] ? CLASS.pen : CLASS.faint;
   }
-  return out;
+  return { cls: out, contrast };
 }
 
 const runsOf = (cls, value) => { const runs = []; for (let i = 0; i < cls.length;) { if (cls[i] !== value) { i++; continue; } let j = i; while (j + 1 < cls.length && cls[j + 1] === value) j++; runs.push([i, j]); i = j + 1; } return runs; };

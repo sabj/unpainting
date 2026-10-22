@@ -3,7 +3,7 @@
 // source shows a pen line there, not a mass edge (line-class.mjs). A long, smooth line that is mostly pen line is
 // structure and is kept whatever the ground says. Pure: arrays in, arrays out, with a record of every cut.
 import { resample, turning } from './ink-lines.mjs';
-import { classifyPath, CLASS, MASS_DEFAULTS } from './line-class.mjs';
+import { classifyPathDetail, CLASS, MASS_DEFAULTS } from './line-class.mjs';
 import { ruleAt, INK_RULES } from './ink-labels.mjs';
 
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
@@ -31,7 +31,7 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
   const add = (label, key, px) => { (byLabel[label] ??= { keptPx: 0, droppedPx: 0 })[key] += px; };
   for (const g of lines) {
     const R = resample(g.points, 1); if (R.length < 2) continue;
-    const cls = classifyPath(R, L, w, h, pxMm, o), d = arc(R), total = d.at(-1);
+    const { cls, contrast } = classifyPathDetail(R, L, w, h, pxMm, o), d = arc(R), total = d.at(-1);
     lengthPx += total;
     let pen = 0, mass = 0;
     for (let k = 1; k < R.length; k++) { const s = d[k] - d[k - 1]; if (cls[k] === CLASS.pen) pen += s; else if (cls[k] === CLASS.mass) { mass += s; massLen += s; } }
@@ -43,6 +43,7 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
       if (structural) { live[k] = 1; continue; }
       if (cls[k] === CLASS.mass) { drop.mass += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
       if (cls[k] === CLASS.faint && o.dropFaint) { drop.faint += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
+      if (r.ink !== 'none' && r.penContrast && contrast[k] < r.penContrast) { const name = r.label; drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
       if (r.ink === 'none') { const name = labelAt(Math.round(R[k].x), Math.round(R[k].y)); drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
       live[k] = 1;
     }

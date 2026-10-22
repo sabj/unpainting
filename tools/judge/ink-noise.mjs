@@ -50,8 +50,8 @@ for (const [name, s] of Object.entries(spec)) {
     const paths = lines.flatMap(({ R, cls }) => {
       const out = []; let k = 0;
       while (k < R.length - 1) {
-        let j = k; while (j + 1 < R.length && cls[j + 1] === cls[k]) j++;
-        if (j > k) out.push(`<polyline fill="none" stroke="${COLOUR[cls[k]]}" stroke-width="${Math.max(1.4, 0.25 / pxMm * f)}" stroke-linecap="round" stroke-linejoin="round" points="${R.slice(k, j + 1).map(p => `${((p.x - b.left) * f).toFixed(1)},${((p.y - b.top) * f).toFixed(1)}`).join(' ')}"/>`);
+        let j = k + 1; while (j + 1 < R.length && cls[j + 1] === cls[k + 1]) j++;
+        out.push(`<polyline fill="none" stroke="${COLOUR[cls[k + 1]]}" stroke-width="${Math.max(1.4, 0.25 / pxMm * f)}" stroke-linecap="round" stroke-linejoin="round" points="${R.slice(k, j + 1).map(p => `${((p.x - b.left) * f).toFixed(1)},${((p.y - b.top) * f).toFixed(1)}`).join(' ')}"/>`);
         k = j;
       }
       return out;
