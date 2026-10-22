@@ -884,7 +884,7 @@ test('looser native painting preserves structural ink and a connected pale cap b
   for(const mark of study.washes.filter(m=>m.role==='cap'&&m.surface?.rails)){const gestures=nativeBrushGestures(mark);assert.equal(gestures.length,1);assert.deepEqual(gestures[0].path.map(q=>[q.x,q.y]),mark.points);assert.ok(gestures[0].path.every(q=>q.r===mark.width/2));assert.ok(gestures[0].path[0].p<gestures[0].path.at(-1).p);}
 });
 
-import {clampPlateViewport,zoomPlateViewport,centredPlateViewport,mountPlateViewport} from './mushrooms.mjs';
+import {clampPlateViewport,zoomPlateViewport,centredPlateViewport,mountPlateViewport,PLATE_KEY_TURN} from './mushrooms.mjs';
 
 test('plate zoom keeps the plate centred and clamps scale to the paper',()=>{
   const size={width:800,height:600},anchor={x:230,y:180};
@@ -926,6 +926,18 @@ test('plate zoom: wheel and keys zoom about the centre, a drag never pans, a dou
   f.event(f.viewport,'pointerdown',{pointerType:'mouse',button:0,pointerId:2,clientX:300,clientY:300});f.event(f.viewport,'pointerup',{pointerId:2,clientX:300,clientY:300});
   assert.equal(taps,1,'a click on the plate is a tap');
   assert.equal(f.canvas.width,1200);assert.equal(f.canvas.height,1000);f.controller.destroy();
+});
+test('arrow keys turn the plate like a drag, and only when turning is enabled',async()=>{
+  const turns=[],ends=[];let starts=0;
+  const f=zoomFixture({onOrbitStart:()=>starts++,onOrbit:d=>turns.push(d),onOrbitEnd:e=>ends.push(e)});
+  f.event(f.root,'keydown',{key:'ArrowLeft'});assert.equal(turns.length,0,'no turn while turning is off');
+  f.controller.setOrbitEnabled(true);
+  assert.equal(f.event(f.root,'keydown',{key:'ArrowLeft'}).defaultPrevented,true);
+  f.event(f.root,'keydown',{key:'ArrowUp'});
+  assert.equal(starts,1,'one turn for a run of keys');assert.deepEqual(turns,[{x:-PLATE_KEY_TURN.step,y:0},{x:0,y:-PLATE_KEY_TURN.step}]);
+  assert.deepEqual(f.controller.getState(),{scale:1,x:0,y:0},'keys never zoom or pan while turning');
+  await new Promise(r=>setTimeout(r,PLATE_KEY_TURN.settleMs+50));
+  assert.deepEqual(ends,[{settle:true}]);f.controller.destroy();
 });
 test('plate pinch scales about the plate centre and keeps the whole canvas as the export source',()=>{
   const f=zoomFixture();

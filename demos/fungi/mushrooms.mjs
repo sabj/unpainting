@@ -9960,9 +9960,11 @@ export function orbitRestDistance(camera,rest){
   return Math.hypot(yaw,camera.pitch-rest.pitch);
 }
 export function orbitRestOpacity(camera,rest){const F=ORBIT_REST_FADE;return 1-smooth(clamp((orbitRestDistance(camera,rest)-F.start)/(F.end-F.start)));}
+// Arrow keys turn the plate as a drag of `step` CSS pixels would; the turn settles after `settleMs` without a key.
+export const PLATE_KEY_TURN=Object.freeze({ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],step:24,settleMs:450});
 export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=()=>{},onOrbitEnd=()=>{},onFit=()=>{},onView=()=>{},onTap=()=>{},root=viewport.parentElement}){
   let view={scale:1,x:0,y:0},size={width:viewport.clientWidth,height:viewport.clientHeight},pinch=null;
-  let orbitEnabled=false,gestureMode=null,orbitHeld=false,pending=null,lastTap=null;
+  let orbitEnabled=false,gestureMode=null,orbitHeld=false,pending=null,lastTap=null,keyTurnTimer=0;
   const pointers=new Map(),events=new AbortController();
   const listen=(el,type,fn,options={})=>el?.addEventListener(type,fn,{...options,signal:events.signal});
   const sync=()=>{
@@ -10043,6 +10045,15 @@ export function mountPlateViewport({viewport,canvas,onOrbitStart=()=>{},onOrbit=
   for(const type of ['pointerup','pointercancel','lostpointercapture'])listen(viewport,type,release);
   listen(root,'keydown',event=>{
     if(event.ctrlKey||event.metaKey||event.altKey||event.target?.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName??''))return;
+    const arrow=PLATE_KEY_TURN[event.key];
+    if(arrow){
+      if(!orbitEnabled)return;
+      event.preventDefault();
+      if(!orbitHeld){orbitHeld=true;onOrbitStart();}
+      onOrbit({x:arrow[0]*PLATE_KEY_TURN.step,y:arrow[1]*PLATE_KEY_TURN.step},size);
+      clearTimeout(keyTurnTimer);keyTurnTimer=setTimeout(()=>{endOrbit(true);sync();},PLATE_KEY_TURN.settleMs);
+      return;
+    }
     if(!['+','=','-','_','0'].includes(event.key))return;
     event.preventDefault();if(event.key==='0')reset();else zoom(event.key==='+'||event.key==='='?1.25:1/1.25);
   });
@@ -10532,7 +10543,9 @@ async function mount() {
   // its final; the plate is then exactly the native painting.
   function replayPrepared(job,value,isCurrent){
     const key=job.plateKey,revision=++settledRevision,started=performance.now();
-    const current=()=>revision===settledRevision&&isCurrent()&&!playing;
+    const live=()=>revision===settledRevision&&isCurrent()&&!playing;
+    // An interrupted replay owns its prepared worker; release it so it does not linger.
+    const current=()=>{if(live())return true;job.worker?.terminate();job.worker=null;return false;};
     const promise=new Promise(resolve=>{nativeBuilding={resolve,key};});
     nativeResult={key,frames:[],streamedFrames:0,bytes:0,complete:false,metrics:null,priorFinal:null};
     replaying=true;settledBusy=true;renderMode='painting';canvas.dataset.renderMode=renderMode;canvas.dataset.refining='true';canvas.dataset.nativeComplete='false';canvas.dataset.preparedReplay='true';controls();
@@ -10563,6 +10576,8 @@ async function mount() {
   // Same-geometry crossfades: the coloured preview of a plate and its native
   // painting share every contour, so blending them is a reveal, not a dissolve.
   let fadeToken=0,fadeFrom=null,morphFrom=null;
+  // Supersedes any running fade; a cancelled fade must not leave Loop waiting on settleFade.
+  function cancelFade(){fadeToken++;if(canvas.dataset.settleFade==='running')canvas.dataset.settleFade='cancelled';}
   function captureCanvas(){const copy=newCanvas(canvas.width,canvas.height);copy.getContext('2d').drawImage(canvas,0,0);return copy;}
   function crossfadeTo(bitmap,ms=MORPH_SETTLE_FADE_MS){
     const token=++fadeToken;
@@ -10739,7 +10754,7 @@ async function mount() {
     if(!covered)hideDetail();
     if(painter.useSheet(plateSheetSeed(value)))nativeInkPaperRaster=null;
     const keep=value.keepFrame&&painter.previewColoured||covered;value.keepFrame=false;if(rest!==null)setRestOpacity(rest);
-    if(!keep){fadeToken++;if(drawReprojectedPreview(value))painter.previewColoured=false;else{painter.sketch(value.genome,{morph:value.morph,blend:value.blend,scene:value.scene,coloured:playbackColouring({playing,sketchPlaying}),interactive:playing||!!plateViewport?.isOrbitHolding()});canvas.dataset.reprojected='false';}}renderMode='sketch';canvas.dataset.renderMode=renderMode;
+    if(!keep){cancelFade();if(drawReprojectedPreview(value))painter.previewColoured=false;else{painter.sketch(value.genome,{morph:value.morph,blend:value.blend,scene:value.scene,coloured:playbackColouring({playing,sketchPlaying}),interactive:playing||!!plateViewport?.isOrbitHolding()});canvas.dataset.reprojected='false';}}renderMode='sketch';canvas.dataset.renderMode=renderMode;
     if(morphFrom&&playing){const c=painter.ctx,k=clamp(morphFrom.until-performance.now(),0,MORPH_FADE_MS)/MORPH_FADE_MS;if(k>0){c.setTransform(1,0,0,1,0,0);c.globalAlpha=smooth(k);c.drawImage(morphFrom.canvas,0,0);c.globalAlpha=1;}else morphFrom=null;}
     canvas.dataset.previewColoured=String(!!painter.previewColoured);
     if(!covered){canvas.dataset.previewGeometryMs=painter.lastPreviewGeometryMs.toFixed(2);canvas.dataset.previewDrawMs=painter.lastPreviewDrawMs.toFixed(2);canvas.dataset.previewMs=painter.lastPreviewMs.toFixed(2);canvas.dataset.previewFrame=String(painter.previewFrames);}
@@ -11034,7 +11049,7 @@ async function mount() {
     if(!fromOrbit){plateViewport?.cancelGesture({settle:false});hideRestLayer();}
     playbackEpoch++;const restoreDetail=playing||renderMode!=='painted';
     if(playing)publishMotionMetrics();
-    sketchQueue.cancel();cancelRefinement();cancelPrefetch();fadeToken++;morphFrom=null;
+    sketchQueue.cancel();cancelRefinement();cancelPrefetch();cancelFade();morphFrom=null;
     if(preparing){cache.reset();preparing=false;$('morph-progress').hidden=true;}
     playStart=0;playing=continuous=replaying=sketchPlaying=false;last=0;dirty=false;controls();persist();
     if(settle&&restoreDetail)showFinished();
