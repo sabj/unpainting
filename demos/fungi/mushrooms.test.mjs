@@ -2824,3 +2824,15 @@ test('a painter builds its paper and ink textures only when first used',async()=
  const sheet={width:1200,height:1000},given=new Painter(canvas,{paper:sheet});
  assert.equal(given.hasPaper(),true);assert.equal(given.paper,sheet);assert.equal(given.adoptPaper({width:1,height:1}),false,'a painter keeps the paper it has');
 });
+
+test('the morel head hangs from the stem at a broad lower rim, not an egg in a cup',async()=>{
+ const {buildGeometry}=await import('./mushrooms.mjs');
+ for(const seed of ['1352778786','woodland-042','a','b']){
+  // The outline's two ends of the head's base (where the cap meets the stem).
+  const g=buildGeometry(generateSpecimen(seed,'morel-1')),rimWidth=Math.abs(g.cap[80][0]-g.cap[81][0]),stemTop=2*g.halfAt(1);
+  assert.ok(rimWidth>stemTop*1.25,`${seed}: rim ${rimWidth.toFixed(1)} overhangs the stem top ${stemTop.toFixed(1)}`);
+ }
+ // Other morels keep their egg.
+ const other=buildGeometry(generateSpecimen('woodland-042','morel-2'));
+ assert.ok(Math.abs(other.cap[80][0]-other.cap[81][0])<2*other.halfAt(1));
+});

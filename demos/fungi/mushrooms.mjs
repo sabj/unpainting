@@ -781,6 +781,7 @@ export function capSurface3D(genome,{w,h,cx=0,cy=0,tilt=0,rimDepth,young=false})
 // its gills. The same view, from the same side, is p = e.
 const drawnPitch=g=>g.capSurface.elevation;
 const drawnProportions=g=>({rise:g.h/g.w,stem:g.length/g.w,girth:[.15,.3,.45,.6,.75,.85].reduce((sum,t)=>sum+g.halfAt(t),0)/6/g.w});
+const MOREL_RIM=-.72;
 export function buildGeometry(genome, young = false) {
   const v = genome.values, f = FAMILIES[genome.family], family = genome.family;
   const profile=genome.phenotype, grammar=profile?.grammar;
@@ -907,7 +908,14 @@ export function buildGeometry(genome, young = false) {
     const angle = i / 9 * Math.PI;
     stem.push([Math.cos(angle) * halfAt(0), 6 * (1 - i / 9) + Math.sin(angle) * halfAt(0) * .2]);
   }
+  // Morchella esculenta (refs-lib) hangs from the stem at a broad lower rim:
+  // morel-1's egg is cut at cos -0.72 (MOREL_RIM) and keeps its height.
+  const morelRim=grammar==='morel'&&profile?.variant===0;
   const cap = family === 'morel' ? Array.from({ length: 162 }, (_, i) => {
+    if(morelRim){
+      const angle0=i/161*TAU,t=(1-Math.cos(angle0))/2,side=angle0<=Math.PI?1:-1,a=1-t*(1-MOREL_RIM),angle=Math.acos(a)*side,profileWidth=.85+.15*a;
+      return [cx+Math.sin(angle)*w*profileWidth*(.86-.12*a)*(1+.018*Math.sin(angle*7+phase)+.012*Math.sin(angle*13-phase)),cy-h+t*h*1.04+Math.sin(angle)*tilt*.3];
+    }
     const angle = i / 161 * TAU;
     const profileWidth=!profile?1:profile.variant===1?.62+.38*(1-Math.cos(angle))/2:profile.variant===2?1.06:profile.variant===3?1+.12*Math.sin(angle*3+phase):.85+.15*Math.cos(angle);
     return [cx + Math.sin(angle) * w * profileWidth * (.86 - .12 * Math.cos(angle))*(1+.018*Math.sin(angle*7+phase)+.012*Math.sin(angle*13-phase)),
@@ -920,7 +928,7 @@ export function buildGeometry(genome, young = false) {
   }
   return { family, w, h, length, stemWidth, cx, cy, tilt, phase,
     cap, underside: underShape,
-    top, lower, gillRim, flesh:[...lower,...gillRim.slice().reverse()], stem, centerAt, halfAt, capPoint,projectUnderside,rimDepth,rimCenter,collarRadius,capSurface,stemYAt,freeGillRoot };
+    top, lower, gillRim, flesh:[...lower,...gillRim.slice().reverse()], stem, centerAt, halfAt, capPoint,projectUnderside,rimDepth,rimCenter,collarRadius,capSurface,stemYAt,freeGillRoot,morelRim };
 }
 
 function polygon(points) {
@@ -1679,6 +1687,7 @@ function buildLegacyStudy(genome,sketch=false) {
     if(family==='morel') {
       outline(g.cap.slice(2,74),'cap-contour',1,.65);
       outline(g.cap.slice(82,160),'cap-contour',1.65,.85);
+      if(g.morelRim){const r0=g.cap[80],l0=g.cap[81];outline([...g.cap.slice(74,81),...curve(r0,[mix(r0[0],l0[0],.3),r0[1]+3],[mix(r0[0],l0[0],.7),l0[1]+3],l0,12)],'cap-contour',1.35,.8);}
     } else {
       outline(g.top.slice(1,32),'cap-contour',.95,.65);
       outline(g.top.slice(35,80),'cap-contour',1.35,.78);
@@ -1971,8 +1980,8 @@ function buildLegacyStudy(genome,sketch=false) {
           // Warp the connected network in surface coordinates, then project it
           // onto the egg. Curvature compresses pits at the silhouette naturally.
           [u,t]=growSurfacePoint(local,u,t,93);
-          t=.001+clamp(t)*.998;const a=1-2*t,angle=Math.acos(a)*(u<0?-1:1),arc=Math.sqrt(Math.max(.001,1-a*a));
-          const span=g.w*arc*(.86-.12*a)*(1+.018*Math.sin(angle*7+phase)+.012*Math.sin(angle*13-phase));
+          t=.001+clamp(t)*.998;const a=g.morelRim?1-t*(1-MOREL_RIM):1-2*t,angle=Math.acos(a)*(u<0?-1:1),arc=Math.sqrt(Math.max(.001,1-a*a));
+          const span=g.w*arc*(.86-.12*a)*(g.morelRim?.85+.15*a:1)*(1+.018*Math.sin(angle*7+phase)+.012*Math.sin(angle*13-phase));
           return[g.cx+Math.sin(u*Math.PI/2)*span,g.cy-g.h+t*g.h*1.04+u*arc*g.tilt*.3];
         });
         const center=[0,1].map(k=>pit.reduce((s,p)=>s+p[k],0)/pit.length);
