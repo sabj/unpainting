@@ -732,6 +732,19 @@ test('dense construction previews keep canvas submissions bounded and reset pape
   assert.deepEqual(paperAlphas,[1,1],'preview opacity does not leak into the next paper frame');
 });
 
+test('morph playback stays in colour through its last frame, so the landing never shows a bare sketch',async()=>{
+  const {Painter,playbackColouring,createMorphPair,morphPreviewKind}=await import('./mushrooms.mjs');
+  assert.equal(playbackColouring({playing:true,sketchPlaying:true}),true);
+  assert.equal(playbackColouring({playing:false,sketchPlaying:false}),null);
+  const pair=createMorphPair(generateSpecimen('land-a','amanita-1'),generateSpecimen('land-b','agaric-1'));assert.ok(morphPreviewKind(pair));
+  // Stubs stand in for the two drawing paths: the coloured morph preview and the ink lines.
+  let previews=0,lines=0;const painter={morphPreview(){previews++;this.previewColoured=true;},orbitLines(){lines++;}};
+  Painter.prototype.sketch.call(painter,pair.b,{morph:pair,blend:1,coloured:playbackColouring({playing:true,sketchPlaying:true})});
+  assert.equal(previews,1);assert.equal(painter.previewColoured,true,'the last playback frame is coloured');
+  Painter.prototype.sketch.call(painter,pair.b,{morph:{...pair,orbitRest:true},blend:1,coloured:playbackColouring({})});
+  assert.equal(previews,1);assert.equal(lines,1);assert.equal(painter.previewColoured,false,'a plate at rest is sketched in ink');
+});
+
 test('connected cross-form chart stays genuinely 3D while closed and branching pairs use fictional fields',async()=>{
  const {createMorphPair,buildMorphSketch,buildConnectedAnatomySurface}=await import('./mushrooms.mjs');
  const a=generateSpecimen('chart-A','oyster-1'),b=generateSpecimen('chart-B','chanterelle-4'),pair=createMorphPair(a,b),again=createMorphPair(a,b);

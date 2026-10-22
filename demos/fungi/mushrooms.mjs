@@ -7461,6 +7461,10 @@ const PREVIEW_INK='rgb(44,36,27)',PREVIEW_SPARSE_INK=new Set(['fibres','habitat'
 // Which coloured preview a morph pair gets: 'field' for the transported body
 // field between unlike recipes, 'study' for the native constructor between
 // seeds of one recipe, null where the existing ink-only sketch still applies.
+// Morph playback draws every frame, the last (blend 1) included, as the
+// coloured preview; the landing keeps that frame until the new plate's
+// painting crossfades over it. Otherwise a plate at rest is sketched in ink.
+export function playbackColouring({playing=false,sketchPlaying=false}={}){return playing&&sketchPlaying?true:null;}
 export function morphPreviewKind(pair){
   if(!pair||pair.orbitRest||pair.connectedAnatomy)return null;
   if(pair.implicitMorph)return pair.fieldPlate?null:'field';
@@ -10395,7 +10399,7 @@ async function mount() {
     if(value.skipPreview){canvas.dataset.renderMode=renderMode='sketch';return;}const frameStarted=performance.now();hideDetail();
     if(painter.useSheet(plateSheetSeed(value)))nativeInkPaperRaster=null;
     const keep=value.keepFrame&&painter.previewColoured;value.keepFrame=false;
-    if(!keep){fadeToken++;if(drawReprojectedPreview(value))painter.previewColoured=false;else{painter.sketch(value.genome,{morph:value.morph,blend:value.blend,scene:value.scene,interactive:playing||!!plateViewport?.isOrbitHolding()});canvas.dataset.reprojected='false';}}renderMode='sketch';canvas.dataset.renderMode=renderMode;
+    if(!keep){fadeToken++;if(drawReprojectedPreview(value))painter.previewColoured=false;else{painter.sketch(value.genome,{morph:value.morph,blend:value.blend,scene:value.scene,coloured:playbackColouring({playing,sketchPlaying}),interactive:playing||!!plateViewport?.isOrbitHolding()});canvas.dataset.reprojected='false';}}renderMode='sketch';canvas.dataset.renderMode=renderMode;
     if(morphFrom&&playing){const c=painter.ctx,k=clamp(morphFrom.until-performance.now(),0,MORPH_FADE_MS)/MORPH_FADE_MS;if(k>0){c.setTransform(1,0,0,1,0,0);c.globalAlpha=smooth(k);c.drawImage(morphFrom.canvas,0,0);c.globalAlpha=1;}else morphFrom=null;}
     canvas.dataset.previewColoured=String(!!painter.previewColoured);
     canvas.dataset.previewGeometryMs=painter.lastPreviewGeometryMs.toFixed(2);canvas.dataset.previewDrawMs=painter.lastPreviewDrawMs.toFixed(2);canvas.dataset.previewMs=painter.lastPreviewMs.toFixed(2);canvas.dataset.previewFrame=String(painter.previewFrames);
