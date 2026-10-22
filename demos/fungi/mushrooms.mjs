@@ -878,10 +878,9 @@ export function buildGeometry(genome, young = false) {
   const collarRadius=halfAt(1)/w,collarCenter=capSurface?projectUnderside(0,collarRadius)[1]-(family==='amanita'?6:0):rimCenter;
   // Keep the growing shoulder inside the actual projected cap context.
   // The underside alone is below the front cuticle and cannot hide a cut top.
-  // Hydnum repandum's stipe runs up into the spiny underside, and Boletus's
-  // into its tubes (refs-lib): the top follows the near half of its ring, as
-  // the Amanita stem's does.
-  const ringTop=family==='amanita'||(grammar==='hedgehog'||grammar==='bolete')&&profile?.variant===0;
+  // Hydnum repandum's stipe runs up into the spiny underside (refs-lib): its
+  // top follows the near half of its ring, as the Amanita stem's does.
+  const ringTop=family==='amanita'||grammar==='hedgehog'&&profile?.variant===0;
   const shoulderY=u=>{
     if(!ringTop||!capSurface)return collarCenter;
     const x=u*halfAt(1),y=-halfAt(1)*Math.sqrt(Math.max(0,1-u*u));
@@ -2013,14 +2012,12 @@ function buildLegacyStudy(genome,sketch=false) {
         const topT=.97,sx=g.centerAt(topT),sw=g.halfAt(topT),sy=g.stemYAt(topT);
         for(let i=0;i<24;i++){const u=-1.6+i/23*3.2,x=sx+u*sw,y=sy+2+Math.abs(u)*1.5;outline([[x,y],[x+.4,y+3+sample(i,238)*3]],'pores',.4,.45,g.underside,[g.stem]);}
       }
-      // Hydnum's rolled margin is cap tissue to the edge of the spines, and
-      // Boletus's cap overhangs its tubes (refs-lib): no band of bare paper
-      // between cap and underside.
+      // Hydnum's rolled margin is cap tissue to the edge of the spines
+      // (refs-lib), not a band of bare paper between cap and underside.
       // The spines are darkest up under the cap, so the underside's own wash
       // also runs to the rim instead of leaving a pale strip below it.
-      const hydnum=profile?.grammar==='hedgehog'&&profile.variant===0,boletus=profile?.grammar==='bolete'&&profile.variant===0;
-      if(hydnum||boletus){surface(g.flesh,g.lower.slice().reverse(),18,capPalette,(1)*(hydnum?.16+v[21]*.16:.34+v[21]*.16),'flesh');
-        surface(g.underside,Array.from({length:30},(_,i)=>{const u=-.98+i/29*1.96;return[g.cx+u*g.w,mix(rimY(u),floorY(u),.14)];}),26,hydnum?{ochre:.5,sienna:.3,umber:.2}:{ochre:.45,sapgreen:.3,umber:.25},.14,'gill-face',[g.stem,g.cap]);}
+      if(profile?.grammar==='hedgehog'&&profile.variant===0){surface(g.flesh,g.lower.slice().reverse(),18,capPalette,(1)*(.16+v[21]*.16),'flesh');
+        surface(g.underside,Array.from({length:30},(_,i)=>{const u=-.98+i/29*1.96;return[g.cx+u*g.w,mix(rimY(u),floorY(u),.14)];}),26,{ochre:.5,sienna:.3,umber:.2},.14,'gill-face',[g.stem,g.cap]);}
     }
     if(family!=='morel') {
       for(let i=0;i<(family==='amanita'?0:190);i++){

@@ -2777,8 +2777,8 @@ test('the hedgehog stem runs up into its cap instead of stopping short in a flat
   const i=Math.round((g.centerAt(1)-g.cx)/g.w*40+40),lip=g.lower[80-i][1];
   assert.ok(lip-top>=3,`${seed}: stem top ${top.toFixed(1)} must reach above the cap's lower lip ${lip.toFixed(1)}`);
  }
- // Another bolete keeps its own stem top.
- const bolete=buildGeometry(generateSpecimen('woodland-042','bolete-2'));assert.equal(new Set(bolete.stem.filter(p=>p[1]<Math.min(...bolete.stem.map(q=>q[1]))+.5).map(p=>p[1])).size,1);
+ // The bolete keeps its own stem top.
+ const bolete=buildGeometry(generateSpecimen('woodland-042','bolete-1'));assert.equal(new Set(bolete.stem.filter(p=>p[1]<Math.min(...bolete.stem.map(q=>q[1]))+.5).map(p=>p[1])).size,1);
 });
 
 test('the hedgehog cap margin is cap tissue down to the spines, with no bare paper band',async()=>{
@@ -2789,7 +2789,7 @@ test('the hedgehog cap margin is cap tissue down to the spines, with no bare pap
   const rim=washes.find(w=>w.role==='flesh'),cap=washes.find(w=>w.role==='cap');
   assert.deepEqual(Object.keys(rim.palette).sort(),Object.keys(cap.palette).sort(),'the margin is painted in the cap colour');
  }
- const bolete=buildStudy(generateSpecimen('woodland-042','bolete-2')).washes;assert.equal(bolete.filter(w=>w.role==='flesh'||w.role==='gill-face').length,0,'another bolete keeps its own margin');
+ const bolete=buildStudy(generateSpecimen('woodland-042','bolete-1')).washes;assert.equal(bolete.filter(w=>w.role==='flesh'||w.role==='gill-face').length,0,'the bolete keeps its own margin');
 });
 
 test('bracket shelves show a painted thick margin over the pores, not a doubled outline',async()=>{
@@ -2801,17 +2801,6 @@ test('bracket shelves show a painted thick margin over the pores, not a doubled 
  }
  // Oyster fans keep their own gill sides.
  const oyster=buildStudy(generateSpecimen('woodland-042','oyster-1'));assert.ok(oyster.washes.length>0);
-});
-
-test('the bolete stem runs up into its cap and its cap colour reaches the tubes',async()=>{
- const {buildGeometry,buildStudy}=await import('./mushrooms.mjs');
- for(const seed of ['205022449','1264199944','woodland-042']){
-  const g=buildGeometry(generateSpecimen(seed,'bolete-1')),top=Math.min(...g.stem.map(p=>p[1]));
-  const i=Math.round((g.centerAt(1)-g.cx)/g.w*40+40),lip=g.lower[80-i][1];
-  assert.ok(lip-top>=3,`${seed}: stem top ${top.toFixed(1)} reaches above the cap's lower lip ${lip.toFixed(1)}`);
-  const washes=buildStudy(generateSpecimen(seed,'bolete-1')).washes;
-  assert.ok(washes.some(w=>w.role==='flesh')&&washes.some(w=>w.role==='gill-face'),`${seed}: no bare band between cap and tubes`);
- }
 });
 
 test('milkcap gills run from the margin to the stem instead of meeting in one point',async()=>{
