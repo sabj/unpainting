@@ -53,11 +53,13 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
       if (on && start < 0) start = k;
       if (!on && start >= 0) {
         const piece = R.slice(start, k), pd = arc(piece), pl = pd.at(-1), mid = rules[start + (piece.length >> 1)];
-        const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < Math.max(0.3, structural ? 0 : (mid.minMm ?? 0));
+        const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < 0.3;
         const tooTurny = !structural && mid.ink === 'elongated' && turning(piece) / pxMm > o.elongatedDegPerMm;
         if (tooShort || tooTurny) { drop.short += pl; add(mid.label ?? 'none', 'droppedPx', pl); }
         else {
-          out.push({ ...g, points: piece });
+          // the shortest piece the ground allows (ink-labels.mjs minMm) is applied by the salience step, after collinear
+          // pieces are joined: a trace is cut at every junction, so a contour arrives in pieces of a millimetre or two
+          out.push({ ...g, points: piece, inkLabel: mid.label ?? 'none', inkMinMm: structural ? 0 : (Number.isFinite(mid.minMm) ? mid.minMm : 0) });
           keptPx += pl; add(mid.label ?? 'none', 'keptPx', pl);
           for (let j = start + 1; j < k; j++) if (cls[j] === CLASS.mass) keptMass += d[j] - d[j - 1];
         }
