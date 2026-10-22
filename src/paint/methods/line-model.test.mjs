@@ -61,3 +61,15 @@ test('the traced line file carries the target hash and the map size', () => {
     assert.equal(t.summary, '{"tracedPaths": 0}');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('with strokes the source itself is traced, gated by the map', () => {
+  const root = setup(), calls = [], seen = [];
+  try {
+    const run = (python, args) => { seen.push(args); return fake(root, calls)(python, args); };
+    traceLineModel({ python: 'py', root, image: path.join(root, 'target.png'), stem: path.join(root, 'lines'), cacheDir: path.join(root, 'cache'), strokes: true, run });
+    const copy = seen.find(a => a[0].endsWith('copy-lines.py'));
+    assert.equal(copy[1], path.join(root, 'target.png'));
+    assert.equal(copy[copy.indexOf('--kind') + 1], 'stroke');
+    assert.ok(copy[copy.indexOf('--gate') + 1].endsWith('target.png'));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

@@ -30,6 +30,8 @@ export function inkLineFlags(num) {
 
 // a contour piece shorter than this, or turning faster than this, is detail (an eye, a pupil, a nostril)
 const SHORT_MM = 6, CURVED_DEG_PER_MM = 25;
+// the line files the models made: the lineart map's contours, and the source's own pen strokes gated by the map
+const MODEL_KINDS = ['line-map', 'stroke'];
 
 const lPlaneCache = new Map();
 async function lPlane(image, w, h) {
@@ -76,7 +78,7 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   // --inkdecide 1: a lineart map's candidate lines are drawn only where the ink rule of the ground under them allows it and
   // the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made from decided lines is not decided again.
   let decided = doc.inkDecided === true;
-  if (decide && doc0.inputKind === 'line-map' && !decided) {
+  if (decide && MODEL_KINDS.includes(doc0.inputKind) && !decided) {
     const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
     doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
   }
@@ -84,7 +86,7 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   // (defaults 2 and 3 of the file's pixels)
   // A lineart map's contours (copy-lines --kind line-map) are measured, never cut: the map says where the line is, and the
   // target's pixels only set its width and darkness. Their pieces are never drawn on damp paper (--inkbleed).
-  const model = doc0.inputKind === 'line-map', support = model ? 0 : flags.support;
+  const model = MODEL_KINDS.includes(doc0.inputKind), support = model ? 0 : flags.support;
   const opts = { sigma: flags.smoothMm / pxMm, cornerDeg: flags.cornerDeg, threshold: support,
     ...(flags.gapMm > 0 ? { gapPx: flags.gapMm / pxMm } : {}), ...(flags.minMm > 0 ? { minRunPx: flags.minMm / pxMm } : {}) };
   const inkMask = flags.inkOnly > 0 && support > 0 ? await inkCells(image, im.w, im.h) : null;

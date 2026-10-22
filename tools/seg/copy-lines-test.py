@@ -126,4 +126,25 @@ class LineMap(unittest.TestCase):
         self.assertTrue(all('tier' not in g for g in copy.plan(im)[0]))
 
 
+class Strokes(unittest.TestCase):
+    def test_a_thick_stroke_is_one_centreline_with_its_width_and_a_wash_block_is_nothing(self):
+        im = np.full((120, 200, 3), 235, 'uint8')
+        cv2.line(im, (20, 30), (180, 30), (40,)*3, 2)        # a 3 px pen stroke (the disc is 5 px across at this size)
+        im[70:120, 0:200] = 150                               # a wash block: its edge is a step, not a stroke
+        lines = copy.plan(im, 'stroke')[0]
+        top = [g for g in lines if all(abs(p[1]-30) < 2 for p in g['points'])]
+        self.assertEqual(len(top), 1)
+        self.assertGreater(np.median(top[0]["widths"]), 2)
+        self.assertFalse(any(any(abs(p[1]-70) < 3 for p in g['points']) for g in lines))
+
+    def test_the_gate_keeps_only_strokes_the_map_also_sees(self):
+        im = np.full((100, 200, 3), 235, 'uint8')
+        cv2.line(im, (20, 30), (180, 30), (40,)*3, 2)
+        cv2.line(im, (20, 70), (180, 70), (40,)*3, 2)
+        gate = np.zeros((100, 200), np.float32); gate[29:32, 20:180] = .5
+        lines = copy.plan(im, 'stroke', gate=gate)[0]
+        self.assertTrue(lines)
+        self.assertTrue(all(all(abs(p[1]-30) < 3 for p in g['points']) for g in lines))
+
+
 if __name__ == '__main__': unittest.main()

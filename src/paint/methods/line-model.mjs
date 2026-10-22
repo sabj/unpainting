@@ -38,15 +38,19 @@ export function lineModelMap({ python, root, image, cacheDir, width = 1080, maxs
 
 /**
  * Trace the fused lineart map of `image` into the line file `<stem>-lines.json` (plus its -ink.png and -skeleton.png).
- * The lines are the map's own: nothing here cuts them against the target.
+ * The lines are the map's own: nothing here cuts them against the target. With `strokes`, the source's own pen strokes
+ * are traced instead (copy-lines.py --kind stroke), gated by the map.
  * @returns {{ map, cached, summary }} summary is copy-lines.py's stage counts line
  */
-export function traceLineModel({ python, root, image, stem, cacheDir, width, maxside, tolerance = null, offline = false, weights, run = spawnSync }) {
+export function traceLineModel({ python, root, image, stem, cacheDir, width, maxside, tolerance = null, offline = false, weights, strokes = false, run = spawnSync }) {
   const m = lineModelMap({ python, root, image, cacheDir, width, maxside, offline, weights, run });
   // the fine model's own map: its marks in busy detail regions join the mask (copy-lines.py --fine)
   const fine = m.map.replace(/\.png$/, '-fine.png');
-  const r = run(python, [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map',
-    ...(fs.existsSync(fine) ? ['--fine', fine] : []), ...(tolerance == null ? [] : ['--map-tolerance', String(tolerance)])],
+  // strokes: the source's own pen strokes (centrelines and widths), kept where the map also sees a line; else the map's contours
+  const args = strokes
+    ? [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(m.width), '--kind', 'stroke', '--gate', m.map]
+    : [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map', ...(fs.existsSync(fine) ? ['--fine', fine] : [])];
+  const r = run(python, [...args, ...(tolerance == null ? [] : ['--map-tolerance', String(tolerance)])],
     { cwd: root, encoding: 'utf8', timeout: 900000, env: { ...process.env, ...ENV } });
   if (r.error || r.status !== 0) throw new Error(`copy-lines on the lineart map failed: ${r.error?.message ?? r.stderr}`);
   // the line file is the target's own: its hash and size, not the map's

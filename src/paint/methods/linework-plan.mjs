@@ -102,11 +102,11 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
         }
         try {
           const t = traceLineModel({ python, root, image, stem, cacheDir: path.resolve(root, opt('linemodelcache', 'work/line-maps')),
-            width: num('linemodelwidth', 1080), maxside: num('linemodelside', 1620), tolerance: opt('mapsmoothing', '') === '' ? null : num('mapsmoothing', 0.15), offline: num('linemodeloffline', 0) > 0 });
+            width: num('linemodelwidth', 1080), maxside: num('linemodelside', 1620), strokes: num('linestroke', 0) > 0, tolerance: opt('mapsmoothing', '') === '' ? null : num('mapsmoothing', 0.15), offline: num('linemodeloffline', 0) > 0 });
           info.extractor = 'lineart-models';
           info.lineMap = { map: t.map, cached: t.cached };
           if (!opt('inkprofile', '')) argv.push('--inkprofile', 'drawing-ink');
-          log(`line source source-ink: lineart models, fused map ${t.cached ? 'from the cache' : 'computed'}, traced whole (${t.summary})`);
+          log(`line source source-ink: lineart models, fused map ${t.cached ? 'from the cache' : 'computed'}, ${num('linestroke', 0) > 0 ? "the source's pen strokes traced where the map sees a line" : 'traced whole'} (${t.summary})`);
         } catch (e) {
           if (opt('linemodel', '') === 'strict') throw e;
           info.warning = `lineart models fallback: ${e.message}`;
