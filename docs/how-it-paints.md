@@ -30,7 +30,7 @@ Code: `src/media/paper.mjs` builds the surface and `src/media/sheet.mjs` moves t
 
 ## 2. Pencil and ink
 
-The drawing goes down first and dries before the washes. The drawing medium defaults to pencil (graphite), which does not move under water. Ink is drawn when asked for, with `--outlinemedium ink` or a plan's ink medium, and by the pen-and-wash recipe that `--inkrecipe auto` picks when the source is a pen drawing ([Ink](ink.md#pen-and-wash-ink)). When a run draws in ink, sepia ink can rewet and lift under the washes; black ink resists lifting better. A plan can also add closing ink accents after the washes.
+The drawing goes down first and dries before the washes. The drawing medium defaults to pencil (graphite), which does not move under water. Ink is drawn only when asked for, with `--outlinemedium ink`, a plan's ink medium or `--inkrecipe wash` ([Ink](ink.md#pen-and-wash-ink)). When a run draws in ink, sepia ink can rewet and lift under the washes; black ink resists lifting better. A plan can also add closing ink accents after the washes.
 
 The pen is a dip pen with a finite load of walnut ink. Four things change its line:
 

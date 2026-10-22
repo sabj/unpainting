@@ -45,8 +45,8 @@ On a staged run the pen layer is `layer-prepink.jpg` times `layer-finishink.jpg`
 Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and these configurations:
 
 - `d020`: the default painter at tag `v0.2.0`.
-- `pencil`: `--inkrecipe none`, the pencil drawing, from this branch.
-- `auto`: the default painter from this branch. It chooses the pen-and-wash recipe or pencil from the pen line in the target.
+- `pencil`: the default painter from this release, pencil only (`--inkrecipe none`).
+- `auto`: `--inkrecipe auto`, which chooses the pen-and-wash recipe or pencil from the pen line in the target.
 - `wash`: `--inkrecipe wash`, to force the recipe.
 
 Run `npm run doctor` first. The wash recipe traces lines with `copy-lines.py`. That needs the line python (`PAINTER_LINES_PYTHON` or `.venv-lines`) with NumPy and OpenCV; without it, the run logs a `!!!` fallback line and traces less.
@@ -70,8 +70,8 @@ paint() { # paint <config> <flags...>
     done
   done
 }
-paint pencil --inkrecipe none
-paint auto
+paint pencil
+paint auto --inkrecipe auto
 paint wash --inkrecipe wash
 # in a checkout of v0.2.0, with the same T and paint(), and with the h36-a image given by an absolute path:
 #   paint d020

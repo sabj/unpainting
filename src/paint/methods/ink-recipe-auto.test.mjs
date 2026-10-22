@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseInkRecipe, penShare, DRAWING_FLAGS } from './ink-recipe-auto.mjs';
+import { chooseInkRecipe, penShare, DRAWING_FLAGS, DEFAULT_INK_RECIPE } from './ink-recipe-auto.mjs';
 
 test('auto picks wash from the pen-line share and the --penfirst threshold', () => {
   assert.equal(chooseInkRecipe('auto', [], () => 0.01).recipe, 'wash');
@@ -26,4 +26,9 @@ test('a white sheet with a few dark pen strokes reads as some pen line, blank pa
   assert.equal(penShare(px, w, h), 0);
   for (let x = 10; x < 110; x++) for (const y of [20, 45, 70]) for (let dy = 0; dy < 2; dy++) { const i = ((y + dy) * w + x) * 3; px[i] = px[i + 1] = px[i + 2] = 40; }
   assert.ok(penShare(px, w, h) > 0);
+});
+
+test('the default recipe is none, so a pen drawing source gets no ink unless asked', () => {
+  assert.equal(DEFAULT_INK_RECIPE, 'none');
+  assert.equal(chooseInkRecipe(DEFAULT_INK_RECIPE, [], () => { throw new Error('measured'); }).recipe, 'none');
 });

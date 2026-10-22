@@ -152,7 +152,7 @@ import { inkCapOnScrap } from '../src/paint/methods/ink-scrap.mjs';
 import { inkKFromSource } from '../src/paint/methods/ink-hue.mjs';
 import { matchInkLoad, sampleGestures, strokesPeakAbsorbance, lPlane as inkLPlane } from '../src/paint/methods/ink-match.mjs';
 import { inkRecipeArgs } from '../src/paint/methods/ink-recipe.mjs';
-import { chooseInkRecipe, penShare, DRAWING_FLAGS, AUTO_INK_WIDTH } from '../src/paint/methods/ink-recipe-auto.mjs';
+import { chooseInkRecipe, penShare, DRAWING_FLAGS, AUTO_INK_WIDTH, DEFAULT_INK_RECIPE } from '../src/paint/methods/ink-recipe-auto.mjs';
 import { chooseDrawingStages, drawingStageIntent } from '../src/paint/methods/drawing-stages-auto.mjs';
 import { eraseWeights, erasePrep } from '../src/paint/methods/pencil-erase.mjs';
 import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
@@ -296,9 +296,8 @@ const CODE_STATE = checkCodeState({ root, out, allowDirty: num('allowdirty', 0) 
 // --inkrecipe v2|wash: ink flags as one switch (src/paint/methods/ink-recipe.mjs); flags typed on the command line win,
 // and the recipe's flags win over the --recipe preset's. Added before the line source is prepared, since the wash
 // recipe picks it.
-// --inkrecipe auto (the default) picks wash for a pen drawing, none otherwise (src/paint/methods/ink-recipe-auto.mjs);
-// a resumed painting keeps the recipe it was started with.
-const INK_RECIPE_NAME = opt('inkrecipe', opt('resumestate', '') ? 'none' : 'auto');
+// --inkrecipe auto picks wash for a pen drawing, none otherwise (src/paint/methods/ink-recipe-auto.mjs). The default is none.
+const INK_RECIPE_NAME = opt('inkrecipe', DEFAULT_INK_RECIPE);
 const INK_RECIPE = await (async () => {
   // the share is read at one width, so --width does not change the choice (the separator's line share depends on it)
   // a missing image is left to fail at the normal image load below

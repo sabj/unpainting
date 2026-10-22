@@ -10,7 +10,7 @@ In the third image of each row, the pen drawing is thin, brown and hard-edged. I
 
 ## Ink or pencil
 
-`--outlinemedium` defaults to graphite, a light pencil underdrawing. Ink is drawn when asked for, and by the pen-and-wash recipe when the source is a pen drawing (see [Pen and wash ink](#pen-and-wash-ink)). Pencil is light, neutral and does not move under water, so the washes cover it.
+`--outlinemedium` defaults to graphite, a light pencil underdrawing, for every source. Ink is drawn only when asked for: with `--outlinemedium ink`, a plan's ink medium, or `--inkrecipe wash` or `auto` (see [Pen and wash ink](#pen-and-wash-ink)). Pencil is light, neutral and does not move under water, so the washes cover it.
 
 `--outlinemedium ink` draws in ink. `--outlinemedium auto` chooses from the target. It draws in ink if at least 0.5% of the picture reads as ink line (`--penfirst`), and in pencil below that. Ink on a target without line would add marks the original lacks.
 
@@ -83,9 +83,9 @@ See [Choosing linework](linework.md) for the short job-to-tool guide and its def
 
 ## Pen and wash ink
 
-`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101. It turns ink on by itself.
+`--inkrecipe wash` is ink for pen drawings and pen-and-wash sources, such as a Guardi or Tiepolo sheet or an ink-led sketch. It is in painter V101 and it is off by default. It turns ink on by itself.
 
-`--inkrecipe` is `auto` by default. Auto reads the source first, scaled to 1200 px wide, whatever `--width` is. If the ink separator finds at least `--penfirst` (0.5%) of it to be pen line, the run uses the `wash` recipe. Otherwise it uses no recipe, and the drawing is pencil only. A run that sets `--drawing`, `--drawingfile`, `--drawinglast`, `--outlinemedium`, `--linesource`, `--drawingstages` or `--stages` is left as it set it, so a plan's drawing is never replaced. A resumed painting keeps the recipe it started with. The log says which recipe auto chose and why. `--inkrecipe none` turns the recipe off.
+`--inkrecipe auto` chooses for you. It reads the source scaled to 1200 px wide, whatever `--width` is. If the ink separator finds at least `--penfirst` (0.5%) of it to be pen line, the run uses the `wash` recipe. Otherwise it uses no recipe. A run that sets `--drawing`, `--drawingfile`, `--drawinglast`, `--outlinemedium`, `--linesource`, `--drawingstages` or `--stages` is left as it set it. The log says which recipe auto chose and why. The default is `--inkrecipe none`: the drawing is pencil only, for every source.
 
 - Lines. The pen draws the source's own pen lines, traced whole by `tools/seg/copy-lines.py`, first and with no pencil. The tracer runs when at least 0.5% of the source reads as pen line (`--copylinesmin 0.005`). It needs python with NumPy and OpenCV, as the other line tools do.
 - Placement. The support filter keeps a line only where the source shows one, joins gaps up to 0.6 mm and drops pieces under 1.2 mm. Smoothing is light, at 0.3 mm, so a short descriptive mark keeps its shape.
@@ -115,7 +115,7 @@ With `--linemeasure`, a line file drawn on a finer grid than the painting's is r
 
 `--lineinkonly 1` also keeps a line only within a pixel of cells the ink separator reads as pen line. On the ink-led sketches it drops the brush marks in foliage that the tracer reads as lines. On a Guardi it also drops arch mouldings drawn beside wash, so the recipe leaves it off.
 
-The recipe is not for photographs or brush-only works. Auto leaves them on pencil. Forcing `--inkrecipe wash` on a target with less pen line than `--penfirst` (0.5%) makes the painter warn. On Fragonard's brush-and-wash Rinaldo, with 0.15% pen line, it adds pen marks the source lacks.
+The recipe is not for photographs or brush-only works. `--inkrecipe auto` leaves them on pencil. Forcing `--inkrecipe wash` on a target with less pen line than `--penfirst` (0.5%) makes the painter warn. On Fragonard's brush-and-wash Rinaldo, with 0.15% pen line, it adds pen marks the source lacks.
 
 ## Linework stages
 

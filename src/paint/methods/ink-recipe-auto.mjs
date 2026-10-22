@@ -1,4 +1,4 @@
-// --inkrecipe auto, the default: the pen-and-wash recipe (ink-recipe.mjs) when the source reads as a pen drawing, else
+// --inkrecipe auto, opt in: the pen-and-wash recipe (ink-recipe.mjs) when the source reads as a pen drawing, else
 // none. A source is a pen drawing when the ink separator reads at least --penfirst per cent of it as pen line. A run that
 // sets its own drawing, a drawing file or a line source keeps what it set, so a plan's drawing is never replaced.
 import { paperOf } from '../../crop/palettepick.mjs';
@@ -6,6 +6,9 @@ import { separate } from '../../crop/inkwash.mjs';
 
 /** The width the picture is read at: the separator's line share depends on it, and this is the width of the benchmark runs. */
 export const AUTO_INK_WIDTH = 1200;
+
+/** The recipe a run uses when --inkrecipe is not given: none, so the drawing is pencil only. */
+export const DEFAULT_INK_RECIPE = 'none';
 
 /** Flags that say how the drawing is made; any of them on the command line turns the automatic choice off. */
 export const DRAWING_FLAGS = Object.freeze(['--drawing', '--drawingfile', '--drawinglast', '--outlinemedium', '--linesource', '--drawingstages', '--stages']);

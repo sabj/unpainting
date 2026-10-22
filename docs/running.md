@@ -16,7 +16,7 @@ Each image example needs an empty output folder. On a repeat run, move the previ
 
 The image planner is experimental. The stroke plan is the small, reproducible demonstration of brushwork and drying. The paintings in the README come from separate whole-painting plans; see [Painting sequences](examples.md).
 
-The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. If the target is a pen drawing, `--inkrecipe auto` swaps in the pen-and-wash recipe ([Ink](ink.md#pen-and-wash-ink)). `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
+The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--inkrecipe wash` draws a pen-and-wash drawing, and `--inkrecipe auto` uses it only when the target shows pen line ([Ink](ink.md#pen-and-wash-ink)); both are off by default. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
 
 Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
 
