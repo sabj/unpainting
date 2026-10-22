@@ -3445,11 +3445,22 @@ function buildNovelStudy(genome,sketch=false) {
     }else if(grammar==='tooth'){
       const tufts=j===1?4:j===2?2:j===3?4:j===4?1:3,all=[],teeth=[],cores=[],spineGrow=j===0?clamp(.3+1.25*local.maturity,.45,1.3):1;
       for(let k=0;k<tufts;k++){
-        const x=j===1?(k-1.5)*45:(k-(tufts-1)/2)*w*.36,y=-h*.8+(j===0?k*(14+v[5]*34):j===2?k*45:j===3?(k%2)*38:k*9),rx=w*(j===4?.92:j===2?.77:j===0?.42+.2*v[2]:.51),ry=j===4?58:42;
+        const x=j===1?(k-1.5)*45:(k-(tufts-1)/2)*w*.36,y=-h*.8+(j===0?k*(14+v[5]*34):j===2?k*45:j===3?(k%2)*38:k*9),rx=w*(j===4?.92:j===2?.77:j===0?.42+.2*v[2]:.51),ry=j===4?58:j===0?rx*.95:42;
         const core=A(x,y,rx,ry,0,TA,65).map(([px,py],q)=>[px+Math.sin(q*.37+phase)*2.5,py+Math.cos(q*.49)*2]);cores.push(core);all.push(core);
         if(j===1){const branch=[...B([-11,-14],[-10,-h*.34],[x-13,y+80],[x-9,y+17],21),...B([x+9,y+17],[x+13,y+80],[10,-h*.34],[11,-14],21)];all.push(branch);line(branch,'branch',1,.62,null,cores);}
-        const count=j===4?97:j===2?59:j===0?72:47;
+        const count=j===4?97:j===2?59:j===0?260:47;
         for(let q=0;q<count;q++){
+          if(j===0){
+            // Hericium erinaceus: the lower body is all spines. They spring from
+            // the whole mass, short at the shoulder and lengthening downward
+            // into a cascading fringe, each a fine stroke following the form.
+            const n=q+k*263,t=N(n,570),u=N(n,571)*2-1,sy=y-ry*.8+t*ry*1.72,hw=rx*Math.sqrt(Math.max(0,1-((sy-y)/ry)**2)),sx=x+u*hw*.96;
+            const len=104*(.1+.9*t**1.25)*(1-.3*Math.abs(u))*(.75+N(n,572)*.5)*spineGrow,lean=u*len*.14+(N(n,573)-.5)*len*.12;
+            const center=B([sx,sy],[sx+lean*.2,sy+len*.35],[sx+lean*.65,sy+len*.75],[sx+lean,sy+len],9);
+            if(q%3===0){const th=1+N(n,574)*1.5;teeth.push([...center.map(([px,py],z)=>[px-th*(1-z/8),py]),...center.slice().reverse().map(([px,py],z)=>[px+th*z/8,py])]);all.push(teeth.at(-1));}
+            line(center,'teeth',.28+N(n,575)*.14,.1+.24*t+N(n,576)*.08);
+            continue;
+          }
           const u=(q+.3+N(q+k*59,560)*.4)/count*2-1,start=[x+u*rx*.98,y+ry*Math.sqrt(Math.max(0,1-u*u))*.35],len=(j===2?27:j===4?133:j===3?98:j===0?104:79)*(1-.4*Math.abs(u))*(.7+N(q,561)*.5)*spineGrow,lean=(N(q,562)-.5)*8,thickness=1.5+N(q,563)*2.5;
           const center=B(start,[start[0]+lean,start[1]+len*.3],[start[0]+lean*1.3,start[1]+len*.74],[start[0]+lean*.7,start[1]+len],17),left=center.map(([px,py],z)=>[px-thickness*(1-z/16),py]),right=center.slice().reverse().map(([px,py],z)=>[px+thickness*z/16,py]);
           teeth.push([...left,...right]);all.push(teeth.at(-1));
@@ -3459,7 +3470,7 @@ function buildNovelStudy(genome,sketch=false) {
       }
       const cloud=all.flat(),b=bb(cloud),region=[[b.x,b.y],[b.x+b.w,b.y],[b.x+b.w,b.y+b.h],[b.x,b.y+b.h]];
       wash(region,seedShadePalette(genome.profileId,cream,v,local.maturity),.12*seedShadeLoad(local.maturity),'folded-body',[],all);
-      for(const core of cores)line(core.slice(33,63),'cap-contour',.75,.48);
+      if(j!==0)for(const core of cores)line(core.slice(33,63),'cap-contour',.75,.48);
       // Short brush contact under the shoulder models the roots of the teeth.
       wash(region,{umber:.31,ochre:.28,walnut:.41},.065,'tooth-root-shadow',teeth,cores);
       const support=[...B([-39,11],[-48,-h*.3],[-w*.62,-h*.57],[-w*.46,-h*.94],26),...B([-w*.46,-h*.94],[-w*.34,-h*.98],[-w*.14,-h*.95],[-w*.09,-h*.9],12),...B([-w*.09,-h*.9],[-w*.17,-h*.53],[24,-h*.3],[31,10],26)];

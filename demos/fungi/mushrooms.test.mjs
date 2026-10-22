@@ -2666,3 +2666,16 @@ test('Paint playback patches compose the same fields as the whole sheet', async 
   assert.deepEqual(nativePatchRect({x0:95,y0:45,x1:120,y1:60},100,50,1200,600),{x:1140,y:540,w:60,h:60});
   assert.deepEqual(nativePatchRect({x0:3,y0:2,x1:3,y1:2},7,5,10,10),{x:4,y:4,w:2,h:2});
 });
+
+test('Hericium erinaceus is one rounded mass whose lower body is spines',async()=>{
+ const study=buildStudy(generateSpecimen('woodland-042','tooth-1')),teeth=study.ink.filter(k=>k.role==='teeth');
+ assert.ok(teeth.length>500,`${teeth.length} spines`);
+ const tops=teeth.map(k=>Math.min(...k.points.map(p=>p[1]))),bottoms=teeth.map(k=>Math.max(...k.points.map(p=>p[1])));
+ const y0=Math.min(...tops),y1=Math.max(...bottoms);
+ assert.ok(tops.filter(y=>y<y0+(y1-y0)*.35).length>teeth.length*.2,'spines spring from high on the body, not only from a rim');
+ // Spines that spring lower hang longer: short on the shoulder, long in the fringe.
+ const len=teeth.map((k,i)=>bottoms[i]-tops[i]),mt=tops.reduce((a,b)=>a+b)/tops.length,ml=len.reduce((a,b)=>a+b)/len.length;
+ let sxy=0,sxx=0,syy=0;tops.forEach((t,i)=>{sxy+=(t-mt)*(len[i]-ml);sxx+=(t-mt)**2;syy+=(len[i]-ml)**2;});
+ assert.ok(sxy/Math.sqrt(sxx*syy)>.15,'spine length grows down the body');
+ assert.equal(study.ink.filter(k=>k.role==='cap-contour').length,0,'a spine mass has no hard outline');
+});
