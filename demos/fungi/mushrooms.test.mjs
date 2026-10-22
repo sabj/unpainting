@@ -2888,3 +2888,13 @@ test('ux11: a morph preview frame is drawn unframed under its page frame',async(
   for(const s of strokes)assert.ok([...sheet].some(w=>Math.abs(w-s.width*frame.scale)<1e-9),`sheet width ${s.width*frame.scale}`);
  }finally{globalThis.Path2D=saved;}
 });
+
+test('ux12: a Morph destination planned while idle is reused only while its identity holds',async()=>{
+ const {plannedDestinationFor}=await import('./mushrooms.mjs');
+ const pair={},composition={},value={genome:{}};
+ const now={seed:'s1',pair,composition,fieldPlate:false,state:'{"seed":"a","next":"b"}'},planned={...now,value};
+ assert.equal(plannedDestinationFor(planned,{...now}),value,'same seed, pair, layout, mode and state');
+ for(const [k,v] of [['seed','s2'],['pair',{}],['composition',{}],['fieldPlate',true],['state','{"seed":"a","next":"c"}']])
+  assert.equal(plannedDestinationFor(planned,{...now,[k]:v}),null,`a changed ${k} rebuilds it`);
+ assert.equal(plannedDestinationFor(null,now),null);
+});

@@ -9706,6 +9706,12 @@ export function plannedPlateData(value){return {genome:value.genome,scene:value.
 export function plannedPlateSnapshot({genome,scene,fieldPlate,recipe}){const {a,b,blend,composition,view,shapeModifiers}=recipe;return {genome,scene,fieldPlate,blend,morph:{a,b,composition,view,shapeModifiers}};}
 // The parts of a pair createPromotedMorphPair reads.
 export function promotionSource(pair){return {b:pair.b,composition:pair.composition,sameRecipe:!!pair.sameRecipe,implicitMorph:!!pair.implicitMorph,connectedAnatomy:!!pair.connectedAnatomy,view:pair.view,shapeModifiers:pair.shapeModifiers,fieldPlate:!!pair.fieldPlate};}
+// A Morph destination planned while idle stands for the one Morph would build
+// only while nothing it was planned from has changed: the seed, the pair and
+// its layout, field-plate mode and the advanced state (serialised).
+export function plannedDestinationFor(planned,now){
+  return planned&&now&&['seed','pair','composition','fieldPlate','state'].every(k=>planned[k]===now[k])?planned.value:null;
+}
 export const PREPARED_PLATE=Object.freeze({limit:2,idleMs:700,recordEveryMs:180,frameQuality:.94,replayMs:3600,version:2});
 // Full identity of a prepared painting: plate (genome, recipe, composition,
 // view, scene, field study), raster scale and paper sheet. Any difference means
@@ -10367,6 +10373,16 @@ async function mount() {
     if(!morphPreviewKind(morphPair))return snapshot();
     const blend=smooth(state.blend);return {genome:morphGenome(morphPair,blend),morph:morphPair,blend,scene:state.scene,fieldPlate:state.fieldPlate};
   }
+  // The destination planned while idle (planAhead): Morph starts from it
+  // instead of rebuilding it on the main thread (plannedDestinationFor).
+  let plannedDestination=null;
+  function destinationIdentity(seed,dest=advanceMorphState(state,seed)){return {seed,pair:morphPair,composition:morphPair?.composition,fieldPlate:state.fieldPlate,state:JSON.stringify(dest)};}
+  function destinationSnapshot(seed){
+    const d=plannedDestination,now=destinationIdentity(seed);
+    const planned=plannedDestinationFor(d,now);
+    canvas.dataset.destinationPlanned=planned?'reused':'rebuilt';
+    return planned??finishedSnapshot(seed);
+  }
   // The plate that finishMorph will settle on, built without side effects so
   // its native painting can be prepared while the morph is still playing.
   function finishedSnapshot(nextSeed){
@@ -10485,7 +10501,9 @@ async function mount() {
         // One background painting at a time: Morph destination first, then Random.
         if(!state.fieldPlate&&morphPair?.supportedMotion!==false&&!(state.blend>0&&state.blend<1)){
           plannedNextSeed??=randomSeed();
-          planAhead({type:'destination',state:advanceMorphState(state,plannedNextSeed),seed:plannedNextSeed},later(value=>{
+          const dest=advanceMorphState(state,plannedNextSeed),from=destinationIdentity(plannedNextSeed,dest);
+          planAhead({type:'destination',state:dest,seed:plannedNextSeed},later(value=>{
+            plannedDestination={...from,value};
             if(!preparedJobs.has(preparedPlateKey(preparedRequest(value)))&&!(prefetch&&prefetch.key===nativeKey(value))){startPrepared(value);return;}
             random();
           }));
@@ -11126,7 +11144,7 @@ async function mount() {
     sketchQueue.cancel();cancelRefinement();playbackEpoch++;preparing=false;
     playing=sketchPlaying=true;continuous=loop;replaying=false;drawingStage=1;dirty=false;
     // A single morph settles on a known plate: paint it while the shapes move.
-    plannedNextSeed??=randomSeed();try{prefetchNative(finishedSnapshot(plannedNextSeed));}catch(error){console.warn('Destination painting not prepared',error);prefetch=null;}
+    plannedNextSeed??=randomSeed();try{prefetchNative(destinationSnapshot(plannedNextSeed));}catch(error){console.warn('Destination painting not prepared',error);prefetch=null;}
     playStart=0;lastSketchAt=0;hiddenAt=0;renderMode='sketch';
     metrics={preparationMs:0,cached:false,mode:'sketch',delivered:0,skipped:0,intervals:[],playbackStarted:performance.now()};
     controls();queueFrame();status.textContent=loop?'Looping':'Morphing';
@@ -11305,7 +11323,10 @@ async function mount() {
     if(morphPair.supportedMotion===false){status.textContent='This target can\x27t morph yet';return;}
     if (preparing || (playing && continuous === loop)) { pause(); status.textContent = 'Growth paused'; return; }
     if (loop && continuous && !playing) { stopLoopPause(); continuous=false; controls(); persist(); return; }
-    pause({settle:false});drawingStage=1;
+    // A start from rest keeps the destination planned while idle (and the
+    // painting prepared for it); pausing would otherwise drop its seed.
+    const planned=state.blend<1?plannedNextSeed:null;
+    pause({settle:false});plannedNextSeed=planned;drawingStage=1;
     if (state.blend >= 1) {
       Object.assign(state,advanceMorphState(state,randomSeed()));
       $('seed').value = state.seed; $('next-seed').value = state.next; regenerate({preview:false,promoteFrom:morphPair});
