@@ -22,12 +22,10 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 <table>
 <tr>
-<td align="center" width="50%"><a href="https://sabj.github.io/unpainting/demos/lab/"><img src="demos/thumbs/lab.webp" width="220" alt="A heart with an arrow through it, painted in Paint Lab"><br>Paint Lab, to try it</a></td>
-<td align="center" width="50%"><a href="https://samjackson.org/writing/whats-a-painting-anyway-part-1/"><img src="docs/img/thumb-blog.webp" width="220" alt="The Mona Lisa painted several ways, from the blog post's header"><br>Blog post on the motivations</a></td>
-</tr>
-<tr>
-<td align="center" width="50%"><a href="docs/reading-list.md"><img src="docs/img/thumb-reading.webp" width="220" alt="Titles of papers from the literature review"><br>Literature review, to see more</a></td>
-<td align="center" width="50%"><a href="https://sabj.github.io/unpainting/demos/"><img src="demos/thumbs/fungi-paint.webp" width="220" alt="A mushroom plate painting itself from blank paper"><br>More demos</a></td>
+<td align="center" width="25%"><a href="https://sabj.github.io/unpainting/demos/lab/"><img src="demos/thumbs/lab.webp" width="180" alt="A heart with an arrow through it, painted in Paint Lab"><br>Paint Lab, to try it</a></td>
+<td align="center" width="25%"><a href="https://samjackson.org/writing/whats-a-painting-anyway-part-1/"><img src="docs/img/thumb-blog.webp" width="180" alt="The Mona Lisa painted several ways, from the blog post's header"><br>Blog post on the motivations</a></td>
+<td align="center" width="25%"><a href="docs/reading-list.md"><img src="docs/img/thumb-reading.webp" width="180" alt="Titles of papers from the literature review"><br>Literature review, to see more</a></td>
+<td align="center" width="25%"><a href="https://sabj.github.io/unpainting/demos/"><img src="demos/thumbs/fungi-paint.webp" width="180" alt="A mushroom plate painting itself from blank paper"><br>More demos</a></td>
 </tr>
 </table>
 
