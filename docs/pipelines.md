@@ -15,8 +15,10 @@ This is `--inkrecipe wash`. Each stage names its module and file.
       |   trace          src/paint/methods/line-model.mjs -> tools/seg/copy-lines.py --kind line-map
       |   fallback       tools/seg/copy-lines.py on the target's own ink (logged with !!!)
       v
- 2. hold and measure     src/paint/methods/ink-lines-file.mjs -> ink-lines.mjs, ink-measure.mjs
-      |                  model lines are measured, not cut: width 0.06 to 0.35 mm, darkness
+ 2. decide, hold, measure   src/paint/methods/ink-lines-file.mjs -> ink-decide-file.mjs, ink-decide.mjs, line-class.mjs, ink-labels.mjs
+      |                  mass edges (shadow and wash steps) are cut by the line-or-mass test; sky, foliage and water are wash
+      |                  (ink-labels.json next to the painting); opt-in: line-geometry.mjs, line-foliage.mjs, line-salience.mjs, line-hatch.mjs
+      |                  then ink-lines.mjs, ink-measure.mjs measure the rest, not cut: width 0.06 to 0.35 mm, darkness
       v
  3. stages               src/paint/methods/drawing-stages.mjs
       |                  opening file (stage-prepink) and closing file (stage-finishink)

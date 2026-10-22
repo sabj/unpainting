@@ -2,21 +2,25 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## Unreleased, after 0.2.1-rc.1
+## 0.2.1-rc.2 - unreleased
 
-Painter V101-dev, sim 102, judges J1. Defaults still match 0.2.0.
+Painter V101-dev, sim 102, judges J1. Defaults still match 0.2.0. Everything below is in `--inkrecipe wash`, which is off by default.
 
 ### Ink on ink-heavy works
 
-- `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). It draws the source's own pen lines whole, with no pencil, and follows the source's line width and darkness along each stroke. It also matches the ink's darkness and hue to the source's lines. It turns ink on by itself.
-- New flags, each off by default: `--linemeasure`, `--inkdarkmatch`, `--inkhue source`, `--inkbleed`, `--linegapmm`, `--lineminmm`, `--lineinkonly`, `--copylinesmin` and `--linecleanup 0`.
-- Fix: the ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) now reach the line files that the linked drawing stages write. In 0.2.1-rc.1, a run whose stages came from the automatic stage choice drew those files unchanged. There, `--inkrecipe v2` applied only `--inkwidthfloor` and `--inkdamp`.
-- `tools/judge/ink-lines-report.mjs` measures a painting's pen lines against its source's: placement, darkness at the source's lines, hue and crops.
-- `bench/ink-heavy/` holds an eight-target ink set with sources, licences and the A/B commands.
+- `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). The pen draws the lines of the published lineart models' fused map (`tools/seg/sketch-map.py`, cached by the source's SHA-256), traced whole by `tools/seg/copy-lines.py --kind line-map`, first and with no pencil. Without torch, controlnet_aux or the weights it logs a `!!!` line and traces the source's own ink instead (`--linemodel strict` stops). `npm run doctor` warns about the models. Setup is in [tools/seg/README.md](tools/seg/README.md).
+- Mass edges are cut. Each candidate line is read across the source: a pen line is thin and dark with lighter tone on both sides, and a shadow or wash edge is a one-sided step between two tone masses. Mass edges are left to the wash unless long and smooth (`src/paint/methods/line-class.mjs`, `ink-decide.mjs`). SAM's regions are labelled, and sky, foliage and water take no ink. The labels and the decision are written to `ink-labels.json` next to the painting. `tools/judge/ink-labels-view.mjs` tints the regions, and `tools/judge/ink-noise.mjs` colours the lines on mass edges red. Region labels come from a simple classifier of colour and size; `--inklabeljudge codex` or `agy` has a vision model label them from an overlay, which uploads the overlay and is opt-in.
+- `--inkres` works: lines are held on the fine grid, the pen's volumes and sizes scale with it, dark matching works with it, and `drawing-opening.png` is the fine ink. The recipe sets it to 1620 over the width, from 1 to 3, so output is up to 3 times as wide: at 540 px wide it is 1620 px. The fine ink carry now syncs the GPU sheet, and the fine sheet dries under the nib only.
+- The model lines are measured and not cut by the support filter, are never drawn damp, and take widths of 0.06 to 0.35 mm (0.15 mm on detail) from the map and the source with a 0.2 mm probe. The hand model draws them: long contours first, lines chained, strokes of 10% of the short side.
+- Opt-in, off in the recipe: `--inkgeom` (straight runs and arcs), `--inkfoliage`, `--inksalience`, `--inkshadowmask 1`, `--inkdropfaint 1`, and `--inkhatch 1` for cross-hatched shadows in pure ink. They cut deeper and lowered recognisability on the four test images.
+- Tools: `tools/judge/ink-legibility.mjs` (12 named crops judged blind by a vision model, `--judge codex` or `agy`), `ink-noise.mjs`, `ink-labels-view.mjs`, `ink-results-sheet.mjs`, `ink-features.mjs`, `ink-lines-report.mjs`. `bench/ink-heavy/` holds the eight-target ink set and `legibility.json`.
+- Fix: the ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) now reach the line files that the linked drawing stages write.
 
-The set was painted locally at 720 px in fast mode, 2 seeds per configuration, each painting scored 3 times with J1. Mean J1: the wash recipe 5.68, 0.2.1-rc.1 with `--inkrecipe v2` 5.28, 0.2.0 ink 5.12, and the default pencil 5.08. The wash recipe gained 0.5 to 0.75 over rc.1 v2 on Guardi, Tiepolo's Bacchus and Ariadne and both Yale sketches, on both seeds. On the other four targets it moved within the 0.33 judge noise. The full-size A/B is not yet run.
+Legibility, 12 crops of 4 sources at 540 px wide and `--inkres 3`, seed 0, judged by codex three times (recognised crops, mean): the rc.1 recipe's pen layer 1, the lineart line source with the new pen 11.3, the same with shadow and wash edges cut by region and tone masks 8.3, with geometry fitting 5.7, with every opt-in step 2.7, and the shipped recipe 11. The share of drawn line length on mass edges, by the same classifier that cuts them, fell from 40% to 7%. The shipped recipe cuts what the line-or-mass test calls a mass edge and not the faint marks; the deeper cuts removed pen line the judge needs. Limits: four images, one seed, a lenient judge (a second judge, agy with claude-sonnet-4-6, gave the round-1 recipe 7 of 12 where codex gave 11; its quota ran out before the rest), and the measure of mass edges is the cutting classifier's own. The J1 A/B and the full-size run are not run for rc.2. The J1 means below were measured on the rc.1 recipe's older line source:
 
-## 0.2.1-rc.1 - unreleased
+- Mean J1 at 720 px, fast mode, 2 seeds, 3 scorings each: the wash recipe 5.68, 0.2.1-rc.1 with `--inkrecipe v2` 5.28, 0.2.0 ink 5.12, and the default pencil 5.08.
+
+## 0.2.1-rc.1
 
 Painter V101-dev, sim 102, judges J1. Release candidate 1. Ink and colour changes are opt-in flags. Defaults match 0.2.0. On the published Opus 5.5 V5 plans, neither moved J1 beyond judge noise. Ink v2 scored +0.05 and colour v2 +0.06 against the same build.
 

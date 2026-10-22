@@ -101,7 +101,11 @@ test('the wash recipe draws on a fine sheet by width, by a hand that chains stro
   assert.ok(!inkRecipeArgs('wash', ['--width', '540', '--inkres', '2']).includes('--inkres'), 'a flag on the command line wins');
   assert.equal(INK_RECIPES.wash.drawinghand, '1');
   assert.equal(INK_RECIPES.wash.drawstroke, '0.1');
-  for (const k of ['inkdecide', 'inkgeom', 'inkfoliage', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
+  assert.equal(INK_RECIPES.wash.inkdecide, '1');
+  assert.equal(INK_RECIPES.wash.inklabeljudge, 'simple', 'no region image leaves the machine by default');
+  assert.equal(INK_RECIPES.wash.inkshadowmask, '0');
+  assert.equal(INK_RECIPES.wash.inkdropfaint, '0');
+  for (const k of ['inkgeom', 'inkfoliage', 'inksalience', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
 });
 
 test('lineart map lines are measured and never cut or marked soft, whatever --linesupport says', async () => {

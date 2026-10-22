@@ -3,14 +3,15 @@
 //   v2    holds the pen to the target's lines (support filter, smoothing, width floor, darkness cap, damp pen). It does
 //         not turn ink on.
 //   wash  pen-and-wash: ink on, the lines of the lineart models' fused map traced whole (line-model.mjs; copy-lines on
-//         the target's own ink only when the models cannot run) and drawn first with no pencil,
+//         the target's own ink only when the models cannot run), mass edges (shadow and wash steps) cut out by the
+//         line-or-mass test (ink-decide.mjs) and drawn first with no pencil,
 //         held to the target, with the width and darkness of the source's line along each stroke, the ink load
 //         matched to the source's line darkness on a scrap, the ink's hue taken from the source, and pale spread lines
 //         drawn on damp paper; the pens draw on a fine sheet (--inkres, 3 at 540 px wide, less as the painting is wider; washInkRes). For pen drawings and pen-and-wash sources; not for photographs.
 export const INK_RECIPES = Object.freeze({
   v2: Object.freeze({ linesupport: '5', linesmooth: '1', linesmoothcorner: '50', inkwidthfloor: '1', inkdarkcap: '1', inkdamp: '0.3' }),
   wash: Object.freeze({
-    outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', linemodel: '1', copylinesmin: '0.005', copylinesagree: '2', copylinesfloor: '0.6', copylinesfill: '1',
+    outlinemedium: 'ink', drawing: 'both', linesource: 'source-ink', linemodel: '1', inkdecide: '1', inkshadowmask: '0', inkdropfaint: '0', inklabeljudge: 'simple', copylinesmin: '0.005', copylinesagree: '2', copylinesfloor: '0.6', copylinesfill: '1',
     drawingstages: 'off', stages: 'prepink,finishink', prepinkfrom: 'lines', prepinkamount: '1', prepinkkeep: '1', prepinkadd: '0', prepinkdeviate: '0',
     openingpressure: '0.75', drawinghand: '1', drawstroke: '0.1',
     linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '0.3', inkwidthfloor: '1',

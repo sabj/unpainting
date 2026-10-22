@@ -45,7 +45,7 @@ On a staged run the pen layer is `layer-prepink.jpg` times `layer-finishink.jpg`
 Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and three configurations:
 
 - `pencil`: the default drawing.
-- `rc1v2`: `--outlinemedium ink --drawing both --inkrecipe v2`. Paint it from tag `v0.2.1-rc.1` for the release candidate as tagged.
+- `rc1v2`: `--outlinemedium ink --drawing both --inkrecipe v2`. Paint it from the commit of 0.2.1-rc.1 (there is no tag for it).
 - `wash`: `--inkrecipe wash`, from this branch.
 
 Run `npm run doctor` first. The wash recipe traces lines with `copy-lines.py`. That needs the line python (`PAINTER_LINES_PYTHON` or `.venv-lines`) with NumPy and OpenCV; without it, the run logs a `!!!` fallback line and traces less.
@@ -71,7 +71,7 @@ paint() { # paint <config> <flags...>
 }
 paint pencil
 paint wash --inkrecipe wash
-# in a checkout of v0.2.1-rc.1, with the same T and paint():
+# in a checkout of the 0.2.1-rc.1 commit, with the same T and paint():
 #   paint rc1v2 --outlinemedium ink --drawing both --inkrecipe v2
 ```
 
