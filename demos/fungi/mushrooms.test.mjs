@@ -1654,6 +1654,24 @@ test('settled rest repaint keeps the dragged preview geometry, placement and was
 });
 
 
+// Field-guide plates show a cap from a little below its rim, so the gills,
+// pores or teeth are in view. The default plate does; a turn must too, at
+// every yaw, rather than flipping to a view of the cap's top.
+test('capped types show their gills, pores or teeth at the default view and at every turn',async()=>{
+ const m=await import('./mushrooms.mjs');
+ const area=poly=>{let a=0;for(let i=0;i<poly.length;i++){const q=poly[i],r=poly[(i+1)%poly.length];a+=q[0]*r[1]-r[0]*q[1];}return Math.abs(a)/2;};
+ const washed=(study,role)=>study.washes.filter(w=>w.role===role).reduce((sum,w)=>sum+w.islands.reduce((t,p)=>t+area(p),0),0);
+ for(const [id,mark] of [['amanita-1','gills'],['bolete-1','pores'],['parasol-1','gills'],['agaric-1','gills'],['waxcap-1','gills'],['hedgehog-1','teeth'],['inkcap-1','gills'],['bonnet-1','gills']]){
+  const g=generateSpecimen('woodland-042',id);
+  assert.ok(buildStudy(g).ink.filter(k=>k.role.startsWith(mark)).length>20,`${id}: the default plate draws its ${mark}`);
+  const comp=m.orbitRestComposition(g,m.createSpecimenComposition(g));
+  for(const yaw of [.121,.13,.8,1.6,2.6,-2,-.9]){
+   const study=m.orbitRestStudy(g,comp,{view:{yaw,pitch:.36},shapeModifiers:{capDepth:1,stemBend:0}}),under=washed(study,'underside'),cap=washed(study,'cap');
+   assert.ok(under/(under+cap)>.2,`${id} at yaw ${yaw}: the underside is ${(under/(under+cap)).toFixed(2)} of the cap's area`);
+  }
+ }
+});
+
 test('the untouched default view keeps the catalog drawing path; any turn selects the 3D body',async()=>{
  const m=await import('./mushrooms.mjs');
  const state=parseState('?type=amanita-1&nextType=morel-2');
@@ -2034,10 +2052,10 @@ test('catalog drawings export each specimen view; the turned body starts from it
  const g=generateSpecimen('native-proof-20261019','amanita-1'),sketch=m.buildSketch(g),comp=m.orbitRestComposition(g);
  assert.equal(sketch.views.length,sketch.specimenCount);
  for(const [i,view] of sketch.views.entries()){
-  assert.ok(view.pitch>0&&view.pitch<.6,'a drawn cap rim is seen from above in the 3D convention');
+  assert.ok(view.pitch<0&&view.pitch>-.6,'the plate shows the gills, so its 3D camera is a little below the rim');
   assert.ok(view.rise>0&&view.stem>0&&view.girth>0);
   const member=comp.members[i];assert.equal(member.rotation,view.roll,'the body takes the drawn lean');
-  assert.ok(Math.abs(member.viewPitch-(view.pitch-(-.05)))<1e-9,'drawn pitch is an offset from the family plate pitch');
+  assert.ok(Math.abs(member.viewPitch-(view.pitch-m.defaultViewPitch('amanita-1')))<1e-9,'drawn pitch is an offset from the family plate pitch');
   assert.deepEqual(Object.keys(member.drawn).sort(),['girth','rise','stem','widen'],'drawn proportions, plus the width fitted to the drawn outline');
  }
  // The turned body has the drawn cap rise, within limits, and the mesh uses the member pitch.

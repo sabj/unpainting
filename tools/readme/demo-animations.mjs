@@ -70,16 +70,17 @@ async function fungiPaint(browser) {
   await finish('fungi-paint', files, { delays });
 }
 
-// 36 finished plates a tenth of a turn apart. The default angle (the plate at rest) is never one of them.
+// 36 finished plates a tenth of a turn apart, the camera rising and dipping once per turn so the bodies read as
+// solid: from below the rim (gills in view) to a little above it. The default angle is never one of them.
 async function fungiTurn(browser) {
   const dir = frameDir('fungi-turn'), steps = 36, yaws = Array.from({ length: steps }, (_, k) => {
     const yaw = 0.12 + (k + 0.5) * 2 * Math.PI / steps; return +(((yaw + Math.PI) % (2 * Math.PI)) - Math.PI).toFixed(4);
-  });
+  }), pitches = yaws.map((_, k) => +(0.36 + 0.12 * Math.sin((k + 0.5) * 2 * Math.PI / steps)).toFixed(4));
   const files = yaws.map((_, k) => framePath(dir, k)), queue = [...yaws.keys()];
   await Promise.all([0, 1, 2].map(async () => {
     const { page, errors, context } = await newPage(browser, { width: 1200, height: 900 });
     for (let k = queue.shift(); k !== undefined; k = queue.shift()) {
-      await page.goto(`${DEMOS_ORIGIN}/fungi/?${PLATE}&paint=fast&yaw=${yaws[k]}`);
+      await page.goto(`${DEMOS_ORIGIN}/fungi/?${PLATE}&paint=fast&yaw=${yaws[k]}&pitch=${pitches[k]}`);
       await plateDone(page); await sleep(300);
       saveDataUrl(files[k], await grabPlate(page));
     }

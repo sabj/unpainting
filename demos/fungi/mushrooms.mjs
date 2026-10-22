@@ -775,9 +775,11 @@ export function capSurface3D(genome,{w,h,cx=0,cy=0,tilt=0,rimDepth,young=false})
 /** Pure numerical geometry; points describe closed vector outlines in plate units. */
 // Drawn proportions over the cap radius: cap rise, stipe length and mean
 // stipe half-width, exported with each specimen's view.
-// capSurface3D draws screen y = cy - y*sin(e) - z*cos(e); the 3D chart draws
-// -z*cos(p) + y*sin(p). The same picture therefore has p = -e.
-const drawnPitch=g=>-g.capSurface.elevation;
+// capSurface3D draws screen y = cy - y*sin(e) - z*cos(e) with -y nearest; the
+// 3D chart draws -z*cos(p) + y*sin(p) with +y nearest. p = -e lands every point
+// in the same place but shows the far side: the cap's top where the plate shows
+// its gills. The same view, from the same side, is p = e.
+const drawnPitch=g=>g.capSurface.elevation;
 const drawnProportions=g=>({rise:g.h/g.w,stem:g.length/g.w,girth:[.15,.3,.45,.6,.75,.85].reduce((sum,t)=>sum+g.halfAt(t),0)/6/g.w});
 export function buildGeometry(genome, young = false) {
   const v = genome.values, f = FAMILIES[genome.family], family = genome.family;
@@ -4825,12 +4827,14 @@ function caBodyPlan(p,genome,v,variant,m){
 // interpolate them; the strings that choose them come from the type recipe.
 const CA_CAPPED=new Set(['amanita','agaric','bonnet','waxcap','inkcap','parasol','milkcap','bolete','hedgehog']);
 const CA_VIEW_PITCH=Object.freeze({morel:.1,club:.12,stinkhorn:.1,saddle:.12,coral:.16,puffball:.14,tooth:.16,earthstar:.42,cup:.5,nest:.55,bracket:.32,oyster:-.14,jelly:.36,trumpet:.12,chanterelle:.08});
-// Stipitate caps are drawn near eye level, as on a botanical plate, so the
-// gills or pores under the cap are in view; open forms are seen from above.
-export function defaultViewPitch(typeId){return CA_VIEW_PITCH[TYPES_BY_ID.get(typeId)?.grammar]??-.05;}
+// Stipitate caps are seen from a little below the rim, as on a botanical
+// plate, so the gills, pores or teeth under the cap are in view; brackets,
+// tooth tufts and open forms are seen from above, as the default plate shows them.
+const CA_UNDER_CAP_PITCH=-.3;
+export function defaultViewPitch(typeId){return CA_VIEW_PITCH[TYPES_BY_ID.get(typeId)?.grammar]??CA_UNDER_CAP_PITCH;}
 // The camera's default (.36) maps to the family's plate angle; the drag range
 // (-.12..85) still reaches from below the cap to nearly straight down.
-const caBodyPitch=(pitch,genome)=>{const home=CA_VIEW_PITCH[genome?.phenotype?.grammar]??-.05;return caClamp(pitch>=.36?home+(pitch-.36)*(1.2-home)/.49:home+(pitch-.36)*(home+.6)/.48,-.6,1.2);};
+const caBodyPitch=(pitch,genome)=>{const home=CA_VIEW_PITCH[genome?.phenotype?.grammar]??CA_UNDER_CAP_PITCH;return caClamp(pitch>=.36?home+(pitch-.36)*(1.2-home)/.49:home+(pitch-.36)*(home+.6)/.48,-.6,1.2);};
 const CA_ANATOMY_DEFAULTS=Object.freeze({inroll:0,cone:0,tubes:0,overhang:0,gillFree:0,stemClub:0,stemRoot:0,apexFlare:0,bulbRings:0,skirtDrop:0,skirtWidth:0,
   snake:0,inkMargin:0,pear:0,rimGap:12,bulbAt:0,bulbWidth:0,radialPow:1,waist:0,head:0,headMargin:0,hatch:1,wartReserve:0,pitRows:0,pitDepth:0,leanY:0,attach:0,spines:0,stemPores:0,zoneRidges:0,umbo:0,lamellulae:1,coralLevels:0,logRadius:0,pleats:0});
 function caCapProfile(p,ph,open){
