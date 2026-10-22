@@ -8,6 +8,9 @@ import { loadSegments, registerSegments } from '../../crop/segments.mjs';
 import { labelRegions, shadowMassMask, INK_RULES, LABELS } from './ink-labels.mjs';
 import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
 import { geometrise, GEOM_DEFAULTS } from './line-geometry.mjs';
+import { foliageMask } from './line-foliage.mjs';
+import { labPlanes } from './line-evidence.mjs';
+import sharp from 'sharp';
 
 const toPoints = g => g.points.map(([x, y], k) => ({ x, y, ...(Array.isArray(g.widths) && g.widths.length === g.points.length ? { width: g.widths[k] } : {}), ...(Array.isArray(g.weights) && g.weights.length === g.points.length ? { weight: g.weights[k] } : {}) }));
 const r2 = v => Math.round(v * 100) / 100;
@@ -20,15 +23,21 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, foliage = false }) {
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   registerSegments(base, segments.stem);
   const seg = await loadSegments(base, w, h), segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
   const regions = segDoc.regions.map(r => ({ ...r, id: Number(r.id) }));
   const lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}) });
   const shadow = shadowMassMask(L, w, h, pxMm);
+  // --inkfoliage 1: green, busy cells are leaves, wash only (line-foliage.mjs), whatever the regions' labels say
+  let foliageCells = null;
+  if (foliage) {
+    const rgb = await sharp(image).flatten({ background: '#fff' }).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer(), lab = labPlanes(rgb, w, h);
+    foliageCells = foliageMask(L, lab.A, lab.B, w, h, pxMm);
+  }
   const cellLabel = (x, y) => lab.labels[seg.labels[y * w + x]] ?? 'architecture';
-  const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, cellLabel, shadow }, o);
+  const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, cellLabel, shadow, foliage: foliageCells }, o);
   let kept = r.lines, geometry = null;
   // --inkgeom 1: straight runs and arcs where the source shows them; squiggles that are not forms or features are left to the wash
   if (geom) {
@@ -42,6 +51,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     stage, judge: lab.judge, cached: lab.cached, ...(lab.note ? { note: lab.note } : {}),
     regions: regions.map(rg => ({ id: rg.id, label: lab.labels[rg.id], from: lab.source[rg.id], ink: INK_RULES[lab.labels[rg.id]].ink, area: rg.area })),
     shadowShare: shadowCells / shadow.length,
+    ...(foliageCells ? { foliageShare: foliageCells.reduce((s, v) => s + v, 0) / foliageCells.length } : {}),
     stats: r.stats,
     ...(geometry ? { geometry } : {}),
   };

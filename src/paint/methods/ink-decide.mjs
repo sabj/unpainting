@@ -24,7 +24,10 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
   const { L, w, h, pxMm } = ctx, reach = Math.max(1, o.reachMm / pxMm);
   const labelAt = (x, y) => {
     const xi = Math.max(0, Math.min(w - 1, x)), yi = Math.max(0, Math.min(h - 1, y));
-    return ctx.shadow && ctx.shadow[yi * w + xi] ? 'shadow_mass' : ctx.cellLabel(xi, yi);
+    const base = ctx.cellLabel(xi, yi), i = yi * w + xi;
+    // leaves found by colour and texture are wash even where a region's label missed them; a trunk's own region stays a trunk
+    if (ctx.foliage && ctx.foliage[i] && base !== 'tree_trunk') return 'foliage';
+    return ctx.shadow && ctx.shadow[i] ? 'shadow_mass' : base;
   };
   const drop = { mass: 0, faint: 0, label: {}, short: 0 }, byLabel = {}, out = [];
   let lengthPx = 0, keptPx = 0, massLen = 0, keptMass = 0;

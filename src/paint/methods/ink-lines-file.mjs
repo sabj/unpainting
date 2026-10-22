@@ -21,7 +21,7 @@ export function inkLineFlags(num) {
   const f = { support: num('linesupport', 0), smoothMm: num('linesmooth', 0), cornerDeg: num('linesmoothcorner', 50),
     darkCap: num('inkdarkcap', 0), widthFloor: num('inkwidthfloor', 0), lineMeasure: num('linemeasure', 0), darkMatch: num('inkdarkmatch', 0),
     gapMm: num('linegapmm', 0), minMm: num('lineminmm', 0), inkOnly: num('lineinkonly', 0),
-    decide: num('inkdecide', 0), geom: num('inkgeom', 0), widthMinMm: num('linewidthmin', 0.06), widthMaxMm: num('linewidthmax', 0.35), detailMm: num('linedetailmm', 0.15), probeMm: num('lineprobemm', 0.2) };
+    decide: num('inkdecide', 0), geom: num('inkgeom', 0), foliage: num('inkfoliage', 0), widthMinMm: num('linewidthmin', 0.06), widthMaxMm: num('linewidthmax', 0.35), detailMm: num('linedetailmm', 0.15), probeMm: num('lineprobemm', 0.2) };
   for (const [k, v] of Object.entries(f)) if (!Number.isFinite(v) || v < 0) throw new Error(`ink lines: ${k} must be a number of 0 or more, not ${v}`);
   if (f.cornerDeg > 180) throw new Error('--linesmoothcorner: degrees from 0 to 180');
   return { ...f, measure: f.decide > 0 || f.support > 0 || f.smoothMm > 0 || f.darkCap > 0 || f.widthFloor > 0 || f.lineMeasure > 0 || f.darkMatch > 0 };
@@ -76,7 +76,7 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   // the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made from decided lines is not decided again.
   let decided = doc.inkDecided === true;
   if (decide && doc0.inputKind === 'line-map' && !decided) {
-    const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, log });
+    const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, foliage: flags.foliage > 0, log });
     doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
   }
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this

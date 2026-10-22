@@ -143,7 +143,7 @@ export function shadowMassMask(L, w, h, pxMm, { sigmaMm = 0.8, drop = 20, minAre
   return out;
 }
 
-function boxBlur(P, w, h, r) {
+export function boxBlur(P, w, h, r) {
   const tmp = new Float32Array(w * h), out = new Float32Array(w * h);
   for (let y = 0; y < h; y++) { let s = 0, c = 0; for (let x = -r; x < w; x++) { const a = x + r, b = x - r - 1; if (a < w) { s += P[y * w + a]; c++; } if (b >= 0) { s -= P[y * w + b]; c--; } if (x >= 0) tmp[y * w + x] = s / c; } }
   for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let y = -r; y < h; y++) { const a = y + r, b = y - r - 1; if (a < h) { s += tmp[a * w + x]; c++; } if (b >= 0) { s -= tmp[b * w + x]; c--; } if (y >= 0) out[y * w + x] = s / c; } }
