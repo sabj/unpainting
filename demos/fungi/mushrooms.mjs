@@ -5416,7 +5416,7 @@ function caMemberChart(p,slot,view={yaw:.12,pitch:.36},{chartOnly=false,inkOnly=
   const project=p3=>{
     const x0=p3[0]*cy-p3[1]*sy,depthAxis=p3[0]*sy+p3[1]*cy,y0=-p3[2]*cp+depthAxis*sp,depth=-depthAxis*cp-p3[2]*sp,k=p.body3d?CA_FOCAL/(CA_FOCAL+depth):1,x=x0*k,y=y0*k;
     const lx=x*ca-y*sa,ly=x*sa+y*ca;
-    return [slot.x+slot.scale*(lx*stretch-ly*shear),slot.y+slot.scale*ly,depth*slot.scale+(slot.depth??0)];
+    return [slot.x+slot.scale*(lx*stretch-ly*shear)*(slot.fitX??1),slot.y+slot.scale*ly*(slot.fitY??1),depth*slot.scale+(slot.depth??0)];
   };
   if(chartOnly)return {chart:{lower,upper,stem,project}};
   const worldKey=inkOnly&&interactive&&!meshOnly?`${N}:${R}:${H}:${slot.id}:${JSON.stringify(slot.barkClip??null)}:${JSON.stringify(p)}`:null,cachedWorld=worldKey?caWorldCache.get(worldKey):null;
@@ -5954,7 +5954,13 @@ export function orbitRestComposition(genome,composition=null,{habit=false}={}){
     const plainExt=caDefaultExtent(p,view,genome),plainScale=caClamp(Math.min(box.h/plainExt.h,box.w/plainExt.w),.2,3);
     const plain={...shaped,x:foot[0]-plainScale*plainExt.cx,y:foot[1]-plainScale*plainExt.bottom,scale:plainScale,...view};
     const placed=(e,m)=>e.outline.map(poly=>poly.map(v=>[m.x+m.scale*v[0],m.y+m.scale*v[1]]));
-    return caOutlineAgreement(placed(plainExt,plain),drawnOutline)>caOutlineAgreement(placed(ext,fitted),drawnOutline)+.02?plain:fitted;
+    const [chosen,chosenExt]=caOutlineAgreement(placed(plainExt,plain),drawnOutline)>caOutlineAgreement(placed(ext,fitted),drawnOutline)+.02?[plain,plainExt]:[fitted,ext];
+    // Register exactly: at the default camera the body's projected box is the
+    // drawn figure's box, so the first frame of a drag (and the plate painted
+    // after it) keeps the figure's size and place. The factors act about the
+    // foot in screen space and hold at every yaw.
+    const fitX=caClamp(box.w/(chosen.scale*chosenExt.w),.4,2.5),fitY=caClamp(box.h/(chosen.scale*chosenExt.h),.4,2.5);
+    return {...chosen,x:foot[0]-chosen.scale*fitX*chosenExt.cx,y:foot[1]-chosen.scale*fitY*chosenExt.bottom,fitX,fitY};
   });
   return {...base,id:`${base.id}-catalog-fit`,members,catalogFit:true,...(ownFrame?{ownFrame:true}:{})};
 }

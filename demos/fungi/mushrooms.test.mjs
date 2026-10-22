@@ -1685,6 +1685,30 @@ test('capped types show their gills, pores or teeth at the default view and at e
  }
 });
 
+// Starting a turn must not rescale the plate: each figure keeps its size and
+// place from the rest plate to the first frame of the drag and to the plate
+// painted after it.
+test('a turn keeps every figure the size and place it has on the rest plate',async()=>{
+ const m=await import('./mushrooms.mjs');
+ const skip=/shadow|ground|habitat|background|glaze|accent|spore|deposit|cast|contact|wood|log|litter|moss/;
+ const boxes=marks=>{const g=new Map();for(const w of marks??[]){if(!Number.isInteger(w.individual)||skip.test(w.role??'')||!w.shape)continue;const b=g.get(w.individual)??[1e9,1e9,-1e9,-1e9];for(const [x,y] of w.shape){b[0]=Math.min(b[0],x);b[1]=Math.min(b[1],y);b[2]=Math.max(b[2],x);b[3]=Math.max(b[3],y);}g.set(w.individual,b);}return g;};
+ for(const q of ['?type=amanita-1&seed=woodland-042','?type=bolete-1&members=3&seed=205022449','?type=parasol-1&seed=872250143','?type=agaric-4&members=3&seed=173140941','?type=morel-1&seed=1352778786','?type=stinkhorn-1&seed=1','?type=waxcap-1&seed=woodland-042']){
+  const st=parseState(q),a=generateSpecimen(st.seed,st.typeId,st.donorId),b=generateSpecimen(st.next,st.nextTypeId,st.nextDonorId);
+  const pair=m.createMorphPair(a,b,{composition:m.createSpecimenComposition({...a,seed:st.compositionSeed},{count:st.compositionCount||m.seedSpecimenCount(a,m.buildSketch(a).specimenCount)}),...m.orbitViewOptions(st)});
+  if(pair.implicitMorph&&!pair.composition.implicitAnchors)pair.composition=m.implicitAnchoredComposition(pair.a,pair.composition,{view:pair.view,shapeModifiers:pair.shapeModifiers}).composition;
+  const rest=boxes(m.buildMorphStudy(pair,0).washes),composition=m.orbitRestComposition(a,pair.composition),view={yaw:.125,pitch:.36},frame=m.pageFrameAt(m.pagePairFrame(pair,'plain'),0);
+  const drag=boxes(m.buildMorphSketch(m.createOrbitRestPair(a,composition,{view},{frame}),0,{interactive:true}).bodies);
+  const released=boxes(m.orbitRestStudy(a,composition,{view,shapeModifiers:{capDepth:1,stemBend:0}}).washes);
+  assert.ok(rest.size>0,q);
+  for(const [i,r] of rest)for(const [label,other] of [['first drag frame',drag],['released plate',released]]){
+   const t=other.get(i);assert.ok(t,`${q} member ${i} on the ${label}`);
+   const sx=(t[2]-t[0])/(r[2]-r[0]),sy=(t[3]-t[1])/(r[3]-r[1]),dx=(t[0]+t[2]-r[0]-r[2])/2,dy=t[3]-r[3];
+   assert.ok(Math.abs(sx-1)<.04&&Math.abs(sy-1)<.04,`${q} member ${i}: the ${label} scales it ${sx.toFixed(3)} x ${sy.toFixed(3)}`);
+   assert.ok(Math.abs(dx)<12&&Math.abs(dy)<12,`${q} member ${i}: the ${label} moves it ${dx.toFixed(1)}, ${dy.toFixed(1)}`);
+  }
+ }
+});
+
 test('the untouched default view keeps the catalog drawing path; any turn selects the 3D body',async()=>{
  const m=await import('./mushrooms.mjs');
  const state=parseState('?type=amanita-1&nextType=morel-2');
