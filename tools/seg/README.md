@@ -77,6 +77,8 @@ python3 -m venv .venv-lines
 .venv-lines/bin/pip install numpy opencv-python-headless scikit-image torch torchvision controlnet_aux pillow
 ```
 
+`PAINTER_LINES_MODELS=1 tools/cloud/setup-lines.sh` does the same.
+
 CPU torch is enough. The weights download once into `work/line-models/hf`. `--linemodeloffline 1` requires them to be there already. `--linemodelcache` moves the fused maps. The fused maps are kept in `work/line-maps/<target SHA-256>-<width>x<side>-<script hash>/`, so a source is mapped once. All of `work/` is untracked.
 
 The trace keeps small features. Components of two cells or more stay. The fine model's own marks above 0.28 join the mask inside busy detail regions, where the fused map is damped. Tight curves are traced with a three-pixel tangent window. Only a short stub (two cells or less) off a fork is pruned, so a short mark of its own stays. Polylines are simplified at 0.15 cells. Each line carries `tier` 1 when it is 57 cells or longer at 1080 px wide, else 2.

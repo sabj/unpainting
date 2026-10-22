@@ -20,4 +20,9 @@ fi
 # numpy 2.2 needs Python 3.10 or later; the macOS system python3 is 3.9, which takes numpy 2.0.2.
 numpy=$("$prefix/bin/python" -c 'import sys; print("2.2.6" if sys.version_info >= (3, 10) else "2.0.2")')
 "$prefix/bin/python" -m pip install --disable-pip-version-check "numpy==$numpy" 'opencv-python-headless==4.11.0.86' 'scikit-image==0.24.0'
+# --inkrecipe wash takes its lines from the lineart models (tools/seg/sketch-map.py): PAINTER_LINES_MODELS=1 adds torch (CPU),
+# torchvision, controlnet_aux and pillow. Without them the recipe falls back to copy-lines on the source's own ink and says so.
+if [ "${PAINTER_LINES_MODELS:-0}" = "1" ]; then
+  "$prefix/bin/python" -m pip install --disable-pip-version-check torch torchvision controlnet_aux pillow
+fi
 "$prefix/bin/python" -c 'import numpy, cv2, skimage; print("line tools:", numpy.__version__, cv2.__version__, skimage.__version__)'
