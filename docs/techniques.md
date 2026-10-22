@@ -17,7 +17,7 @@ Subject ids name benchmark images. `Y1` is `examples/targets/trumbull.jpg` with 
 Default recipe flags, with the value that turns each off:
 
 - `--palettewide 1`: 3 to 6 palette paints chosen per area of the picture. Off: `0`.
-- `--physical 1`: brush sizes, water and loads from real brushes (`data/brushes.json`). Off: `0`.
+- `--physical 1`: brush sizes, water and loads from real brushes (`src/paint/brushes.json`). Off: `0`.
 - `--paperbase source`: paper colour from the target's lightest tenth; `--paperrgb` overrides it. Off: `auto`.
 - `--loadedcontact 1`: a loaded brush touches the paper's pits too. Off: `0`.
 - `--order painter`: the light-to-dark value planner. Off: `ladder`.

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Judge a painting against the real ink-and-wash work in data/refs/real/. Measures line quality, instrument fit,
+// Judge a painting against the real ink-and-wash scans in $JUDGE_REFS (default work/refs/real/, not in the repository). Measures line quality, instrument fit,
 // wash quality, value structure, paper and overall human-ness, each from numbers rather than from a look.
 //
 //   node tools/judge/judge.mjs sheet work/pc-face11.jpg            one of this project's comparison sheets
 //   node tools/judge/judge.mjs pair target.png painting.png        two images of the same crop
-//   node tools/judge/judge.mjs solo data/refs/real/met-339000-...jpg    one picture on its own (no instrument fit)
+//   node tools/judge/judge.mjs solo work/refs/real/met-339000-...jpg    one picture on its own (no instrument fit)
 //   node tools/judge/judge.mjs calibrate [--res 384] [glob...]     what the real sheets measure, band by band
 //   node tools/judge/judge.mjs rank work/pc-*.jpg                  every sheet scored, worst first
 //   node tools/judge/judge.mjs discriminate                        whether the measures tell the groups apart
@@ -24,6 +24,7 @@ import { summarise, separation, verdictLine } from '../../src/eval/discriminate.
 import { judge } from '../../src/eval/score.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ROOT = path.join(HERE, '..', '..');
+const REFS = path.resolve(ROOT, process.env.JUDGE_REFS || 'work/refs/real');
 const argv = process.argv.slice(2);
 const flag = n => argv.includes('--' + n);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
@@ -134,7 +135,7 @@ if (cmd === 'solo') {
   }
 } else if (cmd === 'calibrate') {
   // What the real work measures. Every band in score.mjs should contain most of this.
-  const roots = files.length ? files : [path.join(ROOT, 'data/refs/real')];
+  const roots = files.length ? files : [REFS];
   const rows = [];
   for (const f of listFiles(roots)) {
     const img = await loadDensity(f, { maxDim: RES, trim: true });
@@ -157,7 +158,7 @@ if (cmd === 'solo') {
   const negDir = path.join(ROOT, 'work/negatives');
   fs.mkdirSync(negDir, { recursive: true });
   const negs = await writeNegatives(negDir);
-  const realDirs = ['data/refs/real'].map(d => path.join(ROOT, d));
+  const realDirs = [REFS];
 
   // 1. Craft: real sheets against the synthetic faults.
   const realCraft = [], realRows = [];
@@ -175,7 +176,7 @@ if (cmd === 'solo') {
   }
 
   // 2. Fidelity control with a known answer: a real sheet against itself, and against a different one.
-  const sample = listFiles([path.join(ROOT, 'data/refs/real')]).slice(0, 10);
+  const sample = listFiles([REFS]).slice(0, 10);
   const selfFid = [], crossFid = [];
   for (let i = 0; i < sample.length; i++) {
     const self = await judgePair(sample[i], sample[i]);

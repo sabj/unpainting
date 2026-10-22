@@ -20,7 +20,7 @@ export function codeState(root) {
   let commit;
   try { commit = git('rev-parse', 'HEAD').toString().trim(); } catch { return { commit: null, git: false, dirty: null, tracked: [], untracked: [], diffSha256: null }; }
   const tracked = lines(git('status', '--porcelain', '--untracked-files=no')).map(l => l.slice(3));
-  const untracked = lines(git('ls-files', '--others', '--exclude-standard', '--', 'src', 'tools', 'data')).filter(f => SOURCE_FILE.test(f))
+  const untracked = lines(git('ls-files', '--others', '--exclude-standard', '--', 'src', 'tools')).filter(f => SOURCE_FILE.test(f))
     .map(file => ({ file, sha256: sha256(fs.readFileSync(path.join(root, file))) }));
   return { commit, git: true, dirty: tracked.length + untracked.length > 0, tracked, untracked, diffSha256: tracked.length ? sha256(git('diff', 'HEAD', '--binary')) : null };
 }

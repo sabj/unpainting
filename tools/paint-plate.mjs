@@ -1418,7 +1418,7 @@ phaseMark('plan');
 const SC = num('scale', 1), W2 = w * SC, H2 = h * SC, N2 = W2 * H2;
 // --brushfloor 1: a graded wash runs as one stroke, recharged every --floorchunk px at 1086 wide (default 24). On with --physical.
 // Without it the wash is lifted and recharged every --gradedchunk cells (default 6).
-// --physical 1 (data/brushes.json, src/paint/methods/brushes.mjs): brushes from a physical sheet and real brushes
+// --physical 1 (src/paint/brushes.json, src/paint/methods/brushes.mjs): brushes from a physical sheet and real brushes
 const PB = loadPhysical({ root, opt, num, W2, H2 });
 if (PB) console.log(`physical: picture ${PB.mm.toFixed(0)} mm wide, ${PB.mmPerCell.toFixed(3)} mm a cell; ${PB.summary()}`);
 const GFLOOR = num('brushfloor', 0) > 0 || !!PB;
