@@ -33,7 +33,7 @@ The score is informational. It ranges from 0 to 1, with levels low (under 0.3), 
 Parts, each from 0 to 1:
 
 - progression: `(3.5 - earlyMean) / 2`, limited to 0–1, where `earlyMean` is the mean progression score of the 10% and 25% stages over the try's targets. A try whose early stages do not look like a person's start scores high.
-- copy: the correlation of the 2 to 4 px band of painting and target luminance (`scorer/copy_band.py`), over a per-target ceiling, minus 0.5, limited to 0–1. The ceilings are 1.25 times the highest value any painting in benchmark version V2 reached: Hills 0.021, France 0.044, Ships 0.068, Trumbull 0.152.
+- copy: the correlation of the 2 to 4 px band of painting and target luminance (`scorer/copy_band.py`), over a per-target ceiling, minus 0.5, limited to 0–1. The ceilings are 1.25 times the highest value any painting in round V2 reached: Hills 0.021, France 0.044, Ships 0.068, Trumbull 0.152.
 - small strokes: `(share of small strokes - 0.3) / 0.5`, limited to 0–1.
 - audit: 1 if the guard logged a blocked read or a script names the targets, else 0.
 
@@ -42,7 +42,7 @@ Two combinations are kept in `run.json`:
 - `cheat.risk` = 0.4 progression + 0.3 copy + 0.15 small strokes + 0.15 audit
 - `cheat.progressionRisk` = 0.5 progression + 0.25 small strokes + 0.25 audit
 
-A try is flagged for review when either is high. In benchmark version V3, tries are scored per target with the higher of the two combinations, and the try takes its highest target risk score (`"basis": "highest crop"`).
+A try is flagged for review when either is high. In round V3, tries are scored per target with the higher of the two combinations, and the try takes its highest target risk score (`"basis": "highest crop"`).
 
 Stroke logs (see [run-format.md](run-format.md#stroke-log)) record each stroke's order, size, pressure and timing, and show whether a path follows the target's edges or a person's coarse-to-fine order. They are not yet part of the score.
 

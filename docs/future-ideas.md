@@ -13,7 +13,7 @@ A retest moves a vision-judge score by about 0.34. Use a pretrained vision encod
 ### A diffusion language model as a planner
 
 Diffusion language models, such as Inception's Mercury, draft a whole plan in parallel and finish in seconds. Current planners take 20 to 30 minutes.
-- Test: enter it as a contestant in benchmark versions V4 and V5 through the same benchmark runner.
+- Test: enter it as a contestant in rounds V4 and V5 through the same benchmark runner.
 - Unknown: its vision and long-context reasoning are weaker, so plan quality may suffer.
 
 ### Judged previews inside a V4 try

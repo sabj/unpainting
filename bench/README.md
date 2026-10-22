@@ -4,7 +4,7 @@ AI models paint five small targets, each a section of a larger image, with the s
 
 ## Rounds
 
-A round is a benchmark version with a different set of tools or feedback. A try is one model session that paints the requested targets.
+The benchmark has five rounds, V1 to V5, each with different tools or feedback. A try is one model session that paints the requested targets.
 
 <!-- rounds-table:start -->
 | Round | What the model gets | Learns between tries | Winning painting (J1) |

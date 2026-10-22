@@ -1,6 +1,6 @@
 # Technique guides for V2 and V3
 
-These guides explain painting techniques for benchmark versions V2 and V3.
+These guides explain painting techniques for rounds V2 and V3.
 
 The runner copies these guides to `.agents/skills/` in each V2 worktree. `.claude/skills` links to `../.agents/skills` so both agents' command-line tools find the same files. These benchmark copies are kept separate from the current repo skills in [.agents/skills/](../../../../.agents/skills/).
 

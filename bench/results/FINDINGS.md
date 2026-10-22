@@ -1,6 +1,6 @@
 # Findings
 
-Generated from the run records by `scripts/build-findings.mjs`. Scores are automated scores out of 10. A round is a benchmark version (V1 to V5). A try is one model session that paints the requested targets. [Scoring](../docs/scoring.md) says how far to trust them; [statistics](../docs/statistics.md) explains the intervals.
+Generated from the run records by `scripts/build-findings.mjs`. Scores are automated scores out of 10. The rounds are V1 to V5. A try is one model session that paints the requested targets. [Scoring](../docs/scoring.md) says how far to trust them; [statistics](../docs/statistics.md) explains the intervals.
 
 ## Technique guides made no clear difference on average (V1 and V2)
 

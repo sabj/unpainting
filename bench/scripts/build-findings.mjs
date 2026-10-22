@@ -20,7 +20,7 @@ const excludes0 = c => c && (c[0] > 0 || c[1] < 0);
 
 const L = [];
 L.push('# Findings', '');
-L.push('Generated from the run records by `scripts/build-findings.mjs`. Scores are automated scores out of 10. A round is a benchmark version (V1 to V5). A try is one model session that paints the requested targets. [Scoring](../docs/scoring.md) says how far to trust them; [statistics](../docs/statistics.md) explains the intervals.', '');
+L.push('Generated from the run records by `scripts/build-findings.mjs`. Scores are automated scores out of 10. The rounds are V1 to V5. A try is one model session that paints the requested targets. [Scoring](../docs/scoring.md) says how far to trust them; [statistics](../docs/statistics.md) explains the intervals.', '');
 
 
 const v = d.v1v2;

@@ -6,7 +6,7 @@ Command-line tools. Run each from the repository root with `node tools/<path>`. 
 |---|---|---|
 | `tools/` | the painter and the stroke-plan runner | `paint-plate.mjs --image FILE --out DIR`, `run-plan.mjs PLAN.json` |
 | `painter/` | the modules `paint-plate.mjs` imports: area plans, brush paths supplied by a plan, calibration, production checks | `semantic-areas.mjs` (`paint-plate.mjs --areahelp` prints its contract) |
-| `aware/` | stops at passage boundaries (`--pausedir`) and the take-over of a saved painting by a fresh process (`--resumestate`), used by benchmark versions V4 and V5 | `pause.mjs` (the pause folder's files), `aware.test.mjs` |
+| `aware/` | stops at passage boundaries (`--pausedir`) and the take-over of a saved painting by a fresh process (`--resumestate`), used by rounds V4 and V5 | `pause.mjs` (the pause folder's files), `aware.test.mjs` |
 | `guard/` | the target guard (a check that blocks target-pixel reads), the cheat-risk score, the deliberate-cheat test and the source lint | `cheat-test.mjs`, `promote-check.mjs RUNDIR` |
 | `judge/` | classic measures against a target, stage checks, the wash scorer, and blind evaluations of saved stages with model judges in `rounds/` | `judge-plate.mjs`, `stage-check.mjs`, `wash-score.mjs --dir DUMP` |
 | `lab/` | builds Paint Lab's recorded examples in `demos/lab/examples/`, copies `src/media/` into the lab, builds the site, and records the lab's demo animation | `build-live-examples.mjs`; `sync-site-media.mjs`; `build-site.mjs`; `record-demo.mjs` |
