@@ -8,17 +8,17 @@ import { resample } from './ink-lines.mjs';
 import { crossProfile, MASS_DEFAULTS } from './line-class.mjs';
 
 export const GEOM_DEFAULTS = Object.freeze({
-  tolMm: 0.1,           // a primitive stays this close to the trace
+  tolMm: 0.15,          // a primitive stays this close to the trace
   supportShare: 0.7,    // and at least this share of it lies on a pen line of the source
   penContrast: MASS_DEFAULTS.penContrast,
   arcMinRadiusMm: 1,
   arcMaxSweepDeg: 270,
-  maxPiecesPerMm: 0.5,  // more primitives than this and the piece is a squiggle, not geometry
+  maxPiecesPerMm: 1.2,  // more primitives than this and the piece is a squiggle, not geometry
   formMm: 6,            // a form contour is at least this long ...
   formDegPerMm: 20,     // ... and turns no faster than this
-  gapMm: 0.8,           // collinear pieces join across at most this
-  joinCos: 0.97,
-  joinAim: 0.95,
+  gapMm: 2.5,           // collinear pieces join across at most this
+  joinCos: 0.98,
+  joinAim: 0.97,
   energyStepMm: 0.5,    // the spacing curvature energy is read at, coarse enough to ignore the pixel staircase
 });
 
@@ -84,7 +84,9 @@ const share = (prim, L, w, h, pxMm, o) => {
   const R = resample(prim, 1); let on = 0;
   for (let k = 0; k < R.length; k++) {
     const a = R[Math.max(0, k - 2)], b = R[Math.min(R.length - 1, k + 2)], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    if (crossProfile(L, w, h, R[k], -(b.y - a.y) / tl, (b.x - a.x) / tl, pxMm).contrast >= o.penContrast) on++;
+    // read within a pixel either side of the primitive: it sits within the tolerance of the trace, not on its pixel
+    const nx = -(b.y - a.y) / tl, ny = (b.x - a.x) / tl;
+    if ([-0.8, 0, 0.8].some(d => crossProfile(L, w, h, { x: R[k].x + d * nx, y: R[k].y + d * ny }, nx, ny, pxMm).contrast >= o.penContrast)) on++;
   }
   return on / R.length;
 };
@@ -97,7 +99,7 @@ const share = (prim, L, w, h, pxMm, o) => {
 export function geometrise(lines, ctx, o = GEOM_DEFAULTS) {
   const { L, w, h, pxMm } = ctx, tolPx = Math.max(0.5, o.tolMm / pxMm), out = [];
   const energy = ls => (ls.length ? ls.reduce((s, g) => s + curvatureEnergy(g.points, pxMm, o), 0) / ls.length : 0);
-  const stats = { fragmentsBefore: lines.length, energyBefore: energy(lines), geometry: 0, kept: 0, droppedSquiggle: 0 };
+  const stats = { fragmentsBefore: lines.length, energyBefore: energy(lines), geometry: 0, kept: 0, droppedSquiggle: 0, offSource: 0, tooManyPieces: 0 };
   for (const g of lines) {
     const R = resample(g.points, 1); if (R.length < 2) continue;
     const mm = len(R) * pxMm, feature = ctx.isFeature?.(R[R.length >> 1].x, R[R.length >> 1].y);
@@ -112,7 +114,7 @@ export function geometrise(lines, ctx, o = GEOM_DEFAULTS) {
     const limit = (o.formDegPerMm * Math.PI / 180) ** 2;
     const smooth = mm >= o.formMm && curvatureEnergy(R, pxMm, o) <= limit && curvatureEnergy(R, pxMm, o, o.energyStepMm / 2) <= 4 * limit;
     if (smooth || feature) { out.push({ ...g, points: R }); stats.kept++; continue; }
-    stats.droppedSquiggle++;
+    stats.droppedSquiggle++; if (!supported) stats.offSource++; else stats.tooManyPieces++;
   }
   const joined = joinCollinear(out, ctx, o);
   stats.fragmentsAfter = joined.length; stats.energyAfter = energy(joined);
