@@ -2768,3 +2768,14 @@ test('Hericium erinaceus is one rounded mass whose lower body is spines',async()
  assert.ok(sxy/Math.sqrt(sxx*syy)>.15,'spine length grows down the body');
  assert.equal(study.ink.filter(k=>k.role==='cap-contour').length,0,'a spine mass has no hard outline');
 });
+
+test('the hedgehog stem runs up into its cap instead of stopping short in a flat cut',async()=>{
+ const {buildGeometry}=await import('./mushrooms.mjs');
+ for(const seed of ['1354655151','812471376','woodland-042','a','b']){
+  const g=buildGeometry(generateSpecimen(seed,'hedgehog-1')),top=Math.min(...g.stem.map(p=>p[1]));
+  const i=Math.round((g.centerAt(1)-g.cx)/g.w*40+40),lip=g.lower[80-i][1];
+  assert.ok(lip-top>=3,`${seed}: stem top ${top.toFixed(1)} must reach above the cap's lower lip ${lip.toFixed(1)}`);
+ }
+ // The bolete keeps its own stem top.
+ const bolete=buildGeometry(generateSpecimen('woodland-042','bolete-1'));assert.equal(new Set(bolete.stem.filter(p=>p[1]<Math.min(...bolete.stem.map(q=>q[1]))+.5).map(p=>p[1])).size,1);
+});

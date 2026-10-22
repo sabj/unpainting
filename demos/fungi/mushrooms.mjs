@@ -878,8 +878,11 @@ export function buildGeometry(genome, young = false) {
   const collarRadius=halfAt(1)/w,collarCenter=capSurface?projectUnderside(0,collarRadius)[1]-(family==='amanita'?6:0):rimCenter;
   // Keep the growing shoulder inside the actual projected cap context.
   // The underside alone is below the front cuticle and cannot hide a cut top.
+  // Hydnum repandum's stipe runs up into the spiny underside (refs-lib): its
+  // top follows the near half of its ring, as the Amanita stem's does.
+  const ringTop=family==='amanita'||grammar==='hedgehog'&&profile?.variant===0;
   const shoulderY=u=>{
-    if(family!=='amanita'||!capSurface)return collarCenter;
+    if(!ringTop||!capSurface)return collarCenter;
     const x=u*halfAt(1),y=-halfAt(1)*Math.sqrt(Math.max(0,1-u*u));
     const projected=capSurface.project([x,y,capSurface.undersideHeight(x,y)+6])[1];
     const f=(x/w+1)*40,i=Math.min(79,Math.max(0,Math.floor(f))),q=f-i;
@@ -887,16 +890,16 @@ export function buildGeometry(genome, young = false) {
     return clamp(projected,crown+4,lip-4);
   };
   const stemYAt=(t,u=0)=>-length*t+(capSurface?(collarCenter-cy)*t**8:0)
-    +(family==='amanita'?(shoulderY(u)-collarCenter)*t**12:0)
-    +.18*halfAt(t)*(1-Math.sqrt(Math.max(0,1-u*u)))*(family==='amanita'?1-t**12:1);
+    +(ringTop?(shoulderY(u)-collarCenter)*t**12:0)
+    +.18*halfAt(t)*(1-Math.sqrt(Math.max(0,1-u*u)))*(ringTop?1-t**12:1);
   const sideCount=family==='amanita'?46:50;
   for (const side of [-1, 1]) {
     for (let j = 0; j <= sideCount; j++) {
       const t = side < 0 ? j / sideCount : 1 - j / sideCount;
       stem.push([centerAt(t) + side * halfAt(t) + Math.sin(t * 31 + phase) * .7*(1-t),
-        (family==='amanita'?stemYAt(t,side):-length*t+(capSurface?(collarCenter-cy)*t**8:0))+(1-t)**15*(3+3*side)]);
+        (ringTop?stemYAt(t,side):-length*t+(capSurface?(collarCenter-cy)*t**8:0))+(1-t)**15*(3+3*side)]);
     }
-    if(family==='amanita'&&side===-1)for(let j=1;j<=8;j++){
+    if(ringTop&&side===-1)for(let j=1;j<=8;j++){
       const u=-1+j/9*2;stem.push([cx+u*halfAt(1),stemYAt(1,u)]);
     }
   }
