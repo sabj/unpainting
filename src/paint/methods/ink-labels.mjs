@@ -38,14 +38,14 @@ export const INK_RULES = Object.freeze({
 const sha = b => createHash('sha256').update(b).digest('hex');
 
 /** Centroid of each label's largest blob, cheaply: the mean of its cells nearest the label's median row. */
-export function regionCentroids(labels, w, h, ids) {
+function regionCentroids(labels, w, h, ids) {
   const sx = new Map(), sy = new Map(), n = new Map();
   for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) { const id = labels[y * w + x]; sx.set(id, (sx.get(id) ?? 0) + x); sy.set(id, (sy.get(id) ?? 0) + y); n.set(id, (n.get(id) ?? 0) + 1); }
   return ids.map(id => ({ id, x: (sx.get(id) ?? 0) / (n.get(id) || 1), y: (sy.get(id) ?? 0) / (n.get(id) || 1), n: n.get(id) ?? 0 }));
 }
 
 /** The source with each region's outline and its number, for the vision model. */
-export async function overlayPng({ image, labels, w, h, ids }) {
+async function overlayPng({ image, labels, w, h, ids }) {
   const long = 1100, f = Math.min(1, long / Math.max(w, h)), ow = Math.round(w * f), oh = Math.round(h * f);
   const base = await sharp(image).flatten({ background: '#fff' }).removeAlpha().resize(ow, oh, { fit: 'fill' }).raw().toBuffer();
   const edge = Buffer.from(base);

@@ -4,7 +4,7 @@
 // structure and is kept whatever the ground says. Pure: arrays in, arrays out, with a record of every cut.
 import { resample, turning } from './ink-lines.mjs';
 import { classifyPathDetail, CLASS, MASS_DEFAULTS } from './line-class.mjs';
-import { ruleAt, INK_RULES } from './ink-labels.mjs';
+import { ruleAt } from './ink-labels.mjs';
 
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
 export const DECIDE_DEFAULTS = Object.freeze({
@@ -76,4 +76,3 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
   } };
 }
 
-export { INK_RULES };
