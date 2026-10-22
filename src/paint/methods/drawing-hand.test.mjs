@@ -17,3 +17,14 @@ test('a gesture shorter than the stroke length is one stroke, so it is dipped on
   const r = handDrawing([line(0, 0, 40, 0, 1)], { gap: 0, w: 100, h: 100, strokeLength: 60 });
   assert.equal(r.strokes.length, 1);
 });
+
+test('a flick is set down and lifted in one motion and drawn finer, and a detail stroke is narrower than a structural one', () => {
+  const mk = (n, tier) => ({ tier, points: Array.from({ length: n }, (_, k) => ({ x: k, y: 0, width: 2, weight: 1 })) });
+  const flick = handDrawing([mk(4, 1)], { gap: 0, w: 100, h: 100, strokeLength: 1000, flickCells: 10, inLen: 3, start: 0.2 }).strokes[0];
+  const long = handDrawing([mk(40, 1)], { gap: 0, w: 100, h: 100, strokeLength: 1000, flickCells: 10, inLen: 3, start: 0.2 }).strokes[0];
+  assert.ok(flick.points[0].nw / flick.points[1].nw > 0.95, 'no landing taper on a flick');
+  assert.ok(long.points[0].nw / long.points[20].nw < 0.7, 'a long stroke lands light');
+  assert.ok(flick.points[1].nw < long.points[20].nw, 'and finer than a full stroke');
+  const detail = handDrawing([mk(40, 2)], { gap: 0, w: 100, h: 100, strokeLength: 1000, detailScale: 0.75 }).strokes[0];
+  assert.ok(detail.points[20].nw < long.points[20].nw);
+});

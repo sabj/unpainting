@@ -88,11 +88,11 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
       strokeLength: num('drawstroke', .35) * Math.min(w, h),
       base, gain, margin:margin*handScale, minNib:minNib*handScale, inLen: num('drawtaperin', 3) * handScale,
       outLen: num('drawtaperout', 5) * handScale, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
-      detailScale: num('drawdetailscale', 1), D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
+      detailScale: num('drawdetailscale', 1), flickCells: num('drawflickmm', 0) / (num('sheetmm', 152.4) / w), D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
     log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
     // --inkhand 1: the hand's speed along each stroke (slower on curves, which lays a wider, darker line, faster on straights)
     // without a second taper or a blot at the nib's first touch: the gestures are already tapered
-    if (num('inkhand', 0) > 0) return r.strokes.map(g => inkHand(g, { base, inLen: 0, outLen: 0, dwell: 0 }));
+    if (num('inkhand', 0) > 0) return r.strokes.map(g => inkHand(g, { base, inLen: 0, outLen: 0, dwell: 0, pull: { x: 0.42, y: 0.91 }, speedWidth: 0.3 }));
     return r.strokes;
   }
   const perPoint = q => (q.width == null && q.weight == null ? q : {
@@ -125,7 +125,7 @@ const ease = u => u * u * (3 - 2 * u);
  * pull, while a long straight run is drawn faster and finer. Speed `v` runs from 1.9 - 1.1 x share, as draw.mjs sets
  * it, scaled by the curve. Points keep their positions.
  */
-export function inkHand(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.35, end = 0.25, dwell = 0.5, slow = 0.45, fast = 1.15, turnSpan = 2 } = {}) {
+export function inkHand(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.35, end = 0.25, dwell = 0.5, slow = 0.45, fast = 1.15, turnSpan = 2, pull = null, speedWidth = 0 } = {}) {
   const P = g.points, n = P.length, d = [0];
   for (let k = 1; k < n; k++) d.push(d[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
   const L = d[n - 1] || 1, tin = Math.min(inLen, 0.3 * L), tout = Math.min(outLen, 0.35 * L);
@@ -144,6 +144,13 @@ export function inkHand(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.35, en
     const e = env(d[k]), share = (q.s ?? base * (g.weight ?? 1)) * e, c = turn(k);
     const out = { ...q, s: share, v: (1.9 - 1.1 * Math.min(1, share)) * (c > 0.05 ? 1 - slow * c : fast) };
     if (q.nw != null) out.nw = q.nw * (0.6 + 0.4 * e);
+    // a slow nib lays a wider line (speedWidth is the exponent); a right hand pulls down and to the right, so a pulled
+    // stroke swells and a pushed one thins (`pull` is the pulling direction)
+    if (q.nw != null && speedWidth > 0) out.nw *= (c > 0.05 ? 1 - slow * c : fast) ** -speedWidth;
+    if (q.nw != null && pull) {
+      const a = P[Math.max(0, k - 2)], b = P[Math.min(n - 1, k + 2)], dl = Math.hypot(b.x - a.x, b.y - a.y) || 1, dot = ((b.x - a.x) * pull.x + (b.y - a.y) * pull.y) / dl;
+      out.nw *= 0.75 + 0.5 * Math.max(0, dot);
+    }
     if (k === 0) out.dwell = dwell;
     return out;
   });

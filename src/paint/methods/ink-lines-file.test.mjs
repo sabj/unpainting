@@ -106,7 +106,13 @@ test('the wash recipe draws on a fine sheet by width, by a hand that chains stro
   assert.equal(INK_RECIPES.wash.inklabeljudge, 'simple', 'no region image leaves the machine by default');
   assert.equal(INK_RECIPES.wash.inkshadowmask, '0');
   assert.equal(INK_RECIPES.wash.inkdropfaint, '0');
-  for (const k of ['inkgeom', 'inkfoliage', 'inksalience', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
+  assert.equal(INK_RECIPES.wash.inkdarkrule, '1');
+  assert.equal(INK_RECIPES.wash.inkjoin, '2.5');
+  assert.equal(INK_RECIPES.wash.inkfoliage, '1');
+  const fl = (argv) => { const a = inkRecipeArgs('wash', argv); return a[a.indexOf('--inkwidthfloor') + 1]; };
+  assert.equal(fl(['--width', '540']), '0', 'on a fine sheet no floor');
+  assert.equal(fl(['--width', '2400']), '1');
+  for (const k of ['inkgeom', 'inksalience', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
 });
 
 test('lineart map lines are measured and never cut or marked soft, whatever --linesupport says', async () => {

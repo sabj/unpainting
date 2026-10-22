@@ -4,7 +4,7 @@
 // geometry, a form contour (long and smooth) or a face or hand feature is left out and the wash carries it; wiggly
 // fragments are never joined into longer wiggly lines. Only pieces that are collinear across a short gap are joined.
 // Pure: arrays in, arrays out. Coordinates are the line file's image pixels.
-import { resample } from './ink-lines.mjs';
+import { resample, turning } from './ink-lines.mjs';
 import { crossProfile, MASS_DEFAULTS } from './line-class.mjs';
 
 export const GEOM_DEFAULTS = Object.freeze({
@@ -17,6 +17,9 @@ export const GEOM_DEFAULTS = Object.freeze({
   formMm: 6,            // a form contour is at least this long ...
   formDegPerMm: 20,     // ... and turns no faster than this
   gapMm: 2.5,           // collinear pieces join across at most this
+  nodeMm: 0.35,         // ends this close are one junction: the pair that turns least, within nodeDeg, continues
+  nodeDeg: 30,
+  squiggleDegPerMm: 60, // a piece turning faster than this is never chained
   joinCos: 0.98,
   joinAim: 0.97,
   energyStepMm: 0.5,    // the spacing curvature energy is read at, coarse enough to ignore the pixel staircase
@@ -123,19 +126,29 @@ export function geometrise(lines, ctx, o = GEOM_DEFAULTS) {
 
 /** Join two lines only where their ends are within the gap, facing, and aimed along the line between them. */
 export function joinCollinear(lines, { pxMm }, o = GEOM_DEFAULTS) {
+  o = { ...GEOM_DEFAULTS, ...o };
   const gap = o.gapMm / pxMm, n = lines.length, used = new Set(), items = lines.map(g => ({ g, pts: g.points }));
   const dir = (pts, atEnd) => { const a = atEnd ? pts[Math.max(0, pts.length - 4)] : pts[Math.min(pts.length - 1, 3)], b = atEnd ? pts.at(-1) : pts[0], d = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / d, y: (b.y - a.y) / d }; };
+  // a squiggle is never chained to anything: it stays as short as it is, or goes
+  const wiggly = items.map(it => turning(it.pts) / pxMm > o.squiggleDegPerMm);
   const ends = []; items.forEach((it, i) => { ends.push({ i, tail: false, p: it.pts[0], t: dir(it.pts, false) }, { i, tail: true, p: it.pts.at(-1), t: dir(it.pts, true) }); });
-  const pairs = [];
+  const node = o.nodeMm / pxMm, nodeCos = Math.cos(o.nodeDeg * Math.PI / 180), pairs = [];
   for (let a = 0; a < ends.length; a++) for (let b = a + 1; b < ends.length; b++) {
-    const A = ends[a], B = ends[b]; if (A.i === B.i) continue;
+    const A = ends[a], B = ends[b]; if (A.i === B.i || wiggly[A.i] || wiggly[B.i]) continue;
     const dx = B.p.x - A.p.x, dy = B.p.y - A.p.y, d = Math.hypot(dx, dy); if (d > gap) continue;
-    const u = d > 1e-6 ? { x: dx / d, y: dy / d } : null;
-    if (-(A.t.x * B.t.x + A.t.y * B.t.y) < o.joinCos) continue;
-    if (u && (Math.min(A.t.x * u.x + A.t.y * u.y, -(B.t.x * u.x + B.t.y * u.y)) < o.joinAim)) continue;
-    pairs.push({ a, b, d });
+    const cos = -(A.t.x * B.t.x + A.t.y * B.t.y);
+    if (d <= node) {
+      // at a junction the pieces meet in one place, so the gap has no direction: the pair that turns least continues
+      if (cos < nodeCos) continue;
+      pairs.push({ a, b, d: 0, turn: Math.acos(Math.min(1, cos)) });
+      continue;
+    }
+    const u = { x: dx / d, y: dy / d };
+    if (cos < o.joinCos) continue;
+    if (Math.min(A.t.x * u.x + A.t.y * u.y, -(B.t.x * u.x + B.t.y * u.y)) < o.joinAim) continue;
+    pairs.push({ a, b, d, turn: Math.acos(Math.min(1, cos)) });
   }
-  pairs.sort((p, q) => p.d - q.d);
+  pairs.sort((p, q) => (p.d === 0 && q.d === 0 ? p.turn - q.turn : p.d - q.d));
   const taken = new Set(), links = new Map();
   for (const { a, b } of pairs) { if (taken.has(a) || taken.has(b)) continue; taken.add(a); taken.add(b); links.set(a, b); links.set(b, a); }
   const done = new Uint8Array(n), out = [];

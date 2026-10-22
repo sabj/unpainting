@@ -35,7 +35,7 @@ export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength =
   const ordered = handOrder(gestures);
   const broken = lit > 0 && D ? ordered.flatMap(g => breakOnLights(g, D, w, h, { lit, reach, minPts: 2 })) : ordered;
   return { joined, gestures: ordered.length, runs: broken.length,
-    strokes: broken.map(g => shapeGesture(g, { ...shape, scale: (shape.scale ?? 1) * (g.tier === 2 ? (shape.detailScale ?? 1) : 1) })).flatMap(g => personStrokes(g, strokeLength)) };
+    strokes: broken.map(g => shapeGesture(g, { ...shape, scale: (shape.scale ?? 1) * (g.tier === 2 ? (shape.detailScale ?? 1) : 1), widthScale: g.tier === 2 ? (shape.detailScale ?? 1) : 1 })).flatMap(g => personStrokes(g, strokeLength)) };
 }
 
 /** Join lines that continue one another. `gap` in cells. Loose gates: a segmenter breaks contours at every junction. */
@@ -82,13 +82,15 @@ export function handOrder(gestures) {
  * @param scale  a further factor on the share, per gesture (the toning's need)
  * @param floor  the darkness a line is drawn at when the file says 0, so faint file values still state the form
  */
-export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.45, end = 0.3, gain = 1.39, margin = 0.42, minNib = 0.3, scale = 1, floor = 0 } = {}) {
+export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.45, end = 0.3, gain = 1.39, margin = 0.42, minNib = 0.3, scale = 1, floor = 0, widthScale = 1, flickCells = 0 } = {}) {
   const P = g.points, n = P.length, s = [0];
   for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
   const L = s[n - 1] || 1, tin = Math.min(inLen, 0.25 * L), tout = Math.min(outLen, 0.3 * L);
+  // a flick (a mark under `flickCells` long) is set down and lifted in one motion: no landing taper, and finer
+  const flick = flickCells > 0 && L < flickCells, ws = widthScale * (flick ? 0.6 : 1);
   const ease = u => u * u * (3 - 2 * u);
   const env = d => {
-    const a = tin > 0 && d < tin ? start + (1 - start) * ease(d / tin) : 1;
+    const a = !flick && tin > 0 && d < tin ? start + (1 - start) * ease(d / tin) : 1;
     const b = tout > 0 && L - d < tout ? end + (1 - end) * ease((L - d) / tout) : 1;
     return Math.min(a, b);
   };
@@ -96,7 +98,7 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
   const points = P.map((q, k) => {
     const e = env(s[k]), dark = floor + (1 - floor) * Math.max(0, Math.min(1, q.weight ?? lineWeight));
     const out = { ...q, s: Math.min(1, base * dark * e * scale) };
-    if (q.width != null) out.nw = Math.max(minNib, (q.width * gain - margin) * (0.5 + 0.5 * e));
+    if (q.width != null) out.nw = Math.max(minNib, (q.width * gain - margin) * (0.5 + 0.5 * e) * ws);
     return out;
   });
   return { ...g, points };

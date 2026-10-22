@@ -9,6 +9,7 @@ import { ruleAt } from './ink-labels.mjs';
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
 export const DECIDE_DEFAULTS = Object.freeze({
   ...MASS_DEFAULTS,
+  bridgeMm: 0.8,           // a hand does not lift for a gap this short between two drawn runs of one line
   reachMm: 0.6,            // a contour is drawn when either side within this reach is ink-worthy
   dropFaint: true,         // a point with no contrast of its own and no step beside it is texture
   keepPenShare: 0.6,       // a structural line is at least this share pen line
@@ -51,6 +52,11 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
       if (r.ink !== 'none' && r.penContrast && contrast[k] < r.penContrast) { const name = r.label; drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
       if (r.ink === 'none') { const name = labelAt(Math.round(R[k].x), Math.round(R[k].y)); drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
       live[k] = 1;
+    }
+    // bridge the short gaps the mass and faint cuts left inside a line
+    for (let k = 0, gapFrom = -1; k < R.length; k++) {
+      if (!live[k]) { if (gapFrom < 0 && k > 0 && live[k - 1]) gapFrom = k; continue; }
+      if (gapFrom >= 0) { if ((d[k] - d[gapFrom]) * pxMm < o.bridgeMm) for (let j = gapFrom; j < k; j++) live[j] = 1; gapFrom = -1; }
     }
     let start = -1;
     for (let k = 0; k <= R.length; k++) {

@@ -236,6 +236,8 @@ function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}
       widths = pts.map((q, k) => Math.max(widthPx.min, (detail ? widthPx.detail : 1) * Math.min(widthPx.max, Number.isFinite(q.mapWidth) ? Math.min(widths[k], 2 * q.mapWidth) : widths[k])));
       // the map's confidence adds to the source's darkness: a line both agree on is drawn firmest
       kept = weights.map((v, k) => (pts[k].weight != null ? (v + pts[k].weight) / 2 : v));
+      // a dip pen pressed harder is darker and wider
+      widths = widths.map((v, k) => Math.max(widthPx.min, v * (0.7 + 0.3 * kept[k])));
     }
     return { ...rest, points: pts.map(p => [r(p.x), r(p.y)]), widths: widths.map(r), weights: kept.map(r), ...(soft ? { soft: true } : {}) };
   });

@@ -58,3 +58,12 @@ test('curvature energy is zero for a straight line and grows with the wiggle', (
   assert.equal(curvatureEnergy(s, PX), 0);
   assert.ok(curvatureEnergy(w, PX) > 0.01);
 });
+
+test('at a junction the pair that turns least continues, and a squiggle is never chained', () => {
+  const a = line([[10, 40], [60, 40]]), b = line([[60, 40], [120, 40]]), c = line([[60, 40], [60, 90]]);
+  const r = joinCollinear([a, b, c], { pxMm: PX });
+  assert.equal(r.length, 2, 'a and b run on; c stays a branch');
+  assert.ok(r.some(g => g.points.length >= 4 && Math.abs(g.points.at(-1).x - g.points[0].x) > 100));
+  const squig = line(Array.from({ length: 30 }, (_, k) => [120 + 1.5 * k, 40 + (k % 2 ? 4 : -4)]));
+  assert.equal(joinCollinear([line([[60, 40], [120, 40]]), squig], { pxMm: PX }).length, 2);
+});
