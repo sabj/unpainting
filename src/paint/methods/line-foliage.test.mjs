@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { foliageMask } from './line-foliage.mjs';
-import { decideLines } from './ink-decide.mjs';
+import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
 
 const W = 120, H = 80, PX = 0.15;
 function planes() {
@@ -24,7 +24,7 @@ test('a short mark in foliage cells is wash, a long smooth stroke through them i
   for (let x = 0; x < W; x++) { L[30 * W + x] = 35; L[31 * W + x] = 35; }
   const cellLabel = () => 'architecture';
   const line = (x0, x1) => ({ points: Array.from({ length: 21 }, (_, k) => ({ x: x0 + (x1 - x0) * k / 20, y: 31 })) });
-  const short = decideLines([line(5, 30)], { L, w: W, h: H, pxMm: PX, cellLabel, foliage });
+  const short = decideLines([line(5, 30)], { L, w: W, h: H, pxMm: PX, cellLabel, foliage }, { ...DECIDE_DEFAULTS, strongContrast: Infinity });
   assert.equal(short.lines.length, 0);
   const long = decideLines([line(0, 119)], { L, w: W, h: H, pxMm: PX, cellLabel, foliage });
   assert.ok(long.stats.keptPx > 100);

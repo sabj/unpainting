@@ -68,3 +68,15 @@ test('a lineart map contour is held to the map width, the pen range and the deta
   assert.ok(r.lines.every(g => g.soft === undefined && g.widths.every(v => v >= 0.5 - 1e-9)));
   assert.ok(r.lines[0].weights.every(v => v > 0.6 && v <= 1), 'map confidence and source darkness are combined');
 });
+
+test('a traced stroke weighs by its own darkness against the paper, not against what is beside it', () => {
+  const w = 120, h = 80, L = new Float32Array(w * h).fill(90);
+  for (let y = 40; y < 80; y++) for (let x = 0; x < w; x++) L[y * w + x] = 32;            // a dark wash
+  for (let x = 0; x < w; x++) { L[60 * w + x] = 15; L[61 * w + x] = 15; L[20 * w + x] = 60; L[21 * w + x] = 60; }
+  const line = y => ({ points: [[5, y], [115, y]], widths: [2, 2], weights: [1, 1] });
+  const widthPx = { min: 0.5, max: 4, detail: 1, shortPx: 1, curvedDegPerPx: 99, darkWidth: false, paperWeight: true, paperL: 90 };
+  const r = holdLinesToTarget([line(61), line(21)], L, w, h, { threshold: 0, measure: true, contour: true, reach: 2.5, widthPx });
+  const mean = g => g.weights.reduce((a, v) => a + v, 0) / g.weights.length;
+  const onDark = r.lines.find(g => g.points[0][1] > 40), onPaper = r.lines.find(g => g.points[0][1] < 40);
+  assert.ok(mean(onDark) > mean(onPaper), `black stroke on a dark wash ${mean(onDark)} against a grey stroke on paper ${mean(onPaper)}`);
+});

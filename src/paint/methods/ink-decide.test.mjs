@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { decideLines } from './ink-decide.mjs';
+import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
 import { parseLabelReply, simpleLabel, ruleAt, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
 import { cutMassEdges } from './line-class.mjs';
 
@@ -26,7 +26,9 @@ test('the label of the ground decides: foliage is wash only, architecture keeps 
   const L = plane();
   const arch = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' });
   assert.ok(arch.stats.keptPx > 60);
-  const leaves = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' });
+  const leaves = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }, { ...DECIDE_DEFAULTS, strongContrast: Infinity });
+  // a strong ink stroke is not a leaf: it stays
+  assert.ok(decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx > 20);
   assert.equal(leaves.lines.length, 0);
   assert.ok(leaves.stats.droppedMm.short > 4, "a piece too short to be a branch is wash");
   const edge = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: (x, y) => (y < 21 ? 'sky' : 'architecture') });

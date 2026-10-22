@@ -185,7 +185,7 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
     // `inkMask` (0/1 on the grid): a point with no ink cell within a pixel has no support, so a trace along a wash
     // edge or a coloured brush mark is cut where the separator does not read pen line
     if (inkMask) R.forEach((q, k) => { if (!nearInk(inkMask, w, h, q.x, q.y)) support[k] = Math.min(support[k], 0); });
-    if (measure) { const m = measureAlong(R, L, w, h, on, side, { spacing: step, reach }); R.forEach((q, k) => { q.mapWidth = q.width; q.width = m.width[k]; q.absorb = m.absorbance[k]; }); }
+    if (measure) { const m = measureAlong(R, L, w, h, on, side, { spacing: step, reach }); R.forEach((q, k) => { q.mapWidth = q.width; q.width = m.width[k]; q.absorb = m.absorbance[k]; q.onL = on[k]; }); }
     const { runs } = supportedRuns(support, { threshold: Math.max(threshold, 1e-6), window: 1 / step, gap: Math.round(gapPx / step), minRun: Math.round(minRunPx / step) });
     for (const [a, b] of runs) { supportedPx += (b - a) * step; for (let k = a; k <= b; k++) { abs.push(-Math.log(Math.max(1e-4, Y(on[k])) / Math.max(1e-4, Y(side[k])))); onL.push(on[k]); sideL.push(side[k]); } }
     if (!(threshold > 0)) {
@@ -218,6 +218,10 @@ function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}
   const r = v => Math.round(v * 100) / 100, all = [], allW = [];
   for (const [, pts] of measured) for (const q of pts) { if (q.absorb > 0) all.push(q.absorb); if (Number.isFinite(q.width)) allW.push(q.width); }
   const ref = quantile(all, 0.85) ?? 0, fileW = quantile(allW, 0.5) ?? 1;
+  // a traced stroke's weight is its own darkness against the paper: the darkest tenth of the strokes is full weight, the
+  // paper none. Its contrast with what is beside it would make a black stroke on a dark wash pale on white paper.
+  const onLs = []; if (widthPx?.paperWeight) for (const [, pts] of measured) for (const q of pts) if (Number.isFinite(q.onL)) onLs.push(q.onL);
+  const inkL = quantile(onLs, 0.1), paperL = widthPx?.paperL;
   return measured.map(([g, pts]) => {
     const own = pts.map(q => q.width).filter(Number.isFinite), pieceW = quantile(own, 0.5) ?? fileW;
     // a contour of a lineart map may fade lighter than a line of the source's own tracing: its pressure floor is lower
@@ -236,6 +240,7 @@ function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}
       widths = pts.map((q, k) => Math.max(widthPx.min, (detail ? widthPx.detail : 1) * Math.min(widthPx.max, Number.isFinite(q.mapWidth) ? Math.min(widths[k], 2 * q.mapWidth) : widths[k])));
       // the map's confidence adds to the source's darkness: a line both agree on is drawn firmest
       kept = weights.map((v, k) => (pts[k].weight != null ? (v + pts[k].weight) / 2 : v));
+      if (widthPx.paperWeight && inkL != null && paperL > inkL) kept = kept.map((v, k) => (Number.isFinite(pts[k].onL) ? Math.max(0.35, Math.min(1, (paperL - pts[k].onL) / (paperL - inkL))) : v));
       // a dip pen pressed harder is darker and wider
       if (widthPx.darkWidth !== false) widths = widths.map((v, k) => Math.max(widthPx.min, v * (0.7 + 0.3 * kept[k])));
     }

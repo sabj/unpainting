@@ -6,9 +6,11 @@ import { resample, turning } from './ink-lines.mjs';
 import { classifyPathDetail, CLASS, MASS_DEFAULTS } from './line-class.mjs';
 import { ruleAt } from './ink-labels.mjs';
 
+const median = (v, a, b) => { const s = Array.from(v.slice(a, b)).sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
 export const DECIDE_DEFAULTS = Object.freeze({
   ...MASS_DEFAULTS,
+  strongContrast: 20,      // L*: a stroke this much darker than both sides is ink wherever it lies
   bridgeMm: 0.8,           // a hand does not lift for a gap this short between two drawn runs of one line
   reachMm: 0.6,            // a contour is drawn when either side within this reach is ink-worthy
   dropFaint: true,         // a point with no contrast of its own and no step beside it is texture
@@ -64,8 +66,11 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
       if (on && start < 0) start = k;
       if (!on && start >= 0) {
         const piece = R.slice(start, k), pd = arc(piece), pl = pd.at(-1), mid = rules[start + (piece.length >> 1)];
-        const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < 0.3 || (!structural && mid.ink === 'elongated' && lenMm < (mid.minMm ?? 0)); // trunks and branches are long strokes
-        const tooTurny = !structural && mid.ink === 'elongated' && turning(piece) / pxMm > o.elongatedDegPerMm;
+        // trunks and branches are long strokes; leaves are wash. A strong ink stroke (ironwork through a garden, a figure in
+        // front of a hedge) is not a leaf, whatever the ground's colour: it stays.
+        const strong = median(contrast, start, k) >= o.strongContrast;
+        const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < 0.3 || (!structural && !strong && mid.ink === 'elongated' && lenMm < (mid.minMm ?? 0));
+        const tooTurny = !structural && !strong && mid.ink === 'elongated' && turning(piece) / pxMm > o.elongatedDegPerMm;
         if (tooShort || tooTurny) { drop.short += pl; add(mid.label ?? 'none', 'droppedPx', pl); }
         else {
           // the shortest piece the ground allows (ink-labels.mjs minMm) is applied by the salience step, after collinear

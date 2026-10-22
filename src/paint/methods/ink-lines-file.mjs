@@ -33,6 +33,8 @@ const SHORT_MM = 6, CURVED_DEG_PER_MM = 25;
 // the line files the models made: the lineart map's contours, and the source's own pen strokes gated by the map
 const MODEL_KINDS = ['line-map', 'stroke'];
 
+const quantileOf = (P, q) => { const s = Float32Array.from(P).sort(); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
+
 const lPlaneCache = new Map();
 async function lPlane(image, w, h) {
   const key = `${image}|${w}|${h}`;
@@ -94,7 +96,7 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   // pieces), read with a probe of --lineprobemm either way so a wash beside the line is not taken for the line
   // a traced pen stroke carries its own width: up to --linestrokemax mm, no detail ratio, no darkness shrink
   const stroke = doc0.inputKind === 'stroke';
-  const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: (stroke ? flags.strokeMaxMm : flags.widthMaxMm) / pxMm, detail: stroke ? 1 : flags.detailRatio, darkWidth: !stroke, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
+  const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: (stroke ? flags.strokeMaxMm : flags.widthMaxMm) / pxMm, detail: stroke ? 1 : flags.detailRatio, darkWidth: !stroke, paperWeight: stroke, paperL: stroke ? quantileOf(L, 0.9) : null, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
   const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
   // the target's line cores, as --inkdarkmatch reads the pen's strokes on its scrap
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));
