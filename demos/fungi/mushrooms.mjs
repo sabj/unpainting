@@ -3726,11 +3726,19 @@ function decorateCatalog(study,genome,sketch=false){
         }else{
           const kind=sample(i,336),a=(i+.5+(sample(i,334)-.5)*1.1)/count*Math.PI,r=kind<.45?.06:kind<.7?.22+sample(i,337)*.2:.45+sample(i,338)*.3;
           const edge=[cx+Math.cos(a)*b.w*.5,b.y+b.h*(.2+.8*Math.sin(a))],bend=(valueNoise(i*.11,phase)-.5)*b.w*.04;
-          const start=[mix(cx,edge[0],r),mix(cy,edge[1],r)];
-          const blade=curve(start,[mix(cx,edge[0],.4)+bend,mix(cy,edge[1],.38)],[mix(cx,edge[0],.77)+bend,mix(cy,edge[1],.8)],edge,24);
+          let start=[mix(cx,edge[0],r),mix(cy,edge[1],r)];
+          let blade=curve(start,[mix(cx,edge[0],.4)+bend,mix(cy,edge[1],.38)],[mix(cx,edge[0],.77)+bend,mix(cy,edge[1],.8)],edge,24);
+          // Lactarius gills (refs-lib) run from the margin down the funnel to
+          // the stem and end across its width at staggered heights; they do
+          // not meet in one point. Short gills stop part way.
+          if(hymType==='milkcap-1'){
+            const u=((i+.5+(sample(i,334)-.5)*.8)/count)*2-1,top=[cx+u*b.w*.5,b.y-2],depth=kind<.45?.08+sample(i,337)*.08:.17+sample(i,338)*.13;
+            const foot=[cx+u*b.w*.5*mix(1,.25,clamp(depth/.3)),b.y+b.h*depth];
+            blade=curve(top,[mix(top[0],foot[0],.3)+bend,mix(top[1],foot[1],.22)],[mix(top[0],foot[0],.72)+bend*.5,mix(top[1],foot[1],.68)],foot,24);
+          }
           add(blade,p.hymenium==='folds'?'folds':'gills',p.hymenium==='folds'?1.25:.6,.48+sample(i,335)*.2,region.clip,region.exclude);
           // An occasional gill forks near the margin.
-          if(p.hymenium!=='folds'&&sample(i,339)<.12){const q=blade[15],tip=[edge[0]+Math.sin(a)*b.w*.02,edge[1]+2];add(curve(q,[mix(q[0],tip[0],.4),mix(q[1],tip[1],.35)],[mix(q[0],tip[0],.8),mix(q[1],tip[1],.8)],tip,10),'gills',.45,.42,region.clip,region.exclude);}
+          if(p.hymenium!=='folds'&&hymType!=='milkcap-1'&&sample(i,339)<.12){const q=blade[15],tip=[edge[0]+Math.sin(a)*b.w*.02,edge[1]+2];add(curve(q,[mix(q[0],tip[0],.4),mix(q[1],tip[1],.35)],[mix(q[0],tip[0],.8),mix(q[1],tip[1],.8)],tip,10),'gills',.45,.42,region.clip,region.exclude);}
         }
       }
     }

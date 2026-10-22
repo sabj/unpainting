@@ -2813,3 +2813,16 @@ test('the bolete stem runs up into its cap and its cap colour reaches the tubes'
   assert.ok(washes.some(w=>w.role==='flesh')&&washes.some(w=>w.role==='gill-face'),`${seed}: no bare band between cap and tubes`);
  }
 });
+
+test('milkcap gills run from the margin to the stem instead of meeting in one point',async()=>{
+ const {buildStudy}=await import('./mushrooms.mjs');
+ for(const seed of ['1640445019','1689370685','woodland-042']){
+  const gills=buildStudy(generateSpecimen(seed,'milkcap-1')).ink.filter(m=>m.role==='gills'&&Number.isInteger(m.individual)?m.individual===0:m.role==='gills');
+  assert.ok(gills.length>40,`${seed}: gills are drawn`);
+  // Of each gill, the end nearer the plate's centre line: on the old fan these met at one point.
+  const ends=gills.map(m=>m.points[0][1]<m.points.at(-1)[1]?m.points.at(-1):m.points[0]),cx=ends.reduce((s,p)=>s+p[0],0)/ends.length,cy=ends.reduce((s,p)=>s+p[1],0)/ends.length;
+  const crowded=ends.filter(([x,y])=>Math.hypot(x-cx,y-cy)<4).length;
+  assert.ok(crowded<=gills.length*.1,`${seed}: ${crowded} of ${gills.length} gill ends meet in one point`);
+  assert.equal(gills.filter(m=>m.role==='gills'&&m.points.length<12).length,0,'no stray fork lines');
+ }
+});
