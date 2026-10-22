@@ -73,15 +73,15 @@ export function parseLabelReply(text, ids) {
 
 /**
  * A label for a region from its own numbers, for when no vision model can run: green and textured is foliage, a large
- * smooth pale region touching the top is sky, a blue-grey smooth one is water, a small dark one is a shadow mass, the
- * rest is architecture. `r` is a segments.json region { area, lab, labSpread, bbox }.
+ * smooth pale region touching the top is sky, a blue-grey smooth one is water, the rest is architecture. Dark is not
+ * shadow: a dark region may be an iron gate or a figure, so the classifier never calls one a shadow mass (the line-or-mass
+ * test still leaves shadow edges to the wash). `r` is a segments.json region { area, lab, labSpread, bbox }.
  */
 export function simpleLabel(r, { w, h }) {
   const [L, A, B] = r.lab, [sL] = r.labSpread ?? [0], top = r.bbox[1] / h < 0.05;
   if (A < -6 && B > 4) return 'foliage';
   if (top && r.area > 0.08 && sL < 12 && L > 55) return 'sky';
   if (B < -4 && sL < 12) return 'water';
-  if (L < 38 && r.area < 0.1) return 'shadow_mass';
   return 'architecture';
 }
 
