@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Inking pipeline, legibility test. Renders each source's pen drawing alone (wash recipe, --inkres 3, --drawingonly 1),
+// Inking pipeline, legibility test. Renders each source's pen drawing alone (wash recipe at its own --inkres, --drawingonly 1),
 // cuts the named feature crops (bench/ink-heavy/features.json) from drawing-opening.png, and asks a vision model about
 // each crop alone: first what it is, with no hint, then which listed parts it can see (bench/ink-heavy/legibility.json).
 //   node tools/judge/ink-legibility.mjs --label <name> [--only <subject,..>] [--render 1] [--vision 1] [--note <text>]
@@ -33,7 +33,7 @@ async function render(name) {
   const out = path.join(RUNS, name);
   if (opt('render', '1') === '0') { if (!fs.existsSync(path.join(out, FROM))) throw new Error(`no ${FROM} in ${out}`); return out; }
   fs.rmSync(out, { recursive: true, force: true });
-  const args = ['tools/paint-plate.mjs', '--image', spec[name].image, '--width', '540', '--inkrecipe', 'wash', '--inkres', '3', '--drawingonly', '1', '--seed', '0', '--video', '0', ...opt('paintflags', '').split(' ').filter(Boolean), '--out', out];
+  const args = ['tools/paint-plate.mjs', '--image', spec[name].image, '--width', '540', '--inkrecipe', 'wash', '--drawingonly', '1', '--seed', '0', '--video', '0', ...opt('paintflags', '').split(' ').filter(Boolean), '--out', out];
   const r = spawnSync('node', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
   fs.writeFileSync(path.join(RUNS, `${name}.log`), r.stdout + r.stderr);
   if (r.status !== 0 || !fs.existsSync(path.join(out, 'drawing-opening.png'))) throw new Error(`render of ${name} failed; see ${path.join(RUNS, name + '.log')}`);
