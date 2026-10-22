@@ -35,7 +35,7 @@ export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength =
   const ordered = handOrder(gestures);
   const broken = lit > 0 && D ? ordered.flatMap(g => breakOnLights(g, D, w, h, { lit, reach, minPts: 2 })) : ordered;
   return { joined, gestures: ordered.length, runs: broken.length,
-    strokes: broken.map(g => shapeGesture(g, shape)).flatMap(g => personStrokes(g, strokeLength)) };
+    strokes: broken.map(g => shapeGesture(g, { ...shape, scale: (shape.scale ?? 1) * (g.tier === 2 ? (shape.detailScale ?? 1) : 1) })).flatMap(g => personStrokes(g, strokeLength)) };
 }
 
 /** Join lines that continue one another. `gap` in cells. Loose gates: a segmenter breaks contours at every junction. */

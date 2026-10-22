@@ -26,9 +26,9 @@ test('the label of the ground decides: foliage is wash only, architecture keeps 
   const L = plane();
   const arch = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' });
   assert.ok(arch.stats.keptPx > 60);
-  const leaves = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' });
+  const leaves = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' });
   assert.equal(leaves.lines.length, 0);
-  assert.ok(leaves.stats.droppedMm.label.foliage > 8);
+  assert.ok(leaves.stats.droppedMm.short > 4, "a piece too short to be a branch is wash");
   const edge = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: (x, y) => (y < 21 ? 'sky' : 'architecture') });
   assert.ok(edge.stats.keptPx > 60, 'a contour with architecture on one side is drawn');
 });

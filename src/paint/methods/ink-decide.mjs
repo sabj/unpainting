@@ -58,7 +58,7 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
       if (on && start < 0) start = k;
       if (!on && start >= 0) {
         const piece = R.slice(start, k), pd = arc(piece), pl = pd.at(-1), mid = rules[start + (piece.length >> 1)];
-        const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < 0.3;
+        const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < 0.3 || (!structural && mid.ink === 'elongated' && lenMm < (mid.minMm ?? 0)); // trunks and branches are long strokes
         const tooTurny = !structural && mid.ink === 'elongated' && turning(piece) / pxMm > o.elongatedDegPerMm;
         if (tooShort || tooTurny) { drop.short += pl; add(mid.label ?? 'none', 'droppedPx', pl); }
         else {

@@ -11,6 +11,8 @@ import { geometrise, GEOM_DEFAULTS } from './line-geometry.mjs';
 import { foliageMask } from './line-foliage.mjs';
 import { hatchShadows, HATCH_DEFAULTS } from './line-hatch.mjs';
 import { salience } from './line-salience.mjs';
+import { joinCollinear } from './line-geometry.mjs';
+import { estimateInkDark } from './line-class.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import sharp from 'sharp';
 
@@ -25,7 +27,8 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0 }) {
+  let o = o0;
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   registerSegments(base, segments.stem);
   const seg = await loadSegments(base, w, h), segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
@@ -39,6 +42,8 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     foliageCells = foliageMask(L, lab.A, lab.B, w, h, pxMm);
   }
   const cellLabel = (x, y) => lab.labels[seg.labels[y * w + x]] ?? 'architecture';
+  // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
+  if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }
   const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, cellLabel, shadow, foliage: foliageCells }, o);
   let kept = r.lines, geometry = null;
   // --inkgeom 1: straight runs and arcs where the source shows them; squiggles that are not forms or features are left to the wash
@@ -47,6 +52,8 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     const gres = geometrise(kept, { L, w, h, pxMm, isFeature }, geomOptions);
     kept = gres.lines; geometry = gres.stats;
   }
+  // --inkjoin mm: pieces that continue one another in a straight line join across a gap of up to mm (nothing is dropped)
+  if (joinMm > 0) kept = joinCollinear(kept, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm });
   // --inksalience 1: connected and closed geometry first; a short isolated piece that belongs to no form is left to the wash
   let sal = null;
   if (salient) {

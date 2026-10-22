@@ -16,6 +16,7 @@ export const MASS_DEFAULTS = Object.freeze({
   minRunMm: 1,                // a run of mass edge shorter than this stays (the majority has already spoken)
   structureMm: 12,            // a mass edge this long and smooth is a structural contour
   structureDegPerMm: 8,
+  inkDarkContrast: 2,         // L*: the least contrast a line as dark as the source's ink needs
 });
 
 function sample(P, w, h, x, y) {
@@ -35,7 +36,7 @@ export function crossProfile(L, w, h, p, nx, ny, pxMm, o = MASS_DEFAULTS) {
   }
   const R = Math.max(2, o.broadMm / pxMm);
   const bl = (at(R) + at(1.6 * R) + at(2.2 * R)) / 3, br = (at(-R) + at(-1.6 * R) + at(-2.2 * R)) / 3;
-  return { contrast, step: Math.abs(bl - br), dark: Math.min(bl, br) };
+  return { contrast, step: Math.abs(bl - br), dark: Math.min(bl, br), on: at(0) };
 }
 
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
@@ -50,7 +51,9 @@ export function classifyPathDetail(R, L, w, h, pxMm, o = MASS_DEFAULTS) {
     const a = R[Math.max(0, k - 2)], b = R[Math.min(n - 1, k + 2)], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
     const c = crossProfile(L, w, h, R[k], -(b.y - a.y) / tl, (b.x - a.x) / tl, pxMm, o);
     contrast[k] = c.contrast;
-    raw[k] = c.contrast >= o.penContrast ? CLASS.pen : c.step >= o.stepContrast ? CLASS.mass : CLASS.faint;
+    // ink is darker than any wash: where the source's ink is darkest (o.inkDark, L*), a line that beats both sides by a little
+    // is a pen line though a dark wash beside it leaves it little contrast
+    raw[k] = c.contrast >= o.penContrast || (o.inkDark != null && c.on <= o.inkDark && c.contrast >= o.inkDarkContrast) ? CLASS.pen : c.step >= o.stepContrast ? CLASS.mass : CLASS.faint;
   }
   const half = Math.max(1, Math.round(o.smoothMm / pxMm)), out = new Uint8Array(n);
   for (let k = 0; k < n; k++) {
@@ -95,4 +98,23 @@ export function cutMassEdges(lines, L, w, h, pxMm, o = MASS_DEFAULTS) {
     if (mass.length && !structural) cut++;
   }
   return { lines: out, stats: { lines: lines.length, pieces: out.length, cut, structural: kept, lengthPx: len, massBefore: len ? massLen / len : 0, massAfter: keptLen ? keptMass / keptLen : 0 } };
+}
+
+/**
+ * The darkness (L*) that the source's own pen lines reach: the level at or under which a line that only just beats a dark wash
+ * beside it is still ink. It is the 30th percentile of the on-line tone over points whose contrast is at least 12 L*.
+ * @returns the level, or null when the lines give too few confident points
+ */
+export function estimateInkDark(lines, L, w, h, pxMm, o = MASS_DEFAULTS) {
+  const vals = [];
+  for (const g of lines) {
+    const R = resample(g.points, 1);
+    for (let k = 2; k < R.length - 2; k += 3) {
+      const a = R[k - 2], b = R[k + 2], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1, c = crossProfile(L, w, h, R[k], -(b.y - a.y) / tl, (b.x - a.x) / tl, pxMm, o);
+      if (c.contrast >= 12) vals.push(c.on);
+    }
+  }
+  if (vals.length < 200) return null;
+  vals.sort((x, y) => x - y);
+  return vals[Math.floor(0.3 * vals.length)];
 }

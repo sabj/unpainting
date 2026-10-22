@@ -27,7 +27,7 @@ export const INK_RULES = Object.freeze({
   hands: { ink: 'features', minMm: 0 },
   drapery: { ink: 'outline', minMm: 3 },
   tree_trunk: { ink: 'elongated', minMm: 6 },
-  foliage: { ink: 'none' },
+  foliage: { ink: 'elongated', minMm: 8 }, // leaves are wash; a long, smooth, connected stroke through them is a branch
   sky: { ink: 'none' },
   water: { ink: 'none' },
   ground: { ink: 'structure', minMm: 6 },

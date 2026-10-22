@@ -79,7 +79,7 @@ test('--inkrecipe wash turns ink on and picks the source lines, and the command 
   const add = inkRecipeArgs('wash', ['--inkbleed', '0']), opt = n => add[add.indexOf('--' + n) + 1];
   assert.equal(opt('outlinemedium'), 'ink');
   assert.equal(opt('linesource'), 'source-ink');
-  assert.equal(opt('inkdarkmatch'), '1.6');
+  assert.equal(opt('inkdarkmatch'), '1');
   assert.ok(!add.includes('--inkbleed'));
   assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');
 });
@@ -95,9 +95,10 @@ test('--inkres keeps a finer file on its own grid, up to the fine sheet', async 
 
 test('the wash recipe draws on a fine sheet by width, by a hand that chains strokes', () => {
   const opt = (argv, n) => { const a = inkRecipeArgs('wash', argv); return a[a.indexOf('--' + n) + 1]; };
-  assert.equal(opt(['--width', '540'], 'inkres'), '3');
-  assert.equal(opt(['--width', '1200'], 'inkres'), '1');
-  assert.equal(opt(['--width', '800'], 'inkres'), '2');
+  assert.equal(opt(['--width', '540'], 'inkres'), '4');
+  assert.equal(opt(['--width', '1200'], 'inkres'), '2');
+  assert.equal(opt(['--width', '800'], 'inkres'), '3');
+  assert.equal(opt(['--width', '2400'], 'inkres'), '1');
   assert.ok(!inkRecipeArgs('wash', ['--width', '540', '--inkres', '2']).includes('--inkres'), 'a flag on the command line wins');
   assert.equal(INK_RECIPES.wash.drawinghand, '1');
   assert.equal(INK_RECIPES.wash.drawstroke, '0.1');
