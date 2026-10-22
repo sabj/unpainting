@@ -48,7 +48,7 @@ export function traceLineModel({ python, root, image, stem, cacheDir, width, max
   const fine = m.map.replace(/\.png$/, '-fine.png');
   // strokes: the source's own pen strokes (centrelines and widths), kept where the map also sees a line; else the map's contours
   const args = strokes
-    ? [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(m.width), '--kind', 'stroke', '--gate', m.map]
+    ? [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(m.width), '--kind', 'stroke', '--gate', m.map, '--stroke-close', '3']
     : [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map', ...(fs.existsSync(fine) ? ['--fine', fine] : [])];
   const r = run(python, [...args, ...(tolerance == null ? [] : ['--map-tolerance', String(tolerance)])],
     { cwd: root, encoding: 'utf8', timeout: 900000, env: { ...process.env, ...ENV } });

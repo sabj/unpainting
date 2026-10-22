@@ -18,10 +18,10 @@ export const GEOM_DEFAULTS = Object.freeze({
   formDegPerMm: 20,     // ... and turns no faster than this
   gapMm: 2.5,           // collinear pieces join across at most this
   nodeMm: 0.35,         // ends this close are one junction: the pair that turns least, within nodeDeg, continues
-  nodeDeg: 30,
+  nodeDeg: 40,
   squiggleDegPerMm: 60, // a piece turning faster than this is never chained
-  joinCos: 0.98,
-  joinAim: 0.97,
+  joinCos: 0.92,
+  joinAim: 0.9,
   energyStepMm: 0.5,    // the spacing curvature energy is read at, coarse enough to ignore the pixel staircase
 });
 
@@ -130,7 +130,8 @@ export function joinCollinear(lines, { pxMm }, o = GEOM_DEFAULTS) {
   const gap = o.gapMm / pxMm, n = lines.length, used = new Set(), items = lines.map(g => ({ g, pts: g.points }));
   const dir = (pts, atEnd) => { const a = atEnd ? pts[Math.max(0, pts.length - 4)] : pts[Math.min(pts.length - 1, 3)], b = atEnd ? pts.at(-1) : pts[0], d = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / d, y: (b.y - a.y) / d }; };
   // a squiggle is never chained to anything: it stays as short as it is, or goes
-  const wiggly = items.map(it => turning(it.pts) / pxMm > o.squiggleDegPerMm);
+  // read at 0.4 mm along the piece: a traced centreline steps from pixel to pixel, and that staircase is not a wiggle
+  const wiggly = items.map(it => { const R = resample(it.pts, Math.max(1, 0.4 / pxMm)); return R.length > 2 && turning(R) / pxMm > o.squiggleDegPerMm; });
   const ends = []; items.forEach((it, i) => { ends.push({ i, tail: false, p: it.pts[0], t: dir(it.pts, false) }, { i, tail: true, p: it.pts.at(-1), t: dir(it.pts, true) }); });
   const node = o.nodeMm / pxMm, nodeCos = Math.cos(o.nodeDeg * Math.PI / 180), pairs = [];
   for (let a = 0; a < ends.length; a++) for (let b = a + 1; b < ends.length; b++) {
