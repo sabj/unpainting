@@ -86,6 +86,40 @@
    "coarseFile": "targets/trumbull-coarse.json",
    "licence": "noncommercial project use; see NOTICE",
    "selfScore": 8.57
+  },
+  {
+   "task": "h36a",
+   "name": "Yale h36-a",
+   "width": 300,
+   "height": 200,
+   "coarse": {
+    "cols": 24,
+    "rows": 16
+   },
+   "style": "loose ink-and-watercolor field sketch, ink led",
+   "source": "Yale photograph, public domain",
+   "distributed": true,
+   "file": "targets/h36a.png",
+   "coarseFile": "targets/h36a-coarse.json",
+   "licence": "public domain",
+   "selfScore": 9.23
+  },
+  {
+   "task": "h34a",
+   "name": "Yale h34-a",
+   "width": 300,
+   "height": 200,
+   "coarse": {
+    "cols": 24,
+    "rows": 16
+   },
+   "style": "loose ink-and-watercolor field sketch, ink led",
+   "source": "Yale photograph, public domain",
+   "distributed": true,
+   "file": "targets/h34a.png",
+   "coarseFile": "targets/h34a-coarse.json",
+   "licence": "public domain",
+   "selfScore": 9.37
   }
  ]
 }

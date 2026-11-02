@@ -1,6 +1,9 @@
 {
  "note": "Models the harness knows how to run. runner: claude (Claude Code CLI), codex (Codex CLI), muse (Muse Code CLI), agy (Antigravity CLI) or together (bench/v2/runners/oss_loop.py on Together). effort is the reasoning setting sent, or n/a.",
  "models": [
+  { "key": "fable", "name": "Fable 5.1", "id": "claude-fable-5-1", "effort": "xhigh", "runner": "claude" },
+  { "key": "haiku55", "name": "Haiku 5.5", "id": "claude-haiku-5-5", "effort": "xhigh", "runner": "claude" },
+  { "key": "terra", "name": "Codex Terra", "id": "gpt-6.1-terra", "effort": "xhigh", "runner": "codex" },
   { "key": "opus", "name": "Opus 5.5", "id": "claude-opus-5-5", "effort": "xhigh", "runner": "claude" },
   { "key": "sonnet", "name": "Sonnet 5.5", "id": "claude-sonnet-5-5", "effort": "xhigh", "runner": "claude" },
   { "key": "haiku", "name": "Haiku 4.5", "id": "claude-haiku-4-5-20251001", "effort": "n/a", "runner": "claude" },

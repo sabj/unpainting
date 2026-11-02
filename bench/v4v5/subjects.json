@@ -35,6 +35,20 @@
    "width": 1200,
    "sheetmm": 280,
    "trumbull": false
+  },
+  "h36a": {
+   "name": "Yale h36-a",
+   "taskStyle": "loose ink-and-watercolor field sketch, ink led",
+   "width": 1224,
+   "sheetmm": 280,
+   "trumbull": false
+  },
+  "h34a": {
+   "name": "Yale h34-a",
+   "taskStyle": "loose ink-and-watercolor field sketch, ink led",
+   "width": 1224,
+   "sheetmm": 280,
+   "trumbull": false
   }
  }
 }

@@ -52,6 +52,15 @@
    "cachedInput": 0.1,
    "output": 10,
    "verified": "2026-10-07"
+  },
+  "claude-fable-5-1": {
+   "label": "Claude Fable 5.1",
+   "source": "https://platform.claude.com/docs/en/about-claude/pricing",
+   "input": 10,
+   "cacheWrite1h": 20,
+   "cacheWrite5m": 12.5,
+   "cacheRead": 0.25,
+   "output": 50
   }
  }
 }
