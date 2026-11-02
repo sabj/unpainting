@@ -1,0 +1,692 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V1",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 16.6,
+  "tokens": 3917841,
+  "costUSD": null,
+  "exitCode": 0,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 2,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 629,
+   "minutes": 0.1,
+   "smallShare": 0.469,
+   "shortStrokes": 39,
+   "dotStrokes": 0,
+   "copyHF": -0.0007,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.17,
+    "pm": 0.14,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 1,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 7.01,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 2.33,
+     "marks_texture": 2.33,
+     "classic_value": 5.58,
+     "classic_edge": 6.77,
+     "classic_landmark": null,
+     "classic_marks": 8.67
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 3,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J1",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J1-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 3,
+     "aggregation": "mean of per-judge medians"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"cb7a0fc8abb27372575bf4f14ddfe206b72a27731560f8e88df6648133d40733\",\"image\":\"83f026ad0be04bdd9ea57b40a20ae5b2f9bebe98d228205fefe0862f2029f9b6\",\"style\":\"very loose ink and wash\",\"judge\":\"J1\",\"profile\":\"J1-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 94.605
+   },
+   "progression": {
+    "stages": {
+     "10": 1,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 3
+    },
+    "earlyMean": 1.5,
+    "mean": 2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "e": 1,
+     "c": 4,
+     "m": 2,
+     "b": 2,
+     "j": 2,
+     "f": 1,
+     "a": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The sheet begins as one uniform faint wash with rectangular slab and scalloped block fills spreading like a masked raster reveal, the road arrives as a clean finished white ribbon late, and texture dumps all at once at the end rather than following a brush-and-pen order."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1\",\"image\":\"7a96c1c573d4370430bd9aadc5574d84a9bdeda064c1dacd70c4e28e96358beb\",\"style\":\"very loose ink and wash\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   }
+  },
+  "south-france": {
+   "seed": 2,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 503,
+   "minutes": 0.1,
+   "smallShare": 0.141,
+   "shortStrokes": 15,
+   "dotStrokes": 0,
+   "copyHF": 0.0014,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.97,
+    "pm": 0.1,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 2,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 7.28,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 1.67,
+     "marks_texture": 2.67,
+     "classic_value": 5.23,
+     "classic_edge": 7.61,
+     "classic_landmark": null,
+     "classic_marks": 9
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 3,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J1",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J1-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 3,
+     "aggregation": "mean of per-judge medians"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"c4c00d6ccc8e0ef9fc010030291b749f97054dd6107115c048cc4b600be781ba\",\"image\":\"4790dabe23bed29e1b8840aec680958675718260e61a99411a42e74697ee7175\",\"style\":\"urban sketch, pen plus light wash\",\"judge\":\"J1\",\"profile\":\"J1-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 52.336
+   },
+   "progression": {
+    "stages": {
+     "10": 3,
+     "25": 2,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 2.5,
+    "mean": 2.2,
+    "humanOrderVotes": 0,
+    "judgesN": 1,
+    "tells": {
+     "c": 5,
+     "b": 4,
+     "d": 1,
+     "a": 1,
+     "i": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Tree canopies accumulate as scalloped stamped blobs with white halos while the building stays a flat gray slab and no pen linework ever describes the subject, reading as a masked/stamped fill rather than brush-and-pen order."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1\",\"image\":\"4d3625931a59df951a8e57302a004c0c2f8c1609bf5651d12c4c7d1620f7757d\",\"style\":\"urban sketch, pen plus light wash\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   }
+  },
+  "sargent": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 205,
+   "minutes": 0.1,
+   "smallShare": 0.395,
+   "shortStrokes": 42,
+   "dotStrokes": 0,
+   "copyHF": 0.0107,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.15,
+    "pm": 0.07,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 0,
+    "complete": true,
+    "visionOverall": 2,
+    "classic": 6.3,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 1,
+     "classic_value": 5.12,
+     "classic_edge": 4.51,
+     "classic_landmark": null,
+     "classic_marks": 9.27
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 3,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J1",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J1-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 3,
+     "aggregation": "mean of per-judge medians"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"1e2e5201f186d71d0c0cade0ab27da35948509155b83861b697cce820b2e24d0\",\"image\":\"83cb552580c640bc847ab2ca8231a92c24d34a8371c727e9f9eb62d62d956e33\",\"style\":\"pure watercolor, no ink\",\"judge\":\"J1\",\"profile\":\"J1-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 143.857
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 2,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 1.5,
+    "mean": 1.8,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "e": 3,
+     "c": 7,
+     "m": 6
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The image materializes as scattered flat rectangular patches and stair-step block clusters over a faint low-opacity ghost, rather than through directional brush passages, revealing a block-based uncovering rather than a painter's working order.",
+     "Qwen/Qwen3.5-9B": "The sequence shows a digital filter or reveal effect rather than organic brushwork, with blocky, pixelated shapes emerging from a faint wash."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1\",\"image\":\"0b918066c7b1e37c1502b79c0e99363f46daca8e211523fce145b3d535c51a6c\",\"style\":\"pure watercolor, no ink\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   }
+  },
+  "mittens": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 241,
+   "minutes": 0,
+   "smallShare": 0.483,
+   "shortStrokes": 20,
+   "dotStrokes": 0,
+   "copyHF": -0.0132,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.16,
+    "pm": 0.14,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 1,
+    "complete": true,
+    "visionOverall": 2.33,
+    "classic": 5.99,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 1.67,
+     "classic_value": 3.79,
+     "classic_edge": 5.14,
+     "classic_landmark": null,
+     "classic_marks": 9.05
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 2,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 3,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J1",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J1-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 3,
+     "aggregation": "mean of per-judge medians"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"00584a1f99c95babfc02a5c429e8a2eb7cdef1bb41ef395ed5b84ba954d152a4\",\"image\":\"d0731b9665d24e21744d800c014d318e9737b80b5bb3d784a579948ab3fc0c01\",\"style\":\"watercolor portrait sketch, fine lines and light washes\",\"judge\":\"J1\",\"profile\":\"J1-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 44.427
+   },
+   "progression": {
+    "stages": {
+     "10": 1.5,
+     "25": 1.5,
+     "50": 1.5,
+     "75": 2,
+     "100": 2
+    },
+    "earlyMean": 1.5,
+    "mean": 1.7,
+    "humanOrderVotes": 0,
+    "judgesN": 2,
+    "tells": {
+     "c": 8,
+     "m": 5,
+     "a": 1,
+     "h": 4,
+     "e": 5,
+     "f": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The face and cat arrive as flat horizontally-banded slabs that stay nearly static while the hair swells as a growing blob and features are stamped on late, reading as a procedural fill rather than accumulated brush and pen strokes.",
+     "Qwen/Qwen3.5-9B": "The sequence shows static color masks fading in rather than being painted, with the man's face details appearing suddenly while the cat remains a flat blob."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1\",\"image\":\"bd2216564f6f49e2991ce081da35bb7ee4de96448892e2e7c5044eec8492adfe\",\"style\":\"watercolor portrait sketch, fine lines and light washes\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   }
+  },
+  "h36a": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h36a-strokes.jsonl.gz",
+   "strokes": 206,
+   "minutes": 0,
+   "smallShare": 0.273,
+   "shortStrokes": 10,
+   "dotStrokes": 0,
+   "copyHF": 0.0398,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 4.01,
+    "pm": 0.1,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 0,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 5.02,
+    "criteria": {
+     "composition_values": 3,
+     "edges_detail": 2,
+     "marks_texture": 3.33,
+     "classic_value": 3.21,
+     "classic_edge": 3.65,
+     "classic_landmark": null,
+     "classic_marks": 8.19
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 3,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J1",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J1-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 3,
+     "aggregation": "mean of per-judge medians"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"e7e943706fea7b27d17d5a0a500886f874fe8ef597ffa54323ce1c7f2aee5851\",\"image\":\"e177ecb897a706ac86ede442756dab352eeeacac09a5f76c7ae5410256463c4a\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judge\":\"J1\",\"profile\":\"J1-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 71.616
+   },
+   "progression": {
+    "stages": {
+     "10": 4.5,
+     "25": 4.5,
+     "50": 2.5,
+     "75": 2,
+     "100": 3
+    },
+    "earlyMean": 4.5,
+    "mean": 3.3,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "h": 2,
+     "j": 1,
+     "c": 2
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The ink-led order (arch and gate lines, then windows, then washes, then darks) is human in kind, but the 25–50% stage barely advances and the entire tonal scheme dumps in at 75% as evenly striped wall slabs, which reads as a layered reveal rather than brush-by-brush progress.",
+     "Qwen/Qwen3.5-9B": "The sequence does not lead to the target image; instead, the later stages replace detailed ink lines with flat, simplified color blocks."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1\",\"image\":\"8400a566eb060fca5c871f44231c2f26a82a274706ec0b13fd7d598b5b129d43\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   }
+  },
+  "h34a": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h34a-strokes.jsonl.gz",
+   "strokes": 171,
+   "minutes": 0,
+   "smallShare": 0.257,
+   "shortStrokes": 19,
+   "dotStrokes": 0,
+   "copyHF": -0.0312,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 3.98,
+    "pm": 0.19,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 1,
+    "complete": true,
+    "visionOverall": 2.67,
+    "classic": 5.3,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 2.33,
+     "marks_texture": 2.67,
+     "classic_value": 3.59,
+     "classic_edge": 3.84,
+     "classic_landmark": null,
+     "classic_marks": 8.47
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 2,
+     "zai-org/GLM-5.3-Flash": 3,
+     "Qwen/Qwen3.5-9B": 3
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 3,
+    "visionErrors": {},
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J1",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J1-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 3,
+     "aggregation": "mean of per-judge medians"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"1fa00aa3e91b1749c4131cf47de463ec83e803d8b03b7505aa582ff079e42bbb\",\"image\":\"b7532fe12ec56041ece17a1af21188f56f2aa9f786fae5e5c76a5c742f3fa5b6\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judge\":\"J1\",\"profile\":\"J1-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 62.389
+   },
+   "progression": {
+    "stages": {
+     "10": 5,
+     "25": 4.5,
+     "50": 5,
+     "75": 3,
+     "100": 3
+    },
+    "earlyMean": 4.75,
+    "mean": 4.1,
+    "humanOrderVotes": 1,
+    "judgesN": 2,
+    "tells": {
+     "i": 1,
+     "c": 3,
+     "h": 1
+    },
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable pen-then-wash sequence — main tower drawn first, secondary buildings and ground line added, broad washes at 75%, darks and detail last — with only minor flat slab-like fountain/ground washes at 75% and some noncommittal hatching at 25%.",
+     "Qwen/Qwen3.5-9B": "The sequence fails to progress towards the target, ending with an identical flat-block image that lacks detail."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1\",\"image\":\"ca4a1d121c03b64203e2c777cbe82104f2d133c9c025162592dc54a62a0fa325\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": 4.41,
+  "partialComposite": null,
+  "cropsScored": 6,
+  "complete": true,
+  "elapsedSeconds": 1232.209
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0.17,
+   "level": "low",
+   "parts": {
+    "progression": 0.4,
+    "earlyStageMean": 2.71,
+    "copyHF": {
+     "hills": -0.0007,
+     "south-france": 0.0014,
+     "sargent": 0.0107,
+     "mittens": -0.0132,
+     "h36a": 0.0398,
+     "h34a": -0.0312
+    },
+    "copy": 0,
+    "smallStrokeShare": 0.336,
+    "small": 0.07,
+    "audit": 0,
+    "progressionMissing": false
+   }
+  },
+  "progressionRisk": {
+   "score": 0.22,
+   "level": "low"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v1-naive/fable/2",
+ "judgeProfile": "J1-full",
+ "judgeRoute": "together"
+}

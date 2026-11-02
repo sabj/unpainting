@@ -1,0 +1,201 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V2",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [],
+  "progressionJudges": []
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 15,
+  "sessionCapMin": 85,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": false
+ },
+ "session": {
+  "minutes": 16.8,
+  "tokens": 3610961,
+  "costUSD": null,
+  "exitCode": 0,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 2,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 558,
+   "minutes": 0.1,
+   "smallShare": 0.028,
+   "shortStrokes": 182,
+   "dotStrokes": 47,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null
+  },
+  "south-france": {
+   "seed": 2,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 706,
+   "minutes": 0.1,
+   "smallShare": 0.056,
+   "shortStrokes": 282,
+   "dotStrokes": 54,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null
+  },
+  "sargent": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 108,
+   "minutes": 0,
+   "smallShare": 0.398,
+   "shortStrokes": 36,
+   "dotStrokes": 20,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null
+  },
+  "mittens": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 193,
+   "minutes": 0,
+   "smallShare": 0.24,
+   "shortStrokes": 25,
+   "dotStrokes": 0,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null
+  },
+  "h36a": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h36a-strokes.jsonl.gz",
+   "strokes": 332,
+   "minutes": 0,
+   "smallShare": 0.345,
+   "shortStrokes": 1,
+   "dotStrokes": 0,
+   "copyHF": null,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null
+  },
+  "h34a": {
+   "seed": 2,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h34a-strokes.jsonl.gz",
+   "strokes": 205,
+   "minutes": 0,
+   "smallShare": 0.167,
+   "shortStrokes": 16,
+   "dotStrokes": 0,
+   "copyHF": null,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null
+  }
+ },
+ "score": {
+  "status": "unscored",
+  "composite": null,
+  "complete": false
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": null,
+  "progressionRisk": null,
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v2-skill/fable/2"
+}

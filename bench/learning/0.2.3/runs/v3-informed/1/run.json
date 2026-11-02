@@ -1,0 +1,238 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [],
+  "progressionJudges": []
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 67.1,
+  "tokens": 11593366,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 587,
+   "minutes": 0.1,
+   "smallShare": 0.395,
+   "shortStrokes": 176,
+   "dotStrokes": 46,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 1,
+    "minutes": 10.5,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 523,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 119,
+   "dotStrokes": 23,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 1,
+    "minutes": 8.9,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 134,
+   "minutes": 0,
+   "smallShare": 0.231,
+   "shortStrokes": 13,
+   "dotStrokes": 8,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 1,
+    "minutes": 13.5,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "mittens": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 275,
+   "minutes": 0,
+   "smallShare": 0.407,
+   "shortStrokes": 63,
+   "dotStrokes": 9,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 1,
+    "minutes": 12.1,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "h36a": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h36a-strokes.jsonl.gz",
+   "strokes": 550,
+   "minutes": 0.1,
+   "smallShare": 0.032,
+   "shortStrokes": 201,
+   "dotStrokes": 97,
+   "copyHF": null,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 1,
+    "minutes": 11,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "h34a": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h34a-strokes.jsonl.gz",
+   "strokes": 403,
+   "minutes": 0.1,
+   "smallShare": 0.15,
+   "shortStrokes": 142,
+   "dotStrokes": 6,
+   "copyHF": null,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 1,
+    "minutes": 11.1,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "status": "unscored",
+  "composite": null,
+  "complete": false
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": null,
+  "progressionRisk": null,
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/fable/try-1"
+}

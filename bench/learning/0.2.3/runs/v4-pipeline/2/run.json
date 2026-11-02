@@ -1,0 +1,672 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V4",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J2",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [],
+  "progressionJudges": []
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": null,
+  "minutesPerCrop": null,
+  "sessionCapMin": 85,
+  "modelMinutesCap": 85,
+  "lookBudget": null,
+  "selfView": "gentle",
+  "targetGuard": "gentle",
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": false,
+  "strictVerdict": false,
+  "basePalette": true,
+  "benchmarkProfile": "full-v1",
+  "budget": {
+   "id": "full-v1",
+   "tries": 3,
+   "width": null,
+   "modelMinutes": 85,
+   "wallMinutes": 300,
+   "planOnly": false,
+   "repairTurns": 1,
+   "maxModelSteps": null,
+   "maxToolOutputBytes": null,
+   "tokenWatchLimit": null,
+   "renderMinutes": 60,
+   "checkMinutes": 15,
+   "judgeVersion": "J2",
+   "judgeProfile": "full",
+   "marks": 1
+  },
+  "judgeProfile": "J2-full",
+  "judgeRoute": "together",
+  "scoreProtocol": "native-v1",
+  "paintWidth": {
+   "hills": 1224,
+   "south-france": 1216,
+   "sargent": 1200,
+   "mittens": 1200,
+   "h36a": 1224,
+   "h34a": 1224
+  },
+  "painter": "tools/paint-plate.mjs",
+  "machine": "local"
+ },
+ "session": {
+  "minutes": 148.5,
+  "modelMinutes": 100.1,
+  "tokens": 33175115,
+  "observedTokens": 33175115,
+  "usageComplete": true,
+  "costUSD": null,
+  "modelSessionSeconds": 8912.315,
+  "elapsedSeconds": 8924.392,
+  "renderSeconds": 3647.64,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 968,
+    "mmPerCell": 0.1291
+   },
+   "strokeLog": null,
+   "strokes": 13464,
+   "minutes": 13.2,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay3_ew5",
+    "starts": 1,
+    "looks": 6,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 22.5,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 2054,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay3",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 0,
+    "segments": 1,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 2053.988,
+    "elapsedSeconds": 2054.083,
+    "renderSeconds": 790.934,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "hills-plan"
+   }
+  },
+  "south-france": {
+   "seed": 0,
+   "sheet": {
+    "W": 1216,
+    "H": 996,
+    "mmPerCell": 0.2303
+   },
+   "strokeLog": null,
+   "strokes": 10556,
+   "minutes": 7.3,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13",
+    "starts": 1,
+    "looks": 6,
+    "revisions": 1,
+    "revisionsRefused": 0,
+    "modelMinutes": 16.8,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1338,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "lay4",
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "sep8": "plan draws in another ink",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "skylanemm"
+     ],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 2,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1337.95,
+    "elapsedSeconds": 1338.025,
+    "renderSeconds": 436.314,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "south-france-plan"
+   }
+  },
+  "sargent": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 976,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": 9997,
+   "minutes": 12.4,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay2",
+    "starts": 1,
+    "looks": 6,
+    "revisions": 1,
+    "revisionsRefused": 0,
+    "modelMinutes": 16.4,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1465,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay2",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "closinglines",
+      "closingpressure",
+      "closingedgemin"
+     ],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 2,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1464.971,
+    "elapsedSeconds": 1465.007,
+    "renderSeconds": 741.1129999999999,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "sargent-plan"
+   }
+  },
+  "mittens": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 1036,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": 2461,
+   "minutes": 3.7,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay2_sep4",
+    "starts": 1,
+    "looks": 5,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 17.7,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1185,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay2",
+      "sep8": "plan chose sep4",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "skylanemm",
+      "skyfloc"
+     ],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 1,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1185.009,
+    "elapsedSeconds": 1185.041,
+    "renderSeconds": 219.119,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "mittens-plan"
+   }
+  },
+  "h36a": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 816,
+    "mmPerCell": 0.2288
+   },
+   "strokeLog": null,
+   "strokes": 12335,
+   "minutes": 10.6,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay2_ew5",
+    "starts": 1,
+    "looks": 7,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 11.9,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1239,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay2",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 0,
+    "segments": 1,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1238.724,
+    "elapsedSeconds": 1238.757,
+    "renderSeconds": 633.031,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "h36a-plan"
+   }
+  },
+  "h34a": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 816,
+    "mmPerCell": 0.2288
+   },
+   "strokeLog": null,
+   "strokes": 14217,
+   "minutes": 13.8,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": null,
+   "score": null,
+   "progression": null,
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay2",
+    "starts": 1,
+    "looks": 6,
+    "revisions": 2,
+    "revisionsRefused": 0,
+    "modelMinutes": 14.8,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1632,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay2",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 3,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1631.673,
+    "elapsedSeconds": 1631.733,
+    "renderSeconds": 827.129,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "h34a-plan"
+   }
+  }
+ },
+ "score": {
+  "status": "unscored",
+  "composite": null,
+  "complete": false
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": null,
+  "progressionRisk": null,
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/full-v1/9da0569655ea/v4-pipeline/fable/2"
+}

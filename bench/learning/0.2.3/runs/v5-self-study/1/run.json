@@ -1,0 +1,3433 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V5",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J2",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [
+   "Qwen/Qwen3.5-9B",
+   "moonshotai/Kimi-K3",
+   "zai-org/GLM-5.3-Flash"
+  ],
+  "progressionJudges": [
+   "Qwen/Qwen3.5-9B",
+   "zai-org/GLM-5.3-Flash"
+  ]
+ },
+ "try": 1,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": null,
+  "minutesPerCrop": null,
+  "sessionCapMin": 85,
+  "modelMinutesCap": 85,
+  "lookBudget": null,
+  "selfView": "gentle",
+  "targetGuard": "gentle",
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": true,
+  "strictVerdict": false,
+  "basePalette": true,
+  "benchmarkProfile": "full-v1",
+  "budget": {
+   "id": "full-v1",
+   "tries": 3,
+   "width": null,
+   "modelMinutes": 85,
+   "wallMinutes": 300,
+   "planOnly": false,
+   "repairTurns": 1,
+   "maxModelSteps": null,
+   "maxToolOutputBytes": null,
+   "tokenWatchLimit": null,
+   "renderMinutes": 60,
+   "checkMinutes": 15,
+   "judgeVersion": "J2",
+   "judgeProfile": "full",
+   "marks": 1
+  },
+  "judgeProfile": "J2-full",
+  "judgeRoute": "together",
+  "scoreProtocol": "native-v1",
+  "paintWidth": {
+   "hills": 1224,
+   "south-france": 1216,
+   "sargent": 1200,
+   "mittens": 1200,
+   "h36a": 1224,
+   "h34a": 1224
+  },
+  "painter": "tools/paint-plate.mjs",
+  "machine": "local"
+ },
+ "session": {
+  "minutes": 163.4,
+  "modelMinutes": 95,
+  "tokens": 37508646,
+  "observedTokens": 37508646,
+  "usageComplete": true,
+  "costUSD": null,
+  "modelSessionSeconds": 9806.896,
+  "elapsedSeconds": 9816.853,
+  "renderSeconds": 4979.418000000001,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 968,
+    "mmPerCell": 0.1291
+   },
+   "strokeLog": null,
+   "strokes": 12507,
+   "minutes": 19.3,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.73,
+    "pm": 0.14,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 2,
+    "complete": true,
+    "visionOverall": 3,
+    "classic": 8.46,
+    "criteria": {
+     "composition_values": 4,
+     "edges_detail": 2,
+     "marks_texture": 2.67,
+     "classic_value": 6.57,
+     "classic_edge": 9.44,
+     "classic_landmark": null,
+     "classic_marks": 9.37
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 5,
+    "visionErrors": {},
+    "visionAttempts": [
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1766,
+      "provider": "together",
+      "promptTokens": 667,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 471,
+      "provider": "together",
+      "promptTokens": 667,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1394,
+      "provider": "together",
+      "promptTokens": 667,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"2fd8a4bc-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"062931b6-aws_uw2\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 733,
+      "provider": "together",
+      "promptTokens": 667,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 636,
+      "provider": "together",
+      "promptTokens": 667,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 577,
+      "provider": "together",
+      "promptTokens": 581,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 714,
+      "provider": "together",
+      "promptTokens": 581,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 575,
+      "provider": "together",
+      "promptTokens": 581,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 503,
+      "provider": "together",
+      "promptTokens": 581,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 575,
+      "provider": "together",
+      "promptTokens": 581,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2318,
+      "provider": "together",
+      "promptTokens": 521,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1342,
+      "provider": "together",
+      "promptTokens": 521,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1403,
+      "provider": "together",
+      "promptTokens": 521,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2824,
+      "provider": "together",
+      "promptTokens": 521,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 7109,
+      "provider": "together",
+      "promptTokens": 521,
+      "costUSD": null
+     }
+    ],
+    "visionSamples": {
+     "moonshotai/Kimi-K3": [
+      {
+       "composition_values": 3,
+       "edges_detail": 2,
+       "marks_texture": 2,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 3,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 3,
+       "edges_detail": 2,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      }
+     ],
+     "zai-org/GLM-5.3-Flash": [
+      {
+       "composition_values": 4,
+       "edges_detail": 3,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 3,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 3,
+       "marks_texture": 6,
+       "overall": 4,
+       "_provider": "together"
+      }
+     ],
+     "Qwen/Qwen3.5-9B": [
+      {
+       "composition_values": 2,
+       "edges_detail": 1,
+       "marks_texture": 1,
+       "overall": 1,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 3,
+       "edges_detail": 1,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 3,
+       "edges_detail": 1,
+       "marks_texture": 2,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 3,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      }
+     ]
+    },
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J2",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J2-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 5,
+     "aggregation": "mean of per-judge medians"
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 306,
+     "h": 242,
+     "from": [
+      1224,
+      968
+     ],
+     "resize": "Lanczos to the target's native size"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"cb7a0fc8abb27372575bf4f14ddfe206b72a27731560f8e88df6648133d40733\",\"image\":\"ddc87e5fee6de582266997bb55504a35bf9f532bd18183838d8522cb7d88f9a1\",\"style\":\"very loose ink and wash\",\"judge\":\"J2\",\"profile\":\"J2-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 81.531
+   },
+   "progression": {
+    "complete": true,
+    "perJudge": {
+     "zai-org/GLM-5.3-Flash": {
+      "stages": {
+       "10": 4,
+       "25": 4,
+       "50": 5,
+       "75": 5,
+       "100": 5
+      },
+      "earlyMean": 4,
+      "mean": 4.6,
+      "humanOrderVotes": 1,
+      "judgesN": 1,
+      "tells": {
+       "e": 1,
+       "f": 1
+      },
+      "judges": [
+       "zai-org/GLM-5.3-Flash"
+      ],
+      "judgeNotes": {
+       "zai-org/GLM-5.3-Flash": "Contour lines come first, washes deepen light-to-dark with shadows blocked regionally and texture building gradually to the finish, a natural brush-and-pen sequence with only a faint uniform underlay and an early shadow region as small tells."
+      }
+     },
+     "Qwen/Qwen3.5-9B": {
+      "stages": {
+       "10": 1,
+       "25": 1,
+       "50": 1,
+       "75": 1,
+       "100": 1
+      },
+      "earlyMean": 1,
+      "mean": 1,
+      "humanOrderVotes": 0,
+      "judgesN": 1,
+      "tells": {
+       "e": 5,
+       "c": 1,
+       "i": 1
+      },
+      "judges": [
+       "Qwen/Qwen3.5-9B"
+      ],
+      "judgeNotes": {
+       "Qwen/Qwen3.5-9B": "The sequence depicts a digital filter reveal where the entire image fades in uniformly rather than being built up with additive brushstrokes."
+      }
+     }
+    },
+    "judgesN": 2,
+    "judges": [
+     "zai-org/GLM-5.3-Flash",
+     "Qwen/Qwen3.5-9B"
+    ],
+    "stages": {
+     "10": 2.5,
+     "25": 2.5,
+     "50": 3,
+     "75": 3,
+     "100": 3
+    },
+    "earlyMean": 2.5,
+    "mean": 2.8,
+    "humanOrderVotes": 1,
+    "tells": {
+     "e": 6,
+     "f": 1,
+     "c": 1,
+     "i": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "Contour lines come first, washes deepen light-to-dark with shadows blocked regionally and texture building gradually to the finish, a natural brush-and-pen sequence with only a faint uniform underlay and an early shadow region as small tells.",
+     "Qwen/Qwen3.5-9B": "The sequence depicts a digital filter reveal where the entire image fades in uniformly rather than being built up with additive brushstrokes."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1-complete\",\"image\":\"e843a4a2dc573853695a3fa39431af94ab137d61e3c8f097c9ecd2de15f330fe\",\"style\":\"very loose ink and wash\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   },
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay3_dk14",
+    "starts": 1,
+    "looks": 7,
+    "revisions": 1,
+    "revisionsRefused": 0,
+    "modelMinutes": 11.4,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1684,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay3",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "dk13": "plan chose dk14",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 2,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1683.699,
+    "elapsedSeconds": 1683.753,
+    "renderSeconds": 1158.962,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "hills-plan"
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.479,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   }
+  },
+  "south-france": {
+   "seed": 0,
+   "sheet": {
+    "W": 1216,
+    "H": 996,
+    "mmPerCell": 0.2303
+   },
+   "strokeLog": null,
+   "strokes": 15740,
+   "minutes": 16.1,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.82,
+    "pm": 0.1,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 3,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 8.31,
+    "criteria": {
+     "composition_values": 4.33,
+     "edges_detail": 3,
+     "marks_texture": 2.67,
+     "classic_value": 5.82,
+     "classic_edge": 9.48,
+     "classic_landmark": null,
+     "classic_marks": 9.62
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 5,
+    "visionErrors": {},
+    "visionAttempts": [
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 802,
+      "provider": "together",
+      "promptTokens": 697,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 636,
+      "provider": "together",
+      "promptTokens": 697,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 907,
+      "provider": "together",
+      "promptTokens": 697,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 722,
+      "provider": "together",
+      "promptTokens": 697,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 723,
+      "provider": "together",
+      "promptTokens": 697,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 822,
+      "provider": "together",
+      "promptTokens": 611,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 565,
+      "provider": "together",
+      "promptTokens": 611,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 649,
+      "provider": "together",
+      "promptTokens": 611,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 857,
+      "provider": "together",
+      "promptTokens": 611,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 665,
+      "provider": "together",
+      "promptTokens": 611,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 6084,
+      "provider": "together",
+      "promptTokens": 523,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2141,
+      "provider": "together",
+      "promptTokens": 523,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 4795,
+      "provider": "together",
+      "promptTokens": 523,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1923,
+      "provider": "together",
+      "promptTokens": 523,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 3897,
+      "provider": "together",
+      "promptTokens": 523,
+      "costUSD": null
+     }
+    ],
+    "visionSamples": {
+     "moonshotai/Kimi-K3": [
+      {
+       "composition_values": 4,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      }
+     ],
+     "zai-org/GLM-5.3-Flash": [
+      {
+       "composition_values": 5,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 5,
+       "marks_texture": 7,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ],
+     "Qwen/Qwen3.5-9B": [
+      {
+       "composition_values": 3,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      }
+     ]
+    },
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J2",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J2-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 5,
+     "aggregation": "mean of per-judge medians"
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 304,
+     "h": 249,
+     "from": [
+      1216,
+      996
+     ],
+     "resize": "Lanczos to the target's native size"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"c4c00d6ccc8e0ef9fc010030291b749f97054dd6107115c048cc4b600be781ba\",\"image\":\"d700d45b352fcc8b386f763726dc2b8b5ba6e01d26eede2aab01ec316f7fb6d9\",\"style\":\"urban sketch, pen plus light wash\",\"judge\":\"J2\",\"profile\":\"J2-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 62.206
+   },
+   "progression": {
+    "complete": false,
+    "perJudge": {
+     "zai-org/GLM-5.3-Flash": {
+      "stages": {
+       "10": 3,
+       "25": 2,
+       "50": 3,
+       "75": 4,
+       "100": 5
+      },
+      "earlyMean": 2.5,
+      "mean": 3.4,
+      "humanOrderVotes": 0,
+      "judgesN": 1,
+      "tells": {
+       "e": 2,
+       "c": 2,
+       "j": 1
+      },
+      "judges": [
+       "zai-org/GLM-5.3-Flash"
+      ],
+      "judgeNotes": {
+       "zai-org/GLM-5.3-Flash": "The whole sheet shifts as one uniform value flood (peach, then flat olive slab) through 50% with no region developed ahead of its neighbours, and foliage texture then sharpens everywhere at once late — a global tonal ramp rather than a painter working area by area, despite the credible pen linework on the buildings."
+      }
+     },
+     "Qwen/Qwen3.5-9B": {
+      "stages": {},
+      "earlyMean": null,
+      "errors": {
+       "Qwen/Qwen3.5-9B": "AttributeError(\"'NoneType' object has no attribute 'group'\")"
+      }
+     }
+    },
+    "judgesN": 1,
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "stages": {},
+    "earlyMean": null,
+    "mean": null,
+    "humanOrderVotes": 0,
+    "tells": {
+     "e": 2,
+     "c": 2,
+     "j": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The whole sheet shifts as one uniform value flood (peach, then flat olive slab) through 50% with no region developed ahead of its neighbours, and foliage texture then sharpens everywhere at once late — a global tonal ramp rather than a painter working area by area, despite the credible pen linework on the buildings."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1-complete\",\"image\":\"9e5583e52db169905acd4f6f429fcdff46a0028acd8474bb9bce8dd594d47f59\",\"style\":\"urban sketch, pen plus light wash\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   },
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay2_ew5",
+    "starts": 1,
+    "looks": 5,
+    "revisions": 2,
+    "revisionsRefused": 0,
+    "modelMinutes": 19.4,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 2053,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay2",
+      "sep8": "plan draws in another ink",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "skylanemm"
+     ],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 3,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 2053.268,
+    "elapsedSeconds": 2053.299,
+    "renderSeconds": 967.3960000000001,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "south-france-plan"
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.491,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   }
+  },
+  "sargent": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 976,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": 16638,
+   "minutes": 12.3,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 5.27,
+    "pm": 0.18,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 3,
+    "complete": true,
+    "visionOverall": 3.33,
+    "classic": 7.21,
+    "criteria": {
+     "composition_values": 5,
+     "edges_detail": 3.33,
+     "marks_texture": 3,
+     "classic_value": 5.65,
+     "classic_edge": 9.07,
+     "classic_landmark": null,
+     "classic_marks": 6.9
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 3,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 2
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 5,
+    "visionErrors": {},
+    "visionAttempts": [
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"a1f6c948-aws_uw2\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1042,
+      "provider": "together",
+      "promptTokens": 695,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2072,
+      "provider": "together",
+      "promptTokens": 695,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2059,
+      "provider": "together",
+      "promptTokens": 695,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"7d61cbba-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1807,
+      "provider": "together",
+      "promptTokens": 695,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"7bdc4eab-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"ebd2feaf-aws_uw2\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"75452082-aws_uw2\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 2,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1049,
+      "provider": "together",
+      "promptTokens": 695,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 815,
+      "provider": "together",
+      "promptTokens": 610,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 530,
+      "provider": "together",
+      "promptTokens": 610,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 505,
+      "provider": "together",
+      "promptTokens": 610,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 774,
+      "provider": "together",
+      "promptTokens": 610,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 519,
+      "provider": "together",
+      "promptTokens": 610,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1464,
+      "provider": "together",
+      "promptTokens": 522,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 3639,
+      "provider": "together",
+      "promptTokens": 522,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1904,
+      "provider": "together",
+      "promptTokens": 522,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2877,
+      "provider": "together",
+      "promptTokens": 522,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 5863,
+      "provider": "together",
+      "promptTokens": 522,
+      "costUSD": null
+     }
+    ],
+    "visionSamples": {
+     "moonshotai/Kimi-K3": [
+      {
+       "composition_values": 5,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 3,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      }
+     ],
+     "zai-org/GLM-5.3-Flash": [
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 7,
+       "edges_detail": 6,
+       "marks_texture": 7,
+       "overall": 7,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 4,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      }
+     ],
+     "Qwen/Qwen3.5-9B": [
+      {
+       "composition_values": 3,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 4,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 3,
+       "edges_detail": 2,
+       "marks_texture": 1,
+       "overall": 2,
+       "_provider": "together"
+      }
+     ]
+    },
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J2",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J2-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 5,
+     "aggregation": "mean of per-judge medians"
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 244,
+     "from": [
+      1200,
+      976
+     ],
+     "resize": "Lanczos to the target's native size"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"1e2e5201f186d71d0c0cade0ab27da35948509155b83861b697cce820b2e24d0\",\"image\":\"bad4962926b0bad52808ce655672f2142c2935fa7e7c048cbf441871ec3e5bb1\",\"style\":\"pure watercolor, no ink\",\"judge\":\"J2\",\"profile\":\"J2-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 112.549
+   },
+   "progression": {
+    "complete": false,
+    "perJudge": {
+     "zai-org/GLM-5.3-Flash": {
+      "stages": {
+       "10": 1,
+       "25": 2,
+       "50": 2,
+       "75": 2,
+       "100": 5
+      },
+      "earlyMean": 1.5,
+      "mean": 2.4,
+      "humanOrderVotes": 0,
+      "judgesN": 1,
+      "tells": {
+       "e": 3,
+       "l": 1,
+       "j": 2
+      },
+      "judges": [
+       "zai-org/GLM-5.3-Flash"
+      ],
+      "judgeNotes": {
+       "zai-org/GLM-5.3-Flash": "The whole composition, including fine rigging and the anchor, is already faintly present at 10-25% and merely darkens globally toward 100%, reading as the finished sheet fading in rather than strokes accumulating."
+      }
+     },
+     "Qwen/Qwen3.5-9B": {
+      "stages": {},
+      "earlyMean": null,
+      "errors": {
+       "Qwen/Qwen3.5-9B": "AttributeError(\"'NoneType' object has no attribute 'group'\")"
+      }
+     }
+    },
+    "judgesN": 1,
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "stages": {},
+    "earlyMean": null,
+    "mean": null,
+    "humanOrderVotes": 0,
+    "tells": {
+     "e": 3,
+     "l": 1,
+     "j": 2
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The whole composition, including fine rigging and the anchor, is already faintly present at 10-25% and merely darkens globally toward 100%, reading as the finished sheet fading in rather than strokes accumulating."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1-complete\",\"image\":\"5b7bebb75c3e13e1622445d19b03c94053cd38435ede794bcdd1b49aeac49e62\",\"style\":\"pure watercolor, no ink\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   },
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay2_soft_efade_lf_dk11",
+    "starts": 1,
+    "looks": 6,
+    "revisions": 2,
+    "revisionsRefused": 0,
+    "modelMinutes": 19.2,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1747,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay2",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "dk13": "plan chose dk11",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "closinglines",
+      "closingpressure",
+      "closingedgemin"
+     ],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 3,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1746.66,
+    "elapsedSeconds": 1746.707,
+    "renderSeconds": 735.478,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "sargent-plan"
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.266,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   }
+  },
+  "mittens": {
+   "seed": 0,
+   "sheet": {
+    "W": 1200,
+    "H": 1036,
+    "mmPerCell": 0.2333
+   },
+   "strokeLog": null,
+   "strokes": 3415,
+   "minutes": 4.5,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 6.75,
+    "pm": 0.19,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 2,
+    "complete": true,
+    "visionOverall": 5,
+    "classic": 8.5,
+    "criteria": {
+     "composition_values": 7,
+     "edges_detail": 4.33,
+     "marks_texture": 4.33,
+     "classic_value": 6.84,
+     "classic_edge": 8.92,
+     "classic_landmark": null,
+     "classic_marks": 9.75
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 4,
+     "Qwen/Qwen3.5-9B": 6
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 5,
+    "visionErrors": {},
+    "visionAttempts": [
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"07769181-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1311,
+      "provider": "together",
+      "promptTokens": 699,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"1549aa6b-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2137,
+      "provider": "together",
+      "promptTokens": 699,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"4d6922e1-aws_uw2\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1684,
+      "provider": "together",
+      "promptTokens": 699,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"c1f3d614-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1093,
+      "provider": "together",
+      "promptTokens": 699,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1700,
+      "provider": "together",
+      "promptTokens": 699,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 645,
+      "provider": "together",
+      "promptTokens": 615,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 759,
+      "provider": "together",
+      "promptTokens": 615,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 542,
+      "provider": "together",
+      "promptTokens": 615,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 749,
+      "provider": "together",
+      "promptTokens": 615,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 615,
+      "provider": "together",
+      "promptTokens": 615,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 3917,
+      "provider": "together",
+      "promptTokens": 527,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 3470,
+      "provider": "together",
+      "promptTokens": 527,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1053,
+      "provider": "together",
+      "promptTokens": 527,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 3470,
+      "provider": "together",
+      "promptTokens": 527,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 5791,
+      "provider": "together",
+      "promptTokens": 527,
+      "costUSD": null
+     }
+    ],
+    "visionSamples": {
+     "moonshotai/Kimi-K3": [
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 3,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 4,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ],
+     "zai-org/GLM-5.3-Flash": [
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 3,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 7,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 3,
+       "overall": 4,
+       "_provider": "together"
+      }
+     ],
+     "Qwen/Qwen3.5-9B": [
+      {
+       "composition_values": 8,
+       "edges_detail": 6,
+       "marks_texture": 5,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 8,
+       "edges_detail": 6,
+       "marks_texture": 6,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 9,
+       "edges_detail": 5,
+       "marks_texture": 4,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 9,
+       "edges_detail": 4,
+       "marks_texture": 3,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 9,
+       "edges_detail": 6,
+       "marks_texture": 6,
+       "overall": 7,
+       "_provider": "together"
+      }
+     ]
+    },
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J2",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J2-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 5,
+     "aggregation": "mean of per-judge medians"
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 259,
+     "from": [
+      1200,
+      1036
+     ],
+     "resize": "Lanczos to the target's native size"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"00584a1f99c95babfc02a5c429e8a2eb7cdef1bb41ef395ed5b84ba954d152a4\",\"image\":\"89f92845037bcb22626113875692812ab55b2ef353c20ab8bf0c99bb5afed5e1\",\"style\":\"watercolor portrait sketch, fine lines and light washes\",\"judge\":\"J2\",\"profile\":\"J2-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 78.396
+   },
+   "progression": {
+    "complete": false,
+    "perJudge": {
+     "zai-org/GLM-5.3-Flash": {
+      "stages": {
+       "10": 1,
+       "25": 2,
+       "50": 2,
+       "75": 2,
+       "100": 4
+      },
+      "earlyMean": 1.5,
+      "mean": 2.2,
+      "humanOrderVotes": 0,
+      "judgesN": 1,
+      "tells": {
+       "e": 1,
+       "l": 1,
+       "f": 2,
+       "c": 1,
+       "j": 1
+      },
+      "judges": [
+       "zai-org/GLM-5.3-Flash"
+      ],
+      "judgeNotes": {
+       "zai-org/GLM-5.3-Flash": "The whole sheet appears faintly complete at 10% and then darkens everywhere in proportion to final value — cat and face arriving as parallel fades rather than drawn, region-by-region painting — a dissolve of the finished image, not a brush order."
+      }
+     },
+     "Qwen/Qwen3.5-9B": {
+      "stages": {},
+      "earlyMean": null,
+      "errors": {
+       "Qwen/Qwen3.5-9B": "AttributeError(\"'NoneType' object has no attribute 'group'\")"
+      }
+     }
+    },
+    "judgesN": 1,
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "stages": {},
+    "earlyMean": null,
+    "mean": null,
+    "humanOrderVotes": 0,
+    "tells": {
+     "e": 1,
+     "l": 1,
+     "f": 2,
+     "c": 1,
+     "j": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "The whole sheet appears faintly complete at 10% and then darkens everywhere in proportion to final value — cat and face arriving as parallel fades rather than drawn, region-by-region painting — a dissolve of the finished image, not a brush order."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1-complete\",\"image\":\"77b0d5a3d0d3fc2800698a7593b69fef406c8d1aa562dd43bba0a03241635141\",\"style\":\"watercolor portrait sketch, fine lines and light washes\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   },
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay3_dp80",
+    "starts": 1,
+    "looks": 5,
+    "revisions": 0,
+    "revisionsRefused": 0,
+    "modelMinutes": 19.3,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1360,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay3",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [
+      "skylanemm"
+     ],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 3,
+    "segments": 1,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1360.055,
+    "elapsedSeconds": 1360.089,
+    "renderSeconds": 268.171,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "mittens-plan"
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.582,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   }
+  },
+  "h36a": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 816,
+    "mmPerCell": 0.2288
+   },
+   "strokeLog": null,
+   "strokes": 13608,
+   "minutes": 14.3,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 6.76,
+    "pm": 0.15,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 0,
+    "complete": true,
+    "visionOverall": 5,
+    "classic": 8.53,
+    "criteria": {
+     "composition_values": 6,
+     "edges_detail": 4.33,
+     "marks_texture": 4,
+     "classic_value": 6.42,
+     "classic_edge": 9.54,
+     "classic_landmark": null,
+     "classic_marks": 9.63
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 5,
+    "visionErrors": {},
+    "visionAttempts": [
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"c2c0235c-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1717,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2249,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1990,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 429,
+      "error": "HTTP 429 {\"id\":\"a3966f33-aws_uw1\",\"error\":{\"message\":\"Too many requests in a short window. Our rate limits are dynamic - they shi"
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1774,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2637,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 797,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 714,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 653,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 967,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 620,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1663,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1612,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 2535,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 5580,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 5759,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     }
+    ],
+    "visionSamples": {
+     "moonshotai/Kimi-K3": [
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 4,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 4,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 4,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 5,
+       "edges_detail": 4,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ],
+     "zai-org/GLM-5.3-Flash": [
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ],
+     "Qwen/Qwen3.5-9B": [
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 2,
+       "overall": 3,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 3,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 7,
+       "edges_detail": 4,
+       "marks_texture": 3,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 3,
+       "marks_texture": 7,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ]
+    },
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J2",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J2-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 5,
+     "aggregation": "mean of per-judge medians"
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 200,
+     "from": [
+      1224,
+      816
+     ],
+     "resize": "Lanczos to the target's native size"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"e7e943706fea7b27d17d5a0a500886f874fe8ef597ffa54323ce1c7f2aee5851\",\"image\":\"d3453dedb1993d5b7a92f969ffeffc1f371e5f0b9ad67ce2d64c29a50b4baf6d\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judge\":\"J2\",\"profile\":\"J2-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 95.141
+   },
+   "progression": {
+    "complete": false,
+    "perJudge": {
+     "zai-org/GLM-5.3-Flash": {
+      "stages": {
+       "10": 4,
+       "25": 5,
+       "50": 5,
+       "75": 5,
+       "100": 5
+      },
+      "earlyMean": 4.5,
+      "mean": 4.8,
+      "humanOrderVotes": 1,
+      "judgesN": 1,
+      "tells": {
+       "l": 1
+      },
+      "judges": [
+       "zai-org/GLM-5.3-Flash"
+      ],
+      "judgeNotes": {
+       "zai-org/GLM-5.3-Flash": "A believable pen-led build — ink structure and perspective lines first, then layered stone washes, then shadows and foliage accents last — with the only small stretch being the fully detailed gate bars and window tracery already inked at 10%."
+      }
+     },
+     "Qwen/Qwen3.5-9B": {
+      "stages": {},
+      "earlyMean": null,
+      "errors": {
+       "Qwen/Qwen3.5-9B": "AttributeError(\"'NoneType' object has no attribute 'group'\")"
+      }
+     }
+    },
+    "judgesN": 1,
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "stages": {},
+    "earlyMean": null,
+    "mean": null,
+    "humanOrderVotes": 1,
+    "tells": {
+     "l": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A believable pen-led build — ink structure and perspective lines first, then layered stone washes, then shadows and foliage accents last — with the only small stretch being the fully detailed gate bars and window tracery already inked at 10%."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1-complete\",\"image\":\"a524cfbf1d3dc1b014dcaeb94a5bf6d25b95c54ba1c1fe6102df00f917b356a4\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   },
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w15_lay3_noslane",
+    "starts": 1,
+    "looks": 5,
+    "revisions": 1,
+    "revisionsRefused": 0,
+    "modelMinutes": 13.6,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1511,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "sep8",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay3",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 0,
+    "segments": 2,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1510.978,
+    "elapsedSeconds": 1511.052,
+    "renderSeconds": 855.481,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "h36a-plan"
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.64,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   }
+  },
+  "h34a": {
+   "seed": 0,
+   "sheet": {
+    "W": 1224,
+    "H": 816,
+    "mmPerCell": 0.2288
+   },
+   "strokeLog": null,
+   "strokes": 15232,
+   "minutes": 16.6,
+   "smallShare": null,
+   "shortStrokes": null,
+   "dotStrokes": null,
+   "copyHF": null,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": null,
+   "score": {
+    "composite": 7.05,
+    "pm": 0.12,
+    "repeatabilityMeasured": true,
+    "judgeSpread": 1,
+    "complete": true,
+    "visionOverall": 5.33,
+    "classic": 8.78,
+    "criteria": {
+     "composition_values": 7,
+     "edges_detail": 4.33,
+     "marks_texture": 5.33,
+     "classic_value": 7.18,
+     "classic_edge": 9.5,
+     "classic_landmark": null,
+     "classic_marks": 9.65
+    },
+    "judgeScores": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 6,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "callsPerModel": 5,
+    "callCounts": {
+     "moonshotai/Kimi-K3": 5,
+     "zai-org/GLM-5.3-Flash": 5,
+     "Qwen/Qwen3.5-9B": 5
+    },
+    "minValidCalls": 5,
+    "visionErrors": {},
+    "visionAttempts": [
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1911,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1869,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 727,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1024,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "moonshotai/Kimi-K3",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1540,
+      "provider": "together",
+      "promptTokens": 644,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 556,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 702,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 739,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 708,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "zai-org/GLM-5.3-Flash",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 539,
+      "provider": "together",
+      "promptTokens": 558,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 0,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 5884,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 1,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1980,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 2,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 5015,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 3,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 1218,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     },
+     {
+      "round": 0,
+      "judge": "Qwen/Qwen3.5-9B",
+      "slot": 4,
+      "attempt": 1,
+      "status": 200,
+      "finish_reason": "stop",
+      "maxTokens": 8000,
+      "completionTokens": 7486,
+      "provider": "together",
+      "promptTokens": 478,
+      "costUSD": null
+     }
+    ],
+    "visionSamples": {
+     "moonshotai/Kimi-K3": [
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 3,
+       "overall": 4,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ],
+     "zai-org/GLM-5.3-Flash": [
+      {
+       "composition_values": 7,
+       "edges_detail": 6,
+       "marks_texture": 7,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 6,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 7,
+       "edges_detail": 6,
+       "marks_texture": 7,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 6,
+       "edges_detail": 5,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 7,
+       "edges_detail": 5,
+       "marks_texture": 7,
+       "overall": 6,
+       "_provider": "together"
+      }
+     ],
+     "Qwen/Qwen3.5-9B": [
+      {
+       "composition_values": 6,
+       "edges_detail": 4,
+       "marks_texture": 4,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 8,
+       "edges_detail": 6,
+       "marks_texture": 6,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 7,
+       "edges_detail": 4,
+       "marks_texture": 5,
+       "overall": 5,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 8,
+       "edges_detail": 5,
+       "marks_texture": 4,
+       "overall": 6,
+       "_provider": "together"
+      },
+      {
+       "composition_values": 8,
+       "edges_detail": 4,
+       "marks_texture": 4,
+       "overall": 5,
+       "_provider": "together"
+      }
+     ]
+    },
+    "rubric": "bench-v3-median5",
+    "judgeVersion": "J2",
+    "provider": "together",
+    "judgeRoute": "together",
+    "judgeProfile": "J2-full",
+    "sampling": {
+     "judges": [
+      "moonshotai/Kimi-K3",
+      "zai-org/GLM-5.3-Flash",
+      "Qwen/Qwen3.5-9B"
+     ],
+     "requestedCallsPerJudge": 5,
+     "requiredValidCallsPerJudge": 5,
+     "aggregation": "mean of per-judge medians"
+    },
+    "protocol": "native",
+    "scoreInput": {
+     "w": 300,
+     "h": 200,
+     "from": [
+      1224,
+      816
+     ],
+     "resize": "Lanczos to the target's native size"
+    },
+    "cacheKey": "{\"input\":\"native-v1\",\"target\":\"1fa00aa3e91b1749c4131cf47de463ec83e803d8b03b7505aa582ff079e42bbb\",\"image\":\"5962c98f539771ad422c252549d4a4a984840739bc9d54c1f72adf4f47b7652f\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judge\":\"J2\",\"profile\":\"J2-full\",\"route\":\"together\",\"rubric\":\"bench-v3-median5\"}",
+    "cacheHit": false,
+    "elapsedSeconds": 145.17
+   },
+   "progression": {
+    "complete": false,
+    "perJudge": {
+     "zai-org/GLM-5.3-Flash": {
+      "stages": {
+       "10": 5,
+       "25": 5,
+       "50": 5,
+       "75": 4,
+       "100": 5
+      },
+      "earlyMean": 5,
+      "mean": 4.8,
+      "humanOrderVotes": 1,
+      "judgesN": 1,
+      "tells": {
+       "f": 1
+      },
+      "judges": [
+       "zai-org/GLM-5.3-Flash"
+      ],
+      "judgeNotes": {
+       "zai-org/GLM-5.3-Flash": "A credible ink-led sketch: contour lines first, then broad light-to-dark washes building form, with only the mild quibble that the sky arrives essentially finished at 75% while neighbours are still darkening."
+      }
+     },
+     "Qwen/Qwen3.5-9B": {
+      "stages": {},
+      "earlyMean": null,
+      "errors": {
+       "Qwen/Qwen3.5-9B": "AttributeError(\"'NoneType' object has no attribute 'group'\")"
+      }
+     }
+    },
+    "judgesN": 1,
+    "judges": [
+     "zai-org/GLM-5.3-Flash"
+    ],
+    "stages": {},
+    "earlyMean": null,
+    "mean": null,
+    "humanOrderVotes": 1,
+    "tells": {
+     "f": 1
+    },
+    "judgeNotes": {
+     "zai-org/GLM-5.3-Flash": "A credible ink-led sketch: contour lines first, then broad light-to-dark washes building form, with only the mild quibble that the sky arrives essentially finished at 75% while neighbours are still darkening."
+    },
+    "cacheKey": "{\"protocol\":\"progression-v1-complete\",\"image\":\"417752e43561af0bb0c1d2ff9b2cb4e3e25005801ba59d987f6c940a3ad9bc8d\",\"style\":\"loose ink-and-watercolor field sketch, ink led\",\"judges\":[\"zai-org/GLM-5.3-Flash\",\"Qwen/Qwen3.5-9B\"]}",
+    "cacheHit": false
+   },
+   "pipeline": {
+    "renderBackend": "gpu",
+    "outcome": "painted",
+    "paintedBy": "the model",
+    "tokens": "region_w13_lay3_sep4",
+    "starts": 1,
+    "looks": 5,
+    "revisions": 2,
+    "revisionsRefused": 0,
+    "modelMinutes": 12.1,
+    "cappedAtModelTime": false,
+    "sessionEnd": "the session ended",
+    "repairTurns": [],
+    "turns": [
+     {
+      "k": 1,
+      "repair": false,
+      "exit": 0,
+      "seconds": 1452,
+      "stoppedBy": null
+     }
+    ],
+    "layering": {
+     "applied": [
+      "ink4",
+      "rec2x",
+      "rcl",
+      "sky3",
+      "cg13",
+      "rg10",
+      "skyb",
+      "cpp",
+      "dk13",
+      "tv8",
+      "uncap",
+      "dwg200",
+      "tp2"
+     ],
+     "skipped": {
+      "lay4": "plan chose lay3",
+      "sep8": "plan chose sep4",
+      "blk60": "architecture only",
+      "bmm40": "architecture only",
+      "bka20": "architecture only",
+      "birr": "architecture only",
+      "pgreen": "Trumbull only"
+     }
+    },
+    "optionCheck": {
+     "model": [],
+     "base": [],
+     "unknown": []
+    },
+    "notes": [],
+    "strictVerdict": false,
+    "droppedPassages": 0,
+    "paintExit": 0,
+    "segments": 3,
+    "failure": null,
+    "feedback": null,
+    "selfReview": null,
+    "selfReviewModelMinute": null,
+    "modelSessionSeconds": 1452.236,
+    "elapsedSeconds": 1452.287,
+    "renderSeconds": 993.9300000000001,
+    "usageComplete": true,
+    "costComplete": false,
+    "budgetStopped": false,
+    "plan": "h34a-plan"
+   },
+   "cheatRisk": {
+    "score": 0,
+    "level": "low",
+    "parts": {
+     "progression": 0,
+     "copy": 0,
+     "small": 0,
+     "pixelFit": 0
+    },
+    "hfCorr": 0.629,
+    "hfCeiling": 0.645,
+    "flags": [],
+    "guardViolations": 0
+   }
+  }
+ },
+ "score": {
+  "rubric": "bench-v3-median5, 5 calls per judge model, median per model",
+  "status": "scored",
+  "composite": null,
+  "partialComposite": 6.23,
+  "cropsScored": 6,
+  "complete": false,
+  "elapsedSeconds": 1699.815
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": {
+   "score": 0,
+   "level": "low",
+   "basis": "highest painting (hills), from the painter's cheat-risk record",
+   "parts": {
+    "progression": 0,
+    "copy": 0,
+    "small": 0,
+    "pixelFit": 0
+   }
+  },
+  "progressionRisk": {
+   "score": 0,
+   "level": "low",
+   "basis": "highest progression part of any painting"
+  },
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/full-v1/9da0569655ea/v5-self-study/fable/1",
+ "judgeProfile": "J2-full",
+ "judgeRoute": "together"
+}

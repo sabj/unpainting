@@ -1,0 +1,238 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [],
+  "progressionJudges": []
+ },
+ "try": 3,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 19.6,
+  "tokens": 7273982,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 1305,
+   "minutes": 0.2,
+   "smallShare": 0.684,
+   "shortStrokes": 557,
+   "dotStrokes": 97,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": "Keep attempt 2's method but open the masses up: lit crown holes reserved in the dark fills, a few sky-pale gaps under resist, greyer olive ground, scattered small oaks on the meadows instead of a mid glaze over mixed cells, bolder ink loops: attempt 2 was too uniformly dark and green with no air in the trees.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 3,
+    "minutes": 2.9,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 726,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 246,
+   "dotStrokes": 26,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": "Foliage rebuilt as layered masses: more and bigger overlapping canopies charged wet into the underwash, fuller mid passes, dark negative gaps between trees and a denser darker pine, because attempt 2 read as sparse scribbles on open ground where the target is a dense tapestry of olives.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 3,
+    "minutes": 5.6,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 153,
+   "minutes": 0.1,
+   "smallShare": 0.268,
+   "shortStrokes": 19,
+   "dotStrokes": 9,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": "Keep the a2 structure; lighten the hull glaze and vary it by path wobble and water load instead of pressure blotches; push the darks a step further (left water, lower blue mass, teal, bow spill); enlarge the hawse hole; add brown timber beams and a stronger post at top-left; break the flat upper strip, because the a2 compare showed the hull still too blue and the darks and left-side structure too ",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 3,
+    "minutes": 2.1,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "mittens": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 308,
+   "minutes": 0,
+   "smallShare": 0.5,
+   "shortStrokes": 67,
+   "dotStrokes": 18,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": "Heavier, larger man's features (dark irises with heavy upper lids, thick brows, nose shadow and nostrils, wide smile with teeth reserved and a dark mouth line), a cooler left-face shadow, hair glazed in three masses so the first wash shows as paper-light gaps with wispy curls; cat forehead orange moved above the eyes with a pale bridge, cat body mostly white with curved tan dry-brush sweeps. The a",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 3,
+    "minutes": 4,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "h36a": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h36a-strokes.jsonl.gz",
+   "strokes": 837,
+   "minutes": 0.1,
+   "smallShare": 0.036,
+   "shortStrokes": 341,
+   "dotStrokes": 201,
+   "copyHF": null,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": "Keep the drawing and value layout of attempt 2 but raise the colour: a warmer golden stone base with mottled block dabs in warm, tan and grey tones between the joints; solid mid-green foliage masses with darker green dropped in wet and hansa lights on top instead of pale sparse dabs; a lighter, more violet left-wall glaze that darkens toward the arch; a cream-and-green courtyard glimpse through th",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 3,
+    "minutes": 3.4,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "h34a": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h34a-strokes.jsonl.gz",
+   "strokes": 670,
+   "minutes": 0.1,
+   "smallShare": 0.161,
+   "shortStrokes": 219,
+   "dotStrokes": 14,
+   "copyHF": null,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": "Keep the attempt 2 plan; lighten and warm the stone while deepening the tower's shaded left section, parapet shadows and small dark windows so the building stops being a flat box, lay a faint warm wash over the plaza, break the right trees into rows instead of round dark clumps, and scatter smaller irregular clouds, because those were the clearest gaps in the attempt 2 compare.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 3,
+    "minutes": 1.6,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "status": "unscored",
+  "composite": null,
+  "complete": false
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": null,
+  "progressionRisk": null,
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/fable/try-3"
+}

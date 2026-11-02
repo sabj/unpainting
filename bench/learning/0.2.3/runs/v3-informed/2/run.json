@@ -1,0 +1,238 @@
+{
+ "schema": "unpaint-bench/run@2",
+ "benchmark": "unpaint-bench",
+ "protocol": "v2",
+ "round": "V3",
+ "release": "0.2.1",
+ "painterVersion": "V101",
+ "simVersion": "102",
+ "commit": "9cd28e42c775ff7b843287ebb0bd9c4d65cfa901",
+ "judgeVersion": "J1",
+ "painter": {
+  "key": "fable",
+  "name": "Fable 5.1",
+  "id": "claude-fable-5-1",
+  "effort": "xhigh",
+  "runner": "claude"
+ },
+ "planner": null,
+ "evaluators": {
+  "scoreJudges": [],
+  "progressionJudges": []
+ },
+ "try": 2,
+ "settings": {
+  "mode": "gentle",
+  "strokeBudget": 2500,
+  "minutesPerCrop": 30,
+  "sessionCapMin": 32,
+  "lookBudget": null,
+  "crops": [
+   "hills",
+   "south-france",
+   "sargent",
+   "mittens",
+   "h36a",
+   "h34a"
+  ],
+  "learnsBetweenTries": true,
+  "attemptsPerSession": 3
+ },
+ "session": {
+  "minutes": 25.6,
+  "tokens": 8464723,
+  "costUSD": null,
+  "exitCode": null,
+  "killedAtCap": false
+ },
+ "guard": {
+  "blockedImageReads": 0,
+  "kitRejections": 0,
+  "auditHits": []
+ },
+ "crops": {
+  "hills": {
+   "seed": 1,
+   "sheet": {
+    "W": 306,
+    "H": 242,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "hills-strokes.jsonl.gz",
+   "strokes": 1210,
+   "minutes": 0.2,
+   "smallShare": 0.661,
+   "shortStrokes": 457,
+   "dotStrokes": 75,
+   "copyHF": null,
+   "images": {
+    "final": "hills.webp",
+    "stages": "hills-stages.webp"
+   },
+   "painterNote": "Lighten everything (pale washes, paper left in the meadows), paint the oaks as diagonal foliage strokes with green lit crowns and cold blue-black bodies instead of grid-row blocks, and put the finishing ink on the lit edges of the masses where it reads: attempt 1 was too dark, too yellow and blocky.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 2,
+    "minutes": 5.3,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "south-france": {
+   "seed": 1,
+   "sheet": {
+    "W": 304,
+    "H": 249,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "south-france-strokes.jsonl.gz",
+   "strokes": 582,
+   "minutes": 0.1,
+   "smallShare": 0,
+   "shortStrokes": 156,
+   "dotStrokes": 20,
+   "copyHF": null,
+   "images": {
+    "final": "south-france.webp",
+    "stages": "south-france-stages.webp"
+   },
+   "painterNote": "Paler, greyer and more broken washes (cream walls, muted roofs, pale yellow-green underwash with gaps), olive canopies as curved dabs with light tops instead of stacked bands, a clumped pine with a visible trunk, and pen hatching on shadow walls: attempt 1 was too pink, too dark and too banded next to the light, delicate target.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 2,
+    "minutes": 3.6,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "sargent": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 244,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "sargent-strokes.jsonl.gz",
+   "strokes": 144,
+   "minutes": 0,
+   "smallShare": 0.278,
+   "shortStrokes": 17,
+   "dotStrokes": 9,
+   "copyHF": null,
+   "images": {
+    "final": "sargent.webp",
+    "stages": "sargent-stages.webp"
+   },
+   "painterNote": "Hull paler (value ~0.7 glaze, mid blue only on the left flank) with a curved silhouette and broken vertical streaks instead of a saturated striped rectangle; dark water umber-olive not black; bow mass ragged with drips; rust, timber and rigging heavier, because the a1 compare showed the hull too dark and mechanical and the accents too faint.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 2,
+    "minutes": 3.6,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "mittens": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 259,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "mittens-strokes.jsonl.gz",
+   "strokes": 308,
+   "minutes": 0,
+   "smallShare": 0.442,
+   "shortStrokes": 77,
+   "dotStrokes": 13,
+   "copyHF": null,
+   "images": {
+    "final": "mittens.webp",
+    "stages": "mittens-stages.webp"
+   },
+   "painterNote": "Redrawing the geometry from the compare: bigger cat head turned up-left with eyes at x 33 and 80, nose at (36,83); narrower face with a high bright forehead, larger dark eyes and brows, wide smile with reserved teeth; warmer hair with paper gaps and loose pen curls; lighter skin. Same five-stage process because its materials and progression worked.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 2,
+    "minutes": 4.8,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "h36a": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h36a-strokes.jsonl.gz",
+   "strokes": 882,
+   "minutes": 0.1,
+   "smallShare": 0.072,
+   "shortStrokes": 414,
+   "dotStrokes": 314,
+   "copyHF": null,
+   "images": {
+    "final": "h36a.webp",
+    "stages": "h36a-stages.webp"
+   },
+   "painterNote": "Keep attempt 1's drawing geometry but rebuild the values: violet-grey cast shadows on the left wall, arch reveal, string course and right wing; a near-black gate with a reserved bright glimpse; a sunlit paving path between blue-grey hedge shadows; yellow-green foliage lights over mid and dark greens; a shaded stone wall with a leaded window at the right edge instead of a flat olive slab; and dense",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 2,
+    "minutes": 5,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  },
+  "h34a": {
+   "seed": 1,
+   "sheet": {
+    "W": 300,
+    "H": 200,
+    "mmPerCell": 0.259
+   },
+   "strokeLog": "h34a-strokes.jsonl.gz",
+   "strokes": 629,
+   "minutes": 0.1,
+   "smallShare": 0.134,
+   "shortStrokes": 185,
+   "dotStrokes": 7,
+   "copyHF": null,
+   "images": {
+    "final": "h34a.webp",
+    "stages": "h34a-stages.webp"
+   },
+   "painterNote": "Keep the ink-first order and geometry; deepen and gradate the sky with irregular soft clouds, add ink hatching and pinnacles so the building reads as drawn stone, make the trees darker and textured with ink over dried foliage, use warm umber darks for the portal, and lighten the plinth to a mid warm grey, because attempt 1 was flat, pale and under-drawn next to the target.",
+   "score": null,
+   "progression": null,
+   "attempt": {
+    "n": 2,
+    "minutes": 3.3,
+    "killedAtCap": false,
+    "exitCode": 0
+   }
+  }
+ },
+ "score": {
+  "status": "unscored",
+  "composite": null,
+  "complete": false
+ },
+ "cheat": {
+  "disqualified": false,
+  "readTargetPixels": false,
+  "reason": null,
+  "risk": null,
+  "progressionRisk": null,
+  "review": null
+ },
+ "complete": true,
+ "raw": "work/raw/v3-informed/fable/try-2"
+}
