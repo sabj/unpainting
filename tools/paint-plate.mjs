@@ -61,7 +61,7 @@ import {productionWaterLoad} from './painter/production-water-load.mjs';
 import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
-import { cachedStep, codeHash } from '../src/paint/run-cache.mjs';
+import { cachedStep, codeHash, digest, provenance } from '../src/paint/run-cache.mjs';
 import { canaryStopPass, stopAtCanary } from '../src/paint/canary-stop.mjs';
 import { paintingLooks } from '../src/paint/painting-look.mjs';
 import {cachedSemanticInstrument,instrumentCodeHash} from './painter/semantic-instrument-cache.mjs';
@@ -188,7 +188,7 @@ import { measureStyle } from '../src/paint/methods/practice-style.mjs';
 import { createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET } from './guard/no-target.mjs';
 import { cheatRisk } from './guard/cheat-risk.mjs';
 import { createPause } from './aware/pause.mjs';
-import { writeState, readState } from './aware/state-io.mjs';
+import { writeState, readState, revisionExpectation } from './aware/state-io.mjs';
 import { tapeState, restoreTapeState } from '../src/media/brush.mjs';
 import { passDue, markDue } from '../src/paint/pass-cadence.mjs';
 import { resolveLinePython } from '../src/paint/methods/line-python.mjs';
@@ -334,11 +334,11 @@ if (!argv0.includes('--linesource')) {
 // every line file is checked against the target (lines.mjs); a --drawingfile made for another image or aspect is
 // registered to the target first (drawing-registration.mjs)
 if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('image',''))).catch(() => null));
-const DRAWING_REGISTRATION = !opt('resumestate','') && opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
+const DRAWING_REGISTRATION = opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
 let LINEWORK_STAGE = null;
 const LINEWORK_SOURCES = { python: resolveLinePython({ flag: opt('sketchpython','') }).path, sketchCache: opt('sketchcache','') ? path.resolve(root, opt('sketchcache','')) : null };
 const LINEWORK_JOIN = num('linejoin', 0) > 0;
-if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
+if (opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
   if (!['auto', 'file'].includes(opt('linework'))) throw Error(`--linework: auto, file or off, not ${opt('linework')}`);
   if (opt('linework') === 'file' && !opt('drawingfile','')) throw Error('--linework file needs --drawingfile');
   const om = argv.includes('--outlinemedium') ? opt('outlinemedium','graphite') : 'graphite';
@@ -349,7 +349,7 @@ if (!opt('resumestate','') && opt('linework','off') !== 'off' && opt('drawing','
   argv.push(...r.flags);
   LINEWORK_STAGE = r.record;
 }
-const EARLY_LINES = !opt('resumestate','') && !['none','auto'].includes(opt('linesource','none'))
+const EARLY_LINES = !['none','auto'].includes(opt('linesource','none'))
   ? await prepareLineSource({opt,num,argv,out,root,log:console.log}) : null;
 // Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
 // --linesupport t (L*, default 0 off): keep only the parts of the opening and closing lines along which the target
@@ -483,12 +483,16 @@ setWashSplat(WASH_SPLAT_SETTINGS.enabled,{water:WASH_SPLAT_SETTINGS.water});
 // Sweep jobs unpack into a private /root/sweepwork/<job> tree which is removed after painting.
 // Keep pure, code-and-input-hashed planner entries beside those trees so a repeat target can reuse them on that box.
 const SWEEP_CACHE = path.dirname(root) === '/root/sweepwork' ? '/root/sweepwork/cache' : null;
-const RUN_CACHE = { dir: process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root, 'work', 'cache'), enabled: opt('runcache', '1') !== '0' };
+const CACHE_ARGV = {}; for(let i=0;i<argv.length;i++)if(argv[i].startsWith('--')) { const key=argv[i],value=argv[i+1]?.startsWith('--')?true:argv[++i];if(!['--out','--pausedir','--resumestate','--resumeprefix','--allowdirty','--speedprofile','--speedcpu'].includes(key))CACHE_ARGV[key]=value; }
+const planContentHashes=()=>{const hashes={};for(const key of ['valueplan','areaplan','drawingfile','drawinglast']){const f=opt(key,'');if(f)for(const suffix of ['', '-lines.json','-lines.json.gz']){const p=path.resolve(root,f+suffix);if(fs.existsSync(p)&&fs.statSync(p).isFile())hashes[key+suffix]=digest(fs.readFileSync(p));}}return hashes;};
+const CACHE_PLAN_HASHES=planContentHashes();
+const CACHE_CONTEXT={argv:CACHE_ARGV,planHashes:CACHE_PLAN_HASHES,targetSHA256:crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex'),mode:opt('mode','fast'),backend:'cpu'};
+const RUN_CACHE = { context:CACHE_CONTEXT, guard: TARGET_GUARD, dir: process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root, 'work', 'cache'), enabled: opt('runcache', '1') !== '0' };
 const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [fileURLToPath(import.meta.url)]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
-const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: CODE_HASH, track: optTrack, inputs: { px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
+const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
   const authoredFile=opt('areaplan','');const explicit=authoredFile?authoredPalette(JSON.parse(fs.readFileSync(path.resolve(root,authoredFile)))):null;if(explicit)return {pigments:explicit,authored:true,monochrome:explicit.length===1,paintChroma:0,note:'explicit authored production palette; no source palette fit'};
   const from = opt('palettefrom', '');
   let source = px, sw = w, sh_ = h;
@@ -1184,7 +1188,7 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(SRC, w, h, gaussian, { s
 
 // The separator's reading of the source: which cells are pen line, which are wash. Read once; the ink's colour, the
 // line budget and the gate on the pen all use it.
-const SEP = separate(PX_SOURCE, w, h, paperRGB);
+const SEP = (await cachedStep({...RUN_CACHE,name:'separator',code:codeHash(root,[],{dependencies:['src/crop/inkwash.mjs']}),track:optTrack,inputs:{PX_SOURCE,w,h,paperRGB}},async()=>separate(PX_SOURCE,w,h,paperRGB))).value;
 // the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
 if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
@@ -1528,7 +1532,7 @@ const paper = opt('paperscan', '') ? await (async () => {
   const scan = { data: info.channels === 1 ? data : Uint8Array.from({ length: info.width * info.height }, (_, i) => data[i * info.channels]), width: info.width, height: info.height };
   console.log(`paper: scanned height from ${opt('paperscan', '')} (${info.width}x${info.height}), ${num('paperscanscale', 1)} cells a scan pixel, mix ${num('paperscanmix', 1)}`);
   return scanPaper(W2, H2, scan, { ...PAPER_OPTS, scanScale: num('paperscanscale', 1), scanMix: num('paperscanmix', 1) });
-})() : makePaper(W2, H2, PAPER_OPTS);
+})() : (await cachedStep({...RUN_CACHE,name:'paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2,H2,PAPER_OPTS}},async()=>makePaper(W2,H2,PAPER_OPTS))).value;
 // --physics key=value,...: override any sheet constant (src/media/sheet.mjs DEFAULTS)
 const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS)) throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
 // --gran: granulation strength, default 0.25. The relief never changes, so every sweep lays the same pattern and it compounds.
@@ -1546,7 +1550,7 @@ const ABLATE = new Set(opt('ablate', '').split(',').filter(Boolean));
 // --inkres N: the pens draw on their own sheet at N times the resolution and the output is N times as wide
 // (src/paint/methods/ink-res.mjs). Default 1, off. Cannot combine with --paperscan.
 // --inkresgain: the fine pen's ink strength; the default is a power-law fit in sheet width.
-const INKRES = num('inkres', 1) > 1 ? (() => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); return makeInkRes({ N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, main: sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
+const INKRES = num('inkres', 1) > 1 ? await (async () => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); const N=Math.round(num('inkres',1)),opts={...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N};const finePaper=(await cachedStep({...RUN_CACHE,name:'fine-paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2:W2*N,H2:H2*N,PAPER_OPTS:opts}},async()=>makePaper(W2*N,H2*N,opts))).value; return makeInkRes({paper:finePaper, N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, main: sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
 const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 
 const TARGET_DRAW_EDGE=new Float32Array(N2);
@@ -1890,11 +1894,11 @@ const WET = T => (T.water >= 0.3 ? Math.min(1, T.water * num('waterscale', 1)) :
 const MIX = T => (T.intoWet ? T.wetMix : T.wetMix * num('drymix', 1));
 // What a graded wash lays over the whole scrap and the share that ran past the swatch's edge. Each graded passage
 // is charged for the whole scrap's delivery less that loss, scaled by its own open edge against the swatch's.
-const GRADED_CAL = {};
+let GRADED_CAL = {};
 // --loadedcontact 1: a loaded wash or detail brush touches all the paper under it, pits included; dry brush keeps its tooth-skip. Default 0.
 const LOADED_CONTACT = num('loadedcontact', 0) > 0;
 const washBridge = (T, b) => (LOADED_CONTACT && !T.name.startsWith('dry brush') ? 0 : b);
-const CAL = await (async () => {
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!AREA_PLAN&&!FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
   const SW = 90, SH = 90, SN = SW * SH, want = 0.3;
   const mask = new Uint8Array(SN);
   for (let y = 20; y < 70; y++) for (let x = 20; x < 70; x++) mask[y * SW + x] = 1;
@@ -1947,8 +1951,10 @@ const CAL = await (async () => {
     if (T.chunk) GRADED_CAL[T.name] = { all: c ? all / c / want : 1, escape: all > 1e-9 ? 1 - got / all : 0, edge: openEdgeShare(mask, SW, SH) };
     console.log(`  ${T.name.padEnd(11)} delivers ${delivered.toFixed(2)} of its charge, so it is charged ${out[T.name].toFixed(2)}x${T.chunk ? `; ${(100 * GRADED_CAL[T.name].escape).toFixed(0)}% of what it lays runs past the swatch` : ''}`);
   }
-  return out;
-})();
+  return {CAL:out,GRADED_CAL};
+});
+const CAL = CAL_RESULT.value.CAL;
+GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
 
 const CALIBRATION_PLAN=AREA_PLAN??FINISH_PLAN;
 const SEMANTIC_CAL_MODE=opt('semanticcalibration','legacy');
@@ -2210,7 +2216,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   if(!(PEN.reservoir>0)||!Number.isFinite(PEN.reservoir))throw Error('--penreservoir must be finite and positive');
   // --penblur: scale of the ridge field the pen reads (default 1); coarser gives one line to follow, not a braid.
   const PENBLUR = num('penblur', 1);
-  const field = lineField(DRAW_SOURCE, inkWant, w, h, { sigmas: [0.8, 1.2, 1.8].map(v => v * K * PENBLUR) });
+  const sigmas = [0.8,1.2,1.8].map(v=>v*K*PENBLUR);
+  const field = (await cachedStep({...RUN_CACHE,name:'pen-field',code:codeHash(root,[],{dependencies:['src/media/draw.mjs']}),track:optTrack,inputs:{DRAW_SOURCE,inkWant,w,h,sigmas}},async()=>lineField(DRAW_SOURCE,inkWant,w,h,{sigmas}))).value;
   for (let i = 0; i < n; i++) if (EDGE(i)) field[i] = 0;
   // drawn first, the pen also keeps off the scan's border (--silmargin, default 0.04), which the separator reads as line
   if (first) { const mg = num('silmargin', 0.04), mx = Math.round(mg * w), my = Math.round(mg * h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < mx || y < my || x >= w - mx || y >= h - my) field[y * w + x] = 0; }
@@ -2781,6 +2788,7 @@ if (num('finaldarks', 0) > 0) {
 }
 const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(num('prepkeep', 2)))) : null;
 SPEED_PROFILE?.add('planningAndSetup', process.uptime() * 1000);
+const PROVENANCE_TARGET_SHA = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex');
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step`);
 if (!RESUMING && RESIST && !PRACTICE && Math.round(num('masses', 0)) <= 0) { if(AREA_PLAN){const cells=Array.from(up(AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(sheet,up(RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(sheet, up(RESIST), RESIST_SOFT && upF(RESIST_SOFT)); STAGE = { stage: 'frisket', cells: RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
@@ -3111,9 +3119,12 @@ if (FD_SHAPES?.length) layers.push({ _darks: 1, shapes: [], value: 0, pigment: 0
 // ---- stops at passage boundaries and the take-over of a saved painting (tools/aware/pause.mjs) -------------------------
 // What a revision may not change once painting has started is checked by the harness; here the painter only refuses to
 // save a painting whose state it cannot carry whole (features with state of their own that is not saved below).
+// Linked drawing stages finish after the early setup caches; fingerprint their final inputs.
+const AWARE_PLAN_HASHES = planContentHashes();
+let PROVENANCE_HISTORY = [];
 const AWARE = createPause({ dir: AWARE_DIR });
 const awareUnsupported = () => [
-  [PRACTICE, 'practice'], [MASSES > 0, 'masses'], [SHAPES > 0, 'shapes'], [PREPF, 'prepfade'], [INKRES, 'inkres'], [DARK_MASS, 'darkmass/dogpaint'],
+  [PRACTICE, 'practice'], [MASSES > 0, 'masses'], [SHAPES > 0, 'shapes'], [DARK_MASS, 'darkmass/dogpaint'],
   [PASSAGE_HOOK.names?.length, 'passages'], [AREA_PLAN || FINISH_PLAN, 'areaplan/finishplan'], [MAJOR_INTENT, 'major intent'], [RECEIVER_OBSERVER, 'receiverobserver'],
   [CURLS, 'curls'], [GOUACHE_LIGHTS, 'gouache lights'], [FRAMER, 'async frame worker'], [MOD?.paintOwnedTransfer, 'paint-owned transfer'],
 ].filter(([on]) => on).map(([, name]) => name);
@@ -3125,6 +3136,13 @@ const awareCounts = () => { let s = 0, p = 0; if (MARKTAPE) for (const m of MARK
 const awareSheetPng = async file => { await sharp(INKRES ? INKRES.compose(view()) : view(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(file); };
 const awareWhere = at => (at.kind === 'closing' ? 'the closing boundary' : at.kind === 'start' ? 'boundary 0' : 'boundary ' + (at.L + 1));
 // The whole painting state at a boundary. Sheet arrays come down from the GPU first; the dried layers too.
+const awareProvenance = looksConsumed => {
+  const ignored=new Set(['out','pausedir','resumestate','resumeprefix','allowdirty','speedprofile','speedcpu']);
+  const outAbs=path.resolve(root,out), normOut=v=>typeof v==='string'&&path.resolve(root,v).startsWith(outAbs+path.sep)?`<out>/${path.relative(outAbs,path.resolve(root,v))}`:v;
+  const resolved={}; for(let i=0;i<argv.length;i++){const key=argv[i];if(!key.startsWith('--'))continue; const v=argv[i+1]?.startsWith('--')?true:argv[++i];if(!ignored.has(key.slice(2)))resolved[key]=normOut(v);}
+  const planHashes=AWARE_PLAN_HASHES;
+  return provenance({simCode:codeHash(root),argv:digest(resolved),planHashes,targetSHA256:PROVENANCE_TARGET_SHA,paper:{w:W2,h:H2,opts:digest(PAPER_OPTS)},pigments:SHEET_PIGS.map(p=>({name:p.name,params:digest(p)})),geometry:{W2,H2,SC,sheetMm:num('sheetmm',DEFAULT_SHEET_MM)},mode:opt('mode','fast'),backend:{backend:GPU_INFO.backend,adapter:GPU_INFO.adapter??null,adapterEvidence:GPU_INFO.adapterEvidence??null},guard:{mode:TARGET_GUARD.mode,looksConsumed}});
+};
 const awareSave = async (dir, at) => {
   JSONL.flush();
   const bad = awareUnsupported(); if (bad.length) throw new Error('aware: cannot save this painting (state not carried: ' + bad.join(', ') + ')');
@@ -3139,17 +3157,24 @@ const awareSave = async (dir, at) => {
     return { fields, shapes: shapes.map(sh => { const { mask, ...rest } = sh; if (mask == null) return { tp: -1, rest }; const tp = TP_SHAPES ? TP_SHAPES.findIndex(t => t.mask === mask) : -1; if (tp < 0) throw new Error('aware: a touch-up passage without its planning shape'); return { tp, rest }; }) };
   });
   const state = {
-    at, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
+    at, provenanceHistory: PROVENANCE_HISTORY, inkres: INKRES?.exportState()??null, prepf: PREPF, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
     js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT: new Set(VALUE_OWN_CONTACT), VALUE_PIGMENT_CONTACT: new Set(VALUE_PIGMENT_CONTACT), VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
-  const r = writeState(dir, state);
+  const r = writeState(dir, state, awareProvenance(state.guard.looks.count));
   fs.writeFileSync(path.join(dir, 'boundary.json'), JSON.stringify(at));
-  console.log(`aware: painting saved at ${awareWhere(at)} (${r.arrays} arrays, ${r.zeros} empty, ${(r.bytes / 1e6).toFixed(1)} MB) in ${dir}`);
+  console.log(`aware: painting saved at ${awareWhere(at)} (${r.arrays} arrays, ${r.zeros} empty, ${(r.bytes / 1e6).toFixed(1)} MB, ${r.milliseconds.toFixed(1)} ms IO) in ${dir}`);
 };
 const awareRestore = () => {
   invalidatePaperCertificate(sheet);
-  const st = readState(RESUME_DIR), at = st.at;
+  const savedProvenance=JSON.parse(fs.readFileSync(path.join(RESUME_DIR,'provenance.json'),'utf8'));
+  const ioTiming={};
+  const currentProvenance=awareProvenance(savedProvenance.guard.looksConsumed);
+  const prefixFile=opt('resumeprefix','');
+  const expectedProvenance=prefixFile ? revisionExpectation(savedProvenance,currentProvenance,JSON.parse(fs.readFileSync(path.resolve(root,prefixFile),'utf8'))) : currentProvenance;
+  const st = readState(RESUME_DIR, expectedProvenance,ioTiming), at = st.at;
+  PROVENANCE_HISTORY=[...(st.provenanceHistory??[]),...(prefixFile?[{boundary:at,prefix:savedProvenance,suffix:currentProvenance}]:[])];
+  console.log(`aware: state load ${ioTiming.milliseconds.toFixed(1)} ms IO`);
   if (JSON.stringify(at) !== JSON.stringify(RESUME_AT)) throw new Error('aware: boundary.json and state.json disagree');
   const bad = awareUnsupported(); if (bad.length) throw new Error('aware: cannot take over a saved painting with ' + bad.join(', '));
   // the sheet's own physical arrays are refilled in place (worker threads share them); everything else is replaced, and a
@@ -3157,6 +3182,7 @@ const awareRestore = () => {
   const live = new Map(), later = [];
   for (const [k, v] of Object.entries(st.sheet)) {
     const cur = sheet[k];
+    if(ArrayBuffer.isView(v)&&ArrayBuffer.isView(cur)&&(cur.length!==v.length||cur.constructor!==v.constructor))throw Error(`aware: sheet field mismatch: ${k}`);
     if (ArrayBuffer.isView(v) && ArrayBuffer.isView(cur) && cur.length === v.length && cur.constructor === v.constructor) { cur.set(v); live.set(v, cur); }
     else if (Array.isArray(v) && Array.isArray(cur) && k !== 'layers' && v.length === cur.length && v.every((a, j) => ArrayBuffer.isView(a) && ArrayBuffer.isView(cur[j]) && a.length === cur[j].length)) v.forEach((a, j) => { cur[j].set(a); live.set(a, cur[j]); });
     else later.push([k, v]);
@@ -3182,6 +3208,9 @@ const awareRestore = () => {
   for (const k of Object.keys(used)) delete used[k]; Object.assign(used, j.used);
   Object.assign(feedbackStats, j.feedbackStats); Object.assign(BODY_CADENCE_RECORD, j.BODY_CADENCE_RECORD); j.VALUE_COUNTS.forEach((v, k) => Object.assign(VALUE_COUNTS[k], v));
   if (MARKTAPE) { refill(MARKTAPE, st.tape.marks); restoreTapeState(st.tape); }
+  if(Boolean(INKRES)!==Boolean(st.inkres)||Boolean(PREPF)!==Boolean(st.prepf))throw Error('aware: auxiliary state mismatch');
+  if(INKRES)INKRES.importState(st.inkres);
+  if(PREPF)Object.assign(PREPF,st.prepf);
   TARGET_GUARD.importState(st.guard);
   RESUMING = false;
   console.log(`aware: took over the painting saved at ${awareWhere(at)} (${FRAMES.length} frames, ${MARKTAPE?.length ?? 0} tape entries); this plan has ${layers.length} passes`);
@@ -4228,7 +4257,7 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
   }
 }
 
-writeRunCard({ root, out, args: argv0, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), code: CODE_STATE, segments: SEGMENTS_RECORD, linework: LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
+writeRunCard({ provenanceHistory:PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), code: CODE_STATE, segments: SEGMENTS_RECORD, linework: LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
 

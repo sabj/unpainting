@@ -7,11 +7,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { assertProvenance, provenance } from '../../src/paint/run-cache.mjs';
 
 const TYPES = { Float32Array, Float64Array, Int32Array, Uint32Array, Int16Array, Uint16Array, Int8Array, Uint8Array, Uint8ClampedArray };
 const isZero = v => { const b = new Uint8Array(v.buffer, v.byteOffset, v.byteLength); const w = b.byteOffset % 4 === 0 && b.length % 4 === 0 ? new Uint32Array(b.buffer, b.byteOffset, b.length >> 2) : b; for (let i = 0; i < w.length; i++) if (w[i]) return false; return true; };
 
-export function writeState(dir, value) {
+export function writeState(dir, value, fingerprint = null) {
+  const started=performance.now();
   fs.mkdirSync(dir, { recursive: true });
   let k = 0, bytes = 0, zeros = 0;
   const seen = new Map();
@@ -38,13 +40,16 @@ export function writeState(dir, value) {
     for (const [a, b] of Object.entries(v)) { if (typeof b === 'function') continue; trail.push(a); o[a] = enc(b); trail.pop(); }
     return { $o: o };
   };
+  if(fingerprint)fs.writeFileSync(path.join(dir,'provenance.json'),JSON.stringify(provenance(fingerprint),null,2));
   const manifest = enc(value);
   const json = JSON.stringify(manifest);
   fs.writeFileSync(path.join(dir, 'state.json'), json);
-  return { arrays: k, zeros, bytes: bytes + json.length };
+  return { arrays: k, zeros, bytes: bytes + json.length, milliseconds:performance.now()-started };
 }
 
-export function readState(dir) {
+export function readState(dir, expected = null, timing = null) {
+  const started=performance.now();
+  if(expected)assertProvenance(JSON.parse(fs.readFileSync(path.join(dir,'provenance.json'),'utf8')),provenance(expected));
   const byId = new Map();
   const dec = v => {
     if (v === null || typeof v !== 'object') return v;
@@ -68,5 +73,16 @@ export function readState(dir) {
     if (v.$o) return Object.fromEntries(Object.entries(v.$o).map(([a, b]) => [a, dec(b)]));
     throw new Error('state: unknown entry ' + JSON.stringify(v).slice(0, 80));
   };
-  return dec(JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8')));
+  const result=dec(JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8')));
+  if(timing)timing.milliseconds=performance.now()-started;
+  return result;
+}
+
+// An admitted harness revision reuses an immutable painted prefix, not an identical plan.
+// The caller must name that prefix explicitly; material, target, code and backend still match.
+export function revisionExpectation(saved, current, admittedPrefix) {
+  assertProvenance(provenance(saved), provenance(admittedPrefix));
+  const expected=provenance({...current,argv:saved.argv,planHashes:saved.planHashes});
+  assertProvenance(saved,expected);
+  return expected;
 }

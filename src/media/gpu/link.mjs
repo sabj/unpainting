@@ -633,7 +633,7 @@ export class GpuLink {
     this.flushDrys(sheet);
     if(this.opticalReady)return;
     this.syncLower(sheet);
-    this.call({op:'opticalInit', micro, count:sheet.layers.length, lower:sheet.layers.slice(1,-1)});
+    this.call({op:'opticalInit', micro, count:sheet.layers.length, resistFrom:sheet.resist?sheet.resistFrom??sheet.layers.length:null, lower:sheet.layers.slice(1,-1)});
     this.opticalReady=true;
   }
   opticalFrame(sheet, base) {

@@ -34,6 +34,12 @@ export class Painting {
   run(planDir, variant, resume = null) {
     const k = this.segments.length + 1;
     const plan = resolvePlan({ spec: this.spec, planDir, variant, target: this.target, out: this.out, gpu: this.gpu, pausedir: this.aware, resumestate: resume });
+    if (resume) {
+      // Session.reviseChecked admitted this suffix; keep the saved prefix identity explicit.
+      const prefix=path.join(this.dir, `prefix-${k}.json`);
+      writeJson(prefix, readJson(path.join(resume, 'provenance.json')));
+      plan.args.push('--resumeprefix', prefix);
+    }
     const seg = { k, planDir, variant, resume, args: plan.args, plan, start: Date.now(), exit: undefined, log: path.join(this.dir, `segment-${k}.log`) };
     this.segments.push(seg);
     this.state = 'running';

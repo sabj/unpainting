@@ -43,25 +43,46 @@ const run = (args, log) => new Promise(resolve => {
 });
 const writeJson = (f, v) => fs.writeFileSync(f, JSON.stringify(v));
 
-test('a painting saved at a passage boundary and taken over by a fresh process ends identical', async () => {
+for (const extra of [[], ['--inkres','2','--prepfade','0.5'], ['--inkrecipe','wash','--image','bench/ink-heavy/targets/h34-a.jpg','--inkres','2']]) test(`a painting saved at a passage boundary and taken over by a fresh process ends identical (${extra.join(' ')})`, async () => {
+  const args=[...ARGS,...extra];
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'aware-identity-'));
   const A = path.join(work, 'a'), B = path.join(work, 'b'), pa = path.join(work, 'pa'), pb = path.join(work, 'pb');
   fs.mkdirSync(pa); writeJson(path.join(pa, 'control.json'), { stopAt: 'end', seq: 1 });
-  assert.equal(await run([...ARGS, '--out', A, '--pausedir', pa], path.join(work, 'a.log')), 0);
+  assert.equal(await run([...args, '--out', A, '--pausedir', pa], path.join(work, 'a.log')), 0);
   // B: stop at boundary 2, save and exit 75, then a fresh process takes the painting over
   fs.mkdirSync(pb); writeJson(path.join(pb, 'control.json'), { stopAt: 2, seq: 1 });
   const answer = setInterval(() => {
     for (const f of fs.readdirSync(pb)) { const m = /^offer-(.+)\.json$/.exec(f); if (m && !fs.existsSync(path.join(pb, `go-${m[1]}.json`))) writeJson(path.join(pb, `go-${m[1]}.json`), { action: 'save-exit' }); }
   }, 50);
-  const first = await run([...ARGS, '--out', B, '--pausedir', pb], path.join(work, 'b1.log'));
+  const first = await run([...args, '--out', B, '--pausedir', pb], path.join(work, 'b1.log'));
   clearInterval(answer);
   assert.equal(first, 75, fs.readFileSync(path.join(work, 'b1.log'), 'utf8').slice(-800));
   const saved = JSON.parse(fs.readFileSync(path.join(pb, 'saved.json'), 'utf8'));
   assert.equal(saved.at.kind, 'pass');
   writeJson(path.join(pb, 'control.json'), { stopAt: 'end', seq: 2 });
-  assert.equal(await run([...ARGS, '--out', B, '--pausedir', pb, '--resumestate', saved.dir], path.join(work, 'b2.log')), 0, fs.readFileSync(path.join(work, 'b2.log'), 'utf8').slice(-800));
+  assert.equal(await run([...args, '--out', B, '--pausedir', pb, '--resumestate', saved.dir], path.join(work, 'b2.log')), 0, fs.readFileSync(path.join(work, 'b2.log'), 'utf8').slice(-800));
   const [a, b] = await Promise.all([A, B].map(d => sharp(path.join(d, 'painting.png')).raw().toBuffer()));
   assert.ok(a.equals(b), 'the paintings differ');
   for (const f of ['marks.json', 'frames.json']) assert.equal(fs.readFileSync(path.join(A, f), 'utf8'), fs.readFileSync(path.join(B, f), 'utf8'), f);
   fs.rmSync(work, { recursive: true, force: true });
+});
+
+test('checkpoint provenance refuses each mismatched field before reading state',async()=>{
+ const {provenance}=await import('../../src/paint/run-cache.mjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'state-provenance-'));
+ try{
+ const fp=provenance({simCode:'code',argv:'args',planHashes:{},targetSHA256:'target',paper:{w:10,h:10,opts:'paper'},pigments:[],geometry:{W2:10,H2:10,SC:1,sheetMm:280},mode:'fast',backend:'cpu',guard:{mode:'gentle',looksConsumed:1}});
+ writeState(dir,{x:new Float32Array([1])},fp);
+ for(const k of Object.keys(fp))assert.throws(()=>readState(dir,{...fp,[k]:'changed'}),new RegExp(`provenance mismatch: ${k}`));
+ assert.equal(readState(dir,fp).x[0],1);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('an explicit revised suffix retains its admitted prefix and refuses material changes', async()=>{
+ const {revisionExpectation}=await import('./state-io.mjs');
+ const saved={simCode:'code',argv:'old',planHashes:{plan:'old'},targetSHA256:'target',paper:{w:10},pigments:['ink'],geometry:{w:10},mode:'fast',backend:'cpu',guard:{mode:'gentle',looksConsumed:2}};
+ const current={...saved,argv:'new',planHashes:{plan:'new'}};
+ assert.deepEqual(revisionExpectation(saved,current,saved),saved);
+ assert.throws(()=>revisionExpectation(saved,current,{...saved,argv:'wrong'}),/argv/);
+ for(const key of ['simCode','targetSHA256','paper','pigments','geometry','mode','backend','guard'])assert.throws(()=>revisionExpectation(saved,{...current,[key]:'changed'},saved),new RegExp(key));
 });
