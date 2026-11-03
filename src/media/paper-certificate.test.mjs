@@ -32,3 +32,41 @@ test('threshold dryness, copied/restored sheets and replacement arrays cannot in
   s.W=s.W.slice();assert.equal(hasZeroPaperCertificate(s),false);
   certifyZeroPaper(s);invalidatePaperCertificate(s);assert.equal(hasZeroPaperCertificate(s),false);
 });
+
+import {measurePaperDry,measurePaper,measurePaperBatch} from '../paint/methods/wetdry.mjs';
+import {layersChanged} from './sheet.mjs';
+import {certifyDryFixed,validDryFixedCertificate} from './paper-certificate.mjs';
+
+test('dry-fixed proof skips GPU dispatch but zero water alone and watched dry do not',()=>{
+  const s=make();let calls=0;
+  s._gpu={version:1,dry(){calls++;this.lastDryZero=true;return 75;}};
+  certifyZeroPaper(s);
+  assert.equal(validDryFixedCertificate(s),false);
+  assert.equal(dry(s),75);assert.equal(calls,1);
+  assert.equal(validDryFixedCertificate(s),true);
+  assert.equal(dry(s),0);assert.equal(calls,1);
+  dry(s,40000,DEFAULTS,{onStep(){}});assert.equal(calls,2);
+  layersChanged(s);assert.equal(validDryFixedCertificate(s),false);
+  dry(s);assert.equal(calls,3);
+  s._gpu.version++;assert.equal(validDryFixedCertificate(s),false);
+});
+
+test('certified zero measurements need neither CPU planes nor GPU reads and preserve bounds and stats',()=>{
+  const s=make();let reads=0;
+  s._gpu={version:0,ensurePaperFresh(){reads++;}};certifyZeroPaper(s);
+  s.W[1]=NaN;s.s[1]=NaN; // poisoned stale CPU planes: a valid GPU proof must avoid them
+  assert.deepEqual(measurePaperDry(s),{cells:s.n,bounds:[0,0,15,11],waterMax:0,saturationMax:0,moistShare:0,dry:true});
+  assert.deepEqual(measurePaper(s,[1,17]),{cells:2,bounds:[1,0,1,1],waterMax:0,saturationMax:0,waterP95:0,moistShare:0,dry:true});
+  const groups=measurePaperBatch(s,[{cells:[1,17],stats:'gate'},{cells:[]}],true);
+  assert.equal(groups[0].waterMax,0);assert.equal('waterP95' in groups[0],false);assert.equal(groups[1].cells,0);assert.equal(reads,0);
+  invalidatePaperCertificate(s);assert.throws(()=>measurePaper(s,[1]),/Non-finite/);assert.equal(reads,1);
+});
+
+test('CPU fixed proofs expire on layer edits and material writes',()=>{
+  const s=make();dry(s);assert.equal(validDryFixedCertificate(s),true);
+  const before=s.layers.length;assert.equal(dry(s),0);assert.equal(s.layers.length,before);
+  deposit(s,10,.1,[.01]);assert.equal(validDryFixedCertificate(s),false);
+  dry(s);assert.equal(validDryFixedCertificate(s),true);
+  layersChanged(s);assert.equal(validDryFixedCertificate(s),false);
+  certifyDryFixed(s);s.layers.push([new Float32Array(s.n)]);assert.equal(validDryFixedCertificate(s),false);
+});

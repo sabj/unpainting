@@ -1,4 +1,4 @@
-import { certifyZeroPaper } from '../../media/paper-certificate.mjs';
+import { certifyZeroPaper, validPaperCertificate } from '../../media/paper-certificate.mjs';
 import { census } from '../../media/census.mjs';
 // Shadow technique choice (wet blend or dry layer) from measured edge widths, and paper-state gates that hold a
 // stroke until its paper is dry or moist enough. No physics overrides.
@@ -105,6 +105,7 @@ export function strokeCells(sheet, points, radius) {
 // Scan directly: no boxed cell indices or percentile sort. This is a measured
 // certificate, not an assumption that dry() exhausted all pore moisture.
 export function measurePaperDry(sheet) {
+  if (validPaperCertificate(sheet)) return {cells:sheet.n, bounds:sheet.n > 0 ? [0,0,sheet.w-1,sheet.h-1] : null, waterMax:0, saturationMax:0, moistShare:0, dry:true};
   const cells = { length: sheet.n, *[Symbol.iterator]() { for (let i = 0; i < sheet.n; i++) yield i; } };
   const state = measurePaper(sheet, cells, true, { stats: 'gate', bounds: [0, 0, sheet.w - 1, sheet.h - 1] });
   if (state.waterMax === 0 && state.saturationMax === 0) certifyZeroPaper(sheet);
@@ -122,6 +123,7 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
   let x0 = sheet.w, x1 = 0, y0 = sheet.h, y1 = 0;
   if (bounds) [x0, y0, x1, y1] = bounds;
   else for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (validPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, [x0, y0, x1 - x0 + 1, y1 - y0 + 1], paperOnly);
   let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = stats === 'gate' || uniform ? null : [];
@@ -143,6 +145,7 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
 // All groups belong to the same instant. One union readback, with each group's
 // multiplicity and statistics preserved; never reuse this across a material edit.
 export function measurePaperBatch(sheet, groups, paperOnly = false, options = {}) {
+  if (validPaperCertificate(sheet)) return groups.map(({cells, stats = 'full', bounds}) => measurePaper(sheet,cells,paperOnly,{...options,stats,...(bounds ? {bounds} : {})}));
   const started = census ? performance.now() : 0;
   try {
     let x0 = sheet.w, y0 = sheet.h, x1 = -1, y1 = -1;
