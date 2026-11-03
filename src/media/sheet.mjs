@@ -395,7 +395,7 @@ export const tapeSheet = t => { TAPE = t; };
 let STROKEFLOWS = null, STROKESTEP = null;
 export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 
-export function step(sheet, o = DEFAULTS) {
+export function step(sheet, o = DEFAULTS, reduction = null) {
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
   if (TAPE && sheet._tape) { if (STROKEFLOWS) STROKEFLOWS.push(STROKESTEP()); else TAPE.push({ k: 'f' }); }
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
@@ -403,13 +403,20 @@ export function step(sheet, o = DEFAULTS) {
   if (sheet._gpu && !sheet._gpu.paused) return sheet._gpu.step(sheet, o);
   const boxes = wetBoxes(sheet); if (!boxes.length) return false;
   if (o.dt === 0) return true;
-  if (PAR) { const H = { scratch: scratch(sheet), perm: permeability(sheet.paper), throats: throatTable(sheet.n) }; for (const box of boxes) if (!PAR.stepBox(sheet, o, box, H)) stepBox(sheet, o, box); }
-  else for (const box of boxes) stepBox(sheet, o, box);
+  if (reduction) { reduction.maxW = 0; reduction.surfaceLevel = 0; }
+  const merge = value => { if (reduction) { reduction.maxW = Math.max(reduction.maxW, value.maxW); reduction.surfaceLevel = Math.max(reduction.surfaceLevel, value.surfaceLevel); } };
+  if (PAR) {
+    const H = { scratch: scratch(sheet), perm: permeability(sheet.paper), throats: throatTable(sheet.n) };
+    for (const box of boxes) {
+      if (PAR.stepBox(sheet, o, box, H)) { if (reduction) merge(boxDryStats(sheet, box)); }
+      else { const value = stepBox(sheet, o, box, !!reduction); if (reduction) merge(value); }
+    }
+  } else for (const box of boxes) { const value = stepBox(sheet, o, box, !!reduction); if (reduction) merge(value); }
   sheet.steps++;
   return true;
 }
 
-function stepBox(sheet, o, box) {
+function stepBox(sheet, o, box, reduce = false) {
   const [x0, y0, x1, y1] = box, { w, h, W, s, M, G, D, P, K, paper, pigments, edge, resist, ever } = sheet, { capacity, fdx, fdy, grain } = paper, height = paper.valley || paper.height, dt = o.dt ?? 1;
   // fine pigment (dyes, small particles) travels with water into and through the fibres; coarse, granulating pigment stays on top
   const sc = scratch(sheet), { mobility } = sc;
@@ -772,8 +779,10 @@ function stepBox(sheet, o, box) {
   for (let n = 0; n < nP; n++) { const k = pact[n], Pk = P[k], PN = PNext[k], Dk = D[k], dd = dDep[k]; for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) for (let i = y * w + pxa[r], e = y * w + pxb[r]; i <= e; i++) { Pk[i] = Math.max(0, PN[i]); Dk[i] += dd[i]; } }
   const wetEps = o.wetEps, paperDry = o.paperDry, capSigma = o.capSigma, spill = o.spill, spillHeight = o.spillHeight, dampEase = o.dampEase, pinning = o.pinning ?? 0, pinFibre = o.pinFibre ?? 0, enclose = o.encloseEase ?? 0, holeFill = o.holeFill ?? 0;
   const throats = throatTable(sheet.n);
+  let maxW = 0;
   for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) for (let x = pxa[r], xe = pxb[r]; x <= xe; x++) {
     const i = y * w + x;
+    if (reduce) maxW = Math.max(maxW, W[i]);
     s[i] = Math.max(0, sNext[i]);
     if (W[i] <= wetEps && s[i] > 0) { // damp paper dries; the pigment in its pores stays on the fibres
       let d = Math.min(s[i], dt * paperDry); if (s[i] - d <= 0.02 * capacity[i]) d = s[i]; // the last trace goes at once, so the cell leaves the worked area
@@ -829,6 +838,29 @@ function stepBox(sheet, o, box) {
   }
   for (const j of drying) M[j] = 0;
   for (const j of newly) { M[j] = 1; ever[j] = 1; }
+  if (reduce) {
+    let surfaceLevel = 0;
+    const face = i => {
+      if (!M[i]) return;
+      if (i % w < w - 1 && M[i + 1]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + 1]));
+      if (i + w < sheet.n && M[i + w]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + w]));
+    };
+    for (let q = 0; q < nw; q++) face(wl[q]);
+    for (const i of newly) face(i);
+    return {maxW, surfaceLevel};
+  }
+}
+// Parallel steps do not expose their wet lists; reduce their disjoint active
+// rectangles once, rather than scanning the entire water plane twice.
+function boxDryStats(sheet, [x0, y0, x1, y1]) {
+  const {w, h, W, M} = sheet; let maxW = 0, surfaceLevel = 0;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const i = y * w + x; maxW = Math.max(maxW, W[i]);
+    if (!M[i]) continue;
+    if (x < w - 1 && M[i + 1]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + 1]));
+    if (y < h - 1 && M[i + w]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + w]));
+  }
+  return {maxW, surfaceLevel};
 }
 
 /** Let the sheet dry completely, then fix the wash as a layer. The water levels first; then time runs faster. */
@@ -880,11 +912,23 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
   let t = 0, fast = false;
   // the two settings a step runs with, made once rather than once a step (step reads them and never changes them)
   const oLevel = { ...o, dt: o.dt }, oFast = { ...o, dt };
+  let summary = null;
+  if (analyticTail && !onStep && o.dt > 0 && dt > 0) {
+    summary = boxDryStats(sheet, [0, 0, sheet.w - 1, sheet.h - 1]);
+    // Direct array clients can supply surface water outside the wet mask. Keep
+    // the original full-plane checks for that nonstandard state.
+    for (let i = 0; i < sheet.n; i++) if (sheet.W[i] !== 0 && !sheet.M[i]) { summary = null; break; }
+  }
   for (; t < max; t++) {
-    if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && surfaceLevel(sheet) < levelTol))) fast = true;
-    if (analyticTail && !onStep && quietDryTail(sheet, o)) break;
-    if (analyticTail && !onStep && fast && sheet.W.every(w => w <= 3 * o.wetEps)) oFast.dt = Math.max(dt, 140);
-    if (!step(sheet, fast ? oFast : oLevel)) break;
+    if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && (summary ? summary.surfaceLevel : surfaceLevel(sheet)) < levelTol))) fast = true;
+    if (analyticTail && !onStep) {
+      if (summary ? summary.maxW <= o.wetEps : quietDryTail(sheet, o)) {
+        if (summary) evaporateInPlace(sheet);
+        break;
+      }
+    }
+    if (analyticTail && !onStep && fast && (summary ? summary.maxW <= 3 * o.wetEps : sheet.W.every(w => w <= 3 * o.wetEps))) oFast.dt = Math.max(dt, 140);
+    if (!step(sheet, fast ? oFast : oLevel, summary)) break;
     // a caller watching the sheet dry (frames of a wash spreading and settling)
     if (onStep) onStep(t);
   }
@@ -969,20 +1013,73 @@ export function wetSums(sheet) {
 export const syncTopLayer = sheet => { if (sheet._gpu) sheet._gpu.syncTop(sheet); };
 /** The CPU copy made current over a rectangle [x, y, w, h] of cells, for code that reads the sheet's arrays directly. */
 export const needCells = (sheet, x, y, bw, bh) => { if (sheet._gpu && !sheet._gpu.paused && !ENV.NEEDCELLS_OFF) sheet._gpu.ensureFresh(sheet, [x, y, bw, bh]); };
-function thicknessCached(sheet) {
+function thicknessParts(sheet, materializeWet = true) {
   syncTopLayer(sheet);
-  const sums = wetSums(sheet);
+  const sums = materializeWet ? wetSums(sheet) : sheet._gpu?.wetSums(sheet) ?? null;
+  if (!sums) coherent(sheet);
   const n = sheet.n, layers = sheet.layers, m = layers.length - 1, K = sheet.K;
   let c = sheet._thickLower;
   if (c && (c.ver !== (sheet._layerVer || 0) || c.m > Math.max(0, m) || !c.refs.every((r, q) => layers[q] === r))) c = null;
   if (!c) c = sheet._thickLower = { ver: sheet._layerVer || 0, m: 0, refs: [], sum: sheet.G.map(() => new Float32Array(n)) };
   for (; c.m < m; c.m++) { const layer = layers[c.m]; c.refs.push(layer); for (let k = 0; k < K; k++) { const a = layer[k], o = c.sum[k]; for (let i = 0; i < n; i++) o[i] += a[i]; } }
+  return { lower: c.sum, top: m >= 0 ? layers[m] : null, sums };
+}
+function thicknessCached(sheet) {
+  const { lower, top, sums } = thicknessParts(sheet), n = sheet.n;
   return sheet.G.map((_, k) => {
-    const out = c.sum[k].slice(), s = sums[k];
-    if (m >= 0) { const a = layers[m][k]; for (let i = 0; i < n; i++) out[i] += a[i]; }
+    const out = lower[k].slice(), s = sums[k];
+    if (top) { const a = top[k]; for (let i = 0; i < n; i++) out[i] += a[i]; }
     for (let i = 0; i < n; i++) out[i] += s[i];
     return out;
   });
+}
+
+// Preserve each Float32 addition made by thickness(), including rounding the
+// top layer before adding wet sums. Totals retain the original raster sum order.
+function thicknessReadParts(sheet) {
+  const planes = (PAR && PAR.thickness(sheet)) || (ENV.LAYER_CACHE === '0' ? thicknessPlain(sheet) : null);
+  return planes ? {planes} : thicknessParts(sheet, false);
+}
+export function thicknessTotals(sheet) {
+  const parts = thicknessReadParts(sheet), out = new Array(sheet.K).fill(0);
+  for (let k = 0; k < sheet.K; k++) {
+    if (parts.planes) { out[k] = parts.planes[k].reduce((a, v) => a + v, 0); continue; }
+    const lower = parts.lower[k], top = parts.top?.[k], sums = parts.sums?.[k], G = sheet.G[k], D = sheet.D[k], P = sheet.P[k];
+    let total = 0;
+    for (let i = 0; i < sheet.n; i++) total += Math.fround(
+      (top ? Math.fround(lower[i] + top[i]) : lower[i]) + (sums ? sums[i] : Math.fround(G[i] + D[i] + P[i])));
+    out[k] = total;
+  }
+  return out;
+}
+
+/** Fill caller-owned, cell-major pigment thickness, optionally on a coarser plan grid. */
+export function thicknessInto(sheet, out, {pigments = sheet.K, scale = 1} = {}) {
+  const w = sheet.w / scale, h = sheet.h / scale;
+  if (!(out instanceof Float32Array) || !Number.isFinite(scale) || scale <= 0 ||
+      !Number.isInteger(w) || !Number.isInteger(h) || !Number.isInteger(pigments) || pigments < 1 || pigments > sheet.K || out.length !== w * h * pigments)
+    throw RangeError('Invalid interleaved thickness destination');
+  const parts = thicknessReadParts(sheet);
+  if (scale !== 1) out.fill(0);
+  for (let k = 0; k < pigments; k++) {
+    const plane = parts.planes?.[k], lower = parts.lower?.[k], top = parts.top?.[k], sums = parts.sums?.[k], G = sheet.G[k], D = sheet.D[k], P = sheet.P[k];
+    if (scale === 1) {
+      // Choose the layout once per pigment, not once per cell.
+      if (plane) for (let i = 0; i < sheet.n; i++) out[i * pigments + k] = plane[i];
+      else if (top && sums) for (let i = 0; i < sheet.n; i++) out[i * pigments + k] = Math.fround(lower[i] + top[i]) + sums[i];
+      else if (top) for (let i = 0; i < sheet.n; i++) out[i * pigments + k] = Math.fround(lower[i] + top[i]) + Math.fround(G[i] + D[i] + P[i]);
+      else if (sums) for (let i = 0; i < sheet.n; i++) out[i * pigments + k] = lower[i] + sums[i];
+      else for (let i = 0; i < sheet.n; i++) out[i * pigments + k] = lower[i] + Math.fround(G[i] + D[i] + P[i]);
+    } else {
+      for (let i = 0; i < sheet.n; i++) {
+        const cell = Math.floor(Math.floor(i / sheet.w) / scale) * w + Math.floor((i % sheet.w) / scale);
+        const value = plane ? plane[i] : Math.fround(
+          (top ? Math.fround(lower[i] + top[i]) : lower[i]) + (sums ? sums[i] : Math.fround(G[i] + D[i] + P[i])));
+        out[cell * pigments + k] += value / (scale * scale);
+      }
+    }
+  }
+  return out;
 }
 
 /** Total water and pigment, for conservation checks. */

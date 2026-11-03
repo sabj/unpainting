@@ -76,7 +76,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { makePaper, coldPressField } from '../src/media/paper.mjs';
-import { createSheet, step, dry as physicalDry, layersOf, thickness, layersChanged, DEFAULTS, tapeSheet, blot, setThreads, threadStats, coherent } from '../src/media/sheet.mjs';
+import { createSheet, step, dry as physicalDry, layersOf, thickness, thicknessInto, thicknessTotals, layersChanged, DEFAULTS, tapeSheet, blot, setThreads, threadStats, coherent } from '../src/media/sheet.mjs';
 import { attachGpu, gpuStats } from '../src/media/gpu/link.mjs';
 import { assertDeviceHealthy } from '../src/media/gpu/device-health.mjs';
 import { backendLine } from '../src/media/gpu/backend-record.mjs';
@@ -3195,7 +3195,7 @@ if (RESUMING) { const at = awareRestore(); L_START = at.kind === 'start' ? 0 : a
 else await awareBoundary({ kind: 'start' });
 if (!WASH_BASE && !(PRACTICE || PENWASH) && L_START < layers.length) WASH_BASE = cellRGB(render(), { w, h, SC, W2 });
 for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
-  if(L===FINISH_START){AREA_PLAN=FINISH_PLAN;AREA_COMPILED=FINISH_COMPILED;AREA_EXEC.set(null);if(FINISH_PLAN.doc.finishingBase){const b=FINISH_PLAN.doc.finishingBase;dry(sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaperDry(sheet);fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));check('finishing connected pass requires measured dry base',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(sheet);FINISH_MASS_BEFORE=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0));}
+  if(L===FINISH_START){AREA_PLAN=FINISH_PLAN;AREA_COMPILED=FINISH_COMPILED;AREA_EXEC.set(null);if(FINISH_PLAN.doc.finishingBase){const b=FINISH_PLAN.doc.finishingBase;dry(sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaperDry(sheet);fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));check('finishing connected pass requires measured dry base',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(sheet);FINISH_MASS_BEFORE=thicknessTotals(sheet);}
   const layer = layers[L];
   // --finishsnaps 1: the sheet as the finish begins (the planned ladder laid, before the touch-up rounds), for review
   if (layer._touch === 1 && num('finishsnaps', 0) > 0) { dry(sheet, 20000, O, { levelMax: 200 }); await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'finish-start.png')); }
@@ -3212,15 +3212,13 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       for (let k = 0; k < B.length; k++) ONSHEET[k] = Math.max(0, B[k] + expected[k] - E[k]);
       feedbackStats.predicted++;
     } else {
-    const th = thickness(sheet); ONSHEET = new Float32Array(n * PIGS.length);
-    // at scale 1 a cell is its own block: the sum is the value (it adds to zero, and divides by one)
-    if (SC === 1) { const P = PIGS.length; for (let j = 0; j < P; j++) { const t = th[j]; for (let k = 0; k < N2; k++) ONSHEET[k * P + j] = t[k]; } }
-    else for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = ((y / SC) | 0) * w + ((x / SC) | 0), k = y * W2 + x; for (let j = 0; j < PIGS.length; j++) ONSHEET[i * PIGS.length + j] += th[j][k] / (SC * SC); }
+    if (!ONSHEET || ONSHEET.length !== n * PIGS.length) ONSHEET = new Float32Array(n * PIGS.length);
+    thicknessInto(sheet, ONSHEET, {pigments:PIGS.length, scale:SC});
     feedbackStats.read++; FEEDBACK_FRESH = false;
     if (DELIVERY) { const P = PIGS.length, held = new Float64Array(P); for (let k = 0; k < n; k++) for (let j = 0; j < P; j++) held[j] += ONSHEET[k * P + j]; DELIVERY.observe(held); }
     if (TECH_CAL) { let held = 0; for (let k = 0; k < ONSHEET.length; k++) held += ONSHEET[k]; TECH_CAL.observe(held); }
     if (FEEDBACK_LAG) FEEDBACK_BASE = { onsheet: ONSHEET.slice(), booked: expected.slice() };
-    if (REMIX) REMIX.refresh(th.map(t => { const c = new Float32Array(n); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) c[((y / SC) | 0) * w + ((x / SC) | 0)] += t[y * W2 + x] / (SC * SC); return c; }));
+    if (REMIX) REMIX.refresh(thickness(sheet).map(t => { const c = new Float32Array(n); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) c[((y / SC) | 0) * w + ((x / SC) | 0)] += t[y * W2 + x] / (SC * SC); return c; }));
     }
   }
   // Each passage in the pass is charged for itself: one colour, loaded stronger or weaker as the passage asks.
@@ -3260,7 +3258,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   }
   const FIGURE_SHAPE = FIG_MASK && figureShare >= num('figureshare', 0.25);
   // --trace: every pigment's mass on the sheet before the passage, so a mixed passage is counted whole
-  const TRACE_MASS = opt('trace', '0') !== '0' ? thickness(sheet).map(t => t.reduce((a, v) => a + v, 0)) : null;
+  const TRACE_MASS = opt('trace', '0') !== '0' ? thicknessTotals(sheet) : null;
   // what this passage asks for, read off the source inside it (techniqueOf, above)
   let T = techniqueOf(sh);
   if (num('masswet',0)>0 && MASS_BUDGET?.owns(MASK, MB)) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
@@ -3696,7 +3694,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     // --passframes: a frame every N passages, so playback shows strokes going on, not whole pigment layers at once.
     else if (PASSFRAMES > 0 && ++shIdx % PASSFRAMES === 0) snap({ stage: 'wash', pass: L + 1, of: layers.length, value: layer.value, laying: true });
   }
-  if(FINISH_PLAN&&L===FINISH_START){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-deposition-immediate.png'));coherent(sheet);const after=thickness(sheet).map(a=>a.reduce((s,v)=>s+v,0)),commands=AREA_EXEC.records.filter(r=>r.operation==='physical brush stroke'&&r.status==='executed'),command=commands.at(-1);fs.writeFileSync(path.join(out,'finishing-dose-proof.json'),JSON.stringify({kind:'actual all-sheet pigment inventory delta over one finishing pass; per-contact brush loss separately logged',areaId:command?.areaId,passId:command?.passId,commandId:command?.id,commandIds:commands.map(r=>r.id),gestureIds:commands.map(r=>r.geometry?.[0]?.gestureId??null),paperBeforeByContact:commands.map(r=>r.paper),primaryCellsByContact:commands.map(r=>r.primaryCells?.length??0),primaryCells:command?.primaryCells?.length,requestedDepth:sh.amount,requestedMass:sh.amount*commands.reduce((s,r)=>s+(r.primaryCells?.length??0),0),beforePigmentMass:FINISH_MASS_BEFORE,afterPigmentMass:after,depositedPigmentMass:after.map((v,j)=>v-FINISH_MASS_BEFORE[j]),paperBefore:command?.paper,limit:'all-sheet conserved pigment delta, not percell depth/value/coverage proof; ordinary transport remains active'},null,2));}
+  if(FINISH_PLAN&&L===FINISH_START){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-deposition-immediate.png'));coherent(sheet);const after=thicknessTotals(sheet),commands=AREA_EXEC.records.filter(r=>r.operation==='physical brush stroke'&&r.status==='executed'),command=commands.at(-1);fs.writeFileSync(path.join(out,'finishing-dose-proof.json'),JSON.stringify({kind:'actual all-sheet pigment inventory delta over one finishing pass; per-contact brush loss separately logged',areaId:command?.areaId,passId:command?.passId,commandId:command?.id,commandIds:commands.map(r=>r.id),gestureIds:commands.map(r=>r.geometry?.[0]?.gestureId??null),paperBeforeByContact:commands.map(r=>r.paper),primaryCellsByContact:commands.map(r=>r.primaryCells?.length??0),primaryCells:command?.primaryCells?.length,requestedDepth:sh.amount,requestedMass:sh.amount*commands.reduce((s,r)=>s+(r.primaryCells?.length??0),0),beforePigmentMass:FINISH_MASS_BEFORE,afterPigmentMass:after,depositedPigmentMass:after.map((v,j)=>v-FINISH_MASS_BEFORE[j]),paperBefore:command?.paper,limit:'all-sheet conserved pigment delta, not percell depth/value/coverage proof; ordinary transport remains active'},null,2));}
   if (SOFT_RING) clock('flow', () => { for (let q = 0; q < num('softwetsteps', 60); q++) step(sheet, O); });
   if (crispHere || FLOOR || layer._darkPass || touchSmall) setClip(sheet, PROBE ? PROBE.clip : null);
   if(!BUDGET&&!sh._valuePlan?.texture&&sh._valuePlan?.edges.softCells.length&&paths.length){
@@ -3715,7 +3713,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   }
   // --trace: also what the passage put on the sheet of its pigment against its booking.
   if (opt('trace', '0') !== '0' && TRACE_MASS != null) {
-    const now = thickness(sheet).reduce((a, t, j) => a + t.reduce((x, v) => x + v, 0) - TRACE_MASS[j], 0), mixed = sh.mix.reduce((a, v) => a + v, 0);
+    const now = thicknessTotals(sheet).reduce((a, v, j) => a + v - TRACE_MASS[j], 0), mixed = sh.mix.reduce((a, v) => a + v, 0);
     let booked = 0; for (let i = 0; i < n; i++) if (MASK[i] && !(sh._skip && sh._skip[i])) booked += mixed * (sh.laidShare ?? 1);
     console.log(`trace pass ${L + 1} laid ${(now / Math.max(1e-6, booked * SC * SC)).toFixed(2)} of its booked mass${sh.graded ? ' (graded)' : ''}`);
   }
