@@ -17,6 +17,7 @@ import {
 } from './lib.mjs';
 import { brief, prompt, command, usage, KEYS, installSkills } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
+import { preflight, scorePython } from './preflight.mjs';
 import { profileForRound } from './profiles.mjs';
 
 const argv = process.argv.slice(2);
@@ -53,7 +54,9 @@ const targetOf = c => (cropSpecs[c].distributed ? path.join(V2, cropSpecs[c].fil
 const coarseOf = c => (cropSpecs[c].distributed ? path.join(V2, cropSpecs[c].coarseFile) : path.join(PRIVATE, `${c}-coarse.json`));
 for (const c of crops) for (const f of [targetOf(c), coarseOf(c)]) if (!fs.existsSync(f)) fail(`missing ${f}`);
 
+const python = scorePython(opt('python'));
 if (!DRY) {
+  try { preflight({ root: REPO, python }); } catch (e) { fail(e.message); }
   const k = KEYS[model.runner];
   try { execFileSync('which', [k.cli], { stdio: 'ignore' }); } catch { fail(`${model.runner} runner needs \`${k.cli}\` on PATH`); }
   if (model.runner === 'together' && !process.env.TOGETHER_API_KEY) fail('the together runner needs TOGETHER_API_KEY in the environment');
@@ -78,7 +81,7 @@ if (MULTI) {
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), profile };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), profile, python };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
