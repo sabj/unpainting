@@ -472,7 +472,16 @@ function tapeStroke(brush, sheet, path, { spacing, lift, upright, splat = false 
 }
 
 const unionRect = (a, b) => { const x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]); return [x0, y0, Math.max(a[0] + a[2], b[0] + b[2]) - x0, Math.max(a[1] + a[3], b[1] + b[3]) - y0]; };
+function strokeContacts(sheet) {
+  const state = sheet._strokeContacts ??= { stamps: new Uint32Array(sheet.n), epoch: 0 };
+  state.epoch = (state.epoch + 1) >>> 0;
+  if (!state.epoch) { state.stamps.fill(0); state.epoch = 1; }
+  sheet._lastStrokeContacts = 0;
+  return i => { if (state.stamps[i] !== state.epoch) { state.stamps[i] = state.epoch; sheet._lastStrokeContacts++; } };
+}
+
 function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, flowEvery = 0, candidateMask = null } = {}) {
+  const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
   const { w, h, paper } = sheet, K = sheet.K, L = brush.stiffness, Q = candidateMask ? null : groundQuantiles(paper, L, brush.fine, brush.coarse);
@@ -633,6 +642,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
         const fullContact=contact;
         if (tuft && liquidShare>0 && recentContact) contact=Math.max(0,contact-strengths[i]);
         if (contact<=0) continue;
+        countContact(i);
         markCpuStrokeCell(sheet, i);
         // wetMix: bristles in a wet film exchange equal volumes with it, charging prewet paper without a second puddle
         if (brush.wetMix && sheet.W[i] > 0.03) {
@@ -693,7 +703,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
     if(x1>=x0 && y1>=y0)sheet._cpuDemandWindow.require([x0,y0,x1-x0+1,y1-y0+1]);
   }
   for (let yy = Math.floor(last.y - r); yy <= Math.ceil(last.y + r); yy++) for (let xx = Math.floor(last.x - r); xx <= Math.ceil(last.x + r); xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h && Math.hypot(xx - last.x, yy - last.y) <= r && sheet.M[yy * w + xx]) cells.push(yy * w + xx);
-  if (pool.water > 0 && cells.length) for (const i of cells) { markCpuStrokeCell(sheet, i); deposit(sheet, i, pool.water / cells.length, pool.pig.map(v => v / cells.length)); }
+  if (pool.water > 0 && cells.length) for (const i of cells) { countContact(i); markCpuStrokeCell(sheet, i); deposit(sheet, i, pool.water / cells.length, pool.pig.map(v => v / cells.length)); }
   else if (pool.water > 0) moveMass(pool, belly, pool.water); // off the sheet or over dry paper, the bead stays on the brush
   return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
 }
@@ -701,6 +711,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
 // The strokeImpl stroke with cell work on the GPU (gpu/stepfull.wgsl, stroke_run). Geometry and cell selection are
 // planned here in the same double arithmetic as strokeImpl, so edge cells go the same way as on the CPU.
 function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false } = {}, observational = false) {
+  const countContact = observational ? null : strokeContacts(sheet);
   const link = sheet._gpu, rec = observational ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
   const { w, h, paper } = sheet, K = sheet.K, L = brush.stiffness, Q = observational ? null : groundQuantiles(paper, L, brush.fine, brush.coarse);
@@ -771,6 +782,7 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
         if (clk - stamp[yy * w + xx] < recent || stamp[yy * w + xx] >= onceT0) continue;
         stamp[yy * w + xx] = clk;
         const rel = side > 0 ? across / side : 0;
+        countContact?.(yy * w + xx);
         cI[cnt] = yy * w + xx; cL[cnt] = Math.max(0, Math.min(lanes - 1, Math.round(((rel + 1) / 2) * (lanes - 1)))); cA[cnt++] = across;
       }
     }

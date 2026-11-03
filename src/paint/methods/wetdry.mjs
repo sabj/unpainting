@@ -249,8 +249,8 @@ export function compoundClump(touches) {
 
 // Read the physical reservoir and every bristle, including GPU changes from the
 // preceding touch. Requested dip concentration is not the remaining brush load.
-export function measureBrush(brush) {
-  if (brush._pend) brush._pend.link.settleBrush(brush);
+export function measureBrush(brush, { settle = true } = {}) {
+  if (settle && brush._pend?.hairs) brush._pend.link.settleBrush(brush);
   let water = brush.resW ?? 0;
   const pigment = Array.from({ length: brush.K ?? 0 }, (_, k) => brush.resP?.[k] ?? 0);
   for (const hair of brush.hairs ?? []) {

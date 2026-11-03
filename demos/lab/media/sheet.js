@@ -131,7 +131,12 @@ export function setClip(sheet, mask) {
   sheet.clip = mask || null;
 }
 // A clip mask as runs of set cells, [start, length, ...]. A byte mask skips four clear (or four set) cells at a time.
+const clipRunCache = new WeakMap();
+const stableClipMasks = new WeakSet();
+/** Opt in only after the last mask write. Mutable masks remain uncached. */
+export function stableClipMask(mask) { if(mask)stableClipMasks.add(mask);return mask; }
 export function clipRuns(mask) {
+  const cached=clipRunCache.get(mask);if(cached)return cached;
   const r = [], n = mask.length;
   const words = mask instanceof Uint8Array && mask.byteOffset % 4 === 0 ? new Uint32Array(mask.buffer, mask.byteOffset, n >> 2) : null;
   for (let i = 0; i < n; i++) {
@@ -144,6 +149,7 @@ export function clipRuns(mask) {
     }
     r.push(s, i - s);
   }
+  if(stableClipMasks.has(mask))clipRunCache.set(mask,r);
   return r;
 }
 

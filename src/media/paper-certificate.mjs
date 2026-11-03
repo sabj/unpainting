@@ -19,13 +19,13 @@ export const validPaperCertificate = hasZeroPaperCertificate;
 export function certifyDryFixed(sheet) {
   certifyZeroPaper(sheet);
   Object.defineProperty(sheet, FIXED, {configurable:true, writable:true, value:{
-    zero:sheet[ZERO], layers:sheet.layers, count:sheet.layers.length, layerVersion:sheet._layerVer,
+    zero:sheet[ZERO], layers:(sheet._rawLayers ?? sheet.layers), count:(sheet._rawLayers ?? sheet.layers).length, layerVersion:sheet._layerVer,
     G:sheet.G, P:sheet.P, D:sheet.D,
   }});
 }
 export function validDryFixedCertificate(sheet) {
   const c=sheet[FIXED];
   return !!c && validPaperCertificate(sheet) && c.zero===sheet[ZERO] &&
-    c.layers===sheet.layers && c.count===sheet.layers.length && c.layerVersion===sheet._layerVer &&
+    c.layers===(sheet._rawLayers ?? sheet.layers) && c.count===(sheet._rawLayers ?? sheet.layers).length && c.layerVersion===sheet._layerVer &&
     c.G===sheet.G && c.P===sheet.P && c.D===sheet.D;
 }
