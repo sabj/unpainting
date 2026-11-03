@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { writeInkLines } from '../../crop/ink-lines-file.mjs';
+import { writeInkLines, inkCells } from '../../crop/ink-lines-file.mjs';
 import { finishTexture } from './finish-texture.mjs';
 import { linePaths, scaleLines } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
@@ -87,7 +87,9 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
     const choice = chooseLineSource(mode, { inkShare, threshold: num('penfirst', 0.5), sketchAvailable: canSketch });
     if (choice === 'source-ink') {
       const stem = path.join(out, 'lines-source-ink');
-      const observed = fs.existsSync(image) ? await writeInkLines(image, stem) : null;
+      const observed = fs.existsSync(image) ? await inkCells(image) : null;
+      let traced;
+      const observedLines = async (fill = false) => traced ??= await writeInkLines(image, fill ? stem+'-fill' : stem);
       // copy-lines traces a pen drawing whole; a painted source with only a little pen line gets the narrow-ridge
       // tracer. --copylinesmin sets the pen line share that counts as a pen drawing (default 0.025)
       const penDrawing = !observed || observed.inkCells / (observed.w * observed.h) >= num('copylinesmin', 0.025);
@@ -124,7 +126,7 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
         info.extractor = 'copy-lines';
         if (!opt('inkprofile', '')) argv.push('--inkprofile', 'drawing-ink');
         log(`line source source-ink: observed paths and optical widths (${r.stdout.trim()})`);
-        if (num('copylinesagree', 0) > 0 && !await agreeWithSeparator(stem + '-lines.json', image, { near: num('copylinesagree', 0), gap: num('copylinesgap', 2), minRun: num('copylinesrun', 3), floor: num('copylinesfloor', 0), fill: num('copylinesfill', 0) > 0 ? observed : null, log })) {
+        if (num('copylinesagree', 0) > 0 && !await agreeWithSeparator(stem + '-lines.json', image, { near: num('copylinesagree', 0), gap: num('copylinesgap', 2), minRun: num('copylinesrun', 3), floor: num('copylinesfloor', 0), fill: num('copylinesfill', 0) > 0 ? await observedLines(true) : null, log })) {
           argv.push('--drawing', 'none');
           info.source = 'none';
           return info;
@@ -133,9 +135,10 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
         // traced above from the models' fused map; nothing cuts it against the separator
       } else if (observed && lp.ready) {
         info.extractor = 'ink-lines';
+        const observed = await observedLines();
         log(`line source source-ink: ${observed.lines.length} narrow-ridge lines (painted source)`);
       } else {
-        const r = observed ?? await writeInkLines(image, stem);
+        const r = await observedLines();
         info.extractor = 'ink-lines fallback (numpy/OpenCV unavailable)';
         log(`!!! line source source-ink fallback: ${r.lines.length} narrow-ridge lines, because ${python} cannot import numpy and OpenCV; run tools/cloud/setup-lines.sh`);
       }
