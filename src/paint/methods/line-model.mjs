@@ -3,6 +3,7 @@
 // fused map into a line file. The map is cached by the target's SHA-256, the map size and the script's own hash.
 // Planning only: it reads the target before the first mark.
 import fs from 'node:fs';
+import { linePython } from './line-python.mjs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -46,6 +47,28 @@ export function traceLineModel({ python, root, image, stem, cacheDir, width, max
   const m = lineModelMap({ python, root, image, cacheDir, width, maxside, offline, weights, run });
   // the fine model's own map: its marks in busy detail regions join the mask (copy-lines.py --fine)
   const fine = m.map.replace(/\.png$/, '-fine.png');
+  const environment = linePython({flag:python, root, run, log:()=>{}, warn:()=>{}});
+  if (!environment.ready) throw new Error('Trace cache requires a working line Python: '+environment.error);
+  const scripts = ['copy-lines.py','lines.py','sketch-lines.py'].map(name => [name, sha(fs.readFileSync(path.join(root,'tools/seg',name)))]);
+  const fingerprint = {version:1, adapter:sha(fs.readFileSync(new URL(import.meta.url))), target:sha(fs.readFileSync(image)), map:sha(fs.readFileSync(m.map)),
+    fine:fs.existsSync(fine)?sha(fs.readFileSync(fine)):null, scripts,
+    platform:[process.platform,process.arch], python:environment.executable, versions:[environment.python,environment.numpy,environment.opencv,environment['scikit-image']],
+    strokes, tolerance, width:m.width, height:m.height};
+  const cacheRoot=path.join(cacheDir,'traces'), entry=path.join(cacheRoot,sha(JSON.stringify(fingerprint)));
+  const suffixes=['-lines.json','-ink.png','-skeleton.png'];
+  const patch = () => {
+    const file=stem+'-lines.json',doc=JSON.parse(fs.readFileSync(file,'utf8'));
+    fs.writeFileSync(file,JSON.stringify({...doc,targetSHA256:fingerprint.target,lineMap:{width:m.width,height:m.height,cached:m.cached}})+'\n');
+  };
+  if(fs.existsSync(entry)){
+    const meta=JSON.parse(fs.readFileSync(path.join(entry,'manifest.json'),'utf8'));
+    if(JSON.stringify(meta.fingerprint)!==JSON.stringify(fingerprint))throw Error('Trace cache fingerprint mismatch');
+    for(const suffix of suffixes)if(sha(fs.readFileSync(path.join(entry,'trace'+suffix)))!==meta.hashes[suffix])throw Error('Trace cache artifact hash mismatch: '+suffix);
+    fs.mkdirSync(path.dirname(stem),{recursive:true});
+    for(const suffix of suffixes)fs.copyFileSync(path.join(entry,'trace'+suffix),stem+suffix);
+    patch(); // Current map-cache provenance, even when tracing was cached on its first generation.
+    return {map:m.map,cached:m.cached,traceCached:true,summary:meta.summary};
+  }
   // strokes: the source's own pen strokes (centrelines and widths), kept where the map also sees a line; else the map's contours
   const args = strokes
     ? [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(m.width), '--kind', 'stroke', '--gate', m.map, '--stroke-colour', '10']
@@ -53,8 +76,18 @@ export function traceLineModel({ python, root, image, stem, cacheDir, width, max
   const r = run(python, [...args, ...(tolerance == null ? [] : ['--map-tolerance', String(tolerance)])],
     { cwd: root, encoding: 'utf8', timeout: 900000, env: { ...process.env, ...ENV } });
   if (r.error || r.status !== 0) throw new Error(`copy-lines on the lineart map failed: ${r.error?.message ?? r.stderr}`);
-  // the line file is the target's own: its hash and size, not the map's
-  const file = `${stem}-lines.json`, doc = JSON.parse(fs.readFileSync(file, 'utf8'));
-  fs.writeFileSync(file, JSON.stringify({ ...doc, targetSHA256: sha(fs.readFileSync(image)), lineMap: { width: m.width, height: m.height, cached: m.cached } }) + '\n');
-  return { map: m.map, cached: m.cached, summary: r.stdout.trim() };
+  patch();
+  const summary=r.stdout.trim();
+  fs.mkdirSync(cacheRoot,{recursive:true});
+  const temp=fs.mkdtempSync(path.join(cacheRoot,'.trace-'));
+  try {
+    const hashes={};
+    for(const suffix of suffixes){
+      const bytes=fs.readFileSync(stem+suffix);
+      fs.writeFileSync(path.join(temp,'trace'+suffix),bytes);hashes[suffix]=sha(bytes);
+    }
+    fs.writeFileSync(path.join(temp,'manifest.json'),JSON.stringify({fingerprint,hashes,summary})+'\n');
+    try { fs.renameSync(temp,entry); } catch (e) { if (!['EEXIST','ENOTEMPTY'].includes(e.code)) throw e; }
+  } finally { fs.rmSync(temp,{recursive:true,force:true}); }
+  return {map:m.map,cached:m.cached,traceCached:false,summary};
 }

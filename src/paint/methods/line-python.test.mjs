@@ -68,12 +68,13 @@ function fakeModelPython(dir, model) {
     '    open(os.path.join(out, stem + ".png"), "w").write("m"); open(os.path.join(out, stem + ".json"), "w").write(json.dumps({"width": 100, "height": 80}))',
     'else:',
     '    open(out + "-lines.json", "w").write(json.dumps({"image": {"w": 100, "h": 80}, "lines": []}))',
+    '    open(out + "-ink.png", "w").write("ink"); open(out + "-skeleton.png", "w").write("skeleton")',
     '    print(sys.argv[1].split("/")[-1], a[a.index("--kind") + 1] if "--kind" in a else "ink")',
   ].join('\n'));
   fs.writeFileSync(python, `#!/bin/sh\nif [ "$1" = "-c" ]; then echo '{"python": "3.9.6", "numpy": "2.0.2", "opencv": "4.11.0", "scikit-image": null, "model": ${model}}'; exit 0; fi\nexec python3 "${py}" "$@"\n`);
   fs.chmodSync(python, 0o755);
   fs.mkdirSync(path.join(dir, 'tools/seg'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'tools/seg/sketch-map.py'), '#');
+  for(const name of ['sketch-map.py','copy-lines.py','sketch-lines.py','lines.py'])fs.writeFileSync(path.join(dir,'tools/seg',name),'#');
   return python;
 }
 

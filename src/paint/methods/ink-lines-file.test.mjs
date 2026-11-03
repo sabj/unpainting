@@ -131,3 +131,15 @@ test('lineart map lines are measured and never cut or marked soft, whatever --li
   assert.ok(Math.abs(r.opening.stats.keptPx / r.opening.stats.lengthPx - 1) < 1e-9, 'every pixel of the length is kept');
   assert.equal(open.inkLines.support, 0);
 });
+
+test('unchanged stage measurements reuse their record; edited files and flags invalidate it', async()=>{
+ const dir=await setup(),f=flags(['--drawingfile',path.join(dir,'open'),'--inkdarkcap','1']),logs=[];
+ try {
+  const args={...f,image:path.join(dir,'target.png'),root:dir,out:dir,sheetMm:120,log:s=>logs.push(s)};
+  const a=await holdInkLines(args),b=await holdInkLines(args);
+  assert.strictEqual(a.opening,b.opening);assert(logs.some(s=>s.includes('reused measurements')));
+  const file=path.join(dir,'open-lines.json'),doc=JSON.parse(fs.readFileSync(file));doc.lines.pop();fs.writeFileSync(file,JSON.stringify(doc));
+  const c=await holdInkLines(args);assert.notStrictEqual(c.opening,b.opening);
+  f.argv.push('--inkdarkmatch','1');const d=await holdInkLines(args);assert.notStrictEqual(d.opening,c.opening);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

@@ -2235,7 +2235,12 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --pensimplify c: reduce each pen path to the points it needs within c cells, then resample evenly. Default 0, off.
   const SIMPLIFY = num('pensimplify', 0) * K;
   const simplifyAll = gs => (SIMPLIFY > 0 ? gs.map(g => ({ ...g, points: drawAs(g.points, { tolerance: SIMPLIFY, step: Math.max(1, 2 * K) }) })).filter(g => g.points.length >= 2) : gs);
-  const gestures = simplifyAll(clock('paths', () => (opt('penfrom', 'walk') === 'chains' ? chainPen() : walkPen())));
+  // Hybrid logic and dark-mass curls consume the walker even with an authored drawing.
+  // Diagnostic gesture dumps also promise the original walked paths.
+  const fileReplacesWalk = !!(first ? opt('drawingfile','') : !fine && opt('drawinglast',''))
+    && num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic',0)) === 0
+    && !(DARK_MASS && first && !fine) && !opt('dumpgestures');
+  const gestures = fileReplacesWalk ? [] : simplifyAll(clock('paths', () => (opt('penfrom', 'walk') === 'chains' ? chainPen() : walkPen())));
   // the ink is the darkest fluid on the palette, as walnut ink is darker than any wash made from it
   // --firstpen graphite: the first pen's drawing as a light pencil lay-in, ink kept for the closing pen. Needs a graphite
   // outline medium; --prep does the same.
@@ -2253,7 +2258,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const TIERED = INKTIERS && num('inkbudget', preparing ? 0 : 6) > 0;
   const FAINT_CELLS = CELLS * num('tier3faint', 0.1);
   // --inktiers: the same CELLS, reserved before the greedy walk may use them.
-  const tiered = TIERED ? (() => {
+  const tiered = TIERED && !fileReplacesWalk ? (() => {
     const t1Cells = CELLS * num('tier1', 0.3), t2Cells = CELLS * num('tier2', 0.3);
     const stride = Math.max(1, Math.round(2 * K));
     // Tier 1a: the subject's own boundary; traceOutlines returns ordered, smoothed, longest-first chains.
@@ -2316,7 +2321,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   console.log(`line budget: source ink ${(100 * share).toFixed(1)}% of cells, ${budgeted.length} of ${gestures.length} gestures`);
   // --outline 0|1: a lighter second pass on fainter ridges away from what is drawn, within the line budget. Default 1.
   // --outlinemin p: run it only when the source shows at least p per cent of its cells as line. Default 0.
-  if (opt('outline', '1') !== '0' && share >= num('outlinemin', 0) / 100) {
+  if (!fileReplacesWalk && opt('outline', '1') !== '0' && share >= num('outlinemin', 0) / 100) {
     const drawn = new Uint8Array(n);
     for (const g of budgeted) for (const q of g.points) { const x = Math.round(q.x), y = Math.round(q.y); if (x >= 0 && y >= 0 && x < w && y < h) drawn[y * w + x] = 1; }
     const away = dilate(drawn, w, h, Math.round(2 * K)), faint = Float32Array.from(field, (v, i) => (away[i] ? 0 : v));

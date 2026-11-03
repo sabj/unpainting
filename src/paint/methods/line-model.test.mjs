@@ -8,19 +8,24 @@ import { lineModelDir, lineModelMap, traceLineModel } from './line-model.mjs';
 function setup() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'line-model-'));
   fs.mkdirSync(path.join(root, 'tools/seg'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'tools/seg/sketch-map.py'), '# script');
+  for (const name of ['sketch-map.py','copy-lines.py','lines.py','sketch-lines.py']) fs.writeFileSync(path.join(root,'tools/seg',name),'# script');
   fs.writeFileSync(path.join(root, 'target.png'), 'bytes');
   return root;
 }
 // a fake python: sketch-map.py writes the map and its record, copy-lines.py writes the line file
 function fake(root, calls) {
   return (python, args) => {
+    if (args[0] === '-c') return {status:0,stdout:JSON.stringify({python:'3.9.6',numpy:'2',opencv:'4',executable:python}),stderr:''};
     calls.push(args[0].split('/').at(-1));
     if (args[0].endsWith('sketch-map.py')) {
       const out = args[args.indexOf('--out') + 1];
       fs.writeFileSync(path.join(out, 'target.png'), 'map');
       fs.writeFileSync(path.join(out, 'target.json'), JSON.stringify({ width: 1080, height: 720 }));
-    } else fs.writeFileSync(args[args.indexOf('--out') + 1] + '-lines.json', JSON.stringify({ image: { w: 1080, h: 720 }, lines: [] }));
+    } else {
+      const stem=args[args.indexOf('--out')+1];
+      fs.writeFileSync(stem+'-lines.json', JSON.stringify({image:{w:1080,h:720},lines:[]}));
+      fs.writeFileSync(stem+'-ink.png','ink');fs.writeFileSync(stem+'-skeleton.png','skeleton');
+    }
     return { status: 0, stdout: '{"tracedPaths": 0}\n', stderr: '' };
   };
 }
@@ -72,4 +77,32 @@ test('with strokes the source itself is traced, gated by the map', () => {
     assert.equal(copy[copy.indexOf('--kind') + 1], 'stroke');
     assert.ok(copy[copy.indexOf('--gate') + 1].endsWith('target.png'));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('trace cache copies patched artifacts and keys every numerical input',()=>{
+ const root=setup(),cacheDir=path.join(root,'cache'),calls=[],run=fake(root,calls);
+ const args={python:'py',root,image:path.join(root,'target.png'),stem:path.join(root,'first'),cacheDir,run};
+ try {
+  const a=traceLineModel(args),b=traceLineModel({...args,stem:path.join(root,'second')});
+  assert.equal(a.traceCached,false);assert.equal(b.traceCached,true);
+  assert.equal(calls.filter(x=>x==='copy-lines.py').length,1);
+  assert.deepEqual(fs.readFileSync(args.stem+'-ink.png'),fs.readFileSync(path.join(root,'second-ink.png')));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root,'second-lines.json'))).lineMap.cached,true);
+  traceLineModel({...args,tolerance:.3});
+  fs.writeFileSync(a.map,'changed map');traceLineModel(args);
+  fs.writeFileSync(a.map.replace('.png','-fine.png'),'fine');traceLineModel(args);
+  fs.appendFileSync(path.join(root,'tools/seg/copy-lines.py'),'changed');traceLineModel(args);
+  traceLineModel({...args,python:'another-python'});
+  assert.equal(calls.filter(x=>x==='copy-lines.py').length,6);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('trace cache rejects corrupt artifacts instead of silently reusing them',()=>{
+ const root=setup(),cacheDir=path.join(root,'cache'),args={python:'py',root,image:path.join(root,'target.png'),stem:path.join(root,'first'),cacheDir,run:fake(root,[])};
+ try{
+  traceLineModel(args);
+  const entry=fs.readdirSync(path.join(cacheDir,'traces'))[0];
+  fs.writeFileSync(path.join(cacheDir,'traces',entry,'trace-ink.png'),'corrupt');
+  assert.throws(()=>traceLineModel(args),/artifact hash mismatch/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

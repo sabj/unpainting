@@ -6,6 +6,7 @@
 // <out>/ink-lines.json.
 // Planning only: it reads the target once, before the target guard seals it.
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
 import { linePaths } from '../../crop/lines.mjs';
@@ -37,7 +38,7 @@ const quantileOf = (P, q) => { const s = Float32Array.from(P).sort(); return s[M
 
 const lPlaneCache = new Map();
 async function lPlane(image, w, h) {
-  const key = `${image}|${w}|${h}`;
+  const key = `${image}|${digest(image)}|${w}|${h}`;
   if (!lPlaneCache.has(key)) {
     const { data, info } = await sharp(image).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer({ resolveWithObject: true });
     lPlaneCache.set(key, labPlanes(data, info.width, info.height).L.map(v => 100 * v));
@@ -67,7 +68,7 @@ function onGrid(doc, gridW) {
  * Hold one line file to the target. Returns the stage record { file, out, stats, pixelMm } (out null when the file
  * is passed through unchanged), or null for a file with no lines.
  */
-async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flags, targetW, gridW = 0, log = () => {}, decide = null }) {
+async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, flags, targetW, gridW = 0, log = () => {}, decide = null }) {
   const file = path.resolve(root, linePaths(base).lines);
   if (!fs.existsSync(file)) return null;
   const doc0 = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -116,6 +117,30 @@ async function holdLineFile({ stage, base, image, root = '.', out, sheetMm, flag
   return record;
 }
 
+// A stage can be requested twice while planning installs the remaining stage files.
+// Content keys keep edited files, flags, target pixels and decision inputs distinct.
+const heldStages = new Map();
+const digest = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+async function holdLineFile(args) {
+  const file = path.resolve(args.root, linePaths(args.base).lines);
+  if (!fs.existsSync(file)) return null;
+  const seg = args.decide?.segments?.stem;
+  const key = JSON.stringify([args.stage, file, digest(file), path.resolve(args.image), digest(args.image),
+    path.resolve(args.out), args.sheetMm, args.targetW, args.gridW, args.flags,
+    args.decide && [args.decide.judge, args.decide.cacheDir, seg,
+      seg && digest(seg+'.json'), seg && digest(seg+'.png')]]);
+  const cached = heldStages.get(key);
+  // Output belongs to this stage: another input may have overwritten its stem.
+  if (cached && (!cached.record?.out || (fs.existsSync(cached.file) && digest(cached.file) === cached.hash))) {
+    args.log(`ink lines, ${args.stage}: unchanged input, reused measurements`);
+    return cached.record;
+  }
+  const record = await holdLineFileImpl(args);
+  const output = record?.out && linePaths(record.out).lines;
+  heldStages.set(key, {record, file:output, hash:output && digest(output)});
+  return record;
+}
+
 /**
  * Hold the opening and closing files named by --drawingfile and --drawinglast. Pushes the new file names onto argv.
  * @returns { opening, closing } stage records (or null), also written to <out>/ink-lines.json
@@ -129,7 +154,7 @@ export async function holdInkLines({ opt, num, argv, image, root = '.', out, she
   for (const [stage, key] of [['opening', 'drawingfile'], ['closing', 'drawinglast']]) {
     const base = opt(key, '');
     res[stage] = base ? await holdLineFile({ stage, base, image, root, out, sheetMm, flags, targetW, gridW: num('width', 0) * Math.max(1, Math.round(num('inkres', 1))), log, decide }) : null;
-    if (res[stage]?.out) argv.push('--' + key, res[stage].out);
+    if (res[stage]?.out && base !== res[stage].out) argv.push('--' + key, res[stage].out);
   }
   res.pixelMm = sheetMm / targetW;
   fs.writeFileSync(path.join(out, 'ink-lines.json'), JSON.stringify(res, null, 1) + '\n');

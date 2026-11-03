@@ -4,23 +4,36 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
+import { separate } from './inkwash.mjs';
 import { inkLines } from './ink-lines.mjs';
 import { paperOf } from './palettepick.mjs';
 
 const INK_LINE_DEFAULTS = Object.freeze({ width: 720, minLength: 8, bridge: 1, join: 12, margin: 0.02, darkWash: Infinity,
   ridgeHigh: 0.03, ridgeLow: 0.015, stepOverRidge: 1.4, maxWidth: 5 });
 
-/**
- * Write <stem>-lines.json and <stem>.png for an image. `regions` is an optional { labels, legend, subject } at the
- * working size. @returns { file, lines, inkCells, w, h }
- */
-export async function writeInkLines(image, stem, options = {}) {
+async function inkSource(image, options) {
   const o = { ...INK_LINE_DEFAULTS, ...options };
   if (!(o.width >= 64)) throw new Error(`ink lines: a working width of 64 pixels or more, not ${o.width}`);
   const meta = await sharp(image).metadata();
   const w = o.width, h = Math.round(meta.height * o.width / meta.width);
   const rgb = await sharp(image).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer();
   const { paperRGB } = paperOf(rgb, w, h, { mode: 'source' });
+  return {o,meta,w,h,rgb,paperRGB};
+}
+
+/** Same separator and working grid as writeInkLines, without tracing or writing artifacts. */
+export async function inkCells(image, options = {}) {
+  const {o,w,h,rgb,paperRGB}=await inkSource(image,options);
+  const sep=separate(rgb,w,h,paperRGB,{ridgeHigh:o.ridgeHigh,ridgeLow:o.ridgeLow,stepOverRidge:o.stepOverRidge,maxWidth:o.maxWidth});
+  return {inkCells:sep.stats.ink,w,h};
+}
+
+/**
+ * Write <stem>-lines.json and <stem>.png for an image. `regions` is an optional { labels, legend, subject } at the
+ * working size. @returns { file, lines, inkCells, w, h }
+ */
+export async function writeInkLines(image, stem, options = {}) {
+  const {o,meta,w,h,rgb,paperRGB} = await inkSource(image,options);
   const reg = o.regions ?? {};
   const r = inkLines(rgb, w, h, paperRGB, { labels: reg.labels ?? null, legend: reg.legend ?? {}, subject: reg.subject ?? [], minLength: o.minLength, bridge: o.bridge,
     join: o.join, margin: o.margin, darkWash: o.darkWash, separator: { ridgeHigh: o.ridgeHigh, ridgeLow: o.ridgeLow, stepOverRidge: o.stepOverRidge, maxWidth: o.maxWidth } });

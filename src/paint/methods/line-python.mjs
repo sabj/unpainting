@@ -17,7 +17,7 @@ const REPO_VENV = '.venv-lines';
 // (the lineart models of tools/seg/sketch-map.py) are installed
 const PROBE = [
   'import json, sys',
-  'v = {"python": sys.version.split()[0]}',
+  'v = {"python": sys.version.split()[0], "executable": sys.executable}',
   'for mod, name in (("numpy", "numpy"), ("cv2", "opencv"), ("skimage", "scikit-image")):',
   '    try: v[name] = __import__(mod).__version__',
   '    except Exception: v[name] = None',
@@ -51,7 +51,7 @@ function probe(python, run) {
   const out = {
     ready: !r.error && r.status === 0,
     model: v.model === true,
-    python: v.python ?? null, numpy: v.numpy ?? null, opencv: v.opencv ?? null, 'scikit-image': v['scikit-image'] ?? null,
+    executable: v.executable ?? python, python: v.python ?? null, numpy: v.numpy ?? null, opencv: v.opencv ?? null, 'scikit-image': v['scikit-image'] ?? null,
     ...(r.error || r.status !== 0 ? { error: r.error?.message ?? (String(r.stderr ?? '').trim().split('\n').at(-1) || `exit ${r.status}`) } : {}),
   };
   cache.set(python, out);
