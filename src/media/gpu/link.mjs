@@ -507,6 +507,7 @@ export class GpuLink {
       if(this.queuedDrys>=Math.max(1,Math.min(128,Math.floor(this.rectData.length/6))))this.flushDrys(sheet);
       this.stale=true;this.topStale=true;this.fresh.stale();this.stats.drys++;
       this.stats.queuedDrys=(this.stats.queuedDrys??0)+1;
+      this.lastDryZero = true; // queued dry uses allowWet:false
       // the offline painter ignores dry's step count; consumers drain metadata lazily
       return 0;
     }
@@ -779,6 +780,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   sheet._gpu = link;
   if(link.resident && process.env.GPU_ASYNC_DRY==='1'){
     let layers=sheet.layers;
+    Object.defineProperty(sheet,'_rawLayers',{configurable:true,get(){return layers;}});
     Object.defineProperty(sheet,'layers',{enumerable:true,configurable:true,get(){link.flushDrys(sheet);return layers;},set(value){link.flushDrys(sheet);layers=value;}});
   }
   link.lastO = null; link.applyOptions(O); link.initMasks(sheet);

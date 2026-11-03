@@ -60,9 +60,12 @@ function sampledMask(clip, tape, w, h) {
   return mask;
 }
 
+const erosionCache=new WeakMap();
 function erode(mask,w,h,r) {
+  const key=`${w}/${h}/${r}`,cached=erosionCache.get(mask);if(cached?.key===key)return cached.value;
   // Approximate edge clearance, including holes and the sheet perimeter, using a two-pass chamfer distance.
-  const d=Float32Array.from(mask,(v,i)=>v?Math.min(i%w+.5,w-i%w-.5,Math.floor(i/w)+.5,h-Math.floor(i/w)-.5):0), diagonal=Math.SQRT2;
+  const d=new Float32Array(mask.length),diagonal=Math.SQRT2;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(mask[i])d[i]=Math.min(x+.5,w-x-.5,y+.5,h-y-.5);}
   for(let y=0;y<h;y++)for(let x=0;x<w;x++) {
     const i=y*w+x;if(!mask[i])continue;
     if(x)d[i]=Math.min(d[i],d[i-1]+1);if(y)d[i]=Math.min(d[i],d[i-w]+1);
@@ -73,7 +76,8 @@ function erode(mask,w,h,r) {
     if(x+1<w)d[i]=Math.min(d[i],d[i+1]+1);if(y+1<h)d[i]=Math.min(d[i],d[i+w]+1);
     if(x+1<w&&y+1<h)d[i]=Math.min(d[i],d[i+w+1]+diagonal);if(x&&y+1<h)d[i]=Math.min(d[i],d[i+w-1]+diagonal);
   }
-  return Uint8Array.from(d,v=>v>r?1:0);
+  const value=new Uint8Array(d.length);for(let i=0;i<d.length;i++)value[i]=d[i]>r?1:0;
+  erosionCache.set(mask,{key,value});return value;
 }
 
 function footprint(m,sheet,w,h,allow) {
@@ -182,14 +186,16 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
         if(x>=0&&x<w&&y>=0&&y<h)exclude[y*w+x]=1;
       }
     }
-    const smoothInterior=erode(Uint8Array.from(exclude,v=>v?0:1),w,h,w/sheet.widthMm);
+    const allowed=new Uint8Array(n);for(let i=0;i<n;i++)allowed[i]=exclude[i]?0:1;
+    const smoothInterior=erode(allowed,w,h,w/sheet.widthMm);
     for(const p of plan.passes) {
       const mm=p.resolution?.mmPerCell,mask=passMasks.get(p.id);
       if(!mask||p.texture||!(mm>0)||p.area*mm*mm<sheet.widthMm*sheet.heightMm*.01||p.resolution.estimatedSupportWidthCells*mm<3)continue;
       let interior=erode(mask,w,h,w/sheet.widthMm);
       // All later planned boundaries describe small features, texture or value changes: keep those accents exempt.
-      interior=interior.map((v,i)=>v&&smoothInterior[i]?1:0);
-      if(interior.reduce((s,v)=>s+v,0)<n*.001)continue;
+      const combined=new Uint8Array(n);let interiorCells=0;
+      for(let i=0;i<n;i++){combined[i]=interior[i]&&smoothInterior[i]?1:0;interiorCells+=combined[i];}interior=combined;
+      if(interiorCells<n*.001)continue;
       const key=createHash('sha256').update(interior).digest('hex');
       if(areaMasks.has(key)){areaMasks.get(key).planIds.push(p.id);continue;}
       const a={id:p.id,planIds:[p.id],widthMm:p.resolution.estimatedSupportWidthCells*mm,label:`${[...new Set((p.regions??[]).map(id=>regionProfiles.find(r=>r.id===id)?.descriptiveFamily??id))].join(', ')} (${p.phase}, band ${p.valueBand}, ${p.id.split('/').at(-1)})`,mask:interior,source:'planned broad value-shape clip, >=1% sheet and >=3 mm support; excludes 1 mm around hard planned boundaries'};

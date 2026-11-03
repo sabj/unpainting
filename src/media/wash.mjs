@@ -341,6 +341,8 @@ export function flowField(field, w, h) {
 }
 // flowField for the same field array (and size) is the same field: kept while the array lives
 const FLOW_CACHE = new WeakMap();
+/** Call after rewriting a reusable field before planning the next passage. */
+export function invalidateFlowField(field) { FLOW_CACHE.delete(field); }
 function cachedFlowField(field, w, h) {
   const hit = FLOW_CACHE.get(field);
   if (hit && hit.w === w && hit.h === h) return hit.F;
@@ -409,9 +411,9 @@ function breathe(pts, radius, rnd, amount) {
  * that loss; a swatch of 50 cells in the middle of scrap has 0.078, a sky taking the top half of a sheet about a tenth
  * of that.
  */
-export function openEdgeShare(mask, w, h) {
+export function openEdgeShare(mask, w, h, box = null) {
   let area = 0, open = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+  for (let y = box?.y0 ?? 0; y <= (box?.y1 ?? h-1); y++) for (let x = box?.x0 ?? 0; x <= (box?.x1 ?? w-1); x++) {
     const i = y * w + x; if (!mask[i]) continue;
     area++;
     if ((x > 0 && !mask[i - 1]) || (x < w - 1 && !mask[i + 1]) || (y > 0 && !mask[i - w]) || (y < h - 1 && !mask[i + w])) open++;
@@ -447,15 +449,15 @@ export function prewetArea(mask, D, w, h, { reach = 6, margin = 0.05 } = {}) {
 
 /** Estimate mean sweep overlap per cell.
  * Divide the passage charge by this factor so overlapping lanes do not multiply the paint load. */
-export function sweepCover(paths, mask, w, h, { counts = null } = {}) {
-  let under = 0, cells = 0;
+export function sweepCover(paths, mask, w, h, { counts = null, cells: knownCells = null, box = null } = {}) {
+  let under = 0, cells = knownCells ?? 0;
   // A caller that already charged a graded wash has these exact counts. Reuse
   // them only when Uint16 saturation cannot have lost overlap information.
   if (counts && counts.length === w * h && paths.length <= 65535) {
-    for (let i = 0; i < w * h; i++) if (mask[i]) { cells++; under += counts[i]; }
+    for(let y=box?.y0??0;y<=(box?.y1??h-1);y++)for(let i=y*w+(box?.x0??0),end=y*w+(box?.x1??w-1);i<=end;i++)if(mask[i]){if(knownCells===null)cells++;under+=counts[i];}
     return cells ? under / cells : 0;
   }
-  for (let i = 0; i < w * h; i++) cells += mask[i] ? 1 : 0;
+  if(knownCells===null)for (let i = 0; i < w * h; i++) cells += mask[i] ? 1 : 0;
   if (!cells) return 0;
   for (const pts of paths) under += countUnder(pts, mask, w, h);
   return under / cells;

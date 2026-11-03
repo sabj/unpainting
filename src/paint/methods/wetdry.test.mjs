@@ -102,7 +102,7 @@ test('after waiting, the gate remeasures a revised footprint instead of using st
 
 test('brush audit settles GPU state and measures actual remaining pigment and water', () => {
  const b={K:2,resW:2,resP:[1,.5],hairs:[{water:1,pig:[.5,.25]}]};
- let reads=0;b._pend={link:{settleBrush:()=>{reads++;b.hairs[0].water=.5;}}};
+ let reads=0;b._pend={hairs:true,link:{settleBrush:()=>{reads++;b.hairs[0].water=.5;}}};
  assert.deepEqual(measureBrush(b),{waterMass:2.5,pigmentMass:[1.5,.75],pigmentConcentration:[.6,.3]});
  assert.equal(reads,1);b.resW=NaN;assert.throws(()=>measureBrush(b),/Invalid/);
 });

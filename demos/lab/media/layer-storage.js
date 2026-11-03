@@ -81,7 +81,7 @@ export function compactLowerLayers(sheet,{from=1,before=Infinity,retainPigments=
 /** Inspect allocated storage without triggering plane getters or GPU readback. */
 export function layerStorageStats(sheet, { includeNonzero = true } = {}) {
   const buffers=new Set(), planes=new Set(), nonzeroPlanesSet=new Set(), nonzero=new WeakMap();
-  const layers=sheet.layers;
+  const layers=includeNonzero ? sheet.layers : (sheet._rawLayers ?? sheet.layers);
   let nonzeroPlanes=0,compactedPlanes=0,croppedBytes=0,planeReferences=0,logicalPlaneBytes=0,nonzeroPlaneBytes=0;
   const pending=new Map((sheet._gpu?.pendingLayers??[]).map(p=>[p.index,p.mask]));
   if(sheet._gpu?.topPlaceholder)pending.set(layers.length-1,sheet._gpu.topMask);
