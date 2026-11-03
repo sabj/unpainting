@@ -1367,7 +1367,10 @@ const stroke=(b,target,points,options)=>{
   const fastMode=NATIVE_PAINT_MODE.mode==='fast',fastPaperOpts=fastMode?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:{uniform:SPEED_UNIFORM_PAPER};
   const contactStarted=performance.now(),contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
-  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b,{settle:!fastMode}),paint=load.pigmentMass.some(v=>v>0),observationCells=VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors],observe=()=>measurePaper(target,observationCells,SPEED_PAPER,fastPaperOpts);
+  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b,{settle:!fastMode}),paint=load.pigmentMass.some(v=>v>0);
+  let _observationCells=null;
+  const getObservationCells=()=>{if(!_observationCells)_observationCells=VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors];return _observationCells;};
+  const observe=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,fastPaperOpts);
   const ownCandidate=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i));
   const freshCells=paint&&VALUE_ACTIVE.passageMaterial?cells.filter(i=>!VALUE_PIGMENT_CONTACT.has(i)):cells;
   const intoOwnWash=paint&&freshCells.length<cells.length*.3;
@@ -1376,7 +1379,9 @@ const stroke=(b,target,points,options)=>{
   if(fastMode){
     if(paint&&!wetMove){
       if(ownCandidate&&!VALUE_ACTIVE.texture){
-        const gateCells=[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i));
+        const gateCells=[];
+        for(let k=0;k<cells.length;k++){const i=cells[k];if(!VALUE_OWN_CONTACT.has(i))gateCells.push(i);}
+        for(let k=0;k<neighbors.length;k++){const i=neighbors[k];if(!VALUE_OWN_CONTACT.has(i))gateCells.push(i);}
         own=gateCells.length===0||measurePaper(target,gateCells,SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}).dry;
       }
       if(!own||VALUE_ACTIVE.texture){
@@ -1387,14 +1392,14 @@ const stroke=(b,target,points,options)=>{
       paper=observe();
     }
   }else{
-    const initial=measurePaperBatch(target,[{cells:observationCells},...(ownCandidate?[{cells:[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),stats:'gate'}]:[])],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
+    const initial=measurePaperBatch(target,[{cells:getObservationCells()},...(ownCandidate?[{cells:[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),stats:'gate'}]:[])],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
     paper=initial[0];own=ownCandidate&&initial[1].dry;
     if(paint&&!wetMove&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
   }
   const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER,fastPaperOpts);
   if(paint&&!intoOwnWash&&VALUE_ACTIVE.passageMaterial&&VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
-    const waterStroke=load=>{const p=measurePaper(target,observationCells,SPEED_PAPER,{stats:'gate'});const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
+    const waterStroke=load=>{const p=measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'});const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
     const preparation=preparePassageBed({observe:observeBed,maxActions:16,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>clock('flow',()=>step(target,{...O,dt:2}))});paper=preparation.paper;
     JSONL.append(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:fastMode?null:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }

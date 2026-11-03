@@ -45,8 +45,10 @@ export class GpuLink {
     this.w = sheet.w; this.h = sheet.h; this.n = sheet.n; this.K = sheet.K;
     this.sheet = sheet; this.queuedDrys = 0; this.drainingDrys = false;
     this.version = 0;         // bumped by every op that can change the sheet: what a render was made from is still current while it holds
+    this.paperVersion = 0;
     this.stale = false;       // the GPU copy is ahead of the CPU copy (outside `fresh`)
     this.fresh = new FreshMap(sheet.w, sheet.h); // tiles the CPU copy is known to match, since the last GPU step
+    this.paperFresh = new FreshMap(sheet.w, sheet.h);
     this.dirty = null;        // rectangle the CPU wrote and the GPU has not seen
     this.stroke = null;       // rectangle of the stroke in progress
     this.needFullUp = false;  // the CPU wrote the whole sheet
@@ -85,7 +87,9 @@ export class GpuLink {
     if (o === this.lastO) return;
     const pick = {}; let key = ''; for (const k of OPT_KEYS) if (o[k] !== undefined) { pick[k] = o[k]; key += `${k}=${o[k]};`; }
     this.lastO = o; if (key === this.lastKey) return;
+    const prevVer = this.version;
     this.lastKey = key; this.post({ op: 'opts', o: pick });
+    if (this.paperVersion === prevVer) this.paperVersion = this.version;
   }
 
   recordTransfer(direction, bytes) {
@@ -224,7 +228,9 @@ export class GpuLink {
   syncAct() {
     const m = (this.topMask | this.wetMask) >>> 0;
     if (m === this.sentMask) return;
+    const prevVer = this.version;
     this.sentMask = m; this.post({ op: 'act', mask: m });
+    if (this.paperVersion === prevVer) this.paperVersion = this.version;
     let c = 0; for (let k = 0; k < this.K; k++) c += (m >>> k) & 1;
     this.actCount[c] = (this.actCount[c] || 0) + 1; this.stats.actChanges = (this.stats.actChanges || 0) + 1;
   }
@@ -254,7 +260,7 @@ export class GpuLink {
       return;
     }
     if (!this.stale) return;
-    const need = this.fresh.staleBounds(rect); if (need) { this.down(sheet, need); this.fresh.mark(need); }
+    const need = this.fresh.staleBounds(rect); if (need) { this.down(sheet, need); this.fresh.mark(need); if (this.paperVersion === this.version) this.paperFresh?.mark(need); }
   }
 
   /** Fresh W/s/M for a read-only material observation; never advances pigment freshness. */
@@ -309,8 +315,17 @@ export class GpuLink {
     const rect = this.stroke; this.stroke = null; if (!rect) return;
     const prior = this.transferPhase; this.transferPhase = 'cpu-stroke-end';
     const demand = sheet._cpuDemandWindow;
+    const prevVer = this.version;
     try { this.uploadCpuStroke(sheet, rect); } finally { this.transferPhase = prior; delete sheet._cpuStrokeDirty; delete sheet._cpuDemandWindow; delete sheet._cpuDemandPenAhead; }
-    this.dirty = null; if (this.stale && (!demand || demand.rect)) this.fresh.mark(demand ? demand.rect : rect);
+    this.dirty = null;
+    if (this.stale && (!demand || demand.rect)) {
+      const r = demand ? demand.rect : rect;
+      this.fresh.mark(r);
+      if (this.paperVersion === prevVer) { this.paperFresh?.mark(r); this.paperVersion = this.version; }
+    } else if (this.paperVersion === prevVer) {
+      this.paperFresh?.staleRect(rect);
+      this.paperVersion = this.version;
+    }
     syncWetReachVersion(sheet);
   }
 
@@ -322,7 +337,7 @@ export class GpuLink {
     if (this.needFullUp) this.fullUp(sheet);
     const HS = 4 + K, H0 = 272, S0 = H0 + (lanes + 2) * HS, SP = 16 + nClumps;
     // the steps grow on from the header; the cells (three words each: index, hair, across) grow apart and are joined at the end
-    const plan = { K, lanes, HS, H0, S0, SP, n: 0, cap: 0, F: null, I: null, U: null, nw: 0, wcap: 0, CU: null, CF: null, offs: new Int32Array(lanes + 1), pos: new Int32Array(lanes) };
+    const plan = { K, lanes, HS, H0, S0, SP, n: 0, cap: 0, F: null, I: null, U: null, nw: 0, wcap: 0, CU: null, CF: null, offs: new Int32Array(lanes + 1), pos: new Int32Array(lanes), x0: this.w, y0: this.h, x1: -1, y1: -1 };
     plan.grow = (cap) => {
       const buf = new ArrayBuffer((S0 + cap * SP) * 4);
       if (plan.F) new Uint8Array(buf).set(new Uint8Array(plan.F.buffer, 0, (S0 + plan.n * SP) * 4));
@@ -338,7 +353,13 @@ export class GpuLink {
     // A step's cells, grouped by hair (each hair's in the order given, which is raster order): a table of where each
     // hair's cells start, then an (index, across) pair a cell. Returns where the block starts, in words.
     plan.emit = (idx, lane, acr, cnt) => {
-      recordWetCells(sheet, idx, cnt);
+      const box = recordWetCells(sheet, idx, cnt);
+      if (box) {
+        if (box[0] < plan.x0) plan.x0 = box[0];
+        if (box[1] < plan.y0) plan.y0 = box[1];
+        if (box[2] > plan.x1) plan.x1 = box[2];
+        if (box[3] > plan.y1) plan.y1 = box[3];
+      }
       if (brush.depositDepth) {
         const need=1+3*cnt; while(plan.nw+need>plan.wcap) plan.growCells(plan.wcap*2);
         const base=plan.nw; plan.CU[base]=cnt;
@@ -380,7 +401,15 @@ export class GpuLink {
   /** `lift`: the cell indices within reach of the last contact, for the bead (or null when the brush stays on the paper). */
   endPlan(sheet, brush, plan, lift, rect) {
     if (!plan.n && !lift) return;
-    if (lift?.length) recordWetCells(sheet, lift, lift.length);
+    if (lift?.length) {
+      const box = recordWetCells(sheet, lift, lift.length);
+      if (box) {
+        if (box[0] < plan.x0) plan.x0 = box[0];
+        if (box[1] < plan.y0) plan.y0 = box[1];
+        if (box[2] > plan.x1) plan.x1 = box[2];
+        if (box[3] > plan.y1) plan.y1 = box[3];
+      }
+    }
     const { F, U, S0, SP, H0, HS, lanes, K } = plan, nl = lift ? lift.length : 0;
     let hasFlow = false; for (let s = 0; s < plan.n && !hasFlow; s++) if (U[S0 + s * SP + 6]) hasFlow = true;
     const offC = S0 + plan.n * SP, offL = offC + plan.nw;
@@ -399,11 +428,19 @@ export class GpuLink {
     const restore=brush._restore; delete brush._restore;
     if (!this.resident) this.owners[slot] = brush; brush._pend = this.lastPend = { link: this, seq, slot, state, H0, HS, lanes, K, hairs: true };
     const plannedBytes=data.byteLength; // transfer below detaches the source view
-    this.post({ op: 'stroke', data, seq, slot, info: { mask:plan.mask??0, planFloats: S0, nSteps: plan.n, sp: SP, s0: S0, rect: this.validRect(rect), lift: !!lift, cont, h0: H0, state, restore }, wait: false }, [data.buffer]);
+    const validRect = this.validRect(rect);
+    const prevVer = this.version;
+    this.post({ op: 'stroke', data, seq, slot, info: { mask:plan.mask??0, planFloats: S0, nSteps: plan.n, sp: SP, s0: S0, rect: validRect, lift: !!lift, cont, h0: H0, state, restore }, wait: false }, [data.buffer]);
+    const postStrokeVer = this.version;
     if(this.strokePlanMiB>16||(typeof process!=='undefined'&&process.env.GPU_LOCAL_ROW_PLAN==='1')){this.pendingPlanBytes=(this.pendingPlanBytes??0)+plannedBytes;if(this.pendingPlanBytes>=16*1024*1024){this.call({op:'idle',planQueue:true});this.pendingPlanBytes=0;this.stats.planQueueFlushes=(this.stats.planQueueFlushes??0)+1;}}
     if (SYNC_STROKES()) { this.settleBrush(brush); this.call({ op: 'idle' }); } // test: every stroke finishes before the next thing
     // (a flow inside the stroke can lift from the top dried layer, a rewet, as any step can: its CPU copy is stale too)
     this.stale = true; this.fresh.stale(); if (hasFlow) this.topStale = true;
+    if (this.paperVersion === prevVer && this.version === postStrokeVer) {
+      if (hasFlow) this.paperFresh?.stale();
+      else if (plan.x1 >= plan.x0) this.paperFresh?.staleRect([plan.x0, plan.y0, plan.x1 - plan.x0 + 1, plan.y1 - plan.y0 + 1]);
+      this.paperVersion = this.version;
+    }
     this.stats.strokes = (this.stats.strokes || 0) + 1; this.stats.strokeSteps = (this.stats.strokeSteps || 0) + plan.n;
     syncWetReachVersion(sheet);
   }
@@ -457,10 +494,16 @@ export class GpuLink {
     const restore = this.resident && brush._pend?.splat && brush._pend.hairs ? brush._pend.state : undefined;
     if (!this.resident) this.owners[slot] = brush;
     brush._pend = this.lastPend = { link: this, seq, slot, state, splat: true, W0: W, hairs: true };
+    const prevVer = this.version;
     this.post({ op: 'splat', data, seq, slot, info: { mask:this.wetMask, nRec: recs.length, offRec, flowsBefore, rect: [x0, y0, rw, rh], state, restore, seq }, wait: false }, [data.buffer]);
     let flows = flowsBefore; for (const q of recs) flows += q[5];
     recordWetBox(sheet, x0, y0, x0 + rw - 1, y0 + rh - 1, flows);
     this.stale = true; this.fresh.stale(); if (flows) this.topStale = true;
+    if (this.paperVersion === prevVer) {
+      if (flows) this.paperFresh?.stale();
+      else this.paperFresh?.staleRect([x0, y0, rw, rh]);
+      this.paperVersion = this.version;
+    }
     this.stats.splatStrokes = (this.stats.splatStrokes || 0) + 1; this.stats.splats = (this.stats.splats || 0) + recs.length;
     syncWetReachVersion(sheet);
   }

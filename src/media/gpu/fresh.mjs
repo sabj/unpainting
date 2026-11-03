@@ -12,6 +12,22 @@ export class FreshMap {
   }
   /** The GPU copy moved on: nothing in the CPU copy is known current. */
   stale() { this.epoch++; this.all = false; }
+  /** Only the tiles overlapping `rect` may have changed on the GPU. */
+  staleRect(rect) {
+    const [x0, y0, rw, rh] = rect;
+    if (rw <= 0 || rh <= 0) return;
+    if (this.all) {
+      this.epoch++;
+      this.all = false;
+      this.tiles.fill(this.epoch);
+    }
+    const tx0 = Math.max(0, Math.floor(x0 / TILE)), ty0 = Math.max(0, Math.floor(y0 / TILE));
+    const tx1 = Math.min(this.tw, ceilDiv(x0 + rw, TILE)), ty1 = Math.min(this.th, ceilDiv(y0 + rh, TILE));
+    for (let ty = ty0; ty < ty1; ty++) {
+      const row = ty * this.tw;
+      for (let tx = tx0; tx < tx1; tx++) this.tiles[row + tx] = 0;
+    }
+  }
   /** The whole CPU copy matches the GPU copy (after a full read or write). */
   fresh() { this.all = true; }
   /** The CPU copy matches the GPU copy inside `rect`; only tiles wholly inside it count. */

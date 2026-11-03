@@ -43,18 +43,29 @@ export function commandDeposits(commands) {
   return byPath;
 }
 
-function sampledMask(clip, tape, w, h) {
+function sampledMask(clip, tape, w, h, txOf, tyOf) {
   const mask=new Uint8Array(w*h);
   if(!clip){mask.fill(1);return mask;}
   if(clip.mask) {
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++) mask[y*w+x]=clip.mask[Math.min(tape.h-1,Math.floor((y+.5)*tape.h/h))*tape.w+Math.min(tape.w-1,Math.floor((x+.5)*tape.w/w))]?1:0;
+    const cm=clip.mask;
+    for(let y=0;y<h;y++){
+      const row=y*w,tRow=tyOf[y];
+      for(let x=0;x<w;x++) mask[row+x]=cm[tRow+txOf[x]]?1:0;
+    }
   } else {
     // Sorted RLE indices and sorted sample indices permit a single pass through each clip.
-    const runs=clip.runs;let j=0;
-    for(let y=0;y<h;y++)for(let x=0;x<w;x++) {
-      const i=Math.min(tape.h-1,Math.floor((y+.5)*tape.h/h))*tape.w+Math.min(tape.w-1,Math.floor((x+.5)*tape.w/w));
-      while(j<runs.length&&runs[j]+runs[j+1]<=i)j+=2;
-      if(j<runs.length&&runs[j]<=i)mask[y*w+x]=1;
+    const runs=clip.runs,rLen=runs.length,txMax=txOf[w-1];let j=0;
+    for(let y=0;y<h;y++) {
+      if(j>=rLen)break;
+      const row=y*w,tRow=tyOf[y],iMin=tRow+txOf[0],iMax=tRow+txMax;
+      while(j<rLen&&runs[j]+runs[j+1]<=iMin)j+=2;
+      if(j>=rLen)break;
+      if(runs[j]>iMax)continue;
+      for(let x=0;x<w;x++) {
+        const i=tRow+txOf[x];
+        while(j<rLen&&runs[j]+runs[j+1]<=i)j+=2;
+        if(j<rLen&&runs[j]<=i)mask[row+x]=1;
+      }
     }
   }
   return mask;
@@ -120,19 +131,21 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
   const {sheet,marks}=normalized,w=analysisWidth,h=Math.max(1,Math.round(w*sheet.heightMm/sheet.widthMm)),n=w*h;
   const fields=Object.fromEntries(keys.map(k=>[k,[new Float64Array(n),new Float64Array(n),new Float64Array(n)]]));
   const records=tape?tapeDeposits(tape):new Map(),byPath=commandDeposits(commands),maskCache=new Map(),passMasks=new Map();
+  const txOf=tape?new Int32Array(w):null,tyOf=tape?new Int32Array(h):null;
+  if(tape){
+    for(let x=0;x<w;x++)txOf[x]=Math.min(tape.w-1,Math.floor((x+.5)*tape.w/w));
+    for(let y=0;y<h;y++)tyOf[y]=Math.min(tape.h-1,Math.floor((y+.5)*tape.h/h))*tape.w;
+  }
   const strokeRecords=[],all=new Uint8Array(n).fill(1),remaining=new Map();let observed=0,estimated=0,zeroDeposit=0,matched=0;
-  const maskFor=c=>{if(!c)return all;if(!maskCache.has(c))maskCache.set(c,sampledMask(c,tape,w,h));return maskCache.get(c);};
+  const maskFor=c=>{if(!c)return all;if(!maskCache.has(c))maskCache.set(c,sampledMask(c,tape,w,h,txOf,tyOf));return maskCache.get(c);};
   for(const m of marks) {
     const rec=records.get(m.tapeIndex),raw=tape?.marks[m.tapeIndex];
     const queue=raw?.k==='s'?byPath.get(raw.cid??signature(raw.d)):null,command=queue?.shift();if(command)matched++;
     if(m.kind!=='paint')continue;
     const mask=maskFor(rec?.clip);
     if(command&&!passMasks.has(command.intent))passMasks.set(command.intent,mask);
-    const cells=footprint(m,sheet,w,h,mask).filter(i=>{
-      if(!rec?.resist)return true;
-      const ti=Math.min(tape.h-1,Math.floor((Math.floor(i/w)+.5)*tape.h/h))*tape.w+Math.min(tape.w-1,Math.floor((i%w+.5)*tape.w/w));
-      return !rec.resist[ti];
-    });
+    const resist=rec?.resist;
+    const cells=resist?footprint(m,sheet,w,h,mask).filter(i=>{const y=(i/w)|0,x=i-y*w;return !resist[tyOf[y]+txOf[x]];}):footprint(m,sheet,w,h,mask);
     if(!cells.length)continue;
     let density;
     if(rec?.load&&!remaining.has(rec.load))remaining.set(rec.load,[...rec.load.remaining]);

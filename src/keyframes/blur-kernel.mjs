@@ -3,13 +3,23 @@
 
 /** Horizontal pass on rows y0..y1 - 1: src to tmp. `k` is the kernel (2r + 1 taps). */
 export function blurRows(src, tmp, w, k, r, y0, y1) {
-  const n2 = 2 * r + 1;
+  const n2 = 2 * r + 1, x0 = Math.min(w, r), x1 = Math.max(x0, w - r);
   for (let y = y0; y < y1; y++) {
     const row = y * w;
-    for (let x = 0; x < w; x++) {
+    for (let x = 0; x < x0; x++) {
       let a = 0;
-      if (x >= r && x + r < w) { const b = row + x - r; for (let i = 0; i < n2; i++) a += src[b + i] * k[i]; }
-      else for (let i = -r; i <= r; i++) { const xx = Math.min(w - 1, Math.max(0, x + i)); a += src[row + xx] * k[i + r]; }
+      for (let i = -r; i <= r; i++) { const xx = Math.min(w - 1, Math.max(0, x + i)); a += src[row + xx] * k[i + r]; }
+      tmp[row + x] = a;
+    }
+    for (let x = x0; x < x1; x++) {
+      const b = row + x - r;
+      let a = 0;
+      for (let i = 0; i < n2; i++) a += src[b + i] * k[i];
+      tmp[row + x] = a;
+    }
+    for (let x = x1; x < w; x++) {
+      let a = 0;
+      for (let i = -r; i <= r; i++) { const xx = Math.min(w - 1, Math.max(0, x + i)); a += src[row + xx] * k[i + r]; }
       tmp[row + x] = a;
     }
   }

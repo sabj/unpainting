@@ -87,11 +87,10 @@ export function recordWetCell(sheet, i) {
 }
 
 export function recordWetCells(sheet, indices, count = indices.length) {
-  const c = sheet[WET_REACH];
-  if (!c || !count) return;
-  const w = sheet.w;
+  if (!count) return null;
+  const c = sheet[WET_REACH], w = sheet.w;
   let x0 = w, y0 = sheet.h, x1 = -1, y1 = -1;
-  if (c.exactCells) {
+  if (c && c.exactCells) {
     const buf = sheet[WET_BUF];
     const cells = (buf.cells ??= new Uint32Array(sheet.n)), epoch = c.epoch;
     for (let j = 0; j < count; j++) {
@@ -108,7 +107,9 @@ export function recordWetCells(sheet, indices, count = indices.length) {
       if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
   }
-  if (x1 >= x0) addWetBox(c, x0, y0, x1, y1);
+  if (x1 < x0) return null;
+  if (c) addWetBox(c, x0, y0, x1, y1);
+  return [x0, y0, x1, y1];
 }
 
 export function recordWetBox(sheet, x0, y0, x1, y1, flows = 0) {
