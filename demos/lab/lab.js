@@ -576,3 +576,53 @@ worker.addEventListener('error', e => {
 });
 
 setupScratch(document.getElementById('scratch'),()=>({...settings,surface,scratchDpi:canvas.getBoundingClientRect().width/W*dpi,colour:previewMix(settings.mixture||{[settings.pigment]:1},settings.amount,SURFACES[surface].colour).paint}));
+
+// ?import=mushroom: a mushroom plate's paint plan, handed over in this tab's session storage by the plate's "Open in
+// Paint Lab" (demos/fungi). Its pen drawing goes onto a fresh sheet of the plate's own size, then the replay pauses
+// and offers the washes: Play paints them step by step, Carry on painting keeps the sheet for every lab tool.
+if (query.get('import') === 'mushroom') {
+  const note = document.createElement('p'); note.id = 'import-note'; note.setAttribute('role', 'status'); note.hidden = true; note.style.cssText = 'margin:6px 0;font-size:14px;line-height:1.4';
+  caption.after(note);
+  const showNote = text => { note.textContent = text; note.hidden = !text; };
+  document.getElementById('welcome').hidden = true;
+  let imported = null, importActive = false, importAsked = false;
+  const playImport = () => {
+    const { tape, inkEnd, washes } = imported, run = ++filmRun;
+    cancelStroke(); playbackUI.dismiss(); playbackUI.hide(); hover = null; queueCursor(); importActive = true;
+    runMode.value = 'live'; lab.mode = 'live'; liveBudget.hidden = true; document.body.classList.add('has-example'); note.style.gridColumn = '2';
+    document.getElementById('mode-note').textContent = 'Imported plate · its pen drawing and washes, painted here with the lab’s pen and brushes.';
+    setPlaying(true); playPause.hidden = false; replayPaused = false; playPause.textContent = 'Pause'; playPause.setAttribute('aria-pressed', 'false');
+    handNote = null; playingWhat = tape.title.toLowerCase(); playingExample = true; filmSkip = false; document.getElementById('paint-hint').hidden = true;
+    document.getElementById('sheet-title').textContent = tape.title; state.textContent = `Drawing: ${tape.title}`; caption.textContent = `Pen drawing · ${tape.inkStrokes} strokes`;
+    lab.target = { id: 'import:mushroom', live: true, started: performance.now() }; lab.import = { ...lab.import, phase: 'ink' };
+    showNote(`Drawing ${tape.title} from the mushroom plate.`);
+    worker.postMessage({ type: 'live', tape, liveRun: run, fastStrokes: tape.inkStrokes, ...(washes ? { pauseAfter: inkEnd } : {}) });
+  };
+  const startImport = async () => {
+    const { readPlan, planToTape, PLAN_STORAGE_KEY } = await import('./worker/plan-import.js');
+    let text = null; try { text = sessionStorage.getItem(PLAN_STORAGE_KEY); } catch {}
+    const read = readPlan(text, key => Object.hasOwn(BY_KEY, key));
+    if (read.error) { lab.import = { error: read.error }; showNote(read.error); announce(read.error); return; }
+    try { imported = planToTape(read.plan, key => ({ ...BY_KEY[key] })); }
+    catch (error) { const text = `The mushroom plate could not be prepared: ${error.message}`; lab.import = { error: text }; showNote(text); announce(text); return; }
+    lab.import = { title: imported.tape.title, inkStrokes: imported.tape.inkStrokes, strokes: imported.tape.strokeCount, washes: imported.washes, width: imported.tape.w, height: imported.tape.h, dpi: imported.tape.dpi };
+    playImport();
+  };
+  worker.addEventListener('message', ({ data }) => {
+    if (data.type === 'sheet' && !importAsked) { importAsked = true; startImport().catch(error => { console.error(error); showNote('The mushroom plate could not be opened.'); }); return; }
+    if (!importActive || data.liveRun !== filmRun) return;
+    if (data.type === 'live-paused') {
+      replayPaused = true; playPause.textContent = 'Play'; playPause.setAttribute('aria-pressed', 'true');
+      lab.import = { ...lab.import, phase: 'washes-offered' }; caption.textContent = 'Pen drawing loaded · washes ready'; state.textContent = 'Pen drawing loaded';
+      const text = `The pen drawing is on the paper. Play paints the plate’s ${imported.washes} wash ${imported.washes === 1 ? 'passage' : 'passages'} step by step; Carry on painting keeps the drawing for your own brushes.`;
+      showNote(text); announce(text);
+    } else if (data.type === 'played') {
+      importActive = false; lab.import = { ...lab.import, phase: 'done' };
+      showNote(data.cancelled ? '' : 'Your turn: every Paint Lab tool, undo and autosave work on this sheet.');
+    }
+  });
+  playPause.addEventListener('click', () => { if (importActive && !replayPaused && lab.import?.phase === 'washes-offered') { lab.import = { ...lab.import, phase: 'washes' }; showNote('Painting the washes: masks, brush passages, flow and drying, one step at a time.'); } });
+  // Restart replays the import, not the first example; choosing another painting or a new sheet ends the import.
+  document.getElementById('replay').addEventListener('click', e => { if (!imported || lab.target?.id !== 'import:mushroom') return; e.stopImmediatePropagation(); cancelPlayback(); playImport(); }, true);
+  for (const id of ['painting-picker', 'clear']) document.getElementById(id).addEventListener('click', () => { if (lab.target?.id === 'import:mushroom') { lab.target = null; importActive = false; showNote(''); } }, true);
+}

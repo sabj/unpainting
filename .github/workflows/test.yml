@@ -23,3 +23,16 @@ jobs:
         run: npm run bench:test
       - name: Stroke-plan example
         run: npm run example:plan
+
+  # Spore Studies' own suite: one serial file of about 8 min here, an
+  # estimated 12-16 min on a hosted runner, in parallel with the job above.
+  fungi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 25
+      - name: Spore Studies tests
+        run: node --test --test-timeout=1800000 demos/fungi/mushrooms.test.mjs

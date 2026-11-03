@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { chromium } from 'playwright';
+import { DEMOS_ORIGIN, launchChromium, serveDemos } from '../readme/demos-browser.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const argv = process.argv.slice(2), opt = (name, fallback) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : fallback; };
@@ -23,21 +23,6 @@ const MAX_BYTES = Number(opt('maxmb', 3)) * 1e6, PHYSICS = opt('physics', 'webgp
 const DRY_TIMEOUT_MS = 600000, DRY_FRAMES = 40, DRY_SHOW_MS = 4000;
 if (!(WIDTH >= 200 && WIDTH <= 4000) || ![60, 90, 120, 150, 200, 240, 300].includes(DPI) || !(MAX_BYTES > 0) || !['webgpu', 'cpu'].includes(PHYSICS) || !(Number.isInteger(REWIND) && REWIND >= 0))
   throw new Error('usage: --width 200..4000, --dpi 60|90|120|150|200|240|300, --maxmb above 0, --physics webgpu|cpu, --rewind 0 or more');
-
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg' };
-const DEMOS = path.join(ROOT, 'demos');
-const ORIGIN = 'https://paint-lab.invalid';
-async function serve(context) {
-  await context.route(`${ORIGIN}/**`, async route => {
-    let rel = decodeURIComponent(new URL(route.request().url()).pathname);
-    if (rel.endsWith('/')) rel += 'index.html';
-    const file = path.resolve(DEMOS, '.' + rel);
-    if (!file.startsWith(DEMOS + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-      await route.fulfill({ status: 404, body: '' }); return;
-    }
-    await route.fulfill({ path: file, contentType: TYPES[path.extname(file)] ?? 'application/octet-stream' });
-  });
-}
 
 // A hand's path through the given points (sheet pixels), sampled every `step` pixels and rounded to whole pixels as
 // pointer samples are.
@@ -76,15 +61,15 @@ function thinDrying(frames) {
 }
 
 async function record() {
-  const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-webgpu'] });
+  const browser = await launchChromium(['--enable-unsafe-webgpu']);
   const errors = [], frames = [];
   try {
     const context = await browser.newContext({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 2 });
-    await serve(context);
+    await serveDemos(context);
     const page = await context.newPage();
     page.on('pageerror', e => errors.push(String(e)));
     page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-    await page.goto(`${ORIGIN}/?intro=0&physics=${PHYSICS}&dpi=${DPI}&paper=8x6`);
+    await page.goto(`${DEMOS_ORIGIN}/lab/?intro=0&physics=${PHYSICS}&dpi=${DPI}&paper=8x6`);
     await page.waitForFunction(() => window.__lab?.sheet && window.__lab.physics !== 'pending', null, { timeout: 60000 });
     await page.waitForTimeout(1500);
     const { width: W, height: H } = await page.evaluate(() => window.__lab.sheet);

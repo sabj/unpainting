@@ -1,6 +1,6 @@
 # Rules (protocol v2)
 
-Every round, a benchmark version from V1 to V5, has the same rules. The painting toolkit given to models is in [../v2/kit/](../v2/kit/). Its guard, a check that blocks image reads, enforces the read rules.
+Every round, V1 to V5, has the same rules. The painting toolkit given to models is in [../v2/kit/](../v2/kit/). Its guard, a check that blocks image reads, enforces the read rules.
 
 ## The task
 

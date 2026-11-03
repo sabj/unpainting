@@ -2,7 +2,7 @@
 
 `scripts/build-results.mjs` computes every number from the `run.json` files.
 
-A round is a benchmark version (V1 to V5). A try is one model session that paints the requested targets.
+The rounds are V1 to V5. A try is one model session that paints the requested targets.
 
 ## A model's score in a round
 

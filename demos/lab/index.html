@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<base href="../"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Paint Lab: the unpainting watercolor simulator in the browser. Pick a picture and watch it painted light to dark, or paint on the sheet yourself.">
+<title>Paint Lab · unpainting</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%233b4fb0' opacity='.55'/%3E%3C/svg%3E"><link rel="stylesheet" href="lab/paint-common.css">
+<style>
+:root{color-scheme:light;--paper:#f6f3eb;--ink:#39362f;--muted:#7b7166;--line:#39362f30;--accent:#99543a;--tap:44px;background:var(--paper);color:var(--ink);font:18px/1.45 'EB Garamond',Garamond,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--paper)}a{color:inherit;text-underline-offset:.18em}
+main{max-width:1240px;margin:auto;padding:16px clamp(16px,4vw,48px) clamp(20px,4vw,48px)}
+h1{font-weight:500;font-size:clamp(2rem,4.4vw,3rem);line-height:1.1;margin:1rem 0 .4rem}
+.lab{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:clamp(16px,3vw,36px);align-items:start}
+.stage{min-width:0}
+.sheet{position:relative;border:1px solid var(--line);background:#f7f4ec;touch-action:none;cursor:crosshair}
+.sheet canvas{display:block;width:100%;height:auto;image-rendering:auto}
+.sheet .cursor{position:absolute;left:0;top:0;height:100%;pointer-events:none}
+/* under the paper: what the sheet is doing, and the sheet's own two actions */
+.sheetbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;margin-top:8px}
+.sheetbar .state{font-size:1rem}
+.lab .toolbar{display:flex;gap:6px;flex-wrap:wrap}.lab .toolbar button{white-space:nowrap;flex-shrink:0}
+.lab .toolbar button{min-height:var(--tap);padding:4px 12px;font-size:15px}
+.playbar{display:flex;align-items:center;gap:12px;margin-top:6px}
+.playbar[hidden],.drying[hidden]{display:none}
+.drying{display:flex;align-items:center;gap:12px;font-size:.85rem;color:var(--muted);margin-top:6px}
+.drying progress{width:90px;height:4px;accent-color:var(--accent)}
+#drying-label::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;margin-right:6px;animation:drying-pulse 1s ease-in-out infinite alternate}
+@keyframes drying-pulse{to{opacity:.25}}
+@media(prefers-reduced-motion:reduce){#drying-label::before{animation:none}}
+#step-caption{margin:8px 0 0;font-size:1rem}
+.playbar progress{flex:1;height:6px;accent-color:var(--accent)}
+.lab .playbar button{min-height:var(--tap);padding:4px 12px;font:15px var(--paint-face);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:3px;cursor:pointer}
+.lab .playbar button:hover{border-color:var(--accent)}
+.status{display:flex;flex-wrap:wrap;justify-content:space-between;gap:0 12px;font-size:.8rem;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+/* the control panel: three groups by task, then the settings that rarely change behind a disclosure */
+.panel{display:grid;gap:18px;min-width:0}
+.panel section{display:grid;gap:10px;min-width:0;border-top:1px solid var(--line);padding-top:10px}
+.panel h2{margin:0;font:400 15px/1.3 var(--paint-face);font-variant-caps:all-small-caps;letter-spacing:.08em;color:var(--muted)}
+.panel fieldset{border:0;margin:0;padding:0;min-width:0}
+.panel .label{display:flex;justify-content:space-between;align-items:baseline;gap:8px;width:100%;margin:0 0 4px;padding:0;font-size:15px;color:var(--muted)}
+.panel .label .current{color:var(--ink)}
+.panel :is(button,select){min-height:var(--tap);font-size:15px;white-space:nowrap}
+.panel button:disabled,.panel fieldset:disabled button{opacity:.45;cursor:default}
+.panel button:disabled:hover,.panel fieldset:disabled button:hover{border-color:var(--paint-line)}
+/* one-line segmented controls */
+.panel .seg{display:flex;min-width:0}
+.panel .seg button{flex:1 1 0;min-width:0;padding:4px 6px;border-radius:0;margin-left:-1px;overflow:hidden;text-overflow:ellipsis}
+.panel .seg button:first-child{margin-left:0;border-radius:3px 0 0 3px}
+.panel .seg button:last-child{border-radius:0 3px 3px 0}
+.panel .seg button:is([aria-pressed=true],:hover){position:relative;z-index:1}
+.panel .seg button:focus-visible{position:relative;z-index:2}
+/* the palette: round swatches, the selected one ringed and named above them */
+.panel .swatches{display:grid;grid-template-columns:repeat(auto-fill,var(--tap));justify-content:start}
+.panel .swatches button{display:grid;place-items:center;width:var(--tap);height:var(--tap);min-height:0;padding:0;border:0;border-radius:50%;background:transparent}
+.panel .swatches i{display:block;width:28px;height:28px;border-radius:50%;border:1px solid #0000002a;transition:box-shadow .12s}
+.panel .swatches button:hover i{box-shadow:0 0 0 2px var(--paper),0 0 0 3px var(--accent)}
+.panel .swatches button[aria-pressed=true]{background:transparent}
+.panel .swatches button[aria-pressed=true] i{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--ink)}
+.panel fieldset:disabled .swatches i{filter:saturate(.3)}
+.mixing{display:grid;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.mixing p{margin:0;font-size:15px;color:var(--muted)}
+.mixing .mix-title{display:flex;justify-content:space-between;gap:8px;align-items:baseline;color:var(--ink)}
+.mixing .mix-title span{font-size:14px;color:var(--muted)}
+.mixing button{display:flex;justify-content:center;align-items:center;gap:6px;padding:4px 8px}
+.mixing button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.mix-parts{display:grid;gap:4px}
+.mix-part{display:grid;grid-template-columns:minmax(0,1fr) 44px 2em 44px;align-items:center;gap:4px;font-size:15px}
+.mix-part>span{display:flex;align-items:center;gap:7px;min-width:0}
+.mix-part i{width:14px;height:14px;border-radius:50%;border:1px solid #0002;flex:none}
+.mix-part output{text-align:center;font-variant-numeric:tabular-nums}
+.mix-preview{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mix-preview span{display:grid;place-items:center;min-height:64px;border:1px solid var(--line);border-radius:3px;background:var(--paper)}
+.mix-preview small{color:var(--ink);background:#fbf9f4dd;border-radius:2px;padding:0 5px;font-size:14px}
+.mix-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mixing #mix-load{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.mixing #mix-status{min-height:1.45em;color:var(--ink)}
+/* sliders and selects: the label, the control and the value on one line, values right-aligned in one column */
+.panel .row{display:grid;grid-template-columns:5.2em minmax(0,1fr) 3.6em;align-items:center;gap:10px;min-height:var(--tap);font-size:15px;color:var(--muted)}
+.panel .row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.panel .row select{width:100%;grid-column:2/4}
+.panel input[type=range]{width:100%;height:var(--tap);margin:0;accent-color:var(--accent);background:transparent}
+.panel .pair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.panel .demos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.panel .demos button{display:flex;flex-direction:column;align-items:center;padding:4px 6px;overflow:hidden;text-overflow:ellipsis}
+.panel .examples{display:grid;gap:6px}
+.panel .examples button{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 10px;text-align:left}
+.panel .examples .tag{color:var(--muted);font-size:14px}
+.panel .check{display:flex;align-items:center;gap:10px;min-height:var(--tap);font-size:15px;color:var(--muted);cursor:pointer}
+.panel .check input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
+.panel .examples button:hover .tag{color:inherit}
+.panel :is(.demos,.examples) img{width:100%;height:54px;object-fit:cover;border-radius:2px}
+.panel .examples img{width:64px;height:48px;flex:none}
+/* the settings that rarely change */
+.panel details{border-top:1px solid var(--line)}
+.panel summary{display:flex;align-items:center;gap:8px;min-height:var(--tap);cursor:pointer;list-style:none;font-size:15px;color:var(--muted)}
+.panel summary::-webkit-details-marker{display:none}
+.panel summary::before{content:'';width:7px;height:7px;margin:0 3px 0 2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform .12s}
+.panel details[open] summary::before{transform:rotate(45deg)}
+.panel summary:hover{color:var(--accent)}
+.panel .more{display:grid;gap:10px;padding:2px 0 6px}
+.lab :is(button,input,select,summary):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notes{max-width:70ch;margin-top:2rem;border-top:1px solid var(--line);padding-top:1rem;color:var(--ink)}
+.notes>summary{min-height:44px;cursor:pointer;font-size:1rem;color:var(--muted)}
+.notes p{margin:.4rem 0}
+.notes .muted{color:var(--muted)}
+@media(max-width:860px){.lab{grid-template-columns:minmax(0,1fr)}}
+/* four papers do not fit one line on the narrowest phones: two by two, still one line each */
+@media(max-width:420px){.panel .seg.tools{display:grid;grid-template-columns:repeat(3,1fr)}.panel .seg.tools button{margin:0 0 -1px -1px;border-radius:0}.panel .seg.tools button:nth-child(3n+1){margin-left:0}}
+@media(max-width:360px){.panel .seg.papers{display:grid;grid-template-columns:1fr 1fr}.panel .seg.papers button{margin:0 0 -1px -1px;border-radius:0}.panel .seg.papers button:nth-child(odd){margin-left:0}}
+[hidden]{display:none!important}
+#paint-hint{position:absolute;inset:0;display:grid;place-items:center;color:#7b7166;pointer-events:none;font-size:1.3rem;animation:hint-fade 8s forwards}
+@keyframes hint-fade{0%,55%{opacity:1}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){#paint-hint{animation:none}}
+#panel-tabs{display:none}
+.paint-title{flex-wrap:wrap}
+.help-toggle{min-height:44px;padding:4px 8px;border:0;background:transparent;color:var(--muted);font:15px var(--paint-face);text-decoration:underline;text-underline-offset:.18em;cursor:pointer}
+#paint-help{position:fixed;inset:auto;top:clamp(90px,17svh,180px);left:50%;transform:translateX(-50%);width:min(420px,calc(100vw - 32px));max-height:calc(100svh - 120px);overflow:auto;padding:14px 16px;border:1px solid var(--line);border-radius:4px;background:#fbf9f4;color:var(--ink);box-shadow:0 5px 18px #42372e18;font:17px/1.4 var(--paint-face)}
+#paint-help header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#paint-help header button{min-width:44px;min-height:44px;padding:4px 8px;background:transparent;border:1px solid var(--line);border-radius:3px;color:inherit;font:15px var(--paint-face);cursor:pointer}
+#paint-help p{margin:.6rem 0 0}
+.sheet{overflow:hidden}
+#reset-view{min-width:44px;min-height:44px;font:15px var(--paint-face);border:1px solid var(--line);background:transparent;color:inherit;border-radius:3px}
+#focus-view{min-width:44px;display:grid;place-items:center}#focus-view svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+#exit-focus{position:fixed;top:10px;right:16px;z-index:20;min-height:44px;padding:4px 12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:16px var(--paint-face);border-radius:3px;cursor:pointer}
+body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.panel,.notes,#return-sheet){display:none!important}
+.canvas-focus main{position:fixed;inset:0;max-width:none;padding:58px 12px 12px}.canvas-focus .lab{display:block;height:100%}
+.canvas-focus .stage{height:100%;display:flex;flex-direction:column;justify-content:center;gap:6px}
+.canvas-focus :is(.sheet,.sheetbar,.stage>.status,.playbar,#step-caption,.drying){max-width:100%;margin-inline:auto}
+.canvas-focus .sheet{flex:none}.canvas-focus .sheetbar{margin-top:0}
+@media(max-width:860px){
+ main{padding:10px 16px 88px}.paint-kicker,.paint-lede{display:none}.paint-head h1{font-size:1.8rem}.paint-head{margin-bottom:12px}
+ .paint-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:18px}.paint-nav::-webkit-scrollbar{display:none}.paint-nav a{flex:none;min-height:44px}
+ .panel{gap:8px}
+ #panel-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+ #panel-tabs button{display:grid;place-items:center;gap:3px;min-width:0;min-height:52px;padding:5px 2px;font-size:14px;white-space:nowrap}
+ #panel-tabs svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+ #panel-tabs button[aria-expanded=true]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+ .panel .seg.tools{position:fixed;bottom:0;left:0;right:0;z-index:10;display:flex;background:var(--paper);padding:8px max(8px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom));box-shadow:0 -1px 5px #0002}
+ .panel .seg.tools button{flex:1;min-width:44px;margin:0;padding:4px 3px;font-size:14px}
+ .panel>[data-panel-section]:not([data-panel-section=brush]),.panel>details,.panel:not(.expanded) label:is([for=pressure],[for=amount]),.panel h2#paint-with,#tool-label{display:none}
+ .panel[data-active-panel=colors]>[data-panel-section=colors],.panel[data-active-panel=paper]>[data-panel-section=paper],.panel[data-active-panel=examples]>[data-panel-section=examples]{display:grid}
+ .panel[data-active-panel=paper]>details{display:block}
+ .panel.expanded:not([data-active-panel=brush])>[data-panel-section=brush]>:not(.instrument-tools){display:none}
+ .panel.expanded:not([data-active-panel=brush])>[data-panel-section=brush]{gap:0}
+ .panel section:first-of-type{border:0;padding:0}.lab{gap:10px}
+ .sheetbar{gap:6px}.sheetbar .state{width:100%;font-size:16px}.sheetbar .toolbar{display:flex;flex-wrap:wrap;gap:4px;width:100%}.sheetbar .toolbar button{min-width:44px;padding:4px 7px;font-size:15px}
+ .panel .row{font-size:16px;grid-template-columns:4.3em minmax(0,1fr) 3.2em;gap:8px}
+ .notes{margin-top:1rem}
+}
+@media(max-width:860px) and (orientation:landscape) and (max-height:540px){
+ .lab{grid-template-columns:minmax(0,1fr) minmax(220px,280px);gap:16px}
+ .sheet{max-width:calc(max(100px,100svh - 245px) * 4 / 3);margin-inline:auto}
+ .paint-head h1{font-size:1.5rem}.paint-head{margin-bottom:6px}.panel .row{font-size:15px}
+ .sheetbar .state{font-size:15px}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.targets{margin:0 0 18px}
+.targets h2{margin:0 0 8px;font:400 15px/1.3 var(--paint-face);font-variant-caps:all-small-caps;letter-spacing:.08em;color:var(--muted)}
+.target-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.target-list button{display:grid;gap:4px;padding:4px;border:1px solid var(--line);border-radius:3px;background:transparent;color:var(--ink);font:15px var(--paint-face);cursor:pointer;text-align:left}
+.target-list button img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:2px}
+.target-list button span{padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.target-list button small{padding:0 2px;color:var(--muted);font-size:13px}
+.target-list button:hover{border-color:var(--accent)}
+.target-list button[aria-pressed=true]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.target-list button:disabled{opacity:.5;cursor:default}
+.target-list button:focus-visible,.own-button:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.target-own{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:8px 0 0;font-size:15px;color:var(--muted)}
+.own-button{display:inline-flex;align-items:center;min-height:44px;padding:4px 12px;border:1px solid var(--line);border-radius:3px;color:var(--ink);cursor:pointer}
+.own-button:hover{border-color:var(--accent)}
+.target-credit{margin:6px 0 0;font-size:14px;color:var(--muted)}
+.target-figure{display:flex;align-items:flex-end;gap:10px;margin:10px 0 0}
+.target-figure img{display:block;max-width:min(240px,45%);max-height:160px;border:1px solid var(--line)}
+.target-figure figcaption{font-size:14px;color:var(--muted)}
+.canvas-focus :is(.targets,.target-figure){display:none!important}
+.sheet .film{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#painting-picker{display:block;width:100%;min-height:44px;margin-top:6px;padding:8px;font:18px var(--paint-face);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:3px}
+#replay-controls{align-items:center;margin-top:8px;font-size:15px}#replay-controls label{display:flex;align-items:center;gap:6px;min-height:44px}#replay-speed{min-height:44px;font:inherit}.playbar{flex-wrap:wrap}.playbar progress{min-width:80px}
+#painting-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;border:0;padding:0}#painting-picker button{padding:5px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:14px var(--paint-face);cursor:pointer}#painting-picker img,.blank-sample{display:block;width:100%;height:72px;object-fit:contain;background:#fff;margin-bottom:5px}#painting-picker button[aria-pressed=true]{border:2px solid var(--accent)}#painting-picker button:focus-visible,#timeline button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}#targets-title{font-size:20px;margin:0 0 8px}#run-settings{display:flex;gap:16px;flex-wrap:wrap}#run-settings select{font:inherit;min-height:44px}#mode-note{font-size:14px}#timeline{display:flex;justify-content:space-between;gap:8px}#timeline button{min-height:44px;flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);cursor:pointer}.mix-part{grid-template-columns:minmax(100px,1fr) minmax(80px,1fr) 2em 32px}.mix-part input{width:100%}#scratch{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:10}#load-state{font-size:13px}
+.paint-beta{margin-left:auto;padding:2px 8px;border:1px solid var(--line);border-radius:4px;font-size:12px;letter-spacing:.04em;line-height:1.4}
+</style>
+<link rel="stylesheet" href="lab/app.css">
+</head>
+<body>
+<button id="exit-focus" hidden>Exit fullscreen</button>
+<nav class="paint-nav" aria-label="unpainting"><a href="lab/" aria-current="page">Paint Lab</a><a href="./">All demos</a><a href="https://github.com/sabj/unpainting">Source on GitHub</a><span class="paint-beta">beta</span></nav>
+<main>
+<header class="paint-head">
+<p class="paint-kicker">unpainting</p>
+<div class="paint-title"><h1>Paint Lab</h1><button class="help-toggle" popovertarget="paint-help">How it works</button><a class="help-toggle" href="https://github.com/sabj/unpainting">GitHub repo</a></div>
+<div id="paint-help" popover role="dialog" aria-labelledby="paint-help-title">
+<header><strong id="paint-help-title">How it works</strong><button popovertarget="paint-help" popovertargetaction="hide" aria-label="Close help">Close ×</button></header>
+<p>Choose a complete stroke-budget painting, carry on a painting, or try a technique. Live runs its full recorded strokes through the simulator here. Jump to a thumbnail to continue from that sheet state, or choose Carry on painting. Replay shows the original saved frames without fades, with a labelled stroke path.</p>
+<p>Drag to paint. Pinch to zoom, use two fingers to pan. Fit resets the view.</p>
+<p>A stylus controls pressure. The round brush has a round cursor; the flat brush shows its width and direction.</p>
+<p>Mouse and finger pressure is fixed by default. Turn off “Fixed mouse / finger pressure” for a gentle response to drawing speed. Hold Alt or the stylus barrel button for clean water.</p>
+<p>R round · F flat · W water · I ink · P pencil · D dryer · Shift+D dry layer. [ / ] resize. Space pauses drying. Escape exits focus. Cmd/Ctrl+Z undoes; add Shift to redo.</p>
+</div>
+<p class="paint-lede">Watercolor, ink and pencil on simulated paper. Pick a picture to watch it painted, or drag on the paper to begin.</p>
+</header>
+
+
+<div class="lab">
+  <div class="stage">
+<div class="stage-heading"><span id="sheet-title">Your painting studio</span><button id="focus-view" aria-pressed="false">⛶ Fullscreen</button></div>
+  <div class="toolbar" id="run-settings"><label>Mode <select id="run-mode" aria-label="Playback mode"><option value="replay" selected>Recording · the painter's real frames</option><option value="live">Live · paint a complete study here</option></select></label><label id="live-budget" hidden>Painting budget <select id="stroke-limit" aria-label="Painting budget"><option value="250">250-stroke painting</option><option value="2500">2,500-stroke painting</option></select></label></div>
+  <p id="mode-note">Recording · original saved frames, stepped without fades. Overlay: stroke path.</p>
+
+    <div id="return-sheet" class="toolbar paint-controls" hidden><button id="keep-painting">Keep painting</button><button id="dismiss-return">Start fresh</button></div>
+    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><p>A little paint. A little water.</p><h2>What will you make?</h2><div><button data-start="blank">Start a blank painting</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div><small>Or start a mark anywhere on the paper.</small></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
+    <div id="current-materials" hidden aria-label="Current materials"></div>
+    <section id="sequence" hidden aria-labelledby="sequence-title"><h2 id="sequence-title">Live study · jump in anywhere</h2><div class="sequence-row"><figure><img id="sequence-target" alt=""><figcaption>Target</figcaption></figure><nav id="sequence-thumbs" aria-label="Painting timeline"></nav></div></section>
+    <div class="sheetbar">
+      <span id="state" class="state">Drag to paint</span>
+      <div class="toolbar paint-controls" role="toolbar" aria-label="Sheet"><button id="reset-view" aria-label="Fit paper" title="Reset zoom and pan">Fit</button><button id="clear" aria-label="New sheet">New</button><button id="undo" disabled title="Undo (Cmd/Ctrl+Z)">Undo</button><button id="redo" disabled title="Redo (Shift+Cmd/Ctrl+Z)">Redo</button><button id="redip" type="button">Re-dip</button><label><input id="auto-redip" type="checkbox" checked> Auto re-dip each wet stroke</label><output id="load-state" aria-live="polite"></output><button id="dry-layer" title="Dry the current layer (Shift+D)">Dry layer</button><button id="save" aria-label="Save image">Save</button></div>
+    </div>
+    <div id="drying" class="drying" hidden><span id="drying-label">Drying</span><progress id="drying-progress" max="1" aria-label="Share of peak wet area dried"></progress></div>
+    <p id="step-caption" hidden></p>
+    <div class="playbar" id="playbar" hidden><button id="play-pause" aria-pressed="false">Pause</button><progress id="play-progress" max="1" value="0" aria-label="Progress of the painting"></progress><button id="skip">Carry on painting</button></div>
+
+    <div class="toolbar paint-controls" id="replay-controls"><button id="replay">Restart</button><label for="replay-speed">Speed <select id="replay-speed"><option value="0.5">Half speed</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><label><input id="show-brush" type="checkbox" checked> Show brush</label></div>
+    <details class="targets" id="quick-catalogue"><summary id="targets-title">Quick start · more paintings &amp; techniques</summary>
+  <div id="painting-picker" role="group" aria-labelledby="targets-title"></div>
+  <p class="target-credit" id="target-credit" aria-live="polite"></p>
+</details>
+
+    <figure id="target-figure" class="target-figure" hidden><img id="target-image" alt=""><figcaption id="target-caption"></figcaption></figure>
+    <div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+    <div class="status"><span id="active-tool">Round brush</span></div>
+
+  </div>
+  <aside id="painting-controls" class="panel paint-controls" aria-label="Painting controls">
+    <div id="panel-tabs" role="group" aria-label="Painting settings">
+      <button data-panel-toggle="brush" aria-expanded="false" aria-controls="painting-controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 3 6 6-10 10-6-6Z M5 13c-4 3 0 5-3 8 4 0 7-1 9-2"/></svg><span>Brush</span></button>
+      <button data-panel-toggle="colors" aria-expanded="false" aria-controls="painting-controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-4c-2-1-1-3 1-3h3c5 0 4-11-6-11Z"/><circle cx="8" cy="8" r="1"/><circle cx="14" cy="7" r="1"/><circle cx="6" cy="13" r="1"/></svg><span>Colors</span></button>
+      <button data-panel-toggle="paper" aria-expanded="false" aria-controls="painting-controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h10l4 4v14H5Z M15 3v5h4 M8 12h8 M8 16h5"/></svg><span>Paper</span></button>
+    </div>
+    <section data-panel-section="brush" aria-labelledby="paint-with">
+      <h2 id="paint-with">Your tools</h2>
+      <div class="instrument-tools">
+        <p class="label" id="tool-label">Instrument</p>
+        <div class="seg tools" role="group" aria-labelledby="tool-label">
+          <button data-tool="round" aria-pressed="true" aria-label="Round brush" title="Round brush">Round</button>
+          <button data-tool="flat" aria-pressed="false" aria-label="Flat brush" title="Flat brush">Flat</button>
+          <button data-tool="water" aria-pressed="false" aria-label="Clean water" title="Clean water">Water</button>
+          <button data-tool="pen" aria-pressed="false" aria-label="Dip pen" title="Dip pen">Pen</button>
+          <button data-tool="pencil" aria-pressed="false" title="Pencil">Pencil</button>
+          <button data-tool="dryer" aria-pressed="false" aria-label="Hair dryer" title="Hair dryer: dries the paper under it and blows wet paint away">Dryer</button>
+        </div>
+      </div>
+      <div>
+        <label class="row" for="size">Size <input id="size" type="range" min="2" max="30" step="0.5" value="10"><output for="size" id="size-out">10 mm</output></label>
+        <label class="row" for="water">Water <input id="water" type="range" min="0.1" max="3" step="0.05" value="2"><output for="water" id="water-out">2</output></label>
+        <label class="row" for="amount">Pigment <input id="amount" type="range" min="0.05" max="1.2" step="0.05" value="0.5"><output for="amount" id="amount-out">0.5</output></label>
+      </div>
+    </section>
+    <section data-panel-section="colors" aria-label="Colors">
+      <fieldset id="pigment-set">
+        <legend class="label"><span>Pigment</span><span class="current" id="pigment-name"></span></legend>
+        <div class="swatches" id="pigments" role="group" aria-label="Pigment"></div>
+        <details class="mix-disclosure"><summary>Mix your own colours</summary><div class="mixing" role="group" aria-labelledby="mix-title">
+          <p class="mix-title" id="mix-title">Mixing palette <span id="mix-count">Empty</span></p>
+          <p>Add pigments, set their shares, then load the mix.</p>
+          <button id="mix-add" aria-expanded="false" aria-controls="mix-picker"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>Add pigment</button>
+          <div id="mix-picker" class="swatches" role="group" aria-label="Add pigment" hidden></div>
+          <div id="mix-parts" class="mix-parts" role="group" aria-label="Pigment parts"></div>
+          <div class="mix-preview" aria-label="Mixture color preview">
+            <span id="mix-paint"><small>Paint</small></span><span id="mix-wash"><small>Light wash</small></span>
+          </div>
+          <label class="row" for="mix-strength">Strength <input id="mix-strength" type="range" min="0.05" max="1.2" step="0.05" value="0.5"><output for="mix-strength" id="mix-strength-out">0.5</output></label>
+          <div class="mix-actions">
+            <button id="mix-load" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 10 7-7 2 2-7 7M8 10c-4 0-2 5-5 6 5 1 7-1 7-4"/></svg>Load mix</button>
+            <button id="mix-clear" aria-label="Clear mixing palette" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M7 6V3h6v3M6 6l1 11h6l1-11M9 9v5M11 9v5"/></svg>Clear</button>
+          </div>
+          <p id="mix-status" role="status">Add colors to start mixing.</p>
+          <p>Adjust water in Brush.</p>
+        </div>
+      </details></fieldset>
+    </section>
+    <section data-panel-section="paper" aria-labelledby="paper-drying">
+      <h2 id="paper-drying">Paper and drying</h2>
+      <div>
+        <p class="label" id="surface-label">Paper</p>
+        <div class="seg papers" role="group" aria-labelledby="surface-label">
+          <button data-surface="hot" aria-pressed="false" title="Smooth, heavily sized paper">Hot press</button>
+          <button data-surface="cold" aria-pressed="true" title="Paper with a medium tooth">Cold press</button>
+          <button data-surface="rough" aria-pressed="false" title="Paper with a coarse tooth">Rough</button>
+          <button data-surface="toned" aria-pressed="false" title="Cold press in a warm buff">Toned</button>
+        </div>
+      </div>
+      <label class="row" for="speed">Speed <input id="speed" type="range" min="1" max="8" value="2"><output for="speed" id="speed-out">2×</output></label>
+      <div class="pair"><button id="pause" aria-pressed="false">Pause drying</button><button id="dryer" aria-pressed="false" title="A hair dryer over the whole sheet">Dry everything</button></div>
+    </section>
+    <details id="more-settings">
+      <summary>More settings</summary>
+      <div class="more">
+        <div class="status"><span id="stroke-count">0 strokes</span><span id="marks"></span><span id="backend"></span><span id="resolution-choice"></span><span id="autosave-status" role="status"></span></div>
+        <label class="row" for="quality">Physics <select id="quality"><option value="fast" selected>Fast</option><option value="full">Full physics</option></select></label>
+        <p class="help">Fast uses accelerated drying; Full keeps the slower clock.</p>
+        <label class="check" for="manual-pressure"><input type="checkbox" id="manual-pressure" checked>Fixed mouse / finger pressure</label>
+        <label class="row" for="pressure">Pressure <input id="pressure" type="range" min="0.1" max="1" step="0.05" value="0.8"><output for="pressure" id="pressure-out">0.8</output></label>
+        <div>
+          <p class="label" id="model-label">Brush model</p>
+          <div class="seg" role="group" aria-labelledby="model-label">
+            <button data-model="row" aria-pressed="true">Row of bristles</button>
+            <button data-model="tuft" aria-pressed="false">Deformable tuft</button>
+          </div>
+        </div>
+        <div>
+          <label class="row" for="paper">Paper <select id="paper"><option value="6x4.5">6 × 4.5 in</option><option value="8x6" selected>8 × 6 in</option><option value="12x9">12 × 9 in</option></select></label>
+          <label class="row" for="dpi">Resolution <select id="dpi"><option value="60" selected>60 dpi</option><option value="90">90 dpi</option><option value="120">120 dpi</option><option value="150">150 dpi</option><option value="200">200 dpi</option><option value="240">240 dpi</option><option value="300">300 dpi</option></select></label>
+        </div>
+      </div>
+    </details>
+  </aside>
+</div>
+
+<details class="notes">
+  <summary>About the paper &amp; brushes</summary>
+  <p>Water spreads, soaks into the paper and dries. Pigment settles into its texture; dry washes remain transparent layers.</p>
+  <p>Use a loaded brush for flowing marks, less water for dry brush. The brush reloads with each stroke.</p>
+  <p class="muted">The simulation draws on Curtis et al. (1997), Strassmann (1986) and Kim et al. The physics, the painter and this page are in <a href="https://github.com/sabj/unpainting">sabj/unpainting</a>.</p>
+  <p class="muted">Everything runs in this browser: no picture, stroke or painting leaves it. Autosave keeps your sheet in this browser only.</p>
+</details>
+</main>
+<script type="module" src="lab/lab.js"></script>
+<canvas id="scratch" aria-hidden="true"></canvas></body></html>

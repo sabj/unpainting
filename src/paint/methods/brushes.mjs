@@ -1,4 +1,4 @@
-// --physical 1: brushes sized from a physical sheet and real brushes (data/brushes.json), so every resolution uses the
+// --physical 1: brushes sized from a physical sheet and real brushes (src/paint/brushes.json), so every resolution uses the
 // same brushes and pixel sizes are outputs. --sheetmm overrides the sheet's width.
 // A brush's reach is half its belly or flat width; one load lays water ml / (uptake ml per cm2 x stroke width cm) cm.
 import fs from 'fs';
@@ -6,7 +6,7 @@ import path from 'path';
 
 export function loadPhysical({ root, opt, num, W2, H2 = W2 }) {
   if (num('physical', 0) <= 0) return null;
-  const cfg = JSON.parse(fs.readFileSync(path.join(root, opt('brushes', 'data/brushes.json')), 'utf8'));
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, opt('brushes', 'src/paint/brushes.json')), 'utf8'));
   // the picture fitted inside the sheet turned to its orientation, unless --sheetmm fixes the width
   const sh = cfg.sheet, fit = Math.min(sh.width_mm / Math.min(W2, H2), sh.height_mm / Math.max(W2, H2));
   const mmPerCell = opt('sheetmm', '') !== '' ? num('sheetmm', sh.width_mm) / W2 : fit, mm = mmPerCell * W2;
@@ -23,8 +23,8 @@ export function loadPhysical({ root, opt, num, W2, H2 = W2 }) {
   // --floorbrush name: the smallest brush a wash passage may use, instead of the kit's floor role (round4, 3 mm).
   // Strips narrower than the floor brush need a smaller one, or every darker pass paints across them.
   const R = { ...cfg.roles, ...(opt('washbrush', '') ? { wash: opt('washbrush', '') } : {}), ...(opt('floorbrush', '') ? { floor: opt('floorbrush', '') } : {}) };
-  if (!B(R.wash)) throw new Error(`--washbrush: no brush ${R.wash} in ${opt('brushes', 'data/brushes.json')}`);
-  if (!B(R.floor)) throw new Error(`--floorbrush: no brush ${R.floor} in ${opt('brushes', 'data/brushes.json')}`);
+  if (!B(R.wash)) throw new Error(`--washbrush: no brush ${R.wash} in ${opt('brushes', 'src/paint/brushes.json')}`);
+  if (!B(R.floor)) throw new Error(`--floorbrush: no brush ${R.floor} in ${opt('brushes', 'src/paint/brushes.json')}`);
   const P = { cfg, mm, mmPerCell, half, pick, loadCm, loadCells, floorR: half(R.floor), washR: half(R.wash), detailR: half(R.detail), dragW: B(R.drag).width_mm / mmPerCell, dragLoad: loadCells(R.drag, 'dry brush') };
   P.summary = () => washSet.map(k => `${k} ${B(k).width_mm} mm = ${(2 * half(k)).toFixed(1)} px, a load lays ${loadCm(k, 'wet on dry').toFixed(0)} cm (${loadCells(k, 'wet on dry').toFixed(0)} px) wet on dry`).join('; ') + `; dry brush ${B(R.drag).width_mm} mm = ${P.dragW.toFixed(1)} px, ${loadCm(R.drag, 'dry brush').toFixed(0)} cm a load`;
   return P;

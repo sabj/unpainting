@@ -20,7 +20,7 @@ python3 tools/cloud/render-batch.py TREE JOBS --pods 1 --per-pod 4 --hard-limit 
 | `--gpus` | `GPU id:COMMUNITY\|SECURE,...` | the GPU types to try, in order; the default list is `LADDER` in the script |
 | `--image` | image name | the pod image; the default is `RUNPOD_IMAGE`, else `runpod/base:0.6.2-cuda12.4.1` |
 
-Run it detached, for example in `tmux`, because a batch can outlive a terminal session. The tree ships without `work/`, `task/`, `node_modules/`, `.git/` and `data/refs/`. Pass any inputs a job needs with `--input`. Each pod installs Node, the npm packages and the line tools (`tools/cloud/setup-lines.sh`) before its first job.
+Run it detached, for example in `tmux`, because a batch can outlive a terminal session. The tree ships without `work/`, `task/`, `node_modules/`, `.git/`. Pass any inputs a job needs with `--input`. Each pod installs Node, the npm packages and the line tools (`tools/cloud/setup-lines.sh`) before its first job.
 
 Pods are named `painter-rb-*`. The runner deletes each one by its saved pod id when its jobs finish, on an interrupt, and at the hard limit. Outputs land in `TREE/work/`, with logs and `summary.json` in `TREE/work/cloud-batches/`.
 

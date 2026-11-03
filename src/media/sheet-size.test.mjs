@@ -14,7 +14,7 @@ test('the default sheet is a 6 x 4 inch postcard', () => {
 });
 
 test('the physical brush file uses the same postcard sheet', () => {
-  const { sheet } = JSON.parse(fs.readFileSync(new URL('../../data/brushes.json', import.meta.url), 'utf8'));
+  const { sheet } = JSON.parse(fs.readFileSync(new URL('../paint/brushes.json', import.meta.url), 'utf8'));
   assert.deepEqual([Math.min(sheet.width_mm, sheet.height_mm), Math.max(sheet.width_mm, sheet.height_mm)], [POSTCARD_HEIGHT_MM, POSTCARD_WIDTH_MM]);
 });
 
