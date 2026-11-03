@@ -54,24 +54,24 @@ await runPipeline({round:ROUNDS.find(r=>r.id==='V4'),model:{key:'fixture',name:'
   } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
 });
 
-test('the routine suite fixes five targets and six models; all remains opt-in', () => {
+test('the routine suite fixes seven targets and six models; all remains opt-in', () => {
   const plan = suitePlan();
-  assert.equal(plan.targets.length, 5); assert.equal(plan.models.length, 6);
+  assert.equal(plan.targets.length, 7); assert.equal(plan.models.length, 6);
   assert.equal(plan.profile.id, 'lite-v1');
   assert.ok(suitePlan({ selection: 'all' }).models.length > 6);
 });
 
-test('the run CLI preserves failure status after a model exits without delivering a plan', () => {
+test('the run CLI refuses missing preflight dependencies before starting a model', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-no-plan-'));
   let raw;
   try {
     const bin = path.join(root, 'bin'); fs.mkdirSync(bin);
     const cli = path.join(bin, 'claude'); fs.writeFileSync(cli, `#!${process.execPath}\nprocess.exit(0);\n`); fs.chmodSync(cli, 0o755);
     const result = spawnSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--round', 'V4', '--model', 'opus', '--crops', 'hills', '--out', root, '--gpu', 'off'],
-      { encoding: 'utf8', timeout: 30000, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
-    assert.equal(result.status, 1, result.stderr);
-    const r = readJson(path.join(root, 'v4-pipeline', 'opus', '1', 'run.json')); raw = path.join(BENCH, r.raw);
-    assert.equal(r.complete, false); assert.equal(r.unpainted.hills.pipeline.outcome, 'no-plan');
+      { encoding: 'utf8', timeout: 30000, env: { ...process.env, PAINTER_SEG_PYTHON: '', PATH: `${bin}${path.delimiter}${process.env.PATH}` } });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /PAINTER_SEG_PYTHON|clean git checkout/);
+    assert.ok(!fs.existsSync(path.join(root, 'v4-pipeline')));
   } finally { fs.rmSync(root, { recursive: true, force: true }); if (raw) fs.rmSync(raw, { recursive: true, force: true }); }
 });
 
@@ -141,7 +141,7 @@ test('lite results retain the planned denominator and do not rank a partial succ
 test('--plan is offline and describes the exact job allocation; invalid options fail before model use', () => {
   const script = path.join(BENCH, 'scripts', 'suite.mjs');
   const plan = JSON.parse(execFileSync(process.execPath, [script, '--plan'], { encoding: 'utf8' }));
-  assert.equal(plan.estimate.lite.paintings, 30);
+  assert.equal(plan.estimate.lite.paintings, 42);
   for (const args of [['--unknown'], ['--models'], ['--models', 'missing', '--plan']]) {
     assert.notEqual(spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' }).status, 0);
   }

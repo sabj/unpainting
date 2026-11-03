@@ -216,6 +216,26 @@
    "style": "precise architectural watercolor: a stone college facade with windows",
    "distributed": true,
    "file": "v2/targets/trumbull.png"
+  },
+  {
+   "key": "h36a",
+   "name": "Yale h36-a",
+   "selfScore": 9.23,
+   "w": 300,
+   "h": 200,
+   "style": "loose ink-and-watercolor field sketch, ink led",
+   "distributed": true,
+   "file": "v2/targets/h36a.png"
+  },
+  {
+   "key": "h34a",
+   "name": "Yale h34-a",
+   "selfScore": 9.37,
+   "w": 300,
+   "h": 200,
+   "style": "loose ink-and-watercolor field sketch, ink led",
+   "distributed": true,
+   "file": "v2/targets/h34a.png"
   }
  ],
  "rounds": [
