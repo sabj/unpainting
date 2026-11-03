@@ -760,6 +760,12 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
         const side = across < 0 ? sideL : sideR;
         if (Math.abs(along) > spacing * 0.5 + 0.6 || Math.abs(across) > side + 0.5) continue;
         if (clip && !clip[yy * w + xx]) continue;
+        if (sheet._contactSnapshot) {
+          const {work, source} = sheet._contactSnapshot, i = yy * w + xx;
+          if (work.touchEpoch[i] !== work.epoch) {
+            work.touchEpoch[i] = work.epoch; stamp[i] = source[i]; work.readCells.push(i);
+          }
+        }
         if (clk - stamp[yy * w + xx] < recent || stamp[yy * w + xx] >= onceT0) continue;
         stamp[yy * w + xx] = clk;
         const rel = side > 0 ? across / side : 0;
@@ -807,9 +813,13 @@ export class ContactWorkspace {
       this.n = n;
       for (const key of ['mask', 'primaryMask', 'liftMask', 'neighbors']) this[key] = new Uint8Array(n);
       this.touched = new Int32Array(n);
+      this.touchEpoch = new Uint32Array(n); this.epoch = 0;
     } else if (this.hi >= this.lo) {
       for (const key of ['mask', 'primaryMask', 'liftMask', 'neighbors']) this[key].fill(0, this.lo, this.hi + 1);
     }
+    this.epoch = (this.epoch + 1) >>> 0;
+    if (!this.epoch) { this.touchEpoch.fill(0); this.epoch = 1; }
+    this.readCells = [];
     this.lo = n; this.hi = -1;
     return this;
   }
@@ -817,7 +827,7 @@ export class ContactWorkspace {
 
 /** Read-only upper bound of the cells a stroke can touch, from the GPU planner's geometry and stamp tests, plus the
  *  unclipped lift-off disk. Neighbours are unclipped because wet paint can flow across a passage boundary. */
-export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = true, upright = false, neighborRadius = 0, sparseRow = false, workspace = null } = {}) {
+export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = true, upright = false, neighborRadius = 0, sparseRow = false, workspace = null, includeTouched = true } = {}) {
   if (brush.model !== 'tuft' && !brush.depositDepth && splats(brush)) throw new Error('candidate contact does not support the active wash-splat route');
   if (!Number.isFinite(spacing) || spacing <= 0) throw new Error('candidate contact spacing must be positive');
   if (!Number.isInteger(neighborRadius) || neighborRadius < 0) throw new Error('candidate neighbor radius must be a nonnegative integer');
@@ -834,9 +844,9 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
     beginPlan() { const F = new Float32Array(16 + brush.clumps.length); return { F, U: new Uint32Array(F.buffer), I: new Int32Array(F.buffer), step() { return 0; }, emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;} mask[i]=1; } return 0; } }; },
     endPlan() {},
   };
-  if (work && sheet.touched) work.touched.set(sheet.touched);
   const scratch = { w: sheet.w, h: sheet.h, K: sheet.K, paper: sheet.paper, clip: sheet.clip, _gpu: link, clock: sheet.clock,
     touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
+    _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched } : null,
     contactStrength:brush.model === 'tuft' ? sheet.contactStrength?.slice() : undefined,
     _contactBrush: sheet._contactBrush === brush ? copy : null };
   // an undipped tuft is treated as full, the widest footprint
@@ -901,10 +911,21 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   if(sparse) { sparseCells.sort((a,b)=>a-b); sparseNeighbors.sort((a,b)=>a-b); for(const i of sparseCells)indices.push(i); for(const i of sparseNeighbors)neighborIndices.push(i); }
   else for (let i = Math.max(0, Math.min(lo, nlo)), end = Math.min(n - 1, Math.max(hi, nhi)); i <= end; i++) { if (mask[i]) indices.push(i); if (neighbors[i]) neighborIndices.push(i); }
   if (work) { work.lo = Math.min(lo, nlo); work.hi = Math.max(hi, nhi); }
+  // Production admission needs masks, not the full continuation stamp plane.
+  // Preserve the public snapshot when requested without ever copying the source
+  // into the workspace on the hot prediction path.
+  let touched;
+  if (includeTouched) {
+    touched = scratch.touched;
+    if (scratch._contactSnapshot) {
+      touched = sheet.touched.slice();
+      for (const i of work.readCells) touched[i] = work.touched[i];
+    }
+  }
   // a stable identity for the contract and instrument, not a source hash
   const source = 'brush-primary-contact-v1:' + JSON.stringify({ model:brush.model??'row', lag:brush.lag??.6, flat: !!brush.flat, radius: brush.radius, splay: brush.splay, spacing, upright, lift, neighborRadius, ...(varietyOf(brush) ? { variety: varietyOf(brush) } : {}) });
   return { kind: 'instrument-candidate-contact', source, cells: indices, mask, primaryMask, liftMask, neighbors, neighborIndices,
     contact: { kind: 'instrument-candidate-contact', source, cells: indices },
     cellCount: indices.length, primaryCellCount: sparse ? emitted.length : tuft ? primaryMask.reduce((sum, value) => sum + value, 0) : primaryCount, liftCellCount: liftCount, neighborCells: sparse ? sparseNeighbors.length : neighborCount,
-    continuation: { carry: copy.carry, travel: copy.travel, clock: scratch.clock, touched: scratch.touched } };
+    continuation: { carry: copy.carry, travel: copy.travel, clock: scratch.clock, touched } };
 }
