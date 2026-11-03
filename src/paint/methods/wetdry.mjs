@@ -106,7 +106,7 @@ export function strokeCells(sheet, points, radius) {
 // certificate, not an assumption that dry() exhausted all pore moisture.
 export function measurePaperDry(sheet) {
   if (validPaperCertificate(sheet)) return {cells:sheet.n, bounds:sheet.n > 0 ? [0,0,sheet.w-1,sheet.h-1] : null, waterMax:0, saturationMax:0, moistShare:0, dry:true};
-  const cells = { length: sheet.n, *[Symbol.iterator]() { for (let i = 0; i < sheet.n; i++) yield i; } };
+  const cells = { length: sheet.n, fullSheet: true, *[Symbol.iterator]() { for (let i = 0; i < sheet.n; i++) yield i; } };
   const state = measurePaper(sheet, cells, true, { stats: 'gate', bounds: [0, 0, sheet.w - 1, sheet.h - 1] });
   if (state.waterMax === 0 && state.saturationMax === 0) certifyZeroPaper(sheet);
   return state;
@@ -131,6 +131,24 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
   if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, freshRect, paperOnly);
   const wetCells = reach?.wetCells, exactEpoch = reach?.exactEpoch, rBounds = reach?.bounds, sw = sheet.w;
   let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = stats === 'gate' || uniform ? null : [];
+  if (cells.fullSheet && stats === 'gate' && reach) {
+    const [rx0, ry0, rw, rh] = freshRect, rx1 = rx0 + rw - 1, ry1 = ry0 + rh - 1;
+    const W = sheet.W, S = sheet.s, cap = sheet.paper.capacity;
+    for (let y = ry0; y <= ry1; y++) {
+      const row = y * sw;
+      for (let x = rx0; x <= rx1; x++) {
+        const i = row + x;
+        if (wetCells && wetCells[i] !== exactEpoch) continue;
+        const water = W[i], saturation = S[i] / Math.max(1e-8, cap[i]);
+        if (!Number.isFinite(water) || !Number.isFinite(saturation)) throw new Error('Non-finite paper state');
+        if (water > waterMax) waterMax = water;
+        if (saturation > saturationMax) saturationMax = saturation;
+        if (water >= PAPER_STATE.moistWater || saturation >= PAPER_STATE.moistSaturation) moist++;
+      }
+    }
+    return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, moistShare: moist / cells.length,
+      dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
+  }
   for (const i of cells) {
     let water = 0, saturation = 0;
     if (!reach || (wetCells ? wetCells[i] === exactEpoch : (() => { const y = (i / sw) | 0, x = i - y * sw; return x >= rBounds[0] && x <= rBounds[2] && y >= rBounds[1] && y <= rBounds[3]; })())) {
@@ -179,12 +197,11 @@ export function enforcePaper({ sheet, cells, technique, step, dry, O, log, label
   let state = measurePaper(sheet, cells), waits = 0;
   const fastTime = { ...(O ?? DEFAULTS), dt: 2 }; // same physical processes and default dry() time step, never fix()
   if (!cells.length) return false;
-  const wholeCells = technique === 'dry layer' ? Array.from({ length: sheet.n }, (_, i) => i) : null;
-  let whole = wholeCells ? measurePaper(sheet, wholeCells) : null;
+  let whole = technique === 'dry layer' ? measurePaperDry(sheet) : null;
   if (whole && !whole.dry) {
     dry(sheet, 30000, O, { levelMax: 140, dt: 14 }); waits++;
     // Whole sheet must be dry, including pore water, not merely the planned footprint.
-    whole = measurePaper(sheet, wholeCells);
+    whole = measurePaperDry(sheet);
     if (!whole.dry) {
       const failure = { label, technique, ...measurePaper(sheet, cells), wholeSheetDry: false, wholeSheet: whole, waits, passed: false };
       record?.(failure); log?.(`technique stroke ${JSON.stringify(failure)}`);

@@ -163,16 +163,22 @@ fn tiles_args() {
   ARGS[3] = c; ARGS[4] = u.nAct; ARGS[5] = 1u;
 }
 var<workgroup> anyWet: atomic<u32>;
+var<workgroup> tileMaxW: atomic<u32>;
 fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid);
-  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); }
+  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); atomicStore(&tileMaxW, 0u); }
   workgroupBarrier();
-  if (c.ok) { atomicMax(&CTR[7], bitcast<u32>(W[c.i])); }
+  if (c.ok) {
+    let wBits = bitcast<u32>(W[c.i]);
+    if (wBits > 0u) { atomicMax(&tileMaxW, wBits); }
+  }
   if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); }
   workgroupBarrier();
   if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
     let t = TL[wid.x];
     if (u.p3 != 0u) { atomicStore(&FLAGS[t], 0u); }
+    let maxW = atomicLoad(&tileMaxW);
+    if (maxW > 0u) { atomicMax(&CTR[7], maxW); }
     let seen = atomicLoad(&anyWet);
     if (seen != 0u) { markWet(t); atomicAdd(&CTR[1], 1u); }
     if ((seen & 2u) != 0u) { atomicAdd(&CTR[6], 1u); atomicAdd(&CTR[9], 1u); }
@@ -920,12 +926,22 @@ fn cap_sp_tile(wid: vec3<u32>, lid: vec3<u32>) {
 
 
 // dry() support
+var<workgroup> tileMaxLevel: atomic<u32>;
 fn level_k_tile(wid: vec3<u32>, lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
-  var m = 0.0;
-  if (c.x < u.w - 1u && M[c.i + 1u] == 1u) { m = max(m, abs(W[c.i] - W[c.i + 1u])); }
-  if (c.y < u.h - 1u && M[c.i + u.w] == 1u) { m = max(m, abs(W[c.i] - W[c.i + u.w])); }
-  if (m > 0.0) { atomicMax(&CTR[2], bitcast<u32>(m)); }
+  if (lid.x == 0u && lid.y == 0u) { atomicStore(&tileMaxLevel, 0u); }
+  workgroupBarrier();
+  let c = cx(wid, lid);
+  if (c.ok && M[c.i] == 1u) {
+    var m = 0.0;
+    if (c.x < u.w - 1u && M[c.i + 1u] == 1u) { m = max(m, abs(W[c.i] - W[c.i + 1u])); }
+    if (c.y < u.h - 1u && M[c.i + u.w] == 1u) { m = max(m, abs(W[c.i] - W[c.i + u.w])); }
+    if (m > 0.0) { atomicMax(&tileMaxLevel, bitcast<u32>(m)); }
+  }
+  workgroupBarrier();
+  if (lid.x == 0u && lid.y == 0u) {
+    let maxL = atomicLoad(&tileMaxLevel);
+    if (maxL > 0u) { atomicMax(&CTR[2], maxL); }
+  }
 }
 // The touched-tile union includes the previous top layer, so fix_b also clears
 // its pixels outside the new layer. A second compact queue avoids overwriting

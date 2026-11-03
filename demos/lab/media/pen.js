@@ -1,3 +1,4 @@
+// Generated from src/media/pen.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 import { beginWetOperation, recordWetCell } from './paper-certificate.js';
 import { census, censusMark } from './census.js';
 // Pipeline: inking, stage 6 (the pen physics).

@@ -34,12 +34,12 @@ export class GpuOpticalComposite {
   uploadLayer(layer){for(let k=0;k<layer.length;k++)this.device.queue.writeBuffer(this.layer,k*this.n*4,layer[k]);return this.layer;}
   append(layer,options={}){const buffer=Array.isArray(layer)?this.uploadLayer(layer):layer;const e=this.device.createCommandEncoder();this.encode(e,'compose',this.matrix,buffer,options);this.device.queue.submit([e.finish()]);this.stats.layers++;}
   async frame(paperRGB,live=[],reflectance=false){
-    this.device.queue.writeBuffer(this.base,0,pairs(paperRGB,reflectance?1:255));
+    if(paperRGB!=null)this.device.queue.writeBuffer(this.base,0,pairs(paperRGB,reflectance?1:255));
     const d=this.device,e=d.createCommandEncoder();e.copyBufferToBuffer(this.matrix,0,this.scratch,0,this.matrix.size);
     const uploads=[];
     for(const layer of live){let buffer=layer;if(Array.isArray(layer)){buffer=d.createBuffer({size:this.layer.size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});for(let k=0;k<layer.length;k++)d.queue.writeBuffer(buffer,k*this.n*4,layer[k]);uploads.push(buffer);}this.encode(e,'compose',this.scratch,buffer);}
-    this.encode(e,'frame',this.scratch);const read=d.createBuffer({size:this.n*3*4,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST});e.copyBufferToBuffer(this.out,0,read,0,read.size);d.queue.submit([e.finish()]);
-    await read.mapAsync(GPUMapMode.READ);const out=Uint8Array.from(new Uint32Array(read.getMappedRange()));read.unmap();read.destroy();for(const b of uploads)b.destroy();this.stats.frames++;this.stats.readBytes+=out.length*4;return out;
+    this.encode(e,'frame',this.scratch);const read=this.read??(this.read=d.createBuffer({size:this.n*3*4,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}));e.copyBufferToBuffer(this.out,0,read,0,read.size);d.queue.submit([e.finish()]);
+    await read.mapAsync(GPUMapMode.READ);const out=Uint8Array.from(new Uint32Array(read.getMappedRange()));read.unmap();for(const b of uploads)b.destroy();this.stats.frames++;this.stats.readBytes+=out.length*4;return out;
   }
-  destroy(){this.maskCheckpoint?.destroy();this.maskBuffer?.destroy();for(const k of ['matrix','scratch','layer','base','out','texture','uniform','sparseUniform','table','wet','unused','flags'])this[k].destroy();this.timestamps.destroy();}
+  destroy(){this.maskCheckpoint?.destroy();this.maskBuffer?.destroy();this.read?.destroy();for(const k of ['matrix','scratch','layer','base','out','texture','uniform','sparseUniform','table','wet','unused','flags'])this[k].destroy();this.timestamps.destroy();}
 }

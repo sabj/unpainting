@@ -128,22 +128,50 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     const t = performance.now(); census.inkres.composeCalls++;
     try { return composeImpl(lo); } finally { census.inkres.composeMs += performance.now() - t; }
   }
+  let x0Tab = null, x1Tab = null, txTab = null, y0Tab = null, y1Tab = null, tyTab = null, invInkL = null;
+  function ensureComposeTables() {
+    if (x0Tab) return;
+    x0Tab = new Int32Array(WH); x1Tab = new Int32Array(WH); txTab = new Float32Array(WH);
+    for (let x = 0; x < WH; x++) {
+      const fx = Math.min(W2 - 1, Math.max(0, (x + 0.5) / N - 0.5)), x0 = Math.floor(fx);
+      x0Tab[x] = x0 * 3; x1Tab[x] = Math.min(W2 - 1, x0 + 1) * 3; txTab[x] = fx - x0;
+    }
+    y0Tab = new Int32Array(HH); y1Tab = new Int32Array(HH); tyTab = new Float32Array(HH);
+    for (let y = 0; y < HH; y++) {
+      const fy = Math.min(H2 - 1, Math.max(0, (y + 0.5) / N - 0.5)), y0 = Math.floor(fy);
+      y0Tab[y] = y0 * W2 * 3; y1Tab[y] = Math.min(H2 - 1, y0 + 1) * W2 * 3; tyTab[y] = fy - y0;
+    }
+  }
   function composeImpl(lo) {
+    ensureComposeTables();
     if (renderVersion !== materialVersion) {
       inkH = renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1);
       inkL = renderLayers([inkLo], finePigments, white, nL, 1);
+      invInkL ??= new Float32Array(nH * 3);
+      for (let y = 0; y < HH; y++) {
+        const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * WH * 3;
+        for (let x = 0; x < WH; x++) {
+          const xa = x0Tab[x], xb = x1Tab[x], tx = txTab[x], tx0 = 1 - tx;
+          const a = ya + xa, b = ya + xb, c = yc + xa, d = yc + xb, o = row + x * 3;
+          for (let ch = 0; ch < 3; ch++) {
+            const bInk = (inkL[a + ch] * tx0 + inkL[b + ch] * tx) * ty0 + (inkL[c + ch] * tx0 + inkL[d + ch] * tx) * ty;
+            invInkL[o + ch] = inkH[o + ch] / Math.max(1, bInk);
+          }
+        }
+      }
       renderVersion = materialVersion;
     }
-    const out = Buffer.alloc(nH * 3);
+    const out = Buffer.allocUnsafe(nH * 3);
     for (let y = 0; y < HH; y++) {
-      const fy = Math.min(H2 - 1, Math.max(0, (y + 0.5) / N - 0.5)), y0 = Math.floor(fy), y1 = Math.min(H2 - 1, y0 + 1), ty = fy - y0;
+      const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * WH * 3;
       for (let x = 0; x < WH; x++) {
-        const fx = Math.min(W2 - 1, Math.max(0, (x + 0.5) / N - 0.5)), x0 = Math.floor(fx), x1 = Math.min(W2 - 1, x0 + 1), tx = fx - x0;
-        const a = y0 * W2 + x0, b = y0 * W2 + x1, c = y1 * W2 + x0, d = y1 * W2 + x1, o = (y * WH + x) * 3;
+        const xa = x0Tab[x], xb = x1Tab[x], tx = txTab[x], tx0 = 1 - tx;
+        const a = ya + xa, b = ya + xb, c = yc + xa, d = yc + xb, o = row + x * 3;
         for (let ch = 0; ch < 3; ch++) {
-          const bil = F => (F[a * 3 + ch] * (1 - tx) + F[b * 3 + ch] * tx) * (1 - ty) + (F[c * 3 + ch] * (1 - tx) + F[d * 3 + ch] * tx) * ty;
-          const ratio = inkH[o + ch] / Math.max(1, bil(inkL));
-          out[o + ch] = Math.max(0, Math.min(255, Math.round(bil(lo) * Math.min(ratio, 255 / Math.max(1, bil(lo))))));
+          const bLo = (lo[a + ch] * tx0 + lo[b + ch] * tx) * ty0 + (lo[c + ch] * tx0 + lo[d + ch] * tx) * ty;
+          const ratio = invInkL[o + ch];
+          const v = Math.round(bLo * Math.min(ratio, 255 / Math.max(1, bLo)));
+          out[o + ch] = v < 0 ? 0 : v > 255 ? 255 : v;
         }
       }
     }
