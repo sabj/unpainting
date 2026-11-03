@@ -134,5 +134,5 @@ test('extra args admit only validated artistic controls, never execution or ink 
   const args = optionMap(layerBase({variant: 'region_w13', build}).args);
   assert.equal(args.get('inkrecipe'), 'v2');
   for (const key of ['inkkscale', 'closingpressure', 'drawwidthgain', 'openinglines']) assert.ok(!args.has(key), key);
-  for (const token of ['sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
+  for (const token of ['ink2', 'ink3', 'ink4', 'sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
 });

@@ -134,7 +134,7 @@ test('lite results retain the planned denominator and do not rank a partial succ
     const out = path.join(root, 'results.json');
     execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'build-results.mjs'), '--runs', path.join(root, 'runs'), '--out', out], { stdio: 'pipe' });
     const v4 = readJson(out).rounds.find(r => r.id === 'V4'), m = v4.models[0];
-    assert.equal(v4.plannedTries, 1); assert.equal(m.completion.plannedPaintings, 5); assert.equal(m.completion.scoredPaintings, 1);
+    assert.equal(v4.plannedTries, 1); assert.equal(m.completion.plannedPaintings, 7); assert.equal(m.completion.scoredPaintings, 1);
     assert.equal(m.mean, null); assert.equal(m.indexed.mean, null); assert.equal(m.best, null); assert.equal(m.scoredTries, 0);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

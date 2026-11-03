@@ -55,6 +55,7 @@ export async function main(argv = process.argv.slice(2)) {
     const jobStart = Date.now();
     const args = [path.join(BENCH, 'scripts', 'run.mjs'), '--round', 'V4', '--model', model.key, '--profile', options['--profile'] ?? 'lite',
       '--tries', String(plan.profile.tries), '--crops', plan.targets.join(','), '--gpu', gpu, '--out', modelRoot,
+      ...(options['--python'] ? ['--python', options['--python']] : []),
       ...(dry ? ['--dry-run', '--dry-key', model.key] : []), ...(options['--force'] ? ['--force'] : [])];
     const job = { model: model.key, plannedPaintings: plan.targets.length * plan.profile.tries, status: 'running', runExit: null, scoreExits: [], elapsedSeconds: null };
     jobs.push(job); writeJson(summaryFile, summary);
