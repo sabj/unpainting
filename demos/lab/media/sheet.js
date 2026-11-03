@@ -985,15 +985,50 @@ export function layersOf(sheet) {
   return [...sheet.layers, top];
 }
 
-/** Total pigment per pigment across layers. */
+/** Total pigment across layers. With held:true, return an additive cell reader
+ * (pigment, cell, initial=0) preserving the finishing readers' double-precision order. */
 const ENV = typeof process !== 'undefined' ? process.env : {};
-export function thickness(sheet) {
+export function thickness(sheet, { held = false } = {}) {
+  if (held) return heldThickness(sheet);
   if (PAR) { const t = PAR.thickness(sheet); if (t) return t; }
   if (ENV.LAYER_CACHE === '0') return thicknessPlain(sheet);
   const out = thicknessCached(sheet);
   if (ENV.LAYER_CACHE_CHECK) { const ref = thicknessPlain(sheet), tol = sheet._gpu ? 1e-5 : 0; /* the GPU's sums are rounded twice */ for (let k = 0; k < ref.length; k++) for (let i = 0; i < ref[k].length; i++) if (tol ? Math.abs(ref[k][i] - out[k][i]) > tol * Math.max(1, Math.abs(ref[k][i])) : !Object.is(ref[k][i], out[k][i])) throw new Error(`thickness cache differs at pigment ${k} cell ${i}`); }
   return out;
 }
+// Finishing readers historically add wet mass first, then each fixed layer in double
+// precision (and sometimes continue an SC-cell accumulator). Float32 thickness
+// planes cannot substitute for that arithmetic. Memoize the immutable lower-layer
+// suffix for each queried cell and starting accumulator; read wet/top afresh.
+// The caller retains its existing needCells/coherence boundary.
+const heldCaches = new WeakMap();
+function heldThickness(sheet) {
+  const layers=sheet.layers, m=Math.max(0,layers.length-1), ver=sheet._layerVer||0;
+  let cache=heldCaches.get(sheet);
+  if(!cache || cache.layers!==layers || cache.ver!==ver || cache.m>m || (cache.m && cache.last!==layers[cache.m-1])) {
+    cache={layers,ver,m:0,last:null,cells:new Map()};heldCaches.set(sheet,cache);
+  }
+  cache.m=m;cache.last=layers[m-1];
+  const top=layers.at(-1), pending=sheet._gpu?.pendingLayers?.length>0;
+  return (k,i,initial=0)=>{
+    let v=initial+(sheet.G[k][i]+sheet.D[k][i]+sheet.P[k][i]);
+    if(m){
+      const key=k*sheet.n+i, old=pending?null:cache.cells.get(key);
+      if(old && Object.is(old.start,v)){
+        v=old.sum;
+        for(let l=old.m;l<m;l++)v+=layers[l][k][i];
+        old.sum=v;old.m=m;
+      }else{
+        const start=v;
+        for(let l=0;l<m;l++)v+=layers[l][k][i];
+        if(!pending)cache.cells.set(key,{start,sum:v,m});
+      }
+    }
+    if(top)v+=top[k][i];
+    return v;
+  };
+}
+
 function thicknessPlain(sheet) {
   const L = layersOf(sheet);
   const n = sheet.n;
