@@ -37,6 +37,7 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     peak = v.length ? Math.max(1e-4, v[Math.floor(v.length * 0.95)]) : 1;
   }
   const pen = createPen(penOpts), dryDamp = pen.damp;
+  pen._tapePigmentMap = sheet._tapePigmentMap;
   let dips = 0, drawn = 0;
   for (const g of gestures) {
     if (g.points.length < 2) continue;

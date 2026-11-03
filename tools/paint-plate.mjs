@@ -1545,7 +1545,7 @@ const ABLATE = new Set(opt('ablate', '').split(',').filter(Boolean));
 // --inkres N: the pens draw on their own sheet at N times the resolution and the output is N times as wide
 // (src/paint/methods/ink-res.mjs). Default 1, off. Cannot combine with --paperscan.
 // --inkresgain: the fine pen's ink strength; the default is a power-law fit in sheet width.
-const INKRES = num('inkres', 1) > 1 ? (() => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); return makeInkRes({ N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, main: sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
+const INKRES = num('inkres', 1) > 1 ? (() => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); return makeInkRes({ N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, main: sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
 const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 
 const TARGET_DRAW_EDGE=new Float32Array(N2);
