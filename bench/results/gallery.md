@@ -4,7 +4,7 @@ Generated from [results.json](results.json) by `scripts/build-leaderboard.mjs`.
 
 Every published result: painter V096 · sim 100 · judges J1 · releases 0.1.0 and 0.1.1. V1-V3 used the models' own toolkit on this painter's simulator; V4/V5 used the V096 pipeline (unpublished benchmark build, same recipe). Each result is labelled with its round, painter version, sim version and release. To benchmark a newer painter or sim, rerun V4 or V5 with it. To reproduce a result, check out its release tag (v0.1.0 and v0.1.1).
 
-Each row is one model's highest-scoring painting of the target in trials 1 to 3. A trial is one model session; V1 to V5 are benchmark versions. The row of images beside it shows the painting at 10, 25, 50 and 75% of its strokes. These stages are faded to make the finished painting easier to see. A grey [x] tile marks a target with no scored painting from that model, with the reason from its run records. The first row of each table is the target scored against itself, the realistic ceiling that paintings are indexed to.
+Each row is one model's highest-scoring painting of the target in trials 1 to 3. A trial is one model session; V1 to V5 are the rounds. The row of images beside it shows the painting at 10, 25, 50 and 75% of its strokes. These stages are faded to make the finished painting easier to see. A grey [x] tile marks a target with no scored painting from that model, with the reason from its run records. The first row of each table is the target scored against itself, the realistic ceiling that paintings are indexed to.
 
 ## V1: Tools only
 

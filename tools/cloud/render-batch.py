@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """render-batch.py TREE JOBS [options]: run one shell command per line of JOBS on rented RunPod GPU pods, pull outputs back.
 
-TREE  source tree on this machine (working tree, uncommitted files included). Bundled without work/ task/ node_modules/ .git/ data/refs/.
+TREE  source tree on this machine (working tree, uncommitted files included). Bundled without work/ task/ node_modules/ .git/.
 JOBS  text file, one command per line, run from the tree root on the box (blank lines and # lines skipped).
 Options:
   --pods K          pods to launch (default 4, cap 8, never more than jobs)

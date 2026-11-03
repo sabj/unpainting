@@ -16,9 +16,7 @@ Want to help? The [open problems](docs/future-ideas.md) need work: linework, was
 <p align="center">Trumbull College, painted with release 0.1.0 (painter V096, sim 100).</p>
 
 
-<a href="https://sabj.github.io/unpainting/layers/"><img src="docs/img/layers-thumb.webp" width="200" align="right" alt="The Trumbull painting and its layers as small tiles"></a>
-
-Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/layers/). This is a side experiment, so caveat emptor. The code is 99.9% AI-written and the docs 99%, so expect some slop and odd overfitting.
+Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github.io/unpainting/demos/lab/), watch mushrooms paint themselves in [Spore Studies](https://sabj.github.io/unpainting/demos/fungi/), or take a painting apart [layer by layer](https://sabj.github.io/unpainting/demos/layers/). This is a side experiment, so caveat emptor. The code is 99.9% AI-written and the docs 99%, so expect some slop and odd overfitting.
 
 ## Why model paint drying
 
@@ -28,9 +26,10 @@ Try the [quick start](#try-it), paint by hand in [Paint Lab](https://sabj.github
 
 <table>
 <tr>
-<td align="center" width="33%"><a href="https://samjackson.org/writing/whats-a-painting-anyway-part-1/"><img src="docs/img/thumb-blog.webp" width="220" alt="The Mona Lisa painted several ways, from the blog post's header"><br>Blog post on the motivations</a></td>
-<td align="center" width="33%"><a href="https://sabj.github.io/unpainting/"><img src="docs/img/thumb-heart.webp" width="220" alt="A heart with an arrow through it, painted in Paint Lab"><br>Paint Lab, to try it</a></td>
-<td align="center" width="33%"><a href="docs/reading-list.md"><img src="docs/img/thumb-reading.webp" width="220" alt="Titles of papers from the literature review"><br>Literature review, to see more</a></td>
+<td align="center" width="25%"><a href="https://sabj.github.io/unpainting/demos/lab/"><img src="demos/thumbs/lab.webp" width="180" alt="A heart with an arrow through it, painted in Paint Lab"><br>Paint Lab, to try it</a></td>
+<td align="center" width="25%"><a href="https://samjackson.org/writing/whats-a-painting-anyway-part-1/"><img src="docs/img/thumb-blog.webp" width="180" alt="The Mona Lisa painted several ways, from the blog post's header"><br>Blog post on the motivations</a></td>
+<td align="center" width="25%"><a href="docs/reading-list.md"><img src="docs/img/thumb-reading.webp" width="180" alt="Titles of papers from the literature review"><br>Literature review, to see more</a></td>
+<td align="center" width="25%"><a href="https://sabj.github.io/unpainting/demos/"><img src="demos/thumbs/fungi-paint.webp" width="180" alt="A mushroom plate painting itself from blank paper"><br>More demos</a></td>
 </tr>
 </table>
 
@@ -116,16 +115,16 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 
 ## Benchmark
 
-[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds that give the model more help each time.
+[unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds, V1 to V5, with more help each time.
 
-- V1 to V3, the model paints. It writes scripts that lay every brush and pen stroke through the toolkit. Each painting gets about 15 minutes and at most 2,500 strokes. V2 adds technique guides; V3 adds the model's own earlier attempts.
-- V4 and V5, the model directs a painting harness. It writes a plan (regions, layering, brushes and lines), and the painter turns it into strokes with no stroke limit. At set points the model can look at the painting and revise the rest of the plan. V5 adds feedback from the previous try. The harness does much of the work, so V4 and V5 scores sit closer together.
+- V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
+- V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try.
 
-All leaderboard results use painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1. Release 0.1.1 adds Gemini 4 Argon, Gemini 3.8 Flash and the Muse models, and changes two V4 and V5 harness rules ([changelog](CHANGELOG.md)). Release 0.2.0 (painter V100, sim 102) replayed the published Opus 5.5 V5 plans instead of rerunning every round ([0.2.0 comparison](docs/release-performance-0.2.0.md)). To reproduce, check out tag `v0.1.0` or `v0.1.1` ([versions](docs/versions.md)).
+The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.2.0 or 0.2.1: those releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
 
-Models ran at their highest reasoning setting, xhigh where offered. Gemini 4 Argon and Gemini 3.8 Flash top out at high; Argon also ran at medium. Haiku 4.5, DeepSeek V4.1 Flash and MiniMax M3 have no reasoning setting.
+Models ran at their highest reasoning setting.
 
-| Benchmark version | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
+| Round | What the model gets | Subjects | Top model | Score (% of target) | Raw / 10 |
 |---|---|---:|---|---:|---:|
 | V1 | Tools | 5 | [Gemini 4 Argon (High)](bench/models.json) | 64.1% | 5.50 |
 | V2 | Tools and technique guides | 5 | Gemini 4 Argon (High) | 64.5% | 5.53 |

@@ -2,9 +2,9 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## 0.2.1-rc.2 - unreleased
+## Unreleased — 0.3.0 integration
 
-Painter V101-dev, sim 102, judges J1. Defaults still match 0.2.0. Everything below is in `--inkrecipe wash`, which is off by default.
+Painter V101, sim 102, judges J1. The default drawing is pencil only. Everything below is in `--inkrecipe wash`, which is off by default.
 
 ### Ink on ink-heavy works
 
@@ -44,6 +44,47 @@ These are off by default.
 - `--deliveryreport 1` writes `delivery-by-band.json`: pigment delivered over booked, by how much paint each cell was booked.
 - `npm run bench:run -- ... --no-base-palette` stops the harness forcing Trumbull's seven-paint box. A plan's own palette token or `--paints` still applies.
 
+## 0.2.1 - 2026-10-22
+
+Painter V101, sim 102, judges J1. Tag `v0.2.1`.
+
+By default, 0.2.1 scores the same as 0.2.0 on the published Opus 5.5 V5 plans (J1 6.18 against 6.15, +0.5%) and 3.1% lower on the pen-and-wash set (5.40 against 5.58). Pen and wash is opt-in, and with it the set scores 6.3% above 0.2.0. See the [comparison](docs/release-performance-0.2.1.md).
+
+| Target | 0.2.0 J1 | 0.2.1 J1 | Score change |
+|---|---:|---:|---:|
+| White Ships | 6.06 | 6.17 | +1.9% |
+| Hills | 6.38 | 6.41 | +0.6% |
+| Mittens | 6.66 | 6.68 | +0.3% |
+| South France | 5.62 | 5.62 | 0.0% |
+| Trumbull | 6.02 | 6.00 | -0.3% |
+| All five | 6.15 | 6.18 | +0.5% |
+
+### Drawing
+
+- The drawing is pencil for every source. Ink is drawn only when asked for.
+- The automatic stage choice adds ink stages only when ink is asked for. 0.2.0 could add ink on most pictures. This is why the pen-and-wash set scores lower by default: Guardi -8.5%, Yale gateway -5.3%, camel -5.1%, Rembrandt -4.5%, Fragonard +3.8%.
+
+### Ink, opt-in
+
+All of these are off by default. Ink still needs `--outlinemedium ink`, except where noted.
+
+- `--inkrecipe wash` is the pen-and-wash recipe ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). It draws the source's own pen lines whole, with no pencil, and follows the source's line width and darkness along each stroke. It matches the ink's darkness and hue to the source's lines and turns ink on by itself. On the pen-and-wash set it scores 5.94 against 5.40 for the default pencil (+9.9%) and 5.58 for 0.2.0 (+6.3%).
+- `--inkrecipe auto` uses the wash recipe when the source shows at least 0.5% pen line (`--penfirst`), scaled to 1200 px wide, and no recipe otherwise. A run that sets `--drawing`, `--drawingfile`, `--drawinglast`, `--outlinemedium`, `--linesource`, `--drawingstages` or `--stages` keeps what it set. The log says what auto chose and why.
+- `--inkrecipe v2` sets `--linesupport 5`, `--linesmooth 1`, `--inkwidthfloor 1`, `--inkdarkcap 1` and `--inkdamp 0.3`.
+- New flags, each off unless a recipe sets it: `--linemeasure`, `--inkdarkmatch`, `--inkhue source`, `--inkbleed`, `--linegapmm`, `--lineminmm`, `--lineinkonly`, `--copylinesmin` and `--linecleanup 0`.
+- The ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) reach the line files that the linked drawing stages write.
+- `tools/judge/ink-lines-report.mjs` measures a painting's pen lines against its source's: placement, darkness at the source's lines, hue and crops.
+- `bench/ink-heavy/` holds the eight-target ink set with sources, licences and the A/B commands.
+
+### Colour, opt-in
+
+These are off by default. None was positive beyond noise against 0.2.0.
+
+- `--paintguard dE` checks a paint box forced with `--paints` or `washes.paints`. It acts when the box fits the target more than dE (CIEDE2000) worse than the painter's own pick, and then adds or swaps in the own pick's paints (`--paintguardmode add|merge|replace`). `run-card.json` records the decision. Mean J1 change over the five plan targets: 0.00. Trumbull: -2.8%.
+- `--techcal 1` charges passages in value band 4 and darker for what their technique lays on the sheet. Mean J1 change over seven targets: +0.4%. Hills +3.3%, South France -3.8%.
+- `--deliveryreport 1` writes `delivery-by-band.json`: pigment delivered over booked, by how much paint each cell was booked.
+- `npm run bench:run -- ... --no-base-palette` stops the harness forcing Trumbull's seven-paint box. Trumbull scores 4.8% lower without it.
+
 ## 0.2.0 - 2026-10-20
 
 Painter V100, sim 102, judges J1. Tag `v0.2.0`.
@@ -52,7 +93,7 @@ On the published Opus 5.5 V5 plans, 0.2.0 scores 7% higher than 0.1.1 (J1 6.36 a
 
 ### Drawing
 
-- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. On a run with no prepared drawing, the automatic stage choice (`--drawingstages auto`) can still add ink stages; `--drawingstages off` turns it off. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
+- Pencil by default, with no closing pen. Ink is off while it is reworked; ask for it with `--outlinemedium ink` and `--drawing both`. On a run with no prepared drawing, the automatic stage choice (`--drawingstages auto`) can still add ink stages; `--drawingstages off` turns it off. 0.2.1 fixes this. The bench harness no longer forces ink. Better ink is planned for 0.2.1.
 - Opt-in universal linework stage (`--linework auto`) for every style, with one cleanup for specks, shadow outlines and repeated marks.
 - A drawing made for another image must be registered first.
 

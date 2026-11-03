@@ -1,6 +1,6 @@
 # Run format
 
-A try is one model session that paints the requested targets. A round is a benchmark version (V1 to V5). Every try is one folder: `runs/<round dir>/<model key>/<try>/`.
+A try is one model session that paints the requested targets. The rounds are V1 to V5. Every try is one folder: `runs/<round dir>/<model key>/<try>/`.
 
 - Round dirs: `v1-naive`, `v2-skill`, `v3-informed`, `v4-pipeline`, `v5-self-study`.
 - Model key: a lowercase name used in paths, the same in every round (`opus`, `astra`, `my-model`).

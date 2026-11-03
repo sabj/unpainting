@@ -17,7 +17,7 @@ Subject ids name benchmark images. `Y1` is `examples/targets/trumbull.jpg` with 
 Default recipe flags, with the value that turns each off:
 
 - `--palettewide 1`: 3 to 6 palette paints chosen per area of the picture. Off: `0`.
-- `--physical 1`: brush sizes, water and loads from real brushes (`data/brushes.json`). Off: `0`.
+- `--physical 1`: brush sizes, water and loads from real brushes (`src/paint/brushes.json`). Off: `0`.
 - `--paperbase source`: paper colour from the target's lightest tenth; `--paperrgb` overrides it. Off: `auto`.
 - `--loadedcontact 1`: a loaded brush touches the paper's pits too. Off: `0`.
 - `--order painter`: the light-to-dark value planner. Off: `ladder`.
@@ -216,7 +216,7 @@ Modules:
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
 - `techniques/passages/sand.mjs` (`--passages sand`): mark sizes scaled from one beach crop; medium.
 
-Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 base settings, with stone and palette tokens fitted on Y1. The research and judging scripts in `tools/research/` and `tools/judge/` list fixed subjects; they do not paint.
+Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 base settings, with stone and palette tokens fitted on Y1. The judging scripts in `tools/judge/` list fixed subjects; they do not paint.
 
 ## Opt-in experimental controls
 

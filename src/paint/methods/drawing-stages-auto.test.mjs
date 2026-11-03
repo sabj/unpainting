@@ -167,3 +167,27 @@ test('resume does not override explicit off, none or stage choices', async t => 
     assert.deepEqual(f.invocation, before);
   }
 });
+
+test('the stage choice adds ink only when ink is asked for', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-stages-ink-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const w = 48, h = 48, rgb = Buffer.alloc(w * h * 3, 235);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x % 6 === 0 || y % 6 === 0) rgb.fill(20, 3 * (y * w + x), 3 * (y * w + x) + 3);
+  const image = path.join(dir, 'target.png');
+  await sharp(rgb, { raw: { width: w, height: h, channels: 3 } }).png().toFile(image);
+  const run = async extra => {
+    const args = [...extra];
+    const opt = (name, fallback) => { const at = args.lastIndexOf(`--${name}`); return at < 0 ? fallback : args[at + 1] ?? fallback; };
+    const out = fs.mkdtempSync(path.join(dir, 'out-'));
+    const record = await withoutModelKey(() => chooseDrawingStages({ opt, argv: args, image, root: dir, out, rgb, w, h, penLine: 0,
+      fetcher: async () => { throw new Error('unexpected model call'); }, intent: drawingStageIntent({ argv0: extra }) }));
+    return { record, args };
+  };
+  const ink = await run(['--outlinemedium', 'ink']);
+  assert.notEqual(ink.record.rule.choice.inkFinish, 'none', 'the rule asks for an ink finish on this edge-heavy picture');
+  assert.notEqual(ink.record.final.inkFinish, 'none');
+  const pencil = await run([]);
+  assert.equal(pencil.record.final.inkPrep, 'none');
+  assert.equal(pencil.record.final.inkFinish, 'none');
+  assert.ok(!pencil.args.join(' ').includes('--outlinemedium ink'));
+});

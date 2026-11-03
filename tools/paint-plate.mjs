@@ -152,6 +152,7 @@ import { inkCapOnScrap } from '../src/paint/methods/ink-scrap.mjs';
 import { inkKFromSource } from '../src/paint/methods/ink-hue.mjs';
 import { matchInkLoad, sampleGestures, strokesPeakAbsorbance, lPlane as inkLPlane } from '../src/paint/methods/ink-match.mjs';
 import { inkRecipeArgs } from '../src/paint/methods/ink-recipe.mjs';
+import { chooseInkRecipe, penShare, DRAWING_FLAGS, AUTO_INK_WIDTH, DEFAULT_INK_RECIPE } from '../src/paint/methods/ink-recipe-auto.mjs';
 import { chooseDrawingStages, drawingStageIntent } from '../src/paint/methods/drawing-stages-auto.mjs';
 import { eraseWeights, erasePrep } from '../src/paint/methods/pencil-erase.mjs';
 import { scaleLines, bindLineTarget } from '../src/crop/lines.mjs';
@@ -295,7 +296,18 @@ const CODE_STATE = checkCodeState({ root, out, allowDirty: num('allowdirty', 0) 
 // --inkrecipe v2|wash: ink flags as one switch (src/paint/methods/ink-recipe.mjs); flags typed on the command line win,
 // and the recipe's flags win over the --recipe preset's. Added before the line source is prepared, since the wash
 // recipe picks it.
-argv.push(...inkRecipeArgs(opt('inkrecipe','none'), argv0));
+// --inkrecipe auto picks wash for a pen drawing, none otherwise (src/paint/methods/ink-recipe-auto.mjs). The default is none.
+const INK_RECIPE_NAME = opt('inkrecipe', DEFAULT_INK_RECIPE);
+const INK_RECIPE = await (async () => {
+  // the share is read at one width, so --width does not change the choice (the separator's line share depends on it)
+  // a missing image is left to fail at the normal image load below
+  const measure = INK_RECIPE_NAME === 'auto' && !DRAWING_FLAGS.some(f => argv0.includes(f)) && fs.existsSync(path.resolve(root, opt('image')));
+  const read = measure ? await sharp(path.resolve(root, opt('image'))).flatten({ background: '#ffffff' }).resize({ width: AUTO_INK_WIDTH }).removeAlpha().raw().toBuffer({ resolveWithObject: true }) : null;
+  const share = read ? penShare(read.data, read.info.width, read.info.height) : null;
+  return chooseInkRecipe(INK_RECIPE_NAME, argv0, () => share, num('penfirst', 0.5));
+})();
+if (INK_RECIPE_NAME === 'auto') console.log(`ink recipe: ${INK_RECIPE.recipe} (auto: ${INK_RECIPE.why})`);
+argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
@@ -1163,7 +1175,7 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(SRC, w, h, gaussian, { s
 // line budget and the gate on the pen all use it.
 const SEP = separate(PX_SOURCE, w, h, paperRGB);
 // the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
-if (opt('inkrecipe','none') === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
+if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
 // The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
@@ -1476,7 +1488,7 @@ phaseMark('plan');
 const SC = num('scale', 1), W2 = w * SC, H2 = h * SC, N2 = W2 * H2;
 // --brushfloor 1: a graded wash runs as one stroke, recharged every --floorchunk px at 1086 wide (default 24). On with --physical.
 // Without it the wash is lifted and recharged every --gradedchunk cells (default 6).
-// --physical 1 (data/brushes.json, src/paint/methods/brushes.mjs): brushes from a physical sheet and real brushes
+// --physical 1 (src/paint/brushes.json, src/paint/methods/brushes.mjs): brushes from a physical sheet and real brushes
 const PB = loadPhysical({ root, opt, num, W2, H2 });
 if (PB) console.log(`physical: picture ${PB.mm.toFixed(0)} mm wide, ${PB.mmPerCell.toFixed(3)} mm a cell; ${PB.summary()}`);
 const GFLOOR = num('brushfloor', 0) > 0 || !!PB;

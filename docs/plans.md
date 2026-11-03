@@ -38,7 +38,7 @@ A recipe is a preset of painter settings. The default recipe puts its flags befo
 
 ## In the benchmark
 
-In benchmark versions [V4 and V5](../bench/README.md#rounds), the model writes plan files and command-line arguments for painter presets and settings. It writes no code. The existing pipeline executes those choices. An argument such as `--drawing first` sets drawing order. V4 starts each try fresh. V5 can use its earlier paintings and notes to revise the next plan. [The benchmark run format](../bench/docs/run-format.md) records the benchmark version, settings and notes.
+In rounds [V4 and V5](../bench/README.md#rounds), the model writes plan files and command-line arguments for painter presets and settings. It writes no code. The existing pipeline executes those choices. An argument such as `--drawing first` sets drawing order. V4 starts each try fresh. V5 can use its earlier paintings and notes to revise the next plan. [The benchmark run format](../bench/docs/run-format.md) records the round, settings and notes.
 
 ## Technique toolbox
 

@@ -1,48 +1,25 @@
 #!/usr/bin/env node
-// node tools/lab/compare-live.mjs RUN OUT [--legacy]
-// --legacy reads the former executor from Git commit 9ee5439 for a repeatable baseline.
+// node tools/lab/compare-live.mjs RUN OUT
+// Replays a run's recorded marks with Paint Lab's Live executor and compares the result with the run's painting.png.
 import fs from 'node:fs/promises';
-import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import sharp from 'sharp';
 import {gunzipSync} from 'node:zlib';
 import {runTape} from '../../demos/lab/worker/live-tape.js';
 import {tapeSheet,tapePixels,tapeFlow} from '../../demos/lab/worker/tape-sheet.js';
-import {makePaper} from '../../demos/lab/media/paper.js';
-import {createSheet,step,DEFAULTS,setThreads} from '../../demos/lab/media/sheet.js';
-import {paperReflectance} from '../../demos/lab/media/papers.js';
-import {layerRT} from '../../demos/lab/media/km.js';
-const [run,out]=process.argv.slice(2),legacy=process.argv.includes('--legacy');
+const [run,out]=process.argv.slice(2);
 await fs.mkdir(out,{recursive:true});
 let raw;try{raw=await fs.readFile(path.join(run,'marks.json'));}catch{raw=gunzipSync(await fs.readFile(path.join(run,'marks.json.gz')));}
 const tape=JSON.parse(raw);
-if(legacy)await setThreads(4,()=>import('../../src/media/sheet-par.mjs'));
-const sheet=legacy?createSheet({...makePaper(tape.w,tape.h,{seed:9,scale:1,toothScale:.2,fibres:.5,tooth:.5,proudBlur:1}),mmPerCell:25.4/60},tape.pigments):tapeSheet(tape);
-let execute=runTape;
-if(legacy){
- const base=new URL('../../demos/lab/worker/live-tape.js',import.meta.url);
- const source=execFileSync('git',['show','9ee54395c0fc:docs/lab/worker/live-tape.js'],{encoding:'utf8'}).replace(/from '([^']+)'/g,(_,p)=>`from '${new URL(p,base).href}'`);
- execute=(await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))).runTape;
-}
+const sheet=tapeSheet(tape);
 const t=performance.now();
-// Legacy omitted graphite from its recordings, so baseline reproduces that omission.
-await execute(legacy?{...tape,marks:tape.marks.filter(m=>m.k!=='g')}:tape,{sheet:()=>sheet,ready:async()=>true,begin:()=>{},end:()=>{},touch:async(p,r,fn)=>fn(),present:()=>{},progress:done=>{if(done%50===0)console.log(done);},mutate:async fn=>fn(),flow:async(dry,m)=>{if(!legacy)return tapeFlow(tape,sheet,dry,m);for(let i=0;i<(dry?Math.min(m?.m||30,90):1);i++)step(sheet,{...DEFAULTS,dt:dry?2:.3});}});
-let pixels;
-if(legacy){
- const R=paperReflectance(sheet.paper,'cold',60),n=sheet.n;
- for(const layer of [...sheet.layers,sheet.G.map((g,k)=>Float32Array.from(g,(v,i)=>v+sheet.D[k][i]+sheet.P[k][i]))])for(let i=0;i<n;i++){
-  const mass=layer.reduce((v,p)=>v+p[i],0);if(mass<1e-7)continue;
-  for(let c=0;c<3;c++){let K=0,S=0;for(let k=0;k<sheet.K;k++){K+=layer[k][i]/mass*sheet.pigments[k].K[c];S+=layer[k][i]/mass*sheet.pigments[k].S[c];}const [r,t]=layerRT(K,S,mass),b=R[i*3+c];R[i*3+c]=r+t*t*b/(1-r*b);}
- }
- pixels=new Uint8Array(n*3);
- for(let i=0;i<n;i++){const sheen=sheet.W[i]>.02?1-Math.min(.025,sheet.W[i]*.03):1,reflection=Math.min(.025,Math.max(0,sheet.W[i])*.06);for(let c=0;c<3;c++)pixels[i*3+c]=Math.max(0,Math.min(255,(R[i*3+c]*sheen+(c-1)*reflection)*255));}
-}
-else pixels=tapePixels(tape,sheet);
+await runTape(tape,{sheet:()=>sheet,ready:async()=>true,begin:()=>{},end:()=>{},touch:async(p,r,fn)=>fn(),present:()=>{},progress:done=>{if(done%50===0)console.log(done);},mutate:async fn=>fn(),flow:async(dry,m)=>tapeFlow(tape,sheet,dry,m)});
+const pixels=tapePixels(tape,sheet);
 const expected=await sharp(path.join(run,'painting.png')).removeAlpha().raw().toBuffer();
 if(expected.length!==pixels.length)throw Error('Native dimensions differ');
 let sum=0,max=0;for(let i=0;i<pixels.length;i++){const d=Math.abs(pixels[i]-expected[i]);sum+=d;max=Math.max(max,d);}
-const label=legacy?'before':'after';
+const label='after';
 await sharp(pixels,{raw:{width:tape.w,height:tape.h,channels:3}}).png().toFile(path.join(out,label+'.png'));
 await sharp({create:{width:tape.w*2,height:tape.h,channels:3,background:'white'}}).composite([{input:await sharp(expected,{raw:{width:tape.w,height:tape.h,channels:3}}).png().toBuffer(),left:0,top:0},{input:await sharp(pixels,{raw:{width:tape.w,height:tape.h,channels:3}}).png().toBuffer(),left:tape.w,top:0}]).png().toFile(path.join(out,label+'-side-by-side.png'));
-const result={meanAbsoluteDifference:sum/pixels.length,maxDifference:max,range:'0–255 RGB',executor:legacy?'9ee5439':'current',backend:legacy?'CPU, four threads (historical defaults)':'browser serial CPU',width:tape.w,height:tape.h,seconds:(performance.now()-t)/1000,columns:['painter',legacy?'old Live executor':'fixed Live executor']};
-await fs.writeFile(path.join(out,label+'.json'),JSON.stringify(result,null,2)+'\n');console.log(result);await setThreads(1);
+const result={meanAbsoluteDifference:sum/pixels.length,maxDifference:max,range:'0–255 RGB',executor:'current',backend:'browser serial CPU',width:tape.w,height:tape.h,seconds:(performance.now()-t)/1000,columns:['painter','Live executor']};
+await fs.writeFile(path.join(out,label+'.json'),JSON.stringify(result,null,2)+'\n');console.log(result);

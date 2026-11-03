@@ -1,6 +1,8 @@
-# demos/lab
+# Paint Lab
 
-Paint Lab, the browser version of the paper, brushes, pen and pencil. [demos/index.html](../index.html) is the page. `lab.js` and `worker.js` stay at the top of this folder, and the modules they import sit in folders by role.
+Paint by hand on simulated paper. **[Open it](https://sabj.github.io/unpainting/demos/lab/)**
+
+<img src="../thumbs/lab-paint.webp" width="480" alt="A heart painted wet in rose, then a blue arrow glazed over it and yellow feathers run into the wet shaft">
 
 - `lab.js`: the page, with pointer input, controls and frames from the worker.
 - `worker.js`: the simulation, run off the page's thread.
@@ -9,9 +11,13 @@ Paint Lab, the browser version of the paper, brushes, pen and pencil. [demos/ind
 - `targets/`: one picker for recorded paintings and technique demonstrations. `worker/live-tape.js` re-runs the original recorded material events, including dips, in the simulator. Live is the default; 250 and 2,500 are early-stroke studies, not shortened recreations of a finished picture. Timeline seeks rebuild the physical state, and Carry on painting keeps it. Replay explicitly shows a recording, stepping saved frames without blending. No image upload is offered.
 - `ui/`: pointer contact, the cursor and the move queue on the page side.
 - `worker/`: the worker's helpers: demonstrations, pacing, undo history, autosave, sheet state and self-checks.
-- `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. `node tools/lab/build-recorded-examples.mjs` extracts early White Ships frames and paths into `examples/recorded.json`. It preserves the original frame numbers, tool shapes and coordinates. The full live tapes retain pigment recipes, tools, dip events and early strokes. Rebuild them with `node tools/lab/build-live-examples.mjs H36_250 H36_2500 SHIPS_250 SHIPS_2500`, four run directories; the older compact path logs are used only by recording mode.
+- `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. The full live tapes retain pigment recipes, tools, dip events and early strokes. Rebuild them with `node tools/lab/build-live-examples.mjs H36_250 H36_2500 SHIPS_250 SHIPS_2500`, four run directories; the older compact path logs are used only by recording mode.
 
-Serve it with `python3 -m http.server 8000 --directory demos` and open the server address printed in the terminal.
+| Dry brush | Flat wash | Glazing | Wet in wet |
+| --- | --- | --- | --- |
+| <img src="thumbnails/dry-brush.webp" width="180" alt="Dry brush"> | <img src="thumbnails/wash.webp" width="180" alt="Flat wash"> | <img src="thumbnails/glaze.webp" width="180" alt="Glazing"> | <img src="thumbnails/wet-in-wet.webp" width="180" alt="Wet in wet"> |
+| **Backrun** | **Dip pen** | **Ink then wash** | **Wash then ink** |
+| <img src="thumbnails/backrun.webp" width="180" alt="Backrun"> | <img src="thumbnails/pen.webp" width="180" alt="Dip pen"> | <img src="thumbnails/ink-wash.webp" width="180" alt="Ink then wash"> | <img src="thumbnails/wash-ink.webp" width="180" alt="Wash then ink"> |
 
 [Running the painter](../../docs/running.md#paint-lab) covers the examples and how to rebuild their animations. `tools/lab/build-site.mjs` copies this folder into the static site.
 

@@ -58,7 +58,7 @@ function roundTable(round) {
 const lb = ['# Leaderboard', '',
   'Generated from [results.json](results.json) by `scripts/build-leaderboard.mjs`.', '',
   PAINTER_LINE, '',
-  'A round is a benchmark version (V1 to V5). A trial is one model session that paints the requested targets. '
+  'The rounds are V1 to V5. A trial is one model session that paints the requested targets. '
   + 'Score is the mean over every scored painting in trials 1 to 3 of its automated score as a percentage of the target scored against itself (the realistic ceiling: '
   + `${list(R.crops.filter(c => c.selfScore != null).map(c => `${short(c.key)} ${c.selfScore.toFixed(2)}`))}), ± the half-width of its 95% confidence interval, estimated by resampling paintings. `
   + 'Raw score is the same mean out of 10. Models are ranked by Score. '
@@ -92,7 +92,7 @@ function tile(reason, alt) {
 const g = ['# Gallery', '',
   'Generated from [results.json](results.json) by `scripts/build-leaderboard.mjs`.', '',
   PAINTER_LINE, '',
-  'Each row is one model\'s highest-scoring painting of the target in trials 1 to 3. A trial is one model session; V1 to V5 are benchmark versions. '
+  'Each row is one model\'s highest-scoring painting of the target in trials 1 to 3. A trial is one model session; V1 to V5 are the rounds. '
   + 'The row of images beside it shows the painting at 10, 25, 50 and 75% of its strokes. These stages are faded to make the finished painting easier to see. '
   + 'A grey [x] tile marks a target with no scored painting from that model, with the reason from its run records. '
   + 'The first row of each table is the target scored against itself, the realistic ceiling that paintings are indexed to.', ''];

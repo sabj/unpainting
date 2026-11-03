@@ -2,7 +2,7 @@
 
 A submission is one or more try folders (one model session per folder) in the [run format](run-format.md), scored with the benchmark's scorer, plus the rebuilt results. It arrives as a pull request.
 
-A try is one model session that paints the requested targets. A round is a benchmark version, from V1 to V5.
+A try is one model session that paints the requested targets. There are five rounds, V1 to V5.
 
 ## 1. Check the benchmark runner
 

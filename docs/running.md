@@ -16,7 +16,7 @@ Each image example needs an empty output folder. On a repeat run, move the previ
 
 The image planner is experimental. The stroke plan is the small, reproducible demonstration of brushwork and drying. The paintings in the README come from separate whole-painting plans; see [Painting sequences](examples.md).
 
-The default recipe, a preset of painter settings, opens with a light pencil drawing. On a run with no prepared drawing, `--drawingstages auto` (the default) can add ink stages, usually closing accents ([ink.md](ink.md#automatic-drawing-stages)). `--drawingstages off` keeps the pencil drawing only. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
+The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--inkrecipe wash` draws a pen-and-wash drawing, and `--inkrecipe auto` uses it only when the target shows pen line ([Ink](ink.md#pen-and-wash-ink)); both are off by default. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
 
 Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
 
@@ -114,7 +114,7 @@ CI runs the Node suite and `npm run bench:test`. Both fail on any test failure.
 
 ## Paint Lab
 
-Paint Lab is the browser version of the paper, brushes, pen and pencil. It is a static page at [demos/index.html](../demos/index.html), with code in [demos/lab/](../demos/lab/). Serve `demos/` with any static server:
+Paint Lab is the browser version of the paper, brushes, pen and pencil. It is a static page in [demos/lab/](../demos/lab/), live at <https://sabj.github.io/unpainting/demos/lab/>. Serve `demos/` with any static server:
 
 ```sh
 python3 -m http.server 8000 --directory demos
@@ -125,7 +125,7 @@ The picker offers blank paper, technique demonstrations and two recorded paintin
 
 Paint Lab paints with the painter's own paper, sheet, brush, pen and pencil: `node tools/lab/sync-site-media.mjs` copies them from `src/media/` into `demos/lab/media/`. Run it after changing `src/media/`; `npm test` fails while the copy is stale.
 
-`node tools/lab/build-recorded-examples.mjs` cuts the White Ships recording excerpts from `demos/lab/examples/white-ships-run/`. The full live tapes are rebuilt as described below.
+The full live tapes are rebuilt as described below.
 
 ## Unused-code checks
 
