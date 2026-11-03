@@ -20,3 +20,13 @@ test('whole-sheet dry certificate matches full measurements and reads only paper
   assert.throws(() => measurePaperDry(sheet), /Non-finite/);
   assert.equal(reads, 3);
 });
+
+test('same-instant groups preserve individual statistics with one readback', async () => {
+  const {measurePaperBatch}=await import('./wetdry.mjs');
+  const sheet={w:3,h:2,n:6,W:Float32Array.from([.3,.1,0,.01,.004,.006]),s:new Float32Array(6),paper:{capacity:new Float32Array(6).fill(1)}};
+  const groups=[{cells:[0,1,1,4]},{cells:[2,5],stats:'gate'},{cells:[],stats:'gate'}];
+  const expected=groups.map(({cells,stats})=>measurePaper(sheet,cells,true,{stats}));
+  let calls=0; sheet._gpu={ensurePaperFresh(s,r,only){calls++;assert.equal(only,true);assert.deepEqual(r,[0,0,3,2]);}};
+  assert.deepEqual(measurePaperBatch(sheet,groups,true),expected); assert.equal(calls,1);
+  assert.equal('waterP95' in expected[1],false); assert.equal('waterP95' in expected[2],false);
+});

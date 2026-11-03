@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { EpochCells } from '../src/paint/epoch-cells.mjs';
 import { createJSONLWriter } from './painter/jsonl-writer.mjs';
 import { writeCensus } from './speed/census-write.mjs';
 import { writeRunCard } from '../src/paint/run-card.mjs';
@@ -53,7 +54,7 @@ if(Number(process.env.PAINT_MEMLOG)>0){const t0=Date.now();setInterval(()=>{cons
 // Paint a plate with the simulated instruments: glazes of recovered pigment laid by a brush on absorbent paper.
 // Usage: node tools/paint-plate.mjs --image <reference> --width 700 --out work/plate
 import {AUTHORING_CONTRACT,validateAreaDocument,rasterAreaPlan,compileAreaLayers,semanticTechnique,createAreaExecution,semanticMaterialReady,semanticDrawingGroups,semanticBrushOptions,semanticHighlights,semanticUsesNumericClip,semanticMaterialContact,semanticPreparation,withSemanticWaterClip,semanticPrewetLoad,prepareSemanticContact,semanticGesture,semanticPreparationGesture,semanticReferenceLengths, calibrateSemanticInstrument,semanticCalibrationGain,semanticCalibrationStages,semanticCalibrationSelection,requireAuthoredCalibration,semanticFilmRemovalReady,sha256} from './painter/semantic-areas.mjs';
-import {measurePaperDry,measurePaper as physicalMeasurePaper,measureBrush} from '../src/paint/methods/wetdry.mjs';
+import {measurePaperBatch,measurePaperDry,measurePaper as physicalMeasurePaper,measureBrush} from '../src/paint/methods/wetdry.mjs';
 import {productionWaterLoad} from './painter/production-water-load.mjs';
 import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
@@ -246,7 +247,7 @@ const SPEED_FLOW_RECT = num('speedflowrect', 1) > 0;
 setFlowRectangle(SPEED_FLOW_RECT, num('speedprofile', 0) > 0 ? ({ milliseconds }) => SPEED_PROFILE?.add('painting:flow-field', milliseconds) : null);
 const SPEED_FILM = num('speedfilm', 1) > 0;
 const SPEED_UNIFORM_PAPER = num('speeduniformpaper', 1) > 0;
-const measurePaper = (target, cells, paperOnly = false) => physicalMeasurePaper(target, cells, paperOnly, { uniform: SPEED_UNIFORM_PAPER });
+const measurePaper = (target, cells, paperOnly = false, options = {}) => physicalMeasurePaper(target, cells, paperOnly, { uniform: SPEED_UNIFORM_PAPER, ...options });
 const liftResist = target => {
   const started = performance.now();
   try { return physicalLiftResist(target, { byPlane: SPEED_FILM }); }
@@ -391,7 +392,7 @@ const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(pa
 if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 if(VALUE_CONFIG?.sheet?.widthMm!=null&&Math.abs(num('sheetmm',VALUE_CONFIG.sheet.widthMm)-VALUE_CONFIG.sheet.widthMm)>1e-6)throw Error(`value plan sheet.widthMm ${VALUE_CONFIG.sheet.widthMm} does not match --sheetmm ${num('sheetmm',VALUE_CONFIG.sheet.widthMm)}`);
 const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
-let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Set(),VALUE_PIGMENT_CONTACT=new Set(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
+let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new EpochCells(),VALUE_PIGMENT_CONTACT=new EpochCells(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
 // pigments, charged into the same wet wash. 0 (default): every value-plan shape starts on a dry sheet.
@@ -1338,24 +1339,27 @@ const stroke=(b,target,points,options)=>{
  if(AREA_NUMERIC_CONTACT_STOP&&target===sheet)return;
  if(VALUE_ACTIVE&&target===sheet){
   if(VALUE_ACTIVE.shaped)options={...options,upright:VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
-  const contactStarted=performance.now(),contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
+  const contactStarted=performance.now(),contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
-  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observe=()=>measurePaper(target,VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors],SPEED_PAPER);
-  let paper=observe();const own=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i))&&measurePaper(target,[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),SPEED_PAPER).dry;
+  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0),observationCells=VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors],observe=()=>measurePaper(target,observationCells,SPEED_PAPER);
+  const ownCandidate=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i));
+  const initial=measurePaperBatch(target,[{cells:observationCells},...(ownCandidate?[{cells:[...cells,...neighbors].filter(i=>!VALUE_OWN_CONTACT.has(i)),stats:'gate'}]:[])],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
+  let paper=initial[0];const own=ownCandidate&&initial[1].dry;
   if(paint&&!['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move)&&(!own||VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
   const freshCells=paint&&VALUE_ACTIVE.passageMaterial?cells.filter(i=>!VALUE_PIGMENT_CONTACT.has(i)):cells;
   const intoOwnWash=paint&&freshCells.length<cells.length*.3;
   const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER);
   if(paint&&!intoOwnWash&&VALUE_ACTIVE.passageMaterial&&VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
-    const waterStroke=load=>{const p=observe();const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
+    const waterStroke=load=>{const p=measurePaper(target,observationCells,SPEED_PAPER,{stats:'gate'});const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
     const preparation=preparePassageBed({observe:observeBed,maxActions:16,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>clock('flow',()=>step(target,{...O,dt:2}))});paper=preparation.paper;
     JSONL.append(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }
   // A wet stroke into a fresh wash waits for the shine to go off, then is laid; uneven paper is counted, not a stop (tools/painter/wet-bed-wait.mjs).
   let wetWaits=0;
   if(paint&&!intoOwnWash&&['wet on wet','dry on wet'].includes(VALUE_ACTIVE.move))({paper,wetWaits}=layIntoWetBed({paper,observe,step:o=>step(target,o),O,info:{id:VALUE_ACTIVE.id,band:VALUE_ACTIVE.valueBand,cells:cells.length}}));
-  const id='value-contact-'+(++VALUE_COMMAND),record={id,commandId:VALUE_COMMAND,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary:measurePaper(target,cells,SPEED_PAPER),neighbors:measurePaper(target,neighbors,SPEED_PAPER),brushBefore:load,geometry:points,options};
+  const [primary,neighborPaper]=measurePaperBatch(target,[{cells},{cells:neighbors}],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
+  const id='value-contact-'+(++VALUE_COMMAND),record={id,commandId:VALUE_COMMAND,intent:VALUE_ACTIVE.id,phase:VALUE_ACTIVE.phase,valueBand:VALUE_ACTIVE.valueBand,regions:VALUE_ACTIVE.regions,crossesRegions:VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary,neighbors:neighborPaper,brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
   const previousCommand=target._commandId; target._commandId=VALUE_COMMAND;
   let result; try { result=physicalStroke(b,target,points,options); } finally { target._commandId=previousCommand; }
@@ -1495,6 +1499,7 @@ if(VALUE_ENABLED){
 }
 phaseMark('plan');
 const SC = num('scale', 1), W2 = w * SC, H2 = h * SC, N2 = W2 * H2;
+VALUE_OWN_CONTACT.reserve(N2); VALUE_PIGMENT_CONTACT.reserve(N2);
 // --brushfloor 1: a graded wash runs as one stroke, recharged every --floorchunk px at 1086 wide (default 24). On with --physical.
 // Without it the wash is lifted and recharged every --gradedchunk cells (default 6).
 // --physical 1 (src/paint/brushes.json, src/paint/methods/brushes.mjs): brushes from a physical sheet and real brushes
@@ -3119,7 +3124,7 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, sheet: sheetFields, layersLength: layers.length, tailFrom, tail,
-    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT, VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
+    js: { framePolicy: FRAME_POLICY.state(), laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, FRAMES, marks, lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE, VALUE_OWN_CONTACT: new Set(VALUE_OWN_CONTACT), VALUE_PIGMENT_CONTACT: new Set(VALUE_PIGMENT_CONTACT), VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK, WASH_THK, colourTrace, WETPOL_WET, WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state);
@@ -3152,6 +3157,8 @@ const awareRestore = () => {
   const j = st.js;
   FRAME_POLICY.restore(j.framePolicy);
   ({ laid, dropped, droppedMass, filmLaid, filmNext, filmPass, drawnCount, STAGE, LAST_FRAME_STAGE, frame, lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE, VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT, VALUE_COMMAND, PASS_LATE_DONE, INK_THK, WASH_THK, WETPOL_WET, WASH_BASE } = j);
+  VALUE_OWN_CONTACT = new EpochCells(N2, VALUE_OWN_CONTACT);
+  VALUE_PIGMENT_CONTACT = new EpochCells(N2, VALUE_PIGMENT_CONTACT);
   const refill = (a, b) => { a.length = 0; for (const v of b) a.push(v); };
   refill(FRAMES, j.FRAMES); refill(marks, j.marks); refill(TECHS, j.TECHS); refill(colourTrace, j.colourTrace);
   expected.set(j.expected); LAST.set(j.LAST);
@@ -3292,7 +3299,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation')clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));}
   T=chooseMajorBaseWash(MAJOR_INTENT,T,{value:layer.value,area:sh.area??0,cells:n,semantic:Boolean(sh._semantic)});
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
-  if(sh._valuePlan){T=valueTechnique(sh._valuePlan);VALUE_ACTIVE=sh._valuePlan;VALUE_OWN_CONTACT=new Set();const inSession=(WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer));WASH_LAST={L,layer};if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  if(sh._valuePlan){T=valueTechnique(sh._valuePlan);VALUE_ACTIVE=sh._valuePlan;VALUE_OWN_CONTACT.clear();const inSession=(WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer));WASH_LAST={L,layer};if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
   sh.dryAfter = T.dryAfter;
   MAJOR_TECHNIQUE=MAJOR_INTENT?{...T,shapeId:'numeric-L'+L+'-S'+layer.shapes.indexOf(sh),numericalValue:layer.value,shapeArea:sh.area,firstWash:Boolean(sh.firstWash),materialStatus:'existing production technique/profile consumed; actual contact/state recorded before each stroke'}:null;

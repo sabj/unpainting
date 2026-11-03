@@ -57,3 +57,21 @@ test('a non-tuft candidate footprint is independent of contact strength, as with
     }
   }
 });
+
+test('mask-only predictions lazily read stamps without a full-plane copy', () => {
+  const sheet=createSheet(makePaper(96,72,{seed:9,fibres:0}),[{K:[1,.5,.2],S:[.1,.1,.1],rho:.1,omega:.2,gamma:.1}]);
+  const brush=createBrush({flat:true,radius:6,bristles:19,seed:4}); dip(brush,{water:.7,conc:[1]});
+  const workspace=new ContactWorkspace(),path=[{x:10,y:10},{x:30,y:20}];
+  sheet.touched=new Int32Array(sheet.n).fill(-1e9); sheet.clock=20; sheet._contactBrush=brush;
+  for(let round=0;round<3;round++) {
+    sheet.touched[15*sheet.w+20]=sheet.clock;
+    const expected=candidateContact(brush,sheet,path);
+    workspace.prepare(sheet.n);
+    workspace.touched.set=()=>assert.fail('full-plane workspace copy');
+    sheet.touched.slice=()=>assert.fail('full-plane source copy');
+    const actual=candidateContact(brush,sheet,path,{workspace,includeTouched:false});
+    assert.deepEqual(actual.mask,expected.mask); assert.equal(actual.continuation.touched,undefined);
+    assert.ok(workspace.readCells.length<sheet.n/4);
+    delete sheet.touched.slice; delete workspace.touched.set; sheet.clock+=10;
+  }
+});

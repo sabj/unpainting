@@ -114,13 +114,13 @@ export function measurePaper(sheet, cells, paperOnly = false, options = {}) {
   try { return measurePaperImpl(sheet, cells, paperOnly, options); }
   finally { census.measurePaper.ms += performance.now() - t; }
 }
-function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, stats = 'full', bounds = null } = {}) {
-  if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, waterP95: 0, moistShare: 0, dry: true };
+function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, stats = 'full', bounds = null, fresh = false } = {}) {
+  if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, ...(stats === 'gate' ? {} : {waterP95: 0}), moistShare: 0, dry: true };
   let x0 = sheet.w, x1 = 0, y0 = sheet.h, y1 = 0;
   if (bounds) [x0, y0, x1, y1] = bounds;
   else for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
-  if (sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, [x0, y0, x1 - x0 + 1, y1 - y0 + 1], paperOnly);
+  if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, [x0, y0, x1 - x0 + 1, y1 - y0 + 1], paperOnly);
   let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = stats === 'gate' || uniform ? null : [];
   for (const i of cells) {
     const water = sheet.W[i], saturation = sheet.s[i] / Math.max(1e-8, sheet.paper.capacity[i]);
@@ -135,6 +135,26 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
   if (waters) waters.sort((a, b) => a - b);
   return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, ...(stats === 'gate' ? {} : { waterP95: waters ? quantile(waters, 0.95) : firstWater }), moistShare: moist / cells.length,
     dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
+}
+
+// All groups belong to the same instant. One union readback, with each group's
+// multiplicity and statistics preserved; never reuse this across a material edit.
+export function measurePaperBatch(sheet, groups, paperOnly = false, options = {}) {
+  const started = census ? performance.now() : 0;
+  try {
+    let x0 = sheet.w, y0 = sheet.h, x1 = -1, y1 = -1;
+    for (const {cells} of groups) for (const i of cells) {
+      const x = i % sheet.w, y = Math.floor(i / sheet.w);
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+    }
+    if (x1 >= x0 && sheet._gpu && !sheet._gpu.paused)
+      (sheet._gpu.ensurePaperFresh ?? sheet._gpu.ensureFresh).call(sheet._gpu, sheet, [x0, y0, x1-x0+1, y1-y0+1], paperOnly);
+  } finally {
+    // Batch preparation moved outside the per-group timer, but is still paper
+    // measurement cost (especially the GPU readback), not an apparent saving.
+    if (census) census.measurePaper.ms += performance.now() - started;
+  }
+  return groups.map(({cells, stats = 'full'}) => measurePaper(sheet, cells, paperOnly, {...options, stats, fresh:true}));
 }
 
 export function paperReady(state, technique) {
