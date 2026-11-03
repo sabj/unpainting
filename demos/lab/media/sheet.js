@@ -1,3 +1,4 @@
+// Generated from src/media/sheet.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetStep, syncWetReachVersion } from './paper-certificate.js';
 import { censusDry } from './census.js';
 // Pipeline: painting, stage 4 (the sheet physics).
@@ -58,7 +59,7 @@ export const DEFAULTS = {
 // row bands by a pool of workers (sheet-par.mjs), with output bit-identical to the serial step. Set it before making
 // the sheets: a sheet made earlier keeps plain arrays and steps serially.
 let PAR = null;
-export async function setThreads(n, load = () => import('./sheet-par.js')) {
+export async function setThreads(n, load = () => import('./sheet-par.mjs')) {
   if (!(n > 1)) { if (PAR) PAR.stop(); PAR = null; return 1; }
   PAR = await load();
   return PAR.start(n);

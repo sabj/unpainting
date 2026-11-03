@@ -609,12 +609,13 @@ export class GpuLink {
         }
         if (bytes > cap) {
           const {pending, ks} = batch[0]; this.call({op:'lowerDown', id:pending.id});
-          for (const k of ks) sheet.layers[pending.index][k].set(this.layerData.subarray(k*this.n,(k+1)*this.n));
+          const layer = sheet.layers[pending.index]; layer._cacheVersion = (layer._cacheVersion ?? 0) + 1;
+          for (const k of ks) layer[k].set(this.layerData.subarray(k*this.n,(k+1)*this.n));
         } else {
           const output = new SharedArrayBuffer(Math.max(4, bytes));
           this.call({op:'lowerBatch', ids:batch.map(v=>v.pending.id), output});
           const values = new Float32Array(output); let offset = 0;
-          for (const {pending, ks} of batch) for (const k of ks) { sheet.layers[pending.index][k].set(values.subarray(offset, offset+this.n)); offset += this.n; }
+          for (const {pending, ks} of batch) { const layer = sheet.layers[pending.index]; layer._cacheVersion = (layer._cacheVersion ?? 0) + 1; for (const k of ks) { layer[k].set(values.subarray(offset, offset+this.n)); offset += this.n; } }
         }
         this.stats.lowerBytes = (this.stats.lowerBytes ?? 0) + bytes;
         this.stats.lowerDown = (this.stats.lowerDown ?? 0) + batch.length;
@@ -625,6 +626,7 @@ export class GpuLink {
       if (pending.index >= limit) continue;
       this.call({ op: 'lowerDown', id: pending.id });
       const layer = sheet.layers[pending.index];
+      layer._cacheVersion = (layer._cacheVersion ?? 0) + 1;
       for (let k = 0; k < this.K; k++) if ((pending.mask >>> k) & 1) {
         layer[k].set(this.layerData.subarray(k * this.n, (k + 1) * this.n));
         this.stats.lowerBytes = (this.stats.lowerBytes ?? 0) + this.n * 4;
@@ -637,6 +639,7 @@ export class GpuLink {
   invalidateOptical() {
     // CPU edits to archived layers must be recomposed, not shown from the optical archive or its masking checkpoint.
     this.opticalReady=false;
+    this.lastOpticalBase=null;
     this.stats.opticalInvalidations=(this.stats.opticalInvalidations??0)+1;
   }
   initOptical(sheet, micro) {
@@ -645,11 +648,14 @@ export class GpuLink {
     this.syncLower(sheet);
     this.call({op:'opticalInit', micro, count:sheet.layers.length, resistFrom:sheet.resist?sheet.resistFrom??sheet.layers.length:null, lower:sheet.layers.slice(1,-1)});
     this.opticalReady=true;
+    this.lastOpticalBase=null;
   }
   opticalFrame(sheet, base) {
     this.flushDrys(sheet);
     if(this.needFullUp)this.fullUp(sheet);
-    this.call({op:'opticalFrame',base});
+    const sameBase=!!(base?._immutable&&this.lastOpticalBase===base);
+    this.lastOpticalBase=base?._immutable?base:null;
+    this.call({op:'opticalFrame',base:sameBase?null:base});
     this.stats.opticalFrames=(this.stats.opticalFrames??0)+1;
     this.stats.frameBytes=(this.stats.frameBytes??0)+this.n*3;
     this.stats.opticalReadBytes=(this.stats.opticalReadBytes??0)+this.n*12;

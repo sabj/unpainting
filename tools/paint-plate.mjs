@@ -1365,7 +1365,7 @@ const stroke=(b,target,points,options)=>{
  if(VALUE_ACTIVE&&target===sheet){
   if(VALUE_ACTIVE.shaped)options={...options,upright:VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
   const fastMode=NATIVE_PAINT_MODE.mode==='fast',fastPaperOpts=fastMode?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:{uniform:SPEED_UNIFORM_PAPER};
-  const contactStarted=performance.now(),contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
+  const contactStarted=performance.now(),contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
   const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b,{settle:!fastMode}),paint=load.pigmentMass.some(v=>v>0),observationCells=VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors],observe=()=>measurePaper(target,observationCells,SPEED_PAPER,fastPaperOpts);
   const ownCandidate=contact.cells.some(i=>contact.primaryMask[i]&&VALUE_OWN_CONTACT.has(i));
@@ -1434,7 +1434,7 @@ const stroke=(b,target,points,options)=>{
   if(MAJOR_PLANE_CONTACT?.commandId===commandId){fs.writeFileSync(path.join(out,'paint-owned-plane-immediate.ppm'),Buffer.concat([Buffer.from('P6\n'+W2+' '+H2+'\n255\n'),Buffer.from(render())]));fs.writeFileSync(path.join(out,'paint-owned-plane-contact.json'),JSON.stringify({...record,...MAJOR_PLANE_CONTACT,status:'EXECUTED',brushAfter:measureBrush(b)},null,2));}
   if(paint&&!fs.existsSync(path.join(out,'major-first-pigment.ppm')))fs.writeFileSync(path.join(out,'major-first-pigment.ppm'),Buffer.concat([Buffer.from('P6\n'+W2+' '+H2+'\n255\n'),Buffer.from(render())]));return value;
  }
- const a=AREA_EXEC.active;if(a&&!a.productionLegacyDetail)options={...options,upright:a.pass.brush.orientation==='follow'?false:a.pass.brush.orientation==='sweep'?'sweep':true};const initial=AREA_LOADS.get(b);if(a&&initial&&measureBrush(b).waterMass<initial.waterMass*a.pass.load.minRemainingFraction)AREA_EXEC.command('physical measured refill',{before:measureBrush(b),trigger:a.pass.load.minRemainingFraction,load:initial.load},()=>dipBrush(b,initial.load));const contact=candidateContact(b,{...target,clip:null},points,{...options,neighborRadius:a?.pass.wetness.neighborCells??5}),paper0=measurePaper(target,[...contact.cells,...contact.neighborIndices].filter(i=>!(target.resist?.[i]===1&&(target.resistStrength?.[i]??1)===1))),load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0);
+ const a=AREA_EXEC.active;if(a&&!a.productionLegacyDetail)options={...options,upright:a.pass.brush.orientation==='follow'?false:a.pass.brush.orientation==='sweep'?'sweep':true};const initial=AREA_LOADS.get(b);if(a&&initial&&measureBrush(b).waterMass<initial.waterMass*a.pass.load.minRemainingFraction)AREA_EXEC.command('physical measured refill',{before:measureBrush(b),trigger:a.pass.load.minRemainingFraction,load:initial.load},()=>dipBrush(b,initial.load));const contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:a?.pass.wetness.neighborCells??5}),paper0=measurePaper(target,[...contact.cells,...contact.neighborIndices].filter(i=>!(target.resist?.[i]===1&&(target.resistStrength?.[i]??1)===1))),load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0);
  const continuation=a&&!a.productionLegacyDetail&&paint&&AREA_NUMERIC_SEQUENCE?.key===a.key?productionChargeLink(AREA_NUMERIC_SEQUENCE.history,AREA_NUMERIC_SEQUENCE.shapeKey,contact,validateProductionDetails(AREA_PLAN.doc)?.numericWashSequence?.maxSurfaceWater):null;
  const contactParts=()=>({primary:measurePaper(target,contact.cells.filter(i=>contact.primaryMask[i])),liftEnvelope:measurePaper(target,contact.cells.filter(i=>contact.liftMask[i]&&!contact.primaryMask[i])),neighborHalo:measurePaper(target,contact.neighborIndices),liftRole:'conservative final-lift envelope; not evidence every cell receives pigment'});
  let materialContact=semanticMaterialContact(target,contact,b),paper=measurePaper(target,materialContact.cells.filter(i=>!(target.resist?.[i]===1&&(target.resistStrength?.[i]??1)===1)));
@@ -1456,7 +1456,7 @@ const stroke=(b,target,points,options)=>{
    const wet=createBrush({...b,bristles:b.hairs.length,...(prep?{...semanticBrushOptions(preparedPass,mm),...(prep.depositDepthMm!==undefined?{depositDepth:prep.depositDepthMm}:{})}:{radius:b.radius+a.pass.wetness.neighborCells}),seed:SEED+attempt});
    semanticPrewetLoad(preparedPass,wet.free);
    const legacyAllowed=target.clip?[...contact.cells,...contact.neighborIndices].filter(i=>target.clip[i]).length:null;
-   AREA_EXEC.set({...a,pass:preparedPass});try{dip(wet,{water:preparedPass.load.prewetWater??1,conc:SHEET_PIGS.map(()=>0)});const waterPoints=prep?semanticPreparationGesture(a.pass,points,mm,{predict:path=>candidateContact(wet,{...target,clip:null},path,{...options,neighborRadius:0}),requiredCells:materialContact.cells,width:target.w}):prepared;withSemanticWaterClip(target,setClip,()=>stroke(wet,target,waterPoints,{...options,lift:true}));}finally{AREA_EXEC.set(a);}
+   AREA_EXEC.set({...a,pass:preparedPass});try{dip(wet,{water:preparedPass.load.prewetWater??1,conc:SHEET_PIGS.map(()=>0)});const waterPoints=prep?semanticPreparationGesture(a.pass,points,mm,{predict:path=>candidateContact(wet,target,path,{...options,clip:null,neighborRadius:0}),requiredCells:materialContact.cells,width:target.w}):prepared;withSemanticWaterClip(target,setClip,()=>stroke(wet,target,waterPoints,{...options,lift:true}));}finally{AREA_EXEC.set(a);}
    JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:'semantic-contact-preparation',areaId:a.area.id,passId:a.key,attempt,geometrySource:prep?.contactSweep?'authored extended contact-following clean sweep, aligned by actual native contact prediction':'exact upcoming shaped pigment points/pressure/radius plus declared neighbor reach',primaryCells:contact.primaryCellCount,liftCells:contact.liftCellCount,neighborCells:contact.neighborCells,legacyAllowedCells:legacyAllowed,numericalClipUsedForWater:false,paperAfter:observed()})+'\n');
   },advance:flowStep=>{AREA_EXEC.command('ordinary physical preparation flow',{flowStep,preparation:a.pass.preparation},()=>step(target,O));JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:'semantic-preparation-flow-observation',areaId:a.area.id,passId:a.key,flowStep,paperAfter:observed()})+'\n');}});paper=result.paper;
  }
@@ -1696,17 +1696,30 @@ const finishRGB = rgb => {
 };
 // With the sheet on the GPU a render is kept with the link's change count (GpuLink.version) and the dried layers' version:
 // a frame and the plan-against-sheet mark taken at the same moment render once. The CPU sheet renders every time.
-let RENDER_MEMO = null, RENDER_REUSED = 0;
+let RENDER_MEMO = null, RENDER_REUSED = 0, OPTICAL_UNDER_MEMO = null;
+const getOpticalUnder = (baseBuf, micro = null) => {
+  const hasLower0 = sheet.layers.length > 1;
+  if (hasLower0) sheet._gpu.syncLower(sheet, 1);
+  const layer0 = hasLower0 ? sheet.layers[0] : null;
+  const layer0Ver = layer0?._cacheVersion ?? 0;
+  if (OPTICAL_UNDER_MEMO && OPTICAL_UNDER_MEMO.baseBuf === baseBuf && OPTICAL_UNDER_MEMO.micro === micro && OPTICAL_UNDER_MEMO.hasLower0 === hasLower0 && OPTICAL_UNDER_MEMO.layer0 === layer0 && OPTICAL_UNDER_MEMO.layer0Ver === layer0Ver) {
+    return OPTICAL_UNDER_MEMO.under;
+  }
+  const under = new Float64Array(N2 * 3);
+  if (hasLower0) renderCells([layer0], SHEET_PIGS.map(p => p.K), SHEET_PIGS.map(p => p.S), baseBuf, 0, N2, 1, null, null, null, under, micro);
+  else for (let i = 0; i < under.length; i++) under[i] = baseBuf[i] / 255;
+  under._immutable = true;
+  OPTICAL_UNDER_MEMO = { baseBuf, micro, hasLower0, layer0, layer0Ver, under };
+  return under;
+};
 const renderRaw = () => {
   const link = sheet._gpu;
   if (!link) return renderSheet(sheet, SHEET_PIGS, base, N2, 1);
   const key = `${link.version}|${sheet._layerVer || 0}|${sheet.layers.length}`;
   if (RENDER_MEMO && RENDER_MEMO.key === key) { RENDER_REUSED++; return RENDER_MEMO.rgb.slice(); }
   const rgb = (NATIVE_PAINT_MODE.mode==='fast' || SPEED_GPU_OPTICS) && link.resident && process.env.GPU_COMPOSITE==='1' && !WETRENDER && num('pencilerase',0)===0 ? (()=>{
-      const link=sheet._gpu;link.initOptical(sheet,null);const under=new Float64Array(N2*3);
-      if(sheet.layers.length>1){link.syncLower(sheet,1);renderCells([sheet.layers[0]],SHEET_PIGS.map(p=>p.K),SHEET_PIGS.map(p=>p.S),base,0,N2,1,null,null,null,under);}
-      else for(let i=0;i<under.length;i++)under[i]=base[i]/255;
-      return link.opticalFrame(sheet,under);
+      const link=sheet._gpu;link.initOptical(sheet,null);
+      return link.opticalFrame(sheet,getOpticalUnder(base,null));
   })() : renderSheet(sheet, SHEET_PIGS, base, N2, 1);
   RENDER_MEMO = { key, rgb: rgb.slice() };
   return rgb;
@@ -1764,10 +1777,7 @@ const view = () => {
   if (sheet._gpu?.resident && process.env.GPU_COMPOSITE === '1' && num('pencilerase',0) === 0) {
     const link=sheet._gpu;link.initOptical(sheet,LOOK1.micro);
     // Only the preparatory ink can change below the immutable paint stack; keep its unrounded reflectance.
-    const under=new Float64Array(N2*3);
-    if(sheet.layers.length>1){link.syncLower(sheet,1);renderCells([sheet.layers[0]],SHEET_PIGS.map(p=>p.K),SHEET_PIGS.map(p=>p.S),LOOK1.base,0,N2,1,null,null,null,under,LOOK1.micro);}
-    else for(let i=0;i<under.length;i++)under[i]=LOOK1.base[i]/255;
-    return finishRGB(link.opticalFrame(sheet,under));
+    return finishRGB(link.opticalFrame(sheet,getOpticalUnder(LOOK1.base,LOOK1.micro)));
   }
   if (sheet._gpu?.resident && process.env.GPU_OPTICS !== '0') {
     // Keeps the reference's double-precision pigment sum and KM arithmetic; only completed lower layers are cached.
@@ -3745,7 +3755,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       const extra=LOADS.map((ch,k)=>{
         if(!chargeField&&!componentField)return {factor:1};
-        const contact=candidateContact(brush,{...sheet,clip:null},ch,{upright:UPRIGHT,spacing:cadence.spacing});
+        const contact=candidateContact(brush,sheet,ch,{upright:UPRIGHT,spacing:cadence.spacing,clip:null});
         const cells=[...new Set(contact.cells.filter(i=>contact.primaryMask[i]&&(!sheet.clip||sheet.clip[i])&&!(sheet.resist?.[i]===1&&(sheet.resistStrength?.[i]??1)===1)).map(i=>Math.floor((i/W2|0)/SC)*w+Math.floor(i%W2/SC)))];
         const support=cells.filter(i=>(chargeField??componentField).has(i));
         if(componentField)return {...ownedComponentLoad({cells,field:componentField,mix:sh.mix,baseFactor:f[k]}),fitPigmentChannels:MOD.geometryAw.length/n,allocationStatus:'own-component residual through existing mixed load; not delivered credit'};

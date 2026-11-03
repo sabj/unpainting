@@ -1,3 +1,4 @@
+// Generated from src/media/brush.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 import { invalidatePaperCertificate, beginWetOperation } from './paper-certificate.js';
 import { censusMark } from './census.js';
 // A brush as a row of bristles across the stroke, based on "Hairy Brushes", with a belly
@@ -747,11 +748,13 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
     const [sideL, sideR] = sidesAt(brush, half, q.x, q.y);
     const fringe = 1 + 0.08 * half;
     let gdx = 0, gdy = 0;
-    if (brush.grainTable) [gdx, gdy] = brush.grainTable[((brush.travel / brush.grainPeriod) | 0) % brush.grainTable.length];
-    const o = plan.step(), F = plan.F, I = plan.I, U = plan.U;
-    F[o] = q.p; F[o + 1] = fringe; F[o + 2] = sideL; F[o + 3] = sideR; U[o + 4] = gdx + 1000000; U[o + 5] = gdy + 1000000; U[o + 6] = 0;
-    F[o + 9] = tx; F[o + 10] = ty;
-    for (let c = 0; c < nClumps; c++) F[o + 16 + c] = 1 + brush.streak * (2 * along1(c + brush.clumps[c].lift * 7, brush.travel / brush.streakLength) - 1);
+    if (!observational && brush.grainTable) [gdx, gdy] = brush.grainTable[((brush.travel / brush.grainPeriod) | 0) % brush.grainTable.length];
+    const o = plan.step(), F = plan.F, U = plan.U;
+    if (!observational) {
+      F[o] = q.p; F[o + 1] = fringe; F[o + 2] = sideL; F[o + 3] = sideR; U[o + 4] = gdx + 1000000; U[o + 5] = gdy + 1000000; U[o + 6] = 0;
+      F[o + 9] = tx; F[o + 10] = ty;
+      for (let c = 0; c < nClumps; c++) F[o + 16 + c] = 1 + brush.streak * (2 * along1(c + brush.clumps[c].lift * 7, brush.travel / brush.streakLength) - 1);
+    }
     // strokeImpl's geometric tests, without reading what the cell holds
     const R = Math.ceil(half * (1 + sideX) + 1 + 2 * ET), thin = spacing * 0.5 + 1.1;
     const rx = upright ? Math.abs(ty) * R + Math.abs(tx) * thin : R, ry = upright ? Math.abs(tx) * R + Math.abs(ty) * thin : R;
@@ -781,6 +784,7 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
         }
         if (clk - stamp[yy * w + xx] < recent || stamp[yy * w + xx] >= onceT0) continue;
         stamp[yy * w + xx] = clk;
+        if (observational) { cI[cnt++] = yy * w + xx; continue; }
         const rel = side > 0 ? across / side : 0;
         countContact?.(yy * w + xx);
         cI[cnt] = yy * w + xx; cL[cnt] = Math.max(0, Math.min(lanes - 1, Math.round(((rel + 1) / 2) * (lanes - 1)))); cA[cnt++] = across;
@@ -793,9 +797,10 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
   }
   brush.carry = t; brush.heading = lift ? null : head;
   if (rec) collectFlows(null, null);
+  if (observational) { sheet._lastPoint = path[path.length - 1]; if (lift) { brush.carry = 0; sheet._contactBrush = null; } return undefined; }
   // the paint left on the brush is still on the GPU, so nothing is returned
-  if (!lift) { if (!observational) brush._onPaper = true; link.endPlan(sheet, brush, plan, null, strokeRect(brush, sheet, path)); return undefined; }
-  brush.carry = 0; if (!observational) nextStroke(brush);
+  if (!lift) { brush._onPaper = true; link.endPlan(sheet, brush, plan, null, strokeRect(brush, sheet, path)); return undefined; }
+  brush.carry = 0; nextStroke(brush);
   sheet._contactBrush = null;
   // lift-off bead cells; the GPU keeps the wet ones
   const last = path[path.length - 1], r = Math.max(1.5, brush.radius * 0.35), cells = [];
@@ -865,7 +870,7 @@ export class ContactWorkspace {
 
 /** Read-only upper bound of the cells a stroke can touch, from the GPU planner's geometry and stamp tests, plus the
  *  unclipped lift-off disk. Neighbours are unclipped because wet paint can flow across a passage boundary. */
-export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = true, upright = false, neighborRadius = 0, sparseRow = false, workspace = null, includeTouched = true } = {}) {
+export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = true, upright = false, neighborRadius = 0, sparseRow = false, workspace = null, includeTouched = true, clip = sheet.clip } = {}) {
   if (brush.model !== 'tuft' && !brush.depositDepth && splats(brush)) throw new Error('candidate contact does not support the active wash-splat route');
   if (!Number.isFinite(spacing) || spacing <= 0) throw new Error('candidate contact spacing must be positive');
   if (!Number.isInteger(neighborRadius) || neighborRadius < 0) throw new Error('candidate neighbor radius must be a nonnegative integer');
@@ -884,7 +889,7 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
     beginPlan() { const F = new Float32Array(16 + brush.clumps.length); return { F, U: new Uint32Array(F.buffer), I: new Int32Array(F.buffer), step() { return 0; }, emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;if(rLo){const y=(i/sw)|0,x=i-y*sw;if(x<rLo[y])rLo[y]=x;if(x>rHi[y])rHi[y]=x;}} mask[i]=1; } return 0; } }; },
     endPlan() {},
   };
-  const scratch = { w: sw, h: sh, K: sheet.K, paper: sheet.paper, clip: sheet.clip, _gpu: link, clock: sheet.clock,
+  const scratch = { w: sw, h: sh, K: sheet.K, paper: sheet.paper, clip, _gpu: link, clock: sheet.clock,
     touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
     _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched } : null,
     contactStrength:tuft ? sheet.contactStrength?.slice() : undefined,
@@ -905,7 +910,7 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   }
   let liftCount=0;
   if (lift && path.length > 1) {
-    const vp = varyPath(brush, path, sheet.paper, lift), last = vp[vp.length - 1], r = Math.max(1.5, brush.radius * 0.35);
+    const last = scratch._lastPoint ?? varyPath(brush, path, sheet.paper, lift).at(-1), r = Math.max(1.5, brush.radius * 0.35);
     for (let yy = Math.max(0, Math.floor(last.y - r)); yy <= Math.min(sh - 1, Math.ceil(last.y + r)); yy++)
       for (let xx = Math.max(0, Math.floor(last.x - r)); xx <= Math.min(sw - 1, Math.ceil(last.x + r)); xx++)
         if (Math.hypot(xx - last.x, yy - last.y) <= r) { const i=yy*sw+xx; liftMask[i]=1; liftCount++; if(sparse&&!mask[i])sparseCells.push(i); if(i<lo)lo=i; if(i>hi)hi=i; if(rLo){if(xx<rLo[yy])rLo[yy]=xx;if(xx>rHi[yy])rHi[yy]=xx;} mask[i]=1; }

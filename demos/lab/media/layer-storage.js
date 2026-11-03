@@ -5,9 +5,11 @@
 // keeping existing caches valid. No optical/mass folding or checkpoint format change.
 const slots = new WeakMap();
 const examined = new WeakMap();
+let inflateEpoch = 0;
 
 function inflate(record) {
   if (!record.dense) {
+    inflateEpoch++;
     const {n,shared,w,x,y,cw,ch,bits}=record;
     const dense=shared?new Float32Array(new SharedArrayBuffer(n*4)):new Float32Array(n);
     const out=new Uint32Array(dense.buffer,dense.byteOffset,n);
@@ -41,7 +43,12 @@ export function compactLowerLayers(sheet,{from=1,before=Infinity,retainPigments=
   // Do not turn asynchronous drying into a synchronous readback for storage work.
   if(sheet._gpu?.queuedDrys)return {packed:0,savedBytes:0};
   const end=Math.min(before,sheet.layers.length-1,sheet.resistFrom??Infinity);
-  const pending=new Set((sheet._gpu?.pendingLayers??[]).map(p=>p.index));
+  const start=Math.max(0,from);
+  if(end<=start)return {packed:0,savedBytes:0};
+  const pendingList=sheet._gpu?.pendingLayers??[];
+  const compactKey=`${start}|${end}|${sheet._layerVer||0}|${pendingList.length}|${inflateEpoch}|${retainPigments.join(',')}`;
+  if(sheet._lastCompactKey===compactKey)return {packed:0,savedBytes:0};
+  const pending=new Set(pendingList.map(p=>p.index));
   const keep=new Set(retainPigments);
   const references=new Map();
   for(const layer of [sheet.G,sheet.D,sheet.P,...sheet.layers])for(let k=0;k<sheet.K;k++){
@@ -49,7 +56,7 @@ export function compactLowerLayers(sheet,{from=1,before=Infinity,retainPigments=
     if(plane?.buffer)references.set(plane.buffer,(references.get(plane.buffer)??0)+1);
   }
   let packed=0,savedBytes=0;
-  for(let l=Math.max(0,from);l<end;l++){
+  for(let l=start;l<end;l++){
     if(pending.has(l))continue;
     const layer=sheet.layers[l],version=layer._cacheVersion??0;
     for(let k=0;k<sheet.K;k++){
@@ -75,6 +82,7 @@ export function compactLowerLayers(sheet,{from=1,before=Infinity,retainPigments=
       install(layer,k,record);packed++;savedBytes+=plane.byteLength-crop.byteLength;
     }
   }
+  sheet._lastCompactKey=compactKey;
   return {packed,savedBytes};
 }
 

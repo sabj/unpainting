@@ -1,3 +1,4 @@
+// Generated from src/media/paper-certificate.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 // Exact zero-water certificates only. They are transient (not checkpoint state).
 // Direct CPU array writers must invalidate; GPU changes also invalidate through
 // the link's existing version. A threshold-only "dry" result is not a certificate.
@@ -61,13 +62,15 @@ function addWetBox(c, x0, y0, x1, y1, stepAt = c.steps) {
   const boxes = c.boxes, n = boxes.length;
   if (n && boxes[n - 1][4] === stepAt) {
     const b = boxes[n - 1];
-    if (x0 < b[0]) b[0] = x0;
-    if (y0 < b[1]) b[1] = y0;
-    if (x1 > b[2]) b[2] = x1;
-    if (y1 > b[3]) b[3] = y1;
-  } else {
-    boxes.push([x0, y0, x1, y1, stepAt]);
+    if (x0 <= b[2] + 32 && x1 >= b[0] - 32 && y0 <= b[3] + 32 && y1 >= b[1] - 32) {
+      if (x0 < b[0]) b[0] = x0;
+      if (y0 < b[1]) b[1] = y0;
+      if (x1 > b[2]) b[2] = x1;
+      if (y1 > b[3]) b[3] = y1;
+      return;
+    }
   }
+  boxes.push([x0, y0, x1, y1, stepAt]);
 }
 
 export function recordWetCell(sheet, i) {
@@ -120,6 +123,7 @@ export function recordWetStep(sheet, count = 1) {
   const valid = beginWetOperation(sheet);
   if (!valid) return false;
   const c = sheet[WET_REACH];
+  if (!c.boxes.length) { sheet[WET_REACH] = null; return false; }
   c.steps += count;
   c.exactCells = false;
   return true;
@@ -128,7 +132,7 @@ export function recordWetStep(sheet, count = 1) {
 export function clearWetFootprint(sheet, [x0, y0, fw, fh]) {
   const c = sheet[WET_REACH];
   if (!c || !c.exactCells) return;
-  const cells = sheet[WET_BUF]?.cells;
+  const buf = sheet[WET_BUF], cells = buf?.cells;
   if (!cells) return;
   const w = sheet.w, epoch = c.epoch;
   for (let y = y0; y < y0 + fh; y++) {
@@ -173,7 +177,20 @@ export function queryWetReach(sheet, cells, [x0, y0, x1, y1]) {
     if (x0 <= b[2] + m && x1 >= b[0] - m && y0 <= b[3] + m && y1 >= b[1] - m) { anyBox = true; break; }
   }
   if (!anyBox) return { allZero: true };
-  const w = sheet.w;
+  const w = sheet.w, h = sheet.h;
+  if (cells.fullSheet) {
+    let wx0 = w, wy0 = h, wx1 = -1, wy1 = -1;
+    for (let j = 0; j < boxes.length; j++) {
+      const b = boxes[j], m = 3 * (steps - b[4]);
+      const bx0 = Math.max(0, b[0] - m), by0 = Math.max(0, b[1] - m), bx1 = Math.min(w - 1, b[2] + m), by1 = Math.min(h - 1, b[3] + m);
+      if (bx0 < wx0) wx0 = bx0; if (bx1 > wx1) wx1 = bx1;
+      if (by0 < wy0) wy0 = by0; if (by1 > wy1) wy1 = by1;
+    }
+    if (wx1 < wx0 || wy1 < wy0) return { allZero: true };
+    const wetCells = c.exactCells ? sheet[WET_BUF]?.cells : null;
+    if (c.exactCells && !wetCells) return { allZero: true };
+    return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], bounds: [wx0, wy0, wx1, wy1], ...(wetCells ? { exactEpoch: c.epoch, wetCells } : {}) };
+  }
   if (c.exactCells) {
     const wetCells = sheet[WET_BUF]?.cells;
     if (!wetCells) return { allZero: true };

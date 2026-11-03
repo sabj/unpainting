@@ -481,8 +481,9 @@ export class GpuSheet {
   }
   step(steps = 1, chunk = 20) {
     this.flushStrokes();
+    const limit = this.resident ? steps : chunk;
     for (let done = 0; done < steps;) {
-      const enc = this.device.createCommandEncoder(), k = Math.min(chunk, steps - done);
+      const enc = this.device.createCommandEncoder(), k = Math.min(limit, steps - done);
       this.encodeSteps(enc, k); this.device.queue.submit([enc.finish()]); done += k;
     }
     this.readCountLater(); this.gpuAhead = true;
@@ -695,7 +696,7 @@ export class GpuSheet {
         const clear = this.timestamps.begin(e, 'quiet-dry-clear');
         clear.setPipeline(this.p.quiet_dry_clear); clear.setBindGroup(0, this.bg.quiet_dry_clear);
         clear.dispatchWorkgroups(Math.ceil(this.n / 256)); clear.end(); this.device.queue.submit([e.finish()]);
-        this.epoch++; S.lastEpoch = -1; S.done = true;
+        this.epoch++; c[1] = 0; c[6] = 0; c[7] = 0; S.lastEpoch = this.epoch; S.done = true;
         S.analyticTailUsed = true;
         if (globalThis.GPU_PROF) { const entry = globalThis.GPU_PROF.quietDryTail ??= {ms:0,n:0}; entry.n++; }
       }
