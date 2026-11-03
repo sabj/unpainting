@@ -183,7 +183,7 @@ export function checkExtraArgs(extra, planDir) {
 export function unknownTokens(variant, build) {
   const { prefix, tokens } = variantParts(variant);
   if (prefix !== 'region_w13' && prefix !== 'region_w15') return ['prefix ' + prefix + ' (must be region_w13 or region_w15)'];
-  return tokens.filter(t => delta(build, prefix, t).size === 0);
+  return tokens.filter(t => /^(ink[234]|sep\d*|uncap|dw[gm]\d+|ol\d+|opp\d+)$/.test(t) || delta(build, prefix, t).size === 0);
 }
 
 const PLAN_LIMITS = { families: 64, reserves: 64, familyMinMm: 2, reserveMinMm: 1, lines: 4000, points: 400000, margin: 1 };

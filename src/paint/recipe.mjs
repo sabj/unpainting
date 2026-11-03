@@ -1,6 +1,6 @@
 // --recipe: a named preset of flags put in front of the command line, then the presets the value plan opts into, then
-// the value plan's drawing flags. A flag given on the command line still wins, since the last of a repeated flag is
-// the one read.
+// the value plan's drawing flags. Typed flags win for named recipes; with --recipe none, the plan's drawing
+// overrides harness template flags. The last occurrence of a repeated flag is read.
 //
 // default, combined, general: one general process, adjusted through drawing, washes and order.
 // v096: the V096 compatibility recipe. CLI options override plan choices.
