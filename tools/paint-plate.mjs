@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { compactLowerLayers, layerStorageStats } from '../src/media/layer-storage.mjs';
 import { invalidatePaperCertificate } from '../src/media/paper-certificate.mjs';
 import { EpochCells } from '../src/paint/epoch-cells.mjs';
 import { createJSONLWriter } from './painter/jsonl-writer.mjs';
@@ -1327,7 +1328,7 @@ if(FINISH_FILE){
 }
 const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DRY_VALUE,value:0,fullBoundary:false});if(EARLY_DRY_VALUE&&AREA_PLAN)throw Error('earlydryvalue supports original numeric boundaries only');
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));let EARLY_DRY_CAPTURED=false;
-const dry=(...args)=>{VALUE_PIGMENT_CONTACT.clear();const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);return AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>physicalDry(...args)):physicalDry(...args);};
+const dry=(...args)=>{VALUE_PIGMENT_CONTACT.clear();const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);const result=AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>physicalDry(...args)):physicalDry(...args);if(args[0]._layerStoragePolicy)compactLowerLayers(args[0],args[0]._layerStoragePolicy());return result;};
 const dip=(b,o)=>{const a=AREA_EXEC.active,paint=o.conc.some(v=>v>0),load=a&&!a.productionLegacyDetail?{...o,water:(paint?a.pass.load.water:(a.pass.load.prewetWater??1))*a.pass.load.waterQuantityMm3/a.pass.load.capacityMm3,conc:o.conc.map(v=>v*(paint?a.pass.load.pigmentScale:1))}:o;const padded=(INK||GRAPHITE)&&load.conc.length<SHEET_PIGS.length?{...load,conc:[...load.conc,...new Array(SHEET_PIGS.length-load.conc.length).fill(0)]}:load;if(!AREA_PLAN)return dipBrush(b,padded);const before=measureBrush(b);const value=AREA_EXEC.command('physical brush dip/refill',{load:padded,brushBefore:before,passIntent:a?.pass??null},()=>dipBrush(b,padded));AREA_LOADS.set(b,{load:padded,waterMass:measureBrush(b).waterMass});return value;};
 // Opt-in actual numeric production loads only: calibration and pen loads stay unchanged.
 const PRODUCTION_WATER=num('productionwater',1);productionWaterLoad({water:1,conc:[0]},PRODUCTION_WATER);
@@ -1663,7 +1664,7 @@ const renderRaw = () => {
   RENDER_MEMO = { key, rgb: rgb.slice() };
   return rgb;
 };
-const render = () => finishRGB(renderRaw());
+const render = () => {const rgb=finishRGB(renderRaw());if(sheet._layerStoragePolicy)compactLowerLayers(sheet,sheet._layerStoragePolicy());return rgb;};
 // Paper optics for the pictures only (view()); physics, plan feedback and the tape never see them. All off by default.
 // --relief s: bare-sheet relief lit from one side, slope over 0.5 mm, mean-normalised; replaces --papershade.
 // --papergrain g: a +-g/2 per-pixel grain on the paper.
@@ -1754,10 +1755,10 @@ const traceCells=[];
 if(COLOUR_TRACE) for(let y=Math.round(traceBox[1]*h);y<Math.round(traceBox[3]*h);y++)for(let x=Math.round(traceBox[0]*w);x<Math.round(traceBox[2]*w);x++) traceCells.push(y*w+x);
 function colourMass(stage, extra={}) {
  if(!COLOUR_TRACE)return;
- const held=new Array(PIGS.length).fill(0);
+ const held=new Array(PIGS.length).fill(0), mass=thickness(sheet,{held:true});
  for(const i of traceCells){const x=i%w,y=(i/w)|0;for(let dy=0;dy<SC;dy++)for(let dx=0;dx<SC;dx++){
  const q=(y*SC+dy)*W2+x*SC+dx;
- for(let j=0;j<PIGS.length;j++){let v=sheet.G[j][q]+sheet.D[j][q]+sheet.P[j][q];for(const l of sheet.layers)v+=l[j][q];held[j]+=v/(SC*SC);}
+ for(let j=0;j<PIGS.length;j++){held[j]+=mass(j,q)/(SC*SC);}
  }}
  const sum=a=>Array.from({length:PIGS.length},(_,j)=>traceCells.reduce((v,i)=>v+a[i*PIGS.length+j],0));
  colourTrace.push({stage,held,plan:sum(A),wash:sum(AL),booked:sum(expected),...extra});
@@ -2951,6 +2952,10 @@ const PREPF = num('prepfade', 0) > 0 && PEN_FIRST && DRAWING !== 'none' ? (() =>
   console.log(`prep fade: pigment ${k}, ${sheet.layers.length} layers hold the drawing, ${(100 * keep.reduce((a, v) => a + (v ? 1 : 0), 0) / N2).toFixed(1)}% of the sheet kept as the finish's line`);
   return { k, upto: sheet.layers.length, keep, applied: new Float32Array(N2).fill(1), kk: PIGS.map(p => (p.K[0] + p.K[1] + p.K[2]) / 3 / 0.55) };
 })() : null;
+// Install only after opening/prep calibration. Keep every plane a pending fade,
+// pencil erase or resist removal may edit; GPU archive placeholders are excluded by the compactor.
+sheet._layerStoragePolicy = () => ({from:Math.max(1,PREPF?.upto??1),
+  retainPigments:num('pencilerase',0)>0?[GRAPHITE_AT]:[]});
 const fadePrep = () => {
   if (!PREPF) return 0;
   sheet._gpu?.syncLower(sheet, process.env.GPU_COMPOSITE === '1' ? PREPF.upto : Infinity);
@@ -4166,7 +4171,8 @@ const placed = FRAMES.map((f, i) => {
 // --thkdump 1: the finished sheet's pigment thickness per pigment as raw floats (thickness.f32), to compare two runs cell by cell
 if (opt('thkdump', '0') !== '0') { coherent(sheet); const th = thickness(sheet); fs.writeFileSync(path.join(out, 'thickness.f32'), Buffer.concat(th.map(a => Buffer.from(a.buffer, a.byteOffset, a.byteLength)))); }
 if(PEN_STATE_GATE) fs.writeFileSync(path.join(out,'pen-state-audit.json'),JSON.stringify(PEN_STATE_AUDIT,null,2));
-fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, gpuStats: gpuStats(sheet), performanceOptions: { opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1' } }, null, 1));
+if(sheet._layerStoragePolicy)compactLowerLayers(sheet,sheet._layerStoragePolicy());
+fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify({ ...PAINTER, ...GPU_INFO, layerStorage:{main:layerStorageStats(sheet),...(INKRES?{fine:layerStorageStats(INKRES.fine)}:{})}, gpuStats: gpuStats(sheet), performanceOptions: { opticalThreads, trackedTransfers: SPEED_TRANSFERS, edgePingPong: process.env.GPU_EDGE_PINGPONG === '1', fusedWetScanRequested: process.env.GPU_FUSE_WETSCAN === '1' } }, null, 1));
 console.log(backendLine(GPU_INFO)); // the backend this painting was made on, again at the end (details in backend.json)
 fs.writeFileSync(path.join(out, 'frames.json'), JSON.stringify({ ...PAINTER, width: OUT_W, height: OUT_H, presentation: { framePolicy: FRAME_POLICY.all ? 'all' : 'checkpoints', checkpoints: [10,25,50,75,100], video: Boolean(OUTPUT_VIDEO), requestedTimeline: TIMELINE, retimed: Boolean(RETIMED) }, ...(RETIMED ? { timeline: { target: RETIMED.target.code, fallback: RETIMED.target.fallback, milestones: RETIMED.target.milestones } } : {}), frames: num('phaselabels', 0) > 0 ? labelFrames(placed, RETIMED?.target.milestones ?? null) : placed }, null, 1));
 // The plan as a picture, through the sheet's optics, to tell a bad plan from one the brushes failed to carry out.

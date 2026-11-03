@@ -2,7 +2,7 @@ import {registeredHumanSkin,returnExcludedSkinToWash,registeredFurPlan} from '..
 import { createHash } from 'node:crypto';
 import { legacySkinCell, transferPaintOwnedResidual } from '../tuned/paint-owned-residual.mjs';
 import { recoverWash, remainingMix } from './colour-budget.mjs';
-import { needCells } from '../../media/sheet.mjs';
+import { needCells, thickness } from '../../media/sheet.mjs';
 // --modulate 1: the base plan and marks kept, with washes scaled by 1 - pale x field in a detail field around the focus.
 // What the scaling took out is laid late as dry brush along the form, so the lights stay open and form is built with
 // strokes. The measured style (practice-style.mjs) sets pale and coverage; lights in the field get soft frisket.
@@ -165,7 +165,8 @@ export async function layDryBrush(M, c) {
     if(c.colourBudget) {
       const target=Array.from({length:K},(_,j)=>M.Aw[ci*K+j]+M.Ad[ci*K+j]);
       needCells(sheet, (ci % w) * SC, ((ci / w) | 0) * SC, SC, SC); // the cells it reads, current if the sheet is on the GPU
-      const got=Array.from({length:K},(_,j)=>{let v=0;const x=ci%w,y=(ci/w)|0;for(let dy=0;dy<SC;dy++)for(let dx=0;dx<SC;dx++){const q=(y*SC+dy)*W2+x*SC+dx;v+=sheet.G[j][q]+sheet.D[j][q]+sheet.P[j][q];for(const layer of sheet.layers)v+=layer[j][q];}return v/(SC*SC);});
+      const held=thickness(sheet,{held:true});
+      const got=Array.from({length:K},(_,j)=>{let v=0;const x=ci%w,y=(ci/w)|0;for(let dy=0;dy<SC;dy++)for(let dx=0;dx<SC;dx++){const q=(y*SC+dy)*W2+x*SC+dx;v=held(j,q,v);}return v/(SC*SC);});
       mix=remainingMix(target,got).map(v=>v*0.65);
     }
     if(c.beforeGesture&&!c.beforeGesture({mid,brush:b,points:pts,water:SHAPE?SHAPE.water:num('modwater',.5)}))continue;

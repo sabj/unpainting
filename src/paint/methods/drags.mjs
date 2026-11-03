@@ -12,7 +12,7 @@
 import { orientationField } from '../../crop/fur.mjs';
 import { remainingMix } from './colour-budget.mjs';
 import { dilate } from '../../raster.js';
-import { needCells } from '../../media/sheet.mjs';
+import { needCells, thickness } from '../../media/sheet.mjs';
 
 export function dragRegion({ w, h, n, SRC, num, opt }) {
   if (num('drags', 0) <= 0 || !opt('dragbox', '')) return null;
@@ -78,7 +78,7 @@ export async function layDrags(R, c) {
   if (!R) return;
   const paths = dragPaths(R, SRC, w, h, { gaussian, num, SEED, count: c.count ?? num('dragcount', 400), medCells: c.mmPerCell ? num('draglenmm', 15) / c.mmPerCell : 0 });
   const rW = c.mmPerCell ? Math.max(0.5 * SC, c.dragWmm / c.mmPerCell / 2 * SC) : Math.max(1, num('dragwidth', 8) * (w / 1086) / 2) * SC, gain = num('draggain', 2.5);
-  const held = (ci) => { const got = new Array(K).fill(0), x = ci % w, y = (ci / w) | 0; needCells(sheet, x * SC, y * SC, SC, SC); for (let j = 0; j < K; j++) { let v = 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { const q = (y * SC + dy) * W2 + x * SC + dx; v += sheet.G[j][q] + sheet.D[j][q] + sheet.P[j][q]; for (const layer of sheet.layers) v += layer[j][q]; } got[j] = v / (SC * SC); } return got; };
+  const held = (ci) => { const got = new Array(K).fill(0), x = ci % w, y = (ci / w) | 0; needCells(sheet, x * SC, y * SC, SC, SC); const mass=thickness(sheet,{held:true}); for (let j = 0; j < K; j++) { let v = 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { const q = (y * SC + dy) * W2 + x * SC + dx; v = mass(j,q,v); } got[j] = v / (SC * SC); } return got; };
   const shots = Math.max(1, Math.round(num('dragframes', 3))), every = Math.max(24, Math.round(24 * Math.sqrt(Math.max(1, paths.length))));
   let st = 0, laid = 0, lens = [];
   for (const [q, m] of paths.entries()) {
