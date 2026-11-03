@@ -109,3 +109,12 @@ test('storage work does not flush queued asynchronous GPU drying',()=>{
  const sheet={_gpu:{queuedDrys:1},get layers(){throw Error('unexpected GPU flush');}};
  assert.deepEqual(compactLowerLayers(sheet),{packed:0,savedBytes:0});
 });
+
+test('per-dry storage census counts bytes without scanning plane values',()=>{
+ const plane=new Float32Array(64);
+ plane.some=()=>{throw Error('pixel scan');};
+ const stats=layerStorageStats({layers:[[plane]]},{includeNonzero:false});
+ assert.equal(stats.allocatedBytes,256);assert.equal(stats.planeReferences,1);
+ assert.equal(stats.nonzeroPlanes,null);
+ assert.throws(()=>layerStorageStats({layers:[[plane]]}),/pixel scan/);
+});

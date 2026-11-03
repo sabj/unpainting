@@ -78,7 +78,7 @@ export function compactLowerLayers(sheet,{from=1,before=Infinity,retainPigments=
 }
 
 /** Inspect allocated storage without triggering plane getters or GPU readback. */
-export function layerStorageStats(sheet) {
+export function layerStorageStats(sheet, { includeNonzero = true } = {}) {
   const buffers=new Set(), planes=new Set(), nonzeroPlanesSet=new Set(), nonzero=new WeakMap();
   const layers=sheet.layers;
   let nonzeroPlanes=0,compactedPlanes=0,croppedBytes=0,planeReferences=0,logicalPlaneBytes=0,nonzeroPlaneBytes=0;
@@ -92,16 +92,18 @@ export function layerStorageStats(sheet) {
       const bytes=record?record.n*4:plane.byteLength;planeReferences++;logicalPlaneBytes+=bytes;
       buffers.add(plane.buffer);planes.add(plane);
       if(record&&!record.dense){compactedPlanes++;croppedBytes+=plane.byteLength;}
+      if(includeNonzero){
       if(!nonzero.has(plane))nonzero.set(plane,record&&!record.dense
         ? new Float32Array(plane.buffer,plane.byteOffset,plane.length).some(v=>v!==0)
         : plane.some(v=>v!==0));
       if(nonzero.get(plane)||(((pending.get(l)??0)>>>k)&1)){nonzeroPlanes++;nonzeroPlaneBytes+=bytes;nonzeroPlanesSet.add(plane);}
+      }
     }
   }
   return {layers:layers.length,planeReferences,
-    uniquePlanes:planes.size,uniqueNonzeroPlanes:nonzeroPlanesSet.size,
+    uniquePlanes:planes.size,uniqueNonzeroPlanes:includeNonzero?nonzeroPlanesSet.size:null,
     logicalPlaneBytes,
-    nonzeroPlanes,nonzeroPlaneBytes,
+    nonzeroPlanes:includeNonzero?nonzeroPlanes:null,nonzeroPlaneBytes:includeNonzero?nonzeroPlaneBytes:null,
     allocatedBytes:[...buffers].reduce((n,b)=>n+b.byteLength,0),compactedPlanes,croppedBytes,
     pendingGpuLayers:pending.size};
 }

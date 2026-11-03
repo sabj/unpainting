@@ -48,8 +48,8 @@ def text_only(messages):
 class Base(unittest.TestCase):
     def setUp(self):
         self.saved = sp._post, sp._post_j2, sp.data_uri, sp.load_rgb, sp.classic_scores
-        sp.data_uri, sp.load_rgb = (lambda img: 'data:,x'), (lambda p: p)
-        sp.classic_scores = lambda t, i: {'metrics': {'value': 6.0, 'edge': 6.0, 'landmark': None, 'marks': 6.0}, 'mean': 6.0}
+        sp.data_uri, sp.load_rgb = (lambda img, max_side=768: 'data:,x'), (lambda p: sp.Image.new('RGB', (720, 480)))
+        sp.classic_scores = lambda t, i, *args: {'metrics': {'value': 6.0, 'edge': 6.0, 'landmark': None, 'marks': 6.0}, 'mean': 6.0}
 
     def tearDown(self):
         sp._post, sp._post_j2, sp.data_uri, sp.load_rgb, sp.classic_scores = self.saved

@@ -61,3 +61,24 @@ test('cached production block plan retains shared labels and lazy mask setter/dr
  }
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('scoped hashes track dependencies but ignore unrelated edits',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'scoped-code-'));
+ try{fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'src/a.mjs'),"import './b.mjs';");fs.writeFileSync(path.join(root,'src/b.mjs'),'export const b=1');fs.writeFileSync(path.join(root,'src/c.mjs'),'export const c=1');
+ const hash=()=>codeHash(root,[],{dependencies:['src/a.mjs']}),a=hash();
+ fs.writeFileSync(path.join(root,'src/c.mjs'),'export const c=2');assert.equal(hash(),a);
+ fs.writeFileSync(path.join(root,'src/b.mjs'),'export const b=2');assert.notEqual(hash(),a);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('cache hits replay consumed target looks and preserve hard budget',async()=>{
+ const {createTargetGuard}=await import('../../tools/guard/no-target.mjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'guard-cache-'));
+ const track={start(){},stop(){return []},current(){},replay(){}};
+ try{
+ const run=async()=>{const guard=createTargetGuard({mode:'hard',lookBudget:1});guard.provide('px',new Float32Array(100).fill(.5));
+ const r=await cachedStep({dir,name:'guard',code:'test',inputs:{},track,guard},async()=>guard.look('review','test',new Uint8Array(100).fill(1),{ref:['px']}));return {r,guard};};
+ const a=await run(),b=await run();assert.equal(b.r.cached,true);assert.deepEqual(a.r.value,b.r.value);assert.equal(b.guard.summary().looks.count,1);
+ assert.equal(b.guard.look('review','second',new Uint8Array(100).fill(1),{ref:['px']}),null);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

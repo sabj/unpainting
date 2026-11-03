@@ -68,7 +68,7 @@ function sheetHandler(sid, port) {
         if (asyncDry) { for (let k = 0; k < gpu.K; k++) { if ([sheet.G[k], sheet.D[k], sheet.P[k]].some(a => a.some(v => v !== 0))) workerWetMask |= 1 << k; if (m.top?.[k]?.some(v => v !== 0)) workerTopMask |= 1 << k; } gpu.setAct(workerWetMask | workerTopMask); }
         Atomics.store(ctrl, 3, 1); break;
       }
-      case 'opticalInit': { gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = await GpuOpticalComposite.create(gpu.device, gpu.n, gpu.pigments, m.micro, gpu.w); for (const layer of m.lower) gpu.optical.append(layer); gpu.opticalCount = m.count; break; }
+      case 'opticalInit': { gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = await GpuOpticalComposite.create(gpu.device, gpu.n, gpu.pigments, m.micro, gpu.w); const cut = gpu.resistMask && m.resistFrom != null ? Math.min(m.lower.length, Math.max(0, m.resistFrom - 1)) : m.lower.length; for (let i = 0; i < cut; i++) gpu.optical.append(m.lower[i]); if (gpu.resistMask) gpu.optical.beginMask(gpu.resistMask, m.resistFrom > 1 && m.resistFrom === m.count ? gpu.b.TOP : null); for (let i = cut; i < m.lower.length; i++) gpu.optical.append(m.lower[i]); gpu.opticalCount = m.count; break; }
       case 'opticalFrame': { gpu.flushStrokes(); const wet = gpu.optical.sumWet(gpu.b.G, gpu.b.D, gpu.b.P); const rgb = await gpu.optical.frame(m.base, gpu.hasTop ? [gpu.b.TOP, wet] : [wet], true); new Uint8Array(rectData.buffer, 0, rgb.length).set(rgb); break; }
       case 'opts': gpu.setOptions(m.o); return;
       case 'act': if (!asyncDry) gpu.setAct(m.mask); return;

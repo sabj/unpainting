@@ -96,15 +96,16 @@ def _c01(x):
     return max(0.0, min(1.0, float(x)))
 
 
-def classic_scores(target, image):
-    pair = Pair(target, image)
+def classic_scores(target, image, work_w=720, plate_mm=200.0):
+    pair = Pair(target, image, work_w=work_w)
+    metrics = classic.cached_metrics(pair, plate_mm)
     raw = {}
-    v = classic.value_judge(pair)
+    v = metrics["value"]
     raw["value"] = _mean([_c01(v["soft_agreement"]), _c01(v["worst_cell_agreement"]), _c01(v["big_shape_iou"])])
-    e = classic.edge_judge(pair)
+    e = metrics["edge"]
     raw["edge"] = _mean([_c01(e["f_at_tol"]), _c01(e["hardness_ratio_median"]), math.exp(min(0.0, e["density_balance"]))]) if "recall_at_tol" in e else None
     raw["landmark"] = None  # no benchmark crop has landmark annotations
-    d = classic.marks_distances(classic.marks_judge(pair))
+    d = classic.marks_distances(metrics["marks"])
     raw["marks"] = _mean([_c01(1 - d["hardness_hist_l1"] / 2), _c01(1 - d["paper_share_gap"]),
                           _c01(1 - d["coherence_gap"]), math.exp(-d["speckle_excess"] / 50.0)])
     scores = {k: (None if x is None else round(10 * x, 2)) for k, x in raw.items()}
@@ -117,8 +118,8 @@ def data_uri(img, max_side=768):
     s = max_side / max(im.size)
     if s < 1:
         im = im.resize((round(im.size[0] * s), round(im.size[1] * s)), Image.LANCZOS)
-    elif max(im.size) < 384:
-        k = 384 / max(im.size)
+    elif max(im.size) < min(384, max_side):
+        k = min(384, max_side) / max(im.size)
         im = im.resize((round(im.size[0] * k), round(im.size[1] * k)), Image.BICUBIC)
     b = io.BytesIO(); im.save(b, "JPEG", quality=88)
     return "data:image/jpeg;base64," + base64.b64encode(b.getvalue()).decode()
@@ -240,10 +241,10 @@ def ask_j2(model, content, log=None):
     raise RuntimeError(f"{why} after {J2_ATTEMPTS} attempts")
 
 
-def _content(target, image, style):
+def _content(target, image, style, max_side=768):
     return [{"type": "text", "text": SCORE_PROMPT.format(style=style)},
-            {"type": "image_url", "image_url": {"url": data_uri(load_rgb(target))}},
-            {"type": "image_url", "image_url": {"url": data_uri(load_rgb(image))}}]
+            {"type": "image_url", "image_url": {"url": data_uri(load_rgb(target), max_side)}},
+            {"type": "image_url", "image_url": {"url": data_uri(load_rgb(image), max_side)}}]
 
 
 def _aggregate(calls, errors, min_valid):
@@ -266,9 +267,9 @@ def _aggregate(calls, errors, min_valid):
     return out
 
 
-def vision_scores(target, image, style, calls=5):
+def vision_scores(target, image, style, calls=5, max_side=768):
     """J1: 5 calls per judge, a judge counts with at least 3 valid calls."""
-    content = _content(target, image, style)
+    content = _content(target, image, style, max_side)
 
     def run(m):
         try:
@@ -285,9 +286,9 @@ def vision_scores(target, image, style, calls=5):
     return _aggregate(samples, errors, min(3, calls))
 
 
-def vision_scores_j2(target, image, style, calls=5):
+def vision_scores_j2(target, image, style, calls=5, max_side=768):
     """J2: every judge needs the profile's valid calls; the existing bounded retry policy applies to every profile."""
-    content = _content(target, image, style)
+    content = _content(target, image, style, max_side)
 
     def run(job):
         m, slot = job
@@ -313,14 +314,22 @@ def vision_scores_j2(target, image, style, calls=5):
     return out
 
 
-def score(target, image, style, vision=True, judge=None, profile=None):
+def score(target, image, style, vision=True, judge=None, profile=None, resolution="legacy", plate_mm=200.0):
     judge = judge or DEFAULT_JUDGE
     sampling = sampling_plan(judge, profile)
-    cl = classic_scores(target, image)
-    vi = (vision_scores_j2 if judge == "J2" else vision_scores)(target, image, style, calls=sampling["calls"]) if vision else \
+    t, p = load_rgb(target), load_rgb(image)
+    if resolution not in ("legacy", "native"): raise ValueError("unknown scoring resolution")
+    if plate_mm <= 0: raise ValueError("plate_mm must be positive")
+    if resolution == "native" and (t.width < p.width or t.height < p.height):
+        raise ValueError("native scoring requires a target at least as large as the rendered painting; provide the high-resolution target")
+    work_w = p.width if resolution == "native" else 720
+    max_side = max(p.size) if resolution == "native" else 768
+    cl = classic_scores(target, image, work_w, plate_mm)
+    vi = (vision_scores_j2 if judge == "J2" else vision_scores)(target, image, style, calls=sampling["calls"], **({"max_side": max_side} if resolution == "native" else {})) if vision else \
         {"per_judge": {}, "errors": {}, "complete": False, "callCounts": {}, "minValidCalls": None}
     complete = vi.get("complete", False) and cl["mean"] is not None
     return {
+        "resolution": {"protocol": resolution, "classicWidth": work_w, "visionMaxSide": max_side, "plateMm": plate_mm, "targetSize": list(t.size), "paintingSize": list(p.size)},
         "composite": round((vi["overall"] + cl["mean"]) / 2, 2) if complete else None,
         "pm": round(vi["pm"] / 2, 2) if complete and vi.get("pm") is not None else None,
         "repeatabilityMeasured": vi.get("repeatabilityMeasured", False),
@@ -352,6 +361,8 @@ def main():
     ap.add_argument("--no-vision", action="store_true")
     ap.add_argument("--judge", choices=JUDGE_VERSIONS, default=DEFAULT_JUDGE, help="judge version (default %(default)s)")
     ap.add_argument("--profile", choices=J2_PROFILES, help="J2 sampling budget: lite=1, standard=3, full=5 calls per judge (default full)")
+    ap.add_argument("--resolution", choices=("legacy", "native"), default="legacy")
+    ap.add_argument("--plate-mm", type=float, default=200.0)
     ap.add_argument("--out")
     a = ap.parse_args()
     try:
@@ -360,7 +371,7 @@ def main():
         ap.error(str(e))
     if not a.no_vision and not os.environ.get(KEY):
         sys.exit(f"{KEY} is not set (JUDGE_ROUTE={PROVIDER}); pass --no-vision for the classic part only")
-    r = score(a.target, a.image, a.style, not a.no_vision, a.judge, a.profile)
+    r = score(a.target, a.image, a.style, not a.no_vision, a.judge, a.profile, a.resolution, a.plate_mm)
     s = json.dumps(r, indent=1)
     if a.out:
         open(a.out, "w").write(s)

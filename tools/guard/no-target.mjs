@@ -176,6 +176,19 @@ export function createTargetGuard({ mode = DEFAULT_MODE, targetPaths = [], log =
     },
     category() { return violations.length ? 'copied' : blocking ? 'painted' : 'unguarded'; },
     // A painting taken over by a fresh process (tools/aware/pause.mjs) keeps one record of reads and looks.
+    lookDelta(before) {
+      const delta = JSON.parse(JSON.stringify(looks));
+      for(const k of ['count','cells','refused','overBudget'])delta[k]-=before[k];
+      for(const [key,v] of Object.entries(delta.byCheckpoint))for(const k of ['count','refused','overBudget'])v[k]-=before.byCheckpoint[key]?.[k]??0;
+      delta.entries=delta.entries.slice(before.entries.length);
+      return delta;
+    },
+    replayLooks(delta) {
+      if(budget!=null && looks.count+delta.count>budget)throw Error('target guard: cached looks exceed budget');
+      for(const k of ['count','cells','refused','overBudget'])looks[k]+=delta[k];
+      for(const [key,v] of Object.entries(delta.byCheckpoint)) { const by=looks.byCheckpoint[key]??={count:0,refused:0,overBudget:0}; for(const k of ['count','refused','overBudget'])by[k]+=v[k]; }
+      looks.entries.push(...delta.entries.slice(0,Math.max(0,400-looks.entries.length)));
+    },
     exportState() { return { violations: violations.slice(), seen: [...seen], reads: { ...reads }, looks: JSON.parse(JSON.stringify(looks)) }; },
     importState(st) {
       violations.length = 0; violations.push(...st.violations); seen.clear(); for (const k of st.seen) seen.add(k);

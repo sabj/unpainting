@@ -7,21 +7,47 @@ import crypto from 'node:crypto';
 import util from 'node:util';
 import {passage} from '../crop/blockin.mjs';
 
-/** sha256 over every source file under `root`/src and the extra files given (the calling tool). */
-export function codeHash(root, extra = []) {
-  // Recompute so edits during a long-lived process also invalidate plans.
-  const h = crypto.createHash('sha256');
-  const walk = d => {
-    for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
-      const p = path.join(d, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (/\.(mjs|js|cjs|wgsl|json)$/.test(e.name)) { h.update(path.relative(root, p)); h.update(fs.readFileSync(p)); }
+// Content digests are reused only while the complete stat identity remains unchanged.
+const fileDigests = new Map();
+const loadedManifests = new Set();
+export function digest(value) {
+  const stable = v => ArrayBuffer.isView(v) ? {type:v.constructor.name,bytes:Buffer.from(v.buffer,v.byteOffset,v.byteLength).toString('base64')} :
+    Array.isArray(v) ? v.map(stable) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])])) : v;
+  return crypto.createHash('sha256').update(JSON.stringify(stable(value)) ?? 'undefined').digest('hex');
+}
+export function codeHash(root, extra = [], { dependencies = null } = {}) {
+  const manifest=path.join(root,'work/cache/code-stat-manifest.json');
+  if(!loadedManifests.has(root)){try{for(const [f,v] of JSON.parse(fs.readFileSync(manifest,'utf8')))fileDigests.set(f,v);}catch{} loadedManifests.add(root);}
+  const files = new Set();
+  const add = f => {
+    f=path.resolve(root,f); if(files.has(f))return; files.add(f);
+    if(dependencies && /\.[mc]?js$/.test(f)) {
+      const source=fs.readFileSync(f,'utf8');
+      for(const m of source.matchAll(/(?:from\s*|import\s*\(?\s*)['"](\.[^'"]+)['"]/g)) add(path.resolve(path.dirname(f),m[1]));
     }
   };
-  walk(path.join(root, 'src'));
-  if(fs.existsSync(path.join(root,'tools')))walk(path.join(root,'tools'));
-  for (const f of extra) { h.update(path.relative(root, f)); h.update(fs.readFileSync(f)); }
-  return h.digest('hex');
+  const walk = d => { if(!fs.existsSync(d))return; for(const e of fs.readdirSync(d,{withFileTypes:true})) {
+    const f=path.join(d,e.name); if(e.isDirectory())walk(f); else if(/\.(mjs|js|cjs|wgsl|json)$/.test(f))add(f);
+  }};
+  if(dependencies)dependencies.forEach(add); else {walk(path.join(root,'src'));walk(path.join(root,'tools'));}
+  extra.forEach(add);
+  if(fs.existsSync(path.join(root,'package-lock.json')))add(path.join(root,'package-lock.json'));
+  const result = digest([...files].sort().map(f=>{
+    const st=fs.statSync(f,{bigint:true}), stamp=[st.size,st.mtimeNs,st.ctimeNs,st.ino].join(':');
+    let old=fileDigests.get(f);
+    if(!old || old.stamp!==stamp){old={stamp,hash:crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')};fileDigests.set(f,old);}
+    return [path.relative(root,f),old.hash];
+  }));
+  try{fs.mkdirSync(path.dirname(manifest),{recursive:true});const tmp=manifest+'.'+process.pid;fs.writeFileSync(tmp,JSON.stringify([...fileDigests]));fs.renameSync(tmp,manifest);}catch{}
+  return result;
+}
+export function provenance(record) {
+  const fields=['simCode','argv','planHashes','targetSHA256','paper','pigments','geometry','mode','backend','guard'];
+  for(const k of fields)if(record[k]===undefined)throw Error(`provenance: missing ${k}`);
+  return Object.fromEntries(fields.map(k=>[k,record[k]]));
+}
+export function assertProvenance(actual, expected) {
+  for(const k of Object.keys(expected))if(digest(actual?.[k])!==digest(expected[k]))throw Error(`provenance mismatch: ${k}`);
 }
 
 const TYPED = { Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Uint8Array, Uint16Array, Uint32Array, Uint8ClampedArray };
@@ -111,22 +137,26 @@ function readEntry(file) {
  * Run `fn` (async, returning the step's result), or read it back. `track` is { start(), stop() -> [[name, raw], ...],
  * current(name) -> raw, replay(names) } over the tool's option reader. Returns { value, cached }.
  */
-export async function cachedStep({ dir, name, code, inputs, track, enabled = true, log = console.log }, fn) {
+export async function cachedStep({ dir, name, code, inputs, track, enabled = true, log = console.log, fingerprint = null, guard = null, context = {} }, fn) {
   if (!enabled) return { value: await fn(), cached: false };
-  const key = `${name}-${crypto.createHash('sha256').update(code + inputHash(inputs)).digest('hex').slice(0, 32)}`, file = path.join(dir, `${key}.json`);
+  const fingerprintFor = reads => fingerprint ?? provenance({simCode:digest({code,implementation:fn.toString()}),argv:digest({resolved:context.argv??null,reads}),planHashes:context.planHashes??inputs.planHashes??{},targetSHA256:context.targetSHA256??inputs.targetSHA256??null,paper:inputs.PAPER_OPTS?{w:inputs.W2,h:inputs.H2,opts:digest(inputs.PAPER_OPTS)}:null,pigments:inputs.PIGS??inputs.pigment??null,geometry:{w:inputs.w??inputs.W2??null,h:inputs.h??inputs.H2??null},mode:context.mode??'pure-step',backend:context.backend??'cpu',guard:{mode:guard?.mode??'off',looksConsumed:guard?.exportState().looks.count??0}});
+  const key = `${name}-${crypto.createHash('sha256').update('provenance-v3:' + code + fn.toString() + inputHash(inputs) + digest(context)).digest('hex').slice(0, 32)}`, file = path.join(dir, `${key}.json`);
   let entries = [];
   try { entries = JSON.parse(fs.readFileSync(file, 'utf8')).filter(e => typeof e.file === 'string'); } catch { entries = []; }
   for (const e of entries) {
     if (!e.reads.every(([k, raw]) => track.current(k) === raw)) continue;
+    assertProvenance(e.provenance, fingerprintFor(e.reads));
     let value; try { value = readEntry(path.join(dir, e.file)).value; } catch (err) { log(`cache: ${name} entry unreadable (${err.message})`); continue; }
     log(`cache: ${name} hit (${path.basename(file)})`);
     track.replay(e.reads.map(([k]) => k));
+    if(guard && e.looks)guard.replayLooks(e.looks);
     for (const line of e.logs) log(line);
     return { value, cached: true };
   }
   log(`cache: ${name} miss (${path.basename(file)})`);
   const logs = [], orig = console.log;
   console.log = (...a) => { logs.push(util.format(...a)); orig(...a); };
+  const looksBefore = guard?.exportState().looks;
   track.start();
   let value, reads;
   try { value = await fn(); } finally { console.log = orig; reads = track.stop(); }
@@ -137,7 +167,10 @@ export async function cachedStep({ dir, name, code, inputs, track, enabled = tru
     const readsList = [...seen.entries()], entryFile = `${key}-${crypto.createHash('sha256').update(JSON.stringify(readsList)).digest('hex').slice(0, 16)}.bin`;
     const tmp = path.join(dir, `${entryFile}.${process.pid}.tmp`);
     writeEntry(tmp, { reads: readsList, logs, value }); fs.renameSync(tmp, path.join(dir, entryFile));
-    const kept = [{ reads: readsList, logs, file: entryFile }, ...entries.filter(e => e.file !== entryFile)].slice(0, 8);
+    const looks = guard ? guard.lookDelta(looksBefore) : null;
+    const storedProvenance=fingerprintFor(readsList);
+    if(!fingerprint)storedProvenance.guard.looksConsumed=looksBefore?.count??0;
+    const kept = [{ reads: readsList, logs, file: entryFile, provenance: storedProvenance, looks }, ...entries.filter(e => e.file !== entryFile)].slice(0, 8);
     for (const e of entries) if (!kept.some(k => k.file === e.file)) fs.rmSync(path.join(dir, e.file), { force: true });
     const itmp = `${file}.${process.pid}.tmp`; fs.writeFileSync(itmp, JSON.stringify(kept)); fs.renameSync(itmp, file);
   } catch (e) { if (!(e instanceof Uncacheable)) orig(`cache: ${name} not stored (${e.message})`); }

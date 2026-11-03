@@ -257,6 +257,9 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (spec.recordingMarks != null) args.push('--marks', String(spec.recordingMarks));
   // the harness's segmentation backend (dry runs: off); absent, the painter's own default (SAM) applies
   if (spec.segments != null) args.push('--segments', String(spec.segments));
+  // Offline scripted fixtures deliberately remove tracked benchmark data from their worktree.
+  // Keep the dirty-tree evidence; ordinary contestant runs retain the painter's refusal.
+  if (spec.offlineFixture === true) args.push('--allowdirty', '1');
   // Since 0.1.1 a wet-on-wet stroke on uneven paper is logged, not a stop that loses the painting (tag v0.1.0 has the old rule)
   if (!args.includes('--wetgate')) args.push('--wetgate', '0');
   if (pausedir) args.push('--pausedir', pausedir);

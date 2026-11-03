@@ -2,15 +2,17 @@
 Copied from the judges that scored the published runs, without the landmark judge (no benchmark crop has
 landmark annotations) and without the pairwise voting. score_painting.py turns these into 0-10 scores.
 No metric uses pixel error."""
+import hashlib, json, os, tempfile
+from pathlib import Path
 import numpy as np
 from scipy import ndimage as ndi
 from skimage.feature import canny
 from skimage.measure import label
 
 
-def value_judge(pair, levels=4, low_w=96, grid=4):
+def value_judge(pair, levels=4, low_w=96, grid=4, plate_mm=200.0):
     def lowres(L):
-        sig = max(1.0, pair.W / 120)
+        sig = max(1.0, pair.W / plate_mm * (200 / 120))
         L = ndi.gaussian_filter(L, sig)
         h, w = L.shape
         nh = max(8, int(round(low_w * h / w)))
@@ -62,7 +64,8 @@ def edge_judge(pair, plate_mm=200.0):
     plus hardness: painting gradient peak near each target edge over the target's gradient there."""
     px_mm = pair.W / plate_mm
     tol = max(1.5, 1.0 * px_mm)
-    te, pe = _edges(pair.t_L), _edges(pair.p_L)
+    scale = px_mm / (720 / 200)
+    te, pe = _edges(pair.t_L, 1.5 * scale), _edges(pair.p_L, 1.5 * scale)
     if te.sum() < 20:
         return {"n_target_edges": int(te.sum()), "note": "target has almost no edges here"}
     dt_t = ndi.distance_transform_edt(~te)
@@ -70,7 +73,7 @@ def edge_judge(pair, plate_mm=200.0):
     cap = 4 * tol
     recall = float((dt_p[te] <= tol).mean())
     precision = float((dt_t[pe] <= tol).mean()) if pe.any() else 0.0
-    gt, gp = _grad(pair.t_L), _grad(pair.p_L)
+    gt, gp = _grad(pair.t_L, scale), _grad(pair.p_L, scale)
     win = int(2 * tol) | 1
     gp_peak = ndi.maximum_filter(gp, size=win)
     ratio = np.clip(gp_peak[te] / np.maximum(gt[te], 1e-4), 0, 1.0)  # harder than the target earns nothing
@@ -93,31 +96,32 @@ def edge_judge(pair, plate_mm=200.0):
 HARD_BINS = [0, 0.02, 0.04, 0.07, 0.10, 0.15, 10]
 
 
-def _region_stats(L, paper_L):
-    e = _edges(L)
-    g = _grad(L)
+def _region_stats(L, paper_L, scale=1.0):
+    e = _edges(L, 1.5 * scale)
+    g = _grad(L, scale) * scale
     hist = np.histogram(g[e], bins=HARD_BINS)[0].astype(float) if e.any() else np.zeros(len(HARD_BINS) - 1)
     hist = hist / max(hist.sum(), 1)
     paper = float((L >= paper_L - 0.03).mean())
-    gy = ndi.gaussian_filter(L, 1.0, order=(1, 0)); gx = ndi.gaussian_filter(L, 1.0, order=(0, 1))
-    jxx, jyy, jxy = [ndi.uniform_filter(v, 16) for v in (gx * gx, gy * gy, gx * gy)]
+    gy = ndi.gaussian_filter(L, scale, order=(1, 0)); gx = ndi.gaussian_filter(L, scale, order=(0, 1))
+    jxx, jyy, jxy = [ndi.uniform_filter(v, max(1, round(16 * scale))) for v in (gx * gx, gy * gy, gx * gy)]
     tr = jxx + jyy
     lam = np.sqrt(np.maximum((jxx - jyy) ** 2 + 4 * jxy ** 2, 0))
     coh = lam / np.maximum(tr, 1e-9)
     strong = tr > np.median(tr)
     coherence = float(np.average(coh[strong], weights=tr[strong])) if strong.any() else 0.0
-    dev = np.abs(L - ndi.median_filter(L, 7)) > 0.08
+    dev = np.abs(L - ndi.median_filter(L, max(1, round(7 * scale)) | 1)) > 0.08
     lab, n = ndi.label(dev)
     sizes = ndi.sum(dev, lab, range(1, n + 1)) if n else np.array([])
-    speckle = float(((sizes <= 20)).sum() / max(L.size, 1) * 1e5)
+    speckle = float(((sizes <= 20 * scale * scale)).sum() / max(L.size, 1) * 1e5 * scale * scale)
     return {"hardness_hist": [round(float(v), 3) for v in hist], "paper_share": paper,
             "direction_coherence": coherence, "speckle_per_100k_px": speckle}
 
 
-def marks_judge(pair):
+def marks_judge(pair, plate_mm=200.0):
     """Mark statistics on painting and target over the same region; the judge compares distances."""
     pt = float(np.percentile(pair.t_L_full, 97)); pp = float(np.percentile(pair.p_L_full, 97))
-    return {"painting": _region_stats(pair.p_L, pp), "target": _region_stats(pair.t_L, pt)}
+    scale = (pair.W / plate_mm) / (720 / 200)
+    return {"painting": _region_stats(pair.p_L, pp, scale), "target": _region_stats(pair.t_L, pt, scale)}
 
 
 def marks_distances(m):
@@ -129,3 +133,27 @@ def marks_distances(m):
         "speckle_excess": max(0.0, p["speckle_per_100k_px"] - t["speckle_per_100k_px"]),
     }
 
+
+
+def cached_metrics(pair, plate_mm=200.0, cache_dir=None):
+    """Only deterministic metrics are cached. Keys include aligned pixels, physical size and implementation."""
+    h = hashlib.sha256()
+    for a in (pair.t_rgb_full, pair.p_rgb_full):
+        h.update(str((a.shape, a.dtype.str)).encode()); h.update(a.tobytes())
+    h.update(str(plate_mm).encode())
+    for name in ("classic.py", "common.py"):
+        h.update(Path(__file__).with_name(name).read_bytes())
+    key = h.hexdigest()
+    directory = Path(cache_dir or os.environ.get("BENCH_CLASSIC_CACHE", Path(__file__).resolve().parents[2] / "work/cache/classic"))
+    file = directory / (key + ".json")
+    if file.exists():
+        return json.loads(file.read_text())
+    result = {"value": value_judge(pair, plate_mm=plate_mm), "edge": edge_judge(pair, plate_mm), "marks": marks_judge(pair, plate_mm)}
+    directory.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=directory, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f: json.dump(result, f)
+        os.replace(tmp, file)
+    finally:
+        if os.path.exists(tmp): os.unlink(tmp)
+    return result

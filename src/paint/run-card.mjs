@@ -15,6 +15,8 @@ const fileSha256 = file => {
 function buildRunCard({
   root,
   out,
+  provenance = null,
+  provenanceHistory = [],
   args = [],
   subject = null,
   imageFile = null,
@@ -40,6 +42,8 @@ function buildRunCard({
   const paintingPath = paintingPng && fs.existsSync(paintingPng) ? paintingPng : paintingJpg;
 
   return {
+    provenance,
+    provenanceHistory,
     subject: subject || (targetPath ? path.basename(targetPath, path.extname(targetPath)) : null),
     codeSHA: code?.commit ?? null,
     dirtyTrackedFiles: code?.tracked?.length ?? 0,

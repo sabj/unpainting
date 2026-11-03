@@ -9,11 +9,11 @@ import { drawGestures } from '../../media/draw.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { TAPE } from '../../media/brush.mjs';
 
-export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gain = 1, pad: opt_pad = null }) {
+export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gain = 1, pad: opt_pad = null, paper: cachedPaper = null }) {
   if (!(N > 1)) return null;
   N = Math.round(N);
   const WH = W2 * N, HH = H2 * N, nH = WH * HH, nL = W2 * H2, K = 1;
-  const paper = makePaper(WH, HH, { ...paperOpts, scale: (paperOpts.scale ?? 1) * N });
+  const paper = cachedPaper ?? makePaper(WH, HH, { ...paperOpts, scale: (paperOpts.scale ?? 1) * N });
   if (!Number.isInteger(inkAt) || !pigments[inkAt]) throw new Error('Invalid fine-sheet ink channel');
   const finePigments = [pigments[inkAt]];
   const fine = createSheet(paper, finePigments);
@@ -142,5 +142,17 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     return out;
   }
 
-  return { N, width: WH, height: HH, draw, settle, compose, carry, wet, stats, fine, remapInk, changed };
+  function exportState() {
+    coherent(fine);
+    const fields=Object.fromEntries(Object.entries(fine).filter(([k,v])=>!['paper','pigments','_gpu','_gpuInfo','_renderCaches'].includes(k)&&typeof v!=='function'));
+    return {N,WH,HH,inkAt,fields,seen,inkLo,wetOn,stats};
+  }
+  function importState(st) {
+    for(const [k,v] of Object.entries({N,WH,HH,inkAt}))if(st[k]!==v)throw Error(`inkres state mismatch: ${k}`);
+    Object.assign(fine,st.fields);
+    seen.forEach((v,k)=>v.set(st.seen[k])); inkLo.forEach((v,k)=>v.set(st.inkLo[k]));
+    wetOn=st.wetOn;Object.assign(stats,st.stats);
+    changed();totalVersion=-1;renderVersion=-1;
+  }
+  return { N, width: WH, height: HH, draw, settle, compose, carry, wet, stats, fine, remapInk, changed, exportState, importState };
 }

@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { BENCH, ROUNDS, validateRun, readJson } from './lib.mjs';
-import { argsBuilder, layerBase, checkExtraArgs, unknownTokens, checkPlanLimits, renderVerdict, optionMap } from './pipeline/plan-args.mjs';
+import { resolvePlan, argsBuilder, layerBase, checkExtraArgs, unknownTokens, checkPlanLimits, renderVerdict, optionMap } from './pipeline/plan-args.mjs';
 import { tokensMarkdown } from './pipeline/tokens.mjs';
 import { renderTask, loadSubjects } from './pipeline/round45.mjs';
 import { turnCommand } from './runners.mjs';
@@ -135,4 +135,12 @@ test('extra args admit only validated artistic controls, never execution or ink 
   assert.equal(args.get('inkrecipe'), 'v2');
   for (const key of ['inkkscale', 'closingpressure', 'drawwidthgain', 'openinglines']) assert.ok(!args.has(key), key);
   for (const token of ['ink2', 'ink3', 'ink4', 'sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
+});
+
+
+test('only explicitly offline fixture specs authorize a deliberately stripped worktree', () => {
+  const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};
+  assert.equal(resolvePlan(options).args.includes('--allowdirty'),false);
+  const fixture=resolvePlan({...options,spec:{...options.spec,offlineFixture:true}});
+  assert.equal(optionMap(fixture.args).get('allowdirty'),'1');
 });

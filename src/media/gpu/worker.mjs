@@ -88,7 +88,10 @@ async function handleOp(m) {
     case 'opticalInit': {
       gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = null;
       gpu.optical = await GpuOpticalComposite.create(gpu.device, gpu.n, gpu.pigments, m.micro, gpu.w);
-      for (const layer of m.lower) gpu.optical.append(layer);
+      const cut = gpu.resistMask && m.resistFrom != null ? Math.min(m.lower.length, Math.max(0, m.resistFrom - 1)) : m.lower.length;
+      for (let i = 0; i < cut; i++) gpu.optical.append(m.lower[i]);
+      if (gpu.resistMask) gpu.optical.beginMask(gpu.resistMask, m.resistFrom > 1 && m.resistFrom === m.count ? gpu.b.TOP : null);
+      for (let i = cut; i < m.lower.length; i++) gpu.optical.append(m.lower[i]);
       gpu.opticalCount = m.count; break;
     }
     case 'opticalFrame': {

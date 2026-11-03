@@ -13,9 +13,10 @@ export function censusDry(sheet) {
   const caller = new Error().stack.split('\n').slice(3, 6).map(s => s.trim().replaceAll(process.cwd() + '/', '')).join(' <- ');
   const row = census.dry[caller] ??= { calls: 0, maxLayers: 0, maxLogicalPlaneBytes: 0, maxAllocatedPlaneBytes: 0 };
   row.calls++;
-  const storage=layerStorageStats(sheet);
+  // Counts at every dry must not rescan every pixel of every archived layer.
+  // writeCensus performs the exact nonzero census once, at the end.
+  const storage=layerStorageStats(sheet,{includeNonzero:false});
   row.maxLayers = Math.max(row.maxLayers, storage.layers);
-  row.maxNonzeroPlanes=Math.max(row.maxNonzeroPlanes??0,storage.nonzeroPlanes);
   row.maxLogicalPlaneBytes = Math.max(row.maxLogicalPlaneBytes, storage.logicalPlaneBytes);
   row.maxAllocatedPlaneBytes = Math.max(row.maxAllocatedPlaneBytes, storage.allocatedBytes);
 }
