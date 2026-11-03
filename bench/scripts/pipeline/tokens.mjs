@@ -29,13 +29,13 @@ export function tokensMarkdown() {
     '# Recipe tokens', '',
     `Base (always applied, under your tokens): \`${BASE}\`.`, '',
     'Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlayers 3 (the examples below show the scaling). Tokens in one slot replace each other: '
-    + 'lay2/lay4; sep/sep2..sep9; ink2/ink3/ink4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. '
+    + 'lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. '
     + 'Stone-block tokens of the base (blk, bmm, bka, birr) act on architecture only. Palette tokens act only on Trumbull; there `--paints` is: default '
     + 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm '
     + 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in '
     + 'extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.', '',
     '| token | painter options it sets (on top of the template) |', '|---|---|',
-    ...TOKENS.map(t => `| \`_${t}\` | ${tokenFlags(t)} |`), '',
+    ...TOKENS.filter(t => !/^(sep\d*|ink[234]|uncap|ol\d+|opp\d+|dw[gm]\d+)$/.test(t)).map(t => `| \`_${t}\` | ${tokenFlags(t)} |`), '',
   ].join('\n');
 }
 

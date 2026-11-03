@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const BASE = 'region_w13_lay4_ink4_rec2x_rcl_sky3_sep8_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_pgreen_dwg200_tp2';
+export const BASE = 'region_w13_lay4_rec2x_rcl_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_pgreen_tp2';
 const DEFAULT_VARIANT = 'region_w13';
 const ARCHITECTURE_ONLY = /^(blk|bmm|bka)\d+$|^birr$/;
 const PALETTE = /^(pwarm|pgold|pgreen|pbs|rv)$/;
@@ -39,7 +39,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
     const opening = /_opk/.test(v) ? 'closingink' : 'opening';
     const closing = (/_ink4/.test(v) ? ['closingink4', 'closing'] : /_ink[23]/.test(v) ? ['closingink', 'closing'] : ['closing']).find(f => linesExist(f));
     const t = (re, flags) => (re.test(v) ? flags() : []);
-    return ['tools/paint-plate.mjs', '--recipe', 'none', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1', ...paints,
+    return ['tools/paint-plate.mjs', '--recipe', 'none', '--inkrecipe', 'v2', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1', ...paints,
       '--physical', '1', '--paperbase', /_cur/.test(v) ? 'white' : 'source', '--loadedcontact', '1', '--order', 'painter', '--valueplan', path.join(planDir, 'config.json'),
       '--brushchoice', v.startsWith('region_w15') ? '1' : '0', '--shapedmarks', shaped ? '1' : '0',
       ...t(/_onedom/, () => ['--middomain', '0']), ...t(/_nest/, () => ['--nestedmid', '1']), ...t(/_lay(\d)/, () => ['--midlayers', m(v, /_lay(\d)/)[1]]),
@@ -63,9 +63,6 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
       ...t(/_bcl(\d+)/, () => ['--stoneclusters', m(v, /_bcl(\d+)/)[1]]),       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
-      ...(/_sep([3-9])/.test(v) ? ['--inkk', '.396,.481,.619', '--inkkscale', m(v, /_sep([3-9])/)[1]] : /_sep2/.test(v) ? ['--inkk', '.396,.481,.619', '--inkkscale', '2'] : /_sep/.test(v) ? ['--inkk', '.396,.481,.619'] : []),
-      ...t(/_ink[234]/, () => ['--closinglines', '100000', '--closingpressure', '1', '--closingedgemin', '0']),
-      ...(/_ink[24]/.test(v) ? ['--drawwant', '1'] : /_ink3/.test(v) ? ['--drawwant', '.75'] : []),
       ...(/_rec2x/.test(v) ? ['--recesslayers', '2', '--recessshare', '.75'] : /_rec2/.test(v) ? ['--recesslayers', '2'] : []),
       ...t(/_rcl/, () => ['--recessclean', '1']), 
       ...t(/_tp(\d)/, () => ['--touchpoints', m(v, /_tp(\d)/)[1], '--touchgain', '.6']),
@@ -76,8 +73,6 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_efade/, () => ['--edgefade', '1.2']), ...t(/_stone/, () => ['--layertexture', '1', '--texshort', '1', '--texpress', '.5']),
       ...(/_stub2/.test(v) ? ['--texshort', '1', '--texpress', '.6'] : /_stub/.test(v) ? ['--texshort', '1'] : []),
       ...(/_softs/.test(v) ? ['--softsplit', '1', '--softarcs', '12', '--softarclen', '40', '--softmm', '0.7'] : /_soft/.test(v) ? ['--softarcs', '8', '--softarclen', '48', '--softmm', '1.0'] : []),
-      ...t(/_ol(\d+)/, () => ['--openinglines', m(v, /_ol(\d+)/)[1]]), ...t(/_uncap/, () => ['--openinglines', '100000', '--closinglines', '100000']),
-      ...t(/_opp(\d+)/, () => ['--openingpressure', hundredth(v, /_opp(\d+)/)]),       ...t(/_dwg(\d+)/, () => ['--drawwidthgain', hundredth(v, /_dwg(\d+)/)]), ...t(/_dwm(\d+)/, () => ['--drawwidthmin', hundredth(v, /_dwm(\d+)/)]),
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
       '--drawing', 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
@@ -147,17 +142,33 @@ export function layerBase({ variant, build, architecture = false, trumbull = fal
 // urban-sketch's own wash is a single 25% band (near-blank sheets); its cells get the ink-and-wash value floor
 const valueFloorFor = config => { const s = config?.styleSelection; const styles = [s?.style, ...Object.values(s?.regions ?? {}).map(r => r?.style)]; return styles.includes('urban-sketch') ? 'ink-and-wash' : null; };
 
-// options a plan may never set: the subject, size, guard, seed, recording and stops are the harness's
-const LOCKED_OPTIONS = new Set(['image', 'width', 'scale', 'sheetmm', 'out', 'targetguard', 'gpu', 'mode', 'seed', 'frames', 'marks', 'video', 'runcache', 'valueplan',
-  'allowunused', 'allowunusedplan', 'physical', 'paperphysical', 'wetframes', 'passframes', 'pausedir', 'resumestate', 'recipe', 'valuepreviewonly']);
+// Only artistic controls belong to model plans; execution and ink safety stay with the harness.
+const numeric = (min, max) => v => v.trim() !== '' && Number.isFinite(Number(v)) && Number(v) >= min && Number(v) <= max;
+const choice = values => v => values.includes(v);
+export const ALLOWED_EXTRA_ARGS = Object.freeze({
+  darkgain: numeric(0, 3), coolgain: numeric(0, 3), midgain: numeric(0, 3),
+  midlayers: v => numeric(0, 8)(v) && Number.isInteger(Number(v)),
+  paints: v => /^[a-z]+(?:,[a-z]+)*$/.test(v),
+  drawing: choice(['first', 'both', 'last', 'none']),
+  outlinemedium: choice(['graphite', 'ink', 'none', 'auto']),
+  inkprofile: choice(['sepia-ink', 'black-ink']),
+  valuefloor: choice(['ink-and-wash', 'precise-watercolor', 'urban-sketch', 'atmospheric-wet']),
+  focusmap: v => /\.json$/i.test(v),
+});
 const isPathLike = v => path.isAbsolute(v) || v.includes('/') || v.includes('..');
 /** Problems with extra-args.json (empty = fine): locked options, and path values that leave the plan folder. */
 export function checkExtraArgs(extra, planDir) {
   const bad = []; if (!extra) return bad;
   if (!Array.isArray(extra) || !extra.every(a => typeof a === 'string')) return ['extra-args.json must be a JSON array of strings'];
   const root = fs.existsSync(planDir) ? fs.realpathSync(planDir) : path.resolve(planDir);
-  for (const a of extra) {
-    if (a.startsWith('--')) { const k = a.slice(2).split('=')[0]; if (LOCKED_OPTIONS.has(k)) bad.push('extra-args.json may not set --' + k); continue; }
+  for (let i = 0; i < extra.length;) {
+    const flag = extra[i++];
+    const key = flag.startsWith('--') ? flag.slice(2) : '';
+    const validate = Object.hasOwn(ALLOWED_EXTRA_ARGS, key) ? ALLOWED_EXTRA_ARGS[key] : null;
+    if (!validate) bad.push('extra-args.json may not set ' + flag);
+    if (i === extra.length || extra[i].startsWith('--')) { bad.push('extra-args.json missing value for ' + flag); continue; }
+    const a = extra[i++];
+    if (validate && !validate(a)) bad.push('extra-args.json invalid value for ' + flag + ': ' + a);
     if (!isPathLike(a)) continue;
     if (!/\.json$/i.test(a)) bad.push('extra-args.json path values must be .json files inside the plan folder: ' + a);
     let r = path.resolve(planDir, a), tail = '';

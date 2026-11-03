@@ -47,10 +47,11 @@ All files go in `bench/plan/` unless stated.
      region styles create such edges unless they follow real edges in the target or stay small. The check below runs
      the painter's planning step and catches this.
 2. **Drawing paths: `opening-lines.json` (lines drawn before the washes) and `closing-lines.json` (lines drawn
-   last).** The harness draws `opening-lines.json` in pencil and runs no closing pen. To draw in ink, put `--outlinemedium
-   ink` in `extra-args.json`; to also draw the closing lines, add `--drawing both`. Optional extra files `closingink-lines.json` (used as the closing lines by tokens `_ink2`/`_ink3`) and
-   `closingink4-lines.json` (used by `_ink4`, which is in the base recipe: if this file is absent, `closing-lines.json` is
-   used). Without a drawing file the painter draws from its own reading of the target. Schema:
+   last).** Set `drawing.medium: "ink"` in `config.json` for ink, or use `--outlinemedium ink`
+   in `extra-args.json`. Add `--drawing both` only when closing lines have a stated purpose.
+   Prepared paths use the harness-owned v2 ink rules: source support, smoothing, darkness caps and damp pen.
+   Raw v1 ink controls and legacy ink/sep/uncap/dwg tokens are not admitted. Without a drawing file the painter
+   draws from its own reading of the target. Schema:
    `{"image":{"w":W,"h":H}, "lines":[{"points":[[x,y],...], "width":1, "weight":1, ...}], "medium":"ink"}` with
    `image` equal to the target's pixel size and points in target pixels. At most 4000 lines and 400000 points per file.
    An empty `lines` list with `"medium":"none"` draws nothing. Tracers you may run:
@@ -58,17 +59,19 @@ All files go in `bench/plan/` unless stated.
    `node bench/tools/closing-ink.mjs` (read its header).
 3. **`bench/variant.txt` (required): recipe tokens.** `region_w13` or `region_w15` followed by `_token`s, e.g.
    `region_w13_lay2_dk11`. Write only what you want to change: the base is applied automatically. A token you write
-   replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`, `_sep4` replaces `_sep8`,
-   `_ink2` replaces `_ink4`). A token that changes nothing on this subject is refused. Stone-block tokens of the base act
+   replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`). A token that changes nothing on this subject is refused. Stone-block tokens of the base act
    on architecture only; palette tokens (`_pwarm`, `_pgold`, `_pgreen`, `_pbs`, `_rv`) act only on Trumbull; elsewhere
    choose pigments with `--paints` in `extra-args.json`. `region_w15` switches to brush choice per passage. The full
    token list with the painter options each sets is in `bench/TOKENS.md`.
 4. **`extra-args.json` (optional): painter settings.** A JSON array of painter options and values, appended last (they
    win over the recipe), e.g. `["--darkgain","1.1","--paints","ochre,sienna,ultramarine,cerulean,sepia"]`. Options are
-   the `opt('name')`/`num('name')` reads in `tools/paint-plate.mjs` and the files it imports. Locked (refused): `--image
-   --width --scale --sheetmm --out --targetguard --gpu --mode --seed --frames --marks --video --runcache --valueplan
-   --allowunused --physical --paperphysical --wetframes --passframes --pausedir --resumestate --recipe
-   --valuepreviewonly`. A value that is a path must name a `.json` file inside `bench/plan/`. An option nothing reads
+   limited to `--darkgain`, `--coolgain`, `--midgain` (0–3), `--midlayers` (integer 0–8),
+   `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
+   `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),
+   `--valuefloor` (a style name), and `--focusmap` (a `.json` file inside the plan folder).
+   Every option needs a separate value. All other options are refused, including segmentation, dirty-code
+   bypasses, ink recipes/resolution, speed, awareness and physics controls. The config drawing takes precedence
+   over template and extra drawing flags. An option nothing reads
    {UNREAD_OPTION}. Pigment names: `src/paint/methods/material-profiles.mjs`.
 5. **`bench/PLAN.md` (required): your plan in words.** Reference cues, each region's technique and order, moisture and
    load, protected lights, edges, values, what would show failure, and (V5) what you changed and why. Recorded, not
