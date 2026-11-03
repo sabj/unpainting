@@ -113,7 +113,7 @@ function presetArgv(names, argv) {
 
 // The command line with the recipe's flags, the presets' flags and the plan's drawing flags in front of it, and the
 // line to log about the choice. No --recipe means the default recipe, except on an --areaplan run. An unknown recipe
-// name adds no recipe flags; an unknown preset name throws.
+// name or preset throws. With recipe none, the plan overrides the harness template.
 export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const argv = styleAlias(given0);
   const plan = readPlan(argv, root);
@@ -130,9 +130,9 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const tail = [...extra, ...sheet, ...drawing];
   const describe = note => [note, presets.length ? `presets ${presets.join(', ')}` : null, plan?.drawing ? 'drawing from the plan' : null].filter(Boolean).join(', ');
   if (name === null) return tail.length ? { argv: [...tail, ...argv], note: describe('no recipe') } : { argv, note: null };
-  if (name === 'none') return { argv: [...tail, ...argv], note: describe('recipe none') };
+  if (name === 'none') return { argv: [...argv, ...tail], note: describe('recipe none') };
   const preset = RECIPES[name];
-  if (!preset) return { argv: [...tail, ...argv], note: describe(`recipe ${name} (unknown, ignored)`) };
+  if (!Object.hasOwn(RECIPES, name)) throw new Error(`unknown recipe ${name}`);
   const flags = preset.split(' ');
   // Pen-and-wash uses its source-toned sheet and a lean wash palette. Methods meant for colorful paintings should not
   // recolor sepia studies.
@@ -146,13 +146,14 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const expanded = [...flags, ...tail, ...argv];
   // Collapse scalar options once. A CLI physics override merges named coefficients.
   const values = new Map();
-  for (let i=0;i<expanded.length;i+=2) {
-    const key=expanded[i], value=expanded[i+1];
+  for (let i=0;i<expanded.length;) {
+    const key=expanded[i++];
+    const value = i < expanded.length && !expanded[i].startsWith('--') ? expanded[i++] : undefined;
     if (combined && key === '--physics' && values.has(key)) {
       const fields = new Map(values.get(key).split(',').map(s=>s.split('=')));
       for (const kv of value.split(',')) {const [k,v]=kv.split('='); fields.set(k,v);}
       values.set(key,[...fields].map(([k,v])=>`${k}=${v}`).join(','));
     } else values.set(key,value);
   }
-  return { argv: [...values].flat(), note: describe(`recipe ${name}`), pipeline: pipeline?.plan ?? null };
+  return { argv: [...values].flatMap(([key, value]) => value === undefined ? [key] : [key, value]), note: describe(`recipe ${name}`), pipeline: pipeline?.plan ?? null };
 }
