@@ -718,6 +718,7 @@ export class GpuSheet {
     if (process.env.DRY_TRACE2) { const z=new Uint32Array(await this.readWords("CTR",64)); console.error(`CUM tileSteps=${z[8]} mTileSteps=${z[9]} steps=${z[10]} wetTileSteps=${z[11]}`); }
     if (process.env.DRY_TRACE2) console.error(`DRYT t=${S.t} fastAt=${S.fastAt} level=${S.level} levelMax=${S.levelMax} dt=${S.dt} tail=${S.analyticTail} tailUsed=${!!S.analyticTailUsed} adaptive=${!!S.adaptiveUsed} damp=${!!S.dampOnly} dampAt=${S.dampAt} cnt=${S.lastCounters?.[0]} hist=${(S.hist??[]).join(",")}`);
     let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} this.lastStillWet = 0; if (c[1] !== 0) { if (!S.allowWet) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`); this.lastStillWet = c[1]; this.evaporateInPlace(); }
+    this.lastDryZero = !!(S.analyticTailUsed || c[1] !== 0);
     this.setOptions({ dt: S.oLevel });
     const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
     return S.t;

@@ -1,4 +1,5 @@
 // Generated from src/media/sheet.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { certifyZeroPaper, invalidatePaperCertificate } from './paper-certificate.js';
 import { censusDry } from './census.js';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -72,7 +73,7 @@ const I32 = n => (PAR ? PAR.shared(Int32Array, n) : new Int32Array(n));
 // below that read or write the whole sheet bring the CPU copy up to date first (coherent) and, when they write it, say
 // so (wrote). With `_gpu` unset none of this runs and the sheet is exactly the CPU reference.
 export const coherent = sheet => { if (sheet._gpu) sheet._gpu.syncAll(sheet); };
-const wrote = sheet => { if (sheet._gpu) sheet._gpu.cpuWroteAll(); };
+const wrote = sheet => { invalidatePaperCertificate(sheet); if (sheet._gpu) sheet._gpu.cpuWroteAll(); };
 
 export function createSheet(paper, pigments) {
   const { w, h, n } = paper;
@@ -94,6 +95,7 @@ export function createSheet(paper, pigments) {
 
 /** Water and pigment masses added at a cell. */
 export function deposit(sheet, i, water, pig) {
+  invalidatePaperCertificate(sheet);
   sheet.W[i] += water; sheet.M[i] = 1; sheet.ever[i] = 1; sheet.wetDirty = 1;
   if (pig) for (let k = 0; k < sheet.K; k++) if (pig[k]) sheet.G[k][i] += pig[k];
 }
@@ -230,6 +232,7 @@ export function blot(sheet, mask, { strength = 0.85, pigmentShare = 0.9 } = {}) 
 /** A touch too dry to stand as water: the water goes into the pores (any excess stays as a film) and the pigment
  *  is laid on the fibres it touched. */
 export function depositDry(sheet, i, water, pig) {
+  invalidatePaperCertificate(sheet);
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // it stands on the film, it does not soak in
   const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), into = Math.min(room, water);
   sheet.s[i] += into; sheet.wetDirty = 1;
@@ -241,6 +244,7 @@ export function depositDry(sheet, i, water, pig) {
  *  the fibres; the rest stands on the surface as water carrying its pigment. A dry-brush film soaks in where it lands;
  *  a loaded brush leaves most of its water standing, and that flows as a wash. */
 export function soak(sheet, i, water, pig) {
+  invalidatePaperCertificate(sheet);
   if (water <= 0) return;
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // sealed: everything stays on the surface
   const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]) * (sheet.M[i] ? 0.3 : 1), into = Math.min(room, water), f = into / water;
@@ -261,9 +265,9 @@ const depositScaled = (sheet, i, water, pig, g) => {
 
 // The part of the sheet still worth working: what is wet, plus pores still holding water. Paper this close to dry is
 // finished, and leaving it out keeps every later step cheap.
-const bounds = sheet => {
+const bounds = (sheet, state = null) => {
   const { w, h, M, s, paper } = sheet; let x0 = w, x1 = -1, y0 = h, y1 = -1;
-  for (let y = 0; y < h; y++) { const r = y * w; for (let x = 0; x < w; x++) if (M[r + x] || s[r + x] > 0.02 * paper.capacity[r + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+  for (let y = 0; y < h; y++) { const r = y * w; for (let x = 0; x < w; x++) { if (state && (sheet.W[r + x] !== 0 || s[r + x] !== 0)) state.zero = false; if (M[r + x] || s[r + x] > 0.02 * paper.capacity[r + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } } }
   return x1 < 0 ? null : [Math.max(0, x0 - 2), Math.max(0, y0 - 2), Math.min(w - 1, x1 + 2), Math.min(h - 1, y1 + 2)];
 };
 
@@ -397,6 +401,7 @@ let STROKEFLOWS = null, STROKESTEP = null;
 export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 
 export function step(sheet, o = DEFAULTS, reduction = null) {
+  invalidatePaperCertificate(sheet);
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
   if (TAPE && sheet._tape) { if (STROKEFLOWS) STROKEFLOWS.push(STROKESTEP()); else TAPE.push({ k: 'f' }); }
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
@@ -870,6 +875,7 @@ function boxDryStats(sheet, [x0, y0, x1, y1]) {
  * the dry then runs on between them rather than stopping at every step; the CPU dry calls onStep at every step either way).
  */
 export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, onStep = null, steps = null, analyticTail = false } = {}) {
+  invalidatePaperCertificate(sheet);
   censusDry(sheet);
   if (TAPE && sheet._tape) TAPE.push({ k: 'y', m: max, l: level, lm: levelMax, lt: levelTol, dt, ...(analyticTail ? {at:true} : {}) });
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
@@ -879,6 +885,7 @@ export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4
   if (link && !link.paused) {
     const t = link.dry(sheet, max, o, { level, levelMax, levelTol, dt, analyticTail: analyticTail && !onStep, allowWet: true }, onStep ? { onStep, steps } : null);
     if (link.lastStillWet) { const wetCells = link.lastStillWet; link.lastStillWet = 0; check(DRY_LIMIT, false, { max, wetCells, gpu: true }); }
+    if (link.lastDryZero) certifyZeroPaper(sheet);
     return t;
   }
   return dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail });
@@ -933,8 +940,10 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
     // a caller watching the sheet dry (frames of a wash spreading and settling)
     if (onStep) onStep(t);
   }
-  if (bounds(sheet)) { check(DRY_LIMIT, false, { max, ...wetness(sheet) }); evaporateInPlace(sheet); }
+  const state = {zero:true};
+  if (bounds(sheet, state)) { check(DRY_LIMIT, false, { max, ...wetness(sheet) }); evaporateInPlace(sheet); state.zero = true; }
   fix(sheet);
+  if (state.zero) certifyZeroPaper(sheet);
   return t;
 }
 

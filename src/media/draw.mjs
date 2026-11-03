@@ -1,3 +1,4 @@
+import { hasZeroPaperCertificate } from './paper-certificate.mjs';
 // Pipeline: inking, stage 6 (gestures drawn with the pen).
 // Planned gestures drawn with the pen on the wash sheet. Pressure follows how much ink the plan wants under the
 // point and speed runs the other way. The pen re-dips when it runs low. DOM free.
@@ -84,6 +85,7 @@ export function lineBudget(gestures, cells, { width = 1.5 } = {}) {
 export function dryPenGate({ O, audit = [], drySheet = dry } = {}) {
   return ({ sheet, pen, footprint, index }) => {
     const measure = () => {
+      if (hasZeroPaperCertificate(sheet)) return {water:0,pore:0};
       if(sheet._gpu)(sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet,footprint);
       const [x0,y0,width,height] = footprint;
       let water = 0, pore = 0;

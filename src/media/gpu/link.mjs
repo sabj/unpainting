@@ -498,6 +498,7 @@ export class GpuLink {
    * time). `steps`, the t that matter to the watcher, lets the GPU run on between them; without it the dry stops at every step.
    */
   dry(sheet, max, o, params, watch = null) {
+    this.lastDryZero = false;
     this.notPlanning('a dry');
     if(this.resident && process.env.GPU_ASYNC_DRY==='1' && !watch && max>0 && !this.frameWorkerActive){
       if(this.needFullUp)this.fullUp(sheet);this.applyOptions(o);
@@ -529,7 +530,7 @@ export class GpuLink {
       }
       this.call({ op: 'dryEnd', topMask: this.topMask });
     }
-    const K = this.K, n = this.n, ctrl = this.ctrl;
+    const K = this.K, n = this.n, ctrl = this.ctrl, dryZero = this.ctrl[12] === 1;
     this.lastStillWet = ctrl[6]; // read by sheet.mjs dry, which records the continued check
     if (ctrl[5]) {
       // the superseded layer comes back for the pigments it holds; the new one gets planes for the pigments it holds and
@@ -544,6 +545,7 @@ export class GpuLink {
     this.boundDeferredLayers(sheet);
     this.wetMask = 0; this.syncAct(); // dried: nothing is wet or unfixed, and what is in the newest layer is what was just fixed
     this.stale = true; this.topStale = true; this.fresh.stale(); this.stats.drys++; this.stats.dryMs += performance.now() - t;
+    this.lastDryZero = dryZero;
     this.stats.drySolverIterations=(this.stats.drySolverIterations??0)+ctrl[1];this.stats.drySolverCalls=(this.stats.drySolverCalls??0)+1;
     return ctrl[1];
   }
