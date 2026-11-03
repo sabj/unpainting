@@ -451,7 +451,7 @@ function tapeStroke(brush, sheet, path, { spacing, lift, upright, splat = false 
   let rec = TAPE && brush._tapeId !== undefined && sheet._tape ? [] : null;
   // Only the painting's own sheet records; scrap test sheets do not.
   if (TAPE && brush._tapeId !== undefined && sheet._tape) TAPE.push({
-    k: 's', b: brush._tapeId, points: path.map(p=>({...p})),
+    k: 's', b: brush._tapeId, ...(sheet._commandId !== undefined ? { cid: sheet._commandId } : {}), points: path.map(p=>({...p})),
     u: upright === false ? 0 : upright === true ? 1 : 2,
     // prewet strokes: sheet.wetting marks sheet.ever, which bounds where later washes creep
     ...(sheet.wetting ? { wt: 1 } : {}),

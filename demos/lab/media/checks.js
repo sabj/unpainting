@@ -14,6 +14,8 @@ export const CONTINUED_FILE = 'continued-checks.json';
 const EXAMPLES = 5;
 let strict = false;
 let checks = new Map();
+const failureHooks = new Set();
+export function onCheckFailure(hook) { failureHooks.add(hook); return () => failureHooks.delete(hook); }
 
 /** Turn the old stops back on (--strict 1, or its older alias --wetgate 1). */
 export function setStrict(on) { strict = !!on; }
@@ -28,6 +30,7 @@ export function resetChecks() { strict = false; checks = new Map(); }
  */
 export function check(name, ok, details = {}, { onFail = null } = {}) {
   if (ok) return true;
+  for (const hook of failureHooks) hook();
   if (typeof name !== 'string' || !name) throw new TypeError('check needs a name');
   const text = describe(details);
   if (strict) throw new Error(text ? `${name} ${text}` : name);

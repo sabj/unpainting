@@ -71,8 +71,8 @@ test('actual production support callback writes event to captured output directo
   const sh={_semantic:{area:{id:'cat'},key:'cat/source-values',pass:{brush:{orientation:'sweep'}}}};
   let primaryCellCount=3;
   const predict=(actualBrush,actualSheet,points,options)=>{assert.equal(actualBrush,brush);assert.equal(actualSheet,sheet);assert.equal(options.upright,'sweep');assert.deepEqual(points,gesture);return {primaryCellCount};};
-  const create=new Function('fs','path','out','AREA_NUMERIC_SEQUENCE','productionChargeSupported','candidateContact','brush','sheet','sh','AREA_NUMERIC_CONTACT_STOP',declaration+'\nreturn supportedCharge;');
-  const supported=create(fs,nodePath,out,{shapeKey:'shape-A'},productionChargeSupported,predict,brush,sheet,sh,null);
+  const create=new Function('JSONL','path','out','AREA_NUMERIC_SEQUENCE','productionChargeSupported','candidateContact','brush','sheet','sh','AREA_NUMERIC_CONTACT_STOP',declaration+'\nreturn supportedCharge;');
+  const supported=create({append:fs.appendFileSync},nodePath,out,{shapeKey:'shape-A'},productionChargeSupported,predict,brush,sheet,sh,null);
   const gesture=[{x:294.886,y:229.675,r:2.89,p:.35},{x:508.886,y:229.675,r:2.89,p:.35}];
   assert.equal(supported(gesture),true);primaryCellCount=0;assert.equal(supported(gesture),false);
   const rows=fs.readFileSync(nodePath.join(out,'semantic-commands.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
