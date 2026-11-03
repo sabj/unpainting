@@ -1,0 +1,174 @@
+{
+  "referenceCommit": "41e68683a95612475be35d3d2dabb53dcd470873",
+  "manifestSHA256": "96105fb5e8e71c405994f6dcf8699091d2f4040f56dc953c0f023015012b37ff",
+  "node": "v25.8.2",
+  "platform": "darwin",
+  "arch": "arm64",
+  "encoders": {
+    "aom": "3.15.1",
+    "archive": "3.8.9",
+    "cairo": "1.18.6",
+    "cgif": "0.5.4",
+    "exif": "0.6.26",
+    "expat": "2.8.5",
+    "ffi": "3.8.0",
+    "fontconfig": "2.18.3",
+    "freetype": "2.14.3",
+    "fribidi": "1.0.17",
+    "glib": "2.90.0",
+    "harfbuzz": "14.5.0",
+    "heif": "1.23.5",
+    "highway": "1.4.0",
+    "imagequant": "2.4.1",
+    "lcms": "2.19.1",
+    "mozjpeg": "0826579",
+    "pango": "1.58.2",
+    "pixman": "0.46.4",
+    "png": "1.6.58",
+    "proxy-libintl": "0.5",
+    "rsvg": "2.63.2",
+    "tiff": "4.7.2",
+    "uhdr": "2.0.2",
+    "vips": "8.18.7",
+    "webp": "1.6.0",
+    "xml2": "2.15.4",
+    "zlib-ng": "2.3.3",
+    "sharp": "0.35.5"
+  },
+  "webgpuVersion": "0.6.2",
+  "results": [
+    {
+      "id": "inkres-96-cpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "cpu",
+      "adapter": null,
+      "mode": "fast",
+      "sha256": "36a33007cba876ea60a95a396d152fea863e0d84120f0a0a1daccfd86f468f1d",
+      "status": "recorded"
+    },
+    {
+      "id": "inkres-96-gpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "fast",
+      "sha256": "b669509649fc26df39aca3893037943dedb5911eabbfa6a5dd444ee4216486f9",
+      "status": "recorded"
+    },
+    {
+      "id": "valueplan-96-cpu",
+      "unusedOptions": [
+        "--skylanemm",
+        "--skylanes",
+        "--skylanestep"
+      ],
+      "exit": 3,
+      "backend": "cpu",
+      "adapter": null,
+      "mode": "fast",
+      "sha256": "02593ed71be0eb9857156ab272c17fa8065dedb8bd15e2f5ec99ca5f3061988a",
+      "status": "recorded"
+    },
+    {
+      "id": "valueplan-96-gpu",
+      "unusedOptions": [
+        "--skylanemm",
+        "--skylanes",
+        "--skylanestep"
+      ],
+      "exit": 3,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "fast",
+      "sha256": "ff20a570eb276d71965e7bbdf897ee9ce7c544e7e977a96144225db1ab2fe1a1",
+      "status": "recorded"
+    },
+    {
+      "id": "general-96-cpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "cpu",
+      "adapter": null,
+      "mode": "fast",
+      "sha256": "21cb3ddbe45e6a494c608678f5b7e8230b5a0b29df37a76f9baa486d9e466581",
+      "status": "recorded"
+    },
+    {
+      "id": "general-96-gpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "fast",
+      "sha256": "624b7acea71b63ec8f0418e6f8b2f54959faea5fe2c612679def3156e32abf64",
+      "status": "recorded"
+    },
+    {
+      "id": "general-full-96-cpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "cpu",
+      "adapter": null,
+      "mode": "full",
+      "sha256": "7e2cf57b12768a7611fb0f6980ce442ce012d9b0b29113e834e8310141019f4c",
+      "status": "recorded"
+    },
+    {
+      "id": "general-full-96-gpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "full",
+      "sha256": "c3ca31f0179f5af61d0c9cc19abfc80a787fb998c853f3798a0d6a00cf4d5cd1",
+      "status": "recorded"
+    },
+    {
+      "id": "dry-limit-cpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "cpu",
+      "adapter": null,
+      "mode": "full",
+      "sha256": "97ddaab2d70316ce07fd73ec31cccbe42d2e622beae19784b77101707bbb8ed6",
+      "status": "recorded"
+    },
+    {
+      "id": "dry-limit-gpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "full",
+      "sha256": "97ddaab2d70316ce07fd73ec31cccbe42d2e622beae19784b77101707bbb8ed6",
+      "status": "recorded"
+    }
+  ]
+}

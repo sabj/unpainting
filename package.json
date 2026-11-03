@@ -23,7 +23,8 @@
     "doctor": "node tools/doctor.mjs",
     "bench:add-target": "node bench/scripts/add-target.mjs",
     "bench:suite": "node bench/scripts/suite.mjs",
-    "bench:lite": "node bench/scripts/suite.mjs --profile lite"
+    "bench:lite": "node bench/scripts/suite.mjs --profile lite",
+    "parity:test": "node tools/speed/class-a-gate.mjs"
   },
   "dependencies": {
     "sharp": "^0.35.4",

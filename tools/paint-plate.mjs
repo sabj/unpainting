@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { writeCensus } from './speed/census-write.mjs';
 import { writeRunCard } from '../src/paint/run-card.mjs';
 import { check, setStrict, writeContinuedChecks } from '../src/media/checks.mjs';
 import { reservedContact, withReserveClip } from './painter/reserve-clip.mjs';
@@ -4196,3 +4197,5 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
 writeRunCard({ root, out, args: argv0, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), code: CODE_STATE, segments: SEGMENTS_RECORD, linework: LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
+
+writeCensus(out, { main: sheet, fine: INKRES?.fine });

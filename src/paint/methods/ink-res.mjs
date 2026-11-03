@@ -1,3 +1,4 @@
+import { census } from '../../media/census.mjs';
 // Pipeline: inking, stage 6 (pen on the fine sheet).
 // --inkres N: the pens draw on their own sheet at N times the painting's resolution, so thin lines keep their taper.
 // New ink is averaged down onto the painting's sheet as pigment, so later glazes lie over it. The fine sheet has no
@@ -73,6 +74,11 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
   // the new fine ink, averaged over each coarse cell, deposited on the painting's sheet: settled where the painting's
   // sheet is dry, suspended in the water where a wash stands wet, so it moves with that wash as the pen's ink did
   function carry() {
+    if (!census) return carryImpl();
+    const t = performance.now(); census.inkres.carryCalls++;
+    try { return carryImpl(); } finally { census.inkres.carryMs += performance.now() - t; }
+  }
+  function carryImpl() {
     coherent(main); // bring the GPU's copy down first, so what is written here is added to the real state
     let wrote = false;
     for (let k = 0; k < K; k++) {
@@ -97,6 +103,11 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
 
   /** The painting at N times its width: `lo` is the painting's own render (RGB bytes, W2 by H2). */
   function compose(lo) {
+    if (!census) return composeImpl(lo);
+    const t = performance.now(); census.inkres.composeCalls++;
+    try { return composeImpl(lo); } finally { census.inkres.composeMs += performance.now() - t; }
+  }
+  function composeImpl(lo) {
     const inkH = renderLayers([pigments.map((_, k) => fineTotal(k))], pigments, whiteH, nH, 1);
     const inkL = renderLayers([inkLo], pigments, white, nL, 1);
     const out = Buffer.alloc(nH * 3);
