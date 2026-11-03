@@ -131,3 +131,17 @@ test('experimental pigment properties and sheet-tone stages require an explicit 
  const explicit=expandRecipe({argv:['--flocearth','.2','--crosshatch','1']}).argv;
  assert.equal(explicit[explicit.lastIndexOf('--flocearth')+1],'.2');
 });
+
+test('recipe none gives plan drawing precedence over template defaults', () => {
+  const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', 'examples/plans/trumbull-values.json', '--outlinemedium', 'graphite'] });
+  assert.equal(argv[argv.lastIndexOf('--outlinemedium') + 1], 'ink');
+});
+test('standalone flags do not shift scalar collapse, including negative values', () => {
+  const { argv } = expandRecipe({ argv: ['--verbose', '--midlayers', '2', '--probe', '--offset', '-2', '--midlayers', '3', '--end'] });
+  assert.equal(argv[argv.indexOf('--midlayers') + 1], '3');
+  assert.equal(argv.filter(v => v === '--midlayers').length, 1);
+  assert.deepEqual(argv.slice(-5), ['--verbose', '--probe', '--offset', '-2', '--end'].slice(-6));
+});
+test('unknown recipe names throw, including inherited object names', () => {
+  for (const name of ['typo', 'toString']) assert.throws(() => expandRecipe({argv: ['--recipe', name]}), /unknown recipe/);
+});
