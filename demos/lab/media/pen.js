@@ -1,4 +1,5 @@
 // Generated from src/media/pen.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { invalidatePaperCertificate } from './paper-certificate.js';
 import { census, censusMark } from './census.js';
 // Pipeline: inking, stage 6 (the pen physics).
 // A dip pen with walnut ink, after Kim et al., "Hydrodynamics of Writing with Ink" (PRL 107, 2011): the paper pulls
@@ -158,6 +159,7 @@ export function penRect(pen, sheet, path) {
 }
 
 export function penStroke(pen, sheet, path, options = {}) {
+  invalidatePaperCertificate(sheet);
   const link = sheet._gpu;
   if (!link || link.paused || !path.length) return penStrokeImpl(pen, sheet, path, options);
   link.beginStroke(sheet, penRect(pen, sheet, path), { tracked: !options.between || options.gpuBetween === true, instrument:'pen', periodic:options.gpuBetween===true&&typeof options.between==='function', flowEvery:options.flowEvery??0 });

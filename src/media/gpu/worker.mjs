@@ -124,6 +124,7 @@ async function handleOp(m) {
       // fix(): the layer it supersedes comes back through layerData, the deposit becomes the new top layer
       const defer = gpu.resident && !framePort;
       const r = await gpu.fix(gpu.hasTop && !defer ? layerData.subarray(0, gpu.K * gpu.n) : null, m.topMask, defer);
+      ctrl[12] = gpu.lastDryZero ? 1 : 0; // exact whole-sheet zero water/pore certificate
       driedMask(r);ctrl[9] = r.archive ?? 0;
       ctrl[4] = r.hadTop ? 1 : 0; ctrl[5] = r.pushed ? 1 : 0; ctrl[7] = r.topMask ?? 0;
       // the superseded layer is now under the top: the frame worker lays it into its composite

@@ -1,3 +1,4 @@
+import { certifyZeroPaper } from '../../media/paper-certificate.mjs';
 import { census } from '../../media/census.mjs';
 // Shadow technique choice (wet blend or dry layer) from measured edge widths, and paper-state gates that hold a
 // stroke until its paper is dry or moist enough. No physics overrides.
@@ -105,7 +106,9 @@ export function strokeCells(sheet, points, radius) {
 // certificate, not an assumption that dry() exhausted all pore moisture.
 export function measurePaperDry(sheet) {
   const cells = { length: sheet.n, *[Symbol.iterator]() { for (let i = 0; i < sheet.n; i++) yield i; } };
-  return measurePaper(sheet, cells, true, { stats: 'gate', bounds: [0, 0, sheet.w - 1, sheet.h - 1] });
+  const state = measurePaper(sheet, cells, true, { stats: 'gate', bounds: [0, 0, sheet.w - 1, sheet.h - 1] });
+  if (state.waterMax === 0 && state.saturationMax === 0) certifyZeroPaper(sheet);
+  return state;
 }
 
 export function measurePaper(sheet, cells, paperOnly = false, options = {}) {

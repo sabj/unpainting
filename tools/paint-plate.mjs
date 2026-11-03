@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { invalidatePaperCertificate } from '../src/media/paper-certificate.mjs';
 import { EpochCells } from '../src/paint/epoch-cells.mjs';
 import { createJSONLWriter } from './painter/jsonl-writer.mjs';
 import { writeCensus } from './speed/census-write.mjs';
@@ -3132,6 +3133,7 @@ const awareSave = async (dir, at) => {
   console.log(`aware: painting saved at ${awareWhere(at)} (${r.arrays} arrays, ${r.zeros} empty, ${(r.bytes / 1e6).toFixed(1)} MB) in ${dir}`);
 };
 const awareRestore = () => {
+  invalidatePaperCertificate(sheet);
   const st = readState(RESUME_DIR), at = st.at;
   if (JSON.stringify(at) !== JSON.stringify(RESUME_AT)) throw new Error('aware: boundary.json and state.json disagree');
   const bad = awareUnsupported(); if (bad.length) throw new Error('aware: cannot take over a saved painting with ' + bad.join(', '));
