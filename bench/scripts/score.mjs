@@ -31,7 +31,7 @@ const runFile = path.resolve(tryDir, 'run.json');
 if (!fs.existsSync(runFile)) fail(`no run.json in ${tryDir}`);
 const run = readJson(runFile);
 const raw = path.resolve(opt('raw', run.raw ? path.join(BENCH, run.raw) : ''));
-const PY = opt('python', 'python3');
+const PY = opt('python', process.env.BENCH_SCORE_PYTHON || 'python3');
 const SCORER = path.join(BENCH, 'scorer');
 const judge = opt('judge', run.settings.budget?.judgeVersion ?? run.judgeVersion ?? 'J1');
 const profile = opt('profile', run.settings.budget?.judgeProfile);

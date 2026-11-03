@@ -289,7 +289,7 @@ export async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
-export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, basePalette = true, profile = benchmarkProfile('full') }) {
+export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, basePalette = true, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
   const subjects = loadSubjects();
   if (profile.planOnly && (round.id !== 'V4' || tries !== 1 || fromTry !== 1)) throw new Error('lite requires V4 try 1 only; use full for repeated trials');
   const log = msg => console.error(`bench:run: ${msg}`);
@@ -349,7 +349,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     // V5: the next try's feedback needs this try's judges
     if (round.learning && n < tries) {
       log(`scoring try ${n} for the next try's feedback`);
-      execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'score.mjs'), tryDir, ...(dry ? ['--dry-run'] : [])], { stdio: 'inherit' });
+      execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'score.mjs'), tryDir, '--python', python, ...(dry ? ['--dry-run'] : [])], { stdio: 'inherit' });
     }
   }
 }
