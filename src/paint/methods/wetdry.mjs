@@ -100,31 +100,40 @@ export function strokeCells(sheet, points, radius) {
   return [...cells];
 }
 
+// Full-sheet dry gates need only fresh water and pore saturation, never pigment.
+// Scan directly: no boxed cell indices or percentile sort. This is a measured
+// certificate, not an assumption that dry() exhausted all pore moisture.
+export function measurePaperDry(sheet) {
+  const cells = { length: sheet.n, *[Symbol.iterator]() { for (let i = 0; i < sheet.n; i++) yield i; } };
+  return measurePaper(sheet, cells, true, { stats: 'gate', bounds: [0, 0, sheet.w - 1, sheet.h - 1] });
+}
+
 export function measurePaper(sheet, cells, paperOnly = false, options = {}) {
   if (!census) return measurePaperImpl(sheet, cells, paperOnly, options);
   const t = performance.now(); census.measurePaper.calls++; census.measurePaper.cells += cells.length;
   try { return measurePaperImpl(sheet, cells, paperOnly, options); }
   finally { census.measurePaper.ms += performance.now() - t; }
 }
-function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false } = {}) {
+function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, stats = 'full', bounds = null } = {}) {
   if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, waterP95: 0, moistShare: 0, dry: true };
   let x0 = sheet.w, x1 = 0, y0 = sheet.h, y1 = 0;
-  for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  if (bounds) [x0, y0, x1, y1] = bounds;
+  else for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   if (sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, [x0, y0, x1 - x0 + 1, y1 - y0 + 1], paperOnly);
-  let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = uniform ? null : [];
+  let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = stats === 'gate' || uniform ? null : [];
   for (const i of cells) {
     const water = sheet.W[i], saturation = sheet.s[i] / Math.max(1e-8, sheet.paper.capacity[i]);
     if (!Number.isFinite(water) || !Number.isFinite(saturation)) throw new Error('Non-finite paper state');
     if (waters) waters.push(water);
-    else if (index === 0) firstWater = water;
-    else if (!Object.is(water, firstWater)) { waters = new Array(index).fill(firstWater); waters.push(water); }
+    else if (stats !== 'gate' && index === 0) firstWater = water;
+    else if (stats !== 'gate' && !Object.is(water, firstWater)) { waters = new Array(index).fill(firstWater); waters.push(water); }
     index++;
     waterMax = Math.max(waterMax, water); saturationMax = Math.max(saturationMax, saturation);
     if (water >= PAPER_STATE.moistWater || saturation >= PAPER_STATE.moistSaturation) moist++;
   }
   if (waters) waters.sort((a, b) => a - b);
-  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, waterP95: waters ? quantile(waters, 0.95) : firstWater, moistShare: moist / cells.length,
+  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, ...(stats === 'gate' ? {} : { waterP95: waters ? quantile(waters, 0.95) : firstWater }), moistShare: moist / cells.length,
     dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
 }
 
