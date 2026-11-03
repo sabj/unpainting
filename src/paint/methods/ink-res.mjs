@@ -1,4 +1,5 @@
 import { census } from '../../media/census.mjs';
+import { certifyZeroPaper, certifyDryFixed, hasZeroPaperCertificate, invalidatePaperCertificate } from '../../media/paper-certificate.mjs';
 // Pipeline: inking, stage 6 (pen on the fine sheet).
 // --inkres N: the pens draw on their own sheet at N times the painting's resolution, so thin lines keep their taper.
 // New ink is averaged down onto the painting's sheet as pigment, so later glazes lie over it. The fine sheet has no
@@ -69,11 +70,17 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
   // (pen.mjs dampOf). Pores hold the same share of their capacity. Cleared again on settle.
   function wet() {
     if (TAPE && fine._tape) TAPE.push({ k: 'W', r: N });
+    if (hasZeroPaperCertificate(main)) {
+      if (wetOn) { fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false; }
+      certifyZeroPaper(fine);
+      return;
+    }
     coherent(main); // the painting's sheet may live on the GPU; read its water from there
     const cf = paper.capacity, cm = main.paper.capacity;
     let any = false;
     for (let i = 0; i < nL; i++) if (main.M[i] || main.s[i] > 0) { any = true; break; }
-    if (!any) { if (wetOn) { fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false; } return; }
+    if (!any) { if (wetOn) { fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false; } certifyZeroPaper(fine); return; }
+    invalidatePaperCertificate(fine);
     for (let y = 0; y < HH; y++) { const yl = (y / N) | 0; for (let x = 0; x < WH; x++) {
       const j = y * WH + x, i = yl * W2 + ((x / N) | 0);
       fine.M[j] = main.M[i]; fine.ever[j] = main.ever[i]; fine.W[j] = main.W[i];
@@ -111,6 +118,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     for (let k = 0; k < K; k++) { const G = fine.G[k], D = fine.D[k]; for (let i = 0; i < nH; i++) if (G[i]) { D[i] += G[i]; G[i] = 0; } }
     fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false;
     fix(fine);
+    certifyDryFixed(fine);
     changed();
   }
 

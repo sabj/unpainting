@@ -1,4 +1,4 @@
-import { certifyZeroPaper, validPaperCertificate } from '../../media/paper-certificate.mjs';
+import { certifyZeroPaper, validPaperCertificate, validWetReachCertificate, queryWetReach } from '../../media/paper-certificate.mjs';
 import { census } from '../../media/census.mjs';
 // Shadow technique choice (wet blend or dry layer) from measured edge widths, and paper-state gates that hold a
 // stroke until its paper is dry or moist enough. No physics overrides.
@@ -124,12 +124,19 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
   if (bounds) [x0, y0, x1, y1] = bounds;
   else for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   if (validPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
+  const reach = queryWetReach(sheet, cells, [x0, y0, x1, y1]);
+  if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
-  if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, [x0, y0, x1 - x0 + 1, y1 - y0 + 1], paperOnly);
+  const freshRect = reach?.rect ?? [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+  if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, freshRect, paperOnly);
+  const wetCells = reach?.wetCells, exactEpoch = reach?.exactEpoch, rBounds = reach?.bounds, sw = sheet.w;
   let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = stats === 'gate' || uniform ? null : [];
   for (const i of cells) {
-    const water = sheet.W[i], saturation = sheet.s[i] / Math.max(1e-8, sheet.paper.capacity[i]);
-    if (!Number.isFinite(water) || !Number.isFinite(saturation)) throw new Error('Non-finite paper state');
+    let water = 0, saturation = 0;
+    if (!reach || (wetCells ? wetCells[i] === exactEpoch : (() => { const y = (i / sw) | 0, x = i - y * sw; return x >= rBounds[0] && x <= rBounds[2] && y >= rBounds[1] && y <= rBounds[3]; })())) {
+      water = sheet.W[i], saturation = sheet.s[i] / Math.max(1e-8, sheet.paper.capacity[i]);
+      if (!Number.isFinite(water) || !Number.isFinite(saturation)) throw new Error('Non-finite paper state');
+    }
     if (waters) waters.push(water);
     else if (stats !== 'gate' && index === 0) firstWater = water;
     else if (stats !== 'gate' && !Object.is(water, firstWater)) { waters = new Array(index).fill(firstWater); waters.push(water); }
@@ -145,7 +152,7 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
 // All groups belong to the same instant. One union readback, with each group's
 // multiplicity and statistics preserved; never reuse this across a material edit.
 export function measurePaperBatch(sheet, groups, paperOnly = false, options = {}) {
-  if (validPaperCertificate(sheet)) return groups.map(({cells, stats = 'full', bounds}) => measurePaper(sheet,cells,paperOnly,{...options,stats,...(bounds ? {bounds} : {})}));
+  if (validPaperCertificate(sheet) || validWetReachCertificate(sheet)) return groups.map(({cells, stats = 'full', bounds}) => measurePaper(sheet,cells,paperOnly,{...options,stats,...(bounds ? {bounds} : {})}));
   const started = census ? performance.now() : 0;
   try {
     let x0 = sheet.w, y0 = sheet.h, x1 = -1, y1 = -1;

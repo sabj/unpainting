@@ -1,4 +1,4 @@
-import { invalidatePaperCertificate } from './paper-certificate.mjs';
+import { invalidatePaperCertificate, beginWetOperation } from './paper-certificate.mjs';
 import { censusMark } from './census.mjs';
 // A brush as a row of bristles across the stroke, based on "Hairy Brushes", with a belly
 // reservoir as in DAB. Water and pigment move as separate masses. One contact model covers every load:
@@ -412,7 +412,7 @@ function splatStrokeGpu(brush, sheet, path, { spacing, between, lift, upright })
 const CPU_TRACE = ENV.CPU_STROKE_TRACE === '1' ? new Map() : null;
 if (CPU_TRACE) process.on('exit', () => { for (const [k, n] of CPU_TRACE) console.error(`CPUSTROKE ${n} ${k}`); });
 export function stroke(brush, sheet, path, options = {}) {
-  invalidatePaperCertificate(sheet);
+  beginWetOperation(sheet);
   censusMark();
   if (brush.model !== 'tuft' && !brush.depositDepth && splats(brush)) return splatStroke(brush, sheet, path, options);
   const link = sheet._gpu;
@@ -440,7 +440,7 @@ export function stroke(brush, sheet, path, options = {}) {
   if (CPU_TRACE && link && !gpuOk) { const k = JSON.stringify({ tuft: brush.model === 'tuft', depth: !!brush.depositDepth, paused: !!link.paused, empty: !path.length, brushGpu: !!link.brushGpu, betweenOk, onGpu: onGpu(brush, sheet), fits, model: brush.model, pathLen: path.length > 2000 ? '>2000' : path.length > 200 ? '>200' : 'small' }); CPU_TRACE.set(k, (CPU_TRACE.get(k) ?? 0) + 1); }
   if (!link || link.paused || !path.length) return strokeImpl(brush, sheet, path, options);
   if (gpuOk) {
-    if (link.check) return checkedStroke(brush, sheet, path, options, { cpuStroke: strokeImpl, gpuStroke: strokeGpu, rect: link.validRect(strokeRect(brush, sheet, path)) });
+    if (link.check) { invalidatePaperCertificate(sheet); return checkedStroke(brush, sheet, path, options, { cpuStroke: strokeImpl, gpuStroke: strokeGpu, rect: link.validRect(strokeRect(brush, sheet, path)) }); }
     return strokeGpu(brush, sheet, path, options);
   }
   link.beginStroke(sheet, strokeRect(brush, sheet, path), { tracked: !options.between || options.gpuBetween === true, instrument:'brush', planOverflow:!!link.brushGpu&&onGpu(brush,sheet)&&!fits, periodic:options.gpuBetween===true&&typeof options.between==='function', flowEvery:options.flowEvery??0 });
@@ -822,14 +822,38 @@ function planFits(brush, path, spacing,limit=3900000) {
 /** Reusable ROW observation buffers. A result using this workspace is valid until
  * the next prediction using it. Live sheet arrays are never used as scratch. */
 export class ContactWorkspace {
-  prepare(n) {
+  prepare(n, w = 0, h = 0) {
     if (this.n !== n) {
       this.n = n;
       for (const key of ['mask', 'primaryMask', 'liftMask', 'neighbors']) this[key] = new Uint8Array(n);
       this.touched = new Int32Array(n);
       this.touchEpoch = new Uint32Array(n); this.epoch = 0;
+      this.w = 0; this.h = 0; this.ny0 = 0; this.ny1 = -1;
+    } else if (this.nrowLo && this.ny1 >= this.ny0) {
+      const rw = this.w, rLo = this.rowLo, rHi = this.rowHi, nrLo = this.nrowLo, nrHi = this.nrowHi;
+      for (let y = this.ny0; y <= this.ny1; y++) {
+        const a = nrLo[y], b = nrHi[y];
+        if (b >= a) {
+          const i0 = y * rw + a, i1 = y * rw + b + 1;
+          this.mask.fill(0, i0, i1);
+          this.primaryMask.fill(0, i0, i1);
+          this.liftMask.fill(0, i0, i1);
+          this.neighbors.fill(0, i0, i1);
+        }
+        rLo[y] = rw; rHi[y] = -1; nrLo[y] = rw; nrHi[y] = -1;
+      }
+      this.ny0 = 0; this.ny1 = -1;
     } else if (this.hi >= this.lo) {
       for (const key of ['mask', 'primaryMask', 'liftMask', 'neighbors']) this[key].fill(0, this.lo, this.hi + 1);
+      if (this.rowLo) { this.rowLo.fill(this.w); this.rowHi.fill(-1); this.nrowLo.fill(this.w); this.nrowHi.fill(-1); }
+    }
+    if (w > 0 && h > 0 && (this.w !== w || this.h !== h)) {
+      this.w = w; this.h = h;
+      this.rowLo = new Int32Array(h).fill(w);
+      this.rowHi = new Int32Array(h).fill(-1);
+      this.nrowLo = new Int32Array(h).fill(w);
+      this.nrowHi = new Int32Array(h).fill(-1);
+      this.ny0 = 0; this.ny1 = -1;
     }
     this.epoch = (this.epoch + 1) >>> 0;
     if (!this.epoch) { this.touchEpoch.fill(0); this.epoch = 1; }
@@ -849,38 +873,48 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   for (const q of path) if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y) || (q.p !== undefined && (!Number.isFinite(q.p) || q.p < 0)) || (q.r !== undefined && (!Number.isFinite(q.r) || q.r < 0))) throw new Error('candidate contact path coordinates, pressure and radius must be finite and valid');
   if (![brush.radius, brush.splay, brush.carry, brush.travel].every(Number.isFinite) || brush.radius < 0 || brush.carry < 0) throw new Error('candidate contact instrument geometry must be finite and valid');
   for (let k = 1; k < path.length; k++) if (!Number.isFinite(Math.hypot(path[k].x - path[k - 1].x, path[k].y - path[k - 1].y))) throw new Error('candidate contact path segment must be finite');
-  const n = sheet.w * sheet.h, work = brush.model !== 'tuft' && workspace instanceof ContactWorkspace ? workspace.prepare(n) : null;
-  const mask = work?.mask ?? new Uint8Array(n), copy = { ...brush, tip:brush.tip?{...brush.tip}:null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() };
-  const sparse = sparseRow === true && brush.model !== 'tuft', emitted = sparse ? [] : null;
+  const tuft = brush.model === 'tuft', sw = sheet.w, sh = sheet.h;
+  const n = sw * sh, work = !tuft && workspace instanceof ContactWorkspace ? workspace.prepare(n, sw, sh) : null;
+  const mask = work?.mask ?? new Uint8Array(n), copy = tuft ? { ...brush, tip:brush.tip?{...brush.tip}:null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() } : { ...brush, tip:null };
+  const sparse = sparseRow === true && !tuft, emitted = sparse ? [] : null;
+  const rLo = work?.rowLo ?? null, rHi = work?.rowHi ?? null, nrLo = work?.nrowLo ?? null, nrHi = work?.nrowHi ?? null;
   // row-major index range of the set cells, so dense passes scan only that range
   let lo = n, hi = -1, primaryCount = 0, neighborCount = 0;
   const link = {
-    beginPlan() { const F = new Float32Array(16 + brush.clumps.length); return { F, U: new Uint32Array(F.buffer), I: new Int32Array(F.buffer), step() { return 0; }, emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;} mask[i]=1; } return 0; } }; },
+    beginPlan() { const F = new Float32Array(16 + brush.clumps.length); return { F, U: new Uint32Array(F.buffer), I: new Int32Array(F.buffer), step() { return 0; }, emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;if(rLo){const y=(i/sw)|0,x=i-y*sw;if(x<rLo[y])rLo[y]=x;if(x>rHi[y])rHi[y]=x;}} mask[i]=1; } return 0; } }; },
     endPlan() {},
   };
-  const scratch = { w: sheet.w, h: sheet.h, K: sheet.K, paper: sheet.paper, clip: sheet.clip, _gpu: link, clock: sheet.clock,
+  const scratch = { w: sw, h: sh, K: sheet.K, paper: sheet.paper, clip: sheet.clip, _gpu: link, clock: sheet.clock,
     touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
     _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched } : null,
-    contactStrength:brush.model === 'tuft' ? sheet.contactStrength?.slice() : undefined,
+    contactStrength:tuft ? sheet.contactStrength?.slice() : undefined,
     _contactBrush: sheet._contactBrush === brush ? copy : null };
   // an undipped tuft is treated as full, the widest footprint
-  if (brush.model==='tuft' && !brush.K) for (const hr of copy.hairs) hr.water=brush.capacity*hr.len;
+  if (tuft && !brush.K) for (const hr of copy.hairs) hr.water=brush.capacity*hr.len;
   if (path.length > 1) {
-    if (brush.model==='tuft') strokeImpl(copy,scratch,path,{spacing,lift,upright,candidateMask:mask});
+    if (tuft) strokeImpl(copy,scratch,path,{spacing,lift,upright,candidateMask:mask});
     else strokeGpu(copy,scratch,path,{spacing,lift,upright},true);
   }
-  const tuft = brush.model === 'tuft'; if (tuft) { lo = 0; hi = n - 1; } // strokeImpl writes the mask directly
+  if (tuft) { lo = 0; hi = n - 1; } // strokeImpl writes the mask directly
   const primaryMask = work?.primaryMask ?? mask.slice(), liftMask = work?.liftMask ?? new Uint8Array(n), sparseCells = sparse ? emitted.slice() : null, sparseNeighbors = sparse ? [] : null;
-  if (work && hi >= lo) primaryMask.set(mask.subarray(lo, hi + 1), lo);
+  if (work && hi >= lo) {
+    for (let y = (lo / sw) | 0, yEnd = (hi / sw) | 0; y <= yEnd; y++) {
+      const a = rLo[y], b = rHi[y];
+      if (b >= a) { const i0 = y * sw + a; primaryMask.set(mask.subarray(i0, y * sw + b + 1), i0); }
+    }
+  }
   let liftCount=0;
   if (lift && path.length > 1) {
     const vp = varyPath(brush, path, sheet.paper, lift), last = vp[vp.length - 1], r = Math.max(1.5, brush.radius * 0.35);
-    for (let yy = Math.max(0, Math.floor(last.y - r)); yy <= Math.min(sheet.h - 1, Math.ceil(last.y + r)); yy++)
-      for (let xx = Math.max(0, Math.floor(last.x - r)); xx <= Math.min(sheet.w - 1, Math.ceil(last.x + r)); xx++)
-        if (Math.hypot(xx - last.x, yy - last.y) <= r) { const i=yy*sheet.w+xx; liftMask[i]=1; liftCount++; if(sparse&&!mask[i])sparseCells.push(i); if(i<lo)lo=i; if(i>hi)hi=i; mask[i]=1; }
+    for (let yy = Math.max(0, Math.floor(last.y - r)); yy <= Math.min(sh - 1, Math.ceil(last.y + r)); yy++)
+      for (let xx = Math.max(0, Math.floor(last.x - r)); xx <= Math.min(sw - 1, Math.ceil(last.x + r)); xx++)
+        if (Math.hypot(xx - last.x, yy - last.y) <= r) { const i=yy*sw+xx; liftMask[i]=1; liftCount++; if(sparse&&!mask[i])sparseCells.push(i); if(i<lo)lo=i; if(i>hi)hi=i; if(rLo){if(xx<rLo[yy])rLo[yy]=xx;if(xx>rHi[yy])rHi[yy]=xx;} mask[i]=1; }
   }
   const neighbors = work?.neighbors ?? new Uint8Array(n);
-  let nlo = lo, nhi = hi;
+  let nlo = lo, nhi = hi, y0 = hi >= lo ? (lo / sw) | 0 : 0, y1 = hi >= lo ? (hi / sw) | 0 : -1, ny0 = y0, ny1 = y1;
+  if (work && hi >= lo) {
+    for (let y = y0; y <= y1; y++) if (rHi[y] >= rLo[y]) { nrLo[y] = rLo[y]; nrHi[y] = rHi[y]; }
+  }
   if (work && neighborRadius && hi >= lo) {
     // The union of a disk halo around a horizontal run is one interval on
     // each halo row. Fill those intervals instead of visiting the disk for
@@ -891,40 +925,55 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
       while (dx * dx + dy * dy > neighborRadius * neighborRadius) dx--;
       reach.push(dx);
     }
-    for (let row = Math.floor(lo / sheet.w); row <= Math.floor(hi / sheet.w); row++) {
-      const end = Math.min((row + 1) * sheet.w, hi + 1);
-      for (let i = Math.max(row * sheet.w, lo); i < end;) {
+    for (let row = y0; row <= y1; row++) {
+      if (rHi[row] < rLo[row]) continue;
+      const rowBase = row * sw, end = rowBase + rHi[row] + 1;
+      for (let i = rowBase + rLo[row]; i < end;) {
         if (!mask[i]) { i++; continue; }
         const start = i;
         while (i < end && mask[i]) i++;
-        const xa = start - row * sheet.w, xb = i - row * sheet.w;
+        const xa = start - rowBase, xb = i - rowBase;
         for (let dy = -neighborRadius; dy <= neighborRadius; dy++) {
           const yy = row + dy;
-          if (yy < 0 || yy >= sheet.h) continue;
-          const dx = reach[dy + neighborRadius], a = yy * sheet.w + Math.max(0, xa - dx), b = yy * sheet.w + Math.min(sheet.w, xb + dx);
+          if (yy < 0 || yy >= sh) continue;
+          const dx = reach[dy + neighborRadius], ax = Math.max(0, xa - dx), bx = Math.min(sw, xb + dx), a = yy * sw + ax, b = yy * sw + bx;
           neighbors.fill(1, a, b);
-          nlo = Math.min(nlo, a); nhi = Math.max(nhi, b - 1);
+          if (ax < nrLo[yy]) nrLo[yy] = ax;
+          if (bx - 1 > nrHi[yy]) nrHi[yy] = bx - 1;
+          if (yy < ny0) ny0 = yy;
+          if (yy > ny1) ny1 = yy;
+          if (a < nlo) nlo = a;
+          if (b - 1 > nhi) nhi = b - 1;
         }
       }
     }
-    for (let i = nlo; i <= nhi; i++) {
-      if (mask[i]) neighbors[i] = 0;
-      else if (neighbors[i]) { neighborCount++; if (sparse) sparseNeighbors.push(i); }
+    for (let y = ny0; y <= ny1; y++) {
+      const a = nrLo[y], b = nrHi[y]; if (b < a) continue;
+      for (let i = y * sw + a, end = y * sw + b; i <= end; i++) {
+        if (mask[i]) neighbors[i] = 0;
+        else if (neighbors[i]) { neighborCount++; if (sparse) sparseNeighbors.push(i); }
+      }
     }
   } else if (neighborRadius) for (let k=sparse?0:Math.max(0,lo), count=sparse?sparseCells.length:hi+1; k<count; k++) { const i=sparse?sparseCells[k]:k; if (!mask[i]) continue;
-    const x = i % sheet.w, y = Math.floor(i / sheet.w);
+    const x = i % sw, y = Math.floor(i / sw);
     for (let dy = -neighborRadius; dy <= neighborRadius; dy++) for (let dx = -neighborRadius; dx <= neighborRadius; dx++) {
       if (dx * dx + dy * dy > neighborRadius * neighborRadius) continue;
       const xx = x + dx, yy = y + dy;
-      if (xx < 0 || yy < 0 || xx >= sheet.w || yy >= sheet.h) continue;
-      const j = yy * sheet.w + xx;
+      if (xx < 0 || yy < 0 || xx >= sw || yy >= sh) continue;
+      const j = yy * sw + xx;
       if (!mask[j]) { if(!neighbors[j]){if(sparse)sparseNeighbors.push(j);neighborCount++;if(j<nlo)nlo=j;if(j>nhi)nhi=j;} neighbors[j]=1; }
     }
   }
   const indices = [], neighborIndices = [];
   if(sparse) { sparseCells.sort((a,b)=>a-b); sparseNeighbors.sort((a,b)=>a-b); for(const i of sparseCells)indices.push(i); for(const i of sparseNeighbors)neighborIndices.push(i); }
+  else if (work && hi >= lo) {
+    for (let y = ny0; y <= ny1; y++) {
+      const a = nrLo[y], b = nrHi[y]; if (b < a) continue;
+      for (let i = y * sw + a, end = y * sw + b; i <= end; i++) { if (mask[i]) indices.push(i); if (neighbors[i]) neighborIndices.push(i); }
+    }
+  }
   else for (let i = Math.max(0, Math.min(lo, nlo)), end = Math.min(n - 1, Math.max(hi, nhi)); i <= end; i++) { if (mask[i]) indices.push(i); if (neighbors[i]) neighborIndices.push(i); }
-  if (work) { work.lo = Math.min(lo, nlo); work.hi = Math.max(hi, nhi); }
+  if (work) { work.lo = Math.min(lo, nlo); work.hi = Math.max(hi, nhi); work.ny0 = hi >= lo ? ny0 : 0; work.ny1 = hi >= lo ? ny1 : -1; }
   // Production admission needs masks, not the full continuation stamp plane.
   // Preserve the public snapshot when requested without ever copying the source
   // into the workspace on the hot prediction path.

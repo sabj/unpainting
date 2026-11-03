@@ -1,6 +1,7 @@
 // Preserve the material pen's physical caps and dry-contact audit on a finer ink sheet.
 // Inking pipeline, stage: the pen on the fine sheet (--inkres N).
 import { drawMaterial } from './material-profiles.mjs';
+import { clearWetFootprint } from '../../media/paper-certificate.mjs';
 
 /** The planned gestures on the fine sheet: positions, contact widths and speeds N times as large, in fine cells. */
 export function fineGestures(gestures, N) {
@@ -52,6 +53,7 @@ export function dryFootprint(sheet,max,o,opts,footprint){
   for(let k=0;k<sheet.K;k++){sheet.D[k][i]+=sheet.G[k][i]+sheet.P[k][i];sheet.G[k][i]=0;sheet.P[k][i]=0;}
  }
  sheet.wetDirty=1;
+ clearWetFootprint(sheet,footprint);
  return 0;
 }
 

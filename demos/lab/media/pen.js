@@ -1,5 +1,4 @@
-// Generated from src/media/pen.mjs by tools/lab/sync-site-media.mjs. Edit the source.
-import { invalidatePaperCertificate } from './paper-certificate.js';
+import { beginWetOperation, recordWetCell } from './paper-certificate.js';
 import { census, censusMark } from './census.js';
 // Pipeline: inking, stage 6 (the pen physics).
 // A dip pen with walnut ink, after Kim et al., "Hydrodynamics of Writing with Ink" (PRL 107, 2011): the paper pulls
@@ -16,6 +15,7 @@ import { TAPE, PENS, penId } from './brush.js';
 // would go unstable.
 function inkInto(sheet, i, water, pig, damp) {
   if (damp < 0.05) return soak(sheet, i, water, pig);
+  recordWetCell(sheet, i);
   const into = Math.min(Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), water);
   sheet.s[i] += into;
   for (let k = 0; k < sheet.K; k++) if (pig[k]) { const d = Math.min(1, damp); sheet.P[k][i] += pig[k] * d; sheet.D[k][i] += pig[k] * (1 - d); }
@@ -168,7 +168,7 @@ export function penRect(pen, sheet, path) {
 }
 
 export function penStroke(pen, sheet, path, options = {}) {
-  invalidatePaperCertificate(sheet);
+  beginWetOperation(sheet);
   const link = sheet._gpu;
   if (!link || link.paused || !path.length) return penStrokeImpl(pen, sheet, path, options);
   link.beginStroke(sheet, penRect(pen, sheet, path), { tracked: !options.between || options.gpuBetween === true, instrument:'pen', periodic:options.gpuBetween===true&&typeof options.between==='function', flowEvery:options.flowEvery??0 });
