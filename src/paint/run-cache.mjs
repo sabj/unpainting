@@ -176,3 +176,42 @@ export async function cachedStep({ dir, name, code, inputs, track, enabled = tru
   } catch (e) { if (!(e instanceof Uncacheable)) orig(`cache: ${name} not stored (${e.message})`); }
   return { value, cached: false };
 }
+
+export function cachedStepSync({ dir, name, code, inputs, track, enabled = true, log = console.log, fingerprint = null, guard = null, context = {} }, fn) {
+  if (!enabled) return { value: fn(), cached: false };
+  const fingerprintFor = reads => fingerprint ?? provenance({simCode:digest({code,implementation:fn.toString()}),argv:digest({resolved:context.argv??null,reads}),planHashes:context.planHashes??inputs.planHashes??{},targetSHA256:context.targetSHA256??inputs.targetSHA256??null,paper:inputs.PAPER_OPTS?{w:inputs.W2,h:inputs.H2,opts:digest(inputs.PAPER_OPTS)}:null,pigments:inputs.PIGS??inputs.pigment??null,geometry:{w:inputs.w??inputs.W2??null,h:inputs.h??inputs.H2??null},mode:context.mode??'pure-step',backend:context.backend??'cpu',guard:{mode:guard?.mode??'off',looksConsumed:guard?.exportState().looks.count??0}});
+  const key = `${name}-${crypto.createHash('sha256').update('provenance-v3:' + code + fn.toString() + inputHash(inputs) + digest(context)).digest('hex').slice(0, 32)}`, file = path.join(dir, `${key}.json`);
+  let entries = [];
+  try { entries = JSON.parse(fs.readFileSync(file, 'utf8')).filter(e => typeof e.file === 'string'); } catch { entries = []; }
+  for (const e of entries) {
+    if (!e.reads.every(([k, raw]) => track.current(k) === raw)) continue;
+    assertProvenance(e.provenance, fingerprintFor(e.reads));
+    let value; try { value = readEntry(path.join(dir, e.file)).value; } catch (err) { log(`cache: ${name} entry unreadable (${err.message})`); continue; }
+    log(`cache: ${name} hit (${path.basename(file)})`);
+    track.replay(e.reads.map(([k]) => k));
+    if(guard && e.looks)guard.replayLooks(e.looks);
+    for (const line of e.logs) log(line);
+    return { value, cached: true };
+  }
+  log(`cache: ${name} miss (${path.basename(file)})`);
+  const logs = [], orig = console.log;
+  console.log = (...a) => { logs.push(util.format(...a)); orig(...a); };
+  const looksBefore = guard?.exportState().looks;
+  track.start();
+  let value, reads;
+  try { value = fn(); } finally { console.log = orig; reads = track.stop(); }
+  const seen = new Map(); for (const [k, raw] of reads) if (!seen.has(k)) seen.set(k, raw);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    const readsList = [...seen.entries()], entryFile = `${key}-${crypto.createHash('sha256').update(JSON.stringify(readsList)).digest('hex').slice(0, 16)}.bin`;
+    const tmp = path.join(dir, `${entryFile}.${process.pid}.tmp`);
+    writeEntry(tmp, { reads: readsList, logs, value }); fs.renameSync(tmp, path.join(dir, entryFile));
+    const looks = guard ? guard.lookDelta(looksBefore) : null;
+    const storedProvenance=fingerprintFor(readsList);
+    if(!fingerprint)storedProvenance.guard.looksConsumed=looksBefore?.count??0;
+    const kept = [{ reads: readsList, logs, file: entryFile, provenance: storedProvenance, looks }, ...entries.filter(e => e.file !== entryFile)].slice(0, 8);
+    for (const e of entries) if (!kept.some(k => k.file === e.file)) fs.rmSync(path.join(dir, e.file), { force: true });
+    const itmp = `${file}.${process.pid}.tmp`; fs.writeFileSync(itmp, JSON.stringify(kept)); fs.renameSync(itmp, file);
+  } catch (e) { if (!(e instanceof Uncacheable)) orig(`cache: ${name} not stored (${e.message})`); }
+  return { value, cached: false };
+}

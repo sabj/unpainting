@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { compactLowerLayers, layerStorageStats } from '../src/media/layer-storage.mjs';
-import { invalidatePaperCertificate } from '../src/media/paper-certificate.mjs';
+import { certifyZeroPaper, invalidatePaperCertificate } from '../src/media/paper-certificate.mjs';
 import { EpochCells } from '../src/paint/epoch-cells.mjs';
 import { createJSONLWriter } from './painter/jsonl-writer.mjs';
 import { writeCensus } from './speed/census-write.mjs';
@@ -61,7 +61,7 @@ import {productionWaterLoad} from './painter/production-water-load.mjs';
 import {earlyDryBoundary} from './painter/early-dry-boundary.mjs';
 if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
 import { smoothUp } from '../src/paint/methods/smoothup.mjs';
-import { cachedStep, codeHash, digest, provenance } from '../src/paint/run-cache.mjs';
+import { cachedStep, cachedStepSync, codeHash, digest, provenance } from '../src/paint/run-cache.mjs';
 import {cachedEarlyLines, outputRelative, planFileDigest} from '../src/paint/early-lines-cache.mjs';
 import { canaryStopPass, stopAtCanary } from '../src/paint/canary-stop.mjs';
 import { paintingLooks } from '../src/paint/painting-look.mjs';
@@ -1615,20 +1615,26 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
  const A=INK_LINES?.[stage]?.stats?.peakAbsorbance;
  if(!(A>0)){INK_MATCH[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark match, ${stage}: no measured target lines, load unchanged`);return 1;}
  const sample=sampleGestures(gs,60), N=INKRES?.N??1, fw=w*N, fh=h*N;
- const paper=INKRES?INKRES.fine.paper:makePaper(w,h,PAPER_OPTS);
- if(paper.w!==fw||paper.h!==fh)throw Error('Ink calibration paper dimensions differ');
- const absorbance=sampledInkAbsorbance(fw,fh,N>1?fineGestures(sample,N):sample);
- const measure=f=>{
-  const options=optionsAt(f), ink=INKRES?INKRES.remapInk(options.ink):[options.ink[PIGS.length]];
+ const baseOpts=(()=>{const {edgeStrength,state,audit,O:o,...rest}=optionsAt(1);return rest;})();
+ const r=cachedStepSync({...RUN_CACHE,name:`ink-dark-match-${stage}`,code:codeHash(root,[],{dependencies:['src/paint/methods/ink-match.mjs','src/paint/methods/fine-material.mjs','src/paint/methods/material-profiles.mjs','src/media/draw.mjs','src/media/pen.mjs']}),track:optTrack,inputs:{stage,A,sample,N,w,h,PAPER_OPTS,INK,baseOpts,EDGE:TARGET_DRAW_EDGE,...(INKRES?{}:{want})}},()=>{
+  const paper=INKRES?INKRES.fine.paper:makePaper(w,h,PAPER_OPTS);
+  if(paper.w!==fw||paper.h!==fh)throw Error('Ink calibration paper dimensions differ');
+  const absorbance=sampledInkAbsorbance(fw,fh,N>1?fineGestures(sample,N):sample);
   const scrap=createSheet(paper,[INK]);
   scrap._tapePigmentMap={count:SHEET_PIGS.length,indices:[PIGS.length]};
-  if(INKRES)drawOnFineSheet(scrap,N,sample,{w,h,...options,ink});
-  else drawMaterial(scrap,sample,want,w,h,{...options,ink});
-  return absorbance(scrap);
- };
- const r=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
+  const measure=f=>{
+   scrap.W.fill(0);scrap.s.fill(0);scrap.M.fill(0);scrap.ever.fill(0);scrap.G[0].fill(0);scrap.P[0].fill(0);scrap.D[0].fill(0);scrap.layers.length=0;
+   certifyZeroPaper(scrap);
+   const options=optionsAt(f), ink=INKRES?INKRES.remapInk(options.ink):[options.ink[PIGS.length]];
+   if(INKRES)drawOnFineSheet(scrap,N,sample,{w,h,...options,ink});
+   else drawMaterial(scrap,sample,want,w,h,{...options,ink});
+   return absorbance(scrap);
+  };
+  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
+  console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${res.before.toFixed(2)}, so the load is scaled by ${res.factor.toFixed(3)} (now ${res.after.toFixed(2)})`);
+  return res;
+ }).value;
  INK_MATCH[stage]={...r,target:A,sample:sample.length};
- console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${r.before.toFixed(2)}, so the load is scaled by ${r.factor.toFixed(3)} (now ${r.after.toFixed(2)})`);
  fs.writeFileSync(path.join(out,'ink-dark-match.json'),JSON.stringify(INK_MATCH,null,1)+'\n');
  return r.factor;
 }

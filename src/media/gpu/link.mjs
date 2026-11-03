@@ -1,4 +1,5 @@
 import { fixedBedLower as sumFixedBedLower } from '../fixed-bed.mjs';
+import { recordWetCells, recordWetBox, syncWetReachVersion } from '../paper-certificate.mjs';
 const fixedBedLower = sheet => sumFixedBedLower(sheet, { skipEmpty: process.env.GPU_SKIP_ZERO_LAYER === '1' });
 // The painter's side of the GPU sheet backend. attachGpu(sheet, O, { mode }) starts a worker that holds the sheet on the
 // GPU and sets sheet._gpu; with it unset (mode 'off', no adapter, no `webgpu` package) sheet, brush and pen run on the CPU.
@@ -302,6 +303,7 @@ export class GpuLink {
       // ensureFresh above already read `rect`
       sheet._cpuDemandWindow.rect = process.env.GPU_DEMAND_READBACK==='fast'?null:rect.slice();
     }
+    syncWetReachVersion(sheet);
   }
   endStroke(sheet) {
     const rect = this.stroke; this.stroke = null; if (!rect) return;
@@ -309,6 +311,7 @@ export class GpuLink {
     const demand = sheet._cpuDemandWindow;
     try { this.uploadCpuStroke(sheet, rect); } finally { this.transferPhase = prior; delete sheet._cpuStrokeDirty; delete sheet._cpuDemandWindow; delete sheet._cpuDemandPenAhead; }
     this.dirty = null; if (this.stale && (!demand || demand.rect)) this.fresh.mark(demand ? demand.rect : rect);
+    syncWetReachVersion(sheet);
   }
 
   // The brush plans a stroke (brush.mjs strokeGpu) and the GPU lays it, flowing the sheet where the plan says, so the
@@ -335,6 +338,7 @@ export class GpuLink {
     // A step's cells, grouped by hair (each hair's in the order given, which is raster order): a table of where each
     // hair's cells start, then an (index, across) pair a cell. Returns where the block starts, in words.
     plan.emit = (idx, lane, acr, cnt) => {
+      recordWetCells(sheet, idx, cnt);
       if (brush.depositDepth) {
         const need=1+3*cnt; while(plan.nw+need>plan.wcap) plan.growCells(plan.wcap*2);
         const base=plan.nw; plan.CU[base]=cnt;
@@ -368,6 +372,7 @@ export class GpuLink {
     // (a cont stroke has the same hairs it had, which were counted when they were first planned)
     for (let k = 0; k < K; k++) { let any = brush.resP[k] > 0; for (let j = 0; j < lanes && !any; j++) any = brush.hairs[j].pig[k] > 0; if (any) {this.wetMask |= 1 << k;plan.mask=(plan.mask??0)|(1<<k);} }
     this.syncAct();
+    syncWetReachVersion(sheet);
     return plan;
   }
   /** A flow the brush's `between` asked for, following the step just planned. */
@@ -375,6 +380,7 @@ export class GpuLink {
   /** `lift`: the cell indices within reach of the last contact, for the bead (or null when the brush stays on the paper). */
   endPlan(sheet, brush, plan, lift, rect) {
     if (!plan.n && !lift) return;
+    if (lift?.length) recordWetCells(sheet, lift, lift.length);
     const { F, U, S0, SP, H0, HS, lanes, K } = plan, nl = lift ? lift.length : 0;
     let hasFlow = false; for (let s = 0; s < plan.n && !hasFlow; s++) if (U[S0 + s * SP + 6]) hasFlow = true;
     const offC = S0 + plan.n * SP, offL = offC + plan.nw;
@@ -399,6 +405,7 @@ export class GpuLink {
     // (a flow inside the stroke can lift from the top dried layer, a rewet, as any step can: its CPU copy is stale too)
     this.stale = true; this.fresh.stale(); if (hasFlow) this.topStale = true;
     this.stats.strokes = (this.stats.strokes || 0) + 1; this.stats.strokeSteps = (this.stats.strokeSteps || 0) + plan.n;
+    syncWetReachVersion(sheet);
   }
   /** Take a posted stroke's result into its brush: hairs, belly and the generator's state. Waits if the GPU has not got there. */
   settleBrush(brush) {
@@ -452,8 +459,10 @@ export class GpuLink {
     brush._pend = this.lastPend = { link: this, seq, slot, state, splat: true, W0: W, hairs: true };
     this.post({ op: 'splat', data, seq, slot, info: { mask:this.wetMask, nRec: recs.length, offRec, flowsBefore, rect: [x0, y0, rw, rh], state, restore, seq }, wait: false }, [data.buffer]);
     let flows = flowsBefore; for (const q of recs) flows += q[5];
+    recordWetBox(sheet, x0, y0, x0 + rw - 1, y0 + rh - 1, flows);
     this.stale = true; this.fresh.stale(); if (flows) this.topStale = true;
     this.stats.splatStrokes = (this.stats.splatStrokes || 0) + 1; this.stats.splats = (this.stats.splats || 0) + recs.length;
+    syncWetReachVersion(sheet);
   }
 
   step(sheet, o) {

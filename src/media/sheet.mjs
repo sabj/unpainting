@@ -1,4 +1,4 @@
-import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate } from './paper-certificate.mjs';
+import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
 import { censusDry } from './census.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -94,7 +94,7 @@ export function createSheet(paper, pigments) {
 
 /** Water and pigment masses added at a cell. */
 export function deposit(sheet, i, water, pig) {
-  invalidatePaperCertificate(sheet);
+  recordWetCell(sheet, i);
   sheet.W[i] += water; sheet.M[i] = 1; sheet.ever[i] = 1; sheet.wetDirty = 1;
   if (pig) for (let k = 0; k < sheet.K; k++) if (pig[k]) sheet.G[k][i] += pig[k];
 }
@@ -237,7 +237,7 @@ export function blot(sheet, mask, { strength = 0.85, pigmentShare = 0.9 } = {}) 
 /** A touch too dry to stand as water: the water goes into the pores (any excess stays as a film) and the pigment
  *  is laid on the fibres it touched. */
 export function depositDry(sheet, i, water, pig) {
-  invalidatePaperCertificate(sheet);
+  recordWetCell(sheet, i);
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // it stands on the film, it does not soak in
   const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), into = Math.min(room, water);
   sheet.s[i] += into; sheet.wetDirty = 1;
@@ -249,7 +249,7 @@ export function depositDry(sheet, i, water, pig) {
  *  the fibres; the rest stands on the surface as water carrying its pigment. A dry-brush film soaks in where it lands;
  *  a loaded brush leaves most of its water standing, and that flows as a wash. */
 export function soak(sheet, i, water, pig) {
-  invalidatePaperCertificate(sheet);
+  recordWetCell(sheet, i);
   if (water <= 0) return;
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // sealed: everything stays on the surface
   const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]) * (sheet.M[i] ? 0.3 : 1), into = Math.min(room, water), f = into / water;
@@ -406,12 +406,16 @@ let STROKEFLOWS = null, STROKESTEP = null;
 export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 
 export function step(sheet, o = DEFAULTS, reduction = null) {
-  invalidatePaperCertificate(sheet);
+  const wetValid = recordWetStep(sheet, 1);
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
   if (TAPE && sheet._tape) { if (STROKEFLOWS) STROKEFLOWS.push(STROKESTEP()); else TAPE.push({ k: 'f' }); }
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
   if (!Number.isFinite(o.dt) || o.dt < 0) throw new RangeError('dt must be finite and nonnegative');
-  if (sheet._gpu && !sheet._gpu.paused) return sheet._gpu.step(sheet, o);
+  if (sheet._gpu && !sheet._gpu.paused) {
+    const res = sheet._gpu.step(sheet, o);
+    if (wetValid) syncWetReachVersion(sheet);
+    return res;
+  }
   const boxes = wetBoxes(sheet); if (!boxes.length) return false;
   if (o.dt === 0) return true;
   if (reduction) { reduction.maxW = 0; reduction.surfaceLevel = 0; }
