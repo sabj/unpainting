@@ -44,7 +44,8 @@ export function dryFootprint(sheet,max,o,opts,footprint){
 export function drawFineMaterial(fineInk, gestures, options) {
  fineInk.wet();
  const start=Date.now();
- const r=drawOnFineSheet(fineInk.fine,fineInk.N,gestures,options);
+ const r=drawOnFineSheet(fineInk.fine,fineInk.N,gestures,{...options,ink:fineInk.remapInk(options.ink)});
+ fineInk.changed();
  fineInk.carry(); fineInk.stats.calls++;fineInk.stats.ms+=Date.now()-start;
  return r;
 }

@@ -48,3 +48,39 @@ test('on a GPU sheet the carry reads the sheet down first and tells the GPU it w
   assert.ok(calls.indexOf('syncAll') < calls.lastIndexOf('cpuWroteAll'));
   assert.equal(calls.at(-1), 'cpuWroteAll');
 });
+
+import { renderLayers } from '../../media/km.mjs';
+test('single active ink optics equal a full palette, including zero planes', () => {
+  const mass = Float32Array.from([0, 1e-8, .001, .1, 1, 10, 100]);
+  const zero = new Float32Array(mass.length), white = Buffer.alloc(mass.length * 3, 255);
+  assert.deepEqual(renderLayers([[zero, mass, zero]], [ink, ink, ink], white, mass.length),
+    renderLayers([[mass]], [ink], white, mass.length));
+});
+
+test('fine ink remaps only its active channel, rejects other pigments and invalidates frames', () => {
+  const pigments = [ink, ink, ink], main = createSheet(makePaper(W, H, {seed:2}), pigments);
+  const R = makeInkRes({N:3,W2:W,H2:H,paperOpts:{seed:2},pigments,main,inkAt:1});
+  const want = new Float32Array(W * H).fill(1), white = Buffer.alloc(W * H * 3, 255);
+  assert.throws(() => R.draw([line], want, W, H, {ink:[1,10,0]}), /Only inkAt/);
+  R.draw([line], want, W, H, {ink:[0,10,0],peak:1});
+  assert.equal(R.fine.K, 1);
+  assert(main.D[1].some(v=>v>0)); assert(main.D[0].every(v=>v===0));
+  const first = R.compose(white);
+  assert.deepEqual(R.compose(white), first);
+  const mass = main.D[1].slice(); R.carry(); assert.deepEqual(main.D[1], mass);
+  R.settle(); assert.deepEqual(R.compose(white), first);
+  R.draw([{points:line.points.map(p=>({...p,y:5}))}], want, W, H, {ink:[0,10,0],peak:1});
+  assert.notDeepEqual(R.compose(white), first);
+});
+
+import { recordMarks } from '../../media/brush.mjs';
+test('specialized fine ink retains main-palette dip concentrations in the replay tape', () => {
+  const tape = recordMarks(true);
+  try {
+    const pigments = [ink, ink, ink], main = createSheet(makePaper(W,H),pigments);
+    main._tape = true;
+    const R = makeInkRes({N:2,W2:W,H2:H,paperOpts:{},pigments,main,inkAt:1});
+    R.draw([line], new Float32Array(W*H).fill(1), W,H,{ink:[0,10,0],peak:1});
+    assert.deepEqual(tape.find(m=>m.k==='D').ink,[0,10,0]);
+  } finally { recordMarks(false); }
+});

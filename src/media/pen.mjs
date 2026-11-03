@@ -34,7 +34,7 @@ function makePen({ nib = 0.8, flex = 1.5, reservoir = 250, wick = 0.15, feed = 1
 
 /** Dip: fill the reservoir with ink at `conc` (pigment per unit of water, per pigment); `amount` is how full (0..1). */
 export function dipPen(pen, conc, amount = 1) {
-  if (TAPE && pen._tapeId !== undefined) TAPE.push({ k: 'D', pen: pen._tapeId, ink: Array.from(conc), a: amount });
+  if (TAPE && pen._tapeId !== undefined) TAPE.push({ k: 'D', pen: pen._tapeId, ink: pen._tapePigmentMap ? Array.from({ length: pen._tapePigmentMap.count }, (_, k) => conc[pen._tapePigmentMap.indices.indexOf(k)] ?? 0) : Array.from(conc), a: amount });
   pen.ink = pen.capacity * amount; pen.drop = pen.dropSize * amount; pen.conc = conc.slice();
 }
 

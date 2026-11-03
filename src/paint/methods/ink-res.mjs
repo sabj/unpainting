@@ -9,22 +9,33 @@ import { drawGestures } from '../../media/draw.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { TAPE } from '../../media/brush.mjs';
 
-export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad: opt_pad = null }) {
+export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gain = 1, pad: opt_pad = null }) {
   if (!(N > 1)) return null;
   N = Math.round(N);
-  const WH = W2 * N, HH = H2 * N, nH = WH * HH, nL = W2 * H2, K = pigments.length;
+  const WH = W2 * N, HH = H2 * N, nH = WH * HH, nL = W2 * H2, K = 1;
   const paper = makePaper(WH, HH, { ...paperOpts, scale: (paperOpts.scale ?? 1) * N });
-  const fine = createSheet(paper, pigments);
+  if (!Number.isInteger(inkAt) || !pigments[inkAt]) throw new Error('Invalid fine-sheet ink channel');
+  const finePigments = [pigments[inkAt]];
+  const fine = createSheet(paper, finePigments);
+  function remapInk(ink) {
+    if (ink == null) return ink;
+    if (ink.length !== pigments.length) throw new Error('Fine-sheet ink concentration length');
+    for (let k = 0; k < ink.length; k++) if (k !== inkAt && ink[k] !== 0) throw new Error('Only inkAt may deposit on the fine sheet');
+    return [ink[inkAt]];
+  }
+  let materialVersion = 0, totalVersion = -1, total, renderVersion = -1, inkH, inkL;
+  const changed = () => { materialVersion++; };
   // strokes go on the mark tape tagged with N, so a replay of the tape treats them the same way
-  if (main._tape) { fine._tape = main._tape; fine._tapeRes = N; }
+  if (main._tape) { fine._tape = main._tape; fine._tapeRes = N; fine._tapePigmentMap = { count: pigments.length, indices: [inkAt] }; }
   // what has been carried down to the painting's sheet, per pigment, so the next call carries only what is new
-  const seen = pigments.map(() => new Float32Array(nH)), inkLo = pigments.map(() => new Float32Array(nL));
+  const seen = finePigments.map(() => new Float32Array(nH)), inkLo = finePigments.map(() => new Float32Array(nL));
   const white = Buffer.alloc(nL * 3, 255), whiteH = Buffer.alloc(nH * 3, 255);
-  const fineTotal = k => { const out = new Float32Array(nH), G = fine.G[k], D = fine.D[k], P = fine.P[k]; for (const L of fine.layers) { const a = L[k]; for (let i = 0; i < nH; i++) out[i] += a[i]; } for (let i = 0; i < nH; i++) out[i] += G[i] + D[i] + P[i]; return out; };
+  const fineTotal = k => { if (totalVersion === materialVersion) return total; const out = new Float32Array(nH), G = fine.G[k], D = fine.D[k], P = fine.P[k]; for (const L of fine.layers) { const a = L[k]; for (let i = 0; i < nH; i++) out[i] += a[i]; } for (let i = 0; i < nH; i++) out[i] += G[i] + D[i] + P[i]; totalVersion = materialVersion; return total = out; };
   let stats = { calls: 0, ms: 0 };
 
   /** drawGestures on the fine sheet: points in the painting's cells, want on the painting's grid. */
   function draw(gestures, want, w, h, { ink, peak = null, pen = {}, low = 0.25 } = {}) {
+    ink = remapInk(ink);
     const t0 = Date.now();
     const at = (x, y) => want[Math.max(0, Math.min(h - 1, Math.round(y))) * w + Math.max(0, Math.min(w - 1, Math.round(x)))];
     if (peak == null) {
@@ -48,6 +59,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
     wet();
     // --inkresgain: the ink's strength on the fine sheet, for calibrating a line's darkness against the artwork's
     const r = drawGestures(fine, up, [0], 1, 1, { ink: gain === 1 ? ink : ink.map(v => v * gain), peak: 1, pen: P, low });
+    changed();
     carry();
     stats.calls++; stats.ms += Date.now() - t0;
     return r;
@@ -88,7 +100,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
       if (!any) continue;
       S.set(T);
       wrote = true;
-      const inv = 1 / (N * N), D = main.D[k], G = main.G[k], L = inkLo[k];
+      const inv = 1 / (N * N), D = main.D[inkAt], G = main.G[inkAt], L = inkLo[k];
       for (let i = 0; i < nL; i++) if (add[i]) { const a = add[i] * inv; if (main.M[i]) G[i] += a; else D[i] += a; L[i] += a; }
     }
     if (wrote) main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
@@ -99,6 +111,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
     for (let k = 0; k < K; k++) { const G = fine.G[k], D = fine.D[k]; for (let i = 0; i < nH; i++) if (G[i]) { D[i] += G[i]; G[i] = 0; } }
     fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false;
     fix(fine);
+    changed();
   }
 
   /** The painting at N times its width: `lo` is the painting's own render (RGB bytes, W2 by H2). */
@@ -108,8 +121,11 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
     try { return composeImpl(lo); } finally { census.inkres.composeMs += performance.now() - t; }
   }
   function composeImpl(lo) {
-    const inkH = renderLayers([pigments.map((_, k) => fineTotal(k))], pigments, whiteH, nH, 1);
-    const inkL = renderLayers([inkLo], pigments, white, nL, 1);
+    if (renderVersion !== materialVersion) {
+      inkH = renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1);
+      inkL = renderLayers([inkLo], finePigments, white, nL, 1);
+      renderVersion = materialVersion;
+    }
     const out = Buffer.alloc(nH * 3);
     for (let y = 0; y < HH; y++) {
       const fy = Math.min(H2 - 1, Math.max(0, (y + 0.5) / N - 0.5)), y0 = Math.floor(fy), y1 = Math.min(H2 - 1, y0 + 1), ty = fy - y0;
@@ -126,5 +142,5 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, gain = 1, pad
     return out;
   }
 
-  return { N, width: WH, height: HH, draw, settle, compose, carry, wet, stats, fine };
+  return { N, width: WH, height: HH, draw, settle, compose, carry, wet, stats, fine, remapInk, changed };
 }
