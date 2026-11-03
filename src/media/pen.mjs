@@ -177,13 +177,19 @@ function penStrokeImpl(pen, sheet, path, { between, spacing = 0.5,flowEvery=0, r
       // contact width, only when the path sets one
       ...(q.nw == null ? [] : [Math.round(q.nw * 100)]),
     ];
+  const gestureId = rec ? TAPE.length : null;
   const record = points => {
-    const mark = {k:'P',pen:pen._tapeId,sp:spacing,points:points.map(p=>({...p})),fl:rec,d:points.map(encode),
+    const mark = {k:'P',gestureId,pen:pen._tapeId,sp:spacing,points:points.map(p=>({...p})),fl:rec,d:points.map(encode),
     // a pen drawn on a finer sheet than the painting's (--inkres), in that sheet's cells; absent otherwise
       ...(sheet._tapeRes ? { r: sheet._tapeRes } : {})};
     TAPE.push(mark);return mark;
   };
   let mark = rec ? record(path) : null, recordStart = 0, recordHead = null, flowStart = 0;
+  const truncate = (k, point) => {
+    const done = [...(recordHead ? [recordHead] : []), ...path.slice(recordStart, k + 1), point];
+    mark.points = done.map(p => ({...p}));
+    mark.d = done.map(encode);
+  };
   buffers(pen, sheet);
   if(sheet._cpuDemandWindow && lookaheadCount(flowEvery))sheet._cpuDemandPenAhead=penContactLookahead(pen,path,spacing,lookaheadCount(flowEvery),sheet.w,sheet.h);
   let steps = 0;
@@ -207,11 +213,17 @@ function penStrokeImpl(pen, sheet, path, { between, spacing = 0.5,flowEvery=0, r
         // End the recorded path at the dip, then record D followed by the rest
         // of P. Existing replay tools need no new event format. Simulation and
         // its flow cadence continue uninterrupted at exactly the same sample.
-        if(rec){const done=[...(recordHead?[recordHead]:[]),...path.slice(recordStart,k+1),point];mark.d=done.map(encode);mark.points=done.map(p=>({...p}));}
+        if (rec) truncate(k, point);
         refill(pen);
         if(rec){rec=[];flowStart=steps;recordStart=k+1;recordHead=point;mark=record([point,...path.slice(k+1)]);collectFlows(rec,()=>steps-flowStart);}
       }
-      if (pen.ink <= 0 && pen.drop <= 0) break walk;
+      if (pen.ink <= 0 && pen.drop <= 0) {
+        const t = q / m;
+        if (rec) truncate(k, {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t,
+          p:(a.p??.5)+((b.p??.5)-(a.p??.5))*t, v:va+(vb-va)*t,
+          ...(na==null ? {} : {nw:na+(nb-na)*t})});
+        break walk;
+      }
       const u = q / m, v = Math.max(0.05, va + (vb - va) * u);
       touch(pen, sheet, a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, (a.p ?? 0.5) + ((b.p ?? 0.5) - (a.p ?? 0.5)) * u, L / m / v, na == null ? undefined : na + (nb - na) * u);
       tick();
