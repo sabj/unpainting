@@ -1,8 +1,8 @@
 # Recipe tokens
 
-Base (always applied, under your tokens): `region_w13_lay4_ink4_rec2x_rcl_sky3_sep8_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_pgreen_dwg200_tp2`.
+Base (always applied, under your tokens): `region_w13_lay4_rec2x_rcl_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_pgreen_tp2`.
 
-Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlayers 3 (the examples below show the scaling). Tokens in one slot replace each other: lay2/lay4; sep/sep2..sep9; ink2/ink3/ink4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. Stone-block tokens of the base (blk, bmm, bka, birr) act on architecture only. Palette tokens act only on Trumbull; there `--paints` is: default ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
+Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlayers 3 (the examples below show the scaling). Tokens in one slot replace each other: lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. Stone-block tokens of the base (blk, bmm, bka, birr) act on architecture only. Palette tokens act only on Trumbull; there `--paints` is: default ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
 | token | painter options it sets (on top of the template) |
 |---|---|
@@ -48,13 +48,6 @@ Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlaye
 | `_bcl3` | --stoneclusters 3 |
 | `_fs60` | --fastsettle 60 |
 | `_fl0` | --feedbacklag 0 |
-| `_sep` | --inkk .396,.481,.619 |
-| `_sep2` | --inkk .396,.481,.619, --inkkscale 2 |
-| `_sep4` | --inkk .396,.481,.619, --inkkscale 4 |
-| `_sep8` | --inkk .396,.481,.619, --inkkscale 8 |
-| `_ink2` | --drawinglast <plan>/closingink, --closinglines 100000, --closingpressure 1, --closingedgemin 0, --drawwant 1 |
-| `_ink3` | --drawinglast <plan>/closingink, --closinglines 100000, --closingpressure 1, --closingedgemin 0, --drawwant .75 |
-| `_ink4` | --drawinglast <plan>/closingink4, --closinglines 100000, --closingpressure 1, --closingedgemin 0, --drawwant 1 |
 | `_rec2` | --recesslayers 2 |
 | `_rec2x` | --recesslayers 2, --recessshare .75 |
 | `_rcl` | --recessclean 1 |
@@ -75,12 +68,7 @@ Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlaye
 | `_stub2` | --texshort 1, --texpress .6 |
 | `_soft` | --softarcs 8, --softarclen 48, --softmm 1.0 |
 | `_softs` | --softsplit 1, --softarcs 12, --softarclen 40, --softmm 0.7 |
-| `_ol36` | --openinglines 36 |
-| `_uncap` | --openinglines 100000, --closinglines 100000 |
-| `_opp25` | --openingpressure 0.25 |
 | `_och30` |  |
-| `_dwg200` | --drawwidthgain 2 |
-| `_dwm50` | --drawwidthmin 0.5 |
 | `_ew5` | --edgewobble 0.5 |
 | `_smc4` |  |
 | `_sfa8` | --softarcs 8, --softarclen 200, --softmm 1.0 |

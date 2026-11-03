@@ -124,3 +124,15 @@ test('dry run: V5 try 2 gets feedback on try 1 and writes its self-review', () =
   assert.equal(runOf(out, 'v5-self-study', 1).score.status, 'dry-run');
   fs.rmSync(out, { recursive: true, force: true });
 });
+
+test('extra args admit only validated artistic controls, never execution or ink bypasses', () => {
+  for (const key of ['segments', 'allowdirty', 'inkrecipe', 'inkres', 'speedvaluecache', 'aware', 'awarefoo', 'physics', 'linesupport', 'inkdarkcap', 'unknown']) {
+    for (const args of [[`--${key}`, '1'], [`--${key}=1`]]) assert.ok(checkExtraArgs(args, '/p').length, args.join(' '));
+  }
+  for (const args of [['--darkgain'], ['--darkgain', 'NaN'], ['--darkgain', '4'], ['--drawing', 'bogus'], ['--darkgain', '--drawing', 'first'], ['orphan']]) assert.ok(checkExtraArgs(args, '/p').length);
+  assert.deepEqual(checkExtraArgs(['--outlinemedium', 'ink', '--drawing', 'both', '--darkgain', '1.2'], '/p'), []);
+  const args = optionMap(layerBase({variant: 'region_w13', build}).args);
+  assert.equal(args.get('inkrecipe'), 'v2');
+  for (const key of ['inkkscale', 'closingpressure', 'drawwidthgain', 'openinglines']) assert.ok(!args.has(key), key);
+  for (const token of ['sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
+});

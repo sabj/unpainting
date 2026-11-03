@@ -25,7 +25,7 @@ function paintingCode() {
       if (e.isDirectory()) { if (p !== TUNED_DIR) walk(p); } else if (/\.(mjs|json)$/.test(e.name) && !e.name.endsWith('.test.mjs')) files.push(p);
     }
   };
-  walk(path.join(ROOT, 'src'));
+  for (const dir of ['src', 'tools/speed', 'bench/scripts']) walk(path.join(ROOT, dir));
   return files;
 }
 
@@ -67,5 +67,15 @@ test('every preset is flag and value pairs', () => {
     const t = flags.split(' ');
     assert.equal(t.length % 2, 0, name);
     assert.ok(t.every((a, i) => (i % 2 === 0) === a.startsWith('--')), name);
+  }
+});
+
+test('penwash and person recipes contain no subject switches or tuned-only flags', () => {
+  const forbidden = new Set(presetFlagNames());
+  for (const recipe of ['penwash', 'person']) {
+    const argv = expandRecipe({argv: ['--recipe', recipe]}).argv;
+    assert.ok(!argv.some(v => SUBJECT_IDS.includes(v)), recipe);
+    for (const flag of ['trumbullrules', 'portraitrules', 'drawsubject', ...forbidden])
+      assert.ok(!names(argv).includes(flag), `${recipe}: ${flag}`);
   }
 });
