@@ -41,13 +41,22 @@ export function dipPen(pen, conc, amount = 1) {
 const smooth = x => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
 
+const pinCache = new WeakMap();
+
 function buffers(pen, sheet) {
   if (pen.sheet === sheet && pen.A) return;
   const n = sheet.n; pen.sheet = sheet;
   pen.A = new Float32Array(n); pen.given = new Float32Array(n); pen.seen = new Int32Array(n).fill(-1e9);
   // pinning threshold per pore: fibres standing proud of their neighbours hold a contact line back, hollows let it on
-  const { height, valley } = sheet.paper; pen.pin = new Float32Array(n);
-  for (let i = 0; i < n; i++) pen.pin[i] = 1 + pen.patchy * (Math.min(1, Math.max(0, (height[i] - valley[i]) * 2.5 + 0.5)) - 0.5);
+  let profiles = pinCache.get(sheet.paper);
+  if (!profiles) pinCache.set(sheet.paper, profiles = new Map());
+  pen.pin = profiles.get(pen.patchy);
+  if (!pen.pin) {
+    const { height, valley } = sheet.paper;
+    pen.pin = new Float32Array(n);
+    for (let i = 0; i < n; i++) pen.pin[i] = 1 + pen.patchy * (Math.min(1, Math.max(0, (height[i] - valley[i]) * 2.5 + 0.5)) - 0.5);
+    profiles.set(pen.patchy, pen.pin);
+  }
 }
 
 // One touch of the nib at (x, y) with pressure p for time dt. `pad` (cells) widens the contact for a finer ink sheet:

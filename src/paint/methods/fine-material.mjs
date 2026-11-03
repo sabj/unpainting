@@ -18,10 +18,24 @@ export function finePen(pen={},N){
 /** The nib's first drop: drawMaterial's .1, N squared on the fine sheet. */
 export const fineDrop=N=>.1*N*N;
 
+// Source edge fields are immutable for the duration of a drawing plan.
+const edgeCache = new WeakMap();
+export function fineEdge(edgeStrength, w, h, N) {
+ if (!edgeStrength) return edgeStrength;
+ let sizes = edgeCache.get(edgeStrength);
+ if (!sizes) edgeCache.set(edgeStrength, sizes = new Map());
+ const key = `${w}:${h}:${N}`;
+ if (!sizes.has(key)) {
+  const fw=w*N, fh=h*N;
+  sizes.set(key, Float32Array.from({length:fw*fh},(_,i)=>edgeStrength[Math.floor(Math.floor(i/fw)/N)*w+Math.floor(i%fw/N)]));
+ }
+ return sizes.get(key);
+}
+
 /** drawMaterial on a sheet N times as fine as the plan's grid (w x h); `edgeStrength` is on the plan's grid. */
 export function drawOnFineSheet(sheet, N, gestures, {w,h,edgeStrength,...options}) {
  const fw=w*N, fh=h*N;
- const edge=edgeStrength&&Float32Array.from({length:fw*fh},(_,i)=>edgeStrength[Math.floor(Math.floor(i/fw)/N)*w+Math.floor(i%fw/N)]);
+ const edge=fineEdge(edgeStrength,w,h,N);
  return drawMaterial(sheet,fineGestures(gestures,N),new Float32Array(1),fw,fh,{...options,pen:finePen(options.pen,N),dropSize:fineDrop(N),drySheet:dryFootprint,mmPerCell:options.mmPerCell/N,edgeStrength:edge});
 }
 

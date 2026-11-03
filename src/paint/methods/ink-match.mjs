@@ -5,6 +5,7 @@
 // reads their line cores as the target's lines were read (strokesPeakAbsorbance, on both).
 //
 // Pure apart from the drawing it is handed: no files, no target pixels.
+import { renderCells } from '../../media/km.mjs';
 import { resample } from './ink-lines.mjs';
 
 const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -21,7 +22,8 @@ export function lPlane(rgb, n) {
 function sampleAt(P, w, h, x, y) {
   const fx = Math.max(0, Math.min(w - 1, x - 0.5)), fy = Math.max(0, Math.min(h - 1, y - 0.5));
   const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1), u = fx - x0, v = fy - y0;
-  return (P[y0 * w + x0] * (1 - u) + P[y0 * w + x1] * u) * (1 - v) + (P[y1 * w + x0] * (1 - u) + P[y1 * w + x1] * u) * v;
+  const at = typeof P === 'function' ? P : i => P[i];
+  return (at(y0 * w + x0) * (1 - u) + at(y0 * w + x1) * u) * (1 - v) + (at(y1 * w + x0) * (1 - u) + at(y1 * w + x1) * u) * v;
 }
 
 /**
@@ -71,4 +73,23 @@ export function matchInkLoad({ targetAbsorbance, cap = 1, measure, lo = 0.125, h
     after = measure(f);
   }
   return { factor: f, before, after, want };
+}
+
+/** Gather every bilinear neighbour used by the line probe once; render only those cells on each scrap. */
+export function sampledInkAbsorbance(w, h, gestures) {
+  const indices = new Map();
+  strokesPeakAbsorbance(i => { if (!indices.has(i)) indices.set(i, indices.size); return 100; }, w, h, gestures);
+  const cells = [...indices.keys()], n = cells.length;
+  const white = new Uint8ClampedArray(n * 3).fill(255);
+  return sheet => {
+    if (!n) return 0;
+    if (sheet.w !== w || sheet.h !== h) throw new Error('Ink sample grid differs from scrap');
+    // Preserve layersOf's Float32 rounding of G+D+P and the original layer order.
+    const layers = sheet.layers.map(layer => layer.map(a => Float32Array.from(cells, i => a[i])));
+    layers.push(sheet.G.map((a,k) => Float32Array.from(cells, i => a[i] + sheet.D[k][i] + sheet.P[k][i])));
+    const rgb = new Uint8ClampedArray(n * 3);
+    renderCells(layers, sheet.pigments.map(p=>p.K), sheet.pigments.map(p=>p.S), white, 0, n, 1, null, rgb);
+    const L = lPlane(rgb, n);
+    return strokesPeakAbsorbance(i => L[indices.get(i)], w, h, gestures);
+  };
 }
