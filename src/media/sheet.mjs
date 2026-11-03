@@ -1,4 +1,4 @@
-import { certifyZeroPaper, invalidatePaperCertificate } from './paper-certificate.mjs';
+import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate } from './paper-certificate.mjs';
 import { censusDry } from './census.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -874,9 +874,11 @@ function boxDryStats(sheet, [x0, y0, x1, y1]) {
  * the dry then runs on between them rather than stopping at every step; the CPU dry calls onStep at every step either way).
  */
 export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, onStep = null, steps = null, analyticTail = false } = {}) {
-  invalidatePaperCertificate(sheet);
   censusDry(sheet);
+  const alreadyFixed = !onStep && validDryFixedCertificate(sheet);
   if (TAPE && sheet._tape) TAPE.push({ k: 'y', m: max, l: level, lm: levelMax, lt: levelTol, dt, ...(analyticTail ? {at:true} : {}) });
+  if (alreadyFixed) return 0;
+  invalidatePaperCertificate(sheet);
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
   const link = sheet._gpu;
   // A watched dry stays on the GPU too: it stops at the steps the watcher wants, and whatever the watcher reads (a frame's
@@ -884,7 +886,7 @@ export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4
   if (link && !link.paused) {
     const t = link.dry(sheet, max, o, { level, levelMax, levelTol, dt, analyticTail: analyticTail && !onStep, allowWet: true }, onStep ? { onStep, steps } : null);
     if (link.lastStillWet) { const wetCells = link.lastStillWet; link.lastStillWet = 0; check(DRY_LIMIT, false, { max, wetCells, gpu: true }); }
-    if (link.lastDryZero) certifyZeroPaper(sheet);
+    if (link.lastDryZero) certifyDryFixed(sheet);
     return t;
   }
   return dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analyticTail });
@@ -942,7 +944,7 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
   const state = {zero:true};
   if (bounds(sheet, state)) { check(DRY_LIMIT, false, { max, ...wetness(sheet) }); evaporateInPlace(sheet); state.zero = true; }
   fix(sheet);
-  if (state.zero) certifyZeroPaper(sheet);
+  if (state.zero) certifyDryFixed(sheet);
   return t;
 }
 
@@ -1035,6 +1037,7 @@ function thicknessPlain(sheet) {
 }
 /** Something wrote into a dried layer other than by pushing a new one: the cached sums of the layers are stale. */
 export const layersChanged = (sheet, changed = sheet.layers) => {
+  invalidatePaperCertificate(sheet);
   sheet._layerVer = (sheet._layerVer || 0) + 1;
   for (const layer of changed) layer._cacheVersion = (layer._cacheVersion ?? 0) + 1;
   if (sheet._fixedBed && sheet._gpu && !sheet._gpu.paused) sheet._gpu.fixedLayersChanged(sheet, changed);
