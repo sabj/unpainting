@@ -37,3 +37,30 @@ test('the fine sheet dries under the nib only, without pushing a layer',()=>{
  assert.equal(s.W[88],1);assert.equal(s.G[0][88],2);
  assert.equal(s.layers.length,0);
 });
+
+import { fineEdge } from './fine-material.mjs';
+test('fine edges reuse immutable source fields, with separate entries for each grid',()=>{
+ const edge=Float32Array.from([1,2,3,4]);
+ const a=fineEdge(edge,2,2,2);
+ assert.strictEqual(fineEdge(edge,2,2,2),a);
+ assert.deepEqual([...a],[1,1,2,2,1,1,2,2,3,3,4,4,3,3,4,4]);
+ assert.notStrictEqual(fineEdge(edge,2,2,3),a);
+ assert.notStrictEqual(fineEdge(edge.slice(),2,2,2),a);
+});
+
+import { drawOnFineSheet } from './fine-material.mjs';
+import { sampledInkAbsorbance } from './ink-match.mjs';
+test('one-pigment calibration on shared fine paper equals the full palette scrap',()=>{
+ const w=24,h=16,N=2,pig=materialProfile('drawing-ink').pigment;
+ const pigments=[{...pig,name:'wash'},pig,{...pig,name:'graphite HB'}];
+ const opts={seed:11,scale:2},paper=makePaper(w*N,h*N,opts);
+ const full=createSheet(makePaper(w*N,h*N,opts),pigments),one=createSheet(paper,[pig]);
+ assert.deepEqual(full.paper,paper);
+ const gs=[{points:[{x:3,y:8,s:.6,nw:.8,v:1},{x:20,y:8,s:.6,nw:.8,v:2}]}];
+ const options={w,h,medium:'drawing-ink',sourceInk:true,mmPerCell:.25,O:DEFAULTS};
+ drawOnFineSheet(full,N,gs,{...options,ink:[0,4,0]});
+ drawOnFineSheet(one,N,gs,{...options,ink:[4]});
+ for(const bank of ['G','D','P'])assert.deepEqual(one[bank][0],full[bank][1]);
+ const measure=sampledInkAbsorbance(w*N,h*N,fineGestures(gs,N));
+ assert.equal(measure(one),measure(full));
+});

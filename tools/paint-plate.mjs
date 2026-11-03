@@ -154,7 +154,7 @@ import { registerDrawingFile, lineTargetOf } from '../src/paint/methods/drawing-
 import { holdInkLines } from '../src/paint/methods/ink-lines-file.mjs';
 import { inkCapOnScrap } from '../src/paint/methods/ink-scrap.mjs';
 import { inkKFromSource } from '../src/paint/methods/ink-hue.mjs';
-import { matchInkLoad, sampleGestures, strokesPeakAbsorbance, lPlane as inkLPlane } from '../src/paint/methods/ink-match.mjs';
+import { sampledInkAbsorbance, matchInkLoad, sampleGestures } from '../src/paint/methods/ink-match.mjs';
 import { inkRecipeArgs } from '../src/paint/methods/ink-recipe.mjs';
 import { chooseInkRecipe, penShare, DRAWING_FLAGS, AUTO_INK_WIDTH, DEFAULT_INK_RECIPE } from '../src/paint/methods/ink-recipe-auto.mjs';
 import { chooseDrawingStages, drawingStageIntent } from '../src/paint/methods/drawing-stages-auto.mjs';
@@ -1572,13 +1572,18 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
  if(INK_MATCH[stage])return INK_MATCH[stage].factor;
  const A=INK_LINES?.[stage]?.stats?.peakAbsorbance;
  if(!(A>0)){INK_MATCH[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark match, ${stage}: no measured target lines, load unchanged`);return 1;}
- const sample=sampleGestures(gs,60);
+ const sample=sampleGestures(gs,60), N=INKRES?.N??1, fw=w*N, fh=h*N;
+ const paper=INKRES?INKRES.fine.paper:makePaper(w,h,PAPER_OPTS);
+ if(paper.w!==fw||paper.h!==fh)throw Error('Ink calibration paper dimensions differ');
+ const absorbance=sampledInkAbsorbance(fw,fh,N>1?fineGestures(sample,N):sample);
  const measure=f=>{
-  // with --inkres the sample is drawn on a blank sheet N times as fine, as the pens will draw it, and read there
-  if(INKRES){const N=INKRES.N,fw=w*N,fh=h*N,scrap=createSheet(makePaper(fw,fh,{...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N}),SHEET_PIGS);drawOnFineSheet(scrap,N,sample,{w,h,...optionsAt(f)});
-   return strokesPeakAbsorbance(inkLPlane(renderLayers(layersOf(scrap),SHEET_PIGS,new Uint8ClampedArray(fw*fh*3).fill(255),fw*fh,1),fw*fh),fw,fh,fineGestures(sample,N));}
-  const scrap=createSheet(makePaper(w,h,PAPER_OPTS),SHEET_PIGS);drawMaterial(scrap,sample,want,w,h,optionsAt(f));
-  return strokesPeakAbsorbance(inkLPlane(renderLayers(layersOf(scrap),SHEET_PIGS,new Uint8ClampedArray(w*h*3).fill(255),w*h,1),w*h),w,h,sample);};
+  const options=optionsAt(f), ink=INKRES?INKRES.remapInk(options.ink):[options.ink[PIGS.length]];
+  const scrap=createSheet(paper,[INK]);
+  scrap._tapePigmentMap={count:SHEET_PIGS.length,indices:[PIGS.length]};
+  if(INKRES)drawOnFineSheet(scrap,N,sample,{w,h,...options,ink});
+  else drawMaterial(scrap,sample,want,w,h,{...options,ink});
+  return absorbance(scrap);
+ };
  const r=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
  INK_MATCH[stage]={...r,target:A,sample:sample.length};
  console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${r.before.toFixed(2)}, so the load is scaled by ${r.factor.toFixed(3)} (now ${r.after.toFixed(2)})`);
