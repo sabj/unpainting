@@ -1,4 +1,5 @@
 // Generated from src/media/pen.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { census, censusMark } from './census.js';
 // Pipeline: inking, stage 6 (the pen physics).
 // A dip pen with walnut ink, after Kim et al., "Hydrodynamics of Writing with Ink" (PRL 107, 2011): the paper pulls
 // ink from the nib by capillary imbibition, so slow strokes are wide and dark and fast ones thin. The nib carries a
@@ -53,6 +54,7 @@ function buffers(pen, sheet) {
 // (N - 1) / 2 at N times the painting's resolution. `nw`, when given, sets the contact width in cells; pressure
 // still sets the feed.
 function touch(pen, sheet, x, y, p, dt, nw) {
+  if (census) { census.pen.touches++; censusMark(); }
   const { w, h, paper, s, M } = sheet, { capacity, height, tooth, fdx, fdy, grain } = paper;
   if (pen.ink <= 0 && pen.drop <= 0) return;
   const clock = ++pen.clock, stale = 60, fill = pen.ink / pen.capacity;
@@ -101,6 +103,7 @@ function touch(pen, sheet, x, y, p, dt, nw) {
   for (const i of seeds) { dist[loc(i)] = 0; push(0, i); }
   const D = pen.wick * pen.strength * pull, full = j => capacity[j] * (pen.depth + (1 - pen.depth) * dampOf(j));
   while (hn > 0 && D > 0) {
+    if (census) census.pen.dijkstraPops++;
     pop(); const d = pk, j = pv, jx = j % w, jy = (j - jx) / w, lj = loc(j);
     if (done[lj] || d > dist[lj]) continue; done[lj] = 1;
     let sat = 1;

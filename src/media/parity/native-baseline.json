@@ -1,0 +1,90 @@
+{
+  "referenceCommit": "41e68683a95612475be35d3d2dabb53dcd470873",
+  "manifestSHA256": "aef18213f2ea3413c4fd63d1d81cc54f7a38b885afe924aec46a1176b1c39420",
+  "node": "v25.8.2",
+  "platform": "darwin",
+  "arch": "arm64",
+  "encoders": {
+    "aom": "3.15.1",
+    "archive": "3.8.9",
+    "cairo": "1.18.6",
+    "cgif": "0.5.4",
+    "exif": "0.6.26",
+    "expat": "2.8.5",
+    "ffi": "3.8.0",
+    "fontconfig": "2.18.3",
+    "freetype": "2.14.3",
+    "fribidi": "1.0.17",
+    "glib": "2.90.0",
+    "harfbuzz": "14.5.0",
+    "heif": "1.23.5",
+    "highway": "1.4.0",
+    "imagequant": "2.4.1",
+    "lcms": "2.19.1",
+    "mozjpeg": "0826579",
+    "pango": "1.58.2",
+    "pixman": "0.46.4",
+    "png": "1.6.58",
+    "proxy-libintl": "0.5",
+    "rsvg": "2.63.2",
+    "tiff": "4.7.2",
+    "uhdr": "2.0.2",
+    "vips": "8.18.7",
+    "webp": "1.6.0",
+    "xml2": "2.15.4",
+    "zlib-ng": "2.3.3",
+    "sharp": "0.35.5"
+  },
+  "webgpuVersion": "0.6.2",
+  "results": [
+    {
+      "id": "inkres-1200-gpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "fast",
+      "sha256": "c86de018678ab37c5e41138874a6eac6ece7ac0e3da3468cbaaf0b52e7825c9c",
+      "status": "recorded"
+    },
+    {
+      "id": "valueplan-1200-gpu",
+      "unusedOptions": [
+        "--skylanemm",
+        "--skylanes",
+        "--skylanestep"
+      ],
+      "exit": 3,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "fast",
+      "sha256": "1316897f052b2deb6f4a6ef1944a9674964b8a41b72f2af87174d6f592ebec66",
+      "status": "recorded"
+    },
+    {
+      "id": "general-540-gpu",
+      "unusedOptions": [],
+      "exit": 0,
+      "backend": "gpu",
+      "adapter": {
+        "vendor": "apple",
+        "architecture": "metal-3",
+        "device": "apple-m4",
+        "description": "Metal driver on macOS Version 26.2 (Build 25C56)"
+      },
+      "mode": "fast",
+      "sha256": "df8141495b61a05eee77cc48970643bf2270234e49012f1221d9030774fc4114",
+      "status": "recorded"
+    }
+  ]
+}

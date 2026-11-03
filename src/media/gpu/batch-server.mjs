@@ -121,7 +121,7 @@ function sheetHandler(sid, port) {
       case 'idle': if (!m.planQueue) await gpu.idle(); break;
       case 'counters': { const c = await gpu.counters(); ctrl[1] = c[1]; ctrl[6] = c[4]; break; }
       case 'dryStats': { const t = gpu.dryTelemetry ?? {}; ctrl[1] = t.calls ?? 0; ctrl[4] = t.fastChunk ?? 50; ctrl[6] = t.lastWetCounter ?? -1; ctrl[12] = t.counterReads ?? 0; ctrl[13] = 0; ctrl[14] = t.fastIterations ?? 0; ctrl[15] = t.fastChunks ?? 0; break; }
-      case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ batch: core.stats })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
+      case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ batch: core.stats, dryTelemetry: gpu.dryTelemetry ?? null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
       case 'close': core?.close(sid); core?.flushNow(); parentPort.postMessage({ type: 'closed', sid }); port.close(); return;
       default: throw new Error(`batch gpu: op ${m.op} is not supported`);
     }

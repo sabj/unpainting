@@ -1,3 +1,4 @@
+import { census } from '../../media/census.mjs';
 // Shadow technique choice (wet blend or dry layer) from measured edge widths, and paper-state gates that hold a
 // stroke until its paper is dry or moist enough. No physics overrides.
 import { gaussian } from '../../keyframes/density.mjs';
@@ -99,7 +100,13 @@ export function strokeCells(sheet, points, radius) {
   return [...cells];
 }
 
-export function measurePaper(sheet, cells, paperOnly = false, { uniform = false } = {}) {
+export function measurePaper(sheet, cells, paperOnly = false, options = {}) {
+  if (!census) return measurePaperImpl(sheet, cells, paperOnly, options);
+  const t = performance.now(); census.measurePaper.calls++; census.measurePaper.cells += cells.length;
+  try { return measurePaperImpl(sheet, cells, paperOnly, options); }
+  finally { census.measurePaper.ms += performance.now() - t; }
+}
+function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false } = {}) {
   if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, waterP95: 0, moistShare: 0, dry: true };
   let x0 = sheet.w, x1 = 0, y0 = sheet.h, y1 = 0;
   for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }

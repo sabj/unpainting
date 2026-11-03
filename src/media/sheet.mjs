@@ -1,3 +1,4 @@
+import { censusDry } from './census.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
 // "Computer-Generated Watercolor" (SIGGRAPH 97): water with suspended pigment above the paper, pigment adsorbed
@@ -836,6 +837,7 @@ function stepBox(sheet, o, box) {
  * the dry then runs on between them rather than stopping at every step; the CPU dry calls onStep at every step either way).
  */
 export function dry(sheet, max = 40000, o = DEFAULTS, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, onStep = null, steps = null, analyticTail = false } = {}) {
+  censusDry(sheet);
   if (TAPE && sheet._tape) TAPE.push({ k: 'y', m: max, l: level, lm: levelMax, lt: levelTol, dt, ...(analyticTail ? {at:true} : {}) });
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
   const link = sheet._gpu;

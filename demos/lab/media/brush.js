@@ -1,4 +1,5 @@
 // Generated from src/media/brush.mjs by tools/lab/sync-site-media.mjs. Edit the source.
+import { censusMark } from './census.js';
 // A brush as a row of bristles across the stroke, based on "Hairy Brushes", with a belly
 // reservoir as in DAB. Water and pigment move as separate masses. One contact model covers every load:
 // paint reaches a cell when the hair's liquid spans the depth from the hair to the paper's tooth there.
@@ -411,6 +412,7 @@ function splatStrokeGpu(brush, sheet, path, { spacing, between, lift, upright })
 const CPU_TRACE = ENV.CPU_STROKE_TRACE === '1' ? new Map() : null;
 if (CPU_TRACE) process.on('exit', () => { for (const [k, n] of CPU_TRACE) console.error(`CPUSTROKE ${n} ${k}`); });
 export function stroke(brush, sheet, path, options = {}) {
+  censusMark();
   if (brush.model !== 'tuft' && !brush.depositDepth && splats(brush)) return splatStroke(brush, sheet, path, options);
   const link = sheet._gpu;
   // A stroke goes to the GPU when its `between` only flows the sheet; gpuBetween: false keeps it on the CPU copy.
