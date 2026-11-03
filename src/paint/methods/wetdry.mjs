@@ -120,20 +120,25 @@ export function measurePaper(sheet, cells, paperOnly = false, options = {}) {
 }
 function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, stats = 'full', bounds = null, fresh = false } = {}) {
   if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, ...(stats === 'gate' ? {} : {waterP95: 0}), moistShare: 0, dry: true };
-  let x0 = sheet.w, x1 = 0, y0 = sheet.h, y1 = 0;
+  const sw = sheet.w;
+  let x0 = sw, x1 = 0, y0 = sheet.h, y1 = 0;
   if (bounds) [x0, y0, x1, y1] = bounds;
-  else for (const i of cells) { const x = i % sheet.w, y = Math.floor(i / sheet.w); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  else for (const i of cells) {
+    const y = (i / sw) | 0, x = i - y * sw;
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
   if (validPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
   const reach = queryWetReach(sheet, cells, [x0, y0, x1, y1]);
   if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   const freshRect = reach?.rect ?? [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
   if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, freshRect, paperOnly);
-  const wetCells = reach?.wetCells, exactEpoch = reach?.exactEpoch, rBounds = reach?.bounds, sw = sheet.w;
+  const wetCells = reach?.wetCells, exactEpoch = reach?.exactEpoch, rBounds = reach?.bounds;
+  const W = sheet.W, S = sheet.s, cap = sheet.paper.capacity;
   let waterMax = 0, saturationMax = 0, moist = 0, firstWater, index = 0, waters = stats === 'gate' || uniform ? null : [];
   if (cells.fullSheet && stats === 'gate' && reach) {
     const [rx0, ry0, rw, rh] = freshRect, rx1 = rx0 + rw - 1, ry1 = ry0 + rh - 1;
-    const W = sheet.W, S = sheet.s, cap = sheet.paper.capacity;
     for (let y = ry0; y <= ry1; y++) {
       const row = y * sw;
       for (let x = rx0; x <= rx1; x++) {
@@ -149,17 +154,24 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
     return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, moistShare: moist / cells.length,
       dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
   }
+  const bx0 = rBounds ? rBounds[0] : 0, by0 = rBounds ? rBounds[1] : 0, bx1 = rBounds ? rBounds[2] : sw - 1, by1 = rBounds ? rBounds[3] : sheet.h - 1;
   for (const i of cells) {
     let water = 0, saturation = 0;
-    if (!reach || (wetCells ? wetCells[i] === exactEpoch : (() => { const y = (i / sw) | 0, x = i - y * sw; return x >= rBounds[0] && x <= rBounds[2] && y >= rBounds[1] && y <= rBounds[3]; })())) {
-      water = sheet.W[i], saturation = sheet.s[i] / Math.max(1e-8, sheet.paper.capacity[i]);
+    let inReach = true;
+    if (reach) {
+      if (wetCells) inReach = wetCells[i] === exactEpoch;
+      else { const y = (i / sw) | 0, x = i - y * sw; inReach = x >= bx0 && x <= bx1 && y >= by0 && y <= by1; }
+    }
+    if (inReach) {
+      water = W[i]; saturation = S[i] / Math.max(1e-8, cap[i]);
       if (!Number.isFinite(water) || !Number.isFinite(saturation)) throw new Error('Non-finite paper state');
     }
     if (waters) waters.push(water);
     else if (stats !== 'gate' && index === 0) firstWater = water;
     else if (stats !== 'gate' && !Object.is(water, firstWater)) { waters = new Array(index).fill(firstWater); waters.push(water); }
     index++;
-    waterMax = Math.max(waterMax, water); saturationMax = Math.max(saturationMax, saturation);
+    if (water > waterMax) waterMax = water;
+    if (saturation > saturationMax) saturationMax = saturation;
     if (water >= PAPER_STATE.moistWater || saturation >= PAPER_STATE.moistSaturation) moist++;
   }
   if (waters) waters.sort((a, b) => a - b);
@@ -173,10 +185,12 @@ export function measurePaperBatch(sheet, groups, paperOnly = false, options = {}
   if (validPaperCertificate(sheet) || validWetReachCertificate(sheet)) return groups.map(({cells, stats = 'full', bounds}) => measurePaper(sheet,cells,paperOnly,{...options,stats,...(bounds ? {bounds} : {})}));
   const started = census ? performance.now() : 0;
   try {
-    let x0 = sheet.w, y0 = sheet.h, x1 = -1, y1 = -1;
+    const sw = sheet.w;
+    let x0 = sw, y0 = sheet.h, x1 = -1, y1 = -1;
     for (const {cells} of groups) for (const i of cells) {
-      const x = i % sheet.w, y = Math.floor(i / sheet.w);
-      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      const y = (i / sw) | 0, x = i - y * sw;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
     if (x1 >= x0 && sheet._gpu && !sheet._gpu.paused)
       (sheet._gpu.ensurePaperFresh ?? sheet._gpu.ensureFresh).call(sheet._gpu, sheet, [x0, y0, x1-x0+1, y1-y0+1], paperOnly);
@@ -195,19 +209,19 @@ export function paperReady(state, technique) {
 
 export function enforcePaper({ sheet, cells, technique, step, dry, O, log, label, record, refit }) {
   let state = measurePaper(sheet, cells), waits = 0;
+  if (!state.cells) return false;
   const fastTime = { ...(O ?? DEFAULTS), dt: 2 }; // same physical processes and default dry() time step, never fix()
-  if (!cells.length) return false;
   let whole = technique === 'dry layer' ? measurePaperDry(sheet) : null;
   if (whole && !whole.dry) {
     dry(sheet, 30000, O, { levelMax: 140, dt: 14 }); waits++;
     // Whole sheet must be dry, including pore water, not merely the planned footprint.
     whole = measurePaperDry(sheet);
+    state = measurePaper(sheet, cells);
     if (!whole.dry) {
-      const failure = { label, technique, ...measurePaper(sheet, cells), wholeSheetDry: false, wholeSheet: whole, waits, passed: false };
+      const failure = { label, technique, ...state, wholeSheetDry: false, wholeSheet: whole, waits, passed: false };
       record?.(failure); log?.(`technique stroke ${JSON.stringify(failure)}`);
       return check('wetdry full-sheet drying failed', false, { label, technique, waterMax: whole.waterMax, saturationMax: whole.saturationMax });
     }
-    state = measurePaper(sheet, cells);
   }
   // Waiting changes the paper. Re-fit from the original planned path once the
   // gloss has settled, never rely on a placement measured before that wait.

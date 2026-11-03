@@ -747,10 +747,11 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
     const half = brush.flat ? radius * (0.9 + 0.1 * q.p) * Math.sqrt(Math.min(1, q.p / 0.5)) : radius * (0.25 + 0.75 * q.p);
     const [sideL, sideR] = sidesAt(brush, half, q.x, q.y);
     const fringe = 1 + 0.08 * half;
-    let gdx = 0, gdy = 0;
-    if (!observational && brush.grainTable) [gdx, gdy] = brush.grainTable[((brush.travel / brush.grainPeriod) | 0) % brush.grainTable.length];
-    const o = plan.step(), F = plan.F, U = plan.U;
+    let o = 0, F = null, U = null;
     if (!observational) {
+      let gdx = 0, gdy = 0;
+      if (brush.grainTable) [gdx, gdy] = brush.grainTable[((brush.travel / brush.grainPeriod) | 0) % brush.grainTable.length];
+      o = plan.step(); F = plan.F; U = plan.U;
       F[o] = q.p; F[o + 1] = fringe; F[o + 2] = sideL; F[o + 3] = sideR; U[o + 4] = gdx + 1000000; U[o + 5] = gdy + 1000000; U[o + 6] = 0;
       F[o + 9] = tx; F[o + 10] = ty;
       for (let c = 0; c < nClumps; c++) F[o + 16 + c] = 1 + brush.streak * (2 * along1(c + brush.clumps[c].lift * 7, brush.travel / brush.streakLength) - 1);
@@ -760,9 +761,10 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
     const rx = upright ? Math.abs(ty) * R + Math.abs(tx) * thin : R, ry = upright ? Math.abs(tx) * R + Math.abs(ty) * thin : R;
     const reachA = spacing * 0.5 + 0.6, reachS = Math.max(sideL, sideR) + 0.5 + 2 * ET, clk = sheet.clock;
     const X0 = Math.max(0, Math.floor(q.x - rx)), X1 = Math.min(w - 1, Math.ceil(q.x + rx)), Y1 = Math.min(h - 1, Math.ceil(q.y + ry));
+    const pHeight = paper.height, snapshot = sheet._contactSnapshot, touchEpoch = snapshot?.work.touchEpoch, snapEpoch = snapshot?.work.epoch ?? 0, snapSource = snapshot?.source, readCells = snapshot?.recordReads ? snapshot.work.readCells : null;
     let cnt = 0;
     for (let yy = Math.max(0, Math.floor(q.y - ry)); yy <= Y1; yy++) {
-      const dy = yy + 0.5 - q.y;
+      const dy = yy + 0.5 - q.y, row = yy * w;
       let lo = -Infinity, hi = Infinity;
       if (Math.abs(tx) > 1e-6) { const c = dy * ty, u1 = (-reachA - c) / tx, u2 = (reachA - c) / tx; lo = Math.max(lo, Math.min(u1, u2)); hi = Math.min(hi, Math.max(u1, u2)); }
       if (Math.abs(nx) > 1e-6 && reachS === reachS) { const c = dy * ny, u1 = (-reachS - c) / nx, u2 = (reachS - c) / nx; lo = Math.max(lo, Math.min(u1, u2)); hi = Math.min(hi, Math.max(u1, u2)); }
@@ -772,25 +774,25 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
         if (hi < Infinity) xb = Math.min(xb, Math.ceil(hi + q.x - 0.5) + 1);
       }
       for (let xx = xa; xx <= xb; xx++) {
-        const dx = xx + 0.5 - q.x, along = dx * tx + dy * ty, across = edgeShift(dx * nx + dy * ny, ET, paper.height[yy * w + xx]);
+        const dx = xx + 0.5 - q.x, along = dx * tx + dy * ty;
+        if (Math.abs(along) > reachA) continue;
+        const i = row + xx, rawAcross = dx * nx + dy * ny, across = ET ? rawAcross + ET * (pHeight[i] - 0.5) : rawAcross;
         const side = across < 0 ? sideL : sideR;
-        if (Math.abs(along) > spacing * 0.5 + 0.6 || Math.abs(across) > side + 0.5) continue;
-        if (clip && !clip[yy * w + xx]) continue;
-        if (sheet._contactSnapshot) {
-          const {work, source} = sheet._contactSnapshot, i = yy * w + xx;
-          if (work.touchEpoch[i] !== work.epoch) {
-            work.touchEpoch[i] = work.epoch; stamp[i] = source[i]; work.readCells.push(i);
-          }
+        if (Math.abs(across) > side + 0.5) continue;
+        if (clip && !clip[i]) continue;
+        if (snapshot && touchEpoch[i] !== snapEpoch) {
+          touchEpoch[i] = snapEpoch; stamp[i] = snapSource[i]; if (readCells) readCells.push(i);
         }
-        if (clk - stamp[yy * w + xx] < recent || stamp[yy * w + xx] >= onceT0) continue;
-        stamp[yy * w + xx] = clk;
-        if (observational) { cI[cnt++] = yy * w + xx; continue; }
+        if (clk - stamp[i] < recent || stamp[i] >= onceT0) continue;
+        stamp[i] = clk;
+        if (observational) { cI[cnt++] = i; continue; }
         const rel = side > 0 ? across / side : 0;
-        countContact?.(yy * w + xx);
-        cI[cnt] = yy * w + xx; cL[cnt] = Math.max(0, Math.min(lanes - 1, Math.round(((rel + 1) / 2) * (lanes - 1)))); cA[cnt++] = across;
+        countContact?.(i);
+        cI[cnt] = i; cL[cnt] = Math.max(0, Math.min(lanes - 1, Math.round(((rel + 1) / 2) * (lanes - 1)))); cA[cnt++] = across;
       }
     }
-    U[o + 7] = plan.emit(cI, cL, cA, cnt);
+    if (observational) plan.emit(cI, cL, cA, cnt);
+    else U[o + 7] = plan.emit(cI, cL, cA, cnt);
     steps++;
     if (between) { link.planning = plan; try { between(steps); } finally { link.planning = null; } }
     t += spacing; brush.travel += spacing; sheet.clock++;
@@ -886,12 +888,12 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   // row-major index range of the set cells, so dense passes scan only that range
   let lo = n, hi = -1, primaryCount = 0, neighborCount = 0;
   const link = {
-    beginPlan() { const F = new Float32Array(16 + brush.clumps.length); return { F, U: new Uint32Array(F.buffer), I: new Int32Array(F.buffer), step() { return 0; }, emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;if(rLo){const y=(i/sw)|0,x=i-y*sw;if(x<rLo[y])rLo[y]=x;if(x>rHi[y])rHi[y]=x;}} mask[i]=1; } return 0; } }; },
+    beginPlan() { return { emit(indices, lanes, across, count) { for (let j = 0; j < count; j++) { const i=indices[j]; if(!mask[i]){if(sparse)emitted.push(i);primaryCount++;if(i<lo)lo=i;if(i>hi)hi=i;if(rLo){const y=(i/sw)|0,x=i-y*sw;if(x<rLo[y])rLo[y]=x;if(x>rHi[y])rHi[y]=x;}} mask[i]=1; } return 0; } }; },
     endPlan() {},
   };
   const scratch = { w: sw, h: sh, K: sheet.K, paper: sheet.paper, clip, _gpu: link, clock: sheet.clock,
     touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
-    _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched } : null,
+    _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched, recordReads: includeTouched } : null,
     contactStrength:tuft ? sheet.contactStrength?.slice() : undefined,
     _contactBrush: sheet._contactBrush === brush ? copy : null };
   // an undipped tuft is treated as full, the widest footprint
@@ -974,7 +976,7 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   else if (work && hi >= lo) {
     for (let y = ny0; y <= ny1; y++) {
       const a = nrLo[y], b = nrHi[y]; if (b < a) continue;
-      for (let i = y * sw + a, end = y * sw + b; i <= end; i++) { if (mask[i]) indices.push(i); if (neighbors[i]) neighborIndices.push(i); }
+      for (let i = y * sw + a, end = y * sw + b; i <= end; i++) { if (mask[i]) indices.push(i); else if (neighbors[i]) neighborIndices.push(i); }
     }
   }
   else for (let i = Math.max(0, Math.min(lo, nlo)), end = Math.min(n - 1, Math.max(hi, nhi)); i <= end; i++) { if (mask[i]) indices.push(i); if (neighbors[i]) neighborIndices.push(i); }

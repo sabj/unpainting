@@ -37,6 +37,28 @@ export function unsupportedAxisEdges(mask,w,h,rgb,{minimum=Math.max(12,Math.roun
   const failures=[];
   // The support test needs a full +/-2-cell neighbourhood plus the preceding
   // sample. A clipped paper rim is not an internal passage seam.
-  for(const vertical of [true,false]){const across=vertical?w:h,along=vertical?h:w;for(let a=3;a<across-2;a++){let start=-1;for(let b=0;b<=along;b++){const x=vertical?a:b,y=vertical?b:a,i=y*w+x,j=i-(vertical?1:w);const edge=b<along&&mask[i]!==mask[j]&&!supported(x,y,vertical);if(edge&&start<0)start=b;if(!edge&&start>=0){if(b-start>=minimum)failures.push({axis:vertical?'vertical':'horizontal',at:a,start,length:b-start});start=-1;}}}}
+  for(const vertical of [true,false]){
+    const across=vertical?w:h,along=vertical?h:w,step=vertical?1:w;
+    for(let a=3;a<across-2;a++){
+      let mStart=-1;
+      for(let b=0;b<=along;b++){
+        const i=vertical?b*w+a:a*w+b;
+        const mEdge=b<along&&mask[i]!==mask[i-step];
+        if(mEdge){if(mStart<0)mStart=b;continue;}
+        if(mStart>=0){
+          if(b-mStart>=minimum){
+            let start=-1;
+            for(let k=mStart;k<=b;k++){
+              const x=vertical?a:k,y=vertical?k:a;
+              const edge=k<b&&!supported(x,y,vertical);
+              if(edge&&start<0)start=k;
+              if(!edge&&start>=0){if(k-start>=minimum)failures.push({axis:vertical?'vertical':'horizontal',at:a,start,length:k-start});start=-1;}
+            }
+          }
+          mStart=-1;
+        }
+      }
+    }
+  }
   return failures;
 }
