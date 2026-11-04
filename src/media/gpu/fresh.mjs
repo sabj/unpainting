@@ -37,6 +37,35 @@ export class FreshMap {
     const tx0 = ceilDiv(x0, TILE), ty0 = ceilDiv(y0, TILE), tx1 = xe >= this.w ? this.tw : Math.floor(xe / TILE), ty1 = ye >= this.h ? this.th : Math.floor(ye / TILE);
     for (let ty = ty0; ty < ty1; ty++) if (tx1 > tx0) this.tiles.fill(this.epoch, ty * this.tw + tx0, ty * this.tw + tx1);
   }
+  /** Disjoint stale tile runs for paper observations. Never includes a fresh tile.
+   * Keep the 64-cell lookahead, but only transfer dirty tiles within it. */
+  staleRects(rect) {
+    if (this.all) return [];
+    const [x, y, w, h] = rect;
+    const x0 = Math.max(0, Math.floor(x / GROW) * GROW / TILE);
+    const y0 = Math.max(0, Math.floor(y / GROW) * GROW / TILE);
+    const x1 = Math.min(this.tw, Math.ceil((x + w) / GROW) * GROW / TILE);
+    const y1 = Math.min(this.th, Math.ceil((y + h) / GROW) * GROW / TILE);
+    // A fresh requested region must not read unrelated stale lookahead tiles.
+    if (!this.staleBounds(rect)) return [];
+    const out = [];
+    let previous = new Map();
+    for (let ty = y0; ty < y1; ty++) {
+      const current = new Map();
+      for (let tx = x0; tx < x1;) {
+        if (this.tiles[ty * this.tw + tx] === this.epoch) { tx++; continue; }
+        const start = tx++;
+        while (tx < x1 && this.tiles[ty * this.tw + tx] !== this.epoch) tx++;
+        const key = start + ':' + tx, bottom = Math.min(this.h, (ty + 1) * TILE);
+        let run = previous.get(key);
+        if (run) run[3] = bottom - run[1];
+        else { run = [start * TILE, ty * TILE, Math.min(this.w, tx * TILE) - start * TILE, bottom - ty * TILE]; out.push(run); }
+        current.set(key, run);
+      }
+      previous = current;
+    }
+    return out;
+  }
   /** The stale tiles `rect` touches: their tile-aligned bounding rectangle, or null when all of them are fresh. */
   staleBounds(rect) {
     if (this.all) return null;

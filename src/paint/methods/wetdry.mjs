@@ -133,6 +133,10 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
   if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   const freshRect = reach?.rect ?? [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
+  if(stats==='gate'&&!fresh&&sheet._gpu?.measurePaperGate){
+    const gate=sheet._gpu.measurePaperGate(sheet,cells,reach,freshRect,paperOnly);
+    if(gate)return {cells:cells.length,bounds:[x0,y0,x1,y1],...gate};
+  }
   if (!fresh && sheet._gpu && !sheet._gpu.paused) (sheet._gpu.ensurePaperFresh??sheet._gpu.ensureFresh).call(sheet._gpu,sheet, freshRect, paperOnly);
   const wetCells = reach?.wetCells, exactEpoch = reach?.exactEpoch, rBounds = reach?.bounds;
   const W = sheet.W, S = sheet.s, cap = sheet.paper.capacity;

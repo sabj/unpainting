@@ -35,7 +35,7 @@ function coreFor(sheet, O) { return coreReady ??= (async () => { await deviceOnc
 function sheetHandler(sid, port) {
   let wd = null, ring, done, sumData, ctrl, rectData, layerData, err;
   let gpu = null, chain = Promise.resolve(), pendingSteps = 0, fullBrushPigments = false;
-  const queuedDrys = [], brushMasks = new Map(); let workerWetMask = 0, workerTopMask = 0;
+  const queuedDrys = [], brushMasks = new Map(); let workerWetMask = 0, workerTopMask = 0, queuedPaperZero = false;
   let framePort = null, frameChain = Promise.resolve();
   const ack = () => { Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); };
   const fail = (msg, status = 0) => { console.error(`[batch gpu] sheet ${sid}:`, msg); const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1)); err.fill(0); err.set(b); ctrl[2] = 1; if (status) Atomics.store(ctrl, 3, status); ack(); };
@@ -73,7 +73,8 @@ function sheetHandler(sid, port) {
       case 'opts': gpu.setOptions(m.o); return;
       case 'act': if (!asyncDry) gpu.setAct(m.mask); return;
       case 'down': { rectData.set(await gpu.readRect(m.rect)); break; }
-      case 'paperDown': { rectData.set(await gpu.readPaperRect(m.rect)); break; }
+      case 'paperGate': { rectData.set(await gpu.readPaperGate(m.indices)); break; }
+    case 'paperDown': { rectData.set(await gpu.readPaperRects(m.rects ?? [m.rect])); break; }
       case 'up': { fullBrushPigments ||= m.signedZero || signedZero(m.data ?? rectData); if (asyncDry) { workerWetMask |= m.mask ?? 0; gpu.setAct(workerWetMask | workerTopMask); } const [, , rw, rh] = m.rect; gpu.writeRect(m.rect, m.data ?? rectData.slice(0, rw * rh * gpu.planes()), m.logicalRect); break; }
       case 'upNoop': { fullBrushPigments ||= m.signedZero; if (asyncDry) { workerWetMask |= m.mask ?? 0; gpu.setAct(workerWetMask | workerTopMask); } gpu.writeRect(null, null, m.logicalRect); break; }
       case 'upReduced': {
@@ -84,14 +85,14 @@ function sheetHandler(sid, port) {
       }
       case 'dryQueued': {
         gpu.setOptions(m.o); const steps = await gpu.dry(m.max, m.o, m.params), oldMask = gpu.topMask ?? m.initialTopMask ?? 0;
-        const r = await gpu.fix(null, oldMask, true); driedMask(r); queuedDrys.push([steps, r.hadTop ? 1 : 0, r.pushed ? 1 : 0, r.topMask ?? oldMask, r.archive ?? 0, oldMask]); break;
+        const r = await gpu.fix(null, oldMask, true); driedMask(r); queuedPaperZero = gpu.lastDryZero; queuedDrys.push([steps, r.hadTop ? 1 : 0, r.pushed ? 1 : 0, r.topMask ?? oldMask, r.archive ?? 0, oldMask]); break;
       }
-      case 'drainDrys': { if (queuedDrys.length * 6 > rectData.length) throw new Error('Dry metadata queue exceeded shared mailbox'); new Uint32Array(rectData.buffer).set(queuedDrys.flat()); ctrl[1] = queuedDrys.length; queuedDrys.length = 0; break; }
+      case 'drainDrys': { if (queuedDrys.length * 6 > rectData.length) throw new Error('Dry metadata queue exceeded shared mailbox'); new Uint32Array(rectData.buffer).set(queuedDrys.flat()); ctrl[1] = queuedDrys.length; ctrl[12] = queuedPaperZero ? 1 : 0; queuedDrys.length = 0; break; }
       case 'dry': case 'dryEnd': {
         if (m.op === 'dry') { gpu.setOptions(m.o); ctrl[1] = await gpu.dry(m.max, m.o, m.params); } else ctrl[1] = await gpu.dryEnd(); ctrl[6] = gpu.lastStillWet ?? 0; // wet cells a dry sent with allowWet left to evaporate in place
         const defer = gpu.resident && !framePort;
         const r = await gpu.fix(gpu.hasTop && !defer ? layerData.subarray(0, gpu.K * gpu.n) : null, m.topMask, defer);
-        driedMask(r); ctrl[9] = r.archive ?? 0; ctrl[4] = r.hadTop ? 1 : 0; ctrl[5] = r.pushed ? 1 : 0; ctrl[7] = r.topMask ?? 0;
+        driedMask(r); ctrl[12] = gpu.lastDryZero ? 1 : 0; ctrl[9] = r.archive ?? 0; ctrl[4] = r.hadTop ? 1 : 0; ctrl[5] = r.pushed ? 1 : 0; ctrl[7] = r.topMask ?? 0;
         if (framePort && r.pushed && r.hadTop) {
           const K = gpu.K, n = gpu.n, ks = []; for (let k = 0; k < K; k++) if (m.topMask === undefined || (m.topMask >>> k) & 1) ks.push(k);
           const data = new Float32Array(ks.length * n); ks.forEach((k, q) => data.set(layerData.subarray(k * n, (k + 1) * n), q * n));
