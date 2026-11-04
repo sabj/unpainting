@@ -1,6 +1,8 @@
 // A whole sheet.mjs step on the GPU with the sheet resident (see stepfull.wgsl). Node with the `webgpu` package (Dawn),
 // or a browser's navigator.gpu passed to openGpu. sheet.mjs stays the reference and the fallback.
 import fs from 'node:fs';
+import { PaperReadback } from './paper-readback.mjs';
+import { PaperGate } from './paper-gate.mjs';
 import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
 import {edgePingPong} from './edge-pingpong.mjs';
 import {fastDryChunk, adaptiveFastDryChunk} from './fast-dry-chunk.mjs';
@@ -583,16 +585,16 @@ export class GpuSheet {
     await rb.mapAsync(GPUMapMode.READ, 0, bytes); const out = new Float32Array(rb.getMappedRange(0, bytes).slice(0)); rb.unmap(); return out;
   }
   /** Observation only: packed W/s plus required wet-recipient M, no pigment/layer read or simulator arithmetic. */
-  async readPaperRect(rect) {
-    this.flushStrokes();
-    const [x,y,rw,rh]=rect, area=rw*rh, bytes=area*12, d=this.device;
-    const rb=this.paperRb&&this.paperRb.size>=bytes?this.paperRb:(this.paperRb?.destroy(),this.paperRb=d.createBuffer({size:Math.max(16,bytes),usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST}));
-    // pack_rect converts uint32 M to the numeric header readRect uses. One contiguous copy avoids per-row host work.
-    this.ensurePack(area);d.queue.writeBuffer(this.b.RC,0,new Uint32Array(rect));
-    const enc=d.createCommandEncoder();this.rectPass(enc,'pack_rect',rect);
-    enc.copyBufferToBuffer(this.b.PACK,0,rb,0,bytes);d.queue.submit([enc.finish()]);
-    await rb.mapAsync(GPUMapMode.READ,0,bytes);const result=new Float32Array(rb.getMappedRange(0,bytes).slice(0));rb.unmap();return result;
+  async readPaperGate(indices) {
+    this.flushStrokes();this.paperGate ??= new PaperGate(this.device);
+    return this.paperGate.read(this,indices);
   }
+  async readPaperRects(rects) {
+    this.flushStrokes();
+    this.paperReadback ??= new PaperReadback(this.device);
+    return this.paperReadback.read(this, rects);
+  }
+  async readPaperRect(rect) { return this.readPaperRects([rect]); }
   /** Write packed planes back (the layout readRect returns) and flag the tiles that hold water. */
   async ensureUploadMetadata() {
     if (this.b.UPLOAD_META) return;
@@ -939,5 +941,5 @@ export class GpuSheet {
     this.device.queue.writeBuffer(this.b.RESIST, 0, u);
   }
 
-  destroy() { this.allocationGeneration=(this.allocationGeneration??0)+1;this.demandSetup=null; this.optical?.destroy(); this.timestamps.destroy(); this.flushStrokes(); this.fixQueue?.destroy(); this.brushReadbacks?.destroy(); this.topRb?.destroy(); this.paperRb?.destroy(); for(const a of this.archives.values()) a.buffer.destroy(); for(const v of this.brushSlots.values()) v.buffer.destroy(); for (const k of Object.keys(this.b)) this.b[k].destroy(); }
+  destroy() { this.allocationGeneration=(this.allocationGeneration??0)+1;this.demandSetup=null; this.optical?.destroy(); this.timestamps.destroy(); this.flushStrokes(); this.fixQueue?.destroy(); this.brushReadbacks?.destroy(); this.topRb?.destroy(); this.paperReadback?.destroy();this.paperGate?.destroy(); for(const a of this.archives.values()) a.buffer.destroy(); for(const v of this.brushSlots.values()) v.buffer.destroy(); for (const k of Object.keys(this.b)) this.b[k].destroy(); }
 }

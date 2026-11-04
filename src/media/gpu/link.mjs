@@ -36,7 +36,7 @@ const POST_LIMIT = 4 * 1024 * 1024; // floats: 16 MB
 const TIMEOUT_MS = 30 * 60 * 1000;
 const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
-const READ_OPS = new Set(['down', 'paperDown', 'sums', 'topDown', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
+const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
 const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth'];
 
 export class GpuLink {
@@ -271,15 +271,81 @@ export class GpuLink {
     rect=this.validRect(rect);
     if(!this.stale||!this.fresh.staleBounds(rect))return;
     if(!this.paperFresh)this.paperFresh=new FreshMap(this.w,this.h);
-    if(this.paperVersion!==this.version){this.paperFresh.stale();this.paperVersion=this.version;}
-    const need=this.paperFresh.staleBounds(rect);if(!need)return;
-    const started=performance.now();this.call({op:'paperDown',rect:need});
-    const [x,y,rw,rh]=need,area=rw*rh;
-    for(let row=0;row<rh;row++){const offset=(y+row)*this.w+x,j=row*rw;sheet.W.set(this.rectData.subarray(j,j+rw),offset);sheet.s.set(this.rectData.subarray(area+j,area+j+rw),offset);for(let col=0;col<rw;col++)sheet.M[offset+col]=this.rectData[area*2+j+col];}
-    this.paperFresh.mark(need);
-    this.stats.paperDown=(this.stats.paperDown??0)+1;this.stats.paperDownBytes=(this.stats.paperDownBytes??0)+area*12;this.stats.paperDownMs=(this.stats.paperDownMs??0)+performance.now()-started;
-    this.stats.paperDownFullPlaneEquivalentBytes=(this.stats.paperDownFullPlaneEquivalentBytes??0)+area*PLANES(this.K)*4;
-    this.recordTransfer('paperDown',area*12);
+    if(this.paperVersion!==this.version){this.paperFresh.stale();this.paperVersion=this.version;this.paperWetRect=null;}
+    const rects=this.paperFresh.staleRects(rect);if(!rects.length){this.stats.paperReuse=(this.stats.paperReuse??0)+1;return;}
+    const started=performance.now();this.call({op:'paperDown',rects,...(rects.length===1?{rect:rects[0]}:{})});
+    let base=0;
+    for(const need of rects){
+      const [x,y,rw,rh]=need,area=rw*rh;
+      for(let row=0;row<rh;row++){const offset=(y+row)*this.w+x,j=base+row*rw;sheet.W.set(this.rectData.subarray(j,j+rw),offset);sheet.s.set(this.rectData.subarray(area+j,area+j+rw),offset);for(let col=0;col<rw;col++)sheet.M[offset+col]=this.rectData[area*2+j+col];}
+      this.paperFresh.mark(need);base+=area*3;
+    }
+    const bytes=base*4;
+    this.stats.paperDown=(this.stats.paperDown??0)+1;this.stats.paperDownBytes=(this.stats.paperDownBytes??0)+bytes;this.stats.paperDownMs=(this.stats.paperDownMs??0)+performance.now()-started;
+    this.stats.paperDownRects=(this.stats.paperDownRects??0)+rects.length;
+    this.stats.paperDownFullPlaneEquivalentBytes=(this.stats.paperDownFullPlaneEquivalentBytes??0)+base/3*PLANES(this.K)*4;
+    this.recordTransfer('paperDown',bytes);
+  }
+
+  /** Gate-only arbitrary cell sets: compact GPU partial reductions, never CPU coherence. */
+  measurePaperGate(sheet,cells,reach,rect,force=false) {
+    if(cells.length<256||(!force&&process.env.GPU_PAPER_OBSERVE!=='1')||this.paused||this.stroke||sheet._cpuDemandWindow)return null;
+    this.flushDrys(sheet);this.notPlanning('a paper gate');
+    if(this.needFullUp)this.fullUp(sheet);
+    if(!this.stale||!this.fresh.staleBounds(rect))return null;
+    if(this.paperVersion===this.version&&!this.paperFresh?.staleBounds(rect))return null;
+    const indices=new Uint32Array(cells.length),w=this.w;
+    let count=0;
+    for(const i of cells){
+      if(reach?.wetCells){if(reach.wetCells[i]!==reach.exactEpoch)continue;}
+      else if(reach?.bounds){const y=(i/w)|0,x=i-y*w,b=reach.bounds;if(x<b[0]||y<b[1]||x>b[2]||y>b[3])continue;}
+      indices[count++]=i;
+    }
+    if(!count)return {waterMax:0,saturationMax:0,moistShare:0,dry:true};
+    const selected=indices.subarray(0,count);
+    if(this.paperGateVersion!==this.version){this.paperGateCache=[];this.paperGateVersion=this.version;}
+    for(const entry of this.paperGateCache??[]){
+      if(entry.cells.length===count&&entry.total===cells.length&&selected.every((v,i)=>v===entry.cells[i])){this.stats.paperGateReuse=(this.stats.paperGateReuse??0)+1;return entry.result;}
+    }
+    this.call({op:'paperGate',indices:selected});
+    const groups=Math.ceil(count/256),bytes=groups*32;
+    this.stats.paperGate=(this.stats.paperGate??0)+1;this.stats.paperGateBytes=(this.stats.paperGateBytes??0)+bytes;
+    this.stats.paperGateIndexBytes=(this.stats.paperGateIndexBytes??0)+count*4;this.recordTransfer('paperGate',bytes);
+    let waterMax=0,saturationMax=0,moist=0,uncertain=false;
+    for(let q=0;q<groups;q++){
+      const at=q*8,p=this.rectData;
+      if(p[at+6])throw new Error('Non-finite paper state');
+      waterMax=Math.max(waterMax,p[at]);saturationMax=Math.max(saturationMax,p[at+1]/Math.max(1e-8,p[at+2]));moist+=p[at+3];uncertain ||= p[at+5]!==0;
+    }
+    // Prewet brush depth also branches on saturationMax >= 0.5.
+    uncertain ||= Math.abs(saturationMax-.5)<1e-6;
+    if(uncertain){this.stats.paperGateFallback=(this.stats.paperGateFallback??0)+1;return null;}
+    const result={waterMax,saturationMax,moistShare:moist/cells.length,dry:waterMax<=.004&&saturationMax<=.02};
+    const cache=this.paperGateCache??= [];cache.push({cells:selected,total:cells.length,result});if(cache.length>4)cache.shift();
+    return result;
+  }
+
+  /** Preserve exact dry knowledge independently of pigment/layer coherence. */
+  paperZero(sheet) {
+    sheet.W.fill(0);sheet.s.fill(0);sheet.M.fill(0);
+    (this.paperFresh??=new FreshMap(this.w,this.h)).fresh();
+    this.paperVersion=this.version;this.paperWetRect=[];
+  }
+
+  /** Conservative wet reach since the last exact dry; unknown epochs fall back to all. */
+  paperChanged(rect, flows, previousVersion) {
+    if(this.paperVersion!==previousVersion){this.paperWetRect=null;return;}
+    let wet=this.paperWetRect;
+    if(rect && wet){
+      if(!wet.length)wet=rect.slice();
+      else {const x=Math.min(wet[0],rect[0]),y=Math.min(wet[1],rect[1]);wet=[x,y,Math.max(wet[0]+wet[2],rect[0]+rect[2])-x,Math.max(wet[1]+wet[3],rect[1]+rect[3])-y];}
+    }
+    if(flows){
+      // Same conservative three-cell per-step reach as paper-certificate.mjs.
+      if(wet?.length){const m=3*flows,x=Math.max(0,wet[0]-m),y=Math.max(0,wet[1]-m);wet=[x,y,Math.min(this.w,wet[0]+wet[2]+m)-x,Math.min(this.h,wet[1]+wet[3]+m)-y];this.paperFresh?.staleRect(wet);}
+      else if(!wet)this.paperFresh?.stale();
+    }else if(rect)this.paperFresh?.staleRect(rect);
+    this.paperWetRect=wet;this.paperVersion=this.version;
   }
 
   // a rectangle that is not a valid box on the sheet (a NaN in a path) falls back to the whole sheet rather than misreading memory
@@ -318,11 +384,12 @@ export class GpuLink {
     const prevVer = this.version;
     try { this.uploadCpuStroke(sheet, rect); } finally { this.transferPhase = prior; delete sheet._cpuStrokeDirty; delete sheet._cpuDemandWindow; delete sheet._cpuDemandPenAhead; }
     this.dirty = null;
+    this.paperChanged(rect,0,prevVer);
     if (this.stale && (!demand || demand.rect)) {
       const r = demand ? demand.rect : rect;
       this.fresh.mark(r);
-      if (this.paperVersion === prevVer) { this.paperFresh?.mark(r); this.paperVersion = this.version; }
-    } else if (this.paperVersion === prevVer) {
+      if (this.paperVersion === this.version) { this.paperFresh?.mark(r); this.paperVersion = this.version; }
+    } else if (this.paperVersion === this.version) {
       this.paperFresh?.staleRect(rect);
       this.paperVersion = this.version;
     }
@@ -411,7 +478,8 @@ export class GpuLink {
       }
     }
     const { F, U, S0, SP, H0, HS, lanes, K } = plan, nl = lift ? lift.length : 0;
-    let hasFlow = false; for (let s = 0; s < plan.n && !hasFlow; s++) if (U[S0 + s * SP + 6]) hasFlow = true;
+    let flowCount = 0; for (let s = 0; s < plan.n; s++) flowCount += U[S0 + s * SP + 6];
+    const hasFlow = flowCount > 0;
     const offC = S0 + plan.n * SP, offL = offC + plan.nw;
     U[24] = plan.n; U[31] = offC; U[32] = nl; U[33] = offL;
     const data = new Float32Array(offL + nl), DU = new Uint32Array(data.buffer);
@@ -436,11 +504,7 @@ export class GpuLink {
     if (SYNC_STROKES()) { this.settleBrush(brush); this.call({ op: 'idle' }); } // test: every stroke finishes before the next thing
     // (a flow inside the stroke can lift from the top dried layer, a rewet, as any step can: its CPU copy is stale too)
     this.stale = true; this.fresh.stale(); if (hasFlow) this.topStale = true;
-    if (this.paperVersion === prevVer && this.version === postStrokeVer) {
-      if (hasFlow) this.paperFresh?.stale();
-      else if (plan.x1 >= plan.x0) this.paperFresh?.staleRect([plan.x0, plan.y0, plan.x1 - plan.x0 + 1, plan.y1 - plan.y0 + 1]);
-      this.paperVersion = this.version;
-    }
+    if(this.version===postStrokeVer)this.paperChanged(plan.x1>=plan.x0?[plan.x0,plan.y0,plan.x1-plan.x0+1,plan.y1-plan.y0+1]:null,flowCount,prevVer);
     this.stats.strokes = (this.stats.strokes || 0) + 1; this.stats.strokeSteps = (this.stats.strokeSteps || 0) + plan.n;
     syncWetReachVersion(sheet);
   }
@@ -499,11 +563,7 @@ export class GpuLink {
     let flows = flowsBefore; for (const q of recs) flows += q[5];
     recordWetBox(sheet, x0, y0, x0 + rw - 1, y0 + rh - 1, flows);
     this.stale = true; this.fresh.stale(); if (flows) this.topStale = true;
-    if (this.paperVersion === prevVer) {
-      if (flows) this.paperFresh?.stale();
-      else this.paperFresh?.staleRect([x0, y0, rw, rh]);
-      this.paperVersion = this.version;
-    }
+    this.paperChanged([x0,y0,rw,rh],flows,prevVer);
     this.stats.splatStrokes = (this.stats.splatStrokes || 0) + 1; this.stats.splats = (this.stats.splats || 0) + recs.length;
     syncWetReachVersion(sheet);
   }
@@ -519,7 +579,9 @@ export class GpuLink {
         this.stats.cpuStrokeFlows = (this.stats.cpuStrokeFlows || 0) + 1;
         this.uploadCpuStroke(sheet, this.stroke); // the brush deposited since the last sync
       }
+      const paperBefore=this.version;
       this.post({ op: 'step', n: 1 }); this.stats.steps++; sheet.steps++;
+      this.paperChanged(this.stroke,1,paperBefore);
       this.stale = true; this.topStale = true; this.fresh.stale();
       if (this.stroke) {
         if (sheet._cpuDemandWindow) sheet._cpuDemandWindow.afterFlow();
@@ -533,6 +595,14 @@ export class GpuLink {
     this.drainingDrys=true;const t=performance.now();
     try {
       this.call({op:'drainDrys'});const count=this.ctrl[1],meta=new Uint32Array(this.rectData.buffer,0,count*6).slice();this.queuedDrys=0;
+      if(this.pendingPaperZero){
+        this.pendingPaperZero=false;
+        if(this.ctrl[12]===1 && this.paperVersion===this.version && !this.needFullUp){
+          // Only unmodified tiles are marked fresh. Later stroke/flow tiles stay
+          // stale and will be read back before any paper observation uses them.
+          sheet.W.fill(0);sheet.s.fill(0);sheet.M.fill(0);
+        }else{this.paperFresh?.stale();this.paperWetRect=null;}
+      }
       for(let q=0;q<count;q++){
         const [steps,hadTop,pushed,mask,archive,oldMask]=meta.subarray(q*6,q*6+6);
         this.stats.drySolverIterations=(this.stats.drySolverIterations??0)+steps;this.stats.drySolverCalls=(this.stats.drySolverCalls??0)+1;
@@ -556,10 +626,14 @@ export class GpuLink {
       if(this.needFullUp)this.fullUp(sheet);this.applyOptions(o);
       this.post({op:'dryQueued',max,o:this.optPick(o),params:{...params,allowWet:false},initialTopMask:this.topMask,wait:false});this.queuedDrys++;
       this.stats.maxQueuedDrys=Math.max(this.stats.maxQueuedDrys??0,this.queuedDrys);
-      if(this.queuedDrys>=Math.max(1,Math.min(128,Math.floor(this.rectData.length/6))))this.flushDrys(sheet);
       this.stale=true;this.topStale=true;this.fresh.stale();this.stats.drys++;
       this.stats.queuedDrys=(this.stats.queuedDrys??0)+1;
       this.lastDryZero = true; // queued dry uses allowWet:false
+      // Track subsequent mutations, but do not expose zero values until the worker
+      // confirms an exact tail (a threshold-only dry may retain pore traces).
+      (this.paperFresh??=new FreshMap(this.w,this.h)).fresh();
+      this.paperVersion=this.version;this.paperWetRect=[];this.pendingPaperZero=true;
+      if(this.queuedDrys>=Math.max(1,Math.min(128,Math.floor(this.rectData.length/6))))this.flushDrys(sheet);
       // the offline painter ignores dry's step count; consumers drain metadata lazily
       return 0;
     }
@@ -599,6 +673,7 @@ export class GpuLink {
     this.wetMask = 0; this.syncAct(); // dried: nothing is wet or unfixed, and what is in the newest layer is what was just fixed
     this.stale = true; this.topStale = true; this.fresh.stale(); this.stats.drys++; this.stats.dryMs += performance.now() - t;
     this.lastDryZero = dryZero;
+    if(dryZero)this.paperZero(sheet);
     this.stats.drySolverIterations=(this.stats.drySolverIterations??0)+ctrl[1];this.stats.drySolverCalls=(this.stats.drySolverCalls??0)+1;
     return ctrl[1];
   }
@@ -762,7 +837,7 @@ export class GpuLink {
     return this.sums;
   }
   /** The CPU wrote the whole sheet (masking, blotting, a CPU-only dry): the next GPU op uploads it. */
-  cpuWroteAll() { this.notPlanning('a write of the whole sheet'); this.version++; if (!this.paused) this.needFullUp = true; }
+  cpuWroteAll() { this.notPlanning('a write of the whole sheet'); this.version++; this.paperWetRect=null; if (!this.paused) this.needFullUp = true; }
   fullUp(sheet) {
     this.flushDrys(sheet);
     this.needFullUp = false; this.wetMask = 0; this.topMask = 0; this.up(sheet, this.full());
@@ -773,6 +848,7 @@ export class GpuLink {
     }
     if (sheet._fixedBed) this.call({op:'fixedBedUp', bed:fixedBedLower(sheet)});
     this.stale = false; this.fresh.fresh(); this.topStale = false;
+    this.paperFresh?.fresh();this.paperVersion=this.version;this.paperWetRect=null;
   }
   fixedLayersChanged(sheet, changed) {
     // Layer writers already brought their layers current; complete the other lower layers, and never upload stale water.

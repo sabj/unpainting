@@ -16,7 +16,7 @@ const ring = new Float32Array(workerData.ring), done = new Int32Array(workerData
 const ctrl = new Int32Array(workerData.ctrl), rectData = new Float32Array(workerData.rect), layerData = new Float32Array(workerData.layer), err = new Uint8Array(workerData.err);
 // ctrl: 0 ack, 1 int result, 2 failed, 3 status (0 booting, 1 ready, 2 unavailable), 4 layer returned by a dry, 5 layer pushed by a dry, 6 wet tiles left by the last step
 let gpu = null, sheet = null, chain = Promise.resolve(), watcher = null;
-const queuedDrys=[];
+const queuedDrys=[];let queuedPaperZero=false;
 let fullBrushPigments = false;
 function signedZero(a) { const bits = new Uint32Array(a.buffer, a.byteOffset, a.length); return bits.includes(0x80000000); }
 // GPU_SIGNED_ZERO=ignore (Fast): a -0 pigment value is zero; strokes keep the active-pigment kernel instead of switching
@@ -102,7 +102,8 @@ async function handleOp(m) {
     case 'opts': gpu.setOptions(m.o); return;
     case 'act': if(!asyncDry)gpu.setAct(m.mask); return;
     case 'down': { const p = await gpu.readRect(m.rect); rectData.set(p); break; }
-    case 'paperDown': { const p = await gpu.readPaperRect(m.rect); rectData.set(p); break; }
+    case 'paperGate': { rectData.set(await gpu.readPaperGate(m.indices)); break; }
+    case 'paperDown': { const p = await gpu.readPaperRects(m.rects ?? [m.rect]); rectData.set(p); break; }
     case 'up': { fullBrushPigments ||= m.signedZero || signedZero(m.data ?? rectData); if(asyncDry){workerWetMask|=m.mask??0;gpu.setAct(workerWetMask|workerTopMask);} const [, , rw, rh] = m.rect; gpu.writeRect(m.rect, m.data ?? rectData.slice(0, rw * rh * gpu.planes()), m.logicalRect); break; }
     case 'upNoop': { fullBrushPigments ||= m.signedZero; if(asyncDry){workerWetMask|=m.mask??0;gpu.setAct(workerWetMask|workerTopMask);} gpu.writeRect(null, null, m.logicalRect); break; }
     case 'upReduced': {
@@ -116,11 +117,11 @@ async function handleOp(m) {
     }
     case 'dryQueued': {
       gpu.setOptions(m.o);const steps=await gpu.dry(m.max,m.o,m.params),oldMask=gpu.topMask??m.initialTopMask??0;
-      const r=await gpu.fix(null,oldMask,true);driedMask(r);queuedDrys.push([steps,r.hadTop?1:0,r.pushed?1:0,r.topMask??oldMask,r.archive??0,oldMask]);break;
+      const r=await gpu.fix(null,oldMask,true);driedMask(r);queuedPaperZero=gpu.lastDryZero;queuedDrys.push([steps,r.hadTop?1:0,r.pushed?1:0,r.topMask??oldMask,r.archive??0,oldMask]);break;
     }
     case 'drainDrys': {
       if(queuedDrys.length*6>rectData.length)throw new Error('Dry metadata queue exceeded shared mailbox');
-      new Uint32Array(rectData.buffer).set(queuedDrys.flat());ctrl[1]=queuedDrys.length;queuedDrys.length=0;break;
+      new Uint32Array(rectData.buffer).set(queuedDrys.flat());ctrl[1]=queuedDrys.length;ctrl[12]=queuedPaperZero?1:0;queuedDrys.length=0;break;
     }
     case 'dry': case 'dryEnd': {
       if (m.op === 'dry') { gpu.setOptions(m.o); ctrl[1] = await gpu.dry(m.max, m.o, m.params); } else ctrl[1] = await gpu.dryEnd(); ctrl[6] = gpu.lastStillWet ?? 0; // wet cells a dry sent with allowWet left to evaporate in place
