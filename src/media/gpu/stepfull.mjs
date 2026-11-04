@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
 import {edgePingPong} from './edge-pingpong.mjs';
-import {fastDryChunk} from './fast-dry-chunk.mjs';
+import {fastDryChunk, adaptiveFastDryChunk} from './fast-dry-chunk.mjs';
 import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mjs';
 import { runStrokePrefixDiagnostic } from './stroke-prefix-diagnostic.mjs';
 import { GpuTimestamps } from './gpu-timestamps.mjs';
@@ -231,20 +231,26 @@ export class GpuSheet {
   }
 
   /** Encode `steps` steps into one compute pass. */
-  encodeSteps(enc, steps) { const pass = this.timestamps.begin(enc, 'encodeSteps'); this.stepsInPass(pass, steps); pass.end(); }
-  stepsInPass(pass, steps) {
+  encodeSteps(enc, steps, measure = false) { const pass = this.timestamps.begin(enc, 'encodeSteps'); this.stepsInPass(pass, steps, measure); pass.end(); }
+  stepsInPass(pass, steps, measure = false) {
     const o = this.o, K = this.K, B = this.b;
     const nD = this.cap;
     const go = (name, indirectOffset = 0, dispatch = null) => { if (indirectOffset === 12 && !this.act.length) return; pass.setPipeline(this.p[name]); pass.setBindGroup(0, this.bg[name]); if (dispatch) pass.dispatchWorkgroups(...dispatch); else if (this.persistent && indirectOffset < 24) pass.dispatchWorkgroups(this.workers, indirectOffset === 12 ? this.act.length : 1); else if (this.resident) pass.dispatchWorkgroupsIndirect(B.ARGS, indirectOffset); else pass.dispatchWorkgroups(nD, indirectOffset ? this.act.length : 1); };
     const nT = Math.ceil(this.ntiles / 64);
-    const finish = () => { if (this.p.p5c_wetscan) go('p5c_wetscan'); else { go('p5c'); go('wetscan'); } };
+    // The next step consumes the frontier, but only observations need wet counts/max W.
+    const finish = last => {
+      const scan = measure && last;
+      if (scan && this.p.p5c_wetscan) go('p5c_wetscan');
+      else { go('p5c'); go(scan ? 'wetscan' : 'wetfrontier'); }
+      this.wetCountersDirty = !scan;
+    };
     // Once M is empty, no wet front can form without a stamped source. Keep
     // capillary transport and pore drying, but skip the surface-only passes.
     if (this.resident && this.dryS?.dampOnly) {
       for(let s=0;s<steps;s++) {
         if (SPARSE_ALL) go('sparse_all',0,[1]); else { go('sparse_start',0,[1]); go('sparse_build',24); go('tiles_args',0,[1]); }
         if (process.env.GPU_STEP !== 'old' && o.edgeWidth + 1 <= 7) go('cap_sp'); else { go('cap_s'); go('cap_p', 12); }
-        go('p5a'); finish();
+        go('p5a'); finish(s === steps - 1);
       }
       return;
     }
@@ -256,7 +262,7 @@ export class GpuSheet {
         for (let it = 0; it < o.flowIters; it++) { go('faces_wsc'); go('pflux_sc'); go(it === 0 ? 'apply_f0' : 'apply_f1'); }
         go('p3a_dep');
         if ((o.slide ?? 0) > 0) { go('slide_out_all'); go('slide_apply_all'); }
-        go('cap_sp'); go('p5a'); go('p5b'); finish();
+        go('cap_sp'); go('p5a'); go('p5b'); finish(s === steps - 1);
       }
       return;
     }
@@ -270,7 +276,7 @@ export class GpuSheet {
       }
       go('p3a');
       if ((o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      go('cap_s'); go('cap_p', 12); go('p5a'); go('p5b'); finish();
+      go('cap_s'); go('cap_p', 12); go('p5a'); go('p5b'); finish(s === steps - 1);
     }
   }
 
@@ -312,7 +318,7 @@ export class GpuSheet {
     enc.copyBufferToBuffer(this.b.BSTR, 0, rb, 0, bytes);
     d.queue.submit([enc.finish()]);
     this.readCountLater(false);
-    if (globalThis.GPU_CAP_DEBUG) { const c = await this.counters(); if (c[4]) console.error(`gpu: a step in a stroke saw ${c[4]} active tiles with room for ${this.cap}`); d.queue.writeBuffer(this.b.CTR, 16, new Uint32Array([0])); }
+    if (globalThis.GPU_CAP_DEBUG) { const c = await this.counters({ wet: false }); if (c[4]) console.error(`gpu: a step in a stroke saw ${c[4]} active tiles with room for ${this.cap}`); d.queue.writeBuffer(this.b.CTR, 16, new Uint32Array([0])); }
     await rb.mapAsync(GPUMapMode.READ, 0, bytes);
     const out = new Float32Array(rb.getMappedRange(0, bytes).slice(0)); rb.destroy(); return out;
   }
@@ -473,18 +479,18 @@ export class GpuSheet {
   // stroke's last flow step, so "nothing wet" there must not skip later steps.
   readCountLater(canDry = true) {
     if (this.resident) return;
-    if (this.pending) return; this.pending = true;
+    if (this.pending) return; if (canDry) this.measureWetCounters(); this.pending = true;
     const d = this.device, rb = this.cbuf ?? (this.cbuf = d.createBuffer({ size: 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }));
     const enc = d.createCommandEncoder(); enc.copyBufferToBuffer(this.b.CTR, 0, rb, 0, 16); d.queue.submit([enc.finish()]);
     const epoch = this.epoch;
     rb.mapAsync(GPUMapMode.READ).then(() => { const v = new Uint32Array(rb.getMappedRange(0, 16).slice(0)); rb.unmap(); this.pending = false; if (this.hold > 0) this.hold--; this.noteCount(v[0]); if (canDry && v[1] === 0 && epoch === this.epoch) this.knownDry = true; }, () => { this.pending = false; });
   }
-  step(steps = 1, chunk = 20) {
+  step(steps = 1, chunk = 20, measure = false) {
     this.flushStrokes();
     const limit = this.resident ? steps : chunk;
     for (let done = 0; done < steps;) {
       const enc = this.device.createCommandEncoder(), k = Math.min(limit, steps - done);
-      this.encodeSteps(enc, k); this.device.queue.submit([enc.finish()]); done += k;
+      this.encodeSteps(enc, k, done + k === steps && (measure || (!this.resident && !this.pending))); this.device.queue.submit([enc.finish()]); done += k;
     }
     this.readCountLater(); this.gpuAhead = true;
   }
@@ -514,8 +520,9 @@ export class GpuSheet {
   }
   /** [active tile count of the last step, wet tile count after it, largest face depth difference (if level_k ran)] */
   // one staging buffer kept for it: a dry reads the counters every 25 steps
-  async counters() {
+  async counters({ wet = true } = {}) {
     this.flushStrokes();
+    if (wet) this.measureWetCounters();
     if (this.ctrBusy) return new Uint32Array(await this.readWords('CTR', 32));
     const d = this.device, rb = this.ctrRb ?? (this.ctrRb = d.createBuffer({ size: 32, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }));
     this.ctrBusy = true;
@@ -523,6 +530,22 @@ export class GpuSheet {
       const enc = d.createCommandEncoder(); enc.copyBufferToBuffer(this.b.CTR, 0, rb, 0, 32); d.queue.submit([enc.finish()]);
       await rb.mapAsync(GPUMapMode.READ); const out = new Uint32Array(rb.getMappedRange().slice(0)); rb.unmap(); return out;
     } finally { this.ctrBusy = false; }
+  }
+
+  // TL/ARGS still describe the last simulated step. Repeated reads reuse its
+  // measurement; the frontier was already rebuilt separately for subsequent flow.
+  measureWetCounters() {
+    if (!this.wetCountersDirty) return;
+    const enc = this.device.createCommandEncoder();
+    enc.clearBuffer(this.b.CTR, 4, 4);
+    enc.clearBuffer(this.b.CTR, 24, 8);
+    const pass = this.timestamps.begin(enc, 'wet-counters');
+    pass.setPipeline(this.p.wetmeasure); pass.setBindGroup(0, this.bg.wetmeasure);
+    if (this.persistent) pass.dispatchWorkgroups(this.workers);
+    else if (this.resident) pass.dispatchWorkgroupsIndirect(this.b.ARGS, 0);
+    else pass.dispatchWorkgroups(this.cap);
+    pass.end(); this.device.queue.submit([enc.finish()]);
+    this.wetCountersDirty = false;
   }
 
   /** Copy the GPU state back into a CPU sheet (fields the step changes). */
@@ -652,7 +675,7 @@ export class GpuSheet {
     const enc = this.device.createCommandEncoder();
     const p2 = this.timestamps.begin(enc, 'surfaceLevel'); p2.setPipeline(this.p.level_k); p2.setBindGroup(0, this.bg.level_k); if (this.persistent) p2.dispatchWorkgroups(this.workers); else p2.dispatchWorkgroupsIndirect(this.b.ARGS, 0); p2.end();
     this.device.queue.submit([enc.finish()]);
-    const c = await this.counters(); return new Float32Array(c.buffer)[2];
+    const c = await this.counters({ wet: false }); return new Float32Array(c.buffer)[2];
   }
   /** GPU version of sheet.mjs dry(): same schedule (dt, level check every 25 steps, faster time once level). Returns steps taken. */
   async dry(max = 40000, O = this.o, params = {}) { this.dryBegin(max, O, params); await this.dryAdvance(); return this.dryEnd(); }
@@ -663,7 +686,7 @@ export class GpuSheet {
   dryBegin(max = 40000, O = this.o, { level = 60, levelMax = 4000, levelTol = 0.02, dt = 2, analyticTail = false, allowWet = false } = {}) {
     const oLevel = O.dt ?? 1; this.setOptions({ dt: oLevel });
     if (analyticTail) dt *= FAST_DRY_DT_SCALE;
-    this.dryS = { analyticTail, allowWet, t: 0, fast: false, done: false, max, level, levelMax, levelTol, dt, oLevel, fastChunk:fastDryChunk(process.env.GPU_FAST_DRY_CHUNK??50),counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0 };
+    this.dryS = { analyticTail, allowWet, t: 0, fast: false, done: false, max, level, levelMax, levelTol, dt, oLevel, fastChunk:50,chunkOverride:process.env.GPU_FAST_DRY_CHUNK == null ? null : fastDryChunk(process.env.GPU_FAST_DRY_CHUNK),counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0 };
   }
   /** Returns { t, done }: steps taken so far, and whether the sheet was found dry (no step after that changes it). */
   async dryAdvance(until = Infinity) {
@@ -674,13 +697,18 @@ export class GpuSheet {
       if (!S.fast) {
         if (S.t < S.levelMax) stop = Math.min(stop, S.levelMax);
         stop = Math.min(stop, Math.max(Math.floor(S.t / 25) * 25 + 25, Math.ceil(S.level / 25) * 25));
-      } else stop = Math.min(stop, S.t + S.fastChunk);
+      } else {
+        S.fastChunk = S.chunkOverride ?? adaptiveFastDryChunk(S, this.ntiles);
+        S.maxFastChunk = Math.max(S.maxFastChunk ?? 0, S.fastChunk);
+        stop = Math.min(stop, S.t + S.fastChunk);
+      }
       const chunk = Math.max(1, Math.min(stop, until) - S.t);
-      this.step(chunk, 25); S.t += chunk;if(S.fast){S.fastIterations+=chunk;S.fastChunks++;}
+      this.step(chunk, 25, true); S.t += chunk;if(S.fast){S.fastIterations+=chunk;S.fastChunks++;}
       // fold the next surface-level query into the counter readback; it sees the same post-step state
       const needLevel=this.resident && !S.fast && S.t>=S.level && S.t<S.levelMax && S.t%25===0;
       if(needLevel)this.encodeLevel();
       const readStarted=performance.now(),c = await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;this.noteCount(c[0]);
+      S.lastWetCounter=c[1];
       nextSurface=needLevel?new Float32Array(c.buffer)[2]:null;S.lastCounters=c;S.lastEpoch=this.epoch;
       if (globalThis.GPU_PROF) { const P = globalThis.GPU_PROF, e = P.drySteps ??= { ms: 0, n: 0 }; e.n += chunk; const f = P.dryTiles ??= { ms: 0, n: 0 }; f.n += chunk * c[0]; }
       if (globalThis.DRY_TRACE) console.error(`dry t=${S.t} count=${c[0]} wet=${c[1]} cap=${this.cap} ${(performance.now() - (this._t0 ??= performance.now())).toFixed(0)}ms`);
@@ -721,7 +749,7 @@ export class GpuSheet {
     let c;if(this.resident&&S.lastCounters&&S.lastEpoch===this.epoch)c=S.lastCounters;else{const readStarted=performance.now();c=await this.counters();S.counterReads++;S.counterReadMs+=performance.now()-readStarted;} this.lastStillWet = 0; if (c[1] !== 0) { if (!S.allowWet) throw new Error(`Sheet is still wet after dry() limit of ${S.max} steps`); this.lastStillWet = c[1]; this.evaporateInPlace(); }
     this.lastDryZero = !!(S.analyticTailUsed || c[1] !== 0);
     this.setOptions({ dt: S.oLevel });
-    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
+    const m=this.dryTelemetry??(this.dryTelemetry={calls:0,counterReads:0,counterReadMs:0,fastIterations:0,fastChunks:0});m.calls++;m.counterReads+=S.counterReads;m.counterReadMs+=S.counterReadMs;m.fastIterations+=S.fastIterations;m.fastChunks+=S.fastChunks;m.fastChunk=S.fastChunk;m.maxFastChunk=Math.max(m.maxFastChunk??0,S.maxFastChunk??0);m.lastWetCounter=c[1];m.analyticTailCalls=(m.analyticTailCalls??0)+(S.analyticTailUsed?1:0);
     return S.t;
   }
   /**
@@ -735,7 +763,7 @@ export class GpuSheet {
     pass.setPipeline(this.p.fix_a); pass.setBindGroup(0, this.bg.fix_a);
     if (this.resident) pass.dispatchWorkgroupsIndirect(this.b.ARGS, 36); else pass.dispatchWorkgroups(Math.ceil(this.w / 16), Math.ceil(this.h / 16)); pass.end();
     d.queue.submit([enc.finish()]);
-    const cf = await this.counters();
+    const cf = await this.counters({ wet: false });
     if (cf[3] === 0) return { hadTop: false, pushed: false };
     this.topMask = cf[5]; // the pigments in the layer being fixed: all that is left on the sheet once it has dried
     const hadTop = this.hasTop;

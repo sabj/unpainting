@@ -64,7 +64,7 @@ fn cx(wid: vec3<u32>, lid: vec3<u32>) -> Cx {
 fn wetAt(i: u32) -> bool { return M[i] == 1u; }
 
 // Sparse frontier: FLAGS2 holds membership, a compact tile queue, then its count.
-// Stamps and wetscan enqueue a tile once; only that queue and its one-tile halo are visited.
+// Stamps and wetfrontier enqueue a tile once; only that queue and its one-tile halo are visited.
 fn markDirty(t: u32) {
   if (u.p3 != 0u && atomicExchange(&FLAGS2[2u * u.ntiles + 1u + t], 1u) == 0u) {
     let q = atomicAdd(&FLAGS2[5u * u.ntiles + 1u], 1u);
@@ -164,6 +164,23 @@ fn tiles_args() {
 }
 var<workgroup> anyWet: atomic<u32>;
 var<workgroup> tileMaxW: atomic<u32>;
+// Rebuild the next step's sparse frontier even when nobody observes counters.
+fn wetfrontier_tile(wid: vec3<u32>, lid: vec3<u32>) {
+  let c = cx(wid, lid);
+  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); }
+  workgroupBarrier();
+  if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); }
+  workgroupBarrier();
+  if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
+    let t = TL[wid.x];
+    if (u.p3 != 0u) { atomicStore(&FLAGS[t], 0u); }
+    let seen = atomicLoad(&anyWet);
+    if (seen != 0u) { markWet(t); }
+    if ((seen & 2u) != 0u) { atomicAdd(&CTR[9], 1u); }
+    if (seen != 0u) { atomicAdd(&CTR[11], 1u); }
+  }
+}
+
 fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid);
   if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); atomicStore(&tileMaxW, 0u); }
@@ -183,6 +200,26 @@ fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
     if (seen != 0u) { markWet(t); atomicAdd(&CTR[1], 1u); }
     if ((seen & 2u) != 0u) { atomicAdd(&CTR[6], 1u); atomicAdd(&CTR[9], 1u); }
     if (seen != 0u) { atomicAdd(&CTR[11], 1u); }
+  }
+}
+
+// Read-only observation of wet state: no frontier changes or cumulative census.
+fn wetmeasure_tile(wid: vec3<u32>, lid: vec3<u32>) {
+  let c = cx(wid, lid);
+  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); atomicStore(&tileMaxW, 0u); }
+  workgroupBarrier();
+  if (c.ok) {
+    let wBits = bitcast<u32>(W[c.i]);
+    if (wBits > 0u) { atomicMax(&tileMaxW, wBits); }
+  }
+  if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); }
+  workgroupBarrier();
+  if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
+    let maxW = atomicLoad(&tileMaxW);
+    if (maxW > 0u) { atomicMax(&CTR[7], maxW); }
+    let seen = atomicLoad(&anyWet);
+    if (seen != 0u) { atomicAdd(&CTR[1], 1u); }
+    if ((seen & 2u) != 0u) { atomicAdd(&CTR[6], 1u); }
   }
 }
 
@@ -1643,6 +1680,17 @@ fn p5c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
   }
 }
 @compute @workgroup_size(16, 16)
+fn wetfrontier(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (u.p3 != 2u) { wetfrontier_tile(wid, lid); return; }
+  if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }
+  workgroupBarrier();
+  let count = workgroupUniformLoad(&passTileCount);
+  for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
+    wetfrontier_tile(vec3<u32>(tile, wid.y, wid.z), lid);
+    workgroupBarrier();
+  }
+}
+@compute @workgroup_size(16, 16)
 fn wetscan(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
   if (u.p3 != 2u) { wetscan_tile(wid, lid); return; }
   if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }
@@ -1650,6 +1698,17 @@ fn wetscan(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) 
   let count = workgroupUniformLoad(&passTileCount);
   for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
     wetscan_tile(vec3<u32>(tile, wid.y, wid.z), lid);
+    workgroupBarrier();
+  }
+}
+@compute @workgroup_size(16, 16)
+fn wetmeasure(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (u.p3 != 2u) { wetmeasure_tile(wid, lid); return; }
+  if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }
+  workgroupBarrier();
+  let count = workgroupUniformLoad(&passTileCount);
+  for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
+    wetmeasure_tile(vec3<u32>(tile, wid.y, wid.z), lid);
     workgroupBarrier();
   }
 }
