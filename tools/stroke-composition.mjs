@@ -56,8 +56,10 @@ function sampledMask(clip, tape, w, h, txOf, tyOf) {
     // Sorted RLE indices and sorted sample indices permit a single pass through each clip.
     const runs=clip.runs,rLen=runs.length,txMax=txOf[w-1];let j=0;
     for(let y=0;y<h;y++) {
+      const row=y*w,tRow=tyOf[y];
+      if(y>0&&tRow===tyOf[y-1]){mask.copyWithin(row,row-w,row);continue;}
       if(j>=rLen)break;
-      const row=y*w,tRow=tyOf[y],iMin=tRow+txOf[0],iMax=tRow+txMax;
+      const iMin=tRow+txOf[0],iMax=tRow+txMax;
       while(j<rLen&&runs[j]+runs[j+1]<=iMin)j+=2;
       if(j>=rLen)break;
       if(runs[j]>iMax)continue;

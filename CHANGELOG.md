@@ -2,9 +2,52 @@
 
 Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
 
-## Unreleased — 0.3.0 integration
+## Unreleased — 0.3.0
 
-Painter V101, sim 102, judges J1. The default drawing is pencil only. Everything below is in `--inkrecipe wash`, which is off by default.
+Painter V101, sim 102, judges J1. `0.3.0` combines the pen-and-wash ink pipeline from `wip/0.2.3` with a full simulator, GPU synchronization, caching and memory optimization pass across `src/media`, `src/paint` and `tools/`.
+
+On the three frozen reference workloads on an Apple M4 Mac mini (16 GiB, GPU/Dawn/Metal, `--mode fast`, seed 0), warm suite wall time drops from `725.69 s` to `304.23 s` (**`2.39x` faster**, or `58.1%` less time) while preserving `98.85%` to `99.33%` SSIM (`41.5` to `43.0 dB` PSNR) against `0.2.1` and reducing peak RSS by up to `2.2 GiB`.
+
+| Workload | Target & settings | `0.2.1` Control | `0.3.0` Cold | `0.3.0` Warm | Warm speedup | `0.2.1` RSS | `0.3.0` RSS | SSIM vs `0.2.1` |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| `general-540` | Sargent *A Tramp*, `540 px`, `--recipe general` | `82.39 s` | `58.71 s` | `39.24 s` | **`2.10x`** | `2.12 GiB` | `2.02 GiB` | `99.33%` |
+| `inkres-1200` | Yale (`h34-a`), `1200 px`, `--inkrecipe wash` (`--inkres 2`) | `179.90 s` | `116.61 s` | `73.58 s` | **`2.44x`** | `7.12 GiB` | `4.92 GiB` | `98.85%` |
+| `valueplan-1200` | Sargent *White Ships*, `1200 px`, V4/V5 `--valueplan` | `463.40 s` | `227.13 s` | `191.42 s` | **`2.42x`** | `9.06 GiB` | `7.99 GiB` | `99.21%` |
+| **Three-workload suite** | Serial GPU total | **`725.69 s`** | **`402.45 s`** | **`304.23 s`** | **`2.39x`** | `9.06 GiB` max | `7.99 GiB` max | `99.13%` mean |
+
+### Speed, GPU synchronization and memory
+
+- **Zero-water, dry-fixed and wet-reach paper certificates (`src/media/paper-certificate.mjs`, `src/paint/methods/wetdry.mjs`):**
+  - Full-sheet and footprint dry gates (`measurePaper`, `measurePaperDry`, pen gates) skip GPU readbacks and `waterP95` sorting when a valid zero-water or dry-fixed certificate holds, or when cells lie outside the active wet-reach mask (`wetMask` / `wetList`).
+  - Queued GPU drys (`dryQueued`) certify zero-water completion without draining the async GPU queue, and `sheet._rawLayers` lets certificate and storage checks inspect dried layers without triggering a synchronous GPU flush.
+  - GPU `step` and `dry` narrow their active flow and drying boxes to the exact wet-reach bounding box.
+- **GPU link and regional tile freshness (`src/media/gpu/link.mjs`, `src/media/gpu/fresh.mjs`, `src/media/gpu/optical-gpu.mjs`):**
+  - Non-blocking CPU-to-GPU uploads (`upSync`) replace blocking `call({ op: 'up' })` round-trips during CPU strokes and partial uploads.
+  - Non-flow GPU strokes, splats and CPU strokes invalidate only their touched `64x64` tiles in `paperFresh` (`FreshMap.staleRect`) and preserve `paperVersion` across `'opts'` and `'act'` state updates, avoiding full-sheet `paperDown` readbacks between adjacent strokes.
+  - `optical-gpu.mjs` caches the base-layer optical stack on the sheet so repeated renders and look checks only composite the active top layers.
+- **Lossless lower-layer compaction and cached thickness (`src/media/layer-storage.mjs`, `src/media/sheet.mjs`):**
+  - `sheet.thickness()` caches held pigment mass across unchanged layer versions, and `compactLowerLayers` losslessly compacts zero planes in older dried layers (`-84%` CPU layer-plane storage and `-2.0 GiB` peak RSS on `inkres-1200`).
+- **Fine-ink (`--inkres`) and line-pipeline specialization (`src/paint/methods/ink-res.mjs`, `src/paint/methods/fine-material.mjs`, `src/paint/methods/ink-match.mjs`, `src/media/pen.mjs`):**
+  - `makeInkRes` uses a 1-pigment `[INK]` fine sheet instead of duplicating the full palette on the `2160 px` fine sheet, memoizes `INKRES.compose` across unchanged frames, reuses calibration material and `pen.pin` per `(paper, patchy)`, and gathers 4-neighbor `renderCells` in `inkDarkMatch`.
+  - `holdLineFile` and `traceLineModel` memoize line preparation, and `planPenInner` is skipped when `--drawingfile` replaces the opening drawing.
+- **Wash sessions, buffered JSONL logs and spatial hotloops (`tools/paint-plate.mjs`, `tools/stroke-composition.mjs`):**
+  - Fast value plans retain wash-session contact ownership across shapes within a pass (reducing `valueplan-1200` GPU dry dispatches from `2,579` to `179` and main layers from `2,465` to `99`).
+  - Painter JSONL audit writers buffer up to `1 MiB` in memory (flushing on checks, pass boundaries and exits) and share stroke command IDs with `stroke-composition.mjs`.
+
+### Step caching, passage checkpoints and native scoring
+
+- **Fingerprinted run cache (`src/paint/run-cache.mjs`):**
+  - `--runcache 1` (and `--speedvaluecache 1` for value plans) caches deterministic setup stages (`palette`, `pigment-fit`, `separator`, `paper`, `fine-paper`, `calibration`, `pen-field`, `early-lines` and `value-plan`) keyed by a persistent stat-manifest source hash, dependency closure hash, target bytes and options. Warm hits replay `TARGET_GUARD` look accounting and produce byte-identical `run-card.json` provenance and output PNGs.
+- **Extended passage checkpoints (`tools/aware/state-io.mjs`):**
+  - `--pausedir` and `--resumestate` now support `--inkres` (saving and restoring fine-sheet material, carry-down buffers and wet state) and `--prepfade` (`PREPF`), and validate `provenance.json` before loading arrays. Restored native `inkres-1200` runs finish byte-identical to uninterrupted runs.
+- **Native-resolution scoring (`bench/scripts/score_painting.py`, `bench/scripts/classic.py`):**
+  - `--resolution native` scores paintings at their rendered resolution (`1200 px`) with physical-millimetre filter widths (`--plate-mm`) and a content-addressed deterministic metric cache. Legacy target-size scoring remains the default.
+
+### Harness, recipes and pen fixes
+
+- `src/paint/recipe.mjs`: fixed `--recipe none` precedence so `config.json` `drawingFlags` are not overridden by template defaults, and made unknown `--recipe` names throw an explicit error.
+- `bench/scripts/pipeline/plan-args.mjs` and `bench/scripts/pipeline/round45.mjs`: enforced an explicit `ALLOWED_EXTRA_ARGS` allowlist, updated `BASE` and `bench/v4v5/TASK.md` to v2/wash ink flags, and forwarded `--python` / `BENCH_SCORE_PYTHON` with SAM + scorer preflight checks before launching model sessions.
+- `src/media/pen.mjs`: truncated recorded `mark.points` and `mark.d` when a pen walk breaks early on ink starvation, and attached a shared `gestureId` across refill splits.
 
 ### Ink on ink-heavy works
 

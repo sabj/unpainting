@@ -776,7 +776,7 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
       for (let xx = xa; xx <= xb; xx++) {
         const dx = xx + 0.5 - q.x, along = dx * tx + dy * ty;
         if (Math.abs(along) > reachA) continue;
-        const i = row + xx, rawAcross = dx * nx + dy * ny, across = ET ? rawAcross + ET * (pHeight[i] - 0.5) : rawAcross;
+        const i = row + xx, across = edgeShift(dx * nx + dy * ny, ET, pHeight[i]);
         const side = across < 0 ? sideL : sideR;
         if (Math.abs(across) > side + 0.5) continue;
         if (clip && !clip[i]) continue;
