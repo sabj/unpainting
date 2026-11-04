@@ -7,3 +7,32 @@ test('Fast mode cannot fix or report successful dry at a wet limit; supported en
 test('watched advance honors exact requested checkpoints before real final dry',async()=>{const old=process.env.GPU_FAST_DRY_CHUNK;process.env.GPU_FAST_DRY_CHUNK='200';try{const h=host();h.dryBegin(30000,DEFAULTS,{levelMax:140,dt:14});const r=await h.dryAdvance(165);assert.equal(r.t,165);assert.equal(h.elapsed,165);await h.dryAdvance();const t=await h.dryEnd();assert.equal(t,h.elapsed);assert.equal(h.dryTelemetry.lastWetCounter,0);}finally{if(old===undefined)delete process.env.GPU_FAST_DRY_CHUNK;else process.env.GPU_FAST_DRY_CHUNK=old;}});
 import {gpuStats} from './link.mjs';
 test('dry telemetry mailbox preserves existing actual iteration counters and distinguishes wait timing',()=>{const old=process.env.GPU_FAST_DRY_CHUNK;process.env.GPU_FAST_DRY_CHUNK='200';try{const ctrl=new Int32Array(16),sheet={_gpu:{stats:{drySolverIterations:540,drySolverCalls:1},ctrl,flushDrys(){},call(m){assert.equal(m.op,'dryStats');ctrl[1]=1;ctrl[4]=200;ctrl[6]=0;ctrl[12]=7;ctrl[13]=12345;ctrl[14]=400;ctrl[15]=2;}}};const r=gpuStats(sheet);assert.equal(r.drySolverIterations,540);assert.equal(r.fastDry.counterReadbacks,7);assert.equal(r.fastDry.counterReadWaitMs,12.345);assert.equal(r.fastDry.acceleratedIterations,400);assert.equal(r.fastDry.lastWetCounter,0);}finally{if(old===undefined)delete process.env.GPU_FAST_DRY_CHUNK;else process.env.GPU_FAST_DRY_CHUNK=old;}});
+
+import {adaptiveFastDryChunk} from './fast-dry-chunk.mjs';
+test('adaptive chunks amortize early/wet Fast reads and return to 50 near dry',()=>{
+ assert.equal(adaptiveFastDryChunk({analyticTail:false,lastWetCounter:1000,fastChunks:0},1000),50);
+ assert.equal(adaptiveFastDryChunk({analyticTail:true,lastWetCounter:200,fastChunks:3},1000),200);
+ assert.equal(adaptiveFastDryChunk({analyticTail:true,lastWetCounter:200,fastChunks:1,adaptiveUsed:true},1000),50);
+ assert.equal(adaptiveFastDryChunk({analyticTail:true,lastWetCounter:1,fastChunks:0},1000),50);
+ assert.equal(adaptiveFastDryChunk({analyticTail:true,lastWetCounter:1,fastChunks:1},1000),150);
+ assert.equal(adaptiveFastDryChunk({analyticTail:true,lastWetCounter:1,fastChunks:3},1000),50);
+});
+
+test('adaptive long wet chunks cut maps over 3x while retaining measured termination and limits',async()=>{
+ const run=async({override=null,max=1000,until=Infinity}={})=>{
+  const h=Object.assign(Object.create(GpuSheet.prototype),{
+   resident:true,ntiles:64,epoch:0,o:{wetEps:.003},elapsed:0,
+   setOptions(){},step(n){this.elapsed+=n;},noteCount(){},
+   async counters(){const c=new Uint32Array(8);c[0]=64;c[1]=this.elapsed<625?32:0;c[6]=c[1];new Float32Array(c.buffer)[7]=1;return c;},
+  });
+  h.dryBegin(max,DEFAULTS,{level:0,levelMax:0,analyticTail:true});h.dryS.chunkOverride=override;
+  await h.dryAdvance(until);return h;
+ };
+ const fixed=await run({override:50}),adaptive=await run();
+ assert.equal(await adaptive.dryEnd(),650);assert.equal(await fixed.dryEnd(),650);
+ assert.equal(adaptive.dryTelemetry.lastWetCounter,0);
+ assert(fixed.dryTelemetry.counterReads/adaptive.dryTelemetry.counterReads>=3);
+ const limited=await run({max:600});assert.equal(limited.elapsed,600);
+ await assert.rejects(limited.dryEnd(),/still wet/);
+ const watched=await run({until:123});assert.equal(watched.elapsed,123);assert.equal(watched.dryS.done,false);
+});
