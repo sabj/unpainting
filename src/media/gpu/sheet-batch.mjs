@@ -29,7 +29,7 @@ function sheetLayout(n, K, ntiles, o, bstrBytes) {
   for (const k of ['PAPER', 'PAPER2', 'PAPER3', 'BPAP']) L[k] = [f * 4, 16];
   for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM', 'PN', 'DD']) L[k] = [kf, 4];
   L.FXY = [f * 2, 8]; L.QXY = [kf * 2, 8]; L.OUT4 = [kf * 4, 16];
-  L.FLAGS = [ntiles * 4, 4]; L.TLS = [ntiles * 4, 4]; L.ARGS = [48, 4]; L.FLAGS2 = [(5 * ntiles + 3) * 4, 4]; L.CTR = [64, 4]; L.BSTR = [bstrBytes, 4];
+  L.FLAGS = [ntiles * 4, 4]; L.TLS = [ntiles * 4, 4]; L.ARGS = [48, 4]; L.FLAGS2 = [(6 * ntiles + 3) * 4, 4]; L.CTR = [64, 4]; L.BSTR = [bstrBytes, 4];
   for (const k of Object.keys(L)) L[k] = { bytes: up256(L[k][0]), elem: L[k][1] };
   return L;
 }
@@ -86,8 +86,11 @@ fn sparse_all(@builtin(local_invocation_index) li: u32) {
     for (var g = li; g < count; g += 256u) {
       let t = atomicLoad(&FLAGS2[u.ntiles + g]);
       atomicStore(&FLAGS2[t], 0u);
+      let savedHalo = atomicLoad(&FLAGS2[5u * u.ntiles + 3u + t]);
+      let halo = select(savedHalo, 511u, savedHalo == 0u || u.padC == 0.0);
       let tx = i32(t % u.tw); let ty = i32(t / u.tw);
       for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
+        if ((halo & (1u << u32((dy + 1) * 3 + dx + 1))) == 0u) { continue; }
         let x = tx + dx; let y = ty + dy;
         if (x < 0 || y < 0 || x >= i32(u.tw) || y >= i32(u.th)) { continue; }
         let a = u32(y) * u.tw + u32(x);
@@ -326,7 +329,7 @@ export class SheetBatch {
       go('sparse_all', 1);
       if (damp) { go('cap_sp'); go('p5a'); go('p5c'); go('wetscan'); continue; }
       go('edge_phase1');
-      for (let it = 0; it < this.o.flowIters; it++) { go('faces_wsc'); go('pflux_sc'); go(it === 0 ? 'apply_f0' : 'apply_f1'); }
+      for (let it = 0; it < this.o.flowIters; it++) { if (process.env.GPU_FUSE_FACES !== '0') go('faces_pflux'); else { go('faces_wsc'); go('pflux_sc'); } go(it === 0 ? 'apply_f0' : 'apply_f1'); }
       go('p3a_dep');
       if (slide) { go('slide_out_all'); go('slide_apply_all'); }
       go('cap_sp'); go('p5a'); go('p5b'); go('p5c'); go('wetscan');

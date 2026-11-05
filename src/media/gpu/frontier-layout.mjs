@@ -1,6 +1,6 @@
-// Observational decoder only. Physical shaders and queue ordering are unchanged.
+// Observational decoder for both legacy and halo-extended frontier buffers.
 export function frontierLayout(words, ntiles) {
-  if(!Number.isInteger(ntiles)||ntiles<1||words.length!==5*ntiles+3)
+  if(!Number.isInteger(ntiles)||ntiles<1||(words.length!==5*ntiles+3&&words.length!==6*ntiles+3))
     throw new RangeError('Invalid FLAGS2 allocation');
   const values=(start,n)=>Array.from(words.subarray(start,start+n));
   const queue=(name,start,countAt)=>{
@@ -12,13 +12,15 @@ export function frontierLayout(words, ntiles) {
       ...(invalid?{historicalInvalid:true,validationError:'keep invalid or duplicate tiles'}:{})};
   };
   const wet=queue('wet',ntiles,2*ntiles),dirty=queue('dirty',3*ntiles+1,5*ntiles+1),keep=queue('keep',4*ntiles+1,5*ntiles+2);
+  const halo=words.length===6*ntiles+3?values(5*ntiles+3,ntiles):undefined;
+  if(halo?.some(v=>v>511))throw new RangeError('Invalid frontier halo');
   const wetMembership=values(0,ntiles),dirtyMembership=values(2*ntiles+1,ntiles);
   for(const membership of [wetMembership,dirtyMembership])if(membership.some(v=>v!==0&&v!==1))throw new RangeError('Nonbinary frontier membership');
   const indices=membership=>membership.flatMap((v,i)=>v?[i]:[]);
   if(JSON.stringify(indices(wetMembership))!==JSON.stringify(wet.sorted)||JSON.stringify(indices(dirtyMembership))!==JSON.stringify(dirty.sorted))
     throw new Error('Quiescent frontier membership differs from its valid queue');
-  return {ntiles,wetMembership,dirtyMembership,wet,dirty,keep,
-    semantic:{ntiles,wetMembership,dirtyMembership,wet:{count:wet.count,tiles:wet.sorted},dirty:{count:dirty.count,tiles:dirty.sorted},
+  return {ntiles,halo,wetMembership,dirtyMembership,wet,dirty,keep,
+    semantic:{ntiles,...(halo?{halo}:{}),wetMembership,dirtyMembership,wet:{count:wet.count,tiles:wet.sorted},dirty:{count:dirty.count,tiles:dirty.sorted},
       keep:keep.historicalInvalid?{count:keep.count,historicalInvalid:true,rawPrefix:keep.valid,rawTrailing:keep.trailing}:{count:keep.count,tiles:keep.sorted}}};
 }
 

@@ -98,12 +98,26 @@ function dec(v, arrays = new Map(), blobs = null) {
   const o = {}; for (const [k, x] of Object.entries(v)) o[k] = dec(x,arrays,blobs); return o;
 }
 /** A stable digest of a step's named inputs: typed arrays and buffers by their bytes, the rest as JSON. */
-function inputHash(inputs) {
+export function inputHash(inputs) {
   const h = crypto.createHash('sha256');
-  for (const [k, v] of Object.entries(inputs)) {
-    h.update(k);
-    if (ArrayBuffer.isView(v)) { h.update(v.constructor.name); h.update(Buffer.from(v.buffer, v.byteOffset, v.byteLength)); } else h.update(JSON.stringify(v) ?? 'undefined');
-  }
+  // Frame every value, including nested binary planes. JSON-stringifying a
+  // sheet turns millions of floats into indexed object properties and loses
+  // NaN/-0 identity. Length framing also prevents ambiguous concatenations.
+  const visit = v => {
+    if (ArrayBuffer.isView(v)) {
+      h.update(`binary:${v.constructor.name}:${v.byteLength}:`);
+      h.update(Buffer.from(v.buffer, v.byteOffset, v.byteLength));
+    } else if (Array.isArray(v)) {
+      h.update(`array:${v.length}:`); for (const x of v) visit(x);
+    } else if (v && typeof v === 'object') {
+      const keys = Object.keys(v).sort(); h.update(`object:${keys.length}:`);
+      for (const k of keys) { visit(k); visit(v[k]); }
+    } else {
+      const s = typeof v === 'number' && Object.is(v, -0) ? '-0' : String(v);
+      h.update(`${typeof v}:${s.length}:${s}`);
+    }
+  };
+  visit(inputs);
   return h.digest('hex');
 }
 

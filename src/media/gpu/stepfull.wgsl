@@ -64,6 +64,7 @@ fn cx(wid: vec3<u32>, lid: vec3<u32>) -> Cx {
 fn wetAt(i: u32) -> bool { return M[i] == 1u; }
 
 // Sparse frontier: FLAGS2 holds membership, a compact tile queue, then its count.
+// The dirty/keep queues retain their offsets; a final ntiles-word plane stores 3x3 halo masks.
 // Stamps and wetfrontier enqueue a tile once; only that queue and its one-tile halo are visited.
 fn markDirty(t: u32) {
   if (u.p3 != 0u && atomicExchange(&FLAGS2[2u * u.ntiles + 1u + t], 1u) == 0u) {
@@ -72,6 +73,8 @@ fn markDirty(t: u32) {
   }
 }
 fn markWet(t: u32) {
+  // Stamps/uploads conservatively reactivate the complete one-tile halo.
+  atomicStore(&FLAGS2[5u * u.ntiles + 3u + t], 511u);
   markDirty(t);
   if (atomicExchange(&FLAGS2[t], 1u) == 0u && u.p3 != 0u) {
     let q = atomicAdd(&FLAGS2[2u * u.ntiles], 1u);
@@ -89,8 +92,11 @@ fn sparse_build(@builtin(global_invocation_id) g: vec3<u32>) {
   if (g.x >= atomicLoad(&FLAGS2[2u * u.ntiles])) { return; }
   let t = atomicLoad(&FLAGS2[u.ntiles + g.x]);
   atomicStore(&FLAGS2[t], 0u);
+  let savedHalo = atomicLoad(&FLAGS2[5u * u.ntiles + 3u + t]);
+  let halo = select(savedHalo, 511u, savedHalo == 0u || u.padC == 0.0);
   let tx = i32(t % u.tw); let ty = i32(t / u.tw);
   for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
+    if ((halo & (1u << u32((dy + 1) * 3 + dx + 1))) == 0u) { continue; }
     let x = tx + dx; let y = ty + dy;
     if (x < 0 || y < 0 || x >= i32(u.tw) || y >= i32(u.th)) { continue; }
     let a = u32(y) * u.tw + u32(x);
@@ -114,8 +120,11 @@ fn sparse_all(@builtin(local_invocation_index) li: u32) {
   for (var g = li; g < count; g += 256u) {
     let t = atomicLoad(&FLAGS2[u.ntiles + g]);
     atomicStore(&FLAGS2[t], 0u);
+    let savedHalo = atomicLoad(&FLAGS2[5u * u.ntiles + 3u + t]);
+    let halo = select(savedHalo, 511u, savedHalo == 0u || u.padC == 0.0);
     let tx = i32(t % u.tw); let ty = i32(t / u.tw);
     for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
+      if ((halo & (1u << u32((dy + 1) * 3 + dx + 1))) == 0u) { continue; }
       let x = tx + dx; let y = ty + dy;
       if (x < 0 || y < 0 || x >= i32(u.tw) || y >= i32(u.th)) { continue; }
       let a = u32(y) * u.tw + u32(x);
@@ -162,20 +171,35 @@ fn tiles_args() {
   if (u.p3 != 0u) { atomicStore(&FLAGS2[2u * u.ntiles], 0u); }
   ARGS[3] = c; ARGS[4] = u.nAct; ARGS[5] = 1u;
 }
+// A two-cell reach covers pore drying (nearWet), capillary flux and wet fronts.
+// Settled interior cells need no neighboring tile; edge/corner cells keep that halo.
+// Sub-threshold capillary options and the legacy edge schedule retain the old tile list.
+fn frontierHalo(lid: vec3<u32>) -> u32 {
+  if (u.padC == 0.0 || u.capEps < 0.02) { return 511u; }
+  var mask = 16u;
+  let left = lid.x < 2u; let right = lid.x >= 14u;
+  let up = lid.y < 2u; let down = lid.y >= 14u;
+  if (left) { mask |= 8u; } if (right) { mask |= 32u; }
+  if (up) { mask |= 2u; } if (down) { mask |= 128u; }
+  if (left && up) { mask |= 1u; } if (right && up) { mask |= 4u; }
+  if (left && down) { mask |= 64u; } if (right && down) { mask |= 256u; }
+  return mask;
+}
+var<workgroup> activeHalo: atomic<u32>;
 var<workgroup> anyWet: atomic<u32>;
 var<workgroup> tileMaxW: atomic<u32>;
 // Rebuild the next step's sparse frontier even when nobody observes counters.
 fn wetfrontier_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid);
-  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); }
+  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); atomicStore(&activeHalo, 0u); }
   workgroupBarrier();
-  if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); }
+  if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); atomicOr(&activeHalo, frontierHalo(lid)); }
   workgroupBarrier();
   if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
     let t = TL[wid.x];
     if (u.p3 != 0u) { atomicStore(&FLAGS[t], 0u); }
     let seen = atomicLoad(&anyWet);
-    if (seen != 0u) { markWet(t); }
+    if (seen != 0u) { markWet(t); atomicStore(&FLAGS2[5u * u.ntiles + 3u + t], atomicLoad(&activeHalo)); }
     if ((seen & 2u) != 0u) { atomicAdd(&CTR[9], 1u); }
     if (seen != 0u) { atomicAdd(&CTR[11], 1u); }
   }
@@ -183,13 +207,13 @@ fn wetfrontier_tile(wid: vec3<u32>, lid: vec3<u32>) {
 
 fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid);
-  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); atomicStore(&tileMaxW, 0u); }
+  if (lid.x == 0u && lid.y == 0u) { atomicStore(&anyWet, 0u); atomicStore(&activeHalo, 0u); atomicStore(&tileMaxW, 0u); }
   workgroupBarrier();
   if (c.ok) {
     let wBits = bitcast<u32>(W[c.i]);
     if (wBits > 0u) { atomicMax(&tileMaxW, wBits); }
   }
-  if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); }
+  if (c.ok && (M[c.i] == 1u || S[c.i] > 0.02 * PAPER[c.i].x)) { atomicOr(&anyWet, select(1u, 3u, M[c.i] == 1u)); atomicOr(&activeHalo, frontierHalo(lid)); }
   workgroupBarrier();
   if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
     let t = TL[wid.x];
@@ -197,7 +221,7 @@ fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let maxW = atomicLoad(&tileMaxW);
     if (maxW > 0u) { atomicMax(&CTR[7], maxW); }
     let seen = atomicLoad(&anyWet);
-    if (seen != 0u) { markWet(t); atomicAdd(&CTR[1], 1u); }
+    if (seen != 0u) { markWet(t); atomicStore(&FLAGS2[5u * u.ntiles + 3u + t], atomicLoad(&activeHalo)); atomicAdd(&CTR[1], 1u); }
     if ((seen & 2u) != 0u) { atomicAdd(&CTR[6], 1u); atomicAdd(&CTR[9], 1u); }
     if (seen != 0u) { atomicAdd(&CTR[11], 1u); }
   }
@@ -745,32 +769,31 @@ fn faceDrive(i: u32, j: u32, wi: f32, wj: f32, p: f32, rate: f32) -> f32 {
   if (u.mar != 0.0) { f += p * u.mar * (concAt(i) - concAt(j)) * min(wi, wj); }
   return f;
 }
-fn faces_wsc_tile(wid: vec3<u32>, lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok) { return; }
-  let i = c.i;
-  if (M[i] != 1u) { return; }   // never read: every reader of FXY and WSC checks M on both sides first
+// Immutable water/pigment inputs let each workgroup compute a one-cell face halo.
+// No invocation consumes another workgroup's freshly written flux or scale.
+fn faceState(i: u32, x: u32, y: u32) -> vec3<f32> {
+  if (M[i] != 1u) { return vec3<f32>(0.0, 0.0, 1.0); }
   var fx = 0.0; var fy = 0.0;
-  if (c.x < u.w - 1u && M[i + 1u] == 1u) { fx = faceX(i); }
-  if (c.y < u.h - 1u && M[i + u.w] == 1u) { fy = faceY(i); }
-  FXY[i] = vec2<f32>(fx, fy);
+  if (x < u.w - 1u && M[i + 1u] == 1u) { fx = faceX(i); }
+  if (y < u.h - 1u && M[i + u.w] == 1u) { fy = faceY(i); }
   var o = max(fx, 0.0) + max(fy, 0.0);
-  if (c.x > 0u && M[i - 1u] == 1u) { o += max(-faceX(i - 1u), 0.0); }
-  if (c.y > 0u && M[i - u.w] == 1u) { o += max(-faceY(i - u.w), 0.0); }
+  if (x > 0u && M[i - 1u] == 1u) { o += max(-faceX(i - 1u), 0.0); }
+  if (y > 0u && M[i - u.w] == 1u) { o += max(-faceY(i - u.w), 0.0); }
   let lim = W[i] * 0.95;
-  WSC[i] = select(1.0, lim / o, o > lim);
+  return vec3<f32>(fx, fy, select(1.0, lim / o, o > lim));
 }
-fn pflux_sc_tile(wid: vec3<u32>, lid: vec3<u32>) {
-  let c = cx(wid, lid); if (!c.ok) { return; }
-  let i = c.i;
-  if (M[i] != 1u) { return; }   // never read: apply_both reads QXY and SC only across faces between two wet cells
-  let wi = W[i]; let si = WSC[i]; let f = FXY[i];
+fn faces_wsc_tile(wid: vec3<u32>, lid: vec3<u32>) {
+  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
+  let f = faceState(c.i, c.x, c.y); FXY[c.i] = f.xy; WSC[c.i] = f.z;
+}
+fn pigmentFaces(c: Cx, f: vec2<f32>, si: f32, r: vec3<f32>, d: vec3<f32>, l: vec3<f32>, up: vec3<f32>) {
+  let i = c.i; let wi = W[i];
   let okR = c.x < u.w - 1u && M[i + 1u] == 1u; let okD = c.y < u.h - 1u && M[i + u.w] == 1u;
   let okL = c.x > 0u && M[i - 1u] == 1u; let okU = c.y > 0u && M[i - u.w] == 1u;
-  var wR = 0.0; var sR = 0.0; var wD = 0.0; var sD = 0.0; var wL = 0.0; var sL = 0.0; var fL = 0.0; var wU = 0.0; var sU = 0.0; var fU = 0.0;
-  if (okR) { wR = W[i + 1u]; sR = WSC[i + 1u]; }
-  if (okD) { wD = W[i + u.w]; sD = WSC[i + u.w]; }
-  if (okL) { wL = W[i - 1u]; sL = WSC[i - 1u]; fL = FXY[i - 1u].x; }
-  if (okU) { wU = W[i - u.w]; sU = WSC[i - u.w]; fU = FXY[i - u.w].y; }
+  var wR = 0.0; var wD = 0.0; var wL = 0.0; var wU = 0.0;
+  if (okR) { wR = W[i + 1u]; } if (okD) { wD = W[i + u.w]; }
+  if (okL) { wL = W[i - 1u]; } if (okU) { wU = W[i - u.w]; }
+  let sR = r.z; let sD = d.z; let sL = l.z; let sU = up.z; let fL = l.x; let fU = up.y;
   for (var ka = 0u; ka < u.nAct; ka++) {
     let base = klAt(ka) * u.n; let gi = G[base + i];
     var qx = 0.0; var qy = 0.0;
@@ -783,6 +806,34 @@ fn pflux_sc_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let lim = gi * 0.95;
     SC[base + i] = select(1.0, lim / o, o > lim);
   }
+}
+fn pflux_sc_tile(wid: vec3<u32>, lid: vec3<u32>) {
+  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
+  let i = c.i;
+  var r = vec3<f32>(0.0); var d = r; var l = r; var up = r;
+  if (c.x < u.w - 1u && M[i + 1u] == 1u) { r.z = WSC[i + 1u]; }
+  if (c.y < u.h - 1u && M[i + u.w] == 1u) { d.z = WSC[i + u.w]; }
+  if (c.x > 0u && M[i - 1u] == 1u) { l = vec3<f32>(FXY[i - 1u], WSC[i - 1u]); }
+  if (c.y > 0u && M[i - u.w] == 1u) { up = vec3<f32>(FXY[i - u.w], WSC[i - u.w]); }
+  pigmentFaces(c, FXY[i], WSC[i], r, d, l, up);
+}
+var<workgroup> faceHalo: array<vec3<f32>, 324>;
+fn faces_pflux_tile(wid: vec3<u32>, lid: vec3<u32>) {
+  let li = lid.y * 16u + lid.x;
+  if (wid.x < TL[u.ntiles]) {
+    let t = TL[wid.x]; let x0 = i32(t % u.tw) * 16 - 1; let y0 = i32(t / u.tw) * 16 - 1;
+    for (var q = li; q < 324u; q += 256u) {
+      let x = x0 + i32(q % 18u); let y = y0 + i32(q / 18u);
+      var f = vec3<f32>(0.0, 0.0, 1.0);
+      if (x >= 0 && y >= 0 && x < i32(u.w) && y < i32(u.h)) { f = faceState(u32(y) * u.w + u32(x), u32(x), u32(y)); }
+      faceHalo[q] = f;
+    }
+  }
+  workgroupBarrier();
+  let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
+  let q = (lid.y + 1u) * 18u + lid.x + 1u; let f = faceHalo[q];
+  FXY[c.i] = f.xy; WSC[c.i] = f.z;
+  pigmentFaces(c, f.xy, f.z, faceHalo[q + 1u], faceHalo[q + 18u], faceHalo[q - 1u], faceHalo[q - 18u]);
 }
 fn apply_both(c: Cx, first: bool) {
   let i = c.i;
@@ -1555,6 +1606,17 @@ fn edge_phase1(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_
   let count = workgroupUniformLoad(&passTileCount);
   for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
     edge_phase1_tile(vec3<u32>(tile, wid.y, wid.z), lid, li);
+    workgroupBarrier();
+  }
+}
+@compute @workgroup_size(16, 16)
+fn faces_pflux(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  if (u.p3 != 2u) { faces_pflux_tile(wid, lid); return; }
+  if (lid.x == 0u && lid.y == 0u) { passTileCount = TL[u.ntiles]; }
+  workgroupBarrier();
+  let count = workgroupUniformLoad(&passTileCount);
+  for (var tile = wid.x; tile < count; tile += u32(u.padB)) {
+    faces_pflux_tile(vec3<u32>(tile, wid.y, wid.z), lid);
     workgroupBarrier();
   }
 }
