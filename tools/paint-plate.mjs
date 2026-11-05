@@ -411,8 +411,9 @@ const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
 let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new EpochCells(),VALUE_PIGMENT_CONTACT=new EpochCells(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
-// pigments, charged into the same wet wash. Fast value plans default to 1; 0 starts every shape on a dry sheet.
-const WASH_SESSION = Math.max(0, Math.round(num('washsession', NATIVE_PAINT_MODE.mode==='fast' && opt('valueplan','') ? 1 : 0)));
+// pigments, charged into the same wet wash. Default 0 preserves the control
+// drying boundaries; sharing sessions changes layering and must be explicitly requested.
+const WASH_SESSION = Math.max(0, Math.round(num('washsession', 0)));
 let WASH_LAST = null;
 
 const MAJOR_FILE=opt('majorintent',''), MAJOR_INTENT=MAJOR_FILE?validateLegacyIntent(JSON.parse(fs.readFileSync(path.resolve(root,MAJOR_FILE))),{imageSHA:sha256(path.resolve(root,opt('image'))),loadedContact:num('loadedcontact',0)}):null;let MAJOR_TECHNIQUE=null,MAJOR_COMMAND=0,MAJOR_PREVIOUS=null,MAJOR_PLANE_CONTACT=null;
@@ -1648,7 +1649,7 @@ const penDraw = (sh,gs,want,w,h,o0) => {
  const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
  const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0;
  const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
-  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options}):drawMaterial(sh,paths,want,w,h,options);};
+  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
  if(!AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };

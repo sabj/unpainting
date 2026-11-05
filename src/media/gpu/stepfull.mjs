@@ -118,7 +118,7 @@ export class GpuSheet {
     this.out4Planes = planeBytes * K > out4Max ? Math.max(1, Math.floor(out4Max / planeBytes)) : 4096;
     if (this.out4Planes < K && planeBytes * (K - this.out4Planes) > out4Max) throw Error('OUT4 needs more than two bindings at this sheet size');
     B.OUT4 = mk(planeBytes * Math.min(K, this.out4Planes)); B.OUT4B = mk(this.out4Planes < K ? planeBytes * (K - this.out4Planes) : 16);
-    B.TL = mk((this.ntiles + 1) * 4); for (const k of ['FLAGS', 'FLAGS2']) B[k] = mk((k === 'FLAGS2' ? 5 * this.ntiles + 3 : this.ntiles) * 4);
+    B.TL = mk((this.ntiles + 1) * 4); for (const k of ['FLAGS', 'FLAGS2']) B[k] = mk((k === 'FLAGS2' ? 6 * this.ntiles + 3 : this.ntiles) * 4);
     B.RC = d.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); B.CTR = mk(64); B.ARGS = mk(48, GPUBufferUsage.INDIRECT); B.U = d.createBuffer({ size: UBYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     if (process.env.GPU_DEMAND_READBACK === '1') B.UPLOAD_META = mk(8);
     const put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
@@ -180,7 +180,7 @@ export class GpuSheet {
       capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? 0.85, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
       enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: this.workers, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03,
-      holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
+      padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length;
     const gran = o.gran ?? 1, scour = o.scour ?? 0;
@@ -219,6 +219,7 @@ export class GpuSheet {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (sheet.M[i] || sheet.s[i] > 0.02 * cap[i]) fl[((y / TILE) | 0) * this.tw + ((x / TILE) | 0)] = 1; }
     if (this.resident) for (let t = 0; t < this.ntiles; t++) if (fl[t]) fl[this.ntiles + fl[2 * this.ntiles]++] = t;
     put(B.FLAGS2, fl);
+    put(B.FLAGS2, new Uint32Array(this.ntiles), (5 * this.ntiles + 3) * 4);
     if (this.resident) {
       const dirty = new Uint32Array(3 * this.ntiles + 2), top = sheet.layers.at(-1);
       for (let i = 0; i < n; i++) {
@@ -261,7 +262,7 @@ export class GpuSheet {
       for (let s = 0; s < steps; s++) {
         if (this.resident && SPARSE_ALL) go('sparse_all', 0, [1]); else { if (this.resident) { go('sparse_start', 0, [1]); go('sparse_build', 24); } else { go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); } go('tiles_args', 0, [1]); }
         go('edge_phase1');
-        for (let it = 0; it < o.flowIters; it++) { go('faces_wsc'); go('pflux_sc'); go(it === 0 ? 'apply_f0' : 'apply_f1'); }
+        for (let it = 0; it < o.flowIters; it++) { if (process.env.GPU_FUSE_FACES !== '0') go('faces_pflux'); else { go('faces_wsc'); go('pflux_sc'); } go(it === 0 ? 'apply_f0' : 'apply_f1'); }
         go('p3a_dep');
         if ((o.slide ?? 0) > 0) { go('slide_out_all'); go('slide_apply_all'); }
         go('cap_sp'); go('p5a'); go('p5b'); finish(s === steps - 1);

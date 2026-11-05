@@ -88,3 +88,10 @@ test('actual uploadTop mock buffer writes preserve stale keep count and observat
   const altered=raw.slice();altered[4*n+1]=5;
   assert.notDeepEqual(observeFrontier(altered,n).layout.semantic,observation.layout.semantic);
 });
+
+test('halo metadata extends the allocation without changing existing queue offsets',()=>{
+  const n=6,a=new Uint32Array(6*n+3);a.set(fixture(n));a[5*n+3+1]=16;a[5*n+3+4]=511;
+  const decoded=frontierLayout(a,n);assert.deepEqual(decoded.wet.sorted,[1,4]);
+  assert.deepEqual(decoded.halo,[0,16,0,0,511,0]);assert.deepEqual(decoded.semantic.halo,decoded.halo);
+  a[5*n+3]=512;assert.throws(()=>frontierLayout(a,n),/halo/);
+});

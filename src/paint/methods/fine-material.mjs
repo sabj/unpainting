@@ -2,6 +2,7 @@
 // Inking pipeline, stage: the pen on the fine sheet (--inkres N).
 import { drawMaterial } from './material-profiles.mjs';
 import { clearWetFootprint } from '../../media/paper-certificate.mjs';
+import { cachedFineDrawing } from './fine-drawing-cache.mjs';
 
 /** The planned gestures on the fine sheet: positions, contact widths and speeds N times as large, in fine cells. */
 export function fineGestures(gestures, N) {
@@ -34,10 +35,12 @@ export function fineEdge(edgeStrength, w, h, N) {
 }
 
 /** drawMaterial on a sheet N times as fine as the plan's grid (w x h); `edgeStrength` is on the plan's grid. */
-export function drawOnFineSheet(sheet, N, gestures, {w,h,edgeStrength,...options}) {
+export function drawOnFineSheet(sheet, N, gestures, {w,h,edgeStrength,cache,...options}) {
+ return cachedFineDrawing(cache,sheet,{N,gestures,w,h,edgeStrength},options,()=>{
  const fw=w*N, fh=h*N;
  const edge=fineEdge(edgeStrength,w,h,N);
  return drawMaterial(sheet,fineGestures(gestures,N),new Float32Array(1),fw,fh,{...options,pen:finePen(options.pen,N),dropSize:fineDrop(N),drySheet:dryFootprint,mmPerCell:options.mmPerCell/N,edgeStrength:edge});
+ });
 }
 
 /**
