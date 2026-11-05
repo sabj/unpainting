@@ -733,6 +733,8 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
   const onceT0 = varietyOf(brush) && brush.model !== 'tuft' ? brush._strokeT0 : Infinity;
   sheet._contactBrush = brush;
   const plan = link.beginPlan(sheet, brush, { K, lanes, nClumps, Q });
+  // Mask-only observation needs a cell once, regardless of subsequent stamps.
+  const observedMask = observational ? sheet._observedMask : null;
   const cI = [], cL = [], cA = []; // one step's cells: index, hair, distance across the brush
   let head = brush._onPaper ? brush.heading ?? null : null;
   while (k < path.length) {
@@ -775,7 +777,9 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
       for (let xx = xa; xx <= xb; xx++) {
         const dx = xx + 0.5 - q.x, along = dx * tx + dy * ty;
         if (Math.abs(along) > reachA) continue;
-        const i = row + xx, across = edgeShift(dx * nx + dy * ny, ET, pHeight[i]);
+        const i = row + xx;
+        if (observedMask?.[i]) continue;
+        const across = edgeShift(dx * nx + dy * ny, ET, pHeight[i]);
         const side = across < 0 ? sideL : sideR;
         if (Math.abs(across) > side + 0.5) continue;
         if (clip && !clip[i]) continue;
@@ -892,6 +896,7 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   };
   const scratch = { w: sw, h: sh, K: sheet.K, paper: sheet.paper, clip, _gpu: link, clock: sheet.clock,
     touched: sheet.touched ? work?.touched ?? sheet.touched.slice() : undefined,
+    _observedMask: !includeTouched && !tuft ? mask : null,
     _contactSnapshot: work && sheet.touched ? { work, source: sheet.touched, recordReads: includeTouched } : null,
     contactStrength:tuft ? sheet.contactStrength?.slice() : undefined,
     _contactBrush: sheet._contactBrush === brush ? copy : null };

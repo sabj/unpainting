@@ -82,3 +82,21 @@ test('cache hits replay consumed target looks and preserve hard budget',async()=
  assert.equal(b.guard.look('review','second',new Uint8Array(100).fill(1),{ref:['px']}),null);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('compressed cache planes preserve exact bytes and shared typed-array identity', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'compressed-cache-'));
+ try {
+  const a=new Float32Array(65536),bits=new Uint32Array(a.buffer);
+  bits[17]=0x80000000; bits[29]=0x7fc01234; a[40000]=.123;
+  const track={start(){},stop(){return []},current(){},replay(){}};
+  let calls=0;
+  const run=()=>cachedStep({dir,name:'planes',code:'fixture',inputs:{version:1},track},async()=>{calls++;return {a,alias:a,small:Uint16Array.of(1,2,3)};});
+  const cold=await run(),warm=await run();
+  assert.equal(calls,1);assert.equal(warm.cached,true);
+  assert.deepEqual(Buffer.from(warm.value.a.buffer,warm.value.a.byteOffset,warm.value.a.byteLength),Buffer.from(a.buffer));
+  assert.strictEqual(warm.value.a,warm.value.alias);
+  assert.deepEqual(warm.value.small,cold.value.small);
+  const bin=fs.readdirSync(dir).find(f=>f.endsWith('.bin'));
+  assert.ok(fs.statSync(path.join(dir,bin)).size<a.byteLength/10);
+ } finally { fs.rmSync(dir,{recursive:true,force:true}); }
+});

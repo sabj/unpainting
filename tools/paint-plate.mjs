@@ -242,7 +242,7 @@ const SPEED_TRANSFERS = num('speedtransfers', 1) > 0;
 // Exact CPU and GPU speed switches (SPEED2, SPEED3): byte-identical paintings, on by default; pass 0 to disable each.
 const SPEED_PAPER = num('speedpaper', 1) > 0;
 const SPEED_CONTACT = num('speedcontact', 1) > 0;
-const SPEED_VALUE_CACHE = num('speedvaluecache', 0) > 0;
+const SPEED_VALUE_CACHE = num('speedvaluecache', 1) > 0;
 const SPEED_VALUE_ONLY = num('speedvalueonly', 1) > 0;
 const SPEED_COVERAGE = num('speedcoverage', 1) > 0;
 setSweepIntervals(SPEED_COVERAGE);
@@ -3498,7 +3498,15 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   let FLOOR_R = FLOOR;
   // under --strokebudget the passage gets its share of the strokes: the brush and the closing radius grow together
   // until its sweeps fit (stroke-budget.mjs)
-  const floorPaths = rr => { const plan = prof('floor close', () => closeLocal(FLOORMASK, W2, H2, rr)); return prof('floor lanes', () => brushedWashPaths(plan, W2, H2, { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), field: getShapeLoad(), seed: 17 + laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle })).map(pts => pts.map(p => ({ ...p, r: Math.max(rr, p.r) }))); };
+  const floorPaths = rr => {
+   const options = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), field: getShapeLoad(), seed: 17 + laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
+   // Cache geometry only; paper observation, charge, contact and drying still execute.
+   return prof('floor lanes', () => cachedStepSync({...RUN_CACHE,name:'floor-paths',code:CODE_HASH,track:optTrack,
+     inputs:{mask:FLOORMASK,w:W2,h:H2,rr,options}},()=>{
+       const plan = prof('floor close', () => closeLocal(FLOORMASK, W2, H2, rr));
+       return brushedWashPaths(plan,W2,H2,options).map(pts=>pts.map(p=>({...p,r:Math.max(rr,p.r)})));
+     }).value);
+  };
   // a final dark goes on with a small round brush drawn through the accent itself, held to it by the clip below
   const darkPaths = layer._darkPass ? washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: 0.5 * SC, minLength: 2 * SC }).map(pts => pts.map(p => ({ ...p, r: Math.min(p.r, Math.max(SC, PB ? PB.detailR : SC)) }))) : null;
   const paths = shapedPaths ?? authoredPaths ?? darkPaths ?? clock('paths', () => FLOOR
