@@ -5,7 +5,10 @@ import { TAPE, tapeState, restoreTapeState } from '../../media/brush.mjs';
 import { invalidatePaperCertificate } from '../../media/paper-certificate.mjs';
 
 const paperHashes = new WeakMap(); // paper is immutable during a painting
-const excluded = new Set(['paper', 'pigments', '_gpu', '_gpuInfo', '_tape', '_renderCaches']);
+// Solver workspaces and optical caches are derived, not material state. They
+// are rebuilt after a hit, avoiding hundreds of MB of scratch planes per call.
+const derived = ['scratch', 'tiles', '_renderCaches'];
+const excluded = new Set(['paper', 'pigments', '_gpu', '_gpuInfo', '_tape', ...derived]);
 const fields = sheet => Object.fromEntries(Object.entries(sheet).filter(([k, v]) => !excluded.has(k) && typeof v !== 'function'));
 
 export function cachedFineDrawing(cache, sheet, inputs, options, execute) {
@@ -27,7 +30,7 @@ export function cachedFineDrawing(cache, sheet, inputs, options, execute) {
     const saved = result.value;
     for (const k of Object.keys(fields(sheet))) delete sheet[k];
     Object.assign(sheet, saved.sheet);
-    delete sheet._renderCaches;
+    for (const k of derived) delete sheet[k];
     invalidatePaperCertificate(sheet);
     if (state) Object.assign(state, saved.state);
     if (audit) for (const record of saved.audit) audit.push(record);

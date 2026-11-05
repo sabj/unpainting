@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import util from 'node:util';
+import { zstdCompressSync, zstdDecompressSync, constants } from 'node:zlib';
 import {passage} from '../crop/blockin.mjs';
 
 // Content digests are reused only while the complete stat identity remains unchanged.
@@ -91,8 +92,10 @@ function dec(v, arrays = new Map(), blobs = null) {
   if ('__b' in v) {
     const b = v.bi !== undefined ? blobs[v.bi] : Buffer.from(v.d, 'base64');
     if (v.__b === 'Buffer') return b;
-    const T = TYPED[v.__b], copy = new Uint8Array(b.length); copy.set(b);
-    const result=new T(copy.buffer, 0, b.length / T.BYTES_PER_ELEMENT);
+    const T = TYPED[v.__b];
+    // Each blob owns its buffer. Aligned views avoid a second full-plan copy.
+    const bytes = b.byteOffset % T.BYTES_PER_ELEMENT === 0 ? b : Uint8Array.from(b);
+    const result=new T(bytes.buffer, bytes.byteOffset, b.length / T.BYTES_PER_ELEMENT);
     if(v.__id!==undefined)arrays.set(v.__id,result);return result;
   }
   const o = {}; for (const [k, x] of Object.entries(v)) o[k] = dec(x,arrays,blobs); return o;
@@ -121,18 +124,25 @@ export function inputHash(inputs) {
   return h.digest('hex');
 }
 
-// One entry on disk: "RCB1", u32 skeleton bytes, the skeleton (JSON: reads, logs, the value with each typed array as a
-// blob index), u32 blob count, then each blob as an f64 byte length and its bytes. Arrays stay out of the JSON, since
+// One entry on disk: "RCB2" (reads legacy RCB1 too), u32 skeleton bytes, the skeleton (JSON: reads, logs, the value with each typed array as a
+// blob index), u32 blob count, then each blob as an f64 byte length and its bytes.
+// Negative lengths denote lossless Zstandard blobs. Arrays stay out of the JSON, since
 // a large plan as one string passes V8's string limit. Each entry is its own .bin file; NAME-HASH.json indexes them by
 // the options they read.
-const MAGIC = Buffer.from('RCB1');
+const MAGIC = Buffer.from('RCB2');
 function writeEntry(file, entry) {
   const blobs = [], skeleton = Buffer.from(JSON.stringify({ reads: entry.reads, logs: entry.logs, value: enc(entry.value, new Map(), blobs) }));
   const fd = fs.openSync(file, 'w');
   try {
     const head = Buffer.alloc(8); MAGIC.copy(head); head.writeUInt32LE(skeleton.length, 4); fs.writeSync(fd, head); fs.writeSync(fd, skeleton);
     const count = Buffer.alloc(4); count.writeUInt32LE(blobs.length); fs.writeSync(fd, count);
-    for (const b of blobs) { const len = Buffer.alloc(8); len.writeDoubleLE(b.length); fs.writeSync(fd, len); for (let o = 0; o < b.length; o += 1 << 30) fs.writeSync(fd, b, o, Math.min(1 << 30, b.length - o)); }
+    for (const b of blobs) {
+      // Sparse material planes and plan masks otherwise write gigabytes of zeros.
+      const packed = b.length >= 4096 ? zstdCompressSync(b, { params: { [constants.ZSTD_c_compressionLevel]: 1 } }) : b;
+      const compressed = packed.length < b.length, data = compressed ? packed : b;
+      const len = Buffer.alloc(8); len.writeDoubleLE(compressed ? -data.length : data.length); fs.writeSync(fd, len);
+      for (let o = 0; o < data.length; o += 1 << 30) fs.writeSync(fd, data, o, Math.min(1 << 30, data.length - o));
+    }
   } finally { fs.closeSync(fd); }
 }
 function readEntry(file) {
@@ -140,9 +150,12 @@ function readEntry(file) {
   try {
     let at = 0;
     const rd = len => { const b = Buffer.allocUnsafe(len); let o = 0; while (o < len) { const r = fs.readSync(fd, b, o, len - o, at + o); if (!r) throw new Error('short cache entry'); o += r; } at += len; return b; };
-    const head = rd(8); if (!head.subarray(0, 4).equals(MAGIC)) throw new Error('not a cache entry');
+    const head = rd(8); if (!['RCB1','RCB2'].includes(head.toString('ascii',0,4))) throw new Error('not a cache entry');
     const sk = JSON.parse(rd(head.readUInt32LE(4)).toString()), count = rd(4).readUInt32LE(0), blobs = [];
-    for (let i = 0; i < count; i++) blobs.push(rd(rd(8).readDoubleLE(0)));
+    for (let i = 0; i < count; i++) {
+      const size = rd(8).readDoubleLE(0), bytes = rd(Math.abs(size));
+      blobs.push(size < 0 ? zstdDecompressSync(bytes) : bytes);
+    }
     return { reads: sk.reads, logs: sk.logs, value: dec(sk.value, new Map(), blobs) };
   } finally { fs.closeSync(fd); }
 }

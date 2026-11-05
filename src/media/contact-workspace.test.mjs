@@ -24,6 +24,8 @@ test('reused observation matches independent masks, halos and continuation over 
         const before = sheet.touched.slice();
         const expected = candidateContact(brush, sheet, path, options);
         assert.deepEqual(candidateContact(brush, sheet, path, { ...options, workspace }), expected);
+        const maskOnly = candidateContact(brush, sheet, path, { ...options, workspace, includeTouched: false });
+        assert.deepEqual(maskOnly, {...expected, continuation: {...expected.continuation, touched: undefined}});
         assert.deepEqual(sheet.touched, before);
       }
     }
