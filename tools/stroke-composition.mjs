@@ -93,16 +93,25 @@ function erode(mask,w,h,r) {
   erosionCache.set(mask,{key,value});return value;
 }
 
+let fpRowL = new Int32Array(0), fpRowR = new Int32Array(0), fpExtra = [];
 function footprint(m,sheet,w,h,allow) {
-  const out=[],rows=Array.from({length:h},()=>[]),scale=w/sheet.widthMm;
+  const out=[],scale=w/sheet.widthMm;
+  if(fpRowL.length<h){fpRowL=new Int32Array(h);fpRowR=new Int32Array(h).fill(-2);}
+  let minY=h,maxY=-1,hasExtra=false;
   const points=m.points, widths=m.widths;
   const dab=(x,y,r,p)=>{
     if(p<=0||r<=0)return;
     const y0=Math.max(0,Math.ceil(y-r-.5)),y1=Math.min(h-1,Math.floor(y+r-.5));
+    if(y0<minY)minY=y0;if(y1>maxY)maxY=y1;
     for(let yy=y0;yy<=y1;yy++) {
       const dx=Math.sqrt(Math.max(0,r*r-(yy+.5-y)**2));
       const left=Math.max(0,Math.ceil(x-dx-.5)),right=Math.min(w-1,Math.floor(x+dx-.5));
-      if(left<=right)rows[yy].push([left,right]);
+      if(left<=right) {
+        const r0=fpRowR[yy];
+        if(r0===-2){fpRowL[yy]=left;fpRowR[yy]=right;}
+        else if(left<=r0+1&&right>=fpRowL[yy]-1){if(left<fpRowL[yy])fpRowL[yy]=left;if(right>r0)fpRowR[yy]=right;}
+        else{(fpExtra[yy]??=[]).push([fpRowL[yy],r0]);fpRowL[yy]=left;fpRowR[yy]=right;hasExtra=true;}
+      }
     }
   };
   for(let j=0;j<points.length;j++) {
@@ -112,10 +121,18 @@ function footprint(m,sheet,w,h,allow) {
       const f=k/steps;dab((a[0]+(b[0]-a[0])*f)*scale,(a[1]+(b[1]-a[1])*f)*scale,ra+(rb-ra)*f,(m.pressures?.[j]??1));
     }
   }
-  rows.forEach((row,y)=>{
-    row.sort((a,b)=>a[0]-b[0]);let end=-1;
-    for(const [left,right]of row){for(let x=Math.max(left,end+1);x<=right;x++)if(allow[y*w+x])out.push(y*w+x);end=Math.max(end,right);}
-  });
+  for(let y=minY;y<=maxY;y++) {
+    const r0=fpRowR[y];if(r0===-2)continue;
+    const base=y*w,l0=fpRowL[y];fpRowR[y]=-2;
+    const ex=hasExtra?fpExtra[y]:null;
+    if(!ex?.length) {
+      for(let x=l0;x<=r0;x++)if(allow[base+x])out.push(base+x);
+    } else {
+      ex.push([l0,r0]);ex.sort((a,b)=>a[0]-b[0]);let end=-1;
+      for(let k=0;k<ex.length;k++){const iv=ex[k],left=iv[0],right=iv[1];for(let x=Math.max(left,end+1);x<=right;x++)if(allow[base+x])out.push(base+x);if(right>end)end=right;}
+      ex.length=0;
+    }
+  }
   return out;
 }
 
@@ -169,7 +186,8 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
     const f=fields[markClass(m,sheet)];
     // Wash strokes that may fill a broad area: planned detail, texture and edge marks are exempt.
     if(!isDetail(m)&&!plan?.passes?.find(p=>p.id===command?.intent)?.texture)strokeRecords.push({mark:m,cells,dir:strokeDirection(m),group:command?.intent??m.group??`frame-${m.time}/clip-${rec?.clipId??0}`});
-    for(const i of cells)for(let ch=0;ch<3;ch++)f[ch][i]+=density[ch]/cells.length;
+    const f0=f[0],f1=f[1],f2=f[2],cLen=cells.length,d0=density[0]/cLen,d1=density[1]/cLen,d2=density[2]/cLen;
+    for(let c=0;c<cLen;c++){const i=cells[c];f0[i]+=d0;f1[i]+=d1;f2[i]+=d2;}
   }
   const explicit=normalized.broadAreas!==undefined?normalized.broadAreas:plan?.broadAreas;
   const areas=[],areaMasks=new Map();

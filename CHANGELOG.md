@@ -6,14 +6,14 @@ Releases are plain semver, with a git tag per release. Each release names its pa
 
 Painter V101, sim 102, judges J1. `0.3.0` combines the pen-and-wash ink pipeline from `wip/0.2.3` with a full simulator, GPU synchronization, caching and memory optimization pass across `src/media`, `src/paint` and `tools/`.
 
-On the three frozen reference workloads on an Apple M4 Mac mini (16 GiB, GPU/Dawn/Metal, `--mode fast`, seed 0), warm suite wall time drops from `725.69 s` to `304.23 s` (**`2.39x` faster**, or `58.1%` less time) while preserving `98.85%` to `99.33%` SSIM (`41.5` to `43.0 dB` PSNR) against `0.2.1` and reducing peak RSS by up to `2.2 GiB`.
+On the three frozen reference workloads on an Apple M4 Mac mini (16 GiB, GPU/Dawn/Metal, `--mode fast`, seed 0), warm suite wall time drops from `725.69 s` to `244.85 s` (**`2.96x` faster**, or `66.3%` less time) while preserving `99.91%` to `99.9998%` SSIM against `0.2.1`, non-degraded deterministic scorer composites (`55.6`, `60.2`, `64.8`), and reducing peak RSS by up to `2.2 GiB`.
 
 | Workload | Target & settings | `0.2.1` Control | `0.3.0` Cold | `0.3.0` Warm | Warm speedup | `0.2.1` RSS | `0.3.0` RSS | SSIM vs `0.2.1` |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| `general-540` | Sargent *A Tramp*, `540 px`, `--recipe general` | `82.39 s` | `58.71 s` | `39.24 s` | **`2.10x`** | `2.12 GiB` | `2.02 GiB` | `99.33%` |
-| `inkres-1200` | Yale (`h34-a`), `1200 px`, `--inkrecipe wash` (`--inkres 2`) | `179.90 s` | `116.61 s` | `73.58 s` | **`2.44x`** | `7.12 GiB` | `4.92 GiB` | `98.85%` |
-| `valueplan-1200` | Sargent *White Ships*, `1200 px`, V4/V5 `--valueplan` | `463.40 s` | `227.13 s` | `191.42 s` | **`2.42x`** | `9.06 GiB` | `7.99 GiB` | `99.21%` |
-| **Three-workload suite** | Serial GPU total | **`725.69 s`** | **`402.45 s`** | **`304.23 s`** | **`2.39x`** | `9.06 GiB` max | `7.99 GiB` max | `99.13%` mean |
+| `general-540` | Sargent *A Tramp*, `540 px`, `--recipe general` | `82.39 s` | `43.43 s` | `36.93 s` | **`2.23x`** | `2.12 GiB` | `2.02 GiB` | `99.997%` |
+| `inkres-1200` | Yale (`h34-a`), `1200 px`, `--inkrecipe wash` (`--inkres 2`) | `179.90 s` | `116.61 s` | `67.44 s` | **`2.67x`** | `7.12 GiB` | `4.92 GiB` | `99.9998%` |
+| `valueplan-1200` | Sargent *White Ships*, `1200 px`, V4/V5 `--valueplan` | `463.40 s` | `227.13 s` | `140.48 s` | **`3.30x`** | `9.06 GiB` | `7.99 GiB` | `99.91%` |
+| **Three-workload suite** | Serial GPU total | **`725.69 s`** | **`387.17 s`** | **`244.85 s`** | **`2.96x`** | `9.06 GiB` max | `7.99 GiB` max | `99.97%` mean |
 
 ### Speed, GPU synchronization and memory
 
@@ -30,14 +30,19 @@ On the three frozen reference workloads on an Apple M4 Mac mini (16 GiB, GPU/Daw
 - **Fine-ink (`--inkres`) and line-pipeline specialization (`src/paint/methods/ink-res.mjs`, `src/paint/methods/fine-material.mjs`, `src/paint/methods/ink-match.mjs`, `src/media/pen.mjs`):**
   - `makeInkRes` uses a 1-pigment `[INK]` fine sheet instead of duplicating the full palette on the `2160 px` fine sheet, memoizes `INKRES.compose` across unchanged frames, reuses calibration material and `pen.pin` per `(paper, patchy)`, and gathers 4-neighbor `renderCells` in `inkDarkMatch`.
   - `holdLineFile` and `traceLineModel` memoize line preparation, and `planPenInner` is skipped when `--drawingfile` replaces the opening drawing.
-- **Wash sessions, buffered JSONL logs and spatial hotloops (`tools/paint-plate.mjs`, `tools/stroke-composition.mjs`):**
-  - Fast value plans retain wash-session contact ownership across shapes within a pass (reducing `valueplan-1200` GPU dry dispatches from `2,579` to `179` and main layers from `2,465` to `99`).
+- **GPU step kernel fusion, brush-pigment specialization and adaptive dry chunks (`src/media/gpu/stepfull.wgsl`, `src/media/gpu/stepfull.mjs`, `src/media/gpu/fast-dry-chunk.mjs`):**
+  - Fused `faces` and `pflux` into `faces_pflux` in the GPU step solver, deferred `finish_wet_scan` to checkpoint boundaries, and scaled sustained wet-frontier fast-dry chunks (`adaptiveFastDryChunk`), cutting GPU dispatches by up to `44%`.
+  - Specialized `stroke_run`, `stroke_metered`, `feed_pigments` and `hair_cell` to active brush pigments (`brushPigmentCount`), parallelized `feed_pigments` across pigments (`4–18` barriers/step down to `1`), and skipped zero-load `D`/`G` read-modify-writes (`stroke_run` GPU time `-30.6%` on `inkres-1200`).
+- **Wash sessions, pass-boundary drying, buffered JSONL logs and spatial hotloops (`tools/paint-plate.mjs`, `tools/stroke-composition.mjs`):**
+  - `--dryboundaries 1` dries at value-plan pass boundaries and wet-contact overlaps (reducing `valueplan-1200` GPU dry solver iterations from `351,645` to `79,415` while maintaining `99.91%` SSIM vs `0.2.1`).
+  - `stroke-composition.mjs` reuses `Int32Array` row-interval buffers in `footprint` instead of allocating/sorting per-row arrays on every stroke, and `paint-plate.mjs` memoizes CLI flag lookups (`optIdx`) and defers `FLOORMASK`/`SHAPE_LOAD` construction on warm cache hits.
   - Painter JSONL audit writers buffer up to `1 MiB` in memory (flushing on checks, pass boundaries and exits) and share stroke command IDs with `stroke-composition.mjs`.
 
 ### Step caching, passage checkpoints and native scoring
 
-- **Fingerprinted run cache (`src/paint/run-cache.mjs`):**
-  - `--runcache 1` (and `--speedvaluecache 1` for value plans) caches deterministic setup stages (`palette`, `pigment-fit`, `separator`, `paper`, `fine-paper`, `calibration`, `pen-field`, `early-lines` and `value-plan`) keyed by a persistent stat-manifest source hash, dependency closure hash, target bytes and options. Warm hits replay `TARGET_GUARD` look accounting and produce byte-identical `run-card.json` provenance and output PNGs.
+- **Fingerprinted run cache (`src/paint/run-cache.mjs`, `src/paint/run-cache-planes.mjs`, `src/paint/floor-paths-cache.mjs`):**
+  - `--runcache 1` (and `--speedvaluecache 1` for value plans) caches deterministic setup stages (`palette`, `pigment-fit`, `separator`, `paper`, `fine-paper`, `calibration`, `pen-field`, `early-lines`, `value-plan`, `floor-paths` and `fine-drawing`) keyed by a persistent stat-manifest source hash, dependency closure hash, target bytes and options.
+  - Typed-array cache planes use compact deflate compression (`run-cache-planes.mjs`) and `ObservedMask` skips untouched planes on partial GPU readbacks (`paper-readback.mjs`). Warm hits replay `TARGET_GUARD` look accounting and produce byte-identical `run-card.json` provenance and output PNGs.
 - **Extended passage checkpoints (`tools/aware/state-io.mjs`):**
   - `--pausedir` and `--resumestate` now support `--inkres` (saving and restoring fine-sheet material, carry-down buffers and wet state) and `--prepfade` (`PREPF`), and validate `provenance.json` before loading arrays. Restored native `inkres-1200` runs finish byte-identical to uninterrupted runs.
 - **Native-resolution scoring (`bench/scripts/score_painting.py`, `bench/scripts/classic.py`):**
