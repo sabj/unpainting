@@ -219,8 +219,16 @@ const { argv, note: RECIPE_NOTE, pipeline: PIPELINE } = expandRecipe({ argv: arg
 // every option name the painter asks for, so options given but never read are reported at the end
 const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
-let OPT_TRACK = null;
-const opt = (n, d) => { OPTS_READ.add(n); const i = argv.lastIndexOf('--' + n); if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; }, num = (n, d) => Number(opt(n, d));
+let OPT_TRACK = null, optIndex = null, optArgvLen = -1;
+const optIdx = n => {
+  if (optArgvLen !== argv.length) {
+    optIndex = new Map();
+    for (let i = 0; i < argv.length; i++) if (typeof argv[i] === 'string' && argv[i].startsWith('--')) optIndex.set(argv[i].slice(2), i);
+    optArgvLen = argv.length;
+  }
+  return optIndex.get(n) ?? -1;
+};
+const opt = (n, d) => { OPTS_READ.add(n); const i = optIdx(n); if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; }, num = (n, d) => Number(opt(n, d));
 // Caller-owned drawing inputs and stage intent, separated from recipe/plan and generated arguments.
 const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv });
 // An explicit budget changes planning only; absent/zero preserves every default.
@@ -233,7 +241,7 @@ const RECESSES = num('recesses', 0) > 0;
 const optTrack = {
   start() { OPT_TRACK = []; },
   stop() { const r = OPT_TRACK; OPT_TRACK = null; return r; },
-  current(n) { const i = argv.lastIndexOf('--' + n); return i >= 0 ? argv[i + 1] ?? null : null; },
+  current(n) { const i = optIdx(n); return i >= 0 ? argv[i + 1] ?? null : null; },
   replay(names) { for (const k of names) OPTS_READ.add(k); },
 };
 const NATIVE_PAINT_MODE = nativePaintMode(opt('mode', 'fast'));
@@ -411,8 +419,7 @@ const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
 let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new EpochCells(),VALUE_PIGMENT_CONTACT=new EpochCells(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
-// pigments, charged into the same wet wash. Default 0 preserves the control
-// drying boundaries; sharing sessions changes layering and must be explicitly requested.
+// pigments, charged into the same wet wash. 0 starts every shape on a dry sheet.
 const WASH_SESSION = Math.max(0, Math.round(num('washsession', 0)));
 let WASH_LAST = null;
 
@@ -2623,10 +2630,13 @@ const planDensityOfLayers = () => {
   for (const L2 of layers) for (const sh of L2.shapes) {
     const kk = sh.mix.reduce((s, v, j) => s + v * (PIGS[j].K[0] + PIGS[j].K[1] + PIGS[j].K[2]) / 3, 0);
     // a graded passage lays its own amount in each cell, at the same colour
-    const add = i => { D[i] += sh.graded ? kk * sh.graded[i] / Math.max(1e-6, sh.amount) : kk; };
-    if(sh._runs) { for(let r=0;r<sh._runs.length;r+=2)for(let i=sh._runs[r];i<sh._runs[r+1];i++)add(i); }
-    else if(sh.box&&sh.ids) { const b=sh.box;for(let y=b.y0;y<=b.y1;y++)for(let i=y*w+b.x0,e=y*w+b.x1;i<=e;i++)if(sh.ids[i]===sh.id)add(i); }
-    else { const m=sh.mask,b=sh._mbox??sh.box??{x0:0,y0:0,x1:w-1,y1:h-1};for(let y=b.y0;y<=b.y1;y++)for(let i=y*w+b.x0,e=y*w+b.x1;i<=e;i++)if(m[i])add(i); }
+    const gr = sh.graded, denom = gr ? Math.max(1e-6, sh.amount) : 1;
+    if(sh._runs) {
+      if (gr) { for(let r=0;r<sh._runs.length;r+=2)for(let i=sh._runs[r],e=sh._runs[r+1];i<e;i++)D[i]+=kk*gr[i]/denom; }
+      else { for(let r=0;r<sh._runs.length;r+=2)for(let i=sh._runs[r],e=sh._runs[r+1];i<e;i++)D[i]+=kk; }
+    }
+    else if(sh.box&&sh.ids) { const b=sh.box,ids=sh.ids,id=sh.id;for(let y=b.y0;y<=b.y1;y++)for(let i=y*w+b.x0,e=y*w+b.x1;i<=e;i++)if(ids[i]===id)D[i]+=gr?kk*gr[i]/denom:kk; }
+    else { const m=sh.mask,b=sh._mbox??sh.box??{x0:0,y0:0,x1:w-1,y1:h-1};for(let y=b.y0;y<=b.y1;y++)for(let i=y*w+b.x0,e=y*w+b.x1;i<=e;i++)if(m[i])D[i]+=gr?kk*gr[i]/denom:kk; }
     dropMask(sh);   // one passage's field at a time, not the plan's worth of them
   }
   return D;
@@ -3494,16 +3504,19 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // Under --physical, passes after --floorfrom may use the detail brush (rigger).
   // --detailfloor 1: under --physical the floor brush moves toward the detail brush by the share of cells with focus over --detailfocus.
   const FLOOR = (() => { const f = num('brushfloor', 0); if (layer._darkPass || authoredPaths || (f <= 0 && !PB) || detail) return 0; if (through > num('floorfrom', 0.85)) return PB ? Math.max(SC, PB.detailR) : 0; const base = Math.max(SC, PB ? PB.floorR : f * W2 / 1086); if (PB && FOCUS && num('detailfloor', 0) > 0) { const thr = num('detailfocus', 0.5); let a = 0, c = 0; for (let i = 0; i < n; i++) if (sh.mask[i]) { a++; if (FOCUS[i] > thr) c++; } const q = a ? c / a : 0; return Math.max(SC, base + (Math.max(SC, PB.detailR) - base) * q); } return base; })();
-  const FLOORMASK = FLOOR ? up(brushMask(sh)) : null;
+  let _floorMask = null;
+  const getFloorMask = () => (_floorMask ??= up(brushMask(sh)));
   let FLOOR_R = FLOOR;
   // under --strokebudget the passage gets its share of the strokes: the brush and the closing radius grow together
   // until its sweeps fit (stroke-budget.mjs)
   const floorPaths = rr => {
-   const options = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), field: getShapeLoad(), seed: 17 + laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
+   const baseOpts = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), seed: 17 + laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
+   const bm = brushMask(sh), row0 = MB.y0 * w, row1 = (MB.y1 + 1) * w;
    // Cache geometry only; paper observation, charge, contact and drying still execute.
    return prof('floor lanes', () => cachedStepSync({...RUN_CACHE,name:'floor-paths',code:CODE_HASH,track:optTrack,
-     inputs:{mask:FLOORMASK,w:W2,h:H2,rr,options}},()=>{
-       const plan = prof('floor close', () => closeLocal(FLOORMASK, W2, H2, rr));
+     inputs:{mask:bm === MASK ? bm.subarray(row0, row1) : bm,box:[MB.y0,MB.y1,w,h,W2,H2,SC],field:shapeLoad ? shapeLoad.subarray(row0, row1) : [SHAPE_LACK, bm === MASK ? null : MASK.subarray(row0, row1)],rr,options:baseOpts}},()=>{
+       const fm = getFloorMask(), options = { ...baseOpts, field: getShapeLoad() };
+       const plan = prof('floor close', () => closeLocal(fm, W2, H2, rr));
        return brushedWashPaths(plan,W2,H2,options).map(pts=>pts.map(p=>({...p,r:Math.max(rr,p.r)})));
      }).value);
   };
@@ -3560,6 +3573,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     touchSmall = true; used['touch-up small brush'] = (used['touch-up small brush'] || 0) + 1;
   }
   if (!paths.length) {
+    const FLOORMASK = FLOOR ? getFloorMask() : null;
     // --rescue sweep: a round brush as wide as the passage, drawn down its middle, instead of small marks (default marks).
     // Under --brushfloor a passage too small for a sweep is one clipped touch of the floor brush across its middle.
     // --floordabskip also applies to that span touch; skipped cells are held out of the booking (sh._skip).
@@ -3600,7 +3614,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   }
   // under --brushfloor the clip is the passage closed by --clipclose (default 1.5) floor radii, joined with the probe's,
   // so pinholes inside a passage do not become paper holes. The outer edge is not moved.
-  if (!BUDGET && !shapedPaths && FLOOR && !touchSmall && semanticUsesNumericClip(sh._semantic)) { const cr = num('clipclose', 1.5) * FLOOR, reach = MASSP ? edgeReach(sh, num) * FLOOR : 0, cm0 = prof('clip close', () => closeLocal(FLOORMASK, W2, H2, cr)), cm = reach >= 1 ? dilate(cm0, W2, H2, reach) : cm0; const c0 = PROBE ? Uint8Array.from(cm, (v, i) => v & PROBE.clip[i]) : cm;
+  if (!BUDGET && !shapedPaths && FLOOR && !touchSmall && semanticUsesNumericClip(sh._semantic)) { const FLOORMASK = getFloorMask(), cr = num('clipclose', 1.5) * FLOOR, reach = MASSP ? edgeReach(sh, num) * FLOOR : 0, cm0 = prof('clip close', () => closeLocal(FLOORMASK, W2, H2, cr)), cm = reach >= 1 ? dilate(cm0, W2, H2, reach) : cm0; const c0 = PROBE ? Uint8Array.from(cm, (v, i) => v & PROBE.clip[i]) : cm;
     // under --ladderkeepout the clip is also held off the passages' cells, so closing does not reach back into them
     const KO = (num('ladderkeepout', 0) > 0 || PASSAGE_HOOK.exact) && PASSAGE_HOOK.names.length && !NOKEEP ? keepoutMask() : null;
     // --keepsmooth s: cut the keep-out smooth at the sheet's grid, as --foliagesmooth does the seal

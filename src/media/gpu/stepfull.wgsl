@@ -1245,7 +1245,7 @@ fn feed_water() {
       let wat = min(bw, (tgt - hw) * feed);
       if (wat > 0.0 && bw > 0.0) {
         let f = min(1.0, wat / bw);
-        let wq = bw * f; bw -= wq; hw += wq; ff = f;
+        let wq = bw * f; bw -= wq; hw += wq; ff = f; any |= 4u;
       }
     }
     fFeed[j] = ff;
@@ -1291,23 +1291,24 @@ override FULL_BRUSH_PIGMENTS: bool = false;
 fn brushPigmentCount() -> u32 { return select(u.nAct, pK, FULL_BRUSH_PIGMENTS); }
 fn brushPigmentAt(a: u32) -> u32 { if (FULL_BRUSH_PIGMENTS) { return a; } return klAt(a); }
 fn feed_pigments(li: u32, lanesU: u32, moved: bool) {
-  if (moved) {
-    if (li < brushPigmentCount()) { feed_pig(brushPigmentAt(li)); }
-    workgroupBarrier();
-    return;
-  }
-  let K = pK; var bp = 0.0;
-  if (li < brushPigmentCount()) { bp = wh[hb(lanesU) + 4u + brushPigmentAt(li)]; }
-  for (var c0 = 0u; c0 < lanesU; c0 += 64u) {
-    let cn = min(64u, lanesU - c0);
-    if (li < brushPigmentCount()) {
-      for (var jj = 0u; jj < cn; jj++) { let f = fFeed[c0 + jj]; var q = 0.0; if (f > 0.0) { q = bp * f; bp -= q; } fScr[brushPigmentAt(li) * 64u + jj] = q; }
+  let nP = brushPigmentCount();
+  if (li < nP) {
+    let k = brushPigmentAt(li);
+    if (moved) {
+      feed_pig(k);
+    } else {
+      let bel = hb(lanesU) + 4u + k;
+      var bp = wh[bel];
+      if (bp != 0.0 || FULL_BRUSH_PIGMENTS) {
+        for (var j = 0u; j < lanesU; j++) {
+          let f = fFeed[j];
+          if (f > 0.0) { let q = bp * f; bp -= q; wh[hb(j) + 4u + k] += q; }
+        }
+        wh[bel] = bp;
+      }
     }
-    workgroupBarrier();
-    if (li < cn) { let j = c0 + li; if (fFeed[j] > 0.0) { let h = hb(j) + 4u; for (var ka = 0u; ka < brushPigmentCount(); ka++) { let k = brushPigmentAt(ka); wh[h + k] += fScr[k * 64u + li]; } } }
-    workgroupBarrier();
   }
-  if (li < brushPigmentCount()) { wh[hb(lanesU) + 4u + brushPigmentAt(li)] = bp; }
+  workgroupBarrier();
 }
 
 // the tooth under a hair, averaged along the stroke behind its tip (brush.mjs groundAt)
@@ -1411,7 +1412,9 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   }
   let stand = give - into; let gs = 1.0 - fr;
   for (var ka = 0u; ka < brushPigmentCount(); ka++) { let k = brushPigmentAt(ka);
-    let pg = wh[h + 4u + k] * f; wh[h + 4u + k] -= pg;
+    let hpk = wh[h + 4u + k];
+    if (hpk == 0.0 && !FULL_BRUSH_PIGMENTS) { continue; }
+    let pg = hpk * f; wh[h + 4u + k] = hpk - pg;
     if (!masked) { D[k * u.n + i] += pg * fr; }
     if (stand > 0.0) { G[k * u.n + i] += pg * gs; }
   }
@@ -1440,16 +1443,18 @@ fn stroke_run(@builtin(local_invocation_index) li: u32) {
     let sb = offs + cur * sp;
     if (li == 0u) { feed_water(); w_flag = fAnyMove | select(0u, 2u, bu(sb + 6u) != 0u); }
     let flag = workgroupUniformLoad(&w_flag);
-    feed_pigments(li, lanesU, (flag & 1u) != 0u);
+    if ((flag & 5u) != 0u) { feed_pigments(li, lanesU, (flag & 1u) != 0u); }
     let blk = offc + bu(sb + 7u); let ent = blk + lanes + 1u;
     let tx = BSTR[sb + 9u]; let ty = BSTR[sb + 10u];
     if (pDepth > 0.0) {
       // Metered contact draws from the shared belly at every cell. Preserve CPU
       // raster order; parallel hair traversal changes which hair exhausts it.
-      if (li == 0u) { for(var e=0u;e<bu(blk);e++) {
-        let q=blk+1u+3u*e; hair_cell(bu(q+1u),sb,bu(q),BSTR[q+2u],tx,ty);
-      } }
-
+      if (li == 0u) {
+        for(var e=0u;e<bu(blk);e++) {
+          let q=blk+1u+3u*e; hair_cell(bu(q+1u),sb,bu(q),BSTR[q+2u],tx,ty);
+        }
+        for(var j=0u;j<lanes;j++) { fScr[j]=wh[hb(j)]; }
+      }
     } else {
     for (var j = li; j < lanes; j += 64u) {
       let e1 = bu(blk + j + 1u);
@@ -1457,8 +1462,6 @@ fn stroke_run(@builtin(local_invocation_index) li: u32) {
       fScr[j] = wh[hb(j)];   // the hair's water for the next step's walk (the shares are done with by now)
     }
     }
-    workgroupBarrier();
-    for(var j=li;j<lanes;j+=64u) { fScr[j]=wh[hb(j)]; }
     storageBarrier(); workgroupBarrier();
     cur += 1u;
     if ((flag & 2u) != 0u) { break; }
@@ -1984,7 +1987,13 @@ fn stroke_metered() {
   var cur=bu(H_CUR);let nst=bu(H_NSTEPS);let sp=bu(H_SP);let offs=bu(H_OFFS);let offc=bu(H_OFFC);
   loop {
     if(cur>=nst){break;}let sb=offs+cur*sp;feed_water();
-    for(var k=0u;k<pK;k++){feed_pig(k);}
+    if((fAnyMove&5u)!=0u){
+      let moved=(fAnyMove&1u)!=0u;let nP=brushPigmentCount();
+      for(var ka=0u;ka<nP;ka++){
+        let k=brushPigmentAt(ka);
+        if(moved||wh[hb(pLanes)+4u+k]!=0.0||FULL_BRUSH_PIGMENTS){feed_pig(k);}
+      }
+    }
     let blk=offc+bu(sb+7u);let tx=BSTR[sb+9u];let ty=BSTR[sb+10u];
     for(var e=0u;e<bu(blk);e++){let q=blk+1u+3u*e;hair_cell(bu(q+1u),sb,bu(q),BSTR[q+2u],tx,ty);}
     for(var j=0u;j<pLanes;j++){fScr[j]=wh[hb(j)];}
