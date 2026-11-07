@@ -31,7 +31,20 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
   // what has been carried down to the painting's sheet, per pigment, so the next call carries only what is new
   const seen = finePigments.map(() => new Float32Array(nH)), inkLo = finePigments.map(() => new Float32Array(nL));
   const white = Buffer.alloc(nL * 3, 255), whiteH = Buffer.alloc(nH * 3, 255);
-  const fineTotal = k => { if (totalVersion === materialVersion) return total; const out = new Float32Array(nH), G = fine.G[k], D = fine.D[k], P = fine.P[k]; for (const L of fine.layers) { const a = L[k]; for (let i = 0; i < nH; i++) out[i] += a[i]; } for (let i = 0; i < nH; i++) out[i] += G[i] + D[i] + P[i]; totalVersion = materialVersion; return total = out; };
+  const totalBuf = new Float32Array(nH), carryAdd = new Float32Array(nL);
+  const fineTotal = k => {
+    if (totalVersion === materialVersion) return total;
+    const out = totalBuf, G = fine.G[k], D = fine.D[k], P = fine.P[k], layers = fine.layers;
+    if (layers.length === 0) {
+      for (let i = 0; i < nH; i++) out[i] = G[i] + D[i] + P[i];
+    } else {
+      out.fill(0);
+      for (const L of layers) { const a = L[k]; for (let i = 0; i < nH; i++) out[i] += a[i]; }
+      for (let i = 0; i < nH; i++) out[i] += G[i] + D[i] + P[i];
+    }
+    totalVersion = materialVersion;
+    return total = out;
+  };
   let stats = { calls: 0, ms: 0 };
 
   /** drawGestures on the fine sheet: points in the painting's cells, want on the painting's grid. */
@@ -81,11 +94,29 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     for (let i = 0; i < nL; i++) if (main.M[i] || main.s[i] > 0) { any = true; break; }
     if (!any) { if (wetOn) { fine.W.fill(0); fine.s.fill(0); fine.M.fill(0); fine.ever.fill(0); wetOn = false; } certifyZeroPaper(fine); return; }
     invalidatePaperCertificate(fine);
-    for (let y = 0; y < HH; y++) { const yl = (y / N) | 0; for (let x = 0; x < WH; x++) {
-      const j = y * WH + x, i = yl * W2 + ((x / N) | 0);
-      fine.M[j] = main.M[i]; fine.ever[j] = main.ever[i]; fine.W[j] = main.W[i];
-      fine.s[j] = cm[i] > 0 ? main.s[i] * cf[j] / cm[i] : 0;
-    } }
+    const mM = main.M, mEver = main.ever, mW = main.W, ms = main.s;
+    const fM = fine.M, fEver = fine.ever, fW = fine.W, fs = fine.s;
+    let j = 0;
+    for (let yl = 0; yl < H2; yl++) {
+      const rowL = yl * W2;
+      for (let dy = 0; dy < N; dy++) {
+        for (let xl = 0; xl < W2; xl++) {
+          const i = rowL + xl;
+          const mMi = mM[i], mEveri = mEver[i], mWi = mW[i], cmi = cm[i], msi = ms[i];
+          if (cmi > 0 && msi !== 0) {
+            for (let dx = 0; dx < N; dx++, j++) {
+              fM[j] = mMi; fEver[j] = mEveri; fW[j] = mWi;
+              fs[j] = msi * cf[j] / cmi;
+            }
+          } else {
+            for (let dx = 0; dx < N; dx++, j++) {
+              fM[j] = mMi; fEver[j] = mEveri; fW[j] = mWi;
+              fs[j] = 0;
+            }
+          }
+        }
+      }
+    }
     wetOn = true;
   }
   let wetOn = false;
@@ -101,14 +132,28 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     coherent(main); // bring the GPU's copy down first, so what is written here is added to the real state
     let wrote = false;
     for (let k = 0; k < K; k++) {
-      const T = fineTotal(k), S = seen[k], add = new Float32Array(nL);
-      let any = false;
-      for (let y = 0; y < HH; y++) { const yl = (y / N) | 0; for (let x = 0; x < WH; x++) { const i = y * WH + x, d = T[i] - S[i]; if (d !== 0) { add[yl * W2 + ((x / N) | 0)] += d; any = true; } } }
+      const T = fineTotal(k), S = seen[k], add = carryAdd;
+      let any = false, i = 0;
+      for (let yl = 0; yl < H2; yl++) {
+        const rowL = yl * W2;
+        for (let dy = 0; dy < N; dy++) {
+          for (let xl = 0; xl < W2; xl++) {
+            const idxL = rowL + xl;
+            for (let dx = 0; dx < N; dx++, i++) {
+              const d = T[i] - S[i];
+              if (d !== 0) { add[idxL] += d; any = true; }
+            }
+          }
+        }
+      }
       if (!any) continue;
       S.set(T);
       wrote = true;
-      const inv = 1 / (N * N), D = main.D[inkAt], G = main.G[inkAt], L = inkLo[k];
-      for (let i = 0; i < nL; i++) if (add[i]) { const a = add[i] * inv; if (main.M[i]) G[i] += a; else D[i] += a; L[i] += a; }
+      const inv = 1 / (N * N), D = main.D[inkAt], G = main.G[inkAt], L = inkLo[k], M = main.M;
+      for (let i = 0; i < nL; i++) {
+        const ai = add[i];
+        if (ai) { add[i] = 0; const a = ai * inv; if (M[i]) G[i] += a; else D[i] += a; L[i] += a; }
+      }
     }
     if (wrote) main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
   }
@@ -128,7 +173,7 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     const t = performance.now(); census.inkres.composeCalls++;
     try { return composeImpl(lo); } finally { census.inkres.composeMs += performance.now() - t; }
   }
-  let x0Tab = null, x1Tab = null, txTab = null, y0Tab = null, y1Tab = null, tyTab = null, invInkL = null;
+  let x0Tab = null, x1Tab = null, txTab = null, y0Tab = null, y1Tab = null, tyTab = null, invInkL = null, hBuf0 = null, hBuf1 = null;
   function ensureComposeTables() {
     if (x0Tab) return;
     x0Tab = new Int32Array(WH); x1Tab = new Int32Array(WH); txTab = new Float32Array(WH);
@@ -141,38 +186,60 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
       const fy = Math.min(H2 - 1, Math.max(0, (y + 0.5) / N - 0.5)), y0 = Math.floor(fy);
       y0Tab[y] = y0 * W2 * 3; y1Tab[y] = Math.min(H2 - 1, y0 + 1) * W2 * 3; tyTab[y] = fy - y0;
     }
+    hBuf0 = new Float64Array(WH * 3);
+    hBuf1 = new Float64Array(WH * 3);
+  }
+  function interpRow(src, yOff, dst) {
+    for (let x = 0, o = 0; x < WH; x++, o += 3) {
+      const a = yOff + x0Tab[x], b = yOff + x1Tab[x], tx = txTab[x], tx0 = 1 - tx;
+      dst[o] = src[a] * tx0 + src[b] * tx;
+      dst[o + 1] = src[a + 1] * tx0 + src[b + 1] * tx;
+      dst[o + 2] = src[a + 2] * tx0 + src[b + 2] * tx;
+    }
   }
   function composeImpl(lo) {
     ensureComposeTables();
+    const rowLen = WH * 3;
     if (renderVersion !== materialVersion) {
       inkH = renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1);
       inkL = renderLayers([inkLo], finePigments, white, nL, 1);
       invInkL ??= new Float32Array(nH * 3);
+      let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
       for (let y = 0; y < HH; y++) {
-        const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * WH * 3;
-        for (let x = 0; x < WH; x++) {
-          const xa = x0Tab[x], xb = x1Tab[x], tx = txTab[x], tx0 = 1 - tx;
-          const a = ya + xa, b = ya + xb, c = yc + xa, d = yc + xb, o = row + x * 3;
-          for (let ch = 0; ch < 3; ch++) {
-            const bInk = (inkL[a + ch] * tx0 + inkL[b + ch] * tx) * ty0 + (inkL[c + ch] * tx0 + inkL[d + ch] * tx) * ty;
-            invInkL[o + ch] = inkH[o + ch] / Math.max(1, bInk);
-          }
+        const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * rowLen;
+        if (ya !== cy0) {
+          if (ya === cy1) { const t = r0; r0 = r1; r1 = t; cy1 = cy0; cy0 = ya; }
+          else { interpRow(inkL, ya, r0); cy0 = ya; }
+        }
+        let rb = r0;
+        if (yc !== ya) {
+          if (yc !== cy1) { interpRow(inkL, yc, r1); cy1 = yc; }
+          rb = r1;
+        }
+        for (let i = 0; i < rowLen; i++) {
+          const bInk = r0[i] * ty0 + rb[i] * ty;
+          invInkL[row + i] = inkH[row + i] / Math.max(1, bInk);
         }
       }
       renderVersion = materialVersion;
     }
     const out = Buffer.allocUnsafe(nH * 3);
+    let r0 = hBuf0, r1 = hBuf1, cy0 = -1, cy1 = -1;
     for (let y = 0; y < HH; y++) {
-      const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * WH * 3;
-      for (let x = 0; x < WH; x++) {
-        const xa = x0Tab[x], xb = x1Tab[x], tx = txTab[x], tx0 = 1 - tx;
-        const a = ya + xa, b = ya + xb, c = yc + xa, d = yc + xb, o = row + x * 3;
-        for (let ch = 0; ch < 3; ch++) {
-          const bLo = (lo[a + ch] * tx0 + lo[b + ch] * tx) * ty0 + (lo[c + ch] * tx0 + lo[d + ch] * tx) * ty;
-          const ratio = invInkL[o + ch];
-          const v = Math.round(bLo * Math.min(ratio, 255 / Math.max(1, bLo)));
-          out[o + ch] = v < 0 ? 0 : v > 255 ? 255 : v;
-        }
+      const ya = y0Tab[y], yc = y1Tab[y], ty = tyTab[y], ty0 = 1 - ty, row = y * rowLen;
+      if (ya !== cy0) {
+        if (ya === cy1) { const t = r0; r0 = r1; r1 = t; cy1 = cy0; cy0 = ya; }
+        else { interpRow(lo, ya, r0); cy0 = ya; }
+      }
+      let rb = r0;
+      if (yc !== ya) {
+        if (yc !== cy1) { interpRow(lo, yc, r1); cy1 = yc; }
+        rb = r1;
+      }
+      for (let i = 0; i < rowLen; i++) {
+        const bLo = r0[i] * ty0 + rb[i] * ty;
+        const v = Math.round(bLo * invInkL[row + i]);
+        out[row + i] = v < 0 ? 0 : v > 255 ? 255 : v;
       }
     }
     return out;

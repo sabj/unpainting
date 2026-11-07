@@ -90,6 +90,7 @@ export class GpuLink {
     const prevVer = this.version;
     this.lastKey = key; this.post({ op: 'opts', o: pick });
     if (this.paperVersion === prevVer) this.paperVersion = this.version;
+    if (this.paperGateVersion === prevVer) this.paperGateVersion = this.version;
   }
 
   recordTransfer(direction, bytes) {
@@ -231,6 +232,7 @@ export class GpuLink {
     const prevVer = this.version;
     this.sentMask = m; this.post({ op: 'act', mask: m });
     if (this.paperVersion === prevVer) this.paperVersion = this.version;
+    if (this.paperGateVersion === prevVer) this.paperGateVersion = this.version;
     let c = 0; for (let k = 0; k < this.K; k++) c += (m >>> k) & 1;
     this.actCount[c] = (this.actCount[c] || 0) + 1; this.stats.actChanges = (this.stats.actChanges || 0) + 1;
   }
@@ -295,13 +297,18 @@ export class GpuLink {
     if(!this.stale||!this.fresh.staleBounds(rect))return null;
     if(this.paperVersion===this.version&&!this.paperFresh?.staleBounds(rect))return null;
     const indices=new Uint32Array(cells.length),w=this.w;
-    let count=0;
+    let count=0,sx0=w,sy0=this.h,sx1=-1,sy1=-1;
     for(const i of cells){
       if(reach?.wetCells){if(reach.wetCells[i]!==reach.exactEpoch)continue;}
       else if(reach?.bounds){const y=(i/w)|0,x=i-y*w,b=reach.bounds;if(x<b[0]||y<b[1]||x>b[2]||y>b[3])continue;}
+      const y=(i/w)|0,x=i-y*w;
+      if(x<sx0)sx0=x;if(x>sx1)sx1=x;
+      if(y<sy0)sy0=y;if(y>sy1)sy1=y;
       indices[count++]=i;
     }
     if(!count)return {waterMax:0,saturationMax:0,moistShare:0,dry:true};
+    const sRect=[sx0,sy0,sx1-sx0+1,sy1-sy0+1];
+    if(!this.fresh.staleBounds(sRect)||(this.paperVersion===this.version&&!this.paperFresh?.staleBounds(sRect)))return null;
     const selected=indices.subarray(0,count);
     if(this.paperGateVersion!==this.version){this.paperGateCache=[];this.paperGateVersion=this.version;}
     for(const entry of this.paperGateCache??[]){
@@ -321,7 +328,7 @@ export class GpuLink {
     uncertain ||= Math.abs(saturationMax-.5)<1e-6;
     if(uncertain){this.stats.paperGateFallback=(this.stats.paperGateFallback??0)+1;return null;}
     const result={waterMax,saturationMax,moistShare:moist/cells.length,dry:waterMax<=.004&&saturationMax<=.02};
-    const cache=this.paperGateCache??= [];cache.push({cells:selected,total:cells.length,result});if(cache.length>4)cache.shift();
+    const cache=this.paperGateCache??= [];cache.push({cells:selected,total:cells.length,bounds:[sx0,sy0,sx1,sy1],result});if(cache.length>8)cache.shift();
     return result;
   }
 
@@ -333,7 +340,14 @@ export class GpuLink {
   }
 
   /** Conservative wet reach since the last exact dry; unknown epochs fall back to all. */
-  paperChanged(rect, flows, previousVersion) {
+  paperChanged(rect, flows, previousVersion, previousGateVersion = previousVersion) {
+    if(this.paperGateVersion===previousGateVersion&&!flows&&rect){
+      if(this.paperGateCache?.length){
+        const rx0=rect[0],ry0=rect[1],rx1=rx0+rect[2]-1,ry1=ry0+rect[3]-1;
+        this.paperGateCache=this.paperGateCache.filter(({bounds:b})=>b[2]<rx0||b[0]>rx1||b[3]<ry0||b[1]>ry1);
+      }
+      this.paperGateVersion=this.version;
+    }
     if(this.paperVersion!==previousVersion){this.paperWetRect=null;return;}
     let wet=this.paperWetRect;
     if(rect && wet){
@@ -381,10 +395,10 @@ export class GpuLink {
     const rect = this.stroke; this.stroke = null; if (!rect) return;
     const prior = this.transferPhase; this.transferPhase = 'cpu-stroke-end';
     const demand = sheet._cpuDemandWindow;
-    const prevVer = this.version;
+    const hadPaper = this.paperVersion === this.version, hadGate = this.paperGateVersion === this.version;
     try { this.uploadCpuStroke(sheet, rect); } finally { this.transferPhase = prior; delete sheet._cpuStrokeDirty; delete sheet._cpuDemandWindow; delete sheet._cpuDemandPenAhead; }
     this.dirty = null;
-    this.paperChanged(rect,0,prevVer);
+    this.paperChanged(rect, 0, hadPaper ? this.paperVersion : -1, hadGate ? this.paperGateVersion : -1);
     if (this.stale && (!demand || demand.rect)) {
       const r = demand ? demand.rect : rect;
       this.fresh.mark(r);
@@ -575,13 +589,13 @@ export class GpuLink {
     const prior = this.transferPhase;
     if (this.stroke) this.transferPhase = 'cpu-stroke-flow';
     try {
+      const hadPaper = this.paperVersion === this.version;
       if (this.stroke) {
         this.stats.cpuStrokeFlows = (this.stats.cpuStrokeFlows || 0) + 1;
         this.uploadCpuStroke(sheet, this.stroke); // the brush deposited since the last sync
       }
-      const paperBefore=this.version;
       this.post({ op: 'step', n: 1 }); this.stats.steps++; sheet.steps++;
-      this.paperChanged(this.stroke,1,paperBefore);
+      this.paperChanged(this.stroke, 1, hadPaper ? this.paperVersion : -1);
       this.stale = true; this.topStale = true; this.fresh.stale();
       if (this.stroke) {
         if (sheet._cpuDemandWindow) sheet._cpuDemandWindow.afterFlow();
