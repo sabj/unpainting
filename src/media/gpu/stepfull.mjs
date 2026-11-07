@@ -29,7 +29,7 @@ export async function openGpu(gpu) {
   const adapter = await gpu.requestAdapter(); if (!adapter) throw new Error('no WebGPU adapter'); KEEP.push(adapter);
   const L = adapter.limits;
   const device = await adapter.requestDevice({ requiredFeatures: process.env.GPU_TIMESTAMPS === '1' && adapter.features.has('timestamp-query') ? ['timestamp-query'] : [], requiredLimits: {
-    maxStorageBuffersPerShaderStage: Math.min(process.env.GPU_FUSE_WETSCAN === '1' ? 14 : 12, L.maxStorageBuffersPerShaderStage),
+    maxStorageBuffersPerShaderStage: Math.min(process.env.GPU_FUSE_WETSCAN === '0' ? 12 : 14, L.maxStorageBuffersPerShaderStage),
     maxStorageBufferBindingSize: L.maxStorageBufferBindingSize, maxBufferSize: L.maxBufferSize,
     // the brush kernel keeps its hairs (16 KB) and the feed's log (9.6 KB) in workgroup memory
     maxComputeWorkgroupStorageSize: Math.min(32768, L.maxComputeWorkgroupStorageSize),
@@ -109,7 +109,7 @@ export class GpuSheet {
     if (o.fixedBed > 0) { B.DEP.destroy(); B.DEP = mk(f * 3); }
     for (const k of ['PAPER', 'PAPER2', 'PAPER3', 'BPAP']) B[k] = mk(f * 4);
     // the stroke plan and the hairs (up to SB floats), then the brush's last touch of each cell and the paper's capacity
-    this.strokePlanBudget=strokePlanBudget(planMiB(process.env.GPU_STROKE_PLAN_MIB,n),n,d.limits);this.SB=this.strokePlanBudget.words;const strokeSource=strokePlanShader(SRC,this.SB)+(process.env.GPU_FUSE_WETSCAN==='1'&&d.limits.maxStorageBuffersPerShaderStage>=13?FINISH_WET_SCAN:'');B.BSTR=mk(this.strokePlanBudget.gpuBufferBytes);
+    this.strokePlanBudget=strokePlanBudget(planMiB(process.env.GPU_STROKE_PLAN_MIB,n),n,d.limits);this.SB=this.strokePlanBudget.words;const strokeSource=strokePlanShader(SRC,this.SB)+(process.env.GPU_FUSE_WETSCAN!=='0'&&d.limits.maxStorageBuffersPerShaderStage>=14?FINISH_WET_SCAN:'');B.BSTR=mk(this.strokePlanBudget.gpuBufferBytes);
     this.resistMask = null;
     for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM', 'PN', 'DD']) B[k] = mk(f * K);
     B.FXY = mk(f * 2); B.QXY = mk(f * 2 * K);   // the fused step's fluxes (stepsInPass)
@@ -241,9 +241,11 @@ export class GpuSheet {
     const go = (name, indirectOffset = 0, dispatch = null) => { if (indirectOffset === 12 && !this.act.length) return; pass.setPipeline(this.p[name]); pass.setBindGroup(0, this.bg[name]); if (dispatch) pass.dispatchWorkgroups(...dispatch); else if (this.persistent && indirectOffset < 24) pass.dispatchWorkgroups(this.workers, indirectOffset === 12 ? this.act.length : 1); else if (this.resident) pass.dispatchWorkgroupsIndirect(B.ARGS, indirectOffset); else pass.dispatchWorkgroups(nD, indirectOffset ? this.act.length : 1); };
     const nT = Math.ceil(this.ntiles / 64);
     // The next step consumes the frontier, but only observations need wet counts/max W.
+    const fuseStep = !!this.b.W && process.env.GPU_FUSE_FACES !== '0' && process.env.GPU_FUSE_WETSCAN !== '0';
     const finish = last => {
       const scan = measure && last;
       if (scan && this.p.p5c_wetscan) go('p5c_wetscan');
+      else if (!scan && fuseStep && this.p.p5c_wetfrontier) go('p5c_wetfrontier');
       else { go('p5c'); go(scan ? 'wetscan' : 'wetfrontier'); }
       this.wetCountersDirty = !scan;
     };
@@ -262,10 +264,19 @@ export class GpuSheet {
       for (let s = 0; s < steps; s++) {
         if (this.resident && SPARSE_ALL) go('sparse_all', 0, [1]); else { if (this.resident) { go('sparse_start', 0, [1]); go('sparse_build', 24); } else { go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); } go('tiles_args', 0, [1]); }
         go('edge_phase1');
-        for (let it = 0; it < o.flowIters; it++) { if (process.env.GPU_FUSE_FACES !== '0') go('faces_pflux'); else { go('faces_wsc'); go('pflux_sc'); } go(it === 0 ? 'apply_f0' : 'apply_f1'); }
-        go('p3a_dep');
-        if ((o.slide ?? 0) > 0) { go('slide_out_all'); go('slide_apply_all'); }
-        go('cap_sp'); go('p5a'); go('p5b'); finish(s === steps - 1);
+        for (let it = 0; it < o.flowIters; it++) {
+          if (process.env.GPU_FUSE_FACES !== '0') go('faces_pflux'); else { go('faces_wsc'); go('pflux_sc'); }
+          if (it > 0 && it === o.flowIters - 1 && fuseStep && this.p.apply_f1_p3a_dep) go('apply_f1_p3a_dep');
+          else go(it === 0 ? 'apply_f0' : 'apply_f1');
+        }
+        if (!(o.flowIters > 1 && fuseStep && this.p.apply_f1_p3a_dep)) go('p3a_dep');
+        if ((o.slide ?? 0) > 0) {
+          go('slide_out_all');
+          if (fuseStep && this.p.slide_apply_cap_sp) go('slide_apply_cap_sp');
+          else { go('slide_apply_all'); go('cap_sp'); }
+        } else go('cap_sp');
+        if (fuseStep && this.p.p5ab) go('p5ab'); else { go('p5a'); go('p5b'); }
+        finish(s === steps - 1);
       }
       return;
     }
@@ -332,15 +343,23 @@ export class GpuSheet {
     const { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore } = info;
     if (data.length > this.SB || planFloats > 6144) throw new Error('stroke exceeds GPU slot');
     const d = this.device, U = new Uint32Array(data.buffer, data.byteOffset, data.length);
+    const bytes = data.byteLength, align = Math.ceil(bytes / 4) * 4, cap = 8 * 1024 * 1024;
+    if ((this.batchBytes ?? 0) + align > cap && this.batchEncoder) this.flushStrokes();
+    let src, off = 0;
+    if (d.queue.writeBuffer && align <= cap) {
+      src = this.batchStaging ??= d.createBuffer({ size: cap, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+      off = this.batchBytes ?? 0; d.queue.writeBuffer(src, off, data);
+    } else {
+      src = d.createBuffer({ size: bytes, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true });
+      new Float32Array(src.getMappedRange()).set(data); src.unmap(); this.batchItems.push(src);
+    }
     const enc = this.batchEncoder ??= d.createCommandEncoder();
-    const src = d.createBuffer({size: data.byteLength, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true});
-    new Float32Array(src.getMappedRange()).set(data); src.unmap();
     if(restore!==undefined) {
       const prev=this.brushSlots.get(restore); if(!prev) throw new Error('missing resident brush');
       enc.copyBufferToBuffer(prev.buffer,22*4,this.b.BSTR,22*4,8);
       if(cont===2) enc.copyBufferToBuffer(prev.buffer,h0*4,this.b.BSTR,h0*4,(s0-h0)*4);
     }
-    const cp = (a,b) => { if (b>a) enc.copyBufferToBuffer(src,a*4,this.b.BSTR,a*4,(b-a)*4); };
+    const cp = (a,b) => { if (b>a) enc.copyBufferToBuffer(src,off+a*4,this.b.BSTR,a*4,(b-a)*4); };
     if (cont === 2) { cp(0,22); cp(24,h0); cp(s0,data.length); }
     else if (cont === 1) { cp(0,22); cp(24,data.length); }
     else cp(0,data.length);
@@ -357,9 +376,9 @@ export class GpuSheet {
     const saved = this.brushBuffer(state, planFloats * 4);
     enc.copyBufferToBuffer(this.b.BSTR,0,saved.buffer,0,planFloats*4);
     Object.assign(saved,{seq,bytes:planFloats*4});
-    this.batchItems.push(src); this.batchBytes=(this.batchBytes??0)+data.byteLength;
+    this.batchCount=(this.batchCount??0)+1; this.batchBytes=(this.batchBytes??0)+align;
     this.epoch++; this.knownDry=false; this.gpuAhead=true;
-    if(this.batchItems.length>=32 || this.batchBytes>=8*1024*1024) this.flushStrokes();
+    if(this.batchCount>=32 || this.batchBytes>=8*1024*1024) this.flushStrokes();
     return null;
   }
   brushBuffer(state, bytes) {
@@ -375,7 +394,7 @@ export class GpuSheet {
   flushStrokes() {
     if(!this.batchEncoder) return;
     this.device.queue.submit([this.batchEncoder.finish()]); this.batchEncoder=null;
-    for(const b of this.batchItems) b.destroy(); this.batchItems=[]; this.batchBytes=0;
+    for(const b of this.batchItems) b.destroy(); this.batchItems=[]; this.batchCount=0; this.batchBytes=0;
   }
   async brushState(state,seq) {
     this.flushStrokes();
@@ -441,10 +460,18 @@ export class GpuSheet {
   queueSplat(data, { nRec, offRec, flowsBefore, state, restore, seq }) {
     if (data.length > this.SB) throw new Error('GpuSheet: the splat plan is too long');
     const d = this.device, words = new Uint32Array(data.buffer, data.byteOffset, data.length);
+    const bytes = data.byteLength, align = Math.ceil(bytes / 4) * 4, cap = 8 * 1024 * 1024;
+    if ((this.batchBytes ?? 0) + align > cap && this.batchEncoder) this.flushStrokes();
+    let src, off = 0;
+    if (d.queue.writeBuffer && align <= cap) {
+      src = this.batchStaging ??= d.createBuffer({ size: cap, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+      off = this.batchBytes ?? 0; d.queue.writeBuffer(src, off, data);
+    } else {
+      src = d.createBuffer({ size: bytes, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true });
+      new Float32Array(src.getMappedRange()).set(data); src.unmap(); this.batchItems.push(src);
+    }
     const enc = this.batchEncoder ??= d.createCommandEncoder();
-    const src = d.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true });
-    new Float32Array(src.getMappedRange()).set(data); src.unmap();
-    enc.copyBufferToBuffer(src, 0, this.b.BSTR, 0, data.byteLength);
+    enc.copyBufferToBuffer(src, off, this.b.BSTR, 0, data.byteLength);
     if (restore !== undefined) {
       const prev = this.brushSlots.get(restore); if (!prev) throw new Error('missing resident splat brush');
       enc.copyBufferToBuffer(prev.buffer, 12, this.b.BSTR, 12, 4);
@@ -461,9 +488,9 @@ export class GpuSheet {
     const saved = this.brushBuffer(state, 16);
     enc.copyBufferToBuffer(this.b.BSTR, 0, saved.buffer, 0, 16);
     Object.assign(saved, { seq, bytes: 16 });
-    this.batchItems.push(src); this.batchBytes = (this.batchBytes ?? 0) + data.byteLength;
+    this.batchCount = (this.batchCount ?? 0) + 1; this.batchBytes = (this.batchBytes ?? 0) + align;
     this.epoch++; this.knownDry = false; this.gpuAhead = true;
-    if (this.batchItems.length >= 32 || this.batchBytes >= 8 * 1024 * 1024) this.flushStrokes();
+    if (this.batchCount >= 32 || this.batchBytes >= 8 * 1024 * 1024) this.flushStrokes();
     return null;
   }
 
@@ -942,5 +969,5 @@ export class GpuSheet {
     this.device.queue.writeBuffer(this.b.RESIST, 0, u);
   }
 
-  destroy() { this.allocationGeneration=(this.allocationGeneration??0)+1;this.demandSetup=null; this.optical?.destroy(); this.timestamps.destroy(); this.flushStrokes(); this.fixQueue?.destroy(); this.brushReadbacks?.destroy(); this.topRb?.destroy(); this.paperReadback?.destroy();this.paperGate?.destroy(); for(const a of this.archives.values()) a.buffer.destroy(); for(const v of this.brushSlots.values()) v.buffer.destroy(); for (const k of Object.keys(this.b)) this.b[k].destroy(); }
+  destroy() { this.allocationGeneration=(this.allocationGeneration??0)+1;this.demandSetup=null; this.optical?.destroy(); this.timestamps.destroy(); this.flushStrokes(); this.batchStaging?.destroy(); this.fixQueue?.destroy(); this.brushReadbacks?.destroy(); this.topRb?.destroy(); this.paperReadback?.destroy();this.paperGate?.destroy(); for(const a of this.archives.values()) a.buffer.destroy(); for(const v of this.brushSlots.values()) v.buffer.destroy(); for (const k of Object.keys(this.b)) this.b[k].destroy(); }
 }

@@ -58,9 +58,9 @@ export function syncWetReachVersion(sheet) {
   }
 }
 
-function addWetBox(c, x0, y0, x1, y1, stepAt = c.steps) {
+function addWetBox(c, x0, y0, x1, y1, stepAt = c.steps, nonExact = false) {
   const boxes = c.boxes, n = boxes.length;
-  if (n && boxes[n - 1][4] === stepAt) {
+  if (n && boxes[n - 1][4] === stepAt && boxes[n - 1][5] === nonExact) {
     const b = boxes[n - 1];
     if (x0 <= b[2] + 32 && x1 >= b[0] - 32 && y0 <= b[3] + 32 && y1 >= b[1] - 32) {
       if (x0 < b[0]) b[0] = x0;
@@ -70,18 +70,16 @@ function addWetBox(c, x0, y0, x1, y1, stepAt = c.steps) {
       return;
     }
   }
-  boxes.push([x0, y0, x1, y1, stepAt]);
+  boxes.push([x0, y0, x1, y1, stepAt, nonExact]);
 }
 
 export function recordWetCell(sheet, i) {
   const valid = beginWetOperation(sheet);
   if (!valid) return;
   const c = sheet[WET_REACH];
-  if (c.exactCells) {
-    const buf = sheet[WET_BUF];
-    const cells = (buf.cells ??= new Uint32Array(sheet.n));
-    cells[i] = c.epoch;
-  }
+  const buf = sheet[WET_BUF];
+  const cells = (buf.cells ??= new Uint32Array(sheet.n));
+  cells[i] = c.epoch;
   const w = sheet.w, y = (i / w) | 0, x = i - y * w;
   addWetBox(c, x, y, x, y);
 }
@@ -90,7 +88,7 @@ export function recordWetCells(sheet, indices, count = indices.length) {
   if (!count) return null;
   const c = sheet[WET_REACH], w = sheet.w;
   let x0 = w, y0 = sheet.h, x1 = -1, y1 = -1;
-  if (c && c.exactCells) {
+  if (c) {
     const buf = sheet[WET_BUF];
     const cells = (buf.cells ??= new Uint32Array(sheet.n)), epoch = c.epoch;
     for (let j = 0; j < count; j++) {
@@ -117,7 +115,7 @@ export function recordWetBox(sheet, x0, y0, x1, y1, flows = 0) {
   if (!c) return;
   c.exactCells = false;
   const stepAt = Math.max(0, c.steps - flows);
-  if (x1 >= x0 && y1 >= y0) addWetBox(c, x0, y0, x1, y1, stepAt);
+  if (x1 >= x0 && y1 >= y0) addWetBox(c, x0, y0, x1, y1, stepAt, true);
 }
 
 export function recordWetStep(sheet, count = 1) {
@@ -132,7 +130,7 @@ export function recordWetStep(sheet, count = 1) {
 
 export function clearWetFootprint(sheet, [x0, y0, fw, fh]) {
   const c = sheet[WET_REACH];
-  if (!c || !c.exactCells) return;
+  if (!c) return;
   const buf = sheet[WET_BUF], cells = buf?.cells;
   if (!cells) return;
   const w = sheet.w, epoch = c.epoch;
@@ -152,30 +150,33 @@ export function isFootprintDryCertified(sheet, [x0, y0, fw, fh]) {
   let anyBox = false;
   for (let j = 0; j < boxes.length; j++) {
     const b = boxes[j], m = 3 * (steps - b[4]);
-    if (x0 <= b[2] + m && x1 >= b[0] - m && y0 <= b[3] + m && y1 >= b[1] - m) { anyBox = true; break; }
+    if (x0 <= b[2] + m && x1 >= b[0] - m && y0 <= b[3] + m && y1 >= b[1] - m) {
+      if (b[5] || b[4] < steps) return false;
+      anyBox = true;
+    }
   }
   if (!anyBox) return true;
-  if (c.exactCells) {
-    const cells = sheet[WET_BUF]?.cells;
-    if (!cells) return true;
-    const w = sheet.w, epoch = c.epoch;
-    for (let y = y0; y <= y1; y++) {
-      const r = y * w;
-      for (let x = x0; x <= x1; x++) if (cells[r + x] === epoch) return false;
-    }
-    return true;
+  const cells = sheet[WET_BUF]?.cells;
+  if (!cells) return true;
+  const w = sheet.w, epoch = c.epoch;
+  for (let y = y0; y <= y1; y++) {
+    const r = y * w;
+    for (let x = x0; x <= x1; x++) if (cells[r + x] === epoch) return false;
   }
-  return false;
+  return true;
 }
 
 export function queryWetReach(sheet, cells, [x0, y0, x1, y1]) {
   if (!validWetReachCertificate(sheet)) return null;
   const c = sheet[WET_REACH], boxes = c.boxes, steps = c.steps;
   if (!boxes.length) return { allZero: true };
-  let anyBox = false;
+  let anyBox = false, nonExact = null;
   for (let j = 0; j < boxes.length; j++) {
     const b = boxes[j], m = 3 * (steps - b[4]);
-    if (x0 <= b[2] + m && x1 >= b[0] - m && y0 <= b[3] + m && y1 >= b[1] - m) { anyBox = true; break; }
+    if (x0 <= b[2] + m && x1 >= b[0] - m && y0 <= b[3] + m && y1 >= b[1] - m) {
+      anyBox = true;
+      if (b[5] || b[4] < steps) (nonExact ??= []).push([b[0] - m, b[1] - m, b[2] + m, b[3] + m]);
+    }
   }
   if (!anyBox) return { allZero: true };
   const w = sheet.w, h = sheet.h;
@@ -192,11 +193,10 @@ export function queryWetReach(sheet, cells, [x0, y0, x1, y1]) {
     if (c.exactCells && !wetCells) return { allZero: true };
     return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], bounds: [wx0, wy0, wx1, wy1], ...(wetCells ? { exactEpoch: c.epoch, wetCells } : {}) };
   }
-  if (c.exactCells) {
-    const wetCells = sheet[WET_BUF]?.cells;
+  const wetCells = sheet[WET_BUF]?.cells, epoch = c.epoch;
+  if (!nonExact) {
     if (!wetCells) return { allZero: true };
-    const epoch = c.epoch;
-    let wx0 = w, wy0 = sheet.h, wx1 = -1, wy1 = -1;
+    let wx0 = w, wy0 = h, wx1 = -1, wy1 = -1;
     for (const i of cells) {
       if (wetCells[i] === epoch) {
         const y = (i / w) | 0, x = i - y * w;
@@ -205,21 +205,28 @@ export function queryWetReach(sheet, cells, [x0, y0, x1, y1]) {
       }
     }
     if (wx1 < wx0) return { allZero: true };
-    return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], exactEpoch: epoch, wetCells };
+    return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], bounds: [wx0, wy0, wx1, wy1], exactEpoch: epoch, wetCells };
   }
-  let wx0 = w, wy0 = sheet.h, wx1 = -1, wy1 = -1;
+  let wx0 = w, wy0 = h, wx1 = -1, wy1 = -1, hitNonExact = false;
+  const nbe = nonExact.length;
   for (const i of cells) {
     const y = (i / w) | 0, x = i - y * w;
-    for (let j = 0; j < boxes.length; j++) {
-      const b = boxes[j], m = 3 * (steps - b[4]);
-      if (x >= b[0] - m && x <= b[2] + m && y >= b[1] - m && y <= b[3] + m) {
-        if (x < wx0) wx0 = x; if (x > wx1) wx1 = x;
-        if (y < wy0) wy0 = y; if (y > wy1) wy1 = y;
-        break;
+    let wet = wetCells !== undefined && wetCells[i] === epoch;
+    if (!wet) {
+      for (let j = 0; j < nbe; j++) {
+        const b = nonExact[j];
+        if (x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]) { wet = true; hitNonExact = true; break; }
       }
+    }
+    if (wet) {
+      if (x < wx0) wx0 = x; if (x > wx1) wx1 = x;
+      if (y < wy0) wy0 = y; if (y > wy1) wy1 = y;
     }
   }
   if (wx1 < wx0) return { allZero: true };
+  if (!hitNonExact && wetCells) {
+    return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], bounds: [wx0, wy0, wx1, wy1], exactEpoch: epoch, wetCells };
+  }
   return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], bounds: [wx0, wy0, wx1, wy1] };
 }
 

@@ -78,27 +78,48 @@ export function chooseShadowTechnique(measurement, fallback = null) {
     ...(evidence !== measurement && evidence ? { fallbackMeasurement: evidence } : {}) };
 }
 
+const STROKE_STAMP = Symbol('strokeCellsStamp');
+
 // Conservative envelope of the brush path, including the lifted tip. Sample all its
 // cells, not just its centre; exclude intentional resist and cells the brush cannot touch.
 export function strokeCells(sheet, points, radius) {
-  const cells = new Set();
-  const dot = p => {
-    if ((p.p ?? 1) <= 0) return; // lifted connector between touches in one compound stroke
-    const r = Math.max(1.5, (p.r ?? radius) * (0.25 + 0.75 * (p.p ?? 1)) * 1.07 + 0.75);
-    for (let y = Math.max(0, Math.floor(p.y - r)); y <= Math.min(sheet.h - 1, Math.ceil(p.y + r)); y++)
-      for (let x = Math.max(0, Math.floor(p.x - r)); x <= Math.min(sheet.w - 1, Math.ceil(p.x + r)); x++) {
-        const i = y * sheet.w + x;
-        if ((x + 0.5 - p.x) ** 2 + (y + 0.5 - p.y) ** 2 <= r * r &&
-            (!sheet.clip || sheet.clip[i]) && !sheet.resist?.[i]) cells.add(i);
-      }
-  };
+  let stamp = sheet[STROKE_STAMP];
+  if (!stamp || stamp.n !== sheet.n) {
+    stamp = { n: sheet.n, epoch: 1, seen: new Uint32Array(sheet.n) };
+    Object.defineProperty(sheet, STROKE_STAMP, { configurable: true, writable: true, value: stamp });
+  } else {
+    stamp.epoch = (stamp.epoch + 1) >>> 0;
+    if (!stamp.epoch) { stamp.seen.fill(0); stamp.epoch = 1; }
+  }
+  const seen = stamp.seen, epoch = stamp.epoch, sw = sheet.w, sh = sheet.h, clip = sheet.clip, resist = sheet.resist;
+  const cells = [];
   for (let j = 0; j < points.length; j++) {
     const a = points[j], b = points[Math.min(j + 1, points.length - 1)];
-    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) * 2));
-    for (let k = 0; k < n; k++) { const t = k / n; dot({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t,
-      p: (a.p ?? 1) + ((b.p ?? 1) - (a.p ?? 1)) * t, r: (a.r ?? radius) + ((b.r ?? radius) - (a.r ?? radius)) * t }); }
+    const ax = a.x, ay = a.y, ap = a.p ?? 1, ar = a.r ?? radius;
+    const dx = b.x - ax, dy = b.y - ay, dp = (b.p ?? 1) - ap, dr = (b.r ?? radius) - ar;
+    const n = Math.max(1, Math.ceil(Math.hypot(dx, dy) * 2));
+    for (let k = 0; k < n; k++) {
+      const t = k / n, pp = ap + dp * t;
+      if (pp <= 0) continue; // lifted connector between touches in one compound stroke
+      const px = ax + dx * t, py = ay + dy * t, pr = ar + dr * t;
+      const r = Math.max(1.5, pr * (0.25 + 0.75 * pp) * 1.07 + 0.75), r2 = r * r;
+      const y0 = Math.max(0, Math.floor(py - r)), y1 = Math.min(sh - 1, Math.ceil(py + r));
+      const x0 = Math.max(0, Math.floor(px - r)), x1 = Math.min(sw - 1, Math.ceil(px + r));
+      for (let y = y0; y <= y1; y++) {
+        const y2 = (y + 0.5 - py) ** 2, row = y * sw;
+        for (let x = x0; x <= x1; x++) {
+          if ((x + 0.5 - px) ** 2 + y2 <= r2) {
+            const i = row + x;
+            if (seen[i] !== epoch && (!clip || clip[i]) && !resist?.[i]) {
+              seen[i] = epoch;
+              cells.push(i);
+            }
+          }
+        }
+      }
+    }
   }
-  return [...cells];
+  return cells;
 }
 
 // Full-sheet dry gates need only fresh water and pore saturation, never pigment.
