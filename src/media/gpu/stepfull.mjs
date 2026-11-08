@@ -41,7 +41,7 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   ...['dt', 'evap', 'edgeEvap', 'edgeWidth', 'capE', 'absorb', 'film', 'flow', 'ff', 'flowDepth', 'diffuse', 'cd', 'settle', 'liftDepth', 'rewetLift', 'granFill', 'holdCap', 'slide', 'slideFill', 'capStep', 'capEps', 'capDelta', 'sizing', 'wickFilter', 'wetEps', 'paperDry', 'capSigma', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre',
   // encloseEase and slideCap, holeFill and holeSpan in cells, marangoni and slope; pads keep the pigment table that
   // follows on a 16-byte boundary
-  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'padD', 'padE'].map(k => [k, 'f'])];
+  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UBYTES = UF.length * 4 + 512 + 64; const UBYTES_EXPORT = UBYTES;
@@ -96,6 +96,7 @@ export class GpuSheet {
     this.persistent = this.resident && process.env.GPU_PERSISTENT !== '0';
     this.batch = this.resident && process.env.GPU_BATCH !== '0'; this.batchItems = []; this.brushSlots = new Map(); this.archives = new Map(); this.archiveSequence = 0;
     this.o = { ...o }; this.device = d; this.timestamps = new GpuTimestamps(d); this.w = w; this.h = h; this.n = n; this.K = K; this.act = Array.from({ length: K }, (_, k) => k);
+    this.paper = paper; this.mmPerCell = paper?.mmPerCell > 0 ? paper.mmPerCell : 0.3;
     this.tw = Math.ceil(w / TILE); this.th = Math.ceil(h / TILE); this.ntiles = this.tw * this.th;
     this.workers = workerCount(this.ntiles);
     this.pigments = sheet.pigments;
@@ -183,6 +184,8 @@ export class GpuSheet {
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
       enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: this.workers, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03,
       padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
+      mmPerCell: o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : (this.paper?.mmPerCell > 0 ? this.paper.mmPerCell : 0.3)),
+      edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length;
     const gran = o.gran ?? 1, scour = o.scour ?? 0;
@@ -203,6 +206,7 @@ export class GpuSheet {
 
   /** Copy a whole CPU sheet to the GPU. */
   upload(sheet) {
+    this.paper = sheet.paper; this.mmPerCell = sheet.paper?.mmPerCell > 0 ? sheet.paper.mmPerCell : 0.3;
     const { device: d, b: B, n, K, w, h } = this, put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     const u32 = a => { const o = new Uint32Array(n); for (let i = 0; i < n; i++) o[i] = a[i]; return o; };
     put(B.W, sheet.W); put(B.S, sheet.s); put(B.M, u32(sheet.M)); put(B.EVER, u32(sheet.ever));

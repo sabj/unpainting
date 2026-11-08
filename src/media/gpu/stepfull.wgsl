@@ -309,14 +309,15 @@ fn phase1_tile(wid: vec3<u32>, lid: vec3<u32>) {
   var near = 0.0;
   if (e <= u.edgeWidth) {
     let geomNear = 1.0 - (e - 1.0) / u.edgeWidth;
-    let mmPerCell = 0.3;
+    let mmPerCell = select(0.3, u.mmPerCell, u.mmPerCell > 0.0);
     let r = i32(clamp(round(2.0 / mmPerCell), 2.0, 8.0));
     let dryFrac = localDryFraction(c.x, c.y, r);
     let fMin = select(0.18, 0.10, r <= 2);
     let fMax = select(0.42, 0.28, r <= 2);
     let u_step = clamp((dryFrac - fMin) / (fMax - fMin), 0.0, 1.0);
     let dryFactor = u_step * u_step * (3.0 - 2.0 * u_step);
-    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, u.flowDepth), 0.0, 1.0), u.flowDepth > 0.0);
+    let edgeFlowDepth = select(0.06, u.edgeFlowDepth, u.edgeFlowDepth > 0.0);
+    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, edgeFlowDepth), 0.0, 1.0), edgeFlowDepth > 0.0);
     near = geomNear * dryFactor * depthFactor;
   }
   let wv = max(0.0, W[i] - u.dt * (u.evap + u.edgeEvap * near));
@@ -758,14 +759,15 @@ fn edge_phase1_tile(wid: vec3<u32>, lid: vec3<u32>, li: u32) {
   var near = 0.0;
   if (e <= u.edgeWidth) {
     let geomNear = 1.0 - (e - 1.0) / u.edgeWidth;
-    let mmPerCell = 0.3;
+    let mmPerCell = select(0.3, u.mmPerCell, u.mmPerCell > 0.0);
     let r = i32(clamp(round(2.0 / mmPerCell), 2.0, 8.0));
     let dryFrac = localDryFraction(c.x, c.y, r);
     let fMin = select(0.18, 0.10, r <= 2);
     let fMax = select(0.42, 0.28, r <= 2);
     let u_step = clamp((dryFrac - fMin) / (fMax - fMin), 0.0, 1.0);
     let dryFactor = u_step * u_step * (3.0 - 2.0 * u_step);
-    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, u.flowDepth), 0.0, 1.0), u.flowDepth > 0.0);
+    let edgeFlowDepth = select(0.06, u.edgeFlowDepth, u.edgeFlowDepth > 0.0);
+    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, edgeFlowDepth), 0.0, 1.0), edgeFlowDepth > 0.0);
     near = geomNear * dryFactor * depthFactor;
   }
   let wv = max(0.0, W[i] - u.dt * (u.evap + u.edgeEvap * near));

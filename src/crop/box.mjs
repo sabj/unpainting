@@ -124,11 +124,11 @@ const built = (() => {
 })();
 
 /** The shelf: { key, name, ci, dir (unit density direction), source } for every paint. */
-export const BOX = Object.freeze(built.map(p => Object.freeze({ ...p, dir: Object.freeze(p.dir) })));
+export const BOX = Object.freeze(built.map(p => Object.freeze({ ...p, dir: Object.freeze(p.dir), scatter: Object.freeze([...p.scatter]) })));
 
 /** A box paint as a sheet pigment in paletteOf's format (asPigment there), with its name kept for the logs. */
 export function boxPigment(paint, { kscale = 0.55, scatter, rho, omega, gamma, floc } = {}) {
-  const S = scatter ? [...scatter] : [...(paint.scatter ?? [0.02, 0.02, 0.02])];
+  const S = Object.freeze(scatter ? [...scatter] : [...(paint.scatter ?? [0.02, 0.02, 0.02])]);
   const r = rho ?? paint.rho ?? 0.05;
   const o = omega ?? paint.omega ?? 1.4;
   const g = gamma ?? paint.gamma ?? 0.25;
