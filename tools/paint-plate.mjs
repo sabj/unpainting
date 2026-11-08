@@ -1522,7 +1522,7 @@ if(VALUE_ENABLED){
  // --darkfirst: shadow-phase layers (shadow glazes, deep accents) before the middle layers, light first still
  if(num('darkfirst',0)>0){const ph=l=>l._valuePhase==='light'?0:l._valuePhase==='shadow'?1:2;layers=layers.map((l,i)=>({l,i})).sort((a,b)=>ph(a.l)-ph(b.l)||a.i-b.i).map(q=>q.l);console.log('darkfirst: '+layers.map(l=>l._valuePhase[0]).join(''));}
  const seams=layers.filter(l=>l.value===1).flatMap(l=>l.shapes.flatMap(sh=>unsupportedAxisEdges(sh.mask,w,h,px).map(edge=>({pass:sh._valuePlan.id,...edge}))));
- const baseMass=new Float32Array(n);for(const l of layers.filter(l=>l.value===1))for(const sh of l.shapes)for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){const i=y*w+x;if(sh.ids[i]===sh.id)baseMass[i]+=sh.graded[i];}
+ const baseMass=new Float32Array(n);for(const l of layers.filter(l=>l.value===1))for(const sh of l.shapes)for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){const i=y*w+x;if(sh.ids[i]===sh.id)baseMass[i]+=(sh.graded?sh.graded[i]:sh.amount);}
  let warm=0,warmPainted=0;for(let i=0;i<n;i++)if(px[3*i]-px[3*i+2]>18&&px[3*i+1]-px[3*i+2]>8){warm++;if(baseMass[i]>0)warmPainted++;}
  fs.writeFileSync(path.join(out,'value-region-check.json'),JSON.stringify({source:VALUE_PLAN.regions.source,band1UnsupportedAxisEdges:seams,regionCount:VALUE_PLAN.regions.regions.length,regions:VALUE_PLAN.regions.regions,warmTargetCells:warm,warmCellsWithPositiveBand1Pigment:warmPainted,physicalReserve:'same target-white mask as compiled plan'},null,2));
  // A line-only checkpoint never executes these wash masks. Keep their diagnostic
@@ -3740,7 +3740,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       const rampMod = ramp && PF > 1e-6 ? ((1 - u) * ramp.start + u * ramp.end) / PF : 1;
       return { ...p, p: Math.max(0.18, Math.min(1.2, body * Math.min(land, lift) * rampMod)) };
     });
-    if(authoredPaths||shapedPaths)shaped=pts;else if(sh._semantic)shaped=semanticGesture(sh._semantic.pass,shaped,num('sheetmm', DEFAULT_SHEET_MM)/W2);
+    if(authoredPaths||(shapedPaths&&!sh._strokePlan))shaped=pts;else if(sh._semantic)shaped=semanticGesture(sh._semantic.pass,shaped,num('sheetmm', DEFAULT_SHEET_MM)/W2);
     const supportedCharge=gesturePoints=>!AREA_NUMERIC_CONTACT_STOP&&(!AREA_NUMERIC_SEQUENCE||productionChargeSupported({predict:()=>candidateContact(brush,sheet,gesturePoints,{upright:sh._semantic.pass.brush.orientation==='sweep'?'sweep':sh._semantic.pass.brush.orientation==='follow'?false:true,neighborRadius:0}),record:event=>JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:event.status==='not-executed'?'production-numeric-contact-omitted':'production-numeric-contact-support',areaId:sh._semantic.area.id,passId:sh._semantic.key,shapeKey:AREA_NUMERIC_SEQUENCE.shapeKey,geometry:gesturePoints,clipApplied:!!sheet.clip,...event})+'\n')}));
     if(!supportedCharge(shaped))continue;
     const numericTuftLoads=numericTuftHere&&PB?splitLoads(shaped,PB.loadCells(PB.pick(r),T.name)):null;

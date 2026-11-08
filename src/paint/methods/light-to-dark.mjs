@@ -45,7 +45,6 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // minShapeCells (whole paintings): a fixed shape floor in cells. The automatic floor grows with sheet area and drops
   // small face shadow shapes.
   const minShape=minShapeCells>0?minShapeCells:Math.max(shaped?144:4,Math.round(w*h*.00015));
-  if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 below it per channel is a light. With --paperbase source the sheet takes that colour too.
   let PAP=null;if(paperRel&&rgb){const L=Float32Array.from({length:n},(_,i)=>rgb[3*i]+rgb[3*i+1]+rgb[3*i+2]),idx=Array.from(L.keys()).sort((a,b)=>L[b]-L[a]).slice(0,Math.max(1,Math.floor(n*.1)));PAP=[0,1,2].map(c=>idx.reduce((a,i)=>a+rgb[3*i+c],0)/idx.length);}
@@ -90,13 +89,15 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
       }
     }
     const ringMean=ringCount?ringSum/ringCount:meanIn;
-    if(ringMean-meanIn>=0.18){
+    const contrastThresh=list.length<2?.35:.18;
+    if(ringMean-meanIn>=contrastThresh){
       for(const i of list)catchlights[i]=1;
     }
   }
   protectedCells.fill(0);
   for(let i=0;i<n;i++)if(lights[i]||catchlights[i]||(hold&&hold[i]))protectedCells[i]=1;
   for(const r of reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)protectedCells[y*w+x]=1;}
+  if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
   // A single coherent shadow support, shared by both last glazes. Smooth strength
   // within it, rather than five nested isodensity silhouettes. Filter tiny dark
   // flecks out of the glaze list; their demand stays in the dry middle passage.
@@ -226,9 +227,10 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // nestedBands: every cell's demand is split into the five value bands as flat value steps, the nested masses the
   // ink-and-wash style uses, whatever the style. Band k covers the cells darker than the band below it and carries the
   // step from that band's cap to its own, so each passage's one mean charge fits all of its cells. Without it a light
+  // cell and a dark neighbour share a band in different proportions and the mean charge muddies the light one.
   if(nestedBands)for(let i=0;i<n;i++){
     if(profile&&cellStyle(i).name==='ink-and-wash')continue;
-    if(accentCells[i]||(rgb&&isRecess(rgb,i))||litStoneMask?.[i]||groundCells[i])continue;
+    if(accentCells[i]||(recesses&&rgb&&isRecess(rgb,i))||litStoneMask?.[i]||groundCells[i])continue;
     const v=value.values[i];
     for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*styleGain:0;}
     if(!shadowMask[i]){weights[1][i]+=weights[3][i]+weights[4][i];weights[3][i]=0;weights[4][i]=0;}
@@ -268,6 +270,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
     // layerIncrement: each layer carries the value step between its threshold and the next layer's, as a painter lays
     // one flat value over the whole form and then only darker steps where the form is darker. An equal split (the
     // default) gives a light cell all its middle demand in layer 0 while a dark neighbour puts only a quarter there, so
+    // the shape's one mean charge is too dark for the light cells and too light for the dark ones.
     const effThresholds = (localQ || subjects) ? (i => (localQ?.get(region.labels[i])) ?? q) : q;
     const share=layerIncrement?layerShares(cover,effThresholds,sm,n):null;
     const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
@@ -336,7 +339,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
             const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
           if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.1,4*(1-detailScale*meanOver(list,DETAIL))):4)){omittedDemand+=total;continue;}
           if(total<=1e-8)continue;const amount=placed?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
-          sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=G;sh._follow=true;
+          sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=null;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
           const family=profile&&touched.map(r=>r.descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name),

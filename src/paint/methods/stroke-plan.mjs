@@ -78,25 +78,40 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
     }
   }
 
-  const paths = [], factors = [], ramps = [], cells = [];
-  for (const u0 of laneOffsets(uMin, uMax, R, reach, rnd)) {
+  let uRelMin = Infinity, uRelMax = -Infinity;
+  const Urel = new Float32Array(c);
+  for (let k = 0; k < c; k++) {
+    const s = Math.round(T[k] / step);
+    const spineU = curved && stepCentroid.has(s) ? stepCentroid.get(s).u / stepCentroid.get(s).n : 0;
+    const ur = U[k] - spineU;
+    Urel[k] = ur;
+    uRelMin = Math.min(uRelMin, ur);
+    uRelMax = Math.max(uRelMax, ur);
+  }
+
+  const paths = [], factors = [], relDeltas = [], cells = [];
+  for (const u0 of laneOffsets(curved ? uRelMin : uMin, curved ? uRelMax : uMax, R, reach, rnd)) {
     const st = new Map();
     for (let k = 0; k < c; k++) {
+      if (Math.abs(Urel[k] - u0) > R) continue;
       const s = Math.round(T[k] / step);
-      const spineU = curved && stepCentroid.has(s) ? stepCentroid.get(s).u / stepCentroid.get(s).n : 0;
-      if (Math.abs(U[k] - (u0 + spineU)) > R) continue;
       const e = st.get(s) ?? { n: 0, u: 0, t: 0, g: 0 };
       e.n++; e.u += U[k]; e.t += T[k]; e.g += G[list[k]]; st.set(s, e);
     }
     if (!st.size) continue;
+    const lanePt = s => {
+      const e = st.get(s);
+      const uu = curved ? e.u / e.n : u0 + .5 * (e.u / e.n - u0);
+      const tt = e.t / e.n;
+      return { x: cx + dx * tt - dy * uu, y: cy + dy * tt + dx * uu };
+    };
     const keys = [...st.keys()].sort((p, q) => p - q), runs = [];
     let run = [keys[0]];
     for (let q = 1; q < keys.length; q++) {
       const sPrev = keys[q - 1], sCur = keys[q];
       const gap = (sCur - sPrev) * step;
-      const t0 = sPrev * step, t1 = sCur * step;
-      const p0 = { x: cx + dx * t0 - dy * u0, y: cy + dy * t0 + dx * u0 };
-      const p1 = { x: cx + dx * t1 - dy * u0, y: cy + dy * t1 + dx * u0 };
+      const p0 = lanePt(sPrev);
+      const p1 = lanePt(sCur);
       if (gap > 2 * R || segmentTouchesProtected(p0, p1, R, protect, w, h)) {
         runs.push(run);
         run = [];
@@ -111,59 +126,92 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
         let a0 = Math.max(0, lo - pad), a1 = Math.min(rk.length, hi + pad);
         if (protect) {
           while (a0 < lo) {
-            const s = rk[a0], t = s * step, px = cx + dx * t - dy * u0, py = cy + dy * t + dx * u0;
-            const x = Math.round(px), y = Math.round(py);
-            if (x >= 0 && x < w && y >= 0 && y < h && protect[y * w + x]) a0++; else break;
+            const pt0 = lanePt(rk[a0]);
+            if (segmentTouchesProtected(pt0, pt0, R, protect, w, h)) a0++; else break;
           }
           while (a1 > hi) {
-            const s = rk[a1 - 1], t = s * step, px = cx + dx * t - dy * u0, py = cy + dy * t + dx * u0;
-            const x = Math.round(px), y = Math.round(py);
-            if (x >= 0 && x < w && y >= 0 && y < h && protect[y * w + x]) a1--; else break;
+            const pt1 = lanePt(rk[a1 - 1]);
+            if (segmentTouchesProtected(pt1, pt1, R, protect, w, h)) a1--; else break;
           }
         }
         let g = 0, n = 0; const pts = [];
         const sliceKeys = rk.slice(a0, a1);
         for (const s of sliceKeys) {
-          const e = st.get(s), uu = u0 + .5 * (e.u / e.n - u0), tt = e.t / e.n;
+          const e = st.get(s), uu = curved ? e.u / e.n : u0 + .5 * (e.u / e.n - u0), tt = e.t / e.n;
           g += e.g; n += e.n;
           pts.push({ x: cx + dx * tt - dy * uu, y: cy + dy * tt + dx * uu, r: R, p: .9 });
         }
         if (reach > 0) {
-          const ext = (q, sign) => { const e = (rnd() - 0.35) * reach - 0.4 * R; return { ...q, x: q.x + sign * dx * e, y: q.y + sign * dy * e }; };
+          const ext = (q, sign) => {
+            const e = (rnd() - 0.35) * reach - 0.4 * R;
+            const cand = { ...q, x: q.x + sign * dx * e, y: q.y + sign * dy * e };
+            return protect && segmentTouchesProtected(cand, cand, R, protect, w, h) ? q : cand;
+          };
           if (a0 === 0) pts[0] = ext(pts[0], -1);
           if (a1 === rk.length) pts[pts.length - 1] = ext(pts[pts.length - 1], 1);
         }
         if (pts.length === 1) pts.push({ ...pts[0], x: pts[0].x + dx * .5, y: pts[0].y + dy * .5 });
         const fStroke = (g / Math.max(1, n)) / amount;
-        let fStart = fStroke, fEnd = fStroke;
+        let relDelta = 0;
         if (sliceKeys.length > 2) {
           const half = Math.max(1, Math.floor(sliceKeys.length / 2));
           let g0 = 0, n0 = 0, g1 = 0, n1 = 0;
           for (let j = 0; j < half; j++) { const e = st.get(sliceKeys[j]); if (e) { g0 += e.g; n0 += e.n; } }
           for (let j = sliceKeys.length - half; j < sliceKeys.length; j++) { const e = st.get(sliceKeys[j]); if (e) { g1 += e.g; n1 += e.n; } }
           const m0 = n0 > 0 ? g0 / n0 : amount, m1 = n1 > 0 ? g1 / n1 : amount, mMean = n > 0 ? g / n : amount;
-          const delta = mMean > 1e-6 ? Math.max(-0.45, Math.min(0.45, (m1 - m0) / (2 * mMean))) : 0;
-          fStart = fStroke * (1 - delta);
-          fEnd = fStroke * (1 + delta);
+          relDelta = mMean > 1e-6 ? Math.max(-0.45, Math.min(0.45, (m1 - m0) / (2 * mMean))) : 0;
         }
-        paths.push(pts); factors.push(fStroke); ramps.push({ start: fStart, end: fEnd }); cells.push(n);
+        paths.push(pts); factors.push(fStroke); relDeltas.push(relDelta); cells.push(n);
       }
     }
   }
   if (!paths.length) return null;
   const wsum = cells.reduce((s, v) => s + v, 0);
-  let fm = factors.reduce((s, f, k) => s + f * cells[k], 0) / Math.max(1, wsum);
-  let clampedFactors = factors.map(f => Math.max(fmin, Math.min(fmax, f / Math.max(1e-6, fm))));
-  const postMean = clampedFactors.reduce((s, f, k) => s + f * cells[k], 0) / Math.max(1, wsum);
-  if (postMean > 1e-6 && Math.abs(postMean - 1) > 1e-4) {
-    clampedFactors = clampedFactors.map(f => Math.max(fmin, Math.min(fmax, f / postMean)));
+  const fm = factors.reduce((s, f, k) => s + f * cells[k], 0) / Math.max(1, wsum);
+  let clampedFactors;
+  if (!(fm > 1e-9)) {
+    clampedFactors = factors.map(() => 1.0);
+  } else {
+    const r = factors.map(f => f / fm);
+    let sMax = 0, minPosR = Infinity;
+    for (let k = 0; k < r.length; k++) {
+      if (r[k] > 1e-9) {
+        sMax += cells[k] * fmax;
+        if (r[k] < minPosR) minPosR = r[k];
+      } else {
+        sMax += cells[k] * fmin;
+      }
+    }
+    if (sMax < wsum) {
+      const posMass = r.reduce((s, val, k) => s + (val > 1e-9 ? cells[k] * fmax : 0), 0);
+      const zeroCells = r.reduce((s, val, k) => s + (val <= 1e-9 ? cells[k] : 0), 0);
+      const zeroFactor = zeroCells > 0 ? (wsum - posMass) / zeroCells : 1.0;
+      clampedFactors = r.map(val => val > 1e-9 ? fmax : Math.max(fmin, Math.min(fmax, zeroFactor)));
+    } else {
+      const sUpper = minPosR < Infinity ? fmax / minPosR : 1.0;
+      let low = 0, high = Math.max(1.0, sUpper);
+      for (let it = 0; it < 36; it++) {
+        const mid = (low + high) * 0.5;
+        let s = 0;
+        for (let k = 0; k < r.length; k++) {
+          s += Math.max(fmin, Math.min(fmax, r[k] * mid)) * cells[k];
+        }
+        if (s < wsum) low = mid; else high = mid;
+      }
+      const scale = (low + high) * 0.5;
+      clampedFactors = r.map(val => Math.max(fmin, Math.min(fmax, val * scale)));
+    }
   }
-  const clampedRamps = ramps.map((r, k) => {
-    const scale = clampedFactors[k] / Math.max(1e-6, factors[k] / Math.max(1e-6, fm));
+
+  const clampedRamps = clampedFactors.map((fMean, k) => {
+    const rawDelta = fMean * relDeltas[k];
+    const maxDelta = Math.min(fMean - fmin, fmax - fMean);
+    const boundDelta = Math.max(0, Math.min(maxDelta, Math.abs(rawDelta)));
+    const delta = rawDelta >= 0 ? boundDelta : -boundDelta;
     return {
-      start: Math.max(fmin, Math.min(fmax, (r.start / Math.max(1e-6, fm)) * scale)),
-      end: Math.max(fmin, Math.min(fmax, (r.end / Math.max(1e-6, fm)) * scale))
+      start: fMean - delta,
+      end: fMean + delta
     };
   });
-  return { paths, factors: clampedFactors, ramps: clampedRamps, laneR: R, reachCells: reach, angle: ang };
+  return { paths, factors: clampedFactors, ramps: clampedRamps, cells, laneR: R, reachCells: reach, angle: ang };
 }

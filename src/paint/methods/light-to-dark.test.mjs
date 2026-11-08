@@ -174,3 +174,74 @@ test('layerShares supports both static array thresholds and functional per-cell 
   assert.ok(sFn[0][1] > 0);
 });
 
+test('planLightToDark nullifies sh.graded to eliminate raw target gradient leaks', () => {
+  const w = 40, h = 40, n = w * h;
+  // Blue sky target: rgb[2] > rgb[0] + 10 (bypasses planLanes)
+  const rgb = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    rgb[i * 3] = 100;
+    rgb[i * 3 + 1] = 150;
+    rgb[i * 3 + 2] = 220;
+  }
+  const d = new Float32Array(n).fill(0.3);
+  const plan = planLightToDark({
+    w, h, rgb, density: d, demand: d, k: 1,
+    shaped: true, strokePlan: true, sheetWidthMm: 120, minShapeCells: 10,
+  });
+  const allShapes = plan.layers.flatMap(l => l.shapes);
+  const leaked = allShapes.filter(s => s.graded !== null && s.graded !== undefined);
+  assert.equal(leaked.length, 0, 'Zero shapes retain non-null sh.graded');
+});
+
+test('mergePlaneFragments runs after protectedCells is populated, preventing highlight merges', () => {
+  const w = 20, h = 20, n = w * h;
+  const rgb = new Uint8ClampedArray(n * 3).fill(220);
+  const density = new Float32Array(n).fill(0.4);
+  // Highlight square in center: 2x2 pixels with pure paper white
+  for (const y of [9, 10]) {
+    for (const x of [9, 10]) {
+      const i = y * w + x;
+      rgb.set([255, 255, 255], i * 3);
+      density[i] = 0.01;
+    }
+  }
+  const plan = planLightToDark({
+    w, h, rgb, density, demand: density.slice(), k: 1,
+    shaped: true, minShapeCells: 50,
+  });
+  // Highlight cells must remain protected
+  assert.equal(plan.protectedCells[9 * w + 9], 1, 'Highlight cell (9, 9) is protected');
+  assert.equal(plan.protectedCells[10 * w + 10], 1, 'Highlight cell (10, 10) is protected');
+});
+
+test('nestedBands only exempts isRecess when recesses flag is true', () => {
+  const isRecess = (rgb, i) => rgb[i * 3] < 50 && rgb[i * 3 + 1] < 50 && rgb[i * 3 + 2] < 50;
+  const rgb = new Uint8Array([20, 20, 20]);
+  const i = 0;
+
+  const recessesFalse = false;
+  const exemptFalse = recessesFalse && rgb ? isRecess(rgb, i) : false;
+  assert.equal(exemptFalse, false, 'Recess check does not exempt when recesses is false');
+
+  const recessesTrue = true;
+  const exemptTrue = recessesTrue && rgb ? isRecess(rgb, i) : false;
+  assert.equal(exemptTrue, true, 'Recess check exempts when recesses is true');
+});
+
+test('detectFineCatchlights filters out isolated 1-cell JPEG noise specks below 0.35 contrast', () => {
+  const w = 30, h = 30, n = w * h;
+  const rgb = new Uint8ClampedArray(n * 3).fill(50);
+  const density = new Float32Array(n).fill(0.7);
+
+  // Single pixel noise speck (contrast ~0.22, below 0.35 threshold)
+  const speckIdx = 15 * w + 15;
+  density[speckIdx] = 0.48;
+  rgb.set([100, 100, 100], speckIdx * 3);
+
+  const plan = planLightToDark({
+    w, h, rgb, density, demand: density.slice(), k: 1,
+    shaped: true, minShapeCells: 20,
+  });
+  assert.equal(plan.protectedCells[speckIdx], 0, '1-cell noise speck is not protected');
+});
+

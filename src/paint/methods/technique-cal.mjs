@@ -13,7 +13,7 @@
  *   for the window to calibrate it (default 0.8); minMass: least charged mass in a window; smooth: weight of the newest
  *   reading against the previous factor (default 0.7); baseline: initial pigment mass before the first booking window.
  */
-export function createTechniqueCal({ max = 2.5, min = 0.8, share = 0.8, minMass = 1e-3, smooth = 0.7, baseline = null } = {}) {
+export function createTechniqueCal({ max = 2.5, min = 0.8, share = 0.95, minMass = 1e-3, smooth = 0.7, baseline = null } = {}) {
   if (!(max >= min && min > 0)) throw new Error('technique calibration: max must be at least min, and min positive');
   if (!(share > 0.5 && share <= 1)) throw new Error('technique calibration: share must be over 0.5 and at most 1');
   const factor = new Map(), window = new Map(), history = [];
@@ -30,19 +30,10 @@ export function createTechniqueCal({ max = 2.5, min = 0.8, share = 0.8, minMass 
       const gained = last == null ? null : held - last;
       let record = { charged: +charged.toFixed(4), gained: gained == null ? null : +gained.toFixed(4), technique: null, kept: null };
       if (gained != null && charged > minMass) {
-        const [key, mass] = [...window.entries()].reduce((a, b) => (b[1] > a[1] ? b : a));
-        if (mass / charged >= share) {
-          // Deduct expected gain of secondary techniques using their current factor
-          // so secondary technique shortfall/excess is not attributed to the dominant technique
-          let otherExpectedGain = 0;
-          for (const [k, m] of window.entries()) {
-            if (k !== key) {
-              const f = factor.get(k) ?? 1;
-              otherExpectedGain += m / f;
-            }
-          }
-          const netGained = Math.max(0, gained - otherExpectedGain);
-          const kept = netGained / mass;
+        const entries = [...window.entries()];
+        const [key, mass] = entries.reduce((a, b) => (b[1] > a[1] ? b : a));
+        if (entries.length === 1 || mass / charged >= share) {
+          const kept = gained / mass;
           record = { ...record, technique: key, kept: +kept.toFixed(3) };
           // the booked charge already carries the factor, so kept is the technique's own yield
           if (kept > 0) factor.set(key, smooth * Math.max(min, Math.min(max, 1 / kept)) + (1 - smooth) * (factor.get(key) ?? 1));
