@@ -3498,16 +3498,10 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const through = layer._darkPass ? Math.min(throughRaw, 0.95) : layer._touched && num('touchbroad', 0) > 0 ? Math.min(throughRaw, num('touchthrough', 0.5)) : throughRaw;
   // --detailfrom t: passes later than t of the ladder are laid as detail marks, not glazes. Default 2, never.
   const authoredPaths=sh._semantic?lowerAuthoredGestures(sh._semantic,{target:AREA_PLAN.doc.target,crop:AREA_PLAN.crop,width:W2,height:H2,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*AREA_PLAN.doc.target.width/AREA_PLAN.crop[2]}):null;
-  // --skylanes 1: a large plane that reads cool at one shape-level look (blue over red by 10+) is laid as overlapping wet lanes.
-  const skyLaneRadius=sh2=>{
-    if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;
-    if (sh2._valuePlan?.cool != null) return sh2._valuePlan.cool ? num('skylanemm', 3) / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
-    let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;
-    if(!(a>n*num('skylanemin',.015)))return 0;
-    const lk=paintingLook('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});
-    if (!lk?.ref?.px) return 0;
-    const [refR, , refB] = lk.ref.px;
-    return refB > refR + 10 ? num('skylanemm', 3) / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
+  const skyLaneRadius = sh2 => {
+    if (!(num('skylanes', 0) > 0) || !sh2._valuePlan || sh2._valuePlan.texture) return 0;
+    const cool = sh2._valuePlan?.cool ?? 0;
+    return cool ? num('skylanemm', 3) / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
   };
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;

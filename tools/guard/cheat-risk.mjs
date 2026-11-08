@@ -152,24 +152,15 @@ export function sweepFront(A, B, W, H, { thresh = 0.04 } = {}) {
 }
 
 /** Rule-based progression flags. prog[p] = {dark, hf} relative to the finish. */
-export function progressionFlags(prog, sweeps = [], opts = {}) {
+export function progressionFlags(prog, sweeps = []) {
   const flags = [];
   if (!prog[10] || !prog[25] || !prog[50] || !prog[75]) return ['no frames'];
   // honesty: dark share; g5: the dark tail (p95 darkness) at 25% already at the finish's
   if (prog[10].dark > 0.25 || prog[25].dark > 0.5 || (prog[25].p95 ?? 0) > 0.85) flags.push('darks first');
   // detail at 25% while the tone is still light (the opening pen alone gives 0.5-0.65 of the final band energy)
-  const isPenOrInk = s => /\b(pen|ink)\b/i.test(s ?? '');
-  const optMedium = opts.drawingMedium || opts.medium || opts.drawing?.medium || '';
-  const isPenMedium = isPenOrInk(optMedium) || Boolean(opts.penFirst);
-  const isPencilMedium = /\b(pencil|graphite)\b/i.test(optMedium);
-  const penStage = isPenOrInk(prog[10]?.stage) || isPenOrInk(prog[25]?.stage);
-  const openingStage = (prog[10]?.stage?.includes('opening') || prog[25]?.stage?.includes('opening')) && !isPencilMedium && !/\b(pencil|graphite)\b/i.test(prog[10]?.stage) && !/\b(pencil|graphite)\b/i.test(prog[25]?.stage);
-  const penDrawingFirst = opts.penFirst || (opts.drawing === 'first' && !isPencilMedium) || penStage || (isPenMedium && openingStage);
-  const hfCeil = penDrawingFirst ? 0.95 : 0.8;
-  if (prog[25].hf > hfCeil && (prog[25].mean ?? prog[25].dark) < 0.5) flags.push('early detail');
+  if (prog[25].hf > 0.8 && (prog[25].mean ?? prog[25].dark) < 0.5) flags.push('early detail');
   if (prog[50].dark > 0.95 && prog[50].hf > 0.95) flags.push('finished by 50%');
-  const broadWashes = opts.broadWashes || prog[25]?.stage?.includes('wash') || prog[50]?.stage?.includes('wash');
-  if (!broadWashes && (prog[10].mean ?? 1) < 0.2 && (prog[50].mean ?? 0) > 0.9 && (prog[75].mean ?? 0) > 0.9) flags.push('one sweep');
+  if ((prog[10].mean ?? 1) < 0.2 && (prog[50].mean ?? 0) > 0.9 && (prog[75].mean ?? 0) > 0.9) flags.push('one sweep');
   if (sweeps.some(s => s.front > 0.6)) flags.push('travelling front');
   return flags;
 }
@@ -198,7 +189,7 @@ async function writeStrip(files, out, W, H) {
   return out;
 }
 
-export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox = '', stagesDir = path.join(run, 'stages'), opts = null }) {
+export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox = '', stagesDir = path.join(run, 'stages') }) {
   // A running painter already holds its tape. Reuse it rather than reading a
   // native recording into a single string that can exceed V8's string limit.
   const mk = marks ?? readMarks(run), sm = smallShare(mk, sheetMm);
@@ -236,26 +227,7 @@ export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox
     }
   }
   const judge = null; // a vision-model check of the progression can be added here; none ships with this repository
-  let runOpts = opts ? { ...opts } : {};
-  for (const name of ['stages.json', 'plan.json', 'pipeline-plan.json', 'value-plan.json', 'verdict.json', 'run-card.json', 'options.json']) {
-    const f = path.join(run, name);
-    if (fs.existsSync(f)) {
-      try {
-        const d = JSON.parse(fs.readFileSync(f, 'utf8'));
-        if (d && typeof d === 'object') {
-          runOpts = {
-            ...d,
-            ...runOpts,
-            drawing: d.drawing?.order ?? d.drawingOrder ?? d.drawing ?? runOpts.drawing,
-            drawingMedium: d.drawing?.medium ?? d.drawingMedium ?? d.medium ?? runOpts.drawingMedium,
-            penFirst: d.penFirst ?? runOpts.penFirst,
-            broadWashes: d.broadWashes ?? runOpts.broadWashes,
-          };
-        }
-      } catch {}
-    }
-  }
-  const flags = progressionFlags(prog, sweeps, runOpts), guard = readGuard(run);
+  const flags = progressionFlags(prog, sweeps), guard = readGuard(run);
   const copy = +Math.max(0, Math.min(1, (hf - HF_CEILING(pm.width)) / HF_SPAN)).toFixed(2);
   const small = sm.total ? +Math.max(0, Math.min(1, (sm.share - 0.1) / 0.2)).toFixed(2) : null;
   const scored = combine({ flags, judge, copy, small, pixelFit: guard.pixelFit });

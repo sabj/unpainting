@@ -19,7 +19,7 @@ import { CpuDemandWindow } from './cpu-demand-window.mjs';
 import { demandPolicy } from './demand-policy.mjs';
 import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
-import { deviceHealth, brokenReason, assertHealthy } from './device-health.mjs';
+import { deviceHealth, brokenReason, assertHealthy, markBroken } from './device-health.mjs';
 import { cpuFallbackWarning } from './backend-record.mjs';
 
 const PLANES = K => 4 + 3 * K;
@@ -880,7 +880,7 @@ export class GpuLink {
   }
   pause() { this.paused = true; }
   resume() { this.paused = false; }
-  close() { try { this.worker.postMessage({ op: 'close', wait: false }); } catch { /* already gone */ } this.worker.terminate(); }
+  close() { this.closed = true; try { this.worker.postMessage({ op: 'close', wait: false }); } catch { /* already gone */ } this.worker.terminate(); }
 }
 
 /**
@@ -902,18 +902,31 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
   worker.unref();
   let workerDied = null;
-  worker.on('error', e => { workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); Atomics.notify(ctrl, 3); });
+  let link = null;
+  worker.on('error', e => {
+    workerDied = e;
+    markBroken(health, e.message ?? String(e));
+    Atomics.store(ctrl, 3, 2);
+    Atomics.store(ctrl, 0, 1);
+    Atomics.notify(ctrl, 0);
+    Atomics.notify(ctrl, 3);
+  });
   worker.on('exit', code => {
     if (Atomics.load(ctrl, 3) === 0) {
       workerDied = new Error(`GPU worker exited prematurely with code ${code}`);
+      markBroken(health, `GPU worker exited during boot with code ${code}`);
       Atomics.store(ctrl, 3, 2);
       Atomics.store(ctrl, 0, 1);
       Atomics.notify(ctrl, 0);
       Atomics.notify(ctrl, 3);
+    } else if (code !== 0 && !link?.closed) {
+      markBroken(health, `GPU worker exited prematurely with code ${code}`);
+      Atomics.store(ctrl, 0, 1);
+      Atomics.notify(ctrl, 0);
     }
   });
   const shared = { ctrl, health, err: new Uint8Array(errSab), rectData: new Float32Array(rectSab), layerData: new Float32Array(layerSab), ring: new Float32Array(ringSab), done: new Int32Array(doneSab), sumData: new Float32Array(sumSab) };
-  const link = new GpuLink(worker, shared, sheet);
+  link = new GpuLink(worker, shared, sheet);
   const o = { ...O }; sheet._fixedBed = O.fixedBed > 0;
   const paper = sheet.paper, top = sheet.layers.length ? sheet.layers[sheet.layers.length - 1] : null;
   const clone = a => a && a.slice();

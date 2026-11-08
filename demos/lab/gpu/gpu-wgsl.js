@@ -209,7 +209,7 @@ fn phase1(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) l
     let fMax = select(0.42, 0.28, r <= 2);
     let u_step = clamp((dryFrac - fMin) / (fMax - fMin), 0.0, 1.0);
     let dryFactor = u_step * u_step * (3.0 - 2.0 * u_step);
-    let edgeFlowDepth = select(0.06, u.edgeFlowDepth, u.edgeFlowDepth > 0.0);
+    let edgeFlowDepth = u.edgeFlowDepth;
     let depthFactor = select(1.0, clamp(W[i] / max(1e-5, edgeFlowDepth), 0.0, 1.0), edgeFlowDepth > 0.0);
     near = geomNear * dryFactor * depthFactor;
   }
