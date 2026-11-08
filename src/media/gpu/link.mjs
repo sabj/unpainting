@@ -918,7 +918,11 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
     },
     top: top ? top.map(clone) : null,
   });
-  while (Atomics.load(ctrl, 3) === 0) Atomics.wait(ctrl, 3, 0, 200); // booting
+  const bootT0 = Date.now();
+  while (Atomics.load(ctrl, 3) === 0) {
+    if (Date.now() - bootT0 > 30000) { Atomics.store(ctrl, 3, 2); break; }
+    Atomics.wait(ctrl, 3, 0, 200);
+  } // booting
   if (Atomics.load(ctrl, 3) !== 1 || brokenReason(health)) {
     const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || 'GPU unavailable';
     worker.terminate();
