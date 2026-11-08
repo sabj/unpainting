@@ -1,6 +1,6 @@
 # unpainting docs
 
-The [project README](../README.md) has the quick start.
+The [project README](../README.md) has the quick start. The [0.3.0 release notes](../CHANGELOG.md#030--2026-11-07) show measured runtime changes and visual comparisons, followed by implementation details.
 
 ## Use it
 

@@ -77,11 +77,17 @@ mkdir -p %(tree)s/work; touch %(tree)s/work/runs.jsonl
 export XDG_RUNTIME_DIR=/tmp;
 cd %(tree)s
 find tools src -name '*.mjs' -o -name '*.js' -o -name '*.sh' | xargs grep -l 'backend=metal' 2>/dev/null | xargs -r sed -i 's/backend=metal/backend=vulkan/g'
+has_nvidia_icd() {
+  for icd in /usr/share/vulkan/icd.d/*nvidia*.json /etc/vulkan/icd.d/*nvidia*.json; do
+    [ -f "$icd" ] && return 0
+  done
+  return 1
+}
 # compute-only NVIDIA images lack the Vulkan ICD: add the GL userspace that matches the installed driver
-if command -v nvidia-smi >/dev/null && ! ls /usr/share/vulkan/icd.d/nvidia* /etc/vulkan/icd.d/nvidia* >/dev/null 2>&1; then
+if command -v nvidia-smi >/dev/null && ! has_nvidia_icd; then
   GL=$(dpkg-query -W -f='${Package} ${Version} ${Status}\n' 'libnvidia-compute-*' 2>/dev/null | awk '/ installed$/ {sub("libnvidia-compute-", "libnvidia-gl-", $1); print $1 "=" $2; exit}')
   [ -n "$GL" ] && apt-get install -y -qq "$GL" >/dev/null
-  ls /usr/share/vulkan/icd.d/nvidia* /etc/vulkan/icd.d/nvidia* >/dev/null 2>&1 || { echo "no NVIDIA Vulkan ICD after installing '$GL'"; exit 3; }
+  has_nvidia_icd || { echo "no NVIDIA Vulkan ICD after installing '$GL'"; exit 3; }
 fi
 PKG=$( [ -f package.json ] && pwd || dirname "$(pwd)" )
 (cd "$PKG" && npm install --no-audit --no-fund >/dev/null 2>&1)

@@ -13,7 +13,17 @@ npm run quick-start
 
 `npm test` fails on any failing test. `npm run bench:test` checks the benchmark records and confirms the published tables regenerate from them.
 
-Tests use bundled inputs or recorded expectations. GPU checks need a WebGPU adapter; the rest run on the CPU.
+Tests use bundled inputs or recorded expectations. GPU checks need a WebGPU adapter; the rest run on the CPU. A CPU-only pass does not validate the GPU path.
+
+The mushroom suite is separate:
+
+```sh
+node --test demos/fungi/mushrooms.test.mjs
+```
+
+It contains 210 tests in 0.3.0. Changes to shared media also need a real Paint Lab painting/drying check and representative mushroom renders. Run `node tools/lab/sync-site-media.mjs` after editing mirrored media; the normal test suite detects a stale browser copy.
+
+For GPU changes, check both Metal and NVIDIA/Vulkan, record the adapter name and driver, and verify that fused-path tests compile and exercise the fused pipelines. `GPU_REQUIRED=1 node --test src/media/gpu/device-health.test.mjs` makes missing hardware a failure for device-health validation. Keep reference and candidate commands, seeds, output dimensions and modes together with image hashes. A dry-run or a software WebGPU adapter is not a hardware pass.
 
 `npm test` also runs the Python line-tool tests (`tools/seg/*-test.py`, `tools/judge/*-test.py`) with the line python the painter uses (`tools/cloud/setup-lines.sh` installs it). Without numpy and OpenCV, and without a WebGPU adapter for the GPU checks, those tests are reported as skipped, not passed.
 
