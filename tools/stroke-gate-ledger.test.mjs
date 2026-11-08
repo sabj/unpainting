@@ -78,6 +78,8 @@ test('without --marks the painter still measures the stroke gate, writes no mark
   const stats = JSON.parse(fs.readFileSync(path.join(lean, 'stroke-stats.json'), 'utf8'));
   const fullStats = JSON.parse(fs.readFileSync(path.join(full, 'stroke-stats.json'), 'utf8'));
   assert.ok(stats.counts.paint > 0, 'strokes were measured');
+  assert.ok(stats.composition.observations.observedDepositMarks > 0, 'fast runs retain measured brush pigment loss');
+  assert.deepEqual(stats.composition.observations, fullStats.composition.observations, 'compact and full tapes retain the same deposition evidence');
   assert.deepEqual(stats.counts, fullStats.counts);
   assert.deepEqual(stats.histograms, fullStats.histograms);
   const gate = JSON.parse(fs.readFileSync(path.join(lean, 'stroke-gate.json'), 'utf8'));

@@ -1375,7 +1375,7 @@ const stroke=(b,target,points,options)=>{
   const fastMode=NATIVE_PAINT_MODE.mode==='fast',fastPaperOpts=fastMode?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:{uniform:SPEED_UNIFORM_PAPER};
   const contactStarted=performance.now(),contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
-  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b,{settle:!fastMode}),paint=load.pigmentMass.some(v=>v>0);
+  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b),paint=load.pigmentMass.some(v=>v>0);
   let _observationCells=null;
   const getObservationCells=()=>{if(!_observationCells)_observationCells=VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors];return _observationCells;};
   const observe=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,fastPaperOpts);
@@ -1423,7 +1423,7 @@ const stroke=(b,target,points,options)=>{
   // Clean-water preparation belongs to this passage too. Otherwise the first
   // pigment stroke dries away the very wet bed prepared for merging its lanes.
   for(const i of contact.cells){VALUE_OWN_CONTACT.add(i);if(paint)VALUE_PIGMENT_CONTACT.add(i);}
-  JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({...record,status:'EXECUTED',brushAfter:NATIVE_PAINT_MODE.mode==='fast'?null:measureBrush(b)})+'\n');return result;
+  JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({...record,status:'EXECUTED',brushAfter:measureBrush(b)})+'\n');return result;
  }
 
  if(!AREA_PLAN){

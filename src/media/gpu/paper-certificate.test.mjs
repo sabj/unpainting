@@ -49,3 +49,40 @@ test('queued dry certifies without flushing and redundant dry stays queued',t=>{
     for(const [key,value] of [['GPU_ASYNC_DRY',saved.async],['GPU_RESIDENT',saved.resident]])if(value===undefined)delete process.env[key];else process.env[key]=value;
   }
 });
+
+import {measurePaperDry} from '../../paint/methods/wetdry.mjs';
+import {validDryFixedCertificate} from '../paper-certificate.mjs';
+
+test('public queued threshold dry preserves residual pores and cannot skip a later dry',t=>{
+  const keys=['GPU_ASYNC_DRY','GPU_RESIDENT','GPU_PAPER_OBSERVE'],saved=keys.map(k=>process.env[k]);
+  process.env.GPU_ASYNC_DRY='1';process.env.GPU_RESIDENT='1';process.env.GPU_PAPER_OBSERVE='1';
+  const sheet=createSheet(makePaper(16,16,{seed:7}),[{K:[.35,.49,.66],S:[.06,.025,.014],rho:.05,omega:1.4,gamma:.15}]);
+  sheet.s.fill(.0001);
+  try{
+    const info=attachGpu(sheet,DEFAULTS,{mode:'auto',log(){}});
+    if(info.backend!=='gpu'){t.skip(info.reason);return;}
+    dry(sheet,1000,DEFAULTS,{analyticTail:false,dt:2});
+    const link=sheet._gpu;
+    assert.equal(link.queuedDrys,1);
+    assert.equal(link.lastDryZero,false);
+    assert.equal(hasZeroPaperCertificate(sheet),false);
+    assert.equal(validDryFixedCertificate(sheet),false);
+    const measured=measurePaperDry(sheet);
+    assert.equal(measured.dry,true);
+    assert.ok(measured.saturationMax>0,'threshold dryness is not exact zero');
+    link.syncAll(sheet);
+    assert.ok(sheet.s.some(v=>v>0),'pore traces survive the readback');
+    assert.equal(hasZeroPaperCertificate(sheet),false);
+    assert.equal(validDryFixedCertificate(sheet),false);
+    const calls=link.stats.drys;
+    dry(sheet,1000,DEFAULTS,{analyticTail:false,dt:2});
+    assert.equal(link.stats.drys,calls+1,'residual pores cannot skip another dry');
+    link.flushDrys(sheet);
+  }finally{
+    try { sheet._gpu?.flushDrys(sheet); }
+    finally {
+      sheet._gpu?.close();
+      keys.forEach((key,i)=>{if(saved[i]===undefined)delete process.env[key];else process.env[key]=saved[i];});
+    }
+  }
+});
