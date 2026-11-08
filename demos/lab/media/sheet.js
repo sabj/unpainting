@@ -278,7 +278,7 @@ const depositScaled = (sheet, i, water, pig, g) => {
  * and establishing a uniform damp sheen (wet bed) without pigment.
  * Prevents premature boundary drying and enables continuous wet-into-wet wash merging.
  */
-export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare = 0.85, surfaceFilm = 0.02, protect = null } = {}) {
+function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare = 0.85, surfaceFilm = 0.02, protect = null } = {}) {
   coherent(sheet);
   const { n, paper, W, s, M, ever } = sheet;
   const capacity = paper.capacity;
@@ -316,7 +316,7 @@ export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare
 /**
  * Deposit an entire passage directly through a mask with specified pigment concentration and water load.
  */
-export function depositPassage(sheet, mask, pigmentConcentration, waterLoad, options = {}) {
+function depositPassage(sheet, mask, pigmentConcentration, waterLoad, options = {}) {
   coherent(sheet);
   const { prewet = false, waterMm = 0.03, protect = null } = options;
   if (prewet) {
@@ -339,7 +339,7 @@ export function depositPassage(sheet, mask, pigmentConcentration, waterLoad, opt
 /**
  * Compute a damp perimeter feathering ring around a mask, applying damp pore moisture without pigment.
  */
-export function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7, options = {}) {
+function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7, options = {}) {
   if (!(radiusMm > 0)) return { wettedCells: 0, maxMoistureAdded: 0 };
   coherent(sheet);
   const { w, h, paper, s, ever } = sheet;

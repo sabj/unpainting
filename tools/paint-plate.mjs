@@ -1226,7 +1226,7 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing
 // unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
 // shows --penfirst per cent of line or more, else graphite.
 const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
-const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : materialProfile(OUTLINE_REQUESTED).kind, share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
+const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : (OUTLINE_REQUESTED === 'none' ? 'graphite' : materialProfile(OUTLINE_REQUESTED).kind), share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
 console.log(describeOutlineMedium(OUTLINE));
 DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
 // the drawing's stages for this image: planner model, rule and gate (drawing-stages-auto.mjs); the prep pencil's erase
@@ -1300,7 +1300,7 @@ const GRAPHITE_PROFILE=materialProfile(opt('graphiteprofile',REQUESTED_DRAW_MEDI
 if(INK_PROFILE.kind!=='ink'||GRAPHITE_PROFILE.kind!=='graphite')throw Error('inkprofile/graphiteprofile must use the corresponding material family');
 if(!['ink','graphite'].includes(opt('firstpen','ink')))materialProfile(opt('firstpen','ink'));
 const OUTLINE_MEDIUM=REQUESTED_DRAW_MEDIUM;
-if(!['ink','graphite'].includes(OUTLINE_MEDIUM))materialProfile(OUTLINE_MEDIUM);
+if(!['ink','graphite','none'].includes(OUTLINE_MEDIUM))materialProfile(OUTLINE_MEDIUM);
 // --inkk r,g,b overrides the profile's absorption; --inkkscale multiplies it.
 const INK_K_DECLARED=opt('inkk','')?opt('inkk','').split(',').map(Number):null;
 if(INK_K_DECLARED&&(INK_K_DECLARED.length!==3||INK_K_DECLARED.some(v=>!(v>0))))throw Error('--inkk needs three positive numbers');
@@ -1322,7 +1322,7 @@ const PENCIL = opt('penpencil', '') && DRAWS_FIRST ? await (async () => {
   return { ...m, pig: {...GRAPHITE_PROFILE.pigment,strength:GRAPHITE_PROFILE.concentration} };
 })() : null;
 const PENCIL_STAGE = DRAWS_FIRST && num('pencilstage', 0) > 0;
-const GRAPHITE = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STAGE_PLAN?.files.prep || OUTLINE_MEDIUM === 'graphite' || (OUTLINE_MEDIUM !== 'ink' && materialProfile(OUTLINE_MEDIUM).kind==='graphite')) && opt('drawing', 'first') !== 'none' && DRAWS_FIRST
+const GRAPHITE = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STAGE_PLAN?.files.prep || OUTLINE_MEDIUM === 'graphite' || (OUTLINE_MEDIUM !== 'ink' && OUTLINE_MEDIUM !== 'none' && (OUTLINE_MEDIUM === 'none' ? materialProfile('graphite') : materialProfile(OUTLINE_MEDIUM)).kind==='graphite')) && opt('drawing', 'first') !== 'none' && DRAWS_FIRST
   ? GRAPHITE_PROFILE.pigment
   : null;
 // --wickfloor f: least share of a granulating paint's water-borne pigment the pores take, 0..0.9, so peaks stay pale. Default 0.

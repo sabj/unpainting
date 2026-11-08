@@ -101,8 +101,13 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   if (!onlyAuthored || rawW.inkAware != null || (plan?.drawing?.source && ['source-ink', 'line-map'].includes(plan.drawing.source))) add('washinkfree', +w.inkAware);
   if (!onlyAuthored || rawOrder.strength != null || rawOrder.subjects != null || plan?.subjectOrder != null) add('subjectorder', p.order.strength);
   if (!onlyAuthored || rawPhysics.holeRimMm != null) add('holerim', w.physics.holeRimMm);
-  if (!onlyAuthored || (rawW.physics != null && (rawPhysics.marangoni != null || rawPhysics.slope != null))) {
+  if (!onlyAuthored) {
     add('physics', `marangoni=${w.physics.marangoni},slope=${w.physics.slope}`);
+  } else if (rawW.physics != null) {
+    const parts = [];
+    if (rawPhysics.marangoni != null) parts.push(`marangoni=${rawPhysics.marangoni}`);
+    if (rawPhysics.slope != null) parts.push(`slope=${rawPhysics.slope}`);
+    if (parts.length) add('physics', parts.join(','));
   }
   return { flags, plan:p };
 }

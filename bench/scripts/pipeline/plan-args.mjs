@@ -260,7 +260,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const targetPixels = pngSize(target);
   // spec.basePalette false: no paint box from the base tokens; a plan's own palette token or --paints still applies
   const basePalette = spec.basePalette !== false;
-  const planMedium = config?.drawing?.medium;
+  const planMedium = config?.drawing?.medium && config.drawing.medium !== 'none' ? config.drawing.medium : null;
   const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
   const outlineMedium = planMedium ?? (isPenWash ? 'ink' : 'graphite');
   const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, basePalette, out, compile, gpu, targetPixels, linesExist, outlineMedium });
@@ -271,6 +271,13 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const glazeGains = Boolean(spec.glazeGains ?? spec.trumbull);
   const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, glazeGains, sepiaInk, linesExist });
   const args = [...layered.args];
+  if (!glazeGains && !args.includes('--techcal')) args.push('--techcal', '1');
+  const hasDrawingFile = args.includes('--drawingfile');
+  const inkActive = outlineMedium === 'ink' || hasDrawingFile || args.includes('--drawinglast');
+  if (inkActive) {
+    if (hasDrawingFile && !args.includes('--washinkfree')) args.push('--washinkfree', '1');
+    if ((hasDrawingFile || args.includes('--drawinglast')) && !args.includes('--drawinghand')) args.push('--drawinghand', '1');
+  }
   const valueFloor = valueFloorFor(config);
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);
   args.push(...extraArgs);

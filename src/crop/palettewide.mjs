@@ -106,7 +106,8 @@ export function coverKeyHues(sample, colours, paints, { max = 6, library = BOX, 
     let best = null;
     for (const paint of library.filter(p => !kept.some(q => q.key === p.key))) {
       const trial = keyHueCoverage(sample, colours, [...kept, paint], options);
-      if (trial.loss < coverage.loss - 1e-6 && (!best || trial.loss < best.coverage.loss)) best = { paint, coverage: trial };
+      const isImprovement = trial.loss < coverage.loss - 1e-6 && (!best || trial.loss < best.coverage.loss);
+      if (isImprovement) best = { paint, coverage: trial };
     }
     if (!best) break;
     kept.push(best.paint); added.push(best.paint.key); coverage = best.coverage;
