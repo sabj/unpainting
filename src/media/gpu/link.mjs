@@ -900,8 +900,17 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   // tools/gpu/paint-batch.mjs: this painter is one sheet of a batch; its GPU thread is shared and reached through a port
   const batchPort = threadData?.gpuBatchPort;
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
-  worker.unref();
-  let workerDied = null; worker.on('error', e => { workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); });
+  let workerDied = null;
+  worker.on('error', e => { workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); Atomics.notify(ctrl, 3); });
+  worker.on('exit', code => {
+    if (Atomics.load(ctrl, 3) === 0) {
+      workerDied = new Error(`GPU worker exited prematurely with code ${code}`);
+      Atomics.store(ctrl, 3, 2);
+      Atomics.store(ctrl, 0, 1);
+      Atomics.notify(ctrl, 0);
+      Atomics.notify(ctrl, 3);
+    }
+  });
   const shared = { ctrl, health, err: new Uint8Array(errSab), rectData: new Float32Array(rectSab), layerData: new Float32Array(layerSab), ring: new Float32Array(ringSab), done: new Int32Array(doneSab), sumData: new Float32Array(sumSab) };
   const link = new GpuLink(worker, shared, sheet);
   const o = { ...O }; sheet._fixedBed = O.fixedBed > 0;
