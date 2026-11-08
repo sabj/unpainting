@@ -4,43 +4,40 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 ## 0.3.0 — 2026-11-07
 
-**Less GPU overhead, closely matched output.** 0.3.0 reduces GPU dispatches, paper readbacks and repeated preparation.
+**Five benchmark paintings, 30% less total time.** Replaying the saved Opus V5 plans took **14:47 instead of 21:13** on Apple M4 (**1.44× overall**). One run per painting/version; gains vary by target. France falls below the 98% image-similarity floor. The earlier 1.85× claim, which mixed cache states, is withdrawn.
 
-**Timing correction (2026-11-08):** the previous 1.85× headline mixed preprocessing cache states. For General, the control computed segmentation (12.7 s), while 0.3.0 reused it. That ratio is withdrawn; matched release-tag replays of the five benchmark plans are in progress.
+<a href="docs/img/release-0.3.0-painting.gif"><img src="docs/img/release-0.3.0-painting.gif" width="560" alt="Actual White Ships painting playback: 0.2.1 on left, 0.3.0 on right, synchronized at 24×."></a>
 
-<a href="docs/img/release-0.3.0-painting.gif"><img src="docs/img/release-0.3.0-painting.gif" width="560" alt="Real painting playback at 8× speed. BEFORE: frozen control on the left. AFTER: 0.3.0 on the right. Both recordings share the same clock; initial setup is trimmed."></a>
+**White Ships playback, 24×:** actual frames on one shared clock. Full recordings took **264.9 s before / 200.2 s after**; both omit the first 36.3 s. Segmentation is warm and recording overhead is included; the table uses separate unrecorded runs with cold segmentation. Each final PNG exactly matches its clean run.
 
-**A Tramp playback, 8× speed.** This performance fixture is outside the five-target model benchmark. Full recorded runs took **91.3 s before / 80.2 s after (1.14×)**, including capture overhead. Both omit the first 38 seconds. [Watch the MP4](https://github.com/sabj/unpainting/releases/download/v0.3.0/release-0.3.0-painting.mp4).
+| Target | Before · 0.2.1 | After · 0.3.0 | Speedup | RGB SSIM |
+|---|---:|---:|---:|---:|
+| Hills | 5:54 | 3:07 | 1.89× | 98.81% |
+| France | 2:10 | 1:51 | 1.18× | 97.47% |
+| Ships | 4:31 | 3:27 | 1.31× | 98.53% |
+| Mittens | 2:09 | 1:38 | 1.32× | 99.92% |
+| Trumbull | 6:29 | 4:44 | 1.37× | 99.31% |
 
-Single runs, fast mode, seed 0. The historical timings below have unmatched preprocessing cache states and are not a controlled speed comparison. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
+<a href="docs/img/release-0.3.0-before-after.png"><img src="docs/img/release-0.3.0-before-after.png" width="680" alt="All five benchmark paintings: BEFORE 0.2.1, AFTER 0.3.0, and differences brightened 8×. Black means unchanged. Each painting keeps its original aspect ratio."></a>
 
-### Before / after
-
-<a href="docs/img/release-0.3.0-before-after.png"><img src="docs/img/release-0.3.0-before-after.png" width="560" alt="Three painting pairs with labels baked into the image. Top: BEFORE, frozen control. Bottom: AFTER, 0.3.0. General: 99.76% SSIM; ink and wash: 99.32%; value plan: 98.75%. Click to enlarge."></a>
-
-**98.75–99.76% local RGB SSIM**, measured on original pixels across three workloads at one seed. This measures similarity, not artistic quality. Click the thumbnails to enlarge; inspect [8× differences and largest-change crops](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) or download the [interactive comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/comparison.html).
-
-| Painting | Before · control | After · 0.3.0 |
-|---|---:|---:|
-| General | 82.39 s | 57.07 s |
-| Ink and wash | 179.90 s | 118.32 s |
-| Value plan | 463.40 s | 217.62 s |
+France remains a 0.3.1 investigation: disabling passage-level drying only raises its similarity to 97.79%. SSIM measures similarity between releases, not artistic quality.
 
 ### What changed
 
-- **Less waiting:** fewer GPU dispatches, smaller paper readbacks, reused stroke buffers.
-- **Less repeated work:** compact empty layers, faster ink filtering, cached preparation and queued image writes.
-- **Dry by passage:** fast value-plan runs keep shapes wet together by default. The timing above includes this change, which can alter pixels. `--washsession 0` restores per-shape drying.
+Fewer GPU dispatches, smaller readbacks, reused stroke buffers, faster ink filtering, cached preparation, queued image writes. Fast value-plan runs now dry by passage, a behavior change that affects pixels.
 
 ### Checked on real GPUs
 
-M4/Metal and NVIDIA L40S/Vulkan each pass **1,446 tests + 83 benchmark tests**, with zero failures and two reported non-GPU skips. Four native paint fixtures complete on L40S; RTX 4090 passes 11 targeted GPU regressions.
+M4/Metal and L40S/Vulkan each passed **1,446 tests + 83 benchmark tests**; two non-GPU skips. Paint Lab paints, dries and saves on Chrome Metal and CPU. **210 mushroom tests pass.** NVIDIA and browser speedups are unmeasured.
 
-[Paint Lab](https://sabj.github.io/unpainting/demos/lab/) paints, dries and saves on Chrome’s Metal WebGPU and CPU paths. All **210 mushroom tests** pass; Amanita, Morel and Coral render in Chromium. Browser speedups are not measured.
+<details>
+<summary>Measurement details</summary>
 
-Painter **V102** · simulator **103** · judges **J1**. Quality work continues in **0.3.1**.
+[Archived Opus V5 try-3 plans](https://github.com/sabj/unpainting/tree/v0.3.0/bench/runs/v5-self-study/opus/3), one per target, replayed with the frozen 0.2.1 argument builder: tags 1cc2c08 → 70ceb7c, seed 0, fast mode, 1200–1224 px. Full process time includes preparation and saving. Run cache off; segmentation cold on both; other preprocessing caches may remain. Ten Metal renders, zero target-read violations; same unused-option warnings. Overall ratio uses summed runtimes; SSIM compares original releases. The withdrawn 1.85× used three fixtures and mixed segmentation caches.
 
-[Historical timings (unmatched caches)](https://github.com/sabj/unpainting/releases/download/v0.3.0/performance-evidence.json) · [Image metrics and hashes](https://github.com/sabj/unpainting/releases/download/v0.3.0/visual-evidence.json) · [Validation](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) · [Logs](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation-logs.zip) · [Full implementation notes](https://github.com/sabj/unpainting/blob/v0.3.0/CHANGELOG.md#030--2026-11-07)
+[GPU validation](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json)
+
+</details>
 
 ## 0.2.1-rc.1
 
