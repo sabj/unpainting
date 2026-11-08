@@ -4,13 +4,15 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 ## 0.3.0 — 2026-11-07
 
-**Faster painting, closely matched output.** Against our frozen development control (a build after 0.2.1), three reference paintings finish in **6:33 instead of 12:06, 1.85× faster** on Apple M4. Run caching is disabled on both.
+**Less GPU overhead, closely matched output.** 0.3.0 reduces GPU dispatches, paper readbacks and repeated preparation.
+
+**Timing correction (2026-11-08):** the previous 1.85× headline mixed preprocessing cache states. For General, the control computed segmentation (12.7 s), while 0.3.0 reused it. That ratio is withdrawn; matched release-tag replays of the five benchmark plans are in progress.
 
 <a href="docs/img/release-0.3.0-painting.gif"><img src="docs/img/release-0.3.0-painting.gif" width="560" alt="Real painting playback at 8× speed. BEFORE: frozen control on the left. AFTER: 0.3.0 on the right. Both recordings share the same clock; initial setup is trimmed."></a>
 
-**General-workload playback, 8× speed.** Real captured frames, one run per version; both timelines omit the first 38 seconds. Full recorded runs took **91.3 s before / 80.2 s after**, including recording overhead. Unfilmed, this workload takes **82.4 s / 57.1 s**; the headline 1.85× covers the full three-painting suite. [Watch the MP4](https://github.com/sabj/unpainting/releases/download/v0.3.0/release-0.3.0-painting.mp4).
+**A Tramp playback, 8× speed.** This performance fixture is outside the five-target model benchmark. Full recorded runs took **91.3 s before / 80.2 s after (1.14×)**, including capture overhead. Both omit the first 38 seconds. [Watch the MP4](https://github.com/sabj/unpainting/releases/download/v0.3.0/release-0.3.0-painting.mp4).
 
-Single runs, fast mode, seed 0; preprocessing caches may remain. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
+Single runs, fast mode, seed 0. The historical timings below have unmatched preprocessing cache states and are not a controlled speed comparison. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
 
 ### Before / after
 
@@ -38,7 +40,7 @@ M4/Metal and NVIDIA L40S/Vulkan each pass **1,446 tests + 83 benchmark tests**, 
 
 Painter **V102** · simulator **103** · judges **J1**. Quality work continues in **0.3.1**.
 
-[Timings](https://github.com/sabj/unpainting/releases/download/v0.3.0/performance-evidence.json) · [Image metrics and hashes](https://github.com/sabj/unpainting/releases/download/v0.3.0/visual-evidence.json) · [Validation](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) · [Logs](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation-logs.zip) · [Full implementation notes](https://github.com/sabj/unpainting/blob/v0.3.0/CHANGELOG.md#030--2026-11-07)
+[Historical timings (unmatched caches)](https://github.com/sabj/unpainting/releases/download/v0.3.0/performance-evidence.json) · [Image metrics and hashes](https://github.com/sabj/unpainting/releases/download/v0.3.0/visual-evidence.json) · [Validation](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) · [Logs](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation-logs.zip) · [Full implementation notes](https://github.com/sabj/unpainting/blob/v0.3.0/CHANGELOG.md#030--2026-11-07)
 
 ## 0.2.1-rc.1
 
