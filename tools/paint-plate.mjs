@@ -4401,6 +4401,7 @@ JSONL.flush();
 writeCensus(out, { main: sheet, fine: INKRES?.fine });
 
 } finally {
+  try { sheet?._gpu?.close(); } catch {}
   JSONL.close();
   removeLogFailureHook();
   process.off('exit', JSONL.close);
