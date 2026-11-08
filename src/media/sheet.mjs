@@ -76,7 +76,7 @@ const wrote = sheet => { invalidatePaperCertificate(sheet); if (sheet._gpu) shee
 
 export function createSheet(paper, pigments) {
   const { w, h, n } = paper;
-  return {
+  const sheet = {
     paper, pigments, w, h, n, K: pigments.length,
     W: F32(n), s: F32(n), M: U8(n),
     G: pigments.map(() => F32(n)),   // suspended pigment mass

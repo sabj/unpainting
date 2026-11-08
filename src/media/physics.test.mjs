@@ -126,3 +126,115 @@ test('a mixed glaze conserves each pigment separately', () => {
   for (let k = 0; k < 2; k++) near(totals(s).pig[k],before.pig[k]);
   finite(s);
 });
+
+test('sheet instances expose M2 <-> M3 contract methods', () => {
+  const s = sheet();
+  assert.equal(typeof s.prewetRegion, 'function', 's.prewetRegion must be a function on sheet instance');
+  assert.equal(typeof s.depositPassage, 'function', 's.depositPassage must be a function on sheet instance');
+  assert.equal(typeof s.softEdgeRing, 'function', 's.softEdgeRing must be a function on sheet instance');
+
+  const multi = createSheet(makePaper(10, 10), [pigment, { ...pigment, gamma: 0.8 }]);
+  assert.equal(typeof multi.prewetRegion, 'function');
+  assert.equal(typeof multi.depositPassage, 'function');
+  assert.equal(typeof multi.softEdgeRing, 'function');
+});
+
+test('sheet contract methods execute with dummy empty masks without throwing', () => {
+  const s = sheet(16);
+  const dummyMask = new Uint8Array(s.n);
+  assert.equal(s.prewetRegion(dummyMask, 0.1), 0);
+  assert.equal(s.depositPassage(dummyMask, [0.05], 0.3), 0);
+  assert.equal(s.softEdgeRing(dummyMask, 1.0, 0.5), 0);
+  near(totals(s).water, 0);
+  near(totals(s).pig[0], 0);
+  finite(s);
+});
+
+test('sheet.prewetRegion saturates capillary pores and establishes damp sheen without pigment', () => {
+  const s = sheet(16);
+  const mask = new Uint8Array(s.n);
+  let count = 0;
+  for (let y = 4; y < 12; y++) {
+    for (let x = 4; x < 12; x++) {
+      mask[y * 16 + x] = 1;
+      count++;
+    }
+  }
+  const wetted = s.prewetRegion(mask, 0.06, { dampPoreShare: 0.8, surfaceFilm: 0.03 });
+  assert.equal(wetted, count);
+  near(totals(s).pig[0], 0);
+  assert.ok(totals(s).water > 0);
+  for (let i = 0; i < s.n; i++) {
+    if (mask[i]) {
+      assert.ok(s.s[i] >= s.paper.capacity[i] * 0.8 - 1e-6);
+      assert.ok(s.W[i] >= 0.03 - 1e-6);
+      assert.equal(s.M[i], 1);
+      assert.equal(s.ever[i], 1);
+    } else {
+      assert.equal(s.s[i], 0);
+      assert.equal(s.W[i], 0);
+      assert.equal(s.M[i], 0);
+    }
+  }
+  finite(s);
+});
+
+test('sheet.depositPassage deposits pigment and water load through mask', () => {
+  const s = createSheet(makePaper(16, 16), [pigment, { ...pigment, gamma: 0.5 }]);
+  const mask = new Uint8Array(s.n);
+  let count = 0;
+  for (let y = 5; y < 11; y++) {
+    for (let x = 5; x < 11; x++) {
+      mask[y * 16 + x] = 1;
+      count++;
+    }
+  }
+  const deposited = s.depositPassage(mask, [0.03, 0.02], 0.25, { prewet: true, waterMm: 0.03 });
+  assert.equal(deposited, count);
+  near(totals(s).pig[0], count * 0.03);
+  near(totals(s).pig[1], count * 0.02);
+  assert.ok(totals(s).water >= count * 0.25);
+  finite(s);
+});
+
+test('sheet.softEdgeRing applies perimeter pore moisture without pigment or puddles', () => {
+  const s = sheet(20);
+  const mask = new Uint8Array(s.n);
+  for (let y = 8; y < 12; y++) {
+    for (let x = 8; x < 12; x++) {
+      mask[y * 20 + x] = 1;
+    }
+  }
+  const ringCount = s.softEdgeRing(mask, 0.9, 0.6);
+  assert.ok(ringCount > 0);
+  near(totals(s).pig[0], 0);
+  for (let y = 8; y < 12; y++) {
+    for (let x = 8; x < 12; x++) {
+      assert.equal(s.s[y * 20 + x], 0);
+    }
+  }
+  assert.ok(s.s[7 * 20 + 8] > 0);
+  assert.ok(s.s[12 * 20 + 8] > 0);
+  for (let i = 0; i < s.n; i++) assert.equal(s.W[i], 0);
+  assert.equal(s.s[0], 0);
+  assert.equal(s.s[19 * 20 + 19], 0);
+  finite(s);
+});
+
+test('sheet contract methods invalidate paper certificates and support complete step/dry cycles', () => {
+  const s = sheet(16);
+  const mask = new Uint8Array(s.n);
+  mask[8 * 16 + 8] = 1;
+  s.prewetRegion(mask, 0.05);
+  s.softEdgeRing(mask, 0.6, 0.4);
+  s.depositPassage(mask, [0.04], 0.2);
+
+  for (let i = 0; i < 10; i++) step(s, { ...DEFAULTS, dt: 0.5 });
+  finite(s);
+  dry(s, 200, { evap: 0.2, paperDry: 0.2 });
+  near(totals(s).water, 0);
+  near(totals(s).pig[0], 0.04);
+  assert.equal(s.layers.length, 1);
+  finite(s);
+});
+
