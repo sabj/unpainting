@@ -318,4 +318,30 @@ test('Consult #9 Catch 2: uniform passage yields zero delta with stable fallback
   assert.ok(Number.isFinite(uniformShape._rampVec.dy), 'dy is finite');
 });
 
+test('Consult #12 & #13: paperRel protects white highlights on toned paper while rejecting yellow-ochre sunlit walls', () => {
+  const w = 24, h = 24, n = w * h;
+  const rgb = new Uint8Array(n * 3).fill(150);
+  const density = new Float32Array(n).fill(0.4);
+  for (let y = 9; y < 15; y++) {
+    for (let x = 9; x < 15; x++) {
+      const i = y * w + x;
+      rgb.set([255, 255, 255], 3 * i);
+      density[i] = 0;
+    }
+  }
+  const tonedPlan = planLightToDark({
+    w, h, k: 1, rgb, density, demand: density.slice(),
+    paperRGB: [240, 220, 190], paperRel: true, shaped: true, minShapeCells: 4
+  });
+  assert.equal(tonedPlan.protectedCells[12 * w + 12], 1, 'white highlight on warm toned paper must remain protected');
+
+  const ochreRgb = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) ochreRgb.set([235, 195, 130], 3 * i);
+  const ochreDensity = new Float32Array(n).fill(0.05);
+  const whitePaperPlan = planLightToDark({
+    w, h, k: 1, rgb: ochreRgb, density: ochreDensity, demand: ochreDensity.slice(),
+    paperRGB: [249, 250, 252], paperRel: true, shaped: true, minShapeCells: 4
+  });
+  assert.equal(whitePaperPlan.protectedCells[12 * w + 12], 0, 'sunlit yellow-ochre stone wall must not be falsely masked as paper');
+});
 

@@ -178,3 +178,26 @@ test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.task
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('resolvePlan preserves base glazeGains by default and enables --drawing both when closing lines exist', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-close-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'opening-lines.json'), '[]');
+    const openOnly = resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    const openMap = optionMap(openOnly.args);
+    assert.equal(openMap.get('drawing'), 'first');
+    assert.equal(openMap.get('darkgain'), '1.3');
+    assert.equal(openMap.get('coolgain'), '1.3');
+    assert.equal(openMap.has('techcal'), false);
+
+    fs.writeFileSync(path.join(tmpDir, 'closing-lines.json'), '[]');
+    const withClosing = resolvePlan({ spec: { width: 96, sheetmm: 280, glazeGains: false }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    const closeMap = optionMap(withClosing.args);
+    assert.equal(closeMap.get('drawing'), 'both');
+    assert.equal(closeMap.has('darkgain'), false);
+    assert.equal(closeMap.get('techcal'), '1');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
