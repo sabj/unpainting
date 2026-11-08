@@ -18,15 +18,29 @@ if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // 
 const RING_FLOATS = 6144; // must match link.mjs
 const ring = new Float32Array(workerData.ring), done = new Int32Array(workerData.done), sumData = new Float32Array(workerData.sum);
 const ctrl = new Int32Array(workerData.ctrl), rectData = new Float32Array(workerData.rect), layerData = new Float32Array(workerData.layer), err = new Uint8Array(workerData.err);
+function ack() { Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); }
+function fail(msg, status = 0) {
+  try { fs.appendFileSync('/tmp/worker-trace.txt', 'fail called: ' + msg + '\n'); } catch {}
+  const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1));
+  err.fill(0); err.set(b); ctrl[2] = 1;
+  if (status || Atomics.load(ctrl, 3) === 0) {
+    Atomics.store(ctrl, 3, status || 2);
+    Atomics.notify(ctrl, 3);
+  }
+  ack();
+}
 process.on('uncaughtException', err => {
   console.error('[gpu-worker uncaught]', err);
+  try { fs.appendFileSync('/tmp/worker-trace.txt', 'uncaught: ' + (err.stack ?? err.message) + '\n'); } catch {}
   fail(err.stack ?? err.message, 2);
 });
 process.on('unhandledRejection', reason => {
   console.error('[gpu-worker unhandled]', reason);
+  try { fs.appendFileSync('/tmp/worker-trace.txt', 'unhandled: ' + (reason?.stack ?? reason?.message ?? String(reason)) + '\n'); } catch {}
   fail(reason?.stack ?? reason?.message ?? String(reason), 2);
 });
 process.on('exit', () => {
+  try { fs.appendFileSync('/tmp/worker-trace.txt', 'worker process exit hook\n'); } catch {}
   if (Atomics.load(ctrl, 3) === 0) {
     Atomics.store(ctrl, 3, 2);
     Atomics.notify(ctrl, 3);
@@ -50,16 +64,7 @@ function driedMask(r){if(!asyncDry)return;workerWetMask=0;if(r.pushed)workerTopM
 // taken in the queue, whatever order their read-backs land in
 let framePort = null, frameChain = Promise.resolve();
 const toFrames = (p, build) => { frameChain = frameChain.then(() => p).then(v => { const { msg, transfer } = build(v); framePort.postMessage(msg, transfer); }).catch(e => { console.error('gpu worker frame error', e); fail(e.stack ?? e.message); }); };
-const ack = () => { Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); };
-const fail = (msg, status = 0) => {
-  const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1));
-  err.fill(0); err.set(b); ctrl[2] = 1;
-  if (status || Atomics.load(ctrl, 3) === 0) {
-    Atomics.store(ctrl, 3, status || 2);
-    Atomics.notify(ctrl, 3);
-  }
-  ack();
-};
+try { fs.appendFileSync('/tmp/worker-trace.txt', 'worker setup complete\n'); } catch {}
 
 // Normal profiling preserves scheduling. Serial profiling is diagnostic only: its wall timings include queue waits.
 const PROF = process.env.GPU_PROF === '1' ? {} : null;
