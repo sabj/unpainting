@@ -6,13 +6,13 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 **Faster painting, closely matched output.** Against our frozen development control (a build after 0.2.1), three reference paintings finish in **6:33 instead of 12:06, 1.85× faster** on Apple M4. Run caching is disabled on both.
 
-<a href="https://github.com/sabj/unpainting/releases/download/v0.3.0/speed-before-after.gif"><img src="https://github.com/sabj/unpainting/releases/download/v0.3.0/speed-before-after.gif" width="560" alt="Measured elapsed-time animation at 60× speed: BEFORE frozen control takes 12 minutes 6 seconds; AFTER 0.3.0 takes 6 minutes 33 seconds."></a>
+<a href="docs/img/release-0.3.0-speed.gif"><img src="docs/img/release-0.3.0-speed.gif" width="560" alt="Measured elapsed-time animation at 60× speed: BEFORE frozen control takes 12 minutes 6 seconds; AFTER 0.3.0 takes 6 minutes 33 seconds."></a>
 
 The GIF illustrates elapsed time at **60× speed**, not painting playback. Single runs, fast mode, seed 0; preprocessing caches may remain. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
 
 ### Before / after
 
-<a href="https://github.com/sabj/unpainting/releases/download/v0.3.0/before-after-compact.png"><img src="https://github.com/sabj/unpainting/releases/download/v0.3.0/before-after-compact.png" width="560" alt="Three painting pairs with labels baked into the image. Top: BEFORE, frozen control. Bottom: AFTER, 0.3.0. General: 99.76% SSIM; ink and wash: 99.32%; value plan: 98.75%. Click to enlarge."></a>
+<a href="docs/img/release-0.3.0-before-after.png"><img src="docs/img/release-0.3.0-before-after.png" width="560" alt="Three painting pairs with labels baked into the image. Top: BEFORE, frozen control. Bottom: AFTER, 0.3.0. General: 99.76% SSIM; ink and wash: 99.32%; value plan: 98.75%. Click to enlarge."></a>
 
 **98.75–99.76% local RGB SSIM**, measured on original pixels. This measures similarity, not artistic quality. Click the thumbnails to enlarge; inspect [8× differences and largest-change crops](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) or download the [interactive comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/comparison.html).
 
