@@ -304,15 +304,6 @@ if (SPEED_RENDER_THREADS > 1) {
   const opticsPool = await import('../src/media/sheet-par.mjs');
   opticalThreads = opticsPool.threads() > 1 ? opticsPool.threads() : opticsPool.start(SPEED_RENDER_THREADS, { opticsOnly: true });
 }
-if (process.argv.includes('--testgpu')) {
-  const paper = makePaper(100, 100);
-  const sheet = createSheet(paper, [{ name: 'pb15', K: [0.1, 0.1, 0.1], S: [0.1, 0.1, 0.1], rho: 0.1, omega: 1, gamma: 0 }]);
-  console.log('[testgpu after threads] testing attachGpu');
-  const info = attachGpu(sheet, { ...DEFAULTS }, { mode: 'on' });
-  console.log('[testgpu after threads] attachGpu returned:', info.backend);
-  sheet._gpu.close();
-  process.exit(0);
-}
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
