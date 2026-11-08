@@ -15,6 +15,14 @@ if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // 
 const RING_FLOATS = 6144; // must match link.mjs
 const ring = new Float32Array(workerData.ring), done = new Int32Array(workerData.done), sumData = new Float32Array(workerData.sum);
 const ctrl = new Int32Array(workerData.ctrl), rectData = new Float32Array(workerData.rect), layerData = new Float32Array(workerData.layer), err = new Uint8Array(workerData.err);
+process.on('uncaughtException', err => {
+  console.error('[gpu-worker uncaught]', err);
+  fail(err.stack ?? err.message, 2);
+});
+process.on('unhandledRejection', reason => {
+  console.error('[gpu-worker unhandled]', reason);
+  fail(reason?.stack ?? reason?.message ?? String(reason), 2);
+});
 process.on('exit', () => {
   if (Atomics.load(ctrl, 3) === 0) {
     Atomics.store(ctrl, 3, 2);
@@ -84,6 +92,7 @@ async function handle(m) {
 async function handleOp(m) {
   switch (m.op) {
     case 'init': {
+      console.error('[gpu-worker] handleOp init starting');
       let webgpu;
       try { webgpu = await import('webgpu'); } catch (e) { return fail(`the webgpu package is not installed (${e.code ?? e.message})`, 2); }
       let device, adapter;
