@@ -108,7 +108,8 @@ export function decideLines(lines, ctx, options = {}) {
         else {
           // the shortest piece the ground allows (ink-labels.mjs minMm) is applied by the salience step, after collinear
           // pieces are joined: a trace is cut at every junction, so a contour arrives in pieces of a millimetre or two
-          out.push({ ...g, points: piece, inkLabel: mid.label ?? 'none', inkMinMm: structural ? 0 : (Number.isFinite(mid.minMm) ? mid.minMm : 0) });
+          const { widths: _w, weights: _wt, ...restG } = g;
+          out.push({ ...restG, points: piece, inkLabel: mid.label ?? 'none', inkMinMm: structural ? 0 : (Number.isFinite(mid.minMm) ? mid.minMm : 0) });
           keptPx += pl; add(mid.label ?? 'none', 'keptPx', pl);
           for (let j = start + 1; j < k; j++) if (cls[j] === CLASS.mass) keptMass += d[j] - d[j - 1];
         }

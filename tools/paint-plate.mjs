@@ -1241,7 +1241,7 @@ const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. graphite (default): the drawing is pencil
 // unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
 // shows --penfirst per cent of line or more, else graphite.
-const OUTLINE_REQUESTED = opt('outlinemedium', 'graphite');
+const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
 const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : materialProfile(OUTLINE_REQUESTED).kind, share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
 console.log(describeOutlineMedium(OUTLINE));
 // --penfacelong e: face rule and face-detail walks read only line-shaped ink marks (longest side squared over area >= e). Default 0.
@@ -1505,7 +1505,7 @@ if(VALUE_ENABLED){
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
- const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',shaped?1:0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',shaped?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
+ const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',shaped?1:0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',shaped?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
@@ -3498,12 +3498,38 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // --detailfrom t: passes later than t of the ladder are laid as detail marks, not glazes. Default 2, never.
   const authoredPaths=sh._semantic?lowerAuthoredGestures(sh._semantic,{target:AREA_PLAN.doc.target,crop:AREA_PLAN.crop,width:W2,height:H2,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*AREA_PLAN.doc.target.width/AREA_PLAN.crop[2]}):null;
   // --skylanes 1: a large plane that reads cool at one shape-level look (blue over red by 10+) is laid as overlapping wet lanes.
-  const skyLaneRadius=sh2=>{if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;if(!(a>n*num('skylanemin',.015)))return 0;const lk=paintingLook('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});return lk&&lk.ref.px[2]>lk.ref.px[0]+10?num('skylanemm',3)/(num('sheetmm', DEFAULT_SHEET_MM)/w):0;};
+  const skyLaneRadius=sh2=>{
+    if(!(num('skylanes',0)>0)||!sh2._valuePlan||sh2._valuePlan.texture)return 0;
+    if (sh2._valuePlan?.cool != null) return sh2._valuePlan.cool ? num('skylanemm', 3) / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
+    let a=0;for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])a++;
+    if(!(a>n*num('skylanemin',.015)))return 0;
+    const lk=paintingLook('passage',`L${L + 1}/s${shIdx}/sky`,MASK,{box:{...MB,w},ref:['px']});
+    if (!lk?.ref?.px) return 0;
+    const [refR, , refB] = lk.ref.px;
+    return refB > refR + 10 ? num('skylanemm', 3) / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
+  };
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
-  const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38})):null;
+  const makeShapedPlanePaths = () => {
+    const raw = shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38});
+    if(raw && sh._rampVec) {
+      const { cx, cy, dx, dy, minT, maxT, spanT, delta } = sh._rampVec;
+      const tMid = (minT + maxT) * 0.5, halfSpan = (spanT * 0.5) || 1;
+      for (const ps of raw) {
+        if (!ps.length) continue;
+        const p0 = ps[0], p1 = ps[ps.length - 1];
+        const t0 = (p0.x / SC - cx) * dx + (p0.y / SC - cy) * dy;
+        const t1 = (p1.x / SC - cx) * dx + (p1.y / SC - cy) * dy;
+        const u0 = Math.max(-1, Math.min(1, (t0 - tMid) / halfSpan));
+        const u1 = Math.max(-1, Math.min(1, (t1 - tMid) / halfSpan));
+        PATH_RAMP.set(ps, { start: 1 + delta * u0, end: 1 + delta * u1 });
+      }
+    }
+    return raw;
+  };
+  const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):makeShapedPlanePaths()):null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
   const gradedAngle = sh.graded && !sh._follow ? (sh._gradedAngle ?? null) : null;
@@ -3550,11 +3576,14 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutbandin n: cut-in band inside the subject (--fwmask); --cutband (default 2) elsewhere.
-    const CB = num('cutband', 2), CBIN = opt('cutbandin', '') !== '' && FW_SUBJ ? num('cutbandin', CB) : CB;
-    // --cutfrac f: also cap the band at f of the passage's own width, so a wide brush cuts in round a sky, not a small rim. Default 0.
+    const cellMmHigh = num('sheetmm', DEFAULT_SHEET_MM) / W2;
+    const cutMm = opt('cutbandmm', '') !== '' ? num('cutbandmm', 3.175) : (opt('cutband', '') !== '' ? num('cutband', 2) * (num('sheetmm', DEFAULT_SHEET_MM) / 270) : 3.175);
+    const CB = Math.max(1, Math.round(cutMm / cellMmHigh));
+    const cutInMm = opt('cutbandinmm', '') !== '' ? num('cutbandinmm', cutMm) : (opt('cutbandin', '') !== '' ? num('cutbandin', 2) * (num('sheetmm', DEFAULT_SHEET_MM) / 270) : cutMm);
+    const CBIN = FW_SUBJ ? Math.max(1, Math.round(cutInMm / cellMmHigh)) : CB;
     const CF = num('cutfrac', 0); let CAP = Infinity;
-    if (CF > 0) { let dmax = 0; for (let i = 0; i < N2; i++) if (M[i] && dist[i] > dmax) dmax = dist[i]; CAP = Math.max(SC, CF * 2 * dmax); }
-    const SUBJ2 = CBIN !== CB ? up(FW_SUBJ) : null, bandAt = i => Math.min((SUBJ2 && SUBJ2[i] ? CBIN : CB) * SC, CAP);
+    if (CF > 0) { let dmax = 0; for (let i = 0; i < N2; i++) if (M[i] && dist[i] > dmax) dmax = dist[i]; CAP = Math.max(1, CF * 2 * dmax); }
+    const SUBJ2 = CBIN !== CB ? up(FW_SUBJ) : null, bandAt = i => Math.min((SUBJ2 && SUBJ2[i] ? CBIN : CB), CAP);
     for (let i = 0; i < N2; i++) if (M[i] && dist[i] <= bandAt(i)) band[i] = 1;
     // --cuttrace 0|1: the small brush goes round the edge half the band in, not across the band in rows. Default 1.
     let raw = washPaths(band, W2, H2, { pad: 0, minRadius: 0.5 * SC, minLength: 2 * SC });
@@ -3741,6 +3770,17 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       return { ...p, p: Math.max(0.18, Math.min(1.2, body * Math.min(land, lift) * rampMod)) };
     });
     if(authoredPaths||(shapedPaths&&!sh._strokePlan))shaped=pts;else if(sh._semantic)shaped=semanticGesture(sh._semantic.pass,shaped,num('sheetmm', DEFAULT_SHEET_MM)/W2);
+    const planeRamp = PATH_RAMP.get(pts);
+    if(planeRamp && shapedPaths && !sh._strokePlan) {
+      let rrun = 0;
+      shaped = shaped.map((p, i) => {
+        if (i) rrun += Math.hypot(p.x - shaped[i - 1].x, p.y - shaped[i - 1].y);
+        const u = rrun / total;
+        const rampMod = (1 - u) * planeRamp.start + u * planeRamp.end;
+        const curP = p.p ?? 1;
+        return { ...p, p: Math.max(0.18, Math.min(1.2, curP * rampMod)) };
+      });
+    }
     const supportedCharge=gesturePoints=>!AREA_NUMERIC_CONTACT_STOP&&(!AREA_NUMERIC_SEQUENCE||productionChargeSupported({predict:()=>candidateContact(brush,sheet,gesturePoints,{upright:sh._semantic.pass.brush.orientation==='sweep'?'sweep':sh._semantic.pass.brush.orientation==='follow'?false:true,neighborRadius:0}),record:event=>JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:event.status==='not-executed'?'production-numeric-contact-omitted':'production-numeric-contact-support',areaId:sh._semantic.area.id,passId:sh._semantic.key,shapeKey:AREA_NUMERIC_SEQUENCE.shapeKey,geometry:gesturePoints,clipApplied:!!sheet.clip,...event})+'\n')}));
     if(!supportedCharge(shaped))continue;
     const numericTuftLoads=numericTuftHere&&PB?splitLoads(shaped,PB.loadCells(PB.pick(r),T.name)):null;

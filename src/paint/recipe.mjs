@@ -122,15 +122,30 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const [given, ...typed] = at < 0 ? [argv.includes('--areaplan') ? 'none' : DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
   const name = given === 'none' && at < 0 ? null : given;
   const combined = ['default', 'combined', 'general'].includes(name);
-  const pipeline = combined ? pipelineFlags(plan ?? {}) : null;
-  if (pipeline) drawing = pipeline.flags;
+  const hasWashPlan = Boolean(plan && (plan.washes || plan.order || plan.subjectOrder));
+  const pipeline = (combined || (name === 'none' && hasWashPlan)) ? pipelineFlags(plan ?? {}) : null;
+  const washFlags = (name === 'none' && hasWashPlan && pipeline) ? pipeline.flags : [];
+  if (combined && pipeline) drawing = pipeline.flags;
   const presets = [...new Set([...planPresets(plan), ...typed])];
   const extra = presetArgv(presets, argv);
   const sheet = planSheet(plan, argv);
   const tail = [...extra, ...sheet, ...drawing];
   const describe = note => [note, presets.length ? `presets ${presets.join(', ')}` : null, plan?.drawing ? 'drawing from the plan' : null].filter(Boolean).join(', ');
   if (name === null) return tail.length ? { argv: [...tail, ...argv], note: describe('no recipe') } : { argv, note: null };
-  if (name === 'none') return { argv: [...argv, ...tail], note: describe('recipe none') };
+  if (name === 'none') {
+    const expanded = [...washFlags, ...argv, ...tail];
+    const values = new Map();
+    for (let i = 0; i < expanded.length;) {
+      const key = expanded[i++];
+      const value = i < expanded.length && !expanded[i].startsWith('--') ? expanded[i++] : undefined;
+      if (key === '--physics' && values.has(key)) {
+        const fields = new Map(values.get(key).split(',').map(s => s.split('=')));
+        for (const kv of value.split(',')) { const [k, v] = kv.split('='); fields.set(k, v); }
+        values.set(key, [...fields].map(([k, v]) => `${k}=${v}`).join(','));
+      } else values.set(key, value);
+    }
+    return { argv: [...values].flatMap(([key, value]) => value === undefined ? [key] : [key, value]), note: describe('recipe none'), pipeline: pipeline?.plan ?? null };
+  }
   const preset = RECIPES[name];
   if (!Object.hasOwn(RECIPES, name)) throw new Error(`unknown recipe ${name}`);
   const flags = preset.split(' ');

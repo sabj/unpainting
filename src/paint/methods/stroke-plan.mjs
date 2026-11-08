@@ -22,7 +22,7 @@ function principalAxis(list, w) {
 }
 
 function laneOffsets(uMin, uMax, R, reach, rnd) {
-  const span = uMax - uMin, spacing = 1.7 * R;
+  const span = uMax - uMin, spacing = 1.6 * R;
   const nl = Math.max(1, Math.ceil(Math.max(0, span - 2 * R) / spacing) + 1);
   const lanes = [];
   for (let j = 0; j < nl; j++) {
@@ -63,11 +63,32 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
   if (!(cellMm > 0)) throw Error('planLanes needs cellMm');
   if (!list.length || !(amount > 0)) return null;
   const { cx, cy, ang, dx, dy } = principalAxis(list, w);
-  const R = Math.max(1.5, laneMm / 2 / cellMm), reach = reachMm / cellMm, rnd = rng(seed);
   const c = list.length, T = new Float32Array(c), U = new Float32Array(c);
   let uMin = Infinity, uMax = -Infinity;
   list.forEach((i, k) => { const x = i % w + .5 - cx, y = Math.floor(i / w) + .5 - cy; T[k] = x * dx + y * dy; U[k] = -x * dy + y * dx; uMin = Math.min(uMin, U[k]); uMax = Math.max(uMax, U[k]); });
-  const step = Math.max(1, .6 * R), maxLen = Math.max(3 * R, strokeMm / cellMm), pad = Math.ceil(R / step / 2);
+
+  let effectiveLaneMm = laneMm;
+  if (laneMm === 'auto' || !(laneMm > 0)) {
+    const preBin = Math.max(1, Math.round(3 / cellMm));
+    const sliceMinMax = new Map();
+    for (let k = 0; k < c; k++) {
+      const s = Math.round(T[k] / preBin);
+      const mm = sliceMinMax.get(s) ?? [Infinity, -Infinity];
+      if (U[k] < mm[0]) mm[0] = U[k];
+      if (U[k] > mm[1]) mm[1] = U[k];
+      sliceMinMax.set(s, mm);
+    }
+    const spans = [...sliceMinMax.values()].map(([u0, u1]) => (u1 - u0) * cellMm).filter(Number.isFinite).sort((a, b) => a - b);
+    const t90 = spans.length ? spans[Math.floor(spans.length * 0.9)] : (uMax - uMin) * cellMm;
+    const target = 1.2 * t90;
+    const SIZES = [6, 12, 20, 38];
+    effectiveLaneMm = SIZES.reduce((prev, curr) => Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev);
+  }
+
+  const R = Math.max(1.5, effectiveLaneMm / 2 / cellMm), reach = reachMm / cellMm, rnd = rng(seed);
+  const step = Math.max(1, .6 * R);
+  const maxLen = strokeMm > 0 && Number.isFinite(strokeMm) ? Math.max(3 * R, strokeMm / cellMm) : Infinity;
+  const pad = Math.ceil(R / step / 2);
 
   const stepCentroid = new Map();
   if (curved) {

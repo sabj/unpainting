@@ -25,7 +25,8 @@ export async function openDevice(gpu = globalThis.navigator?.gpu) {
 }
 
 const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntiles', 'u'], ['K', 'u'], ['hasTop', 'u'], ['holdOn', 'u'], ['cap', 'u'], ['p2', 'u'], ['p3', 'u'],
-  ...['dt', 'evap', 'edgeEvap', 'edgeWidth', 'capE', 'absorb', 'film', 'flow', 'ff', 'flowDepth', 'diffuse', 'cd', 'settle', 'liftDepth', 'rewetLift', 'granFill', 'holdCap', 'slide', 'slideFill', 'capStep', 'capEps', 'capDelta', 'sizing', 'wickFilter', 'wetEps', 'paperDry', 'capSigma', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre'].map(k => [k, 'f'])];
+  ...['dt', 'evap', 'edgeEvap', 'edgeWidth', 'capE', 'absorb', 'film', 'flow', 'ff', 'flowDepth', 'diffuse', 'cd', 'settle', 'liftDepth', 'rewetLift', 'granFill', 'holdCap', 'slide', 'slideFill', 'capStep', 'capEps', 'capDelta', 'sizing', 'wickFilter', 'wetEps', 'paperDry', 'capSigma', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre',
+  'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth'].map(k => [k, 'f'])];
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UBYTES = UF.length * 4 + 512 + 64;
 const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  act: array<vec4<u32>, 4>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\nfn physicalChannel(a: u32) -> u32 { return u.act[a / 4u][a % 4u]; }\n`;
@@ -143,6 +144,9 @@ export class GpuSheet {
       rewetLift: o.rewetLift, granFill: o.granFill ?? 0, holdCap: Number.isFinite(o.hold ?? Infinity) ? o.hold : 0, slide: o.slide ?? 0, slideFill: o.slideFill ?? 1,
       capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? 0.85, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
+      enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: 0,
+      filmDiff: o.filmDiffuse ?? 0, filmDepth: o.filmDepth ?? 0, holeSpan: o.holeSpan ?? 0, mar: o.marangoni ?? 0, slope: o.slope ?? 0,
+      padC: 0, mmPerCell: o.mmPerCell ?? 0.3, edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length, gran = o.gran ?? 1, scour = o.scour ?? 0;
     this.pigments.forEach((p, k) => {
@@ -166,7 +170,7 @@ export class GpuSheet {
     this.hasTop = sheet.layers.length > 0;
     if (this.hasTop) { const top = sheet.layers[sheet.layers.length - 1]; for (let k = 0; k < K; k++) put(B.TOP, top[k], k * n * 4); }
     this.channelMask = observeSheetChannels(this.channelMask ?? 0, sheet, K);
-    this.setOptions({});
+    this.setOptions({ mmPerCell: sheet.paper?.mmPerCell ?? 0.3 });
     const fl = new Uint32Array(this.ntiles), cap = sheet.paper.capacity;
     // The active-tile reduction covers every nonzero W only if loaded surface
     // water has its M flag. Imported states violating this invariant keep the

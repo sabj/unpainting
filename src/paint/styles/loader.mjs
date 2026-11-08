@@ -32,6 +32,11 @@ function validateProfile(profile, name) {
       throw Error(`Invalid style profile: ${name}: waterToPigmentRatio must be finite positive`);
     }
   }
+  if (profile.paintStrength != null) {
+    if (!Number.isFinite(profile.paintStrength) || profile.paintStrength < 0) {
+      throw Error(`Invalid style profile: ${name}: paintStrength must be non-negative`);
+    }
+  }
 }
 
 export function loadStyleProfile(nameOrConfig) {
