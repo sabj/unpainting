@@ -24,12 +24,14 @@ const BRUSH_ENTRIES = ['stroke_run', 'stroke_end', 'splat_run', 'stroke_metered'
 /** Per-sheet byte sizes of the stacked buffers (shader name -> bytes, element bytes). */
 function sheetLayout(n, K, ntiles, o, bstrBytes) {
   const f = n * 4, kf = f * Math.max(1, K), L = {};
-  for (const k of ['M', 'EVER', 'RESIST', 'W', 'S', 'S2', 'EA', 'EB', 'FX', 'FY', 'WSC', 'WENT', 'NEWF']) L[k] = [f, 4];
+  for (const k of ['M', 'EVER', 'RESIST', 'W', 'EA', 'EB', 'FX', 'FY', 'WSC', 'WENT']) L[k] = [f, 4];
+  L.S = [f * 3, 4];
   L.DEP = [o.fixedBed > 0 ? f * 3 : f, 4];
   for (const k of ['PAPER', 'PAPER2', 'PAPER3', 'BPAP']) L[k] = [f * 4, 16];
-  for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM', 'PN', 'DD']) L[k] = [kf, 4];
+  for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM']) L[k] = [kf, 4];
+  L.DD = [kf * 2, 4];
   L.FXY = [f * 2, 8]; L.QXY = [kf * 2, 8]; L.OUT4 = [kf * 4, 16];
-  L.FLAGS = [ntiles * 4, 4]; L.TLS = [ntiles * 4, 4]; L.ARGS = [48, 4]; L.FLAGS2 = [(6 * ntiles + 3) * 4, 4]; L.CTR = [64, 4]; L.BSTR = [bstrBytes, 4];
+  L.TLS = [ntiles * 4, 4]; L.ARGS = [48, 4]; L.FLAGS2 = [(6 * ntiles + 3) * 4, 4]; L.CTR = [(16 + ntiles) * 4, 4]; L.BSTR = [bstrBytes, 4];
   for (const k of Object.keys(L)) L[k] = { bytes: up256(L[k][0]), elem: L[k][1] };
   return L;
 }
@@ -95,7 +97,7 @@ fn sparse_all(@builtin(local_invocation_index) li: u32) {
         if (x < 0 || y < 0 || x >= i32(u.tw) || y >= i32(u.th)) { continue; }
         let a = u32(y) * u.tw + u32(x);
         markDirty(a);
-        if (atomicExchange(&FLAGS[a], 1u) == 0u) { TL[atomicAdd(&saTotal, 1u)] = s * NTL + a; TLS[atomicAdd(&CTR[0], 1u)] = a; }
+        if (atomicExchange(&CTR[16u + a], 1u) == 0u) { TL[atomicAdd(&saTotal, 1u)] = s * NTL + a; TLS[atomicAdd(&CTR[0], 1u)] = a; }
       } }
     }
     storageBarrier(); workgroupBarrier();

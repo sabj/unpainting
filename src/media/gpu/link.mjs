@@ -1,5 +1,5 @@
 import { fixedBedLower as sumFixedBedLower } from '../fixed-bed.mjs';
-import { recordWetCells, recordWetBox, syncWetReachVersion } from '../paper-certificate.mjs';
+import { recordWetCells, recordWetBox, syncWetReachVersion, invalidatePaperCertificate } from '../paper-certificate.mjs';
 const fixedBedLower = sheet => sumFixedBedLower(sheet, { skipEmpty: process.env.GPU_SKIP_ZERO_LAYER === '1' });
 // The painter's side of the GPU sheet backend. attachGpu(sheet, O, { mode }) starts a worker that holds the sheet on the
 // GPU and sets sheet._gpu; with it unset (mode 'off', no adapter, no `webgpu` package) sheet, brush and pen run on the CPU.
@@ -616,6 +616,7 @@ export class GpuLink {
           // stale and will be read back before any paper observation uses them.
           sheet.W.fill(0);sheet.s.fill(0);sheet.M.fill(0);
         }else{this.paperFresh?.stale();this.paperWetRect=null;}
+        if(this.ctrl[12]!==1){this.lastDryZero=false;invalidatePaperCertificate(sheet);}
       }
       for(let q=0;q<count;q++){
         const [steps,hadTop,pushed,mask,archive,oldMask]=meta.subarray(q*6,q*6+6);
@@ -642,7 +643,9 @@ export class GpuLink {
       this.stats.maxQueuedDrys=Math.max(this.stats.maxQueuedDrys??0,this.queuedDrys);
       this.stale=true;this.topStale=true;this.fresh.stale();this.stats.drys++;
       this.stats.queuedDrys=(this.stats.queuedDrys??0)+1;
-      this.lastDryZero = true; // queued dry uses allowWet:false
+      // Only the analytic tail promises exact zero on successful completion.
+      // allowWet:false alone rejects a wet limit but permits residual pore traces.
+      this.lastDryZero = params.analyticTail === true;
       // Track subsequent mutations, but do not expose zero values until the worker
       // confirms an exact tail (a threshold-only dry may retain pore traces).
       (this.paperFresh??=new FreshMap(this.w,this.h)).fresh();

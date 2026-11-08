@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { PaperReadback } from './paper-readback.mjs';
 import { PaperGate } from './paper-gate.mjs';
-import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
+import {FINISH_WET_SCAN, FINISH_WET_SCAN_14} from './finish-wet-scan.mjs';
 import {edgePingPong} from './edge-pingpong.mjs';
 import {fastDryChunk, adaptiveFastDryChunk} from './fast-dry-chunk.mjs';
 import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mjs';
@@ -105,21 +105,23 @@ export class GpuSheet {
     if (fit.over.length) throw new Error(`GpuSheet: ${w}x${h} with ${K} pigments needs ${fit.over.map(([k, b]) => `${k} ${(b / 2 ** 30).toFixed(2)} GiB`).join(', ')}, over this device's ${(fit.limit / 2 ** 30).toFixed(2)} GiB binding limit; use fewer pigments or a smaller sheet`);
     const mk = (bytes, usage = 0) => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage });
     const f = n * 4, B = this.b = {};
-    for (const k of ['M', 'EVER', 'RESIST', 'W', 'S', 'S2', 'EA', 'EB', 'FX', 'FY', 'WSC', 'WENT', 'DEP', 'NEWF']) B[k] = mk(f);
+    for (const k of ['M', 'EVER', 'RESIST', 'W', 'EA', 'EB', 'FX', 'FY', 'WSC', 'WENT', 'DEP']) B[k] = mk(f);
+    B.S = mk(f * 3);
     if (o.fixedBed > 0) { B.DEP.destroy(); B.DEP = mk(f * 3); }
     for (const k of ['PAPER', 'PAPER2', 'PAPER3', 'BPAP']) B[k] = mk(f * 4);
     // the stroke plan and the hairs (up to SB floats), then the brush's last touch of each cell and the paper's capacity
-    this.strokePlanBudget=strokePlanBudget(planMiB(process.env.GPU_STROKE_PLAN_MIB,n),n,d.limits);this.SB=this.strokePlanBudget.words;const strokeSource=strokePlanShader(SRC,this.SB)+(process.env.GPU_FUSE_WETSCAN!=='0'&&d.limits.maxStorageBuffersPerShaderStage>=14?FINISH_WET_SCAN:'');B.BSTR=mk(this.strokePlanBudget.gpuBufferBytes);
+    this.strokePlanBudget=strokePlanBudget(planMiB(process.env.GPU_STROKE_PLAN_MIB,n),n,d.limits);this.SB=this.strokePlanBudget.words;const fuseWet=process.env.GPU_FUSE_WETSCAN!=='0';const strokeSource=strokePlanShader(SRC,this.SB)+(fuseWet&&d.limits.maxStorageBuffersPerShaderStage>=10?FINISH_WET_SCAN:'')+(fuseWet&&d.limits.maxStorageBuffersPerShaderStage>=14?FINISH_WET_SCAN_14:'');B.BSTR=mk(this.strokePlanBudget.gpuBufferBytes);
     this.resistMask = null;
-    for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM', 'PN', 'DD']) B[k] = mk(f * K);
+    for (const k of ['G', 'P', 'D', 'TOP', 'QX', 'QY', 'SC', 'OUTM']) B[k] = mk(f * K);
+    B.DD = mk(f * K * 2);
     B.FXY = mk(f * 2); B.QXY = mk(f * 2 * K);   // the fused step's fluxes (stepsInPass)
     // Split OUT4 by pigment planes when one binding would exceed the device limit.
     const out4Max = d.limits.maxStorageBufferBindingSize, planeBytes = f * 4;
     this.out4Planes = planeBytes * K > out4Max ? Math.max(1, Math.floor(out4Max / planeBytes)) : 4096;
     if (this.out4Planes < K && planeBytes * (K - this.out4Planes) > out4Max) throw Error('OUT4 needs more than two bindings at this sheet size');
     B.OUT4 = mk(planeBytes * Math.min(K, this.out4Planes)); B.OUT4B = mk(this.out4Planes < K ? planeBytes * (K - this.out4Planes) : 16);
-    B.TL = mk((this.ntiles + 1) * 4); for (const k of ['FLAGS', 'FLAGS2']) B[k] = mk((k === 'FLAGS2' ? 6 * this.ntiles + 3 : this.ntiles) * 4);
-    B.RC = d.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); B.CTR = mk(64); B.ARGS = mk(48, GPUBufferUsage.INDIRECT); B.U = d.createBuffer({ size: UBYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    B.TL = mk((this.ntiles + 1) * 4); B.FLAGS2 = mk((6 * this.ntiles + 3) * 4);
+    B.RC = d.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); B.CTR = mk((16 + this.ntiles) * 4); B.ARGS = mk(48, GPUBufferUsage.INDIRECT); B.U = d.createBuffer({ size: UBYTES, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     if (process.env.GPU_DEMAND_READBACK === '1') B.UPLOAD_META = mk(8);
     const put = (buf, arr, off = 0) => d.queue.writeBuffer(buf, off, arr);
     // paper: constant for a sheet

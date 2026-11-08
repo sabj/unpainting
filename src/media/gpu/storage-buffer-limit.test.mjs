@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
 
 // Parse balanced function bodies, then follow calls transitively. Counting all
 // module declarations would incorrectly charge unused bindings to every stage.
@@ -53,7 +54,8 @@ test('every WGSL compute entry point fits the Metal 10-storage-buffer ceiling', 
   const paths = shaders(new URL('./', import.meta.url));
   assert(paths.length > 0);
   for (const path of paths) {
-    const entries = storageUses(fs.readFileSync(path, 'utf8'));
+    const raw = fs.readFileSync(path, 'utf8') + (path.pathname.endsWith('/stepfull.wgsl') ? FINISH_WET_SCAN : '');
+    const entries = storageUses(raw);
     assert(entries.length > 0, `no compute entries parsed in ${path.pathname}`);
     for (const {entry, bindings} of entries) {
       assert(bindings.length <= 10, `${path.pathname}: ${entry} binds ${bindings.length} storage buffers (${bindings.join(', ')})`);

@@ -155,7 +155,10 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
         if (ai) { add[i] = 0; const a = ai * inv; if (M[i]) G[i] += a; else D[i] += a; L[i] += a; }
       }
     }
-    if (wrote) main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
+    if (wrote) {
+      invalidatePaperCertificate(main); // new pigment has not been fixed by the earlier dry
+      main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
+    }
   }
 
   /** The fine sheet dried: its water gone and its pigment fixed, as the painting's sheet is at the end of a pass. */
