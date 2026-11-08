@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deviceHealth, markBroken, brokenReason, assertDeviceHealthy, watchDevice } from './device-health.mjs';
 import { GpuLink, attachGpu } from './link.mjs';
+import { openGpu } from './stepfull.mjs';
 import { createSheet, DEFAULTS } from '../sheet.mjs';
 import { makePaper } from '../paper.mjs';
 
@@ -69,13 +70,13 @@ test('a GPU link stops at its next call once the GPU thread reported a device er
 
 // The real worker on the real GPU (skipped without one): a synthetic device error injected in the GPU thread reaches the
 // painter's next call.
-test('a device error in the GPU worker thread reaches the painter thread', () => {
+test('a device error in the GPU worker thread reaches the painter thread', t => {
   const prior = process.env.GPU_FAKE_DEVICE_ERROR;
   process.env.GPU_FAKE_DEVICE_ERROR = '3';
   try {
     const sheet = createSheet(makePaper(16, 16, { seed: 1 }), [{ K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 }]);
-    const logs = [], info = attachGpu(sheet, { ...DEFAULTS }, { mode: 'auto', log: m => logs.push(m) });
-    if (info.backend !== 'gpu') { console.log(`# skipped: ${info.reason}`); return; }
+    const logs = [], info = attachGpu(sheet, { ...DEFAULTS }, { mode: process.env.GPU_REQUIRED === '1' ? 'on' : 'auto', log: m => logs.push(m) });
+    if (info.backend !== 'gpu') { t.skip(info.reason); return; }
     try {
       assert.throws(() => { for (let i = 0; i < 6; i++) sheet._gpu.call({ op: 'idle' }); }, /GPU device error: synthetic device error on GPU message 3/);
       assert.throws(() => assertDeviceHealthy(sheet), /GPU device error/);
@@ -83,18 +84,33 @@ test('a device error in the GPU worker thread reaches the painter thread', () =>
   } finally { if (prior === undefined) delete process.env.GPU_FAKE_DEVICE_ERROR; else process.env.GPU_FAKE_DEVICE_ERROR = prior; }
 });
 
-// Dawn itself (skipped without the `webgpu` package or an adapter): an invalid copy is an uncaptured validation error and
-// the submit that carries it is dropped, yet mapping the copy's target still succeeds. The watch is what notices.
-test('a real Dawn validation error is caught by the watch, though the read-back still succeeds', async () => {
-  let webgpu; try { webgpu = await import('webgpu'); } catch { console.log('# skipped: no webgpu package'); return; }
+// Dawn itself: an invalid copy is an uncaptured validation error, even though mapping the target succeeds.
+// Use the production opener: it keeps Dawn's instance reachable for the device's lifetime.
+test('a real Dawn validation error is caught by the watch, though the read-back still succeeds', async t => {
+  let webgpu;
+  try { webgpu = await import('webgpu'); }
+  catch (error) {
+    if (error.code !== 'ERR_MODULE_NOT_FOUND' || process.env.GPU_REQUIRED === '1') throw error;
+    t.skip('no webgpu package'); return;
+  }
   Object.assign(globalThis, webgpu.globals);
-  const adapter = await webgpu.create([]).requestAdapter(); if (!adapter) { console.log('# skipped: no adapter'); return; }
-  const device = await adapter.requestDevice(), seen = [];
-  watchDevice(device, t => seen.push(t), { fakeAfterOps: 0 });
-  const src = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC }), dst = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-  const e = device.createCommandEncoder(); e.copyBufferToBuffer(src, 0, dst, 0, 64); device.queue.submit([e.finish()]);
-  await device.queue.onSubmittedWorkDone(); await dst.mapAsync(GPUMapMode.READ); dst.unmap();
-  for (let i = 0; i < 20 && !seen.length; i++) await new Promise(r => setTimeout(r, 10));
-  assert.equal(seen.length, 1); assert.match(seen[0], /^validation: Copy range/);
-  device.destroy();
+  let device;
+  try { ({ device } = await openGpu(webgpu.create(process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : []))); }
+  catch (error) {
+    if (error.message !== 'no WebGPU adapter' || process.env.GPU_REQUIRED === '1') throw error;
+    t.skip(error.message); return;
+  }
+  try {
+    globalThis.gc?.(); // --expose-gc also checks that the opener retains Dawn's native owners.
+    const seen = [];
+    watchDevice(device, message => seen.push(message), { fakeAfterOps: 0 });
+    const src = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC });
+    const dst = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const encoder = device.createCommandEncoder();
+    encoder.copyBufferToBuffer(src, 0, dst, 0, 64); device.queue.submit([encoder.finish()]);
+    await device.queue.onSubmittedWorkDone(); await dst.mapAsync(GPUMapMode.READ); dst.unmap();
+    for (let i = 0; i < 20 && !seen.length; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(seen.length, 1);
+    assert.match(seen[0], /^validation: Copy range/);
+  } finally { device.destroy(); }
 });
