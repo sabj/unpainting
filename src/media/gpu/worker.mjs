@@ -10,10 +10,17 @@ import { observeFrontier } from './frontier-layout.mjs';
 import { instrumentDispatches } from './dispatch-profile.mjs';
 import { watchDevice, markBroken } from './device-health.mjs';
 
+const keepAlive = setInterval(() => {}, 1000);
 if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // say when a step in a stroke had more active tiles than it was sized for
 const RING_FLOATS = 6144; // must match link.mjs
 const ring = new Float32Array(workerData.ring), done = new Int32Array(workerData.done), sumData = new Float32Array(workerData.sum);
 const ctrl = new Int32Array(workerData.ctrl), rectData = new Float32Array(workerData.rect), layerData = new Float32Array(workerData.layer), err = new Uint8Array(workerData.err);
+process.on('exit', () => {
+  if (Atomics.load(ctrl, 3) === 0) {
+    Atomics.store(ctrl, 3, 2);
+    Atomics.notify(ctrl, 3);
+  }
+});
 // ctrl: 0 ack, 1 int result, 2 failed, 3 status (0 booting, 1 ready, 2 unavailable), 4 layer returned by a dry, 5 layer pushed by a dry, 6 wet tiles left by the last step
 let gpu = null, sheet = null, chain = Promise.resolve(), watcher = null;
 const queuedDrys=[];let queuedPaperZero=false;
@@ -33,7 +40,15 @@ function driedMask(r){if(!asyncDry)return;workerWetMask=0;if(r.pushed)workerTopM
 let framePort = null, frameChain = Promise.resolve();
 const toFrames = (p, build) => { frameChain = frameChain.then(() => p).then(v => { const { msg, transfer } = build(v); framePort.postMessage(msg, transfer); }).catch(e => { console.error('gpu worker frame error', e); fail(e.stack ?? e.message); }); };
 const ack = () => { Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); };
-const fail = (msg, status = 0) => { const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1)); err.fill(0); err.set(b); ctrl[2] = 1; if (status) Atomics.store(ctrl, 3, status); ack(); };
+const fail = (msg, status = 0) => {
+  const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1));
+  err.fill(0); err.set(b); ctrl[2] = 1;
+  if (status || Atomics.load(ctrl, 3) === 0) {
+    Atomics.store(ctrl, 3, status || 2);
+    Atomics.notify(ctrl, 3);
+  }
+  ack();
+};
 
 // Normal profiling preserves scheduling. Serial profiling is diagnostic only: its wall timings include queue waits.
 const PROF = process.env.GPU_PROF === '1' ? {} : null;
@@ -83,7 +98,7 @@ async function handleOp(m) {
       writeAdapterEvidence(workerData.adapterMetadata ? new Uint8Array(workerData.adapterMetadata) : null, { adapterInfo, dawnFlags: process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : [] });
       err.fill(0); err.set(new TextEncoder().encode(String(m.adapterNote ?? 'webgpu')));
       if(asyncDry){for(let k=0;k<gpu.K;k++){if([sheet.G[k],sheet.D[k],sheet.P[k]].some(a=>a.some(v=>v!==0)))workerWetMask|=1<<k;if(m.top?.[k]?.some(v=>v!==0))workerTopMask|=1<<k;}gpu.setAct(workerWetMask|workerTopMask);}
-      Atomics.store(ctrl, 3, 1); break;
+      Atomics.store(ctrl, 3, 1); Atomics.notify(ctrl, 3); break;
     }
     case 'opticalInit': {
       gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = null;
@@ -188,7 +203,7 @@ async function handleOp(m) {
     }
     case 'dryStats': {const m=gpu.dryTelemetry??{};ctrl[1]=m.calls??0;ctrl[4]=m.fastChunk??50;ctrl[6]=m.lastWetCounter??-1;ctrl[12]=m.counterReads??0;ctrl[13]=Math.min(2147483647,Math.round((m.counterReadMs??0)*1000));ctrl[14]=m.fastIterations??0;ctrl[15]=m.fastChunks??0;break;}
     case 'prof': { gpu.flushStrokes(); const b = new TextEncoder().encode(JSON.stringify({ ...(PROF ?? {}), dryTelemetry: gpu.dryTelemetry ?? null, capabilities: { wetCounterPolicy: 'on-demand; frontier maintained every step', fastDryChunkPolicy: 'adaptive 50/150/200; explicit override supported', maxStorageBuffersPerShaderStage: gpu.device.limits.maxStorageBuffersPerShaderStage, fusedWetScan: process.env.GPU_FUSE_WETSCAN !== '0' && gpu.device.limits.maxStorageBuffersPerShaderStage >= 10 }, timingScope: SERIAL_PROF ? 'legacy serialized worker wall time' : 'worker handling wall time; data-dependent readbacks include queued GPU work; unawaited stroke execution excluded', dispatchBatches: gpu.device.dispatchProfile?.snapshot(), timestamps: await gpu.timestamps.result(), optical: gpu.optical ? { ...gpu.optical.stats, timestamps: await gpu.optical.timestamps.result() } : null })); new Uint8Array(rectData.buffer).set(b); ctrl[1] = b.length; break; }
-    case 'close': process.exit(0);
+    case 'close': clearInterval(keepAlive); process.exit(0);
   }
   if (m.wait !== false) ack();
 }
