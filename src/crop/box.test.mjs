@@ -74,6 +74,53 @@ test('a box paint is a sheet pigment in the palette format', () => {
   const p = boxPigment(byKey.sienna);
   assert.deepEqual(Object.keys(p).sort(), ['K', 'S', 'gamma', 'name', 'omega', 'rho']);
   assert.ok(p.K.every((v, c) => Math.abs(v - 0.55 * byKey.sienna.dir[c]) < 1e-12));
-  assert.deepEqual(p.S, [0.02, 0.02, 0.02]);
+  assert.deepEqual(p.S, [0.025, 0.02, 0.015]);
+  assert.equal(p.gamma, 0.55);
+  assert.equal(p.omega, 0.6);
+  assert.equal(p.rho, 0.07);
   assert.equal(p.name, 'burnt sienna');
 });
+
+test('authentic Color Index constants differentiate granulating vs staining pigments', () => {
+  const ultramarine = boxPigment(byKey.ultramarine);
+  const phthalo = boxPigment(byKey.phthaloblue);
+  const cerulean = boxPigment(byKey.cerulean);
+  const rose = boxPigment(byKey.rose);
+  const cadyellow = boxPigment(byKey.cadyellow);
+
+  // PB29 & PB36 granulate heavily; PB15 & PV19 have zero granulation
+  assert.ok(ultramarine.gamma >= 0.8 && cerulean.gamma >= 0.8);
+  assert.equal(phthalo.gamma, 0);
+  assert.equal(rose.gamma, 0);
+
+  // PB15 & PV19 stain deeply; PB29 & PB36 lift easily
+  assert.ok(phthalo.omega >= 2.5 && rose.omega >= 2.5);
+  assert.ok(ultramarine.omega <= 0.4 && cerulean.omega <= 0.4);
+
+  // Mineral pigments (PY35, PB36) scatter light; organic dyes are transparent
+  assert.ok(cadyellow.S[0] > 0.10 && cerulean.S[0] > 0.10);
+  assert.ok(phthalo.S[0] <= 0.01 && rose.S[0] <= 0.01);
+});
+
+test('mixed paints inherit physical properties weighted by pigment share', () => {
+  const sap = boxPigment(byKey.sapgreen);
+  const paynes = boxPigment(byKey.paynes);
+  const sepia = boxPigment(byKey.sepia);
+  const black = boxPigment(byKey.lampblack);
+
+  assert.equal(black.omega, 2.0);
+  assert.equal(black.gamma, 0.1);
+
+  // Sap green is a mixture of non-granulating dyes (PG7 + PY97)
+  assert.equal(sap.gamma, 0);
+  assert.ok(sap.omega > 2.0);
+
+  // Payne's grey (PBk6 + PB29) inherits mild granulation from ultramarine
+  assert.ok(paynes.gamma > 0.15 && paynes.gamma < 0.25);
+
+  // Sepia (umber + lampblack) inherits moderate granulation and medium lift resistance
+  assert.ok(sepia.gamma > 0.20 && sepia.gamma < 0.35);
+  assert.ok(sepia.omega > 1.0 && sepia.omega < 1.5);
+});
+
+

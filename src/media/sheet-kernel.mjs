@@ -102,7 +102,7 @@ function spans(C, y, y0, y1, x0, x1, out) {
 }
 
 function phaseB(C, ya, yb) {
-  const { ctrl, prm, w, h, M, s, W, G, D, P: Pp, K, ever, edge, capacity, wl, wrow, wf, rlo, rhi, wlo, whi, plo, phi } = C;
+  const { ctrl, prm, w, h, M, s, W, G, D, P: Pp, K, ever, edge, capacity, height, wl, wrow, wf, rlo, rhi, wlo, whi, plo, phi } = C;
   const x0 = ctrl[BOX], y0 = ctrl[BOX + 1], x1 = ctrl[BOX + 2], y1 = ctrl[BOX + 3];
   const sp = [0, 0, 0, 0];
   for (let y = ya; y <= yb; y++) { spans(C, y, y0, y1, x0, x1, sp); wlo[y] = sp[0]; whi[y] = sp[1]; plo[y] = sp[2]; phi[y] = sp[3]; }
@@ -152,9 +152,37 @@ function phaseB(C, ya, yb) {
     const Dk = D[k]; for (let q = q0; q < q1; q++) if (Dk[wl[q]] !== 0) { ctrl[DF + k] = 1; break; }
   }
   const dt = prm[P.dt], evap = prm[P.evap], edgeEvap = prm[P.edgeEvap], absorb = prm[P.absorb], oFilm = prm[P.film];
+  const flowDepth = prm[P.flowDepth] || 0.06;
+  const mmPerCell = 0.3;
+  const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
+  const dryR2 = dryR * dryR;
   for (let q = q0; q < q1; q++) {
     const i = wl[q];
-    const near = edge[i] <= edgeWidth ? 1 - (edge[i] - 1) / edgeWidth : 0;
+    let near = 0;
+    if (edge[i] <= edgeWidth) {
+      const geomNear = 1 - (edge[i] - 1) / edgeWidth;
+      const cx = i % w, cy = (i / w) | 0;
+      let dryCells = 0, totalCells = 0;
+      for (let dy = -dryR; dy <= dryR; dy++) {
+        const dy2 = dy * dy, py = cy + dy;
+        const inY = py >= 0 && py < h;
+        const prow = inY ? py * w : 0;
+        for (let dx = -dryR; dx <= dryR; dx++) {
+          if (dx * dx + dy2 <= dryR2) {
+            totalCells++;
+            const px = cx + dx;
+            if (!inY || px < 0 || px >= w || !M[prow + px]) dryCells++;
+          }
+        }
+      }
+      const dryFrac = totalCells > 0 ? dryCells / totalCells : 0;
+      const fMin = dryR <= 2 ? 0.10 : 0.18;
+      const fMax = dryR <= 2 ? 0.28 : 0.42;
+      const u = Math.min(1, Math.max(0, (dryFrac - fMin) / (fMax - fMin)));
+      const dryFactor = u * u * (3 - 2 * u);
+      const depthFactor = flowDepth > 0 ? Math.min(1, Math.max(0, W[i] / flowDepth)) : 1;
+      near = geomNear * dryFactor * depthFactor;
+    }
     W[i] = Math.max(0, W[i] - dt * (evap + edgeEvap * near));
     const a = Math.min(dt * absorb, Math.max(0, capacity[i] - s[i]), Math.max(0, W[i] - oFilm));
     if (a > 0) { const aw = a / W[i]; for (let n = 0; n < nl; n++) { const k = la[n], Gk = G[k], g = Gk[i] * aw * prm[PK + k * PKS]; Gk[i] -= g; Pp[k][i] += g; } }
