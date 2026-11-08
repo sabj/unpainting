@@ -84,3 +84,23 @@ test('specialized fine ink retains main-palette dip concentrations in the replay
     assert.deepEqual(tape.find(m=>m.k==='D').ink,[0,10,0]);
   } finally { recordMarks(false); }
 });
+
+import {dry} from '../../media/sheet.mjs';
+import {validDryFixedCertificate} from '../../media/paper-certificate.mjs';
+
+test('fine ink carry invalidates a CPU dry-fixed proof and the next dry fixes that ink',()=>{
+  const {main,R}=setup();dry(main);
+  assert.equal(validDryFixedCertificate(main),true);
+  R.draw([line],new Float32Array(W*H).fill(1),W,H,{ink:[10],peak:1});
+  const mass=main.D[0].reduce((sum,v)=>sum+v,0),layers=main.layers.length;
+  assert.ok(mass>0);
+  assert.equal(validDryFixedCertificate(main),false);
+  dry(main);
+  assert.equal(main.layers.length,layers+1);
+  assert.ok(main.D[0].every(v=>v===0));
+  const fixed=thickness(main)[0].reduce((sum,v)=>sum+v,0);
+  assert.ok(Math.abs(fixed-mass)<1e-4,'fixing preserves the carried pigment');
+  assert.equal(validDryFixedCertificate(main),true);
+  R.carry();
+  assert.equal(validDryFixedCertificate(main),true,'a no-op carry does not discard the proof');
+});

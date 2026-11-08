@@ -70,3 +70,14 @@ test('CPU fixed proofs expire on layer edits and material writes',()=>{
   layersChanged(s);assert.equal(validDryFixedCertificate(s),false);
   certifyDryFixed(s);s.layers.push([new Float32Array(s.n)]);assert.equal(validDryFixedCertificate(s),false);
 });
+
+import {beginWetOperation,recordWetBox,queryWetReach} from './paper-certificate.mjs';
+
+test('first boxed wet footprint after a dry certificate needs no cell stamp buffer',()=>{
+  const s=make();certifyZeroPaper(s);beginWetOperation(s);
+  recordWetBox(s,2,2,5,5);
+  assert.deepEqual(queryWetReach(s,[34],[2,2,2,2]),{
+    allZero:false,rect:[2,2,1,1],bounds:[2,2,2,2],
+  });
+  assert.deepEqual(queryWetReach(s,[0],[0,0,0,0]),{allZero:true});
+});
