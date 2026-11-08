@@ -1,4 +1,4 @@
-import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
+import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
 import { censusDry } from './census.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -90,6 +90,10 @@ export function createSheet(paper, pigments) {
     resist: null, resistFrom: null,
     edge: F32(n), steps: 0,
   };
+  sheet.prewetRegion = (mask, waterMm, opts) => prewetRegion(sheet, mask, waterMm, opts);
+  sheet.depositPassage = (mask, conc, water, opts) => depositPassage(sheet, mask, conc, water, opts);
+  sheet.softEdgeRing = (mask, radiusMm, strength) => softEdgeRing(sheet, mask, radiusMm, strength);
+  return sheet;
 }
 
 /** Water and pigment masses added at a cell. */
@@ -267,6 +271,114 @@ const depositScaled = (sheet, i, water, pig, g) => {
   sheet.W[i] += water; sheet.M[i] = 1; sheet.ever[i] = 1; sheet.wetDirty = 1;
   if (pig) for (let k = 0; k < sheet.K; k++) { const v = pig[k] * g; if (v) sheet.G[k][i] += v; }
 };
+
+/**
+ * Pre-wet a region of the paper with clean water, saturating the capillary pores
+ * and establishing a uniform damp sheen (wet bed) without pigment.
+ * Prevents premature boundary drying and enables continuous wet-into-wet wash merging.
+ */
+export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare = 0.85, surfaceFilm = 0.02 } = {}) {
+  coherent(sheet);
+  const { n, paper, W, s, M, ever } = sheet;
+  const capacity = paper.capacity;
+  const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.218;
+  const targetDepth = Math.max(surfaceFilm, (waterMm / mmPerCell) * 0.1);
+  const wettedIndices = [];
+
+  for (let i = 0; i < n; i++) {
+    if (mask && !mask[i]) continue;
+    if (sheet.resist !== null && sheet.resist[i] === 1 && (sheet.resistStrength === null || sheet.resistStrength[i] === 1)) continue;
+
+    const cap = capacity[i];
+    const targetPore = cap * dampPoreShare;
+    if (s[i] < targetPore) s[i] = targetPore;
+
+    if (W[i] < targetDepth) W[i] = targetDepth;
+
+    M[i] = 1;
+    ever[i] = 1;
+    wettedIndices.push(i);
+  }
+
+  sheet.wetDirty = 1;
+  recordWetCells(sheet, wettedIndices);
+  wrote(sheet);
+
+  if (TAPE && sheet._tape) {
+    TAPE.push({ k: 'pw', m: mask ? Array.from(mask) : null, w: waterMm });
+  }
+
+  return wettedIndices.length;
+}
+
+/**
+ * Deposit an entire passage directly through a mask with specified pigment concentration and water load.
+ */
+export function depositPassage(sheet, mask, pigmentConcentration, waterLoad, options = {}) {
+  coherent(sheet);
+  const { prewet = false, waterMm = 0.03 } = options;
+  if (prewet) {
+    prewetRegion(sheet, mask, waterMm);
+  }
+  const n = sheet.n;
+  const indices = [];
+  for (let i = 0; i < n; i++) {
+    if (mask && !mask[i]) continue;
+    deposit(sheet, i, waterLoad, pigmentConcentration);
+    indices.push(i);
+  }
+  recordWetCells(sheet, indices);
+  wrote(sheet);
+  return indices.length;
+}
+
+/**
+ * Compute a damp perimeter feathering ring around a mask, applying damp pore moisture without pigment.
+ */
+export function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7) {
+  coherent(sheet);
+  const { w, h, paper, s, ever } = sheet;
+  const capacity = paper.capacity;
+  const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.218;
+  const rCells = Math.max(1, Math.round(radiusMm / mmPerCell));
+  const r2 = rCells * rCells;
+  const wetted = [];
+
+  for (let y = 0; y < h; y++) {
+    const prow = y * w;
+    for (let x = 0; x < w; x++) {
+      const i = prow + x;
+      if (mask && mask[i]) continue;
+      let minD2 = Infinity;
+      const y0 = Math.max(0, y - rCells), y1 = Math.min(h - 1, y + rCells);
+      const x0 = Math.max(0, x - rCells), x1 = Math.min(w - 1, x + rCells);
+      for (let py = y0; py <= y1; py++) {
+        const dy = py - y, dy2 = dy * dy;
+        const rrow = py * w;
+        for (let px = x0; px <= x1; px++) {
+          if (mask && mask[rrow + px]) {
+            const dx = px - x, d2 = dx * dx + dy2;
+            if (d2 < minD2) minD2 = d2;
+          }
+        }
+      }
+      if (minD2 <= r2) {
+        const dist = Math.sqrt(minD2);
+        const falloff = Math.max(0, 1 - dist / rCells);
+        const target = capacity[i] * featherStrength * falloff;
+        if (s[i] < target) s[i] = target;
+        ever[i] = 1;
+        wetted.push(i);
+      }
+    }
+  }
+  if (wetted.length) {
+    sheet.wetDirty = 1;
+    recordWetCells(sheet, wetted);
+    wrote(sheet);
+  }
+  return wetted.length;
+}
 
 // The part of the sheet still worth working: what is wet, plus pores still holding water. Paper this close to dry is
 // finished, and leaving it out keeps every later step cheap.
@@ -519,9 +631,38 @@ function stepBox(sheet, o, box, reduce = false) {
 
   // 1. drying, faster at the pinned boundary; absorption into the pores without tearing the film
   const evap = o.evap, edgeEvap = o.edgeEvap, absorb = o.absorb, oFilm = o.film;
+  const edgeFlowDepth = o.flowDepth ?? 0.06;
+  const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.3;
+  const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
+  const dryR2 = dryR * dryR;
+
   for (let q = 0; q < nw; q++) {
     const i = wl[q];
-    const near = edge[i] <= edgeWidth ? 1 - (edge[i] - 1) / edgeWidth : 0;
+    let near = 0;
+    if (edge[i] <= edgeWidth) {
+      const geomNear = 1 - (edge[i] - 1) / edgeWidth;
+      const cx = i % w, cy = (i / w) | 0;
+      let dryCells = 0, totalCells = 0;
+      for (let dy = -dryR; dy <= dryR; dy++) {
+        const dy2 = dy * dy, py = cy + dy;
+        const inY = py >= 0 && py < h;
+        const prow = inY ? py * w : 0;
+        for (let dx = -dryR; dx <= dryR; dx++) {
+          if (dx * dx + dy2 <= dryR2) {
+            totalCells++;
+            const px = cx + dx;
+            if (!inY || px < 0 || px >= w || !M[prow + px]) dryCells++;
+          }
+        }
+      }
+      const dryFrac = totalCells > 0 ? dryCells / totalCells : 0;
+      const fMin = dryR <= 2 ? 0.10 : 0.18;
+      const fMax = dryR <= 2 ? 0.28 : 0.42;
+      const u = Math.min(1, Math.max(0, (dryFrac - fMin) / (fMax - fMin)));
+      const dryFactor = u * u * (3 - 2 * u);
+      const depthFactor = edgeFlowDepth > 0 ? Math.min(1, Math.max(0, W[i] / edgeFlowDepth)) : 1;
+      near = geomNear * dryFactor * depthFactor;
+    }
     W[i] = Math.max(0, W[i] - dt * (evap + edgeEvap * near));
     const a = Math.min(dt * absorb, Math.max(0, capacity[i] - s[i]), Math.max(0, W[i] - oFilm));
     if (a > 0) { const aw = a / W[i]; for (let n = 0; n < nA; n++) { const k = act[n], Gk = G[k], g = Gk[i] * aw * mobility[k]; Gk[i] -= g; P[k][i] += g; } }
@@ -534,7 +675,7 @@ function stepBox(sheet, o, box, reduce = false) {
   // Face conductance is the fibres' permeability (1 - ff + ff (0.25 + 1.75 perm)) times the flow rate times the upwind
   // depth's conductance (min(1, (max depth / flowDepth)^2)), so a deep wash still feeds its thin pinned edge. It is
   // written out at each face because closures are slower here.
-  const perm = permeability(paper), px = perm.px, py = perm.py, ff = o.fibreFlow ?? 0.6, flowDepth = o.flowDepth ?? 0.12, flow = o.flow, slope = o.slope;
+  const perm = permeability(paper), px = perm.px, py = perm.py, ff = o.fibreFlow ?? 0.6, flowDepth = o.flowDepth ?? 0.06, flow = o.flow, slope = o.slope;
   // Paint dropped into clean water spreads over it: its binder lowers the surface tension, and the water surface is pulled
   // towards the higher tension of the clean water around it (Marangoni flow), carrying the pigment out; the front
   // breaks into fingers as it runs over the uneven paper. Pigment concentration stands in for the binder that comes
