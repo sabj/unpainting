@@ -88,7 +88,8 @@ test('a device error in the GPU worker thread reaches the painter thread', () =>
 test('a real Dawn validation error is caught by the watch, though the read-back still succeeds', async () => {
   let webgpu; try { webgpu = await import('webgpu'); } catch { console.log('# skipped: no webgpu package'); return; }
   Object.assign(globalThis, webgpu.globals);
-  const adapter = await webgpu.create([]).requestAdapter(); if (!adapter) { console.log('# skipped: no adapter'); return; }
+  const gpu = globalThis._testGpuInstance = webgpu.create([]);
+  const adapter = await gpu.requestAdapter(); if (!adapter) { console.log('# skipped: no adapter'); return; }
   const device = await adapter.requestDevice(), seen = [];
   watchDevice(device, t => seen.push(t), { fakeAfterOps: 0 });
   const src = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC }), dst = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
