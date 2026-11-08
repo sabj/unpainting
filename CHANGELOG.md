@@ -1,59 +1,75 @@
 # Changelog
 
-Releases are plain semver, with a git tag per release. Each release names its painter version (the V number) and sim version ([docs/versions.md](docs/versions.md)).
+Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## Unreleased — 0.3.0
+## 0.3.0 — 2026-11-07
 
-Painter V102, sim 103, judges J1. `0.3.0` combines the pen-and-wash ink pipeline from `wip/0.2.3` with a full simulator, GPU synchronization, caching and memory optimization pass across `src/media`, `src/paint` and `tools/`.
+**More time painting, less time waiting.**
 
-On the three frozen reference workloads on an Apple M4 Mac mini (16 GiB, GPU/Dawn/Metal, `--mode fast`, seed 0), warm suite wall time drops from `725.69 s` to `244.85 s` (**`2.96x` faster**, or `66.3%` less time) while preserving `99.91%` to `99.9998%` SSIM against `0.2.1`, non-degraded deterministic scorer composites (`55.6`, `60.2`, `64.8`), and reducing peak RSS by up to `2.2 GiB`.
+0.3.0 reduces the work between brushstrokes: checking dry paper, preparing another run, moving data off the GPU and storing layers that contain no paint. It also combines GPU steps to reduce dispatch overhead.
 
-| Workload | Target & settings | `0.2.1` Control | `0.3.0` Cold | `0.3.0` Warm | Warm speedup | `0.2.1` RSS | `0.3.0` RSS | SSIM vs `0.2.1` |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| `general-540` | Sargent *A Tramp*, `540 px`, `--recipe general` | `82.39 s` | `43.43 s` | `36.93 s` | **`2.23x`** | `2.12 GiB` | `2.02 GiB` | `99.997%` |
-| `inkres-1200` | Yale (`h34-a`), `1200 px`, `--inkrecipe wash` (`--inkres 2`) | `179.90 s` | `116.61 s` | `67.44 s` | **`2.67x`** | `7.12 GiB` | `4.92 GiB` | `99.9998%` |
-| `valueplan-1200` | Sargent *White Ships*, `1200 px`, V4/V5 `--valueplan` | `463.40 s` | `227.13 s` | `140.48 s` | **`3.30x`** | `9.06 GiB` | `7.99 GiB` | `99.91%` |
-| **Three-workload suite** | Serial GPU total | **`725.69 s`** | **`387.17 s`** | **`244.85 s`** | **`2.96x`** | `9.06 GiB` max | `7.99 GiB` max | `99.97%` mean |
+During development, the three-painting M4 reference suite fell from **12.1 minutes to 4.7 minutes with warm caches: about 2.6× faster**. With run caching disabled, it took **6.3 minutes: 1.91× faster**.
 
-### Speed, GPU synchronization and memory
+![The reference suite takes 12.09 minutes on the frozen control, 6.33 minutes at Stage 17 with run caching off, and 4.68 minutes with warm caches.](https://github.com/sabj/unpainting/releases/download/v0.3.0/speed.png)
 
-- **Zero-water, dry-fixed and wet-reach paper certificates (`src/media/paper-certificate.mjs`, `src/paint/methods/wetdry.mjs`):**
-  - Full-sheet and footprint dry gates (`measurePaper`, `measurePaperDry`, pen gates) skip GPU readbacks and `waterP95` sorting when a valid zero-water or dry-fixed certificate holds, or when cells lie outside the active wet-reach mask (`wetMask` / `wetList`).
-  - Queued GPU drys (`dryQueued`) certify zero-water completion without draining the async GPU queue, and `sheet._rawLayers` lets certificate and storage checks inspect dried layers without triggering a synchronous GPU flush.
-  - GPU `step` and `dry` narrow their active flow and drying boxes to the exact wet-reach bounding box.
-- **GPU link and regional tile freshness (`src/media/gpu/link.mjs`, `src/media/gpu/fresh.mjs`, `src/media/gpu/optical-gpu.mjs`):**
-  - Non-blocking CPU-to-GPU uploads (`upSync`) replace blocking `call({ op: 'up' })` round-trips during CPU strokes and partial uploads.
-  - Non-flow GPU strokes, splats and CPU strokes invalidate only their touched `64x64` tiles in `paperFresh` (`FreshMap.staleRect`) and preserve `paperVersion` across `'opts'` and `'act'` state updates, avoiding full-sheet `paperDown` readbacks between adjacent strokes.
-  - `optical-gpu.mjs` caches the base-layer optical stack on the sheet so repeated renders and look checks only composite the active top layers.
-- **Lossless lower-layer compaction and cached thickness (`src/media/layer-storage.mjs`, `src/media/sheet.mjs`):**
-  - `sheet.thickness()` caches held pigment mass across unchanged layer versions, and `compactLowerLayers` losslessly compacts zero planes in older dried layers (`-84%` CPU layer-plane storage and `-2.0 GiB` peak RSS on `inkres-1200`).
-- **Fine-ink (`--inkres`) and line-pipeline specialization (`src/paint/methods/ink-res.mjs`, `src/paint/methods/fine-material.mjs`, `src/paint/methods/ink-match.mjs`, `src/media/pen.mjs`):**
-  - `makeInkRes` uses a 1-pigment `[INK]` fine sheet instead of duplicating the full palette on the `2160 px` fine sheet, memoizes `INKRES.compose` across unchanged frames with separable horizontal row caching and preallocated carry/total buffers, reuses calibration material and `pen.pin` per `(paper, patchy)`, and gathers 4-neighbor `renderCells` in `inkDarkMatch`.
-  - `holdLineFile` and `traceLineModel` memoize line preparation, and `planPenInner` is skipped when `--drawingfile` replaces the opening drawing.
-- **GPU step kernel fusion, 10-binding Dawn/Metal scratch packing, brush-pigment specialization and adaptive dry chunks (`src/media/gpu/stepfull.wgsl`, `src/media/gpu/stepfull.mjs`, `src/media/gpu/finish-wet-scan.mjs`, `src/media/gpu/fast-dry-chunk.mjs`):**
-  - Fused `faces` + `pflux` (`faces_pflux`), `apply_f1` + `p3a_dep` (`apply_f1_p3a_dep`), `slide_apply_all` + `cap_sp` (`slide_apply_cap_sp`), `p5a` + `p5b` (`p5ab`), and `p5c` + `wetfrontier`/`wetscan` (`p5c_wetfrontier` / `p5c_wetscan`) in the GPU step solver, packed GPU scratch storage buffers (`FLAGS` into `CTR`, `S2`+`NEWF` into `S`, `PN` into `DD`) so `p5c_wetfrontier`, `p5c_wetscan`, `p5ab` and `slide_apply_cap_sp` fit Dawn/Metal's `maxStorageBuffersPerShaderStage = 10` ceiling, deferred `finish_wet_scan` to checkpoint boundaries, and scaled sustained wet-frontier fast-dry chunks (`adaptiveFastDryChunk`), cutting per-step compute dispatches and reusing a persistent `8 MiB` staging buffer (`batchStaging`) across queued strokes.
-  - Specialized `stroke_run`, `stroke_metered`, `feed_pigments` and `hair_cell` to active brush pigments (`brushPigmentCount`), parallelized `feed_pigments` across pigments (`4–18` barriers/step down to `1`), and skipped zero-load `D`/`G` read-modify-writes (`stroke_run` GPU time `-30.6%` on `inkres-1200`).
-  - Kept exact cell stamps (`WET_BUF`) active for 0-flow strokes after earlier flow steps (`paper-certificate.mjs`), gated queued exact-zero paper certificates on `analyticTail: true` (`link.mjs`), invalidated dry-fixed certificates on fine-ink carry (`ink-res.mjs`), retained spatially disjoint `paperGateCache` entries across strokes (`link.mjs`), and replaced per-stroke `Set`/object allocations in `strokeCells` (`wetdry.mjs`) with a reusable stamp buffer.
-- **Wash sessions, pass-boundary drying, buffered JSONL logs and spatial hotloops (`tools/paint-plate.mjs`, `tools/stroke-composition.mjs`):**
-  - `--dryboundaries 1` and `--washsession` fast defaults dry at value-plan pass boundaries and wet-contact overlaps (reducing suite GPU `drySolverIterations` down to `92,040` across the 3 reference workloads while maintaining `99.94%–99.97%` luminance SSIM and `98.75%–99.97%` 7x7 RGB SSIM vs `0.2.1`) and queue `value-band-*-dried.png` sharp writes asynchronously (`PENDING_IO`).
-  - `stroke-composition.mjs` reuses `Int32Array` row-interval buffers in `footprint` instead of allocating/sorting per-row arrays on every stroke, and `paint-plate.mjs` memoizes CLI flag lookups (`optIdx`), retains measured brush deposition evidence (`brushAfter`) in `value-commands.jsonl`, and defers `FLOORMASK`/`SHAPE_LOAD` construction on warm cache hits.
-  - Painter JSONL audit writers buffer up to `1 MiB` in memory (flushing on checks, pass boundaries and exits) and share stroke command IDs with `stroke-composition.mjs`.
+### The largest painting saves the most time
 
-### Step caching, passage checkpoints and native scoring
+The value-plan workload drops from **7.7 minutes to 2.9 minutes** in the measured warm run. The smaller paintings also improve.
 
-- **Fingerprinted run cache (`src/paint/run-cache.mjs`, `src/paint/run-cache-planes.mjs`, `src/paint/floor-paths-cache.mjs`):**
-  - `--runcache 1` (and `--speedvaluecache 1` for value plans) caches deterministic setup stages (`palette`, `pigment-fit`, `separator`, `paper`, `fine-paper`, `calibration`, `pen-field`, `early-lines`, `value-plan`, `floor-paths` and `fine-drawing`) keyed by a persistent stat-manifest source hash, dependency closure hash, target bytes and options.
-  - Typed-array cache planes use compact deflate compression (`run-cache-planes.mjs`) and `ObservedMask` skips untouched planes on partial GPU readbacks (`paper-readback.mjs`). Warm hits replay `TARGET_GUARD` look accounting and produce byte-identical `run-card.json` provenance and output PNGs.
-- **Extended passage checkpoints (`tools/aware/state-io.mjs`):**
-  - `--pausedir` and `--resumestate` now support `--inkres` (saving and restoring fine-sheet material, carry-down buffers and wet state) and `--prepfade` (`PREPF`), and validate `provenance.json` before loading arrays. Restored native `inkres-1200` runs finish byte-identical to uninterrupted runs.
-- **Native-resolution scoring (`bench/scripts/score_painting.py`, `bench/scripts/classic.py`):**
-  - `--resolution native` scores paintings at their rendered resolution (`1200 px`) with physical-millimetre filter widths (`--plate-mm`) and a content-addressed deterministic metric cache. Legacy target-size scoring remains the default.
+![Wall times for the three reference paintings, before and after optimization.](https://github.com/sabj/unpainting/releases/download/v0.3.0/workloads.png)
 
-### Harness, recipes and pen fixes
+| Reference workload | Frozen control | Stage 17 warm | Speedup |
+|---|---:|---:|---:|
+| General painting · 540 px | 82.39 s | 37.99 s | 2.17× |
+| Ink and wash · 1200 px planning grid | 179.90 s | 68.83 s | 2.61× |
+| Value-plan painting · 1200 px | 463.40 s | 173.75 s | 2.67× |
+| **Suite** | **725.69 s** | **280.56 s** | **2.59×** |
 
-- `src/paint/recipe.mjs`: fixed `--recipe none` precedence so `config.json` `drawingFlags` are not overridden by template defaults, and made unknown `--recipe` names throw an explicit error.
-- `bench/scripts/pipeline/plan-args.mjs` and `bench/scripts/pipeline/round45.mjs`: enforced an explicit `ALLOWED_EXTRA_ARGS` allowlist, updated `BASE` and `bench/v4v5/TASK.md` to v2/wash ink flags, and forwarded `--python` / `BENCH_SCORE_PYTHON` with SAM + scorer preflight checks before launching model sessions.
-- `src/media/pen.mjs`: truncated recorded `mark.points` and `mark.d` when a pen walk breaks early on ink starvation, and attached a shared `gestureId` across refill splits.
+These are single-run measurements on an Apple M4 Mac mini, with fixed workloads, fast mode and seed 0. The charts compare frozen control `41e6868` with Stage 17 `5e91484`; they do not mix the fastest runs from different stages. The control includes changes after the published `v0.2.1` tag (`1cc2c08`), so this is a development comparison, not a clean released-version A/B. The control and Stage 17 cache-off runs both use `--runcache 0`; warm uses `--runcache 1`. It is not an NVIDIA speed measurement.
+
+A fresh run of the final engine (`efbf8b7`) with `--runcache 0` took **57.07 s, 118.32 s and 217.62 s**, respectively: **393.01 s total**, or about **1.85×** the control’s throughput. That is a single cold-run observation, not a final warm-cache measurement. The graphs above retain the historical Stage 17 measurements.
+
+### The pictures stay close
+
+The final engine (`efbf8b7`) reproduces the earlier candidate's three PNGs byte for byte. Against the frozen control, **local RGB SSIM ranges from 98.75% to 99.76%**. SSIM is an image-similarity measurement, not a new vision-judge score or a percentage of artistic quality.
+
+The panel shows the least-similar workload. The right column amplifies absolute RGB differences by a fixed **8×**; black means an exact match. The crop shows the region with the largest average change. Small differences are visible around edges and washes; they are not assumed to be random noise.
+
+![Frozen control and final-engine paintings, an 8× absolute-difference view, and the largest-change crop.](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png)
+
+| Workload | Local RGB SSIM · 7 × 7 | Mean absolute channel difference · /255 |
+|---|---:|---:|
+| General painting | 99.76% | 0.202 |
+| Ink and wash | 99.32% | 0.455 |
+| Value-plan painting | 98.75% | 0.948 |
+
+[Value-plan comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) · [General comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/general-540-comparison.png) · [Ink-and-wash comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/inkres-1200-comparison.png) · [Measurements and hashes](https://github.com/sabj/unpainting/releases/download/v0.3.0/visual-evidence.json)
+
+Metrics use the original decoded RGB pixels at matching dimensions, with no registration, color correction or exclusions. The crop is selected by maximum mean absolute difference on a fixed 96-pixel grid, including the image edges. All three final M4 runs record zero target-guard violations. The ink run has an “early detail” heuristic flag; its risk level is low. [Validation records](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) preserve those results.
+
+### Compatibility and validation
+
+Apple M4 / Metal and NVIDIA L40S / Vulkan each pass **1,446 tests**, with **0 failures and 2 reported skips**, plus **83 benchmark tests**. The skips are a declared blur comparison and a private-reference fixture absent from the isolated checkout; neither is a GPU test. The NVIDIA regression set passes **11/11**, with zero fused/unfused field difference. Device-health checks pass **8/8** on both platforms with `GPU_REQUIRED=1` and `--expose-gc`.
+
+Four native paint fixtures complete on L40S. The 11 targeted GPU regressions also pass on RTX 4090. Forty L40S worker close/reopen cycles pass, half following injected device errors. The release fixes a raw-Dawn test that failed to retain its native GPU owner; it now uses the same opener as the painter and retains the error assertions. Claude reviewed that fix and the release claims.
+
+[Validation record](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) · [Test logs](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation-logs.zip) · [Timing data](https://github.com/sabj/unpainting/releases/download/v0.3.0/performance-evidence.json)
+
+Paint Lab paints, dries and saves pigment state on Chrome’s Apple Metal WebGPU and CPU paths. All **210 mushroom tests** pass, and Amanita, Morel and Coral complete real Chromium renders on the M4. These browser painters share media code with the CLI but have different execution paths; the CLI timing gains do not establish a browser speedup.
+
+Painter **V102**, simulator **103**, judges **J1**. The published model leaderboard retains its original versions and scores. Quality work for 0.3.1 is separate.
+
+### Implementation details
+
+- **Check only paper that can have changed.** Zero-water, dry-fixed and wet-reach certificates avoid redundant readbacks. Regional freshness tracking preserves unrelated paper gates across strokes. Flow expands the tracked wet area conservatively. Queued drying certifies exact zero only when an analytic tail guarantees it; fine-ink carry invalidates the dry-fixed state.
+- **Do more work per GPU dispatch.** Fused solver passes and packed scratch buffers fit Dawn/Metal's ten-storage-binding limit. A persistent 8 MiB staging buffer replaces per-stroke allocations. Active tiles and brush-pigment specialization avoid work on empty regions and unused pigment lanes.
+- **Keep less duplicated state.** Lower-layer compaction removes zero planes without discarding pigment. Thickness and optical-stack caches avoid rescanning unchanged layers. The fine-ink sheet uses one pigment and a separable box filter with reusable buffers.
+- **Reuse preparation across runs.** Fingerprinted caches cover palette fitting, paper, calibration, drawing and value-plan preparation. Keys include inputs, relevant code and options. Cache hits retain target-look accounting; tested cold/warm pairs produce identical final pixels. Typed arrays use compressed binary storage.
+- **Dry at passage boundaries.** Fast value-plan runs default to `--washsession 1`, keeping shapes in a pass wet together. This changes the drying schedule and can change pixels. `--washsession 0` starts each shape dry. Stage PNG writes are queued, and audit logs are buffered.
+- **Keep the audit evidence.** Fast strokes retain before/after brush measurements in `value-commands.jsonl`. Certificate regressions cover residual pore water, queued drying and fine-ink carry. Fusion tests assert that the fused pipelines actually compile before comparing them with the unfused path.
+- **Resume more painting states.** Passage checkpoints support fine ink and preparatory fade, validate provenance before loading arrays and preserve the fine sheet's wet state.
+- **Score at native resolution when requested.** `--resolution native` uses physical-millimetre filter widths and a deterministic metric cache. Legacy target-size scoring remains the default.
+- **Tighten recipe and harness behavior.** `--recipe none` preserves a plan's drawing choices; unknown recipes fail explicitly. Benchmark extra arguments use an allowlist, and dependency checks run before model sessions. Starved pen recordings stop at the executed path, with refill segments linked by gesture ID.
 
 ### Ink on ink-heavy works
 

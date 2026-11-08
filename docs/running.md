@@ -58,7 +58,7 @@ Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. 
 
 The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a pencil drawing first, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture` and `glaze-gains`. Its `washes.paints` fixes a palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is painter V096's recipe, which runs the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [Tuned settings](techniques.md#tuned-settings) lists every preset and fitted item.
 
-`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with release 0.1.0 (painter V096, sim 100). Painter V100 paints them differently.
+`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with release 0.1.0 (painter V096, sim 100). The current painter is V102, sim 103; those saved images retain their original version stamps.
 
 ## Main command-line controls
 
@@ -83,6 +83,9 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--physical` | `0`, `1` | `0` | `1` |
 | `--gpu` | `auto`, `on`, `off` | `auto` | same |
 | `--gpustrokes` | `0`, `check`; omit for normal GPU dispatch | normal dispatch | same; see [CLOUD.md](CLOUD.md#cpu-or-gpu) |
+| `--runcache` | `0`, `1`: reuse matching deterministic preparation | `1` | same |
+| `--speedvaluecache` | `0`, `1`: reuse matching value-plan preparation | `1` | same |
+| `--washsession` | `0`: dry before each shape; `1`: keep a pass wet; `2`: also join compatible passes | `1` in fast mode with `--valueplan`, otherwise `0` | same |
 | `--video` | `0`, `1` | `1` | same |
 | `--frames` | target wash frame count | 40 | 8 |
 | `--marks` | `0`, `1` | `0` | `1` |
@@ -96,7 +99,13 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--techcalfrom`, `--techcalmax`, `--techcalmin` | first value band calibrated; factor clamp | `4`, `2.5`, `0.8` | same |
 | `--deliveryreport` | `0`, `1`: write `delivery-by-band.json`, pigment delivered over booked by booked amount | `0` | same |
 
-`fast` approximates the final part of ordinary drying; `full` keeps the full drying schedule. They need not produce the same pixels. [techniques.md](techniques.md) lists the other recipe flags and off switches. There is no complete reference for every experimental flag. Unknown recipe names add no recipe flags.
+`fast` approximates the final part of ordinary drying; `full` keeps the full drying schedule. They need not produce the same pixels. [techniques.md](techniques.md) lists the other recipe flags and off switches. There is no complete reference for every experimental flag. Unknown recipe names stop with an error.
+
+In 0.3.0, run caches reuse preparation keyed by source inputs, relevant code and options. They do not replace painting with a saved final image. Use `--runcache 0` for a cold comparison. For a value plan, also set `--speedvaluecache 0` if you want to disable its separate preparation cache.
+
+Fast value-plan runs keep a pass wet by default (`--washsession 1`). This changes drying boundaries and can change pixels; `--washsession 0` starts each shape dry. Compare the same mode, seed and wash-session setting when measuring an implementation change.
+
+Use `--gpu on` when a GPU is required. Inspect the adapter identity in `backend.json`: the word `gpu` alone does not exclude a software adapter such as llvmpipe. [Cloud rendering](CLOUD.md#cpu-or-gpu) covers NVIDIA/Vulkan setup.
 
 Source-line extraction is an explicit choice (`--linesource auto` or `source-ink`), and final darks need `--finaldarks 1`. Without a prepared drawing or these options, the bounded drawing path runs.
 

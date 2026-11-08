@@ -16,3 +16,5 @@ Mushroom plates in ink and watercolour, painted live. **[Open it](https://sabj.g
 The palette button opens the plate in [Paint Lab](https://sabj.github.io/unpainting/demos/lab/).
 
 Code: `mushrooms.mjs`. Tests: `node --test demos/fungi/mushrooms.test.mjs`.
+
+0.3.0 validation passed all 210 mushroom tests. Browser checks also completed Amanita, Morel and Coral with seed `release-030-holdout` and `paint=fast`, producing dry 1200 × 1000 plates from the native 512 × 427 simulation. These checks establish compatibility. This browser painter uses a different path from the CLI's GPU implementation, so the CLI speedup is not a mushroom speedup.
