@@ -2,6 +2,8 @@
 // Atomics.wait for the few results it needs (a rectangle of the sheet, a dry, a layer); everything else is posted and
 // runs in order. Rectangles and layers travel in SharedArrayBuffers named in workerData.
 import { parentPort, workerData } from 'node:worker_threads';
+import fs from 'node:fs';
+try { fs.appendFileSync('/tmp/worker-trace.txt', 'worker thread loaded at ' + Date.now() + '\n'); } catch {}
 console.error('[worker.mjs] worker thread loaded');
 import { openGpu, GpuSheet } from './stepfull.mjs';
 import { writeAdapterEvidence } from './adapter-evidence.mjs';
@@ -93,6 +95,7 @@ async function handle(m) {
 async function handleOp(m) {
   switch (m.op) {
     case 'init': {
+      try { fs.appendFileSync('/tmp/worker-trace.txt', 'handleOp init starting\n'); } catch {}
       let webgpu;
       try { webgpu = await import('webgpu'); } catch (e) { return fail(`the webgpu package is not installed (${e.code ?? e.message})`, 2); }
       let device, adapter;
@@ -107,7 +110,9 @@ async function handleOp(m) {
       writeAdapterEvidence(workerData.adapterMetadata ? new Uint8Array(workerData.adapterMetadata) : null, { adapterInfo, dawnFlags: process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : [] });
       err.fill(0); err.set(new TextEncoder().encode(String(m.adapterNote ?? 'webgpu')));
       if(asyncDry){for(let k=0;k<gpu.K;k++){if([sheet.G[k],sheet.D[k],sheet.P[k]].some(a=>a.some(v=>v!==0)))workerWetMask|=1<<k;if(m.top?.[k]?.some(v=>v!==0))workerTopMask|=1<<k;}gpu.setAct(workerWetMask|workerTopMask);}
-      Atomics.store(ctrl, 3, 1); Atomics.notify(ctrl, 3); break;
+      Atomics.store(ctrl, 3, 1); Atomics.notify(ctrl, 3);
+      try { fs.appendFileSync('/tmp/worker-trace.txt', 'handleOp init done, ctrl[3]=1\n'); } catch {}
+      break;
     }
     case 'opticalInit': {
       gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = null;
@@ -216,4 +221,4 @@ async function handleOp(m) {
   }
   if (m.wait !== false) ack();
 }
-parentPort.on('message', m => { console.error('[worker.mjs] got message', m.op); watcher?.tick(); chain = chain.then(() => handle(m)).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); }); });
+parentPort.on('message', m => { try { fs.appendFileSync('/tmp/worker-trace.txt', 'got message: ' + m.op + '\n'); } catch {} console.error('[worker.mjs] got message', m.op); watcher?.tick(); chain = chain.then(() => handle(m)).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); }); });
