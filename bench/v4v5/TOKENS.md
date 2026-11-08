@@ -39,7 +39,7 @@ Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlaye
 | `_tv8` | --texvariety 0.8 |
 | `_rac` | --recessaccent 1 |
 | `_eye10` | --eyering <n>/<target width> |
-| `_skyb` | --skyblue 1, --skyfloc .5, --layerhue 1, --skysplit 1 |
+| `_skyb` | --skyblue 1, --skyfloc .5 |
 | `_cpp` | --paper coldpress |
 | `_tsh8` |  |
 | `_tfl8` | --texflow 0.8 |

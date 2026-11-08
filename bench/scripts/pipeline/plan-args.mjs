@@ -15,7 +15,8 @@ import path from 'node:path';
 
 export const BASE = 'region_w13_lay4_rec2x_rcl_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_pgreen_tp2';
 const DEFAULT_VARIANT = 'region_w13';
-const ARCHITECTURE_ONLY = /^(blk|bmm|bka)\d+$|^birr$/;
+const ARCHITECTURE_ONLY = /^(blk|bmm|bka|rg|rec)\d*x?$|^birr$|^rcl$/;
+const GLAZE_GAINS = /^(dk|cg)\d+$/;
 const PALETTE = /^(pwarm|pgold|pgreen|pbs|rv)$/;
 const LINES = name => `${name}-lines.json`;
 
@@ -69,14 +70,14 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_spl(\d*)/, () => ['--strokeplan', '1', '--lanemm', m(v, /_spl(\d*)/)[1] || '6']), ...t(/_sml(\d+)/, () => ['--strokemm', m(v, /_sml(\d+)/)[1]]),
       ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]), ...t(/_lit(\d+)/, () => ['--litlift', hundredth(v, /_lit(\d+)/)]),
       ...t(/_lad/, () => ['--laneadapt', '1']), ...t(/_lw/, () => ['--litwarm', '1']),
-      ...(/_sky/.test(v) ? ['--layerhue', '1', '--skysplit', '1'] : /_hue/.test(v) ? ['--layerhue', '1'] : []),
+      ...(/_sky(?=\d|_|$)/.test(v) ? ['--layerhue', '1', '--skysplit', '1'] : /_hue/.test(v) ? ['--layerhue', '1'] : []),
       ...t(/_efade/, () => ['--edgefade', '1.2']), ...t(/_stone/, () => ['--layertexture', '1', '--texshort', '1', '--texpress', '.5']),
       ...(/_stub2/.test(v) ? ['--texshort', '1', '--texpress', '.6'] : /_stub/.test(v) ? ['--texshort', '1'] : []),
       ...(/_softs/.test(v) ? ['--softsplit', '1', '--softarcs', '12', '--softarclen', '40', '--softmm', '0.7'] : /_soft/.test(v) ? ['--softarcs', '8', '--softarclen', '48', '--softmm', '1.0'] : []),
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
       '--drawing', 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
-      '--outlinemedium', 'graphite', '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
+      '--outlinemedium', 'auto', '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
       '--out', out, '--targetguard', 'gentle', ...(compile ? ['--valuepreviewonly', '1'] : ['--gpu', gpu])];
   };
 }
@@ -110,7 +111,7 @@ function delta(build, prefix, token) {
  * The base recipe under the plan's own tokens. Returns the args to run and an account of the layers.
  * architecture: stone blocks apply; trumbull: palette tokens apply; sepiaInk: false when the plan draws in another ink.
  */
-export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
+export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, glazeGains = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
   const { prefix, tokens: mt } = variantParts(variant), { tokens: bt } = variantParts(base);
   const modelArgs = build(variant), modelSlots = new Set(mt.map(slotOf)), skipped = {}, applied = [];
   for (const b of bt) {
@@ -118,6 +119,7 @@ export function layerBase({ variant, build, architecture = false, trumbull = fal
     if (!architecture && ARCHITECTURE_ONLY.test(b)) { skipped[b] = 'architecture only'; continue; }
     if (!trumbull && PALETTE.test(b)) { skipped[b] = 'Trumbull only'; continue; }
     if (!basePalette && PALETTE.test(b)) { skipped[b] = 'base palette off; the plan names none'; continue; }
+    if (!glazeGains && GLAZE_GAINS.test(b)) { skipped[b] = 'calibrated 0.3.1 delivery (glaze gains off)'; continue; }
     if (!sepiaInk && slotOf(b) === 'sep') { skipped[b] = 'plan draws in another ink'; continue; }
     applied.push(b);
   }
@@ -154,8 +156,20 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   inkprofile: choice(['sepia-ink', 'black-ink']),
   valuefloor: choice(['ink-and-wash', 'precise-watercolor', 'urban-sketch', 'atmospheric-wet']),
   focusmap: v => /\.json$/i.test(v),
+  brushchoice: choice(['0', '1']),
+  strokeplan: choice(['0', '1']),
+  lanemm: numeric(1, 40),
+  strokemm: numeric(0, 300),
+  drawinghand: choice(['0', '1']),
+  washinkfree: choice(['0', '1']),
+  inkdarkskip: numeric(0, 1),
+  skylanes: choice(['0', '1']),
+  skylanemm: numeric(1, 40),
+  skylanestep: numeric(0.1, 2),
+  softsplit: choice(['0', '1']),
+  softmm: numeric(0.1, 10),
 });
-const isPathLike = v => path.isAbsolute(v) || v.includes('/') || v.includes('..');
+const isPathLike = (k, v) => k === 'focusmap' || path.isAbsolute(v) || v.includes('/') || v.includes('..');
 /** Problems with extra-args.json (empty = fine): locked options, and path values that leave the plan folder. */
 export function checkExtraArgs(extra, planDir) {
   const bad = []; if (!extra) return bad;
@@ -169,7 +183,7 @@ export function checkExtraArgs(extra, planDir) {
     if (i === extra.length || extra[i].startsWith('--')) { bad.push('extra-args.json missing value for ' + flag); continue; }
     const a = extra[i++];
     if (validate && !validate(a)) bad.push('extra-args.json invalid value for ' + flag + ': ' + a);
-    if (!isPathLike(a)) continue;
+    if (!isPathLike(key, a)) continue;
     if (!/\.json$/i.test(a)) bad.push('extra-args.json path values must be .json files inside the plan folder: ' + a);
     let r = path.resolve(planDir, a), tail = '';
     while (!fs.existsSync(r) && r !== path.dirname(r)) { tail = path.join(path.basename(r), tail); r = path.dirname(r); }
@@ -249,7 +263,8 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
-  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, sepiaInk, linesExist });
+  const glazeGains = Boolean(spec.glazeGains ?? spec.trumbull);
+  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, glazeGains, sepiaInk, linesExist });
   const args = [...layered.args];
   const valueFloor = valueFloorFor(config);
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);

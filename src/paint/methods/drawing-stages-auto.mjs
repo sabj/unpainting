@@ -69,10 +69,12 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   const model = await plannerChoice({ image, root, model: opt('drawingplanner', PLANNER_MODEL), fetcher, log });
   const gated = gateChoice(model.choice ?? null, rule, { style });
   const { verdicts } = gated;
-  // The drawing is pencil unless ink is asked for (--outlinemedium other than graphite, or a plan's ink medium).
-  const inkAsked = opt('outlinemedium', 'graphite') !== 'graphite';
+  // The drawing is pencil unless ink is asked for (--outlinemedium other than graphite, or auto on pen source).
+  const medium = opt('outlinemedium', 'graphite');
+  const isInkExplicit = medium !== 'graphite' && medium !== 'auto' && medium !== 'none';
+  const inkAsked = isInkExplicit || (medium === 'auto' && (penLine >= 0.025 || style === 'penwash' || intent.planMedium === 'ink'));
   const final = inkAsked ? gated.final : { ...gated.final, inkPrep: 'none', inkFinish: 'none' };
-  if (!inkAsked && (gated.final.inkPrep !== 'none' || gated.final.inkFinish !== 'none')) log('drawing stages: ink stages dropped; ask for ink with --outlinemedium ink');
+  if (!inkAsked && (gated.final.inkPrep !== 'none' || gated.final.inkFinish !== 'none')) log('drawing stages: ink stages dropped; ask for ink with --outlinemedium ink or auto');
   const flags = stageFlags(final, { style, penSource: penLine >= 0.025 });
   const record = { features, model, rule, style, verdicts, final, flags };
   fs.mkdirSync(out, { recursive: true });

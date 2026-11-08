@@ -66,7 +66,7 @@ export function cutInDarkWash(gestures, values, w, h, thr, { hysteresis = 0.04, 
           frag.weights = runWeights.slice();
         }
         if ('dip' in g) {
-          frag.dip = firstEmitted ? Boolean(g.dip) : false;
+          frag.dip = firstEmitted ? g.dip : false;
           firstEmitted = false;
         }
         out.push(frag);
@@ -99,7 +99,7 @@ export function cutInDarkWash(gestures, values, w, h, thr, { hysteresis = 0.04, 
       const wPrev = hasWidths ? g.widths[k - 1] : undefined;
       const wtPrev = hasWeights ? g.weights[k - 1] : undefined;
 
-      if (dist > 1.5) {
+      if (dist > 1.5 || (Math.floor(px) !== Math.floor(cx) || Math.floor(py) !== Math.floor(cy))) {
         // Multi-step interpolation along long segments
         const steps = Math.ceil(dist);
         let prevSample = prevQ;

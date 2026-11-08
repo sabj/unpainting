@@ -152,15 +152,18 @@ export function sweepFront(A, B, W, H, { thresh = 0.04 } = {}) {
 }
 
 /** Rule-based progression flags. prog[p] = {dark, hf} relative to the finish. */
-export function progressionFlags(prog, sweeps = []) {
+export function progressionFlags(prog, sweeps = [], opts = {}) {
   const flags = [];
   if (!prog[10] || !prog[25] || !prog[50] || !prog[75]) return ['no frames'];
   // honesty: dark share; g5: the dark tail (p95 darkness) at 25% already at the finish's
   if (prog[10].dark > 0.25 || prog[25].dark > 0.5 || (prog[25].p95 ?? 0) > 0.85) flags.push('darks first');
   // detail at 25% while the tone is still light (the opening pen alone gives 0.5-0.65 of the final band energy)
-  if (prog[25].hf > 0.8 && (prog[25].mean ?? prog[25].dark) < 0.5) flags.push('early detail');
+  const penDrawingFirst = opts.drawing === 'first' || opts.penFirst || prog[10]?.stage?.includes('ink') || prog[25]?.stage?.includes('ink') || prog[10]?.stage?.includes('pen') || prog[25]?.stage?.includes('pen') || prog[10]?.stage?.includes('opening') || prog[25]?.stage?.includes('opening');
+  const hfCeil = penDrawingFirst ? 0.95 : 0.8;
+  if (prog[25].hf > hfCeil && (prog[25].mean ?? prog[25].dark) < 0.5) flags.push('early detail');
   if (prog[50].dark > 0.95 && prog[50].hf > 0.95) flags.push('finished by 50%');
-  if ((prog[10].mean ?? 1) < 0.2 && (prog[50].mean ?? 0) > 0.9 && (prog[75].mean ?? 0) > 0.9) flags.push('one sweep');
+  const broadWashes = opts.broadWashes || prog[25]?.stage?.includes('wash') || prog[50]?.stage?.includes('wash');
+  if (!broadWashes && (prog[10].mean ?? 1) < 0.2 && (prog[50].mean ?? 0) > 0.9 && (prog[75].mean ?? 0) > 0.9) flags.push('one sweep');
   if (sweeps.some(s => s.front > 0.6)) flags.push('travelling front');
   return flags;
 }
@@ -227,7 +230,12 @@ export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox
     }
   }
   const judge = null; // a vision-model check of the progression can be added here; none ships with this repository
-  const flags = progressionFlags(prog, sweeps), guard = readGuard(run);
+  const optFile = path.join(run, 'options.json');
+  let runOpts = {};
+  if (fs.existsSync(optFile)) {
+    try { runOpts = JSON.parse(fs.readFileSync(optFile, 'utf8')); } catch {}
+  }
+  const flags = progressionFlags(prog, sweeps, runOpts), guard = readGuard(run);
   const copy = +Math.max(0, Math.min(1, (hf - HF_CEILING(pm.width)) / HF_SPAN)).toFixed(2);
   const small = sm.total ? +Math.max(0, Math.min(1, (sm.share - 0.1) / 0.2)).toFixed(2) : null;
   const scored = combine({ flags, judge, copy, small, pixelFit: guard.pixelFit });
