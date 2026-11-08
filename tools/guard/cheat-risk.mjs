@@ -158,7 +158,13 @@ export function progressionFlags(prog, sweeps = [], opts = {}) {
   // honesty: dark share; g5: the dark tail (p95 darkness) at 25% already at the finish's
   if (prog[10].dark > 0.25 || prog[25].dark > 0.5 || (prog[25].p95 ?? 0) > 0.85) flags.push('darks first');
   // detail at 25% while the tone is still light (the opening pen alone gives 0.5-0.65 of the final band energy)
-  const penDrawingFirst = opts.drawing === 'first' || opts.penFirst || prog[10]?.stage?.includes('ink') || prog[25]?.stage?.includes('ink') || prog[10]?.stage?.includes('pen') || prog[25]?.stage?.includes('pen') || prog[10]?.stage?.includes('opening') || prog[25]?.stage?.includes('opening');
+  const isPenOrInk = s => /\b(pen|ink)\b/i.test(s ?? '');
+  const optMedium = opts.drawingMedium || opts.medium || opts.drawing?.medium || '';
+  const isPenMedium = isPenOrInk(optMedium) || Boolean(opts.penFirst);
+  const isPencilMedium = /\b(pencil|graphite)\b/i.test(optMedium);
+  const penStage = isPenOrInk(prog[10]?.stage) || isPenOrInk(prog[25]?.stage);
+  const openingStage = (prog[10]?.stage?.includes('opening') || prog[25]?.stage?.includes('opening')) && !isPencilMedium && !/\b(pencil|graphite)\b/i.test(prog[10]?.stage) && !/\b(pencil|graphite)\b/i.test(prog[25]?.stage);
+  const penDrawingFirst = opts.penFirst || (opts.drawing === 'first' && !isPencilMedium) || penStage || (isPenMedium && openingStage);
   const hfCeil = penDrawingFirst ? 0.95 : 0.8;
   if (prog[25].hf > hfCeil && (prog[25].mean ?? prog[25].dark) < 0.5) flags.push('early detail');
   if (prog[50].dark > 0.95 && prog[50].hf > 0.95) flags.push('finished by 50%');
@@ -192,7 +198,7 @@ async function writeStrip(files, out, W, H) {
   return out;
 }
 
-export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox = '', stagesDir = path.join(run, 'stages') }) {
+export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox = '', stagesDir = path.join(run, 'stages'), opts = null }) {
   // A running painter already holds its tape. Reuse it rather than reading a
   // native recording into a single string that can exceed V8's string limit.
   const mk = marks ?? readMarks(run), sm = smallShare(mk, sheetMm);
@@ -230,10 +236,24 @@ export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox
     }
   }
   const judge = null; // a vision-model check of the progression can be added here; none ships with this repository
-  const optFile = path.join(run, 'options.json');
-  let runOpts = {};
-  if (fs.existsSync(optFile)) {
-    try { runOpts = JSON.parse(fs.readFileSync(optFile, 'utf8')); } catch {}
+  let runOpts = opts ? { ...opts } : {};
+  for (const name of ['stages.json', 'plan.json', 'pipeline-plan.json', 'value-plan.json', 'verdict.json', 'run-card.json', 'options.json']) {
+    const f = path.join(run, name);
+    if (fs.existsSync(f)) {
+      try {
+        const d = JSON.parse(fs.readFileSync(f, 'utf8'));
+        if (d && typeof d === 'object') {
+          runOpts = {
+            ...d,
+            ...runOpts,
+            drawing: d.drawing?.order ?? d.drawingOrder ?? d.drawing ?? runOpts.drawing,
+            drawingMedium: d.drawing?.medium ?? d.drawingMedium ?? d.medium ?? runOpts.drawingMedium,
+            penFirst: d.penFirst ?? runOpts.penFirst,
+            broadWashes: d.broadWashes ?? runOpts.broadWashes,
+          };
+        }
+      } catch {}
+    }
   }
   const flags = progressionFlags(prog, sweeps, runOpts), guard = readGuard(run);
   const copy = +Math.max(0, Math.min(1, (hf - HF_CEILING(pm.width)) / HF_SPAN)).toFixed(2);

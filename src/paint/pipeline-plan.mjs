@@ -67,34 +67,42 @@ export function resolvePipeline(plan = {}) {
   if (!subjects && resolved.order.strength) throw Error('order.strength needs order.subjects');
   return resolved;
 }
-export function pipelineFlags(plan) {
+export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   const p = resolvePipeline(plan), w = p.washes, flags = drawingFlags(p.drawing);
   const add = (k,v) => flags.push('--'+k,String(v));
-  if (w.furReserves) add('furreserves', JSON.stringify(w.furReserves));
-  if (w.paints) add('paints', w.paints.join(','));
+  const rawW = plan?.washes ?? {};
+  const rawOrder = plan?.order ?? {};
+  const rawPhysics = rawW.physics ?? {};
+  if (w.furReserves && (!onlyAuthored || rawW.furReserves != null)) add('furreserves', JSON.stringify(w.furReserves));
+  if (w.paints && (!onlyAuthored || rawW.paints != null)) add('paints', w.paints.join(','));
   // washes.darkGain: shadow glazes (bands 4-5) are charged at this multiple of their fitted demand. The physical
   // wash delivers about 70% of a planned dark, so a dark subject names the gain it needs to reach its value.
-  if (w.darkGain != null) add('darkgain', w.darkGain);
-  if (w.deepAccent) { add('deepaccent', w.deepAccent.max); add('deepgrow', w.deepAccent.grow); add('deepaccentin', w.deepAccent.families.join(',')); }
-  add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
+  if (w.darkGain != null && (!onlyAuthored || rawW.darkGain != null)) add('darkgain', w.darkGain);
+  if (w.deepAccent && (!onlyAuthored || rawW.deepAccent != null)) { add('deepaccent', w.deepAccent.max); add('deepgrow', w.deepAccent.grow); add('deepaccentin', w.deepAccent.families.join(',')); }
+  if (!onlyAuthored || rawW.sessions != null) add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
   // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
   // washes still keep light colour families apart, split on perceptual chroma, so a neutral
   // foundation cannot pool its sepia charge across a saturated orange passage.
   // Layered washes split at Lab chroma 20: the cat's broad orange (C20-30) then gets its own connected light and
   // middle washes instead of pooling with muted warm and grey neighbours. Family mode keeps RGB range 30.
-  add('huechroma', w.colour === 'layered' ? 20 : 30);
-  if (w.colour === 'layered') add('huechromalab', 1);
-  // Layered shadow glazes also keep colour families apart: the grey shadow does not pool its blue across the orange.
-  if (w.colour === 'layered') add('shadowfamilies', 1);
+  if (!onlyAuthored || rawW.colour != null) {
+    add('huechroma', w.colour === 'layered' ? 20 : 30);
+    if (w.colour === 'layered') add('huechromalab', 1);
+    if (w.colour === 'layered') add('shadowfamilies', 1);
+    add('maskmm', w.colour === 'family' ? w.carryMm : 0);
+    add('lightfamilies', 1);
+    add('palelights', w.colour === 'family' ? w.paleLimit : 0);
+  }
   // Both modes charge each passage at the washes.charge quantile of its demand and carry the rest into the next
   // band, so the darkest cells of a shadow get a smaller, darker restatement instead of the shape's flat mean.
-  add('passcap', w.charge);
-  add('maskmm', w.colour === 'family' ? w.carryMm : 0);
-  add('lightfamilies', 1);
-  add('palelights', w.colour === 'family' ? w.paleLimit : 0);
-  add('washinkfree', +w.inkAware);
-  add('subjectorder', p.order.strength);
-  add('holerim', w.physics.holeRimMm);
-  add('physics', `marangoni=${w.physics.marangoni},slope=${w.physics.slope}`);
+  if (!onlyAuthored || rawW.charge != null) add('passcap', w.charge);
+  if (onlyAuthored && rawW.carryMm != null && rawW.colour == null) add('maskmm', w.colour === 'family' ? w.carryMm : 0);
+  if (onlyAuthored && rawW.paleLimit != null && rawW.colour == null) add('palelights', w.colour === 'family' ? w.paleLimit : 0);
+  if (!onlyAuthored || rawW.inkAware != null || (plan?.drawing?.source && ['source-ink', 'line-map'].includes(plan.drawing.source))) add('washinkfree', +w.inkAware);
+  if (!onlyAuthored || rawOrder.strength != null || rawOrder.subjects != null || plan?.subjectOrder != null) add('subjectorder', p.order.strength);
+  if (!onlyAuthored || rawPhysics.holeRimMm != null) add('holerim', w.physics.holeRimMm);
+  if (!onlyAuthored || (rawW.physics != null && (rawPhysics.marangoni != null || rawPhysics.slope != null))) {
+    add('physics', `marangoni=${w.physics.marangoni},slope=${w.physics.slope}`);
+  }
   return { flags, plan:p };
 }

@@ -26,7 +26,7 @@ export function contactMm(w) {
 }
 
 /** Extracts point coordinates {x, y} from either [x, y] array or {x, y} object representation. */
-export function extractPoint(p) {
+function extractPoint(p) {
   if (Array.isArray(p)) {
     if (p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
       return { x: p[0], y: p[1] };
@@ -71,7 +71,7 @@ export function lineCover(doc, w, h, { sheetMm, marginMm = 0.3 } = {}) {
  * Stamps a line segment of radius r into mask.
  * Pixel centers are at (x + 0.5, y + 0.5).
  */
-export function stampSegment(mask, w, h, ax, ay, bx, by, r) {
+function stampSegment(mask, w, h, ax, ay, bx, by, r) {
   if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx) || !Number.isFinite(by) || !(r > 0)) return;
 
   const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - r)), x1 = Math.min(w - 1, Math.ceil(Math.max(ax, bx) + r));

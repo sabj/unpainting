@@ -31,7 +31,7 @@ const argValue = (args, name) => {
 };
 
 /** Caller-owned drawing inputs, separated from recipe/plan and generated arguments. */
-export function drawingStageIntent({ argv0 = [], expandedArgv = argv0 }) {
+export function drawingStageIntent({ argv0 = [], expandedArgv = argv0, pipeline = null, outlineMedium = null }) {
   const lineworkAuto = argValue(expandedArgv, 'linework') === 'auto';
   return {
     explicitStages: expandedArgv.includes('--stages'),
@@ -39,6 +39,7 @@ export function drawingStageIntent({ argv0 = [], expandedArgv = argv0 }) {
     // Universal linework replaces the opening source; a closing file remains independently caller-authored.
     authoredOpening: !lineworkAuto && Boolean(argValue(argv0, 'drawingfile')),
     authoredClosing: Boolean(argValue(argv0, 'drawinglast')),
+    planMedium: pipeline?.drawing?.medium ?? outlineMedium ?? null,
   };
 }
 
@@ -72,10 +73,12 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   // The drawing is pencil unless ink is asked for (--outlinemedium other than graphite, or auto on pen source).
   const medium = opt('outlinemedium', 'graphite');
   const isInkExplicit = medium !== 'graphite' && medium !== 'auto' && medium !== 'none';
-  const inkAsked = isInkExplicit || (medium === 'auto' && (penLine >= 0.025 || style === 'penwash' || intent.planMedium === 'ink'));
+  const penThreshold = Number(opt('penfirst', 0.5)) / 100;
+  const penSource = penLine >= penThreshold;
+  const inkAsked = isInkExplicit || (medium === 'auto' && (penSource || style === 'penwash' || intent.planMedium === 'ink'));
   const final = inkAsked ? gated.final : { ...gated.final, inkPrep: 'none', inkFinish: 'none' };
   if (!inkAsked && (gated.final.inkPrep !== 'none' || gated.final.inkFinish !== 'none')) log('drawing stages: ink stages dropped; ask for ink with --outlinemedium ink or auto');
-  const flags = stageFlags(final, { style, penSource: penLine >= 0.025 });
+  const flags = stageFlags(final, { style, penSource });
   const record = { features, model, rule, style, verdicts, final, flags };
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'drawing-choice.json'), JSON.stringify(record, null, 1) + '\n');

@@ -7,6 +7,13 @@
    "rule": "fit-score-loop",
    "reason": "fitMix chooses a 1-3 pan box mix for a set of cells from the set's mean colour against the sheet's mean colour there: a mix choice at shape level, not a mark kept for lowering error. It runs only with --passages treelayers, not in any default run.",
    "approvedBy": "anti-cheat review (bench/docs/anti-cheat.md): a shape-level mix choice is allowed"
+  },
+  {
+   "key": "2b77cc5e9737",
+   "file": "src/crop/palettewide.mjs",
+   "rule": "keep-if-closer",
+   "reason": "coverKeyHues chooses 1-6 box paints from the library to cover measured hue gaps before painting begins: a palette choice from box pigments, not mark optimization.",
+   "approvedBy": "anti-cheat review (bench/docs/anti-cheat.md): palette choice from box pigments is allowed"
   }
  ]
 }

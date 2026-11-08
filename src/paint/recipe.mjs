@@ -123,7 +123,7 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const name = given === 'none' && at < 0 ? null : given;
   const combined = ['default', 'combined', 'general'].includes(name);
   const hasWashPlan = Boolean(plan && (plan.washes || plan.order || plan.subjectOrder));
-  const pipeline = (combined || (name === 'none' && hasWashPlan)) ? pipelineFlags(plan ?? {}) : null;
+  const pipeline = (combined || (name === 'none' && hasWashPlan)) ? pipelineFlags(plan ?? {}, { onlyAuthored: name === 'none' }) : null;
   const washFlags = (name === 'none' && hasWashPlan && pipeline) ? pipeline.flags : [];
   if (combined && pipeline) drawing = pipeline.flags;
   const presets = [...new Set([...planPresets(plan), ...typed])];
@@ -133,7 +133,7 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const describe = note => [note, presets.length ? `presets ${presets.join(', ')}` : null, plan?.drawing ? 'drawing from the plan' : null].filter(Boolean).join(', ');
   if (name === null) return tail.length ? { argv: [...tail, ...argv], note: describe('no recipe') } : { argv, note: null };
   if (name === 'none') {
-    const expanded = [...washFlags, ...argv, ...tail];
+    const expanded = [...argv, ...washFlags, ...tail];
     const values = new Map();
     for (let i = 0; i < expanded.length;) {
       const key = expanded[i++];
