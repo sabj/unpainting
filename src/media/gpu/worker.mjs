@@ -92,7 +92,6 @@ async function handle(m) {
 async function handleOp(m) {
   switch (m.op) {
     case 'init': {
-      console.error('[gpu-worker] handleOp init starting');
       let webgpu;
       try { webgpu = await import('webgpu'); } catch (e) { return fail(`the webgpu package is not installed (${e.code ?? e.message})`, 2); }
       let device, adapter;
