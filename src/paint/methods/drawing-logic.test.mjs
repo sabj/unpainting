@@ -136,3 +136,44 @@ test('hybrid file width inverts the actual physical material pressure law',async
  const s=r[30].s;assert.ok(Math.abs(profile.nib+profile.flex*s**profile.pressureExponent-2)<1e-9);
  assert.ok(r.every(p=>!p.dwell));
 });
+
+test('shapeGesture: 2-point line achieves full body weight 0.60 via inserted knots', () => {
+  const g = { points: [{ x: 0, y: 0, width: 2, weight: 1 }, { x: 50, y: 0, width: 2, weight: 1 }] };
+  const shaped = shapeGesture(g, { base: 0.6, inLen: 3, outLen: 5 });
+  const maxPressure = Math.max(...shaped.points.map(p => p.s));
+  assert.ok(Math.abs(maxPressure - 0.60) < 1e-6, `body pressure was ${maxPressure}, expected 0.60`);
+  assert.ok(shaped.points.length >= 4, `points count ${shaped.points.length} >= 4`);
+});
+
+test('personStrokes: long 2-point segment is split into strokes within max length L', () => {
+  const g = { points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] };
+  const strokes = personStrokes(g, 10);
+  assert.ok(strokes.length >= 9, `expected >= 9 strokes, got ${strokes.length}`);
+  for (const s of strokes) {
+    assert.ok(s.length <= 10.0001, `stroke length ${s.length} exceeds 10`);
+  }
+});
+
+test('personStrokes: tiny tail strokes (< 0.25 * L) are merged into the preceding segment', () => {
+  // Length 10.5 with L = 10 -> tail of 0.5 < 2.5 is merged into preceding segment -> 1 stroke of length 10.5
+  const g = { points: [{ x: 0, y: 0 }, { x: 10.5, y: 0 }] };
+  const strokes = personStrokes(g, 10);
+  assert.equal(strokes.length, 1);
+  assert.ok(Math.abs(strokes[0].length - 10.5) < 1e-4);
+});
+
+test('personStrokes: guard against L <= 1e-4 prevents hang', () => {
+  const g = { points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] };
+  const res = personStrokes(g, 1e-7);
+  assert.equal(res.length, 1);
+});
+
+test('scaleDrawingGestures: scales point.width along with coordinates and nw', () => {
+  const gestures = [{ points: [{ x: 10, y: 20, width: 2.0, nw: 1.5 }] }];
+  const scaled = scaleDrawingGestures(gestures, 2.5);
+  const p = scaled[0].points[0];
+  assert.equal(p.x, 25);
+  assert.equal(p.y, 50);
+  assert.equal(p.width, 5.0);
+  assert.equal(p.nw, 3.75);
+});

@@ -58,3 +58,27 @@ test('without a vision model the regions take the simple classifier and the reco
   // the overlay needs a real image; either way the failure is loud, never silent
   assert.ok(r instanceof Error || r.judge === 'simple');
 });
+
+test('bridging does not cross intentional semantic label cuts', () => {
+  const L = plane();
+  // Line crossing from architecture into sky:
+  // x=10..14 is architecture (draws line); x=15..16 is within reach=2; x >= 17 is pure sky (r.ink === 'none')
+  const crossing = { points: Array.from({ length: 20 }, (_, k) => ({ x: 10 + k, y: 21 })) };
+  const r = decideLines([crossing], {
+    L, w: W, h: H, pxMm: PX,
+    cellLabel: (x) => (x < 15 ? 'architecture' : 'sky'),
+  }, { bridgeMm: 5.0 });
+  // Points at x >= 19 are outside reach=4 of architecture and in pure sky; they must be dropped and NOT bridged
+  for (const line of r.lines) {
+    for (const p of line.points) {
+      assert.ok(p.x < 19, `point at x=${p.x} should not be bridged into pure sky`);
+    }
+  }
+});
+
+test('partial options object merges with defaults without dropping unmentioned options', () => {
+  const L = plane();
+  const r = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' }, { bridgeMm: 0.5 });
+  assert.ok(r.stats != null);
+  assert.ok(r.stats.lines === 1);
+});

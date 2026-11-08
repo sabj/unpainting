@@ -26,17 +26,21 @@ function sample(P, w, h, x, y) {
   return (P[y0 * w + x0] * (1 - u) + P[y0 * w + x1] * u) * (1 - v) + (P[y1 * w + x0] * (1 - u) + P[y1 * w + x1] * u) * v;
 }
 
-const arcLengths = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
+const ptX = p => (Array.isArray(p) ? p[0] : p.x);
+const ptY = p => (Array.isArray(p) ? p[1] : p.y);
+const arcLengths = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(ptX(pts[k]) - ptX(pts[k - 1]), ptY(pts[k]) - ptY(pts[k - 1]))); return d; };
 
 /** Points {x, y, width?, weight?} resampled every `step` along the path; width and weight interpolate. */
 export function resample(pts, step) {
-  if (pts.length < 2) return pts.map(p => ({ ...p }));
-  const d = arcLengths(pts), L = d.at(-1), n = Math.max(1, Math.round(L / step)), out = [];
+  if (!pts || pts.length === 0) return [];
+  const norm = pts.map(p => (Array.isArray(p) ? { x: p[0], y: p[1] } : { ...p }));
+  if (norm.length < 2) return norm;
+  const d = arcLengths(norm), L = d.at(-1), n = Math.max(1, Math.round(L / step)), out = [];
   let k = 0;
   for (let i = 0; i <= n; i++) {
     const s = L * i / n;
-    while (k < pts.length - 2 && d[k + 1] < s) k++;
-    const span = d[k + 1] - d[k], t = span > 0 ? Math.max(0, Math.min(1, (s - d[k]) / span)) : 0, a = pts[k], b = pts[k + 1];
+    while (k < norm.length - 2 && d[k + 1] < s) k++;
+    const span = d[k + 1] - d[k], t = span > 0 ? Math.max(0, Math.min(1, (s - d[k]) / span)) : 0, a = norm[k], b = norm[k + 1];
     const q = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
     if (a.width != null && b.width != null) q.width = a.width + (b.width - a.width) * t;
     if (a.weight != null && b.weight != null) q.weight = a.weight + (b.weight - a.weight) * t;
@@ -49,26 +53,58 @@ export function resample(pts, step) {
 export function turning(pts) {
   let turn = 0, len = 0;
   for (let k = 1; k < pts.length; k++) {
-    const dx = pts[k].x - pts[k - 1].x, dy = pts[k].y - pts[k - 1].y; len += Math.hypot(dx, dy);
+    const dx = ptX(pts[k]) - ptX(pts[k - 1]), dy = ptY(pts[k]) - ptY(pts[k - 1]); len += Math.hypot(dx, dy);
     if (k < pts.length - 1) {
-      const a1 = Math.atan2(dy, dx), a2 = Math.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x);
+      const a1 = Math.atan2(dy, dx), a2 = Math.atan2(ptY(pts[k + 1]) - ptY(pts[k]), ptX(pts[k + 1]) - ptX(pts[k]));
       let da = Math.abs(a2 - a1); if (da > Math.PI) da = 2 * Math.PI - da; turn += da;
     }
   }
   return len > 0 ? turn * 180 / Math.PI / len : 0;
 }
 
-// Douglas-Peucker over indices, keeping every index in `pinned`.
-function simplify(pts, tol, pinned = new Set()) {
+// Douglas-Peucker over indices, keeping every index in `pinned`, with clamped projection & modulation preservation.
+export function simplify(pts, tol, pinned = new Set(), { widthTol = 0.15, darkTol = 0.1 } = {}) {
+  if (!pts || pts.length < 3 || !(tol > 0)) return pts ? pts.map(p => ({ ...p })) : [];
   const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
-  for (const i of pinned) keep[i] = 1;
+  for (const i of pinned) if (i >= 0 && i < pts.length) keep[i] = 1;
   const stack = []; let a = 0;
   for (let i = 1; i < pts.length; i++) if (keep[i]) { stack.push([a, i]); a = i; }
   while (stack.length) {
     const [i, j] = stack.pop(); if (j - i < 2) continue;
-    const ax = pts[i].x, ay = pts[i].y, dx = pts[j].x - ax, dy = pts[j].y - ay, L = Math.hypot(dx, dy) || 1;
+    const ax = pts[i].x, ay = pts[i].y, bx = pts[j].x, by = pts[j].y;
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
     let best = -1, far = tol;
-    for (let k = i + 1; k < j; k++) { const e = Math.abs((pts[k].x - ax) * dy - (pts[k].y - ay) * dx) / L; if (e > far) { far = e; best = k; } }
+    for (let k = i + 1; k < j; k++) {
+      const px = pts[k].x - ax, py = pts[k].y - ay;
+      let dGeom = 0, tMod = 0;
+      if (len2 > 1e-12) {
+        const t = Math.max(0, Math.min(1, (px * dx + py * dy) / len2));
+        tMod = t;
+        dGeom = Math.hypot(px - t * dx, py - t * dy);
+      } else {
+        tMod = (k - i) / (j - i);
+        dGeom = Math.hypot(px, py);
+      }
+      let dWidth = 0;
+      if (Number.isFinite(pts[i].width) && Number.isFinite(pts[j].width) && Number.isFinite(pts[k].width)) {
+        const wExpected = pts[i].width + tMod * (pts[j].width - pts[i].width);
+        dWidth = Math.abs(pts[k].width - wExpected);
+      }
+      let dDark = 0;
+      const hasWeight = Number.isFinite(pts[i].weight) && Number.isFinite(pts[j].weight) && Number.isFinite(pts[k].weight);
+      const hasAbsorb = Number.isFinite(pts[i].absorb) && Number.isFinite(pts[j].absorb) && Number.isFinite(pts[k].absorb);
+      if (hasWeight || hasAbsorb) {
+        const valI = hasWeight ? pts[i].weight : pts[i].absorb;
+        const valJ = hasWeight ? pts[j].weight : pts[j].absorb;
+        const valK = hasWeight ? pts[k].weight : pts[k].absorb;
+        const dExpected = valI + tMod * (valJ - valI);
+        dDark = Math.abs(valK - dExpected);
+      }
+      const eWidth = widthTol > 0 ? (dWidth / widthTol) * tol : 0;
+      const eDark = darkTol > 0 ? (dDark / darkTol) * tol : 0;
+      const e = Math.max(dGeom, eWidth, eDark);
+      if (e > far) { far = e; best = k; }
+    }
     if (best > 0) { keep[best] = 1; stack.push([i, best], [best, j]); }
   }
   return pts.filter((_, i) => keep[i]);
