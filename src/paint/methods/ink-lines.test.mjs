@@ -91,3 +91,38 @@ test('the dark cap only thins the ink', () => {
   assert.equal(inkCapFactor(4, 0.8, 0), 1);
   assert.equal(inkCapFactor(4, 0, 1), 1);
 });
+
+test('closed-loop simplify does not collapse to 2 points and preserves geometric bounds', () => {
+  const N = 40, R = 10;
+  const loop = Array.from({ length: N + 1 }, (_, i) => {
+    const th = (2 * Math.PI * (i % N)) / N;
+    return { x: 50 + R * Math.cos(th), y: 50 + R * Math.sin(th) };
+  });
+  const smoothed = smoothPath(loop, { tol: 0.5, sigma: 0.1 });
+  assert.ok(smoothed.length >= 8, `loop retained ${smoothed.length} vertices`);
+  const minX = Math.min(...smoothed.map(p => p.x));
+  const maxX = Math.max(...smoothed.map(p => p.x));
+  assert.ok(minX < 42 && maxX > 58, 'bounding box preserved');
+});
+
+test('calligraphic width and darkness variations are preserved along straight lines during simplification', () => {
+  const pts = Array.from({ length: 41 }, (_, i) => ({
+    x: i * 2, y: 10,
+    r: i === 20 ? 1.5 : 0.2,
+    d: i === 20 ? 0.9 : 0.3,
+  }));
+  const res = smoothPath(pts, { tol: 0.1, sigma: 0 });
+  const midPoint = res.find(p => p.x === 40);
+  assert.ok(midPoint != null, 'interior width swell point retained');
+  assert.equal(midPoint.r, 1.5);
+  assert.equal(midPoint.d, 0.9);
+});
+
+test('resample and turning accept both [x, y] and {x, y} point representations', () => {
+  const arr = [[0, 0], [10, 0], [10, 10]];
+  const obj = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+  const rArr = resample(arr, 1);
+  const rObj = resample(obj, 1);
+  assert.equal(rArr.length, rObj.length);
+  assert.ok(Math.abs(turning(arr) - turning(obj)) < 1e-6);
+});

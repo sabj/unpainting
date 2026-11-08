@@ -11,15 +11,16 @@ import { renderLayers } from '../../media/km.mjs';
 import { TAPE } from '../../media/brush.mjs';
 
 export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, gain = 1, pad: opt_pad = null, paper: cachedPaper = null }) {
-  if (!(N > 1)) return null;
+  if (!Number.isFinite(N)) return null;
   N = Math.round(N);
+  if (!(N > 1)) return null;
   const WH = W2 * N, HH = H2 * N, nH = WH * HH, nL = W2 * H2, K = 1;
   const paper = cachedPaper ?? makePaper(WH, HH, { ...paperOpts, scale: (paperOpts.scale ?? 1) * N });
   if (!Number.isInteger(inkAt) || !pigments[inkAt]) throw new Error('Invalid fine-sheet ink channel');
   const finePigments = [pigments[inkAt]];
   const fine = createSheet(paper, finePigments);
   function remapInk(ink) {
-    if (ink == null) return ink;
+    if (ink == null) return null;
     if (ink.length !== pigments.length) throw new Error('Fine-sheet ink concentration length');
     for (let k = 0; k < ink.length; k++) if (k !== inkAt && ink[k] !== 0) throw new Error('Only inkAt may deposit on the fine sheet');
     return [ink[inkAt]];
@@ -71,8 +72,8 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
       return q;
     }) }));
     wet();
-    // --inkresgain: the ink's strength on the fine sheet, for calibrating a line's darkness against the artwork's
-    const r = drawGestures(fine, up, [0], 1, 1, { ink: gain === 1 ? ink : ink.map(v => v * gain), peak: 1, pen: P, low });
+    const scaledInk = Array.isArray(ink) ? ink.map(v => v * gain) : ink;
+    const r = drawGestures(fine, up, [0], 1, 1, { ink: scaledInk, peak: 1, pen: P, low });
     changed();
     carry();
     stats.calls++; stats.ms += Date.now() - t0;
@@ -141,21 +142,38 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
             const idxL = rowL + xl;
             for (let dx = 0; dx < N; dx++, i++) {
               const d = T[i] - S[i];
-              if (d !== 0) { add[idxL] += d; any = true; }
+              // Add 1e-6 epsilon guard against float jitter / rounding accumulation
+              if (Math.abs(d) >= 1e-6) { add[idxL] += d; any = true; S[i] = T[i]; }
             }
           }
         }
       }
       if (!any) continue;
-      S.set(T);
       wrote = true;
       const inv = 1 / (N * N), D = main.D[inkAt], G = main.G[inkAt], L = inkLo[k], M = main.M;
       for (let i = 0; i < nL; i++) {
         const ai = add[i];
-        if (ai) { add[i] = 0; const a = ai * inv; if (M[i]) G[i] += a; else D[i] += a; L[i] += a; }
+        if (ai) {
+          add[i] = 0;
+          const a = ai * inv;
+          let applied;
+          if (M[i]) {
+            const prev = G[i];
+            const next = Math.max(0, prev + a);
+            G[i] = next;
+            applied = next - prev;
+          } else {
+            const prev = D[i];
+            const next = Math.max(0, prev + a);
+            D[i] = next;
+            applied = next - prev;
+          }
+          L[i] += applied;
+        }
       }
     }
     if (wrote) {
+      renderVersion = -1; // Reset renderVersion so downstream composition detects carried ink
       invalidatePaperCertificate(main); // new pigment has not been fixed by the earlier dry
       main._gpu?.cpuWroteAll?.(); // and the GPU's copy takes the new ink back up
     }
@@ -262,3 +280,4 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
   }
   return { N, width: WH, height: HH, draw, settle, compose, carry, wet, stats, fine, remapInk, changed, exportState, importState };
 }
+
