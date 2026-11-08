@@ -1907,6 +1907,7 @@ const marks = [];
 let lastPainted = null;
 // --asyncframes 0: render frames and marks on the painter's thread, not the frame worker (src/media/gpu/framer.mjs). Default 1.
 let FRAMER = null, FRAMER_HANDED = false, MARK_PENDING = new Map();
+const PENDING_IO = [];
 const framer = () => {
   if (NATIVE_PAINT_MODE.mode==='fast' || FRAMER === false || !sheet._gpu || INKRES || LOOK || GOUACHE || opt('asyncframes', '1') === '0') return null;
   if (!FRAMER) {
@@ -1918,6 +1919,7 @@ const framer = () => {
 };
 // every frame and mark handed to the frame worker done, and the marks put in their places
 const drainFrames = async () => {
+  if (PENDING_IO.length) await Promise.all(PENDING_IO.splice(0));
   if (!FRAMER) return;
   const res = await FRAMER.drain();
   for (const r of res) { const slot = MARK_PENDING.get(r.id); if (!slot) continue; Object.assign(slot.mark, { pass: r.pass, ...r.numbers }); if (slot.last) lastPainted = r.paintedD; }
@@ -3956,7 +3958,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       if (TECH_CAL && sh._tkey) for (let j = 0; j < P; j++) TECH_CAL.book(sh._tkey, mix[j] * share * (sh._fb ?? 1) * (sh._dcal?.[j] ?? 1) * sh._tcal);
     }
   }
-  if(VALUE_PLAN){const next=layers[L+1];if(!next||next.value!==layer.value){VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png'));}}
+  if(VALUE_PLAN){const next=layers[L+1];if(!next||next.value!==layer.value){VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));const bandRgb=Buffer.from(render());PENDING_IO.push(sharp(bandRgb,{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png')));}}
   // Nothing after a pass reads its passages again (the ledger holds what it laid), so its sheet-sized fields are freed.
   for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh.ids = null; }
   layer.mask = null; layer.ids = null;

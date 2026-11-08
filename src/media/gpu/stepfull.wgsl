@@ -13,8 +13,7 @@ const FIXED_BED: bool = false;
 @group(0) @binding(2) var<storage, read_write> EVER: array<u32>;
 @group(0) @binding(3) var<storage, read> RESIST: array<u32>;
 @group(0) @binding(4) var<storage, read_write> W: array<f32>;
-@group(0) @binding(5) var<storage, read_write> S: array<f32>;
-@group(0) @binding(6) var<storage, read_write> S2: array<f32>;
+@group(0) @binding(5) var<storage, read_write> S: array<f32>;   // [0, n): S; [n, 2*n): S2; [2*n, 3*n): NEWF
 @group(0) @binding(8) var<storage, read> PAPER: array<vec4<f32>>;   // capacity, grain, fdx, fdy
 @group(0) @binding(9) var<storage, read> PAPER2: array<vec4<f32>>;  // perm +x, perm +y, unused, unused
 @group(0) @binding(10) var<storage, read> PAPER3: array<vec4<f32>>; // tooth, throat, valley-or-height, height
@@ -40,13 +39,10 @@ const FIXED_BED: bool = false;
 const OUT4_CUT: u32 = 4294967295u;
 fn o4get(q: u32) -> vec4<f32> { if (q < OUT4_CUT) { return OUT4[q]; } return OUT4B[q - OUT4_CUT]; }
 fn o4set(q: u32, v: vec4<f32>) { if (q < OUT4_CUT) { OUT4[q] = v; } else { OUT4B[q - OUT4_CUT] = v; } }
-@group(0) @binding(27) var<storage, read_write> PN: array<f32>;
-@group(0) @binding(28) var<storage, read_write> DD: array<f32>;
-@group(0) @binding(29) var<storage, read_write> NEWF: array<u32>;
+@group(0) @binding(28) var<storage, read_write> DD: array<f32>;   // [0, K*n): DD; [K*n, 2*K*n): PN
 @group(0) @binding(30) var<storage, read_write> TL: array<u32>;
-@group(0) @binding(31) var<storage, read_write> FLAGS: array<atomic<u32>>;
 @group(0) @binding(32) var<storage, read_write> FLAGS2: array<atomic<u32>>;
-@group(0) @binding(33) var<storage, read_write> CTR: array<atomic<u32>, 16>;
+@group(0) @binding(33) var<storage, read_write> CTR: array<atomic<u32>>;   // [0, 16): counters; [16, 16 + ntiles): FLAGS
 @group(0) @binding(34) var<storage, read_write> ARGS: array<u32, 12>;
 @group(0) @binding(35) var<storage, read_write> EDGE: array<f32>;  // the final edge distance: bound to whichever of EA, EB the last pass wrote
 
@@ -101,7 +97,7 @@ fn sparse_build(@builtin(global_invocation_id) g: vec3<u32>) {
     if (x < 0 || y < 0 || x >= i32(u.tw) || y >= i32(u.th)) { continue; }
     let a = u32(y) * u.tw + u32(x);
     markDirty(a);
-    if (atomicExchange(&FLAGS[a], 1u) == 0u) { TL[atomicAdd(&CTR[0], 1u)] = a; }
+    if (atomicExchange(&CTR[16u + a], 1u) == 0u) { TL[atomicAdd(&CTR[0], 1u)] = a; }
   } }
 }
 
@@ -129,7 +125,7 @@ fn sparse_all(@builtin(local_invocation_index) li: u32) {
       if (x < 0 || y < 0 || x >= i32(u.tw) || y >= i32(u.th)) { continue; }
       let a = u32(y) * u.tw + u32(x);
       markDirty(a);
-      if (atomicExchange(&FLAGS[a], 1u) == 0u) { TL[atomicAdd(&CTR[0], 1u)] = a; }
+      if (atomicExchange(&CTR[16u + a], 1u) == 0u) { TL[atomicAdd(&CTR[0], 1u)] = a; }
     } }
   }
   storageBarrier(); workgroupBarrier();
@@ -148,7 +144,7 @@ fn sparse_all(@builtin(local_invocation_index) li: u32) {
 fn tiles_prep(@builtin(global_invocation_id) g: vec3<u32>) {
   let t = g.x;
   if (t == 0u) { atomicStore(&CTR[0], 0u); atomicStore(&CTR[1], 0u); atomicStore(&CTR[6], 0u); atomicStore(&CTR[7], 0u); }
-  if (t < u.ntiles) { atomicStore(&FLAGS[t], atomicLoad(&FLAGS2[t])); atomicStore(&FLAGS2[t], 0u); }
+  if (t < u.ntiles) { atomicStore(&CTR[16u + t], atomicLoad(&FLAGS2[t])); atomicStore(&FLAGS2[t], 0u); }
 }
 @compute @workgroup_size(64)
 fn tiles_build(@builtin(global_invocation_id) g: vec3<u32>) {
@@ -158,7 +154,7 @@ fn tiles_build(@builtin(global_invocation_id) g: vec3<u32>) {
   for (var dy = -1; dy <= 1; dy++) { for (var dx = -1; dx <= 1; dx++) {
     let xx = tx + dx; let yy = ty + dy;
     if (xx < 0 || yy < 0 || xx >= i32(u.tw) || yy >= i32(u.th)) { continue; }
-    if (atomicLoad(&FLAGS[u32(yy) * u.tw + u32(xx)]) != 0u) { on = true; }
+    if (atomicLoad(&CTR[16u + u32(yy) * u.tw + u32(xx)]) != 0u) { on = true; }
   } }
   if (on) { let k = atomicAdd(&CTR[0], 1u); TL[k] = t; }
 }
@@ -197,7 +193,7 @@ fn wetfrontier_tile(wid: vec3<u32>, lid: vec3<u32>) {
   workgroupBarrier();
   if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
     let t = TL[wid.x];
-    if (u.p3 != 0u) { atomicStore(&FLAGS[t], 0u); }
+    if (u.p3 != 0u) { atomicStore(&CTR[16u + t], 0u); }
     let seen = atomicLoad(&anyWet);
     if (seen != 0u) { markWet(t); atomicStore(&FLAGS2[5u * u.ntiles + 3u + t], atomicLoad(&activeHalo)); }
     if ((seen & 2u) != 0u) { atomicAdd(&CTR[9], 1u); }
@@ -217,7 +213,7 @@ fn wetscan_tile(wid: vec3<u32>, lid: vec3<u32>) {
   workgroupBarrier();
   if (lid.x == 0u && lid.y == 0u && wid.x < TL[u.ntiles]) {
     let t = TL[wid.x];
-    if (u.p3 != 0u) { atomicStore(&FLAGS[t], 0u); }
+    if (u.p3 != 0u) { atomicStore(&CTR[16u + t], 0u); }
     let maxW = atomicLoad(&tileMaxW);
     if (maxW > 0u) { atomicMax(&CTR[7], maxW); }
     let seen = atomicLoad(&anyWet);
@@ -507,7 +503,7 @@ fn cap_s_tile(wid: vec3<u32>, lid: vec3<u32>) {
   if (c.x > 0u) { v -= capflux(i, i - 1u, 1u); v += capflux(i - 1u, i, 0u); }
   if (c.y < u.h - 1u) { v -= capflux(i, i + u.w, 2u); v += capflux(i + u.w, i, 3u); }
   if (c.y > 0u) { v -= capflux(i, i - u.w, 3u); v += capflux(i - u.w, i, 2u); }
-  S2[i] = v;
+  S[u.n + i] = v;
 }
 // pigment in the pores moved by the same fluxes; the share the fibres catch goes to the deposit
 fn pmove(a: u32, b: u32, dir: u32, base: u32, out: ptr<function, f32>, inn: ptr<function, f32>, dep: ptr<function, f32>, asDonor: bool) {
@@ -529,7 +525,7 @@ fn cap_p_tile(wid: vec3<u32>, lid: vec3<u32>) {
   if (c.x > 0u) { pmove(i, i - 1u, 1u, base, &o, &inn, &dep, true); pmove(i - 1u, i, 0u, base, &o, &inn, &dep, false); }
   if (c.y < u.h - 1u) { pmove(i, i + u.w, 2u, base, &o, &inn, &dep, true); pmove(i + u.w, i, 3u, base, &o, &inn, &dep, false); }
   if (c.y > 0u) { pmove(i, i - u.w, 3u, base, &o, &inn, &dep, true); pmove(i - u.w, i, 2u, base, &o, &inn, &dep, false); }
-  PN[base + i] = P[base + i] - o + inn; DD[base + i] = dep;
+  DD[u.K * u.n + base + i] = P[base + i] - o + inn; DD[base + i] = dep;
 }
 
 // 5. wet fronts
@@ -566,19 +562,19 @@ fn p5a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }
   let i = c.i;
   if (u.nAct > 0u && DD[klAt(0u) * u.n + i] >= 0.0) {   // below zero: cap_sp moved nothing here (PN = P, DD = 0)
-    for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; P[q] = max(0.0, PN[q]); D[q] += DD[q]; }
+    for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; P[q] = max(0.0, DD[u.K * u.n + q]); D[q] += DD[q]; }
   }
-  var s = max(0.0, S2[i]);
+  var s = max(0.0, S[u.n + i]);
   if (W[i] <= u.wetEps && s > 0.0 && (M[i] == 1u || nearWetS(lid))) {
     var d = min(s, u.dt * u.paperDry);
     if (s - d <= 0.02 * PAPER[i].x) { d = s; }
     let f = d / s; s -= d;
     for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; let qq = P[q] * f; P[q] -= qq; D[q] += qq; }
   }
-  S2[i] = s;
+  S[u.n + i] = s;
 }
 // the value a raster-order walk sees for cell j when it is at cell i: cells before i are final, cells after are not
-fn sSeen(j: u32, i: u32) -> f32 { return select(S[j], S2[j], j < i); }
+fn sSeen(j: u32, i: u32) -> f32 { return select(S[j], S[u.n + j], j < i); }
 // water (M) within R cells of (x, y) in each of the four directions (sheet.mjs heldHole with ever = M)
 fn heldHole(x: u32, y: u32, R: u32) -> bool { return heldHoleOf(x, y, R, false); }
 // sheet.mjs heldHole: water, or with `ever` also paper the wash has covered, within R cells in each of the four directions
@@ -603,8 +599,8 @@ fn wetBeside(x: u32, y: u32) -> bool {
 }
 fn p5b_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }
-  let i = c.i; NEWF[i] = 0u;
-  let pi = PAPER[i]; let si = S2[i];
+  let i = c.i; S[2u * u.n + i] = 0.0;
+  let pi = PAPER[i]; let si = S[u.n + i];
   var nb = array<u32, 4>(0u, 0u, 0u, 0u); var nbOk = array<bool, 4>(false, false, false, false);
   if (c.x < u.w - 1u) { nb[0] = i + 1u; nbOk[0] = true; }
   if (c.x > 0u) { nb[1] = i - 1u; nbOk[1] = true; }
@@ -637,26 +633,26 @@ fn p5b_tile(wid: vec3<u32>, lid: vec3<u32>) {
     // holeFill (sheet.mjs): a dry hollow the standing wash surrounds (water within holeFill cells on all four sides)
     // fills where it is lower than the wet paper beside it
     else if (u.holeFill > 0.0 && wn > 0.0 && ws / wn > u.film && PAPER3[i].z < hn / wn && heldHole(c.x, c.y, u32(u.holeFill))) { newly = true; }
-    if (newly) { NEWF[i] = 1u; }
+    if (newly) { S[2u * u.n + i] = 1.0; }
     return;
   }
   // wet cell: dries out when thin all round
   if (W[i] <= u.wetEps && si < u.capSigma * pi.x) {
     var thinAround = true;
     for (var d = 0u; d < 4u; d++) { if (nbOk[d] && M[nb[d]] == 1u && W[nb[d]] > 3.0 * u.wetEps) { thinAround = false; } }
-    if (thinAround && W[i] == 0.0) { NEWF[i] = 2u; }
+    if (thinAround && W[i] == 0.0) { S[2u * u.n + i] = 2.0; }
   }
 }
 fn p5c_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok) { return; }
-  let i = c.i; let f = NEWF[i];
-  S[i] = S2[i];
+  let i = c.i; let f = u32(S[2u * u.n + i]);
+  S[i] = S[u.n + i];
   if (f == 1u) { M[i] = 1u; EVER[i] = 1u; }
   if (f == 2u) {
     for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; D[q] += G[q]; G[q] = 0.0; }
     M[i] = 0u;
   }
-  NEWF[i] = 0u;
+  S[2u * u.n + i] = 0.0;
 }
 
 // The step in fewer passes (stepfull.mjs stepsInPass)
@@ -993,7 +989,7 @@ fn cap_sp_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let si = S[i];
   var v = si;
   for (var e = 0u; e < 4u; e++) { if (okN[e]) { v -= oF[e]; v += iF[e]; } }
-  S2[i] = v;
+  S[u.n + i] = v;
   // pmove: the donor's share of its pore pigment; a receiver's fibres catch a share where its pores were near empty
   let catchF = select(u.wickFilter, 0.0, si > u.capDelta * PAPER[i].x);
   var sN = vec4<f32>(0.0);
@@ -1008,7 +1004,7 @@ fn cap_sp_tile(wid: vec3<u32>, lid: vec3<u32>) {
       if (oF[e] > 0.0) { let q = pi * min(1.0, oF[e] / si); if (q != 0.0) { o += q; } }
       if (iF[e] > 0.0) { let q = P[base + nb[e]] * min(1.0, iF[e] / sN[e]); if (q != 0.0) { inn += q * (1.0 - catchF); dep += q * catchF; } }
     }
-    PN[base + i] = pi - o + inn; DD[base + i] = dep;
+    DD[u.K * u.n + base + i] = pi - o + inn; DD[base + i] = dep;
   }
 }
 
@@ -2008,7 +2004,7 @@ fn stroke_metered() {
 @compute @workgroup_size(256)
 fn quiet_dry_tail(@builtin(global_invocation_id) g: vec3<u32>) {
   let i = g.x; if (i >= u.n) { return; }
-  W[i] = 0.0; S[i] = 0.0; S2[i] = 0.0; M[i] = 0u;
+  W[i] = 0.0; S[i] = 0.0; S[u.n + i] = 0.0; M[i] = 0u;
   for (var ka = 0u; ka < u.nAct; ka++) {
     let q = klAt(ka) * u.n + i;
     D[q] += G[q] + P[q]; G[q] = 0.0; P[q] = 0.0;
@@ -2020,8 +2016,8 @@ fn quiet_dry_tail(@builtin(global_invocation_id) g: vec3<u32>) {
 @compute @workgroup_size(256)
 fn quiet_dry_clear(@builtin(global_invocation_id) g: vec3<u32>) {
   let i = g.x; if (i >= u.n) { return; }
-  NEWF[i] = 0u;
-  if (i < u.ntiles) { atomicStore(&FLAGS2[i], 0u); atomicStore(&FLAGS[i], 0u); }
+  S[2u * u.n + i] = 0.0;
+  if (i < u.ntiles) { atomicStore(&FLAGS2[i], 0u); atomicStore(&CTR[16u + i], 0u); }
   if (i == 0u) {
     atomicStore(&CTR[1], 0u); atomicStore(&CTR[6], 0u); atomicStore(&CTR[7], 0u);
     atomicStore(&FLAGS2[2u * u.ntiles], 0u);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createSheet, DEFAULTS} from '../sheet.mjs';
 import {makePaper} from '../paper.mjs';
 import {GpuSheet, openGpu, analyse, SRC} from './stepfull.mjs';
+import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
 import {SheetBatch} from './sheet-batch.mjs';
 
 const pigments=[{K:[.4,.2,.1],S:[.02,.02,.02],rho:.05,omega:1.4,gamma:.25},
@@ -22,11 +23,15 @@ function fixture() {
   return s;
 }
 test('fused faces bind exactly ten storage buffers',()=>{
-  const a=analyse(SRC);assert.equal(a.uses('faces_pflux').filter(b=>a.decl.find(d=>d.binding===b).kind.startsWith('storage')).length,10);
+  const info=analyse(SRC+FINISH_WET_SCAN);
+  assert.equal(info.uses('faces_pflux').filter(b=>info.decl.find(d=>d.binding===b).kind.startsWith('storage')).length,10);
+  for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab','slide_apply_cap_sp']) {
+    assert(info.uses(name).filter(b=>b!==0).length<=10,`${name} uses ${info.uses(name).filter(b=>b!==0).length} storage bindings`);
+  }
 });
 
 test('GPU fusion and tight frontier retain fields across boundaries, drying and re-upload', {timeout:120000}, async t=>{
-  const keys=['GPU_RESIDENT','GPU_PERSISTENT','GPU_FUSE_FACES','GPU_SPARSE_TIGHT','GPU_WORKERS'];
+  const keys=['GPU_RESIDENT','GPU_PERSISTENT','GPU_FUSE_FACES','GPU_FUSE_WETSCAN','GPU_SPARSE_TIGHT','GPU_WORKERS'];
   const saved=keys.map(k=>process.env[k]);let device;
   try {
     let gpu;
@@ -37,9 +42,12 @@ test('GPU fusion and tight frontier retain fields across boundaries, drying and 
       const o={...DEFAULTS,dt:2,...(special?{slope:.2,marangoni:.03,capEps:.01}: {})};
       const sheets=[];const counts=[];
       for(const optimized of [false,true]) {
-        process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
+        process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_FUSE_WETSCAN=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
         const s=fixture(),g=await GpuSheet.create(device,s,o);
         try {
+          for(const name of ['p5c_wetfrontier','p5c_wetscan','p5ab','slide_apply_cap_sp']) {
+            assert.equal(!!g.p[name],optimized && device.limits.maxStorageBuffersPerShaderStage>=10,name+' compiled for the selected arm');
+          }
           g.step(60,25,true);await g.download(s);
           // A host stamp into a previously culled tile must re-open its halo.
           const i=8*s.w+8;s.M[i]=s.ever[i]=1;s.W[i]=.2;s.G[0][i]=.01;g.upload(s);
@@ -66,7 +74,7 @@ test('GPU fusion and tight frontier retain fields across boundaries, drying and 
     process.env.GPU_RESIDENT='1';process.env.GPU_PERSISTENT='1';
     const batched=[];
     for(const optimized of [false,true]) {
-      process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
+      process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_FUSE_WETSCAN=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
       const sheets=[fixture(),fixture()];for(const a of fields(sheets[1]))a.reverse();
       const core=await SheetBatch.create(device,2,sheets[0],DEFAULTS);
       const views=[];

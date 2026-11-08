@@ -1,6 +1,6 @@
 // Each invocation's scan reads only its own updated M/S cells. Cross-cell
 // communication is confined to wetscan_tile's existing workgroup atomics.
-// Thirteen to fourteen storage bindings are needed; smaller adapters keep separate passes.
+// Packed scratch planes fit within Metal's ten-storage-buffer limit; apply_f1_p3a_dep needs fourteen.
 export const FINISH_WET_SCAN = `
 @compute @workgroup_size(16, 16)
 fn p5c_wetscan(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
@@ -54,6 +54,8 @@ fn slide_apply_cap_sp(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invo
     workgroupBarrier();
   }
 }
+`;
+export const FINISH_WET_SCAN_14 = `
 @compute @workgroup_size(16, 16)
 fn apply_f1_p3a_dep(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   if (u.p3 != 2u) { apply_f1_tile(wid, lid); p3a_dep_tile(wid, lid); return; }

@@ -210,7 +210,7 @@ export function queryWetReach(sheet, cells, [x0, y0, x1, y1]) {
   const nbe = nonExact.length;
   for (const i of cells) {
     const y = (i / w) | 0, x = i - y * w;
-    let wet = wetCells !== undefined && wetCells[i] === epoch;
+    let wet = wetCells != null && wetCells[i] === epoch;
     if (!wet) {
       for (let j = 0; j < nbe; j++) {
         const b = nonExact[j];
