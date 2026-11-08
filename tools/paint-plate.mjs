@@ -205,6 +205,18 @@ try {
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
 // Run the physical material diagnostic through the sweep's standard entry point.
 if(process.argv.includes('--materialstudy'))await import('./judge/ink-material-study.mjs');
+if (process.argv.includes('--testgpu')) {
+  const { attachGpu } = await import('../src/media/gpu/link.mjs');
+  const { makePaper } = await import('../src/media/paper.mjs');
+  const { createSheet, DEFAULTS } = await import('../src/media/sheet.mjs');
+  const paper = makePaper(100, 100);
+  const sheet = createSheet(paper, [{ name: 'pb15', K: [0.1, 0.1, 0.1], S: [0.1, 0.1, 0.1], rho: 0.1, omega: 1, gamma: 0 }]);
+  console.log('[testgpu] testing attachGpu at top of paint-plate.mjs');
+  const info = attachGpu(sheet, { ...DEFAULTS }, { mode: 'on' });
+  console.log('[testgpu] attachGpu returned:', info.backend);
+  sheet._gpu.close();
+  process.exit(0);
+}
 
 // GPU paths default on for painter runs; set 0 to turn one off.
 // The defaults live here because generic dry() callers may depend on synchronous counts.
