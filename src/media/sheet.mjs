@@ -339,6 +339,7 @@ export function depositPassage(sheet, mask, pigmentConcentration, waterLoad, opt
  * Compute a damp perimeter feathering ring around a mask, applying damp pore moisture without pigment.
  */
 export function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7, options = {}) {
+  if (!(radiusMm > 0)) return { wettedCells: 0, maxMoistureAdded: 0 };
   coherent(sheet);
   const { w, h, paper, s, ever } = sheet;
   const capacity = paper.capacity;
