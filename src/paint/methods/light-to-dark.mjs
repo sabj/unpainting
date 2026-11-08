@@ -47,20 +47,20 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   const minShape=minShapeCells>0?minShapeCells:Math.max(shaped?144:4,Math.round(w*h*.00015));
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 below it per channel is a light. With --paperbase source the sheet takes that colour too.
-  let PAP = paperRGB ? [...paperRGB] : null;
+  let PAP = paperRel && paperRGB ? [...paperRGB] : null;
   if (!PAP && paperRel && rgb) {
     const L = Float32Array.from({ length: n }, (_, i) => rgb[3 * i] + rgb[3 * i + 1] + rgb[3 * i + 2]);
     const idx = Array.from(L.keys()).sort((a, b) => L[b] - L[a]).slice(0, Math.max(1, Math.floor(n * .1)));
     PAP = [0, 1, 2].map(c => idx.reduce((a, i) => a + rgb[3 * i + c], 0) / idx.length);
   }
-  const tonedPap = Boolean(PAP && (PAP[0] - PAP[2] >= 12 || 252 - PAP[2] >= 15));
+  const tonedPap = Boolean(PAP && PAP[0] - PAP[2] >= 12 && 252 - PAP[2] >= 15);
   const papTol = tonedPap ? [16, 16, 20] : [9, 9, 12];
   const papFloor = PAP ? Math.max(120, Math.min(180, PAP[2] - 15)) : 180;
   const inferred = Uint8Array.from({ length: n }, (_, i) => {
     if (hold?.[i]) return 1;
-    if (PAP && PAP[0] >= papFloor && PAP[1] >= papFloor && PAP[2] >= papFloor - 15) {
-      const isPaper = Math.abs(rgb[3 * i] - PAP[0]) <= papTol[0] && Math.abs(rgb[3 * i + 1] - PAP[1]) <= papTol[1] && Math.abs(rgb[3 * i + 2] - PAP[2]) <= papTol[2];
-      if (isPaper || (value.values[i] < .055 && rgb[3 * i] >= papFloor - 10)) return 1;
+    if (PAP) {
+      if (PAP[0] < papFloor || PAP[1] < papFloor || PAP[2] < papFloor - 15) return 0;
+      return (Math.abs(rgb[3 * i] - PAP[0]) <= papTol[0] && Math.abs(rgb[3 * i + 1] - PAP[1]) <= papTol[1] && Math.abs(rgb[3 * i + 2] - PAP[2]) <= papTol[2]) ? 1 : 0;
     }
     if (rgb) {
       return (Math.min(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]) >= 245 && Math.max(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]) - Math.min(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]) <= 8) ? 1 : 0;

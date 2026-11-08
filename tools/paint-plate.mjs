@@ -322,7 +322,7 @@ const INK_RECIPE = await (async () => {
   // the share is read at one width, so --width does not change the choice (the separator's line share depends on it)
   // a missing image is left to fail at the normal image load below
   const measure = INK_RECIPE_NAME === 'auto' && !DRAWING_FLAGS.some(f => argv0.includes(f)) && fs.existsSync(path.resolve(root, opt('image')));
-  const read = measure ? await sharp(path.resolve(root, opt('image'))).flatten({ background: '#ffffff' }).resize({ width: AUTO_INK_WIDTH, withoutEnlargement: true }).removeAlpha().raw().toBuffer({ resolveWithObject: true }) : null;
+  const read = measure ? await sharp(path.resolve(root, opt('image'))).flatten({ background: '#ffffff' }).resize({ width: AUTO_INK_WIDTH }).removeAlpha().raw().toBuffer({ resolveWithObject: true }) : null;
   const share = read ? penShare(read.data, read.info.width, read.info.height) : null;
   return chooseInkRecipe(INK_RECIPE_NAME, argv0, () => share, num('penfirst', 0.5));
 })();
@@ -1880,7 +1880,7 @@ const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
 // Detail marks are left alone. --techcalfrom v: only passages at value band v or darker (default 4, the shadow glazes).
 // --techcalmax and --techcalmin clamp the factor (default 2.5 and 0.8). Default 0.
 const TECH_CAL = num('techcal', 0) > 0 ? createTechniqueCal({ max: num('techcalmax', 2.5), min: num('techcalmin', 0.8) }) : null;
-const TECH_CAL_FROM = num('techcalfrom', 1);
+const TECH_CAL_FROM = num('techcalfrom', 4);
 const TCAL = (sh, T, detail, value) => {
   if (!TECH_CAL || detail || !(value >= TECH_CAL_FROM)) return 1;
   sh._tkey ??= `${T.name}${sh.graded ? ' graded' : ''}`;
