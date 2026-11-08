@@ -200,6 +200,7 @@ const JSONL = createJSONLWriter();
 const removeLogFailureHook = onCheckFailure(JSONL.flush);
 process.on('exit', JSONL.close);
 process.on('uncaughtExceptionMonitor', JSONL.flush);
+let sheet = null;
 try {
 
 // the last of a repeated flag wins, so a batch script can append overrides to a shared set
@@ -1587,7 +1588,7 @@ const paper = opt('paperscan', '') ? await (async () => {
 // --physics key=value,...: override any sheet constant (src/media/sheet.mjs DEFAULTS)
 const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS)) throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
 // --gran: granulation strength, default 0.25. The relief never changes, so every sweep lays the same pattern and it compounds.
-const sheet = createSheet(paper, SHEET_PIGS); sheet._tape = 1;
+sheet = createSheet(paper, SHEET_PIGS); sheet._tape = 1;
 // --probebox x0,y0,x1,y1[;...] (sheet fractions, diagnostic): paint only inside the boxes; compare only with a crop run of the same boxes.
 // --ablate dry,accents: skip those passes (diagnostic).
 const PROBE = opt('probebox', '') ? (() => {

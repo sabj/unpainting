@@ -60,7 +60,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
     if (hold?.[i]) return 1;
     if (PAP) {
       if (PAP[0] < papFloor || PAP[1] < papFloor || PAP[2] < papFloor - 15) return 0;
-      return (Math.abs(rgb[3 * i] - PAP[0]) <= papTol[0] && Math.abs(rgb[3 * i + 1] - PAP[1]) <= papTol[1] && Math.abs(rgb[3 * i + 2] - PAP[2]) <= papTol[2]) ? 1 : 0;
+      return (rgb[3 * i] >= PAP[0] - papTol[0] && rgb[3 * i + 1] >= PAP[1] - papTol[1] && rgb[3 * i + 2] >= PAP[2] - papTol[2]) ? 1 : 0;
     }
     if (rgb) {
       return (Math.min(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]) >= 245 && Math.max(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]) - Math.min(rgb[3 * i], rgb[3 * i + 1], rgb[3 * i + 2]) <= 8) ? 1 : 0;
