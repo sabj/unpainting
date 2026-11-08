@@ -6,7 +6,7 @@ export const STYLE_NAMES = Object.freeze(['ink-and-wash','precise-watercolor','u
 
 const styleCache = new Map();
 
-export function clearStyleCache() {
+function clearStyleCache() {
   styleCache.clear();
 }
 
@@ -39,7 +39,7 @@ function validateProfile(profile, name) {
   }
 }
 
-export function loadStyleProfile(nameOrConfig) {
+function loadStyleProfile(nameOrConfig) {
   if (typeof nameOrConfig === 'string') {
     const name = nameOrConfig;
     if (!STYLE_NAMES.includes(name)) throw Error(`Unknown watercolor style: ${name}`);

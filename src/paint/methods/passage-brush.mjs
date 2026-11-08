@@ -22,11 +22,11 @@ export function attachPlaneRamp(paths, rampVec, scale = 1, map = new WeakMap()) 
   for (const ps of paths) {
     if (!ps.length) continue;
     const p0 = ps[0], p1 = ps[ps.length - 1];
-    const t0 = (p0.x / scale - cx) * dx + (p0.y / scale - cy) * dy;
-    const t1 = (p1.x / scale - cx) * dx + (p1.y / scale - cy) * dy;
-    const u0 = Math.max(-1, Math.min(1, (t0 - tMid) / halfSpan));
-    const u1 = Math.max(-1, Math.min(1, (t1 - tMid) / halfSpan));
-    map.set(ps, { start: 1 + delta * u0, end: 1 + delta * u1 });
+    const t0 = ((p0.x / scale - cx) * dx + (p0.y / scale - cy) * dy - tMid) / halfSpan;
+    const t1 = ((p1.x / scale - cx) * dx + (p1.y / scale - cy) * dy - tMid) / halfSpan;
+    const s0 = Math.max(0.67, Math.min(1.33, 1 + Math.max(-1, Math.min(1, t0)) * delta));
+    const s1 = Math.max(0.67, Math.min(1.33, 1 + Math.max(-1, Math.min(1, t1)) * delta));
+    map.set(ps, { start: s0, end: s1 });
   }
   return paths;
 }

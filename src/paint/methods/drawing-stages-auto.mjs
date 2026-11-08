@@ -72,7 +72,7 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   const { verdicts } = gated;
   // The drawing is pencil unless ink is asked for (--outlinemedium other than graphite, or auto on pen source).
   const medium = opt('outlinemedium', 'graphite');
-  const isInkExplicit = medium !== 'graphite' && medium !== 'auto' && medium !== 'none';
+  const isInkExplicit = !medium.startsWith('graphite') && medium !== 'auto' && medium !== 'none';
   const penThreshold = Number(opt('penfirst', 0.5)) / 100;
   const penSource = penLine >= penThreshold;
   const inkAsked = isInkExplicit || (medium === 'auto' && (penSource || style === 'penwash' || intent.planMedium === 'ink'));
