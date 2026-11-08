@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { smoothPath, turning, pathSupport, supportedRuns, holdLinesToTarget, inkCapFactor, resample } from './ink-lines.mjs';
+import { smoothPath, simplify, turning, pathSupport, supportedRuns, holdLinesToTarget, inkCapFactor, resample, getWidth, getDark } from './ink-lines.mjs';
 
 // a 60 x 40 L* plane: paper at 90 with a dark horizontal line (L* 40) one pixel wide along row 10, and a step edge
 // at x = 30 below row 20 (left 30, right 90)
@@ -105,24 +105,79 @@ test('closed-loop simplify does not collapse to 2 points and preserves geometric
   assert.ok(minX < 42 && maxX > 58, 'bounding box preserved');
 });
 
-test('calligraphic width and darkness variations are preserved along straight lines during simplification', () => {
+test('calligraphic width and darkness variations (r, d) are preserved along straight lines during direct simplification', () => {
   const pts = Array.from({ length: 41 }, (_, i) => ({
     x: i * 2, y: 10,
     r: i === 20 ? 1.5 : 0.2,
     d: i === 20 ? 0.9 : 0.3,
   }));
-  const res = smoothPath(pts, { tol: 0.1, sigma: 0 });
+  const res = simplify(pts, 0.1);
+  assert.ok(res.length < 41, `simplification occurred: length ${res.length} < 41`);
+  assert.ok(res.length > 2, `interior swell points retained: length ${res.length} > 2`);
   const midPoint = res.find(p => p.x === 40);
   assert.ok(midPoint != null, 'interior width swell point retained');
   assert.equal(midPoint.r, 1.5);
   assert.equal(midPoint.d, 0.9);
 });
 
-test('resample and turning accept both [x, y] and {x, y} point representations', () => {
-  const arr = [[0, 0], [10, 0], [10, 10]];
-  const obj = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+test('width and weight variations are preserved along straight lines during direct simplification', () => {
+  const pts = Array.from({ length: 41 }, (_, i) => ({
+    x: i * 2, y: 10,
+    width: i === 20 ? 1.5 : 0.2,
+    weight: i === 20 ? 0.9 : 0.3,
+  }));
+  const res = simplify(pts, 0.1);
+  assert.ok(res.length < 41, `simplification occurred: length ${res.length} < 41`);
+  assert.ok(res.length > 2, `interior swell points retained: length ${res.length} > 2`);
+  const midPoint = res.find(p => p.x === 40);
+  assert.ok(midPoint != null, 'interior width swell point retained');
+  assert.equal(midPoint.width, 1.5);
+  assert.equal(midPoint.weight, 0.9);
+});
+
+test('calligraphic swell is preserved under active smoothing in smoothPath', () => {
+  const pts = Array.from({ length: 41 }, (_, i) => ({
+    x: i * 2, y: 10,
+    r: i === 20 ? 1.5 : 0.2,
+    d: i === 20 ? 0.9 : 0.3,
+  }));
+  const res = smoothPath(pts, { tol: 0.1, sigma: 1.0 });
+  assert.ok(res.length > 2, `interior swell retained under active smoothing: length ${res.length} > 2`);
+  const midPoint = res.find(p => Math.abs(p.x - 40) < 0.5);
+  assert.ok(midPoint != null, 'interior width swell point retained near x=40');
+  assert.ok(midPoint.r > 1.0, `swell radius preserved: ${midPoint.r}`);
+  assert.ok(midPoint.d > 0.7, `swell darkness preserved: ${midPoint.d}`);
+});
+
+test('resample, turning, and simplify accept both [x, y] and {x, y} point representations', () => {
+  const arr = [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]];
+  const obj = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }];
   const rArr = resample(arr, 1);
   const rObj = resample(obj, 1);
   assert.equal(rArr.length, rObj.length);
   assert.ok(Math.abs(turning(arr) - turning(obj)) < 1e-6);
+  const sArr = simplify(arr, 0.1);
+  const sObj = simplify(obj, 0.1);
+  assert.equal(sArr.length, 5, 'simplify preserves array polygon vertices');
+  assert.equal(sObj.length, 5, 'simplify preserves object polygon vertices');
+  for (let k = 0; k < sArr.length; k++) {
+    assert.ok(Array.isArray(sArr[k]));
+    assert.equal(sArr[k][0], sObj[k].x);
+    assert.equal(sArr[k][1], sObj[k].y);
+  }
+});
+
+test('getWidth and getDark accessors support width/r and weight/absorb/d aliases', () => {
+  assert.equal(getWidth({ width: 2.5 }), 2.5);
+  assert.equal(getWidth({ r: 1.8 }), 1.8);
+  assert.equal(getWidth({ width: 2.5, r: 1.8 }), 2.5);
+  assert.ok(Number.isNaN(getWidth({})));
+  assert.ok(Number.isNaN(getWidth(null)));
+
+  assert.equal(getDark({ weight: 0.7 }), 0.7);
+  assert.equal(getDark({ absorb: 0.8 }), 0.8);
+  assert.equal(getDark({ d: 0.9 }), 0.9);
+  assert.equal(getDark({ weight: 0.7, d: 0.9 }), 0.7);
+  assert.ok(Number.isNaN(getDark({})));
+  assert.ok(Number.isNaN(getDark(null)));
 });
