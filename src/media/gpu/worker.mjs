@@ -2,6 +2,7 @@
 // Atomics.wait for the few results it needs (a rectangle of the sheet, a dry, a layer); everything else is posted and
 // runs in order. Rectangles and layers travel in SharedArrayBuffers named in workerData.
 import { parentPort, workerData } from 'node:worker_threads';
+console.error('[worker.mjs] worker thread loaded');
 import { openGpu, GpuSheet } from './stepfull.mjs';
 import { writeAdapterEvidence } from './adapter-evidence.mjs';
 import { GpuOpticalComposite } from './optical-gpu.mjs';
@@ -215,4 +216,4 @@ async function handleOp(m) {
   }
   if (m.wait !== false) ack();
 }
-parentPort.on('message', m => { watcher?.tick(); chain = chain.then(() => handle(m)).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); }); });
+parentPort.on('message', m => { console.error('[worker.mjs] got message', m.op); watcher?.tick(); chain = chain.then(() => handle(m)).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); }); });
