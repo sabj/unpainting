@@ -24,10 +24,8 @@ const FAST_DRY_DT_SCALE = Math.max(0.01, envNum('GPU_FAST_DRY_DT_SCALE', 2));
 const SPARSE_ALL = typeof process === 'undefined' || process.env.GPU_SPARSE_ALL !== '0';
 const KEEP = []; // Dawn's instance, adapter and device must stay reachable or the GC frees them under the running device
 
-const retainedGpuInstances = new Set();
 export async function openGpu(gpu) {
   if (!gpu) throw new Error('no WebGPU implementation');
-  retainedGpuInstances.add(gpu);
   KEEP.push(gpu);
   const adapter = await gpu.requestAdapter(); if (!adapter) throw new Error('no WebGPU adapter'); KEEP.push(adapter);
   const L = adapter.limits;
