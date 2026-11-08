@@ -9,6 +9,8 @@
 
 How the pen drawing and the washes are made, stage by stage: [Pipelines](docs/pipelines.md).
 
+**0.3.0: less time waiting for paint to dry.** During development, the three-workload M4 reference suite fell from 12.1 minutes on the frozen control to 4.7 minutes with warm caches. A fresh final-engine run with run caching off took 6.6 minutes. The final engine retains 98.75%–99.76% local RGB SSIM on those paintings. See the [release notes](CHANGELOG.md#030--2026-11-07) for timing charts, full images, amplified differences and the exact commits. Paint Lab and Spore Studies use different browser paths; the CLI speedup is not a browser speed claim.
+
 Want to help? The [open problems](docs/future-ideas.md) need work: linework, washes, judging and more. Issues and pull requests welcome.
 
 <p align="center"><img src="docs/img/hero-trumbull.webp" alt="Trumbull College: original photo, stylized target, and the painting building from blank paper to the finished painting"></p>
@@ -62,7 +64,7 @@ unpainting/
 
 The pipeline has seven steps: instructions, planning tools, plan execution, tool preparation, tool use, judgment and practice between attempts. It takes a painting-style image and prepares paper, colors and brushes. It plans the painting, executes the plan, then judges the result and improves on it.
 
-A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. In 0.2.0 the drawing medium defaults to pencil. A plan, `--outlinemedium ink` or the [automatic stage choice](docs/ink.md#automatic-drawing-stages) can add ink.
+A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. The drawing medium defaults to pencil. A plan, `--outlinemedium ink` or the [automatic stage choice](docs/ink.md#automatic-drawing-stages) can add ink.
 
 <p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run with a pencil drawing"></a></p>
 
@@ -120,7 +122,7 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 - V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
 - V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try.
 
-The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.2.0 or 0.2.1: those releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
+The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.3.0. The 0.2.0 and 0.2.1 releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
 
 Models ran at their highest reasoning setting.
 
