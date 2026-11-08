@@ -6,15 +6,17 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 **Faster painting, closely matched output.** Against our frozen development control (a build after 0.2.1), three reference paintings finish in **6:33 instead of 12:06, 1.85× faster** on Apple M4. Run caching is disabled on both.
 
-<a href="docs/img/release-0.3.0-speed.gif"><img src="docs/img/release-0.3.0-speed.gif" width="560" alt="Measured elapsed-time animation at 60× speed: BEFORE frozen control takes 12 minutes 6 seconds; AFTER 0.3.0 takes 6 minutes 33 seconds."></a>
+<a href="docs/img/release-0.3.0-painting.gif"><img src="docs/img/release-0.3.0-painting.gif" width="560" alt="Real painting playback at 8× speed. BEFORE: frozen control on the left. AFTER: 0.3.0 on the right. Both recordings share the same clock; initial setup is trimmed."></a>
 
-The GIF illustrates elapsed time at **60× speed**, not painting playback. Single runs, fast mode, seed 0; preprocessing caches may remain. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
+**General-workload playback, 8× speed.** Real captured frames, one run per version; both timelines omit the first 38 seconds. Full recorded runs took **91.3 s before / 80.2 s after**, including recording overhead. Unfilmed, this workload takes **82.4 s / 57.1 s**; the headline 1.85× covers the full three-painting suite. [Watch the MP4](https://github.com/sabj/unpainting/releases/download/v0.3.0/release-0.3.0-painting.mp4).
+
+Single runs, fast mode, seed 0; preprocessing caches may remain. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
 
 ### Before / after
 
 <a href="docs/img/release-0.3.0-before-after.png"><img src="docs/img/release-0.3.0-before-after.png" width="560" alt="Three painting pairs with labels baked into the image. Top: BEFORE, frozen control. Bottom: AFTER, 0.3.0. General: 99.76% SSIM; ink and wash: 99.32%; value plan: 98.75%. Click to enlarge."></a>
 
-**98.75–99.76% local RGB SSIM**, measured on original pixels. This measures similarity, not artistic quality. Click the thumbnails to enlarge; inspect [8× differences and largest-change crops](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) or download the [interactive comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/comparison.html).
+**98.75–99.76% local RGB SSIM**, measured on original pixels across three workloads at one seed. This measures similarity, not artistic quality. Click the thumbnails to enlarge; inspect [8× differences and largest-change crops](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) or download the [interactive comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/comparison.html).
 
 | Painting | Before · control | After · 0.3.0 |
 |---|---:|---:|
