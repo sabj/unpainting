@@ -900,6 +900,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   // tools/gpu/paint-batch.mjs: this painter is one sheet of a batch; its GPU thread is shared and reached through a port
   const batchPort = threadData?.gpuBatchPort;
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
+  worker.unref();
   let workerDied = null;
   worker.on('error', e => { workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); Atomics.notify(ctrl, 3); });
   worker.on('exit', code => {
