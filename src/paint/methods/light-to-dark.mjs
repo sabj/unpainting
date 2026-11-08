@@ -394,20 +394,31 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
             const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0,protect:protectedCells,curved:true});
             if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
           else if(shaped && list.length >= 4) {
-            let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
-            for (const idx of list) { const x = idx % w + .5, y = Math.floor(idx / w) + .5; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; }
-            const c = list.length, cx = sx / c, cy = sy / c, a = sxx / c - cx * cx, b = syy / c - cy * cy, cv = sxy / c - cx * cy;
-            const ang = .5 * Math.atan2(2 * cv, a - b);
-            const dx = Math.cos(ang), dy = Math.sin(ang);
+            let sx = 0, sy = 0;
+            for (const idx of list) {
+              sx += (idx % w) + 0.5;
+              sy += Math.floor(idx / w) + 0.5;
+            }
+            const c = list.length, cx = sx / c, cy = sy / c;
+            const mMean = amount > 1e-6 ? amount : 1;
+            let covX = 0, covY = 0;
+            for (const idx of list) {
+              const w_i = G[idx] - mMean;
+              covX += ((idx % w) + 0.5 - cx) * w_i;
+              covY += (Math.floor(idx / w) + 0.5 - cy) * w_i;
+            }
+            const len = Math.hypot(covX, covY);
+            const dx = len > 1e-5 ? covX / len : 1;
+            const dy = len > 1e-5 ? covY / len : 0;
             let g0 = 0, n0 = 0, g1 = 0, n1 = 0, minT = Infinity, maxT = -Infinity;
             for (const idx of list) {
-              const x = idx % w + .5 - cx, y = Math.floor(idx / w) + .5 - cy;
+              const x = (idx % w) + 0.5 - cx, y = Math.floor(idx / w) + 0.5 - cy;
               const t = x * dx + y * dy;
               minT = Math.min(minT, t); maxT = Math.max(maxT, t);
               if (t < 0) { g0 += G[idx]; n0++; } else { g1 += G[idx]; n1++; }
             }
-            const m0 = n0 > 0 ? g0 / n0 : amount, m1 = n1 > 0 ? g1 / n1 : amount, mMean = amount > 1e-6 ? amount : 1;
-            const relDelta = (m1 - m0) / (2 * mMean);
+            const m0 = n0 > 0 ? g0 / n0 : amount, m1 = n1 > 0 ? g1 / n1 : amount;
+            const relDelta = (m1 - m0) / mMean;
             const delta = Math.max(-0.33, Math.min(0.33, relDelta));
             const spanT = Math.max(1, maxT - minT);
             sh._rampVec = { cx, cy, dx, dy, minT, maxT, spanT, delta, amount };

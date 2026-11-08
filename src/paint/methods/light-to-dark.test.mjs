@@ -245,3 +245,77 @@ test('detectFineCatchlights filters out isolated 1-cell JPEG noise specks below 
   assert.equal(plan.protectedCells[speckIdx], 0, '1-cell noise speck is not protected');
 });
 
+test('Consult #9 Catch 2: 2D gradient direction covariance correctly detects vertical gradient on horizontal passage', () => {
+  const w = 40, h = 10, n = w * h;
+  const density = new Float32Array(n);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      density[y * w + x] = 0.2 + 0.6 * (y / (h - 1));
+    }
+  }
+  const demand = density.slice();
+  const plan = planLightToDark({
+    w, h, k: 1, density, demand, shaped: true,
+    strokePlan: false,
+    sheetWidthMm: 120, minShapeCells: 10
+  });
+
+  const shapes = plan.layers.flatMap(l => l.shapes);
+  // Both light foundation and middle shapes detect the true 2D gradient direction
+  const skyLight = shapes.find(s => s._rampVec && s._valuePlan?.phase === 'light');
+  assert.ok(skyLight, 'light shape has _rampVec attached');
+  assert.ok(Math.abs(skyLight._rampVec.dx) < 0.05, `light dx should be ~0, got ${skyLight._rampVec.dx}`);
+  assert.ok(Math.abs(Math.abs(skyLight._rampVec.dy) - 1.0) < 0.05, `light |dy| should be ~1, got ${skyLight._rampVec.dy}`);
+
+  const skyMid = shapes.find(s => s._rampVec && s._valuePlan?.phase === 'mid');
+  assert.ok(skyMid, 'mid shape has _rampVec attached');
+  const rv = skyMid._rampVec;
+
+  assert.ok(Math.abs(rv.dx) < 0.05, `dx should be ~0, got ${rv.dx}`);
+  assert.ok(Math.abs(Math.abs(rv.dy) - 1.0) < 0.05, `|dy| should be ~1, got ${rv.dy}`);
+
+  assert.ok(rv.delta > 0.15, `delta should be >= 0.15, got ${rv.delta}`);
+  assert.ok(rv.delta <= 0.33, `delta must be clamped to 0.33, got ${rv.delta}`);
+});
+
+test('Consult #9 Catch 2: 2D gradient direction covariance detects horizontal gradient on vertical passage', () => {
+  const w = 10, h = 40, n = w * h;
+  const density = new Float32Array(n);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      density[y * w + x] = 0.2 + 0.6 * (x / (w - 1));
+    }
+  }
+  const demand = density.slice();
+  const plan = planLightToDark({
+    w, h, k: 1, density, demand, shaped: true,
+    strokePlan: false,
+    sheetWidthMm: 120, minShapeCells: 10
+  });
+
+  const shapes = plan.layers.flatMap(l => l.shapes);
+  const colShape = shapes.find(s => s._rampVec && s._valuePlan?.phase === 'mid');
+  assert.ok(colShape, 'shape has _rampVec attached');
+  const rv = colShape._rampVec;
+
+  assert.ok(Math.abs(Math.abs(rv.dx) - 1.0) < 0.05, `|dx| should be ~1, got ${rv.dx}`);
+  assert.ok(Math.abs(rv.dy) < 0.05, `dy should be ~0, got ${rv.dy}`);
+  assert.ok(rv.delta > 0.15, `delta should be >= 0.15, got ${rv.delta}`);
+});
+
+test('Consult #9 Catch 2: uniform passage yields zero delta with stable fallback', () => {
+  const w = 30, h = 20, n = w * h;
+  const density = new Float32Array(n).fill(0.45);
+  const plan = planLightToDark({
+    w, h, k: 1, density, demand: density.slice(), shaped: true,
+    strokePlan: false, sheetWidthMm: 120, minShapeCells: 10
+  });
+  const shapes = plan.layers.flatMap(l => l.shapes);
+  const uniformShape = shapes.find(s => s._rampVec);
+  assert.ok(uniformShape, 'shape has _rampVec attached');
+  assert.equal(uniformShape._rampVec.delta, 0, 'uniform passage must have delta === 0');
+  assert.ok(Number.isFinite(uniformShape._rampVec.dx), 'dx is finite');
+  assert.ok(Number.isFinite(uniformShape._rampVec.dy), 'dy is finite');
+});
+
+

@@ -21,7 +21,7 @@ import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
 import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
 import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
 import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
-import {passageBrushPaths} from '../src/paint/methods/passage-brush.mjs';
+import {passageBrushPaths, attachPlaneRamp as attachRampToPaths} from '../src/paint/methods/passage-brush.mjs';
 import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
 import {GROUND} from '../src/paint/tuned/trumbull.mjs';
@@ -230,7 +230,7 @@ const optIdx = n => {
 };
 const opt = (n, d) => { OPTS_READ.add(n); const i = optIdx(n); if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; }, num = (n, d) => Number(opt(n, d));
 // Caller-owned drawing inputs and stage intent, separated from recipe/plan and generated arguments.
-const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv });
+const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv, pipeline: PIPELINE });
 // An explicit budget changes planning only; absent/zero preserves every default.
 const STROKE_BUDGET = num('strokebudget', 0);
 for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
@@ -1222,6 +1222,13 @@ if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * S
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
 // The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
 // come from, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
+// --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. graphite (default): the drawing is pencil
+// unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
+// shows --penfirst per cent of line or more, else graphite.
+const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
+const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : materialProfile(OUTLINE_REQUESTED).kind, share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
+console.log(describeOutlineMedium(OUTLINE));
+DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
 // the drawing's stages for this image: planner model, rule and gate (drawing-stages-auto.mjs); the prep pencil's erase
 // weights are made now, before the target is sealed (pencil-erase.mjs)
 const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: SEP.stats.ink / n, log: console.log, intent: DRAWING_STAGE_INTENT });
@@ -1238,12 +1245,6 @@ if (DRAWING_CHOICE) LINEWORK.drawingChoice = DRAWING_CHOICE;
 if (LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${LINEWORK_STAGE.source}`, universal:{gate:LINEWORK_STAGE.gate, features:LINEWORK_STAGE.features, lines:LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
-// --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. graphite (default): the drawing is pencil
-// unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
-// shows --penfirst per cent of line or more, else graphite.
-const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
-const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : materialProfile(OUTLINE_REQUESTED).kind, share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
-console.log(describeOutlineMedium(OUTLINE));
 // --penfacelong e: face rule and face-detail walks read only line-shaped ink marks (longest side squared over area >= e). Default 0.
 // --penfacelongmin: shortest such mark, in cells at 540 px (default 6).
 let FACE_INK_CACHE = null;
@@ -3512,24 +3513,10 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
-  const makeShapedPlanePaths = () => {
-    const raw = shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38});
-    if(raw && sh._rampVec) {
-      const { cx, cy, dx, dy, minT, maxT, spanT, delta } = sh._rampVec;
-      const tMid = (minT + maxT) * 0.5, halfSpan = (spanT * 0.5) || 1;
-      for (const ps of raw) {
-        if (!ps.length) continue;
-        const p0 = ps[0], p1 = ps[ps.length - 1];
-        const t0 = (p0.x / SC - cx) * dx + (p0.y / SC - cy) * dy;
-        const t1 = (p1.x / SC - cx) * dx + (p1.y / SC - cy) * dy;
-        const u0 = Math.max(-1, Math.min(1, (t0 - tMid) / halfSpan));
-        const u1 = Math.max(-1, Math.min(1, (t1 - tMid) / halfSpan));
-        PATH_RAMP.set(ps, { start: 1 + delta * u0, end: 1 + delta * u1 });
-      }
-    }
-    return raw;
-  };
-  const shapedPaths=BUDGET?budgetPaths(up(MASK),W2,H2,BUDGET.target(sh)):sh._valuePlan?.shaped?sh._strokePlan?strokePlanPaths(sh):(sh._valuePlan.brush?.paths?passageBrushPaths(sh._valuePlan.brush,SC):makeShapedPlanePaths()):null;
+  const attachPlaneRamp = raw => attachRampToPaths(raw, sh._rampVec ?? sh._valuePlan?.rampVec, SC, PATH_RAMP);
+  const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38});
+  const rawShapedPaths = () => (sh._valuePlan.brush?.paths ? passageBrushPaths(sh._valuePlan.brush, SC) : makeShapedPlanePaths());
+  const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
   const gradedAngle = sh.graded && !sh._follow ? (sh._gradedAngle ?? null) : null;

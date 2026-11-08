@@ -28,7 +28,7 @@ const hundredth = (v, re) => String(Number(m(v, re)[1]) / 100);
  * The paint-plate command for a variant, as [script, --option, value, ...]. ctx: {planDir, target, width, sheetmm,
  * trumbull, out, compile, gpu, linesExist}. The regular expressions are the recipe tokens; bench/v4v5/TOKENS.md lists them.
  */
-export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false, basePalette = true, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true }) {
+export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false, basePalette = true, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true, outlineMedium = 'auto' }) {
   return v => {
     const shaped = v.startsWith('region_w13') || v.startsWith('region_w15');
     // basePalette false: Trumbull gets a box only when the variant names a palette token; otherwise the painter picks
@@ -77,7 +77,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
       '--drawing', 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
-      '--outlinemedium', 'auto', '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
+      '--outlinemedium', outlineMedium, '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
       '--out', out, '--targetguard', 'gentle', ...(compile ? ['--valuepreviewonly', '1'] : ['--gpu', gpu])];
   };
 }
@@ -158,8 +158,10 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   focusmap: v => /\.json$/i.test(v),
   brushchoice: choice(['0', '1']),
   strokeplan: choice(['0', '1']),
-  lanemm: numeric(1, 40),
+  lanemm: v => v === 'auto' || numeric(0, 40)(v),
   strokemm: numeric(0, 300),
+  techcal: choice(['0', '1']),
+  techcalfrom: numeric(1, 5),
   drawinghand: choice(['0', '1']),
   washinkfree: choice(['0', '1']),
   inkdarkskip: numeric(0, 1),
@@ -258,7 +260,10 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const targetPixels = pngSize(target);
   // spec.basePalette false: no paint box from the base tokens; a plan's own palette token or --paints still applies
   const basePalette = spec.basePalette !== false;
-  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, basePalette, out, compile, gpu, targetPixels, linesExist });
+  const planMedium = config?.drawing?.medium;
+  const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
+  const outlineMedium = planMedium ?? (isPenWash ? 'ink' : 'graphite');
+  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, basePalette, out, compile, gpu, targetPixels, linesExist, outlineMedium });
   problems.push(...unknownTokens(safeVariant, build).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;

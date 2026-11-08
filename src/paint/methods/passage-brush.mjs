@@ -15,3 +15,18 @@ export function choosePassageBrush(mask,w,h,{mmPerCell,texture=false,referenceCu
  paths,classification:detail?'detail':'plane',supportWidthMm:span};
 }
 export function passageBrushPaths(brush,scale=1){return brush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale})));}
+export function attachPlaneRamp(paths, rampVec, scale = 1, map = new WeakMap()) {
+  if (!paths || !rampVec) return paths;
+  const { cx, cy, dx, dy, minT, maxT, spanT, delta } = rampVec;
+  const tMid = (minT + maxT) * 0.5, halfSpan = (spanT * 0.5) || 1;
+  for (const ps of paths) {
+    if (!ps.length) continue;
+    const p0 = ps[0], p1 = ps[ps.length - 1];
+    const t0 = (p0.x / scale - cx) * dx + (p0.y / scale - cy) * dy;
+    const t1 = (p1.x / scale - cx) * dx + (p1.y / scale - cy) * dy;
+    const u0 = Math.max(-1, Math.min(1, (t0 - tMid) / halfSpan));
+    const u1 = Math.max(-1, Math.min(1, (t1 - tMid) / halfSpan));
+    map.set(ps, { start: 1 + delta * u0, end: 1 + delta * u1 });
+  }
+  return paths;
+}

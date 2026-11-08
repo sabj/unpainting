@@ -26,8 +26,8 @@ function sample(P, w, h, x, y) {
   return (P[y0 * w + x0] * (1 - u) + P[y0 * w + x1] * u) * (1 - v) + (P[y1 * w + x0] * (1 - u) + P[y1 * w + x1] * u) * v;
 }
 
-export const ptX = p => (Array.isArray(p) ? p[0] : p?.x);
-export const ptY = p => (Array.isArray(p) ? p[1] : p?.y);
+const ptX = p => (Array.isArray(p) ? p[0] : p?.x);
+const ptY = p => (Array.isArray(p) ? p[1] : p?.y);
 export const getWidth = p => (p == null ? NaN : Number.isFinite(p.width) ? p.width : Number.isFinite(p.r) ? p.r : NaN);
 export const getDark = p => (p == null ? NaN : Number.isFinite(p.weight) ? p.weight : Number.isFinite(p.absorb) ? p.absorb : Number.isFinite(p.d) ? p.d : NaN);
 const arcLengths = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(ptX(pts[k]) - ptX(pts[k - 1]), ptY(pts[k]) - ptY(pts[k - 1]))); return d; };
