@@ -4,86 +4,39 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 ## 0.3.0 — 2026-11-07
 
-**More time painting, less time waiting.**
+**Faster painting, closely matched output.** Against our frozen development control (a build after 0.2.1), three reference paintings finish in **6:33 instead of 12:06, 1.85× faster** on Apple M4. Run caching is disabled on both.
 
-0.3.0 reduces the work between brushstrokes: checking dry paper, preparing another run, moving data off the GPU and storing layers that contain no paint. It also combines GPU steps to reduce dispatch overhead.
+<a href="https://github.com/sabj/unpainting/releases/download/v0.3.0/speed-before-after.gif"><img src="https://github.com/sabj/unpainting/releases/download/v0.3.0/speed-before-after.gif" width="560" alt="Measured elapsed-time animation at 60× speed: BEFORE frozen control takes 12 minutes 6 seconds; AFTER 0.3.0 takes 6 minutes 33 seconds."></a>
 
-During development, the three-painting M4 reference suite fell from **12.1 minutes to 4.7 minutes with warm caches: about 2.6× faster**. With run caching disabled, it took **6.3 minutes: 1.91× faster**.
+The GIF illustrates elapsed time at **60× speed**, not painting playback. Single runs, fast mode, seed 0; preprocessing caches may remain. “Before” is control `41e6868`. “After” is final engine `efbf8b7`, with the same painting code as release `70ceb7c`. These are M4 timings, not NVIDIA results.
 
-![The reference suite takes 12.09 minutes on the frozen control, 6.33 minutes at Stage 17 with run caching off, and 4.68 minutes with warm caches.](https://github.com/sabj/unpainting/releases/download/v0.3.0/speed.png)
+### Before / after
 
-### The largest painting saves the most time
+<a href="https://github.com/sabj/unpainting/releases/download/v0.3.0/before-after-compact.png"><img src="https://github.com/sabj/unpainting/releases/download/v0.3.0/before-after-compact.png" width="560" alt="Three painting pairs with labels baked into the image. Top: BEFORE, frozen control. Bottom: AFTER, 0.3.0. General: 99.76% SSIM; ink and wash: 99.32%; value plan: 98.75%. Click to enlarge."></a>
 
-The value-plan workload drops from **7.7 minutes to 2.9 minutes** in the measured warm run. The smaller paintings also improve.
+**98.75–99.76% local RGB SSIM**, measured on original pixels. This measures similarity, not artistic quality. Click the thumbnails to enlarge; inspect [8× differences and largest-change crops](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) or download the [interactive comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/comparison.html).
 
-![Wall times for the three reference paintings, before and after optimization.](https://github.com/sabj/unpainting/releases/download/v0.3.0/workloads.png)
-
-| Reference workload | Frozen control | Stage 17 warm | Speedup |
-|---|---:|---:|---:|
-| General painting · 540 px | 82.39 s | 37.99 s | 2.17× |
-| Ink and wash · 1200 px planning grid | 179.90 s | 68.83 s | 2.61× |
-| Value-plan painting · 1200 px | 463.40 s | 173.75 s | 2.67× |
-| **Suite** | **725.69 s** | **280.56 s** | **2.59×** |
-
-These are single-run measurements on an Apple M4 Mac mini, with fixed workloads, fast mode and seed 0. The charts compare frozen control `41e6868` with Stage 17 `5e91484`; they do not mix the fastest runs from different stages. The control includes changes after the published `v0.2.1` tag (`1cc2c08`), so this is a development comparison, not a clean released-version A/B. The control and Stage 17 cache-off runs both use `--runcache 0`; warm uses `--runcache 1`. It is not an NVIDIA speed measurement.
-
-A fresh run of the final engine (`efbf8b7`) with `--runcache 0` took **57.07 s, 118.32 s and 217.62 s**, respectively: **393.01 s total**, or about **1.85×** the control’s throughput. That is a single cold-run observation, not a final warm-cache measurement. The graphs above retain the historical Stage 17 measurements.
-
-### The pictures stay close
-
-The final engine (`efbf8b7`) reproduces the earlier candidate's three PNGs byte for byte. Against the frozen control, **local RGB SSIM ranges from 98.75% to 99.76%**. SSIM is an image-similarity measurement, not a new vision-judge score or a percentage of artistic quality.
-
-The panel shows the least-similar workload. The right column amplifies absolute RGB differences by a fixed **8×**; black means an exact match. The crop shows the region with the largest average change. Small differences are visible around edges and washes; they are not assumed to be random noise.
-
-![Frozen control and final-engine paintings, an 8× absolute-difference view, and the largest-change crop.](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png)
-
-| Workload | Local RGB SSIM · 7 × 7 | Mean absolute channel difference · /255 |
+| Painting | Before · control | After · 0.3.0 |
 |---|---:|---:|
-| General painting | 99.76% | 0.202 |
-| Ink and wash | 99.32% | 0.455 |
-| Value-plan painting | 98.75% | 0.948 |
+| General | 82.39 s | 57.07 s |
+| Ink and wash | 179.90 s | 118.32 s |
+| Value plan | 463.40 s | 217.62 s |
 
-[Value-plan comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/valueplan-1200-comparison.png) · [General comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/general-540-comparison.png) · [Ink-and-wash comparison](https://github.com/sabj/unpainting/releases/download/v0.3.0/inkres-1200-comparison.png) · [Measurements and hashes](https://github.com/sabj/unpainting/releases/download/v0.3.0/visual-evidence.json)
+### What changed
 
-Metrics use the original decoded RGB pixels at matching dimensions, with no registration, color correction or exclusions. The crop is selected by maximum mean absolute difference on a fixed 96-pixel grid, including the image edges. All three final M4 runs record zero target-guard violations. The ink run has an “early detail” heuristic flag; its risk level is low. [Validation records](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) preserve those results.
+- **Less waiting:** fewer GPU dispatches, smaller paper readbacks, reused stroke buffers.
+- **Less repeated work:** compact empty layers, faster ink filtering, cached preparation and queued image writes.
+- **Dry by passage:** fast value-plan runs keep shapes wet together by default. The timing above includes this change, which can alter pixels. `--washsession 0` restores per-shape drying.
 
-### Compatibility and validation
+### Checked on real GPUs
 
-Apple M4 / Metal and NVIDIA L40S / Vulkan each pass **1,446 tests**, with **0 failures and 2 reported skips**, plus **83 benchmark tests**. The skips are a declared blur comparison and a private-reference fixture absent from the isolated checkout; neither is a GPU test. The NVIDIA regression set passes **11/11**, with zero fused/unfused field difference. Device-health checks pass **8/8** on both platforms with `GPU_REQUIRED=1` and `--expose-gc`.
+M4/Metal and NVIDIA L40S/Vulkan each pass **1,446 tests + 83 benchmark tests**, with zero failures and two reported non-GPU skips. Four native paint fixtures complete on L40S; RTX 4090 passes 11 targeted GPU regressions.
 
-Four native paint fixtures complete on L40S. The 11 targeted GPU regressions also pass on RTX 4090. Forty L40S worker close/reopen cycles pass, half following injected device errors. The release fixes a raw-Dawn test that failed to retain its native GPU owner; it now uses the same opener as the painter and retains the error assertions. Claude reviewed that fix and the release claims.
+[Paint Lab](https://sabj.github.io/unpainting/demos/lab/) paints, dries and saves on Chrome’s Metal WebGPU and CPU paths. All **210 mushroom tests** pass; Amanita, Morel and Coral render in Chromium. Browser speedups are not measured.
 
-[Validation record](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) · [Test logs](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation-logs.zip) · [Timing data](https://github.com/sabj/unpainting/releases/download/v0.3.0/performance-evidence.json)
+Painter **V102** · simulator **103** · judges **J1**. Quality work continues in **0.3.1**.
 
-Paint Lab paints, dries and saves pigment state on Chrome’s Apple Metal WebGPU and CPU paths. All **210 mushroom tests** pass, and Amanita, Morel and Coral complete real Chromium renders on the M4. These browser painters share media code with the CLI but have different execution paths; the CLI timing gains do not establish a browser speedup.
-
-Painter **V102**, simulator **103**, judges **J1**. The published model leaderboard retains its original versions and scores. Quality work for 0.3.1 is separate.
-
-### Implementation details
-
-- **Check only paper that can have changed.** Zero-water, dry-fixed and wet-reach certificates avoid redundant readbacks. Regional freshness tracking preserves unrelated paper gates across strokes. Flow expands the tracked wet area conservatively. Queued drying certifies exact zero only when an analytic tail guarantees it; fine-ink carry invalidates the dry-fixed state.
-- **Do more work per GPU dispatch.** Fused solver passes and packed scratch buffers fit Dawn/Metal's ten-storage-binding limit. A persistent 8 MiB staging buffer replaces per-stroke allocations. Active tiles and brush-pigment specialization avoid work on empty regions and unused pigment lanes.
-- **Keep less duplicated state.** Lower-layer compaction removes zero planes without discarding pigment. Thickness and optical-stack caches avoid rescanning unchanged layers. The fine-ink sheet uses one pigment and a separable box filter with reusable buffers.
-- **Reuse preparation across runs.** Fingerprinted caches cover palette fitting, paper, calibration, drawing and value-plan preparation. Keys include inputs, relevant code and options. Cache hits retain target-look accounting; tested cold/warm pairs produce identical final pixels. Typed arrays use compressed binary storage.
-- **Dry at passage boundaries.** Fast value-plan runs default to `--washsession 1`, keeping shapes in a pass wet together. This changes the drying schedule and can change pixels. `--washsession 0` starts each shape dry. Stage PNG writes are queued, and audit logs are buffered.
-- **Keep the audit evidence.** Fast strokes retain before/after brush measurements in `value-commands.jsonl`. Certificate regressions cover residual pore water, queued drying and fine-ink carry. Fusion tests assert that the fused pipelines actually compile before comparing them with the unfused path.
-- **Resume more painting states.** Passage checkpoints support fine ink and preparatory fade, validate provenance before loading arrays and preserve the fine sheet's wet state.
-- **Score at native resolution when requested.** `--resolution native` uses physical-millimetre filter widths and a deterministic metric cache. Legacy target-size scoring remains the default.
-- **Tighten recipe and harness behavior.** `--recipe none` preserves a plan's drawing choices; unknown recipes fail explicitly. Benchmark extra arguments use an allowlist, and dependency checks run before model sessions. Starved pen recordings stop at the executed path, with refill segments linked by gesture ID.
-
-### Ink on ink-heavy works
-
-- `--inkrecipe wash` is ink for pen drawings and pen-and-wash sources ([docs/ink.md](docs/ink.md#pen-and-wash-ink)). The pen copies the source's own pen strokes, first and with no pencil. `tools/seg/copy-lines.py --kind stroke` finds each stroke with a black top-hat (a dark mark under 1 mm wide, which a wash mass or its edge is not) and traces its centre with its own width. A stroke is kept where the published lineart models' fused map (`tools/seg/sketch-map.py`, cached by the source's SHA-256) also sees a line, and where it has the ink's own colour (a coloured ink by hue, a black ink by being less coloured than the wash around it), which drops watercolour texture. Without torch, controlnet_aux or the weights the run logs a `!!!` line and traces the source's ink with the older tracer (`--linemodel strict` stops). `npm run doctor` warns about the models. Setup is in [tools/seg/README.md](tools/seg/README.md).
-- The pen draws like a hand. Width follows the stroke's own, at 0.75 of it, so a thick stroke stays thick and a hairline stays fine. Each stroke lands light and lifts to a hairline, slows and swells in curves, swells when pulled down and to the right, and sets a short mark down in one motion. Strokes that continue one another through a junction or across a short straight gap are drawn as one. Long contours come first, detail after, lighter. A stroke's weight is its own darkness against the paper, so a black stroke over a dark wash stays black. A draughtsman's economy drops specks and near repeats and caps small marks at 9 mm per 4 mm square. Strokes are about 0.07 to 0.2 mm at contact, even along most of their length, and a stroke's widest point is about 1.6 times its narrowest.
-- The pens draw on a sheet near 2160 px wide (`--inkres`, 2160 over the width, from 1 to 4) with no width floor, and the output is that wide. The fine ink carry syncs the GPU sheet, the fine sheet dries under the nib only, and `drawing-opening.png` is the fine ink.
-- Ink or wash. Each candidate line is read across the source: a mass edge (a one-sided step between two tone masses) is left to the wash unless long and smooth. Leaves (green and busy), sky and water take no ink except long smooth strokes (branches). Region labels come from a simple classifier of colour and size; `--inklabeljudge codex` or `agy` has a vision model label them from an overlay, which uploads it and is opt-in. The decision is written to `ink-labels.json` next to the painting.
-- Opt-in, off in the recipe: `--inkgeom` (straight runs and arcs), `--inksalience`, `--inkshadowmask 1`, `--inkdropfaint 1`, `--inkhatch 1` (cross-hatched shadows for pure ink) and `--linestroke 0` (the lineart map's own contours).
-- Tools: `tools/judge/ink-legibility.mjs` (12 named crops judged blind, `--judge codex` or `agy`), `ink-prefer.mjs` (two versions side by side, the judge picks the better pen drawing), `ink-noise.mjs`, `ink-labels-view.mjs`, `ink-results-sheet.mjs`, `ink-features.mjs`, `ink-lines-report.mjs`. `bench/ink-heavy/` holds the eight-target ink set and `legibility.json`.
-- Fix: the ink flags (`--linesupport`, `--linesmooth`, `--inkdarkcap`) now reach the line files that the linked drawing stages write.
-
-Results on 12 crops of 4 sources at 540 px wide, seed 0, judged by codex three times (recognised, mean of 12): the rc.1 recipe's pen layer 1; lineart-map lines 11.3; the same with mass edges cut 11.7; source strokes with the hand 10; with the ink-colour test, paper-based weight, economy and even strokes (this release) 9.7. Pairwise, codex preferred this release's drawings to the first source-stroke version 10 to 2, that version to the cut map lines 11 to 1, and before that the cut map lines to the uncut ones 9 to 3, the source strokes to the map lines 11 to 1, and was split 6 to 6 between fine and full stroke widths. A whole Guardi at 540 px paints in 138 s with a peak of 9.2 GB. Limits: four images, one seed, one judge (agy's quota ran out), and the J1 A/B and full-size runs are not run for rc.2. The J1 means below were measured on the rc.1 recipe's older line source:
-
-- Mean J1 at 720 px, fast mode, 2 seeds, 3 scorings each: the wash recipe 5.68, 0.2.1-rc.1 with `--inkrecipe v2` 5.28, 0.2.0 ink 5.12, and the default pencil 5.08.
+[Timings](https://github.com/sabj/unpainting/releases/download/v0.3.0/performance-evidence.json) · [Image metrics and hashes](https://github.com/sabj/unpainting/releases/download/v0.3.0/visual-evidence.json) · [Validation](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation.json) · [Logs](https://github.com/sabj/unpainting/releases/download/v0.3.0/validation-logs.zip) · [Full implementation notes](https://github.com/sabj/unpainting/blob/v0.3.0/CHANGELOG.md#030--2026-11-07)
 
 ## 0.2.1-rc.1
 
