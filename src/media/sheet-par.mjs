@@ -259,6 +259,8 @@ function params(C, sheet, o) {
     spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
     hasTop: C.top ? 1 : 0, hasResist: C.resist ? 1 : 0, enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0,
     holeSpan: o.holeSpan ?? 0, holeFill: o.holeFill ?? 0,
+    edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
+    mmPerCell: o.mmPerCell > 0 ? o.mmPerCell : (sheet.paper?.mmPerCell > 0 ? sheet.paper.mmPerCell : 0.3),
   };
   for (const k in P) prm[P[k]] = v[k] === undefined ? NaN : v[k];
   const f32 = new Float32Array(2);

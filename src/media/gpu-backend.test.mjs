@@ -75,3 +75,60 @@ test('accumulated support follows GPU fixation and CPU edits to lower layers', {
     }
   } finally { gpu._gpu.close(); }
 });
+
+test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell', { timeout: 120000 }, t => {
+  for (const mmPerCell of [0.218, 0.3]) {
+    const paperCpu = makePaper(64, 64, { seed: 7, mmPerCell });
+    const cpu = createSheet(paperCpu, pigments);
+    const paperGpu = makePaper(64, 64, { seed: 7, mmPerCell });
+    const gpu = createSheet(paperGpu, pigments);
+
+    // Turn off bulk flow so we test pure dry-fraction boundary evaporation
+    const O = { ...DEFAULTS, evap: 0.02, edgeEvap: 0.10, edgeWidth: 3, flowIters: 0, dt: 1 };
+    const info = attachGpu(gpu, O, { mode: 'auto', log: () => {} });
+    if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+
+    try {
+      // Create a square wet passage in the center with dry surrounding paper
+      const mask = new Uint8Array(64 * 64);
+      for (let y = 16; y < 48; y++) {
+        for (let x = 16; x < 48; x++) {
+          mask[y * 64 + x] = 1;
+        }
+      }
+      cpu.prewetRegion(mask, 0.06);
+      gpu.prewetRegion(mask, 0.06);
+
+      // Force GPU to upload initial state
+      gpu._gpu.fullUp(gpu);
+
+      // Advance both CPU and GPU by 10 drying steps
+      for (let i = 0; i < 10; i++) {
+        step(cpu, O);
+        step(gpu, O);
+      }
+
+      // Synchronize GPU state down to CPU sheet
+      gpu._gpu.down(gpu, [0, 0, 64, 64]);
+
+      // Calculate error metrics
+      let maxDiff = 0, sumDiff = 0, count = 0;
+      for (let i = 0; i < 64 * 64; i++) {
+        if (mask[i]) {
+          const diff = Math.abs(cpu.W[i] - gpu.W[i]);
+          if (diff > maxDiff) maxDiff = diff;
+          sumDiff += diff;
+          count++;
+        }
+      }
+      const meanDiff = sumDiff / (count || 1);
+
+      // Tight parity bound: CPU and GPU must agree within float noise
+      assert.ok(maxDiff < 5e-3, `mmPerCell ${mmPerCell}: max difference ${maxDiff} exceeds 5e-3 tolerance`);
+      assert.ok(meanDiff < 5e-4, `mmPerCell ${mmPerCell}: mean difference ${meanDiff} exceeds 5e-4 tolerance`);
+    } finally {
+      gpu._gpu.close();
+    }
+  }
+});
+

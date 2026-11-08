@@ -7,6 +7,7 @@ import { createPen, dipPen, penStroke } from './pen.mjs';
 import { createPencil, pencilStroke, wetGraphite, sharpen } from './pencil.mjs';
 import { fromColours, layerRT, renderLayers } from './km.mjs';
 import { setStrict, resetChecks } from './checks.mjs';
+import { BOX, boxPigment } from '../crop/box.mjs';
 const pigment = { rho: .05, omega: 1.4, gamma: .15, K: [.35,.49,.66], S: [.06,.025,.014] };
 const sheet = (w = 24, h = w, seed = 1) => createSheet(makePaper(w,h,{seed}), [pigment]);
 const still = { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0, absorb: 0, paperDry: 0, capRate: 0, slide: 0, settle: 0, lift: 0, rewetLift: 0 };
@@ -237,4 +238,81 @@ test('sheet contract methods invalidate paper certificates and support complete 
   assert.equal(s.layers.length, 1);
   finite(s);
 });
+
+test('sheet.prewetRegion respects masking fluid resist without throwing TypeError when resistStrength is undefined', () => {
+  const s = sheet(16);
+  s.resist = new Uint8Array(s.n);
+  for (let i = 0; i < s.n / 2; i++) s.resist[i] = 1;
+  delete s.resistStrength;
+  assert.equal(s.resistStrength, undefined);
+
+  assert.doesNotThrow(() => {
+    s.prewetRegion(null, 0.05);
+  });
+
+  for (let i = 0; i < s.n / 2; i++) {
+    assert.equal(s.W[i], 0, `cell ${i} under resist should have W === 0`);
+    assert.equal(s.s[i], 0, `cell ${i} under resist should have s === 0`);
+    assert.equal(s.M[i], 0, `cell ${i} under resist should have M === 0`);
+  }
+
+  for (let i = s.n / 2; i < s.n; i++) {
+    assert.ok(s.W[i] > 0, `cell ${i} outside resist should have W > 0`);
+    assert.ok(s.s[i] > 0, `cell ${i} outside resist should have s > 0`);
+    assert.equal(s.M[i], 1, `cell ${i} outside resist should have M === 1`);
+  }
+  finite(s);
+});
+
+test('boxPigment returns immutable or defensively copied scatter arrays protecting shared box state', () => {
+  for (const paint of BOX) {
+    assert.ok(Object.isFrozen(paint.scatter), `BOX paint ${paint.key}.scatter should be frozen`);
+    assert.throws(() => { paint.scatter[0] = 999; }, TypeError, `mutating paint.scatter for ${paint.key} must throw`);
+  }
+
+  const paint = BOX[0];
+  const origS0 = paint.scatter[0];
+  const pig1 = boxPigment(paint);
+  const pig2 = boxPigment(paint);
+
+  assert.deepEqual(pig1.S, paint.scatter);
+  assert.deepEqual(pig2.S, paint.scatter);
+
+  if (Object.isFrozen(pig1.S)) {
+    assert.throws(() => { pig1.S[0] = 999; }, TypeError);
+  } else {
+    pig1.S[0] = 999;
+    assert.equal(paint.scatter[0], origS0, 'paint.scatter must not be mutated by modifying returned pigment.S');
+    assert.equal(pig2.S[0], origS0, 'subsequent boxPigment call must not receive mutated scatter');
+  }
+});
+
+test('stepBox decouples flowDepth for bulk face conductance from edgeFlowDepth for edge evaporation', () => {
+  const s1 = sheet(16);
+  const s2 = sheet(16);
+  s1.W.fill(0.03); s1.M.fill(1); s1.ever.fill(1);
+  s2.W.fill(0.03); s2.M.fill(1); s2.ever.fill(1);
+
+  step(s1, { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0.01, edgeWidth: 2, flowDepth: 0.12, edgeFlowDepth: 0.06, dt: 1 });
+  step(s2, { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0.01, edgeWidth: 2, flowDepth: 0.12, edgeFlowDepth: 0.01, dt: 1 });
+
+  assert.ok(s2.W[0] < s1.W[0], `s2 edge cell (${s2.W[0]}) should have evaporated more than s1 (${s1.W[0]})`);
+
+  const sf1 = sheet(16);
+  const sf2 = sheet(16);
+  const i1 = 7 * 16 + 8, i2 = 7 * 16 + 9;
+  sf1.M[i1] = 1; sf1.M[i2] = 1; sf1.ever[i1] = 1; sf1.ever[i2] = 1;
+  sf2.M[i1] = 1; sf2.M[i2] = 1; sf2.ever[i1] = 1; sf2.ever[i2] = 1;
+  sf1.W[i1] = 0.06; sf1.W[i2] = 0.02;
+  sf2.W[i1] = 0.06; sf2.W[i2] = 0.02;
+
+  step(sf1, { ...DEFAULTS, evap: 0, edgeEvap: 0, absorb: 0, flow: 0.1, flowIters: 1, flowDepth: 0.12, edgeFlowDepth: 0.06, dt: 1 });
+  step(sf2, { ...DEFAULTS, evap: 0, edgeEvap: 0, absorb: 0, flow: 0.1, flowIters: 1, flowDepth: 0.06, edgeFlowDepth: 0.06, dt: 1 });
+
+  assert.ok(sf2.W[i1] < sf1.W[i1], 'lower flowDepth (0.06) must produce higher conductance spreading water faster than 0.12');
+  assert.ok(sf2.W[i2] > sf1.W[i2], 'lower flowDepth (0.06) must deliver more water to adjacent cell than 0.12');
+  finite(sf1);
+  finite(sf2);
+});
+
 

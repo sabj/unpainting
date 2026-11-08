@@ -88,7 +88,7 @@ export function createSheet(paper, pigments) {
     // Masking fluid. Where it is on, the paper is sealed: nothing soaks in, nothing settles, and a wash flows over
     // the top of it rather than round it, so a planned shape survives inside a flowing wash. The paint runs up to its
     // edge and stops. Rubbed off, the paper under it is untouched.
-    resist: null, resistFrom: null,
+    resist: null, resistFrom: null, resistStrength: null,
     edge: F32(n), steps: 0,
   };
   sheet.prewetRegion = (mask, waterMm, opts) => prewetRegion(sheet, mask, waterMm, opts);
@@ -288,7 +288,7 @@ export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare
 
   for (let i = 0; i < n; i++) {
     if (mask && !mask[i]) continue;
-    if (sheet.resist !== null && sheet.resist[i] === 1 && (sheet.resistStrength === null || sheet.resistStrength[i] === 1)) continue;
+    if (sheet.resist?.[i] === 1 && (sheet.resistStrength?.[i] ?? 1) === 1) continue;
 
     const cap = capacity[i];
     const targetPore = cap * dampPoreShare;
@@ -632,7 +632,7 @@ function stepBox(sheet, o, box, reduce = false) {
 
   // 1. drying, faster at the pinned boundary; absorption into the pores without tearing the film
   const evap = o.evap, edgeEvap = o.edgeEvap, absorb = o.absorb, oFilm = o.film;
-  const edgeFlowDepth = o.flowDepth ?? 0.06;
+  const edgeFlowDepth = o.edgeFlowDepth ?? 0.06;
   const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.3;
   const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
   const dryR2 = dryR * dryR;
@@ -676,7 +676,7 @@ function stepBox(sheet, o, box, reduce = false) {
   // Face conductance is the fibres' permeability (1 - ff + ff (0.25 + 1.75 perm)) times the flow rate times the upwind
   // depth's conductance (min(1, (max depth / flowDepth)^2)), so a deep wash still feeds its thin pinned edge. It is
   // written out at each face because closures are slower here.
-  const perm = permeability(paper), px = perm.px, py = perm.py, ff = o.fibreFlow ?? 0.6, flowDepth = o.flowDepth ?? 0.06, flow = o.flow, slope = o.slope;
+  const perm = permeability(paper), px = perm.px, py = perm.py, ff = o.fibreFlow ?? 0.6, flowDepth = o.flowDepth ?? 0.12, flow = o.flow, slope = o.slope;
   // Paint dropped into clean water spreads over it: its binder lowers the surface tension, and the water surface is pulled
   // towards the higher tension of the clean water around it (Marangoni flow), carrying the pigment out; the front
   // breaks into fingers as it runs over the uneven paper. Pigment concentration stands in for the binder that comes

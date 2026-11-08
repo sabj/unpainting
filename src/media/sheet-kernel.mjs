@@ -17,6 +17,7 @@ export const P = {
   rewetLift: 20, granFill: 21, slide: 22, fill: 23, repose: 24, capStep: 25, sizing: 26, filter: 27, capEps: 28,
   capDelta: 29, wetEps: 30, paperDry: 31, capSigma: 32, spill: 33, spillHeight: 34, dampEase: 35, pinning: 36,
   pinFibre: 37, hasTop: 38, hasResist: 39, enclose: 40, slideCap: 41, holeSpan: 42, holeFill: 43, filmDiff: 44, filmDepth: 45,
+  mmPerCell: 46, edgeFlowDepth: 47,
 };
 export const PK = 64, PKS = 10; // per pigment: mobility, rho, omega, gamma, gg, lift, scour, rep, floc
 export const PRM_LEN = PK + PKS * MAXK;
@@ -152,8 +153,8 @@ function phaseB(C, ya, yb) {
     const Dk = D[k]; for (let q = q0; q < q1; q++) if (Dk[wl[q]] !== 0) { ctrl[DF + k] = 1; break; }
   }
   const dt = prm[P.dt], evap = prm[P.evap], edgeEvap = prm[P.edgeEvap], absorb = prm[P.absorb], oFilm = prm[P.film];
-  const flowDepth = prm[P.flowDepth] || 0.06;
-  const mmPerCell = 0.3;
+  const edgeFlowDepth = prm[P.edgeFlowDepth] ?? 0.06;
+  const mmPerCell = prm[P.mmPerCell] > 0 ? prm[P.mmPerCell] : 0.3;
   const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
   const dryR2 = dryR * dryR;
   for (let q = q0; q < q1; q++) {
@@ -180,7 +181,7 @@ function phaseB(C, ya, yb) {
       const fMax = dryR <= 2 ? 0.28 : 0.42;
       const u = Math.min(1, Math.max(0, (dryFrac - fMin) / (fMax - fMin)));
       const dryFactor = u * u * (3 - 2 * u);
-      const depthFactor = flowDepth > 0 ? Math.min(1, Math.max(0, W[i] / flowDepth)) : 1;
+      const depthFactor = edgeFlowDepth > 0 ? Math.min(1, Math.max(0, W[i] / edgeFlowDepth)) : 1;
       near = geomNear * dryFactor * depthFactor;
     }
     W[i] = Math.max(0, W[i] - dt * (evap + edgeEvap * near));
