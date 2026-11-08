@@ -92,7 +92,7 @@ export function createSheet(paper, pigments) {
   };
   sheet.prewetRegion = (mask, waterMm, opts) => prewetRegion(sheet, mask, waterMm, opts);
   sheet.depositPassage = (mask, conc, water, opts) => depositPassage(sheet, mask, conc, water, opts);
-  sheet.softEdgeRing = (mask, radiusMm, strength) => softEdgeRing(sheet, mask, radiusMm, strength);
+  sheet.softEdgeRing = (mask, radiusMm, strength, opts) => softEdgeRing(sheet, mask, radiusMm, strength, opts);
   return sheet;
 }
 
@@ -277,7 +277,7 @@ const depositScaled = (sheet, i, water, pig, g) => {
  * and establishing a uniform damp sheen (wet bed) without pigment.
  * Prevents premature boundary drying and enables continuous wet-into-wet wash merging.
  */
-export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare = 0.85, surfaceFilm = 0.02 } = {}) {
+export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare = 0.85, surfaceFilm = 0.02, protect = null } = {}) {
   coherent(sheet);
   const { n, paper, W, s, M, ever } = sheet;
   const capacity = paper.capacity;
@@ -287,6 +287,7 @@ export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare
 
   for (let i = 0; i < n; i++) {
     if (mask && !mask[i]) continue;
+    if (protect?.[i]) continue;
     if (sheet.resist?.[i] === 1 && (sheet.resistStrength?.[i] ?? 1) === 1) continue;
 
     const cap = capacity[i];
@@ -316,14 +317,16 @@ export function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare
  */
 export function depositPassage(sheet, mask, pigmentConcentration, waterLoad, options = {}) {
   coherent(sheet);
-  const { prewet = false, waterMm = 0.03 } = options;
+  const { prewet = false, waterMm = 0.03, protect = null } = options;
   if (prewet) {
-    prewetRegion(sheet, mask, waterMm);
+    prewetRegion(sheet, mask, waterMm, options);
   }
   const n = sheet.n;
   const indices = [];
   for (let i = 0; i < n; i++) {
     if (mask && !mask[i]) continue;
+    if (protect?.[i]) continue;
+    if (sheet.resist?.[i] === 1 && (sheet.resistStrength?.[i] ?? 1) === 1) continue;
     deposit(sheet, i, waterLoad, pigmentConcentration);
     indices.push(i);
   }
@@ -335,43 +338,63 @@ export function depositPassage(sheet, mask, pigmentConcentration, waterLoad, opt
 /**
  * Compute a damp perimeter feathering ring around a mask, applying damp pore moisture without pigment.
  */
-export function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7) {
+export function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7, options = {}) {
   coherent(sheet);
   const { w, h, paper, s, ever } = sheet;
   const capacity = paper.capacity;
   const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.218;
   const rCells = Math.max(1, Math.round(radiusMm / mmPerCell));
-  const r2 = rCells * rCells;
+  const protect = options.protect ?? null;
   const wetted = [];
 
+  const n = w * h;
+  const dist = new Float32Array(n).fill(Infinity);
+  let q = [];
   for (let y = 0; y < h; y++) {
-    const prow = y * w;
     for (let x = 0; x < w; x++) {
-      const i = prow + x;
-      if (mask && mask[i]) continue;
-      let minD2 = Infinity;
-      const y0 = Math.max(0, y - rCells), y1 = Math.min(h - 1, y + rCells);
-      const x0 = Math.max(0, x - rCells), x1 = Math.min(w - 1, x + rCells);
-      for (let py = y0; py <= y1; py++) {
-        const dy = py - y, dy2 = dy * dy;
-        const rrow = py * w;
-        for (let px = x0; px <= x1; px++) {
-          if (mask && mask[rrow + px]) {
-            const dx = px - x, d2 = dx * dx + dy2;
-            if (d2 < minD2) minD2 = d2;
-          }
-        }
-      }
-      if (minD2 <= r2) {
-        const dist = Math.sqrt(minD2);
-        const falloff = Math.max(0, 1 - dist / rCells);
-        const target = capacity[i] * featherStrength * falloff;
-        if (s[i] < target) s[i] = target;
-        ever[i] = 1;
-        wetted.push(i);
+      const i = y * w + x;
+      if (!mask || !mask[i]) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (mask && mask[j]) continue;
+        if (protect?.[j]) continue;
+        if (sheet.resist?.[j] === 1 && (sheet.resistStrength?.[j] ?? 1) === 1) continue;
+        if (dist[j] > 1) { dist[j] = 1; q.push(j); }
       }
     }
   }
+
+  for (let step = 1; step < rCells && q.length; step++) {
+    const next = [];
+    for (const i of q) {
+      const x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (mask && mask[j]) continue;
+        if (protect?.[j]) continue;
+        if (sheet.resist?.[j] === 1 && (sheet.resistStrength?.[j] ?? 1) === 1) continue;
+        if (dist[j] > step + 1) { dist[j] = step + 1; next.push(j); }
+      }
+    }
+    q = next;
+  }
+
+  for (let i = 0; i < n; i++) {
+    const d = dist[i];
+    if (d > rCells) continue;
+    const falloff = Math.max(0, (rCells - d + 1) / (rCells + 1));
+    const target = capacity[i] * featherStrength * falloff;
+    if (target > 0) {
+      if (s[i] < target) s[i] = target;
+      ever[i] = 1;
+      wetted.push(i);
+    }
+  }
+
   if (wetted.length) {
     sheet.wetDirty = 1;
     recordWetCells(sheet, wetted);

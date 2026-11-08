@@ -45,18 +45,57 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // minShapeCells (whole paintings): a fixed shape floor in cells. The automatic floor grows with sheet area and drops
   // small face shadow shapes.
   const minShape=minShapeCells>0?minShapeCells:Math.max(shaped?144:4,Math.round(w*h*.00015));
-  if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape);
+  if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 below it per channel is a light. With --paperbase source the sheet takes that colour too.
   let PAP=null;if(paperRel&&rgb){const L=Float32Array.from({length:n},(_,i)=>rgb[3*i]+rgb[3*i+1]+rgb[3*i+2]),idx=Array.from(L.keys()).sort((a,b)=>L[b]-L[a]).slice(0,Math.max(1,Math.floor(n*.1)));PAP=[0,1,2].map(c=>idx.reduce((a,i)=>a+rgb[3*i+c],0)/idx.length);}
   const tonedPap=Boolean(PAP&&PAP[0]-PAP[2]>=18&&252-PAP[2]>=20),papTol=tonedPap?[14,14,18]:[9,9,12];
-  const inferred=Uint8Array.from({length:n},(_,i)=>PAP?(rgb[3*i]>=PAP[0]-papTol[0]&&rgb[3*i+1]>=PAP[1]-papTol[1]&&rgb[3*i+2]>=PAP[2]-papTol[2]?1:0):rgb ? (Math.min(rgb[3*i],rgb[3*i+1],rgb[3*i+2])>=245 && Math.max(rgb[3*i],rgb[3*i+1],rgb[3*i+2])-Math.min(rgb[3*i],rgb[3*i+1],rgb[3*i+2])<=8 ? 1:0) : (hold?.[i]||value.values[i]<.055?1:0));
+  const papFloor=180;
+  const inferred=Uint8Array.from({length:n},(_,i)=>{
+    if(hold?.[i])return 1;
+    if(PAP&&PAP[0]>=papFloor&&PAP[1]>=papFloor&&PAP[2]>=papFloor-15){
+      return (rgb[3*i]>=Math.max(papFloor,PAP[0]-papTol[0])&&rgb[3*i+1]>=Math.max(papFloor,PAP[1]-papTol[1])&&rgb[3*i+2]>=Math.max(papFloor-15,PAP[2]-papTol[2]))?1:0;
+    }
+    if(rgb){
+      return (Math.min(rgb[3*i],rgb[3*i+1],rgb[3*i+2])>=245&&Math.max(rgb[3*i],rgb[3*i+1],rgb[3*i+2])-Math.min(rgb[3*i],rgb[3*i+1],rgb[3*i+2])<=8)?1:0;
+    }
+    return value.values[i]<.055?1:0;
+  });
   if(paper)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=paperDelta)inferred[i]=1;}
   // detailScale k (detail-scale.mjs): the minimum shape shrinks with the target's mid-scale detail, down to share 1-k.
   const DETAIL0=detailScale>0?detailField(value.values,w,h,sheetWidthMm/w):null;
   const DETAIL=DETAIL0&&detailSegments?detailField(value.values,w,h,sheetWidthMm/w,segmentDetailMask(detailSegments,rgb,DETAIL0,w,h)):DETAIL0;
-  const lights=DETAIL?keepByDetail(closeLocal(inferred,w,h,1),w,h,minShape,DETAIL,detailScale):removeSmall(closeLocal(inferred,w,h,1),w,h,minShape);
-  protectedCells.fill(0);for(let i=0;i<n;i++)protectedCells[i]=lights[i];
+  const closedInferred=closeLocal(inferred,w,h,1);
+  const lights=DETAIL?keepByDetail(closedInferred,w,h,minShape,DETAIL,detailScale):removeSmall(closedInferred,w,h,minShape);
+  const cc=components(closedInferred,w,h),compCells=Array.from({length:cc.count+1},()=>[]);
+  for(let i=0;i<n;i++)if(cc.labels[i])compCells[cc.labels[i]].push(i);
+  const catchlights=new Uint8Array(n);
+  for(let id=1;id<=cc.count;id++){
+    const list=compCells[id];
+    if(list.length>=minShape)continue;
+    let sumIn=0,hasHold=false;
+    for(const i of list){sumIn+=value.values[i];if(hold?.[i])hasHold=true;}
+    if(hasHold){for(const i of list)catchlights[i]=1;continue;}
+    const meanIn=sumIn/list.length;
+    let ringSum=0,ringCount=0;
+    for(const i of list){
+      const x=i%w,y=(i/w)|0;
+      for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+        if(Math.abs(dx)<=1&&Math.abs(dy)<=1)continue;
+        const xx=x+dx,yy=y+dy;
+        if(xx>=0&&xx<w&&yy>=0&&yy<h){
+          const j=yy*w+xx;
+          if(!closedInferred[j]){ringSum+=value.values[j];ringCount++;}
+        }
+      }
+    }
+    const ringMean=ringCount?ringSum/ringCount:meanIn;
+    if(ringMean-meanIn>=0.18){
+      for(const i of list)catchlights[i]=1;
+    }
+  }
+  protectedCells.fill(0);
+  for(let i=0;i<n;i++)if(lights[i]||catchlights[i]||(hold&&hold[i]))protectedCells[i]=1;
   for(const r of reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)protectedCells[y*w+x]=1;}
   // A single coherent shadow support, shared by both last glazes. Smooth strength
   // within it, rather than five nested isodensity silhouettes. Filter tiny dark
@@ -111,7 +150,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
       // --recesses 1 (the architecture preset): hard dark architectural recesses are last paint accents on the dried wall (fitted on Y1; docs/techniques.md, Tuned settings).
       if(recesses&&rgb&&isRecess(rgb,i)){weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=1-light;if(recessAccent)accentCells[i]=1;
         // Darks build in two dried layers, as a painter restates a window: band 4 then band 5.
-        if(recessLayers>1){const keep=recessClean?1:1-light;if(recessClean)weights[0][i]=0;weights[3][i]=keep*recessShare;weights[4][i]=keep*recessShare;}}
+        if(recessLayers>1){const keep=recessClean?1:1-light;if(recessClean)weights[0][i]=0;weights[3][i]=keep*recessShare;weights[4][i]=keep*(1-recessShare);}}
       // accentShare: small dark features (brows, lids, iris rims, nostrils, lip line) are too small for the shadow
       // glaze support. Their share of middle demand above value accentMin moves to band 5, as last accents on dry paint.
       if(accentShare>0&&!shadowMask[i]&&v>accentMin){const a=middle*accentShare*Math.min(1,(v-accentMin)/.2);weights[1][i]-=a*weights[1][i]/Math.max(1e-6,middle);weights[2][i]-=a*weights[2][i]/Math.max(1e-6,middle);weights[4][i]+=a;accentCells[i]=1;}
@@ -187,9 +226,13 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // nestedBands: every cell's demand is split into the five value bands as flat value steps, the nested masses the
   // ink-and-wash style uses, whatever the style. Band k covers the cells darker than the band below it and carries the
   // step from that band's cap to its own, so each passage's one mean charge fits all of its cells. Without it a light
-  // cell and a dark neighbour share a band in different proportions and the mean charge muddies the light one.
-  if(nestedBands)for(let i=0;i<n;i++){if(profile&&cellStyle(i).name==='ink-and-wash')continue;const v=value.values[i];
-    for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*styleGain:0;}}
+  if(nestedBands)for(let i=0;i<n;i++){
+    if(profile&&cellStyle(i).name==='ink-and-wash')continue;
+    if(accentCells[i]||(rgb&&isRecess(rgb,i))||litStoneMask?.[i]||groundCells[i])continue;
+    const v=value.values[i];
+    for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*styleGain:0;}
+    if(!shadowMask[i]){weights[1][i]+=weights[3][i]+weights[4][i];weights[3][i]=0;weights[4][i]=0;}
+  }
   // paleLights v: pale planes (smoothed value at most v, at least a minimum shape) are pale local colour, one clean
   // wash: their whole demand goes to band 1 and no middle layer or glaze crosses them.
   if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
@@ -225,8 +268,8 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
     // layerIncrement: each layer carries the value step between its threshold and the next layer's, as a painter lays
     // one flat value over the whole form and then only darker steps where the form is darker. An equal split (the
     // default) gives a light cell all its middle demand in layer 0 while a dark neighbour puts only a quarter there, so
-    // the shape's one mean charge is too dark for the light cells and too light for the dark ones.
-    const share=layerIncrement?layerShares(cover,q,sm,n):null;
+    const effThresholds = (localQ || subjects) ? (i => (localQ?.get(region.labels[i])) ?? q) : q;
+    const share=layerIncrement?layerShares(cover,effThresholds,sm,n):null;
     const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
@@ -311,10 +354,10 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
             intent.styleName=chosen.name;intent.styleReason=chosen.reason;
             intent.regionStyleDecisions=touched.map(r=>{const q=resolveStyle(subject,r.descriptiveFamily,styleSelection);return {region:r.id,family:r.descriptiveFamily,style:q.name,reason:q.reason};});
             if(!identity){
-              const technique=profileTechnique(chosen,phase,band);
-              Object.assign(intent,technique,{referenceCue:cue+' '+chosen.reason,styleReason:chosen.reason,break:chosen.name==='atmospheric-wet'?'Reference soft gradients require dark charge in an open wet passage.':null});
-              intent.load={...intent.load,water:technique.water};
-              intent.brush={...intent.brush,kind:chosen.brushes.join(', ')};
+              const {brush:brushNames,...settings}=profileTechnique(chosen,phase,band);
+              Object.assign(intent,settings,{referenceCue:cue+' '+chosen.reason,styleReason:chosen.reason,break:chosen.name==='atmospheric-wet'?'Reference soft gradients require dark charge in an open wet passage.':null});
+              intent.load={...intent.load,water:settings.water};
+              intent.brush={...intent.brush,kind:Array.isArray(brushNames)?brushNames.join(', '):brushNames};
               intent.edges.policy=chosen.edge;
               intent.resolution.minimumWashBodyCells=chosen.detailThresholdCells;
             }
@@ -326,8 +369,8 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           // one fitted gesture and an exact edge.
           const supportMm=2*list.length/Math.max(1,hard.length+soft.length)*(sheetWidthMm/w),laneHere=laneMax>0?Math.min(laneMax,Math.max(laneMm,supportMm*.5)):Math.min(laneMm,Math.max(2,supportMm*.9));
           if(strokePlan&&shaped&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!(rgb&&list.length>n*.015&&list.filter(i=>rgb[i*3+2]>rgb[i*3]+10).length>list.length*.6)){
-            const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0});
-            if(sp){sh._strokePlan=sp;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
+            const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0,protect:protectedCells,curved:true});
+            if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
           if(familyMatch||wet){
             const decision=passageMaterial({phase,family:familyMatch,fallbackMove:wet?'wet on wet':'wet on dry'});
             intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
@@ -423,7 +466,7 @@ function makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover,mm,pigments,
 // their shape. Every mask is resampled through one smooth displacement field (sines of 2.5 to 12 mm wavelength,
 // amplitude edgeWobbleMm), so neighbouring passages still meet; reserved lights stay out. No target pixels are read.
 const WOB=new Map();
-function wobbleField(w,h,amp,cellMm){const key=w+'x'+h+'x'+amp.toFixed(3);if(WOB.has(key))return WOB.get(key);let s=0x9e3779b9;const rnd=()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
+function wobbleField(w,h,amp,cellMm){const key=w+'x'+h+'x'+amp.toFixed(3)+':'+(cellMm?cellMm.toFixed(4):'0');if(WOB.has(key))return WOB.get(key);let s=0x9e3779b9;const rnd=()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
  const waves=[];for(const [lambda,a] of [[12,.55],[6,.3],[2.5,.15]])for(let k=0;k<2;k++){const th=rnd()*Math.PI*2;waves.push({kx:Math.cos(th)*2*Math.PI*cellMm/lambda,ky:Math.sin(th)*2*Math.PI*cellMm/lambda,p:rnd()*Math.PI*2,q:rnd()*Math.PI*2,a});}
  const u=new Float32Array(w*h),v=new Float32Array(w*h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let a=0,b=0;for(const c of waves){const ph=c.kx*x+c.ky*y;a+=c.a*Math.sin(ph+c.p);b+=c.a*Math.sin(ph*1.13+c.q);}u[y*w+x]=a*amp/1.4;v[y*w+x]=b*amp/1.4;}
  const f={u,v};WOB.set(key,f);return f;}
@@ -433,12 +476,13 @@ function wobbleMask(M,w,h,amp,protect,cellMm){const {u,v}=wobbleField(w,h,amp,ce
 // value s split at the thresholds of the layers that cover it, each layer taking the step up to the next one's threshold
 // and the last taking the rest. Shares of a cell sum to 1.
 export function layerShares(cover,thresholds,sm,n){
-  const L=cover.length,share=Array.from({length:L},()=>new Float32Array(n));
+  const L=cover.length,share=Array.from({length:L},()=>new Float32Array(n)),isFn=typeof thresholds==='function';
   for(let i=0;i<n;i++){
     const on=[];for(let j=0;j<L;j++)if(cover[j][i])on.push(j);
     if(!on.length)continue;
+    const th=isFn?thresholds(i):thresholds;
     const s=Math.max(sm[i],1e-6);let total=0;
-    for(let k=0;k<on.length;k++){const j=on[k],lo=k?thresholds[j]:0,hi=k<on.length-1?thresholds[on[k+1]]:Infinity;const v=Math.max(0,Math.min(s,hi)-lo);share[j][i]=v;total+=v;}
+    for(let k=0;k<on.length;k++){const j=on[k],lo=k?th[j]:0,hi=k<on.length-1?th[on[k+1]]:Infinity;const v=Math.max(0,Math.min(s,hi)-lo);share[j][i]=v;total+=v;}
     if(total>0)for(const j of on)share[j][i]/=total;else share[on[0]][i]=1;
   }
   return share;

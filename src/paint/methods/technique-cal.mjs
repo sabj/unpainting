@@ -8,16 +8,16 @@
 // It reads only the sheet and the ledger, never the target. One number per technique, so it carries no spatial detail.
 
 /**
- * @param {{ max?: number, min?: number, share?: number, minMass?: number, smooth?: number }} options
+ * @param {{ max?: number, min?: number, share?: number, minMass?: number, smooth?: number, baseline?: number | null }} options
  *   max/min: clamp on a factor (default 2.5 and 0.8); share: least share of a window's charge one technique must hold
  *   for the window to calibrate it (default 0.8); minMass: least charged mass in a window; smooth: weight of the newest
- *   reading against the previous factor (default 0.7).
+ *   reading against the previous factor (default 0.7); baseline: initial pigment mass before the first booking window.
  */
-export function createTechniqueCal({ max = 2.5, min = 0.8, share = 0.8, minMass = 1e-3, smooth = 0.7 } = {}) {
+export function createTechniqueCal({ max = 2.5, min = 0.8, share = 0.8, minMass = 1e-3, smooth = 0.7, baseline = null } = {}) {
   if (!(max >= min && min > 0)) throw new Error('technique calibration: max must be at least min, and min positive');
   if (!(share > 0.5 && share <= 1)) throw new Error('technique calibration: share must be over 0.5 and at most 1');
   const factor = new Map(), window = new Map(), history = [];
-  let last = null;
+  let last = baseline;
   return {
     /** The factor for a technique; 1 until a window has measured it. */
     factor: key => factor.get(key) ?? 1,
@@ -32,7 +32,17 @@ export function createTechniqueCal({ max = 2.5, min = 0.8, share = 0.8, minMass 
       if (gained != null && charged > minMass) {
         const [key, mass] = [...window.entries()].reduce((a, b) => (b[1] > a[1] ? b : a));
         if (mass / charged >= share) {
-          const kept = gained / charged;
+          // Deduct expected gain of secondary techniques using their current factor
+          // so secondary technique shortfall/excess is not attributed to the dominant technique
+          let otherExpectedGain = 0;
+          for (const [k, m] of window.entries()) {
+            if (k !== key) {
+              const f = factor.get(k) ?? 1;
+              otherExpectedGain += m / f;
+            }
+          }
+          const netGained = Math.max(0, gained - otherExpectedGain);
+          const kept = netGained / mass;
           record = { ...record, technique: key, kept: +kept.toFixed(3) };
           // the booked charge already carries the factor, so kept is the technique's own yield
           if (kept > 0) factor.set(key, smooth * Math.max(min, Math.min(max, 1 / kept)) + (1 - smooth) * (factor.get(key) ?? 1));
