@@ -76,7 +76,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...(/_softs/.test(v) ? ['--softsplit', '1', '--softarcs', '12', '--softarclen', '40', '--softmm', '0.7'] : /_soft/.test(v) ? ['--softarcs', '8', '--softarclen', '48', '--softmm', '1.0'] : []),
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
-      '--drawing', 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
+      '--drawing', closing ? 'both' : 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
       '--outlinemedium', outlineMedium, '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
       '--out', out, '--targetguard', 'gentle', ...(compile ? ['--valuepreviewonly', '1'] : ['--gpu', gpu])];
   };
@@ -268,7 +268,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
-  const glazeGains = Boolean(spec.glazeGains ?? spec.trumbull);
+  const glazeGains = spec.glazeGains !== false;
   const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, glazeGains, sepiaInk, linesExist });
   const args = [...layered.args];
   if (!glazeGains && !args.includes('--techcal')) args.push('--techcal', '1');
