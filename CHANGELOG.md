@@ -4,7 +4,7 @@ Releases are plain semver, with a git tag per release. Each release names its pa
 
 ## Unreleased — 0.3.0
 
-Painter V101, sim 102, judges J1. `0.3.0` combines the pen-and-wash ink pipeline from `wip/0.2.3` with a full simulator, GPU synchronization, caching and memory optimization pass across `src/media`, `src/paint` and `tools/`.
+Painter V102, sim 103, judges J1. `0.3.0` combines the pen-and-wash ink pipeline from `wip/0.2.3` with a full simulator, GPU synchronization, caching and memory optimization pass across `src/media`, `src/paint` and `tools/`.
 
 On the three frozen reference workloads on an Apple M4 Mac mini (16 GiB, GPU/Dawn/Metal, `--mode fast`, seed 0), warm suite wall time drops from `725.69 s` to `244.85 s` (**`2.96x` faster**, or `66.3%` less time) while preserving `99.91%` to `99.9998%` SSIM against `0.2.1`, non-degraded deterministic scorer composites (`55.6`, `60.2`, `64.8`), and reducing peak RSS by up to `2.2 GiB`.
 
