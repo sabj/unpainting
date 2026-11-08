@@ -901,6 +901,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   const batchPort = threadData?.gpuBatchPort;
   console.error('[attachGpu] creating worker for', sheet.w, sheet.h, sheet.K);
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
+  console.error('[attachGpu] worker created, threadId:', worker.threadId);
   let workerDied = null;
   worker.on('error', e => { console.error('[attachGpu worker error]', e); workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); Atomics.notify(ctrl, 3); });
   worker.on('exit', code => {
@@ -918,6 +919,7 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   const o = { ...O }; sheet._fixedBed = O.fixedBed > 0;
   const paper = sheet.paper, top = sheet.layers.length ? sheet.layers[sheet.layers.length - 1] : null;
   const clone = a => a && a.slice();
+  console.error('[attachGpu] posting init...');
   worker.postMessage({
     op: 'init', O: o,
     sheet: {
@@ -929,9 +931,12 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
     },
     top: top ? top.map(clone) : null,
   });
+  console.error('[attachGpu] init posted, waiting for ctrl[3]...');
   const bootT0 = Date.now();
+  let loopCount = 0;
   while (Atomics.load(ctrl, 3) === 0) {
     if (Date.now() - bootT0 > 30000) { Atomics.store(ctrl, 3, 2); break; }
+    if (++loopCount % 5 === 0) console.error('[attachGpu] still waiting, elapsed:', Date.now() - bootT0, 'ms');
     Atomics.wait(ctrl, 3, 0, 200);
   } // booting
   if (Atomics.load(ctrl, 3) !== 1 || brokenReason(health)) {
