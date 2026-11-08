@@ -4407,3 +4407,5 @@ writeCensus(out, { main: sheet, fine: INKRES?.fine });
   process.off('exit', JSONL.close);
   process.off('uncaughtExceptionMonitor', JSONL.flush);
 }
+process.exit(process.exitCode ?? 0);
+
