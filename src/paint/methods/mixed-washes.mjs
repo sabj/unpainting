@@ -4,21 +4,20 @@
 // ask of every pigment. Planning only: it reads the plan's demand, never the sheet.
 
 /**
- * The charge of one passage. `scale[i]` is the share of cell i's demand this step carries (weights and gains).
- * Pigments under `minShare` of the charge are left out and their mass goes to the rest: a palette mix holds a few
- * paints, and a trace of a fourth one only greys it.
- * @returns {{mix: Float64Array, amount: number}} mix[j] is pigment j's amount; the mix sums to `amount`.
+ * The charge of one passage. `fields[j][i]` is what cell i asks of pigment j in this step, and `amount` the passage's
+ * charge (the mean of those over its cells, or a quantile under --passcap). Pigments under `minShare` of the charge are
+ * left out and their mass goes to the rest: a palette mix holds a few paints, and a trace of a fourth one only greys it.
+ * @returns {Float64Array} mix[j] is pigment j's amount; the mix sums to `amount`.
  */
-export function mixedCharge(list, demand, k, scale, { minShare = 0.03 } = {}) {
-  const mix = new Float64Array(k);
-  for (const i of list) for (let j = 0; j < k; j++) mix[j] += demand[i * k + j] * scale[i];
+export function mixedCharge(list, fields, amount, { minShare = 0.03 } = {}) {
+  const k = fields.length, mix = new Float64Array(k);
   let total = 0;
-  for (let j = 0; j < k; j++) { mix[j] /= Math.max(1, list.length); total += mix[j]; }
-  if (!(total > 0)) return { mix: new Float64Array(k), amount: 0 };
+  for (let j = 0; j < k; j++) { const f = fields[j]; let s = 0; for (const i of list) s += f[i]; mix[j] = s; total += s; }
+  if (!(total > 0) || !(amount > 0)) return new Float64Array(k);
   let kept = 0;
   for (let j = 0; j < k; j++) { if (mix[j] < minShare * total) mix[j] = 0; kept += mix[j]; }
-  if (kept > 0) for (let j = 0; j < k; j++) mix[j] *= total / kept;
-  return { mix, amount: total };
+  for (let j = 0; j < k; j++) mix[j] *= amount / kept;
+  return mix;
 }
 
 export function leadPigment(mix) {

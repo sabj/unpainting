@@ -1,30 +1,38 @@
 // Which boundaries of a passage are soft (--softchoice). The planner's cell test (low contrast with the next cell) calls
 // 86 to 96% of boundaries soft, because almost no value steps much within one cell; opening them all blurs the plate. A
 // painter softens an edge where the wash is meant to die away, and keeps it where the form turns sharply. So a boundary
-// cell is soft only when the passage's own demand has faded there, the target has no step within reach of the brush tip,
-// and enough such cells run together to read as an edge. Planning only, from the plan's fields.
+// cell is soft only when the passage's own demand has faded there and the target turns gradually: most of the value
+// change near the cell does not happen right at it. Enough such cells must run together to read as an edge. Planning
+// only, from the plan's fields.
+
+/** The spread of `values` in a square of half width r around cell (x, y). */
+function spreadAround(values, w, h, x, y, r) {
+  let lo = Infinity, hi = -Infinity;
+  for (let yy = Math.max(0, y - r); yy <= Math.min(h - 1, y + r); yy++) {
+    for (let xx = Math.max(0, x - r); xx <= Math.min(w - 1, x + r); xx++) {
+      const v = values[yy * w + xx];
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+  }
+  return hi - lo;
+}
 
 /**
  * @param candidates boundary cells the planner's cell test passed
  * @param G the passage's demand field, amount its mean charge
  * @param values the plan's value field (0..1)
+ * @param flat a value change under this within wideMm is no step at all
+ * @param sharp the share of the change within wideMm that may happen within nearMm for the turn to count as gradual
  * @returns {{soft: number[], hard: number[]}} every candidate lands in one of the two
  */
-export function chooseSoftCells({ candidates, G, amount, values, w, h, cellMm, fade = 0.5, step = 0.14, reachMm = 1.5, minChainMm = 5 }) {
-  const reach = Math.max(1, Math.round(reachMm / cellMm)), minChain = Math.max(3, Math.round(minChainMm / cellMm));
+export function chooseSoftCells({ candidates, G, amount, values, w, h, cellMm, fade = 0.5, flat = 0.06, sharp = 0.5, nearMm = 0.75, wideMm = 3, minChainMm = 5 }) {
+  const near = Math.max(1, Math.round(nearMm / cellMm)), wide = Math.max(near + 1, Math.round(wideMm / cellMm)), minChain = Math.max(3, Math.round(minChainMm / cellMm));
   const passes = new Set();
   for (const i of candidates) {
     if (!(G[i] <= fade * amount)) continue;
-    const x = i % w, y = Math.floor(i / w);
-    let lo = Infinity, hi = -Infinity;
-    for (let yy = Math.max(0, y - reach); yy <= Math.min(h - 1, y + reach); yy++) {
-      for (let xx = Math.max(0, x - reach); xx <= Math.min(w - 1, x + reach); xx++) {
-        const v = values[yy * w + xx];
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
-      }
-    }
-    if (hi - lo < step) passes.add(i);
+    const x = i % w, y = Math.floor(i / w), broad = spreadAround(values, w, h, x, y, wide);
+    if (broad < flat || spreadAround(values, w, h, x, y, near) <= sharp * broad) passes.add(i);
   }
   const soft = [], seen = new Set();
   for (const s of passes) {
