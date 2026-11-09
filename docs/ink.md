@@ -66,7 +66,7 @@ In painter V101, five flags hold the pen to the target's own lines. Each is off 
 
 `--linesupport` and `--linesmooth` write `ink-opening-lines.json` and `ink-closing-lines.json` next to the painting, and the pens draw those. Any of the five writes the target's line measures to `ink-lines.json`. `--inkdarkcap` also writes `ink-dark-cap.json`.
 
-`--inkrecipe v2` sets all of them at once. A flag given on the command line wins over the recipe.
+`--inkrecipe v2` sets them at once. From painter V104 it sets `--inkdarkmatch 1` in place of `--inkdarkcap`: the ink load is scaled until the pen's lines are as dark as the source's, and it can rise as well as fall. A flag given on the command line wins over the recipe.
 
 | Flag | Ink v2 | Off |
 |---|---|---|
