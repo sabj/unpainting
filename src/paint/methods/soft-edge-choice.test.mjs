@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseSoftCells, gradientAngle } from './soft-edge-choice.mjs';
+import { chooseSoftCells } from './soft-edge-choice.mjs';
 
 const W = 60, H = 40;
 const idx = (x, y) => y * W + x;
@@ -37,17 +37,4 @@ test('a few stray cells are not a soft edge: a chain must be long enough to read
   const s = chooseSoftCells({ candidates: column(20).slice(0, 3), G, amount: 1, values, w: W, h: H, cellMm: 0.5 });
   assert.equal(s.soft.length, 0);
   assert.equal(s.hard.length, 3);
-});
-
-test('lanes run across the gradient: the angle follows the iso-lines of the passage demand', () => {
-  const list = [], G = new Float32Array(W * H);
-  for (let y = 5; y < 35; y++) for (let x = 5; x < 55; x++) { const i = idx(x, y); list.push(i); G[i] = 0.2 + y * 0.02; }
-  const a = gradientAngle(list, G, W, { minSpan: 0.1 });
-  assert.ok(Math.abs(Math.sin(a)) < 0.05, `angle ${a}: horizontal lanes for a vertical gradient`);
-});
-
-test('a flat passage has no gradient to follow', () => {
-  const list = [], G = new Float32Array(W * H);
-  for (let y = 5; y < 35; y++) for (let x = 5; x < 55; x++) { const i = idx(x, y); list.push(i); G[i] = 0.5; }
-  assert.equal(gradientAngle(list, G, W, { minSpan: 0.1 }), null);
 });

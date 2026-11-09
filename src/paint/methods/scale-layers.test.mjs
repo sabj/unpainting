@@ -12,6 +12,20 @@ test('opening keeps a broad plateau and removes a line narrower than the element
   assert.equal(O[20 * w + 35], 0);
 });
 
+test('the opening is round: a disc survives whole under a brush of its size, which a square window would cut', () => {
+  const w = 60, h = 60, F = grid(w, h, (x, y) => (Math.hypot(x - 30, y - 30) <= 12 ? 1 : 0));
+  const O = maskedOpening(F, all(w, h), w, h, 8);
+  const diag = Math.round(30 + 11 * Math.SQRT1_2);
+  assert.equal(O[diag * w + diag], 1, 'the disc keeps its diagonal rim');
+});
+
+test('a large radius on the coarse grid still keeps a broad plateau and drops a line', () => {
+  const w = 200, h = 200, F = grid(w, h, (x, y) => (x >= 40 && x < 160 && y >= 40 && y < 160 ? 1 : x === 180 ? 1 : 0));
+  const O = maskedOpening(F, all(w, h), w, h, 24);
+  assert.equal(O[100 * w + 100], 1);
+  assert.equal(O[100 * w + 180], 0);
+});
+
 test('cells that take no paint do not pull the opening down', () => {
   const w = 40, h = 40, F = grid(w, h, () => 0.5), live = all(w, h);
   for (let y = 0; y < h; y++) for (const x of [12, 25]) { live[y * w + x] = 0; F[y * w + x] = 0; }

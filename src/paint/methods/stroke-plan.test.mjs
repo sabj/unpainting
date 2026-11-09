@@ -278,3 +278,12 @@ test('minLanes narrows the brush so there is something to grade across', () => {
   const three = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3 });
   assert.ok(three.laneR < one.laneR, `${three.laneR} against ${one.laneR}`);
 });
+
+test('straight lanes stay parallel on an irregular passage, so neighbouring lanes cannot open a gap', () => {
+  const w = 200, h = 200, list = [], G = new Float32Array(w * h);
+  for (let y = 20; y < 180; y++) { const x0 = 20 + Math.round(30 * Math.sin(y / 20) + 30); for (let x = x0; x < x0 + 100; x++) { const i = y * w + x; list.push(i); G[i] = 0.2 + y * 0.003; } }
+  const res = planLanes(list, w, h, G, 0.5, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3, spacingK: 1.93, straight: true });
+  const rows = [...new Set(res.paths.map(ps => Math.round(ps[0].y)))].sort((a, b) => a - b);
+  for (const ps of res.paths) for (const p of ps) assert.ok(Math.abs(p.y - ps[0].y) < 1e-6, 'a lane keeps its line');
+  for (let i = 1; i < rows.length; i++) assert.ok(rows[i] - rows[i - 1] <= 1.93 * res.laneR + 1, `lanes ${rows[i] - rows[i - 1]} apart, radius ${res.laneR}`);
+});
