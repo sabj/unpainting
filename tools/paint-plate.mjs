@@ -92,9 +92,9 @@ import { backendLine } from '../src/media/gpu/backend-record.mjs';
 import { renderLayers, renderLayersCached, renderCells, microAmps } from '../src/media/km.mjs';
 import { renderSheet } from '../src/media/render-cache.mjs';
 import { createFramer } from '../src/media/gpu/framer.mjs';
-import { createBrush as createBrushRaw, dip as dipBrush, stroke as physicalStrokeRaw, candidateContact as candidateContactRaw, ContactWorkspace, recordMarks, thirsty, setWashSplat, solidHalfWidth } from '../src/media/brush.mjs';
+import { createBrush as createBrushRaw, dip as dipBrush, stroke as physicalStrokeRaw, candidateContact as candidateContactRaw, ContactWorkspace, recordMarks, thirsty, setWashSplat, edgeHalfWidth } from '../src/media/brush.mjs';
 // The splay of the wash flat (the brush that lays shaped value planes, and its scrap calibration). Shaped-plane lanes
-// are spaced by this brush's solid reach (solidHalfWidth).
+// are spaced by this brush's edge reach (edgeHalfWidth).
 const WASH_FLAT_SPLAY = 0.03;
 import { paperOf, pickPalette, paletteOptions } from '../src/crop/palettepick.mjs';
 import { widePalette, puddleLabels } from '../src/crop/palettewide.mjs';
@@ -3558,7 +3558,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // the plan's graded plane (graded-demand.mjs) carries the grade through the physical loads below; the single-sweep
   // pressure ramp stands in for it only where there are no physical loads
   const attachPlaneRamp = raw => attachRampToPaths(raw, PB && sh._plane ? null : (sh._rampVec ?? sh._valuePlan?.rampVec), SC, PATH_RAMP);
-  const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,coat:sh._valuePlan.coat??0,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38,protect:VALUE_PLAN?.protectedCells,solidHalf:(r,p)=>solidHalfWidth(r,{pressure:p,splay:WASH_FLAT_SPLAY})});
+  const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38,protect:VALUE_PLAN?.protectedCells,edgeHalf:(r,p)=>edgeHalfWidth(r,{pressure:p,splay:WASH_FLAT_SPLAY})});
   const rawShapedPaths = () => (sh._valuePlan.brush?.paths ? passageBrushPaths(sh._valuePlan.brush, SC) : makeShapedPlanePaths());
   const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
