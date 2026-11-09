@@ -42,4 +42,7 @@ test("runDoctor warns, and does not fail, when the lineart models are missing", 
   const noWeights = runDoctor({ ...base, run: probe(true) });
   assert.match(noWeights.warnings[0], /weights are not downloaded/);
   assert.deepEqual(runDoctor({ ...base, exists: () => true, run: probe(true) }).warnings, []);
+  const strictFail = runDoctor({ ...base, strictModels: true, run: probe(false) });
+  assert.equal(strictFail.ok, false);
+  assert.ok(strictFail.failures.some(f => /strict mode/.test(f)));
 });

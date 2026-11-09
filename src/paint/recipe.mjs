@@ -122,10 +122,11 @@ export function expandRecipe({ argv: given0, root = process.cwd() }) {
   const [given, ...typed] = at < 0 ? [argv.includes('--areaplan') ? 'none' : DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
   const name = given === 'none' && at < 0 ? null : given;
   const combined = ['default', 'combined', 'general'].includes(name);
-  const hasWashPlan = Boolean(plan && (plan.washes || plan.order || plan.subjectOrder));
+  const hasWashPlan = Boolean(plan && (plan.washes || (plan.order && typeof plan.order === 'object' && !Array.isArray(plan.order)) || plan.subjectOrder));
   const pipeline = (combined || (name === 'none' && hasWashPlan)) ? pipelineFlags(plan ?? {}, { onlyAuthored: name === 'none' }) : null;
   const washFlags = (name === 'none' && hasWashPlan && pipeline) ? pipeline.flags : [];
   if (combined && pipeline) drawing = pipeline.flags;
+  else if (washFlags.length) drawing = [];
   const presets = [...new Set([...planPresets(plan), ...typed])];
   const extra = presetArgv(presets, argv);
   const sheet = planSheet(plan, argv);

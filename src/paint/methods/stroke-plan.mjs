@@ -22,7 +22,7 @@ function principalAxis(list, w) {
 }
 
 function laneOffsets(uMin, uMax, R, reach, rnd) {
-  const span = uMax - uMin, spacing = 1.6 * R;
+  const span = uMax - uMin, spacing = 1.7 * R;
   const nl = Math.max(1, Math.ceil(Math.max(0, span - 2 * R) / spacing) + 1);
   const lanes = [];
   for (let j = 0; j < nl; j++) {
@@ -45,12 +45,14 @@ function segmentTouchesProtected(p0, p1, R, protect, w, h) {
   const maxY = Math.min(h - 1, Math.ceil(Math.max(y0, y1) + R));
 
   for (let y = minY; y <= maxY; y++) {
+    const cy = y + 0.5;
     for (let x = minX; x <= maxX; x++) {
       if (!protect[y * w + x]) continue;
+      const cx = x + 0.5;
       let u = 0;
-      if (len2 > 1e-6) u = Math.max(0, Math.min(1, ((x - x0) * vx + (y - y0) * vy) / len2));
+      if (len2 > 1e-6) u = Math.max(0, Math.min(1, ((cx - x0) * vx + (cy - y0) * vy) / len2));
       const qx = x0 + u * vx, qy = y0 + u * vy;
-      const d2 = (x - qx) ** 2 + (y - qy) ** 2;
+      const d2 = (cx - qx) ** 2 + (cy - qy) ** 2;
       if (d2 <= (R - 0.5) ** 2) return true;
     }
   }
@@ -133,7 +135,7 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
       const gap = (sCur - sPrev) * step;
       const p0 = lanePt(sPrev);
       const p1 = lanePt(sCur);
-      if (gap > 2 * R || segmentTouchesProtected(p0, p1, R, protect, w, h)) {
+      if (gap > 2 * R || (sCur - sPrev > 1 && segmentTouchesProtected(p0, p1, R, protect, w, h))) {
         runs.push(run);
         run = [];
       }

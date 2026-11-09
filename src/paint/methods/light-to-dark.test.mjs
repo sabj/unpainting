@@ -345,3 +345,33 @@ test('Consult #12 & #13: paperRel protects white highlights on toned paper while
   assert.equal(whitePaperPlan.protectedCells[12 * w + 12], 0, 'sunlit yellow-ochre stone wall must not be falsely masked as paper');
 });
 
+test('subjectCovers exposes per-subject cuts and sm so layerIncrement preserves subject layer shares', async () => {
+  const { subjectCovers } = await import('./subject-washes.mjs');
+  const w = 30, h = 20, n = w * h;
+  const subject = new Uint16Array(n);
+  const values = new Float32Array(n);
+  const weights = new Float32Array(n).fill(1);
+  const protectedCells = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = i % w;
+    if (x < 15) {
+      subject[i] = 1;
+      values[i] = 0.08 + 0.16 * (x / 14); // pale subject: [0.08 .. 0.24]
+    } else {
+      subject[i] = 2;
+      values[i] = 0.45 + 0.45 * ((x - 15) / 14); // dark subject: [0.45 .. 0.90]
+    }
+  }
+  const cover = subjectCovers({
+    subjects: { subject, formMm: 2, bands: 'subject' },
+    values, weights, protectedCells, count: 3, w, h, mmPerCell: 0.5, minShape: 4, smoothMm: 1
+  });
+  assert.ok(cover.cuts instanceof Map && cover.cuts.has(1) && cover.cuts.has(2), 'subjectCovers attaches per-subject cuts');
+  const shares = layerShares(cover, i => cover.cuts.get(cover.subject[i]), cover.sm, n);
+  // Darkest cells of pale subject (x=14) are covered by upper subject layers and must receive positive upper-layer share
+  const paleDarkIdx = 10 * w + 14;
+  if (cover[1][paleDarkIdx]) {
+    assert.ok(shares[1][paleDarkIdx] > 0, `Upper layer share on pale subject should be > 0, got ${shares[1][paleDarkIdx]}`);
+  }
+});
+

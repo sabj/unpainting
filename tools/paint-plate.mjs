@@ -105,7 +105,7 @@ import { localSubjectWash } from '../src/paint/techniques/subject-local.mjs';
 import { pencilBatches, penEndPosition, eraseFactor, prepFade } from '../src/paint/methods/pencil-stage.mjs';
 import { tintRegions, tintSubject } from '../src/paint/techniques/subject-tint.mjs';
 import { painterOrder, subjectRegions } from '../src/paint/methods/painter-order.mjs';
-import { hasLines, loadLines, linePaths } from '../src/crop/lines.mjs';
+import { hasLines, loadLines, linePaths, readLineText } from '../src/crop/lines.mjs';
 import { deferredFirstWash } from '../src/paint/methods/colour-budget.mjs';
 import { retimeRun, codeForImage, concatList, phaseAt, phaseShares, PHASES, labelFrames } from '../src/paint/film-timeline.mjs';
 import { distanceToZero } from '../src/raster.js';
@@ -433,6 +433,7 @@ if(NUMERIC_TUFT_SHAPES.length&&!MAJOR_INTENT)throw Error('numerictuftshapes requ
 const WALL_PHASES = [`load ${process.uptime().toFixed(1)}s`]; let phaseT = performance.now();
 const phaseMark = name => { const t = performance.now(); WALL_PHASES.push(`${name} ${((t - phaseT) / 1000).toFixed(1)}s`); phaseT = t; if (process.env.PHASE_EXIT === name) { console.log(`phases: ${WALL_PHASES.join(', ')} (PHASE_EXIT)`); process.exit(0); } };
 
+const srcMeta = await sharp(path.resolve(root, opt('image'))).metadata();
 const src = sharp(path.resolve(root, opt('image'))).flatten({ background: '#ffffff' }).resize({ width: num('width', 700) });
 const { data: PX_SOURCE, info } = await src.removeAlpha().raw().toBuffer({ resolveWithObject: true });
 const paperSetupStarted = performance.now();
@@ -440,9 +441,9 @@ const paperSetupStarted = performance.now();
 // surroundings (src/crop/ink-free.mjs), so the wash carries mass and the pen carries line, not both. Pre-paint only.
 // --washinkfile <base>: the line file of the target's own ink to remove, when the pen draws a different drawing
 // (a cleaner opening file). Default: the --drawingfile.
-const PX_RAW = num('washinkfree', 0) > 0 ? (() => {
+const PX_RAW = num('washinkfree', 0) > 0 && (opt('washinkfile', '') !== '' || opt('drawing', 'first') !== 'none') ? (() => {
   const base = opt('washinkfile', '') || opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
-  const doc = JSON.parse(fs.readFileSync(path.resolve(root, linePaths(base).lines), 'utf8'));
+  const doc = JSON.parse(readLineText(path.resolve(root, linePaths(base).lines)));
   const r = removePlannedInk(PX_SOURCE, info.width, info.height, doc, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marginMm: num('washinkmargin', 0.3) });
   console.log(`wash target: planned ink removed from ${r.changed} cells (${(100 * r.changed / (info.width * info.height)).toFixed(1)}% of the sheet)`);
   return Buffer.from(r.rgb);
@@ -1226,7 +1227,7 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? SRC : TARGET_GUARD.register('drawing
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. graphite (default): the drawing is pencil
 // unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
 // shows --penfirst per cent of line or more, else graphite.
-const OUTLINE_REQUESTED = opt('outlinemedium', 'auto');
+const OUTLINE_REQUESTED = opt('outlinemedium', 'graphite');
 const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : (OUTLINE_REQUESTED === 'none' ? 'graphite' : materialProfile(OUTLINE_REQUESTED).kind), share: SEP.stats.ink / n, threshold: num('penfirst', 0.5) });
 console.log(describeOutlineMedium(OUTLINE));
 DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
@@ -1507,7 +1508,7 @@ if(VALUE_ENABLED){
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
-  const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',shaped?1:0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
+  const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
@@ -1586,7 +1587,7 @@ const paper = opt('paperscan', '') ? await (async () => {
   return scanPaper(W2, H2, scan, { ...PAPER_OPTS, scanScale: num('paperscanscale', 1), scanMix: num('paperscanmix', 1) });
 })() : (await cachedStep({...RUN_CACHE,name:'paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2,H2,PAPER_OPTS}},async()=>makePaper(W2,H2,PAPER_OPTS))).value;
 // --physics key=value,...: override any sheet constant (src/media/sheet.mjs DEFAULTS)
-const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS)) throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
+const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS) && k !== 'edgeFlowDepth') throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
 // --gran: granulation strength, default 0.25. The relief never changes, so every sweep lays the same pattern and it compounds.
 sheet = createSheet(paper, SHEET_PIGS); sheet._tape = 1;
 // --probebox x0,y0,x1,y1[;...] (sheet fractions, diagnostic): paint only inside the boxes; compare only with a crop run of the same boxes.
@@ -1883,9 +1884,9 @@ const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
 const TECH_CAL = num('techcal', 0) > 0 ? createTechniqueCal({ max: num('techcalmax', 2.5), min: num('techcalmin', 0.8) }) : null;
 const TECH_CAL_FROM = num('techcalfrom', 4);
 const TCAL = (sh, T, detail, value) => {
-  if (!TECH_CAL || detail || !(value >= TECH_CAL_FROM)) return 1;
-  sh._tkey ??= `${T.name}${sh.graded ? ' graded' : ''}`;
-  return (sh._tcal ??= TECH_CAL.factor(sh._tkey));
+  if (!TECH_CAL || detail) return 1;
+  sh._tkey ??= `${T.name}${(sh.graded || sh._valuePlan) ? ' graded' : ''}`;
+  return (sh._tcal ??= value >= TECH_CAL_FROM ? TECH_CAL.factor(sh._tkey) : 1);
 };
 // the plan in the sheet's units: the planned layers over the sheet before the first wash (src/eval/plan-optics.mjs)
 let WASH_BASE = null;
@@ -3509,7 +3510,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
   const attachPlaneRamp = raw => attachRampToPaths(raw, sh._rampVec ?? sh._valuePlan?.rampVec, SC, PATH_RAMP);
-  const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38});
+  const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38,protect:VALUE_PLAN?.protectedCells});
   const rawShapedPaths = () => (sh._valuePlan.brush?.paths ? passageBrushPaths(sh._valuePlan.brush, SC) : makeShapedPlanePaths());
   const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
@@ -3689,7 +3690,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     }
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
-  const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = sh.graded && !detail && SHARE > 0 ? sweepCount(paths, W2, H2) : null;
+  const useGradedCal = Boolean(sh.graded || sh._valuePlan);
+  const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = useGradedCal && !detail && SHARE > 0 ? sweepCount(paths, W2, H2) : null;
   SPEED_PROFILE?.add('painting:sweep-count', performance.now() - coverStarted);
   let cachedCover;
   const passageCover = () => {
@@ -3730,14 +3732,14 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     if (sh._under == null) sh._under = detail || opt('undercover', '1') === '0' ? 1 : 1 / Math.max(num('underfloor', 0.4), Math.min(1, passageCover()));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
-    if (sh.graded && sh._gcal == null) {
+    if (useGradedCal && sh._gcal == null) {
       const G = GRADED_CAL[`${T.name} graded`];
       sh._open = openEdgeShare(MASK, w, h, MB) / SC;
       const lost = G ? Math.min(0.6, G.escape * sh._open / Math.max(1e-6, G.edge)) : 0;
       sh._gcal = G ? 1 / Math.max(0.02, G.all * (1 - lost)) : CHARGE_CAL;
     }
     // --trace: one line per passage, to see where a shape's paint goes
-    if (opt('trace', '0') !== '0') { let area = 0, x0 = w, y0 = h, x1 = 0, y1 = 0; for (let i = 0; i < n; i++) if (MASK[i]) { area++; const x = i % w, y = (i / w) | 0; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } console.log(`trace pass ${L + 1} value ${layer.value} pig ${layer.pigment} ${T.name} area ${area} box ${x0},${y0}-${x1},${y1} amount ${sh.amount.toFixed(3)} paths ${paths.length} cover ${sweepCover(paths, up(MASK), W2, H2).toFixed(2)} fb ${(sh._fb ?? 1).toFixed(2)} under ${sh._under.toFixed(2)}${sh.graded ? ` graded over ${sh.merged + 1} values, angle ${gradedAngle == null ? '-' : (gradedAngle * 180 / Math.PI).toFixed(0)}, open edge ${sh._open.toFixed(3)}, charged ${sh._gcal.toFixed(2)}x` : ''}`); }
+    if (opt('trace', '0') !== '0') { let area = 0, x0 = w, y0 = h, x1 = 0, y1 = 0; for (let i = 0; i < n; i++) if (MASK[i]) { area++; const x = i % w, y = (i / w) | 0; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } console.log(`trace pass ${L + 1} value ${layer.value} pig ${layer.pigment} ${T.name} area ${area} box ${x0},${y0}-${x1},${y1} amount ${sh.amount.toFixed(3)} paths ${paths.length} cover ${sweepCover(paths, up(MASK), W2, H2).toFixed(2)} fb ${(sh._fb ?? 1).toFixed(2)} under ${sh._under.toFixed(2)}${useGradedCal ? ` graded over ${sh.merged + 1} values, angle ${gradedAngle == null ? '-' : (gradedAngle * 180 / Math.PI).toFixed(0)}, open edge ${sh._open.toFixed(3)}, charged ${sh._gcal.toFixed(2)}x` : ''}`); }
     if(COLOUR_TRACE && pts===paths[0] && traceCells.some(i=>MASK[i])) colourTrace.push({stage:'charge',pass:L+1,pigment:layer.pigment,value:layer.value,amount:sh.amount,mix:sh.mix,opening,feedback:sh._fb??1,calibration:CHARGE_CAL,under:sh._under,cover:sh._cover,paths:paths.length,technique:T.name});
     // A sweep lands, bears down through its body and lifts; the paper shows where the touch is lightest.
     const total = pts.reduce((a, p, i) => a + (i ? Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0) || 1;
@@ -3751,14 +3753,15 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       const rampMod = ramp && PF > 1e-6 ? ((1 - u) * ramp.start + u * ramp.end) / PF : 1;
       return { ...p, p: Math.max(0.18, Math.min(1.2, body * Math.min(land, lift) * rampMod)) };
     });
-    if(authoredPaths||(shapedPaths&&!sh._strokePlan))shaped=pts;else if(sh._semantic)shaped=semanticGesture(sh._semantic.pass,shaped,num('sheetmm', DEFAULT_SHEET_MM)/W2);
+    if(authoredPaths||shapedPaths)shaped=pts;else if(sh._semantic)shaped=semanticGesture(sh._semantic.pass,shaped,num('sheetmm', DEFAULT_SHEET_MM)/W2);
     const planeRamp = PATH_RAMP.get(pts);
-    if(planeRamp && shapedPaths && !sh._strokePlan) {
+    if(planeRamp && shapedPaths) {
       let rrun = 0;
+      const denom = sh._strokePlan ? (PF > 1e-6 ? PF : 1) : 1;
       shaped = shaped.map((p, i) => {
         if (i) rrun += Math.hypot(p.x - shaped[i - 1].x, p.y - shaped[i - 1].y);
         const u = rrun / total;
-        const rampMod = (1 - u) * planeRamp.start + u * planeRamp.end;
+        const rampMod = ((1 - u) * planeRamp.start + u * planeRamp.end) / denom;
         const curP = p.p ?? 1;
         return { ...p, p: Math.max(0.18, Math.min(1.2, curP * rampMod)) };
       });
@@ -3789,12 +3792,12 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     };
     // --graded c: recharge every c cells along a sweep at the strength the passage wants there, normalised to a mean of one. Default 0.
     // A graded wash (--gradedwash) is always charged this way from its own graded amount, not normalised per sweep.
-    const gradedLen = BUDGET || authoredPaths || (PB && !detail) ? 0 : (sh.graded ? (GFLOOR ? GCHUNK / SC : num('gradedchunk', 6)) : num('graded', 0)) * SC;
+    const gradedLen = BUDGET || authoredPaths || (PB && !detail) ? 0 : (useGradedCal ? (GFLOOR ? GCHUNK / SC : num('gradedchunk', 6)) : num('graded', 0)) * SC;
     // --physical: the path is cut where the brush's released water runs out (brushes.mjs splitLoads) and each load is a
     // stroke of its own, dipped afresh; a graded wash is graded by the puddle's dilution between loads (the mean of its
     // graded amount under each load), not by recharging every few cells
     const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name) * (METERED_BRUSH && !T.name.startsWith('dry brush') ? BRUSH_LOAD * WET(T) : 1)) : null;
-    if (LOADS && (LOADS.length > 1 || sh.graded || MOD?.paintOwnedTransfer)) {
+    if (LOADS && (LOADS.length > 1 || useGradedCal || MOD?.paintOwnedTransfer)) {
       // One amount per shape: every load of a passage is charged the passage's amount, never per-cell amounts under it.
       const F = null, chargeField=sh._paintOwnedCharge, componentField=sh._paintOwnedComponentCharge, lo = 0, hi = 8;
       const readField=i=>(F?F[i]:sh.amount)+(chargeField?.get(i)??0);
@@ -3815,7 +3818,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
         return count ? sum / count : (MASK[sy * w + sx] ? readField(sy*w+sx) : sh.amount);
       };
       const f = LOADS.map(ch => { if (!F&&!chargeField) return 1; let a = 0; for (const q of ch) a += readLoad(q); return Math.max(lo, Math.min(hi, a / ch.length / Math.max(1e-4, sh.amount))); });
-      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       const extra=LOADS.map((ch,k)=>{
         if(!chargeField&&!componentField)return {factor:1};
         const contact=candidateContact(brush,sheet,ch,{upright:UPRIGHT,spacing:cadence.spacing,clip:null});
@@ -3827,12 +3830,12 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       if(extra.some(q=>q.factor>1))JSONL.append(path.join(out,'paint-owned-loads.jsonl'),JSON.stringify({shapeId:MAJOR_TECHNIQUE?.shapeId,kind:'existing path/load concentration allocation; not pigment delivery or ledger credit',input:opt('modpaintplanes',''),requestedWater:WET(T),calibratedBaseConcentration:base,existingPasses:T.passes,loads:extra})+'\n');
       let st = 0;
       clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { if(!supportedCharge(ch))return; brush._paintOwnedLoad=extra[k];productionDip(brush, { water: WET(T), conc: base.map((v,j) => v * (extra[k].componentFactors?.[j]??f[k])) }); numericalStroke(brush, sheet, ch, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, between: () => { if (++st % every === 0) clock('flow', () => step(sheet, O)); } }); }); });
-    } else if (gradedLen > 0 && !detail && (sh.graded ? shaped.length > 1 : shaped.length > gradedLen * 2)) {
+    } else if (gradedLen > 0 && !detail && (useGradedCal ? shaped.length > 1 : shaped.length > gradedLen * 2)) {
       const chunks = [];
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
       // One amount per shape: the chunks carry the passage's amount, not a per-cell field.
       const f = chunks.map(() => 1), mean = 1;
-      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (sh.graded ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       // The water moves on the sweep's clock, counted across its chunks, so the sheet flows while a chunked sweep is laid.
       let st = 0;
       clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: base.map(v => v * f[k] / mean) }); numericalStroke(brush, sheet, ch, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(sheet, O)); } }); }); });
@@ -4388,7 +4391,7 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
   }
 }
 
-writeRunCard({ provenanceHistory:PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), code: CODE_STATE, segments: SEGMENTS_RECORD, linework: LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
+writeRunCard({ provenanceHistory:PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), code: CODE_STATE, segments: SEGMENTS_RECORD, linework: LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
 

@@ -24,6 +24,7 @@
     "bench:add-target": "node bench/scripts/add-target.mjs",
     "bench:suite": "node bench/scripts/suite.mjs",
     "bench:lite": "node bench/scripts/suite.mjs --profile lite",
+    "bench:rerender": "node bench/scripts/rerender.mjs",
     "parity:test": "node tools/speed/class-a-gate.mjs"
   },
   "dependencies": {

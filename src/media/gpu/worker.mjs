@@ -19,9 +19,11 @@ function ack() { Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); }
 function fail(msg, status = 0) {
   const b = new TextEncoder().encode(String(msg).slice(0, err.length - 1));
   err.fill(0); err.set(b); ctrl[2] = 1;
-  if (status || Atomics.load(ctrl, 3) === 0) {
-    Atomics.store(ctrl, 3, status || 2);
-    Atomics.notify(ctrl, 3);
+  Atomics.store(ctrl, 3, status || 2);
+  Atomics.notify(ctrl, 3);
+  for (let i = 0; i < done.length; i++) {
+    Atomics.store(done, i, -1);
+    Atomics.notify(done, i);
   }
   ack();
 }
@@ -106,8 +108,9 @@ async function handleOp(m) {
       writeAdapterEvidence(workerData.adapterMetadata ? new Uint8Array(workerData.adapterMetadata) : null, { adapterInfo, dawnFlags: process.env.DAWN_FLAGS ? process.env.DAWN_FLAGS.split(' ') : [] });
       err.fill(0); err.set(new TextEncoder().encode(String(m.adapterNote ?? 'webgpu')));
       if(asyncDry){for(let k=0;k<gpu.K;k++){if([sheet.G[k],sheet.D[k],sheet.P[k]].some(a=>a.some(v=>v!==0)))workerWetMask|=1<<k;if(m.top?.[k]?.some(v=>v!==0))workerTopMask|=1<<k;}gpu.setAct(workerWetMask|workerTopMask);}
+      ack();
       Atomics.store(ctrl, 3, 1); Atomics.notify(ctrl, 3);
-      break;
+      return;
     }
     case 'opticalInit': {
       gpu.flushStrokes(); gpu.optical?.destroy(); gpu.optical = null;

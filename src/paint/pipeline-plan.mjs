@@ -37,7 +37,7 @@ export function resolvePipeline(plan = {}) {
   const drawing = structuredClone(plan.drawing ?? {});
   object(drawing, 'drawing');
   const washes = object(plan.washes ?? {}, 'washes');
-  const order = object(plan.order ?? {}, 'order');
+  const order = plan.order && typeof plan.order === 'object' && !Array.isArray(plan.order) ? plan.order : {};
   if (plan.subjectOrder && order.subjects) throw Error('use order.subjects, not both order.subjects and subjectOrder');
   const subjects = order.subjects ?? plan.subjectOrder ?? null;
   readSubjectOrder(subjects, plan.families ?? []);
@@ -71,7 +71,7 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   const p = resolvePipeline(plan), w = p.washes, flags = drawingFlags(p.drawing);
   const add = (k,v) => flags.push('--'+k,String(v));
   const rawW = plan?.washes ?? {};
-  const rawOrder = plan?.order ?? {};
+  const rawOrder = plan?.order && typeof plan.order === 'object' && !Array.isArray(plan.order) ? plan.order : {};
   const rawPhysics = rawW.physics ?? {};
   if (w.furReserves && (!onlyAuthored || rawW.furReserves != null)) add('furreserves', JSON.stringify(w.furReserves));
   if (w.paints && (!onlyAuthored || rawW.paints != null)) add('paints', w.paints.join(','));

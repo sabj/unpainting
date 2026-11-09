@@ -46,20 +46,22 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // small face shadow shapes.
   const minShape=minShapeCells>0?minShapeCells:Math.max(shaped?144:4,Math.round(w*h*.00015));
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
-  // cell within 9/9/12 below it per channel is a light. With --paperbase source the sheet takes that colour too.
-  let PAP = paperRel && paperRGB ? [...paperRGB] : null;
-  if (!PAP && paperRel && rgb) {
+  // cell within 9/9/12 (or 14/14/18 on warm cream paper) below it per channel is a light. With --paperbase source the sheet takes that colour too.
+  let PAP = null;
+  if (paperRel && rgb) {
     const L = Float32Array.from({ length: n }, (_, i) => rgb[3 * i] + rgb[3 * i + 1] + rgb[3 * i + 2]);
     const idx = Array.from(L.keys()).sort((a, b) => L[b] - L[a]).slice(0, Math.max(1, Math.floor(n * .1)));
     PAP = [0, 1, 2].map(c => idx.reduce((a, i) => a + rgb[3 * i + c], 0) / idx.length);
+  } else if (paperRel && paperRGB) {
+    PAP = [...paperRGB];
   }
-  const tonedPap = Boolean(PAP && PAP[0] - PAP[2] >= 12 && 252 - PAP[2] >= 15);
-  const papTol = tonedPap ? [16, 16, 20] : [9, 9, 12];
-  const papFloor = PAP ? Math.max(120, Math.min(180, PAP[2] - 15)) : 180;
+  const tonedPap = Boolean(PAP && PAP[0] - PAP[2] >= 18 && 252 - PAP[2] >= 20);
+  const papTol = tonedPap ? [14, 14, 18] : [9, 9, 12];
+  const papDark = Boolean(PAP && (0.2126 * PAP[0] + 0.7152 * PAP[1] + 0.0722 * PAP[2] < 180 || PAP[0] < 180 || PAP[1] < 200 || PAP[2] < 145));
   const inferred = Uint8Array.from({ length: n }, (_, i) => {
     if (hold?.[i]) return 1;
     if (PAP) {
-      if (PAP[0] < papFloor || PAP[1] < papFloor || PAP[2] < papFloor - 15) return 0;
+      if (papDark) return 0;
       return (rgb[3 * i] >= PAP[0] - papTol[0] && rgb[3 * i + 1] >= PAP[1] - papTol[1] && rgb[3 * i + 2] >= PAP[2] - papTol[2]) ? 1 : 0;
     }
     if (rgb) {
@@ -96,15 +98,14 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
       }
     }
     const ringMean=ringCount?ringSum/ringCount:meanIn;
-    const contrastThresh=list.length<2?.35:.18;
-    if(ringMean-meanIn>=contrastThresh){
+    if(list.length>=2&&list.length<=16&&meanIn<=.08&&ringMean>=.45&&ringMean-meanIn>=.40){
       for(const i of list)catchlights[i]=1;
     }
   }
   protectedCells.fill(0);
   for(let i=0;i<n;i++)if(lights[i]||catchlights[i]||(hold&&hold[i]))protectedCells[i]=1;
-  for(const r of reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)protectedCells[y*w+x]=1;}
   if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
+  for(const r of reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)protectedCells[y*w+x]=1;}
   // A single coherent shadow support, shared by both last glazes. Smooth strength
   // within it, rather than five nested isodensity silhouettes. Filter tiny dark
   // flecks out of the glaze list; their demand stays in the dry middle passage.
@@ -278,8 +279,8 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
     // one flat value over the whole form and then only darker steps where the form is darker. An equal split (the
     // default) gives a light cell all its middle demand in layer 0 while a dark neighbour puts only a quarter there, so
     // the shape's one mean charge is too dark for the light cells and too light for the dark ones.
-    const effThresholds = (localQ || subjects) ? (i => (localQ?.get(region.labels[i])) ?? q) : q;
-    const share=layerIncrement?layerShares(cover,effThresholds,sm,n):null;
+    const effThresholds = subjects && cover.cuts ? (i => cover.cuts.get(cover.subject[i]) ?? q) : localQ ? (i => localQ.get(region.labels[i]) ?? q) : q;
+    const share=layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
     const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
@@ -387,11 +388,9 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           // least one lane wide and three minimum shapes big are laned, so windows, recesses, mullions and figures keep
           // one fitted gesture and an exact edge.
           const supportMm=2*list.length/Math.max(1,hard.length+soft.length)*(sheetWidthMm/w);
-          const SIZES = [6, 12, 20, 38];
-          const snappedSupport = SIZES.reduce((prev, curr) => Math.abs(curr - 1.2 * supportMm) < Math.abs(prev - 1.2 * supportMm) ? curr : prev);
-          const laneHere=laneMax>0?Math.min(laneMax,Math.max(laneMm,supportMm*.5)):(laneAdapt?snappedSupport:laneMm);
+          const laneHere=laneMax>0?Math.min(laneMax,Math.max(laneMm,supportMm*.5)):Math.min(laneMm,Math.max(2,supportMm*.9));
           if(strokePlan&&shaped&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!isCoolSky){
-            const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0,protect:protectedCells,curved:true});
+            const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0,protect:protectedCells});
             if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
           else if(shaped && list.length >= 4) {
             let sx = 0, sy = 0;

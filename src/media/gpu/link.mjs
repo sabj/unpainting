@@ -921,8 +921,14 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
       Atomics.notify(ctrl, 3);
     } else if (code !== 0 && !link?.closed) {
       markBroken(health, `GPU worker exited prematurely with code ${code}`);
+      Atomics.store(ctrl, 3, 2);
       Atomics.store(ctrl, 0, 1);
       Atomics.notify(ctrl, 0);
+      Atomics.notify(ctrl, 3);
+      for (let i = 0; i < shared.done.length; i++) {
+        Atomics.store(shared.done, i, -1);
+        Atomics.notify(shared.done, i);
+      }
     }
   });
   const shared = { ctrl, health, err: new Uint8Array(errSab), rectData: new Float32Array(rectSab), layerData: new Float32Array(layerSab), ring: new Float32Array(ringSab), done: new Int32Array(doneSab), sumData: new Float32Array(sumSab) };
@@ -947,7 +953,8 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
     Atomics.wait(ctrl, 3, 0, 200);
   } // booting
   if (Atomics.load(ctrl, 3) !== 1 || brokenReason(health)) {
-    const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || 'GPU unavailable';
+    const timedOut = Atomics.load(ctrl, 3) === 2 && !link.errText();
+    const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || (timedOut ? 'GPU worker boot timed out after 30s' : 'GPU unavailable');
     worker.terminate();
     if (mode === 'on') throw new Error(`--gpu on but the GPU sheet is unavailable: ${reason}`);
     log(cpuFallbackWarning(reason));

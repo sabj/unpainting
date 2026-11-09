@@ -81,7 +81,7 @@ if (MULTI) {
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'auto'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), profile, python };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), profile, python };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);

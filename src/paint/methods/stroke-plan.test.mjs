@@ -227,3 +227,14 @@ test('Consult #4: catchlight detection splits curved strokes on curve and avoids
     }
   }
 });
+
+test('continuous wash lanes with scattered protected flecks do not shatter into 0.5-cell stubs', () => {
+  const { list, G } = slab(200, 100, 10, 190, 20, 80, () => 1);
+  const protect = new Uint8Array(200 * 100);
+  // Scatter 12 1-cell protected flecks inside the continuous passage
+  for (let k = 0; k < 12; k++) protect[(30 + (k * 4) % 40) * 200 + 25 + k * 12] = 1;
+  const r = planLanes(list, 200, 100, G, 1, { cellMm: 0.45, laneMm: 12, strokeMm: 60, protect, curved: true });
+  assert.ok(r && r.paths.length > 0 && r.paths.length <= 24, `Expected continuous lanes, got ${r?.paths.length}`);
+  const stubCount = r.paths.filter(p => p.length <= 2 && Math.hypot(p[p.length - 1].x - p[0].x, p[p.length - 1].y - p[0].y) < 1).length;
+  assert.equal(stubCount, 0, 'Zero 0.5-cell stub strokes emitted on continuous passage');
+});

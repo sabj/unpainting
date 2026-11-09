@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { linePaths } from '../../crop/lines.mjs';
+import { linePaths, hasLineFile, readLineText } from '../../crop/lines.mjs';
 import { registerLines, applyRegistration } from '../../crop/register-lines.mjs';
 import { edgeEvidence } from './line-evidence.mjs';
 import { noDrawingDeclared } from './drawing-file.mjs';
@@ -38,8 +38,8 @@ export async function lineTargetOf(image) {
  */
 export async function registerDrawingFile({ base, image, root = '.', out, stem = path.join(out, 'lines-registered'), width, argv = [], force = false, log = () => {} }) {
   const file = path.resolve(root, linePaths(base).lines);
-  if (!fs.existsSync(file)) return null;
-  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!hasLineFile(file)) return null;
+  const doc = JSON.parse(readLineText(file));
   if (!doc.image?.w || !doc.image?.h || (!force && doc.registration?.targetGrid)) return null;
   const t = await lineTargetOf(image), gap = aspectGap(doc.image, t.w, t.h);
   const otherImage = !!doc.targetSHA256 && doc.targetSHA256 !== t.sha256;

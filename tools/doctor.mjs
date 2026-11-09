@@ -4,7 +4,8 @@ import { fileURLToPath } from "node:url";
 import { runDoctor } from "../src/paint/doctor.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const report = runDoctor({ root });
+const strictModels = process.argv.includes("--strict");
+const report = runDoctor({ root, strictModels });
 console.log(JSON.stringify(report, null, 2));
 for (const w of report.warnings ?? []) console.error(`doctor warning: ${w}`);
 if (!report.ok) {

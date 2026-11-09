@@ -45,6 +45,7 @@ export function runDoctor({
   state = null,
   segPythonPath = undefined,
   samCheckpointPath = undefined,
+  strictModels = false,
 } = {}) {
   const code = state ?? codeState(root);
   const gitOk = Boolean(code.git && !code.dirty);
@@ -77,6 +78,8 @@ export function runDoctor({
   if (!seg.ready) failures.push(`seg python not ready (${seg.error ?? "missing packages"})`);
   if (!samOk) failures.push("SAM checkpoint sam_vit_b_01ec64.pth missing");
   if (!diskOk) failures.push(`free disk ${freeGiB} GiB is below 20 GiB floor`);
+  if (strictModels && !lp.model) failures.push("line models missing (torch/controlnet_aux required in strict mode)");
+  if (strictModels && lp.model && !modelWeights) failures.push("line model weights work/line-models/hf missing in strict mode");
 
   return {
     ok: failures.length === 0,
