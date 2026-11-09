@@ -21,8 +21,8 @@ function principalAxis(list, w) {
   return { cx, cy, ang, dx: Math.cos(ang), dy: Math.sin(ang) };
 }
 
-function laneOffsets(uMin, uMax, R, reach, rnd) {
-  const span = uMax - uMin, spacing = 1.7 * R;
+function laneOffsets(uMin, uMax, R, reach, rnd, spacingK = 1.7) {
+  const span = uMax - uMin, spacing = spacingK * R;
   const nl = Math.max(1, Math.ceil(Math.max(0, span - 2 * R) / spacing) + 1);
   const lanes = [];
   for (let j = 0; j < nl; j++) {
@@ -61,10 +61,12 @@ function segmentTouchesProtected(p0, p1, R, protect, w, h) {
 
 // Each stroke's charge factor is the plan's mean amount under its footprint over the passage mean, fixed before the
 // first mark. reachMm > 0: lane ends and outer sides land past or short of the outline by a seeded amount up to reachMm.
-export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm = 30, reachMm = 0, seed = 1, fmin = 0.45, fmax = 1.8, protect = null, curved = false } = {}) {
+export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm = 30, reachMm = 0, seed = 1, fmin = 0.45, fmax = 1.8, protect = null, curved = false, angle = null, minLanes = 1, spacingK = 1.7, straight = false } = {}) {
   if (!(cellMm > 0)) throw Error('planLanes needs cellMm');
   if (!list.length || !(amount > 0)) return null;
-  const { cx, cy, ang, dx, dy } = principalAxis(list, w);
+  const axis = principalAxis(list, w);
+  // angle: lanes along a given direction (a graded wash runs its lanes across the gradient) rather than the long axis
+  const { cx, cy, ang, dx, dy } = angle == null ? axis : { cx: axis.cx, cy: axis.cy, ang: angle, dx: Math.cos(angle), dy: Math.sin(angle) };
   const c = list.length, T = new Float32Array(c), U = new Float32Array(c);
   let uMin = Infinity, uMax = -Infinity;
   list.forEach((i, k) => { const x = i % w + .5 - cx, y = Math.floor(i / w) + .5 - cy; T[k] = x * dx + y * dy; U[k] = -x * dy + y * dx; uMin = Math.min(uMin, U[k]); uMax = Math.max(uMax, U[k]); });
@@ -85,6 +87,12 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
     const target = 1.2 * t90;
     const SIZES = [6, 12, 20, 38];
     effectiveLaneMm = SIZES.reduce((prev, curr) => Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev);
+    // minLanes: one lane as wide as the passage has nothing to grade across, so the brush is narrowed until that many
+    // lanes (overlapping as laneOffsets lays them) fit across the passage, down to the smallest brush.
+    if (minLanes > 1) {
+      const width = (uMax - uMin) * cellMm, fits = SIZES.filter(s => s * (1 + spacingK / 2 * (minLanes - 1)) <= width);
+      effectiveLaneMm = Math.min(effectiveLaneMm, fits.at(-1) ?? SIZES[0]);
+    }
   }
 
   const R = Math.max(1.5, effectiveLaneMm / 2 / cellMm), reach = reachMm / cellMm, rnd = rng(seed);
@@ -113,7 +121,7 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
   }
 
   const paths = [], factors = [], relDeltas = [], cells = [];
-  for (const u0 of laneOffsets(curved ? uRelMin : uMin, curved ? uRelMax : uMax, R, reach, rnd)) {
+  for (const u0 of laneOffsets(curved ? uRelMin : uMin, curved ? uRelMax : uMax, R, reach, rnd, spacingK)) {
     const st = new Map();
     for (let k = 0; k < c; k++) {
       if (Math.abs(Urel[k] - u0) > R) continue;
@@ -124,7 +132,7 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
     if (!st.size) continue;
     const lanePt = s => {
       const e = st.get(s);
-      const uu = curved ? e.u / e.n : u0 + .5 * (e.u / e.n - u0);
+      const uu = curved ? e.u / e.n : straight ? u0 : u0 + .5 * (e.u / e.n - u0);
       const tt = e.t / e.n;
       return { x: cx + dx * tt - dy * uu, y: cy + dy * tt + dx * uu };
     };
@@ -150,7 +158,7 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
         let g = 0, n = 0; const pts = [];
         const sliceKeys = rk.slice(a0, a1);
         for (const s of sliceKeys) {
-          const e = st.get(s), uu = curved ? e.u / e.n : u0 + .5 * (e.u / e.n - u0), tt = e.t / e.n;
+          const e = st.get(s), uu = curved ? e.u / e.n : straight ? u0 : u0 + .5 * (e.u / e.n - u0), tt = e.t / e.n;
           g += e.g; n += e.n;
           pts.push({ x: cx + dx * tt - dy * uu, y: cy + dy * tt + dx * uu, r: R, p: .9 });
         }

@@ -263,3 +263,27 @@ test('pad overlaps consecutive strokes in a split lane so joints never leave an 
     }
   }
 });
+
+test('lanes can run along a given direction: a vertical gradient is laid in horizontal lanes of different strength', () => {
+  const w = 200, h = 200, { list, G } = slab(w, h, 20, 180, 20, 180, (x, y) => 0.2 + y * 0.004);
+  const res = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3 });
+  for (const ps of res.paths) assert.ok(Math.abs(ps[0].y - ps.at(-1).y) < 2, 'lane runs horizontally');
+  assert.ok(res.paths.length >= 3, `${res.paths.length} lanes`);
+  assert.ok(Math.max(...res.factors) > 1.2 && Math.min(...res.factors) < 0.8, res.factors.join(' '));
+});
+
+test('minLanes narrows the brush so there is something to grade across', () => {
+  const w = 200, h = 200, { list, G } = slab(w, h, 20, 180, 80, 120, (x, y) => 0.2 + y * 0.004);
+  const one = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0 });
+  const three = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3 });
+  assert.ok(three.laneR < one.laneR, `${three.laneR} against ${one.laneR}`);
+});
+
+test('straight lanes stay parallel on an irregular passage, so neighbouring lanes cannot open a gap', () => {
+  const w = 200, h = 200, list = [], G = new Float32Array(w * h);
+  for (let y = 20; y < 180; y++) { const x0 = 20 + Math.round(30 * Math.sin(y / 20) + 30); for (let x = x0; x < x0 + 100; x++) { const i = y * w + x; list.push(i); G[i] = 0.2 + y * 0.003; } }
+  const res = planLanes(list, w, h, G, 0.5, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3, spacingK: 1.93, straight: true });
+  const rows = [...new Set(res.paths.map(ps => Math.round(ps[0].y)))].sort((a, b) => a - b);
+  for (const ps of res.paths) for (const p of ps) assert.ok(Math.abs(p.y - ps[0].y) < 1e-6, 'a lane keeps its line');
+  for (let i = 1; i < rows.length; i++) assert.ok(rows[i] - rows[i - 1] <= 1.93 * res.laneR + 1, `lanes ${rows[i] - rows[i - 1]} apart, radius ${res.laneR}`);
+});

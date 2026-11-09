@@ -22,7 +22,7 @@ test('a mixed dry-paper passage carries both pigments once and has no raw demand
  const sh=mid[0].shapes[0];
  assert.ok(sh.mix.every(v=>v>0));
  assert.equal(sh.graded,null);
- assert.ok(sh._plane||sh._strokePlan);
+ assert.equal(sh._valuePlan.mixed,true);
  assert.equal(valueTechnique(sh._valuePlan).intoWet,false);
  const mass=plan.layers.flatMap(l=>l.shapes).reduce((s,q)=>s+q.mix.reduce((a,b)=>a+b,0)*q.area,0);
  assert.ok(Math.abs(mass-n*.3)<1e-3);

@@ -74,7 +74,7 @@ In painter V101, five flags hold the pen to the target's own lines. Each is off 
 | `--linesmooth` | 1 | 0 |
 | `--linesmoothcorner` | 50 | 50 |
 | `--inkwidthfloor` | 1 | 0 |
-| `--inkdarkcap` | 1 | 0 |
+| `--inkdarkmatch` | 1 | 0 |
 | `--inkdamp` | 0.3 | 0 |
 
 The recipe does not turn ink on. Add `--outlinemedium ink --drawing both` for an opening ink drawing with closing accents.
