@@ -1,5 +1,14 @@
 // Passage progress is measured at completed boundaries, never by wall time.
 // Keep drawing/material stages for galleries and the first wash for the process map.
+
+/** Fast all-frame films keep every other stage, the first and every fourth completed pass, and every forced frame
+ * (a completed value band, dried): nothing while a pass is still being laid. */
+export function fastPaintFrame(stage) {
+  if (stage.stage !== 'paint') return true;
+  if (stage.laying) return false;
+  return Boolean(stage.force) || (stage.pass ?? 0) <= 1 || stage.pass % 4 === 0;
+}
+
 export function framePolicy({ video = false, keepAll = false } = {}) {
   const all = Boolean(video || keepAll), goals = [0.1, 0.25, 0.5, 0.75, 1];
   let next = 0, firstWash = false, last = null, prevOf = 0;
