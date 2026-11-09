@@ -4,7 +4,7 @@ import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {fitPlanOptics} from './plan-optics-fit.mjs';
 import {paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mjs';
 import {normalizeWashWeights} from './wash-system.mjs';
-import {reserveLights,validateReserves} from './light-reserves.mjs';
+import {reserveLights,validateReserves,brushFootprintCells} from './light-reserves.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
@@ -42,7 +42,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({washSystem=false,paperRule=washSystem,calibratedPlan=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null,mixedWash=washSystem,mixedShadows=washSystem,scaleCuts=washSystem,gradedLanes=washSystem,softChoice=washSystem}) {
+export function planLightToDark({washSystem=false,paperRule=washSystem,calibratedPlan=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null,mixedWash=washSystem,mixedShadows=washSystem,scaleCuts=washSystem,gradedLanes=washSystem,softChoice=washSystem}) {
   if(calibratedPlan){darkGain=1;coolGain=1;midGain=1;}
   let coolGroup=null;setRecessMax(recessMax);
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
@@ -125,8 +125,8 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   for(let i=0;i<n;i++)if(lights[i]||catchlights[i]||(hold&&hold[i]))protectedCells[i]=1;
   if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
   // An explicit reserve is the target's light inside its box (light-reserves.mjs), kept whatever its size.
-  if(reserves.length){const RES=reserveLights(reserves,{w,h,light:closedInferred});for(let i=0;i<n;i++)if(RES.mask[i])protectedCells[i]=1;
-    for(const q of RES.report)console.log(`reserve "${q.reason}": ${q.kept} of ${q.boxCells} box cells are target lights${q.kept?'':'; nothing reserved'}`);}
+  if(reserves.length){const RES=reserveLights(reserves,{w,h,light:closedInferred,values:value.values,minCells:smallestBrushMm>0?brushFootprintCells(smallestBrushMm,sheetWidthMm/w):0});for(let i=0;i<n;i++)if(RES.mask[i])protectedCells[i]=1;
+    for(const q of RES.report)console.log(`reserve "${q.reason}": ${q.kept} of ${q.boxCells} box cells are target lights${q.fromPlan?' (lightest connected cells by the target value plan)':''}${q.kept?'':'; nothing reserved'}`);}
   // A single coherent shadow support, shared by both last glazes. Smooth strength
   // within it, rather than five nested isodensity silhouettes. Filter tiny dark
   // flecks out of the glaze list; their demand stays in the dry middle passage.
