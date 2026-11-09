@@ -313,24 +313,26 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
   const carry=passCap>0?Array.from({length:k},()=>new Float32Array(n)):null;
   // mixedWash (mixed-washes.mjs): a passage is one shape of one colour domain with one mixed charge, laid once on dry
-  // paper. Carried demand and per-cell styles are per pigment or per cell, so those plans keep their pigment passes.
-  const mixedOn=mixedWash&&!carry&&!cellProf;
-  if(mixedWash&&!mixedOn)console.log(`mixed washes: off for this plan (${carry?'carried demand':'per-cell styles'} are per pigment)`);
+  // paper. Per-cell styles paint cell by cell, so those plans keep their pigment passes.
+  const mixedOn=mixedWash&&!cellProf;
+  if(mixedWash&&!mixedOn)console.log('mixed washes: off for this plan (per-cell styles)');
   const WD=mixedOn&&!subjects?washDomains(region.labels,region.regions.length,demand,k,w,h,{mayJoin:profile?(a,b)=>regionProfiles[a-1]?.name===regionProfiles[b-1]?.name:null}):null;
   if(WD)console.log(`mixed washes: ${WD.ids.length} colour domains from ${region.regions.length} regions`);
   for(const step of steps){const band=step.band;
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
-    const mixedStep=mixedOn&&!step.pig&&(phase!=='shadow'||mixedShadows),stepScale=mixedStep?new Float32Array(n):null;
+    const mixedStep=mixedOn&&!step.pig&&(phase!=='shadow'||mixedShadows);
+    // A mixed step reads what each cell asks of every pigment; under passCap each pigment keeps its own carried demand.
+    const fields=mixedStep?Array.from({length:k},()=>new Float32Array(n)):null,placedOf=mixedStep&&carry?Array.from({length:k},()=>new Float32Array(n)):null;
     for(const pigment of mixedStep?[-1]:Array.from({length:k},(_,j)=>j)){
-      const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,elig=placed&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null;
+      const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig&&!mixedStep?new Float32Array(n):null,carried=placed||placedOf,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>{if(!mixedStep)return carry[pigment][i];let c=0;for(let q=0;q<k;q++)c+=carry[q][i];return c;};
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=0;if(mixedStep){for(let q=0;q<k;q++)fitted+=demand[i*k+q];}else fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        const effCool=coolGain,cellScale=step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(effCool!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?effCool:1);if(stepScale)stepScale[i]=cellScale;G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&!mixedStep&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
+        const effCool=coolGain,cellScale=step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(effCool!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?effCool:1);G[i]=fitted*cellScale;if(fields){const asked=G[i];let t=0;for(let q=0;q<k;q++){const own=demand[i*k+q]*cellScale;if(carry){const g=own+carry[q][i];fields[q][i]=Math.max(0,g);carry[q][i]=Math.min(0,g);}else fields[q][i]=own;t+=fields[q][i];}G[i]=carry&&keepMask&&asked>1e-8?Math.max(1e-6,t):t;}if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&!mixedStep&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
       // maskMm: where a carried glaze goes is judged over a brush-sized area, not cell by cell: the mask is the
       // signed demand left (what is still needed less what was over-laid) averaged over maskMm.
-      if(elig){const g=Float32Array.from(G,(v,i)=>v+carry[pigment][i]),sm=boxMeanValue(g,w,h,Math.max(1,Math.round(maskMm/(sheetWidthMm/w))));for(let i=0;i<n;i++)mask[i]=elig[i]&&sm[i]>1e-8?1:0;}
-      if(placed&&shaped&&phase!=='light'&&holeFill){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(phase!=='shadow'||shadowMask[i])&&step.wt[i]>0?1:0),big=removeSmall(hole,w,h,Math.round(minShape*holeFill));for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
+      if(elig){const g=Float32Array.from(G,(v,i)=>v+carryAt(i)),sm=boxMeanValue(g,w,h,Math.max(1,Math.round(maskMm/(sheetWidthMm/w))));for(let i=0;i<n;i++)mask[i]=elig[i]&&sm[i]>1e-8?1:0;}
+      if(carried&&shaped&&phase!=='light'&&holeFill){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(phase!=='shadow'||shadowMask[i])&&step.wt[i]>0?1:0),big=removeSmall(hole,w,h,Math.round(minShape*holeFill));for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // Middle local colors belong to regions. Shadow connectivity ignores ownership boundaries.
       // midDomains=false: a middle plane follows the target value, not the colour-cluster boundary,
       // so smooth skin is not split into flat posterized patches along invisible cluster lines.
@@ -369,8 +371,8 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
             const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
           if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.1,4*(1-detailScale*meanOver(list,DETAIL))):4)){omittedDemand+=total;continue;}
-          if(total<=1e-8)continue;const amount=placed?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
-          sh.mix=mixedStep?Array.from(mixedCharge(list,demand,k,stepScale).mix):Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=null;sh._follow=true;
+          if(total<=1e-8)continue;const amount=carried?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
+          sh.mix=mixedStep?Array.from(mixedCharge(list,fields,amount)):Array.from({length:k},(_,j)=>j===pigment?amount:0);if(placedOf)for(const i of list)for(let q=0;q<k;q++)placedOf[q][i]=sh.mix[q];sh.graded=null;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/${mixedStep?'pm':'p'+pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
           // softChoice (soft-edge-choice.mjs): only boundaries where this wash fades and the target has no step are soft
@@ -380,7 +382,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
           const familyMatch=passageFamily(list,w,h,families),wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
           const isCoolSky = Boolean(rgb && list.length > n * .015 && list.filter(i => rgb[i * 3 + 2] > rgb[i * 3] + 10).length > list.length * .6);
-          const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue,
+          const intent={id:key,mixed:mixedStep,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue,
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',cool:isCoolSky,
             shaped,subject,move:wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
             brush:{kind:shaped?'flat physical brush; one directional gesture per connected plane':'existing physical wash brush',contact:'side/belly; point for narrow shape',width:'target-fitted physical paths'},
@@ -463,9 +465,13 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
         const layerMix=mixedStep&&shapes.length?(()=>{const m=new Float64Array(k);let t=0;for(const q of shapes)for(let j=0;j<k;j++){m[j]+=q.mix[j]*q.area;t+=q.mix[j]*q.area;}return Array.from(m,v=>v/Math.max(1e-9,t));})():null;
         if(shapes.length)layers.push({value:band,pigment:layerMix?leadPigment(layerMix):pigment,shapes,mix:layerMix??Array.from({length:k},(_,j)=>j===pigment?1:0),amount:shapes.reduce((s,q)=>s+q.amount*q.area,0)/shapes.reduce((s,q)=>s+q.area,0),area:shapes.reduce((s,q)=>s+q.area,0),_order:{phase:phase==='light'?'ground':phase==='shadow'?'dark':'mid',region:typeof domain==='string'?(regionProfiles.findIndex(p=>p.name===domain)+1||0):Math.abs(domain),shoot:true},_valuePhase:phase});
       }
-      if(placed){for(let i=0;i<n;i++)carry[pigment][i]+=G[i]-placed[i];if(carryMm>0){const r=Math.max(1,Math.round(carryMm/(sheetWidthMm/w))),c=boxMeanValue(carry[pigment],w,h,r);for(let i=0;i<n;i++)carry[pigment][i]=protectedCells[i]?0:c[i];}}
+      // Over or under what each cell asked is carried to that pigment's next band, smoothed over a brush-sized area.
+      const settleCarry=(q,own,laid)=>{for(let i=0;i<n;i++)carry[q][i]+=own[i]-laid[i];if(carryMm>0){const r=Math.max(1,Math.round(carryMm/(sheetWidthMm/w))),c=boxMeanValue(carry[q],w,h,r);for(let i=0;i<n;i++)carry[q][i]=protectedCells[i]?0:c[i];}};
+      if(placed)settleCarry(pigment,G,placed);
+      if(placedOf)for(let q=0;q<k;q++)settleCarry(q,fields[q],placedOf[q]);
     }
   }
+  if(softChoice){let hc=0,sc=0;for(const q of instructions){hc+=q.edges.hardCells.length;sc+=q.edges.softCells.length;}console.log(`soft edges: ${(100*sc/Math.max(1,hc+sc)).toFixed(1)}% of ${hc+sc} boundary cells`);}
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
   return {paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }

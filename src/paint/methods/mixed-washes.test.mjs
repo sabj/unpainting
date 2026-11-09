@@ -2,28 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mixedCharge, washDomains, leadPigment } from './mixed-washes.mjs';
 
-test('a mixed charge keeps the passage mass and each pigment share', () => {
-  // two cells, two pigments, scale 1 on the first and 0.5 on the second
-  const demand = Float32Array.from([1, 3, 2, 2]), scale = Float32Array.from([1, 0.5]);
-  const { mix, amount } = mixedCharge([0, 1], demand, 2, scale);
-  assert.ok(Math.abs(amount - (4 + 2) / 2) < 1e-6);
-  assert.ok(Math.abs(mix[0] - (1 + 1) / 2) < 1e-6);
-  assert.ok(Math.abs(mix[1] - (3 + 1) / 2) < 1e-6);
-  assert.ok(Math.abs(mix[0] + mix[1] - amount) < 1e-6);
+test('a mixed charge keeps the passage amount and each pigment share', () => {
+  const fields = [Float32Array.from([1, 1]), Float32Array.from([3, 1])];
+  const mix = mixedCharge([0, 1], fields, 3);
+  assert.ok(Math.abs(mix[0] - 1) < 1e-6);
+  assert.ok(Math.abs(mix[1] - 2) < 1e-6);
+});
+
+test('a charge set below the mean (a quantile) keeps the shares and sums to that amount', () => {
+  const mix = mixedCharge([0, 1], [Float32Array.from([1, 1]), Float32Array.from([3, 1])], 1.5);
+  assert.ok(Math.abs(mix[0] + mix[1] - 1.5) < 1e-6);
+  assert.ok(Math.abs(mix[1] / mix[0] - 2) < 1e-6);
 });
 
 test('a trace pigment is left out of the mix and its mass goes to the rest', () => {
-  const demand = Float32Array.from([0.99, 0.01]), scale = Float32Array.from([1]);
-  const { mix, amount } = mixedCharge([0], demand, 2, scale, { minShare: 0.03 });
+  const mix = mixedCharge([0], [Float32Array.from([0.99]), Float32Array.from([0.01])], 1, { minShare: 0.03 });
   assert.equal(mix[1], 0);
-  assert.ok(Math.abs(mix[0] - amount) < 1e-6);
-  assert.ok(Math.abs(amount - 1) < 1e-6);
+  assert.ok(Math.abs(mix[0] - 1) < 1e-6);
 });
 
 test('a passage with no demand has no charge', () => {
-  const { mix, amount } = mixedCharge([0], Float32Array.from([0, 0]), 2, Float32Array.from([1]));
-  assert.equal(amount, 0);
-  assert.deepEqual([...mix], [0, 0]);
+  assert.deepEqual([...mixedCharge([0], [Float32Array.from([0]), Float32Array.from([0])], 0)], [0, 0]);
 });
 
 test('the lead pigment is the largest share', () => {
