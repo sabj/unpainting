@@ -2,6 +2,7 @@
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
+import {reserveLights,validateReserves} from './light-reserves.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
 import {joinDomainFragments} from './wash-join.mjs';
@@ -39,7 +40,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // measure values against it, and reserve near-paper cells as bare paper.
   const paper=paperLights&&rgb?estimatePaper(rgb,w,h,density):null;
   const value=targetValueMap(paper?Float32Array.from(density,v=>Math.max(0,v-paper.density)):density),region=subjects??targetRegions({w,h,rgb,demand,k,density,families}),protectedCells=Uint8Array.from({length:n},(_,i)=>hold?.[i]?1:0);
-  for(const r of reserves){if(!r.reason||!Array.isArray(r.bounds)||r.bounds.length!==4||r.bounds.some(v=>!Number.isFinite(v)||v<0||v>1)||r.bounds[0]>=r.bounds[2]||r.bounds[1]>=r.bounds[3])throw Error('invalid explicit light reserve');const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)protectedCells[y*w+x]=1;}
+  validateReserves(reserves);
   // Broad target lights, simplified before any paint. Explicit glints survive the
   // area filter; inferred isolated white pixels are not a painting instruction.
   // minShapeCells (whole paintings): a fixed shape floor in cells. The automatic floor grows with sheet area and drops
@@ -105,7 +106,9 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   protectedCells.fill(0);
   for(let i=0;i<n;i++)if(lights[i]||catchlights[i]||(hold&&hold[i]))protectedCells[i]=1;
   if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
-  for(const r of reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)protectedCells[y*w+x]=1;}
+  // An explicit reserve is the target's light inside its box (light-reserves.mjs), kept whatever its size.
+  if(reserves.length){const RES=reserveLights(reserves,{w,h,light:closedInferred});for(let i=0;i<n;i++)if(RES.mask[i])protectedCells[i]=1;
+    for(const q of RES.report)console.log(`reserve "${q.reason}": ${q.kept} of ${q.boxCells} box cells are target lights${q.kept?'':'; nothing reserved'}`);}
   // A single coherent shadow support, shared by both last glazes. Smooth strength
   // within it, rather than five nested isodensity silhouettes. Filter tiny dark
   // flecks out of the glaze list; their demand stays in the dry middle passage.
@@ -441,13 +444,23 @@ export function valueTechnique(intent) {
   if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
   const wet=intent.move==='wet on wet';return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
 }
+// A drawing the plan wrote is drawn as written. The filter in valueInkVerdict is for lines the walker finds.
+export const drawsWholeFile=({first=false,fine=false,graphiteFirst=false,drawingFile='',closingFile='',sourceInk=false}={})=>Boolean(sourceInk)||(first&&graphiteFirst&&!!drawingFile)||(!first&&!fine&&!!closingFile);
+export function valueInkVerdict(g,{first,w,h,density,reserves=null}){
+  const pts=g.points;if(!pts?.length)return 'no points';
+  let length=0,contrast=0,count=0,protectedCount=0;
+  for(let j=0;j<pts.length;j++){const p=pts[j],x=Math.max(0,Math.min(w-1,Math.round(p.x))),y=Math.max(0,Math.min(h-1,Math.round(p.y))),i=y*w+x;if(j)length+=Math.hypot(p.x-pts[j-1].x,p.y-pts[j-1].y);if(reserves?.[i])protectedCount++;for(const q of neighbors(i,w,w*h))contrast+=Math.abs(density[i]-density[q]);count+=neighbors(i,w,w*h).length;}
+  if(protectedCount)return 'reserve';
+  if(first)return g.outline||g.tier==='outline'||length/w>=.035?'kept':'short';
+  return contrast/Math.max(1,count)>=.06?'kept':'low contrast';
+}
 export function selectValueInk(paths,{first,w,h,density,reserves=null,subject=null,shaped=false,styleSelection=null,sourceInk=false}){
   const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
   // Pen contours naturally border paper lights. A wash reserve is not a reason
   // to delete the entire source line, and short marks carry faces and capitals.
   if(sourceInk)return paths.filter(g=>g.points?.length>=2);
   if(profile&&profile.name!=='precise-watercolor'&&(first?profile.ink+profile.graphite:profile.ink)===0)return [];
-  return paths.filter(g=>{const pts=g.points;if(!pts?.length)return false;let length=0,contrast=0,count=0,protectedCount=0;for(let j=0;j<pts.length;j++){const p=pts[j],x=Math.max(0,Math.min(w-1,Math.round(p.x))),y=Math.max(0,Math.min(h-1,Math.round(p.y))),i=y*w+x;if(j)length+=Math.hypot(p.x-pts[j-1].x,p.y-pts[j-1].y);if(reserves?.[i])protectedCount++;for(const q of neighbors(i,w,w*h))contrast+=Math.abs(density[i]-density[q]);count+=neighbors(i,w,w*h).length;}return !protectedCount&&(first?(g.outline||g.tier==='outline'||length/w>=.035):contrast/Math.max(1,count)>=.06);});
+  return paths.filter(g=>valueInkVerdict(g,{first,w,h,density,reserves})==='kept');
 }
 
 // Connected soft edge chains only; hard boundaries remain dry placement.

@@ -18,7 +18,7 @@ export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,p
  const K=pigments.length,n=w*h,paths=[],panels=[];
  const marks=createMarkPreview(w,h,pigments,paperRGB,plan.protectedCells);
  const targetHash=(await import('node:crypto')).createHash('sha256').update(fs.readFileSync(target)).digest('hex');
- const drawing=(file,first)=>file&&hasLines(file)?selectValueInk(loadLines(file,w,h,{keepOrder:true}),{first,w,h,sourceInk:plan.style?.structure==='ink',density:plan.value.values,reserves:plan.protectedCells,subject,styleSelection:plan.style?{style:plan.style.name,reason:plan.style.reason}:null,shaped:plan.instructions[0]?.shaped}):[];
+ const drawing=(file,first)=>file&&hasLines(file)?selectValueInk(loadLines(file,w,h,{keepOrder:true}),{first,w,h,sourceInk:plan.style?.structure==='ink'||!first,density:plan.value.values,reserves:plan.protectedCells,subject,styleSelection:plan.style?{style:plan.style.name,reason:plan.style.reason}:null,shaped:plan.instructions[0]?.shaped}):[];
  const open=drawing(opening,true),close=drawing(closing,false);
  let drawings=[];
  const panel=async(stage)=>{

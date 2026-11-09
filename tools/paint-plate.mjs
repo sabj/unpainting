@@ -26,7 +26,7 @@ import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
 import {GROUND} from '../src/paint/tuned/trumbull.mjs';
 import {setTextureVariety,setTextureFlow,flowField} from '../src/paint/techniques/shaped-marks.mjs';
-import {planLightToDark,valueTechnique,selectValueInk,softBoundaryPaths} from '../src/paint/methods/light-to-dark.mjs';
+import {planLightToDark,valueTechnique,selectValueInk,drawsWholeFile,valueInkVerdict,softBoundaryPaths} from '../src/paint/methods/light-to-dark.mjs';
 import {softRing} from '../src/paint/methods/soft-edges.mjs';
 import {leaveTouchUp} from '../src/paint/methods/touch-cover.mjs';
 import {unsupportedAxisEdges} from '../src/paint/methods/target-regions.mjs';
@@ -74,6 +74,7 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { prepareOutputDirectory } from '../src/paint/output-directory.mjs';
+import { ignoredSettings, badNumbers, isSwitchWord } from '../src/paint/option-check.mjs';
 import { checkCodeState } from '../src/paint/code-state.mjs';
 import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -229,7 +230,12 @@ const optIdx = n => {
   }
   return optIndex.get(n) ?? -1;
 };
-const opt = (n, d) => { OPTS_READ.add(n); const i = optIdx(n); if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; }, num = (n, d) => Number(opt(n, d));
+// NAN_GIVEN: number options typed with a non-number; TEXT_READ: options also read as text; WORD_GIVEN: 0/1 switches typed
+// with a word, unless another read of the option takes words (WORD_OK). See src/paint/option-check.mjs.
+const NAN_GIVEN = new Map(), TEXT_READ = new Set(), WORD_GIVEN = new Map(), WORD_OK = new Set();
+const read = (n, d) => { OPTS_READ.add(n); const i = optIdx(n); if (i >= 0) { if (isSwitchWord(d, argv[i + 1])) WORD_GIVEN.set(n, argv[i + 1]); else if (d !== '0' && d !== '1') WORD_OK.add(n); } if (OPT_TRACK) OPT_TRACK.push([n, i >= 0 ? argv[i + 1] ?? null : null]); return i >= 0 ? argv[i + 1] : d; };
+const opt = (n, d) => { TEXT_READ.add(n); return read(n, d); };
+const num = (n, d) => { const v = read(n, d), x = Number(v); if (Number.isNaN(x) && optIdx(n) >= 0) NAN_GIVEN.set(n, v); return x; };
 // Caller-owned drawing inputs and stage intent, separated from recipe/plan and generated arguments.
 const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv, pipeline: PIPELINE });
 // An explicit budget changes planning only; absent/zero preserves every default.
@@ -762,8 +768,9 @@ const WHITE_HOLD = (() => {
   console.log(`whites: ${c} cells (${(100 * c / n).toFixed(1)}% of the sheet) under ${floor.toFixed(3)} held out of every pass`);
   return c ? held : null;
 })();
+// Plan reserves (VALUE_CONFIG.reserves) are not boxes on the hold: the value planner reserves the target's own light
+// inside each box (src/paint/methods/light-reserves.mjs) and HOLD takes its protectedCells after the plan.
 let HOLD = WHITE_HOLD;
-if(VALUE_ENABLED&&VALUE_CONFIG?.reserves?.length){HOLD??=new Uint8Array(n);for(const r of VALUE_CONFIG.reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h)HOLD[y*w+x]=1;}}
 // --mixes K: mix K plate puddles before loading the brush (src/crop/mixes.mjs); each pass is one puddle at one strength. Default 0.
 const NMIX = Math.max(0, Math.round(num('mixes', 0)));
 const MIXES = NMIX > 1 && PIGS.length > 1 ? choosePlateMixes(A, n, PIGS.length, NMIX, { floor: num('mixfloor', 0.1) }) : null;
@@ -1617,7 +1624,7 @@ const DRAW_MATERIAL_STATE={opening:{used:0},closing:{used:0}};
 const sourceInkDrawing = () => OUTLINE.medium === 'ink' && (opt('sourceink', '') !== '' ? num('sourceink', 0) > 0
   : VALUE_PLAN?.style?.name === 'ink-and-wash' || VALUE_CONFIG?.drawing?.medium === 'ink' || !!opt('drawingfile', ''));
 const drawingCapsFor = (stage, graphite = false) => {
- const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt('drawingfile','')});
+ const defaults = sourceDrawingCaps({medium:graphite?'graphite-HB':opt('inkprofile',STYLE_INK_DEFAULT),stage,sourceInk:sourceInkDrawing()&&(stage==='opening'||!!opt('drawinglast','')),plannedDrawing:!!opt(stage==='closing'?'drawinglast':'drawingfile','')});
  return {lines:num(stage+'lines',defaults.lines),pressure:graphite&&stage==='opening'&&STAGE_PLAN?.files.prep?num('preppressure',1):num(stage+'pressure',defaults.pressure),
   ...(stage==='opening'?{minLengthMm:num('openingminmm',defaults.minLengthMm)}:{edgeMin:num('closingedgemin',defaults.edgeMin)})};
 };
@@ -2555,7 +2562,10 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // goes under the washes as a painter's does. src/paint/methods/ink-dark-skip.mjs
   if (VALUE_PLAN && !first && num('inkdarkskip', 0) > 0) { const before = kept.length; kept = cutInDarkWash(kept, VALUE_PLAN.value.values, w, h, num('inkdarkskip', 0)); console.log(`ink dark skip: ${before} ${first ? 'opening' : 'closing'} gestures cut to ${kept.length} runs outside planned value ${num('inkdarkskip', 0)}`); }
   // A prepared pencil drawing describes the same contours as pen, including paper-light borders.
-  if(VALUE_PLAN)kept=selectValueInk(kept,{first,w,h,sourceInk:sourceInkDrawing()||(first&&graphiteFirst&&!!opt('drawingfile','')) ,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection});
+  if(VALUE_PLAN){const before=kept,sourceInk=drawsWholeFile({first,fine,graphiteFirst,drawingFile:opt('drawingfile',''),closingFile:opt('drawinglast',''),sourceInk:sourceInkDrawing()});
+    kept=selectValueInk(before,{first,w,h,sourceInk,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection});
+    const tally={};for(const g of before){const r=valueInkVerdict(g,{first,w,h,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells});if(r!=='kept')tally[r]=(tally[r]??0)+1;}
+    console.log(`value ink, ${first?'opening':fine?'fine':'closing'}: ${kept.length} of ${before.length} lines kept${sourceInk?' (drawn whole)':''}; the line filter marks ${Object.entries(tally).map(([k,v])=>`${v} ${k}`).join(', ')||'none'}`);}
   const passName = first ? 'first' : fine ? 'fine' : 'last';
   const inkVerdict = INKFILTER && !SELECTED ? classifyInkPaths(kept, DRAW_SOURCE, w, h, { scale: num('inkfilterscale', K), accent: num('inkfilteraccent', 10) * K }) : null;
   if (inkVerdict) {
@@ -2762,7 +2772,9 @@ if(VALUE_PLAN){
  // --locallights cells join it: they were laid in RESIST_BASE above and would otherwise be dropped here.
  RESIST=Uint8Array.from(VALUE_PLAN.protectedCells,(v,i)=>v||LOCAL_LIGHTS?.[i]?1:0);RESIST_SOFT=Float32Array.from(RESIST);
 }
-if(VALUE_PLAN&&VALUE_CONFIG?.reserves?.length){RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(const r of VALUE_CONFIG.reserves){const b=r.bounds;for(let y=Math.floor(b[1]*h);y<Math.ceil(b[3]*h);y++)for(let x=Math.floor(b[0]*w);x<Math.ceil(b[2]*w);x++)if(x<w&&y<h){RESIST[y*w+x]=1;RESIST_SOFT[y*w+x]=1;}}const paper=measurePaperDry(sheet);check('essential light film requires dry paper',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'essential-light-film-plan',paper,operation:'real applyResist through existing union lifecycle; full strength; remove after last dry shadow',reserves:VALUE_CONFIG.reserves})+'\n');}
+// Plan reserves are already in RESIST through the value plan's protectedCells: the target's own light inside each
+// box (src/paint/methods/light-reserves.mjs), not the box. Only the film record and its dry-paper check remain here.
+if(VALUE_PLAN&&VALUE_CONFIG?.reserves?.length){const paper=measurePaperDry(sheet);check('essential light film requires dry paper',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'essential-light-film-plan',paper,operation:'real applyResist through existing union lifecycle; full strength; remove after last dry shadow',cells:'the value plan protectedCells: the target light inside each reserve box',reserves:VALUE_CONFIG.reserves})+'\n');}
 const upF = f => { if (SC === 1) return f; const m = new Float32Array(N2); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) m[y * W2 + x] = f[((y / SC) | 0) * w + ((x / SC) | 0)]; return m; };
 // --practice: the practice plan: value passes over all colours in place of the ladder
 // (src/paint/methods/practice-plan.mjs); it lays its own frisket and lifts it once the first pass is done
@@ -3501,9 +3513,11 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // --detailfrom t: passes later than t of the ladder are laid as detail marks, not glazes. Default 2, never.
   const authoredPaths=sh._semantic?lowerAuthoredGestures(sh._semantic,{target:AREA_PLAN.doc.target,crop:AREA_PLAN.crop,width:W2,height:H2,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*AREA_PLAN.doc.target.width/AREA_PLAN.crop[2]}):null;
   const skyLaneRadius = sh2 => {
-    if (!(num('skylanes', 0) > 0) || !sh2._valuePlan || sh2._valuePlan.texture) return 0;
+    if (!(num('skylanes', 0) > 0)) return 0;
+    const laneMm = num('skylanemm', 3); // read on every sheet, so a typed value is not reported unused when the picture has no cool sky
+    if (!sh2._valuePlan || sh2._valuePlan.texture) return 0;
     const cool = sh2._valuePlan?.cool ?? 0;
-    return cool ? num('skylanemm', 3) / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
+    return cool ? laneMm / (num('sheetmm', DEFAULT_SHEET_MM) / w) : 0;
   };
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
@@ -4387,6 +4401,11 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
 {
   const given = [...new Set(argv0.filter(a => a.startsWith('--')).map(a => a.slice(2)))];
   const unused = given.filter(k => !OPTS_READ.has(k) && k !== 'allowunused');
+  // typed settings that were read but could not act: a switch they need is off, nothing can make them act, or a number option was given a word
+  const value = n => { const i = optIdx(n); return i >= 0 ? argv[i + 1] : undefined; };
+  const ignored = [...ignoredSettings({ given, value }), ...badNumbers(NAN_GIVEN, TEXT_READ).map(b => ({ flag: b.flag, reason: `--${b.flag} takes a number, got "${b.value}"` }))];
+  for (const [flag, word] of WORD_GIVEN) if (!WORD_OK.has(flag)) ignored.push({ flag, reason: `--${flag} takes 0 or 1, got "${word}"` });
+  for (const r of ignored) { console.log(`IGNORED OPTION: ${r.reason}`); if (!unused.includes(r.flag)) unused.push(r.flag); }
   if (unused.length) {
     fs.writeFileSync(path.join(out, 'unused-options.txt'), unused.map(k => `--${k}`).join('\n') + '\n');
     console.log(`UNUSED OPTIONS (read by nothing in this run): ${unused.map(k => `--${k}`).join(' ')}`);
