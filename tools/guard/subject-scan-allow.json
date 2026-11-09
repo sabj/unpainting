@@ -54,18 +54,6 @@
       "rule": "name",
       "count": 1,
       "reason": "Token help text telling a model that palette tokens act only on Trumbull."
-    },
-    {
-      "file": "bench/scripts/compare-release-collect.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Maps report aliases to existing benchmark records. Reporting only; it does not select painter behavior."
-    },
-    {
-      "file": "bench/scripts/compare-release-improved.mjs",
-      "rule": "name",
-      "count": 5,
-      "reason": "Lists existing plates as examples in the comparison report. Reporting only; no painter or judge settings depend on these names."
     }
   ]
 }

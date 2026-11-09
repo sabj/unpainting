@@ -44,3 +44,8 @@ export function softWashBoundary(i,out,{values,w,h,cellMm,phase}) {
     return Math.abs(at(x+dx*r,y+dy*r)-at(x-dx*r,y-dy*r))<.14;
   });
 }
+
+export function shapeMix(shape) {
+  const total=shape.mix.reduce((s,v)=>s+v,0);
+  return shape.mix.map(v=>total>0?v/total:0);
+}

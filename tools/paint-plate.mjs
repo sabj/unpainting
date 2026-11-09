@@ -23,6 +23,7 @@ import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
 import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../src/paint/methods/passage-brush.mjs';
 import {sheetColour} from '../src/paint/methods/paper-colour.mjs';
+import {shapeMix} from '../src/paint/methods/wash-system.mjs';
 import {planeAtCell, gradeLoadPressure, softClipMask} from '../src/paint/methods/graded-demand.mjs';
 import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
@@ -3368,6 +3369,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // Each passage in the pass is charged for itself: one colour, loaded stronger or weaker as the passage asks.
   let shIdx = 0; const shQuarter = Math.max(1, Math.ceil(layer.shapes.length / 4));
   for (const sh of layer.shapes) {
+  if(sh._valuePlan?.washSystem)sh._paintExecuted=false;
   if(BUDGET && !BUDGET.target(sh)) continue;
   AREA_NUMERIC_SEQUENCE=AREA_PLAN&&validateProductionDetails(AREA_PLAN.doc)?.numericWashSequence&&sh._semantic?{key:sh._semantic.key,shapeKey:sh._semantic.key+'/layer-'+L+'/shape-'+layer.shapes.indexOf(sh),history:[]}:null;
   if (PROBE) {
@@ -3404,7 +3406,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   // --trace: every pigment's mass on the sheet before the passage, so a mixed passage is counted whole
   const TRACE_MASS = opt('trace', '0') !== '0' ? thicknessTotals(sheet) : null;
   // what this passage asks for, read off the source inside it (techniqueOf, above)
-  let T = NATIVE_PAINT_MODE.mode==='fast'&&sh._valuePlan&&!WETPOL&&!MAJOR_INTENT&&!sh._semantic ? valueTechnique(sh._valuePlan) : techniqueOf(sh);
+  let T = NATIVE_PAINT_MODE.mode==='fast'&&sh._valuePlan&&!WETPOL&&!MAJOR_INTENT&&!sh._semantic ? valueTechnique(sh._valuePlan,num('glazepasses',2)) : techniqueOf(sh);
   if (num('masswet',0)>0 && MASS_BUDGET?.owns(MASK, MB)) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
   // --gradedwet (default on under --gradedwash): a graded wash goes in wet on wet unless its passage was dragged.
   if (sh.graded && !sh._follow && opt('gradedwet', '1') !== '0' && T.name !== 'wet on wet' && T.name !== 'dry brush') T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
@@ -3441,7 +3443,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation')clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));}
   T=chooseMajorBaseWash(MAJOR_INTENT,T,{value:layer.value,area:sh.area??0,cells:n,semantic:Boolean(sh._semantic)});
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
-  if(sh._valuePlan){T=valueTechnique(sh._valuePlan);VALUE_ACTIVE=sh._valuePlan;const inSession=(WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer));WASH_LAST={L,layer};if(!inSession)VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  if(sh._valuePlan){T=valueTechnique(sh._valuePlan,num('glazepasses',2));VALUE_ACTIVE=sh._valuePlan;const inSession=!sh._valuePlan.washSystem&&((WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer)));WASH_LAST={L,layer};if(!inSession)VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
   sh.dryAfter = T.dryAfter;
   MAJOR_TECHNIQUE=MAJOR_INTENT?{...T,shapeId:'numeric-L'+L+'-S'+layer.shapes.indexOf(sh),numericalValue:layer.value,shapeArea:sh.area,firstWash:Boolean(sh.firstWash),materialStatus:'existing production technique/profile consumed; actual contact/state recorded before each stroke'}:null;
@@ -3452,7 +3454,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     clock('dry', () => dry(sheet, 20000, O, { levelMax: num('dryeachlevel', 200) }));
   // One shape-level look per passage (TARGET_GUARD.look) gives plan and sheet means; the charge comes from their difference.
   // SHAPE_LOAD spreads that one number over the shape for path planners that take a field; it steers nothing.
-  const colourMix = COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
+  const colourMix = sh._valuePlan?.washSystem ? shapeMix(sh) : COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
   const LEDGER = ONSHEET ?? expected;
   const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
   const LOOK = paintingLook('passage', `L${L + 1}/s${shIdx}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
@@ -3815,6 +3817,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       BODY_CADENCE_RECORD.numericalCallsAttempted++;
       if(cadence.approximated)BODY_CADENCE_RECORD.approximatedCallsAttempted++;
       const result=stroke(b,target,points,{...options,spacing:cadence.spacing});
+      if(sh._valuePlan?.washSystem&&target===sheet&&points.length)sh._paintExecuted=true;
       if(cadence.approximated)BODY_CADENCE_RECORD.approximatedCallsReturned++;
       return result;
     };
@@ -4017,7 +4020,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   for (const sh of layer.shapes) {
     if (process.env.CHECKBOX && sh.mask && sh._mbox) { let out = 0; const b = sh._mbox; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (sh.mask[y * w + x] && (y < b.y0 || y > b.y1 || x < b.x0 || x > b.x1)) out++; if (out) console.log(`BOXCHECK ${out} mask cells outside the box (booked ${!!sh._booked})`); }
     if(sh._authoredDose){JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:'semantic-authored-demand',areaId:sh._semantic.area.id,passId:sh._semantic.key,expectedLedgerCredit:0,reason:'explicit dose is not full ownership-mask delivery'})+'\n');continue;}
-    if (sh._booked) continue; const m = sh.mask, sk = sh._skip, mb = sh._mbox ?? FULLBOX, P = PIGS.length, share = sh.laidShare ?? 1, amt = Math.max(1e-6, sh.amount), gr = sh.graded, mix = sh.mix;
+    if (sh._booked||(sh._valuePlan?.washSystem&&!sh._paintExecuted)) continue; const m = sh.mask, sk = sh._skip, mb = sh._mbox ?? FULLBOX, P = PIGS.length, share = sh.laidShare ?? 1, amt = Math.max(1e-6, sh.amount), gr = sh.graded, mix = sh.mix;
     for (let y = mb.y0; y <= mb.y1; y++) for (let i = y * w + mb.x0, e = y * w + mb.x1; i <= e; i++) if (m[i] && !(sk && sk[i])) {
       // one amount per shape: the ledger books what the brush was charged, the passage's amount in every cell
       void gr; void amt;
