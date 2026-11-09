@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { codeState } from '../../src/paint/code-state.mjs';
 
@@ -20,8 +21,9 @@ export function preflight({ root, python, env = process.env, run = spawnSync, ex
 }
 
 // Authoritative post-render / comparison guardrail: prevents comparing CPU fallback runs against GPU runs,
-// prevents passing 300px crop thumbnails as full-resolution plates, and enforces SAM segmentation on non-planless runs.
-export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments = false, minWidth = 540, minSourceWidth = 0, readFile = p => fs.readFileSync(p, 'utf8'), exists = fs.existsSync } = {}) {
+// prevents passing 300px crop thumbnails as full-resolution plates, enforces SAM segmentation on non-planless runs,
+// and verifies progressive playback stage distinctness.
+export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments = false, requireStages = false, requireDistinctStages = true, minWidth = 540, minSourceWidth = 0, readFile = p => fs.readFileSync(p, 'utf8'), readBytes = p => fs.readFileSync(p), exists = fs.existsSync } = {}) {
   const cardPath = path.join(runDir, 'run-card.json');
   const speedPath = path.join(runDir, 'paint-speed-summary.json');
   const card = exists(cardPath) ? JSON.parse(readFile(cardPath)) : null;
@@ -45,11 +47,28 @@ export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments
     const segPath = path.join(runDir, 'segments.json');
     if (exists(segPath)) {
       const seg = JSON.parse(readFile(segPath));
-      if (seg?.mode === 'off' || seg?.status === 'off' || seg?.backend === 'off') throw new Error(`comparison run ${runDir} ran with --segments off; full SAM segmentation is required`);
+      const segBackend = seg?.backend ?? seg?.mode ?? seg?.status;
+      if (segBackend !== 'sam') throw new Error(`comparison run ${runDir} ran with --segments ${segBackend ?? 'unknown'}; full SAM segmentation is required`);
     } else if (card?.segments) {
-      if (card.segments.backend === 'off' || card.segments.mode === 'off') throw new Error(`comparison run ${runDir} ran with --segments off; full SAM segmentation is required`);
+      const segBackend = card.segments.backend ?? card.segments.mode;
+      if (segBackend !== 'sam') throw new Error(`comparison run ${runDir} ran with --segments ${segBackend ?? 'unknown'}; full SAM segmentation is required`);
     } else {
       throw new Error(`comparison run ${runDir} is missing segmentation evidence (segments.json / run-card.segments); full SAM segmentation is required`);
+    }
+  }
+  const stagePcts = [10, 25, 50, 75, 100];
+  const stageFiles = stagePcts.map(p => ({ pct: p, file: path.join(runDir, 'stages', `stage-${String(p).padStart(3, '0')}.jpg`) }));
+  const presentStages = stageFiles.filter(s => exists(s.file));
+  if (requireStages && presentStages.length < stagePcts.length) {
+    const missing = stageFiles.filter(s => !exists(s.file)).map(s => `${s.pct}%`);
+    throw new Error(`comparison run ${runDir} is missing progressive stage images: ${missing.join(', ')}`);
+  }
+  if (requireDistinctStages && presentStages.length === stagePcts.length) {
+    const hashes = presentStages.map(s => ({ pct: s.pct, sha256: crypto.createHash('sha256').update(readBytes(s.file)).digest('hex') }));
+    for (let i = 1; i < hashes.length; i++) {
+      if (hashes[i].sha256 === hashes[i - 1].sha256) {
+        throw new Error(`comparison run ${runDir} has duplicate consecutive playback stages (${hashes[i - 1].pct}% and ${hashes[i].pct}% are byte-identical); progressive playback requires distinct stages`);
+      }
     }
   }
   return { ok: true, backend, width, sourceWidth, enlargement };

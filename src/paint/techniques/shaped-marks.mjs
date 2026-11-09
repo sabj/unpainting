@@ -26,13 +26,22 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  const maxRadius=Math.max(...points.map(p=>p.r/scale));
  if(!texture&&mmPerCell>0&&maxBrushMm>0){
   const lanes=Math.ceil(2*maxRadius*mmPerCell/maxBrushMm);
-  if(lanes>1)return Array.from({length:lanes},(_,k)=>{
-   const pts=k%2===1?points.slice().reverse():points;
-   return pts.map(p=>{
-    const offset=(k-(lanes-1)/2)*2*p.r/lanes;
-    return {...p,x:p.x-dy*offset,y:p.y+dx*offset,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.18)};
+  if(lanes>1){
+   let uMin=Infinity,uMax=-Infinity;
+   for(const b of bins.values()){if(b[0]<uMin)uMin=b[0];if(b[1]>uMax)uMax=b[1];}
+   const uMid=(uMin+uMax)/2,spanR=Math.max(maxRadius,(uMax-uMin)/2);
+   const laneRCell=Math.min(maxBrushMm/(2*mmPerCell),spanR/lanes*1.18),laneR=laneRCell*scale;
+   const keys=[...bins.keys()].sort((p,q)=>p-q);
+   return Array.from({length:lanes},(_,k)=>{
+    const uk=uMid+(k-(lanes-1)/2)*2*spanR/lanes;
+    let j0=lo,j1=hi;
+    const hit=keys.filter(j=>{const b=bins.get(j);return b&&b[1]>=uk-laneRCell&&b[0]<=uk+laneRCell;});
+    if(hit.length>=2){j0=hit[0];j1=hit[hit.length-1];}
+    const lanePts=[];
+    for(let j=j0;j<=j1;j++)if(bins.has(j))lanePts.push({x:(cx+dx*j-dy*uk)*scale,y:(cy+dy*j+dx*uk)*scale,r:laneR,p:.9});
+    return k%2===1?lanePts.reverse():lanePts;
    });
-  });
+  }
  }
  return [points];
 }
