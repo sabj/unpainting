@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {framePolicy} from './frame-policy.mjs';
+import {framePolicy, fastPaintFrame} from './frame-policy.mjs';
 
 test('checkpoints keep first wash and five completed boundaries plus gallery stages', () => {
   const policy = framePolicy(), kept = [];
@@ -25,4 +25,21 @@ test('short paintings, video, dynamic pass expansion and explicit all-frame outp
     assert(all.all);
     assert(all.keep({stage: 'paint', pass: 2, of: 100, laying: true}));
   }
+});
+test('a forced value-band boundary is kept at any progress and uses no checkpoint', () => {
+  const policy = framePolicy(), kept = [];
+  for (let pass = 1; pass <= 40; pass++) {
+    const boundary = pass === 3 || pass === 12 ? {force: true, boundary: 'value'} : {};
+    if (policy.keep({stage: 'paint', pass, of: 40, ...boundary})) kept.push(pass);
+  }
+  assert.deepEqual(kept, [1, 3, 4, 10, 12, 20, 30, 40]);
+});
+test('fast all-frame films keep every fourth completed pass, every forced boundary and every other stage', () => {
+  assert.equal(fastPaintFrame({stage: 'paint', pass: 1, of: 40}), true);
+  assert.equal(fastPaintFrame({stage: 'paint', pass: 5, of: 40}), false);
+  assert.equal(fastPaintFrame({stage: 'paint', pass: 8, of: 40}), true);
+  assert.equal(fastPaintFrame({stage: 'paint', pass: 8, of: 40, laying: true}), false);
+  assert.equal(fastPaintFrame({stage: 'paint', pass: 5, of: 40, force: true, boundary: 'value'}), true);
+  assert.equal(fastPaintFrame({stage: 'paint', pass: 5, of: 40, force: true, laying: true}), false);
+  for (const stage of ['paper', 'frisket', 'prep', 'finished']) assert.equal(fastPaintFrame({stage}), true);
 });

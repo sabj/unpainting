@@ -11,7 +11,7 @@ import { layIntoWetBed } from './painter/wet-bed-wait.mjs';
 import { scaleBrushForDensity } from '../src/media/brush-density.mjs';
 import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
 import { drawFineMaterial, drawOnFineSheet, fineGestures } from '../src/paint/methods/fine-material.mjs';
-import {framePolicy} from './speed/frame-policy.mjs';
+import {framePolicy, fastPaintFrame} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
 import {runSpeedSequence} from './speed/sequence.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
@@ -389,7 +389,7 @@ const FAST_PAPER_OBSERVE=num('fastpaperobserve',NATIVE_PAINT_MODE.mode==='fast'?
 if(![0,1].includes(FAST_PAPER_OBSERVE))throw Error('--fastpaperobserve takes 0 or 1');
 const PAPER_OBSERVE_POLICY={requested:FAST_PAPER_OBSERVE,enabled:NATIVE_PAINT_MODE.mode==='fast'&&FAST_PAPER_OBSERVE===1&&process.env.GPU_PAPER_OBSERVE!=='0',scope:'fresh regional W/s plus wet-recipient M observation only; pigment/layer freshness independent; CPU stroke/demand windows use original full observation'};
 process.env.GPU_PAPER_OBSERVE=PAPER_OBSERVE_POLICY.enabled?'1':'0';NATIVE_PAINT_MODE.paperObservation=PAPER_OBSERVE_POLICY;
-NATIVE_PAINT_MODE.syncPolicy={demand:process.env.GPU_DEMAND_READBACK,paperObservation:PAPER_OBSERVE_POLICY.enabled,frames:!FRAME_POLICY.all?'completed passage checkpoints at 10/25/50/75/100 percent; first wash and other stages retained':NATIVE_PAINT_MODE.mode==='fast'?'completed paint boundary every fourth pass; other stages retained; no within-stroke snapshots':'full existing cadence',optical:NATIVE_PAINT_MODE.mode==='fast'||SPEED_GPU_OPTICS?'GPU optical RGB for frame and density feedback':'CPU composite',mask:NATIVE_PAINT_MODE.mode==='fast'?'demand CPU uploads conservatively retain all pigment lanes and signed zero':'original'};
+NATIVE_PAINT_MODE.syncPolicy={demand:process.env.GPU_DEMAND_READBACK,paperObservation:PAPER_OBSERVE_POLICY.enabled,frames:!FRAME_POLICY.all?'completed passage checkpoints at 10/25/50/75/100 percent and every completed value band; first wash and other stages retained':NATIVE_PAINT_MODE.mode==='fast'?'completed paint boundary every fourth pass and every completed value band; other stages retained; no within-stroke snapshots':'full existing cadence',optical:NATIVE_PAINT_MODE.mode==='fast'||SPEED_GPU_OPTICS?'GPU optical RGB for frame and density feedback':'CPU composite',mask:NATIVE_PAINT_MODE.mode==='fast'?'demand CPU uploads conservatively retain all pigment lanes and signed zero':'original'};
 fs.writeFileSync(path.join(out,'native-paper-observation.json'),JSON.stringify(PAPER_OBSERVE_POLICY,null,2));
 fs.writeFileSync(path.join(out,'native-mode.json'),JSON.stringify(NATIVE_PAINT_MODE,null,2));
 const FAST_BODY_ENABLED=num('fastbodycadence',NATIVE_PAINT_MODE.mode==='fast'?1:0);
@@ -2090,8 +2090,8 @@ let LAST_FRAME_STAGE=null;
 const shoot = async () => {
   if (RESUMING) return; // a fresh process taking over a saved painting: its frames are already on disk
   if (!FRAME_POLICY.keep(STAGE)) return;
-  // Fast films only completed paint boundaries, every fourth pass; all other stages survive.
-  if(FRAME_POLICY.all && NATIVE_PAINT_MODE.mode==='fast' && STAGE.stage==='paint' && (STAGE.laying || ((STAGE.pass??0)>1 && STAGE.pass%4!==0)))return;
+  // Fast films only completed paint boundaries: every fourth pass and every dried value band; all other stages survive.
+  if(FRAME_POLICY.all && NATIVE_PAINT_MODE.mode==='fast' && !fastPaintFrame(STAGE))return;
   const stageKey=JSON.stringify(STAGE);
   if(NATIVE_PAINT_MODE.mode==='fast' && LAST_FRAME_STAGE===stageKey)return;
   LAST_FRAME_STAGE=stageKey;
@@ -3999,16 +3999,19 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh.ids = null; }
   layer.mask = null; layer.ids = null;
   const endOfTouch = Boolean(layer._touched && layers[L + 1]?._touched !== layer._touched);
-  const forceStageFrame = (endOfValue && L >= Math.floor(layers.length / 2)) || endOfTouch;
-  STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, ...(forceStageFrame && !AWARE_DIR && !RESUME_DIR ? { force: true } : {}), ...(layer._order ? { order: layer._order.phase } : {}), techniques: Object.fromEntries(Object.entries(used).filter(([k]) => ['wet on dry', 'wet on wet', 'glazed', 'dry brush', 'detail marks', 'small brush'].includes(k))) };
-  if (!FRAME_POLICY.all) await shoot();
+  // Playback gets a frame at every value-band boundary (the band complete and dried) and at the end of each touch-up
+  // round, whatever the frame policy, so lights before darks can be seen band by band.
+  const forceStageFrame = (endOfValue || endOfTouch) && !AWARE_DIR && !RESUME_DIR;
+  STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, ...(forceStageFrame ? { force: true, boundary: endOfValue ? 'value' : 'touch' } : {}), ...(layer._order ? { order: layer._order.phase } : {}), techniques: Object.fromEntries(Object.entries(used).filter(([k]) => ['wet on dry', 'wet on wet', 'glazed', 'dry brush', 'detail marks', 'small brush'].includes(k))) };
+  const boundaryShot = !FRAME_POLICY.all || forceStageFrame;
+  if (boundaryShot) await shoot();
   if (CANARY_STOP === L + 1) await stopAtCanary({ out, pass: L + 1, passes: layers.length, value: layer.value, brushMarks: laid, backend: GPU_INFO,
     writeImage: f => sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(f), close: async () => { await drainFrames(); FRAMER?.close(); sheet._gpu?.close(); } });
   if (FILM_BY_PAINT) {
     // the pass's whole booking, whether or not every passage found a path, so the shares stay on the plan's mass
     filmPass += layer.shapes.reduce((a, sh) => a + (FILM_MASS.get(sh) ?? 0), 0); filmLaid = filmPass;
     const filmTotal=AUTHORED_INPUT?AREA_COMPILED.diagnostics.authoredPaintGestures:plannedMass;
-    if (filmTotal>0&&filmLaid >= filmTotal * filmNext / FILM_FRAMES - 1e-9) { while (filmNext<=FILM_FRAMES&&filmLaid >= filmTotal * filmNext / FILM_FRAMES - 1e-9) filmNext++; await shoot(); }
+    if (filmTotal>0&&filmLaid >= filmTotal * filmNext / FILM_FRAMES - 1e-9) { while (filmNext<=FILM_FRAMES&&filmLaid >= filmTotal * filmNext / FILM_FRAMES - 1e-9) filmNext++; if (!boundaryShot) await shoot(); }
   }
   if(MAJOR_INTENT&&(L===0||L===Math.floor(layers.length/2))){const stage=L===0?'firstwash':'shadow';await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-'+stage+'.png'));if(opt('majorstop','')===stage){await drainFrames();if(FRAMER)FRAMER.close();sheet._gpu?.close();console.log('major checkpoint '+stage+'; not art acceptance');process.exit(0);}}
   if(MAJOR_INTENT&&opt('majorstop','')==='pass:'+(L+1)){RECEIVER_OBSERVER?.assertComplete();await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-pass-'+(L+1)+'-ordinary-dried.png'));fs.writeFileSync(path.join(out,'major-pass-checkpoint.json'),JSON.stringify({pass:L+1,value:layer.value,paper:measurePaperDry(sheet),backend:GPU_INFO,connectedSky:MAJOR_INTENT.connectedSky,kind:'same original full field through selected pass; no full painting acceptance'},null,2));await drainFrames();if(FRAMER)FRAMER.close();sheet._gpu?.close();process.exit(0);}
