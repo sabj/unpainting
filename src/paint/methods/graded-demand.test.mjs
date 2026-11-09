@@ -115,3 +115,10 @@ test('softClipMask opens the clip past soft boundary cells only, never past hard
   const none = softClipMask(mask, { softCells: [], hardCells: hard }, W, H, 3, protect);
   assert.equal(none.ring, 0); assert.equal(none.clip, mask, 'no soft cells: the mask itself is the clip');
 });
+test('a clipped grade conserves its mean on an asymmetric support with a long dark tail',()=>{
+ const w=100,list=[],G=new Float32Array(w*w);
+ for(let y=0;y<w;y++)for(let x=0;x<w;x++)if(x<10||y<10){const i=y*w+x;list.push(i);G[i]=.001+(x/99)**16;}
+ const plane=fitGradedPlane(list,G,w);
+ const mean=list.reduce((s,i)=>s+planeAtCell(plane,i,w),0)/list.length;
+ assert.ok(Math.abs(mean-1)<1e-6,String(mean));
+});

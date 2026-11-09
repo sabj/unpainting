@@ -10,7 +10,7 @@ import { softRing } from './soft-edges.mjs';
 export const GRADED_RANGE = Object.freeze({ lo: 0.5, hi: 1.5 });
 // The sweep's own pressure bounds (paint-plate's land/body/lift profile keeps the same ones).
 const PRESSURE = Object.freeze({ min: 0.18, max: 1.2 });
-const MEAN_ROUNDS = 8, MEAN_TOL = 1e-4;
+const MEAN_ROUNDS = 48, MEAN_TOL = 1e-7;
 
 /** The factor at a continuous sheet point (cell centres sit at x + .5, y + .5). */
 export function planeAt(plane, x, y) {
@@ -42,12 +42,16 @@ export function fitGradedPlane(list, G, w, { lo = GRADED_RANGE.lo, hi = GRADED_R
   else if (syy > 1e-9) gy = syg / syy;
   const plane = { cx, cy, gx: gx / m, gy: gy / m, shift: 0, lo, hi, range: [1, 1] };
   if (gx === 0 && gy === 0) return plane;
-  for (let round = 0; round < MEAN_ROUNDS; round++) {
-    let s = 0;
-    for (const i of list) s += planeAtCell(plane, i, w);
-    const mean = s / c;
-    if (Math.abs(mean - 1) < MEAN_TOL) break;
-    plane.shift -= mean - 1;
+  let rawMin=Infinity,rawMax=-Infinity;
+  for(const i of list){const raw=1+plane.gx*(i%w+.5-cx)+plane.gy*(Math.floor(i/w)+.5-cy);rawMin=Math.min(rawMin,raw);rawMax=Math.max(rawMax,raw);}
+  // At the low bracket every cell is at lo; at the high bracket every cell is at hi.
+  // The clipped mean is monotone, so bisection also conserves mass on asymmetric supports.
+  let shiftLo=lo-rawMax,shiftHi=hi-rawMin;
+  for(let round=0;round<MEAN_ROUNDS;round++){
+    plane.shift=(shiftLo+shiftHi)/2;
+    let sum=0;for(const i of list)sum+=planeAtCell(plane,i,w);
+    const mean=sum/c;if(Math.abs(mean-1)<MEAN_TOL)break;
+    if(mean<1)shiftLo=plane.shift;else shiftHi=plane.shift;
   }
   let fmin = Infinity, fmax = -Infinity;
   for (const i of list) { const f = planeAtCell(plane, i, w); if (f < fmin) fmin = f; if (f > fmax) fmax = f; }

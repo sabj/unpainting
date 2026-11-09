@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {planLightToDark,valueTechnique} from './light-to-dark.mjs';
-import {normalizeWashWeights,softWashBoundary,lightReference,connectedLightTest} from './wash-system.mjs';
+import {normalizeWashWeights,softWashBoundary,lightReference,connectedLightTest,shapeMix} from './wash-system.mjs';
+import {shapeDeficit,shapeCharge} from './shape-deficit.mjs';
 
 test('merged middle washes conserve demand and remove excess accent allocation',()=>{
  const weights=[.1,.2,.2,.5,.5].map(v=>Float32Array.of(v));
@@ -30,6 +31,35 @@ test('a mixed dry-paper passage carries both pigments once and has no raw demand
 test('connected glaze execution uses the water and pass count of its calibration',()=>{
  const T=valueTechnique({phase:'shadow',move:'wet on dry',load:{water:.45},washSystem:true});
  assert.equal(T.water,.58);assert.equal(T.passes,2);assert.equal(T.intoWet,false);
+ assert.equal(valueTechnique({phase:'shadow',washSystem:true},3).passes,3);
+});
+
+test('subject ownership splits mixed support once, without duplicating the charge',()=>{
+ const w=60,h=40,n=w*h,half=Uint16Array.from({length:n},(_,i)=>i%w<w/2?1:2);
+ const subjects={subject:half,wash:half,washIds:[1,2],shadow:new Uint16Array(n).fill(1),shadowIds:[1],
+  lights:new Uint8Array(n),formMm:1,labels:half,summary:{groups:[]},
+  regions:['a','b'].map(id=>({id,referenceCue:'',baseMove:'wet on dry',descriptiveFamily:null}))};
+ const p=planLightToDark({w,h,k:2,demand:Float32Array.from({length:n*2},(_,i)=>i%2?.1:.2),
+  density:new Float32Array(n).fill(.3),rgb:new Uint8Array(n*3).fill(170),shaped:true,washSystem:true,
+  paperRGB:[252,251,248],minShapeCells:4,subjects});
+ const mass=p.layers.flatMap(l=>l.shapes).reduce((s,q)=>s+q.mix.reduce((a,b)=>a+b,0)*q.area,0);
+ assert.ok(Math.abs(mass-n*.3)<1e-3);
+});
+
+test('a mixture carried by the second pan survives single-pan share filtering',()=>{
+ const w=60,h=40,n=w*h;
+ const p=planLightToDark({w,h,k:2,demand:Float32Array.from({length:n*2},(_,i)=>i%2?.3:0),
+  density:new Float32Array(n).fill(.3),rgb:new Uint8Array(n*3).fill(170),shaped:true,washSystem:true,
+  paperRGB:[252,251,248],minShapeCells:4,pigShare:.1});
+ const mass=p.layers.flatMap(l=>l.shapes).reduce((s,q)=>s+q.mix[1]*q.area,0);
+ assert.ok(Math.abs(mass-n*.3)<1e-3);
+});
+
+test('feedback follows the passage mixture when the first pan is already complete',()=>{
+ const target=[.02,.5],held=[.02,.1],booked=[.01,.1],mix=shapeMix({mix:target});
+ const factor=shapeCharge(shapeDeficit(target,held,{mix}),shapeDeficit(target,booked,{mix}));
+ assert.ok(factor>.99&&factor<=1);
+ assert.equal(shapeCharge(shapeDeficit(target,held,{pigment:0}),shapeDeficit(target,booked,{pigment:0})),0);
 });
 
 test('a sharp enlarged edge and a shadow edge keep their clip',()=>{
