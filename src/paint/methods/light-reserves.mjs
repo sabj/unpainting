@@ -14,7 +14,7 @@ export function validateReserves(reserves) {
 }
 
 /** The box of a reserve in cells, clipped to the grid: {x0, y0, x1, y1} with x1 and y1 exclusive. */
-export function reserveBox(r, w, h) {
+function reserveBox(r, w, h) {
   const b = r.bounds;
   return { x0: Math.max(0, Math.floor(b[0] * w)), y0: Math.max(0, Math.floor(b[1] * h)), x1: Math.min(w, Math.ceil(b[2] * w)), y1: Math.min(h, Math.ceil(b[3] * h)) };
 }

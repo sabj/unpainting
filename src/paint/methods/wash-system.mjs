@@ -26,12 +26,6 @@ export function normalizeWashWeights(weights,{mergeMiddle=true}={}) {
   }
 }
 
-export function mixedCharge(list,demand,k,weight) {
-  const mix=new Array(k).fill(0);
-  for(const i of list) for(let j=0;j<k;j++) mix[j]+=demand[i*k+j]*weight[i]/list.length;
-  return mix;
-}
-
 // Compare across a millimetre, not an upsampled pixel. A sharp source edge can
 // look locally gradual after enlargement. Glazes and detail keep their dry cut.
 export function softWashBoundary(i,out,{values,w,h,cellMm,phase}) {

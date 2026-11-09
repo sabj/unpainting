@@ -38,7 +38,7 @@ export const labOfColour = rgb => labOf(rgb, 0, D65);
  * The largest connected region among the lightest cells: luminance at or above the 96th percentile less lightCut.
  * Returns {rgb (mean), cells, share, touchesBorder} or null when there is none.
  */
-export function lightestRegion(rgb, w, h, { lightCut = PAPER_RULE.lightCut } = {}) {
+function lightestRegion(rgb, w, h, { lightCut = PAPER_RULE.lightCut } = {}) {
   const n = w * h;
   if (!(n > 0) || !rgb || rgb.length < 3 * n) return null;
   const lum = Float32Array.from({ length: n }, (_, i) => 0.2126 * rgb[3 * i] + 0.7152 * rgb[3 * i + 1] + 0.0722 * rgb[3 * i + 2]);
@@ -57,7 +57,7 @@ export function lightestRegion(rgb, w, h, { lightCut = PAPER_RULE.lightCut } = {
 }
 
 /** Share of the border zone (outer borderMargin of each side) within borderTol of `colour`, per channel. */
-export function borderShare(rgb, w, h, colour, { borderMargin = PAPER_RULE.borderMargin, borderTol = PAPER_RULE.borderTol } = {}) {
+function borderShare(rgb, w, h, colour, { borderMargin = PAPER_RULE.borderMargin, borderTol = PAPER_RULE.borderTol } = {}) {
   const mx = Math.max(1, Math.round(borderMargin * w)), my = Math.max(1, Math.round(borderMargin * h));
   let total = 0, match = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
