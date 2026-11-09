@@ -235,6 +235,23 @@ class Vision(unittest.TestCase):
         self.assertEqual(sorted(set(budgets)), [8000, 16000])
         self.assertEqual(budgets.count(16000), 4)
 
+    def test_a_judge_may_miss_two_tiles_in_five_but_not_more(self):
+        def flaky(miss):
+            def post(model, messages, **_):
+                text = messages[0]['content'][0]['text']
+                if 'Qwen' in model and any(w in text for w in miss):
+                    return '', {}
+                return json.dumps(GOOD), {}
+            return post
+
+        r = fs.vision_tiles(self.img, 'wash', 128.0, post=flaky(['top left']))       # 3 of 4 tiles answered
+        self.assertTrue(r['complete'])
+        self.assertEqual(r['per_judge']['Qwen/Qwen3.5-9B']['tiles'], 3)
+        self.assertEqual((r['overall'], r['errors']['Qwen/Qwen3.5-9B']), (6.0, 1))
+        r = fs.vision_tiles(self.img, 'wash', 128.0, post=flaky(['top left', 'top right']))   # 2 of 4
+        self.assertFalse(r['complete'])
+        self.assertNotIn('overall', r)
+
     def test_a_judge_with_no_valid_reply_makes_it_incomplete(self):
         def post(model, messages, **_):
             if 'Qwen' in model:
