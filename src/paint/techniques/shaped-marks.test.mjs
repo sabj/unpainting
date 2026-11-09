@@ -155,3 +155,23 @@ test('Consult #3: skyLanes never bridges across gaps containing protected catchl
   assert.equal(unbridged.length, 2, 'With protect, gap containing catchlight is NEVER bridged');
 });
 
+
+test('multi-lane paths leave no uncovered cell on a wide curved plane', () => {
+ const w = 700, h = 500, mm = 0.65, m = new Uint8Array(w * h);
+ for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const r = Math.hypot(x - 350, y - 500); if (r > 250 && r < 400 && y < 450) m[y * w + x] = 1; }
+ for (const maxBrushMm of [38, 25]) {
+  const lanes = shapedPlanePaths(m, w, h, { mmPerCell: mm, maxBrushMm });
+  assert.ok(lanes.length > 1);
+  const covered = new Uint8Array(w * h);
+  for (const lane of lanes) for (let j = 0; j < lane.length; j++) {
+   const b = lane[j], a = lane[j - 1] ?? b, n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y)));
+   for (let s = 0; s <= n; s++) {
+    const t = s / n, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t, r = a.r + (b.r - a.r) * t;
+    for (let q = Math.max(0, Math.floor(y - r)); q < Math.min(h, Math.ceil(y + r + 1)); q++) for (let k = Math.max(0, Math.floor(x - r)); k < Math.min(w, Math.ceil(x + r + 1)); k++) if ((k + .5 - x) ** 2 + (q + .5 - y) ** 2 <= r * r) covered[q * w + k] = 1;
+   }
+  }
+  let holes = 0, cells = 0;
+  for (let i = 0; i < m.length; i++) if (m[i]) { cells++; if (!covered[i]) holes++; }
+  assert.ok(holes / cells < 0.001, `${maxBrushMm} mm brush left ${holes} of ${cells} cells uncovered`);
+ }
+});

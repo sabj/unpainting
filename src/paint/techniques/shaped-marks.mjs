@@ -25,7 +25,6 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  // Split against the real mop width; changing native density must not change physical brush selection.
  const maxRadius=Math.max(...points.map(p=>p.r/scale));
  if(!texture&&mmPerCell>0&&maxBrushMm>0&&2*maxRadius*mmPerCell>maxBrushMm){
-  const lanes=Math.ceil(2*maxRadius*mmPerCell/maxBrushMm);
   const envW=Math.max(3,Math.round((hi-lo)*.18));
   const envPts=[];
   for(let j=lo;j<=hi;j++){
@@ -35,6 +34,8 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
    const u=(b0+b1)/2,r=Math.max(maxRadius*.85,(b1-b0)/2);
    envPts.push({x:(cx+dx*j-dy*u)*scale,y:(cy+dy*j+dx*u)*scale,r:r*scale,p:.9});
   }
+  // The envelope of a curved plane is wider than any one slice, so the lane count comes from it: lanes never spread wider than the brush.
+  const lanes=Math.ceil(2*Math.max(...envPts.map(p=>p.r/scale))*mmPerCell/maxBrushMm);
   return Array.from({length:lanes},(_,k)=>envPts.map(p=>{
    const offset=(k-(lanes-1)/2)*2*(p.r/scale)/lanes;
    return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.035),p:p.p};

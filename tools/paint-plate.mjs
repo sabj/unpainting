@@ -21,7 +21,7 @@ import {writeInkLines} from '../src/crop/ink-lines-file.mjs';
 import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
 import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
 import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
-import {passageBrushPaths, attachPlaneRamp as attachRampToPaths} from '../src/paint/methods/passage-brush.mjs';
+import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../src/paint/methods/passage-brush.mjs';
 import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
 import {GROUND} from '../src/paint/tuned/trumbull.mjs';
@@ -3755,9 +3755,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     });
     if(authoredPaths||shapedPaths)shaped=pts;else if(sh._semantic)shaped=semanticGesture(sh._semantic.pass,shaped,num('sheetmm', DEFAULT_SHEET_MM)/W2);
     const planeRamp = PATH_RAMP.get(pts);
-    if(planeRamp && shapedPaths && sh._strokePlan) {
+    if(planeRamp && shapedPaths && planeRampApplies({strokePlan:sh._strokePlan,pathCount:paths.length})) {
       let rrun = 0;
-      const denom = PF > 1e-6 ? PF : 1;
+      const denom = sh._strokePlan && PF > 1e-6 ? PF : 1;
       shaped = shaped.map((p, i) => {
         if (i) rrun += Math.hypot(p.x - shaped[i - 1].x, p.y - shaped[i - 1].y);
         const u = rrun / total;
