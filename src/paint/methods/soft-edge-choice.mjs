@@ -51,31 +51,3 @@ export function chooseSoftCells({ candidates, G, amount, values, w, h, cellMm, f
   const softSet = new Set(soft);
   return { soft, hard: candidates.filter(i => !softSet.has(i)) };
 }
-
-/**
- * The direction lanes should run so each lane lies along one strength of the passage's demand: the iso-line direction of
- * the least-squares plane through G, in radians. Null when the plane spans under `minSpan` of the mean across the
- * passage, since a nearly flat wash has no gradient to follow and its lanes should follow its shape.
- */
-export function gradientAngle(list, G, w, { minSpan = 0.25 } = {}) {
-  const c = list.length;
-  if (c < 3) return null;
-  let sx = 0, sy = 0, sg = 0;
-  for (const i of list) { sx += i % w; sy += Math.floor(i / w); sg += G[i]; }
-  const mx = sx / c, my = sy / c, mg = sg / c;
-  if (!(mg > 0)) return null;
-  let xx = 0, yy = 0, xy = 0, xg = 0, yg = 0;
-  for (const i of list) {
-    const x = i % w - mx, y = Math.floor(i / w) - my, g = G[i] - mg;
-    xx += x * x; yy += y * y; xy += x * y; xg += x * g; yg += y * g;
-  }
-  const det = xx * yy - xy * xy;
-  if (!(Math.abs(det) > 1e-9)) return null;
-  const a = (xg * yy - yg * xy) / det, b = (yg * xx - xg * xy) / det, norm = Math.hypot(a, b);
-  if (!(norm > 0)) return null;
-  // the plane's span over the passage along its gradient
-  let lo = Infinity, hi = -Infinity;
-  for (const i of list) { const t = (i % w - mx) * a + (Math.floor(i / w) - my) * b; if (t < lo) lo = t; if (t > hi) hi = t; }
-  if ((hi - lo) / mg < minSpan) return null;
-  return Math.atan2(a, -b);
-}

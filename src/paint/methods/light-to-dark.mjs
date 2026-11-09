@@ -10,7 +10,8 @@ import {detailField,keepByDetail,localMinShape,meanOver,segmentDetailMask} from 
 import {layerFractions,regionCuts} from './layer-cuts.mjs';
 import {mixedCharge,washDomains,leadPigment} from './mixed-washes.mjs';
 import {scaleLayers,radiiForLayers} from './scale-layers.mjs';
-import {chooseSoftCells,gradientAngle} from './soft-edge-choice.mjs';
+import {chooseSoftCells} from './soft-edge-choice.mjs';
+import {gradientPlane} from './graded-plane.mjs';
 // Target-value scheduling. Pure CPU planning; no paper mutation or bitmap painting.
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
@@ -24,8 +25,8 @@ const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
 const SCALE_MIN_STEP = .04;
 // The most value one middle wash carries under --scalelayers: the plan's own second band cap, about a third of the range.
 const SCALE_MAX_STEP = VALUE_CAPS[1];
-// A graded lane's sweep before the next dip: long enough to be one gesture of a flat brush, not a run of patches.
-const GRADED_STROKE_MM = 60;
+// Lanes of a graded wash barely overlap, as the multi-lane flat does (shaped-marks.mjs, 1.035): more overlap prints a stripe.
+const GRADED_LANE_SPACING = 2/1.035;
 // The q quantile of G over a passage's cells.
 function quantileOf(list,G,q){const v=Float32Array.from(list,i=>G[i]).sort();return v[Math.min(v.length-1,Math.max(0,Math.floor(q*(v.length-1))))];}
 const neighbors = (i,w,n) => [i%w?i-1:-1,i%w<w-1?i+1:-1,i>=w?i-w:-1,i+w<n?i+w:-1].filter(j=>j>=0);
@@ -322,6 +323,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   if(mixedWash&&!mixedOn)console.log('mixed washes: off for this plan (per-cell styles)');
   const WD=mixedOn&&!subjects?washDomains(region.labels,region.regions.length,demand,k,w,h,{mayJoin:profile?(a,b)=>regionProfiles[a-1]?.name===regionProfiles[b-1]?.name:null}):null;
   if(WD)console.log(`mixed washes: ${WD.ids.length} colour domains from ${region.regions.length} regions`);
+  let laneField=null;
   for(const step of steps){const band=step.band;
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
     const mixedStep=mixedOn&&!step.pig&&(phase!=='shadow'||mixedShadows);
@@ -420,11 +422,14 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           // one fitted gesture and an exact edge.
           const supportMm=2*list.length/Math.max(1,hard.length+soft.length)*(sheetWidthMm/w);
           const laneHere=laneMax>0?Math.min(laneMax,Math.max(laneMm,supportMm*.5)):Math.min(laneMm,Math.max(2,supportMm*.9));
-          // gradedLanes: a wash big enough for lanes is laid in lanes across its own gradient, each dipped at the plan's
-          // strength under it. A chosen passage brush keeps its width. Shadow glazes stay one gesture over dry paint.
-          if(gradedLanes&&shaped&&!step.pig&&phase!=='shadow'&&list.length>=minShape*3){
-            const gradeAngle=gradientAngle(list,G,w),sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:intent.brush.sizeMm??'auto',strokeMm:GRADED_STROKE_MM,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0,angle:gradeAngle,minLanes:gradeAngle==null?1:3,protect:protectedCells});
-            if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneR:+sp.laneR.toFixed(1),strokeMm:GRADED_STROKE_MM,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
+          // gradedLanes (graded-plane.mjs): a wash with a real gradient is laid in long straight lanes across it, each
+          // dipped at the plane's strength there, enough lanes that no step between them is large. A flat wash keeps its one
+          // fitted gesture. A chosen passage brush keeps its width. Shadow glazes stay one gesture over dry paint.
+          const gradePlane=gradedLanes&&shaped&&!step.pig&&phase!=='shadow'&&list.length>=minShape*3?gradientPlane(list,G,w):null;
+          if(gradePlane){
+            laneField??=new Float32Array(n);for(const i of list)laneField[i]=gradePlane.at(i);
+            const sp=planLanes(list,w,h,laneField,amount,{cellMm:sheetWidthMm/w,laneMm:intent.brush.sizeMm??'auto',strokeMm:0,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0,angle:gradePlane.angle,minLanes:Math.min(5,Math.max(3,Math.ceil(gradePlane.span/.2))),spacingK:GRADED_LANE_SPACING,straight:true,protect:protectedCells});
+            if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneR:+sp.laneR.toFixed(1),span:+gradePlane.span.toFixed(2),fit:+gradePlane.fit.toFixed(2),factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
           else if(strokePlan&&shaped&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!isCoolSky){
             const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0});
             if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}

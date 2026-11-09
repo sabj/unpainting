@@ -17,40 +17,69 @@ export function radiiForLayers(count) {
   return [...KIT_RADII];
 }
 
-// A sliding minimum or maximum along one row or column (monotonic queue), with `dead` cells ignored.
-function slide1d(src, live, start, stride, len, r, sign, out) {
-  const q = new Int32Array(len);
+// A sliding minimum (sign 1) or maximum (sign -1) along one row, reach r either side, with dead cells ignored. Writes one
+// value per cell of the row into `row`; a window with no live cell gets +/-Infinity.
+function slideRow(src, live, start, len, r, sign, row, q) {
   let head = 0, tail = 0, next = 0;
   for (let p = 0; p < len; p++) {
     const reach = Math.min(len - 1, p + r);
     for (; next <= reach; next++) {
-      const at = start + next * stride;
-      if (!live[at]) continue;
-      const v = sign * src[at];
-      while (tail > head && sign * src[start + q[tail - 1] * stride] >= v) tail--;
+      if (!live[start + next]) continue;
+      const v = sign * src[start + next];
+      while (tail > head && sign * src[start + q[tail - 1]] >= v) tail--;
       q[tail++] = next;
     }
     while (tail > head && q[head] < p - r) head++;
-    out[start + p * stride] = tail > head ? src[start + q[head] * stride] : sign > 0 ? Infinity : -Infinity;
+    row[p] = tail > head ? src[start + q[head]] : sign > 0 ? Infinity : -Infinity;
   }
 }
 
-function slide(src, live, w, h, r, sign) {
-  const rows = new Float32Array(w * h), out = new Float32Array(w * h), anyLive = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) slide1d(src, live, y * w, 1, w, r, sign, rows);
-  for (let i = 0; i < w * h; i++) anyLive[i] = Number.isFinite(rows[i]) ? 1 : 0;
-  for (let x = 0; x < w; x++) slide1d(rows, anyLive, x, w, h, r, sign, out);
+// The same over a disc of radius r: a brush is round, and a square window leaves axis-aligned edges in the washes.
+function slideDisc(src, live, w, h, r, sign) {
+  const out = new Float32Array(w * h).fill(sign > 0 ? Infinity : -Infinity), row = new Float32Array(w), q = new Int32Array(w);
+  for (let dy = -r; dy <= r; dy++) {
+    const reach = Math.floor(Math.sqrt(r * r - dy * dy));
+    for (let y = Math.max(0, -dy); y < Math.min(h, h - dy); y++) {
+      slideRow(src, live, (y + dy) * w, w, reach, sign, row, q);
+      const at = y * w;
+      if (sign > 0) { for (let x = 0; x < w; x++) if (row[x] < out[at + x]) out[at + x] = row[x]; }
+      else for (let x = 0; x < w; x++) if (row[x] > out[at + x]) out[at + x] = row[x];
+    }
+  }
   return out;
 }
 
+// One coarse cell per `s` fine ones, each holding the least live value under it, so the coarse field never overstates.
+function poolMin(F, live, w, h, s) {
+  const cw = Math.ceil(w / s), ch = Math.ceil(h / s), v = new Float32Array(cw * ch).fill(Infinity), alive = new Uint8Array(cw * ch);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (!live[i]) continue;
+    const c = Math.floor(y / s) * cw + Math.floor(x / s);
+    if (F[i] < v[c]) v[c] = F[i];
+    alive[c] = 1;
+  }
+  return { v, alive, cw, ch };
+}
+
 /**
- * Grey opening over a square of half width r: what survives where a shape of that size fits under the field. Cells with
- * live 0 take no paint (reserved lights, recesses laid later), so they neither pull the opening down nor hold it up.
+ * Grey opening over a disc of radius r: what survives where a brush of that size fits under the field. Cells with live 0
+ * take no paint (reserved lights, recesses laid later), so they neither pull the opening down nor hold it up. A large
+ * radius is worked on a coarser grid, near eight cells to the radius; the blur that follows hides the difference.
  */
 export function maskedOpening(F, live, w, h, r) {
-  const eroded = slide(F, live, w, h, r, 1);
-  const O = slide(eroded, Uint8Array.from(eroded, v => (Number.isFinite(v) ? 1 : 0)), w, h, r, -1);
-  return Float32Array.from(O, (v, i) => (live[i] && Number.isFinite(v) ? Math.min(v, F[i]) : 0));
+  const s = Math.max(1, Math.floor(r / 8)), R = Math.max(1, Math.round(r / s));
+  const { v, alive, cw, ch } = s > 1 ? poolMin(F, live, w, h, s) : { v: F, alive: live, cw: w, ch: h };
+  const eroded = slideDisc(v, alive, cw, ch, R, 1);
+  const opened = slideDisc(eroded, Uint8Array.from(eroded, q => (Number.isFinite(q) ? 1 : 0)), cw, ch, R, -1);
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (!live[i]) continue;
+    const q = opened[Math.floor(y / s) * cw + Math.floor(x / s)];
+    out[i] = Number.isFinite(q) ? Math.min(q, F[i]) : 0;
+  }
+  return out;
 }
 
 function maskedBlur(F, live, w, h, r) {
