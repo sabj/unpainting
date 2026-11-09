@@ -430,11 +430,13 @@ test('mixedWash: one passage per colour shape in each step, carrying a mix, with
   for (let j = 0; j < 3; j++) assert.ok(Math.abs(a[j] - b[j]) <= 0.08 * Math.max(a[j], 1e-6), `pigment ${j}: ${a[j]} against ${b[j]}`);
 });
 
-test('mixedWash: shadow glazes stay pigment by pigment over dry paint unless asked', async () => {
-  const mixed = await twoColourPlan({ mixedWash: true, shadowThresh: 0.1 });
-  const shadows = mixed.layers.filter(q => q._valuePhase === 'shadow');
-  assert.ok(shadows.length > 0, 'the plan has shadow glazes');
-  for (const l of shadows) for (const sh of l.shapes) assert.equal(sh.mix.filter(v => v > 0).length, 1);
+test('mixedShadows: a shadow glaze is one mix too; without it the glazes stay pigment by pigment', async () => {
+  const apart = await twoColourPlan({ mixedWash: true, shadowThresh: 0.1 }), mixed = await twoColourPlan({ mixedWash: true, mixedShadows: true, shadowThresh: 0.1 });
+  const glazes = p => p.layers.filter(q => q._valuePhase === 'shadow').flatMap(l => l.shapes);
+  assert.ok(glazes(apart).length > 0, 'the plan has shadow glazes');
+  for (const sh of glazes(apart)) assert.equal(sh.mix.filter(v => v > 0).length, 1);
+  assert.ok(glazes(mixed).some(sh => sh.mix.filter(v => v > 0).length > 1), 'a mixed glaze carries more than one pigment');
+  assert.ok(glazes(mixed).length < glazes(apart).length);
 });
 
 test('without the new options the plan is the same as before', async () => {

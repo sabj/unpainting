@@ -3,7 +3,8 @@
 // lets it dry, and then lays only the darker shapes that are really there, each with a smaller brush. So each layer here
 // takes what a brush of its size can carry: the lower envelope of what is still owed at that scale. A ramp goes wholly
 // into the first layer; a real dark shape stays a shape of its own, with the base wash light under it, and where such a
-// shape meets the base it has one sharp side and one side that fades. Planning only, from the plan's value field.
+// shape meets the base it has one sharp side and one side that fades. One wash carries at most `maxStep` of value, since
+// a dark mass is built in stages, lights first, not laid at full strength. Planning only, from the plan's value field.
 
 // Half widths in mm of the kit's flat, large round, medium round and small round (passage-brush.mjs): a layer carries
 // what the brush that lays it can hold.
@@ -105,15 +106,16 @@ function keepShapes(mask, w, h, minShape) {
  * @param field value each live cell owes in the middle washes
  * @param radiiMm one half width per layer, broadest first
  * @param minStep the smallest value step worth a wash of its own
+ * @param maxStep the most value one layer may carry; the last layer takes whatever is left
  * @returns {{cover: Uint8Array[], share: Float32Array[]}} per layer, its cells and the share of a cell's middle demand
  *   it carries. Shares of a live cell sum to 1. A later layer's cell with too small a step stays with the layers under it.
  */
-export function scaleLayers({ field, live, w, h, cellMm, radiiMm, minStep, minShape }) {
+export function scaleLayers({ field, live, w, h, cellMm, radiiMm, minStep, maxStep = Infinity, minShape }) {
   const n = w * h, L = radiiMm.length, parts = [];
   let rest = Float32Array.from(field, (v, i) => (live[i] ? v : 0));
   radiiMm.forEach((mm, j) => {
     const r = Math.max(1, Math.round(mm / cellMm));
-    const part = j === L - 1 ? rest : lowerEnvelope(rest, live, w, h, r);
+    const part = j === L - 1 ? rest : Float32Array.from(lowerEnvelope(rest, live, w, h, r), v => Math.min(v, maxStep));
     parts.push(part);
     rest = Float32Array.from(rest, (v, i) => Math.max(0, v - part[i]));
   });

@@ -34,6 +34,19 @@ test('a smooth ramp goes into the first layer: no band cuts, only a small cap at
   assert.ok(s.share[0][30 * w + 60] > 0.95);
 });
 
+test('one wash carries at most maxStep: a dark mass is built in stages and the next layer fades in from the first', () => {
+  const w = 120, h = 60, F = grid(w, h, x => 0.1 + 0.6 * x / w);
+  const s = scaleLayers({ field: F, live: all(w, h), w, h, cellMm: 0.5, radiiMm: [8, 2], minStep: 0.04, maxStep: 0.3, minShape: 16 });
+  const dark = 30 * w + 110, light = 30 * w + 20;
+  assert.ok(F[dark] * s.share[0][dark] <= 0.3 + 1e-5, `first layer carries ${F[dark] * s.share[0][dark]}`);
+  assert.equal(s.cover[1][dark], 1);
+  assert.equal(s.cover[1][light], 0);
+  assert.ok(Math.abs(s.share[0][dark] + s.share[1][dark] - 1) < 1e-4);
+  // the second layer starts faint where it begins, so its edge there can go soft
+  const row = 30 * w; let first = -1; for (let x = 0; x < w; x++) if (s.cover[1][row + x]) { first = x; break; }
+  assert.ok(first > 0 && F[row + first] * s.share[1][row + first] < 0.1, `second layer starts at ${F[row + first] * s.share[1][row + first]}`);
+});
+
 test('a real dark shape stays a shape of its own in a later layer, and the base stays light under it', () => {
   const w = 120, h = 60, F = grid(w, h, (x, y) => (x >= 55 && x < 62 && y > 10 && y < 50 ? 0.7 : 0.2));
   const s = scaleLayers({ field: F, live: all(w, h), w, h, cellMm: 0.5, radiiMm: [8, 1], minStep: 0.04, minShape: 16 });
