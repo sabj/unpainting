@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sheetColour, lightTolerance, paperLightTest, isPaperLight, WHITE_SHEET, PAPER_RULE } from './paper-colour.mjs';
+import { sheetColour, lightTolerance, paperLightTest, isPaperLight, lightestTenth, paperLightReference, WHITE_SHEET, PAPER_RULE } from './paper-colour.mjs';
 
 const image = (w, h, at) => { const rgb = new Uint8Array(w * h * 3); for (let i = 0; i < w * h; i++) rgb.set(at(i % w, (i / w) | 0), 3 * i); return rgb; };
 
@@ -11,6 +11,10 @@ test('a cream sheet is the paper even when a frame line cuts the lightest region
   assert.equal(s.detected, true, s.reason);
   assert.deepEqual(s.rgb, [248, 245, 216]);
   assert.ok(s.candidate.borderShare > 0.7, `border share ${s.candidate.borderShare}`);
+  const ref = paperLightReference(rgb, w, h);
+  assert.equal(ref.detected, true);
+  assert.deepEqual(ref.sheet, [248, 245, 216]);
+  assert.deepEqual(ref.lightRef, [248, 245, 216]);
 });
 
 test('a white sheet reads as white and a cool grey sheet is paper too: no hue test', () => {
@@ -42,6 +46,32 @@ test('a pale region along one edge only (a crop with no margin) is not the sheet
   assert.deepEqual(s.rgb, [...WHITE_SHEET]);
 });
 
+test('crops with no visible paper: light neutral highlights fall back to lightest tenth, saturated/dark ones do not', () => {
+  const w = 60, h = 60;
+  // Case A: Trumbull-like crop. No margin paper, but lightest tenth is light cloud/facade (L* ~94, neutral).
+  // 10% clouds [236, 237, 233], rest building/sky [180, 160, 130].
+  const cloudCrop = image(w, h, (x, y) => (y < 6 ? [236, 237, 233] : [180, 160, 130]));
+  const refA = paperLightReference(cloudCrop, w, h);
+  assert.equal(refA.detected, false, 'no paper sheet on border');
+  assert.equal(refA.fallback, true, 'falls back to lightest tenth highlights');
+  assert.deepEqual(refA.sheet, [...WHITE_SHEET], 'painted on white paper');
+  assert.deepEqual(refA.lightRef, [236, 237, 233]);
+
+  // Case B: Overlook photo-like. Lightest material is dark mountain haze (L* 81 < 90).
+  const hazeCrop = image(w, h, (x, y) => (y < 6 ? [221, 198, 181] : [140, 120, 100]));
+  const refB = paperLightReference(hazeCrop, w, h);
+  assert.equal(refB.detected, false);
+  assert.equal(refB.fallback, false, 'dark haze does not become white paper highlights');
+  assert.deepEqual(refB.lightRef, [...WHITE_SHEET]);
+
+  // Case C: Hills-like. Lightest material is saturated yellow grass (chroma > 24).
+  const grassCrop = image(w, h, (x, y) => (y < 6 ? [227, 221, 149] : [100, 120, 60]));
+  const refC = paperLightReference(grassCrop, w, h);
+  assert.equal(refC.detected, false);
+  assert.equal(refC.fallback, false, 'saturated grass does not become white paper highlights');
+  assert.deepEqual(refC.lightRef, [...WHITE_SHEET]);
+});
+
 test('a low-key picture whose lightest region is mid grey shows no paper', () => {
   const w = 24, h = 24;
   const s = sheetColour(image(w, h, (x, y) => (x < 10 && y < 10 ? [110, 110, 110] : [70, 70, 70])), w, h);
@@ -49,7 +79,7 @@ test('a low-key picture whose lightest region is mid grey shows no paper', () =>
   assert.match(s.reason, /L\*/);
 });
 
-test('the light tolerance is 5 L* on a sheet at L* 85 or more and shrinks to nothing by L* 72; chroma stays at 10', () => {
+test('the light tolerance is 5 L* on a sheet at L* 85 or more and shrinks to nothing by L* 72; chroma stays at 6', () => {
   assert.deepEqual(lightTolerance([252, 251, 248]), { L: PAPER_RULE.toleranceL, C: PAPER_RULE.toleranceC });
   assert.equal(lightTolerance([248, 245, 216]).L, PAPER_RULE.toleranceL);
   assert.equal(lightTolerance([110, 110, 110]).L, 0);

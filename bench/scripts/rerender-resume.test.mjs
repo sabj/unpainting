@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runRerender,renderStamp } from './rerender.mjs';
+import { runRerender,renderStamp,jobFingerprint,discoverStoredPlans,parseRerenderArgs } from './rerender.mjs';
 import {execFileSync} from 'node:child_process';
 import { fakePainter } from './rerender-fixtures.mjs';
 
@@ -126,4 +126,28 @@ test('untracked source helpers change the render stamp when their contents chang
   const first=renderStamp(root);fs.writeFileSync(file,'export const value=2;');const second=renderStamp(root);
   assert.notEqual(first.dirtyHash,second.dirtyHash);assert.match(first.commit,/-dirty$/);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('an input or code change during a job fails that job and the next job captures its own stamp',async()=>{
+ const out=tmp();
+ try{
+  const p=await fakePainter();let commit='before',input='before';
+  const run=(exe,args)=>{const result=p.run(exe,args);if(p.calls.length===1){commit='after';input='after';}return result;};
+  const r=await runRerender(base(out),{run,verify,doctor,stamp:()=>fs_(commit)(),fingerprint:()=>input});
+  assert.equal(r.results[0].ok,false);assert.match(r.results[0].problems.join(' '),/changed while/);
+  assert.equal(r.results[1].ok,true);
+  const record=subject=>JSON.parse(fs.readFileSync(path.join(out,'v4-pipeline','opus','1',`${subject}-job.json`)));
+  assert.equal(record('hills').stamp.commit,'before');assert.equal(record('hills').inputFingerprint,'before');
+  assert.equal(record('mittens').stamp.commit,'after');assert.equal(record('mittens').inputFingerprint,'after');
+ }finally{fs.rmSync(out,{recursive:true,force:true});}
+});
+
+test('plan fingerprints refuse symlink inputs rather than ignoring their contents',()=>{
+ const out=tmp();
+ try{
+  const opts=parseRerenderArgs(base(out)),job=discoverStoredPlans(opts)[0],planDir=path.join(out,'plan');
+  fs.cpSync(job.planDir,planDir,{recursive:true});
+  const linked=path.join(out,'linked-lines.json');fs.writeFileSync(linked,'[]');fs.symlinkSync(linked,path.join(planDir,'linked-lines.json'));
+  assert.throws(()=>jobFingerprint(opts,{...job,planDir}),/symlink plan input/);
+ }finally{fs.rmSync(out,{recursive:true,force:true});}
 });

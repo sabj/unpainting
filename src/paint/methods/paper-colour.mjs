@@ -7,6 +7,10 @@
 // region off the border, so the border is matched by colour), is light (L* 75 or more) and near neutral (chroma 24 or
 // under: white, cream, grey or buff). Anything else (a crop with no margin, a photograph, a dark painting) shows no
 // paper and is painted on white. There is no hue test: a cool grey sheet counts as much as a warm cream one.
+//
+// For crops with no margin (no visible paper along the border zone): the plate is painted on white paper, but
+// highlights/lights fall back to the lightest tenth of the target when that material is light (L* >= 90) and near-neutral
+// (chroma <= 24). Saturated or dark washes in photographs and crops never become bare white paper.
 import { components } from '../../raster.js';
 import { labOf } from '../../eval/colour.mjs';
 
@@ -19,8 +23,9 @@ export const PAPER_RULE = Object.freeze({
   borderTol: 22,          // a border cell within this of the paper, per channel, shows the paper
   minL: 75,               // paper is light
   maxChroma: 24,          // and near neutral
+  minHighlightL: 90,      // highlights on a crop without visible paper must be light
   toleranceL: 5,          // a cell this far below the paper in L* is still bare paper (one tea glaze)...
-  toleranceC: 10,         // ...when it is no more than this much more chromatic than the paper...
+  toleranceC: 6,          // ...when it is no more than this much more chromatic than the paper (delta E > 5 is a different colour)...
   fullToleranceL: 85,     // ...at the full L* tolerance on a sheet this light or lighter...
   noToleranceL: 72,       // ...and at none on a sheet this dark or darker (nothing in it is paper)
 });
@@ -65,6 +70,23 @@ export function borderShare(rgb, w, h, colour, { borderMargin = PAPER_RULE.borde
 }
 
 /**
+ * Mean colour of the lightest tenth of the target cells by luminance.
+ */
+export function lightestTenth(rgb, w, h) {
+  const n = w * h;
+  if (!(n > 0) || !rgb || rgb.length < 3 * n) return [...WHITE_SHEET];
+  const lum = Float32Array.from({ length: n }, (_, i) => 0.2126 * rgb[3 * i] + 0.7152 * rgb[3 * i + 1] + 0.0722 * rgb[3 * i + 2]);
+  const sorted = Float32Array.from(lum).sort(), cut = sorted[Math.floor(n * 0.90)];
+  let r = 0, g = 0, b = 0, count = 0;
+  for (let i = 0; i < n; i++) {
+    if (lum[i] >= cut) {
+      r += rgb[3 * i]; g += rgb[3 * i + 1]; b += rgb[3 * i + 2]; count++;
+    }
+  }
+  return count ? [r / count, g / count, b / count] : [...WHITE_SHEET];
+}
+
+/**
  * The sheet colour of a target. Returns {rgb, detected, candidate, reason}: `rgb` is the target's own paper when the
  * lightest region passes the paper rule, else WHITE_SHEET; `candidate` describes that region (rgb, share, borderShare,
  * L, chroma) or is null; `reason` says why the candidate was refused, or that it is the sheet.
@@ -82,6 +104,63 @@ export function sheetColour(rgb, w, h, opts = {}) {
   if (chroma > o.maxChroma) reasons.push(`chroma ${chroma.toFixed(1)} is over ${o.maxChroma}`);
   const detected = reasons.length === 0;
   return { rgb: detected ? candidate.rgb : [...WHITE_SHEET], detected, candidate, reason: detected ? "the target's own sheet" : reasons.join('; ') };
+}
+
+/**
+ * The reference colours for paper and lights. Returns { sheet, lightRef, detected, fallback, reason }.
+ * - When the target shows a visible sheet (pass across border and area), both sheet and lights follow that sheet.
+ * - When no sheet shows (a crop painted edge-to-edge), the plate is painted on white paper (WHITE_SHEET), while
+ *   reserved lights fall back to the lightest tenth of the target when that material is light (L* >= 90) and near-neutral
+ *   (chroma <= 24); otherwise lights require true near-white cells (WHITE_SHEET).
+ */
+export function paperLightReference(rgb, w, h, paperRGB = null, opts = {}) {
+  const o = { ...PAPER_RULE, ...opts };
+  const sheet = sheetColour(rgb, w, h, o);
+  if (paperRGB) {
+    const rgbArr = paperRGB.map(Number);
+    if (sheet.detected) {
+      return { sheet: rgbArr, lightRef: rgbArr, detected: true, fallback: false, reason: 'relative to declared sheet' };
+    }
+    if (rgbArr.every((v, j) => v === WHITE_SHEET[j])) {
+      const lt = lightestTenth(rgb, w, h);
+      const [L, a, b] = labOfColour(lt), chroma = Math.hypot(a, b);
+      const minHighlightL = o.minHighlightL ?? 90;
+      if (L >= minHighlightL && chroma <= o.maxChroma) {
+        const ref = lt.map(v => Math.round(v));
+        return {
+          sheet: rgbArr,
+          lightRef: ref,
+          detected: false,
+          fallback: true,
+          reason: `no visible paper; lights against lightest tenth (${ref.join('/')}, L* ${L.toFixed(1)}, chroma ${chroma.toFixed(1)})`
+        };
+      }
+    }
+    return { sheet: rgbArr, lightRef: rgbArr, detected: false, fallback: false, reason: sheet.reason };
+  }
+  if (sheet.detected) {
+    return { sheet: sheet.rgb, lightRef: sheet.rgb, detected: true, fallback: false, reason: sheet.reason };
+  }
+  const lt = lightestTenth(rgb, w, h);
+  const [L, a, b] = labOfColour(lt), chroma = Math.hypot(a, b);
+  const minHighlightL = o.minHighlightL ?? 90;
+  if (L >= minHighlightL && chroma <= o.maxChroma) {
+    const ref = lt.map(v => Math.round(v));
+    return {
+      sheet: [...WHITE_SHEET],
+      lightRef: ref,
+      detected: false,
+      fallback: true,
+      reason: `no visible paper; lights against lightest tenth (${ref.join('/')}, L* ${L.toFixed(1)}, chroma ${chroma.toFixed(1)})`
+    };
+  }
+  return {
+    sheet: [...WHITE_SHEET],
+    lightRef: [...WHITE_SHEET],
+    detected: false,
+    fallback: false,
+    reason: `no visible paper; lightest tenth is not neutral/light (L* ${L.toFixed(1)}, chroma ${chroma.toFixed(1)}); lights against white`
+  };
 }
 
 /**

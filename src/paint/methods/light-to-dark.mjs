@@ -2,9 +2,9 @@
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {fitPlanOptics} from './plan-optics-fit.mjs';
-import {sheetColour} from './paper-colour.mjs';
+import {sheetColour,paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mjs';
 import {fitGradedPlane,planeAtCell} from './graded-demand.mjs';
-import {lightReference,connectedLightTest,normalizeWashWeights,mixedCharge,softWashBoundary} from './wash-system.mjs';
+import {normalizeWashWeights,mixedCharge,softWashBoundary} from './wash-system.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {reserveLights,validateReserves} from './light-reserves.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
@@ -33,7 +33,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({calibratedPlan=false,washSystem=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
+export function planLightToDark({paperRule=false,calibratedPlan=false,washSystem=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
   if(washSystem||calibratedPlan){darkGain=1;coolGain=1;midGain=1;}
   if(washSystem){washLayers=0;passCap=0;strokePlan=false;layerHue=false;midDomains=true;}
   let coolGroup=null;setRecessMax(recessMax);
@@ -44,7 +44,10 @@ export function planLightToDark({calibratedPlan=false,washSystem=false,sourceCel
   if(demand.some(v=>!Number.isFinite(v)||v<0))throw Error('invalid pigment demand');
   // paperLights: a cream target sheet is paper, not paint. Estimate it from the brightest large connected region,
   // measure values against it, and reserve near-paper cells as bare paper.
-  const paper=paperLights&&rgb?estimatePaper(rgb,w,h,density):null;
+  const lightRef=(paperRule||washSystem)&&rgb&&(paperRel||paperLights||washSystem)?paperLightReference(rgb,w,h,paperRGB):null;
+  const referenceTest=lightRef?(paperDelta==null?paperLightTest(lightRef.lightRef):(pixels,i)=>isPaperLight(pixels,i,lightRef.lightRef,paperDelta)):null;
+  let paper=paperLights&&rgb&&!lightRef?estimatePaper(rgb,w,h,density):null;
+  if(paperLights&&lightRef){let total=0,cells=0;for(let i=0;i<n;i++)if(referenceTest(rgb,i)){total+=density[i];cells++;}paper={rgb:lightRef.sheet,density:cells?total/cells:0,cells};}
   const value=targetValueMap(paper?Float32Array.from(density,v=>Math.max(0,v-paper.density)):density),region=subjects??targetRegions({w,h,rgb,demand,k,density,families}),protectedCells=Uint8Array.from({length:n},(_,i)=>hold?.[i]?1:0);
   validateReserves(reserves);
   // Broad target lights, simplified before any paint. Explicit glints survive the
@@ -55,21 +58,19 @@ export function planLightToDark({calibratedPlan=false,washSystem=false,sourceCel
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 (or 14/14/18 on warm cream paper) below it per channel is a light. With --paperbase source the sheet takes that colour too.
   let PAP = null;
-  if (paperRel && rgb) {
+  if (!lightRef && paperRel && rgb) {
     const L = Float32Array.from({ length: n }, (_, i) => rgb[3 * i] + rgb[3 * i + 1] + rgb[3 * i + 2]);
     const idx = Array.from(L.keys()).sort((a, b) => L[b] - L[a]).slice(0, Math.max(1, Math.floor(n * .1)));
     PAP = [0, 1, 2].map(c => idx.reduce((a, i) => a + rgb[3 * i + c], 0) / idx.length);
-  } else if (paperRel && paperRGB) {
+  } else if (!lightRef && paperRel && paperRGB) {
     PAP = [...paperRGB];
   }
   const tonedPap = Boolean(PAP && PAP[0] - PAP[2] >= 18 && 252 - PAP[2] >= 20);
   const papTol = tonedPap ? [14, 14, 18] : [9, 9, 12];
   const papDark = Boolean(PAP && (0.2126 * PAP[0] + 0.7152 * PAP[1] + 0.0722 * PAP[2] < 180 || PAP[0] < 180 || PAP[1] < 200 || PAP[2] < 145));
-  const washSheet=washSystem&&rgb?sheetColour(rgb,w,h):null;
-  const washLight=washSheet?connectedLightTest(lightReference(rgb,w,h,washSheet)):null;
   const inferred = Uint8Array.from({ length: n }, (_, i) => {
     if (hold?.[i]) return 1;
-    if(washLight)return washLight(rgb,i)?1:0;
+    if(referenceTest)return referenceTest(rgb,i)?1:0;
     if (PAP) {
       if (papDark) return 0;
       return (rgb[3 * i] >= PAP[0] - papTol[0] && rgb[3 * i + 1] >= PAP[1] - papTol[1] && rgb[3 * i + 2] >= PAP[2] - papTol[2]) ? 1 : 0;
@@ -79,7 +80,7 @@ export function planLightToDark({calibratedPlan=false,washSystem=false,sourceCel
     }
     return value.values[i] < .055 ? 1 : 0;
   });
-  if(paper&&!washSystem)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=paperDelta)inferred[i]=1;}
+  if(paper&&!lightRef)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=(paperDelta??10))inferred[i]=1;}
   // detailScale k (detail-scale.mjs): the minimum shape shrinks with the target's mid-scale detail, down to share 1-k.
   const DETAIL0=detailScale>0?detailField(value.values,w,h,sheetWidthMm/w):null;
   const DETAIL=DETAIL0&&detailSegments?detailField(value.values,w,h,sheetWidthMm/w,segmentDetailMask(detailSegments,rgb,DETAIL0,w,h)):DETAIL0;
@@ -262,7 +263,7 @@ export function planLightToDark({calibratedPlan=false,washSystem=false,sourceCel
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
   if(washSystem||calibratedPlan)normalizeWashWeights(weights,{mergeMiddle:washSystem});
   let opticsReport=null;
-  if(calibratedPlan){const fit=fitPlanOptics({demand,rgb,labels:region.labels,protect:protectedCells,pigments,paperRGB:paperRGB??[252,251,248],k});demand=fit.demand;opticsReport=fit.report;console.log(`plan optics: ${opticsReport.length} region mixtures fitted in K/S thickness units; ${opticsReport.filter(r=>!r.matched).length} outside the material value range`);}
+  if(calibratedPlan){const fit=fitPlanOptics({demand,rgb,labels:region.labels,protect:protectedCells,pigments,paperRGB:paperRGB??[252,251,248],k,mode:washSystem?'mixed':'separate'});demand=fit.demand;opticsReport=fit.report;console.log(`plan optics: ${opticsReport.length} region factors estimated from mean K/S reflected light; ${opticsReport.filter(r=>!r.matched).length} outside the material value range`);}
   const mixedDemand=washSystem?new Float32Array(n):null;
   if(mixedDemand)for(let i=0;i<n;i++)for(let j=0;j<k;j++)mixedDemand[i]+=demand[i*k+j];
   const layers=[],instructions=[];let omittedDemand=0;
