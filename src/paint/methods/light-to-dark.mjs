@@ -337,7 +337,9 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   if(subjects)steps.splice(0,steps.length,...holdSubjectLights(steps,subjects.lights));
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
-  const carry=passCap>0?Array.from({length:k},()=>new Float32Array(n)):null;
+  // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,
+  // and paint cannot be taken back: carrying only the lack into the next band would lay it twice.
+  const carry=passCap>0&&!massTone?Array.from({length:k},()=>new Float32Array(n)):null;
   // mixedWash (mixed-washes.mjs): a passage is one shape of one colour domain with one mixed charge, laid once on dry
   // paper. Per-cell styles paint cell by cell, so those plans keep their pigment passes.
   const mixedOn=mixedWash&&!cellProf;
