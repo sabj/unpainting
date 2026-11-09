@@ -247,7 +247,7 @@ export const pngSize = file => { const b = fs.readFileSync(file); return [b.read
  */
 export function resolvePlan({ spec, planDir, variant, target, out, compile = false, gpu = 'auto', pausedir = null, resumestate = null }) {
   const problems = [];
-  const linesExist = name => fs.existsSync(path.join(planDir, LINES(name)));
+  const linesExist = name => fs.existsSync(path.join(planDir, LINES(name))) || fs.existsSync(path.join(planDir, LINES(name) + '.gz'));
   const config = readJson(path.join(planDir, 'config.json'));
   if (!config || typeof config !== 'object' || Array.isArray(config)) problems.push('config.json is missing or not a JSON object');
   if (!/^[A-Za-z0-9_]+$/.test(variant)) problems.push('variant.txt must hold one recipe name of letters, digits and underscores');
@@ -273,10 +273,13 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const args = [...layered.args];
   if (!glazeGains && !args.includes('--techcal')) args.push('--techcal', '1');
   const hasDrawingFile = args.includes('--drawingfile');
-  const inkActive = outlineMedium === 'ink' || hasDrawingFile || args.includes('--drawinglast');
+  const extraVal = name => { const i = extraArgs.lastIndexOf('--' + name); return i >= 0 && i + 1 < extraArgs.length && !extraArgs[i + 1].startsWith('--') ? extraArgs[i + 1] : null; };
+  const effMedium = extraVal('outlinemedium') ?? (config?.drawing?.medium === 'none' ? 'none' : outlineMedium);
+  const effDrawing = extraVal('drawing') ?? (config?.drawing?.medium === 'none' ? 'none' : optionMap(args).get('drawing') ?? 'first');
+  const inkActive = effDrawing !== 'none' && effMedium === 'ink';
   if (inkActive) {
-    if (hasDrawingFile && !args.includes('--washinkfree')) args.push('--washinkfree', '1');
-    if ((hasDrawingFile || args.includes('--drawinglast')) && !args.includes('--drawinghand')) args.push('--drawinghand', '1');
+    if (hasDrawingFile && effDrawing !== 'last' && !args.includes('--washinkfree') && !extraArgs.includes('--washinkfree')) args.push('--washinkfree', '1');
+    if ((hasDrawingFile || args.includes('--drawinglast')) && !args.includes('--drawinghand') && !extraArgs.includes('--drawinghand')) args.push('--drawinghand', '1');
   }
   const valueFloor = valueFloorFor(config);
   if (valueFloor && !extraArgs.includes('--valuefloor')) args.push('--valuefloor', valueFloor);

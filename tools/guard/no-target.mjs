@@ -122,7 +122,7 @@ export function createTargetGuard({ mode = DEFAULT_MODE, targetPaths = [], log =
       registered.set(arr, name);
       return new Proxy(arr, {
         get(t, k) {
-          if (phase === 'paint' && typeof k === 'string' && k.length && k.charCodeAt(0) >= 48 && k.charCodeAt(0) <= 57) {
+          if (phase === 'paint' && ((typeof k === 'string' && k.length && k.charCodeAt(0) >= 48 && k.charCodeAt(0) <= 57) || k === 'at' || k === 'slice' || k === 'subarray' || k === 'buffer' || k === 'values' || k === 'entries' || k === Symbol.iterator)) {
             reads[name] = (reads[name] || 0) + 1;
             if (reads[name] === 1 || blocking) record('element read', name);
           }

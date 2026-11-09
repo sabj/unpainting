@@ -44,7 +44,7 @@ export function mergePlaneFragments(labels,w,h,rgb,minimum=144,protect=null){
  for(let s=0;s<labels.length;s++)if(!seen[s]){queue.length=0;queue.push(s);seen[s]=1;const votes=new Map(),diffs=new Map();
   for(let p=0;p<queue.length;p++){const i=queue[p],x=i%w;for(const j of [x?i-1:-1,x<w-1?i+1:-1,i>=w?i-w:-1,i+w<labels.length?i+w:-1])if(j>=0){if(labels[j]===labels[s]){if(!seen[j]){seen[j]=1;queue.push(j);}}else if(rgb){const va=.2126*rgb[i*3]+.7152*rgb[i*3+1]+.0722*rgb[i*3+2],vb=.2126*rgb[j*3]+.7152*rgb[j*3+1]+.0722*rgb[j*3+2];if(Math.abs(va-vb)<12&&Math.max(...[0,1,2].map(q=>Math.abs(rgb[i*3+q]-rgb[j*3+q])))<24){const nl=labels[j];votes.set(nl,(votes.get(nl)??0)+1);const d=diffs.get(nl)??[0,0];d[0]+=vb-va;d[1]++;diffs.set(nl,d);}}}}
   let isProtected=false;
-  if(protect){if(protect.has)isProtected=protect.has(labels[s]);else if(typeof protect==='function')isProtected=queue.some(i=>protect(i,labels[s]));else isProtected=queue.some(i=>protect[i]);}
+  if(protect){if(protect.has)isProtected=protect.has(labels[s]);else if(typeof protect==='function')isProtected=queue.every(i=>protect(i,labels[s]));else isProtected=queue.every(i=>protect[i]);}
   if(!isProtected&&rgb){let sumL=0;for(let p=0;p<queue.length;p++){const i=queue[p];sumL+=.2126*rgb[i*3]+.7152*rgb[i*3+1]+.0722*rgb[i*3+2];}if(sumL/queue.length>=240)isProtected=true;}
   if(queue.length<minimum&&votes.size){
    let candidates=[...votes];

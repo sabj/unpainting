@@ -657,7 +657,7 @@ function stepBox(sheet, o, box, reduce = false) {
   // 1. drying, faster at the pinned boundary; absorption into the pores without tearing the film
   const evap = o.evap, edgeEvap = o.edgeEvap, absorb = o.absorb, oFilm = o.film;
   const edgeFlowDepth = o.edgeFlowDepth ?? 0.06;
-  const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.3;
+  const mmPerCell = o.mmPerCell > 0 ? o.mmPerCell : (paper.mmPerCell > 0 ? paper.mmPerCell : 0.3);
   const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
   const dryR2 = dryR * dryR;
 

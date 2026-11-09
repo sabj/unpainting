@@ -18,7 +18,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { writeInkLines, inkCells } from '../../crop/ink-lines-file.mjs';
 import { finishTexture } from './finish-texture.mjs';
-import { linePaths, scaleLines } from '../../crop/lines.mjs';
+import { linePaths, scaleLines, readLineText } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
 import { linePython } from './line-python.mjs';
 import { gaussian } from '../../keyframes/density.mjs';
@@ -230,7 +230,7 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
   let doc, setName;
   const file = opt('drawingfile', '');
   if (file) {
-    doc = JSON.parse(fs.readFileSync(linePaths(file).lines, 'utf8'));
+    doc = JSON.parse(readLineText(linePaths(file).lines));
     setName = info.source === 'file' ? linePaths(file).lines : info.source;
   } else {
     // no line file: the target's own dark ridges, as source-ink traces them, cleaned of shadow edges and foliage squiggles

@@ -2,6 +2,19 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
+## 0.3.1 — 2026-11-08
+
+**Cleaner washes, truer paper reserves, and stricter preflight guardrails.**
+
+0.3.1 refines wash planning, highlight reserves, pigment scattering, and wet-edge physics while adding preflight verification for benchmark and release comparisons:
+
+- **Wash Lanes & Graded Ramps (`src/paint/methods/stroke-plan.mjs`, `src/paint/methods/light-to-dark.mjs`, `tools/paint-plate.mjs`):** Curved wash lanes (`planLanes`) preserve continuous sweeps across scattered 1-cell flecks while splitting across genuine protected highlight gaps, retain `GRADED_CAL` open-edge escape calibration (`useGradedCal`) when `sh.graded` is cleared to prevent raw target gradient leaks, and compute true 2D gradient direction covariance (`_rampVec`) across passages.
+- **Paper Reserves & Fine Catchlights (`src/paint/methods/light-to-dark.mjs`, `src/paint/methods/subject-washes.mjs`):** Preserves fine specular catchlights inside dark features without reserving midtone snow or foliage noise specks, runs plane-fragment merging (`mergePlaneFragments`) after natural light/catchlight detection and before rectangular reserves so V4/V5 plans compile without axis-aligned seam errors, and carries per-subject threshold cuts through `subjectCovers` for `layerIncrement`.
+- **Simulation & Pigments (`src/water/fluid.mjs`, `src/color/pigments.mjs`, `src/media/sheet.mjs`, `src/draw/drawing-hand.mjs`):** Adds dry-fraction boundary evaporation scaling (`edgeEvapScale`) and wet-boundary capillary flow (`edgeFlowDepth`), per-pigment Kubelka-Munk scattering (`S`) and gamma profiles, Catmull-Rom spline smoothing and nib dynamics in `drawing-hand.mjs`, and unified `mmPerCell` precedence across CLI and browser sheets.
+- **Authoritative Preflight & Tear-Sheet Contracts (`src/paint/doctor.mjs`, `tools/doctor.mjs`, `bench/scripts/preflight.mjs`):** Adds `tools/doctor.mjs --strict`, `verifyComparisonRun`, and `verifyTearsheetContract` to enforce hardware GPU parity, full render widths, SAM/lineart model availability, and multi-model (`argon`, `astra`, `opus`) stage playbacks.
+
+Painter **V103**, simulator **104**, judges **J1**.
+
 ## 0.3.0 — 2026-11-07
 
 **More time painting, less time waiting.**

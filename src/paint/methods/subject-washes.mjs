@@ -62,11 +62,12 @@ export function subjectCovers({ subjects, values, weights, protectedCells, skyCe
     cut.set(s, layerFractions(count).map((q, j) => (j && at(q) - pale >= j * MIN_LAYER_STEP ? at(q) : Infinity)));
   }
   const close = smoothMm < 2 ? 1 : 2, least = smoothMm < 2 ? minShape : minShape * 4;
-  return Array.from({ length: count }, (_, j) => {
+  const covers = Array.from({ length: count }, (_, j) => {
     if (j === 0) return Uint8Array.from(weights, v => (v > 0 ? 1 : 0));
     const raw = Uint8Array.from(sm, (v, i) => (v > (cut.get(subject[i])?.[j] ?? Infinity) && !skyCells?.[i] ? 1 : 0));
     return removeSmall(closeLocal(raw, w, h, close), w, h, least);
   });
+  return Object.assign(covers, { cuts: cut, sm, subject });
 }
 
 /**

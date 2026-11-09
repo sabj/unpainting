@@ -6,7 +6,28 @@
 export async function loadFocus({ opt, w, h, sharp, path, root }) {
   const f = opt('focusmap', '');
   if (!f) return null;
-  const { data } = await sharp(path.resolve(root, f)).greyscale().resize(w, h, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+  const full = path.resolve(root, f);
+  if (full.endsWith('.json')) {
+    const fs = await import('node:fs');
+    const doc = JSON.parse(fs.readFileSync(full, 'utf8'));
+    const out = new Float32Array(w * h);
+    const arr = Array.isArray(doc) ? doc : (Array.isArray(doc?.values) ? doc.values : (Array.isArray(doc?.focus) ? doc.focus : null));
+    if (arr && arr.length === w * h && typeof arr[0] === 'number') {
+      for (let i = 0; i < w * h; i++) out[i] = Math.max(0, Math.min(1, arr[i] > 1 ? arr[i] / 255 : arr[i]));
+      return out;
+    }
+    const boxes = Array.isArray(doc?.regions) ? doc.regions : (Array.isArray(doc?.boxes) ? doc.boxes : (Array.isArray(doc) ? doc : []));
+    for (const r of boxes) {
+      const b = r?.bounds ?? r?.box ?? (Array.isArray(r) ? r : null);
+      if (!Array.isArray(b) || b.length < 4) continue;
+      const wt = Math.max(0, Math.min(1, Number(r?.weight ?? r?.focus ?? 1)));
+      const x0 = Math.max(0, Math.floor((b[0] <= 1 && b[2] <= 1 ? b[0] * w : b[0]))), y0 = Math.max(0, Math.floor((b[1] <= 1 && b[3] <= 1 ? b[1] * h : b[1])));
+      const x1 = Math.min(w, Math.ceil((b[0] <= 1 && b[2] <= 1 ? b[2] * w : b[2]))), y1 = Math.min(h, Math.ceil((b[1] <= 1 && b[3] <= 1 ? b[3] * h : b[3])));
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) out[y * w + x] = Math.max(out[y * w + x], wt);
+    }
+    return out;
+  }
+  const { data } = await sharp(full).greyscale().resize(w, h, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
   return Float32Array.from(data, v => v / 255);
 }
 

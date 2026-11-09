@@ -8,6 +8,7 @@
 // DOM free. Reads JSON and nothing else.
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const DEFAULT_DIR = 'work/lines';
 // The most a line file's aspect may differ from the bound target's, as a share.
@@ -35,8 +36,18 @@ export function linePaths(base, dir = DEFAULT_DIR) {
   return { map: `${stem}.png`, lines: `${stem}-lines.json` };
 }
 
+export function hasLineFile(file) {
+  return fs.existsSync(file) || fs.existsSync(file + '.gz');
+}
+
+export function readLineText(file) {
+  if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8');
+  if (fs.existsSync(file + '.gz')) return zlib.gunzipSync(fs.readFileSync(file + '.gz')).toString('utf8');
+  throw new Error(`lines: no line file at ${file}`);
+}
+
 export function hasLines(base, dir = DEFAULT_DIR) {
-  return fs.existsSync(linePaths(base, dir).lines);
+  return hasLineFile(linePaths(base, dir).lines);
 }
 
 /** Arc length of a polyline of {x, y}, in whatever units its points are in. */
@@ -85,6 +96,5 @@ export function scaleLines(doc, w, h, { keepOrder = false, file = null } = {}) {
 
 export function loadLines(base, w, h, { dir = DEFAULT_DIR, keepOrder = false } = {}) {
   const file = linePaths(base, dir).lines;
-  if (!fs.existsSync(file)) throw new Error(`lines: no line file at ${file}`);
-  return scaleLines(JSON.parse(fs.readFileSync(file, 'utf8')), w, h, { keepOrder, file });
+  return scaleLines(JSON.parse(readLineText(file)), w, h, { keepOrder, file });
 }

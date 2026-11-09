@@ -28,6 +28,7 @@ function buildRunCard({
   segments = null,
   linework = null,
   gpu = null,
+  dimensions = null,
   palette = null,
   phases = [],
   seconds = 0,
@@ -36,7 +37,8 @@ function buildRunCard({
   const resolveOpt = p => (p ? path.resolve(root, p) : null);
   const targetPath = resolveOpt(imageFile);
   const planPath = resolveOpt(planFile);
-  const lineJsonPath = drawingFile ? path.resolve(root, linePaths(drawingFile).lines) : null;
+  const rawLinePath = drawingFile ? path.resolve(root, linePaths(drawingFile).lines) : null;
+  const lineJsonPath = rawLinePath && !fs.existsSync(rawLinePath) && fs.existsSync(rawLinePath + '.gz') ? rawLinePath + '.gz' : rawLinePath;
   const paintingPng = out ? path.join(out, "painting.png") : null;
   const paintingJpg = out ? path.join(out, "painting.jpg") : null;
   const paintingPath = paintingPng && fs.existsSync(paintingPng) ? paintingPng : paintingJpg;
@@ -76,6 +78,15 @@ function buildRunCard({
           backend: gpu.backend ?? null,
           adapter: gpu.adapter ?? null,
           device: gpu.device ?? null,
+        }
+      : null,
+    dimensions: dimensions
+      ? {
+          sourceWidth: dimensions.sourceWidth ?? null,
+          sourceHeight: dimensions.sourceHeight ?? null,
+          paintWidth: dimensions.paintWidth ?? null,
+          paintHeight: dimensions.paintHeight ?? null,
+          enlargement: dimensions.enlargement ?? null,
         }
       : null,
     // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)

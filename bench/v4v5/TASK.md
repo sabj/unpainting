@@ -19,7 +19,7 @@ how much its progress frames look like a person painting.
 ## What is fixed for everyone
 
 - The painter code (`tools/paint-plate.mjs`) and its base recipe. Every painting starts from the base recipe
-  `region_w13_lay4_ink4_rec2x_rcl_sky3_sep8_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_uncap_pgreen_dwg200_tp2`.
+  `region_w13_lay4_rec2x_rcl_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_pgreen_tp2`.
   Your recipe tokens and painter settings are layered on top of it (below).
 - Fast drying mode, seed 0, the recording (progress frames and the stroke log), the target guard in `gentle` mode (the
   painter may look at broad shape averages of the target while painting; cell-level target reads are blocked and
@@ -48,7 +48,7 @@ All files go in `bench/plan/` unless stated.
      the painter's planning step and catches this.
 2. **Drawing paths: `opening-lines.json` (lines drawn before the washes) and `closing-lines.json` (lines drawn
    last).** Set `drawing.medium: "ink"` in `config.json` for ink, or use `--outlinemedium ink`
-   in `extra-args.json`. Add `--drawing both` only when closing lines have a stated purpose.
+   in `extra-args.json`. When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
    Prepared paths use the harness-owned v2 ink rules: source support, smoothing, darkness caps and damp pen.
    Raw v1 ink controls and legacy ink/sep/uncap/dwg tokens are not admitted. Without a drawing file the painter
    draws from its own reading of the target. Schema:
@@ -59,7 +59,7 @@ All files go in `bench/plan/` unless stated.
    `node bench/tools/closing-ink.mjs` (read its header).
 3. **`bench/variant.txt` (required): recipe tokens.** `region_w13` or `region_w15` followed by `_token`s, e.g.
    `region_w13_lay2_dk11`. Write only what you want to change: the base is applied automatically. A token you write
-   replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`). A token that changes nothing on this subject is refused. Stone-block tokens of the base act
+   replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`). A token that changes nothing on this subject is refused. Stone-block and recess tokens of the base act
    on architecture only; palette tokens (`_pwarm`, `_pgold`, `_pgreen`, `_pbs`, `_rv`) act only on Trumbull; elsewhere
    choose pigments with `--paints` in `extra-args.json`. `region_w15` switches to brush choice per passage. The full
    token list with the painter options each sets is in `bench/TOKENS.md`.
