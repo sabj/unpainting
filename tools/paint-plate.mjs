@@ -3464,7 +3464,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     clock('dry', () => dry(sheet, 20000, O, { levelMax: num('dryeachlevel', 200) }));
   // One shape-level look per passage (TARGET_GUARD.look) gives plan and sheet means; the charge comes from their difference.
   // SHAPE_LOAD spreads that one number over the shape for path planners that take a field; it steers nothing.
-  const colourMix = sh.mix.filter(v=>v>1e-9).length>1 ? shapeMix(sh) : COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
+  const colourMix = sh._valuePlan?.mixed || sh.mix.filter(v=>v>1e-9).length>1 ? shapeMix(sh) : COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
 
   const LEDGER = ONSHEET ?? expected;
   const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
@@ -3666,7 +3666,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
     // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
     // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
-    const softReach=num('softwet',0)>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',sh._valuePlan?.washSystem ? .75 : 0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
+    const softReach=SOFT_WET_MM>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',sh._valuePlan?.washSystem ? .75 : 0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
     const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;
     const grow=soft?.ring?softReach*SC:0;
     const box=baseMask===MASK&&reach<=0?{x0:Math.max(0,MB.x0*SC-grow),y0:Math.max(0,MB.y0*SC-grow),x1:Math.min(W2-1,(MB.x1+1)*SC-1+grow),y1:Math.min(H2-1,(MB.y1+1)*SC-1+grow)}:null;
@@ -4462,4 +4462,3 @@ writeCensus(out, { main: sheet, fine: INKRES?.fine });
   process.off('uncaughtExceptionMonitor', JSONL.flush);
 }
 process.exit(process.exitCode ?? 0);
-
