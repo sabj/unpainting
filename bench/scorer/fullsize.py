@@ -7,16 +7,17 @@
 J1 shrinks the painting to the target's size, so it cannot see what happens below about a millimetre of paper.
 This reads the painting at its own pixels and never shrinks it.
 
-classic:  target-free measures in millimetres of paper (the sheet is --plate-mm wide):
-            edges     share of boundary length that is hard, firm or soft, from the blur width of each edge
-            fills     share of the open wash that is flat, and a posterisation index (flat fills with hard rims)
-            flecks    small white specks and thin white slashes that sit inside paint, away from open paper
-                      (pale ones are counted too, but not scored)
-          Each becomes 0-10 by a stated convention; their mean is classic.mean.
 vision:   the sheet is cut into 1:1 tiles (64 mm of paper each, never resized). The three J1 judges see a small
           view of the same painting for context and one tile, and rate edges, washes, lines and artefacts, give one
           overall, and tick named defects. They never see the target.
-craft:    mean(vision overall, classic mean), or null when incomplete.
+craft:    the mean over judges of each judge's mean tile score, 0 to 10, or null when incomplete. worstTile is the
+          mean over judges of each judge's lowest tile.
+measures: target-free measurements in millimetres of paper (the sheet is --plate-mm wide). They are reported, with
+          an overlay picture on request, and are not part of craft:
+            edges     share of boundary length that is hard, firm or soft, from the blur width of each edge
+            fills     share of the open wash that is flat, and a posterisation index (flat fills with hard rims)
+            flecks    small white specks and thin white slashes that sit inside paint, away from open paper;
+                      pale ones are counted apart
 
 Nothing here reads the target: there is no target argument, so copying the target cannot raise any number. Every constant below is a physical or
 perceptual quantity fixed before any plate was measured; none was fitted to a plate.
@@ -25,7 +26,7 @@ import argparse, json, math, os, re, sys
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 from scipy import ndimage as ndi
 from skimage.color import rgb2lab
 from skimage.feature import canny
@@ -178,25 +179,24 @@ def flecks(L, px_mm, painted):
     opened = ndi.grey_opening(L, footprint=_disc(FLECK_MAX_MM * px_mm))
     cand = (L - opened >= STRONG) & (opened <= paper - STRONG)
     near_paper = ndi.binary_dilation(opened >= paper - PAPER_TOL, iterations=max(1, round(PAPER_GAP_MM * px_mm)))
-    lab, length, width, area = _components(cand, px_mm)
     kinds = np.zeros(L.shape, np.uint8)  # 1 white fleck, 2 white slash, 3 pale fleck, 4 pale slash; for the overlay
-    out = {"grain": 0, "white_flecks": 0, "white_slashes": 0, "white_slash_mm": 0.0,
-           "pale_flecks": 0, "pale_slashes": 0, "pale_slash_mm": 0.0}
-    if len(length):
-        idx = np.arange(1, len(length) + 1)
-        isolated = ndi.maximum(near_paper, lab, idx) == 0
-        white = ndi.mean(L, lab, idx) >= paper - PAPER_TOL  # bare paper, not a lighter tint of paint
+    out = {"grain": 0}
+    is_white = L >= paper - PAPER_TOL  # bare paper, not a lighter tint of paint
+    # white and pale parts are separated first, so a white core inside a pale halo still counts as white
+    for name, mask, base in (("white", cand & is_white, 1), ("pale", cand & ~is_white, 3)):
+        lab, length, width, _ = _components(mask, px_mm)
+        out.update({name + "_flecks": 0, name + "_slashes": 0, name + "_slash_mm": 0.0})
+        if not len(length):
+            continue
+        isolated = ndi.maximum(near_paper, lab, np.arange(1, len(length) + 1)) == 0
         grain = length < GRAIN_MM
         slash = isolated & ~grain & (length >= SLASH_MIN_MM) & (length >= 3 * width)
         fleck = isolated & ~grain & ~slash
-        out.update(grain=int((isolated & grain).sum()),
-                   white_flecks=int((fleck & white).sum()), white_slashes=int((slash & white).sum()),
-                   white_slash_mm=round(float(length[slash & white].sum()), 1),
-                   pale_flecks=int((fleck & ~white).sum()), pale_slashes=int((slash & ~white).sum()),
-                   pale_slash_mm=round(float(length[slash & ~white].sum()), 1))
-        code = np.zeros(len(length) + 1, np.uint8)
-        code[1:][fleck] = 3; code[1:][slash] = 4; code[1:][fleck & white] = 1; code[1:][slash & white] = 2
-        kinds = code[lab]
+        out["grain"] += int((isolated & grain).sum())
+        out.update({name + "_flecks": int(fleck.sum()), name + "_slashes": int(slash.sum()),
+                    name + "_slash_mm": round(float(length[slash].sum()), 1)})
+        code = np.zeros(len(length) + 1, np.uint8); code[1:][fleck] = base; code[1:][slash] = base + 1
+        kinds = np.maximum(kinds, code[lab])
     cm2 = float(painted.sum()) / px_mm ** 2 / 100.0
     # one unit of defect is one white fleck, or SLASH_MIN_MM of white slash. Pale marks are reported, not scored:
     # without the subject a pale slash cannot be told from a window bar or a whisker.
@@ -206,23 +206,17 @@ def flecks(L, px_mm, painted):
 
 
 def classic_fullsize(image, plate_mm=200.0, overlay=None):
-    """Target-free measures on the painting at its own size."""
+    """Target-free measures on the painting at its own size. These are measurements, not scores: on the plates
+    and scans tried they did not separate real paintings from the simulator's (design-full-size-judge.md)."""
     img = load_rgb(image) if isinstance(image, str) else image
     L = lightness(img)
     px_mm = img.width / plate_mm
     e, edge_map = edge_types(L, px_mm)
     f, painted = fills(L, px_mm, edge_map, e["hard_contrast_share"])
     k, fleck_map = flecks(L, px_mm, painted)
-    # 0-10 conventions, stated, not fitted: variety is the entropy of the three edge classes; posterisation is
-    # one minus the index; flecks fall by 1/e for each white defect per square centimetre of paint.
-    scores = {"edge_variety": round(10 * e["variety"], 2),
-              "posterisation": None if f["posterisation"] is None else round(10 * (1 - f["posterisation"]), 2),
-              "flecks": None if k["white_per_cm2"] is None else round(10 * math.exp(-k["white_per_cm2"]), 2)}
-    m = _mean(list(scores.values())) if None not in scores.values() else None
     if overlay:
         _overlay(img, edge_map, fleck_map, px_mm).save(overlay, quality=85)
-    return {"pxPerMm": round(px_mm, 3), "edges": e, "fills": f, "flecks": k, "scores": scores,
-            "mean": None if m is None else round(m, 2)}
+    return {"pxPerMm": round(px_mm, 3), "edges": e, "fills": f, "flecks": k}
 
 
 def _overlay(img, edge_map, fleck_map, px_mm):
@@ -344,7 +338,7 @@ def vision_tiles(image, style, plate_mm=200.0, calls=1, post=None):
 
     def run(job):
         j, i = job
-        for _ in range(2):  # one retry with the images; no text-only repair
+        for _ in range(3):  # up to two retries with the images, as J1 allows; no text-only repair
             try:
                 raw, _usage = post(j, [{"role": "user", "content": contents[i]}])
             except RuntimeError as e:
@@ -378,11 +372,11 @@ def score(image, style, plate_mm=200.0, vision=True, calls=1, overlay=None, post
     img = load_rgb(image)
     cl = classic_fullsize(img, plate_mm, overlay)
     vi = vision_tiles(img, style, plate_mm, calls, post) if vision else {"complete": False, "tiles": [], "per_judge": {}}
-    complete = bool(vi.get("complete")) and cl["mean"] is not None
+    complete = bool(vi.get("complete"))
     return {"version": VERSION, "paintingSize": list(img.size), "plateMm": plate_mm, "style": style,
-            "craft": round((vi["overall"] + cl["mean"]) / 2, 2) if complete else None, "complete": complete,
-            "visionOverall": vi.get("overall"), "visionWorstTile": vi.get("worst"), "classic": cl["mean"],
-            "classicDetail": cl, "vision": vi}
+            "craft": vi["overall"] if complete else None, "worstTile": vi["worst"] if complete else None,
+            "complete": complete, "criteria": vi.get("criteria"), "flagShare": vi.get("flagShare"),
+            "flagPeak": vi.get("flagPeak"), "measures": cl, "vision": vi}
 
 
 def main():
@@ -390,7 +384,7 @@ def main():
     ap.add_argument("--image", required=True)
     ap.add_argument("--style", default="watercolor and ink")
     ap.add_argument("--plate-mm", type=float, default=200.0, help="width of the sheet in millimetres (default %(default)s)")
-    ap.add_argument("--no-vision", action="store_true")
+    ap.add_argument("--no-vision", action="store_true", help="measures only; needs no key")
     ap.add_argument("--calls", type=int, default=1, help="calls per judge per tile (default %(default)s)")
     ap.add_argument("--overlay", help="write a JPEG that marks the edges, flecks and slashes found")
     ap.add_argument("--out")
