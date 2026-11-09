@@ -293,20 +293,19 @@ def _tile_content(img, tile, style, plate_mm, sp):
 
 def aggregate_tiles(tiles, samples, judges, min_valid):
     """samples[(judge, tile index)] is a list of parsed replies. A tile's score from one judge is the median of
-    its calls; a judge's score is the mean over tiles; the result is the mean over judges. worst is the mean over
-    judges of each judge's lowest tile, because a defect lives in one place."""
+    its calls; a judge's score is the mean over the tiles it answered; the result is the mean over judges. worst is
+    the mean over judges of each judge's lowest tile, because a defect lives in one place. A judge counts when it
+    answered at least 3 in 5 of the tiles, the share of valid calls J1 asks of a judge."""
     med = lambda xs: float(np.median(xs)) if xs else None
     per_tile, per_judge = [], {}
-    complete = True
+    need = math.ceil(0.6 * len(tiles))
     for j in judges:
         rows = []
         for i in range(len(tiles)):
             ds = samples.get((j, i), [])
-            if len(ds) < min_valid:
-                complete = False
-                continue
-            rows.append({k: med([d[k] for d in ds if d[k] is not None]) for k in CRITERIA + ["overall"]})
-        if rows:
+            if len(ds) >= min_valid:
+                rows.append({k: med([d[k] for d in ds if d[k] is not None]) for k in CRITERIA + ["overall"]})
+        if rows and len(rows) >= need:
             per_judge[j] = {**{k: _mean([r[k] for r in rows]) for k in CRITERIA + ["overall"]},
                             "worst": min(r["overall"] for r in rows), "tiles": len(rows)}
     for i, t in enumerate(tiles):
@@ -314,7 +313,7 @@ def aggregate_tiles(tiles, samples, judges, min_valid):
         per_tile.append({"row": t["row"], "col": t["col"], "box": list(t["box"]), "where": t["where"], "calls": len(ds),
                          "overall": _mean([med([d["overall"] for d in samples.get((j, i), [])]) for j in judges]),
                          "flags": {f: round(sum(f in d["flags"] for d in ds) / len(ds), 2) for f in FLAGS} if ds else {}})
-    out = {"complete": complete and len(per_judge) == len(judges) and bool(tiles), "minValidCalls": min_valid,
+    out = {"complete": len(per_judge) == len(judges) and bool(tiles), "minValidCalls": min_valid, "minTilesPerJudge": need,
            "per_judge": {j: {k: (None if v is None else round(v, 2)) for k, v in r.items()} for j, r in per_judge.items()},
            "tiles": [{**t, "overall": None if t["overall"] is None else round(t["overall"], 2)} for t in per_tile]}
     if out["complete"]:
@@ -329,7 +328,8 @@ def aggregate_tiles(tiles, samples, judges, min_valid):
 
 
 def vision_tiles(image, style, plate_mm=200.0, calls=1, post=None):
-    """Ask each J1 judge about each tile, `calls` times. A (judge, tile) pair needs more than half its calls valid."""
+    """Ask each J1 judge about each tile, `calls` times. A (judge, tile) pair needs more than half its calls valid;
+    a judge needs 3 in 5 of its tiles."""
     import score_painting as sp
     post = post or sp._post
     img = load_rgb(image) if isinstance(image, str) else image
@@ -404,7 +404,7 @@ def main():
         open(a.out, "w").write(s)
     print(s)
     if not a.no_vision and not r["complete"]:
-        print("incomplete: some judge and tile pairs have too few valid calls", file=sys.stderr)
+        print("incomplete: a judge answered fewer than 3 in 5 of the tiles", file=sys.stderr)
 
 
 if __name__ == "__main__":
