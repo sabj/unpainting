@@ -176,3 +176,44 @@ test('multi-lane paths leave no uncovered cell on a wide curved plane', () => {
   assert.ok(holes / cells < 0.001, `${maxBrushMm} mm brush left ${holes} of ${cells} cells uncovered`);
  }
 });
+
+// A flat wash laid in lanes leaves a thin bare seam where two lanes meet (measured: about 8 cells of paper on a 1200 px
+// plate). Each pigment is its own coat over the same plane, so if every coat splits at the same place the seams stack
+// into one white slash. A painter shifts the stroke boundaries from coat to coat; the coat option does the same.
+test("successive coats on one plane split their lanes at different seams", () => {
+ const w = 700, h = 500, mm = 0.4, m = new Uint8Array(w * h);
+ for (let y = 100; y < 300; y++) for (let x = 60; x < 640; x++) m[y * w + x] = 1;
+ const seam = coat => { const lanes = shapedPlanePaths(m, w, h, { mmPerCell: mm, maxBrushMm: 38, coat }), i = lanes[0].length >> 1; return { n: lanes.length, at: (lanes[0][i].y + lanes[0][i].r + lanes[1][i].y - lanes[1][i].r) / 2, lanes }; };
+ const first = seam(0), plain = shapedPlanePaths(m, w, h, { mmPerCell: mm, maxBrushMm: 38 });
+ assert.deepEqual(first.lanes, plain, "the first coat keeps the established lane layout");
+ const at = [0, 1, 2, 3, 4, 5].map(c => seam(c).at);
+ for (let a = 0; a < at.length; a++) for (let b = a + 1; b < at.length; b++) assert.ok(Math.abs(at[a] - at[b]) >= 3, `coats ${a} and ${b} share a seam: ${at[a].toFixed(1)} and ${at[b].toFixed(1)}`);
+ for (let c = 0; c < 6; c++) {
+  const { n, lanes } = seam(c); assert.equal(n, first.n, "the lane count does not change");
+  for (const l of lanes) for (const p of l) assert.ok(p.r <= 38 / (2 * mm) + 1e-6, "a lane never exceeds the brush");
+  const covered = new Uint8Array(w * h);
+  for (const lane of lanes) for (const b of lane) for (let q = Math.floor(b.y - b.r); q <= Math.ceil(b.y + b.r); q++) for (let k = Math.floor(b.x - b.r); k <= Math.ceil(b.x + b.r); k++) if (q >= 0 && q < h && k >= 0 && k < w && (k + .5 - b.x) ** 2 + (q + .5 - b.y) ** 2 <= b.r * b.r) covered[q * w + k] = 1;
+  let holes = 0, cells = 0; for (let i = 0; i < m.length; i++) if (m[i]) { cells++; if (!covered[i]) holes++; }
+  assert.ok(holes / cells < 0.002, `coat ${c} left ${holes} of ${cells} cells uncovered`);
+ }
+});
+
+// The joins between lanes meet in solid paint: each lane is wide enough that the brush's solid reach (its half-width
+// less the wander of its sides and the fringe of outer hairs, brush.mjs solidHalfWidth) covers half the lane pitch,
+// for every coat however its joins are moved, and no lane is wider than the brush.
+test("lanes are spaced by the brush's solid reach, so neighbouring lanes meet in solid paint", () => {
+ const w = 700, h = 500, mm = 0.4, m = new Uint8Array(w * h);
+ for (let y = 100; y < 300; y++) for (let x = 60; x < 640; x++) m[y * w + x] = 1;
+ const solidHalf = (r, p) => 0.8 * r * (0.9 + 0.1 * p) - 1; // a brush whose solid paint stops well inside its radius
+ const brushR = 38 / (2 * mm);
+ for (let coat = 0; coat < 6; coat++) {
+  const lanes = shapedPlanePaths(m, w, h, { mmPerCell: mm, maxBrushMm: 38, coat, solidHalf });
+  assert.ok(lanes.length > 1, 'a plane wider than the brush is laid in lanes');
+  const mid = lanes[0].length >> 1;
+  for (let k = 0; k + 1 < lanes.length; k++) {
+   const a = lanes[k][mid], b = lanes[k + 1][mid], gap = Math.hypot(b.x - a.x, b.y - a.y);
+   assert.ok(solidHalf(a.r, a.p) + solidHalf(b.r, b.p) >= gap - 1e-6, `coat ${coat}, lanes ${k} and ${k + 1}: solid reach ${(solidHalf(a.r, a.p) + solidHalf(b.r, b.p)).toFixed(1)} short of the pitch ${gap.toFixed(1)}`);
+  }
+  for (const l of lanes) for (const p of l) assert.ok(p.r <= brushR + 1e-6, 'a lane never exceeds the brush');
+ }
+});

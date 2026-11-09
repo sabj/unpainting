@@ -1,6 +1,9 @@
 // Geometry of shaped plane marks, shared by planner and executor: one flat-brush gesture per plane, short texture marks
 // and sky lanes. A physical contact clip retains concavities, recesses and reserved lights.
-export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null,mmPerCell=0,maxBrushMm=38,protect=null}={}) {
+// A join moves at most half a lane: that puts it midway between two joins of the first coat, as far from them as it
+// can get (any further brings it towards the next one), and keeps the narrowed edge lane at least half a lane wide.
+const LANE_OVERLAP=1.035,GOLDEN=.6180339887498949,MAX_SEAM_SHIFT=.5;
+export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null,mmPerCell=0,maxBrushMm=38,protect=null,coat=0,solidHalf=null}={}) {
  // An authored per-passage tool choice is shared with every geometry consumer.
  if(mask.passageBrush)return mask.passageBrush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale}))); 
  // lanesR: a large sky plane is one wet passage of overlapping horizontal lanes (a graded band wash with a wide flat),
@@ -35,10 +38,31 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
    envPts.push({x:(cx+dx*j-dy*u)*scale,y:(cy+dy*j+dx*u)*scale,r:r*scale,p:.9});
   }
   // The envelope of a curved plane is wider than any one slice, so the lane count comes from it: lanes never spread wider than the brush.
-  const lanes=Math.ceil(2*Math.max(...envPts.map(p=>p.r/scale))*mmPerCell/maxBrushMm);
+  // solidHalf(r, p), in sheet cells (brush.mjs solidHalfWidth for the brush that lays the plane): how far from its path
+  // the brush lays solid paint. A painter overlaps each stroke onto the last by more than the ragged edge of the brush,
+  // so the lanes are spaced to meet in solid paint: each lane is as wide as it must be for that, never wider than the
+  // brush, and the plane takes as many lanes as the brush's solid reach needs. Without solidHalf the lanes overlap by
+  // the nominal 3.5% of the older geometry.
+  const Rmax=Math.max(...envPts.map(p=>p.r/scale)),brushR=maxBrushMm/(2*mmPerCell);
+  const solid=solidHalf?(r,p)=>solidHalf(r*scale,p)/scale:null,reach=solid?solid(brushR,.9):0;
+  const lanes=Math.max(Math.ceil(2*Rmax*mmPerCell/maxBrushMm),solid&&reach>0?Math.ceil(Rmax/reach):0);
+  // the narrowest lane radius whose solid reach covers half a lane of width 2*half (solid grows with the radius)
+  const radiusFor=(half,p)=>{if(!solid)return Math.min(brushR,half*LANE_OVERLAP);if(solid(brushR,p)<=half)return brushR;let lo=half,hi=brushR;for(let it=0;it<40;it++){const m=(lo+hi)/2;if(solid(m,p)>=half)hi=m;else lo=m;}return hi;};
+  // Lane seams: where two lanes meet the brush edge leaves a thin seam. Every pigment is its own coat over the same
+  // plane, so coats that split at one place stack that seam into a slash. A painter moves the stroke boundaries
+  // from coat to coat. Coat n shifts every interior boundary by the same share of a lane (golden-ratio spacing, coat 0
+  // unshifted), as far as the widened lane can still fit the brush. The planner numbers the coats by the coats it has
+  // already planned on the same cells (methods/coat-order.mjs), never from painting progress, so a painting taken over
+  // by a fresh process lays the same lanes.
+  const room=solid?reach*lanes/Rmax:brushR/(Rmax/lanes*LANE_OVERLAP);
+  const maxShift=Math.max(0,Math.min(MAX_SEAM_SHIFT,room-1));
+  const shift=maxShift*(2*((.5+coat*GOLDEN)%1)-1);
+  const cut=k=>k<=0?-1:k>=lanes?1:-1+2*(k+shift)/lanes;
   return Array.from({length:lanes},(_,k)=>envPts.map(p=>{
-   const offset=(k-(lanes-1)/2)*2*(p.r/scale)/lanes;
-   return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.035),p:p.p};
+   const R=p.r/scale;
+   if(!shift&&!solid){const offset=(k-(lanes-1)/2)*2*R/lanes;return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:Math.min(brushR*scale,p.r/lanes*LANE_OVERLAP),p:p.p};}
+   const mid=(cut(k)+cut(k+1))/2*R,half=(cut(k+1)-cut(k))/2*R;
+   return {x:p.x-dy*mid*scale,y:p.y+dx*mid*scale,r:radiusFor(half,p.p)*scale,p:p.p};
   }));
  }
  return [points];
