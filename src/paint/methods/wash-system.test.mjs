@@ -55,6 +55,24 @@ test('a mixture carried by the second pan survives single-pan share filtering',(
  assert.ok(Math.abs(mass-n*.3)<1e-3);
 });
 
+test('explicit component overrides in the bundle remain real ablations',()=>{
+ const w=60,h=40,n=w*h,common={w,h,k:2,demand:Float32Array.from({length:n*2},(_,i)=>i%2?.1:.2),
+  density:new Float32Array(n).fill(.3),rgb:new Uint8Array(n*3).fill(170),shaped:true,washSystem:true,
+  paperRGB:[252,251,248],minShapeCells:4,layers:4};
+ const bundled=planLightToDark(common),separate=planLightToDark({...common,mixedWash:false,mixedShadows:false,scaleCuts:false,gradedLanes:false,softChoice:false});
+ assert.ok(bundled.layers.flatMap(l=>l.shapes).some(sh=>sh.mix.filter(v=>v>0).length>1));
+ assert.ok(separate.layers.flatMap(l=>l.shapes).every(sh=>sh.mix.filter(v=>v>0).length===1));
+ assert.ok(separate.layers.flatMap(l=>l.shapes).every(sh=>!sh._strokePlan));
+});
+
+test('an explicit paper-rule override keeps the legacy light rule inside the bundle',()=>{
+ const w=30,h=30,n=w*h,rgb=new Uint8Array(n*3),density=new Float32Array(n).fill(.2);
+ for(let i=0;i<n;i++)rgb.set([248,245,216],3*i);
+ const common={w,h,k:1,rgb,density,demand:density.slice(),shaped:true,washSystem:true,paperRel:true,paperRGB:[252,251,248],minShapeCells:4};
+ assert.equal(planLightToDark(common).protectedCells[5*w+5],0,'cream is a wash on the declared white sheet');
+ assert.equal(planLightToDark({...common,paperRule:false}).protectedCells[5*w+5],1,'the explicit override retains the old relative-light rule');
+});
+
 test('feedback follows the passage mixture when the first pan is already complete',()=>{
  const target=[.02,.5],held=[.02,.1],booked=[.01,.1],mix=shapeMix({mix:target});
  const factor=shapeCharge(shapeDeficit(target,held,{mix}),shapeDeficit(target,booked,{mix}));
