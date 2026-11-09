@@ -76,6 +76,7 @@ function buildRunCard({
     gpuBackend: gpu
       ? {
           backend: gpu.backend ?? null,
+          fallback: typeof gpu.fallback === 'boolean' ? gpu.fallback : null,
           adapter: gpu.adapter ?? null,
           device: gpu.device ?? null,
         }

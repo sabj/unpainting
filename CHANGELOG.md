@@ -2,19 +2,18 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## 0.3.1 — 2026-11-08
+## 0.3.1 — local candidate, 2026-11-09
 
-**Cleaner washes, truer paper reserves, and stricter preflight guardrails.**
+Painter **V104**, simulator **104**, judges **J1**.
 
-0.3.1 refines wash planning, highlight reserves, pigment scattering, and wet-edge physics while adding preflight verification for benchmark and release comparisons:
+- Explicit highlight reserves keep the observed light inside the declared box. They no longer leave the whole box as white paper. Opening and closing drawing files keep their authored lines.
+- Automatic ink choices use one source-scale pen reading. The preparation gate uses the declared pen threshold, and the v2 ink recipe matches source line darkness.
+- Playback keeps the 10%, 25%, 50%, 75% and final images, plus dried value-band checkpoints. Lane and seam checks retain small paper flecks while respecting real highlight gaps.
+- Settings diagnostics identify controls the chosen method cannot use. The benchmark base drops inert settings. A source scan flags new subject-dependent rules. Paint Lab checks cover the active shader and GPU parity.
+- Resumable rerenders identify code, arguments and input contents, recheck required output evidence, and refuse inputs that change during a job. Scoring preparation fails on absent guard evidence and retains actual target-look counts. Benchmark sessions accept an explicit judge version and a zero-target-look requirement.
+- `--washsystem 1` is an experimental, opt-in combination of mixed charges on dry paper, brush-scale middle layers, graded lanes, selective soft edges, paper rules, ideal K/S value estimates and sheet-only delivery readings. `--calibratedplan 1` and `--paperrule 1` can be tried separately. These controls do not establish a quality gain and remain off by default. The K/S estimate models ideal layers; brush deposition and later layer order can differ.
 
-- **Wash Lanes & Graded Ramps (`src/paint/methods/stroke-plan.mjs`, `src/paint/methods/light-to-dark.mjs`, `tools/paint-plate.mjs`):** Straight wash lanes (`planLanes`) preserve continuous sweeps across scattered 1-cell flecks while splitting across genuine protected highlight gaps, retain `GRADED_CAL` open-edge escape calibration (`useGradedCal`) when `sh.graded` is cleared to prevent raw target gradient leaks, and compute true 2D gradient direction covariance (`_rampVec`) across passages.
-- **Paper Reserves & Fine Catchlights (`src/paint/methods/light-to-dark.mjs`, `src/paint/methods/subject-washes.mjs`):** Preserves fine specular catchlights inside dark features without reserving midtone snow or foliage noise specks, runs plane-fragment merging (`mergePlaneFragments`) after natural light/catchlight detection and before rectangular reserves so V4/V5 plans compile without axis-aligned seam errors, and carries per-subject threshold cuts through `subjectCovers` for `layerIncrement`.
-- **Simulation & Pigments (`src/media/step-box.mjs`, `src/crop/box.mjs`, `src/media/sheet.mjs`, `src/draw/drawing-hand.mjs`):** Adds dry-fraction boundary evaporation scaling (`edgeEvapScale`) and wet-boundary capillary flow (`edgeFlowDepth`), restores uniform optical constants in `box.mjs` while keeping defensive `scatter` array copies in `boxPigment`, adds Catmull-Rom spline smoothing and nib dynamics in `drawing-hand.mjs`, and unifies `mmPerCell` precedence across CLI and browser sheets.
-- **Band-Boundary Playback (`tools/paint-plate.mjs`, `tools/speed/frame-policy.mjs`):** Playback records a frame at every completed value band, dried, under both frame policies (`boundary: "value"` in `frames.json`), and at the end of each touch-up round. Fast all-frame films keep these frames beside every fourth pass. The painting itself is unchanged.
-- **Authoritative Preflight, Rerender & Tear-Sheet Contracts (`src/paint/doctor.mjs`, `tools/doctor.mjs`, `bench/scripts/preflight.mjs`, `bench/scripts/rerender.mjs`):** Adds `tools/doctor.mjs --strict`, `npm run bench:rerender`, `verifyComparisonRun`, and `verifyTearsheetContract` to enforce hardware GPU parity, full render widths, SAM/lineart model availability, transparent `.json.gz` line-file support, and multi-model (`argon`, `astra`, `opus`) stage playbacks.
-
-Painter **V103**, simulator **104**, judges **J1**.
+The quality experiments have not established the requested 10% gain over the five published winners. The ordinary wash defaults and physical pigment settings are retained. No new speed claim is made. Release review requires full-resolution comparison evidence and independent review.
 
 ## 0.3.0 — 2026-11-07
 

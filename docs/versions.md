@@ -19,7 +19,7 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 | 0.2.1-rc.2 | V101-dev | 102 | J1 |
 | 0.2.1 | V101 | 102 | J1 |
 | 0.3.0 | V102 | 103 | J1 |
-| 0.3.1 | V103 | 104 | J1 |
+| 0.3.1 candidate | V104 | 104 | J1 |
 
 V100 sets the drawing medium to pencil by default. Ink comes from a plan, `--outlinemedium ink`, or the automatic stage choice on a run with no prepared drawing. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. V101 adds the opt-in `--inkrecipe wash` and `auto`, and fixes the automatic stage choice so it adds ink stages only when ink is asked for. V102 and sim 103 add the full source-stroke pen-and-wash tracer, 1-pigment `--inkres` fine sheet, pass-boundary wash sessions, fingerprinted setup/value-plan caching, paper-state certificates, lower-layer compaction and 10-binding fused GPU step kernels. The 0.3.0 timing charts use development checkpoint `5e91484` against frozen control `41e6868`; that control includes post-0.2.1 changes and is not the published `v0.2.1` tag (`1cc2c08`). Final visual checks use engine commit `efbf8b7`. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
 

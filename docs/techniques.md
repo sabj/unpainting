@@ -228,3 +228,7 @@ Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 
 - `--pigphys 1`: settling, granulation and flocculation per pigment. `--flocblue`, `--flocgrey`, `--flocviolet`, `--flocearth` and `--flocyellow` take 0 to 1 and override one colour family. An unset value keeps the pigment's own `floc`; an explicit 0 clears it. The families are absorption-channel heuristics, not chemical measurements.
 - `--crosshatch 1`: contour-following hatching as a finishing stage.
 - `--tonestage 1`: records a paper-colour choice before drawing. `auto` also detects warm source paper. It changes the paper colour and lays no pigment, so it is not a wash.
+
+### Experimental connected washes
+
+`--washsystem 1` joins mixed dry-paper charges, brush-scale middle layers, graded lanes and selective soft edges with the paper and plan-value experiments. It is off by default. `--calibratedplan 1` removes blind value gains, limits excess band allocation, estimates one K/S value factor per existing region and enables fresh sheet-only delivery readings. The estimate averages reflected light over the region; it does not guarantee the final brush-painted value. `--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. Neither control adds paint-time target reads.

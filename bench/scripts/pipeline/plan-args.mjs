@@ -164,6 +164,9 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   lanemm: v => v === 'auto' || numeric(0, 40)(v),
   strokemm: numeric(0, 300),
   techcal: choice(['0', '1']),
+  washsystem: choice(['0', '1']), calibratedplan: choice(['0', '1']), paperrule: choice(['0', '1']),
+  mixedwash: choice(['0', '1']), mixedshadows: choice(['0', '1']), scalelayers: choice(['0', '1']),
+  gradedlanes: choice(['0', '1']), softchoice: choice(['0', '1']),
   techcalfrom: numeric(1, 5),
   drawinghand: choice(['0', '1']),
   washinkfree: choice(['0', '1']),
@@ -290,6 +293,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (spec.recordingMarks != null) args.push('--marks', String(spec.recordingMarks));
   // the harness's segmentation backend (dry runs: off); absent, the painter's own default (SAM) applies
   if (spec.segments != null) args.push('--segments', String(spec.segments));
+  if (spec.noTargetLooks === true) args.push('--notargetlooks', '1');
   // Offline scripted fixtures deliberately remove tracked benchmark data from their worktree.
   // Keep the dirty-tree evidence; ordinary contestant runs retain the painter's refusal.
   if (spec.offlineFixture === true) args.push('--allowdirty', '1');
