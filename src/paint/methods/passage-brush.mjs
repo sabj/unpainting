@@ -15,6 +15,8 @@ export function choosePassageBrush(mask,w,h,{mmPerCell,texture=false,referenceCu
  paths,classification:detail?'detail':'plane',supportWidthMm:span};
 }
 export function passageBrushPaths(brush,scale=1){return brush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale})));}
+// Side-by-side lanes each take the ramp at their own position, which steps darkness across the lanes and shows as stripes.
+export const planeRampApplies=({strokePlan=false,pathCount=0}={})=>Boolean(strokePlan)||pathCount===1;
 export function attachPlaneRamp(paths, rampVec, scale = 1, map = new WeakMap()) {
   if (!paths || !rampVec) return paths;
   const { cx, cy, dx, dy, minT, maxT, spanT, delta } = rampVec;

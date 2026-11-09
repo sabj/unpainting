@@ -13,6 +13,9 @@ import { verifyComparisonRun } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
 
 const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
+// Published targets start at 300 px, so a fixed floor admits them all and still refuses thumbnails.
+const MIN_SOURCE_WIDTH = 300;
+export const rerenderGate = spec => ({ minWidth: spec.width, minSourceWidth: MIN_SOURCE_WIDTH });
 
 export function parseRerenderArgs(argv = process.argv.slice(2)) {
   const o = {
@@ -146,8 +149,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
           requireSegments: opts.segments !== 'off',
           requireStages: true,
           requireDistinctStages: true,
-          minWidth: job.spec.width,
-          minSourceWidth: Math.floor(job.spec.width / 4),
+          ...rerenderGate(job.spec),
         });
       } catch (err) {
         problems.push(err.message);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { choosePassageBrush, passageBrushPaths, attachPlaneRamp } from './passage-brush.mjs';
+import { choosePassageBrush, passageBrushPaths, attachPlaneRamp, planeRampApplies} from './passage-brush.mjs';
 
 test('Consult #9 Catch 3: attachPlaneRamp attaches PATH_RAMP to passageBrushPaths', () => {
   const w = 60, h = 30;
@@ -61,4 +61,10 @@ test('Consult #9 Catch 3: attachPlaneRamp handles reverse strokes with correct s
   // Backward starts at y=15 (bottom, u=+1) and ends at y=5 (top, u=-1)
   assert.ok(Math.abs(rBwd.start - 1.25) < 1e-4, 'backward starts at 1.25');
   assert.ok(Math.abs(rBwd.end - 0.75) < 1e-4, 'backward ends at 0.75');
+});
+
+test('a plane ramp applies to stroke plans and single sweeps, never across side-by-side lanes', () => {
+  assert.equal(planeRampApplies({ strokePlan: true, pathCount: 5 }), true);
+  assert.equal(planeRampApplies({ strokePlan: false, pathCount: 1 }), true);
+  assert.equal(planeRampApplies({ strokePlan: false, pathCount: 5 }), false);
 });

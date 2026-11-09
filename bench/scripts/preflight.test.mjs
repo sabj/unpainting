@@ -4,7 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { preflight, scorePython, verifyComparisonRun, verifyTearsheetContract } from './preflight.mjs';
-import { parseRerenderArgs, discoverStoredPlans, runRerender } from './rerender.mjs';
+import { parseRerenderArgs, discoverStoredPlans, runRerender, rerenderGate } from './rerender.mjs';
 import { resolvePlan } from './pipeline/plan-args.mjs';
 
 test('scorer interpreter prefers CLI, then environment, then PATH', () => {
@@ -96,4 +96,10 @@ test('rerender discovers all 60 stored V4 plans with gzipped line files and enfo
   } finally {
     fs.rmSync(tmpOut, { recursive: true, force: true });
   }
+});
+test('the rerender source gate admits every published target', () => {
+  for (const [spec, sourceWidth] of [[1224, 300], [1224, 306], [1216, 304], [1200, 300]]) {
+    assert.ok(sourceWidth >= rerenderGate({ width: spec }).minSourceWidth, `${sourceWidth}px source at ${spec}px`);
+  }
+  assert.ok(rerenderGate({ width: 1224 }).minSourceWidth > 200, 'a thumbnail-sized source still fails');
 });
