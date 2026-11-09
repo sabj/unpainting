@@ -13,6 +13,7 @@ import { resolvePlan, renderVerdict } from './pipeline/plan-args.mjs';
 import { STAGES, thumb, stageStrip } from './images.mjs';
 import { verifyComparisonRun } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
+import { codeState } from '../../src/paint/code-state.mjs';
 import { versionStamp } from '../../src/painter-version.mjs';
 
 const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
@@ -84,12 +85,11 @@ export function discoverStoredPlans({ round = 'v4-pipeline', models = ['argon', 
 /** What made a rerender: the stamped release, painter and sim versions and the commit, plus a hash of the diff when the tree is dirty. */
 export function renderStamp(root = REPO) {
   const v = versionStamp(root);
-  let dirtyHash = null;
-  if (String(v.commit).endsWith('-dirty')) {
-    const diff = spawnSync('git', ['diff', 'HEAD'], { cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }).stdout || '';
-    dirtyHash = crypto.createHash('sha256').update(diff).digest('hex').slice(0, 12);
-  }
-  return { release: v.release, painterVersion: v.painterVersion, simVersion: v.simVersion, commit: v.commit, dirtyHash };
+  const state=codeState(root);
+  const extra=spawnSync('git',['ls-files','--others','--exclude-standard','-z','--','bench/scripts'],{cwd:root,encoding:'utf8'}).stdout.split('\0').filter(f=>/\.(mjs|js|json|py|wgsl)$/.test(f)).sort().map(file=>({file,sha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex')}));
+  const dirty=state.dirty||extra.length>0;
+  const dirtyHash=dirty?crypto.createHash('sha256').update(JSON.stringify({diff:state.diffSha256,untracked:[...state.untracked,...extra]})).digest('hex').slice(0,12):null;
+  return {release:v.release,painterVersion:v.painterVersion,simVersion:v.simVersion,commit:state.commit+(dirty?'-dirty':''),dirtyHash};
 }
 const sameStamp = (a, b) => ['release', 'painterVersion', 'simVersion', 'commit', 'dirtyHash'].every(k => (a?.[k] ?? null) === (b?.[k] ?? null));
 
@@ -98,15 +98,27 @@ export function jobPaths(opts, job) {
   return { tryOut, jobOut: path.join(tryOut, `${job.subject}-raw`), recordFile: path.join(tryOut, `${job.subject}-job.json`) };
 }
 
+/** Resolved command and all source/plan inputs, before painting. */
+export function jobFingerprint(opts,job){
+ const {jobOut}=jobPaths(opts,job),spec=opts.segments?{...job.spec,segments:opts.segments}:job.spec;
+ const plan=resolvePlan({spec,planDir:job.planDir,variant:job.variant,target:job.target,out:jobOut,compile:opts.compileOnly,gpu:opts.gpu});
+ const hash=crypto.createHash('sha256').update(JSON.stringify({args:plan.args,strictPlan:opts.strictPlan}));
+ const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(entry.isFile())hash.update(path.relative(job.planDir,file)).update(fs.readFileSync(file));}};
+ hash.update(fs.readFileSync(job.target));walk(job.planDir);return hash.digest('hex');
+}
+
 /** The finished record for a job, when it is valid at this stamp and its files are still on disk; otherwise null. */
-export function finishedRecord(opts, job, stamp) {
+export function finishedRecord(opts, job, stamp, {verify=verifyComparisonRun}={}) {
   const { jobOut, recordFile } = jobPaths(opts, job);
   if (!fs.existsSync(recordFile)) return null;
   let rec;
   try { rec = readJson(recordFile); } catch { return null; }
   if (!rec?.ok || !sameStamp(rec.stamp, stamp) || Boolean(rec.compileOnly) !== opts.compileOnly) return null;
+  if(rec.inputFingerprint!==jobFingerprint(opts,job))return null;
   const need = opts.compileOnly ? ['value-plan.json'] : ['painting.png', ...STAGES.map(p => path.join('frames', `stage-${p}.png`))];
-  return need.every(f => fs.existsSync(path.join(jobOut, f))) ? rec : null;
+  if(!need.every(f=>fs.existsSync(path.join(jobOut,f))))return null;
+  if(!opts.compileOnly)try{verify(jobOut,{requireGpu:true,requireSegments:opts.segments!=='off',requireStages:true,requireDistinctStages:true,...rerenderGate(job.spec)});}catch{return null;}
+  return rec;
 }
 
 function writeRecord(file, rec) {
@@ -199,7 +211,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
   const jobs = discoverStoredPlans(opts);
   const at = stamp();
   if (opts.dryRun) {
-    return { ok: true, count: jobs.length, done: jobs.filter(j => finishedRecord(opts, j, at)).length, jobs: jobs.map(j => ({ model: j.model, try: j.tryNum, subject: j.subject, variant: j.variant, width: j.spec.width, done: Boolean(finishedRecord(opts, j, at)) })) };
+    return { ok: true, count: jobs.length, done: jobs.filter(j => finishedRecord(opts, j, at, {verify})).length, jobs: jobs.map(j => ({ model: j.model, try: j.tryNum, subject: j.subject, variant: j.variant, width: j.spec.width, done: Boolean(finishedRecord(opts, j, at, {verify})) })) };
   }
   if (!opts.compileOnly) {
     const doc = doctor({ root: REPO, strictModels: true });
@@ -223,7 +235,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
   const results = [];
   for (const job of jobs) {
     const { tryOut, recordFile } = jobPaths(opts, job);
-    const prior = opts.force ? null : finishedRecord(opts, job, at);
+    const prior = opts.force ? null : finishedRecord(opts, job, at, {verify});
     let rec;
     if (prior) {
       const { stamp: _s, compileOnly: _c, ...rest } = prior;
@@ -236,7 +248,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
         rec = { round: job.round, model: job.model, try: job.tryNum, subject: job.subject, variant: job.variant, exit: null, painted: false, ok: false, seconds: 0, problems: [`job crashed: ${err.message}`], planWarnings: [], notes: [], stages: null, outDir: jobPaths(opts, job).jobOut };
       }
       fs.mkdirSync(tryOut, { recursive: true });
-      writeRecord(recordFile, { ...rec, stamp: at, compileOnly: opts.compileOnly });
+      writeRecord(recordFile, { ...rec, stamp: at, compileOnly: opts.compileOnly,inputFingerprint:jobFingerprint(opts,job) });
       console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: ${rec.ok ? 'PAINTED' : 'FAILED'} in ${rec.seconds}s (exit ${rec.exit})`);
     }
     results.push(rec);
