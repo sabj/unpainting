@@ -25,6 +25,18 @@ const argv = process.argv.slice(2);
 const has = n => argv.includes('--' + n);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
 const fail = msg => { console.error(`bench:run: ${msg}`); process.exit(2); };
+const FLAGS = new Set(['--dry-run', '--link-v4-try1', '--force', '--strict-verdict', '--no-base-palette']);
+const OPTS = new Set(['--round', '--profile', '--mode', '--try', '--dry-key', '--model', '--crops', '--python', '--out', '--tries', '--from-try', '--gpu', '--dry-width']);
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (FLAGS.has(a)) continue;
+  if (OPTS.has(a)) {
+    if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) fail(`${a} requires a value`);
+    i++;
+    continue;
+  }
+  fail(`unknown option ${a}`);
+}
 
 const DRY = has('dry-run');
 const round = roundById(opt('round', 'V1'));

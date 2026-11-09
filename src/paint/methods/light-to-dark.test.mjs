@@ -375,3 +375,30 @@ test('subjectCovers exposes per-subject cuts and sm so layerIncrement preserves 
   }
 });
 
+test('hold cells populate protectedCells for contact clipping without splitting strokePlan lanes across narrow reserves', () => {
+  const w = 100, h = 40, n = w * h;
+  const rgb = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) rgb.set([180, 190, 140], 3 * i);
+  const density = new Float32Array(n).fill(0.35);
+  const hold = new Uint8Array(n);
+  // Narrow 2-cell vertical highlight in the middle of a warm hillside wash
+  for (let y = 12; y < 28; y++) {
+    hold[y * w + 50] = 1;
+    hold[y * w + 51] = 1;
+  }
+  const plan = planLightToDark({
+    w, h, k: 1, rgb, density, demand: density.slice(), hold,
+    shaped: true, strokePlan: true, laneMm: 8, strokeMm: 120, sheetWidthMm: 100, minShapeCells: 20,
+  });
+  assert.equal(plan.protectedCells[20 * w + 50], 1, 'hold cells are preserved in protectedCells');
+  const washShape = plan.layers[0].shapes[0];
+  assert.ok(washShape._strokePlan, 'wash shape has _strokePlan');
+  // Verify lanes sweep continuously across x=50 (relying on the sheet contact clip for the 2px reserve rather than a 2*R stroke gap)
+  const spanning = washShape._strokePlan.paths.filter(p => {
+    const xs = p.map(q => q.x);
+    return Math.min(...xs) < 40 && Math.max(...xs) > 60;
+  });
+  assert.ok(spanning.length > 0, 'strokePlan lanes sweep continuously across narrow hold without a 2*R split gap');
+});
+
+
