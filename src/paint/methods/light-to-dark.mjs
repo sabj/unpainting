@@ -21,7 +21,6 @@ import { components, closeLocal, removeSmall, erode, dilate } from '../../raster
 import { targetRegions } from './target-regions.mjs';
 import { subjectCovers, holdSubjectLights, subjectDomain } from './subject-washes.mjs';
 import { passage } from '../../crop/blockin.mjs';
-import { coatTally } from './coat-order.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { RECESS, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND } from '../tuned/trumbull.mjs';
 
@@ -341,8 +340,6 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   if(mixedWash&&!mixedOn)console.log('mixed washes: off for this plan (per-cell styles)');
   const WD=mixedOn&&!subjects?washDomains(region.labels,region.regions.length,demand,k,w,h,{mayJoin:profile?(a,b)=>regionProfiles[a-1]?.name===regionProfiles[b-1]?.name:null}):null;
   if(WD)console.log(`mixed washes: ${WD.ids.length} colour domains from ${region.regions.length} regions`);
-  // coat-order.mjs: each passage's coat number over the cells it covers, so lane joins move from coat to coat
-  const coats=coatTally(n);
   let laneField=null;
   for(const step of steps){const band=step.band;
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
@@ -490,7 +487,7 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
             intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
             if(familyMatch)intent.referenceCue=familyMatch.referenceCue??intent.referenceCue;
           }
-          intent.coat=coats.lay(list);sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
+          sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
         }
         // A mixed layer is filed under its lead pigment; each passage carries its own mix.
         const layerMix=mixedStep&&shapes.length?(()=>{const m=new Float64Array(k);let t=0;for(const q of shapes)for(let j=0;j<k;j++){m[j]+=q.mix[j]*q.area;t+=q.mix[j]*q.area;}return Array.from(m,v=>v/Math.max(1e-9,t));})():null;
