@@ -231,4 +231,10 @@ Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 
 
 ### Experimental connected washes
 
-`--washsystem 1` joins mixed dry-paper charges, brush-scale middle layers, graded lanes and selective soft edges with the paper and plan-value experiments. It is off by default. `--calibratedplan 1` removes blind value gains, limits excess band allocation, estimates one K/S value factor per existing region and enables fresh sheet-only delivery readings. The estimate averages reflected light over the region; it does not guarantee the final brush-painted value. `--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. Neither control adds paint-time target reads.
+`--washsystem 1` joins mixed dry-paper charges, brush-scale middle layers, graded lanes and selective soft edges with the paper and plan-value experiments. It is off by default. In the 0.3.1 candidate (painter V104) it paints worse than the default: 8 of 12 paired renders exceed the fine-detail correlation limit, and full-size review found flatter masses, harder edges and lost paper lights ([changelog](../CHANGELOG.md)).
+
+`--calibratedplan 1` removes blind value gains, limits excess band allocation, estimates one K/S value factor per existing region and turns on delivery and technique calibration from sheet readings. It sets `--darkgain`, `--coolgain` and `--midgain` to 1 and prints no notice when one is typed. The estimate averages reflected light over the region; it does not guarantee the final brush-painted value. The calibration reads the sheet alone only with `--notargetlooks 1`; without it the run still takes its looks at the target between passes.
+
+`--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. It changes the light reference only when `--paperrel 1`, `--paperlights 1` or `--washsystem 1` is also on, and it sets the sheet colour only with `--paperrgb auto`. The test compares lightness and chroma, not hue, so pale material of another hue can count as paper.
+
+The 0.3.1 candidate renders with `--notargetlooks 1` record no paint-time target looks and no guard violations.
