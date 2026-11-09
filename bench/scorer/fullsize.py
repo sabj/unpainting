@@ -338,16 +338,18 @@ def vision_tiles(image, style, plate_mm=200.0, calls=1, post=None):
 
     def run(job):
         j, i = job
-        for _ in range(3):  # up to two retries with the images, as J1 allows; no text-only repair
+        budget = sp.J2_MAX_TOKENS
+        for _ in range(3):  # up to two retries with the images; no text-only repair
             try:
-                raw, _usage = post(j, [{"role": "user", "content": contents[i]}])
+                raw, _usage = post(j, [{"role": "user", "content": contents[i]}], max_tokens=budget)
             except RuntimeError as e:
                 err = str(e)[:160]
                 continue
             d = parse_tile(raw)
             if d:
                 return d
-            err = "no valid JSON"
+            # at temperature 0 a judge that spent its whole budget thinking does so again: give it more room
+            err, budget = "no valid JSON", min(budget * 2, sp.J2_MAX_TOKENS_CAP)
         return {"error": err}
 
     jobs = [(j, i) for j in sp.JUDGES for i in range(len(tiles)) for _ in range(calls)]

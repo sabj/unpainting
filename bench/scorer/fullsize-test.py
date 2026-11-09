@@ -223,6 +223,18 @@ class Vision(unittest.TestCase):
         self.assertEqual(r['flagPeak']['white_flecks'], 1.0)
         self.assertEqual(r['flagShare']['white_flecks'], 0.25)
 
+    def test_an_empty_reply_is_asked_again_with_more_room(self):
+        budgets = []
+
+        def post(model, messages, max_tokens=None, **_):
+            budgets.append(max_tokens)
+            return ('' if max_tokens == 8000 and 'Qwen' in model else json.dumps(GOOD)), {}
+
+        r = fs.vision_tiles(self.img, 'wash', 128.0, calls=1, post=post)
+        self.assertTrue(r['complete'])
+        self.assertEqual(sorted(set(budgets)), [8000, 16000])
+        self.assertEqual(budgets.count(16000), 4)
+
     def test_a_judge_with_no_valid_reply_makes_it_incomplete(self):
         def post(model, messages, **_):
             if 'Qwen' in model:
