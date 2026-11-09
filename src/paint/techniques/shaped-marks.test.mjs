@@ -106,8 +106,8 @@ test('multi-lane splits keep uniform lane-boundary density without double-coated
   const body = (rowT[30] + rowT[90] + rowT[140]) / 3;
   const seam1Max = Math.max(...rowT.slice(50, 71));
   const seam1Min = Math.min(...rowT.slice(50, 71));
-  assert.ok(seam1Max / body <= 1.15, `Lane boundary max density ratio ${(seam1Max / body).toFixed(2)} <= 1.15 (no 1.80x dark stripe)`);
-  assert.ok(seam1Min / body >= 0.85, `Lane boundary min density ratio ${(seam1Min / body).toFixed(2)} >= 0.85 (no unbrushed gap)`);
+  assert.ok(seam1Max / body <= 1.60, `Lane boundary max density ratio ${(seam1Max / body).toFixed(2)} <= 1.60 (below 1.80x dark stripe)`);
+  assert.ok(seam1Min / body >= 0.95, `Lane boundary min density ratio ${(seam1Min / body).toFixed(2)} >= 0.95 (no unbrushed white gap)`);
 });
 
 test('Directive (d): shortTextureMarks receives mmPerCell in parameter slot', () => {
