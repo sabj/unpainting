@@ -106,7 +106,8 @@ test('multi-lane splits keep uniform lane-boundary density without double-coated
   const body = (rowT[30] + rowT[90] + rowT[140]) / 3;
   const seam1Max = Math.max(...rowT.slice(50, 71));
   const seam1Min = Math.min(...rowT.slice(50, 71));
-  assert.ok(seam1Max / body <= 1.60, `Lane boundary max density ratio ${(seam1Max / body).toFixed(2)} <= 1.60 (below 1.80x dark stripe)`);
+  // Measured 1.44 with these seeds (1.36 to 1.44 over paper seeds 1 to 3) at the 1.035 lane overlap; the bound is that plus a small margin.
+  assert.ok(seam1Max / body <= 1.50, `Lane boundary max density ratio ${(seam1Max / body).toFixed(2)} <= 1.50 (measured 1.44; a 1.80x dark stripe fails)`);
   assert.ok(seam1Min / body >= 0.95, `Lane boundary min density ratio ${(seam1Min / body).toFixed(2)} >= 0.95 (no unbrushed white gap)`);
 });
 
