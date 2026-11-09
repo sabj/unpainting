@@ -604,3 +604,10 @@ test('cell light and mass tone need the target colours and the pigments, and say
   assert.throws(() => planLightToDark({ w, h, k: 1, density, demand: density.slice(), calibratedPlan: true }), /cellLight needs/);
   assert.throws(() => planLightToDark({ w, h, k: 1, density, demand: density.slice(), massTone: true }), /massTone needs/);
 });
+
+test('mass tone carries nothing: a quantile charge with carry plans the same washes as no carry at all', () => {
+  const { run, booked } = threeValues();
+  assert.deepEqual(booked(run({ calibratedPlan: true, passCap: 0.5, carryMm: 2, maskMm: 2 })), booked(run({ calibratedPlan: true })));
+  // without mass tone the carry is still there
+  assert.notDeepEqual(booked(run({ nestedBands: true, passCap: 0.5 })), booked(run({ nestedBands: true })));
+});
