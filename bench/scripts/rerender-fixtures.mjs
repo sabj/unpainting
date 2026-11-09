@@ -20,7 +20,9 @@ export async function fakePainter({ failFor = null, throwFor = null, risk = { ri
     fs.writeFileSync(path.join(out, 'painting.png'), png);
     STAGES.forEach((p, i) => fs.writeFileSync(path.join(out, 'stages', `stage-${String(p).padStart(3, '0')}.jpg`), jpgs[i]));
     fs.writeFileSync(path.join(out, 'cheat-risk.json'), JSON.stringify(risk));
-    fs.writeFileSync(path.join(out, 'target-guard.json'), JSON.stringify({ violations: 0 }));
+    fs.writeFileSync(path.join(out, 'target-guard.json'), JSON.stringify({ violations: 0,looks:{count:0},mode:'gentle' }));
+    fs.writeFileSync(path.join(out,'run-card.json'),JSON.stringify({gpuBackend:{backend:'gpu',fallback:false},dimensions:{paintWidth:Number(args[args.indexOf('--width')+1]),sourceWidth:300},segments:{backend:'sam'}}));
+    fs.writeFileSync(path.join(out,'backend.json'),JSON.stringify({backend:'gpu',fallback:false}));
     fs.writeFileSync(path.join(out, 'marks.json'), '{}');
     return { status: 0, stdout: 'marks: 123 strokes\n', stderr: '' };
   };

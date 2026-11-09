@@ -1,6 +1,7 @@
 // Pipeline: painting, stage 5 (glazes and darks).
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
+import {fitPlanOptics} from './plan-optics-fit.mjs';
 import {sheetColour} from './paper-colour.mjs';
 import {fitGradedPlane,planeAtCell} from './graded-demand.mjs';
 import {lightReference,connectedLightTest,normalizeWashWeights,mixedCharge,softWashBoundary} from './wash-system.mjs';
@@ -32,8 +33,9 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({washSystem=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
-  if(washSystem){washLayers=0;passCap=0;strokePlan=false;layerHue=false;midDomains=true;darkGain=1;coolGain=1;midGain=1;}
+export function planLightToDark({calibratedPlan=false,washSystem=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
+  if(washSystem||calibratedPlan){darkGain=1;coolGain=1;midGain=1;}
+  if(washSystem){washLayers=0;passCap=0;strokePlan=false;layerHue=false;midDomains=true;}
   let coolGroup=null;setRecessMax(recessMax);
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -258,7 +260,9 @@ export function planLightToDark({washSystem=false,sourceCellsPerPx=1,smallLightM
   if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
     for(let i=0;i<n;i++)if(pale[i]&&!litStoneMask?.[i]){let t=0;for(let b=0;b<5;b++){t+=weights[b][i];weights[b][i]=0;}weights[0][i]=t;}}
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
-  if(washSystem)normalizeWashWeights(weights);
+  if(washSystem||calibratedPlan)normalizeWashWeights(weights,{mergeMiddle:washSystem});
+  let opticsReport=null;
+  if(calibratedPlan){const fit=fitPlanOptics({demand,rgb,labels:region.labels,protect:protectedCells,pigments,paperRGB:paperRGB??[252,251,248],k});demand=fit.demand;opticsReport=fit.report;console.log(`plan optics: ${opticsReport.length} region mixtures fitted in K/S thickness units; ${opticsReport.filter(r=>!r.matched).length} outside the material value range`);}
   const mixedDemand=washSystem?new Float32Array(n):null;
   if(mixedDemand)for(let i=0;i<n;i++)for(let j=0;j<k;j++)mixedDemand[i]+=demand[i*k+j];
   const layers=[],instructions=[];let omittedDemand=0;
@@ -388,6 +392,7 @@ export function planLightToDark({washSystem=false,sourceCellsPerPx=1,smallLightM
               intent.resolution.minimumWashBodyCells=chosen.detailThresholdCells;
             }
           }
+          if(calibratedPlan)intent.calibratedPlan=true;
           if(washSystem){intent.washSystem=true;intent.move='wet on dry';intent.paperBefore='dry base; one mixed charge';intent.load.water=phase==='shadow'?.58:.62;}
           if(brushChoice){
             const pb=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});
@@ -464,10 +469,14 @@ export function planLightToDark({washSystem=false,sourceCellsPerPx=1,smallLightM
     }
   }
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
-  return {paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
+  return {opticsReport,paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent,glazePasses=2) {
-  if(intent.washSystem&&(!Number.isInteger(glazePasses)||glazePasses<1))throw new RangeError('glazepasses must be a positive integer');
+  if((intent.washSystem||intent.calibratedPlan)&&(!Number.isInteger(glazePasses)||glazePasses<1))throw new RangeError('glazepasses must be a positive integer');
+  if(intent.calibratedPlan){
+    const wet=intent.move==='wet on wet',shadow=intent.phase==='shadow';
+    return {name:wet?'wet on wet':shadow?'glazed':'wet on dry',water:wet?.88:shadow?.58:.62,wetMix:wet?.85:shadow?.3:.55,bridge:wet?.98:shadow?.82:.78,bridgeSoft:wet?3:shadow?2.4:2.2,intoWet:wet,dryAfter:!wet,passes:shadow&&!wet?glazePasses:1,valuePlan:intent};
+  }
   if(intent.washSystem)return {name:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.phase==='shadow'?.58:.62,wetMix:intent.phase==='shadow'?.3:.55,bridge:intent.phase==='shadow'?.82:.78,bridgeSoft:intent.phase==='shadow'?2.4:2.2,intoWet:false,dryAfter:true,passes:intent.phase==='shadow'?glazePasses:1,valuePlan:intent};
   if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
   const wet=intent.move==='wet on wet';return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};

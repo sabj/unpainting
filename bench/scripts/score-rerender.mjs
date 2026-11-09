@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { BENCH, V2, RUN_SCHEMA, readJson, writeJson, roundById, loadModels, validateRun, posix } from './lib.mjs';
 import { STAGES } from './images.mjs';
+import {verifyComparisonRun} from './preflight.mjs';
 import { pngSize } from './pipeline/plan-args.mjs';
 
 const subjects = () => readJson(path.join(BENCH, 'v4v5', 'subjects.json')).subjects;
@@ -39,6 +40,7 @@ const optionalJson = f => { try { return fs.existsSync(f) ? readJson(f) : null; 
 
 function cropEntry({ rec, jobOut, spec, warnings, rawTry, roundDir }) {
   const c = rec.subject, [tw, th] = pngSize(path.join(V2, 'targets', `${c}.png`));
+  verifyComparisonRun(jobOut,{requireGpu:true,requireSegments:true,requireStages:true,minWidth:spec.width,minSourceWidth:300});
   const rawOut = path.join(rawTry, 'out', c);
   link(path.join(jobOut, 'painting.png'), path.join(rawOut, 'final.png'));
   for (const p of STAGES) link(path.join(jobOut, 'frames', `stage-${p}.png`), path.join(rawOut, 'frames', `stage-${p}.png`));
@@ -46,15 +48,16 @@ function cropEntry({ rec, jobOut, spec, warnings, rawTry, roundDir }) {
   if (Number.isFinite(risk?.risk)) link(path.join(jobOut, 'cheat-risk.json'), path.join(rawTry, c, 'painting', 'out', 'cheat-risk.json'));
   else warnings.push(`${c}: no cheat-risk score from the painter, so its cheat risk is not scored`);
   const guard = optionalJson(path.join(jobOut, 'target-guard.json'));
+  if(!guard||!Number.isInteger(guard.violations)||guard.violations<0||!Number.isInteger(guard.looks?.count)||guard.looks.count<0||typeof guard.mode!=='string')throw new Error(c+': missing or malformed target guard evidence');
   const backend = optionalJson(path.join(jobOut, 'backend.json'));
   return {
-    violations: guard?.violations ?? 0,
+    violations:guard.violations,targetLooks:guard.looks.count,guardMode:guard.mode,
     entry: {
       seed: 0, sheet: { W: spec.width, H: Math.round(spec.width * th / tw), mmPerCell: +(spec.sheetmm / spec.width).toFixed(4) }, strokeLog: null,
       strokes: strokesOf(jobOut), strokesBasis: 'brush strokes plus pen lines', minutes: +(rec.seconds / 60).toFixed(2),
       smallShare: null, shortStrokes: null, dotStrokes: null, copyHF: null, images: { final: `${c}.webp`, stages: `${c}-stages.webp` }, painterNote: null, score: null, progression: null,
       pipeline: {
-        outcome: 'painted', rerender: true, plan: `bench/runs/${roundDir}/${rec.model}/${rec.try}/${c}-plan`, renderSeconds: rec.seconds,
+        outcome: 'painted', rerender: true, targetGuard:{mode:guard.mode,violations:guard.violations,looks:guard.looks.count}, plan: `bench/runs/${roundDir}/${rec.model}/${rec.try}/${c}-plan`, renderSeconds: rec.seconds,
         renderBackend: backend?.backend ?? backend?.renderBackend ?? null, paintExit: rec.exit, notes: rec.notes ?? [], warnings: rec.planWarnings?.length ? rec.planWarnings : undefined,
       },
     },
@@ -80,7 +83,7 @@ function buildTry({ from, out, roundDir, model, tryNum, route, force }) {
   for (const f of fs.readdirSync(tryOut)) if (/\.webp$/.test(f)) fs.rmSync(path.join(tryOut, f));
   for (const f of fs.readdirSync(tryFrom)) if (/\.webp$/.test(f)) link(path.join(tryFrom, f), path.join(tryOut, f));
   const warnings = [], crops = {}, unpainted = {};
-  let violations = 0, seconds = 0;
+  let violations = 0, targetLooks=0,seconds = 0;const guardModes=new Set();
   for (const rec of recs) {
     seconds += rec.seconds || 0;
     if (!rec.ok) {
@@ -89,8 +92,10 @@ function buildTry({ from, out, roundDir, model, tryNum, route, force }) {
     }
     const jobOut = path.join(tryFrom, `${rec.subject}-raw`);
     const r = cropEntry({ rec, jobOut, spec: spec[rec.subject], warnings, rawTry, roundDir });
-    crops[rec.subject] = r.entry; violations += r.violations;
+    crops[rec.subject] = r.entry; violations += r.violations;targetLooks+=r.targetLooks;guardModes.add(r.guardMode);
   }
+  if(guardModes.size>1)throw new Error('rerender guard modes differ within a try');
+  const guardMode=[...guardModes][0]??'gentle';
   const model_ = loadModels().find(m => m.key === model) ?? { key: model, name: model, id: model, effort: null, runner: null };
   const names = recs.map(r => r.subject);
   const run = {
@@ -98,14 +103,14 @@ function buildTry({ from, out, roundDir, model, tryNum, route, force }) {
     release: stamp.release, painterVersion: stamp.painterVersion, simVersion: stamp.simVersion, commit: stamp.commit, judgeVersion: 'J1',
     painter: { key: model_.key, name: model_.name, id: model_.id, effort: model_.effort ?? null, runner: model_.runner ?? null },
     planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: tryNum,
-    settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: null, modelMinutesCap: null, lookBudget: null, selfView: 'gentle', targetGuard: 'gentle',
+    settings: { mode: guardMode, strokeBudget: null, minutesPerCrop: null, sessionCapMin: null, modelMinutesCap: null, lookBudget: null, selfView:'gentle',targetGuard:guardMode,
       crops: names, learnsBetweenTries: round.learning, judgeRoute: route, scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(names.map(c => [c, spec[c].width])),
       painter: 'tools/paint-plate.mjs', machine: 'local', rerender: { of: `bench/runs/${roundDir}/${model}/${tryNum}`, note: 'stored plan repainted on this release; no model session' } },
     session: { minutes: +(seconds / 60).toFixed(1), modelMinutes: 0, tokens: null, usageComplete: false, costUSD: null, renderSeconds: +seconds.toFixed(1) },
-    guard: { blockedImageReads: violations, kitRejections: 0, auditHits: [] },
+    guard: { aggregateTargetLooks:targetLooks,blockedImageReads: violations, kitRejections: 0, auditHits: [] },
     crops, ...(Object.keys(unpainted).length ? { unpainted } : {}),
     score: { status: 'unscored', composite: null, complete: false },
-    cheat: { disqualified: violations > 0, readTargetPixels: violations > 0, reason: violations > 0 ? `${violations} blocked target read(s) by the painter` : null, risk: null, progressionRisk: null, review: null },
+    cheat: { disqualified: violations > 0||targetLooks>0, readTargetPixels: violations > 0||targetLooks>0, reason: violations > 0||targetLooks>0 ? `${violations} blocked target read(s), ${targetLooks} aggregate target look(s) by the painter` : null, risk: null, progressionRisk: null, review: null },
     complete: Object.keys(crops).length === names.length,
     raw: posix(path.relative(BENCH, rawTry)),
   };

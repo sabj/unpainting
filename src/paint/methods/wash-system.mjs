@@ -18,12 +18,11 @@ export function connectedLightTest(reference) {
   return paperLightTest(reference, lightTolerance(reference, {toleranceC:5}));
 }
 
-export function normalizeWashWeights(weights) {
+export function normalizeWashWeights(weights,{mergeMiddle=true}={}) {
   for(let i=0;i<weights[0].length;i++) {
     const sum=weights.reduce((s,a)=>s+a[i],0);
     if(sum>1) for(const a of weights) a[i]/=sum;
-    weights[1][i]+=weights[2][i];
-    weights[2][i]=0;
+    if(mergeMiddle){weights[1][i]+=weights[2][i];weights[2][i]=0;}
   }
 }
 

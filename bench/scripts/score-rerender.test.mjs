@@ -97,3 +97,18 @@ test('an absent or error cheat-risk record is left out so score.mjs does not rea
     assert.match(res.tries[0].warnings.join(' '), /cheat-risk/);
   } finally { fs.rmSync(from, { recursive: true, force: true }); fs.rmSync(to, { recursive: true, force: true }); }
 });
+test('missing or malformed guard evidence cannot become a zero-read score record',async()=>{
+ const from=tmp(),to=tmp();
+ try{
+  await render(from,await fakePainter());
+  const guard=path.join(from,'v4-pipeline','opus','1','hills-raw','target-guard.json');
+  fs.rmSync(guard);
+  assert.throws(()=>buildTryFolders({from,out:to}),/missing or malformed target guard evidence/);
+  fs.writeFileSync(guard,JSON.stringify({violations:0,looks:{count:12},mode:'gentle'}));
+  buildTryFolders({from,out:to});
+  const run=readJson(path.join(to,'v4-pipeline','opus','1','run.json'));
+  assert.equal(run.guard.aggregateTargetLooks,12);
+  assert.equal(run.cheat.readTargetPixels,true);
+  assert.equal(run.cheat.disqualified,true);
+ }finally{fs.rmSync(from,{recursive:true,force:true});fs.rmSync(to,{recursive:true,force:true});}
+});

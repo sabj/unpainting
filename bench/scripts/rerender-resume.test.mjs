@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runRerender } from './rerender.mjs';
+import { runRerender,renderStamp } from './rerender.mjs';
+import {execFileSync} from 'node:child_process';
 import { fakePainter } from './rerender-fixtures.mjs';
 
 const doctor = () => ({ ok: true, failures: [] });
@@ -101,4 +102,28 @@ test('--dry-run reports which jobs are already done', async () => {
     const r2 = await runRerender([...base(out), '--dry-run'], { stamp: fs_('ccccccc') });
     assert.deepEqual(r2.jobs.map(j => j.done), [false, false]);
   } finally { fs.rmSync(out, { recursive: true, force: true }); }
+});
+
+test('resume invalidates changed segmentation and rechecks the evidence gates',async()=>{
+ const out=tmp();
+ try{
+  const p=await fakePainter();await go(out,p);
+  await go(out,p,'aaaaaaa',['--segments','off']);
+  assert.equal(p.calls.length,4,'a different segmentation route is a new render');
+  const reject=()=>{throw Error('invalid current evidence');};
+  await runRerender([...base(out),'--segments','off'],{run:p.run,verify:reject,doctor,stamp:fs_('aaaaaaa')});
+  assert.equal(p.calls.length,6,'existing evidence is checked again before reuse');
+ }finally{fs.rmSync(out,{recursive:true,force:true});}
+});
+
+test('untracked source helpers change the render stamp when their contents change',()=>{
+ const root=tmp();
+ try{
+  const git=(...args)=>execFileSync('git',['-C',root,...args],{stdio:'ignore'});
+  git('init');fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({version:'0.3.1'}));
+  git('add','package.json');git('-c','user.name=Test','-c','user.email=test@example.invalid','commit','-m','fixture');
+  fs.mkdirSync(path.join(root,'src'));const file=path.join(root,'src','helper.mjs');fs.writeFileSync(file,'export const value=1;');
+  const first=renderStamp(root);fs.writeFileSync(file,'export const value=2;');const second=renderStamp(root);
+  assert.notEqual(first.dirtyHash,second.dirtyHash);assert.match(first.commit,/-dirty$/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
