@@ -120,6 +120,40 @@
    "coarseFile": "targets/h34a-coarse.json",
    "licence": "public domain",
    "selfScore": 9.37
+  },
+  {
+   "task": "dog-paint",
+   "name": "Dog, paint",
+   "width": 300,
+   "height": 402,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "classic transparent watercolour portrait, restrained glazes, no ink",
+   "source": "watercolour generated from a private photo",
+   "distributed": false,
+   "file": "targets/dog-paint.png",
+   "coarseFile": "targets/dog-paint-coarse.json",
+   "licence": "private, not distributed",
+   "selfScore": 9.11
+  },
+  {
+   "task": "dog-ink",
+   "name": "Dog, ink",
+   "width": 300,
+   "height": 402,
+   "coarse": {
+    "cols": 24,
+    "rows": 32
+   },
+   "style": "loose ink and wash portrait, ink led",
+   "source": "ink and wash generated from a private photo",
+   "distributed": false,
+   "file": "targets/dog-ink.png",
+   "coarseFile": "targets/dog-ink-coarse.json",
+   "licence": "private, not distributed",
+   "selfScore": 9.4
   }
  ]
 }
