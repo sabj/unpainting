@@ -1,6 +1,9 @@
 // Pipeline: painting, stage 5 (glazes and darks).
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
+import {sheetColour} from './paper-colour.mjs';
+import {fitGradedPlane,planeAtCell} from './graded-demand.mjs';
+import {lightReference,connectedLightTest,normalizeWashWeights,mixedCharge,softWashBoundary} from './wash-system.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {reserveLights,validateReserves} from './light-reserves.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
@@ -29,7 +32,8 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
+export function planLightToDark({washSystem=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=10,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,lightFamilies=false,laneMax=0,subjects=null}) {
+  if(washSystem){washLayers=0;passCap=0;strokePlan=false;layerHue=false;midDomains=true;darkGain=1;coolGain=1;midGain=1;}
   let coolGroup=null;setRecessMax(recessMax);
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -45,7 +49,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   // area filter; inferred isolated white pixels are not a painting instruction.
   // minShapeCells (whole paintings): a fixed shape floor in cells. The automatic floor grows with sheet area and drops
   // small face shadow shapes.
-  const minShape=minShapeCells>0?minShapeCells:Math.max(shaped?144:4,Math.round(w*h*.00015));
+  const minShape=minShapeCells>0?minShapeCells:washSystem?Math.max(Math.round(Math.PI*(1.5/(sheetWidthMm/w))**2),Math.round(9*sourceCellsPerPx**2)):Math.max(shaped?144:4,Math.round(w*h*.00015));
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 (or 14/14/18 on warm cream paper) below it per channel is a light. With --paperbase source the sheet takes that colour too.
   let PAP = null;
@@ -59,8 +63,11 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   const tonedPap = Boolean(PAP && PAP[0] - PAP[2] >= 18 && 252 - PAP[2] >= 20);
   const papTol = tonedPap ? [14, 14, 18] : [9, 9, 12];
   const papDark = Boolean(PAP && (0.2126 * PAP[0] + 0.7152 * PAP[1] + 0.0722 * PAP[2] < 180 || PAP[0] < 180 || PAP[1] < 200 || PAP[2] < 145));
+  const washSheet=washSystem&&rgb?sheetColour(rgb,w,h):null;
+  const washLight=washSheet?connectedLightTest(lightReference(rgb,w,h,washSheet)):null;
   const inferred = Uint8Array.from({ length: n }, (_, i) => {
     if (hold?.[i]) return 1;
+    if(washLight)return washLight(rgb,i)?1:0;
     if (PAP) {
       if (papDark) return 0;
       return (rgb[3 * i] >= PAP[0] - papTol[0] && rgb[3 * i + 1] >= PAP[1] - papTol[1] && rgb[3 * i + 2] >= PAP[2] - papTol[2]) ? 1 : 0;
@@ -70,7 +77,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
     }
     return value.values[i] < .055 ? 1 : 0;
   });
-  if(paper)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=paperDelta)inferred[i]=1;}
+  if(paper&&!washSystem)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=paperDelta)inferred[i]=1;}
   // detailScale k (detail-scale.mjs): the minimum shape shrinks with the target's mid-scale detail, down to share 1-k.
   const DETAIL0=detailScale>0?detailField(value.values,w,h,sheetWidthMm/w):null;
   const DETAIL=DETAIL0&&detailSegments?detailField(value.values,w,h,sheetWidthMm/w,segmentDetailMask(detailSegments,rgb,DETAIL0,w,h)):DETAIL0;
@@ -251,6 +258,9 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
     for(let i=0;i<n;i++)if(pale[i]&&!litStoneMask?.[i]){let t=0;for(let b=0;b<5;b++){t+=weights[b][i];weights[b][i]=0;}weights[0][i]=t;}}
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
+  if(washSystem)normalizeWashWeights(weights);
+  const mixedDemand=washSystem?new Float32Array(n):null;
+  if(mixedDemand)for(let i=0;i<n;i++)for(let j=0;j<k;j++)mixedDemand[i]+=demand[i*k+j];
   const layers=[],instructions=[];let omittedDemand=0;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
   // layers>0: the middle values are built as several wide connected wash layers, each dried
@@ -301,9 +311,10 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   const carry=passCap>0?Array.from({length:k},()=>new Float32Array(n)):null;
   for(const step of steps){const band=step.band;
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
-    for(let pigment=0;pigment<k;pigment++){
+    const mixing=washSystem&&!step.pig;
+    for(let pigment=0;pigment<(mixing?1:k);pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,elig=placed&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null;
-      for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
+      for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=mixing?mixedDemand[i]:demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
         const effCool=coolGain;G[i]=fitted*step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(effCool!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?effCool:1);if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
@@ -329,7 +340,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
       const litDom=phase==='light'&&litStoneMask?region.regions.findIndex(r=>/stone/i.test(r.descriptiveFamily??''))+1:0;
       const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0).concat(litDom>0?[-litDom]:[]):[];
-      const domains=subjects?[0]:groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
+      const domains=mixing?region.regions.map((_,i)=>i+1):subjects?[0]:groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
       // washJoin (wash-join.mjs): a domain piece under the minimum shape joins the neighbouring domain's passage
       // instead of being dropped as a bare-paper shard.
       const keyOfDomain=d=>d<0?7:groupMode?coolGroup[d]:typeof d==='string'?domains.indexOf(d)+1:d;
@@ -347,16 +358,16 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
           const touched=[...new Set(list.map(i=>region.labels[i]))].map(i=>region.regions[i-1]);
           const box={x0:w,y0:h,x1:-1,y1:-1},soft=[],hard=[];let total=0;
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
-            const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
+            const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));((washSystem?softWashBoundary(i,out,{values:value.values,w,h,cellMm:sheetWidthMm/w,phase}):contrast<.14)&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
           if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.1,4*(1-detailScale*meanOver(list,DETAIL))):4)){omittedDemand+=total;continue;}
           if(total<=1e-8)continue;const amount=placed?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
-          sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=null;sh._follow=true;
+          sh.mix=mixing?mixedCharge(list,demand,k,step.wt):Array.from({length:k},(_,j)=>j===pigment?amount:0);sh.graded=null;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
           const family=profile&&touched.map(r=>r.descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name),
             chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
-          const familyMatch=passageFamily(list,w,h,families),wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
+          const familyMatch=passageFamily(list,w,h,families),wet=!washSystem&&phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
           const isCoolSky = Boolean(rgb && list.length > n * .015 && list.filter(i => rgb[i * 3 + 2] > rgb[i * 3] + 10).length > list.length * .6);
           const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue,
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',cool:isCoolSky,
@@ -377,6 +388,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
               intent.resolution.minimumWashBodyCells=chosen.detailThresholdCells;
             }
           }
+          if(washSystem){intent.washSystem=true;intent.move='wet on dry';intent.paperBefore='dry base; one mixed charge';intent.load.water=phase==='shadow'?.58:.62;}
           if(brushChoice){
             const pb=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});
             if(pb){
@@ -425,10 +437,19 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
             const spanT = Math.max(1, maxT - minT);
             sh._rampVec = { cx, cy, dx, dy, minT, maxT, spanT, delta, amount };
           }
-          if(familyMatch||wet){
+          if(!washSystem&&(familyMatch||wet)){
             const decision=passageMaterial({phase,family:familyMatch,fallbackMove:wet?'wet on wet':'wet on dry'});
             intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
             if(familyMatch)intent.referenceCue=familyMatch.referenceCue??intent.referenceCue;
+          }
+          if(washSystem&&!step.pig){
+            sh._plane=fitGradedPlane(list,G,w);
+            delete sh._rampVec;
+            if(sh._plane&&supportMm>=laneMm&&list.length>=minShape*3){
+              const planeDemand=new Float32Array(n);for(const i of list)planeDemand[i]=amount*planeAtCell(sh._plane,i,w);
+              sh._strokePlan=planLanes(list,w,h,planeDemand,amount,{cellMm:sheetWidthMm/w,laneMm,strokeMm,reachMm:0,seed:(id*7919+band*131+1)>>>0});
+              if(sh._strokePlan){delete sh._plane;intent.graded={order:'plane',range:sh._strokePlan.factors.length?[Math.min(...sh._strokePlan.factors),Math.max(...sh._strokePlan.factors)]:[1,1]};}
+            }
           }
           sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
         }
@@ -441,6 +462,7 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   return {paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
+  if(intent.washSystem)return {name:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.phase==='shadow'?.58:.62,wetMix:intent.phase==='shadow'?.3:.55,bridge:intent.phase==='shadow'?.82:.78,bridgeSoft:intent.phase==='shadow'?2.4:2.2,intoWet:false,dryAfter:true,passes:intent.phase==='shadow'?2:1,valuePlan:intent};
   if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
   const wet=intent.move==='wet on wet';return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
 }

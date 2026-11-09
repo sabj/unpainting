@@ -22,6 +22,8 @@ import {cutInDarkWash} from '../src/paint/methods/ink-dark-skip.mjs';
 import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
 import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../src/paint/methods/passage-brush.mjs';
+import {sheetColour} from '../src/paint/methods/paper-colour.mjs';
+import {planeAtCell, gradeLoadPressure, softClipMask} from '../src/paint/methods/graded-demand.mjs';
 import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
 import {GROUND} from '../src/paint/tuned/trumbull.mjs';
@@ -497,8 +499,10 @@ const PAPER_PICK = paperOf(px, w, h, { margin: num('papermargin', 0.03), mode: o
 const TONE_MODE = opt('tonestage', '0');
 if (!['0', '1', 'auto'].includes(TONE_MODE)) throw Error('--tonestage: 0, 1 or auto');
 const SHEET_TONE = TONE_MODE === '0' ? { toned: false } : detectSheetTone(px, w, h);
+const WASH_SYSTEM=num('washsystem',0)>0;
+const WASH_SHEET=WASH_SYSTEM?sheetColour(px,w,h):null;
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(px, w, h, new Float32Array(w * h)) : null;
-const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (SHEET_TONE.toned ? SHEET_TONE.paperRGB : PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
+const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (WASH_SHEET?WASH_SHEET.rgb:SHEET_TONE.toned ? SHEET_TONE.paperRGB : PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
 const PAPER_DECLARED = opt('paperrgb', '') === 'source' ? PAPER_PICK.paperRGB : PAPER_AUTO ?? (opt('paperrgb', '') ? opt('paperrgb', '').split(',').map(Number) : null);
 if (PAPER_AUTO) console.log(`paper: auto sheet ${PAPER_AUTO.join('/')} from the largest bright region ${PAPER_EST ? PAPER_EST.rgb.map(v => v.toFixed(0)).join('/') + ' (' + (100 * PAPER_EST.cells / (w * h)).toFixed(1) + '% of the sheet)' : 'none (under 1%)'}`);
 if (PAPER_DECLARED && (PAPER_DECLARED.length !== 3 || PAPER_DECLARED.some(v => !(v > 0 && v <= 255)))) throw Error('--paperrgb needs three values in 1..255');
@@ -1515,7 +1519,7 @@ if(VALUE_ENABLED){
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
-  const valueOptions={smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
+  const valueOptions={washSystem:WASH_SYSTEM,sourceCellsPerPx:w/srcMeta.width,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:num('paperdelta',10),accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
@@ -1882,14 +1886,14 @@ const expected = new Float32Array(n * PIGS.length);
 // --deliverycal 1: at each full read of the sheet, what it holds of each pigment over what the brush was charged for
 // (the ledger) sets a per-pigment charge factor for later passages (src/paint/methods/delivery-cal.mjs). Sheet against
 // ledger only. --deliverycalmax caps the factor (default 1.8). Default 0.
-const DELIVERY = num('deliverycal', 0) > 0 ? createDeliveryCal(PIGS.length, { max: num('deliverycalmax', 1.8) }) : null;
+const DELIVERY = num('deliverycal', WASH_SYSTEM?1:0) > 0 ? createDeliveryCal(PIGS.length, { max: num('deliverycalmax', 1.8) }) : null;
 const DCAL = (sh, j) => (DELIVERY ? (sh._dcal ??= DELIVERY.factors())[j] : 1);
 // --techcal 1: the same, per technique (graded or not): between two reads of the sheet, what it gained over what the
 // brush was charged for sets the charge factor of the technique that laid that window (src/paint/methods/technique-cal.mjs).
 // Detail marks are left alone. --techcalfrom v: only passages at value band v or darker (default 4, the shadow glazes).
 // --techcalmax and --techcalmin clamp the factor (default 2.5 and 0.8). Default 0.
-const TECH_CAL = num('techcal', 0) > 0 ? createTechniqueCal({ max: num('techcalmax', 2.5), min: num('techcalmin', 0.8) }) : null;
-const TECH_CAL_FROM = num('techcalfrom', 4);
+const TECH_CAL = num('techcal', WASH_SYSTEM?1:0) > 0 ? createTechniqueCal({ max: num('techcalmax', 2.5), min: num('techcalmin', 0.8) }) : null;
+const TECH_CAL_FROM = num('techcalfrom', WASH_SYSTEM?1:4);
 const TCAL = (sh, T, detail, value) => {
   if (!TECH_CAL || detail) return 1;
   sh._tkey ??= `${T.name}${(sh.graded || sh._valuePlan) ? ' graded' : ''}`;
@@ -3139,7 +3143,7 @@ await PASSAGE_HOOK.run('shapes');
 let ONSHEET = null;
 // --feedbacklag 1 (fast default): read the sheet only when it is in hand; between reads, predict it as the last read
 // plus what the ledger booked since, so planning overlaps the GPU's dry. Full mode reads every pass.
-const FEEDBACK_LAG = num('feedbacklag', NATIVE_PAINT_MODE.mode === 'fast' ? 1 : 0) > 0 && num('orderremix', 0) <= 0;
+const FEEDBACK_LAG = !DELIVERY&&!TECH_CAL&&num('feedbacklag', NATIVE_PAINT_MODE.mode === 'fast' ? 1 : 0) > 0 && num('orderremix', 0) <= 0;
 let FEEDBACK_BASE = null, FEEDBACK_FRESH = true;
 const feedbackStats = { read: 0, predicted: 0 };
 if (num('orderremix', 0) > 0) throw new Error('--orderremix was removed by the anti-cheat rules: it charged each cell from the per-cell gap to the plan');
@@ -3523,7 +3527,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
   // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
-  const attachPlaneRamp = raw => attachRampToPaths(raw, sh._rampVec ?? sh._valuePlan?.rampVec, SC, PATH_RAMP);
+  // the plan's graded plane (graded-demand.mjs) carries the grade through the physical loads below; the single-sweep
+  // pressure ramp stands in for it only where there are no physical loads
+  const attachPlaneRamp = raw => attachRampToPaths(raw, PB && sh._plane ? null : (sh._rampVec ?? sh._valuePlan?.rampVec), SC, PATH_RAMP);
   const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38,protect:VALUE_PLAN?.protectedCells});
   const rawShapedPaths = () => (sh._valuePlan.brush?.paths ? passageBrushPaths(sh._valuePlan.brush, SC) : makeShapedPlanePaths());
   const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
@@ -3643,8 +3649,16 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if (crispHere) {
     const baseMask=brushMask(sh),reach=sh._strokePlan?.reachCells??0;
     const clipMask=reach>0?(()=>{const g=dilate(baseMask,w,h,Math.ceil(reach*.8)+1);return P?Uint8Array.from(g,(v,i)=>v&&!P[i]?1:0):g;})():baseMask;
-    const box=baseMask===MASK&&reach<=0?{x0:MB.x0*SC,y0:MB.y0*SC,x1:Math.min(W2-1,(MB.x1+1)*SC-1),y1:Math.min(H2-1,(MB.y1+1)*SC-1)}:null;
-    setClip(sheet,up(clipMask),box);used['crisp edge']=(used['crisp edge']||0)+1;
+    // --softclipmm r: along the plan's soft boundary cells the clip opens r mm past the passage (graded-demand.mjs
+    // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
+    // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
+    // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
+    const softReach=num('softwet',0)>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',sh._valuePlan?.washSystem ? .75 : 0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
+    const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;
+    const grow=soft?.ring?softReach*SC:0;
+    const box=baseMask===MASK&&reach<=0?{x0:Math.max(0,MB.x0*SC-grow),y0:Math.max(0,MB.y0*SC-grow),x1:Math.min(W2-1,(MB.x1+1)*SC-1+grow),y1:Math.min(H2-1,(MB.y1+1)*SC-1+grow)}:null;
+    setClip(sheet,up(soft?.ring?soft.clip:clipMask),box);used['crisp edge']=(used['crisp edge']||0)+1;
+    if(soft?.ring)used['soft edge, open clip']=(used['soft edge, open clip']||0)+1;
   }
   // under --brushfloor the clip is the passage closed by --clipclose (default 1.5) floor radii, joined with the probe's,
   // so pinholes inside a passage do not become paper holes. The outer edge is not moved.
@@ -3812,9 +3826,10 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     // graded amount under each load), not by recharging every few cells
     const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name) * (METERED_BRUSH && !T.name.startsWith('dry brush') ? BRUSH_LOAD * WET(T) : 1)) : null;
     if (LOADS && (LOADS.length > 1 || useGradedCal || MOD?.paintOwnedTransfer)) {
-      // One amount per shape: every load of a passage is charged the passage's amount, never per-cell amounts under it.
-      const F = null, chargeField=sh._paintOwnedCharge, componentField=sh._paintOwnedComponentCharge, lo = 0, hi = 8;
-      const readField=i=>(F?F[i]:sh.amount)+(chargeField?.get(i)??0);
+      // One amount per shape, graded by the plan's plane (graded-demand.mjs): each load is dipped at the plane's mean
+      // under it and pressed along it, never charged per-cell amounts. A passage without a plane takes its amount throughout.
+      const PLANE = sh._plane ?? null, chargeField=sh._paintOwnedCharge, componentField=sh._paintOwnedComponentCharge, lo = 0, hi = 8;
+      const readField=i=>(PLANE?sh.amount*planeAtCell(PLANE,i,w):sh.amount)+(chargeField?.get(i)??0);
       // --followfootprint 1: load from the brush's whole footprint inside the shape, not its center, so narrow shapes are not pale. Default 0.
       const footprint = Boolean(chargeField)||sh._follow && num('followfootprint', 0) > 0;
       const readLoad = q => {
@@ -3831,7 +3846,10 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
         }
         return count ? sum / count : (MASK[sy * w + sx] ? readField(sy*w+sx) : sh.amount);
       };
-      const f = LOADS.map(ch => { if (!F&&!chargeField) return 1; let a = 0; for (const q of ch) a += readLoad(q); return Math.max(lo, Math.min(hi, a / ch.length / Math.max(1e-4, sh.amount))); });
+      const f = LOADS.map(ch => { if (!PLANE&&!chargeField) return 1; let a = 0; for (const q of ch) a += readLoad(q); return Math.max(lo, Math.min(hi, a / ch.length / Math.max(1e-4, sh.amount))); });
+      // along one load the hand presses toward the plane's darker end, so load factor times pressure follows the plane
+      const GRADED = PLANE && !chargeField ? LOADS.map((ch, k) => gradeLoadPressure(ch, PLANE, f[k], SC)) : LOADS;
+      if (PLANE) used['graded load'] = (used['graded load'] || 0) + LOADS.length;
       const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       const extra=LOADS.map((ch,k)=>{
         if(!chargeField&&!componentField)return {factor:1};
@@ -3843,7 +3861,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       });
       if(extra.some(q=>q.factor>1))JSONL.append(path.join(out,'paint-owned-loads.jsonl'),JSON.stringify({shapeId:MAJOR_TECHNIQUE?.shapeId,kind:'existing path/load concentration allocation; not pigment delivery or ledger credit',input:opt('modpaintplanes',''),requestedWater:WET(T),calibratedBaseConcentration:base,existingPasses:T.passes,loads:extra})+'\n');
       let st = 0;
-      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { if(!supportedCharge(ch))return; brush._paintOwnedLoad=extra[k];productionDip(brush, { water: WET(T), conc: base.map((v,j) => v * (extra[k].componentFactors?.[j]??f[k])) }); numericalStroke(brush, sheet, ch, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: k === LOADS.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(sheet, O)); } }); }); });
+      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { if(!supportedCharge(ch))return; brush._paintOwnedLoad=extra[k];productionDip(brush, { water: WET(T), conc: base.map((v,j) => v * (extra[k].componentFactors?.[j]??f[k])) }); numericalStroke(brush, sheet, GRADED[k], { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: k === LOADS.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(sheet, O)); } }); }); });
     } else if (gradedLen > 0 && !detail && (useGradedCal ? shaped.length > 1 : shaped.length > gradedLen * 2)) {
       const chunks = [];
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
