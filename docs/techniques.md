@@ -117,7 +117,11 @@ Modules, with their flags:
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
 - `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
-- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`, parked): clean water past a passage's soft edges before its colour.
+- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`): clean water past a passage's soft edges before its colour. 0.8 mm under `--softchoice`, otherwise off.
+- `methods/soft-edge-choice.mjs` (`--softchoice`, default 1): a boundary is soft only where the passage's own demand has faded, the target turns gradually over 3 mm, and at least 5 mm of such cells run together.
+- `methods/mixed-washes.mjs` (`--mixedwash`, `--mixedshadows`, both default 1): one mixed charge per connected shape of one colour domain, laid on dry paper, instead of one pass per pigment. Touching regions with nearly the same pigment shares share a domain.
+- `methods/scale-layers.mjs` (`--scalelayers`, default 1): under `--midlayers n` the middle washes are cut by what each brush size can carry (flat, large round, medium round, small round), not at value quantiles. A smooth form is one graded wash; a later layer is a real darker shape; one layer carries at most a third of the value range, so darks build in stages.
+- `methods/graded-plane.mjs` (`--gradedlanes`, default 1): a wash with a real gradient is laid in long straight lanes across it, each dipped at the strength of one plane fitted to its demand. A flat wash keeps its one fitted gesture.
 - `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
 - `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.

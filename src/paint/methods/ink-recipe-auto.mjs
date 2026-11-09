@@ -19,6 +19,17 @@ export function penShare(px, w, h) {
   return separate(px, w, h, paper).stats.ink / (w * h);
 }
 
+/**
+ * The pen-line share of an image file (a path or its bytes) read at AUTO_INK_WIDTH, whatever size the file or the run is.
+ * The separator measures marks in pixels, so one picture reads 0.2% to 0.9% at different widths; every pen or pencil
+ * choice (the recipe, the outline medium, the drawing stages, the line source) takes this one reading.
+ * `sharp` is passed in so this file stays free of the image library.
+ */
+export async function sourcePenShare({ image, sharp, width = AUTO_INK_WIDTH }) {
+  const { data, info } = await sharp(image).flatten({ background: '#ffffff' }).resize({ width }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  return penShare(data, info.width, info.height);
+}
+
 /** The recipe name to use: 'wash' or 'none' for 'auto', the given name otherwise. share is read lazily. */
 export function chooseInkRecipe(name, argv, readShare, penfirst = 0.5) {
   if (name !== 'auto') return { recipe: name, why: null };

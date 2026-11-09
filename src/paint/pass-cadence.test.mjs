@@ -35,6 +35,8 @@ test('the recipes pin the mark cadence to their old --frames, and a later --fram
 const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80',
   '--palettewide', '1', '--physical', '1', '--order', 'painter', '--midlayers', '2', '--texture', '0', '--mode', 'fast', '--video', '0',
   '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1',
+  // enough passes that the all-frame film holds more frames than the checkpoint film; mixed washes would lay too few on this sheet
+  '--mixedwash', '0',
   // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
   '--segments', 'off'];
 const run = (args, log) => new Promise(resolve => {
