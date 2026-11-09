@@ -12,6 +12,7 @@
 // This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins.
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 export const BASE = 'region_w13_lay4_rec2x_rcl_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_tv8_pgreen_tp2';
 const DEFAULT_VARIANT = 'region_w13';
@@ -295,9 +296,16 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (pausedir) args.push('--pausedir', pausedir);
   if (resumestate) args.push('--resumestate', resumestate);
   const linesByName = {};
+  const readLineJson = f => {
+    try {
+      if (fs.existsSync(f)) return JSON.parse(fs.readFileSync(f, 'utf8'));
+      if (fs.existsSync(f + '.gz')) return JSON.parse(zlib.gunzipSync(fs.readFileSync(f + '.gz')).toString('utf8'));
+      return null;
+    } catch { return null; }
+  };
   for (const k of ['drawingfile', 'drawinglast']) {
     const i = args.lastIndexOf('--' + k); if (i < 0) continue;
-    const f = args[i + 1] + '-lines.json', doc = readJson(f);
+    const f = args[i + 1] + '-lines.json', doc = readLineJson(f);
     if (!doc) problems.push(path.basename(f) + ' is missing or not valid JSON'); else linesByName[path.basename(f)] = doc;
   }
   if (config) problems.push(...checkPlanLimits(config, spec.sheetmm, linesByName, targetPixels));

@@ -33,21 +33,23 @@ export function verifyComparisonRun(runDir, { requireGpu = true, requireSegments
     throw new Error(`comparison run ${runDir} used backend "${backend ?? 'unknown'}" (fallback=${fallback}); GPU hardware is required for timing and quality comparisons`);
   }
   const width = Number(card?.dimensions?.paintWidth ?? speed?.width ?? card?.width ?? card?.frame?.[0] ?? 0);
-  if (minWidth > 0 && width > 0 && width < minWidth) {
+  if (minWidth > 0 && (!(width > 0) || width < minWidth)) {
     throw new Error(`comparison run ${runDir} rendered at width ${width}px (< ${minWidth}px minimum); do not substitute 300px crop thumbnails for full-resolution targets`);
   }
   const sourceWidth = Number(card?.dimensions?.sourceWidth ?? 0);
   const enlargement = Number(card?.dimensions?.enlargement ?? (sourceWidth > 0 && width > 0 ? +(width / sourceWidth).toFixed(2) : 0));
-  if (minSourceWidth > 0 && sourceWidth > 0 && sourceWidth < minSourceWidth) {
+  if (minSourceWidth > 0 && (!(sourceWidth > 0) || sourceWidth < minSourceWidth)) {
     throw new Error(`comparison run ${runDir} used a ${sourceWidth}px source target (< ${minSourceWidth}px minimum, ${enlargement}x enlargement)`);
   }
   if (requireSegments) {
     const segPath = path.join(runDir, 'segments.json');
     if (exists(segPath)) {
       const seg = JSON.parse(readFile(segPath));
-      if (seg?.mode === 'off' || seg?.status === 'off') throw new Error(`comparison run ${runDir} ran with --segments off; full SAM segmentation is required`);
-    } else if (card?.segments?.backend === 'off') {
-      throw new Error(`comparison run ${runDir} ran with --segments off; full SAM segmentation is required`);
+      if (seg?.mode === 'off' || seg?.status === 'off' || seg?.backend === 'off') throw new Error(`comparison run ${runDir} ran with --segments off; full SAM segmentation is required`);
+    } else if (card?.segments) {
+      if (card.segments.backend === 'off' || card.segments.mode === 'off') throw new Error(`comparison run ${runDir} ran with --segments off; full SAM segmentation is required`);
+    } else {
+      throw new Error(`comparison run ${runDir} is missing segmentation evidence (segments.json / run-card.segments); full SAM segmentation is required`);
     }
   }
   return { ok: true, backend, width, sourceWidth, enlargement };
