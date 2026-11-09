@@ -29,6 +29,7 @@ import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
 import {GROUND} from '../src/paint/tuned/trumbull.mjs';
 import {setTextureVariety,setTextureFlow,flowField} from '../src/paint/techniques/shaped-marks.mjs';
+import {plannedEdges,supportedLines} from '../src/paint/methods/line-support.mjs';
 import {planLightToDark,valueTechnique,selectValueInk,drawsWholeFile,valueInkVerdict,softBoundaryPaths} from '../src/paint/methods/light-to-dark.mjs';
 import {smallestBrushMm} from '../src/paint/methods/light-reserves.mjs';
 import {softRing} from '../src/paint/methods/soft-edges.mjs';
@@ -426,7 +427,7 @@ const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(pa
 if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 if(VALUE_CONFIG?.sheet?.widthMm!=null&&Math.abs(num('sheetmm',VALUE_CONFIG.sheet.widthMm)-VALUE_CONFIG.sheet.widthMm)>1e-6)throw Error(`value plan sheet.widthMm ${VALUE_CONFIG.sheet.widthMm} does not match --sheetmm ${num('sheetmm',VALUE_CONFIG.sheet.widthMm)}`);
 const VALUE_ENABLED=!opt('areaplan','') && opt('order','painter')==='painter';
-let VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new EpochCells(),VALUE_PIGMENT_CONTACT=new EpochCells(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
+let LINE_EDGES=null,VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new EpochCells(),VALUE_PIGMENT_CONTACT=new EpochCells(),VALUE_COMMAND=0;const VALUE_COUNTS=Array.from({length:5},(_,i)=>({band:i+1,strokes:0,contacts:0}));
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
 // pigments, charged into the same wet wash. 0 starts every shape on a dry sheet.
@@ -2582,6 +2583,14 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // A prepared pencil drawing describes the same contours as pen, including paper-light borders.
   if(VALUE_PLAN){const before=kept,sourceInk=drawsWholeFile({first,fine,graphiteFirst,drawingFile:opt('drawingfile',''),closingFile:opt('drawinglast',''),sourceInk:sourceInkDrawing()});
     kept=selectValueInk(before,{first,w,h,sourceInk,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells,shaped:VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection});
+    // --lineedges 0 turns it off. A line from the plan's drawing file is drawn only when at least half of it lies on an
+    // edge of a planned passage (src/paint/methods/line-support.mjs); a line inside one planned mass is left off whole.
+    // The slack is one source pixel. A source's own pen lines are drawn as they are.
+    if(num('lineedges',1)>0&&!sourceInkDrawing()&&drawsWholeFile({first,fine,graphiteFirst,drawingFile:opt('drawingfile',''),closingFile:opt('drawinglast','')})){
+      LINE_EDGES??=plannedEdges(VALUE_PLAN.instructions,n);
+      const r=supportedLines(kept,{edges:LINE_EDGES,w,h,tol:Math.max(1,Math.round(w/srcMeta.width))});kept=r.kept;
+      console.log(`line support, ${first?'opening':fine?'fine':'closing'}: ${r.kept.length} of ${r.kept.length+r.dropped.length} lines lie mostly on planned passage edges and are drawn; ${r.dropped.length} inside planned masses are left off`);
+    }
     const tally={};for(const g of before){const r=valueInkVerdict(g,{first,w,h,density:VALUE_PLAN.value.values,reserves:VALUE_PLAN.protectedCells});if(r!=='kept')tally[r]=(tally[r]??0)+1;}
     console.log(`value ink, ${first?'opening':fine?'fine':'closing'}: ${kept.length} of ${before.length} lines kept${sourceInk?' (drawn whole)':''}; the line filter marks ${Object.entries(tally).map(([k,v])=>`${v} ${k}`).join(', ')||'none'}`);}
   const passName = first ? 'first' : fine ? 'fine' : 'last';
