@@ -21,6 +21,7 @@ import { components, closeLocal, removeSmall, erode, dilate } from '../../raster
 import { targetRegions } from './target-regions.mjs';
 import { subjectCovers, holdSubjectLights, subjectDomain } from './subject-washes.mjs';
 import { passage } from '../../crop/blockin.mjs';
+import { coatTally } from './coat-order.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { RECESS, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND } from '../tuned/trumbull.mjs';
 
@@ -42,7 +43,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({washSystem=false,paperRule=washSystem,calibratedPlan=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null,mixedWash=washSystem,mixedShadows=washSystem,scaleCuts=washSystem,gradedLanes=washSystem,softChoice=washSystem}) {
+export function planLightToDark({washSystem=false,paperRule=washSystem,calibratedPlan=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null,mixedWash=washSystem,mixedShadows=washSystem,scaleCuts=washSystem,gradedLanes=washSystem,softChoice=washSystem}) {
   if(calibratedPlan){darkGain=1;coolGain=1;midGain=1;}
   let coolGroup=null;setRecessMax(recessMax);
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
@@ -77,7 +78,7 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   const papTol = tonedPap ? [14, 14, 18] : [9, 9, 12];
   const papDark = Boolean(PAP && (0.2126 * PAP[0] + 0.7152 * PAP[1] + 0.0722 * PAP[2] < 180 || PAP[0] < 180 || PAP[1] < 200 || PAP[2] < 145));
   const inferred = Uint8Array.from({ length: n }, (_, i) => {
-    if (hold?.[i]) return 1;
+    if (hold?.[i] || paleHold?.[i]) return 1;
     if(referenceTest)return referenceTest(rgb,i)?1:0;
     if (PAP) {
       if (papDark) return 0;
@@ -122,6 +123,9 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
     }
   }
   protectedCells.fill(0);
+  // hold: explicit reserves, kept whatever their size. paleHold: cells the plan gives almost no paint (under half a glaze);
+  // they are inferred lights like any other, so a patch too small for the smallest brush to paint around is not masked
+  // (a hard white fleck in a wall) but takes the wash around it, unless it passes the catchlight test above.
   for(let i=0;i<n;i++)if(lights[i]||catchlights[i]||(hold&&hold[i]))protectedCells[i]=1;
   if(shaped)region.labels=mergePlaneFragments(region.labels,w,h,rgb,minShape,protectedCells);
   // An explicit reserve is the target's light inside its box (light-reserves.mjs), kept whatever its size.
@@ -337,6 +341,8 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   if(mixedWash&&!mixedOn)console.log('mixed washes: off for this plan (per-cell styles)');
   const WD=mixedOn&&!subjects?washDomains(region.labels,region.regions.length,demand,k,w,h,{mayJoin:profile?(a,b)=>regionProfiles[a-1]?.name===regionProfiles[b-1]?.name:null}):null;
   if(WD)console.log(`mixed washes: ${WD.ids.length} colour domains from ${region.regions.length} regions`);
+  // coat-order.mjs: each passage's coat number over the cells it covers, so lane joins move from coat to coat
+  const coats=coatTally(n);
   let laneField=null;
   for(const step of steps){const band=step.band;
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
@@ -484,7 +490,7 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
             intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
             if(familyMatch)intent.referenceCue=familyMatch.referenceCue??intent.referenceCue;
           }
-          sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
+          intent.coat=coats.lay(list);sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
         }
         // A mixed layer is filed under its lead pigment; each passage carries its own mix.
         const layerMix=mixedStep&&shapes.length?(()=>{const m=new Float64Array(k);let t=0;for(const q of shapes)for(let j=0;j<k;j++){m[j]+=q.mix[j]*q.area;t+=q.mix[j]*q.area;}return Array.from(m,v=>v/Math.max(1e-9,t));})():null;
