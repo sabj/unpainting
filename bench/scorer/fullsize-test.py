@@ -112,6 +112,14 @@ class Flecks(unittest.TestCase):
         cm2 = 360 * 480 / PX ** 2 / 100
         self.assertAlmostEqual(k['white_per_cm2'], (5 + k['white_slash_mm'] / 2) / cm2, delta=0.03)   # the painted mask is read after smoothing, so it is a little wider
 
+    def test_a_white_core_inside_a_pale_halo_is_white(self):
+        L = paint_field(40.0)
+        L[196:207, 100:220] = 62                                  # a pale seam
+        L[200:203, 100:220] = 96                                  # with bare paper down its middle
+        k = self.measure(L)
+        self.assertEqual(k['white_slashes'], 1)
+        self.assertAlmostEqual(k['white_slash_mm'], 20, delta=1)
+
     def test_a_reserved_shape_and_a_ragged_edge_are_not_flecks(self):
         L = paint_field()
         L[150:200, 150:200] = 96                                  # an 8 mm reserve
@@ -125,14 +133,14 @@ class Flecks(unittest.TestCase):
         k = self.measure(L)
         self.assertEqual((k['grain'], k['white_flecks'], k['white_per_cm2']), (1, 0, 0.0))
 
-    def test_a_clean_wash_scores_ten_and_a_rash_scores_low(self):
+    def test_a_clean_wash_has_none_and_a_rash_has_many(self):
         clean = fs.classic_fullsize(sheet(paint_field()), MM)
-        self.assertEqual(clean['scores']['flecks'], 10.0)
+        self.assertEqual(clean['flecks']['white_per_cm2'], 0.0)
         L = paint_field()
         rng = np.random.default_rng(0)
         for y, x in zip(rng.integers(70, 400, 400), rng.integers(70, 520, 400)):
             L[y:y + 5, x:x + 5] = 96
-        self.assertLess(fs.classic_fullsize(sheet(L), MM)['scores']['flecks'], 5.0)
+        self.assertGreater(fs.classic_fullsize(sheet(L), MM)['flecks']['white_per_cm2'], 1.0)
 
 
 class TargetFree(unittest.TestCase):
@@ -145,9 +153,13 @@ class TargetFree(unittest.TestCase):
             self.assertNotIn('target', inspect.signature(f).parameters)
         self.assertNotIn('--target', Path(fs.__file__).read_text())
 
-    def test_pale_marks_do_not_change_the_score(self):
-        L = paint_field(); L[300:303, 100:400] = 70
-        self.assertEqual(fs.classic_fullsize(sheet(L), MM)['scores']['flecks'], 10.0)
+    def test_measures_are_not_part_of_craft(self):
+        L = paint_field(); L[300:303, 100:400] = 96
+        post = lambda *a, **k: (json.dumps(GOOD), {})
+        a = fs.score(p_path(sheet(paint_field()), self), 'wash', MM, post=post)
+        b = fs.score(p_path(sheet(L), self), 'wash', MM, post=post)
+        self.assertNotEqual(a['measures']['flecks'], b['measures']['flecks'])
+        self.assertEqual((a['craft'], b['craft']), (6.0, 6.0))
 
 
 def p_path(img, case, name='p.png'):
@@ -221,11 +233,12 @@ class Vision(unittest.TestCase):
         self.assertFalse(r['complete']); self.assertIsNone(r['craft'])
         self.assertEqual(r['vision']['errors']['Qwen/Qwen3.5-9B'], 4)
 
-    def test_craft_is_the_mean_of_vision_and_classic(self):
+    def test_craft_is_the_judges_tile_mean_and_needs_most_calls_valid(self):
         r = fs.score(p_path(self.img, self), 'wash', 128.0, calls=3, post=lambda *a, **k: (json.dumps(GOOD), {}))
         self.assertTrue(r['complete'])
-        self.assertEqual(r['craft'], round((6 + r['classic']) / 2, 2))
+        self.assertEqual((r['craft'], r['worstTile']), (6.0, 6.0))
         self.assertEqual(r['vision']['minValidCalls'], 2)
+        self.assertIn('edges', r['measures'])
 
 
 if __name__ == '__main__':
