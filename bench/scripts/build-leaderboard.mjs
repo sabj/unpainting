@@ -60,7 +60,7 @@ const lb = ['# Leaderboard', '',
   PAINTER_LINE, '',
   'The rounds are V1 to V5. A trial is one model session that paints the requested targets. '
   + 'Score is the mean over every scored painting in trials 1 to 3 of its automated score as a percentage of the target scored against itself (the realistic ceiling: '
-  + `${list(R.crops.filter(c => c.selfScore != null).map(c => `${short(c.key)} ${c.selfScore.toFixed(2)}`))}), ± the half-width of its 95% confidence interval, estimated by resampling paintings. `
+  + `${list(R.crops.filter(c => c.selfScore != null && c.distributed).map(c => `${short(c.key)} ${c.selfScore.toFixed(2)}`))}), ± the half-width of its 95% confidence interval, estimated by resampling paintings. `
   + 'Raw score is the same mean out of 10. Models are ranked by Score. '
   + 'Best trial gives the indexed score and trial number. Strokes, minutes, tokens and cost are medians per trial. '
   + 'Every trial the cheat-risk score flagged was reviewed by hand, and none of them cheated. One trial was disqualified for a blocked target read ([findings](FINDINGS.md#target-reads-and-cheat-risk)). '
