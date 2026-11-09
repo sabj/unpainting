@@ -22,6 +22,8 @@ import { RECESS, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND } 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
 // The smallest value step worth a wash of its own under --scalelayers: about 3 L* on a 0..1 value, just visible.
 const SCALE_MIN_STEP = .04;
+// The most value one middle wash carries under --scalelayers: the plan's own second band cap, about a third of the range.
+const SCALE_MAX_STEP = VALUE_CAPS[1];
 // A graded lane's sweep before the next dip: long enough to be one gesture of a flat brush, not a run of patches.
 const GRADED_STROKE_MM = 60;
 // The q quantile of G over a passage's cells.
@@ -266,7 +268,9 @@ export function planLightToDark({smallLightMax=120,detailScale=0,detailSegments=
   const midShare=i=>weights[1][i]+(layerTexture?0:weights[2][i]);
   if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'&&!nestedBands&&scaleCuts){
     const mid=Float32Array.from({length:n},(_,i)=>value.values[i]*midShare(i)),live=Uint8Array.from(mid,(v,i)=>!protectedCells[i]&&v>0?1:0);
-    const sl=scaleLayers({field:boxMeanValue(mid,w,h,Math.max(1,Math.round(1/(sheetWidthMm/w)))),live,w,h,cellMm:sheetWidthMm/w,radiiMm:radiiForLayers(washLayers),minStep:SCALE_MIN_STEP,minShape});
+    // Smoothed and floored as the quantile layers were (layerSmoothMm, four minimum shapes): a wash layer holds no
+    // detail finer than that, and what is finer belongs to the pen and the last glazes.
+    const sl=scaleLayers({field:boxMeanValue(mid,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),live,w,h,cellMm:sheetWidthMm/w,radiiMm:radiiForLayers(washLayers),minStep:SCALE_MIN_STEP,maxStep:SCALE_MAX_STEP,minShape:layerSmoothMm<2?minShape:minShape*4});
     const layerSteps=sl.cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v?midShare(i)*sl.share[j][i]:0)}));
     steps.splice(1,layerTexture?1:2,...layerSteps);
     console.log(`scale layers: ${layerSteps.length} middle layers at ${radiiForLayers(washLayers).join(', ')} mm, covering ${sl.cover.map(c=>(100*c.reduce((a,v)=>a+v,0)/n).toFixed(0)+'%').join(', ')} of the sheet`);
