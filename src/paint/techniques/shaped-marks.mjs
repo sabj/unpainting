@@ -7,8 +7,8 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  // not one fitted diagonal gesture, whose straight sides leave wedges and streaks.
  if(lanesR>0&&!texture)return skyLanes(mask,w,h,lanesR,scale,laneStep,protect??mask.protect??mask.protectedCells);
  const x0=box?.x0??0,x1=box?.x1??w-1,y0=box?.y0??0,y1=box?.y1??h-1;
- let count=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;
- for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x=i%w+.5,y=Math.floor(i/w)+.5;count++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;}
+ let count=0,sx=0,sy=0,sxx=0,syy=0,sxy=0,xMin=w,xMax=-1,yMin=h,yMax=-1;
+ for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x0i=i%w,x=x0i+.5,y=row+.5;count++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;if(x0i<xMin)xMin=x0i;if(x0i>xMax)xMax=x0i;if(row<yMin)yMin=row;if(row>yMax)yMax=row;}
  if(count<4)return [];
  const cx=sx/count,cy=sy/count,a=sxx/count-cx*cx,b=syy/count-cy*cy,c=sxy/count-cx*cy;
  const angle=.5*Math.atan2(2*c,a-b),dx=Math.cos(angle),dy=Math.sin(angle);
@@ -25,20 +25,14 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  // Split against the real mop width; changing native density must not change physical brush selection.
  const maxRadius=Math.max(...points.map(p=>p.r/scale));
  if(!texture&&mmPerCell>0&&maxBrushMm>0){
-  const lanes=Math.ceil(2*maxRadius*mmPerCell/maxBrushMm);
-  if(lanes>1){
-   let uMin=Infinity,uMax=-Infinity;
-   for(const b of bins.values()){if(b[0]<uMin)uMin=b[0];if(b[1]>uMax)uMax=b[1];}
-   const uMid=(uMin+uMax)/2,spanR=Math.max(maxRadius,(uMax-uMin)/2);
-   const laneRCell=Math.min(maxBrushMm/(2*mmPerCell),spanR/lanes*1.18),laneR=laneRCell*scale;
-   const keys=[...bins.keys()].sort((p,q)=>p-q);
+  const spanH=(yMax-yMin+1)/2;
+  const lanes=Math.ceil(2*Math.max(maxRadius,spanH)*mmPerCell/maxBrushMm);
+  if(lanes>1&&xMax>xMin){
+   const laneR=Math.max(1,spanH/lanes*1.15)*scale;
    return Array.from({length:lanes},(_,k)=>{
-    const uk=uMid+(k-(lanes-1)/2)*2*spanR/lanes;
-    let j0=lo,j1=hi;
-    const hit=keys.filter(j=>{const b=bins.get(j);return b&&b[1]>=uk-laneRCell&&b[0]<=uk+laneRCell;});
-    if(hit.length>=2){j0=hit[0];j1=hit[hit.length-1];}
+    const yk=(yMin+(k+.5)*(yMax-yMin+1)/lanes)*scale;
     const lanePts=[];
-    for(let j=j0;j<=j1;j++)if(bins.has(j))lanePts.push({x:(cx+dx*j-dy*uk)*scale,y:(cy+dy*j+dx*uk)*scale,r:laneR,p:.9});
+    for(let x=xMin;x<=xMax;x++)lanePts.push({x:(x+.5)*scale,y:yk,r:laneR,p:.9});
     return k%2===1?lanePts.reverse():lanePts;
    });
   }
