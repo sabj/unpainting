@@ -24,18 +24,21 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  if(points.length<2)return [];
  // Split against the real mop width; changing native density must not change physical brush selection.
  const maxRadius=Math.max(...points.map(p=>p.r/scale));
- if(!texture&&mmPerCell>0&&maxBrushMm>0){
-  const spanH=(yMax-yMin+1)/2;
-  const lanes=Math.ceil(2*Math.max(maxRadius,spanH)*mmPerCell/maxBrushMm);
-  if(lanes>1&&xMax>xMin){
-   const laneR=Math.max(1,spanH/lanes*1.15)*scale;
-   return Array.from({length:lanes},(_,k)=>{
-    const yk=(yMin+(k+.5)*(yMax-yMin+1)/lanes)*scale;
-    const lanePts=[];
-    for(let x=xMin;x<=xMax;x++)lanePts.push({x:(x+.5)*scale,y:yk,r:laneR,p:.9});
-    return k%2===1?lanePts.reverse():lanePts;
-   });
+ if(!texture&&mmPerCell>0&&maxBrushMm>0&&2*maxRadius*mmPerCell>maxBrushMm){
+  const lanes=Math.ceil(2*maxRadius*mmPerCell/maxBrushMm);
+  const envW=Math.max(3,Math.round((hi-lo)*.18));
+  const envPts=[];
+  for(let j=lo;j<=hi;j++){
+   if(!bins.has(j))continue;
+   let b0=Infinity,b1=-Infinity;
+   for(let q=j-envW;q<=j+envW;q++){const v=bins.get(q);if(v){if(v[0]<b0)b0=v[0];if(v[1]>b1)b1=v[1];}}
+   const u=(b0+b1)/2,r=Math.max(maxRadius*.85,(b1-b0)/2);
+   envPts.push({x:(cx+dx*j-dy*u)*scale,y:(cy+dy*j+dx*u)*scale,r:r*scale,p:.9});
   }
+  return Array.from({length:lanes},(_,k)=>envPts.map(p=>{
+   const offset=(k-(lanes-1)/2)*2*(p.r/scale)/lanes;
+   return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.005),p:p.p};
+  }));
  }
  return [points];
 }

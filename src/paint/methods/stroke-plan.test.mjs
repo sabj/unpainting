@@ -238,3 +238,28 @@ test('continuous wash lanes with scattered protected flecks do not shatter into 
   const stubCount = r.paths.filter(p => p.length <= 2 && Math.hypot(p[p.length - 1].x - p[0].x, p[p.length - 1].y - p[0].y) < 1).length;
   assert.equal(stubCount, 0, 'Zero 0.5-cell stub strokes emitted on continuous passage');
 });
+
+test('pad overlaps consecutive strokes in a split lane so joints never leave an unbrushed gap', () => {
+  const { list, G } = slab(200, 40, 10, 190, 15, 25, () => 1);
+  const protect = new Uint8Array(200 * 40);
+  // Place a protected cell near the mid-lane joint at x=100
+  protect[20 * 200 + 100] = 1;
+  const r = planLanes(list, 200, 40, G, 1, { cellMm: 0.5, laneMm: 6, strokeMm: 45, protect: null });
+  assert.ok(r.paths.length >= 2, 'Lane splits into multiple strokes along length');
+  // Sort strokes in the same y-lane by starting x and verify joint overlap >= R
+  const byY = new Map();
+  for (const p of r.paths) {
+    const yKey = Math.round(p[0].y);
+    if (!byY.has(yKey)) byY.set(yKey, []);
+    byY.get(yKey).push(p);
+  }
+  for (const strokes of byY.values()) {
+    if (strokes.length < 2) continue;
+    strokes.sort((a, b) => Math.min(a[0].x, a.at(-1).x) - Math.min(b[0].x, b.at(-1).x));
+    for (let i = 1; i < strokes.length; i++) {
+      const prevMaxX = Math.max(strokes[i - 1][0].x, strokes[i - 1].at(-1).x);
+      const nextMinX = Math.min(strokes[i][0].x, strokes[i].at(-1).x);
+      assert.ok(prevMaxX >= nextMinX, `Stroke joint must overlap (prevMaxX=${prevMaxX} >= nextMinX=${nextMinX})`);
+    }
+  }
+});

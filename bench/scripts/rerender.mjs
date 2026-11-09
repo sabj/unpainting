@@ -25,6 +25,7 @@ export function parseRerenderArgs(argv = process.argv.slice(2)) {
     segments: null,
     allowDirty: false,
     keepMarks: false,
+    strictPlan: false,
     dryRun: false,
     compileOnly: false,
   };
@@ -39,6 +40,7 @@ export function parseRerenderArgs(argv = process.argv.slice(2)) {
     else if (a === '--segments') o.segments = next();
     else if (a === '--allowdirty') o.allowDirty = next() !== '0';
     else if (a === '--keep-marks') o.keepMarks = true;
+    else if (a === '--strict-plan') o.strictPlan = true;
     else if (a === '--dry-run' || a === '--plan') o.dryRun = true;
     else if (a === '--compile') o.compileOnly = true;
     else throw new Error(`unknown option: ${a}`);
@@ -125,6 +127,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
     });
     const painted = verdict.exit === 0 && finished;
     const problems = [...verdict.failures.map(f => f.reason)];
+    if (opts.strictPlan && plan.problems?.length) problems.push(...plan.problems);
     let stagesFile = null;
     if (!opts.compileOnly && painted) {
       const pFile = path.join(jobOut, 'painting.png');
@@ -157,6 +160,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
     }
     const ok = (opts.compileOnly ? child.status === 0 : painted) && problems.length === 0;
     const rec = {
+      round: job.round,
       model: job.model,
       try: job.tryNum,
       subject: job.subject,
@@ -175,8 +179,20 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
     console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: ${ok ? 'PAINTED' : 'FAILED'} in ${seconds}s (exit ${child.status})`);
   }
   const summaryPath = path.join(opts.out, 'rerender-summary.json');
+  const keyOf = r => `${r.round || opts.round}:${r.model}:${r.try}:${r.subject}`;
+  const mergedMap = new Map();
+  if (fs.existsSync(summaryPath)) {
+    try {
+      const prev = readJson(summaryPath);
+      if (Array.isArray(prev?.results)) {
+        for (const r of prev.results) mergedMap.set(keyOf(r), r);
+      }
+    } catch { /* replace unreadable summary */ }
+  }
+  for (const r of results) mergedMap.set(keyOf(r), r);
+  const mergedResults = [...mergedMap.values()];
   const allOk = results.every(r => r.ok);
-  writeJson(summaryPath, { generatedAt: new Date().toISOString(), options: opts, total: results.length, painted: results.filter(r => r.painted).length, okCount: results.filter(r => r.ok).length, results });
+  writeJson(summaryPath, { generatedAt: new Date().toISOString(), options: opts, total: mergedResults.length, painted: mergedResults.filter(r => r.painted).length, okCount: mergedResults.filter(r => r.ok).length, results: mergedResults });
   return { ok: allOk, results, summaryPath };
 }
 

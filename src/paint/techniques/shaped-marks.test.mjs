@@ -59,21 +59,55 @@ test('Directive (b): bottom strips up to y1 are covered by final lane', () => {
   assert.ok(maxY >= 31, `Bottom strip covered, maxY = ${maxY} >= 31`);
 });
 
-test('Directive (c): multi-lane splits alternate lane direction on odd k', () => {
-  const w = 100, h = 100, m = new Uint8Array(w * h).fill(1);
-  const lanes = shapedPlanePaths(m, w, h, { mmPerCell: 0.8, maxBrushMm: 38 });
-  assert.ok(lanes.length >= 2, `Split into ${lanes.length} lanes`);
-  const l0 = lanes[0], l1 = lanes[1];
-  const distEnd0ToStart1 = Math.hypot(l0[l0.length - 1].x - l1[0].x, l0[l0.length - 1].y - l1[0].y);
-  const distEnd0ToEnd1 = Math.hypot(l0[l0.length - 1].x - l1[l1.length - 1].x, l0[l0.length - 1].y - l1[l1.length - 1].y);
-  assert.ok(distEnd0ToStart1 < distEnd0ToEnd1, `Lane 1 alternates direction: ${distEnd0ToStart1.toFixed(1)} < ${distEnd0ToEnd1.toFixed(1)}`);
-
-  if (lanes.length >= 3) {
-    const l2 = lanes[2];
-    const distEnd1ToStart2 = Math.hypot(l1[l1.length - 1].x - l2[0].x, l1[l1.length - 1].y - l2[0].y);
-    const distEnd1ToEnd2 = Math.hypot(l1[l1.length - 1].x - l2[l2.length - 1].x, l1[l1.length - 1].y - l2[l2.length - 1].y);
-    assert.ok(distEnd1ToStart2 < distEnd1ToEnd2, `Lane 2 alternates direction: ${distEnd1ToStart2.toFixed(1)} < ${distEnd1ToEnd2.toFixed(1)}`);
+test('non-rectangular thin diagonal mask keeps a single PCA spine inside the mask', () => {
+  const w = 200, h = 200, m = new Uint8Array(w * h);
+  for (let y = 20; y < 180; y++) {
+    for (let x = 20; x < 180; x++) {
+      if (Math.abs(x - y) <= 10) m[y * w + x] = 1;
+    }
   }
+  const lanes = shapedPlanePaths(m, w, h, { mmPerCell: 0.5, maxBrushMm: 38 });
+  assert.equal(lanes.length, 1, 'Thin 45-degree diagonal strip emits 1 PCA lane, not multiple horizontal lanes');
+  const pts = lanes[0];
+  let inside = 0;
+  for (const p of pts) {
+    const ix = Math.round(p.x - 0.5), iy = Math.round(p.y - 0.5);
+    if (ix >= 0 && ix < w && iy >= 0 && iy < h && m[iy * w + ix]) inside++;
+  }
+  assert.ok(inside / pts.length >= 0.95, `Expected >= 95% of spine points inside mask, got ${(100 * inside / pts.length).toFixed(1)}%`);
+});
+
+test('multi-lane splits keep uniform lane-boundary density without double-coated seams or bottom-edge cutouts', async () => {
+  const { makePaper } = await import('../../media/paper.mjs');
+  const { createSheet } = await import('../../media/sheet.mjs');
+  const { createBrush, dip, stroke } = await import('../../media/brush.mjs');
+  const w = 240, h = 180, m = new Uint8Array(w * h).fill(1);
+  // Carve a bottom-edge reserve cutout (x = 100..130, y = 150..179) to verify envelope bridging
+  for (let y = 150; y < h; y++) for (let x = 100; x < 130; x++) m[y * w + x] = 0;
+  const lanes = shapedPlanePaths(m, w, h, { mmPerCell: 0.5, maxBrushMm: 38 });
+  assert.equal(lanes.length, 3, 'Expected 3 mop lanes');
+  // All lanes sweep in the same direction (left to right)
+  for (const l of lanes) assert.ok(l[0].x < l[l.length - 1].x, 'Each lane sweeps in the same direction');
+  const paper = makePaper(w, h, { seed: 1, mmPerCell: 0.5 });
+  const sheet = createSheet(paper, [{ K: [1, 1, 1], S: [0.1, 0.1, 0.1] }]);
+  for (let k = 0; k < lanes.length; k++) {
+    const pts = lanes[k];
+    const r = Math.max(...pts.map(p => p.r));
+    const b = createBrush({ flat: true, radius: r, bristles: Math.ceil(r * 2), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, bridge: 0, bridgeSoft: 2.4, seed: 31 + k });
+    dip(b, { water: 0.62, conc: [0.5] });
+    stroke(b, sheet, pts, { upright: 'sweep' });
+  }
+  const rowT = new Float64Array(h);
+  for (let y = 0; y < h; y++) {
+    let s = 0;
+    for (let x = 30; x < 210; x++) s += sheet.D[0][y * w + x] + sheet.G[0][y * w + x];
+    rowT[y] = s / 180;
+  }
+  const body = (rowT[30] + rowT[90] + rowT[140]) / 3;
+  const seam1Max = Math.max(...rowT.slice(50, 71));
+  const seam1Min = Math.min(...rowT.slice(50, 71));
+  assert.ok(seam1Max / body <= 1.15, `Lane boundary max density ratio ${(seam1Max / body).toFixed(2)} <= 1.15 (no 1.80x dark stripe)`);
+  assert.ok(seam1Min / body >= 0.85, `Lane boundary min density ratio ${(seam1Min / body).toFixed(2)} >= 0.85 (no unbrushed gap)`);
 });
 
 test('Directive (d): shortTextureMarks receives mmPerCell in parameter slot', () => {
