@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
 import { createSheet, deposit, step, totals, dry, DEFAULTS } from './sheet.mjs';
-import { createBrush, dip, stroke, thirsty, setStrokeVariety } from './brush.mjs';
+import { createBrush, dip, stroke, thirsty, setStrokeVariety, solidHalfWidth } from './brush.mjs';
 import { brushFor, TECHNIQUES } from '../paint/methods/lay.mjs';
 // exact-geometry contracts of the planned stroke: run with no stroke variety and no damp-paint merge
 const classic = t => { setStrokeVariety(0); t.after(() => setStrokeVariety(1)); };
@@ -263,4 +263,27 @@ test('paint charged into a glossy film mixes out into it (filmDiffuse); on dry p
   assert.ok(on.far > 1.5 * off.far, `paint reaches 1.5 mm out on a glossy film (${on.far.toFixed(4)} vs ${off.far.toFixed(4)} without)`);
   const d1 = run(false, 0.2).far, d0 = run(false, 0).far;
   assert.ok(Math.abs(d1 - d0) < 1e-3 && d1 < 0.01, `on dry paper the paint stays in its own stroke (${d1.toFixed(4)} vs ${d0.toFixed(4)})`);
+});
+
+// A wide plane is laid in lanes; their joins must meet in solid paint. The flat brush's sides wander and its outer
+// hairs touch only the high paper, so solid contact stops short of the nominal radius. solidHalfWidth is that reach.
+test('a flat wash brush touches every cell within its solid half-width, and not every cell out to its radius', () => {
+  for (const r of [12, 30]) {
+    const W = 10 * r, H = 4 * r, mm = 280 / 1200;
+    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2, coldPress: { mmPerCell: mm, bumpMm: [.5, 2], cover: 2.2, swell: .3 } }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: .25 }]);
+    const b = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 });
+    dip(b, { water: 1, conc: [.05] });
+    const y0 = H / 2;
+    stroke(b, sheet, Array.from({ length: 80 }, (_, i) => ({ x: r + i * (W - 2 * r) / 79, y: y0, r, p: .9 })), { lift: true });
+    const solid = solidHalfWidth(r, { pressure: .9, splay: .03 });
+    assert.ok(solid > .5 * r && solid < r, `solid reach ${solid.toFixed(1)} of radius ${r}`);
+    const touched = (y, x) => { const i = y * W + x; return sheet.W[i] > 0 || sheet.G[0][i] > 0 || sheet.D[0][i] > 0 || sheet.s[i] > 0; };
+    let bare = 0, cells = 0, edgeBare = 0, edgeCells = 0;
+    for (let x = Math.round(W * .2); x < Math.round(W * .8); x++) {
+      for (let y = Math.ceil(y0 - solid); y <= Math.floor(y0 + solid) - 1; y++) { cells++; if (!touched(y, x)) bare++; }
+      for (const y of [Math.floor(y0 - r), Math.ceil(y0 + r) - 1]) { edgeCells++; if (!touched(y, x)) edgeBare++; }
+    }
+    assert.equal(bare, 0, `radius ${r}: ${bare} of ${cells} cells within the solid half-width were not touched`);
+    assert.ok(edgeBare > 0, `radius ${r}: the nominal edge is ragged (${edgeBare} of ${edgeCells} bare)`);
+  }
 });

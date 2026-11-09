@@ -544,3 +544,20 @@ test('gradedLanes: a big wash is laid in lanes with charges from the plan', asyn
   assert.ok(graded.length > 0, 'at least one passage has lanes of different strength');
 });
 
+
+// Cells the plan gives almost no paint (paleHold: under half a glaze) are inferred lights. Like every inferred light,
+// a patch too small to paint around joins the wash around it instead of being masked into a hard white fleck; a
+// large one stays reserved. Explicit holds (hold) are reserved whatever their size.
+test('pale holds follow the size floor of inferred lights; explicit holds do not', () => {
+  const w = 40, h = 40, n = w * h;
+  const rgb = new Uint8ClampedArray(n * 3).fill(150);
+  const density = new Float32Array(n).fill(0.4);
+  const paleHold = new Uint8Array(n), hold = new Uint8Array(n);
+  for (let y = 10; y < 12; y++) for (let x = 10; x < 12; x++) paleHold[y * w + x] = 1; // a 4-cell fleck
+  for (let y = 20; y < 34; y++) for (let x = 20; x < 34; x++) paleHold[y * w + x] = 1; // a 196-cell light
+  hold[5 * w + 30] = 1; // an explicit one-cell reserve
+  const p = planLightToDark({ w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, hold, paleHold, minShapeCells: 30 });
+  assert.equal(p.protectedCells[10 * w + 10], 0, 'a pale fleck smaller than the minimum shape is painted with its surroundings');
+  assert.equal(p.protectedCells[27 * w + 27], 1, 'a pale light larger than the minimum shape stays reserved');
+  assert.equal(p.protectedCells[5 * w + 30], 1, 'an explicit hold is reserved whatever its size');
+});
