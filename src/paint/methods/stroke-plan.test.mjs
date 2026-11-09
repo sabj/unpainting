@@ -263,3 +263,18 @@ test('pad overlaps consecutive strokes in a split lane so joints never leave an 
     }
   }
 });
+
+test('lanes can run along a given direction: a vertical gradient is laid in horizontal lanes of different strength', () => {
+  const w = 200, h = 200, { list, G } = slab(w, h, 20, 180, 20, 180, (x, y) => 0.2 + y * 0.004);
+  const res = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3 });
+  for (const ps of res.paths) assert.ok(Math.abs(ps[0].y - ps.at(-1).y) < 2, 'lane runs horizontally');
+  assert.ok(res.paths.length >= 3, `${res.paths.length} lanes`);
+  assert.ok(Math.max(...res.factors) > 1.2 && Math.min(...res.factors) < 0.8, res.factors.join(' '));
+});
+
+test('minLanes narrows the brush so there is something to grade across', () => {
+  const w = 200, h = 200, { list, G } = slab(w, h, 20, 180, 80, 120, (x, y) => 0.2 + y * 0.004);
+  const one = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0 });
+  const three = planLanes(list, w, h, G, 0.6, { cellMm: 0.25, laneMm: 'auto', strokeMm: 0, angle: 0, minLanes: 3 });
+  assert.ok(three.laneR < one.laneR, `${three.laneR} against ${one.laneR}`);
+});

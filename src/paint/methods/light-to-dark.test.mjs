@@ -402,3 +402,58 @@ test('hold cells populate protectedCells for contact clipping without splitting 
 });
 
 
+
+const twoColourPlan = async (over = {}) => {
+  // left half one colour in two pigments, right half another; a value ramp across each
+  const w = 80, h = 40, n = w * h, k = 3, demand = new Float32Array(n * k), density = new Float32Array(n), rgb = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const x = i % w, left = x < 40, v = 0.3 + 0.2 * (x % 40) / 40;
+    density[i] = v;
+    if (left) { demand[i * k] = 0.7 * v; demand[i * k + 1] = 0.3 * v; rgb[i * 3] = 200; rgb[i * 3 + 1] = 170; rgb[i * 3 + 2] = 120; }
+    else { demand[i * k + 2] = v; rgb[i * 3] = 90; rgb[i * 3 + 1] = 120; rgb[i * 3 + 2] = 190; }
+  }
+  const labels = Int32Array.from({ length: n }, (_, i) => (i % w < 40 ? 1 : 2));
+  const regions = { labels, regions: [{ id: 'a', referenceCue: '', baseMove: 'wet on dry' }, { id: 'b', referenceCue: '', baseMove: 'wet on dry' }] };
+  return planLightToDark({ demand, k, density, w, h, rgb, shaped: true, subjects: null, sheetWidthMm: 20, minShapeCells: 8, ...over, pigments: [{ name: 'a' }, { name: 'b' }, { name: 'c' }], _regions: regions });
+};
+
+test('mixedWash: one passage per colour shape in each step, carrying a mix, with the planned mass kept', async () => {
+  const flat = await twoColourPlan();
+  const mixed = await twoColourPlan({ mixedWash: true });
+  const passesOf = (p, phase) => p.layers.filter(l => l._valuePhase === phase).length;
+  assert.ok(passesOf(mixed, 'light') < passesOf(flat, 'light'), `${passesOf(mixed, 'light')} mixed against ${passesOf(flat, 'light')} single-pigment`);
+  const multi = mixed.layers.flatMap(l => l.shapes).filter(sh => sh.mix.filter(v => v > 0).length > 1);
+  assert.ok(multi.length > 0, 'some passage carries more than one pigment');
+  for (const sh of mixed.layers.flatMap(l => l.shapes)) assert.ok(Math.abs(sh.mix.reduce((a, v) => a + v, 0) - sh.amount) < 1e-5);
+  const mass = p => { const t = [0, 0, 0]; for (const l of p.layers) for (const sh of l.shapes) sh.mix.forEach((v, j) => { t[j] += v * sh.area; }); return t; };
+  const a = mass(flat), b = mass(mixed);
+  for (let j = 0; j < 3; j++) assert.ok(Math.abs(a[j] - b[j]) <= 0.08 * Math.max(a[j], 1e-6), `pigment ${j}: ${a[j]} against ${b[j]}`);
+});
+
+test('mixedWash: shadow glazes stay pigment by pigment over dry paint unless asked', async () => {
+  const mixed = await twoColourPlan({ mixedWash: true, shadowThresh: 0.1 });
+  const shadows = mixed.layers.filter(q => q._valuePhase === 'shadow');
+  assert.ok(shadows.length > 0, 'the plan has shadow glazes');
+  for (const l of shadows) for (const sh of l.shapes) assert.equal(sh.mix.filter(v => v > 0).length, 1);
+});
+
+test('without the new options the plan is the same as before', async () => {
+  const a = await twoColourPlan(), b = await twoColourPlan({ mixedWash: false, scaleCuts: false, gradedLanes: false, softChoice: false });
+  assert.equal(a.layers.length, b.layers.length);
+  assert.deepEqual(a.layers.flatMap(l => l.shapes.map(sh => sh._valuePlan.id)), b.layers.flatMap(l => l.shapes.map(sh => sh._valuePlan.id)));
+});
+
+test('scaleCuts: a smooth ramp stays in the first middle layer', async () => {
+  const p = await twoColourPlan({ scaleCuts: true, layers: 3 });
+  const tagged = t => p.layers.filter(l => l.shapes[0]._valuePlan.id.includes(`b2${t}/`)).reduce((a, l) => a + l.area, 0);
+  assert.ok(tagged('L0') > 0, 'first layer laid');
+  assert.ok(tagged('L1') < 0.25 * tagged('L0'), `L1 ${tagged('L1')} against L0 ${tagged('L0')}`);
+});
+
+test('gradedLanes: a big wash is laid in lanes with charges from the plan', async () => {
+  const p = await twoColourPlan({ gradedLanes: true, mixedWash: true });
+  const laned = p.layers.flatMap(l => l.shapes).filter(sh => sh._strokePlan);
+  assert.ok(laned.length > 0);
+  const graded = laned.filter(sh => Math.max(...sh._strokePlan.factors) > Math.min(...sh._strokePlan.factors) + 0.02);
+  assert.ok(graded.length > 0, 'at least one passage has lanes of different strength');
+});

@@ -61,10 +61,12 @@ function segmentTouchesProtected(p0, p1, R, protect, w, h) {
 
 // Each stroke's charge factor is the plan's mean amount under its footprint over the passage mean, fixed before the
 // first mark. reachMm > 0: lane ends and outer sides land past or short of the outline by a seeded amount up to reachMm.
-export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm = 30, reachMm = 0, seed = 1, fmin = 0.45, fmax = 1.8, protect = null, curved = false } = {}) {
+export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm = 30, reachMm = 0, seed = 1, fmin = 0.45, fmax = 1.8, protect = null, curved = false, angle = null, minLanes = 1 } = {}) {
   if (!(cellMm > 0)) throw Error('planLanes needs cellMm');
   if (!list.length || !(amount > 0)) return null;
-  const { cx, cy, ang, dx, dy } = principalAxis(list, w);
+  const axis = principalAxis(list, w);
+  // angle: lanes along a given direction (a graded wash runs its lanes across the gradient) rather than the long axis
+  const { cx, cy, ang, dx, dy } = angle == null ? axis : { cx: axis.cx, cy: axis.cy, ang: angle, dx: Math.cos(angle), dy: Math.sin(angle) };
   const c = list.length, T = new Float32Array(c), U = new Float32Array(c);
   let uMin = Infinity, uMax = -Infinity;
   list.forEach((i, k) => { const x = i % w + .5 - cx, y = Math.floor(i / w) + .5 - cy; T[k] = x * dx + y * dy; U[k] = -x * dy + y * dx; uMin = Math.min(uMin, U[k]); uMax = Math.max(uMax, U[k]); });
@@ -85,6 +87,12 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
     const target = 1.2 * t90;
     const SIZES = [6, 12, 20, 38];
     effectiveLaneMm = SIZES.reduce((prev, curr) => Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev);
+    // minLanes: one lane as wide as the passage has nothing to grade across, so the brush is narrowed until that many
+    // lanes (overlapping as laneOffsets lays them) fit across the passage, down to the smallest brush.
+    if (minLanes > 1) {
+      const width = (uMax - uMin) * cellMm, fits = SIZES.filter(s => s * (1 + .85 * (minLanes - 1)) <= width);
+      effectiveLaneMm = Math.min(effectiveLaneMm, fits.at(-1) ?? SIZES[0]);
+    }
   }
 
   const R = Math.max(1.5, effectiveLaneMm / 2 / cellMm), reach = reachMm / cellMm, rnd = rng(seed);
