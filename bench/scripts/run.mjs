@@ -26,7 +26,7 @@ const has = n => argv.includes('--' + n);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
 const fail = msg => { console.error(`bench:run: ${msg}`); process.exit(2); };
 const FLAGS = new Set(['--dry-run', '--link-v4-try1', '--force', '--strict-verdict', '--no-base-palette']);
-const OPTS = new Set(['--round', '--profile', '--mode', '--try', '--dry-key', '--model', '--crops', '--python', '--out', '--tries', '--from-try', '--gpu', '--dry-width']);
+const OPTS = new Set(['--round', '--profile', '--judge', '--notargetlooks', '--mode', '--try', '--dry-key', '--model', '--crops', '--python', '--out', '--tries', '--from-try', '--gpu', '--dry-width']);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (FLAGS.has(a)) continue;
@@ -43,6 +43,11 @@ const round = roundById(opt('round', 'V1'));
 if (!round) fail('--round must be one of V1 to V5');
 let profile;
 try { profile = profileForRound(round.id, opt('profile')); } catch (e) { fail(e.message); }
+if (opt('judge')) {
+  if (!['J1', 'J2'].includes(opt('judge'))) fail('--judge must be J1 or J2');
+  profile = { ...profile, judgeVersion: opt('judge') };
+}
+if (opt('notargetlooks') && !['0', '1'].includes(opt('notargetlooks'))) fail('--notargetlooks must be 0 or 1');
 const MULTI = ['V3', 'V4', 'V5'].includes(round.id);
 const mode = opt('mode', 'gentle');
 if (mode !== 'gentle') fail('only gentle mode is implemented; hard mode needs a look counter per runner (see docs/anti-cheat.md)');
@@ -96,7 +101,7 @@ if (MULTI) {
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), profile, python };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), noTargetLooks: opt('notargetlooks') === '1', profile, python };
   try {
     if (round.id === 'V3') await (await import('./v3.mjs')).runV3(runOpts);
     else await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);

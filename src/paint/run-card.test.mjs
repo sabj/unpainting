@@ -30,7 +30,7 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
       drawingMedium: "ink",
       code: { commit: "abc12345", git: true, dirty: false, tracked: [], untracked: [] },
       segments: { backend: "sam", model: { backend: "sam", model: "vit_b" }, regions: 42, foreground: 18, cached: true },
-      gpu: { backend: "gpu", adapter: "apple-m4", device: "Metal" },
+      gpu: { backend: "gpu", fallback: false, adapter: "apple-m4", device: "Metal" },
       palette: { keys: ["hansa", "cerulean"], guard: { action: "replaced", forced: ["sepia"], own: ["hansa", "cerulean"] } },
       phases: ["load 0.2s", "paint 12.1s"],
       seconds: 12.3,
@@ -42,6 +42,7 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
     assert.equal(card.dirtyTrackedFiles, 0);
     assert.equal(card.segments.backend, "sam");
     assert.equal(card.segments.regions, 42);
+    assert.equal(card.gpuBackend.fallback, false);
     assert.equal(typeof card.targetSHA256, "string");
     assert.equal(typeof card.planSHA256, "string");
     assert.equal(typeof card.paintingSHA256, "string");

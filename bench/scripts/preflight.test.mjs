@@ -66,6 +66,9 @@ test('rerender discovers all 60 stored V4 plans with gzipped line files and enfo
   assert.equal(jobs.length, 60);
   for (const job of jobs) {
     const plan = resolvePlan({ spec: job.spec, planDir: job.planDir, variant: job.variant, target: job.target, out: '/tmp/out', compile: true, gpu: 'on' });
+    const strictLooks = resolvePlan({ spec: { ...job.spec, noTargetLooks: true }, planDir: job.planDir, variant: job.variant, target: job.target, out: '/tmp/out', compile: true, gpu: 'on' });
+    const noLookIndex = strictLooks.args.lastIndexOf('--notargetlooks');
+    assert.deepEqual(strictLooks.args.slice(noLookIndex, noLookIndex + 2), ['--notargetlooks', '1']);
     const missingLineErr = plan.problems.find(p => p.includes('is missing or not valid JSON'));
     assert.equal(missingLineErr, undefined, `${job.model}/${job.tryNum}/${job.subject}: ${missingLineErr}`);
   }
