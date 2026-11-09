@@ -423,3 +423,67 @@ test('hold cells populate protectedCells for contact clipping without splitting 
 });
 
 
+
+test('lights are reserved relative to the sheet the plate is painted on: cream cells on a cream sheet, none on white', () => {
+  const w = 30, h = 30, n = w * h;
+  const rgb = new Uint8Array(n * 3), density = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const x = i % w, y = (i / w) | 0, subj = x >= 10 && x < 20 && y >= 10 && y < 20; rgb.set(subj ? [90, 70, 50] : [248, 245, 216], 3 * i); density[i] = subj ? 0.6 : 0.02; }
+  const common = { w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperLights: true, minShapeCells: 4 };
+  const cream = planLightToDark({ ...common, paperRGB: [248, 245, 216] });
+  assert.equal(cream.protectedCells[2 * w + 2], 1, 'cream paper is bare paper on a cream sheet');
+  assert.equal(cream.protectedCells[15 * w + 15], 0, 'the subject is painted');
+  assert.deepEqual(cream.paper.rgb, [248, 245, 216], 'the plan paper is the sheet, not a second estimate');
+  assert.ok(Math.abs(cream.paper.density - 0.02) < 1e-6, `paper density is the mean over the paper cells (${cream.paper.density})`);
+  const white = planLightToDark({ ...common, paperRGB: [252, 251, 248] });
+  assert.equal(white.protectedCells[2 * w + 2], 0, 'on a white sheet the cream is a pale wash, not bare paper');
+  assert.equal(white.protectedCells[15 * w + 15], 0);
+});
+
+test('without a declared sheet the planner reads the paper from the target itself, frame line and all', () => {
+  const w = 40, h = 40, n = w * h;
+  const rgb = new Uint8Array(n * 3), density = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = i % w, y = (i / w) | 0, frame = x === 0 || y === 0 || x === w - 1 || y === h - 1, subj = x >= 14 && x < 26 && y >= 12 && y < 28;
+    rgb.set(frame ? [40, 35, 30] : subj ? [90, 70, 50] : [248, 245, 216], 3 * i); density[i] = frame ? 0.9 : subj ? 0.6 : 0.02;
+  }
+  const p = planLightToDark({ w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, minShapeCells: 4 });
+  assert.equal(p.protectedCells[3 * w + 3], 1, 'cream cells are reserved against the cream the target shows');
+  assert.equal(p.protectedCells[0], 0, 'the frame line is not paper');
+  assert.equal(p.protectedCells[20 * w + 20], 0, 'the subject is painted');
+});
+
+test('--paperdelta sets the light tolerance a plan asks for', () => {
+  const w = 20, h = 20, n = w * h;
+  const rgb = new Uint8Array(n * 3), density = new Float32Array(n).fill(0.05);
+  for (let i = 0; i < n; i++) rgb.set(i % w < 10 ? [252, 251, 248] : [232, 231, 228], 3 * i);
+  const tight = planLightToDark({ w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], paperDelta: 10, minShapeCells: 4 });
+  assert.equal(tight.protectedCells[5 * w + 15], 0, '20 below the paper is paint at a tolerance of 10');
+  const loose = planLightToDark({ w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], paperDelta: 30, minShapeCells: 4 });
+  assert.equal(loose.protectedCells[5 * w + 15], 1, '20 below the paper is bare paper at a tolerance of 30');
+});
+
+test('a cropped target with no paper border reserves highlights from its lightest material if light and neutral, but not on dark/saturated crops', () => {
+  const w = 40, h = 40, n = w * h;
+  // Case A: a crop with bright neutral clouds. 10% clouds [236, 237, 233] along the top, rest dark/midtone building [120, 100, 80].
+  const rgbCloud = new Uint8Array(n * 3), density = new Float32Array(n).fill(0.2);
+  for (let i = 0; i < n; i++) {
+    const y = (i / w) | 0;
+    const isCloud = y < 4;
+    rgbCloud.set(isCloud ? [236, 237, 233] : [120, 100, 80], 3 * i);
+    density[i] = isCloud ? 0.03 : 0.4;
+  }
+  const planCloud = planLightToDark({ w, h, k: 1, rgb: rgbCloud, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], minShapeCells: 4 });
+  assert.equal(planCloud.protectedCells[2 * w + 10], 1, 'cloud highlight is reserved as bare paper');
+  assert.equal(planCloud.protectedCells[20 * w + 20], 0, 'building is not reserved');
+
+  // Case B: Low-key photo crop. Lightest 10% is mid-grey haze [180, 160, 140] (L* ~66 < 90).
+  const rgbDark = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const y = (i / w) | 0;
+    rgbDark.set(y < 4 ? [180, 160, 140] : [60, 50, 40], 3 * i);
+  }
+  const planDark = planLightToDark({ w, h, k: 1, rgb: rgbDark, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], minShapeCells: 4 });
+  assert.equal(planDark.protectedCells[2 * w + 10], 0, 'dark haze is not reserved as bare white paper');
+});
+
+

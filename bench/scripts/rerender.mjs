@@ -103,7 +103,7 @@ export function jobFingerprint(opts,job){
  const {jobOut}=jobPaths(opts,job),spec=opts.segments?{...job.spec,segments:opts.segments}:job.spec;
  const plan=resolvePlan({spec,planDir:job.planDir,variant:job.variant,target:job.target,out:jobOut,compile:opts.compileOnly,gpu:opts.gpu});
  const hash=crypto.createHash('sha256').update(JSON.stringify({args:plan.args,strictPlan:opts.strictPlan}));
- const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(entry.isFile())hash.update(path.relative(job.planDir,file)).update(fs.readFileSync(file));}};
+ const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){const file=path.join(dir,entry.name);if(entry.isSymbolicLink())throw new Error(`symlink plan input is not supported: ${file}`);if(entry.isDirectory())walk(file);else if(entry.isFile())hash.update(path.relative(job.planDir,file)).update(fs.readFileSync(file));}};
  hash.update(fs.readFileSync(job.target));walk(job.planDir);return hash.digest('hex');
 }
 
@@ -206,7 +206,7 @@ async function renderJob(opts, job, { run, verify }) {
   };
 }
 
-export async function runRerender(argv = process.argv.slice(2), { run = spawnSync, verify = verifyComparisonRun, doctor = runDoctor, stamp = renderStamp } = {}) {
+export async function runRerender(argv = process.argv.slice(2), { run = spawnSync, verify = verifyComparisonRun, doctor = runDoctor, stamp = renderStamp, fingerprint = jobFingerprint } = {}) {
   const opts = parseRerenderArgs(argv);
   const jobs = discoverStoredPlans(opts);
   const at = stamp();
@@ -234,21 +234,27 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
   };
   const results = [];
   for (const job of jobs) {
+    const jobStamp = stamp();
+    const inputFingerprint = fingerprint(opts, job);
     const { tryOut, recordFile } = jobPaths(opts, job);
-    const prior = opts.force ? null : finishedRecord(opts, job, at, {verify});
+    const prior = opts.force ? null : finishedRecord(opts, job, jobStamp, {verify});
     let rec;
     if (prior) {
       const { stamp: _s, compileOnly: _c, ...rest } = prior;
       rec = { ...rest, skipped: true };
-      console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: SKIPPED, finished at ${at.commit}`);
+      console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: SKIPPED, finished at ${jobStamp.commit}`);
     } else {
       try {
         rec = await renderJob(opts, job, { run, verify });
       } catch (err) {
         rec = { round: job.round, model: job.model, try: job.tryNum, subject: job.subject, variant: job.variant, exit: null, painted: false, ok: false, seconds: 0, problems: [`job crashed: ${err.message}`], planWarnings: [], notes: [], stages: null, outDir: jobPaths(opts, job).jobOut };
       }
+      if (!sameStamp(jobStamp, stamp()) || inputFingerprint !== fingerprint(opts, job)) {
+        rec.ok = false;
+        rec.problems.push('code or input changed while this job was rendering');
+      }
       fs.mkdirSync(tryOut, { recursive: true });
-      writeRecord(recordFile, { ...rec, stamp: at, compileOnly: opts.compileOnly,inputFingerprint:jobFingerprint(opts,job) });
+      writeRecord(recordFile, { ...rec, stamp: jobStamp, compileOnly: opts.compileOnly, inputFingerprint });
       console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: ${rec.ok ? 'PAINTED' : 'FAILED'} in ${rec.seconds}s (exit ${rec.exit})`);
     }
     results.push(rec);
