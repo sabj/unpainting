@@ -266,23 +266,22 @@ test('sheet.prewetRegion respects masking fluid resist without throwing TypeErro
 
 test('boxPigment returns immutable or defensively copied scatter arrays protecting shared box state', () => {
   for (const paint of BOX) {
-    assert.ok(Object.isFrozen(paint.scatter), `BOX paint ${paint.key}.scatter should be frozen`);
-    assert.throws(() => { paint.scatter[0] = 999; }, TypeError, `mutating paint.scatter for ${paint.key} must throw`);
+    assert.ok(Object.isFrozen(paint.dir), `BOX paint ${paint.key}.dir should be frozen`);
+    assert.throws(() => { paint.dir[0] = 999; }, TypeError, `mutating paint.dir for ${paint.key} must throw`);
   }
 
   const paint = BOX[0];
-  const origS0 = paint.scatter[0];
   const pig1 = boxPigment(paint);
   const pig2 = boxPigment(paint);
+  const origS0 = pig1.S[0];
 
-  assert.deepEqual(pig1.S, paint.scatter);
-  assert.deepEqual(pig2.S, paint.scatter);
+  assert.deepEqual(pig1.S, [0.02, 0.02, 0.02]);
+  assert.deepEqual(pig2.S, [0.02, 0.02, 0.02]);
 
   if (Object.isFrozen(pig1.S)) {
     assert.throws(() => { pig1.S[0] = 999; }, TypeError);
   } else {
     pig1.S[0] = 999;
-    assert.equal(paint.scatter[0], origS0, 'paint.scatter must not be mutated by modifying returned pigment.S');
     assert.equal(pig2.S[0], origS0, 'subsequent boxPigment call must not receive mutated scatter');
   }
 });

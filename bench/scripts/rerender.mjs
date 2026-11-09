@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Repaint stored V4/V5 benchmark plans on the current painter without a model session.
-// Usage: node bench/scripts/rerender.mjs [--round v4-pipeline] [--models argon,astra,opus] [--tries 1,2,3] [--subjects hills,south-france,...] [--out work/rerender-031] [--gpu on] [--segments sam|off] [--dry-run]
+// Usage: node bench/scripts/rerender.mjs [--round v4-pipeline] [--models argon,argonmed,astra,opus] [--tries 1,2,3] [--subjects hills,south-france,...] [--out work/rerender-031] [--gpu on] [--segments sam|off] [--dry-run]
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 import { BENCH, REPO, V2, readJson, writeJson } from './lib.mjs';
 import { resolvePlan, renderVerdict } from './pipeline/plan-args.mjs';
-import { thumb, stageStrip } from './images.mjs';
+import { STAGES, thumb, stageStrip } from './images.mjs';
 import { verifyComparisonRun } from './preflight.mjs';
 
 const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
@@ -15,13 +16,14 @@ const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
 export function parseRerenderArgs(argv = process.argv.slice(2)) {
   const o = {
     round: 'v4-pipeline',
-    models: ['argon', 'astra', 'opus'],
+    models: ['argon', 'argonmed', 'astra', 'opus'],
     tries: [1, 2, 3],
     subjects: null,
     out: path.join(REPO, 'work', 'rerender-031'),
     gpu: 'on',
     segments: null,
     allowDirty: false,
+    keepMarks: false,
     dryRun: false,
     compileOnly: false,
   };
@@ -35,6 +37,7 @@ export function parseRerenderArgs(argv = process.argv.slice(2)) {
     else if (a === '--gpu') o.gpu = next();
     else if (a === '--segments') o.segments = next();
     else if (a === '--allowdirty') o.allowDirty = next() !== '0';
+    else if (a === '--keep-marks') o.keepMarks = true;
     else if (a === '--dry-run' || a === '--plan') o.dryRun = true;
     else if (a === '--compile') o.compileOnly = true;
     else throw new Error(`unknown option: ${a}`);
@@ -45,7 +48,7 @@ export function parseRerenderArgs(argv = process.argv.slice(2)) {
   return o;
 }
 
-export function discoverStoredPlans({ round = 'v4-pipeline', models = ['argon', 'astra', 'opus'], tries = [1, 2, 3], subjects = null } = {}) {
+export function discoverStoredPlans({ round = 'v4-pipeline', models = ['argon', 'argonmed', 'astra', 'opus'], tries = [1, 2, 3], subjects = null } = {}) {
   const subjectsDoc = readJson(path.join(BENCH, 'v4v5', 'subjects.json')).subjects;
   const roundDir = path.join(BENCH, 'runs', round);
   const jobs = [];
@@ -67,7 +70,7 @@ export function discoverStoredPlans({ round = 'v4-pipeline', models = ['argon', 
   return jobs;
 }
 
-export async function runRerender(argv = process.argv.slice(2)) {
+export async function runRerender(argv = process.argv.slice(2), { run = spawnSync, verify = verifyComparisonRun } = {}) {
   const opts = parseRerenderArgs(argv);
   const jobs = discoverStoredPlans(opts);
   if (opts.dryRun) {
@@ -93,29 +96,79 @@ export async function runRerender(argv = process.argv.slice(2)) {
     const runArgs = [...plan.args];
     if (opts.allowDirty) runArgs.push('--allowdirty', '1');
     const t0 = Date.now();
-    const child = spawnSync(process.execPath, runArgs, { cwd: REPO, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const child = run(process.execPath, runArgs, { cwd: REPO, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
     const seconds = +((Date.now() - t0) / 1000).toFixed(1);
     const logText = (child.stdout || '') + (child.stderr ? `\n${child.stderr}` : '');
     fs.mkdirSync(jobOut, { recursive: true });
     fs.writeFileSync(path.join(jobOut, 'paint.log'), logText);
-    const verdict = renderVerdict({ outDir: jobOut, logText, exit: child.status, plan });
-    if (!opts.compileOnly && verdict.painted) {
-      const pFile = fs.existsSync(path.join(jobOut, 'painting.png')) ? path.join(jobOut, 'painting.png') : path.join(jobOut, 'painting.jpg');
+
+    const uf = path.join(jobOut, 'unused-options.txt');
+    const unused = fs.existsSync(uf) ? fs.readFileSync(uf, 'utf8').split('\n').filter(Boolean) : [];
+    const dm = [...logText.matchAll(/(\d+) passages yielded no brush path and were never painted, carrying ([\d.]+)% of the planned mass/g)].at(-1);
+    const finished = opts.compileOnly ? child.status === 0 : fs.existsSync(path.join(jobOut, 'painting.png'));
+    const verdict = renderVerdict({
+      paintExit: child.status,
+      unused,
+      modelOptions: plan.modelOptions,
+      extraOptions: plan.extraOptions,
+      baseOptions: plan.baseOptions,
+      templateOptions: plan.templateOptions,
+      dropped: dm ? Number(dm[1]) : 0,
+      droppedPct: dm ? Number(dm[2]) : 0,
+      finished,
+    });
+    const painted = verdict.exit === 0 && finished;
+    const problems = [...verdict.failures.map(f => f.reason)];
+    let stagesFile = null;
+    if (!opts.compileOnly && painted) {
+      const pFile = path.join(jobOut, 'painting.png');
       if (fs.existsSync(pFile)) await thumb(pFile, path.join(tryOut, `${job.subject}.webp`));
       const framesDir = path.join(jobOut, 'frames');
-      if (fs.existsSync(framesDir)) await stageStrip(framesDir, path.join(tryOut, `${job.subject}-stages.webp`));
-      if (!opts.segments || opts.segments !== 'off') {
-        const check = verifyComparisonRun(jobOut, { requireGpu: opts.gpu === 'on', minWidth: job.spec.width });
-        if (!check.ok) verdict.problems.push(...check.errors);
+      fs.mkdirSync(framesDir, { recursive: true });
+      for (const pct of STAGES) {
+        const jpg = path.join(jobOut, 'stages', `stage-${String(pct).padStart(3, '0')}.jpg`);
+        if (fs.existsSync(jpg)) await sharp(jpg).png().toFile(path.join(framesDir, `stage-${pct}.png`));
+      }
+      stagesFile = await stageStrip(framesDir, path.join(tryOut, `${job.subject}-stages.webp`));
+      try {
+        verify(jobOut, {
+          requireGpu: opts.gpu === 'on',
+          requireSegments: opts.segments !== 'off',
+          minWidth: job.spec.width,
+          minSourceWidth: Math.floor(job.spec.width / 4),
+        });
+      } catch (err) {
+        problems.push(err.message);
+      }
+      if (!opts.keepMarks) {
+        for (const big of ['marks.json', 'value-plan.json', 'value-commands.jsonl']) {
+          fs.rmSync(path.join(jobOut, big), { force: true });
+        }
       }
     }
-    const rec = { model: job.model, try: job.tryNum, subject: job.subject, variant: job.variant, exit: child.status, painted: verdict.painted, ok: verdict.ok, seconds, problems: verdict.problems, notes: verdict.notes, outDir: jobOut };
+    const ok = (opts.compileOnly ? child.status === 0 : painted) && problems.length === 0;
+    const rec = {
+      model: job.model,
+      try: job.tryNum,
+      subject: job.subject,
+      variant: job.variant,
+      exit: child.status,
+      painted,
+      ok,
+      seconds,
+      problems,
+      planWarnings: plan.problems || [],
+      notes: verdict.notes,
+      stages: stagesFile,
+      outDir: jobOut,
+    };
     results.push(rec);
-    console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: ${verdict.painted ? 'PAINTED' : 'FAILED'} in ${seconds}s (exit ${child.status})`);
+    console.log(`[rerender] ${job.model}/${job.tryNum}/${job.subject}: ${ok ? 'PAINTED' : 'FAILED'} in ${seconds}s (exit ${child.status})`);
   }
   const summaryPath = path.join(opts.out, 'rerender-summary.json');
-  writeJson(summaryPath, { generatedAt: new Date().toISOString(), options: opts, total: results.length, painted: results.filter(r => r.painted).length, results });
-  return { ok: results.every(r => r.painted || opts.compileOnly), results, summaryPath };
+  const allOk = results.every(r => r.ok);
+  writeJson(summaryPath, { generatedAt: new Date().toISOString(), options: opts, total: results.length, painted: results.filter(r => r.painted).length, okCount: results.filter(r => r.ok).length, results });
+  return { ok: allOk, results, summaryPath };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
