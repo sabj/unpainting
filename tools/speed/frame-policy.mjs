@@ -9,6 +9,23 @@ export function fastPaintFrame(stage) {
   return Boolean(stage.force) || (stage.pass ?? 0) <= 1 || stage.pass % 4 === 0;
 }
 
+/**
+ * Mixed washes lay few passes, and one pass can hold half the strokes, so frames at pass ends alone can leave two playback
+ * stages on one frame. This keeps a forced frame each time the sweeps laid cross another of `count` equal shares of the
+ * planned total. `laid()` counts one sweep and says whether a frame is due now.
+ */
+export function progressFrames(total, count = 12) {
+  let done = 0, next = 1;
+  return {
+    laid() {
+      done++;
+      if (!(total > 0) || done >= total || done < next * total / count) return false;
+      while (done >= next * total / count) next++;
+      return true;
+    },
+  };
+}
+
 export function framePolicy({ video = false, keepAll = false } = {}) {
   const all = Boolean(video || keepAll), goals = [0.1, 0.25, 0.5, 0.75, 1];
   let next = 0, firstWash = false, last = null, prevOf = 0;

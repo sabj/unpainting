@@ -11,7 +11,7 @@ import { layIntoWetBed } from './painter/wet-bed-wait.mjs';
 import { scaleBrushForDensity } from '../src/media/brush-density.mjs';
 import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
 import { drawFineMaterial, drawOnFineSheet, fineGestures } from '../src/paint/methods/fine-material.mjs';
-import {framePolicy, fastPaintFrame} from './speed/frame-policy.mjs';
+import {framePolicy, fastPaintFrame, progressFrames} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
 import {runSpeedSequence} from './speed/sequence.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
@@ -2109,6 +2109,8 @@ const RESUME_AT = RESUME_DIR ? JSON.parse(fs.readFileSync(path.join(RESUME_DIR, 
 
 // Playback ships the marks, not the pictures.
 let LAST_FRAME_STAGE=null;
+const WASH_PROGRESS = layers.some(l => l.shapes?.some(sh => sh._valuePlan?.mixed)) ? progressFrames(layers.reduce((a, l) => a + (l.shapes?.reduce((b, sh) => b + (sh._strokePlan?.paths.length ?? 1), 0) ?? 0), 0)) : null;
+let FRAME_SWEEP = 0;
 const shoot = async () => {
   if (RESUMING) return; // a fresh process taking over a saved painting: its frames are already on disk
   if (!FRAME_POLICY.keep(STAGE)) return;
@@ -3915,6 +3917,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       const q = (sh._swept = (sh._swept ?? 0) + 1), k = Math.max(1, Math.ceil(paths.length / Math.max(1, num('ordersplit', 4))));
       if (q % k === 0 && q < paths.length) { STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, order: layer._order.phase, laying: true }; await shoot(); }
     }
+    // Mixed washes: a frame at each equal share of the sweeps, since one pass can hold half of them (progressFrames).
+    if (WASH_PROGRESS?.laid()) { STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, force: true, boundary: 'progress', sweep: FRAME_SWEEP++ }; await shoot(); }
     // --wetframes: a filmed pass is also caught while its passages go down, a quarter at a time
     if (WETFRAMES > 0 && L % WETFRAMES === 0 && ++shIdx % shQuarter === 0) snap({ stage: 'wash', pass: L + 1, of: layers.length, value: layer.value, wet: 'laying' });
     // --passframes: a frame every N passages, so playback shows strokes going on, not whole pigment layers at once.
