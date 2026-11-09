@@ -13,9 +13,13 @@ test('checkpoints keep first wash and five completed boundaries plus gallery sta
   assert(policy.keep({stage: 'finished'}));
   assert.equal(policy.keep({stage: 'finished'}), false);
 });
-test('short paintings, video and explicit all-frame output retain valid states', () => {
+test('short paintings, video, dynamic pass expansion and explicit all-frame output retain valid states', () => {
   const policy = framePolicy();
   for (let pass = 1; pass <= 3; pass++) assert(policy.keep({stage: 'paint', pass, of: 3}));
+  const dyn = framePolicy(), dynKept = [];
+  for (let pass = 1; pass <= 21; pass++) if (dyn.keep({stage: 'paint', pass, of: 27})) dynKept.push(pass);
+  for (let pass = 22; pass <= 50; pass++) if (dyn.keep({stage: 'paint', pass, of: 50, ...(pass === 26 ? {force: true} : {})})) dynKept.push(pass);
+  assert.deepEqual(dynKept, [1, 3, 7, 14, 21, 22, 25, 26, 38, 50]);
   for (const option of [{video: true}, {keepAll: true}]) {
     const all = framePolicy(option);
     assert(all.all);

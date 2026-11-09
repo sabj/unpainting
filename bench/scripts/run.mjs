@@ -18,6 +18,7 @@ import {
 import { brief, prompt, command, usage, KEYS, installSkills } from './runners.mjs';
 import { thumb, stageStrip } from './images.mjs';
 import { preflight, scorePython } from './preflight.mjs';
+import { runDoctor } from '../../src/paint/doctor.mjs';
 import { profileForRound } from './profiles.mjs';
 
 const argv = process.argv.slice(2);
@@ -57,6 +58,8 @@ for (const c of crops) for (const f of [targetOf(c), coarseOf(c)]) if (!fs.exist
 const python = scorePython(opt('python'));
 if (!DRY) {
   try { preflight({ root: REPO, python }); } catch (e) { fail(e.message); }
+  const doc = runDoctor({ root: REPO, strictModels: true });
+  if (!doc.ok) fail(`doctor --strict failed: ${doc.failures.join('; ')}`);
   const k = KEYS[model.runner];
   try { execFileSync('which', [k.cli], { stdio: 'ignore' }); } catch { fail(`${model.runner} runner needs \`${k.cli}\` on PATH`); }
   if (model.runner === 'together' && !process.env.TOGETHER_API_KEY) fail('the together runner needs TOGETHER_API_KEY in the environment');

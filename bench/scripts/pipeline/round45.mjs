@@ -14,6 +14,7 @@ import sharp from 'sharp';
 import { BENCH, REPO, RUN_SCHEMA, VERSION_STAMP, V2, readJson, writeJson, validateRun, posix } from '../lib.mjs';
 import { turnCommand, codexThread, agyConversation, usage, peekUsage } from '../runners.mjs';
 import { thumb, stageStrip } from '../images.mjs';
+import { verifyComparisonRun } from '../preflight.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './harness.mjs';
 import { PaintSession, planSnapshot, variantIn } from './session.mjs';
 import { checkPlan } from './check.mjs';
@@ -203,7 +204,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
       }
     }
     record.totalSeconds = (Date.now() - targetStarted) / 1000;
-    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict });
+    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict, gpu, verifyRun: !dry && !spec.offlineFixture });
   } finally {
     if (session?.painting) session.painting.kill();
     keepScripts(ws, path.join(raw, 'scripts'), SEEDED);
@@ -217,13 +218,28 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
  * The painting's outputs for the scorer and the try folder, and its record. A finished painting with only notes (unread
  * settings, dropped passages) is painted and collected; strictVerdict makes those notes fail it.
  */
-export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false }) {
+export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false, gpu = 'auto', verifyRun = false }) {
   const p = session.painting, v = p && ['done', 'failed'].includes(p.state) ? p.verdict({ strict: strictVerdict }) : null;
   if (p) {
     const last = p.segments.at(-1);
     fs.rmSync(path.join(raw, 'plan-final'), { recursive: true, force: true });
     fs.cpSync(last.planDir, path.join(raw, 'plan-final'), { recursive: true });
     if (!outcome) outcome = v.exit === 0 ? 'painted' : p.planningRefused ? 'plan-refused' : 'render-failed';
+  }
+  let verifyError = null;
+  if (verifyRun && outcome === 'painted' && p && fs.existsSync(path.join(p.out, 'painting.png'))) {
+    try {
+      verifyComparisonRun(p.out, {
+        requireGpu: gpu === 'on',
+        requireSegments: spec.segments !== 'off',
+        requireStages: true,
+        requireDistinctStages: true,
+        minWidth: spec.width || 540,
+      });
+    } catch (err) {
+      outcome = 'render-failed';
+      verifyError = err.message;
+    }
   }
   const stopsRows = fs.existsSync(session.ckpt) ? fs.readFileSync(session.ckpt, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
   const count = k => stopsRows.filter(r => r.kind === k).length;
@@ -243,7 +259,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     warnings: v?.warnings?.length ? v.warnings : undefined,
-    failure: outcome === 'painted' ? null : { failures: v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason })) },
+    failure: outcome === 'painted' ? null : { failures: verifyError ? [...(v?.failures ?? []), { reason: verifyError }] : (v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason }))) },
     feedback: feedbackFiles ? 'FEEDBACK.md' : null, selfReview: fs.existsSync(path.join(raw, 'SELF-REVIEW.md')) || fs.existsSync(path.join(ws, 'bench', 'SELF-REVIEW.md')) ? 'SELF-REVIEW.md' : null,
     selfReviewModelMinute: selfReviewAt,
     modelSessionSeconds: record.wallSeconds, elapsedSeconds: record.totalSeconds ?? null,

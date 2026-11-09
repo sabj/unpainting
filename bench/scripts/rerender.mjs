@@ -10,6 +10,7 @@ import { BENCH, REPO, V2, readJson, writeJson } from './lib.mjs';
 import { resolvePlan, renderVerdict } from './pipeline/plan-args.mjs';
 import { STAGES, thumb, stageStrip } from './images.mjs';
 import { verifyComparisonRun } from './preflight.mjs';
+import { runDoctor } from '../../src/paint/doctor.mjs';
 
 const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
 
@@ -70,11 +71,16 @@ export function discoverStoredPlans({ round = 'v4-pipeline', models = ['argon', 
   return jobs;
 }
 
-export async function runRerender(argv = process.argv.slice(2), { run = spawnSync, verify = verifyComparisonRun } = {}) {
+export async function runRerender(argv = process.argv.slice(2), { run = spawnSync, verify = verifyComparisonRun, doctor = runDoctor } = {}) {
   const opts = parseRerenderArgs(argv);
   const jobs = discoverStoredPlans(opts);
   if (opts.dryRun) {
     return { ok: true, count: jobs.length, jobs: jobs.map(j => ({ model: j.model, try: j.tryNum, subject: j.subject, variant: j.variant, width: j.spec.width })) };
+  }
+  if (!opts.compileOnly) {
+    const doc = doctor({ root: REPO, strictModels: true });
+    const failures = opts.allowDirty ? doc.failures.filter(f => !f.startsWith('working tree is dirty')) : doc.failures;
+    if (failures.length) throw new Error(`doctor --strict failed before rerender: ${failures.join('; ')}`);
   }
   fs.mkdirSync(opts.out, { recursive: true });
   const results = [];
@@ -105,7 +111,7 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
     const uf = path.join(jobOut, 'unused-options.txt');
     const unused = fs.existsSync(uf) ? fs.readFileSync(uf, 'utf8').split('\n').filter(Boolean) : [];
     const dm = [...logText.matchAll(/(\d+) passages yielded no brush path and were never painted, carrying ([\d.]+)% of the planned mass/g)].at(-1);
-    const finished = opts.compileOnly ? child.status === 0 : fs.existsSync(path.join(jobOut, 'painting.png'));
+    const finished = opts.compileOnly ? (child.status === 0 && fs.existsSync(path.join(jobOut, 'value-plan.json'))) : fs.existsSync(path.join(jobOut, 'painting.png'));
     const verdict = renderVerdict({
       paintExit: child.status,
       unused,
@@ -130,10 +136,13 @@ export async function runRerender(argv = process.argv.slice(2), { run = spawnSyn
         if (fs.existsSync(jpg)) await sharp(jpg).png().toFile(path.join(framesDir, `stage-${pct}.png`));
       }
       stagesFile = await stageStrip(framesDir, path.join(tryOut, `${job.subject}-stages.webp`));
+      if (!stagesFile) problems.push('missing or incomplete progressive stage strip');
       try {
         verify(jobOut, {
           requireGpu: opts.gpu === 'on',
           requireSegments: opts.segments !== 'off',
+          requireStages: true,
+          requireDistinctStages: true,
           minWidth: job.spec.width,
           minSourceWidth: Math.floor(job.spec.width / 4),
         });

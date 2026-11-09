@@ -146,17 +146,7 @@ export function planLanes(list, w, h, G, amount, { cellMm, laneMm = 6, strokeMm 
       const parts = Math.max(1, Math.round(rk.length * step / maxLen));
       for (let p = 0; p < parts; p++) {
         const lo = Math.floor(p * rk.length / parts), hi = Math.max(lo + 1, Math.floor((p + 1) * rk.length / parts));
-        let a0 = Math.max(0, lo - pad), a1 = Math.min(rk.length, hi + pad);
-        if (protect) {
-          while (a0 < lo) {
-            const pt0 = lanePt(rk[a0]);
-            if (segmentTouchesProtected(pt0, pt0, R, protect, w, h)) a0++; else break;
-          }
-          while (a1 > hi) {
-            const pt1 = lanePt(rk[a1 - 1]);
-            if (segmentTouchesProtected(pt1, pt1, R, protect, w, h)) a1--; else break;
-          }
-        }
+        const a0 = Math.max(0, lo - pad), a1 = Math.min(rk.length, hi + pad);
         let g = 0, n = 0; const pts = [];
         const sliceKeys = rk.slice(a0, a1);
         for (const s of sliceKeys) {
