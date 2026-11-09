@@ -37,7 +37,7 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
   }
   return Array.from({length:lanes},(_,k)=>envPts.map(p=>{
    const offset=(k-(lanes-1)/2)*2*(p.r/scale)/lanes;
-   return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.005),p:p.p};
+   return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.035),p:p.p};
   }));
  }
  return [points];
