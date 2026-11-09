@@ -2,7 +2,7 @@
 
 Paint by hand on simulated paper. **[Open it](https://sabj.github.io/unpainting/demos/lab/)**
 
-0.3.0 keeps the browser's shared media in sync with the painter. Paint Lab has its own WebGPU flow solver and runs brush contact on the CPU; it does not use the CLI's fused GPU stroke pipeline or disk preparation cache. The CLI benchmark speedup therefore does not describe Paint Lab's frame rate.
+0.3.1 keeps the browser's shared media in sync with the painter, and its WebGPU solver dries a wet rim with the painter's local dry-fraction rule (`tools/lab/gpu-mirror.test.mjs` and `gpu-edge-parity.test.mjs` check it). The planner, ink and stroke-plan changes of 0.3.1 are CLI-only: Paint Lab paints by hand and replays recorded tapes. Paint Lab has its own WebGPU flow solver and runs brush contact on the CPU; it does not use the CLI's fused GPU stroke pipeline or disk preparation cache. The CLI benchmark speedup therefore does not describe Paint Lab's frame rate.
 
 <img src="../thumbs/lab-paint.webp" width="480" alt="A heart painted wet in rose, then a blue arrow glazed over it and yellow feathers run into the wet shaft">
 

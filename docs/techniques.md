@@ -82,6 +82,7 @@ Modules, with their flags:
 - `methods/layer-cuts.mjs` (`--layerlocal 1`, `--midlayers N` above 4): middle-layer cut levels per colour region; evenly spaced cuts for more layers.
 - `methods/lay.mjs` (not reached): one passage from one mixing well, in sweeps.
 - `methods/light-to-dark.mjs` (`--order painter`): five light-to-dark value bands per pigment.
+- `methods/light-reserves.mjs` (plan `reserves[]`): an explicit reserve is the target's own light inside its box, not the box; a box with no target light reserves nothing and the log says so.
 - `methods/lights-shape.mjs` (`--lightsbreak`): breaks large lights into flecks along the paper relief.
 - `methods/local-lights.mjs` (`--locallights`): masks each segment's lightest share before any wash.
 - `methods/look.mjs` (not reached): reads what the sheet still lacks to choose the next act.
@@ -175,11 +176,11 @@ They are contained this way:
 - Fitted values live in `src/paint/tuned/`. They run only through a named preset or the `v096` recipe.
 - A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe default+architecture`.
 - No painting code outside `src/paint/tuned/` checks a subject id. `src/paint/overfit.test.mjs` fails if it does, or if the default recipe sets a tuned flag.
-- `--recipe v096` runs the V096 recipe: the general methods with sky lanes and every tuned flag below, on every subject.
+- `--recipe v096` runs the V096 recipe: the general methods with sky lanes and the tuned flags below, on every subject. It leaves out `--recesses` and the recess flags that need it, and the texture flags.
 
 | Preset | Flags | For |
 |---|---|---|
-| `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1 --texvariety 0.8` | Buildings under a sky |
+| `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1` | Buildings under a sky |
 | `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
 
 `examples/plans/trumbull-values.json` names both presets.
@@ -198,10 +199,10 @@ Preset flags, with the off value, the images they were fitted on and the risk fo
 - `--stoneblockmm 4`: stone block row height. Off: `2.6`. Y1; high.
 - `--stoneirregular 1`: irregular stone corners. Off: `0`. Y1; high.
 - `--recesses 1`: dark windows and doors as last accents on the dried wall. Off: `0`. Y1; medium, since any dark cell counts.
-- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1; low.
+- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1; low. This and the next two act only with `--recesses 1`, and the painter reports them when typed without it.
 - `--recessshare .75`: demand per recess layer. Off: `.5`. Y1; low.
 - `--recessclean 1`: no light wash under recesses. Off: `0`. Y1; low.
-- `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble. It has no effect, since the value planner lays no texture passages.
+- `--texvariety`, `--texflow`, `--texshort`, `--texpress`: short dry-brush texture marks. No preset or recipe sets them, since the value planner lays no texture passages and they change no painting. The painter reports one that is typed.
 
 Modules:
 
@@ -210,7 +211,7 @@ Modules:
 - `tuned/trumbull.mjs` (`architecture` preset or `--recipe v096`): recess, wall and ground constants. Y1, subject-e; high.
 - `tuned/dog-coats.mjs` (`--dogpaint`, `--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium, since both assume a black curly coat.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
-- `tuned/modulation-anatomy.mjs` (`--modulate 1 --modanatomy <file>`): skin and fur regions for modulation. subject-c; low.
+- `tuned/modulation-anatomy.mjs` (`--modulate 1 --modanatomy <file>`): skin and fur regions for modulation, from a file that carries its target's SHA-256. One target; low.
 - `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.
 - `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
