@@ -324,7 +324,7 @@ export class PaintSession {
     if (f && !this.revising.length) {
       if (f.state === 'done') { this.record('finished', { strokes: this.painting.progress().strokes }); return this.answer(seq, 'The painting is finished. `bash bench/paint.sh look` shows it once; then stop.'); }
       if (f.planningRefused) return this.answer(seq, `The painter refused your plan while painting: ${f.planningRefused}\nNothing will be judged from this painting. You may fix the plan and run \`bash bench/paint.sh start\` once more (a clean sheet).`, 1);
-      return this.answer(seq, `The painting failed: the painter exited ${f.segments.at(-1).exit}.`, 1);
+      return this.answer(seq, `The painting stopped at the render time limit (painter exit ${f.segments.at(-1).exit}). It cannot be restarted.`, 1);
     }
     if (age > ANSWER_AFTER) {
       if (p.kind === 'revise') return this.answer(seq, `Revision ${p.k} passed the check (${p.changed.join(', ')}); the painter is saving the painting and planning again from your revised files, then goes on. Run \`bash bench/paint.sh wait\` to see where it stops.`);

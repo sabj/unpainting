@@ -224,7 +224,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     const last = p.segments.at(-1);
     fs.rmSync(path.join(raw, 'plan-final'), { recursive: true, force: true });
     fs.cpSync(last.planDir, path.join(raw, 'plan-final'), { recursive: true });
-    if (!outcome) outcome = v.exit === 0 ? 'painted' : p.planningRefused ? 'plan-refused' : 'render-failed';
+    if (!outcome) outcome = v.exit === 0 ? 'painted' : p.planningRefused && !p.paintBegan ? 'plan-refused' : 'render-failed';
   }
   let verifyError = null;
   if (verifyRun && outcome === 'painted' && p && fs.existsSync(path.join(p.out, 'painting.png'))) {

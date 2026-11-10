@@ -118,11 +118,32 @@ export function findPainting(run) {
   return run;
 }
 
-/** The saved frame nearest each stage share of the timeline. frames: frames.json's list (position 0..1). */
+/**
+ * The saved frames that stand for the stages: in order, one frame per stage, each as near its share of the timeline as
+ * the others allow. Two stages never take the same frame, so a plate painted in a few large passes still shows five
+ * different pictures. With fewer frames than stages each stage takes its nearest frame. frames: frames.json's list
+ * (position 0..1, in painting order).
+ */
 export function pickStages(frames, stages = STAGES) {
   if (!frames.length) return {};
-  const out = {};
-  for (const p of stages) out[p] = frames.reduce((b, f) => (Math.abs(f.position - p / 100) < Math.abs(b.position - p / 100) ? f : b), frames[0]);
+  const n = frames.length, k = stages.length, out = {};
+  if (n < k) {
+    for (const p of stages) out[p] = frames.reduce((b, f) => (Math.abs(f.position - p / 100) < Math.abs(b.position - p / 100) ? f : b), frames[0]);
+    return out;
+  }
+  // best[j][i]: least total distance when stage j takes frame i and the earlier stages take earlier frames
+  const cost = (j, i) => Math.abs(frames[i].position - stages[j] / 100);
+  const best = Array.from({ length: k }, () => new Array(n).fill(Infinity)), from = Array.from({ length: k }, () => new Array(n).fill(-1));
+  for (let i = 0; i < n; i++) best[0][i] = cost(0, i);
+  for (let j = 1; j < k; j++) {
+    let run = Infinity, at = -1;
+    for (let i = 0; i < n; i++) {
+      if (i > 0 && best[j - 1][i - 1] < run) { run = best[j - 1][i - 1]; at = i - 1; }
+      if (run < Infinity) { best[j][i] = run + cost(j, i); from[j][i] = at; }
+    }
+  }
+  let i = best[k - 1].reduce((b, v, x) => (v < best[k - 1][b] ? x : b), 0);
+  for (let j = k - 1; j >= 0; j--) { out[stages[j]] = frames[i]; i = from[j][i]; }
   return out;
 }
 

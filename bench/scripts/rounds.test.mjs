@@ -11,6 +11,7 @@ import { resolvePlan, argsBuilder, layerBase, checkExtraArgs, unknownTokens, che
 import { tokensMarkdown } from './pipeline/tokens.mjs';
 import { renderTask, loadSubjects } from './pipeline/round45.mjs';
 import { turnCommand } from './runners.mjs';
+import { modelCheckSpec } from './pipeline/check.mjs';
 
 const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
 
@@ -130,6 +131,12 @@ test('extra args admit only validated artistic controls, never execution or ink 
   for (const token of ['ink2', 'ink3', 'ink4', 'sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
 });
 
+
+test('the model\'s own check plans with the dirty-tree refusal off, because its worktree is stripped', () => {
+  const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};
+  assert.equal(optionMap(resolvePlan({...options,spec:modelCheckSpec(options.spec)}).args).get('allowdirty'),'1');
+  assert.equal(options.spec.offlineFixture,undefined);
+});
 
 test('only explicitly offline fixture specs authorize a deliberately stripped worktree', () => {
   const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};

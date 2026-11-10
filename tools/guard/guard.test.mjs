@@ -308,6 +308,19 @@ test('stage picks are the frames nearest each share of the timeline', () => {
   assert.equal(p[10].src, 'f1.jpg'); assert.equal(p[25].src, 'f2.jpg'); assert.equal(p[75].src, 'f4.jpg'); assert.equal(p[100].src, 'f5.jpg');
 });
 
+test('two stages never take the same frame when there are enough frames', () => {
+  // five passes whose strokes pile up late: nearest-frame picking would give 10, 25 and 50 percent the same frame
+  const frames = [0, 0.02, 0.04, 0.06, 0.9, 1].map((p, i) => ({ src: `f${i}.jpg`, position: p }));
+  const p = pickStages(frames);
+  const srcs = [10, 25, 50, 75, 100].map(s => p[s].src);
+  assert.equal(new Set(srcs).size, 5);
+  assert.deepEqual(srcs, [...srcs].sort());
+  assert.equal(p[100].src, 'f5.jpg');
+  // fewer frames than stages: each stage takes its nearest frame
+  const few = pickStages([0, 0.5, 1].map((q, i) => ({ src: `g${i}.jpg`, position: q })));
+  assert.equal(few[10].src, 'g0.jpg'); assert.equal(few[50].src, 'g1.jpg'); assert.equal(few[100].src, 'g2.jpg');
+});
+
 test('honest ceiling follows the painting width', () => { assert.equal(HF_CEILING(540), 0.53); assert.equal(HF_CEILING(1086), 0.645); });
 
 async function fakeRun({ copyTarget = false, guard = { mode: 'gentle', violations: 0, byName: {} } } = {}) {
