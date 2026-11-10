@@ -34,7 +34,7 @@ test("the lab hands the sheet's real cell size to its WebGPU sheet and keeps the
 });
 
 test('every file under demos/lab/media is generated from src/media or a named lab-only file', () => {
-  const LAB_ONLY = new Set(['dryer.js', 'lab-media.js', 'mixing.js', 'papers.js', 'pigments.js']);
+  const LAB_ONLY = new Set(['dryer.js', 'lab-media.js', 'mixing.js', 'papers.js', 'pigment-physical.js', 'pigments.js']);
   const base = path.join(ROOT, 'demos', 'lab', 'media'), made = generate();
   const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
   const orphans = walk(base).map(f => path.relative(base, f).split(path.sep).join('/')).filter(r => !made.has(r) && !LAB_ONLY.has(r));
