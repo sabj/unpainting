@@ -6,6 +6,5 @@ export const TUNED_DEFAULT_FLAGS = [
   '--skylanemm 6 --skylanestep .8 --skyfloc .5',
   '--groundglaze 1',
   '--stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1',
-  '--recesslayers 2 --recessshare .75 --recessclean 1',
-  '--texvariety 0.8 --touchgain .6',
+  '--touchgain .6',
 ].join(' ');

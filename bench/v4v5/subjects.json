@@ -49,6 +49,20 @@
    "width": 1224,
    "sheetmm": 280,
    "trumbull": false
+  },
+  "dog-paint": {
+   "name": "Dog, paint",
+   "taskStyle": "classic transparent watercolour portrait, restrained glazes, no ink",
+   "width": 1200,
+   "sheetmm": 280,
+   "trumbull": false
+  },
+  "dog-ink": {
+   "name": "Dog, ink",
+   "taskStyle": "loose ink and wash portrait, ink led",
+   "width": 1200,
+   "sheetmm": 280,
+   "trumbull": false
   }
  }
 }

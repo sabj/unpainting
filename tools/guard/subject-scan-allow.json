@@ -1,0 +1,71 @@
+{
+  "note": "Hits of tools/guard/subject-scan.mjs that have been reviewed. Each entry: file, rule, count (hits allowed in that file), reason. Fewer hits than count also fails, so a fixed entry must be deleted.",
+  "allow": [
+    {
+      "file": "src/eval/image.mjs",
+      "rule": "size",
+      "count": 2,
+      "reason": "Judge board layouts are recognised by their fixed panel widths (776 px). It reads composed score boards, not painted subjects, and does not run in the painter."
+    },
+    {
+      "file": "src/paint/methods/light-to-dark.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Imports the recess, stone and ground constants from tuned/trumbull.mjs. The constants act only when the architecture preset or --recesses, --stoneblocks or --groundglaze is on; the default recipe sets none."
+    },
+    {
+      "file": "tools/paint-plate.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Imports GROUND.from from tuned/trumbull.mjs as the default of --groundfrom. It has an effect only when --groundglaze is above 0."
+    },
+    {
+      "file": "bench/scripts/add-target.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Writes trumbull: false into the spec of every new benchmark target, so a new subject never gets the Trumbull palette or stone tokens."
+    },
+    {
+      "file": "bench/scripts/import-aware.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Maps short run names to crop names when importing published V4 and V5 runs. Reporting only."
+    },
+    {
+      "file": "bench/scripts/lib.mjs",
+      "rule": "name",
+      "count": 2,
+      "reason": "V1 to V3 target list and the per-crop copy ceilings of the published tries. Scoring only. A crop with no ceiling (mittens, h36a, h34a) falls back to the loosest one (0.152, Trumbull's): recorded in the overfit review."
+    },
+    {
+      "file": "bench/scripts/overview-picks.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Picks the Ships crop for the overview figure. Reporting only."
+    },
+    {
+      "file": "bench/scripts/pipeline/plan-args.mjs",
+      "rule": "name",
+      "count": 6,
+      "reason": "The spec.trumbull switch: palette tokens (--paints) and architecture tokens reach only a subject whose spec says trumbull: true. Containment of fitted settings; recorded in the overfit review."
+    },
+    {
+      "file": "bench/scripts/pipeline/tokens.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Token help text telling a model that palette tokens act only on Trumbull."
+    },
+    {
+      "file": "bench/scripts/compare-release-collect.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Maps short subject names to bench subject ids for the comparison page. Reporting only; never runs in the painter."
+    },
+    {
+      "file": "bench/scripts/compare-release-improved.mjs",
+      "rule": "name",
+      "count": 5,
+      "reason": "Names which published plates the comparison page shows beside each improvement note. Reporting only; never runs in the painter."
+    }
+  ]
+}

@@ -58,7 +58,7 @@ test('ink washes keep light and dark parts of one connected form in different ne
  const w=24,h=24,density=Float32Array.from({length:w*h},(_,i)=>i%w<12?.15:.8);
  const p=planLightToDark({w,h,k:1,density,demand:density.slice(),subject:'unseen-ink-study',styleSelection:{style:'ink-and-wash',reason:'Connected light and dark planes'},shaped:true});
  const mass=new Float32Array(w*h);
- for(const l of p.layers)for(const s of l.shapes)for(let i=0;i<mass.length;i++)if(s.mask[i])mass[i]+=s.graded[i];
+ for(const l of p.layers)for(const s of l.shapes)for(let i=0;i<mass.length;i++)if(s.mask[i])mass[i]+=s.graded?s.graded[i]:s.amount;
  for(let i=0;i<mass.length;i++)assert(Math.abs(mass[i]-density[i])<1e-6);
  const last=p.layers.filter(l=>l.value===5);
  assert(last.length>0);

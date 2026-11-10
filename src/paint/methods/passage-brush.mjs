@@ -15,3 +15,20 @@ export function choosePassageBrush(mask,w,h,{mmPerCell,texture=false,referenceCu
  paths,classification:detail?'detail':'plane',supportWidthMm:span};
 }
 export function passageBrushPaths(brush,scale=1){return brush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale})));}
+// Side-by-side lanes each take the ramp at their own position, which steps darkness across the lanes and shows as stripes.
+export const planeRampApplies=({strokePlan=false,pathCount=0}={})=>Boolean(strokePlan)||pathCount===1;
+export function attachPlaneRamp(paths, rampVec, scale = 1, map = new WeakMap()) {
+  if (!paths || !rampVec) return paths;
+  const { cx, cy, dx, dy, minT, maxT, spanT, delta } = rampVec;
+  const tMid = (minT + maxT) * 0.5, halfSpan = (spanT * 0.5) || 1;
+  for (const ps of paths) {
+    if (!ps.length) continue;
+    const p0 = ps[0], p1 = ps[ps.length - 1];
+    const t0 = ((p0.x / scale - cx) * dx + (p0.y / scale - cy) * dy - tMid) / halfSpan;
+    const t1 = ((p1.x / scale - cx) * dx + (p1.y / scale - cy) * dy - tMid) / halfSpan;
+    const s0 = Math.max(0.67, Math.min(1.33, 1 + Math.max(-1, Math.min(1, t0)) * delta));
+    const s1 = Math.max(0.67, Math.min(1.33, 1 + Math.max(-1, Math.min(1, t1)) * delta));
+    map.set(ps, { start: s0, end: s1 });
+  }
+  return paths;
+}

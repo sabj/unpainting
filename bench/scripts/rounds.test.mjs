@@ -144,3 +144,60 @@ test('only explicitly offline fixture specs authorize a deliberately stripped wo
   const fixture=resolvePlan({...options,spec:{...options.spec,offlineFixture:true}});
   assert.equal(optionMap(fixture.args).get('allowdirty'),'1');
 });
+
+test('extra args allow techcal, techcalfrom, lanemm auto/0..40, and reject invalid ranges', () => {
+  assert.deepEqual(checkExtraArgs(['--techcal', '1', '--techcalfrom', '1', '--lanemm', 'auto'], '/p'), []);
+  assert.deepEqual(checkExtraArgs(['--techcal', '0', '--techcalfrom', '5', '--lanemm', '0'], '/p'), []);
+  assert.deepEqual(checkExtraArgs(['--lanemm', '40'], '/p'), []);
+  assert.ok(checkExtraArgs(['--techcal', '2'], '/p').length);
+  assert.ok(checkExtraArgs(['--techcalfrom', '0'], '/p').length);
+  assert.ok(checkExtraArgs(['--lanemm', '45'], '/p').length);
+});
+
+test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.taskStyle', () => {
+  const baseOpt = { planDir: '/missing-fixture', variant: 'region_w13_lay2', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' };
+  // fallback when no config.drawing.medium: penwash -> ink, hills -> graphite
+  const penwash = resolvePlan({ ...baseOpt, spec: { width: 96, sheetmm: 280, taskStyle: 'penwash' } });
+  assert.equal(optionMap(penwash.args).get('outlinemedium'), 'ink');
+  const yale = resolvePlan({ ...baseOpt, spec: { width: 96, sheetmm: 280, taskStyle: 'loose ink-and-watercolor field sketch, ink led' } });
+  assert.equal(optionMap(yale.args).get('outlinemedium'), 'ink');
+  const hills = resolvePlan({ ...baseOpt, spec: { width: 96, sheetmm: 280, taskStyle: 'loose ink and wash' } });
+  assert.equal(optionMap(hills.args).get('outlinemedium'), 'graphite');
+
+  // when config.drawing.medium is authored, it takes precedence over spec.taskStyle
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-med-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'config.json'), JSON.stringify({ drawing: { medium: 'graphite' } }));
+    const overPenwash = resolvePlan({ spec: { width: 96, sheetmm: 280, taskStyle: 'penwash' }, planDir: tmpDir, variant: 'region_w13_lay2', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    assert.equal(optionMap(overPenwash.args).get('outlinemedium'), 'graphite');
+
+    fs.writeFileSync(path.join(tmpDir, 'config.json'), JSON.stringify({ drawing: { medium: 'ink' } }));
+    const overHills = resolvePlan({ spec: { width: 96, sheetmm: 280, taskStyle: 'loose ink and wash' }, planDir: tmpDir, variant: 'region_w13_lay2', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    assert.equal(optionMap(overHills.args).get('outlinemedium'), 'ink');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('resolvePlan preserves base glazeGains by default and enables --drawing both when closing lines exist', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-close-'));
+  try {
+    fs.writeFileSync(path.join(tmpDir, 'opening-lines.json'), '[]');
+    const openOnly = resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    const openMap = optionMap(openOnly.args);
+    assert.equal(openMap.get('drawing'), 'first');
+    assert.equal(openMap.get('darkgain'), '1.3');
+    assert.equal(openMap.get('coolgain'), '1.3');
+    assert.equal(openMap.has('techcal'), false);
+
+    fs.writeFileSync(path.join(tmpDir, 'closing-lines.json'), '[]');
+    const withClosing = resolvePlan({ spec: { width: 96, sheetmm: 280, glazeGains: false }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    const closeMap = optionMap(withClosing.args);
+    assert.equal(closeMap.get('drawing'), 'both');
+    assert.equal(closeMap.has('darkgain'), false);
+    assert.equal(closeMap.get('techcal'), '1');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+

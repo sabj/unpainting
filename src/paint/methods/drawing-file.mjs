@@ -3,7 +3,7 @@
 // whole, in file order, at the outline tier's pressure; no walker gestures, ink filter or silhouette pass.
 // Each line is split into strokes of --drawstroke (share of the short side), one dip each, so the pen does not run dry.
 import fs from 'node:fs';
-import { hasLines, loadLines, linePaths } from '../../crop/lines.mjs';
+import { hasLines, loadLines, linePaths, readLineText } from '../../crop/lines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
 import { boundPreparation } from './preparation-binding.mjs';
 import { drawingLogic } from './drawing-logic.mjs';
@@ -39,7 +39,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (first && opt('preparationbinding','')) return boundPreparation({bindingFile:opt('preparationbinding',''),base:b,image:opt('image',''),guide:opt('penpencil',''),w,h,num,log});
   // A declared no-drawing file is read before the logic branch and the line loader, for both pens, so --drawinglogic,
   // --drawinglastlogic, --finishmasses and the loader's target check of an empty file add or refuse nothing.
-  const declared = noDrawingDeclared(JSON.parse(fs.readFileSync(linePaths(b).lines, 'utf8')), { first });
+  const declared = noDrawingDeclared(JSON.parse(readLineText(linePaths(b).lines)), { first });
   if (declared) {
     log(first ? `drawing: no opening ink, since ${declared}; the walker's ${walked} gestures are not used` : `drawing, closing pen: no closing ink, since ${declared}`);
     return [];
@@ -60,7 +60,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const file = linePaths(b).lines;
   // Linked stages can explicitly omit prep ink; pure-watercolor plans declare medium none.
   // Recognize medium none only for an empty source file, not malformed or filtered-out paths.
-  const doc = first && !candidates.length ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+  const doc = first && !candidates.length ? JSON.parse(readLineText(file)) : null;
   const empty = doc?.empty || (doc?.medium === 'none' && Array.isArray(doc.lines) && doc.lines.length === 0
     ? 'the drawing explicitly declares medium none' : null);
   if (empty) { log(`drawing: no opening ink, since ${empty}; the walker's ${walked} gestures are not used`); return []; }

@@ -31,10 +31,14 @@ function fromPoints(g, pts) {
 export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false }) {
   let o = o0;
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
-  registerSegments(base, segments.stem);
-  const seg = await loadSegments(base, w, h), segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
-  const regions = segDoc.regions.map(r => ({ ...r, id: Number(r.id) }));
-  const lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}) });
+  let seg = null, regions = [], lab = { judge: 'none', cached: true, labels: {}, source: {}, note: 'segments off' };
+  if (segments?.stem) {
+    registerSegments(base, segments.stem);
+    seg = await loadSegments(base, w, h);
+    const segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
+    regions = segDoc.regions.map(r => ({ ...r, id: Number(r.id) }));
+    lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}) });
+  }
   const shadow = shadowMask ? shadowMassMask(L, w, h, pxMm) : new Uint8Array(w * h);
   // --inkfoliage 1: green, busy cells are leaves, wash only (line-foliage.mjs), whatever the regions' labels say
   let foliageCells = null;
@@ -42,7 +46,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     const rgb = await sharp(image).flatten({ background: '#fff' }).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer(), lab = labPlanes(rgb, w, h);
     foliageCells = foliageMask(L, lab.A, lab.B, w, h, pxMm);
   }
-  const cellLabel = (x, y) => lab.labels[seg.labels[y * w + x]] ?? 'architecture';
+  const cellLabel = (x, y) => (seg ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
   // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
   if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }
   const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, cellLabel, shadow, foliage: foliageCells }, o);

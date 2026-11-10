@@ -12,15 +12,16 @@ const nb4 = (i, w, n) => {
 };
 
 // Distance in 4-steps from the seed cells over cells outside `mask`, up to `radius`; Infinity where not reached.
-function outsideDistance(seeds, mask, w, n, radius) {
+// Protected highlights act as impenetrable physical barriers (BFS must not traverse through protected cells).
+function outsideDistance(seeds, mask, w, n, radius, protect = null) {
   const d = new Float32Array(n).fill(Infinity);
   let q = [];
   for (const i of seeds) {
-    for (const j of nb4(i, w, n)) if (j >= 0 && !mask[j] && d[j] > 1) { d[j] = 1; q.push(j); }
+    for (const j of nb4(i, w, n)) if (j >= 0 && !mask[j] && (!protect || !protect[j]) && d[j] > 1) { d[j] = 1; q.push(j); }
   }
   for (let k = 1; k < radius && q.length; k++) {
     const next = [];
-    for (const i of q) for (const j of nb4(i, w, n)) if (j >= 0 && !mask[j] && d[j] > k + 1) { d[j] = k + 1; next.push(j); }
+    for (const i of q) for (const j of nb4(i, w, n)) if (j >= 0 && !mask[j] && (!protect || !protect[j]) && d[j] > k + 1) { d[j] = k + 1; next.push(j); }
     q = next;
   }
   return d;
@@ -33,7 +34,7 @@ function outsideDistance(seeds, mask, w, n, radius) {
 export function softRing(mask, softCells, hardCells, w, h, radius, protect = null) {
   const n = w * h, out = new Uint8Array(n), R = Math.max(1, Math.round(radius));
   if (!softCells?.length) return out;
-  const ds = outsideDistance(softCells, mask, w, n, R), dh = hardCells?.length ? outsideDistance(hardCells, mask, w, n, R) : null;
-  for (let i = 0; i < n; i++) if (ds[i] <= R && !(dh && dh[i] <= ds[i]) && !protect?.[i]) out[i] = 1;
+  const ds = outsideDistance(softCells, mask, w, n, R, protect), dh = hardCells?.length ? outsideDistance(hardCells, mask, w, n, R, protect) : null;
+  for (let i = 0; i < n; i++) if (ds[i] <= R && !(dh && dh[i] <= ds[i]) && (!protect || !protect[i])) out[i] = 1;
   return out;
 }

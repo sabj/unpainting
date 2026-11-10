@@ -365,3 +365,22 @@ test('promotion check refuses unguarded and target-reading runs, and marks high 
   const h = promoteCheck(high.d);
   assert.equal(h.pass, true); assert.equal(h.review, true); assert.match(h.reviewWhy, /cheat risk high/);
 });
+
+test('a sealed map counts element reads made through array methods', () => {
+  const reads = { map: s => s.map(v => v), reduce: s => s.reduce((a, b) => a + b, 0), forEach: s => s.forEach(() => {}), indexOf: s => s.indexOf(2), includes: s => s.includes(2), join: s => s.join(), find: s => s.find(v => v === 2), filter: s => s.filter(Boolean), some: s => s.some(Boolean), every: s => s.every(Boolean), toSorted: s => s.toSorted() };
+  for (const [name, read] of Object.entries(reads)) {
+    const g = createTargetGuard({ mode: 'gentle' });
+    const sealed = g.seal('px', new Uint8Array([1, 2, 3]));
+    g.beginPaint();
+    assert.throws(() => read(sealed), undefined, `${name} should be blocked while painting`);
+    g.endPaint();
+  }
+});
+
+test('length stays readable through a sealed map while painting', () => {
+  const g = createTargetGuard({ mode: 'gentle' });
+  const sealed = g.seal('px', new Uint8Array(3));
+  g.beginPaint();
+  assert.equal(sealed.length, 3);
+  g.endPaint();
+});

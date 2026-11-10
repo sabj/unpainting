@@ -3,11 +3,73 @@
 import fs from 'node:fs';
 const directory = new URL('./', import.meta.url);
 export const STYLE_NAMES = Object.freeze(['ink-and-wash','precise-watercolor','urban-sketch','atmospheric-wet']);
+
+const styleCache = new Map();
+
+function clearStyleCache() {
+  styleCache.clear();
+}
+
+function validateProfile(profile, name) {
+  if (!profile || typeof profile !== 'object') throw Error(`Invalid style profile: ${name}`);
+  if (profile.name !== name && name !== 'custom') throw Error(`Invalid style profile: ${name}`);
+  if (!Array.isArray(profile.weights) || profile.weights.length !== 5 || !profile.weights.every(w => Number.isFinite(w) && w >= 0)) {
+    throw Error(`Invalid style profile: ${name}`);
+  }
+  if (!Array.isArray(profile.water) || profile.water.length !== 5 || !profile.water.every(w => Number.isFinite(w) && w >= 0)) {
+    throw Error(`Invalid style profile: ${name}`);
+  }
+  if (Math.abs(profile.weights.reduce((a, b) => a + b, 0) - 1) > 1e-8) {
+    throw Error(`Invalid style profile: ${name}`);
+  }
+  if (profile.layerOrderWeights != null) {
+    if (!Array.isArray(profile.layerOrderWeights) || !profile.layerOrderWeights.every(w => Number.isFinite(w) && w >= 0)) {
+      throw Error(`Invalid style profile: ${name}: layerOrderWeights must be non-negative numbers`);
+    }
+  }
+  if (profile.waterToPigmentRatio != null) {
+    if (!Number.isFinite(profile.waterToPigmentRatio) || !(profile.waterToPigmentRatio > 0)) {
+      throw Error(`Invalid style profile: ${name}: waterToPigmentRatio must be finite positive`);
+    }
+  }
+  if (profile.paintStrength != null) {
+    if (!Number.isFinite(profile.paintStrength) || profile.paintStrength < 0) {
+      throw Error(`Invalid style profile: ${name}: paintStrength must be non-negative`);
+    }
+  }
+}
+
+function loadStyleProfile(nameOrConfig) {
+  if (typeof nameOrConfig === 'string') {
+    const name = nameOrConfig;
+    if (!STYLE_NAMES.includes(name)) throw Error(`Unknown watercolor style: ${name}`);
+    if (styleCache.has(name)) {
+      return structuredClone(styleCache.get(name));
+    }
+    const profile = JSON.parse(fs.readFileSync(new URL(`${name}.json`, directory), 'utf8'));
+    validateProfile(profile, name);
+    if (profile.paintStrength == null || !Number.isFinite(profile.paintStrength)) {
+      profile.paintStrength = 1.0;
+    }
+    styleCache.set(name, profile);
+    return structuredClone(profile);
+  }
+  if (typeof nameOrConfig === 'object' && nameOrConfig !== null) {
+    const profile = structuredClone(nameOrConfig);
+    validateProfile(profile, profile.name ?? 'custom');
+    if (profile.paintStrength == null || !Number.isFinite(profile.paintStrength)) {
+      profile.paintStrength = 1.0;
+    }
+    return profile;
+  }
+  throw Error(`Invalid style profile argument: ${nameOrConfig}`);
+}
+
 export function loadStyle(name) {
-  if (!STYLE_NAMES.includes(name)) throw Error(`Unknown watercolor style: ${name}`);
-  const profile = JSON.parse(fs.readFileSync(new URL(`${name}.json`, directory)));
-  if (profile.name !== name || profile.weights.length !== 5 || profile.water.length !== 5 || Math.abs(profile.weights.reduce((a,b)=>a+b,0)-1)>1e-8) throw Error(`Invalid style profile: ${name}`);
-  return profile; // fresh data per plan; callers cannot mutate another subject's defaults
+  if (typeof name !== 'string' || !STYLE_NAMES.includes(name)) {
+    throw Error(`Unknown watercolor style: ${name}`);
+  }
+  return loadStyleProfile(name);
 }
 export function resolveStyle(subject, region=null, selection=null) {
   const mapping = selection;

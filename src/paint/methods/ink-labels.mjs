@@ -159,7 +159,7 @@ const RANK = { none: 0, elongated: 1, structure: 2, outline: 3, features: 4 };
 export function ruleAt(cellLabel, x, y, reachPx) {
   let best = { ink: 'none', minMm: Infinity, label: null };
   for (const [dx, dy] of [[0, 0], [reachPx, 0], [-reachPx, 0], [0, reachPx], [0, -reachPx]]) {
-    const label = cellLabel(Math.round(x + dx), Math.round(y + dy));
+    const label = cellLabel(Math.floor(x + dx), Math.floor(y + dy));
     const rule = INK_RULES[label];
     if (rule && RANK[rule.ink] > RANK[best.ink]) best = { ...rule, label };
   }

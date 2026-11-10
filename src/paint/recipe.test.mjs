@@ -136,6 +136,24 @@ test('recipe none gives plan drawing precedence over template defaults', () => {
   const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', 'examples/plans/trumbull-values.json', '--outlinemedium', 'graphite'] });
   assert.equal(argv[argv.lastIndexOf('--outlinemedium') + 1], 'ink');
 });
+
+test('recipe none: authored plan wash settings take precedence over inherited defaults', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recipe-wash-'));
+  try {
+    const file = path.join(dir, 'plan.json');
+    fs.writeFileSync(file, JSON.stringify({ subject: 'test', washes: { darkGain: 2 } }));
+    const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', file, '--darkgain', '1.3', '--passcap', '0.7'] });
+    const get = name => argv[argv.lastIndexOf('--' + name) + 1];
+    assert.equal(get('darkgain'), '2');
+    // Unauthored wash keys (e.g. passcap) are NOT emitted by pipelineFlags, so inherited argv is preserved
+    assert.equal(get('passcap'), '0.7');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 test('standalone flags do not shift scalar collapse, including negative values', () => {
   const { argv } = expandRecipe({ argv: ['--verbose', '--midlayers', '2', '--probe', '--offset', '-2', '--midlayers', '3', '--end'] });
   assert.equal(argv[argv.indexOf('--midlayers') + 1], '3');

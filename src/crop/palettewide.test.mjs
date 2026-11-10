@@ -85,3 +85,30 @@ test('puddle labels follow the amounts', () => {
   assert.notEqual(labels[0], labels[w - 1]);
   assert.equal(labels[0], labels[w * 3 + 2]);
 });
+
+// A model names its own pans (--paints). The box stays, and grows only for a hue cluster it cannot reach.
+function orangeSheet() {
+  const px = new Uint8ClampedArray(N * 3);
+  for (let i = 0; i < N; i++) px.set(i % W < 14 ? [226, 128, 30] : [165, 160, 155], i * 3);
+  return px;
+}
+
+test('an explicit --paints box that cannot reach a large orange cluster gains the pan that does, with the reason logged', () => {
+  const px = orangeSheet(), paperRGB = [252, 251, 248], lean = pickPalette(px, W, H, paperRGB, { boxpick: false }).palette;
+  const keys = ['umber', 'paynes', 'sepia'];
+  const { palette, note } = widePalette(px, W, H, paperRGB, lean, { keys });
+  const got = palette.box.keys;
+  assert.deepEqual(got.slice(0, keys.length), keys, 'the named pans stay, first');
+  assert.ok(got.length > keys.length && got.length <= keys.length + 2, `extended by one or two: ${got}`);
+  assert.ok(got.slice(keys.length).every(k => !['umber', 'paynes', 'sepia', 'lampblack'].includes(k)), `extras are chromatic: ${got}`);
+  assert.match(note, /added .* for hue/, note);
+  assert.ok(palette.hueCoverage.loss < 1e-6, JSON.stringify(palette.hueCoverage));
+});
+
+test('an explicit box that already reaches every large hue cluster is left alone', () => {
+  const px = orangeSheet(), paperRGB = [252, 251, 248], lean = pickPalette(px, W, H, paperRGB, { boxpick: false }).palette;
+  const first = widePalette(px, W, H, paperRGB, lean, { keys: ['umber', 'paynes', 'sepia'] }).palette.box.keys;
+  const again = widePalette(px, W, H, paperRGB, lean, { keys: first });
+  assert.deepEqual(again.palette.box.keys, first);
+  assert.doesNotMatch(again.note, /added .* for hue/);
+});

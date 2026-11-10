@@ -23,3 +23,17 @@ test('reserved lights stay dry and a passage with no soft edge gets no water', (
   assert.equal(softRing(mask, soft, hard, W, H, 3, protect)[15 * W + 8], 0);
   assert.equal(softRing(mask, [], hard, W, H, 3).reduce((a, v) => a + v, 0), 0);
 });
+
+test('protected highlights act as impenetrable barriers; BFS cannot step through them', () => {
+  // A vertical wall of protected cells at x = 9 (right adjacent to soft edge at x = 10)
+  const protect = new Uint8Array(N);
+  for (let y = 0; y < H; y++) protect[y * W + 9] = 1;
+
+  const ring = softRing(mask, soft, hard, W, H, 3, protect);
+  // Barrier itself must stay dry
+  assert.equal(ring[15 * W + 9], 0, 'barrier cell itself stays dry');
+  // Cells behind the barrier (x = 8, x = 7) must NOT be reached by jumping through the barrier
+  assert.equal(ring[15 * W + 8], 0, 'cell immediately behind barrier is unreached');
+  assert.equal(ring[15 * W + 7], 0, 'cells further behind barrier are unreached');
+});
+

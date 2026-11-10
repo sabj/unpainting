@@ -82,6 +82,7 @@ Modules, with their flags:
 - `methods/layer-cuts.mjs` (`--layerlocal 1`, `--midlayers N` above 4): middle-layer cut levels per colour region; evenly spaced cuts for more layers.
 - `methods/lay.mjs` (not reached): one passage from one mixing well, in sweeps.
 - `methods/light-to-dark.mjs` (`--order painter`): five light-to-dark value bands per pigment.
+- `methods/light-reserves.mjs` (plan `reserves[]`): an explicit reserve is the target's own light inside its box, not the box; a box with no target light reserves nothing and the log says so.
 - `methods/lights-shape.mjs` (`--lightsbreak`): breaks large lights into flecks along the paper relief.
 - `methods/local-lights.mjs` (`--locallights`): masks each segment's lightest share before any wash.
 - `methods/look.mjs` (not reached): reads what the sheet still lacks to choose the next act.
@@ -116,7 +117,11 @@ Modules, with their flags:
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
 - `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
-- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`, parked): clean water past a passage's soft edges before its colour.
+- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`): clean water past a passage's soft edges before its colour. 0.8 mm under `--softchoice`, otherwise off.
+- `methods/soft-edge-choice.mjs` (`--softchoice`, default 0, or 1 under `--washsystem 1`): a boundary is soft only where the passage's own demand has faded, the target turns gradually over 3 mm, and at least 5 mm of such cells run together.
+- `methods/mixed-washes.mjs` (`--mixedwash`, `--mixedshadows`, both default 0, or 1 under `--washsystem 1`): one mixed charge per connected shape of one colour domain, laid on dry paper, instead of one pass per pigment. Touching regions with nearly the same pigment shares share a domain.
+- `methods/scale-layers.mjs` (`--scalelayers`, default 0, or 1 under `--washsystem 1`): under `--midlayers n` the middle washes are cut by what each brush size can carry (flat, large round, medium round, small round), not at value quantiles. A smooth form is one graded wash; a later layer is a real darker shape; layers target a third of the value range so darks build in stages; the last layer takes the remainder and small residual shapes fold into surviving layers.
+- `methods/graded-plane.mjs` (`--gradedlanes`, default 0, or 1 under `--washsystem 1`): a wash with a real gradient is laid in long straight lanes across it, each dipped at the strength of one plane fitted to its demand. A flat wash keeps its one fitted gesture.
 - `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
 - `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
@@ -175,11 +180,11 @@ They are contained this way:
 - Fitted values live in `src/paint/tuned/`. They run only through a named preset or the `v096` recipe.
 - A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe default+architecture`.
 - No painting code outside `src/paint/tuned/` checks a subject id. `src/paint/overfit.test.mjs` fails if it does, or if the default recipe sets a tuned flag.
-- `--recipe v096` runs the V096 recipe: the general methods with sky lanes and every tuned flag below, on every subject.
+- `--recipe v096` runs the V096 recipe: the general methods with sky lanes and the tuned flags below, on every subject. It leaves out `--recesses` and the recess flags that need it, and the texture flags.
 
 | Preset | Flags | For |
 |---|---|---|
-| `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1 --texvariety 0.8` | Buildings under a sky |
+| `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1` | Buildings under a sky |
 | `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
 
 `examples/plans/trumbull-values.json` names both presets.
@@ -198,10 +203,10 @@ Preset flags, with the off value, the images they were fitted on and the risk fo
 - `--stoneblockmm 4`: stone block row height. Off: `2.6`. Y1; high.
 - `--stoneirregular 1`: irregular stone corners. Off: `0`. Y1; high.
 - `--recesses 1`: dark windows and doors as last accents on the dried wall. Off: `0`. Y1; medium, since any dark cell counts.
-- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1; low.
+- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1; low. This and the next two act only with `--recesses 1`, and the painter reports them when typed without it.
 - `--recessshare .75`: demand per recess layer. Off: `.5`. Y1; low.
 - `--recessclean 1`: no light wash under recesses. Off: `0`. Y1; low.
-- `--texvariety 0.8`: varied short texture marks. Off: `0`. Y1 stone, subject-c stubble. It has no effect, since the value planner lays no texture passages.
+- `--texvariety`, `--texflow`, `--texshort`, `--texpress`: short dry-brush texture marks. No preset or recipe sets them, since the value planner lays no texture passages and they change no painting. The painter reports one that is typed.
 
 Modules:
 
@@ -210,7 +215,7 @@ Modules:
 - `tuned/trumbull.mjs` (`architecture` preset or `--recipe v096`): recess, wall and ground constants. Y1, subject-e; high.
 - `tuned/dog-coats.mjs` (`--dogpaint`, `--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium, since both assume a black curly coat.
 - `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
-- `tuned/modulation-anatomy.mjs` (`--modulate 1 --modanatomy <file>`): skin and fur regions for modulation. subject-c; low.
+- `tuned/modulation-anatomy.mjs` (`--modulate 1 --modanatomy <file>`): skin and fur regions for modulation, from a file that carries its target's SHA-256. One target; low.
 - `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.
 - `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
 - `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
@@ -223,3 +228,13 @@ Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 
 - `--pigphys 1`: settling, granulation and flocculation per pigment. `--flocblue`, `--flocgrey`, `--flocviolet`, `--flocearth` and `--flocyellow` take 0 to 1 and override one colour family. An unset value keeps the pigment's own `floc`; an explicit 0 clears it. The families are absorption-channel heuristics, not chemical measurements.
 - `--crosshatch 1`: contour-following hatching as a finishing stage.
 - `--tonestage 1`: records a paper-colour choice before drawing. `auto` also detects warm source paper. It changes the paper colour and lays no pigment, so it is not a wash.
+
+### Experimental connected washes
+
+`--washsystem 1` joins mixed dry-paper charges, brush-scale middle layers, graded lanes and selective soft edges with the paper and plan-value experiments. It is off by default. In the 0.3.1 candidate (painter V104) it paints worse than the default: 8 of 12 paired renders exceed the fine-detail correlation limit, and full-size review found flatter masses, harder edges and lost paper lights ([changelog](../CHANGELOG.md)).
+
+`--calibratedplan 1` removes blind value gains, limits excess band allocation and enables fresh sheet-only delivery readings. It sets `--darkgain`, `--coolgain` and `--midgain` to 1 and prints no notice when one is typed. It plans values by three rules, each of which can be set alone: `--celllight 1` scales each cell's fitted paint until its film over the paper returns the cell's light through the sheet's own optics; `--nestedbands 1` splits a cell's paint between the five bands by value steps, so a wash covers the cells darker than its band's floor and carries that step, and the middle layers carry the middle steps; `--masstone 1` charges each wash at the strength whose flat film returns the light its cells asked for, not at their mean paint, and carries nothing into later bands (`--passcap` has no effect with it). `--valuepreviewonly 1` writes `plan-ledger.png` and `plan-value-check.json`: the plan as booked paint through the sheet's optics, with its dark share, paper share and L* beside the target's. These are plan values; they do not guarantee the final brush-painted value. The calibration reads the sheet alone only with `--notargetlooks 1`; without it the run still takes its looks at the target between passes.
+
+`--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. It changes the light reference only when `--paperrel 1`, `--paperlights 1` or `--washsystem 1` is also on, and it sets the sheet colour only with `--paperrgb auto`. The test compares lightness and chroma, not hue, so pale material of another hue can count as paper.
+
+The 0.3.1 candidate renders with `--notargetlooks 1` record no paint-time target looks and no guard violations.

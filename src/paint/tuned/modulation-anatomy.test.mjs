@@ -5,8 +5,15 @@ test('same ginger hue outside registered human stays eligible; target registrati
 test('existing skipped human deferred pigment returns once to same fitted cells/pans; cat and true lights unchanged',()=>{const Aw=Float32Array.from([1,2,3,4]),Ad=Float32Array.from([.5,.75,1,2]),skin=Uint8Array.from([0,0,1,1]),lights=Uint8Array.from([0,0,0,1]);const before=[...Aw].map((v,i)=>v+Ad[i]);const result=returnExcludedSkinToWash({Aw,Ad,K:1,skin,lights});assert.equal(result.transferred,1);assert.deepEqual([...Aw],[1,2,4,4]);assert.deepEqual([...Ad],[.5,.75,0,2]);assert.deepEqual([...Aw].map((v,i)=>v+Ad[i]),before);assert.equal(returnExcludedSkinToWash({Aw,Ad,K:1,skin,lights}).transferred,0);});
 import {registeredFurPlan} from './modulation-anatomy.mjs';
 test('registered body/eye occlusion excludes fur, genuine film and negative cores stay separate',()=>{
- const doc={materialRegions:[{id:'subject-c.production.cat-head',priority:1,material:'fur',contact:'belly',polygon:[[0,0],[1,0],[1,1],[0,1]],flow:[[0,0],[1,1]]},{id:'human-eye',priority:2,material:'body',contact:'none',polygon:[[.5,0],[1,0],[1,1],[.5,1]]}],essentialLights:[{id:'glint',operation:'physical-film',polygon:[[0,0],[.25,0],[.25,1],[0,1]]},{id:'chest',operation:'negativepaint',polygon:[[.25,0],[.5,0],[.5,1],[.25,1]]}]};
- const p=registeredFurPlan(doc,4,1);assert.deepEqual([...p.fur],[1,1,0,0]);assert.deepEqual([...p.film],[1,0,0,0]);assert.deepEqual([...p.negative],[0,1,0,0]);assert.ok(p.dx[0]>0&&p.dy[0]>0);assert.throws(()=>registeredFurPlan({...doc,essentialLights:[{...doc.essentialLights[0],operation:'clip-as-film'}]},4,1),/light roles/);
+ const doc={materialRegions:[{id:'head',priority:1,material:'fur',takesCores:true,contact:'belly',polygon:[[0,0],[1,0],[1,1],[0,1]],flow:[[0,0],[1,1]]},{id:'human-eye',priority:2,material:'body',contact:'none',polygon:[[.5,0],[1,0],[1,1],[.5,1]]}],essentialLights:[{id:'glint',operation:'physical-film',polygon:[[0,0],[.25,0],[.25,1],[0,1]]},{id:'chest',operation:'negativepaint',polygon:[[.25,0],[.5,0],[.5,1],[.25,1]]}]};
+ const p=registeredFurPlan(doc,4,1);assert.deepEqual([...p.fur],[1,1,0,0]);assert.deepEqual([...p.cat],[1,1,0,0]);assert.deepEqual([...p.film],[1,0,0,0]);assert.deepEqual([...p.negative],[0,1,0,0]);assert.ok(p.dx[0]>0&&p.dy[0]>0);assert.throws(()=>registeredFurPlan({...doc,essentialLights:[{...doc.essentialLights[0],operation:'clip-as-film'}]},4,1),/light roles/);
 });
 
 test('body material transfer conserves per-pan demand and leaves genuine core debt unspent',()=>{const Aw=Float32Array.from([1,2,3,4]),Ad=Float32Array.from([2,3,4,5]),before=[...Aw].map((v,i)=>v+Ad[i]);const body=Uint8Array.from([0,1,1,1]),lights=Uint8Array.from([0,0,1,0]);const result=returnExcludedSkinToWash({Aw,Ad,K:1,skin:body,lights});assert.equal(result.transferred,8);assert.deepEqual([...Ad],[2,0,4,0]);assert.deepEqual([...Aw].map((v,i)=>v+Ad[i]),before);});
+
+test('cores apply to regions that say so, never by a subject id prefix',()=>{
+ const region=id=>({id,priority:1,material:'fur',contact:'belly',polygon:[[0,0],[1,0],[1,1],[0,1]],flow:[[0,0],[1,1]]});
+ const cores=[{id:'glint',operation:'physical-film',polygon:[[0,0],[1,0],[1,1],[0,1]]}];
+ assert.deepEqual([...registeredFurPlan({materialRegions:[region('subject-c.production.cat-head')],essentialLights:cores},2,1).cat],[0,0]);
+ assert.deepEqual([...registeredFurPlan({materialRegions:[{...region('head'),takesCores:true}],essentialLights:cores},2,1).cat],[1,1]);
+});

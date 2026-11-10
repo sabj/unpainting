@@ -116,13 +116,13 @@ export function createTargetGuard({ mode = DEFAULT_MODE, targetPaths = [], log =
     beginPaint() { phase = 'paint'; if (mode !== 'off') HOOKED = guard; },
     endPaint() { phase = 'done'; if (HOOKED === guard) HOOKED = null; },
     checkFile(p, via) { if (mode !== 'off' && phase === 'paint' && isTargetFile(p)) record('file read', String(p), via); },
-    /** A view of `arr` that refuses element reads while painting. Methods and length pass through. */
+    /** A view of `arr` that refuses element reads while painting, directly or through an array method. Length passes through. */
     seal(name, arr) {
       if (mode === 'off' || arr == null || typeof arr !== 'object') return arr;
       registered.set(arr, name);
       return new Proxy(arr, {
         get(t, k) {
-          if (phase === 'paint' && typeof k === 'string' && k.length && k.charCodeAt(0) >= 48 && k.charCodeAt(0) <= 57) {
+          if (phase === 'paint' && ((typeof k === 'string' && k.length && k.charCodeAt(0) >= 48 && k.charCodeAt(0) <= 57) || (k !== 'length' && k !== 'constructor' && k !== 'byteLength' && k !== 'byteOffset' && k !== 'BYTES_PER_ELEMENT' && k !== 'keys' && k !== 'set' && k !== 'fill' && (typeof k === 'string' || k === Symbol.iterator) && (k in t) && !/^\d/.test(String(k))))) {
             reads[name] = (reads[name] || 0) + 1;
             if (reads[name] === 1 || blocking) record('element read', name);
           }

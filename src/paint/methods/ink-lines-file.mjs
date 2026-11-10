@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
-import { linePaths } from '../../crop/lines.mjs';
+import { linePaths, hasLineFile, readLineText } from '../../crop/lines.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import { holdLinesToTarget } from './ink-lines.mjs';
 import { strokesPeakAbsorbance } from './ink-match.mjs';
@@ -70,8 +70,8 @@ function onGrid(doc, gridW) {
  */
 async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, flags, targetW, gridW = 0, log = () => {}, decide = null }) {
   const file = path.resolve(root, linePaths(base).lines);
-  if (!fs.existsSync(file)) return null;
-  const doc0 = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!hasLineFile(file)) return null;
+  const doc0 = JSON.parse(readLineText(file));
   if (!Array.isArray(doc0.lines) || !doc0.lines.length) return null;
   if (!(doc0.image?.w && doc0.image?.h)) throw new Error(`ink lines: ${path.basename(file)} has no image box, so its lines cannot be read against the target`);
   // with --linemeasure, a file drawn on a finer grid than the pen's is read on the pen's grid (the painting's, or with
@@ -120,10 +120,10 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
 // A stage can be requested twice while planning installs the remaining stage files.
 // Content keys keep edited files, flags, target pixels and decision inputs distinct.
 const heldStages = new Map();
-const digest = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const digest = file => createHash('sha256').update(fs.existsSync(file) ? fs.readFileSync(file) : Buffer.from(readLineText(file))).digest('hex');
 async function holdLineFile(args) {
   const file = path.resolve(args.root, linePaths(args.base).lines);
-  if (!fs.existsSync(file)) return null;
+  if (!hasLineFile(file)) return null;
   const seg = args.decide?.segments?.stem;
   const key = JSON.stringify([args.stage, file, digest(file), path.resolve(args.image), digest(args.image),
     path.resolve(args.out), args.sheetMm, args.targetW, args.gridW, args.flags,

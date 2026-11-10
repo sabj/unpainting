@@ -100,6 +100,7 @@ export function reportUnusedPlanKeys({ file, pipeline, out, allow = false, log =
   const line = `UNUSED PLAN KEYS (read by nothing in this run${pipeline ? '' : '; washes and order need the combined recipe'}): ${unused.join(' ')}${allow ? '' : '; the run exits 3, --allowunusedplan 1 allows them'}`;
   fs.writeFileSync(path.join(out, 'unused-plan-keys.txt'), unused.join('\n') + '\n');
   log(line);
+  if (!allow && !process.exitCode) process.exitCode = 3;
   process.on('exit', () => { log(line); if (!allow && !process.exitCode) process.exitCode = 3; });
   return unused;
 }

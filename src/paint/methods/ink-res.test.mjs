@@ -104,3 +104,18 @@ test('fine ink carry invalidates a CPU dry-fixed proof and the next dry fixes th
   R.carry();
   assert.equal(validDryFixedCertificate(main),true,'a no-op carry does not discard the proof');
 });
+
+test('gain scaling applies to ink concentration array when gain !== 1', () => {
+  const { main } = setup();
+  const R = makeInkRes({ N: 3, W2: W, H2: H, paperOpts: { seed: 2 }, pigments: [ink], main, gain: 1.5 });
+  assert.doesNotThrow(() => {
+    R.draw([line], new Float32Array(W * H).fill(1), W, H, { ink: [10], peak: 1 });
+  });
+});
+
+test('scale rounding before check: N <= 1.4 returns null', () => {
+  const { main } = setup();
+  const pigments = [ink];
+  assert.equal(makeInkRes({ N: 1.000001, W2: W, H2: H, paperOpts: {}, pigments, main }), null);
+  assert.equal(makeInkRes({ N: 1.2, W2: W, H2: H, paperOpts: {}, pigments, main }), null);
+});

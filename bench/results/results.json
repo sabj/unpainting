@@ -236,6 +236,26 @@
    "style": "loose ink-and-watercolor field sketch, ink led",
    "distributed": true,
    "file": "v2/targets/h34a.png"
+  },
+  {
+   "key": "dog-paint",
+   "name": "Dog, paint",
+   "selfScore": 9.11,
+   "w": 300,
+   "h": 402,
+   "style": "classic transparent watercolour portrait, restrained glazes, no ink",
+   "distributed": false,
+   "file": "v2/targets/dog-paint.png"
+  },
+  {
+   "key": "dog-ink",
+   "name": "Dog, ink",
+   "selfScore": 9.4,
+   "w": 300,
+   "h": 402,
+   "style": "loose ink and wash portrait, ink led",
+   "distributed": false,
+   "file": "v2/targets/dog-ink.png"
   }
  ],
  "rounds": [

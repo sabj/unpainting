@@ -28,7 +28,7 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
 import { gaussian } from '../../keyframes/density.mjs';
-import { scaleLines, linePaths } from '../../crop/lines.mjs';
+import { scaleLines, linePaths, readLineText } from '../../crop/lines.mjs';
 import { writeInkLines } from '../../crop/ink-lines-file.mjs';
 import { separate } from '../../crop/inkwash.mjs';
 import { paperOf } from '../../crop/palettepick.mjs';
@@ -144,7 +144,7 @@ export async function planUniversalLinework({ image, out, root, width, sheetMm, 
   let chosen = null;
   if (drawingFile) {
     // a prepared drawing is the source: it is an artist's selection, cleaned as a pen source's own lines are
-    const raw = scaleLines(JSON.parse(fs.readFileSync(linePaths(drawingFile).lines, 'utf8')), w, h, { keepOrder: true });
+    const raw = scaleLines(JSON.parse(readLineText(linePaths(drawingFile).lines)), w, h, { keepOrder: true });
     record.order = ['file']; record.sources.push({ source: 'file', file: path.basename(linePaths(drawingFile).lines), lines: raw.length, accepted: true });
     chosen = { source: 'file', lines: raw, kind: 'pen' };
   }

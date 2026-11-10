@@ -18,7 +18,7 @@ export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,p
  const K=pigments.length,n=w*h,paths=[],panels=[];
  const marks=createMarkPreview(w,h,pigments,paperRGB,plan.protectedCells);
  const targetHash=(await import('node:crypto')).createHash('sha256').update(fs.readFileSync(target)).digest('hex');
- const drawing=(file,first)=>file&&hasLines(file)?selectValueInk(loadLines(file,w,h,{keepOrder:true}),{first,w,h,sourceInk:plan.style?.structure==='ink',density:plan.value.values,reserves:plan.protectedCells,subject,styleSelection:plan.style?{style:plan.style.name,reason:plan.style.reason}:null,shaped:plan.instructions[0]?.shaped}):[];
+ const drawing=(file,first)=>file&&hasLines(file)?selectValueInk(loadLines(file,w,h,{keepOrder:true}),{first,w,h,sourceInk:plan.style?.structure==='ink'||!first,density:plan.value.values,reserves:plan.protectedCells,subject,styleSelection:plan.style?{style:plan.style.name,reason:plan.style.reason}:null,shaped:plan.instructions[0]?.shaped}):[];
  const open=drawing(opening,true),close=drawing(closing,false);
  let drawings=[];
  const panel=async(stage)=>{
@@ -35,7 +35,7 @@ export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,p
  await panel('0 reserve whites / catchlights; no opaque correction');drawings=open;await panel(`opening drawing: ${open.length} selected structure paths (CPU)`);
  for(let band=1;band<=5;band++){
   for(const L of plan.layers.filter(l=>l.value===band))for(const sh of L.shapes){
-   const m=sh.mask,p=sh._strokePlan?.paths??(sh._valuePlan.shaped?shapedPlanePaths(m,w,h,{texture:sh._valuePlan.texture}):brushedWashPaths(m,w,h,{pad:1.5,minRadius:1,minLength:3})),load=markLoad(L,sh,K);
+   const m=sh.mask,p=sh._strokePlan?.paths??(sh._valuePlan.shaped?shapedPlanePaths(m,w,h,{texture:sh._valuePlan.texture,box:sh.box,protect:plan.protectedCells}):brushedWashPaths(m,w,h,{pad:1.5,minRadius:1,minLength:3})),load=markLoad(L,sh,K);
    const factors=sh._strokePlan?.factors;
    if(factors)for(let i=0;i<p.length;i++)marks.paint([p[i]],load.map(v=>v*factors[i]),{clip:m});
    else marks.paint(p,load,{clip:sh._valuePlan.shaped?m:undefined});

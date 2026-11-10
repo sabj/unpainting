@@ -18,6 +18,7 @@ import { promisify } from 'node:util';
 import { BENCH, V2, PIPELINE_ROUNDS, readJson, writeJson, loadCrops, validateRun, cheatRisk, riskLevel, mean, round2, posix, compositeTargets } from './lib.mjs';
 import sharp from 'sharp';
 import { progressionSheet } from './images.mjs';
+import { scoreJudge } from './score-judge.mjs';
 
 const argv = process.argv.slice(2);
 const has = n => argv.includes('--' + n);
@@ -33,10 +34,8 @@ const run = readJson(runFile);
 const raw = path.resolve(opt('raw', run.raw ? path.join(BENCH, run.raw) : ''));
 const PY = opt('python', process.env.BENCH_SCORE_PYTHON || 'python3');
 const SCORER = path.join(BENCH, 'scorer');
-const judge = opt('judge', run.settings.budget?.judgeVersion ?? run.judgeVersion ?? 'J1');
-const profile = opt('profile', run.settings.budget?.judgeProfile);
-if (!['J1', 'J2'].includes(judge)) fail('--judge must be J1 or J2');
-if (profile && (judge !== 'J2' || !['lite', 'standard', 'full'].includes(profile))) fail('--profile lite|standard|full requires J2');
+let judge, profile;
+try { ({ judge, profile } = scoreJudge(run, { judge: opt('judge'), profile: opt('profile') })); } catch (e) { fail(e.message); }
 const expectedProfile = judge === 'J2' ? `J2-${profile ?? 'full'}` : 'J1-full';
 const route = process.env.JUDGE_ROUTE || run.settings.judgeRoute || 'together';
 const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
