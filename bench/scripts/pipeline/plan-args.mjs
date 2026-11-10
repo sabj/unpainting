@@ -144,7 +144,8 @@ export function layerBase({ variant, build, architecture = false, trumbull = fal
 // urban-sketch's own wash is a single 25% band (near-blank sheets); its cells get the ink-and-wash value floor
 const valueFloorFor = config => { const s = config?.styleSelection; const styles = [s?.style, ...Object.values(s?.regions ?? {}).map(r => r?.style)]; return styles.includes('urban-sketch') ? 'ink-and-wash' : null; };
 
-// Only artistic controls belong to model plans; execution and ink safety stay with the harness.
+// Only artistic controls belong to model plans; execution, delivery (charging, calibration) and ink safety stay with
+// the harness and the engine.
 const numeric = (min, max) => v => v.trim() !== '' && Number.isFinite(Number(v)) && Number(v) >= min && Number(v) <= max;
 const choice = values => v => values.includes(v);
 export const ALLOWED_EXTRA_ARGS = Object.freeze({
@@ -159,9 +160,7 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   strokeplan: choice(['0', '1']),
   lanemm: v => v === 'auto' || numeric(0, 40)(v),
   strokemm: numeric(0, 300),
-  techcal: choice(['0', '1']),
   paperrule: choice(['0', '1']),
-  techcalfrom: numeric(1, 5),
   drawinghand: choice(['0', '1']),
   washinkfree: choice(['0', '1']),
   inkdarkskip: numeric(0, 1),

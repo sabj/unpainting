@@ -166,13 +166,18 @@ test('only explicitly offline fixture specs authorize a deliberately stripped wo
   assert.equal(optionMap(fixture.args).get('allowdirty'),'1');
 });
 
-test('extra args allow techcal, techcalfrom, lanemm auto/0..40, and reject invalid ranges', () => {
-  assert.deepEqual(checkExtraArgs(['--techcal', '1', '--techcalfrom', '1', '--lanemm', 'auto'], '/p'), []);
-  assert.deepEqual(checkExtraArgs(['--techcal', '0', '--techcalfrom', '5', '--lanemm', '0'], '/p'), []);
+test('extra args allow lanemm auto/0..40 and reject invalid ranges', () => {
+  assert.deepEqual(checkExtraArgs(['--lanemm', 'auto'], '/p'), []);
+  assert.deepEqual(checkExtraArgs(['--lanemm', '0'], '/p'), []);
   assert.deepEqual(checkExtraArgs(['--lanemm', '40'], '/p'), []);
-  assert.ok(checkExtraArgs(['--techcal', '2'], '/p').length);
-  assert.ok(checkExtraArgs(['--techcalfrom', '0'], '/p').length);
   assert.ok(checkExtraArgs(['--lanemm', '45'], '/p').length);
+});
+
+test('extra args refuse every delivery calibration: the engine owns delivery, not the plan', () => {
+  for (const flag of ['techcal', 'techcalfrom', 'techcalmax', 'techcalmin', 'deliverycal', 'deliverycalmax']) {
+    const bad = checkExtraArgs(['--' + flag, '1'], '/p');
+    assert.ok(bad.some(m => m.includes('may not set --' + flag)), flag + ': ' + JSON.stringify(bad));
+  }
 });
 
 test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.taskStyle', () => {
