@@ -16,7 +16,7 @@ import zlib from 'node:zlib';
 
 // rec2x, rcl and tv8 were dropped in 0.3.1: recess settings act only with --recesses 1 (the architecture preset sets
 // them itself) and texture variety acts only on dry-brush texture passages, which are never planned.
-export const BASE = 'region_w13_lay4_sky3_rg10_blk60_bmm40_bka20_birr_skyb_cpp_pgreen_tp2';
+export const BASE = 'region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2';
 const DEFAULT_VARIANT = 'region_w13';
 const ARCHITECTURE_ONLY = /^(blk|bmm|bka|rg|rec)\d*x?$|^birr$|^rcl$/;
 const GLAZE_GAINS = /^(dk|cg)\d+$/;
