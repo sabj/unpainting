@@ -2,6 +2,13 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
+## Unreleased, for 0.3.3
+
+Judging painting changes. Checked with unit tests and a run without judge calls on stored plates; the pair test has not been run with live judges yet.
+
+- **Blind full-size pairs decide painting changes.** `bench/scripts/pair-judge.mjs` compares two plates of one subject tile by tile at their own pixels (`bench/scorer/pairs.py`). The J1 judges must pick the crop that looks more like a hand-painted watercolour, see every tile in both orders, and never see the target. The verdict is a sign test over tiles, read together with the copy checks in `bench/scripts/copy-limits.mjs`. `--sheet` writes the same pairs as a blind contact sheet for a person. See [scoring](bench/docs/scoring.md#deciding-a-painting-change).
+- J1 stays as the published score. It no longer decides painting changes.
+
 ## 0.3.2 — 2026-11-09
 
 Painter **V105**, simulator **104**, judges **J1**. The changes run from the 0.3.0 release commit `70ceb7c3`.
