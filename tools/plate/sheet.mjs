@@ -61,19 +61,24 @@ import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
 import {loadPhysical} from '../../src/paint/methods/brushes.mjs';
 import {fillSheetBase, WHITE_PAPER_RGB} from '../../src/paint/methods/sheet-tone.mjs';
 import {sealAtBirth} from '../guard/seal-maps.mjs';
+import {createWetTrace} from './wet-trace.mjs';
+import {wetOnDryGate} from '../painter/passage-dry-gate.mjs';
 
 export async function sheetAndBrushes(ctx) {
 const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_UNIFORM_PAPER, measurePaper, VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, 
   SPEED_PROFILE, root, out, RUN_CACHE, SPARSE_CONTACT_RECORD, VALUE_CONFIG, VALUE_ENABLED, VALUE_COUNTS, 
-  WASH_SESSION, MAJOR_INTENT, phaseMark, w, h, n, SUBJECTS, createBrush, physicalStroke, candidateContact, TONE_MODE, 
+  WASH_SESSION, MAJOR_INTENT, phaseMark, w, h, n, SUBJECTS, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
   SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, WHITE_HOLD, MIXES, 
   setClip, MOD, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP, 
   STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, FINISH_FILE, AREA_LOADS, 
   AREA_EXEC } = ctx;
 Object.assign(ctx, { colourMass });
-const dry=(...args)=>{ctx.VALUE_OWN_CONTACT.clear();ctx.VALUE_PIGMENT_CONTACT.clear();const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);const result=ctx.AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>physicalDry(...args)):physicalDry(...args);if(args[0]._layerStoragePolicy)compactLowerLayers(args[0],args[0]._layerStoragePolicy());return result;};
-const dip=(b,o)=>{const a=AREA_EXEC.active,paint=o.conc.some(v=>v>0),load=a&&!a.productionLegacyDetail?{...o,water:(paint?a.pass.load.water:(a.pass.load.prewetWater??1))*a.pass.load.waterQuantityMm3/a.pass.load.capacityMm3,conc:o.conc.map(v=>v*(paint?a.pass.load.pigmentScale:1))}:o;const padded=(INK||GRAPHITE)&&load.conc.length<SHEET_PIGS.length?{...load,conc:[...load.conc,...new Array(SHEET_PIGS.length-load.conc.length).fill(0)]}:load;if(!ctx.AREA_PLAN)return dipBrush(b,padded);const before=measureBrush(b);const value=AREA_EXEC.command('physical brush dip/refill',{load:padded,brushBefore:before,passIntent:a?.pass??null},()=>dipBrush(b,padded));AREA_LOADS.set(b,{load:padded,waterMass:measureBrush(b).waterMass});return value;};
+// WET_TRACE=<file.jsonl>: a read-only record of the sheet's water under each stroke at landing and around each dry (wet-trace.mjs)
+const physicalStroke=(b,t,p,o)=>ctx.WET_TRACE&&t===ctx.sheet?ctx.WET_TRACE.stroke(b,t,p,o,untracedStroke):untracedStroke(b,t,p,o);
+const tracedDry=(...args)=>ctx.WET_TRACE&&args[0]===ctx.sheet?ctx.WET_TRACE.dry(args,physicalDry):physicalDry(...args);
+const dry=(...args)=>{ctx.VALUE_OWN_CONTACT.clear();ctx.VALUE_PIGMENT_CONTACT.clear();const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);const result=ctx.AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>tracedDry(...args)):tracedDry(...args);if(args[0]._layerStoragePolicy)compactLowerLayers(args[0],args[0]._layerStoragePolicy());return result;};
+const dip=(b,o)=>{const a=AREA_EXEC.active,paint=o.conc.some(v=>v>0);ctx.WET_TRACE?.dipped(b,paint);const load=a&&!a.productionLegacyDetail?{...o,water:(paint?a.pass.load.water:(a.pass.load.prewetWater??1))*a.pass.load.waterQuantityMm3/a.pass.load.capacityMm3,conc:o.conc.map(v=>v*(paint?a.pass.load.pigmentScale:1))}:o;const padded=(INK||GRAPHITE)&&load.conc.length<SHEET_PIGS.length?{...load,conc:[...load.conc,...new Array(SHEET_PIGS.length-load.conc.length).fill(0)]}:load;if(!ctx.AREA_PLAN)return dipBrush(b,padded);const before=measureBrush(b);const value=AREA_EXEC.command('physical brush dip/refill',{load:padded,brushBefore:before,passIntent:a?.pass??null},()=>dipBrush(b,padded));AREA_LOADS.set(b,{load:padded,waterMass:measureBrush(b).waterMass});return value;};
 // Opt-in actual numeric production loads only: calibration and pen loads stay unchanged.
 const PRODUCTION_WATER=num('productionwater',1);productionWaterLoad({water:1,conc:[0]},PRODUCTION_WATER);
 if(PRODUCTION_WATER!==1&&ctx.AREA_PLAN)throw Error('productionwater supports the original numeric route only; no semantic rewet fallback');
@@ -101,16 +106,10 @@ const stroke=(b,target,points,options)=>{
   let paper=null,own=false;
   if(fastMode){
     if(paint&&!wetMove){
-      if(ownCandidate&&!ctx.VALUE_ACTIVE.texture){
-        const gateCells=[];
-        for(let k=0;k<cells.length;k++){const i=cells[k];if(!ctx.VALUE_OWN_CONTACT.has(i))gateCells.push(i);}
-        for(let k=0;k<neighbors.length;k++){const i=neighbors[k];if(!ctx.VALUE_OWN_CONTACT.has(i))gateCells.push(i);}
-        own=gateCells.length===0||measurePaper(target,gateCells,SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}).dry;
-      }
-      if(!own||ctx.VALUE_ACTIVE.texture){
-        paper=observe();
-        if(!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
-      }
+      const gate=wetOnDryGate({cells,neighbors,own:{touches:ownCandidate,has:i=>ctx.VALUE_OWN_CONTACT.has(i)},texture:ctx.VALUE_ACTIVE.texture,observeCells:getObservationCells(),
+        measure:(c,kind)=>measurePaper(target,c,SPEED_PAPER,kind==='gate'?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:fastPaperOpts),dry:()=>dry(target,30000,O,{levelMax:140,dt:2})});
+      paper=gate.paper;own=gate.own;
+      if(gate.dried)check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});
     }else if(paint&&!intoOwnWash&&!(ctx.VALUE_ACTIVE.passageMaterial&&ctx.VALUE_ACTIVE.move==='wet on wet')){
       paper=observe();
     }
@@ -303,6 +302,8 @@ const paper = opt('paperscan', '') ? await (async () => {
 const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS) && k !== 'edgeFlowDepth') throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
 // --gran: granulation strength, default 0.25. The relief never changes, so every sweep lays the same pattern and it compounds.
 ctx.sheet = createSheet(paper, SHEET_PIGS); ctx.sheet._tape = 1;
+ctx.WET_TRACE = process.env.WET_TRACE ? createWetTrace({ file: process.env.WET_TRACE, sheet: ctx.sheet, contact: candidateContact }) : null;
+if (ctx.WET_TRACE) process.once('exit', () => ctx.WET_TRACE.close());
 // --probebox x0,y0,x1,y1[;...] (sheet fractions, diagnostic): paint only inside the boxes; compare only with a crop run of the same boxes.
 // --ablate dry,accents: skip those passes (diagnostic).
 const PROBE = opt('probebox', '') ? (() => {

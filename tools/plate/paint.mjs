@@ -659,6 +659,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     const c = KO2 ? Uint8Array.from(c0, (v, i) => (v && !KO2[i] ? 1 : 0)) : KO ? Uint8Array.from(c0, (v, i) => (v && !KO[((((i / W2) | 0) / SC) | 0) * w + (((i % W2) / SC) | 0)] ? 1 : 0)) : c0;
     setClip(ctx.sheet, c); used['floored brush'] = (used['floored brush'] || 0) + 1; }
   if (detail) used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] = (used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] || 0) + paths.length;
+  ctx.WET_TRACE?.passage({ pass: L + 1, shape: layer.shapes.indexOf(sh), technique: T.name, move: sh._valuePlan?.move ?? null, texture: !!sh._valuePlan?.texture, value: layer.value, paths: paths.length });
   let SOFT_RING = null;
   if (SOFT_WET_MM > 0 && crispHere && !BUDGET && !detail && !(sh._strokePlan?.reachCells > 0) && sh._valuePlan && !sh._valuePlan.texture && sh._valuePlan.edges?.softCells?.length && paths.length && opt('softwetphases', 'light,mid,shadow').split(',').includes(sh._valuePlan.phase)) {
     const rc = SOFT_WET_MM / (num('sheetmm', DEFAULT_SHEET_MM) / w);
@@ -708,7 +709,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     };
     // a passage wetted along its own lanes is wetted lane by lane just ahead of the brush, as its scrap swatch is (prewet-order.mjs)
     if (needPrewet && wetsLaneByLane({ intoWet: Boolean(T.intoWet), wetsOwnLanes: wetOver === paths, preparesOwnBed: Boolean(sh._valuePlan?.passageMaterial) })) wetEachLane = wetLane;
-    else if (needPrewet) for (const pts of wetOver) wetLane(pts);
+    else if (needPrewet) for (const pts of wetOver) { ctx.WET_TRACE?.lane(); wetLane(pts); }
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
   const useGradedCal = Boolean(sh.graded || sh._valuePlan);
@@ -723,6 +724,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     return cachedCover=result;
   };
   for (let pts of paths) {
+    ctx.WET_TRACE?.lane();
     if (wetEachLane) wetEachLane(pts);
     if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
     const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
@@ -952,6 +954,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   if (opt('bookfollow', '0') !== '0') throw new Error('--bookfollow was removed with the per-cell follow pressure (anti-cheat rules)');
   }
   colourMass('after-brush', {pass:L+1});
+  ctx.WET_TRACE?.boundary('end', { pass: L + 1, value: layer.value });
   ctx.RECEIVER_OBSERVER?.beforeDry(L+1,ctx.sheet);
   if(MAJOR_INTENT&&opt('majorstop','')==='pass:'+(L+1))await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-pass-'+(L+1)+'-immediate.png'));
   if(MAJOR_INTENT?.baseWash&&L===0)await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-firstwash-immediate.png'));
@@ -995,6 +998,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   else if (wetInto) clock('dry', () => dry(ctx.sheet, 20000, O, { levelMax: Math.round(num('drylevel', 140) * num('wetmix', 0.35)), dt: num('drydt', 14), ...watch }));
   else if (endOfValue || nextOther) clock('dry', () => dry(ctx.sheet, 20000, O, { levelMax: num('drylevel', 140), dt: num('drydt', 14), ...watch }));
   else if (layer.shapes.some(sh => sh.dryAfter)) clock('dry', () => dry(ctx.sheet, 3000, O, { levelMax: 90, dt: 6, ...watch }));
+  ctx.WET_TRACE?.boundary('next', { pass: L + 1, value: layer.value }); ctx.WET_TRACE?.passage(null);
   ctx.RECEIVER_OBSERVER?.ordinaryDry(L+1,ctx.sheet,{actualBoundary:!!(earlyBoundary||wetInto||endOfValue||nextOther||layer.shapes.some(sh=>sh.dryAfter)),endOfValue,nextOther,wetInto,earlyBoundary:!!earlyBoundary});
   if (filmed && PREPF) fadePrep();
   if (filmed) await shoot();

@@ -542,12 +542,15 @@ export const tapeSheet = t => { TAPE = t; };
 let STROKEFLOWS = null, STROKESTEP = null;
 export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 
+// A sheet clock a read-only trace may hang on a sheet (tools/plate/wet-trace.mjs): step adds its dt, nothing reads it here.
+export const SHEET_CLOCK = Symbol('sheetClock');
 export function step(sheet, o = DEFAULTS, reduction = null) {
   const wetValid = recordWetStep(sheet, 1);
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
   if (TAPE && sheet._tape) { if (STROKEFLOWS) STROKEFLOWS.push(STROKESTEP()); else TAPE.push({ k: 'f' }); }
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
   if (!Number.isFinite(o.dt) || o.dt < 0) throw new RangeError('dt must be finite and nonnegative');
+  const clock = sheet[SHEET_CLOCK]; if (clock) clock.t += o.dt;
   if (sheet._gpu && !sheet._gpu.paused) {
     const res = sheet._gpu.step(sheet, o);
     if (wetValid) syncWetReachVersion(sheet);
