@@ -19,11 +19,14 @@ Every painting records release, painter and sim versions and a commit. Benchmark
 | 0.2.1-rc.2 | V101-dev | 102 | J1 |
 | 0.2.1 | V101 | 102 | J1 |
 | 0.3.0 | V102 | 103 | J1 |
-| 0.3.1 candidate | V104 | 104 | J1 |
+| 0.3.1 candidate, not released | V104 | 104 | J1 |
+| 0.3.2 candidate | V105 | 104 | J1 |
 
 V100 sets the drawing medium to pencil by default. Ink comes from a plan, `--outlinemedium ink`, or the automatic stage choice on a run with no prepared drawing. Sim 102 makes brush water volume consistent across resolution and prepares wet beds before wet-in-wet passages. V101 adds the opt-in `--inkrecipe wash` and `auto`, and fixes the automatic stage choice so it adds ink stages only when ink is asked for. V102 and sim 103 add the full source-stroke pen-and-wash tracer, 1-pigment `--inkres` fine sheet, pass-boundary wash sessions, fingerprinted setup/value-plan caching, paper-state certificates, lower-layer compaction and 10-binding fused GPU step kernels. The 0.3.0 timing charts use development checkpoint `5e91484` against frozen control `41e6868`; that control includes post-0.2.1 changes and is not the published `v0.2.1` tag (`1cc2c08`). Final visual checks use engine commit `efbf8b7`. Each render's own record names the commit that made it. Benchmark scores keep their original version stamps. Sim 100 is the first sim number; it was estimated from earlier simulation revisions.
 
-The 0.3.1 candidate is not released. Sim 104 scales the extra drying at a wet edge by the share of dry paper nearby and by the water depth. V104 is the candidate painter at commit `32b1bfa4`; renders from earlier 0.3.1 development commits carry V103. The [changelog](../CHANGELOG.md) lists what was measured.
+The 0.3.1 candidate is not released. Sim 104 scales the extra drying at a wet edge by the share of dry paper nearby and by the water depth. V104 is the candidate painter at commit `32b1bfa4`; renders from earlier 0.3.1 development commits carry V103. 0.3.1 was not released; its changes are part of 0.3.2.
+
+The 0.3.2 candidate is not released. V105 changes the paintings: lanes in a wide wash are spaced by the brush's ragged edge, small specks of held white obey the size floor, a planned line is drawn only along a planned passage edge, a reserve box with no paper light keeps a catchlight, and a named paint box gains pans for a large hue cluster it cannot reach. The simulation is unchanged, so the sim stays at 104. The [changelog](../CHANGELOG.md) lists what was measured.
 
 ## What each result records
 
