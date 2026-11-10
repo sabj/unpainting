@@ -561,3 +561,70 @@ test('pale holds follow the size floor of inferred lights; explicit holds do not
   assert.equal(p.protectedCells[27 * w + 27], 1, 'a pale light larger than the minimum shape stays reserved');
   assert.equal(p.protectedCells[5 * w + 30], 1, 'an explicit hold is reserved whatever its size');
 });
+
+// A middle value, a half-dark and a full dark side by side: the half-dark sits inside the shadow shape but needs little glaze.
+function threeValues() {
+  const w = 48, h = 24, n = w * h, pigments = [{ K: [1, 1, 1], S: [0, 0, 0] }], paperRGB = [255, 255, 255];
+  const value = i => (i % w < 16 ? 0.3 : i % w < 32 ? 0.6 : 1.0);
+  const density = Float32Array.from({ length: n }, (_, i) => 1.6 * value(i));
+  const rgb = Uint8ClampedArray.from({ length: n * 3 }, (_, q) => Math.round(255 * Math.exp(-density[(q / 3) | 0])));
+  // light crosses the film twice, so the paint a cell needs is half its density
+  const demand = Float32Array.from(density, d => d / 2);
+  const run = options => { const log = console.log; console.log = () => {}; try { return planLightToDark({ w, h, k: 1, density, demand: demand.slice(), rgb, shaped: true, minShapeCells: 10, pigments, paperRGB, ...options }); } finally { console.log = log; } };
+  const booked = plan => { const E = new Float32Array(n); for (const L of plan.layers) for (const sh of L.shapes) { const m = sh.mask; for (let i = 0; i < n; i++) if (m[i]) E[i] += sh.mix[0]; } return [8, 24, 40].map(x => E[12 * w + x] / demand[12 * w + x]); };
+  return { run, booked, n, demand, rgb, w };
+}
+
+test('proportional bands lay the dark core\'s glaze on the half-dark: it gets over 1.25 of its paint', () => {
+  const { run, booked } = threeValues();
+  const [, half, dark] = booked(run({}));
+  assert.ok(half > 1.25, `half-dark booked ${half}`);
+  assert.ok(dark < 0.85, `dark booked ${dark}`);
+});
+
+test('calibratedPlan: value steps keep every value within an eighth of its own paint', () => {
+  const { run, booked } = threeValues();
+  for (const options of [{ calibratedPlan: true }, { calibratedPlan: true, layers: 3 }]) {
+    const got = booked(run(options));
+    for (const r of got) assert.ok(Math.abs(r - 1) < 0.125, `${JSON.stringify(options)} booked ${got.map(v => v.toFixed(3))}`);
+  }
+});
+
+test('calibratedPlan: middle layers stay and carry the middle value steps', () => {
+  const { run } = threeValues();
+  const plan = run({ calibratedPlan: true, layers: 3 });
+  const ids = plan.instructions.map(q => q.id.split('/')[1]);
+  assert.ok(ids.includes('b2L0') && ids.includes('b2L1'), ids.join(' '));
+  // the darkest third reaches the top of the middle range in the layers and takes both glazes
+  assert.ok(ids.includes('b4') && ids.includes('b5'));
+  // a layer whose threshold lies above the middle range has no step left to carry
+  assert.ok(!ids.includes('b2L2'), ids.join(' '));
+});
+
+test('calibratedPlan: every wash is charged at or under the mean paint of its cells, and says so', () => {
+  const { run } = threeValues();
+  const plan = run({ calibratedPlan: true });
+  const tones = plan.layers.flatMap(L => L.shapes.map(sh => sh._tone));
+  assert.ok(tones.length > 0 && tones.every(f => f > 0 && f <= 1 + 1e-6), tones.join(' '));
+  assert.ok(tones.some(f => f < 0.999), 'a wash over two values is weaker than their mean paint');
+  for (const L of plan.layers) for (const sh of L.shapes) assert.ok(Math.abs(sh.mix.reduce((a, b) => a + b, 0) - sh.amount) < 1e-6);
+  assert.equal(plan.opticsReport.rule, 'cell light');
+});
+
+test('calibratedPlan: gains are not applied on top of a plan that already returns its light', () => {
+  const { run, booked } = threeValues();
+  assert.deepEqual(booked(run({ calibratedPlan: true, darkGain: 2.2, coolGain: 1.6, midGain: 1.4 })), booked(run({ calibratedPlan: true })));
+});
+
+test('cell light and mass tone need the target colours and the pigments, and say so', () => {
+  const w = 12, h = 12, density = new Float32Array(w * h).fill(0.5);
+  assert.throws(() => planLightToDark({ w, h, k: 1, density, demand: density.slice(), calibratedPlan: true }), /cellLight needs/);
+  assert.throws(() => planLightToDark({ w, h, k: 1, density, demand: density.slice(), massTone: true }), /massTone needs/);
+});
+
+test('mass tone carries nothing: a quantile charge with carry plans the same washes as no carry at all', () => {
+  const { run, booked } = threeValues();
+  assert.deepEqual(booked(run({ calibratedPlan: true, passCap: 0.5, carryMm: 2, maskMm: 2 })), booked(run({ calibratedPlan: true })));
+  // without mass tone the carry is still there
+  assert.notDeepEqual(booked(run({ nestedBands: true, passCap: 0.5 })), booked(run({ nestedBands: true })));
+});
