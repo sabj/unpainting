@@ -5,9 +5,14 @@
 // Raw sienna is estimated; lamp black uses flat absorption. Each masstone is run back through CIECAM02 (ciecam.mjs) and diluted in CAT02, where masstones stay positive, against paper
 // at J 97 until its most absorbed channel passes half the light. The direction is that tint's density.
 // Mixed paints (sap green, Payne's grey, sepia) are mixed in density from box pigments; sepia is the least certain.
-// Optical constants match paletteOf's (kscale 0.55, scatter 0.02, rho 0.05, omega 1.4, gamma 0.25). DOM free.
+// Picking runs on one set of reference constants for every paint (kscale 0.55, scatter 0.02, rho 0.05, omega 1.4,
+// gamma 0.25), so a paint's physics cannot change which paints a picture gets. boxPigment is that reference pigment.
+// physicalPigment is the same pigment with the paint's published granulation, staining, flocculation, scattering and
+// density from the table Paint Lab shares (demos/lab/media/pigment-physical.js), applied on the sheet under
+// --boxphys 1 (src/paint/methods/pigment-physics.mjs). DOM free.
 import { fromJCh, cat02, xyzOfCat02, linearOfXYZ, encode } from './ciecam.mjs';
 import { labOf } from '../eval/colour.mjs';
+import { MIXED_OF, physicalOf, physicsFields } from '../../demos/lab/media/pigment-physical.js';
 
 const unit = v => { const m = Math.hypot(...v); return m > 1e-12 ? v.map(x => x / m) : [0.577, 0.577, 0.577]; };
 
@@ -29,10 +34,10 @@ export const MEASURED = [
 
 /** Paints mixed from the ones above (and lamp black), as shares of density. */
 const MIXED = [
-  { key: 'sapgreen', name: 'sap green', ci: 'PG7+PY', of: { phthalogreen: 0.48, hansa: 0.52 } },
-  { key: 'paynes', name: "Payne's grey", ci: 'PBk6+PB29', of: { black: 0.88, ultramarine: 0.12 } },
-  { key: 'sepia', name: 'sepia', ci: 'PBr7+PBk6', of: { umber: 0.5, black: 0.5 } },
-];
+  { key: 'sapgreen', name: 'sap green', ci: 'PG7+PY' },
+  { key: 'paynes', name: "Payne's grey", ci: 'PBk6+PB29' },
+  { key: 'sepia', name: 'sepia', ci: 'PBr7+PBk6' },
+].map(m => ({ ...m, of: MIXED_OF[m.key] }));
 
 const PAPER_J = 97;
 const PAPER_CAT = cat02(fromJCh(PAPER_J, 0, 0));
@@ -60,25 +65,32 @@ export function appearance(dir, transmit = 0.15, paper = MEASURED_PAPER) {
 }
 
 const built = (() => {
-  const dirs = new Map([['black', unit([1, 1, 1])]]);
+  const dirs = new Map([['lampblack', unit([1, 1, 1])]]);
   const box = MEASURED.map(p => {
     const dir = directionOf(tintOf(p.jch));
     dirs.set(p.key, dir);
-    return { key: p.key, name: p.name, ci: p.ci, dir, source: `${p.estimated ? "estimated raw-sienna material; pending measured calibration" : "handprint masstone"} J ${p.jch[0]} C ${p.jch[1]} h ${p.jch[2]}` };
+    return { key: p.key, name: p.name, ci: p.ci, dir, physics: physicalOf(p.key), source: `${p.estimated ? "estimated raw-sienna material; pending measured calibration" : "handprint masstone"} J ${p.jch[0]} C ${p.jch[1]} h ${p.jch[2]}` };
   });
-  box.push({ key: 'lampblack', name: 'lamp black', ci: 'PBk6', dir: dirs.get('black'), source: 'flat absorption' });
+  box.push({ key: 'lampblack', name: 'lamp black', ci: 'PBk6', dir: dirs.get('lampblack'), physics: physicalOf('lampblack'), source: 'flat absorption' });
   for (const m of MIXED) {
     const v = [0, 0, 0];
     for (const [k, share] of Object.entries(m.of)) for (let c = 0; c < 3; c++) v[c] += share * dirs.get(k)[c];
-    box.push({ key: m.key, name: m.name, ci: m.ci, dir: unit(v), source: `mixed ${Object.entries(m.of).map(([k, s]) => `${k} ${s}`).join(', ')}` });
+    box.push({ key: m.key, name: m.name, ci: m.ci, dir: unit(v), physics: physicalOf(m.key), source: `mixed ${Object.entries(m.of).map(([k, s]) => `${k} ${s}`).join(', ')}` });
   }
   return box;
 })();
 
-/** The shelf: { key, name, ci, dir (unit density direction), source } for every paint. */
+/** The shelf: { key, name, ci, dir (unit density direction), physics (the shared table's row), source } for every paint. */
 export const BOX = Object.freeze(built.map(p => Object.freeze({ ...p, dir: Object.freeze(p.dir) })));
 
-/** A box paint as a sheet pigment in paletteOf's format (asPigment there), with its name kept for the logs. */
+/** A box paint as a sheet pigment in paletteOf's format (asPigment there), with its name kept for the logs. Every paint gets the same reference constants: this is the picking pigment. */
 export function boxPigment(paint, { kscale = 0.55, scatter = [0.02, 0.02, 0.02], rho = 0.05, omega = 1.4, gamma = 0.25 } = {}) {
   return { K: paint.dir.map(v => v * kscale), S: [...scatter], rho, omega, gamma, name: paint.name };
+}
+
+/** The same pigment with the paint's own physics (the shared table) in place of the reference constants. The colour
+ *  (K) is the reference pigment's, so only what the sheet does with the paint changes. */
+export function physicalPigment(paint, options = {}) {
+  const base = boxPigment(paint, options), row = paint.physics ?? physicalOf(paint.key);
+  return { ...base, ...physicsFields(row), S: [...row.scatter], key: paint.key };
 }
