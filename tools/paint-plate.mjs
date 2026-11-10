@@ -11,7 +11,7 @@ import { layIntoWetBed } from './painter/wet-bed-wait.mjs';
 import { scaleBrushForDensity } from '../src/media/brush-density.mjs';
 import { preparePassageBed } from '../src/paint/techniques/passage-plan.mjs';
 import { drawFineMaterial, drawOnFineSheet, fineGestures } from '../src/paint/methods/fine-material.mjs';
-import {framePolicy, fastPaintFrame, progressFrames} from './speed/frame-policy.mjs';
+import {framePolicy, fastPaintFrame} from './speed/frame-policy.mjs';
 import {startSpeedProfile} from './speed/profile.mjs';
 import {runSpeedSequence} from './speed/sequence.mjs';
 import {estimatePaper} from '../src/paint/methods/light-to-dark.mjs';
@@ -23,7 +23,7 @@ import {createDeliveryCal} from '../src/paint/methods/delivery-cal.mjs';
 import {materialProfile,drawMaterial,prepareDrawing,sourceDrawingCaps} from '../src/paint/methods/material-profiles.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../src/paint/methods/passage-brush.mjs';
 import {sheetColour} from '../src/paint/methods/paper-colour.mjs';
-import {shapeMix} from '../src/paint/methods/wash-system.mjs';
+import {shapeMix} from '../src/paint/methods/wash-weights.mjs';
 import {planeAtCell, gradeLoadPressure, softClipMask} from '../src/paint/methods/graded-demand.mjs';
 import {resolveStyle} from '../src/paint/styles/loader.mjs';
 import {shapedPlanePaths} from '../src/paint/techniques/shaped-marks.mjs';
@@ -437,9 +437,8 @@ let LINE_EDGES=null,VALUE_PLAN=null,VALUE_ACTIVE=null,VALUE_OWN_CONTACT=new Epoc
 // --washsession 1: the shapes of one pass (the fragments of one passage) are laid in one wet session, with no drying
 // between them; the sheet dries before the pass and after it. 2: also the passes of one band and region in other
 // pigments, charged into the same wet wash. 0 starts every shape on a dry sheet.
-// --softchoice (soft-edge-choice.mjs): the plan names a boundary soft only where its wash fades and the target has no
-// step, and those boundaries get clean water just past them (--softwet mm, 0.8 mm under --softchoice, 3 to 4 cells).
-const SOFT_CHOICE = num('softchoice', num('washsystem',0)>0?1:0) > 0, SOFT_WET_MM = num('softwet', SOFT_CHOICE ? 0.8 : 0);
+// --softwet mm: the plan's soft boundaries get clean water just past them (soft-edges.mjs). Default 0, off.
+const SOFT_WET_MM = num('softwet', 0);
 const WASH_SESSION = Math.max(0, Math.round(num('washsession', NATIVE_PAINT_MODE.mode==='fast' && opt('valueplan','') ? 1 : 0)));
 let WASH_LAST = null;
 
@@ -510,9 +509,8 @@ const PAPER_PICK = paperOf(px, w, h, { margin: num('papermargin', 0.03), mode: o
 const TONE_MODE = opt('tonestage', '0');
 if (!['0', '1', 'auto'].includes(TONE_MODE)) throw Error('--tonestage: 0, 1 or auto');
 const SHEET_TONE = TONE_MODE === '0' ? { toned: false } : detectSheetTone(px, w, h);
-const WASH_SYSTEM=num('washsystem',0)>0;
-const CALIBRATED_PLAN=num('calibratedplan',WASH_SYSTEM?1:0)>0;
-const PAPER_RULE=num('paperrule',WASH_SYSTEM?1:0)>0;
+const CALIBRATED_PLAN=num('calibratedplan',0)>0;
+const PAPER_RULE=num('paperrule',0)>0;
 const WASH_SHEET=PAPER_RULE?sheetColour(px,w,h):null;
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(px, w, h, new Float32Array(w * h)) : null;
 const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (WASH_SHEET?WASH_SHEET.rgb:SHEET_TONE.toned ? SHEET_TONE.paperRGB : PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
@@ -1538,7 +1536,7 @@ if(VALUE_ENABLED){
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
-  const valueOptions={mixedWash:num('mixedwash',WASH_SYSTEM?1:0)>0,mixedShadows:num('mixedshadows',WASH_SYSTEM?1:0)>0,scaleCuts:num('scalelayers',WASH_SYSTEM?1:0)>0,gradedLanes:num('gradedlanes',WASH_SYSTEM?1:0)>0,softChoice:SOFT_CHOICE,paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,washSystem:WASH_SYSTEM,sourceCellsPerPx:w/srcMeta.width,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
+  const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,litWarm:num('litwarm',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),litLift:num('litlift',0),litL:num('litl',86),litReserveL:num('litreserve',95),edgeWobbleMm:num('edgewobble',0),coolGain:num('coolgain',1),shadowThresh:num('shadowthresh',.38),midGain:num('midgain',1),shadowWater:num('shadowwater',0),groundGlaze:num('groundglaze',0),groundFrom:num('groundfrom',GROUND.from),stoneBlocks:num('stoneblocks',0),stoneBlockMm:num('stoneblockmm',2.6),stoneBlockAmt:num('stoneblockamt',.18),deepAccent:num('deepaccent',0),deepAccentIn:opt('deepaccentin','')?opt('deepaccentin','').split(','):null,stoneIrregular:num('stoneirregular',0)>0,deepGrow:num('deepgrow',0),recessAccent:num('recessaccent',0)>0,skyOneLayer:num('skyonelayer',0)>0,stoneClusters:num('stoneclusters',0),eyeRing:num('eyering',0),recessMax:num('recessmax',0),stoneCourses:num('stonecourses',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),darkGain:num('darkgain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,recessClean:num('recessclean',0)>0,recessLayers:num('recesslayers',1),recessShare:num('recessshare',.5),layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,recesses:RECESSES,styleSelection:VALUE_CONFIG?.styleSelection,demand:AL,k:PIGS.length,density:SRC,w,h,rgb:px,paperRGB,hold:FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM),subjects:SUBJECTS};
 
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
@@ -2135,8 +2133,6 @@ const RESUME_AT = RESUME_DIR ? JSON.parse(fs.readFileSync(path.join(RESUME_DIR, 
 
 // Playback ships the marks, not the pictures.
 let LAST_FRAME_STAGE=null;
-const WASH_PROGRESS = layers.some(l => l.shapes?.some(sh => sh._valuePlan?.mixed)) ? progressFrames(layers.reduce((a, l) => a + (l.shapes?.reduce((b, sh) => b + (sh._strokePlan?.paths.length ?? 1), 0) ?? 0), 0)) : null;
-let FRAME_SWEEP = 0;
 const shoot = async () => {
   if (RESUMING) return; // a fresh process taking over a saved painting: its frames are already on disk
   if (!FRAME_POLICY.keep(STAGE)) return;
@@ -3489,7 +3485,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation')clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));}
   T=chooseMajorBaseWash(MAJOR_INTENT,T,{value:layer.value,area:sh.area??0,cells:n,semantic:Boolean(sh._semantic)});
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
-  if(sh._valuePlan){T=valueTechnique(sh._valuePlan,num('glazepasses',2));VALUE_ACTIVE=sh._valuePlan;const inSession=!sh._valuePlan.washSystem&&!sh._valuePlan.mixed&&((WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer)));WASH_LAST={L,layer};if(!inSession)VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  if(sh._valuePlan){T=valueTechnique(sh._valuePlan,num('glazepasses',2));VALUE_ACTIVE=sh._valuePlan;const inSession=((WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer)));WASH_LAST={L,layer};if(!inSession)VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
   const ICAL = instrumentOf(T, sh);
@@ -3502,7 +3498,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     clock('dry', () => dry(sheet, 20000, O, { levelMax: num('dryeachlevel', 200) }));
   // One shape-level look per passage (TARGET_GUARD.look) gives plan and sheet means; the charge comes from their difference.
   // SHAPE_LOAD spreads that one number over the shape for path planners that take a field; it steers nothing.
-  const colourMix = sh._valuePlan?.mixed || sh.mix.filter(v=>v>1e-9).length>1 ? shapeMix(sh) : COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
+  const colourMix = sh.mix.filter(v=>v>1e-9).length>1 ? shapeMix(sh) : COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
 
   const LEDGER = ONSHEET ?? expected;
   const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
@@ -3704,7 +3700,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
     // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
     // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
-    const softReach=SOFT_WET_MM>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',sh._valuePlan?.washSystem ? .75 : 0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
+    const softReach=SOFT_WET_MM>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
     const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;
     const grow=soft?.ring?softReach*SC:0;
     const box=baseMask===MASK&&reach<=0?{x0:Math.max(0,MB.x0*SC-grow),y0:Math.max(0,MB.y0*SC-grow),x1:Math.min(W2-1,(MB.x1+1)*SC-1+grow),y1:Math.min(H2-1,(MB.y1+1)*SC-1+grow)}:null;
@@ -3953,8 +3949,6 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
       const q = (sh._swept = (sh._swept ?? 0) + 1), k = Math.max(1, Math.ceil(paths.length / Math.max(1, num('ordersplit', 4))));
       if (q % k === 0 && q < paths.length) { STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, order: layer._order.phase, laying: true }; await shoot(); }
     }
-    // Mixed washes: a frame at each equal share of the sweeps, since one pass can hold half of them (progressFrames).
-    if (WASH_PROGRESS?.laid()) { STAGE = { stage: 'paint', step: `value ${layer.value} of ${steps}`, pass: L + 1, of: layers.length, value: layer.value, of_values: steps, pigment: layer.mixIndex ?? layer.pigment, force: true, boundary: 'progress', sweep: FRAME_SWEEP++ }; await shoot(); }
     // --wetframes: a filmed pass is also caught while its passages go down, a quarter at a time
     if (WETFRAMES > 0 && L % WETFRAMES === 0 && ++shIdx % shQuarter === 0) snap({ stage: 'wash', pass: L + 1, of: layers.length, value: layer.value, wet: 'laying' });
     // --passframes: a frame every N passages, so playback shows strokes going on, not whole pigment layers at once.
