@@ -6,7 +6,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { createTargetGuard, TargetGuardError, writeGuardReport, LOOK_MIN_CELLS, HARD_LOOK_BUDGET, normalizeMode } from './no-target.mjs';
 import { lintSource } from './lint-target-use.mjs';
-import { smallShare, sweepFront, progressionFlags, combine, pickStages, cheatRisk, HF_CEILING, readFrames } from './cheat-risk.mjs';
+import { smallShare, sweepFront, progressionFlags, combine, pickStages, cheatRisk, HF_CEILING, readFrames, SMALL_MARK, strokeCeiling } from './cheat-risk.mjs';
 import { promoteCheck } from './promote-check.mjs';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'guard-'));
@@ -310,6 +310,14 @@ test('stage picks are the frames nearest each share of the timeline', () => {
 
 test('honest ceiling follows the painting width', () => { assert.equal(HF_CEILING(540), 0.53); assert.equal(HF_CEILING(1086), 0.645); });
 
+test('stroke ceiling is one cover of the sheet in the smallest mark that is not small', () => {
+  assert.deepEqual(SMALL_MARK, { widthMm: 1.5, aspect: 3 });
+  assert.equal(strokeCeiling(15, 45), 100);            // 675 mm2 of sheet, 6.75 mm2 per mark
+  assert.equal(strokeCeiling(280, 375.2), 15563);
+  assert.equal(strokeCeiling(560, 750.4), 4 * 15563 + 3);   // grows with the sheet's area, not its width
+  for (const bad of [[0, 10], [10, NaN], [-1, 10], [undefined, 10]]) assert.throws(() => strokeCeiling(...bad), /sheet size/);
+});
+
 async function fakeRun({ copyTarget = false, guard = { mode: 'gentle', violations: 0, byName: {} } } = {}) {
   const d = tmp(), W = 64, H = 64;
   const noise = Buffer.alloc(W * H * 3); for (let i = 0; i < noise.length; i += 3) { const v = (i * 2654435761 >>> 24) & 255; noise[i] = noise[i + 1] = noise[i + 2] = v; }
@@ -334,6 +342,9 @@ test('cheatRisk on a run writes stage frames and catches a copied target', async
   assert.equal(b.parts.copy, 1);
   assert.ok(b.risk > a.risk);
   assert.equal(a.guard.pixelFit, 0);
+  assert.deepEqual(a.sheetMm, [64, 64]);
+  assert.equal(a.strokeCeiling, strokeCeiling(64, 64));
+  assert.equal(a.strokeCeiling, 606);
 });
 
 test('an in-memory tape preserves every audit result without rereading its export', async () => {

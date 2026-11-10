@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { copyLimits, copyLimitsLine } from './copy-limits.mjs';
+import { copyLimits, copyLimitsLine, costChange } from './copy-limits.mjs';
 import { parseArgs, readRun, checkPair, decide, table, runPairJudge } from './pair-judge.mjs';
 
-const rec = o => ({ hfCorr: 0.5, hfCeiling: 0.645, guard: { guarded: true, violations: 0 }, looks: 0, ...o });
+const rec = o => ({ hfCorr: 0.5, hfCeiling: 0.645, guard: { guarded: true, violations: 0 }, looks: 0, strokes: 900, sheetMm: 280, width: 1200, height: 1608, smallShare: 0.01, seconds: 170, ...o });
 const look = (a, b, winner = null, o = {}) => ({ complete: true, tilesA: a, tilesB: b, ties: 0, p: winner ? 0.01 : 0.5, decided: !!winner, winner, ...o });
-const pair = o => ({ name: 'p', heldOut: true, a: {}, b: {}, copyA: copyLimits(rec()), copyB: copyLimits(rec()), look: look(1, 11, 'b'), ...o });
+const pair = o => ({ name: 'p', heldOut: true, a: {}, b: {}, copyA: copyLimits(rec()), copyB: copyLimits(rec()), cost: { strokes: 1, seconds: 1 }, look: look(1, 11, 'b'), ...o });
 
 test('copyLimits passes a guarded plate under its ceiling and fails each limit on its own', () => {
   assert.equal(copyLimits(rec()).pass, true);
@@ -28,6 +28,29 @@ test('copyLimits refuses an unguarded run or a missing number: it never passes b
   assert.throws(() => copyLimits(rec({ hfCorr: null })), /needs hfCorr/);
   assert.throws(() => copyLimits(rec({ hfCeiling: undefined })), /needs hfCeiling/);
   assert.throws(() => copyLimits(rec({ looks: undefined })), /look count/);
+});
+
+test('strokes have an absolute ceiling from the sheet size, and no limit depends on another plate', () => {
+  const r = copyLimits(rec());
+  assert.equal(r.checks.strokes.limit, 15563);          // 280 x 375.2 mm sheet over 6.75 mm2
+  assert.equal(r.checks.strokes.pass, true);
+  assert.equal(copyLimits(rec({ strokes: 15563 })).pass, true);
+  const over = copyLimits(rec({ strokes: 15564 }));
+  assert.equal(over.pass, false);
+  assert.match(copyLimitsLine(over), /FAIL: strokes 15564 over 15563/);
+  assert.equal(copyLimits(rec({ sheetMm: 140 })).checks.strokes.limit, 3890);   // a quarter of the sheet, a quarter of the strokes
+  assert.throws(() => copyLimits(rec({ strokes: null })), /needs the stroke count/);
+  assert.throws(() => copyLimits(rec({ sheetMm: undefined })), /sheet size/);
+  assert.equal(copyLimits.length, 1);                   // one plate in, nothing to compare it with
+});
+
+test('cost is reported per plate and as a change between plates, and never decides', () => {
+  const a = copyLimits(rec()), b = copyLimits(rec({ strokes: 1800, seconds: 255, smallShare: null }));
+  assert.deepEqual(a.cost, { strokes: 900, strokesPer100Cm2: 85.7, sheetCover: 0.058, smallShare: 0.01, seconds: 170 });
+  assert.equal(b.cost.smallShare, null);
+  assert.deepEqual(costChange(a, b), { strokes: 2, seconds: 1.5 });
+  assert.equal(b.pass, true);                           // twice the strokes is a cost, not a failure
+  assert.deepEqual(costChange(a, copyLimits(rec({ seconds: null }))), { strokes: 1, seconds: null });
 });
 
 test('decide accepts only a decided win for B with clean copy checks and a held-out subject', () => {
@@ -58,8 +81,8 @@ function runDir(root, name, { hfCorr = 0.5, looks = 0, mode = 'gentle', width = 
   fs.mkdirSync(dir, { recursive: true });
   const files = {
     'painting.png': 'png',
-    'run-card.json': JSON.stringify({ codeSHA: 'abc', subject: 'dog', provenance: { geometry: { sheetMm } }, dimensions: { paintWidth: width, paintHeight: 1608 } }),
-    'cheat-risk.json': JSON.stringify({ strokes: 900, hfCorr, hfCeiling: 0.645 }),
+    'run-card.json': JSON.stringify({ codeSHA: 'abc', subject: 'dog', seconds: 171, provenance: { geometry: { sheetMm } }, dimensions: { paintWidth: width, paintHeight: 1608 } }),
+    'cheat-risk.json': JSON.stringify({ strokes: 900, smallShare: 0.02, hfCorr, hfCeiling: 0.645 }),
     'target-guard.json': JSON.stringify({ mode, violations: 0, looks: { count: looks } }),
   };
   for (const [f, body] of Object.entries(files)) if (f !== drop) fs.writeFileSync(path.join(dir, f), body);
@@ -70,7 +93,7 @@ test('readRun reads the painter records and refuses a run that lacks one', () =>
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pair-'));
   try {
     const r = readRun(runDir(root, 'ok'));
-    assert.deepEqual([r.sheetMm, r.width, r.height, r.hfCorr, r.looks, r.guard.guarded, r.strokes], [280, 1200, 1608, 0.5, 0, true, 900]);
+    assert.deepEqual([r.sheetMm, r.width, r.height, r.hfCorr, r.looks, r.guard.guarded, r.strokes, r.smallShare, r.seconds], [280, 1200, 1608, 0.5, 0, true, 900, 0.02, 171]);
     assert.equal(readRun(runDir(root, 'off', { mode: 'off' })).guard.guarded, false);
     for (const f of ['painting.png', 'run-card.json', 'cheat-risk.json', 'target-guard.json']) assert.throws(() => readRun(runDir(root, 'no-' + f, { drop: f })), new RegExp(`no ${f}`));
     fs.writeFileSync(path.join(root, 'ok', 'run-card.json'), '{}');
@@ -119,6 +142,8 @@ test('runPairJudge passes the sheet width and both paintings to pairs.py, never 
     assert.equal(v.pooled.winner, 'b');
     assert.match(fs.readFileSync(path.join(out, 'verdict.md'), 'utf8'), /NOT ACCEPTED: cat: B fails/);
     assert.match(table(r.pairs, r.pooled, r.decision), /\| dog paint \| yes \| 11 \| 1 \|/);
+    assert.match(r.md, /900 \(6% of 15563\) \| 900 \(6% of 15563\), 1x A \|/);
+    assert.deepEqual(v.pairs[0].cost, { strokes: 1, seconds: 1 });
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

@@ -8,6 +8,8 @@ Judging painting changes. Checked with unit tests and a run without judge calls 
 
 - **Blind full-size pairs decide painting changes.** `bench/scripts/pair-judge.mjs` compares two plates of one subject tile by tile at their own pixels (`bench/scorer/pairs.py`). The J1 judges must pick the crop that looks more like a hand-painted watercolour, see every tile in both orders, and never see the target. The verdict is a sign test over tiles, read together with the copy checks in `bench/scripts/copy-limits.mjs`. `--sheet` writes the same pairs as a blind contact sheet for a person. See [scoring](bench/docs/scoring.md#deciding-a-painting-change).
 - J1 stays as the published score. It no longer decides painting changes.
+- **The copy limits are absolute ceilings.** A plate passes or fails on its own records: guard clean, no paint-time look at the target, `hfCorr` at or under the ceiling for its width, and paint strokes at or under the sheet's stroke ceiling, which is the number of 1.5 mm by 4.5 mm marks that cover the sheet once (`strokeCeiling` in `tools/guard/cheat-risk.mjs`, written to `cheat-risk.json` with the sheet size). The earlier limits against the previous build (hfCorr up by at most 0.02, strokes up by at most 10%) are not used. Strokes and render seconds are reported as a cost beside the verdict.
+- Measured on 11 stored 1,200 px plates from 0.3.1 and 0.3.2 development commits, all painted with no target looks: 5 pass these ceilings. Five are over the `hfCorr` ceiling of 0.645 (three Mittens plates at 0.654 to 0.700 and two h36a plates at 0.734 and 0.755). One Trumbull plate lays 16,823 paint strokes against its ceiling of 10,182.
 
 ## 0.3.2 — 2026-11-09
 

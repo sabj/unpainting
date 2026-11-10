@@ -13,7 +13,8 @@
 //   - every pair was judged completely, and at least one pair is a held-out subject;
 //   - over all tiles of all pairs the judges prefer B (exact sign test, bench/scorer/pairs.py);
 //   - no single plate is decided for A;
-//   - every B plate passes the copy checks (copy-limits.mjs).
+//   - every B plate passes the copy checks (copy-limits.mjs): absolute ceilings on the plate itself.
+// Strokes and render seconds are reported as B's cost against A. A cost never accepts or refuses a change.
 // Anything else is "not accepted", with the reasons. The look test alone never accepts a change: a copied target
 // looks hand-painted. Nothing here reads a target image.
 //
@@ -24,7 +25,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scorePython } from './preflight.mjs';
-import { copyLimits, copyLimitsLine } from './copy-limits.mjs';
+import { copyLimits, copyLimitsLine, costChange } from './copy-limits.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PAIRS_PY = path.join(HERE, '..', 'scorer', 'pairs.py');
@@ -57,7 +58,7 @@ export function readRun(dir, { exists = fs.existsSync, readFile = f => fs.readFi
   const sheetMm = card.provenance?.geometry?.sheetMm, width = card.dimensions?.paintWidth, height = card.dimensions?.paintHeight;
   if (!(sheetMm > 0) || !(width > 0) || !(height > 0)) throw new Error(`${dir}: run-card.json has no sheet width or painting size`);
   return {
-    dir, painting, sheetMm, width, height, commit: card.codeSHA ?? null, subject: card.subject ?? null, strokes: risk.strokes ?? null,
+    dir, painting, sheetMm, width, height, commit: card.codeSHA ?? null, subject: card.subject ?? null, strokes: risk.strokes, smallShare: risk.smallShare ?? null, seconds: card.seconds ?? null,
     hfCorr: risk.hfCorr, hfCeiling: risk.hfCeiling, guard: { guarded: guard.mode !== 'off', violations: guard.violations }, looks: guard.looks?.count,
   };
 }
@@ -92,11 +93,13 @@ function python(py, args, run) {
   return JSON.parse(r.stdout);
 }
 
+const strokeCell = c => `${c.cost.strokes} (${Math.round(100 * c.cost.sheetCover)}% of ${c.checks.strokes.limit})`;
+
 export function table(pairs, pooled, decision) {
-  const head = ['pair', 'held out', 'tiles for B', 'tiles for A', 'ties', 'p', 'look', 'copy A', 'copy B', 'strokes A', 'strokes B'];
+  const head = ['pair', 'held out', 'tiles for B', 'tiles for A', 'ties', 'p', 'look', 'copy A', 'copy B', 'strokes A', 'strokes B', 'render time B'];
   const rows = pairs.map(p => [p.name, p.heldOut ? 'yes' : 'no', p.look?.tilesB ?? '-', p.look?.tilesA ?? '-', p.look?.ties ?? '-', p.look?.p ?? '-',
-    !p.look?.complete ? 'not judged' : p.look.winner ? `decided for ${p.look.winner.toUpperCase()}` : 'not decided', copyLimitsLine(p.copyA), copyLimitsLine(p.copyB), p.a.strokes ?? '-', p.b.strokes ?? '-']);
-  if (pooled?.complete) rows.push(['all', '', pooled.tilesB, pooled.tilesA, pooled.ties, pooled.p, pooled.winner ? `decided for ${pooled.winner.toUpperCase()}` : 'not decided', '', '', '', '']);
+    !p.look?.complete ? 'not judged' : p.look.winner ? `decided for ${p.look.winner.toUpperCase()}` : 'not decided', copyLimitsLine(p.copyA), copyLimitsLine(p.copyB), strokeCell(p.copyA), `${strokeCell(p.copyB)}, ${p.cost.strokes ?? '-'}x A`, p.cost.seconds == null ? '-' : `${p.cost.seconds}x A`]);
+  if (pooled?.complete) rows.push(['all', '', pooled.tilesB, pooled.tilesA, pooled.ties, pooled.p, pooled.winner ? `decided for ${pooled.winner.toUpperCase()}` : 'not decided', '', '', '', '', '']);
   return ['| ' + head.join(' | ') + ' |', '|' + head.map(() => '---').join('|') + '|', ...rows.map(r => '| ' + r.join(' | ') + ' |'), '',
     decision.accept ? 'ACCEPTED on look and copy checks.' : `NOT ACCEPTED: ${decision.reasons.join('; ')}.`].join('\n');
 }
@@ -114,7 +117,8 @@ export function runPairJudge(argv, { run = spawnSync, read = readRun, env = proc
     const args = ['--a', a.painting, '--b', b.painting, '--style', e.style, '--plate-mm', String(a.sheetMm), '--calls', String(o.calls), '--seed', String(o.seed), '--out', path.join(o.out, `${slug}.json`)];
     if (!o.vision) args.push('--no-vision');
     if (o.sheet) args.push('--sheet', path.join(o.out, `sheet-${slug}`));
-    pairs.push({ name: e.name, heldOut: e.heldOut === true, a, b, copyA: copyLimits(a), copyB: copyLimits(b), look: python(py, args, run) });
+    const copyA = copyLimits(a), copyB = copyLimits(b);
+    pairs.push({ name: e.name, heldOut: e.heldOut === true, a, b, copyA, copyB, cost: costChange(copyA, copyB), look: python(py, args, run) });
   }
   const files = pairs.map(p => path.join(o.out, `${p.name.replace(/[^\w.-]+/g, '-')}.json`));
   const pooled = o.vision && pairs.length ? python(py, ['--pool', ...files], run) : null;

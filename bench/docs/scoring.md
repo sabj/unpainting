@@ -57,7 +57,14 @@ node bench/scripts/pair-judge.mjs --manifest pairs.json --out DIR [--sheet] [--n
 `pairs.json` lists pairs of painter output folders: plate A from the painter as it is, plate B from the change, same subject and plan. At least one pair must be a subject that was not looked at while the change was developed (`"heldOut": true`).
 
 - Look: `scorer/pairs.py` cuts both plates into the same tiles, 64 mm of paper each, sent at their own pixels. The three J1 judges see the two crops of a tile and must pick the one that looks more like a hand-painted watercolour. They never see the target and are not told which plate is which. Each judge sees each tile in both orders and votes only when it picks the same plate both times, so a judge that favours the first or second image casts no vote. A tile goes to the plate with more judge votes. The verdict is an exact two-sided sign test over the tiles at 0.05, for each plate and for all plates pooled. Tiles of one plate overlap a little and share its faults, so the test is somewhat easier to pass than its number says.
-- Copy checks, on each plate's own records (`scripts/copy-limits.mjs`): the paint step ran under the target guard with no blocked read, took no look at the target, and the fine-detail correlation with the target (`hfCorr`) is at or under the ceiling for the plate's width. A run without these records is an error, not a pass.
+- Copy checks, on each plate's own records (`scripts/copy-limits.mjs`). Each is an absolute ceiling on the plate itself, and none compares it with an earlier build:
+  - the paint step ran under the target guard with no blocked read;
+  - the painter took no look at the target while painting, so plates are painted with `--notargetlooks 1`;
+  - the fine-detail correlation with the target (`hfCorr`) is at or under the ceiling for the plate's width: 0.645 at 1,000 px and wider, 0.53 below;
+  - paint strokes are at or under the sheet's stroke ceiling: the number of marks 1.5 mm by 4.5 mm, the smallest mark the cheat-risk record does not count as small, that cover the sheet once. A 280 mm by 375 mm sheet may carry 15,563. The painter writes the ceiling into `cheat-risk.json` as `strokeCeiling`.
+
+  A run without these records is an error, not a pass.
+- Cost, reported and never a pass or fail: strokes, strokes per 100 cm² of sheet, the share of the stroke ceiling used, the small-stroke share and render seconds for each plate, and B's strokes and seconds as a multiple of A's.
 - The change is accepted when every pair was judged completely, the pooled verdict is for B, no single plate is decided for A, and every B plate passes the copy checks. The look test never accepts a change alone, because a copy of the target looks hand-painted.
 
 `--sheet` also writes each pair as a blind contact sheet for a person: JPEG pages with the two crops side by side in shuffled order, `answers.txt` to fill in with `L`, `R` or `=`, and `key.json`. `python3 scorer/pairs.py --answers answers.txt --key key.json` gives that person's verdict by the same sign test. `--no-vision` makes no judge call; it runs the copy checks and writes the sheets.
