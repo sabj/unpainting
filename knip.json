@@ -18,8 +18,7 @@
     "demos/lab/**/*.js"
   ],
   "ignore": [
-    "bench/v2/kit/**",
-    "bench/scripts/dry-painter.mjs"
+    "bench/v2/kit/**"
   ],
   "ignoreBinaries": [
     "codex",

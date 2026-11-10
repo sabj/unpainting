@@ -3,36 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BENCH, loadCrops } from './lib.mjs';
-
-/** Install the V2 technique guides in the runner discovery directories. V1 receives no guides. */
-export function installSkills(roundKey, ws) {
-  if (roundKey !== 'skill') return;
-  fs.cpSync(path.join(BENCH, 'v2', 'skill', 'skills'), path.join(ws, '.agents', 'skills'), { recursive: true });
-  fs.mkdirSync(path.join(ws, '.claude'), { recursive: true });
-  fs.symlinkSync('../.agents/skills', path.join(ws, '.claude', 'skills'));
-}
-
-const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-const PROMPT_NAMES = Object.fromEntries(loadCrops().map(c => [c.task, c.name]));
-
-/** The one-line prompt of protocol v2, for the crops of this run. Identical to v2 when all five are painted. */
-export function prompt(crops) {
-  return `Read bench/BRIEF.md in this directory and do what it says. The ${(WORDS[crops.length] ?? String(crops.length))} target crops are attached in order: ${crops.map(c => PROMPT_NAMES[c] || c).join(', ')}. Work without asking questions; nobody will answer.`;
-}
-
-/** The v2 brief for a round, cut to the crops of this run. Identical to the frozen brief when all five are painted. */
-export function brief(roundKey, crops, viewDir) {
-  const src = path.join(BENCH, 'v2', roundKey === 'skill' ? 'skill' : 'naive', 'BRIEF.md');
-  const lines = fs.readFileSync(src, 'utf8').split('\n')
-    .filter(l => { const m = l.match(/^\| `([\w-]+)` \|/); return !m || crops.includes(m[1]); });
-  // a target added after the brief was frozen gets its row from bench/v2/crops.json, after the frozen rows
-  const listed = new Set(lines.map(l => l.match(/^\| `([\w-]+)` \|/)?.[1]).filter(Boolean));
-  const added = loadCrops().filter(c => crops.includes(c.task) && !listed.has(c.task)).map(c => `| \`${c.task}\` | ${c.width} x ${c.height} | ${c.style} |`);
-  const last = lines.findLastIndex(l => /^\| `[\w-]+` \|/.test(l));
-  if (added.length) lines.splice(last + 1, 0, ...added);
-  return lines.join('\n').replace(/\bfive\b/g, (WORDS[crops.length] ?? String(crops.length))).replaceAll('TARGET_DIR', viewDir);
-}
+import { BENCH } from './lib.mjs';
 
 /** The env variables a runner needs, by name only. A CLI that is logged in needs none of them. */
 export const KEYS = {

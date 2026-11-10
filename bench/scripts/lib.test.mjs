@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { TARGET_SELF_SCORE, CROP_ORDER, compositeTargets, loadCrops, BENCH, REPO, V2, loadRuns, validateRun, cheatRisk, bootstrapMean, mean, readJson, fmtCost, inPublishedScope, writeJson, ROUNDS, RUNS, groupByPainter, paintingScores } from './lib.mjs';
-import { brief, prompt, command, installSkills } from './runners.mjs';
+import { command } from './runners.mjs';
 import { findingsData } from './findings-data.mjs';
 
 const runs = loadRuns();
@@ -175,17 +175,6 @@ test('cheatRisk reproduces the published V1 and V2 cheat-risk scores', () => {
   assert.ok(n >= 30);
 });
 
-test('the published crop brief and prompt agree with current inputs', () => {
-  const all = ['hills', 'south-france', 'sargent', 'mittens', 'trumbull'];
-  for (const round of ['naive', 'skill']) {
-    const frozen = fs.readFileSync(path.join(V2, round, 'BRIEF.md'), 'utf8').replaceAll('TARGET_DIR', '/x/view');
-    assert.equal(brief(round, all, '/x/view'), frozen);
-  }
-  assert.equal(prompt(all), 'Read bench/BRIEF.md in this directory and do what it says. The five target crops are attached in order: Hills, France, Ships, Mittens, Trumbull. Work without asking questions; nobody will answer.');
-  const two = brief('naive', ['sargent', 'trumbull'], '/x/view');
-  assert.ok(!two.includes('`hills`') && two.includes('`sargent`') && two.startsWith('# Paint two small crops'));
-});
-
 test('repo skill discovery uses one directory through a relative Claude symlink', () => {
   const skills = path.join(REPO, '.agents', 'skills');
   const claude = path.join(REPO, '.claude', 'skills');
@@ -194,26 +183,6 @@ test('repo skill discovery uses one directory through a relative Claude symlink'
   for (const name of ['painting-planner', 'watercolor-technique']) {
     assert.ok(fs.readFileSync(path.join(skills, name, 'SKILL.md'), 'utf8').startsWith('---'));
   }
-});
-
-test('trial skill discovery copies the published guides for V2 and leaves V1 without skills', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-skills-'));
-  try {
-    installSkills('naive', tmp);
-    assert.ok(!fs.existsSync(path.join(tmp, '.agents')));
-    assert.ok(!fs.existsSync(path.join(tmp, '.claude')));
-    installSkills('skill', tmp);
-    const source = path.join(V2, 'skill', 'skills');
-    const skills = path.join(tmp, '.agents', 'skills');
-    const claude = path.join(tmp, '.claude', 'skills');
-    assert.equal(fs.readlinkSync(claude), '../.agents/skills');
-    assert.equal(fs.realpathSync(claude), fs.realpathSync(skills));
-    const files = fs.readdirSync(source, { recursive: true }).filter(f => fs.statSync(path.join(source, f)).isFile());
-    for (const file of files) {
-      assert.deepEqual(fs.readFileSync(path.join(skills, file)), fs.readFileSync(path.join(source, file)), file);
-      assert.deepEqual(fs.readFileSync(path.join(claude, file)), fs.readFileSync(path.join(source, file)), file);
-    }
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
 test('results.json, the leaderboard, the findings and the chart regenerate unchanged from runs/', () => {

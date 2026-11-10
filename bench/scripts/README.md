@@ -2,8 +2,7 @@
 
 The scripts that run, score and publish unpaint-bench. Run them from the repository root through `npm run bench:*`.
 
-- `run.mjs` (`npm run bench:run`): runs one model through a round and writes its try folders: one try of V1 or V2, or tries 1 to `--tries` of V3, V4 or V5. `--dry-run` uses `dry-painter.mjs` (V1 to V3) or `pipeline/dry-planner.mjs` (V4, V5) in place of a model.
-- `v3.mjs`: V3, one session per target in attempts.
+- `run.mjs` (`npm run bench:run`): runs one model through a round and writes its try folders: tries 1 to `--tries` of V4 or V5 (V1 to V3 are published history and can no longer be run). `--dry-run` uses `pipeline/dry-planner.mjs` in place of a model.
 - `pipeline/`: V4 and V5. `round45.mjs` runs the tries, `session.mjs` answers the model's paint commands and keeps its clock, `painting.mjs` drives the painter across revisions, `plan-args.mjs` and `check.mjs` turn a plan into painter settings and check it, `feedback.mjs` writes V5 feedback, `harness.mjs` holds the worktree and turn helpers, and `tokens.mjs` writes `v4v5/TOKENS.md`.
 - `runners.mjs`: how each kind of model is launched, and how its token use is read back.
 - `score.mjs` (`npm run bench:score`): scores a try folder and updates its `run.json`.

@@ -1,4 +1,4 @@
-// V3, V4 and V5: the plan checks, the brief, the model commands, and a dry run of each round end to end (a scripted
+// V4 and V5: the plan checks, the brief, the model commands, and a dry run of each round end to end (a scripted
 // stand-in instead of a model, a small painting on the CPU, no keys).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -92,13 +92,6 @@ const dryRun = (round, extra) => {
   return out;
 };
 const runOf = (out, dir, n) => readJson(path.join(out, dir, 'dry-run', String(n), 'run.json'));
-
-test('dry run: V3 paints two attempts in one session; the second carries its change note', () => {
-  const out = dryRun('V3', ['--tries', '2']);
-  for (const n of [1, 2]) { const r = runOf(out, 'v3-informed', n); assert.deepEqual(validateRun(r), []); assert.ok(r.complete); }
-  assert.match(runOf(out, 'v3-informed', 2).crops.hills.painterNote, /attempt 2/);
-  fs.rmSync(out, { recursive: true, force: true });
-});
 
 test('dry run: V4 plans, is refused once, paints with stops, looks, revises and finishes', () => {
   const out = dryRun('V4', ['--tries', '1']);
