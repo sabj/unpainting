@@ -64,19 +64,19 @@ const join = overlap => {
   if (!joins.has(overlap)) joins.set(overlap, scrapJoin({ ...instruments(FLAT, P), half, edge, overlap, length: Math.round(6 * FLAT.R) }));
   return joins.get(overlap);
 };
-const show = r => `body ${r.body.min.toFixed(3)}..${r.body.max.toFixed(3)}, join ${r.join.min.toFixed(3)}..${r.join.max.toFixed(3)}`;
+const show = r => `body ${r.body.min.toFixed(4)}..${r.body.max.toFixed(4)}, join ${r.join.min.toFixed(4)}..${r.join.max.toFixed(4)}`;
 
 test('two strokes on scrap put on the paper all the pigment that left the brushes', () => {
   for (const ov of [0, laneOverlap, 0.25]) { const r = join(ov); assert.ok(r.given > 0 && r.conserved, `overlap ${ov}: given ${r.given}, on sheet ${r.onSheet}`); }
 });
 
-test('two flat strokes lapped by the lane overlap fuse', { todo: 'pores drink a loaded touch at once on sized paper' }, () => {
+test('two flat strokes lapped by the lane overlap fuse', () => {
   const r = join(laneOverlap); assert.ok(r.fused, show(r));
 });
-test('two flat strokes lapped by a quarter fuse', { todo: 'pores drink a loaded touch at once on sized paper' }, () => {
+test('two flat strokes lapped by a quarter fuse', { todo: 'the paint smeared off the second brush soaks in over the first: the lap dries up to 6% darker than the body' }, () => {
   const r = join(0.25); assert.ok(r.fused, show(r));
 });
-test('two butted flat strokes fuse', { todo: 'the ragged fringes leave dry paper between the strokes' }, () => {
+test('two butted flat strokes fuse', { todo: 'the ragged fringes leave dry paper between the strokes, which a bead does not cross' }, () => {
   const r = join(0); assert.ok(r.fused, show(r));
 });
 

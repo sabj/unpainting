@@ -367,10 +367,11 @@ function splatCpu(sheet, x, y, r, want, c, brush, p, conc, pig) {
       const water = sheet.W[i], ex = water * brush.wetMix * fall * c;
       for (let k = 0; k < K; k++) sheet.G[k][i] = Math.max(0, sheet.G[k][i] + ex * (conc[k] - sheet.G[k][i] / water));
     }
-    const Wi = sheet.W[i], give = fall * c * (brush.film * (0.7 + 0.3 * p) * (1 - Math.min(1, Wi / 0.2)) + brush.give * Math.max(0, want - Wi) * p);
+    // the paint smeared off the hairs, and the free liquid a loaded brush lets go (it stands: sheet.mjs soak)
+    const Wi = sheet.W[i], free = fall * c * brush.give * Math.max(0, want - Wi) * p, give = fall * c * brush.film * (0.7 + 0.3 * p) * (1 - Math.min(1, Wi / 0.2)) + free;
     if (give <= 0) continue;
     for (let k = 0; k < K; k++) pig[k] = conc[k] * give;
-    soak(sheet, i, give, pig); used += give;
+    soak(sheet, i, give, pig, free); used += give;
   }
   return used;
 }
@@ -681,7 +682,11 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
         }
         const proud = paper.proud ? paper.proud[gi] : paper.height[gi] - paper.valley[gi];
         const grain = 0.7 + 1.2 * proud + 0.3 * paper.valley[gi];
-        const give = Math.min(hr.water, contact * (brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * q.p) - Wi) * (fill + (1 - fill) * grain) : (brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)) + brush.give * Math.max(0, want - Wi) * q.p)));
+        // the paint smeared off the hairs and the free liquid let go (it stands: sheet.mjs soak); a depth-filling brush
+        // lays liquid only
+        const smear = brush.depositDepth ? 0 : brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2));
+        const loose = brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * q.p) - Wi) * (fill + (1 - fill) * grain) : brush.give * Math.max(0, want - Wi) * q.p;
+        const give = Math.min(hr.water, contact * (smear + loose)), free = smear + loose > 0 ? give * loose / (smear + loose) : 0;
         if (give <= 0) continue;
         // only the outer hairs merge, where a stroke laps over its neighbour; merging the whole body stripes overlapping lanes
         if (mergeK) mergePickup(mergeM, sheet, i, hr, give, mergeK, Math.min(1, Math.max(0, (Math.abs(across) / (side || 1) - 0.5) / 0.3)));
@@ -689,7 +694,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
         if (pigBuf.length !== hp.length) pigBuf = new Float64Array(hp.length);
         const pig = pigBuf; for (let kk = 0; kk < hp.length; kk++) pig[kk] = hp[kk] * f;
         hr.water -= give; for (let kk = 0; kk < K; kk++) hr.pig[kk] -= pig[kk];
-        soak(sheet, i, give, pig);
+        soak(sheet, i, give, pig, free);
         if (tuft) { stamp[i]=clk;strengths[i]=fullContact; }
       }
     }

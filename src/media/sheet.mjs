@@ -250,13 +250,16 @@ export function depositDry(sheet, i, water, pig) {
 }
 
 /** A touch of paint on the paper: empty pores drink what they can at once, filtering their share of the pigment onto
- *  the fibres; the rest stands on the surface as water carrying its pigment. A dry-brush film soaks in where it lands;
- *  a loaded brush leaves most of its water standing, and that flows as a wash. */
-export function soak(sheet, i, water, pig) {
+ *  the fibres; the rest stands on the surface as water carrying its pigment, and the pores take it from there at the
+ *  step's absorption rate. A dry-brush film soaks in where it lands. `free` is the part of `water` that is a loaded
+ *  brush's free liquid: on dry paper the sizing holds that out of the pores (they take only its unsized share,
+ *  1 - sizing, at the moment of contact), so it stands as a bead the next stroke joins and two wet strokes fuse. Where
+ *  a film already stands the sizing is wetted through and the pores take 0.3 of their room, as before. */
+export function soak(sheet, i, water, pig, free = 0) {
   recordWetCell(sheet, i);
   if (water <= 0) return;
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // sealed: everything stays on the surface
-  const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]) * (sheet.M[i] ? 0.3 : 1), into = Math.min(room, water), f = into / water;
+  const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), into = sheet.M[i] ? Math.min(0.3 * room, water) : Math.min(room, water - DEFAULTS.sizing * Math.min(free, water)), f = into / water;
   sheet.s[i] += into; sheet.wetDirty = 1;
   // Water a brush was deliberately drawn over the paper to leave belongs to the wash even when the pores take
   // all of it and nothing stands. A damp brush drawn along a wet edge works exactly that way, and the wash has

@@ -354,13 +354,15 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         }
         const proud = paper.proud ? paper.proud[gi] : paper.height[gi] - paper.valley[gi];
         const grain = 0.7 + 1.2 * proud + 0.3 * paper.valley[gi];
-        const give = Math.min(hr.water, contact * (brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)) + brush.give * Math.max(0, want - Wi) * q.p));
+        // the paint smeared off the hairs and the free liquid let go (it stands: sheet.mjs soak)
+        const smear = brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)), loose = brush.give * Math.max(0, want - Wi) * q.p;
+        const give = Math.min(hr.water, contact * (smear + loose)), free = smear + loose > 0 ? give * loose / (smear + loose) : 0;
         if (give <= 0) continue;
         const f = give / hr.water, hp = hr.pig;
         if (pigBuf.length !== hp.length) pigBuf = new Float64Array(hp.length);
         const pig = pigBuf; for (let kk = 0; kk < hp.length; kk++) pig[kk] = hp[kk] * f;
         hr.water -= give; for (let kk = 0; kk < K; kk++) hr.pig[kk] -= pig[kk];
-        soak(sheet, i, give, pig);
+        soak(sheet, i, give, pig, free);
         stamp[i] = clk; strengths[i] = fullContact;
       }
     }
