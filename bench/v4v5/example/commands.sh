@@ -1,7 +1,7 @@
 # The commands that made this example, run from the worktree root with bench/plan/ holding the example's target.png
 # (a synthetic seascape drawn by a script, not a photograph).
 P=bench/plan
-node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json .12 14 .62
+node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json
 cp $P/opening-lines.json $P/closing-lines.json
 cat > $P/config.json <<'JSON'
 {"subject":"EXAMPLE","name":"EXAMPLE",

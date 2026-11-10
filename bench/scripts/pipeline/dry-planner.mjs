@@ -30,7 +30,7 @@ write('bench/plan/config.json', config);
 write('bench/plan/extra-args.json', ['--midlayers', '3']);
 write('bench/variant.txt', 'region_w13_lay2_bogus\n');
 write('bench/PLAN.md', `# Plan (dry run)\n\nTwo families, three mid layers.${fs.existsSync(fb) ? ' Changed from the last try: nothing; a dry run.' : ''}\n`);
-execFileSync('node', ['bench/tools/trace-ink.mjs', 'bench/plan/target.png', 'bench/plan/opening-lines.json', '.12', '14', '.62'], { stdio: 'inherit' });
+execFileSync('node', ['bench/tools/trace-ink.mjs', 'bench/plan/target.png', 'bench/plan/opening-lines.json'], { stdio: 'inherit' });
 fs.copyFileSync('bench/plan/opening-lines.json', 'bench/plan/closing-lines.json');
 let out = paint('start');                          // refused: "bogus" is not a recipe token
 write('bench/variant.txt', 'region_w13_lay2\n');

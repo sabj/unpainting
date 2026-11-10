@@ -55,7 +55,7 @@ All files go in `bench/plan/` unless stated.
    `{"image":{"w":W,"h":H}, "lines":[{"points":[[x,y],...], "width":1, "weight":1, ...}], "medium":"ink"}` with
    `image` equal to the target's pixel size and points in target pixels. At most 4000 lines and 400000 points per file.
    An empty `lines` list with `"medium":"none"` draws nothing. Tracers you may run:
-   `node bench/tools/trace-ink.mjs <target.png> <out.json> [minContrast=.12] [minLen=10] [maxLum=.62]` and
+   `node bench/tools/trace-ink.mjs <target.png> <out.json>` (fixed limits; one nib and one weight per line) and
    `node bench/tools/closing-ink.mjs` (read its header).
 3. **`bench/variant.txt` (required): recipe tokens.** `region_w13` or `region_w15` followed by `_token`s, e.g.
    `region_w13_lay2_noslane`. Write only what you want to change: the base is applied automatically. A token you write
@@ -135,7 +135,7 @@ When your plan passes the check, paint it yourself:
 
 ```bash
 P=bench/plan
-node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json .12 14 .62   # pen lines traced from the target
+node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json               # pen lines traced from the target
 cp $P/opening-lines.json $P/closing-lines.json                                  # same lines closing the painting
 cat > $P/config.json <<'JSON'
 {"subject":"EXAMPLE","name":"EXAMPLE",

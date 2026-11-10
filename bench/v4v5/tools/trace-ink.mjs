@@ -1,10 +1,17 @@
 // Trace the target's own hard dark pen lines as a drawing file (the pen follows the lines).
-// A pixel is line if it is darker than both sides along x, y or a diagonal by minC within
-// 2-4 px (a thin dark line, not a dark mass). The mask is thinned and chained into
-// polylines; spans shorter than minLen px are dropped. Weight follows the line darkness.
-// node bench/tools/trace-ink.mjs target.png out.json [minC=.12] [minLen=10] [maxLum=.62]
+// A pixel is line if it is darker than both sides along x, y or a diagonal by MIN_CONTRAST within
+// 2-4 px (a thin dark line, not a dark mass), and no lighter than MAX_LUM. The mask is thinned and chained
+// into polylines; spans shorter than MIN_LEN px are dropped (14 px, the value the harness's own example and dry
+// planner always used). Each line is drawn with one nib and one
+// pressure: its width and weight come from the line's mean darkness, the same along the whole stroke; the
+// painter's hand gives the pressure curve along it (taper in and out). Nothing is read point by point.
+// The limits are the tracer's own and are not settable: whether a subject has pen lines is the declared
+// medium's choice, not a contrast turned down until lines appear.
+// node bench/tools/trace-ink.mjs target.png out.json
 import fs from "node:fs";import sharp from "sharp";
-const [tgt,out,mc=".12",ml="10",md=".62"]=process.argv.slice(2);const minC=+mc,minLen=+ml,maxLum=+md;
+const MIN_CONTRAST=.12,MIN_LEN=14,MAX_LUM=.62;
+const args=process.argv.slice(2);if(args.length!==2)throw new Error("usage: node bench/tools/trace-ink.mjs target.png out.json (the contrast, length and darkness limits are fixed)");
+const [tgt,out]=args;const minC=MIN_CONTRAST,minLen=MIN_LEN,maxLum=MAX_LUM;
 const {data,info}=await sharp(tgt).removeAlpha().raw().toBuffer({resolveWithObject:true});const W=info.width,H=info.height,n=W*H;
 const lum=new Float32Array(n);for(let i=0;i<n;i++)lum[i]=(.2126*data[3*i]+.7152*data[3*i+1]+.0722*data[3*i+2])/255;
 const at=(x,y)=>lum[Math.max(0,Math.min(H-1,y))*W+Math.max(0,Math.min(W-1,x))];
@@ -18,11 +25,9 @@ const seen=new Uint8Array(n),nb=i=>{const x=i%W,y=(i/W)|0,r=[];for(let dy=-1;dy<
 const chains=[];const ends=[];for(let i=0;i<n;i++)if(M[i]&&nb(i).length===1)ends.push(i);
 const walk=s=>{const path=[s];seen[s]=1;let c=s;for(;;){const nx=nb(c).filter(j=>!seen[j]);if(!nx.length)break;c=nx[0];seen[c]=1;path.push(c);}return path;};
 for(const s of ends)if(!seen[s])chains.push(walk(s));for(let i=0;i<n;i++)if(M[i]&&!seen[i])chains.push(walk(i));
-// Keep structure, not texture: drop wiggly short spans (stone flecks, leaves) and lines over
-// foliage (green under the line); a pen line in this plate is architecture.
-const green=i=>data[3*i+1]>data[3*i]+4&&data[3*i+1]>data[3*i+2];
-const res=[];for(const p of chains){if(p.length<minLen)continue;const chord=Math.hypot(p[0]%W-p.at(-1)%W,((p[0]/W)|0)-((p.at(-1)/W)|0));if(chord/p.length<.55&&p.length<40)continue;let g=0;for(let j=-2;j<=2;j++)for(const i of p){const x=i%W,y=((i/W)|0)+j;if(y>=0&&y<H&&green(y*W+x))g++;}if(g>p.length*1.5)continue;const pts=p.filter((_,j)=>j%2===0||j===p.length-1).map(i=>[i%W+.5,((i/W)|0)+.5]);let len=0;for(let j=1;j<pts.length;j++)len+=Math.hypot(pts[j][0]-pts[j-1][0],pts[j][1]-pts[j-1][1]);
- const dark=pts.map(([x,y])=>1-at(Math.floor(x),Math.floor(y)));const wts=dark.map(d=>Math.min(.85,.4+.55*d));
- res.push({points:pts,length:len,weights:wts,weight:wts.reduce((a,b)=>a+b,0)/wts.length,strength:1,widths:dark.map(d=>+(1.6+2.4*d).toFixed(2)),width:+(1.6+2.4*dark.reduce((a,b)=>a+b,0)/dark.length).toFixed(2),closed:false,role:"subject",object:"target-hard-line",kind:"line",group:"detail",selection:{method:"traced target thin dark line, darker than both sides by "+minC}});}
+// Keep structure, not texture: drop wiggly short spans (stone flecks, leaves).
+const res=[];for(const p of chains){if(p.length<minLen)continue;const chord=Math.hypot(p[0]%W-p.at(-1)%W,((p[0]/W)|0)-((p.at(-1)/W)|0));if(chord/p.length<.55&&p.length<40)continue;const pts=p.filter((_,j)=>j%2===0||j===p.length-1).map(i=>[i%W+.5,((i/W)|0)+.5]);let len=0;for(let j=1;j<pts.length;j++)len+=Math.hypot(pts[j][0]-pts[j-1][0],pts[j][1]-pts[j-1][1]);
+ const d=pts.reduce((a,[x,y])=>a+1-at(Math.floor(x),Math.floor(y)),0)/pts.length;
+ res.push({points:pts,length:len,weight:Math.min(.85,.4+.55*d),strength:1,width:+(1.6+2.4*d).toFixed(2),closed:false,role:"subject",object:"target-hard-line",kind:"line",group:"detail",selection:{method:"traced target thin dark line, darker than both sides by "+minC+"; one nib and one weight per line"}});}
 fs.writeFileSync(out,JSON.stringify({image:{w:W,h:H},lines:res,source:tgt,crop:[0,0,W,H],registration:"traced from the target crop itself"},null,1));
 let px=0;for(const i of M)px+=i;console.log("line pixels",px,"spans",res.length,"total length",res.reduce((a,l)=>a+l.length,0).toFixed(0));
