@@ -2054,9 +2054,9 @@ GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
 // --instrumentcal 0|1: a passage whose brush load or pass count is not its stock technique's is charged from a swatch
 // laid with its own load and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a
 // 0.45-water brush; the stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. 0 charges every passage
-// from the stock swatch of its technique's name. Default 1. Authored area plans keep their own calibration. A passage
+// from the stock swatch of its technique's name. Default 0, off. Authored area plans keep their own calibration. A passage
 // laid into wet keeps the stock swatch too: its bed is part of the instrument, and the swatch's bed is not the sheet's.
-const INSTRUMENT_ON = num('instrumentcal', 1) > 0 && !AREA_PLAN && !FINISH_PLAN;
+const INSTRUMENT_ON = num('instrumentcal', 0) > 0 && !AREA_PLAN && !FINISH_PLAN;
 const INSTRUMENT_CAL = createInstrumentCal({
   stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
   // the scrap dries as the stock swatches do, without touching the painting's own wet-contact records

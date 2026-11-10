@@ -20,7 +20,7 @@ test('a model token replaces the base token in its slot; architecture and palett
   assert.equal(l.skipped.lay4, 'plan chose lay2');
   assert.equal(l.skipped.blk60, 'architecture only');
   assert.equal(l.skipped.pgreen, 'Trumbull only');
-  assert.ok(!l.applied.includes('dk13') && !optionMap(l.args).has('darkgain'));
+  assert.ok(l.applied.includes('dk13') && optionMap(l.args).get('darkgain') === '1.3');
   const t = layerBase({ variant: 'region_w13', build: argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true }), architecture: true, trumbull: true });
   assert.ok(t.applied.includes('blk60') && t.applied.includes('pgreen'));
   assert.match(optionMap(t.args).get('paints'), /sapgreen/);

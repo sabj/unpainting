@@ -15,7 +15,7 @@ import { labPlanes, deltaE2000 } from '../eval/colour.mjs';
 import { guardForcedBox, guardNote } from './paint-guard.mjs';
 
 /** Share of the sample a hue cluster needs before a named box is extended for it. */
-export const EXPLICIT_MIN_SHARE = 0.02;
+const EXPLICIT_MIN_SHARE = 0.02;
 const hueChroma = (L, a1, b1, a2, b2) => deltaE2000([L, a1, b1], [L, a2, b2]);
 
 /** Deterministic k-means on points (m x d, flat), seeded by farthest-point from the first. @returns labels, centres */
