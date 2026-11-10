@@ -12,6 +12,7 @@ import { tokensMarkdown } from './pipeline/tokens.mjs';
 import { renderTask, loadSubjects } from './pipeline/round45.mjs';
 import { turnCommand } from './runners.mjs';
 import { modelCheckSpec } from './pipeline/check.mjs';
+import { makeWorktree } from './pipeline/harness.mjs';
 
 const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
 
@@ -136,6 +137,23 @@ test('the model\'s own check plans with the dirty-tree refusal off, because its 
   const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};
   assert.equal(optionMap(resolvePlan({...options,spec:modelCheckSpec(options.spec)}).args).get('allowdirty'),'1');
   assert.equal(options.spec.offlineFixture,undefined);
+});
+
+test('each session gets its own temporary folder, outside the workspace, gone with the worktree', () => {
+  const a = makeWorktree(), b = makeWorktree();
+  try {
+    assert.ok(fs.statSync(a.scratch).isDirectory());
+    assert.notEqual(a.scratch, b.scratch);
+    assert.ok(!a.scratch.startsWith(a.ws + path.sep));
+    assert.equal(path.dirname(a.scratch), a.tmp);
+  } finally { a.cleanup(); b.cleanup(); }
+  assert.ok(!fs.existsSync(a.scratch));
+});
+
+test('the planner is seeded with the repository\'s current skills, not the frozen V2 copy', () => {
+  const src = fs.readFileSync(new URL('./pipeline/round45.mjs', import.meta.url), 'utf8');
+  assert.match(src, /path\.join\(REPO, '\.agents', 'skills'\), path\.join\(b, 'skills'\)/);
+  assert.doesNotMatch(src, /'skill', 'skills'/);
 });
 
 test('only explicitly offline fixture specs authorize a deliberately stripped worktree', () => {

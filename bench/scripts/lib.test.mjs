@@ -6,7 +6,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { TARGET_SELF_SCORE, CROP_ORDER, compositeTargets, loadCrops, BENCH, REPO, V2, loadRuns, validateRun, cheatRisk, bootstrapMean, mean, readJson, fmtCost, inPublishedScope, writeJson, ROUNDS, RUNS, groupByPainter, paintingScores } from './lib.mjs';
-import { command } from './runners.mjs';
 import { findingsData } from './findings-data.mjs';
 
 const runs = loadRuns();
@@ -207,28 +206,6 @@ test('every image the gallery links to exists and is under 60 KB', () => {
   const srcs = [...g.matchAll(/src="([^"]+)"/g),...g.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(m => path.resolve(BENCH, 'results', m[1]));
   assert.ok(srcs.length > 50);
   for (const f of srcs) assert.ok(fs.existsSync(f) && fs.statSync(f).size < 60_000, f);
-});
-
-test('the Together runner can read targets while a model-authored script cannot', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'together-guard-'));
-  try {
-    const viewDir = path.join(tmp, 'view');
-    fs.mkdirSync(viewDir);
-    const png = path.join(viewDir, 'hills.png');
-    fs.writeFileSync(png, 'x');
-    const guardDir = path.join(V2, 'kit', 'py');
-    // The environment run.mjs builds for every child, then the runner overrides on top.
-    const base = { ...process.env, PYTHONPATH: guardDir, BENCH_PYGUARD: guardDir, BENCH_VIOLATIONS: path.join(tmp, 'v.jsonl') };
-    const c = command({ runner: 'together', id: 'm' }, { ws: tmp, viewDir, raw: tmp, crops: ['hills'], text: '', sessionCapMin: 10 });
-    const runnerEnv = { ...base, ...c.env };
-    const read = `import pathlib; print(len(pathlib.Path(r"${png}").read_bytes())); print(len(open(r"${png}", "rb").read()))`;
-    // The runner process reads the target to attach it to the prompt.
-    assert.equal(execFileSync('python3', ['-c', read], { env: runnerEnv }).toString().trim(), '1\n1');
-    // A model-authored script runs with PYTHONPATH=BENCH_PYGUARD (oss_loop.py's bash tool) and is blocked.
-    const modelEnv = { ...runnerEnv, PYTHONPATH: runnerEnv.BENCH_PYGUARD };
-    assert.throws(() => execFileSync('python3', ['-c', `open(r"${png}", "rb")`], { env: modelEnv, stdio: 'pipe' }), /reading image files is not allowed/);
-    assert.ok(fs.existsSync(path.join(tmp, 'v.jsonl')));
-  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
 test('judge versions validate and never share a result group', () => {

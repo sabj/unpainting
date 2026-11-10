@@ -73,7 +73,8 @@ function seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile }) 
   }
   for (const f of fs.readdirSync(path.join(V45, 'tools'))) fs.copyFileSync(path.join(V45, 'tools', f), path.join(b, 'tools', f));
   fs.cpSync(path.join(V45, 'example'), path.join(b, 'example'), { recursive: true });
-  fs.cpSync(path.join(V2, 'skill', 'skills'), path.join(b, 'skills'), { recursive: true });
+  // the repository's current skills (.agents/skills), not the frozen V2 copy
+  fs.cpSync(path.join(REPO, '.agents', 'skills'), path.join(b, 'skills'), { recursive: true });
   if (dry && profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'dry-planner.mjs'), `import fs from 'node:fs';
 fs.writeFileSync('bench/plan/config.json',JSON.stringify({subject:'dry',name:'Dry lite plan',styleSelection:{style:'ink-and-wash',reason:'offline fixture'},families:[],reserves:[]}));
@@ -105,7 +106,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
   const raw = path.join(rawTry, crop);
   fs.mkdirSync(raw, { recursive: true });
   const target = path.join(V2, 'targets', `${crop}.png`);
-  const { ws, cleanup } = makeWorktree();
+  const { ws, scratch, cleanup } = makeWorktree();
   const record = { turns: [], repairTurns: [], tokens: 0, costUSD: 0, wallSeconds: 0, usageComplete: true, costComplete: true, budgetStopped: false };
   const targetStarted = Date.now();
   let session = null;
@@ -123,7 +124,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
         : turnCommand(model, { ws, raw, text, sessionId: sessionId ?? thread, resume: repair && model.runner !== 'together', turn: k, briefFile: path.join(ws, 'bench', 'TASK.md'), logFile: events, minutes: repair ? REPAIR_MINUTES : profile.wallMinutes, done: 'any', budget: profile });
       let finT = null;
       const r = await runTurn(c, {
-        cwd: ws, events, stderr, capMs: (repair ? REPAIR_MINUTES : profile.wallMinutes) * 60000, killGraceMs: profile.planOnly ? 1000 : 20000, cleanupGroup: profile.planOnly,
+        cwd: ws, env: { TMPDIR: scratch }, events, stderr, capMs: (repair ? REPAIR_MINUTES : profile.wallMinutes) * 60000, killGraceMs: profile.planOnly ? 1000 : 20000, cleanupGroup: profile.planOnly,
         tick: ({ stop }) => {
           session.tick();
           if (profile.planOnly && session.planReady) session.end('lite plan delivered');

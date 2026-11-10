@@ -18,7 +18,7 @@ function trap() {
   });
 }
 
-/** A detached worktree with benchmark records and model instructions removed. */
+/** A detached worktree with benchmark records and model instructions removed, and a private temporary folder (scratch). */
 export function makeWorktree() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'unpaint-bench-'));
   const ws = path.join(tmp, 'ws');
@@ -27,6 +27,9 @@ export function makeWorktree() {
   for (const p of ['.claude', '.agents', 'AGENTS.md', 'CLAUDE.md', 'bench', 'work', 'examples/targets', 'docs/reviews']) fs.rmSync(path.join(ws, p), { recursive: true, force: true });
   fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(ws, 'node_modules'));
   fs.mkdirSync(path.join(ws, 'bench'), { recursive: true });
+  // the model's own temporary folder: nothing of another session's, and removed with this worktree
+  const scratch = path.join(tmp, 'scratch');
+  fs.mkdirSync(scratch);
   let gone = false;
   const cleanup = () => {
     if (gone) return; gone = true; LIVE.trees.delete(cleanup);
@@ -34,7 +37,7 @@ export function makeWorktree() {
     fs.rmSync(tmp, { recursive: true, force: true });
   };
   trap(); LIVE.trees.add(cleanup);
-  return { ws, tmp, cleanup };
+  return { ws, tmp, scratch, cleanup };
 }
 
 /** Copy the files the model left in the worktree (untracked, outside what the harness seeded) to dest. */
