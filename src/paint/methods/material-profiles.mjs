@@ -24,6 +24,8 @@ export const CLOSING_PRESSURE_MAX=.6;
 export function sourceDrawingCaps({medium,stage='opening',sourceInk=false,plannedDrawing=false}) {
  const sparse=DRAWING_CAPS[stage];
  if(plannedDrawing && stage==='opening' && materialProfile(medium).kind==='graphite') return {...sparse,lines:100000,minLengthMm:.5};
+ // A closing file is the plan's own list of lines, so its budget is the plan's. Ink pressure stays under the ceiling.
+ if(plannedDrawing && stage==='closing') return {...sparse,lines:100000,pressure:CLOSING_PRESSURE_MAX,edgeMin:0};
  return sourceInk && materialProfile(medium).kind==='ink'
   ? {...sparse,lines:100000,pressure:stage==='closing'?CLOSING_PRESSURE_MAX:.75,minLengthMm:0,edgeMin:0}
   : {...sparse};

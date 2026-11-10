@@ -1,20 +1,22 @@
 // Geometry of shaped plane marks, shared by planner and executor: one flat-brush gesture per plane, short texture marks
 // and sky lanes. A physical contact clip retains concavities, recesses and reserved lights.
-export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null,mmPerCell=0,maxBrushMm=38}={}) {
+const LANE_OVERLAP=1.035;
+export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,shortPress=.3,lanesR=0,laneStep=1.5,flowDark=1,box=null,mmPerCell=0,maxBrushMm=38,protect=null,edgeHalf=null}={}) {
  // An authored per-passage tool choice is shared with every geometry consumer.
  if(mask.passageBrush)return mask.passageBrush.paths.map(ps=>ps.map(p=>({...p,x:p.x*scale,y:p.y*scale,r:p.r*scale}))); 
  // lanesR: a large sky plane is one wet passage of overlapping horizontal lanes (a graded band wash with a wide flat),
  // not one fitted diagonal gesture, whose straight sides leave wedges and streaks.
- if(lanesR>0&&!texture)return skyLanes(mask,w,h,lanesR,scale,laneStep);
+ if(lanesR>0&&!texture)return skyLanes(mask,w,h,lanesR,scale,laneStep,protect??mask.protect??mask.protectedCells);
  const x0=box?.x0??0,x1=box?.x1??w-1,y0=box?.y0??0,y1=box?.y1??h-1;
- let count=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;
- for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x=i%w+.5,y=Math.floor(i/w)+.5;count++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;}
+ let count=0,sx=0,sy=0,sxx=0,syy=0,sxy=0,xMin=w,xMax=-1,yMin=h,yMax=-1;
+ for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x0i=i%w,x=x0i+.5,y=row+.5;count++;sx+=x;sy+=y;sxx+=x*x;syy+=y*y;sxy+=x*y;if(x0i<xMin)xMin=x0i;if(x0i>xMax)xMax=x0i;if(row<yMin)yMin=row;if(row>yMax)yMax=row;}
  if(count<4)return [];
  const cx=sx/count,cy=sy/count,a=sxx/count-cx*cx,b=syy/count-cy*cy,c=sxy/count-cx*cy;
  const angle=.5*Math.atan2(2*c,a-b),dx=Math.cos(angle),dy=Math.sin(angle);
  // Dry-brush texture as short marks (stubble, rough stone): a small brush flicked along the
  // plane's long axis (the jaw line on a beard band), sparse on a jittered grid, light pressure.
- if(texture&&shortMm>0)return shortTextureMarks(mask,w,h,dx,dy,shortMm,scale,shortPress,flowDark);
+ const cellMm=mmPerCell>0?mmPerCell:.25;
+ if(texture&&shortMm>0)return shortTextureMarks(mask,w,h,dx,dy,cellMm,scale,shortPress,flowDark);
  let lo=Infinity,hi=-Infinity;
  const bins=new Map();
  for(let row=y0;row<=y1;row++)for(let i=row*w+x0,end=row*w+x1;i<=end;i++)if(mask[i]){const x=i%w+.5-cx,y=Math.floor(i/w)+.5-cy,t=x*dx+y*dy,u=-x*dy+y*dx,j=Math.round(t),bin=bins.get(j)??[Infinity,-Infinity];bin[0]=Math.min(bin[0],u-.75);bin[1]=Math.max(bin[1],u+.75);bins.set(j,bin);lo=Math.min(lo,j);hi=Math.max(hi,j);}
@@ -23,11 +25,30 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
  if(points.length<2)return [];
  // Split against the real mop width; changing native density must not change physical brush selection.
  const maxRadius=Math.max(...points.map(p=>p.r/scale));
- if(!texture&&mmPerCell>0&&maxBrushMm>0){
-  const lanes=Math.ceil(2*maxRadius*mmPerCell/maxBrushMm);
-  if(lanes>1)return Array.from({length:lanes},(_,k)=>points.map(p=>{
-   const offset=(k-(lanes-1)/2)*2*p.r/lanes;
-   return {...p,x:p.x-dy*offset,y:p.y+dx*offset,r:Math.min(maxBrushMm/(2*mmPerCell)*scale,p.r/lanes*1.18)};
+ if(!texture&&mmPerCell>0&&maxBrushMm>0&&2*maxRadius*mmPerCell>maxBrushMm){
+  const envW=Math.max(3,Math.round((hi-lo)*.18));
+  const envPts=[];
+  for(let j=lo;j<=hi;j++){
+   if(!bins.has(j))continue;
+   let b0=Infinity,b1=-Infinity;
+   for(let q=j-envW;q<=j+envW;q++){const v=bins.get(q);if(v){if(v[0]<b0)b0=v[0];if(v[1]>b1)b1=v[1];}}
+   const u=(b0+b1)/2,r=Math.max(maxRadius*.85,(b1-b0)/2);
+   envPts.push({x:(cx+dx*j-dy*u)*scale,y:(cy+dy*j+dx*u)*scale,r:r*scale,p:.9});
+  }
+  // The envelope of a curved plane is wider than any one slice, so the lane count comes from it: lanes never spread wider than the brush.
+  // edgeHalf(r, p), in sheet cells (brush.mjs edgeHalfWidth for the brush that lays the plane): how far from its path
+  // the brush's paint fades to half. A painter overlaps each stroke onto the last by the brush's ragged edge, so the
+  // fading edge of one fills the fading edge of the next. Each lane is as wide as it must be for its edge to reach the
+  // join, never wider than the brush, and the plane takes as many lanes as the brush's edge reach needs. Without
+  // edgeHalf the lanes overlap by the nominal 3.5% of the older geometry.
+  const Rmax=Math.max(...envPts.map(p=>p.r/scale)),brushR=maxBrushMm/(2*mmPerCell);
+  const edge=edgeHalf?(r,p)=>edgeHalf(r*scale,p)/scale:null,reach=edge?edge(brushR,.9):0;
+  const lanes=Math.max(Math.ceil(2*Rmax*mmPerCell/maxBrushMm),edge&&reach>0?Math.ceil(Rmax/reach):0);
+  // the lane radius whose edge reaches half a lane of width 2*half (the edge grows with the radius)
+  const radiusFor=(half,p)=>{if(!edge)return Math.min(brushR,half*LANE_OVERLAP);if(edge(brushR,p)<=half)return brushR;let lo=0,hi=brushR;for(let it=0;it<50;it++){const m=(lo+hi)/2;if(edge(m,p)>=half)hi=m;else lo=m;}return hi;};
+  return Array.from({length:lanes},(_,k)=>envPts.map(p=>{
+   const R=p.r/scale,offset=(k-(lanes-1)/2)*2*R/lanes;
+   return {x:p.x-dy*offset*scale,y:p.y+dx*offset*scale,r:radiusFor(R/lanes,p.p)*scale,p:p.p};
   }));
  }
  return [points];
@@ -35,11 +56,18 @@ export function shapedPlanePaths(mask,w,h,{scale=1,texture=false,shortMm=0,short
 
 // Tiny same-value fragments join an adjacent plane only across a weak target edge.
 // Hard window/face boundaries are never bridged; remaining fragments are omitted.
-export function mergePlaneFragments(labels,w,h,rgb,minimum=144){
+export function mergePlaneFragments(labels,w,h,rgb,minimum=144,protect=null){
  const out=labels.slice(),seen=new Uint8Array(labels.length),queue=[];
- for(let s=0;s<labels.length;s++)if(!seen[s]){queue.length=0;queue.push(s);seen[s]=1;const votes=new Map();
-  for(let p=0;p<queue.length;p++){const i=queue[p],x=i%w;for(const j of [x?i-1:-1,x<w-1?i+1:-1,i>=w?i-w:-1,i+w<labels.length?i+w:-1])if(j>=0){if(labels[j]===labels[s]){if(!seen[j]){seen[j]=1;queue.push(j);}}else if(rgb){const va=.2126*rgb[i*3]+.7152*rgb[i*3+1]+.0722*rgb[i*3+2],vb=.2126*rgb[j*3]+.7152*rgb[j*3+1]+.0722*rgb[j*3+2];if(Math.abs(va-vb)<12&&Math.max(...[0,1,2].map(q=>Math.abs(rgb[i*3+q]-rgb[j*3+q])))<24)votes.set(labels[j],(votes.get(labels[j])??0)+1);}}}
-  if(queue.length<minimum&&votes.size){const winner=[...votes].sort((a,b)=>b[1]-a[1])[0][0];for(const i of queue)out[i]=winner;}
+ for(let s=0;s<labels.length;s++)if(!seen[s]){queue.length=0;queue.push(s);seen[s]=1;const votes=new Map(),diffs=new Map();
+  for(let p=0;p<queue.length;p++){const i=queue[p],x=i%w;for(const j of [x?i-1:-1,x<w-1?i+1:-1,i>=w?i-w:-1,i+w<labels.length?i+w:-1])if(j>=0){if(labels[j]===labels[s]){if(!seen[j]){seen[j]=1;queue.push(j);}}else if(rgb){const va=.2126*rgb[i*3]+.7152*rgb[i*3+1]+.0722*rgb[i*3+2],vb=.2126*rgb[j*3]+.7152*rgb[j*3+1]+.0722*rgb[j*3+2];if(Math.abs(va-vb)<12&&Math.max(...[0,1,2].map(q=>Math.abs(rgb[i*3+q]-rgb[j*3+q])))<24){const nl=labels[j];votes.set(nl,(votes.get(nl)??0)+1);const d=diffs.get(nl)??[0,0];d[0]+=vb-va;d[1]++;diffs.set(nl,d);}}}}
+  let isProtected=false;
+  if(protect){if(protect.has)isProtected=protect.has(labels[s]);else if(typeof protect==='function')isProtected=queue.every(i=>protect(i,labels[s]));else isProtected=queue.every(i=>protect[i]);}
+  if(!isProtected&&rgb){let sumL=0;for(let p=0;p<queue.length;p++){const i=queue[p];sumL+=.2126*rgb[i*3]+.7152*rgb[i*3+1]+.0722*rgb[i*3+2];}if(sumL/queue.length>=240)isProtected=true;}
+  if(queue.length<minimum&&votes.size){
+   let candidates=[...votes];
+   if(isProtected)candidates=candidates.filter(([nl])=>{const d=diffs.get(nl);return d&&d[0]>=0;});
+   if(candidates.length){const winner=candidates.sort((a,b)=>b[1]-a[1])[0][0];for(const i of queue)out[i]=winner;}
+  }
  }
  return out;
 }
@@ -71,14 +99,20 @@ function shortTextureMarks(mask,w,h,dx,dy,mmPerCell,scale,press=.3,flowDark=1){c
  return out;
 }
 
-function skyLanes(mask,w,h,r,scale,laneStep=1.5){
+function skyLanes(mask,w,h,r,scale,laneStep=1.5,protect=null){
  let y0=h,y1=-1;for(let i=0;i<mask.length;i++)if(mask[i]){const y=(i/w)|0;if(y<y0)y0=y;if(y>y1)y1=y;}
+ if(y1<y0)return [];
  const out=[],step=Math.max(1,laneStep*r);let dir=1;
- for(let y=y0+r*.6;y<=y1;y+=step){const row=Math.round(y);let x=0;const runs=[];
+ const emitRow=(y)=>{
+  const row=Math.min(y1,Math.max(y0,Math.round(y)));let x=0;const runs=[];
   while(x<w){while(x<w&&!mask[row*w+x])x++;const a=x;while(x<w&&mask[row*w+x])x++;if(x-a>=3)runs.push([a,x-1]);}
-  // join runs separated by small gaps (cloud specks stay reserved by the contact clip)
-  const joined=[];for(const q of runs){const last=joined.at(-1);if(last&&q[0]-last[1]<=2*r)last[1]=q[1];else joined.push([...q]);}
+  // join runs separated by small gaps, but never bridge across reserved catchlights / protectedCells
+  const joined=[];for(const q of runs){const last=joined.at(-1);let hasProtected=false;if(last&&protect){for(let px=last[1]+1;px<q[0];px++){if(protect[row*w+px]){hasProtected=true;break;}}}if(last&&q[0]-last[1]<=2*r&&!hasProtected)last[1]=q[1];else joined.push([...q]);}
+  if(dir<0)joined.reverse();
   for(const [a,b] of joined){const n=Math.max(2,Math.ceil((b-a)/Math.max(1,r*.5)));const pts=[];for(let k=0;k<=n;k++){const t=dir>0?k/n:1-k/n;pts.push({x:(a+(b-a)*t+.5)*scale,y:(y+.5)*scale,r:r*scale,p:.85});}out.push(pts);}
-  dir=-dir;}
+  if(joined.length)dir=-dir;
+ };
+ if(y0+r*.6>y1){emitRow((y0+y1)/2);}
+ else{let lastY=-Infinity;for(let y=y0+r*.6;y<=y1;y+=step){emitRow(y);lastY=y;}if(lastY<y1-r*.6)emitRow(Math.max(lastY+1,y1-r*.6));}
  return out;
 }

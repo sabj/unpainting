@@ -146,3 +146,12 @@ test('--plan is offline and describes the exact job allocation; invalid options 
     assert.notEqual(spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' }).status, 0);
   }
 });
+
+test('run.mjs rejects unknown flags and missing option values with exit code 2 before launching', () => {
+  const script = path.join(BENCH, 'scripts', 'run.mjs');
+  for (const args of [['--target', 'hills'], ['--models', 'argon'], ['--dry'], ['--crops'], ['--crops', '--dry-run']]) {
+    const res = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+    assert.equal(res.status, 2, `Expected exit 2 for ${args.join(' ')}, got ${res.status}: ${res.stderr}`);
+    assert.match(res.stderr, /bench:run: (unknown option|.*requires a value)/);
+  }
+});

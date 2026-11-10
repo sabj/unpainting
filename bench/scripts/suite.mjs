@@ -33,12 +33,12 @@ export async function main(argv = process.argv.slice(2)) {
   }
   const plan = suitePlan({ profileName: options['--profile'] ?? 'lite', selection: options['--models'] ?? 'core' });
   if (options['--plan']) { console.log(JSON.stringify(plan, null, 2)); return; }
-  const dry = Boolean(options['--dry-run']), gpu = options['--gpu'] ?? 'off';
+  const dry = Boolean(options['--dry-run']), gpu = options['--gpu'] ?? (dry ? 'off' : 'on');
   if (!['off', 'on'].includes(gpu)) throw new Error('--gpu must explicitly be off or on; no automatic timing fallback');
   // Doctor is read-only and precedes every paid job. Scripted tests still exercise the harness without credentials.
   if (!dry) {
-    const preflight = spawnSync(process.execPath, ['tools/doctor.mjs'], { cwd: REPO, stdio: 'inherit' });
-    if (preflight.status !== 0) throw new Error('doctor failed; no model jobs started');
+    const preflight = spawnSync(process.execPath, ['tools/doctor.mjs', '--strict'], { cwd: REPO, stdio: 'inherit' });
+    if (preflight.status !== 0) throw new Error('doctor --strict failed; no model jobs started');
   }
   const out = path.resolve(options['--out'] ?? path.join(BENCH, 'work', 'suites', plan.profile.id));
   const summaryFile = path.join(out, 'suite.json');

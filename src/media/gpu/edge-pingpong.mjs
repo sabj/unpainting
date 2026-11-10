@@ -2,7 +2,7 @@
 // after every relaxation. Integer distances and neighbor order are unchanged.
 export function edgePingPong(source) {
   const begin = source.indexOf('  // edgeWidth + 1 passes of edgeNew');
-  const end = source.indexOf('  let near =', begin);
+  const end = source.indexOf('  var near =', begin) >= 0 ? source.indexOf('  var near =', begin) : source.indexOf('  let near =', begin);
   if (begin < 0 || end < 0) throw Error('edge kernel layout not recognized');
   const relax = (from, to) => `
     for (var q = li; q < R * R; q += 256u) {

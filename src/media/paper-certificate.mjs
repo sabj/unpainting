@@ -229,8 +229,6 @@ export function queryWetReach(sheet, cells, [x0, y0, x1, y1]) {
   return { allZero: false, rect: [wx0, wy0, wx1 - wx0 + 1, wy1 - wy0 + 1], bounds: [wx0, wy0, wx1, wy1] };
 }
 
-// Fixed pigment is a separate proof: measuring zero water alone cannot establish it.
-export const validPaperCertificate = hasZeroPaperCertificate;
 export function certifyDryFixed(sheet) {
   certifyZeroPaper(sheet);
   Object.defineProperty(sheet, FIXED, {configurable:true, writable:true, value:{
@@ -240,7 +238,7 @@ export function certifyDryFixed(sheet) {
 }
 export function validDryFixedCertificate(sheet) {
   const c=sheet[FIXED];
-  return !!c && validPaperCertificate(sheet) && c.zero===sheet[ZERO] &&
+  return !!c && hasZeroPaperCertificate(sheet) && c.zero===sheet[ZERO] &&
     c.layers===(sheet._rawLayers ?? sheet.layers) && c.count===(sheet._rawLayers ?? sheet.layers).length && c.layerVersion===sheet._layerVer &&
     c.G===sheet.G && c.P===sheet.P && c.D===sheet.D;
 }

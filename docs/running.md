@@ -58,7 +58,7 @@ Open `work/my-picture/painting.png`. Choose a fresh output folder for each run. 
 
 The painter runs its default recipe unless told otherwise: light-to-dark value planning with shaped marks, a pencil drawing first, and two passes of touch-up glazes on physical cold-press paper. `--recipe none` paints with the settings used without a preset. A value plan (`--valueplan`) names the subject and its regions; Trumbull's is `examples/plans/trumbull-values.json`. The default uses no setting fitted to one benchmark image. A plan opts into fitted settings with `"presets"`, for example `["architecture"]`; Trumbull's plan names `architecture` and `glaze-gains`. Its `washes.paints` fixes a palette of seven paints. `--recipe default+architecture` does the same from the command line. `--recipe v096` is painter V096's recipe, which runs the fitted settings on every subject. A plan selecting `ink-and-wash` uses a lean fitted palette, source-toned paper and nested value washes. [Tuned settings](techniques.md#tuned-settings) lists every preset and fitted item.
 
-`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with release 0.1.0 (painter V096, sim 100). The current painter is V102, sim 103; those saved images retain their original version stamps.
+`tools/paint-plate.mjs` has many experimental flags documented in the modules that read them. `--areahelp` prints only the area-plan contract. The main controls are listed below. Try `--width 240` for a quick run. `examples/output/` holds saved outputs from the examples, made with release 0.1.0 (painter V096, sim 100). Release 0.3.0 is painter V102, sim 103, and the 0.3.1 candidate is V104, sim 104; those saved images retain their original version stamps.
 
 ## Main command-line controls
 
@@ -95,6 +95,8 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--paintguard` | dE00 threshold; `0` is off. It checks a box forced with `--paints` or `washes.paints`. A box this much worse than the painter's own pick is changed as `--paintguardmode` says. `run-card.json` records the decision | `0` | same |
 | `--paintguardmode` | `add` (add the own pick's paints; merge if that cannot close the gap), `merge` (the own pick plus the forced paints that still fit), `replace` (the own pick) | `add` | same |
 | `--paintguardmax` | most paints after `add` or `merge` | `8` | same |
+| `--paintsextend` | `0`, `1`: a box named with `--paints` gains up to two pans for a hue cluster of at least 2% of the picture that it cannot reach; `0` keeps the box as named | `1` | same |
+| `--instrumentcal` | `0`, `1`: a dry-paper passage whose brush water or pass count differs from its stock technique is charged from a scrap swatch laid with its own water and passes; `0` charges it from the stock swatch of its technique's name | `0` (off; the glaze fix delivers the full charge, and the base recipe's dark and cool gains of 1.3 were not removed, so it paints too dark with them) | same |
 | `--techcal` | `0`, `1`: charge each technique in the dark bands for what the sheet showed it lays | `0` | same |
 | `--techcalfrom`, `--techcalmax`, `--techcalmin` | first value band calibrated; factor clamp | `4`, `2.5`, `0.8` | same |
 | `--deliveryreport` | `0`, `1`: write `delivery-by-band.json`, pigment delivered over booked by booked amount | `0` | same |

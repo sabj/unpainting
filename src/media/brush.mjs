@@ -143,6 +143,16 @@ function sidesAt(brush, half, x = 0, y = 0) {
 }
 // the most sidesAt can add, as a share of half
 export const sideReach = brush => Math.abs(brush.splay) + 0.1 * varietyOf(brush);
+// How far from its path a flat brush's paint fades to half, in cells: the middle of its ragged edge, midway between where
+// solid paint ends (the half-width the footprint lays at that pressure, footHalf, less the most its sides can wander,
+// sideReach, less the fringe where the outer hairs touch only the high paper) and the furthest its sides can wander out.
+// Strokes laid side by side at twice this apart overlap by the ragged edge: the fading edge of one fills the fading
+// edge of the next, so there is neither a bare strip nor a doubled band between them.
+export function edgeHalfWidth(radius, { pressure = 1, splay = 0, variety } = {}) {
+  const half = footHalf({ flat: true, radius }, {}, {}, 0, pressure), wander = sideReach({ splay, variety });
+  const solid = half * (1 - wander) - (1 + 0.08 * half), outer = half * (1 + wander);
+  return Math.max(0, (solid + outer) / 2);
+}
 // How far the wet rim shifts with the tooth, in cells (0.08 mm, clamped at twice that); 0 without variety.
 export const edgeTooth = (brush, paper) => { const v = varietyOf(brush); return v && paper?.height ? v * 0.08 / (paper.mmPerCell || 280 / 1086) : 0; };
 // a cell's distance across the footprint, moved by the tooth there (towards the centre on high paper, away in hollows)

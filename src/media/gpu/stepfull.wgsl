@@ -277,12 +277,49 @@ fn edge_b2a_tile(wid: vec3<u32>, lid: vec3<u32>) {
 }
 // The chain is first -> EB, then b2a -> EA, a2b -> EB, ... ; `EDGE` names whichever holds the last result
 
-// 1. drying and absorption
+// 1. drying and absorption: local dry-fraction edge scaling and valley-adaptive bulk evaporation
+fn localDryFraction(cx: u32, cy: u32, r: i32) -> f32 {
+  var dryCount = 0.0;
+  var totalCount = 0.0;
+  let r2 = r * r;
+  let icx = i32(cx);
+  let icy = i32(cy);
+  for (var dy = -r; dy <= r; dy++) {
+    let dy2 = dy * dy;
+    let py = icy + dy;
+    let inY = py >= 0 && py < i32(u.h);
+    let row = select(0u, u32(py) * u.w, inY);
+    for (var dx = -r; dx <= r; dx++) {
+      if (dx * dx + dy2 <= r2) {
+        totalCount += 1.0;
+        let px = icx + dx;
+        if (!inY || px < 0 || px >= i32(u.w) || M[row + u32(px)] == 0u) {
+          dryCount += 1.0;
+        }
+      }
+    }
+  }
+  return select(0.0, dryCount / totalCount, totalCount > 0.0);
+}
+
 fn phase1_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   let i = c.i;
   let e = EDGE[i];
-  let near = select(0.0, 1.0 - (e - 1.0) / u.edgeWidth, e <= u.edgeWidth);
+  var near = 0.0;
+  if (e <= u.edgeWidth) {
+    let geomNear = 1.0 - (e - 1.0) / u.edgeWidth;
+    let mmPerCell = select(0.3, u.mmPerCell, u.mmPerCell > 0.0);
+    let r = i32(clamp(round(2.0 / mmPerCell), 2.0, 8.0));
+    let dryFrac = localDryFraction(c.x, c.y, r);
+    let fMin = select(0.18, 0.10, r <= 2);
+    let fMax = select(0.42, 0.28, r <= 2);
+    let u_step = clamp((dryFrac - fMin) / (fMax - fMin), 0.0, 1.0);
+    let dryFactor = u_step * u_step * (3.0 - 2.0 * u_step);
+    let edgeFlowDepth = u.edgeFlowDepth;
+    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, edgeFlowDepth), 0.0, 1.0), edgeFlowDepth > 0.0);
+    near = geomNear * dryFactor * depthFactor;
+  }
   let wv = max(0.0, W[i] - u.dt * (u.evap + u.edgeEvap * near));
   let a = min(min(u.dt * u.absorb, max(0.0, PAPER[i].x - S[i])), max(0.0, wv - u.film));
   var wn = wv;
@@ -719,7 +756,20 @@ fn edge_phase1_tile(wid: vec3<u32>, lid: vec3<u32>, li: u32) {
   // phase 1: drying and absorption
   let i = c.i;
   let e = eCur[(lid.y + NP) * R + lid.x + NP];
-  let near = select(0.0, 1.0 - (e - 1.0) / u.edgeWidth, e <= u.edgeWidth);
+  var near = 0.0;
+  if (e <= u.edgeWidth) {
+    let geomNear = 1.0 - (e - 1.0) / u.edgeWidth;
+    let mmPerCell = select(0.3, u.mmPerCell, u.mmPerCell > 0.0);
+    let r = i32(clamp(round(2.0 / mmPerCell), 2.0, 8.0));
+    let dryFrac = localDryFraction(c.x, c.y, r);
+    let fMin = select(0.18, 0.10, r <= 2);
+    let fMax = select(0.42, 0.28, r <= 2);
+    let u_step = clamp((dryFrac - fMin) / (fMax - fMin), 0.0, 1.0);
+    let dryFactor = u_step * u_step * (3.0 - 2.0 * u_step);
+    let edgeFlowDepth = u.edgeFlowDepth;
+    let depthFactor = select(1.0, clamp(W[i] / max(1e-5, edgeFlowDepth), 0.0, 1.0), edgeFlowDepth > 0.0);
+    near = geomNear * dryFactor * depthFactor;
+  }
   let wv = max(0.0, W[i] - u.dt * (u.evap + u.edgeEvap * near));
   let a = min(min(u.dt * u.absorb, max(0.0, PAPER[i].x - S[i])), max(0.0, wv - u.film));
   var wn = wv;

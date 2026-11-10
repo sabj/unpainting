@@ -23,10 +23,11 @@ export const DECIDE_DEFAULTS = Object.freeze({
  * @param ctx { L, w, h, pxMm, cellLabel(x, y) -> label, shadow? (0/1 plane) }
  * @returns { lines, stats } stats: { lengthPx, keptPx, massBefore, massAfter, dropped: { mass, faint, label, short, squiggle }, byLabel }
  */
-export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
+export function decideLines(lines, ctx, options = {}) {
+  const o = { ...DECIDE_DEFAULTS, ...options };
   const { L, w, h, pxMm } = ctx, reach = Math.max(1, o.reachMm / pxMm);
   const labelAt = (x, y) => {
-    const xi = Math.max(0, Math.min(w - 1, x)), yi = Math.max(0, Math.min(h - 1, y));
+    const xi = Math.max(0, Math.min(w - 1, Math.floor(x))), yi = Math.max(0, Math.min(h - 1, Math.floor(y)));
     const base = ctx.cellLabel(xi, yi), i = yi * w + xi;
     // a face or a hand is never taken for a shadow or for leaves by the tone and colour passes
     if (base === 'face' || base === 'hands') return base;
@@ -34,11 +35,19 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
     if (ctx.foliage && ctx.foliage[i] && base !== 'tree_trunk') return 'foliage';
     return ctx.shadow && ctx.shadow[i] ? 'shadow_mass' : base;
   };
+  const DROP_REASON = { LIVE: 0, MASS: 1, FAINT: 2, CONTRAST: 3, LABEL_NONE: 4 };
   const drop = { mass: 0, faint: 0, label: {}, short: 0 }, byLabel = {}, out = [];
   let lengthPx = 0, keptPx = 0, massLen = 0, keptMass = 0;
   const add = (label, key, px) => { (byLabel[label] ??= { keptPx: 0, droppedPx: 0 })[key] += px; };
   for (const g of lines) {
-    const R = resample(g.points, 1); if (R.length < 2) continue;
+    const rawPts = (g.points || []).map((p, k) => {
+      const x = Array.isArray(p) ? p[0] : p.x;
+      const y = Array.isArray(p) ? p[1] : p.y;
+      const width = Array.isArray(g.widths) && k < g.widths.length ? g.widths[k] : p.width;
+      const weight = Array.isArray(g.weights) && k < g.weights.length ? g.weights[k] : p.weight;
+      return { x, y, ...(width != null ? { width } : {}), ...(weight != null ? { weight } : {}) };
+    });
+    const R = resample(rawPts, 1); if (R.length < 2) continue;
     const { cls, contrast } = classifyPathDetail(R, L, w, h, pxMm, o), d = arc(R), total = d.at(-1);
     lengthPx += total;
     let pen = 0, mass = 0;
@@ -46,19 +55,43 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
     const structural = total * pxMm >= o.structureMm && turning(R) / pxMm <= o.structureDegPerMm && pen >= o.keepPenShare * total;
     const rules = R.map(p => ruleAt(labelAt, p.x, p.y, reach));
     const live = new Uint8Array(R.length);
+    const reason = new Uint8Array(R.length);
     for (let k = 0; k < R.length; k++) {
       const seg = k ? d[k] - d[k - 1] : 0, r = rules[k];
       if (structural) { live[k] = 1; continue; }
-      if (cls[k] === CLASS.mass) { drop.mass += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
-      if (cls[k] === CLASS.faint && o.dropFaint) { drop.faint += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
-      if (r.ink !== 'none' && r.penContrast && contrast[k] < r.penContrast) { const name = r.label; drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
-      if (r.ink === 'none') { const name = labelAt(Math.round(R[k].x), Math.round(R[k].y)); drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
+      if (r.ink === 'none') { reason[k] = DROP_REASON.LABEL_NONE; const name = labelAt(R[k].x, R[k].y); drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
+      if (r.ink !== 'none' && r.penContrast && contrast[k] < r.penContrast) { reason[k] = DROP_REASON.CONTRAST; const name = r.label; drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
+      if (cls[k] === CLASS.mass) { reason[k] = DROP_REASON.MASS; drop.mass += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
+      if (cls[k] === CLASS.faint && o.dropFaint) { reason[k] = DROP_REASON.FAINT; drop.faint += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
       live[k] = 1;
     }
-    // bridge the short gaps the mass and faint cuts left inside a line
+    // bridge the short gaps the mass and faint cuts left inside a line, excluding intentional semantic label cuts
     for (let k = 0, gapFrom = -1; k < R.length; k++) {
       if (!live[k]) { if (gapFrom < 0 && k > 0 && live[k - 1]) gapFrom = k; continue; }
-      if (gapFrom >= 0) { if ((d[k] - d[gapFrom]) * pxMm < o.bridgeMm) for (let j = gapFrom; j < k; j++) live[j] = 1; gapFrom = -1; }
+      if (gapFrom >= 0) {
+        const gapLenMm = (d[k] - d[gapFrom - 1]) * pxMm;
+        let canBridge = gapLenMm < o.bridgeMm;
+        if (canBridge) {
+          for (let j = gapFrom; j < k; j++) {
+            if (reason[j] !== DROP_REASON.MASS && reason[j] !== DROP_REASON.FAINT) { canBridge = false; break; }
+          }
+          const prevLabel = rules[gapFrom - 1]?.label;
+          const nextLabel = rules[k]?.label;
+          if (prevLabel && nextLabel && prevLabel !== nextLabel) { canBridge = false; }
+        }
+        if (canBridge) {
+          for (let j = gapFrom; j < k; j++) {
+            live[j] = 1;
+            const segJ = j ? d[j] - d[j - 1] : 0;
+            if (reason[j] === DROP_REASON.MASS) drop.mass -= segJ;
+            else if (reason[j] === DROP_REASON.FAINT) drop.faint -= segJ;
+            const labelName = rules[j]?.label ?? 'none';
+            if (byLabel[labelName]) byLabel[labelName].droppedPx -= segJ;
+            reason[j] = 0;
+          }
+        }
+        gapFrom = -1;
+      }
     }
     let start = -1;
     for (let k = 0; k <= R.length; k++) {
@@ -75,7 +108,8 @@ export function decideLines(lines, ctx, o = DECIDE_DEFAULTS) {
         else {
           // the shortest piece the ground allows (ink-labels.mjs minMm) is applied by the salience step, after collinear
           // pieces are joined: a trace is cut at every junction, so a contour arrives in pieces of a millimetre or two
-          out.push({ ...g, points: piece, inkLabel: mid.label ?? 'none', inkMinMm: structural ? 0 : (Number.isFinite(mid.minMm) ? mid.minMm : 0) });
+          const { widths: _w, weights: _wt, ...restG } = g;
+          out.push({ ...restG, points: piece, inkLabel: mid.label ?? 'none', inkMinMm: structural ? 0 : (Number.isFinite(mid.minMm) ? mid.minMm : 0) });
           keptPx += pl; add(mid.label ?? 'none', 'keptPx', pl);
           for (let j = start + 1; j < k; j++) if (cls[j] === CLASS.mass) keptMass += d[j] - d[j - 1];
         }

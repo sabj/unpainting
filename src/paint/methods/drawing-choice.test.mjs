@@ -41,3 +41,10 @@ test('observed pen sources keep their source paths instead of the reduced pencil
  const flags=stageFlags({graphitePrep:'full',inkPrep:'ink',inkFinish:'none'},{penSource:true});
  assert.equal(flags[flags.indexOf('--prepinkfrom')+1],'lines');
 });
+
+test('the ink prep gate reads the same pen threshold that asks for ink', () => {
+  const soft = { edgeShare: 0.05, penLine: 0.008, perspective: null };
+  assert.equal(ruleChoice(soft).choice.inkPrep, 'ink');
+  assert.equal(ruleChoice({ ...soft, penLine: 0.004 }).choice.inkPrep, 'none');
+  assert.equal(ruleChoice(soft, { penSource: 0.025 }).choice.inkPrep, 'none');
+});

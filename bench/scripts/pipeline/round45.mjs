@@ -14,6 +14,7 @@ import sharp from 'sharp';
 import { BENCH, REPO, RUN_SCHEMA, VERSION_STAMP, V2, readJson, writeJson, validateRun, posix } from '../lib.mjs';
 import { turnCommand, codexThread, agyConversation, usage, peekUsage } from '../runners.mjs';
 import { thumb, stageStrip } from '../images.mjs';
+import { verifyComparisonRun } from '../preflight.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './harness.mjs';
 import { PaintSession, planSnapshot, variantIn } from './session.mjs';
 import { checkPlan } from './check.mjs';
@@ -203,7 +204,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
       }
     }
     record.totalSeconds = (Date.now() - targetStarted) / 1000;
-    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict });
+    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict, gpu, verifyRun: !dry && !spec.offlineFixture });
   } finally {
     if (session?.painting) session.painting.kill();
     keepScripts(ws, path.join(raw, 'scripts'), SEEDED);
@@ -217,13 +218,33 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
  * The painting's outputs for the scorer and the try folder, and its record. A finished painting with only notes (unread
  * settings, dropped passages) is painted and collected; strictVerdict makes those notes fail it.
  */
-export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false }) {
+export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false, gpu = 'auto', verifyRun = false }) {
   const p = session.painting, v = p && ['done', 'failed'].includes(p.state) ? p.verdict({ strict: strictVerdict }) : null;
   if (p) {
     const last = p.segments.at(-1);
     fs.rmSync(path.join(raw, 'plan-final'), { recursive: true, force: true });
     fs.cpSync(last.planDir, path.join(raw, 'plan-final'), { recursive: true });
     if (!outcome) outcome = v.exit === 0 ? 'painted' : p.planningRefused ? 'plan-refused' : 'render-failed';
+  }
+  let verifyError = null;
+  if (verifyRun && outcome === 'painted' && p && fs.existsSync(path.join(p.out, 'painting.png'))) {
+    try {
+      verifyComparisonRun(p.out, {
+        requireGpu: gpu === 'on',
+        requireSegments: spec.segments !== 'off',
+        requireStages: true,
+        requireDistinctStages: true,
+        minWidth: spec.width || 540,
+      });
+      if (spec.noTargetLooks) {
+        const guardFile = path.join(p.out, 'target-guard.json');
+        const evidence = fs.existsSync(guardFile) ? readJson(guardFile) : null;
+        if (evidence?.violations !== 0 || evidence?.looks?.count !== 0) throw new Error('zero paint-time target looks and violations are required');
+      }
+    } catch (err) {
+      outcome = 'render-failed';
+      verifyError = err.message;
+    }
   }
   const stopsRows = fs.existsSync(session.ckpt) ? fs.readFileSync(session.ckpt, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
   const count = k => stopsRows.filter(r => r.kind === k).length;
@@ -243,7 +264,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     warnings: v?.warnings?.length ? v.warnings : undefined,
-    failure: outcome === 'painted' ? null : { failures: v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason })) },
+    failure: outcome === 'painted' ? null : { failures: verifyError ? [...(v?.failures ?? []), { reason: verifyError }] : (v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason }))) },
     feedback: feedbackFiles ? 'FEEDBACK.md' : null, selfReview: fs.existsSync(path.join(raw, 'SELF-REVIEW.md')) || fs.existsSync(path.join(ws, 'bench', 'SELF-REVIEW.md')) ? 'SELF-REVIEW.md' : null,
     selfReviewModelMinute: selfReviewAt,
     modelSessionSeconds: record.wallSeconds, elapsedSeconds: record.totalSeconds ?? null,
@@ -289,7 +310,7 @@ export async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
-export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, basePalette = true, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
+export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, basePalette = true, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
   const subjects = loadSubjects();
   if (profile.planOnly && (round.id !== 'V4' || tries !== 1 || fromTry !== 1)) throw new Error('lite requires V4 try 1 only; use full for repeated trials');
   const log = msg => console.error(`bench:run: ${msg}`);
@@ -307,7 +328,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     for (const crop of crops) {
       // A dry run checks the harness, not segmentation: it paints with --segments off, so it needs no SAM python or
       // checkpoint (src/crop/segment-prep.mjs). Real runs keep the painter's default (SAM) and add nothing.
-      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off', offlineFixture: true } : {}), ...(basePalette ? {} : { basePalette: false }) };
+      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off', offlineFixture: true } : {}), ...(basePalette ? {} : { basePalette: false }), noTargetLooks };
       const prev = round.learning && n > 1 ? previousTry({ outRoot, round, model, n, crop }) : null;
       log(`${model.name}, ${round.id}, try ${n} of ${tries}, ${crop}${dry ? ' (dry run)' : ''}`);
       let r, e;
@@ -332,7 +353,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
       settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: profile.modelMinutes, modelMinutesCap: profile.modelMinutes, lookBudget: profile.planOnly ? 0 : null, selfView: profile.planOnly ? 'none' : 'gentle', targetGuard: 'gentle',
-        crops, learnsBetweenTries: round.learning, strictVerdict, basePalette, benchmarkProfile: profile.id, budget: profile, judgeProfile: `J2-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
+        crops, learnsBetweenTries: round.learning, strictVerdict, basePalette, noTargetLooks, benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
       session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, exitCode: null, killedAtCap: budgetStopped },
       guard: { blockedImageReads: guardViolations, kitRejections: 0, auditHits: [] },
       crops: cropsOut, ...(Object.keys(unpainted).length ? { unpainted } : {}),

@@ -6,6 +6,13 @@
 //   --flocblue f, --flocgrey f, --flocviolet f, --flocearth f, --flocyellow f (unset preserves pigment): how strongly each kind flocculates, a share in [0, 1]
 //   (the grain slide in src/media/sheet.mjs mixes (1 - floc) * fibre + floc * tooth). Any floc flag turns --pigphys on.
 
+// --boxphys 1 (default 0): each box paint on the sheet takes its own published granulation, staining, flocculation,
+// scattering and density (src/crop/box.mjs physicalPigment, from the table Paint Lab shares). Picking is not affected:
+// the palette is chosen on the reference constants, and only the sheet's pigments change. Pigments with no box key
+// pass unchanged. It runs before the hue heuristic below, whose rules keep authored properties, and any explicit
+// --gamma* or --floc* flag still wins.
+import { BOX, physicalPigment } from '../../crop/box.mjs';
+
 const FLOC_FLAGS = ['flocblue', 'flocgrey', 'flocviolet', 'flocearth', 'flocyellow'];
 const flocOf = (num, flag) => Math.min(1, Math.max(0, num(flag, 0) || 0));
 
@@ -21,8 +28,17 @@ const withPhysics = (p, num) => {
   return { ...p, rho: p.rho ?? phys.rho, gamma: num('gamma' + kind, p.gamma ?? phys.gamma), ...(floc != null ? { floc } : {}), kind };
 };
 
+/** --boxphys: box pigments swapped for their physical pigments; the same array when the flag is off. */
+function boxPhysics({ pigments, opt, log }) {
+  if (opt('boxphys', '0') === '0') return pigments;
+  const out = pigments.map(p => { const paint = BOX.find(b => b.name === p.name && (p.key == null || b.key === p.key)); return paint ? physicalPigment(paint) : p; });
+  log(`--boxphys: box paints on their published physics: ${out.map((p, j) => (out[j] === pigments[j] ? `${j} unchanged` : `${j} ${p.name} gamma ${p.gamma} omega ${p.omega} rho ${p.rho}${p.floc ? ` floc ${p.floc}` : ''} scatter ${p.S[0]}`)).join(', ')}`);
+  return out;
+}
+
 // The palette's pigments, each given a physics by its hue under --pigphys, as a new array either way.
-export function pigmentPhysics({ pigments, opt, num, log }) {
+export function pigmentPhysics({ pigments: given, opt, num, log }) {
+  const pigments = boxPhysics({ pigments: given, opt, log });
   const flocSet = FLOC_FLAGS.filter(f => opt(f, '') !== '');
   for (const f of flocSet) { const v = num(f, 0); if (v !== flocOf(num, f)) log(`--${f} ${v} clamped to ${flocOf(num, f)} (floc is a share in [0, 1])`); }
   const on = opt('pigphys', '0') !== '0' || flocSet.length > 0;

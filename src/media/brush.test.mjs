@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
 import { createSheet, deposit, step, totals, dry, DEFAULTS } from './sheet.mjs';
-import { createBrush, dip, stroke, thirsty, setStrokeVariety } from './brush.mjs';
+import { createBrush, dip, stroke, thirsty, setStrokeVariety, edgeHalfWidth } from './brush.mjs';
 import { brushFor, TECHNIQUES } from '../paint/methods/lay.mjs';
 // exact-geometry contracts of the planned stroke: run with no stroke variety and no damp-paint merge
 const classic = t => { setStrokeVariety(0); t.after(() => setStrokeVariety(1)); };
@@ -263,4 +263,32 @@ test('paint charged into a glossy film mixes out into it (filmDiffuse); on dry p
   assert.ok(on.far > 1.5 * off.far, `paint reaches 1.5 mm out on a glossy film (${on.far.toFixed(4)} vs ${off.far.toFixed(4)} without)`);
   const d1 = run(false, 0.2).far, d0 = run(false, 0).far;
   assert.ok(Math.abs(d1 - d0) < 1e-3 && d1 < 0.01, `on dry paper the paint stays in its own stroke (${d1.toFixed(4)} vs ${d0.toFixed(4)})`);
+});
+
+// A wide plane is laid in lanes. A painter overlaps each stroke onto the last by the brush's ragged edge, so the fading
+// edge of one fills the fading edge of the next: no bare strip and no doubled band. edgeHalfWidth is the middle of that
+// edge. Two lanes laid at twice it apart dry as evenly across their join as within a lane; at the old 3.5% overlap the
+// join dries as a ridge.
+test('two flat-brush lanes at twice the edge half-width dry as evenly across the join as within a lane', () => {
+  const r = 40, W = 10 * r, H = 5 * r, mm = 280 / 1200;
+  const lay = halfPitch => {
+    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2, coldPress: { mmPerCell: mm, bumpMm: [.5, 2], cover: 2.2, swell: .3 } }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: .25 }]);
+    const lanes = [H / 2 - halfPitch, H / 2 + halfPitch];
+    lanes.forEach((y, k) => {
+      const b = createBrush({ flat: true, radius: r, bristles: 2 * r, capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 + k });
+      dip(b, { water: 1, conc: [.05] });
+      stroke(b, sheet, Array.from({ length: 80 }, (_, i) => ({ x: r + i * (W - 2 * r) / 79, y, r, p: .9 })), { lift: true });
+    });
+    dry(sheet, 40000, DEFAULTS);
+    const prof = [];
+    for (let y = 0; y < H; y++) { let s = 0, c = 0; for (let x = Math.round(W * .2); x < Math.round(W * .8); x++) { const i = y * W + x; s += sheet.G[0][i] + sheet.D[0][i] + sheet.P[0][i] + sheet.layers.reduce((a, L) => a + (L[0]?.[i] ?? 0), 0); c++; } prof.push(s / c); }
+    // the most the rows within 4 cells of y stray from the mean of the rows 6 to 12 cells either side
+    const dev = y => { const ring = []; for (let d = 6; d <= 12; d++) ring.push(prof[y - d], prof[y + d]); const m = ring.reduce((a, v) => a + v, 0) / ring.length; let worst = 0; for (let d = -4; d <= 4; d++) worst = Math.max(worst, Math.abs(prof[y + d] - m) / m); return worst; };
+    return { join: dev(Math.round(H / 2)), body: Math.max(...lanes.map(y => dev(Math.round(y)))) };
+  };
+  const edge = edgeHalfWidth(r, { pressure: .9, splay: .03 });
+  assert.ok(edge > .85 * r && edge < r, `edge half-width ${edge.toFixed(1)} of radius ${r}`);
+  const even = lay(edge), old = lay(r / 1.035);
+  assert.ok(even.join <= even.body, `the join strays ${even.join.toFixed(3)}, the lane body ${even.body.toFixed(3)}`);
+  assert.ok(old.join > old.body, `control: at the old overlap the join should show (${old.join.toFixed(3)} vs ${old.body.toFixed(3)})`);
 });

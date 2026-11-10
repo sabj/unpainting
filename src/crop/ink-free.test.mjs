@@ -29,3 +29,15 @@ test('a planned line over paper never darkens the target', () => {
   for (let x = 0; x < W; x++) assert.ok(r.rgb[(17 * W + x) * 3] >= 240);
   assert.ok(lineCover(doc([[5, 16], [55, 16]]), W, H, { sheetMm: 15 })[16 * W + 30]);
 });
+
+test('lineCover and removePlannedInk support {x, y} object point representations', () => {
+  const objDoc = {
+    image: { w: W, h: H },
+    lines: [{
+      points: [{ x: 5, y: 20 }, { x: 55, y: 20 }],
+      widths: [2.2, 2.2],
+    }],
+  };
+  const mask = lineCover(objDoc, W, H, { sheetMm: 15 });
+  assert.ok(mask[20 * W + 30] === 1, 'center of line is covered');
+});

@@ -19,7 +19,7 @@ import { CpuDemandWindow } from './cpu-demand-window.mjs';
 import { demandPolicy } from './demand-policy.mjs';
 import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
-import { deviceHealth, brokenReason, assertHealthy } from './device-health.mjs';
+import { deviceHealth, brokenReason, assertHealthy, markBroken } from './device-health.mjs';
 import { cpuFallbackWarning } from './backend-record.mjs';
 
 const PLANES = K => 4 + 3 * K;
@@ -37,7 +37,7 @@ const TIMEOUT_MS = 30 * 60 * 1000;
 const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
 const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
-const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth'];
+const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth'];
 
 export class GpuLink {
   constructor(worker, shared, sheet) {
@@ -880,7 +880,7 @@ export class GpuLink {
   }
   pause() { this.paused = true; }
   resume() { this.paused = false; }
-  close() { try { this.worker.postMessage({ op: 'close', wait: false }); } catch { /* already gone */ } this.worker.terminate(); }
+  close() { this.closed = true; try { this.worker.postMessage({ op: 'close', wait: false }); } catch { /* already gone */ } this.worker.terminate(); }
 }
 
 /**
@@ -901,9 +901,38 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
   const batchPort = threadData?.gpuBatchPort;
   const worker = batchPort ? batchWorker(batchPort, gpuData) : new Worker(fileURLToPath(new URL('./worker.mjs', import.meta.url)), { workerData: gpuData });
   worker.unref();
-  let workerDied = null; worker.on('error', e => { workerDied = e; Atomics.store(ctrl, 3, 2); Atomics.store(ctrl, 0, 1); Atomics.notify(ctrl, 0); });
+  let workerDied = null;
+  let link = null;
+  worker.on('error', e => {
+    workerDied = e;
+    markBroken(health, e.message ?? String(e));
+    Atomics.store(ctrl, 3, 2);
+    Atomics.store(ctrl, 0, 1);
+    Atomics.notify(ctrl, 0);
+    Atomics.notify(ctrl, 3);
+  });
+  worker.on('exit', code => {
+    if (Atomics.load(ctrl, 3) === 0) {
+      workerDied = new Error(`GPU worker exited prematurely with code ${code}`);
+      markBroken(health, `GPU worker exited during boot with code ${code}`);
+      Atomics.store(ctrl, 3, 2);
+      Atomics.store(ctrl, 0, 1);
+      Atomics.notify(ctrl, 0);
+      Atomics.notify(ctrl, 3);
+    } else if (code !== 0 && !link?.closed) {
+      markBroken(health, `GPU worker exited prematurely with code ${code}`);
+      Atomics.store(ctrl, 3, 2);
+      Atomics.store(ctrl, 0, 1);
+      Atomics.notify(ctrl, 0);
+      Atomics.notify(ctrl, 3);
+      for (let i = 0; i < shared.done.length; i++) {
+        Atomics.store(shared.done, i, -1);
+        Atomics.notify(shared.done, i);
+      }
+    }
+  });
   const shared = { ctrl, health, err: new Uint8Array(errSab), rectData: new Float32Array(rectSab), layerData: new Float32Array(layerSab), ring: new Float32Array(ringSab), done: new Int32Array(doneSab), sumData: new Float32Array(sumSab) };
-  const link = new GpuLink(worker, shared, sheet);
+  link = new GpuLink(worker, shared, sheet);
   const o = { ...O }; sheet._fixedBed = O.fixedBed > 0;
   const paper = sheet.paper, top = sheet.layers.length ? sheet.layers[sheet.layers.length - 1] : null;
   const clone = a => a && a.slice();
@@ -914,13 +943,18 @@ export function attachGpu(sheet, O, { mode = 'auto', log = m => console.error(m)
       w: sheet.w, h: sheet.h, n, K, pigments: sheet.pigments, W: clone(sheet.W), s: clone(sheet.s), M: clone(sheet.M), ever: clone(sheet.ever), resist: clone(sheet.resist),
       G: sheet.G.map(clone), P: sheet.P.map(clone), D: sheet.D.map(clone), edge: new Float32Array(0), layers: [],
       paperPlanes: batchPort ? paperPlanes(paper, n) : undefined,
-      paper: { w: sheet.w, h: sheet.h, n, capacity: paper.capacity, grain: paper.grain, fdx: paper.fdx, fdy: paper.fdy, height: paper.height, valley: paper.valley, tooth: paper.tooth, proud: paper.proud },
+      paper: { w: sheet.w, h: sheet.h, n, capacity: paper.capacity, grain: paper.grain, fdx: paper.fdx, fdy: paper.fdy, height: paper.height, valley: paper.valley, tooth: paper.tooth, proud: paper.proud, mmPerCell: paper.mmPerCell ?? 0 },
     },
     top: top ? top.map(clone) : null,
   });
-  while (Atomics.load(ctrl, 3) === 0) Atomics.wait(ctrl, 3, 0, 200); // booting
+  const bootT0 = Date.now();
+  while (Atomics.load(ctrl, 3) === 0) {
+    if (Date.now() - bootT0 > 30000) { Atomics.store(ctrl, 3, 2); break; }
+    Atomics.wait(ctrl, 3, 0, 200);
+  } // booting
   if (Atomics.load(ctrl, 3) !== 1 || brokenReason(health)) {
-    const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || 'GPU unavailable';
+    const timedOut = Atomics.load(ctrl, 3) === 2 && !link.errText();
+    const reason = brokenReason(health) ? `GPU device error while starting: ${brokenReason(health)}` : workerDied ? String(workerDied.message ?? workerDied) : link.errText() || (timedOut ? 'GPU worker boot timed out after 30s' : 'GPU unavailable');
     worker.terminate();
     if (mode === 'on') throw new Error(`--gpu on but the GPU sheet is unavailable: ${reason}`);
     log(cpuFallbackWarning(reason));

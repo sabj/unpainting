@@ -54,6 +54,8 @@ Black opening ink sets before the washes by default; sepia stays soluble. `drawi
 
 Three flags shape the closing pen. `--closingshare c` gives the opening and closing pens one line budget, with `c` of it for the closing pass. `--inkdarkskip v` cuts closing lines where the plan's value is above `v`, since the wash already states those edges. `--closingconc f` dilutes the closing ink, so accents stay lighter than the darkest wash.
 
+A line from the plan's own drawing files (`--drawingfile`, `--drawinglast`) must restate an edge of the planned painting. The painter draws it only when at least half of its path lies within one source pixel of a planned passage boundary (`src/paint/methods/line-support.mjs`). A line inside one planned mass would cross a flat fill on the plate, so it is left off whole; lines are never cut into dashes. The test reads the plan's passages, not the target. A source's own pen lines are drawn as they are. `--lineedges 0` turns it off.
+
 ## Holding ink to the target
 
 In painter V101, five flags hold the pen to the target's own lines. Each is off by default, so without them V101 draws as V100 does. Before painting, the painter reads the opening (`--drawingfile`) and closing (`--drawinglast`) line files against the target (`src/paint/methods/ink-lines.mjs`). That includes the files the linked drawing stages write (`stage-prepink-lines.json`, `stage-finishink-lines.json`).
@@ -66,7 +68,7 @@ In painter V101, five flags hold the pen to the target's own lines. Each is off 
 
 `--linesupport` and `--linesmooth` write `ink-opening-lines.json` and `ink-closing-lines.json` next to the painting, and the pens draw those. Any of the five writes the target's line measures to `ink-lines.json`. `--inkdarkcap` also writes `ink-dark-cap.json`.
 
-`--inkrecipe v2` sets all of them at once. A flag given on the command line wins over the recipe.
+`--inkrecipe v2` sets them at once. From painter V104 it sets `--inkdarkmatch 1` in place of `--inkdarkcap`: the ink load is scaled until the pen's lines are as dark as the source's, and it can rise as well as fall. A flag given on the command line wins over the recipe.
 
 | Flag | Ink v2 | Off |
 |---|---|---|
@@ -74,7 +76,7 @@ In painter V101, five flags hold the pen to the target's own lines. Each is off 
 | `--linesmooth` | 1 | 0 |
 | `--linesmoothcorner` | 50 | 50 |
 | `--inkwidthfloor` | 1 | 0 |
-| `--inkdarkcap` | 1 | 0 |
+| `--inkdarkmatch` | 1 | 0 |
 | `--inkdamp` | 0.3 | 0 |
 
 The recipe does not turn ink on. Add `--outlinemedium ink --drawing both` for an opening ink drawing with closing accents.

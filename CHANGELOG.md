@@ -2,6 +2,123 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
+## 0.3.2 — 2026-11-09
+
+Painter **V105**, simulator **104**, judges **J1**. The changes run from the 0.3.0 release commit `70ceb7c3`.
+
+0.3.1 was not released. Its candidate was commit `32b1bfa4` (painter V104, simulator 104), and everything it changed is part of 0.3.2 and is listed here. The sections from Simulator to Experimental describe changes up to `32b1bfa4`. The section after them describes the changes made since.
+
+**0.3.2 repairs defects. It shows no gain in J1 score or speed.** The aim was a J1 score 10% above the five published benchmark winners. That was not shown.
+
+### Measured on the 0.3.2 release commit
+
+- `npm test`: 1,723 pass, 0 fail, 2 skipped. `npm run bench:test`: 144 pass, 0 fail. `npx knip` passes.
+- No painting was rendered from the 0.3.2 release commit. The paired renders below come from its development commits `32b1bfa4` and `318b5a86`.
+- Fresh model sessions at `318b5a86`, three J1 scorings each in one batch with the 300 px previews of the published winners: V5 Mittens scored 6.18 to 6.23 against the winner's 6.45. All three V5 Trumbull sessions failed (see the known defects). At `32b1bfa4`, V4 on Mittens and Trumbull scored a mean of 6.29 and 6.35 for two models against 6.14 for the winners. The five winner previews scored a mean of 6.09 in that batch, so the 10% line is 6.70.
+
+### Measured at `32b1bfa4`
+
+- `npm test`: 1,643 pass, 0 fail, 2 skipped. `npm run bench:test`: 107 pass, 0 fail.
+- A matrix of 13 cases was painted at `f3ad8f96` and at `32b1bfa4`: nine stored V4 and V5 plans and four direct paintings. `f3ad8f96` is a 0.3.1 development commit, so the pairs show only the changes made after it. No matrix compares 0.3.0 with the candidate.
+- 12 of the 13 cases complete at each commit. The stored Sargent plan fails at both, in wet-bed preparation, with no cells under the brush.
+- Every completed render records the GPU with no fallback, SAM segments, the subject's full width, five different stage images, no target looks during painting and no guard violations. The run cards from `f3ad8f96` do not carry the fallback field. Its `backend.json` does.
+- Three direct paintings (h36a, Rembrandt, Tramp) are byte-identical at the two commits.
+- 11 of 12 pairs stay inside the two anti-copying limits: fine-detail correlation with the target (hfCorr) up by at most 0.02, and strokes up by at most 10%. One Mittens plan exceeds the first limit, at +0.032.
+- J1 on four stored winner plans, `f3ad8f96` to `32b1bfa4`: mean change −0.10. One unchanged image scored 0.34 apart in two batches, so this shows no change.
+- The published winners exist only as 300 px previews, so no full-size comparison with them was made.
+- No timing was taken at `32b1bfa4` or later. No timing pair between 0.3.0 and this candidate shares a plan, host and settings.
+
+### Simulator
+
+- **Edge drying (sim 104).** The extra evaporation at a wet edge is now scaled by the share of dry paper around the cell and by the water depth. The disc is 2 to 8 cells, aimed at 2 mm. The effect fades as the film thins below 0.06 (`--physics edgeFlowDepth=x`). It never raises edge drying. It runs on the CPU and GPU sheets and in Paint Lab. A synthetic probe at 0.258 mm per cell gave slightly softer edges: pigment outside a 1 mm stroke rose from 8.6% to 10.1%, and edge contrast on a disc fell from 0.997 to 0.970. No painting isolates the change. (`56357b14`, `b95fc20e`)
+
+### Washes and lights
+
+- **Plan reserves.** A plan's reserve box now keeps the target's own light inside the box, not the whole box. Full-size review against `f3ad8f96` found the white rectangles gone on two Mittens plans and one Trumbull plan. A box with no paper light reserves nothing and the log says so. On one Mittens plan both catchlights in the man's eyes are lost this way. (`c3cd589f`)
+- **White floor.** The default `--whitefloor 0.5` hold now reaches the value plan. On Mittens the planned bare paper grew by 29,197 cells, 2.4% of the sheet. On Trumbull, Hills, South France and Sargent the hold is under 1% of the sheet. (`6c6faa6c`)
+- **Lane charge.** With `--strokeplan 1`, a passage keeps its planned mean charge when lanes reach the 0.45 floor or the 1.8 cap. In a probe of 18 synthetic passages, 0.3.0 lost up to 27% of the charge. The lighter lanes carry the difference, so contrast inside the passage falls. (`1110afc5`)
+- **Wide shaped planes.** With `--shapedmarks 1` and no stroke plan, a plane wider than the 38 mm brush is laid in lanes that follow its smoothed outline and overlap by 3.5%. 0.3.0 overlapped them by 18%. A unit test holds the densest seam under 1.5 times the body of the wash (measured 1.44). Pale slits between lanes are still visible on Hills and South France plates. (`20676e99`, `6c6faa6c`, `ce79818f`, `7a039c32`, `df63bfe6`)
+
+### Drawing and ink
+
+- **Closing lines in V4 and V5 plans.** A plan with a closing line file now runs `--drawing both`. In 0.3.0 it ran `--drawing first` and the closing file was not drawn. (`86ac3901`)
+- **Closing files are drawn whole.** A prepared closing file is no longer cut by the generic line filter. Before this fix, three development runs logged no closing gestures. Full-size review at `32b1bfa4` found closing contours on Mittens, Trumbull and South France. (`c3cd589f`)
+- **One pen reading.** Every automatic ink choice reads the pen-line share at one width. The same picture had read 0.2% to 0.9% at different widths. The ink preparation gate uses the `--penfirst` threshold, and `--penprepmin` moves that gate alone. (`989f09d9`)
+- **Line darkness in the v2 recipe.** `--inkrecipe v2` now sets `--inkdarkmatch 1` in place of `--inkdarkcap 1`. It can raise the ink load as well as lower it. With the cap, measured lines were 30% to 81% as dark as the source. (`989f09d9`)
+- **Line smoothing keeps swells.** With `--linesmooth`, a point stays when dropping it would change the line's width by more than 0.15 px or its darkness by more than 0.1. On 2,851 stored plan lines the 90th-percentile darkness error fell from 0.130 to 0.085 and the width error from 0.427 to 0.207 px. The smoothed files keep 8.6% more points. (`b6db40a3`, `df18cd2b`)
+
+### Playback
+
+- A frame is kept when each value band has dried and when each touch-up round ends. Two test paintings were byte-identical before and after this change. (`f3ad8f96`)
+- An experimental mixed wash is filmed at equal shares of its sweeps, so the 10% and 25% stages differ. (`32b1bfa4`)
+
+### Checks
+
+- **Unusable settings.** The painter prints `IGNORED OPTION` for a typed setting whose switch is off, a setting nothing reads, a number given a word, and a 0/1 switch given a word. The benchmark base recipe no longer sets such settings. Under `--calibratedplan 1`, `--darkgain`, `--coolgain` and `--midgain` are ignored with no message. (`c3cd589f`)
+- **Subject scan.** A test fails when painting or harness code gains an unreviewed subject name, target hash or image-size branch. (`c3cd589f`)
+- **Target guard.** During painting, a sealed target map now records a read made through an array method such as `map`, `slice` or `reduce`, not only a read by index. `keys`, `set` and `fill` are not recorded. (`7a039c32`)
+- **Benchmark flags.** `npm run bench:run` exits with code 2 on an unknown flag or a flag with no value. 0.3.0 ignored them. (`6c6faa6c`) It also accepts `--judge` and `--notargetlooks 1`. (`4d615435`)
+- **Doctor first.** `bench:run`, `bench:rerender` and `bench:suite` run the strict doctor before any real run. (`20676e99`)
+- **Stored-plan repaints.** `npm run bench:rerender` repaints stored V4 and V5 plans on the current painter with no model session. It reads gzipped line files. A test finds all 60 stored V4 plans. (`468e3bd3`)
+- **Resume.** A repaint is skipped only when code, arguments, target bytes and plan folder contents match and the output still passes its evidence checks. An input that changes during a job fails that job. The check does not tie existing output files to the record of what made them. (`c3cd589f`, `4d9ca697`, `af73685d`)
+- **Comparison gate.** A benchmark render fails when its run card shows a backend other than the GPU, a width under the subject's width, segments not from SAM, a missing stage image or two identical stages in a row. A card with no fallback field passes. (`468e3bd3`, `8ba139a4`)
+- **Run card sizes.** Each run card records source size, paint size and enlargement. The stored-plan targets are about 300 px wide and are painted at four times that size. (`468e3bd3`)
+- **Scoring preparation.** Scoring a repaint refuses jobs from different commits and refuses missing or malformed guard evidence. (`c3cd589f`, `4d9ca697`)
+- **Paint Lab.** Tests check that the Lab's media files are generated from the painter's, and that the Lab's GPU and CPU sheets dry a wet rim to the same water. (`c3cd589f`)
+
+### Experimental, off by default
+
+`--washsystem 1` joins mixed charges on dry paper, middle layers cut by brush size, graded lanes, selective soft edges, a paper rule and plan value estimates. `--calibratedplan 1`, `--paperrule 1`, `--mixedwash`, `--mixedshadows`, `--scalelayers`, `--gradedlanes` and `--softchoice` set the parts one at a time. (`a573ec2e` to `82c74b0e`)
+
+The combination is worse than the default on this evidence:
+
+- 8 of 12 pairs exceed the hfCorr limit. It uses 11% to 52% of the default's strokes.
+- Two full-size reviews found flatter masses, harder edges, lost paper lights and regular stripes. Neither found a plate that was better overall.
+- On the five winner plans it scored a mean J1 of 5.78. The 300 px previews of the published winners scored 6.04 in the same campaign.
+- `--paperrule 1` changes the light reference only with `--paperrel 1`, `--paperlights 1` or `--washsystem 1`, and the sheet colour only with `--paperrgb auto`.
+- The calibration reads the sheet alone only when `--notargetlooks 1` is also given.
+
+Added after `32b1bfa4`, also off by default:
+
+- **Plan values under `--calibratedplan 1`.** Values are planned by each cell's light through the sheet's optics, by value steps and by the mass tone of each wash (`--celllight`, `--nestedbands`, `--masstone`). On plan checks without a render, the planned dark share came close to the target's on Trumbull (0.123 against 0.135) and Hills (0.276 against 0.301). Rendered, it exceeds both anti-copying limits: strokes +64% on Mittens and +15% on Trumbull, hfCorr +0.09 and +0.13, with new white flecks on the Trumbull stone. (`811f7b3d`, `c8940164`)
+- **Glaze charge under `--instrumentcal 1`.** A dry-paper passage whose brush water or pass count differs from its stock technique is charged from a scrap swatch laid its own way. The shadow glaze released 0.36 to 0.39 of its booked pigment before; a fixture rose from 0.382 to 0.926. With the switch on and the base recipe's dark and cool gains kept, paintings come out too dark (Mittens dark share 0.110 against the target's 0.055, Trumbull 0.262 against 0.191). (`eeeec3a6`, `20619a48`)
+- **Palette mix solver.** `src/paint/methods/palette-mix.mjs` solves a mix from the box for a target colour on the pigment model. The painter does not call it. (`e32ab415`)
+- **Physical pigment properties under `--boxphys 1`.** Each box paint takes its published granulation, staining, flocculation, scattering and density from one table that Paint Lab shares (`demos/lab/media/pigment-physical.js`). Picking is unchanged. An explicit `--gamma*` or `--floc*` flag still wins. It is off by default and no painting has been measured with it.
+
+### After `32b1bfa4`
+
+Each painting change below was painted from the same stored plans and commands before and after, at full size, unless it says otherwise.
+
+- **Lane joins in wide washes.** A plane wider than the brush is laid in lanes. The brush lays solid paint only part of the way to its edge, so the old 3.5% overlap left a bare strip at each join, and every pigment coat reused the same lanes. That made pale slashes (Mittens hair, Trumbull facade, Rembrandt dress). Lanes are now spaced so neighbours meet where the paint fades to half, midway through the brush's ragged edge (`edgeHalfWidth` in `src/media/brush.mjs`). The slashes on Mittens, the white verticals on Tramp and most of the bluish lines on Trumbull are gone; one Trumbull seam and one Rembrandt streak remain. An earlier version that met in solid paint printed dark stripes on Tramp and was replaced. (`e40893ac`, `ee0b5a85`)
+- **Specks of held white.** Cells held white because the plan gives them under half a glaze now obey the planner's size floor, like any other light. They were masked at any size and left white flecks on the Trumbull stone. Explicit holds such as fur reserves are kept at any size. On the dog-ink portrait the thinnest fur highlights come out a little greyer. (`e40893ac`)
+- **Planned lines in masses.** A line from the plan's drawing files is drawn only where at least half of it lies within one source pixel of a planned passage boundary (`--lineedges`, default 1). On Mittens the lines across the cat's fur, down the face edge and in the nose are gone; the crease above the man's right eye and the cat's tear line are lost too. A source's own pen lines are unchanged. (`d4bd4f50`)
+- **Catchlights.** A reserve box with no paper light keeps its lightest connected cells by the plan's target value, up to the smallest paint brush's footprint (21 cells at 1200 px). The man's eyes on Mittens get catchlights back. (`24511b26`)
+- **Named paint boxes.** A plan's `--paints` box now gains up to two pans when a hue cluster holding at least 2% of the picture is out of its reach (hue off by more than 12 degrees, or chroma under 0.8 of the cluster's). The log gives the reason. `--paintsextend 0` keeps the box as named. This changes the palette of 53 of the 128 stored plans that name a box. On Mittens it adds a pan and 18% more strokes, which is over the 10% limit used for the other changes; J1 on the stored Mittens plan rose from 6.01 to 6.80 and on a fresh plan from 6.25 to 6.53, three scorings each. The Trumbull and Rembrandt palettes are unchanged. It was not part of the six-plate measurement below. (`0cf0dbfe`)
+- **V5 with J1.** A V5 run with `--judge J1` under a benchmark profile failed to score try 1 for try 2's feedback. It now scores with J1. (`6124d06a`)
+- **Private targets.** The leaderboard names distributed targets only. (`fa0a8632`)
+- **Full-size judge.** `bench/scorer/fullsize.py` shows the J1 judges 1:1 tiles of a painting, 64 mm of paper each, with no target. Scans of real paintings score 7.5 to 7.9 and simulator plates 3.0 to 3.9. No pair of plates before and after a fix moved by more than the spread between passes (0.53), so it is not shown to rank plates. (`f97e7d6b`)
+- **Plate gate.** `bench/scripts/plate-gate.mjs` checks one plate against its target: paper and dark share, edge energy, delivery, the anti-copying limits and lights before darks. (`4f3cc12b`)
+- **Release comparison page.** `bench/scripts/compare-release-*.mjs` and `live.sh` build a page that sets one release's paintings beside another's. (`eea8163a`)
+
+Measured at `318b5a86`, before the named-box change, on six plates (stored Mittens Opus/1 and Trumbull Argon/1, and held-out Rembrandt, Tramp, dog-paint and dog-ink), against `32b1bfa4`:
+
+- Strokes rose 0.6% to 3.4%. hfCorr moved −0.011 to +0.013. No guard violations and no target looks.
+- J1, three repeats each in one batch: the mean of the six subject means went from 5.55 to 5.60. Mittens rose 0.63 and dog-ink fell 0.36; the other four moved by 0.15 or less. One unchanged image can score 0.3 apart between batches.
+
+Tried and not taken: a soft-edge clip opening (no visible change), clean-water edge rings (pale tidelines), three mixed-charge washes (hard islands and outlined patches on Trumbull and Mittens), a stroke-gesture prototype (worse than the default on Mittens, J1 5.62 against 5.90, and on the held-out dog-paint), and two automatic readings of how much pen linework a source has (neither told pen sources from the rest).
+
+### Known defects in the default path
+
+- The stored Sargent plan does not paint (see above).
+- A V5 session can fail the comparison gate after the model pauses and resumes a painting: the resumed part saves no frame when a value band dries, so the 50% and 75% stage images are identical. All three V5 Trumbull sessions at `318b5a86` failed this way. The same plans painted without a pause pass.
+- The shadow glaze releases about 0.39 of its booked pigment, and the value plan asks for more dark than the target has. The two errors partly cancel. The fix for each is off by default (see above), because neither passes alone and the pair has not passed together.
+- Closing ink is drawn on Mittens, whose source has no pen lines. Lines from a plan's drawing files are now limited to passage edges, but the automatic choice still does not turn closing ink off.
+- Closing lines add repeated dark crescents on Hills and stray dark marks on Trumbull stone.
+- Large blank planes remain on the Mittens faces and chests.
+- Strong colours are muted. On a fresh Mittens plan the 90th-percentile chroma is 17.6 against the target's 22.6. On a fresh Trumbull plan it is 31.0 against 36.8.
+
+Changes in this range with no test or measurement are not listed.
+
 ## 0.3.0 — 2026-11-07
 
 **Five benchmark paintings, 30% less total time.** Replaying the saved Opus V5 plans took **14:47 instead of 21:13** on Apple M4 (**1.44× overall**). One run per painting/version; gains vary by target. France falls below the 98% image-similarity floor. The earlier 1.85× claim, which mixed cache states, is withdrawn.

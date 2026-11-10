@@ -5,13 +5,12 @@
 // The flags each preset sets: general techniques whose values were fitted mostly on Trumbull (Y1). No preset is
 // keyed to a subject, and none is applied by subject id.
 export const PRESETS = Object.freeze({
-  // Buildings under a sky: sky lanes, cut-stone blocks, dark recesses in two layers, a cool ground glaze, varied texture.
+  // Buildings under a sky: sky lanes, cut-stone blocks, dark recesses in two layers, a cool ground glaze.
   architecture: [
     '--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5',
     '--groundglaze 1',
     '--stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1',
     '--recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1',
-    '--texvariety 0.8',
   ].join(' '),
   // Glaze strengths fitted on Y1 and Y4: 30% more paint in shadow glazes and cool cells, lighter touch-up glazes.
   'glaze-gains': '--darkgain 1.3 --coolgain 1.3 --touchgain .6',

@@ -26,20 +26,28 @@ function sample(P, w, h, x, y) {
   return (P[y0 * w + x0] * (1 - u) + P[y0 * w + x1] * u) * (1 - v) + (P[y1 * w + x0] * (1 - u) + P[y1 * w + x1] * u) * v;
 }
 
-const arcLengths = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
+const ptX = p => (Array.isArray(p) ? p[0] : p?.x);
+const ptY = p => (Array.isArray(p) ? p[1] : p?.y);
+export const getWidth = p => (p == null ? NaN : Number.isFinite(p.width) ? p.width : Number.isFinite(p.r) ? p.r : NaN);
+export const getDark = p => (p == null ? NaN : Number.isFinite(p.weight) ? p.weight : Number.isFinite(p.absorb) ? p.absorb : Number.isFinite(p.d) ? p.d : NaN);
+const arcLengths = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(ptX(pts[k]) - ptX(pts[k - 1]), ptY(pts[k]) - ptY(pts[k - 1]))); return d; };
 
 /** Points {x, y, width?, weight?} resampled every `step` along the path; width and weight interpolate. */
 export function resample(pts, step) {
-  if (pts.length < 2) return pts.map(p => ({ ...p }));
-  const d = arcLengths(pts), L = d.at(-1), n = Math.max(1, Math.round(L / step)), out = [];
+  if (!pts || pts.length === 0) return [];
+  const norm = pts.map(p => (Array.isArray(p) ? { x: ptX(p), y: ptY(p) } : { ...p }));
+  if (norm.length < 2) return norm;
+  const d = arcLengths(norm), L = d.at(-1), n = Math.max(1, Math.round(L / step)), out = [];
   let k = 0;
   for (let i = 0; i <= n; i++) {
     const s = L * i / n;
-    while (k < pts.length - 2 && d[k + 1] < s) k++;
-    const span = d[k + 1] - d[k], t = span > 0 ? Math.max(0, Math.min(1, (s - d[k]) / span)) : 0, a = pts[k], b = pts[k + 1];
+    while (k < norm.length - 2 && d[k + 1] < s) k++;
+    const span = d[k + 1] - d[k], t = span > 0 ? Math.max(0, Math.min(1, (s - d[k]) / span)) : 0, a = norm[k], b = norm[k + 1];
     const q = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
     if (a.width != null && b.width != null) q.width = a.width + (b.width - a.width) * t;
     if (a.weight != null && b.weight != null) q.weight = a.weight + (b.weight - a.weight) * t;
+    if (a.r != null && b.r != null) q.r = a.r + (b.r - a.r) * t;
+    if (a.d != null && b.d != null) q.d = a.d + (b.d - a.d) * t;
     out.push(q);
   }
   return out;
@@ -49,26 +57,55 @@ export function resample(pts, step) {
 export function turning(pts) {
   let turn = 0, len = 0;
   for (let k = 1; k < pts.length; k++) {
-    const dx = pts[k].x - pts[k - 1].x, dy = pts[k].y - pts[k - 1].y; len += Math.hypot(dx, dy);
+    const dx = ptX(pts[k]) - ptX(pts[k - 1]), dy = ptY(pts[k]) - ptY(pts[k - 1]); len += Math.hypot(dx, dy);
     if (k < pts.length - 1) {
-      const a1 = Math.atan2(dy, dx), a2 = Math.atan2(pts[k + 1].y - pts[k].y, pts[k + 1].x - pts[k].x);
+      const a1 = Math.atan2(dy, dx), a2 = Math.atan2(ptY(pts[k + 1]) - ptY(pts[k]), ptX(pts[k + 1]) - ptX(pts[k]));
       let da = Math.abs(a2 - a1); if (da > Math.PI) da = 2 * Math.PI - da; turn += da;
     }
   }
   return len > 0 ? turn * 180 / Math.PI / len : 0;
 }
 
-// Douglas-Peucker over indices, keeping every index in `pinned`.
-function simplify(pts, tol, pinned = new Set()) {
+// Douglas-Peucker over indices, keeping every index in `pinned`, with clamped projection & modulation preservation.
+export function simplify(pts, tol, pinned = new Set(), { widthTol = 0.15, darkTol = 0.1 } = {}) {
+  if (!pts || pts.length < 3 || !(tol > 0)) return pts ? pts.map(p => (Array.isArray(p) ? [...p] : { ...p })) : [];
   const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
-  for (const i of pinned) keep[i] = 1;
+  for (const i of pinned) if (i >= 0 && i < pts.length) keep[i] = 1;
   const stack = []; let a = 0;
   for (let i = 1; i < pts.length; i++) if (keep[i]) { stack.push([a, i]); a = i; }
   while (stack.length) {
     const [i, j] = stack.pop(); if (j - i < 2) continue;
-    const ax = pts[i].x, ay = pts[i].y, dx = pts[j].x - ax, dy = pts[j].y - ay, L = Math.hypot(dx, dy) || 1;
+    const ax = ptX(pts[i]), ay = ptY(pts[i]), bx = ptX(pts[j]), by = ptY(pts[j]);
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
     let best = -1, far = tol;
-    for (let k = i + 1; k < j; k++) { const e = Math.abs((pts[k].x - ax) * dy - (pts[k].y - ay) * dx) / L; if (e > far) { far = e; best = k; } }
+    for (let k = i + 1; k < j; k++) {
+      const px = ptX(pts[k]) - ax, py = ptY(pts[k]) - ay;
+      let dGeom = 0, tMod = 0;
+      if (len2 > 1e-12) {
+        const t = Math.max(0, Math.min(1, (px * dx + py * dy) / len2));
+        tMod = t;
+        dGeom = Math.hypot(px - t * dx, py - t * dy);
+      } else {
+        tMod = (k - i) / (j - i);
+        dGeom = Math.hypot(px, py);
+      }
+      let dWidth = 0;
+      const wI = getWidth(pts[i]), wJ = getWidth(pts[j]), wK = getWidth(pts[k]);
+      if (Number.isFinite(wI) && Number.isFinite(wJ) && Number.isFinite(wK)) {
+        const wExpected = wI + tMod * (wJ - wI);
+        dWidth = Math.abs(wK - wExpected);
+      }
+      let dDark = 0;
+      const dI = getDark(pts[i]), dJ = getDark(pts[j]), dK = getDark(pts[k]);
+      if (Number.isFinite(dI) && Number.isFinite(dJ) && Number.isFinite(dK)) {
+        const dExpected = dI + tMod * (dJ - dI);
+        dDark = Math.abs(dK - dExpected);
+      }
+      const eWidth = widthTol > 0 ? (dWidth / widthTol) * tol : 0;
+      const eDark = darkTol > 0 ? (dDark / darkTol) * tol : 0;
+      const e = Math.max(dGeom, eWidth, eDark);
+      if (e > far) { far = e; best = k; }
+    }
     if (best > 0) { keep[best] = 1; stack.push([i, best], [best, j]); }
   }
   return pts.filter((_, i) => keep[i]);
@@ -79,9 +116,9 @@ function simplify(pts, tol, pinned = new Set()) {
  * Returns new points; the input is not changed.
  */
 export function smoothPath(pts, { sigma = 1.5, cornerDeg = 50, tol = 0.1 } = {}) {
-  if (pts.length < 3 || !(sigma > 0)) return pts.map(p => ({ ...p }));
+  if (pts.length < 3 || !(sigma > 0)) return pts.map(p => (Array.isArray(p) ? { x: ptX(p), y: ptY(p) } : { ...p }));
   const step = Math.min(0.5, sigma / 3), R = resample(pts, step), n = R.length;
-  if (n < 5) return pts.map(p => ({ ...p }));
+  if (n < 5) return pts.map(p => (Array.isArray(p) ? { x: ptX(p), y: ptY(p) } : { ...p }));
   // corners: the turn between the chords to points two sigmas back and ahead, local maxima above the limit
   const span = Math.max(1, Math.round(2 * sigma / step)), ang = new Float32Array(n);
   for (let i = span; i < n - span; i++) {
@@ -119,10 +156,11 @@ export function smoothPath(pts, { sigma = 1.5, cornerDeg = 50, tol = 0.1 } = {})
 export function pathSupport(pts, L, w, h) {
   const n = pts.length, support = new Float32Array(n), on = new Float32Array(n), side = new Float32Array(n);
   for (let k = 0; k < n; k++) {
-    const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)], tx = b.x - a.x, ty = b.y - a.y, tl = Math.hypot(tx, ty) || 1;
-    const nx = -ty / tl, ny = tx / tl, p = pts[k];
-    const o = (sample(L, w, h, p.x, p.y) + sample(L, w, h, p.x + ON_HALF * nx, p.y + ON_HALF * ny) + sample(L, w, h, p.x - ON_HALF * nx, p.y - ON_HALF * ny)) / 3;
-    let l = 0, r = 0; for (const d of SIDE_RADII) { l += sample(L, w, h, p.x + d * nx, p.y + d * ny); r += sample(L, w, h, p.x - d * nx, p.y - d * ny); }
+    const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)];
+    const tx = ptX(b) - ptX(a), ty = ptY(b) - ptY(a), tl = Math.hypot(tx, ty) || 1;
+    const nx = -ty / tl, ny = tx / tl, px = ptX(pts[k]), py = ptY(pts[k]);
+    const o = (sample(L, w, h, px, py) + sample(L, w, h, px + ON_HALF * nx, py + ON_HALF * ny) + sample(L, w, h, px - ON_HALF * nx, py - ON_HALF * ny)) / 3;
+    let l = 0, r = 0; for (const d of SIDE_RADII) { l += sample(L, w, h, px + d * nx, py + d * ny); r += sample(L, w, h, px - d * nx, py - d * ny); }
     l /= SIDE_RADII.length; r /= SIDE_RADII.length;
     on[k] = o; side[k] = (l + r) / 2; support[k] = side[k] - o;
   }
@@ -149,9 +187,9 @@ export function supportedRuns(support, { threshold, window = 4, gap = 4, minRun 
   return { runs, smoothed: sm };
 }
 
-const toPoints = g => (g.points || []).map(([x, y], k) => ({ x, y, ...(Array.isArray(g.widths) && g.widths.length === g.points.length ? { width: g.widths[k] } : {}), ...(Array.isArray(g.weights) && g.weights.length === g.points.length ? { weight: g.weights[k] } : {}) }));
+const toPoints = g => (g.points || []).map((p, k) => ({ x: ptX(p), y: ptY(p), ...(Array.isArray(g.widths) && g.widths.length === g.points.length ? { width: g.widths[k] } : {}), ...(Array.isArray(g.weights) && g.weights.length === g.points.length ? { weight: g.weights[k] } : {}) }));
 const fromPoints = (g, pts) => {
-  const r = v => Math.round(v * 100) / 100, out = { ...g, points: pts.map(p => [r(p.x), r(p.y)]) };
+  const r = v => Math.round(v * 100) / 100, out = { ...g, points: pts.map(p => [r(ptX(p)), r(ptY(p))]) };
   if (Array.isArray(g.widths)) out.widths = pts.map(p => r(p.width ?? g.width ?? 0));
   if (Array.isArray(g.weights)) out.weights = pts.map(p => r(p.weight ?? g.weight ?? 1));
   return out;
@@ -244,7 +282,7 @@ function measuredLines(measured, { soft: allowSoft = true, widthPx = null } = {}
       // a dip pen pressed harder is darker and wider
       if (widthPx.darkWidth !== false) widths = widths.map((v, k) => Math.max(widthPx.min, v * (0.7 + 0.3 * kept[k])));
     }
-    return { ...rest, points: pts.map(p => [r(p.x), r(p.y)]), widths: widths.map(r), weights: kept.map(r), ...(soft ? { soft: true } : {}) };
+    return { ...rest, points: pts.map(p => [r(ptX(p)), r(ptY(p))]), widths: widths.map(r), weights: kept.map(r), ...(soft ? { soft: true } : {}) };
   });
 }
 

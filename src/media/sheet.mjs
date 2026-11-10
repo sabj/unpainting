@@ -1,4 +1,4 @@
-import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
+import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
 import { censusDry } from './census.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
@@ -76,7 +76,7 @@ const wrote = sheet => { invalidatePaperCertificate(sheet); if (sheet._gpu) shee
 
 export function createSheet(paper, pigments) {
   const { w, h, n } = paper;
-  return {
+  const sheet = {
     paper, pigments, w, h, n, K: pigments.length,
     W: F32(n), s: F32(n), M: U8(n),
     G: pigments.map(() => F32(n)),   // suspended pigment mass
@@ -87,9 +87,13 @@ export function createSheet(paper, pigments) {
     // Masking fluid. Where it is on, the paper is sealed: nothing soaks in, nothing settles, and a wash flows over
     // the top of it rather than round it, so a planned shape survives inside a flowing wash. The paint runs up to its
     // edge and stops. Rubbed off, the paper under it is untouched.
-    resist: null, resistFrom: null,
+    resist: null, resistFrom: null, resistStrength: null,
     edge: F32(n), steps: 0,
   };
+  sheet.prewetRegion = (mask, waterMm, opts) => prewetRegion(sheet, mask, waterMm, opts);
+  sheet.depositPassage = (mask, conc, water, opts) => depositPassage(sheet, mask, conc, water, opts);
+  sheet.softEdgeRing = (mask, radiusMm, strength, opts) => softEdgeRing(sheet, mask, radiusMm, strength, opts);
+  return sheet;
 }
 
 /** Water and pigment masses added at a cell. */
@@ -267,6 +271,138 @@ const depositScaled = (sheet, i, water, pig, g) => {
   sheet.W[i] += water; sheet.M[i] = 1; sheet.ever[i] = 1; sheet.wetDirty = 1;
   if (pig) for (let k = 0; k < sheet.K; k++) { const v = pig[k] * g; if (v) sheet.G[k][i] += v; }
 };
+
+/**
+ * Pre-wet a region of the paper with clean water, saturating the capillary pores
+ * and establishing a uniform damp sheen (wet bed) without pigment.
+ * Prevents premature boundary drying and enables continuous wet-into-wet wash merging.
+ */
+function prewetRegion(sheet, mask = null, waterMm = 0.03, { dampPoreShare = 0.85, surfaceFilm = 0.02, protect = null } = {}) {
+  coherent(sheet);
+  const { n, paper, W, s, M, ever } = sheet;
+  const capacity = paper.capacity;
+  const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.218;
+  const targetDepth = Math.max(surfaceFilm, (waterMm / mmPerCell) * 0.1);
+  const wettedIndices = [];
+
+  for (let i = 0; i < n; i++) {
+    if (mask && !mask[i]) continue;
+    if (protect?.[i]) continue;
+    if (sheet.resist?.[i] === 1 && (sheet.resistStrength?.[i] ?? 1) === 1) continue;
+
+    const cap = capacity[i];
+    const targetPore = cap * dampPoreShare;
+    if (s[i] < targetPore) s[i] = targetPore;
+
+    if (W[i] < targetDepth) W[i] = targetDepth;
+
+    M[i] = 1;
+    ever[i] = 1;
+    wettedIndices.push(i);
+  }
+
+  sheet.wetDirty = 1;
+  recordWetCells(sheet, wettedIndices);
+  wrote(sheet);
+
+  if (TAPE && sheet._tape) {
+    TAPE.push({ k: 'pw', m: mask ? Array.from(mask) : null, w: waterMm });
+  }
+
+  return wettedIndices.length;
+}
+
+/**
+ * Deposit an entire passage directly through a mask with specified pigment concentration and water load.
+ */
+function depositPassage(sheet, mask, pigmentConcentration, waterLoad, options = {}) {
+  coherent(sheet);
+  const { prewet = false, waterMm = 0.03, protect = null } = options;
+  if (prewet) {
+    prewetRegion(sheet, mask, waterMm, options);
+  }
+  const n = sheet.n;
+  const indices = [];
+  for (let i = 0; i < n; i++) {
+    if (mask && !mask[i]) continue;
+    if (protect?.[i]) continue;
+    if (sheet.resist?.[i] === 1 && (sheet.resistStrength?.[i] ?? 1) === 1) continue;
+    deposit(sheet, i, waterLoad, pigmentConcentration);
+    indices.push(i);
+  }
+  recordWetCells(sheet, indices);
+  wrote(sheet);
+  return indices.length;
+}
+
+/**
+ * Compute a damp perimeter feathering ring around a mask, applying damp pore moisture without pigment.
+ */
+function softEdgeRing(sheet, mask, radiusMm = 1.0, featherStrength = 0.7, options = {}) {
+  if (!(radiusMm > 0)) return { wettedCells: 0, maxMoistureAdded: 0 };
+  coherent(sheet);
+  const { w, h, paper, s, ever } = sheet;
+  const capacity = paper.capacity;
+  const mmPerCell = paper.mmPerCell > 0 ? paper.mmPerCell : 0.218;
+  const rCells = Math.max(1, Math.round(radiusMm / mmPerCell));
+  const protect = options.protect ?? null;
+  const wetted = [];
+
+  const n = w * h;
+  const dist = new Float32Array(n).fill(Infinity);
+  let q = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!mask || !mask[i]) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (mask && mask[j]) continue;
+        if (protect?.[j]) continue;
+        if (sheet.resist?.[j] === 1 && (sheet.resistStrength?.[j] ?? 1) === 1) continue;
+        if (dist[j] > 1) { dist[j] = 1; q.push(j); }
+      }
+    }
+  }
+
+  for (let step = 1; step < rCells && q.length; step++) {
+    const next = [];
+    for (const i of q) {
+      const x = i % w, y = (i / w) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const j = yy * w + xx;
+        if (mask && mask[j]) continue;
+        if (protect?.[j]) continue;
+        if (sheet.resist?.[j] === 1 && (sheet.resistStrength?.[j] ?? 1) === 1) continue;
+        if (dist[j] > step + 1) { dist[j] = step + 1; next.push(j); }
+      }
+    }
+    q = next;
+  }
+
+  for (let i = 0; i < n; i++) {
+    const d = dist[i];
+    if (d > rCells) continue;
+    const falloff = Math.max(0, (rCells - d + 1) / (rCells + 1));
+    const target = capacity[i] * featherStrength * falloff;
+    if (target > 0) {
+      if (s[i] < target) s[i] = target;
+      ever[i] = 1;
+      wetted.push(i);
+    }
+  }
+
+  if (wetted.length) {
+    sheet.wetDirty = 1;
+    recordWetCells(sheet, wetted);
+    wrote(sheet);
+  }
+  return wetted.length;
+}
 
 // The part of the sheet still worth working: what is wet, plus pores still holding water. Paper this close to dry is
 // finished, and leaving it out keeps every later step cheap.
@@ -519,9 +655,38 @@ function stepBox(sheet, o, box, reduce = false) {
 
   // 1. drying, faster at the pinned boundary; absorption into the pores without tearing the film
   const evap = o.evap, edgeEvap = o.edgeEvap, absorb = o.absorb, oFilm = o.film;
+  const edgeFlowDepth = o.edgeFlowDepth ?? 0.06;
+  const mmPerCell = o.mmPerCell > 0 ? o.mmPerCell : (paper.mmPerCell > 0 ? paper.mmPerCell : 0.3);
+  const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
+  const dryR2 = dryR * dryR;
+
   for (let q = 0; q < nw; q++) {
     const i = wl[q];
-    const near = edge[i] <= edgeWidth ? 1 - (edge[i] - 1) / edgeWidth : 0;
+    let near = 0;
+    if (edge[i] <= edgeWidth) {
+      const geomNear = 1 - (edge[i] - 1) / edgeWidth;
+      const cx = i % w, cy = (i / w) | 0;
+      let dryCells = 0, totalCells = 0;
+      for (let dy = -dryR; dy <= dryR; dy++) {
+        const dy2 = dy * dy, py = cy + dy;
+        const inY = py >= 0 && py < h;
+        const prow = inY ? py * w : 0;
+        for (let dx = -dryR; dx <= dryR; dx++) {
+          if (dx * dx + dy2 <= dryR2) {
+            totalCells++;
+            const px = cx + dx;
+            if (!inY || px < 0 || px >= w || !M[prow + px]) dryCells++;
+          }
+        }
+      }
+      const dryFrac = totalCells > 0 ? dryCells / totalCells : 0;
+      const fMin = dryR <= 2 ? 0.10 : 0.18;
+      const fMax = dryR <= 2 ? 0.28 : 0.42;
+      const u = Math.min(1, Math.max(0, (dryFrac - fMin) / (fMax - fMin)));
+      const dryFactor = u * u * (3 - 2 * u);
+      const depthFactor = edgeFlowDepth > 0 ? Math.min(1, Math.max(0, W[i] / edgeFlowDepth)) : 1;
+      near = geomNear * dryFactor * depthFactor;
+    }
     W[i] = Math.max(0, W[i] - dt * (evap + edgeEvap * near));
     const a = Math.min(dt * absorb, Math.max(0, capacity[i] - s[i]), Math.max(0, W[i] - oFilm));
     if (a > 0) { const aw = a / W[i]; for (let n = 0; n < nA; n++) { const k = act[n], Gk = G[k], g = Gk[i] * aw * mobility[k]; Gk[i] -= g; P[k][i] += g; } }
