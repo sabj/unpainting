@@ -225,8 +225,8 @@ const EARLY_LINES = !['none','auto'].includes(opt('linesource','none')) ? await 
   prepare:()=>prepareLineSource({opt,num,argv,out,root,log:console.log}),
 }) : null;
 // Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
-// --linesupport t (L*, default 0 off): keep only the parts of the opening and closing lines along which the target
-// shows a line at least t L* darker than beside it. --linesmooth mm (default 0 off): smooth stepped traces at mm,
+// --linesupport t (L*, default 0 off): keep an opening or closing line whole when at least half of it runs along a line
+// in the target at least t L* darker than beside it, and leave it off whole otherwise (never cut point by point). --linesmooth mm (default 0 off): smooth stepped traces at mm,
 // keeping corners sharper than --linesmoothcorner degrees (default 50). Either writes <out>/ink-<stage>-lines.json and
 // points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too. It runs
 // again in a process that takes over a saved painting (--resumestate), on the line files as they now stand.

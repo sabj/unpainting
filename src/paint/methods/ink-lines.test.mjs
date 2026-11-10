@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { smoothPath, simplify, turning, pathSupport, supportedRuns, holdLinesToTarget, inkCapFactor, resample, getWidth, getDark } from './ink-lines.mjs';
+import { smoothPath, simplify, turning, pathSupport, supportedRuns, holdLinesToTarget, lineHeld, inkCapFactor, resample, getWidth, getDark } from './ink-lines.mjs';
 
 // a 60 x 40 L* plane: paper at 90 with a dark horizontal line (L* 40) one pixel wide along row 10, and a step edge
 // at x = 30 below row 20 (left 30, right 90)
@@ -31,18 +31,18 @@ test('a path along a tonal edge with no line is not supported', () => {
   assert.ok(m < 3, `edge support ${m}`);
 });
 
-test('the filter keeps the supported part of a line and drops the rest', () => {
+test('the filter decides per line: a line at least half on a target line is kept whole, others dropped whole', () => {
   const { L, w, h } = plane();
-  // half on the dark line, then a bend away over blank paper
-  const pts = [{ x: 5, y: 10.5 }, { x: 30, y: 10.5 }, { x: 30, y: 18 }, { x: 55, y: 18 }];
-  const r = holdLinesToTarget([line(pts), line(straight(5.5))], L, w, h, { threshold: 6 });
-  assert.equal(r.stats.lines, 2);
+  // most of it on the dark line, then a short bend away over blank paper: kept whole, bend included
+  const most = [{ x: 5, y: 10.5 }, { x: 45, y: 10.5 }, { x: 45, y: 18 }, { x: 55, y: 18 }];
+  // a quarter on the dark line, the rest over blank paper: dropped whole, not cut to its supported quarter
+  const little = [{ x: 5, y: 10.5 }, { x: 18, y: 10.5 }, { x: 18, y: 18 }, { x: 55, y: 18 }];
+  const r = holdLinesToTarget([line(most), line(little), line(straight(5.5))], L, w, h, { threshold: 6 });
+  assert.equal(r.stats.lines, 3);
   assert.equal(r.stats.kept, 1);
   assert.equal(r.lines.length, 1);
-  const xs = r.lines[0].points.map(p => p[0]), ys = r.lines[0].points.map(p => p[1]);
-  assert.ok(Math.min(...xs) <= 6 && Math.max(...xs) >= 28 && Math.max(...xs) <= 32, `kept span ${Math.min(...xs)}..${Math.max(...xs)}`);
-  assert.ok(Math.max(...ys) < 13, `kept down to y ${Math.max(...ys)}`);
-  assert.ok(r.stats.keptPx / r.stats.lengthPx < 0.5);
+  assert.deepEqual(r.lines[0].points, most.map(p => [p.x, p.y]), 'the kept line is the whole line, never a piece');
+  assert.ok(lineHeld([[0, 4]], 10) && !lineHeld([[0, 3]], 10) && !lineHeld([], 0));
 });
 
 test('threshold 0 measures without cutting, and widths and weights follow the kept points', () => {

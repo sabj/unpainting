@@ -1,6 +1,7 @@
 // Pipeline: inking, stage 2 (hold and measure the lines).
 // The ink line files held to the target before painting (ink-lines.mjs): the opening (--drawingfile) and closing
-// (--drawinglast) files are smoothed (--linesmooth mm) and cut to where the target shows a line (--linesupport L*),
+// (--drawinglast) files are smoothed (--linesmooth mm) and kept whole where at least half of a line follows a line in the
+// target (--linesupport L*; never cut point by point),
 // written to <out>/ink-opening-lines.json and <out>/ink-closing-lines.json, and the pens pointed at them. The target's
 // own line darkness and pixel size are measured on the way, for --inkdarkcap and --inkwidthfloor, and written to
 // <out>/ink-lines.json.
@@ -112,7 +113,7 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   }
   const s = r.stats, pct = v => `${(100 * v).toFixed(0)}%`;
   log(`ink lines, ${stage}: ${path.basename(file)}${flags.smoothMm > 0 ? `, smoothed at ${flags.smoothMm} mm (turning ${(s.turnBefore / pxMm).toFixed(1)} to ${(s.turnAfter / pxMm).toFixed(1)} degrees per mm)` : ''}`
-    + `${support > 0 ? `, ${s.pieces} pieces of ${s.kept} of ${s.lines} lines kept where the target shows a line of ${support} L* or more (${pct(s.keptPx / Math.max(1e-9, s.lengthPx))} of the length)` : `, ${model ? 'lineart map lines, measured and not cut, ' : ''}${pct(s.supportedShare)} of the length on a target line`}`
+    + `${support > 0 ? `, ${s.kept} of ${s.lines} lines kept whole, each with at least half its length on a target line of ${support} L* or more (${pct(s.keptPx / Math.max(1e-9, s.lengthPx))} of the length)` : `, ${model ? 'lineart map lines, measured and not cut, ' : ''}${pct(s.supportedShare)} of the length on a target line`}`
     + `; target line L* ${s.lineL?.toFixed(1) ?? '-'} against ${s.sideL?.toFixed(1) ?? '-'} beside it`);
   return record;
 }

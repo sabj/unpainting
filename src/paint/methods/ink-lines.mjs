@@ -187,6 +187,12 @@ export function supportedRuns(support, { threshold, window = 4, gap = 4, minRun 
   return { runs, smoothed: sm };
 }
 
+/** Whether a line is held: its supported runs (index ranges of its n resampled points) cover at least half of it. */
+export function lineHeld(runs, n) {
+  let c = 0; for (const [a, b] of runs) c += b - a + 1;
+  return n > 0 && c >= n / 2;
+}
+
 const toPoints = g => (g.points || []).map((p, k) => ({ x: ptX(p), y: ptY(p), ...(Array.isArray(g.widths) && g.widths.length === g.points.length ? { width: g.widths[k] } : {}), ...(Array.isArray(g.weights) && g.weights.length === g.points.length ? { weight: g.weights[k] } : {}) }));
 const fromPoints = (g, pts) => {
   const r = v => Math.round(v * 100) / 100, out = { ...g, points: pts.map(p => [r(ptX(p)), r(ptY(p))]) };
@@ -205,7 +211,8 @@ const Y = Lstar => (Lstar > 8 ? ((Lstar + 16) / 116) ** 3 : Lstar / 903.3);
 
 /**
  * A line file's lines smoothed and filtered against the target's L* plane (on the file's image grid).
- * `sigma` smoothing in pixels (0 off); `threshold` support in L* (0: measure only, keep every line); `contour`: the lines
+ * `sigma` smoothing in pixels (0 off); `threshold` support in L* (0: measure only, keep every line; above 0: a line is kept
+ * whole when at least half of it reaches it, and dropped whole otherwise); `contour`: the lines
  * are a lineart map's contours, none is marked soft.
  * @returns { lines, stats } with stats { lines, kept, pieces, lengthPx, keptPx, turnBefore, turnAfter,
  *   supportedShare, lineL, sideL, absorbance } where absorbance is the median -ln(Y on-path / Y sides) over supported points
@@ -230,13 +237,13 @@ export function holdLinesToTarget(lines, L, w, h, { sigma = 0, cornerDeg = 50, t
       if (measure) measured.push([g, simplify(R, 0.1)]); else out.push(sigma > 0 ? fromPoints(g, smooth) : g);
       keptPx += len0; kept++; continue;
     }
-    if (runs.length) kept++;
-    for (const [a, b] of runs) {
-      const piece = measure || sigma > 0 || runs.length > 1 || a > 0 || b < R.length - 1 ? simplify(R.slice(a, b + 1), 0.1) : raw;
-      if (piece.length < 2) continue;
-      keptPx += pathLen(piece);
-      if (measure) measured.push([g, piece]); else out.push(fromPoints(g, piece));
-    }
+    // decided per line, never cut point by point: a line is drawn whole when at least half of it follows a line in the
+    // target, and left off whole otherwise (the whole-line rule of the planned-edge test, line-edges)
+    if (!lineHeld(runs, R.length)) continue;
+    const piece = measure || sigma > 0 ? simplify(R, 0.1) : raw;
+    if (piece.length < 2) continue;
+    kept++; keptPx += pathLen(piece);
+    if (measure) measured.push([g, piece]); else out.push(fromPoints(g, piece));
   }
   if (measure) out.push(...measuredLines(measured, { soft: !contour, widthPx: contour ? widthPx : null }));
   return { lines: out, stats: { lines: lines.length, kept, pieces: out.length, lengthPx, keptPx, turnBefore: lengthPx ? tb / lengthPx : 0, turnAfter: lengthPx ? ta / lengthPx : 0,
