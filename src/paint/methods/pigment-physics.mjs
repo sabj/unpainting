@@ -29,7 +29,7 @@ const withPhysics = (p, num) => {
 };
 
 /** --boxphys: box pigments swapped for their physical pigments; the same array when the flag is off. */
-export function boxPhysics({ pigments, opt, log }) {
+function boxPhysics({ pigments, opt, log }) {
   if (opt('boxphys', '0') === '0') return pigments;
   const out = pigments.map(p => { const paint = BOX.find(b => b.name === p.name && (p.key == null || b.key === p.key)); return paint ? physicalPigment(paint) : p; });
   log(`--boxphys: box paints on their published physics: ${out.map((p, j) => (out[j] === pigments[j] ? `${j} unchanged` : `${j} ${p.name} gamma ${p.gamma} omega ${p.omega} rho ${p.rho}${p.floc ? ` floc ${p.floc}` : ''} scatter ${p.S[0]}`)).join(', ')}`);

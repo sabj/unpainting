@@ -2,7 +2,7 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## 0.3.2 — candidate, not released (2026-11-09)
+## 0.3.2 — 2026-11-09
 
 Painter **V105**, simulator **104**, judges **J1**. The changes run from the 0.3.0 release commit `70ceb7c3`.
 
@@ -10,10 +10,10 @@ Painter **V105**, simulator **104**, judges **J1**. The changes run from the 0.3
 
 **0.3.2 repairs defects. It shows no gain in J1 score or speed.** The aim was a J1 score 10% above the five published benchmark winners. That was not shown.
 
-### Measured on the 0.3.2 candidate
+### Measured on the 0.3.2 release commit
 
-- `npm test`: 1,706 pass, 0 fail, 2 skipped. `npm run bench:test`: 144 pass, 0 fail. `npx knip` passes.
-- No painting was rendered from the final 0.3.2 commit before it was frozen. The paired renders below come from its development commits `32b1bfa4` and `318b5a86`.
+- `npm test`: 1,723 pass, 0 fail, 2 skipped. `npm run bench:test`: 144 pass, 0 fail. `npx knip` passes.
+- No painting was rendered from the 0.3.2 release commit. The paired renders below come from its development commits `32b1bfa4` and `318b5a86`.
 - Fresh model sessions at `318b5a86`, three J1 scorings each in one batch with the 300 px previews of the published winners: V5 Mittens scored 6.18 to 6.23 against the winner's 6.45. All three V5 Trumbull sessions failed (see the known defects). At `32b1bfa4`, V4 on Mittens and Trumbull scored a mean of 6.29 and 6.35 for two models against 6.14 for the winners. The five winner previews scored a mean of 6.09 in that batch, so the 10% line is 6.70.
 
 ### Measured at `32b1bfa4`
@@ -83,6 +83,7 @@ Added after `32b1bfa4`, also off by default:
 - **Plan values under `--calibratedplan 1`.** Values are planned by each cell's light through the sheet's optics, by value steps and by the mass tone of each wash (`--celllight`, `--nestedbands`, `--masstone`). On plan checks without a render, the planned dark share came close to the target's on Trumbull (0.123 against 0.135) and Hills (0.276 against 0.301). Rendered, it exceeds both anti-copying limits: strokes +64% on Mittens and +15% on Trumbull, hfCorr +0.09 and +0.13, with new white flecks on the Trumbull stone. (`811f7b3d`, `c8940164`)
 - **Glaze charge under `--instrumentcal 1`.** A dry-paper passage whose brush water or pass count differs from its stock technique is charged from a scrap swatch laid its own way. The shadow glaze released 0.36 to 0.39 of its booked pigment before; a fixture rose from 0.382 to 0.926. With the switch on and the base recipe's dark and cool gains kept, paintings come out too dark (Mittens dark share 0.110 against the target's 0.055, Trumbull 0.262 against 0.191). (`eeeec3a6`, `20619a48`)
 - **Palette mix solver.** `src/paint/methods/palette-mix.mjs` solves a mix from the box for a target colour on the pigment model. The painter does not call it. (`e32ab415`)
+- **Physical pigment properties under `--boxphys 1`.** Each box paint takes its published granulation, staining, flocculation, scattering and density from one table that Paint Lab shares (`demos/lab/media/pigment-physical.js`). Picking is unchanged. An explicit `--gamma*` or `--floc*` flag still wins. It is off by default and no painting has been measured with it.
 
 ### After `32b1bfa4`
 
