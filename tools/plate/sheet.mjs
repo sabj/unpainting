@@ -62,7 +62,7 @@ import {loadPhysical} from '../../src/paint/methods/brushes.mjs';
 import {fillSheetBase, WHITE_PAPER_RGB} from '../../src/paint/methods/sheet-tone.mjs';
 import {sealAtBirth} from '../guard/seal-maps.mjs';
 import {createWetTrace} from './wet-trace.mjs';
-import {wetOnDryGate} from '../painter/passage-dry-gate.mjs';
+import {wetOnDryGate, passageReach} from '../painter/passage-dry-gate.mjs';
 
 export async function sheetAndBrushes(ctx) {
 const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
@@ -106,9 +106,11 @@ const stroke=(b,target,points,options)=>{
   let paper=null,own=false;
   if(fastMode){
     if(paint&&!wetMove){
-      const gate=wetOnDryGate({cells,neighbors,own:{touches:ownCandidate,has:i=>ctx.VALUE_OWN_CONTACT.has(i)},texture:ctx.VALUE_ACTIVE.texture,observeCells:getObservationCells(),
+      // the passage's reach is read once, at its first paint stroke, when its clip is set (tools/painter/passage-dry-gate.mjs)
+      const VP=ctx.VALUE_PASSAGE;if(VP&&VP.reach===undefined)VP.reach=passageReach(target.clip,target.w,target.h);
+      const gate=wetOnDryGate({cells,neighbors,own:{touches:ownCandidate,has:i=>ctx.VALUE_OWN_CONTACT.has(i)},texture:ctx.VALUE_ACTIVE.texture,observeCells:getObservationCells(),passage:VP?.reach?{start:!VP.checked,reach:VP.reach}:null,
         measure:(c,kind)=>measurePaper(target,c,SPEED_PAPER,kind==='gate'?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:fastPaperOpts),dry:()=>dry(target,30000,O,{levelMax:140,dt:2})});
-      paper=gate.paper;own=gate.own;
+      paper=gate.paper;own=gate.own;if(VP?.reach)VP.checked=true;
       if(gate.dried)check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});
     }else if(paint&&!intoOwnWash&&!(ctx.VALUE_ACTIVE.passageMaterial&&ctx.VALUE_ACTIVE.move==='wet on wet')){
       paper=observe();
