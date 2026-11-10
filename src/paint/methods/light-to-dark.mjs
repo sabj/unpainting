@@ -1,7 +1,7 @@
 // Pipeline: painting, stage 5 (glazes and darks).
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
-import {fitPlanOptics} from './plan-optics-fit.mjs';
+import {matchCellLight,createMassTone} from './mass-tone.mjs';
 import {paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mjs';
 import {normalizeWashWeights} from './wash-system.mjs';
 import {reserveLights,validateReserves,brushFootprintCells} from './light-reserves.mjs';
@@ -42,7 +42,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({washSystem=false,paperRule=washSystem,calibratedPlan=false,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=false,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null,mixedWash=washSystem,mixedShadows=washSystem,scaleCuts=washSystem,gradedLanes=washSystem,softChoice=washSystem}) {
+export function planLightToDark({washSystem=false,paperRule=washSystem,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,sourceCellsPerPx=1,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=calibratedPlan,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null,mixedWash=washSystem,mixedShadows=washSystem,scaleCuts=washSystem,gradedLanes=washSystem,softChoice=washSystem}) {
   if(calibratedPlan){darkGain=1;coolGain=1;midGain=1;}
   let coolGroup=null;setRecessMax(recessMax);
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
@@ -274,7 +274,11 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
   if(calibratedPlan)normalizeWashWeights(weights,{mergeMiddle:false});
   let opticsReport=null;
-  if(calibratedPlan){const fit=fitPlanOptics({demand,rgb,labels:region.labels,protect:protectedCells,pigments,paperRGB:paperRGB??[252,251,248],k,mode:mixedWash&&mixedShadows&&!cellProf?'mixed':'separate'});demand=fit.demand;opticsReport=fit.report;console.log(`plan optics: ${opticsReport.length} region factors estimated from mean K/S reflected light; ${opticsReport.filter(r=>!r.matched).length} outside the material value range`);}
+  // cellLight and massTone (mass-tone.mjs): each cell's paint is the film that returns its light, and each wash is
+  // charged at its shape's mass tone, not at the mean paint of its cells.
+  if(cellLight){if(!rgb||!pigments.length)throw Error('cellLight needs the target colours and the pigments');const fit=matchCellLight({demand,rgb,pigments,paperRGB:paperRGB??[252,251,248],k,protect:protectedCells});demand=fit.demand;opticsReport={rule:'cell light',matched:fit.matched,unmatched:fit.unmatched,meanScale:fit.meanScale};console.log(`plan optics: ${fit.matched} cells matched to their light at a mean ${fit.meanScale.toFixed(3)} of the fitted paint; ${fit.unmatched} out of reach and left as fitted`);}
+  if(massTone&&!pigments.length)throw Error('massTone needs the pigments');
+  const TONE=massTone?createMassTone({n,pigments,paperRGB:paperRGB??[252,251,248]}):null;let toneSum=0,toneArea=0;
   const layers=[],instructions=[];let omittedDemand=0;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
   // layers>0: the middle values are built as several wide connected wash layers, each dried
@@ -284,7 +288,7 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   // scaleCuts (scale-layers.mjs): the middle washes are cut by what each brush size can carry, not at value quantiles,
   // so a smooth form is one graded wash and a later layer is a real darker shape.
   const midShare=i=>weights[1][i]+(layerTexture?0:weights[2][i]);
-  if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'&&!nestedBands&&scaleCuts){
+  if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'&&scaleCuts){
     const mid=Float32Array.from({length:n},(_,i)=>value.values[i]*midShare(i)),live=Uint8Array.from(mid,(v,i)=>!protectedCells[i]&&v>0?1:0);
     // Smoothed and floored as the quantile layers were (layerSmoothMm, four minimum shapes): a wash layer holds no
     // detail finer than that, and what is finer belongs to the pen and the last glazes.
@@ -292,7 +296,7 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
     const layerSteps=sl.cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v?midShare(i)*sl.share[j][i]:0)}));
     steps.splice(1,layerTexture?1:2,...layerSteps);
     console.log(`scale layers: ${layerSteps.length} middle layers at ${radiiForLayers(washLayers).join(', ')} mm, covering ${sl.cover.map(c=>(100*c.reduce((a,v)=>a+v,0)/n).toFixed(0)+'%').join(', ')} of the sheet`);
-  }else if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'&&!nestedBands){
+  }else if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'){
     const r=Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w))),sm=boxMeanValue(value.values,w,h,r);
     const rBroad=Math.max(r,Math.round(2/(sheetWidthMm/w))),smBroad=rBroad>r?boxMeanValue(value.values,w,h,rBroad):sm;
     const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(smBroad[i]);live.sort((a,b)=>a-b);
@@ -318,7 +322,10 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
     // default) gives a light cell all its middle demand in layer 0 while a dark neighbour puts only a quarter there, so
     // the shape's one mean charge is too dark for the light cells and too light for the dark ones.
     const effThresholds = subjects && cover.cuts ? (i => cover.cuts.get(cover.subject[i]) ?? q) : localQ ? (i => localQ.get(region.labels[i]) ?? q) : q;
-    const share=layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
+    // nestedBands: the layers carry the middle value steps, so each takes the part of that range between its own
+    // threshold and the next layer's (layerShares over the range the middle bands span).
+    const midLo=VALUE_CAPS[0],midHi=VALUE_CAPS[layerTexture?1:2],inMid=v=>Math.min(midHi,Math.max(midLo,v))-midLo;
+    const share=nestedBands?layerShares(cover,typeof effThresholds==='function'?i=>effThresholds(i).map(inMid):effThresholds.map(inMid),Float32Array.from(cover.sm??sm,inMid),n):layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
     const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
@@ -333,7 +340,9 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
   if(subjects)steps.splice(0,steps.length,...holdSubjectLights(steps,subjects.lights));
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
-  const carry=passCap>0?Array.from({length:k},()=>new Float32Array(n)):null;
+  // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,
+  // and paint cannot be taken back: carrying only the lack into the next band would lay it twice.
+  const carry=passCap>0&&!massTone?Array.from({length:k},()=>new Float32Array(n)):null;
   // mixedWash (mixed-washes.mjs): a passage is one shape of one colour domain with one mixed charge, laid once on dry
   // paper. Per-cell styles paint cell by cell, so those plans keep their pigment passes.
   const mixedOn=mixedWash&&!cellProf;
@@ -394,8 +403,11 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
             const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
           if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.1,4*(1-detailScale*meanOver(list,DETAIL))):4)){omittedDemand+=total;continue;}
-          if(total<=1e-8)continue;const amount=carried?quantileOf(list,G,passCap):total/list.length;if(placed)for(const i of list)placed[i]=amount;const sh=passage(c.labels,id,box,amount,list.length,w);
-          sh.mix=mixedStep?Array.from(mixedCharge(list,fields,amount)):Array.from({length:k},(_,j)=>j===pigment?amount:0);if(placedOf)for(const i of list)for(let q=0;q<k;q++)placedOf[q][i]=sh.mix[q];sh.graded=null;sh._follow=true;
+          if(total<=1e-8)continue;const amount=carried?quantileOf(list,G,passCap):total/list.length;const sh=passage(c.labels,id,box,amount,list.length,w);
+          sh.mix=mixedStep?Array.from(mixedCharge(list,fields,amount)):Array.from({length:k},(_,j)=>j===pigment?amount:0);
+          // massTone: the flat charge is brought to the strength that returns the light its cells asked for
+          if(TONE){const f=TONE.strength(list,sh.mix,mixedStep?(i,q)=>fields[q][i]:(i,q)=>q===pigment?G[i]:0);sh.mix=sh.mix.map(v=>v*f);sh.amount=amount*f;sh._tone=f;TONE.lay(list,sh.mix);toneSum+=f*list.length;toneArea+=list.length;}
+          if(placed)for(const i of list)placed[i]=sh.amount;if(placedOf)for(const i of list)for(let q=0;q<k;q++)placedOf[q][i]=sh.mix[q];sh.graded=null;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/${mixedStep?'pm':'p'+pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
           // softChoice (soft-edge-choice.mjs): only boundaries where this wash fades and the target has no step are soft
@@ -499,6 +511,7 @@ export function planLightToDark({washSystem=false,paperRule=washSystem,calibrate
       if(placedOf)for(let q=0;q<k;q++)settleCarry(q,fields[q],placedOf[q]);
     }
   }
+  if(TONE)console.log(`mass tone: ${instructions.length} washes charged at a mean ${(toneSum/Math.max(1,toneArea)).toFixed(3)} of their cells' mean paint (by area)`);
   if(softChoice){let hc=0,sc=0;for(const q of instructions){hc+=q.edges.hardCells.length;sc+=q.edges.softCells.length;}console.log(`soft edges: ${(100*sc/Math.max(1,hc+sc)).toFixed(1)}% of ${hc+sc} boundary cells`);}
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
   return {opticsReport,paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
