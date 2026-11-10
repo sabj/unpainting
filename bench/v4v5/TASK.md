@@ -19,7 +19,7 @@ how much its progress frames look like a person painting.
 ## What is fixed for everyone
 
 - The painter code (`tools/paint-plate.mjs`) and its base recipe. Every painting starts from the base recipe
-  `region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2`.
+  `region_w13_lay4_sky3_rg10_blk60_bmm40_bka20_birr_skyb_cpp_pgreen_tp2`.
   Your recipe tokens and painter settings are layered on top of it (below).
 - Fast drying mode, seed 0, the recording (progress frames and the stroke log), the target guard in `gentle` mode (the
   painter may look at broad shape averages of the target while painting; cell-level target reads are blocked and
@@ -58,14 +58,14 @@ All files go in `bench/plan/` unless stated.
    `node bench/tools/trace-ink.mjs <target.png> <out.json> [minContrast=.12] [minLen=10] [maxLum=.62]` and
    `node bench/tools/closing-ink.mjs` (read its header).
 3. **`bench/variant.txt` (required): recipe tokens.** `region_w13` or `region_w15` followed by `_token`s, e.g.
-   `region_w13_lay2_dk11`. Write only what you want to change: the base is applied automatically. A token you write
+   `region_w13_lay2_noslane`. Write only what you want to change: the base is applied automatically. A token you write
    replaces the base token in the same slot (for example `_lay2` replaces the base `_lay4`). A token that changes nothing on this subject is refused. Stone-block and recess tokens of the base act
    on architecture only; palette tokens (`_pwarm`, `_pgold`, `_pgreen`, `_pbs`, `_rv`) act only on Trumbull; elsewhere
    choose pigments with `--paints` in `extra-args.json`. `region_w15` switches to brush choice per passage. The full
    token list with the painter options each sets is in `bench/TOKENS.md`.
 4. **`extra-args.json` (optional): painter settings.** A JSON array of painter options and values, appended last (they
-   win over the recipe), e.g. `["--darkgain","1.1","--paints","ochre,sienna,ultramarine,cerulean,sepia"]`. Options are
-   limited to `--darkgain`, `--coolgain`, `--midgain` (0–3), `--midlayers` (integer 0–8),
+   win over the recipe), e.g. `["--midlayers","3","--paints","ochre,sienna,ultramarine,cerulean,sepia"]`. There is no gain to set: the
+   painter delivers the values your plan states. Options are limited to `--midlayers` (integer 0–8),
    `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
    `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),
    `--valuefloor` (a style name), and `--focusmap` (a `.json` file inside the plan folder).
@@ -145,7 +145,7 @@ cat > $P/config.json <<'JSON'
              {"id":"EXAMPLE.sea","bounds":[0,0.45,1,1],"baseMove":"wet on dry","referenceCue":"darker sea, broken lights"}],
  "reserves":[{"reason":"brightest cloud edge","bounds":[0.6,0.13,0.66,0.19]}]}
 JSON
-echo '["--darkgain","1.1"]' > $P/extra-args.json                                # a painter setting on top of the base
+echo '["--outlinemedium","graphite"]' > $P/extra-args.json                      # a painter setting on top of the base
 echo region_w13_lay2_noslane > bench/variant.txt                                # 2 mid layers, no sky lanes
 bash bench/check.sh                                                             # ends with ADMITTED
 ```

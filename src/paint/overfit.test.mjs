@@ -49,10 +49,11 @@ test('no painting code outside src/paint/tuned branches on a subject id', () => 
 
 test('presets apply only when the plan or --recipe names them', () => {
   const plain = expandRecipe({ argv: ['--recipe', 'general', '--valueplan', 'examples/plans/trumbull-values.json', '--presetless'] });
-  assert.match(plain.note, /presets architecture, glaze-gains(,|$)/);
+  assert.match(plain.note, /presets architecture(,|$)/);
   const typed = expandRecipe({ argv: ['--recipe', 'general+architecture'] }).argv;
   for (const flag of presetFlags(['architecture']).filter(a => a.startsWith('--'))) assert.ok(typed.includes(flag), flag);
   assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+nosuch'] }), /unknown preset nosuch/);
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+glaze-gains'] }), /unknown preset glaze-gains/);
 });
 
 test('no preset names a subject or turns on a per-subject rule', () => {

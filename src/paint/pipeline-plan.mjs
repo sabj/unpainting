@@ -41,13 +41,13 @@ export function resolvePipeline(plan = {}) {
   if (plan.subjectOrder && order.subjects) throw Error('use order.subjects, not both order.subjects and subjectOrder');
   const subjects = order.subjects ?? plan.subjectOrder ?? null;
   readSubjectOrder(subjects, plan.families ?? []);
+  if (washes.darkGain != null) throw Error('washes.darkGain was removed in 0.3.3: the painter delivers the value the plan states, so a plan sets values, not gains');
   const physics = object(washes.physics ?? {}, 'washes.physics');
   const resolved = {
     drawing,
     washes: {
       furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
       paints: paints(washes.paints),
-      darkGain: washes.darkGain == null ? null : number(washes.darkGain, 1, .5, 3, 'washes.darkGain'),
       deepAccent: deepAccent(washes.deepAccent, plan.families ?? []),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
@@ -75,9 +75,6 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   const rawPhysics = rawW.physics ?? {};
   if (w.furReserves && (!onlyAuthored || rawW.furReserves != null)) add('furreserves', JSON.stringify(w.furReserves));
   if (w.paints && (!onlyAuthored || rawW.paints != null)) add('paints', w.paints.join(','));
-  // washes.darkGain: shadow glazes (bands 4-5) are charged at this multiple of their fitted demand. The physical
-  // wash delivers about 70% of a planned dark, so a dark subject names the gain it needs to reach its value.
-  if (w.darkGain != null && (!onlyAuthored || rawW.darkGain != null)) add('darkgain', w.darkGain);
   if (w.deepAccent && (!onlyAuthored || rawW.deepAccent != null)) { add('deepaccent', w.deepAccent.max); add('deepgrow', w.deepAccent.grow); add('deepaccentin', w.deepAccent.families.join(',')); }
   if (!onlyAuthored || rawW.sessions != null) add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
   // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered

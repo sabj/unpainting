@@ -32,8 +32,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,darkGain=1,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,coolGain=1,shadowThresh=.38,midGain=1,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=calibratedPlan,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null}) {
-  if(calibratedPlan){darkGain=1;coolGain=1;midGain=1;}
+export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null}) {
   let coolGroup=null;setRecessMax(recessMax);
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -250,11 +249,16 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // ink-and-wash style uses, whatever the style. Band k covers the cells darker than the band below it and carries the
   // step from that band's cap to its own, so each passage's one mean charge fits all of its cells. Without it a light
   // cell and a dark neighbour share a band in different proportions and the mean charge muddies the light one.
+  // stepSquint: the value steps are cut from the squinted picture, the value smoothed over layerSmoothMm as the middle
+  // layers' own cuts are. A wash holds no shape finer than that; cut cell by cell, each step is a tracing of the target.
+  // Each cell still asks for its own paint, so a wash's charge is the mass tone of the cells it covers.
+  const SQUINT=nestedBands&&stepSquint&&layerSmoothMm>0?boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))):null;
   if(nestedBands)for(let i=0;i<n;i++){
     if(profile&&cellStyle(i).name==='ink-and-wash')continue;
     if(accentCells[i]||(recesses&&rgb&&isRecess(rgb,i))||litStoneMask?.[i]||groundCells[i])continue;
-    const v=value.values[i];
-    for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=v>0?Math.max(0,Math.min(v,VALUE_CAPS[band])-lo)/v*styleGain:0;}
+    const v=SQUINT?SQUINT[i]:value.values[i];
+    let asked=0;for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=Math.max(0,Math.min(v,VALUE_CAPS[band])-lo);asked+=weights[band][i];}
+    for(let band=0;band<5;band++)weights[band][i]=asked>0?weights[band][i]/asked*styleGain:0;
     if(!shadowMask[i]){weights[1][i]+=weights[3][i]+weights[4][i];weights[3][i]=0;weights[4][i]=0;}
   }
   // paleLights v: pale planes (smoothed value at most v, at least a minimum shape) are pale local colour, one clean
@@ -327,7 +331,11 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     for(let pigment=0;pigment<k;pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,carried=placed,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>carry[pigment][i];
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        const effCool=coolGain,cellScale=step.wt[i]*(phase==='shadow'?darkGain:phase==='mid'?midGain:1)*(effCool!==1&&rgb&&rgb[i*3+2]>rgb[i*3]+10&&!isRecess(rgb,i)?effCool:1);G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
+        const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
+      // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
+      // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
+      // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
+      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,minShape);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
       // maskMm: where a carried glaze goes is judged over a brush-sized area, not cell by cell: the mask is the
@@ -357,7 +365,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // instead of being dropped as a bare-paper shard.
       const keyOfDomain=d=>d<0?7:groupMode?coolGroup[d]:typeof d==='string'?domains.indexOf(d)+1:d;
       const cellGroup=i=>litDom>0&&litStoneMask?.[i]?7:groupMode?coolGroup[region.labels[i]]:typeof domains[0]==='string'?domains.indexOf(cellStyle(i).name)+1:region.labels[i];
-      const joined=washJoin&&!subjects&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,minShape):null;
+      const joined=(washJoin||(stepHoles&&!step.pig))&&!subjects&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,minShape):null;
       for(const domain of domains){
         const M0=subjects?mask:joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
         const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
@@ -403,7 +411,9 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
               intent.resolution.minimumWashBodyCells=chosen.detailThresholdCells;
             }
           }
-          if(calibratedPlan)intent.calibratedPlan=true;
+          // ownSwatch: the glaze keeps its own damp one-pass brush and is charged from a scrap swatch of that brush
+          // (instrument-cal.mjs); without it a calibrated plan lays the glaze as the stock swatch does, wetter and twice.
+          if(calibratedPlan&&!ownSwatch)intent.calibratedPlan=true;
           if(brushChoice){
             const pb=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});
             if(pb){

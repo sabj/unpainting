@@ -7,7 +7,6 @@
 - Protected lights: the cloud edge (reserve), and the painter's own near-paper lights.
 - Drawing: the traced pen lines are the opening drawing, in pencil, the harness default. The same file is the closing
   file, which the painter draws only with `--drawing both` in extra-args.json.
-- Values: base darks a little lighter than the base recipe (--darkgain 1.1 instead of 1.3) because the target has no
-  deep blacks outside the rock.
+- Values: as the target has them; the painter delivers the planned value, so there is no gain to set.
 - Tokens: _lay2 (two mid layers instead of four), _noslane (no sky lanes: the sky is one soft wash).
 - Failure signs: sky banding, lost cloud edge, sea reading as flat blue.

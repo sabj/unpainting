@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planLightToDark, layerShares } from './light-to-dark.mjs';
+import { planLightToDark, layerShares, valueTechnique } from './light-to-dark.mjs';
 
 test('layer shares: each covering layer takes its value step, shares sum to 1', () => {
   // three cells: light (only layer 0), middle (layers 0, 1), dark (layers 0, 1, 2); thresholds 0, .3, .6
@@ -553,7 +553,7 @@ test('calibratedPlan: every wash is charged at or under the mean paint of its ce
   assert.equal(plan.opticsReport.rule, 'cell light');
 });
 
-test('calibratedPlan: gains are not applied on top of a plan that already returns its light', () => {
+test('there is no gain: dark, cool and middle gains passed to the planner change nothing', () => {
   const { run, booked } = threeValues();
   assert.deepEqual(booked(run({ calibratedPlan: true, darkGain: 2.2, coolGain: 1.6, midGain: 1.4 })), booked(run({ calibratedPlan: true })));
 });
@@ -569,4 +569,40 @@ test('mass tone carries nothing: a quantile charge with carry plans the same was
   assert.deepEqual(booked(run({ calibratedPlan: true, passCap: 0.5, carryMm: 2, maskMm: 2 })), booked(run({ calibratedPlan: true })));
   // without mass tone the carry is still there
   assert.notDeepEqual(booked(run({ nestedBands: true, passCap: 0.5 })), booked(run({ nestedBands: true })));
+});
+
+// A grey wall with a paper-coloured fleck and a field of one-cell stripes, for the gap and squint rules.
+function wallWithFleck({ stripes = false } = {}) {
+  const w = 48, h = 24, n = w * h, pigments = [{ K: [1, 1, 1], S: [0, 0, 0] }], paperRGB = [255, 255, 255];
+  const value = i => { const x = i % w, y = (i / w) | 0; if (stripes) return x % 2 ? 0.9 : 0.225; return x >= 20 && x < 25 && y >= 10 && y < 14 ? 0 : 0.4; };
+  const density = Float32Array.from({ length: n }, (_, i) => 1.6 * value(i));
+  const rgb = Uint8ClampedArray.from({ length: n * 3 }, (_, q) => Math.round(255 * Math.exp(-density[(q / 3) | 0])));
+  const demand = Float32Array.from(density, d => d / 2);
+  const run = options => { const log = console.log; console.log = () => {}; try { return planLightToDark({ w, h, k: 1, density, demand: demand.slice(), rgb, shaped: true, minShapeCells: 30, sheetWidthMm: 48, pigments, paperRGB, ...options }); } finally { console.log = log; } };
+  const covered = (plan, i) => plan.layers.some(L => L.shapes.some(sh => sh.mask[i]));
+  return { run, covered, w };
+}
+
+test('calibratedPlan: a paper-coloured gap under the minimum shape is painted through, not left as a bare fleck', () => {
+  const { run, covered, w } = wallWithFleck();
+  const fleck = 10 * w + 20;
+  const plan = run({ calibratedPlan: true });
+  assert.equal(plan.protectedCells[fleck], 0, 'the fleck is too small to be a reserved light');
+  assert.ok(covered(plan, fleck), 'the first wash covers the fleck');
+  assert.ok(!covered(run({ calibratedPlan: true, stepHoles: false }), fleck), 'without the rule the fleck is bare paper');
+});
+
+test('calibratedPlan: value steps are cut from the squinted picture, so one-cell stripes are one wash and no glaze traces them', () => {
+  const { run } = wallWithFleck({ stripes: true });
+  const ids = plan => [...new Set(plan.instructions.map(q => q.id.split('/')[1]))];
+  assert.ok(ids(run({ calibratedPlan: true, stepSquint: false })).includes('b5'), 'cut cell by cell, the dark stripes get the top glaze');
+  assert.ok(!ids(run({ calibratedPlan: true })).includes('b5'), 'squinted, the stripes are one middle value');
+});
+
+test('ownSwatch: a calibrated plan keeps the glaze one damp pass; without it the glaze is laid as the stock swatch', () => {
+  const { run } = threeValues();
+  const glaze = plan => valueTechnique(plan.instructions.find(q => q.phase === 'shadow'), 2);
+  const own = glaze(run({ calibratedPlan: true, ownSwatch: true })), stock = glaze(run({ calibratedPlan: true }));
+  assert.deepEqual([own.passes, own.water], [1, 0.45]);
+  assert.deepEqual([stock.passes, stock.water], [2, 0.58]);
 });

@@ -16,10 +16,9 @@ import zlib from 'node:zlib';
 
 // rec2x, rcl and tv8 were dropped in 0.3.1: recess settings act only with --recesses 1 (the architecture preset sets
 // them itself) and texture variety acts only on dry-brush texture passages, which are never planned.
-export const BASE = 'region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2';
+export const BASE = 'region_w13_lay4_sky3_rg10_blk60_bmm40_bka20_birr_skyb_cpp_pgreen_tp2';
 const DEFAULT_VARIANT = 'region_w13';
 const ARCHITECTURE_ONLY = /^(blk|bmm|bka|rg|rec)\d*x?$|^birr$|^rcl$/;
-const GLAZE_GAINS = /^(dk|cg)\d+$/;
 const PALETTE = /^(pwarm|pgold|pgreen|pbs|rv)$/;
 const LINES = name => `${name}-lines.json`;
 
@@ -47,14 +46,13 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       '--physical', '1', '--paperbase', /_cur/.test(v) ? 'white' : 'source', '--loadedcontact', '1', '--order', 'painter', '--valueplan', path.join(planDir, 'config.json'),
       '--brushchoice', v.startsWith('region_w15') ? '1' : '0', '--shapedmarks', shaped ? '1' : '0',
       ...t(/_onedom/, () => ['--middomain', '0']), ...t(/_nest/, () => ['--nestedmid', '1']), ...t(/_lay(\d)/, () => ['--midlayers', m(v, /_lay(\d)/)[1]]),
-      ...t(/_dk(\d+)/, () => ['--darkgain', tenth(v, /_dk(\d+)/)]), ...t(/_lf/, () => ['--loadfeather', '1.5']),
+      ...t(/_lf/, () => ['--loadfeather', '1.5']),
       ...t(/_sg(\d+)/, () => ['--stylegain', tenth(v, /_sg(\d+)/)]), ...t(/_ls(\d+)/, () => ['--layersmooth', tenth(v, /_ls(\d+)/)]),
       ...t(/_acc(\d+)/, () => ['--accentshare', tenth(v, /_acc(\d+)/)]), ...t(/_lt/, () => ['--layertexture', '1']),
       ...(/_cur/.test(v) ? ['--paperlights', '1'] : /_relonly/.test(v) ? ['--paperrel', '1'] : ['--paperrel', '1', '--paperlights', '1']),
       ...(/_cur/.test(v) ? ['--paperrgb', '252,251,248'] : /_relonly/.test(v) ? [] : ['--paperrgb', 'auto']),
-      ...t(/_cg(\d+)/, () => ['--coolgain', tenth(v, /_cg(\d+)/)]),
       ...(/_noslane/.test(v) ? [] : /_slane/.test(v) ? ['--skylanes', '1'] : ['--skylanes', '1', '--skylanemm', '6', '--skylanestep', '.8']),
-      ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]), ...t(/_mg(\d+)/, () => ['--midgain', tenth(v, /_mg(\d+)/)]),
+      ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]),
       ...t(/_shw(\d+)/, () => ['--shadowwater', hundredth(v, /_shw(\d+)/)]),
       ...t(/_dkf/, () => ['--darkfirst', '1']), ...t(/_rg(\d+)/, () => ['--groundglaze', tenth(v, /_rg(\d+)/)]),
       ...t(/_blk(\d+)/, () => ['--stoneblocks', hundredth(v, /_blk(\d+)/)]), ...t(/_bka(\d+)/, () => ['--stoneblockamt', hundredth(v, /_bka(\d+)/)]),
@@ -114,7 +112,7 @@ function delta(build, prefix, token) {
  * The base recipe under the plan's own tokens. Returns the args to run and an account of the layers.
  * architecture: stone blocks apply; trumbull: palette tokens apply; sepiaInk: false when the plan draws in another ink.
  */
-export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, glazeGains = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
+export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
   const { prefix, tokens: mt } = variantParts(variant), { tokens: bt } = variantParts(base);
   const modelArgs = build(variant), modelSlots = new Set(mt.map(slotOf)), skipped = {}, applied = [];
   for (const b of bt) {
@@ -122,7 +120,6 @@ export function layerBase({ variant, build, architecture = false, trumbull = fal
     if (!architecture && ARCHITECTURE_ONLY.test(b)) { skipped[b] = 'architecture only'; continue; }
     if (!trumbull && PALETTE.test(b)) { skipped[b] = 'Trumbull only'; continue; }
     if (!basePalette && PALETTE.test(b)) { skipped[b] = 'base palette off; the plan names none'; continue; }
-    if (!glazeGains && GLAZE_GAINS.test(b)) { skipped[b] = 'calibrated 0.3.1 delivery (glaze gains off)'; continue; }
     if (!sepiaInk && slotOf(b) === 'sep') { skipped[b] = 'plan draws in another ink'; continue; }
     applied.push(b);
   }
@@ -151,7 +148,6 @@ const valueFloorFor = config => { const s = config?.styleSelection; const styles
 const numeric = (min, max) => v => v.trim() !== '' && Number.isFinite(Number(v)) && Number(v) >= min && Number(v) <= max;
 const choice = values => v => values.includes(v);
 export const ALLOWED_EXTRA_ARGS = Object.freeze({
-  darkgain: numeric(0, 3), coolgain: numeric(0, 3), midgain: numeric(0, 3),
   midlayers: v => numeric(0, 8)(v) && Number.isInteger(Number(v)),
   paints: v => /^[a-z]+(?:,[a-z]+)*$/.test(v),
   drawing: choice(['first', 'both', 'last', 'none']),
@@ -164,7 +160,7 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   lanemm: v => v === 'auto' || numeric(0, 40)(v),
   strokemm: numeric(0, 300),
   techcal: choice(['0', '1']),
-  calibratedplan: choice(['0', '1']), paperrule: choice(['0', '1']),
+  paperrule: choice(['0', '1']),
   techcalfrom: numeric(1, 5),
   drawinghand: choice(['0', '1']),
   washinkfree: choice(['0', '1']),
@@ -272,10 +268,8 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
-  const glazeGains = spec.glazeGains !== false;
-  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, glazeGains, sepiaInk, linesExist });
+  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, sepiaInk, linesExist });
   const args = [...layered.args];
-  if (!glazeGains && !args.includes('--techcal')) args.push('--techcal', '1');
   const hasDrawingFile = args.includes('--drawingfile');
   const extraVal = name => { const i = extraArgs.lastIndexOf('--' + name); return i >= 0 && i + 1 < extraArgs.length && !extraArgs[i + 1].startsWith('--') ? extraArgs[i + 1] : null; };
   const effMedium = extraVal('outlinemedium') ?? (config?.drawing?.medium === 'none' ? 'none' : outlineMedium);

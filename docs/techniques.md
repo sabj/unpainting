@@ -174,21 +174,18 @@ They are contained this way:
 
 - The default recipe sets only general methods. No value in it was fitted to one image.
 - Fitted values live in `src/paint/tuned/`. They run only through a named preset or the `v096` recipe.
-- A value plan opts in with `"presets": ["architecture", "glaze-gains"]`. The command line opts in with `--recipe default+architecture`.
+- A value plan opts in with `"presets": ["architecture"]`. The command line opts in with `--recipe default+architecture`.
 - No painting code outside `src/paint/tuned/` checks a subject id. `src/paint/overfit.test.mjs` fails if it does, or if the default recipe sets a tuned flag.
 - `--recipe v096` runs the V096 recipe: the general methods with sky lanes and the tuned flags below, on every subject. It leaves out `--recesses` and the recess flags that need it, and the texture flags.
 
 | Preset | Flags | For |
 |---|---|---|
 | `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1` | Buildings under a sky |
-| `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
 
-`examples/plans/trumbull-values.json` names both presets.
+`examples/plans/trumbull-values.json` names it. The `glaze-gains` preset and the `--darkgain`, `--coolgain` and `--midgain` options were removed in 0.3.3: the painter delivers the value the plan states (below), so there is nothing for a gain to make up.
 
 Preset flags, with the off value, the images they were fitted on and the risk for other subjects:
 
-- `--darkgain 1.3`: 30% more paint in shadow glazes. Off: `1`. Y1, subject-e; high.
-- `--coolgain 1.3`: 30% more paint in cool cells. Off: `1`. Y1, subject-e; high.
 - `--touchgain .6`: strength of touch-up glazes. Off: `.8`. Y1, subject-e; medium.
 - `--skylanemm 6`: 6 mm sky sweep radius. Off: `3`. Y1, subject-e skies; medium.
 - `--skylanestep .8`: closer, overlapping sky sweeps. Off: `1.5`. Y1, subject-e skies; medium.
@@ -227,7 +224,7 @@ Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 
 
 ### Experimental plan values and paper
 
-`--calibratedplan 1` removes blind value gains, limits excess band allocation and enables fresh sheet-only delivery readings. It sets `--darkgain`, `--coolgain` and `--midgain` to 1 and prints no notice when one is typed. It plans values by three rules, each of which can be set alone: `--celllight 1` scales each cell's fitted paint until its film over the paper returns the cell's light through the sheet's own optics; `--nestedbands 1` splits a cell's paint between the five bands by value steps, so a wash covers the cells darker than its band's floor and carries that step, and the middle layers carry the middle steps; `--masstone 1` charges each wash at the strength whose flat film returns the light its cells asked for, not at their mean paint, and carries nothing into later bands (`--passcap` has no effect with it). `--valuepreviewonly 1` writes `plan-ledger.png` and `plan-value-check.json`: the plan as booked paint through the sheet's optics, with its dark share, paper share and L* beside the target's. These are plan values; they do not guarantee the final brush-painted value. The calibration reads the sheet alone only with `--notargetlooks 1`; without it the run still takes its looks at the target between passes.
+Values are planned against the sheet's own optics and delivered as planned (0.3.3; `--calibratedplan` and `--instrumentcal` are no longer options, and typing them, or a gain, stops the run). The plan follows three rules, each of which can be set alone: `--celllight 1` scales each cell's fitted paint until its film over the paper returns the cell's light through the sheet's own optics; `--nestedbands 1` splits a cell's paint between the five bands by value steps, so a wash covers the cells darker than its band's floor and carries that step, and the middle layers carry the middle steps; `--masstone 1` charges each wash at the strength whose flat film returns the light its cells asked for, not at their mean paint, and carries nothing into later bands (`--passcap` has no effect with it). `--valuepreviewonly 1` writes `plan-ledger.png` and `plan-value-check.json`: the plan as booked paint through the sheet's optics, with its dark share, paper share and L* beside the target's. Two more rules apply to the value steps: `--stepholes 1` paints through a gap in a wash that is smaller than the minimum shape and is not a reserved light, so a cell at the paper's own value inside a wall is not left as a bare fleck; `--stepsquint 1` cuts the steps from the target value smoothed over `--layersmooth` (2 mm unless the plan sets it), the smoothing the middle layers' own cuts use, so a wash holds no shape finer than that. `--glazebrush 1` (off) cuts the two shadow glazes from the value smoothed over the smallest paint brush's width instead. The shadow glaze keeps its one damp pass and is charged from its own scrap swatch (each passage whose load or pass count is not its stock technique's is charged from a swatch of its own), and `--deliverycal` and `--techcal` are off unless typed. These are plan values; they do not guarantee the final brush-painted value. The calibration reads the sheet alone only with `--notargetlooks 1`; without it the run still takes its looks at the target between passes.
 
 `--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. It changes the light reference only when `--paperrel 1` or `--paperlights 1` is also on, and it sets the sheet colour only with `--paperrgb auto`. The test compares lightness and chroma, not hue, so pale material of another hue can count as paper.
 
