@@ -69,4 +69,3 @@ Each tool has a use and a failure mode. None is mandatory. Paths are under `src/
 | Hole rims | `washes.physics.holeRimMm`; `src/media/sheet.mjs` | Small dry pits inside a wet wash dry without false rims | Too broad a span removes real granulating edges |
 | Marangoni flow | `washes.physics.marangoni` | Surface-tension movement inside wet passages | Strong values are unstable and disturb line edges |
 | Slope flow | `washes.physics.slope` | A wash meant to run down the sheet | Drift damages aligned architecture and reserved lights |
-| Ink diagnostics | `tools/ink-judge.mjs`, `src/eval/ink.mjs`, `tools/judge/line-study.py` | Precision, recall, loops and ink-wash separation after painting | Pixel metrics are not artistic judgments and never steer paint |

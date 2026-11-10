@@ -62,7 +62,7 @@ import fs from 'node:fs';
 import nodePath from 'node:path';
 import os from 'node:os';
 test('actual production support callback writes event to captured output directory, not gesture-array join',()=>{
- const source=fs.readFileSync(new URL('../paint-plate.mjs',import.meta.url),'utf8');
+ const source=fs.readFileSync(new URL('../plate/paint.mjs',import.meta.url),'utf8');
  const declaration=source.split('\n').find(line=>line.includes('const supportedCharge='));
  assert.ok(declaration);
  const out=fs.mkdtempSync(nodePath.join(os.tmpdir(),'production-contact-log-'));
@@ -71,7 +71,7 @@ test('actual production support callback writes event to captured output directo
   const sh={_semantic:{area:{id:'cat'},key:'cat/source-values',pass:{brush:{orientation:'sweep'}}}};
   let primaryCellCount=3;
   const predict=(actualBrush,actualSheet,points,options)=>{assert.equal(actualBrush,brush);assert.equal(actualSheet,sheet);assert.equal(options.upright,'sweep');assert.deepEqual(points,gesture);return {primaryCellCount};};
-  const create=new Function('JSONL','path','out','AREA_NUMERIC_SEQUENCE','productionChargeSupported','candidateContact','brush','sheet','sh','AREA_NUMERIC_CONTACT_STOP',declaration+'\nreturn supportedCharge;');
+  const create=new Function('JSONL','path','out','AREA_NUMERIC_SEQUENCE','productionChargeSupported','candidateContact','brush','sheet','sh','AREA_NUMERIC_CONTACT_STOP','const ctx={AREA_NUMERIC_SEQUENCE,AREA_NUMERIC_CONTACT_STOP,sheet};\n'+declaration+'\nreturn supportedCharge;');
   const supported=create({append:fs.appendFileSync},nodePath,out,{shapeKey:'shape-A'},productionChargeSupported,predict,brush,sheet,sh,null);
   const gesture=[{x:294.886,y:229.675,r:2.89,p:.35},{x:508.886,y:229.675,r:2.89,p:.35}];
   assert.equal(supported(gesture),true);primaryCellCount=0;assert.equal(supported(gesture),false);
@@ -90,9 +90,11 @@ test('real compiled checkpoint rejects declared-but-empty pass before unrelated 
  const layer={_semantic:{key:'hair/source-values',area:{id:'hair'},pass:{id:'source-values',stage:'first-wash'}}};
  assert.throws(()=>validateCompiledAreaStop('paper/source-values',[layer]),/no compiled paint layers: paper/);
  validateCompiledAreaStop('hair/source-values',[layer]);validateCompiledAreaStop('hair',[layer]);validateCompiledAreaStop('stage:first-wash',[layer]);validateCompiledAreaStop('',[layer]);
- const source=fs.readFileSync(new URL('../paint-plate.mjs',import.meta.url),'utf8');
- const compiled=source.indexOf("layers=AREA_COMPILED.layers;validateCompiledAreaStop(opt('areastop',''),layers)");
- assert.ok(compiled>0&&compiled<source.indexOf('const supportedCharge='));
- // the numeric contact stop comes before the notice that target-seeded dry-brush marks are removed
- assert.ok(source.indexOf('if(AREA_NUMERIC_CONTACT_STOP){')<source.indexOf("target-seeded dry-brush marks removed"));
+ const read=name=>fs.readFileSync(new URL('../plate/'+name,import.meta.url),'utf8');
+ const paint=read('paint.mjs'),finish=read('finish.mjs');
+ // the stop is validated before the paint loop defines supportedCharge
+ const compiled=paint.indexOf("validateCompiledAreaStop(opt('areastop',''),ctx.layers)");
+ assert.ok(compiled>0&&compiled<paint.indexOf('const supportedCharge='));
+ // the numeric contact stop is handled in the paint stage, which runs before the finish stage's dry-brush notice
+ assert.ok(paint.includes('if(ctx.AREA_NUMERIC_CONTACT_STOP){')&&finish.includes('target-seeded dry-brush marks removed'));
 });

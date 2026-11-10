@@ -3,36 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { BENCH, loadCrops } from './lib.mjs';
-
-/** Install the V2 technique guides in the runner discovery directories. V1 receives no guides. */
-export function installSkills(roundKey, ws) {
-  if (roundKey !== 'skill') return;
-  fs.cpSync(path.join(BENCH, 'v2', 'skill', 'skills'), path.join(ws, '.agents', 'skills'), { recursive: true });
-  fs.mkdirSync(path.join(ws, '.claude'), { recursive: true });
-  fs.symlinkSync('../.agents/skills', path.join(ws, '.claude', 'skills'));
-}
-
-const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-const PROMPT_NAMES = Object.fromEntries(loadCrops().map(c => [c.task, c.name]));
-
-/** The one-line prompt of protocol v2, for the crops of this run. Identical to v2 when all five are painted. */
-export function prompt(crops) {
-  return `Read bench/BRIEF.md in this directory and do what it says. The ${(WORDS[crops.length] ?? String(crops.length))} target crops are attached in order: ${crops.map(c => PROMPT_NAMES[c] || c).join(', ')}. Work without asking questions; nobody will answer.`;
-}
-
-/** The v2 brief for a round, cut to the crops of this run. Identical to the frozen brief when all five are painted. */
-export function brief(roundKey, crops, viewDir) {
-  const src = path.join(BENCH, 'v2', roundKey === 'skill' ? 'skill' : 'naive', 'BRIEF.md');
-  const lines = fs.readFileSync(src, 'utf8').split('\n')
-    .filter(l => { const m = l.match(/^\| `([\w-]+)` \|/); return !m || crops.includes(m[1]); });
-  // a target added after the brief was frozen gets its row from bench/v2/crops.json, after the frozen rows
-  const listed = new Set(lines.map(l => l.match(/^\| `([\w-]+)` \|/)?.[1]).filter(Boolean));
-  const added = loadCrops().filter(c => crops.includes(c.task) && !listed.has(c.task)).map(c => `| \`${c.task}\` | ${c.width} x ${c.height} | ${c.style} |`);
-  const last = lines.findLastIndex(l => /^\| `[\w-]+` \|/.test(l));
-  if (added.length) lines.splice(last + 1, 0, ...added);
-  return lines.join('\n').replace(/\bfive\b/g, (WORDS[crops.length] ?? String(crops.length))).replaceAll('TARGET_DIR', viewDir);
-}
+import { BENCH } from './lib.mjs';
 
 /** The env variables a runner needs, by name only. A CLI that is logged in needs none of them. */
 export const KEYS = {
@@ -63,58 +34,6 @@ export function agyImageNote(files) {
   return files.length ? `\n\nThe images are not attached. Open each with your file viewer: ${files.map(f => `\`${f}\``).join(', ')}.` : '';
 }
 
-/** Stream-json input: prompt followed by labelled crop images. */
-export function claudeInput(text, viewDir, crops) {
-  const content = [{ type: 'text', text }];
-  for (const t of crops) {
-    content.push({ type: 'text', text: `Target: ${t}` });
-    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: fs.readFileSync(path.join(viewDir, `${t}.png`)).toString('base64') } });
-  }
-  return JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n';
-}
-
-/** {cmd, args, stdinFile?} for a model. raw is the raw output folder of the try. */
-export function command(model, { ws, viewDir, raw, crops, text, sessionCapMin }) {
-  const effort = model.effort && model.effort !== 'n/a' ? model.effort : null;
-  if (model.runner === 'claude') {
-    const input = path.join(raw, 'input.jsonl');
-    fs.writeFileSync(input, claudeInput(text, viewDir, crops));
-    return {
-      cmd: 'claude', stdinFile: input,
-      args: ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--model', model.id,
-        ...(effort ? ['--effort', effort] : []), '--disable-slash-commands', '--dangerously-skip-permissions'],
-    };
-  }
-  if (model.runner === 'codex') {
-    return {
-      cmd: 'codex',
-      args: ['exec', '--json', '--skip-git-repo-check', '-m', model.id, ...(effort ? ['-c', `model_reasoning_effort=${effort}`] : []),
-        '--dangerously-bypass-approvals-and-sandbox', '-C', ws, ...crops.flatMap(t => ['-i', path.join(viewDir, `${t}.png`)]), '--', text],
-    };
-  }
-  if (model.runner === 'muse') {
-    const sessionId = crypto.randomUUID();
-    fs.writeFileSync(path.join(raw, 'muse-session.txt'), sessionId + '\n');
-    return { cmd: 'muse', args: [...museArgs(model, ws, effort, sessionId), ...crops.flatMap(t => ['--image', path.join(viewDir, `${t}.png`)]), text] };
-  }
-  if (model.runner === 'agy') {
-    const files = crops.map(t => path.join(viewDir, `${t}.png`));
-    return { cmd: 'agy', args: agyArgs(model, effort, text + agyImageNote(files), [viewDir]) };
-  }
-  if (model.runner === 'together') {
-    return {
-      cmd: 'python3',
-      // The loop process must read the targets to attach them to the prompt, so it runs without the Python guard
-      // (run.mjs puts the guard on PYTHONPATH for every child). oss_loop.py gives the guard back to the model's own
-      // commands through BENCH_PYGUARD.
-      env: { BENCH_CROPS: crops.join(','), PYTHONPATH: '' },
-      args: [path.join(BENCH, 'v2', 'runners', 'oss_loop.py'), '--model', model.id, '--cwd', ws, '--brief', path.join(ws, 'bench', 'BRIEF.md'),
-        '--images', viewDir, '--log', path.join(raw, 'events.jsonl'), '--usd', '2.4', '--minutes', String(sessionCapMin - 1)],
-    };
-  }
-  throw new Error(`unknown runner ${model.runner}`);
-}
-
 /** Return {cmd, args, stdinFile?, env?} for a benchmark turn. Resume preserves context where supported.
  * images contains PNG attachments; done is 'paintings' (requires every final.png) or 'any'.
  * Runners without resume use briefFile and saved work for each turn. */
@@ -123,7 +42,9 @@ export function turnCommand(model, { ws, raw, text, images = [], sessionId = nul
   if (model.runner === 'claude') {
     const common = ['--output-format', 'stream-json', '--verbose', '--model', model.id, ...(effort ? ['--effort', effort] : []), '--disable-slash-commands', '--dangerously-skip-permissions'];
     // The shell timeout must exceed bench/paint.sh's 100-second wait.
-    const env = { BASH_DEFAULT_TIMEOUT_MS: '300000', BASH_MAX_TIMEOUT_MS: '600000' };
+    // CLAUDE_CODE_DISABLE_AUTO_MEMORY: a git worktree shares its repository's auto-memory folder, which holds the operator's
+    // notes and earlier scores; the session must neither be told of it nor read it.
+    const env = { BASH_DEFAULT_TIMEOUT_MS: '300000', BASH_MAX_TIMEOUT_MS: '600000', CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1' };
     if (resume) return { cmd: 'claude', env, args: ['-p', text, ...common, '--resume', sessionId] };
     const content = [{ type: 'text', text }];
     for (const f of images) {

@@ -117,11 +117,7 @@ Modules, with their flags:
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
 - `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
-- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`): clean water past a passage's soft edges before its colour. 0.8 mm under `--softchoice`, otherwise off.
-- `methods/soft-edge-choice.mjs` (`--softchoice`, default 0, or 1 under `--washsystem 1`): a boundary is soft only where the passage's own demand has faded, the target turns gradually over 3 mm, and at least 5 mm of such cells run together.
-- `methods/mixed-washes.mjs` (`--mixedwash`, `--mixedshadows`, both default 0, or 1 under `--washsystem 1`): one mixed charge per connected shape of one colour domain, laid on dry paper, instead of one pass per pigment. Touching regions with nearly the same pigment shares share a domain.
-- `methods/scale-layers.mjs` (`--scalelayers`, default 0, or 1 under `--washsystem 1`): under `--midlayers n` the middle washes are cut by what each brush size can carry (flat, large round, medium round, small round), not at value quantiles. A smooth form is one graded wash; a later layer is a real darker shape; layers target a third of the value range so darks build in stages; the last layer takes the remainder and small residual shapes fold into surviving layers.
-- `methods/graded-plane.mjs` (`--gradedlanes`, default 0, or 1 under `--washsystem 1`): a wash with a real gradient is laid in long straight lanes across it, each dipped at the strength of one plane fitted to its demand. A flat wash keeps its one fitted gesture.
+- `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`): clean water past a passage's soft edges before its colour. Off by default.
 - `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
 - `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
@@ -229,12 +225,10 @@ Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 
 - `--crosshatch 1`: contour-following hatching as a finishing stage.
 - `--tonestage 1`: records a paper-colour choice before drawing. `auto` also detects warm source paper. It changes the paper colour and lays no pigment, so it is not a wash.
 
-### Experimental connected washes
-
-`--washsystem 1` joins mixed dry-paper charges, brush-scale middle layers, graded lanes and selective soft edges with the paper and plan-value experiments. It is off by default. In the 0.3.1 candidate (painter V104) it paints worse than the default: 8 of 12 paired renders exceed the fine-detail correlation limit, and full-size review found flatter masses, harder edges and lost paper lights ([changelog](../CHANGELOG.md)).
+### Experimental plan values and paper
 
 `--calibratedplan 1` removes blind value gains, limits excess band allocation and enables fresh sheet-only delivery readings. It sets `--darkgain`, `--coolgain` and `--midgain` to 1 and prints no notice when one is typed. It plans values by three rules, each of which can be set alone: `--celllight 1` scales each cell's fitted paint until its film over the paper returns the cell's light through the sheet's own optics; `--nestedbands 1` splits a cell's paint between the five bands by value steps, so a wash covers the cells darker than its band's floor and carries that step, and the middle layers carry the middle steps; `--masstone 1` charges each wash at the strength whose flat film returns the light its cells asked for, not at their mean paint, and carries nothing into later bands (`--passcap` has no effect with it). `--valuepreviewonly 1` writes `plan-ledger.png` and `plan-value-check.json`: the plan as booked paint through the sheet's optics, with its dark share, paper share and L* beside the target's. These are plan values; they do not guarantee the final brush-painted value. The calibration reads the sheet alone only with `--notargetlooks 1`; without it the run still takes its looks at the target between passes.
 
-`--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. It changes the light reference only when `--paperrel 1`, `--paperlights 1` or `--washsystem 1` is also on, and it sets the sheet colour only with `--paperrgb auto`. The test compares lightness and chroma, not hue, so pale material of another hue can count as paper.
+`--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. It changes the light reference only when `--paperrel 1` or `--paperlights 1` is also on, and it sets the sheet colour only with `--paperrgb auto`. The test compares lightness and chroma, not hue, so pale material of another hue can count as paper.
 
 The 0.3.1 candidate renders with `--notargetlooks 1` record no paint-time target looks and no guard violations.

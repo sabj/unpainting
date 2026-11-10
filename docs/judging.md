@@ -9,10 +9,7 @@ The repeatable image measurements are code in `src/eval/`. They give the same nu
 | module | measures | compares at |
 |---|---|---|
 | `values.mjs` | how many tone levels, large areas of uniform darkness, paper left between marks | the painting alone |
-| `linequality.mjs` | line continuity, steadiness and placement | lines |
-| `legibility.mjs` | silhouette at a blur of about 4 cells, and recall of form edges | shapes |
 | `fidelity.mjs` | tone over cells about 16 px wide, and line recall within 2 cells | regions |
-| `ink.mjs` | ink precision and recall within 2 cells | lines |
 | `colour.mjs` | color difference (CIEDE2000, a standard color-difference measure), mean and 90th percentile | pixels |
 | `stages.mjs` | the frames in order (see below) | stages |
 

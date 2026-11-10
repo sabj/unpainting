@@ -2,8 +2,7 @@
 
 The wash plan predicts the sheet without ink (paint-plate.mjs --valuepreviewonly writes planned-wash.png). Dividing
 it out of the original leaves the ink residual (Part 1's split: one lightness ratio per cell, capped at 1, ratios
-within 4% of 1 are no ink). tools/judge/ink-wash-consistency.mjs scores a drawing against that residual. This module
-uses the same residual while planning:
+within 4% of 1 are no ink). This module uses that residual while planning:
 
   - lines with no residual under them are clutter and are dropped;
   - lines lying inside a broad residual (wider than any pen) are mass the wash should carry, and are dropped;

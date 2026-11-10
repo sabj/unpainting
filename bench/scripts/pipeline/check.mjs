@@ -67,13 +67,21 @@ export async function checkPlan({ repo, spec, planDir, variant, target, work, ti
   };
 }
 
+/**
+ * The spec the model's own `bash bench/check.sh` plans with. Its worktree has the benchmark's tracked files removed by the
+ * harness, so the painter's dirty-tree refusal would turn every check away; the planning step paints nothing, and the
+ * dirty state is still written to code-state.json. The harness's own admission check runs in the clean repository
+ * and keeps the refusal.
+ */
+export const modelCheckSpec = frozen => ({ ...frozen, offlineFixture: true });
+
 // CLI, from the worktree root: node bench/check.mjs (bash bench/check.sh)
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = process.cwd();
   const frozen = JSON.parse(fs.readFileSync(path.join(root, 'bench', 'frozen.json'), 'utf8'));
   const vf = path.join(root, 'bench', 'variant.txt');
   const variant = (fs.existsSync(vf) ? fs.readFileSync(vf, 'utf8') : '').replace(/\s+/g, '') || 'region_w13';
-  const r = await checkPlan({ repo: root, spec: frozen, planDir: 'bench/plan', variant, target: 'bench/plan/target.png', work: 'bench/check-out' });
+  const r = await checkPlan({ repo: root, spec: modelCheckSpec(frozen), planDir: 'bench/plan', variant, target: 'bench/plan/target.png', work: 'bench/check-out' });
   console.log(JSON.stringify({ ok: r.ok, failures: r.failures, args: r.args, layering: r.layering, palette: r.palette }, null, 1));
   console.log(r.ok ? 'ADMITTED' : `REFUSED: ${r.refusal.join('; ')}`);
   process.exit(r.ok ? 0 : 4);

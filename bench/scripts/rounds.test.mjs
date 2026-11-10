@@ -1,4 +1,4 @@
-// V3, V4 and V5: the plan checks, the brief, the model commands, and a dry run of each round end to end (a scripted
+// V4 and V5: the plan checks, the brief, the model commands, and a dry run of each round end to end (a scripted
 // stand-in instead of a model, a small painting on the CPU, no keys).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +11,8 @@ import { resolvePlan, argsBuilder, layerBase, checkExtraArgs, unknownTokens, che
 import { tokensMarkdown } from './pipeline/tokens.mjs';
 import { renderTask, loadSubjects } from './pipeline/round45.mjs';
 import { turnCommand } from './runners.mjs';
+import { modelCheckSpec } from './pipeline/check.mjs';
+import { makeWorktree } from './pipeline/harness.mjs';
 
 const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
 
@@ -93,13 +95,6 @@ const dryRun = (round, extra) => {
 };
 const runOf = (out, dir, n) => readJson(path.join(out, dir, 'dry-run', String(n), 'run.json'));
 
-test('dry run: V3 paints two attempts in one session; the second carries its change note', () => {
-  const out = dryRun('V3', ['--tries', '2']);
-  for (const n of [1, 2]) { const r = runOf(out, 'v3-informed', n); assert.deepEqual(validateRun(r), []); assert.ok(r.complete); }
-  assert.match(runOf(out, 'v3-informed', 2).crops.hills.painterNote, /attempt 2/);
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
 test('dry run: V4 plans, is refused once, paints with stops, looks, revises and finishes', () => {
   const out = dryRun('V4', ['--tries', '1']);
   const r = runOf(out, 'v4-pipeline', 1), p = r.crops.hills.pipeline;
@@ -137,6 +132,29 @@ test('extra args admit only validated artistic controls, never execution or ink 
   for (const token of ['ink2', 'ink3', 'ink4', 'sep8', 'uncap', 'dwg200']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
 });
 
+
+test('the model\'s own check plans with the dirty-tree refusal off, because its worktree is stripped', () => {
+  const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};
+  assert.equal(optionMap(resolvePlan({...options,spec:modelCheckSpec(options.spec)}).args).get('allowdirty'),'1');
+  assert.equal(options.spec.offlineFixture,undefined);
+});
+
+test('each session gets its own temporary folder, outside the workspace, gone with the worktree', () => {
+  const a = makeWorktree(), b = makeWorktree();
+  try {
+    assert.ok(fs.statSync(a.scratch).isDirectory());
+    assert.notEqual(a.scratch, b.scratch);
+    assert.ok(!a.scratch.startsWith(a.ws + path.sep));
+    assert.equal(path.dirname(a.scratch), a.tmp);
+  } finally { a.cleanup(); b.cleanup(); }
+  assert.ok(!fs.existsSync(a.scratch));
+});
+
+test('the planner is seeded with the repository\'s current skills, not the frozen V2 copy', () => {
+  const src = fs.readFileSync(new URL('./pipeline/round45.mjs', import.meta.url), 'utf8');
+  assert.match(src, /path\.join\(REPO, '\.agents', 'skills'\), path\.join\(b, 'skills'\)/);
+  assert.doesNotMatch(src, /'skill', 'skills'/);
+});
 
 test('only explicitly offline fixture specs authorize a deliberately stripped worktree', () => {
   const options={spec:{width:96,sheetmm:280},planDir:'/missing-fixture',variant:'region_w13_lay2',target:path.join(BENCH,'v2/targets/hills.png'),out:'/out'};

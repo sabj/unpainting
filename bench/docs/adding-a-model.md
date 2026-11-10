@@ -2,19 +2,19 @@
 
 A submission is one or more try folders (one model session per folder) in the [run format](run-format.md), scored with the benchmark's scorer, plus the rebuilt results. It arrives as a pull request.
 
-A try is one model session that paints the requested targets. There are five rounds, V1 to V5.
+A try is one model session that paints the requested targets. There are five published rounds, V1 to V5; only V4 and V5 can still be run.
 
 ## 1. Check the benchmark runner
 
 ```sh
 npm install
 npm run bench:run -- --dry-run
-npm run bench:score -- bench/work/dry-run/runs/v1-naive/dry-run/1 --dry-run
+npm run bench:score -- bench/work/dry-run/runs/v4-pipeline/dry-run/1 --dry-run
 ```
 
-The dry run needs no keys and no model. A scripted painter paints the five bundled reference images through the painting toolkit given to models. A probe checks that the guard, the target-read check, blocks an image read. The scorer writes a `dry-run` record.
+The dry run needs no keys and no model. A scripted planner stands in for the model. The scorer writes a `dry-run` record.
 
-`--dry-run --round V3`, `V4` or `V5` runs the later rounds the same way. In V4 and V5 a scripted planner writes a plan, has one start refused, paints with stops, looks, revises and finishes, at 96 px wide on the CPU. `npm run bench:test` runs all three on one target.
+`--dry-run --round V4` or `V5` runs a round without a model. In V4 and V5 a scripted planner writes a plan, has one start refused, paints with stops, looks, revises and finishes, at 96 px wide on the CPU. `npm run bench:test` runs both on one target.
 
 ## 2. Add a runner if you need one
 
@@ -23,15 +23,6 @@ The dry run needs no keys and no model. A scripted painter paints the five bundl
 ## 3. Run the tries
 
 ```sh
-npm run bench:run -- --model my-model --round V1 --try 1
-npm run bench:run -- --model my-model --round V1 --try 2
-...
-```
-
-V3, V4 and V5 run all their tries in one command:
-
-```sh
-npm run bench:run -- --model my-model --round V3            # tries 1 to 3: one session per target, three attempts each
 npm run bench:run -- --model my-model --round V4            # tries 1 to 3: one session per target and try
 npm run bench:run -- --model my-model --round V5            # as V4; each try is scored for the next one's feedback
 ```
@@ -45,7 +36,7 @@ Run 3 tries per round; only tries 1 to 3 enter the results. Without the private 
 ```sh
 # TOGETHER_API_KEY must be set in your environment; never commit it
 pip install -r bench/scorer/requirements.txt
-npm run bench:score -- bench/runs/v1-naive/my-model/1
+npm run bench:score -- bench/runs/v4-pipeline/my-model/1
 ```
 
 Scoring one painting takes about 15 calls to AI image judges and 2 calls to judge painting stages.

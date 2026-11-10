@@ -25,21 +25,6 @@ Credit lines:
 
 Paintings made from these targets are © 2026 Sam Jackson under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), as in [examples/SOURCES.md](../../examples/SOURCES.md#outputs).
 
-## Measuring ink
-
-`tools/judge/ink-lines-report.mjs` compares the pen lines in a painting with the pen lines in its source, at the painting's size:
-
-```sh
-node tools/judge/ink-lines-report.mjs --image <target> --run <painting folder> --out report.json --crops <stem>
-```
-
-- Placement recall and precision of the pen layer against the source's line cells (the ink separator, `src/crop/inkwash.mjs`), within 2 pixels.
-- Darkness at the source's line cells: how much darker each is than the lightest cell within 3 pixels, in the source, the painting and the pen layer alone.
-- Ink hue: blue over red optical density of the line cells. Brown ink is above 1.
-- Crops: the two windows with the most source line, target, painting and pen layer side by side.
-
-On a staged run the pen layer is `layer-prepink.jpg` times `layer-finishink.jpg`. Otherwise it is `ink.jpg`.
-
 ## Full-size A/B
 
 Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and these configurations:
@@ -89,8 +74,4 @@ for row in $(echo "$T"); do
 done
 ```
 
-Compare the mean of the nine scores per target and configuration (3 seeds x 3 repeats). Then read the ink report per painting:
-
-```sh
-node tools/judge/ink-lines-report.mjs --image "$img" --run "work/ink-heavy/$cfg/$name-s$seed" --out "work/ink-heavy/$cfg/$name-s$seed/ink-lines-report.json"
-```
+Compare the mean of the nine scores per target and configuration (3 seeds x 3 repeats).

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { renderVerdict } from './pipeline/plan-args.mjs';
-import { Painting } from './pipeline/painting.mjs';
+import { Painting, painterFailure } from './pipeline/painting.mjs';
 import sharp from 'sharp';
 import { collect, tryEntry } from './pipeline/round45.mjs';
 
@@ -101,4 +101,11 @@ test('collection: a painting with only notes is painted, copied for the scorer, 
   assert.equal(s.pipeline.outcome, 'render-failed');
   assert.deepEqual(s.pipeline.failure.failures.map(f => f.code), [4, 4, 5]);
   fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('a painter failure is reported with its own reason, and an empty log still gives one', () => {
+  const crash = ['wet-bed preparation for passage sky/1', 'file:///x/passage-plan.mjs:86', 'Error: wet bed has zero contact cells', '    at prepare (x)', ''].join('\n');
+  assert.equal(painterFailure(crash, 1), 'Error: wet bed has zero contact cells');
+  assert.equal(painterFailure('first\nlast words\n', 2), 'the painter exited 2; its last line was: last words');
+  assert.equal(painterFailure('', 137), 'the painter exited 137 with no output');
 });

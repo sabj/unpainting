@@ -7,7 +7,6 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { BENCH, V2, readJson } from './lib.mjs';
 import { addTarget, coarseMap } from './add-target.mjs';
-import { brief } from './runners.mjs';
 
 test('coarseMap reproduces the shape and values of a published coarse map', async () => {
   const { data, info } = await sharp(path.join(V2, 'targets', 'hills.png')).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -39,10 +38,3 @@ test('addTarget writes the target, its coarse map, its crops.json entry and its 
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('the V1/V2 brief is the frozen brief for the five targets and cuts targets outside the run', () => {
-  const five = brief('naive', ['hills', 'south-france', 'sargent', 'mittens', 'trumbull'], '/view');
-  assert.equal(five, fs.readFileSync(path.join(V2, 'naive', 'BRIEF.md'), 'utf8').replaceAll('TARGET_DIR', '/view'));
-  const two = brief('naive', ['hills', 'sargent'], '/view');
-  assert.ok(!two.includes('| `south-france` |'), 'a target outside the run is cut');
-  assert.ok(two.includes('The two targets'));
-});

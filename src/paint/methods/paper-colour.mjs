@@ -32,7 +32,7 @@ export const PAPER_RULE = Object.freeze({
 const D65 = [255, 255, 255];
 
 /** L*a*b* of one colour against D65 white. */
-export const labOfColour = rgb => labOf(rgb, 0, D65);
+const labOfColour = rgb => labOf(rgb, 0, D65);
 
 /**
  * The largest connected region among the lightest cells: luminance at or above the 96th percentile less lightCut.
