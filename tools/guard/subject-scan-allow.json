@@ -54,6 +54,18 @@
       "rule": "name",
       "count": 1,
       "reason": "Token help text telling a model that palette tokens act only on Trumbull."
+    },
+    {
+      "file": "bench/scripts/compare-release-collect.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Maps short subject names to bench subject ids for the comparison page. Reporting only; never runs in the painter."
+    },
+    {
+      "file": "bench/scripts/compare-release-improved.mjs",
+      "rule": "name",
+      "count": 5,
+      "reason": "Names which published plates the comparison page shows beside each improvement note. Reporting only; never runs in the painter."
     }
   ]
 }
