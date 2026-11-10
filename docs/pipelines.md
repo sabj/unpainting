@@ -66,4 +66,4 @@ This is `--inkrecipe wash`. Each stage names its module and file.
  inking, closing file ->  src/paint/methods/drawing-file.mjs, --drawinglast   (closing pen last)
 ```
 
-The pipeline plan (`src/paint/pipeline-plan.mjs`) fixes the order, and `tools/paint-plate.mjs` runs it. `--drawingonly 1` stops after the opening drawing, which is how the [legibility test](../tools/judge/ink-legibility.mjs) judges it. See [Ink](ink.md) for the flags.
+The pipeline plan (`src/paint/pipeline-plan.mjs`) fixes the order, and `tools/paint-plate.mjs` runs it. `--drawingonly 1` stops after the opening drawing. See [Ink](ink.md) for the flags.

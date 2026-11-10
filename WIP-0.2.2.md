@@ -8,7 +8,6 @@ This branch holds the ink legibility work that did not ship in 0.2.1. It branche
 - A line-or-wash decision per line, from SAM regions labelled by a vision model, with per-label rules (foliage is wash only, faces and hands are never shadow).
 - Even, hand-like strokes in the ink's own colour, with gap closing and collinear joins.
 - Opt-in: straight-line and arc fitting, cross-hatched shadows for pure ink (`--inkhatch 1`), salience.
-- The ink legibility test, `tools/judge/ink-legibility.mjs`: 12 named crops judged blind.
 
 ## Open
 

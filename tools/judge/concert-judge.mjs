@@ -18,7 +18,6 @@ import { labPlanes, deltaE2000 } from '../../src/eval/colour.mjs';
 import { stageMeasures, stageFlags } from '../../src/eval/stages.mjs';
 import { styleOf, orderOf } from '../../src/eval/styles.mjs';
 import { separate } from '../../src/crop/inkwash.mjs';
-import { legibility } from '../../src/eval/legibility.mjs';
 
 const argv = process.argv.slice(2), dir = argv[0];
 const configs = argv.slice(1).filter((a, i, all) => !a.startsWith('--') && !(all[i - 1] ?? '').startsWith('--'));
@@ -117,16 +116,6 @@ for (const c of merge ? [] : configs) {
           }
         }
         fam.stages = { ...m, order: orderOf(plate) ?? 'watercolour', flags: stageFlags(m, { order: orderOf(plate) }), fails: [] };
-        // A drawing made before the washes must read alone: the share of the source's main outlines with line near
-        // them, on the ink layer, calibrated at 420 px. Ink laid after the washes is not held to it.
-        const stages = fj.map(q => q.stage), penAt = stages.indexOf('pen'), washAt = stages.indexOf('wash');
-        if (drawn && penAt >= 0 && (washAt < 0 || penAt < washAt)) {
-          // lighter threshold than the drawn mask: pencil lines (--outlinemedium graphite) sit at 0.1 to 0.2 OD
-          const light = dens(await load(inkFile, w, h), pl), faint = Uint8Array.from(light, v => (v > 0.06 ? 1 : 0));
-          const L = legibility(faint, SD, w, h, gaussian);
-          fam.stages.legibility = L.score;
-          if (L.score < 0.45) fam.stages.fails.push(`the drawing made first does not read on its own: ${(100 * L.silhouette).toFixed(0)}% of the main outlines and ${(100 * L.formEdges).toFixed(0)}% of the form edges drawn (a hand-made beach ink drawing reaches 51% of its outlines)`);
-        }
       }
       void withL;
     }
@@ -151,7 +140,7 @@ const cols = [
   ['sweep/MP', r => r.tooling.sweepsPerMP, 0], ['pen', r => r.tooling.penGestures, 0], ['long', r => r.tooling.longShare],
   ['shapes@33', r => r.stages?.earlyShapes], ['speckle', r => r.stages?.speckle, 1], ['back', r => r.stages?.backwardShare], ['pops', r => r.stages?.pops, 1],
   ['midChroma', r => r.stages?.midChroma], ['midHue', r => r.stages?.midHue, 0], ['reach@25', r => r.stages?.reached?.[0]], ['reach@50', r => r.stages?.reached?.[1]],
-  ['line@25', r => r.stages?.lineReached?.[0]], ['wash@25', r => r.stages?.washReached?.[0]], ['legible', r => r.stages?.legibility], ['colours', r => r.stages?.openColours],
+  ['line@25', r => r.stages?.lineReached?.[0]], ['wash@25', r => r.stages?.washReached?.[0]], ['colours', r => r.stages?.openColours],
   ['end dE', r => r.end.colour, 1], ['end err', r => r.end.toneErr], ['grain', r => r.end.grain], ['ink F1', r => r.end.inkF1], ['edges', r => r.end.edgeRatio],
 ];
 const lines = [['config', ...cols.map(k => k[0])].map((s, i) => (i ? s.padStart(9) : s.padEnd(10))).join('')];

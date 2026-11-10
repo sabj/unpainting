@@ -10,7 +10,7 @@
 // Planned optical width (cells at the line file's own resolution) to pen contact mm. Calibrated on the line study's
 // pen audit: 2.2/1.5/1.0 cells gave about .34/.21/.12 mm. The material clamps contact to its declared range.
 const WIDTH_POINTS = Object.freeze([[1.0, 0.12], [1.5, 0.21], [2.2, 0.34]]);
-export const PEN_MM = Object.freeze([0.1, 0.4]);
+const PEN_MM = Object.freeze([0.1, 0.4]);
 
 export function contactMm(w) {
   if (Number.isNaN(w) || w === undefined) w = 1.5;

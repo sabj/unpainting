@@ -148,7 +148,5 @@ densities.
   `--hybridlift .6` and `--hybriddwell .5` set its pauses.
 - `tools/judge/drawing-audit.mjs RUN ... --out audit.jsonl` summarizes a run's pen audit: contact widths, pressure,
   speed, pauses, reservoir and paper state.
-- `--materialstudy 1 --width 1080 --out DIR` renders dry and damp, speed, pressure, starvation, graphite and brush
-  swatches on a fixed 152.4 mm sheet.
 
 The audit and the material swatches are diagnostics, not a quality gate.

@@ -42,7 +42,7 @@ export function crossProfile(L, w, h, p, nx, ny, pxMm, o = MASS_DEFAULTS) {
 const arc = pts => { const d = [0]; for (let k = 1; k < pts.length; k++) d.push(d[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y)); return d; };
 
 /** Per point class (CLASS) of a path resampled every pixel, smoothed by majority within `smoothMm`. */
-export function classifyPath(R, L, w, h, pxMm, o = MASS_DEFAULTS) { return classifyPathDetail(R, L, w, h, pxMm, o).cls; }
+function classifyPath(R, L, w, h, pxMm, o = MASS_DEFAULTS) { return classifyPathDetail(R, L, w, h, pxMm, o).cls; }
 
 /** classifyPath with each point's own contrast (L*) too: { cls, contrast }. */
 export function classifyPathDetail(R, L, w, h, pxMm, o = MASS_DEFAULTS) {
