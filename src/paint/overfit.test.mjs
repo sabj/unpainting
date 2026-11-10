@@ -25,7 +25,7 @@ function paintingCode() {
       if (e.isDirectory()) { if (p !== TUNED_DIR) walk(p); } else if (/\.(mjs|json)$/.test(e.name) && !e.name.endsWith('.test.mjs')) files.push(p);
     }
   };
-  for (const dir of ['src', 'tools/speed', 'bench/scripts']) walk(path.join(ROOT, dir));
+  for (const dir of ['src', 'tools/plate', 'tools/speed', 'bench/scripts']) walk(path.join(ROOT, dir));
   return files;
 }
 

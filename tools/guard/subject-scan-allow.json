@@ -14,7 +14,13 @@
       "reason": "Imports the recess, stone and ground constants from tuned/trumbull.mjs. The constants act only when the architecture preset or --recesses, --stoneblocks or --groundglaze is on; the default recipe sets none."
     },
     {
-      "file": "tools/paint-plate.mjs",
+      "file": "tools/plate/load-order.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Loads tuned/trumbull.mjs, as the unsplit painter's import list did, so that modules load in the same order. It names no subject and runs no subject branch."
+    },
+    {
+      "file": "tools/plate/sheet.mjs",
       "rule": "name",
       "count": 1,
       "reason": "Imports GROUND.from from tuned/trumbull.mjs as the default of --groundfrom. It has an effect only when --groundglaze is above 0."

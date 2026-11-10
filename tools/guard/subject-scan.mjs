@@ -57,7 +57,7 @@ export function scanSource(text) {
 }
 
 const SKIP_DIR = /(^|\/)(node_modules|fixtures|\.git)(\/|$)/;
-const ROOTS = ['src', 'tools/paint-plate.mjs', 'tools/speed', 'tools/painter', 'tools/guard', 'bench/scripts', 'bench/v4v5'];
+const ROOTS = ['src', 'tools/paint-plate.mjs', 'tools/plate', 'tools/speed', 'tools/painter', 'tools/guard', 'bench/scripts', 'bench/v4v5'];
 // The scan itself and tests name subjects on purpose.
 const SKIP_FILE = f => /\.test\.mjs$/.test(f) || f === 'tools/guard/subject-scan.mjs';
 
