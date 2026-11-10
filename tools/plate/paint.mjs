@@ -37,6 +37,7 @@ import {thirsty, edgeHalfWidth} from '../../src/media/brush.mjs';
 import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
+import {touchLack} from '../../src/paint/methods/touch-up.mjs';
 import {tipMarks, darkClip} from '../../src/paint/methods/final-dark-marks.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
@@ -163,7 +164,7 @@ const touchCorrections = round => {
   ctx.TP_SHAPES.forEach((t, k) => {
     const lk = paintingLook('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
-    const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = Dt.map((v, q) => Math.max(0, v - Ds[q]));
+    const Ds = od(m.map(v => v / Math.max(1, c))), Dt = od(lk.ref.px), d = touchLack(Dt, Ds); // darken only (src/paint/methods/touch-up.mjs)
     if (Math.max(...d) < num('touchdmin', 0.04)) return;
     const a = unmix(Float32Array.from(d), 1, Ks); let any = false;
     for (let j = 0; j < PIGS.length; j++) if (a[j] > 0.004) { const amt = a[j] * num('touchgain', 0.8), sh = { mask: t.mask, area: t.area, amount: amt, mix: PIGS.map((_, q) => (q === j ? amt : 0)) }; TECHNIQUE.set(sh, TECHNIQUE.get(t)); byPig[j].push(sh); any = true; }
