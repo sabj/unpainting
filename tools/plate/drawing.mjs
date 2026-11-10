@@ -15,6 +15,8 @@ import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {channelDensity} from '../../src/crop/pigments.mjs';
 import {accentCells, accentFamilies} from '../../src/paint/methods/final-darks.mjs';
+import {tipTouchMm2} from '../../src/paint/methods/final-dark-marks.mjs';
+import {roleBrushMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetArea} from '../../src/media/wash.mjs';
 import {loadSubject, splitFirstWash} from '../../src/paint/methods/first-wash.mjs';
@@ -270,7 +272,8 @@ if (TP_ROUNDS > 0) {
   ctx.TP_SHAPES = groups.map(cells => { const mask = new Uint8Array(n), look = new Uint8Array(n); for (const i of cells) { mask[i] = 1; if (!PENCELLS[i]) look[i] = 1; } const t = { mask, area: cells.length, amount: 0, mix: PIGS.map(() => 0), _look: look }; techniqueOf(t); return t; });
   console.log(`touchpoints: ${TP_ROUNDS} rounds over ${ctx.TP_SHAPES.length} planning shapes (${ctx.TP_SHAPES.reduce((a, t) => a + t.area, 0)} cells), cut before painting`);
 }
-// --finaldarks 1: after the touch-up rounds, one round of small decisive darks (src/paint/methods/final-darks.mjs). The
+// --finaldarks 1: after the touch-up rounds, one round of small decisive darks (src/paint/methods/final-darks.mjs), laid
+// as marks of the detail brush's tip, accent pieces no smaller than one tip touch (final-dark-marks.mjs). The
 // accent cells and their families are cut here, before painting; at the end each family gets one shape-level look.
 ctx.FD_SHAPES = null;
 if (num('finaldarks', 0) > 0) {
@@ -279,7 +282,7 @@ if (num('finaldarks', 0) > 0) {
     const x = Math.round(q.x / SC), y = Math.round(q.y / SC);
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h) pen[yy * w + xx] = 1; }
   }
-  const cells = accentCells(channelDensity(ctx.px, n, paperRGB), w, h, { mmPerCell: mmCell, pen, darkQ: num('fdquantile', 0.9), minValue: num('fdmin', 0.45), contrast: num('fdcontrast', 0.08), surroundMm: num('fdsurroundmm', 2.5), minMm2: num('fdminmm2', 0.5) });
+  const cells = accentCells(channelDensity(ctx.px, n, paperRGB), w, h, { mmPerCell: mmCell, pen, darkQ: num('fdquantile', 0.9), minValue: num('fdmin', 0.45), contrast: num('fdcontrast', 0.08), surroundMm: num('fdsurroundmm', 2.5), minMm2: num('fdminmm2', tipTouchMm2(PB ? 2 * PB.detailR * PB.mmPerCell : roleBrushMm(root, 'detail', { brushes: opt('brushes', 'src/paint/brushes.json') }))) });
   const fams = accentFamilies(cells, w, h, { mmPerCell: mmCell, tileMm: num('fdtilemm', 10), minCells: 64 });
   const T0 = { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true, passes: 1 };
   ctx.FD_SHAPES = fams.map(f => { const mask = new Uint8Array(n); for (const i of f.cells) mask[i] = 1; const t = { mask, area: f.cells.length, amount: 0, mix: PIGS.map(() => 0), _look: mask }; TECHNIQUE.set(t, T0); return t; });

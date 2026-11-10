@@ -37,6 +37,7 @@ import {thirsty, edgeHalfWidth} from '../../src/media/brush.mjs';
 import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
+import {tipMarks, darkClip} from '../../src/paint/methods/final-dark-marks.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
 import {softenFirstWash} from '../../src/paint/methods/first-wash.mjs';
@@ -546,7 +547,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
      }).value);
   };
   // a final dark goes on with a small round brush drawn through the accent itself, held to it by the clip below
-  const darkPaths = layer._darkPass ? washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: 0.5 * SC, minLength: 2 * SC }).map(pts => pts.map(p => ({ ...p, r: Math.min(p.r, Math.max(SC, PB ? PB.detailR : SC)) }))) : null;
+  // a final dark is laid as touches and strokes of the detail brush's tip over its accent family (final-dark-marks.mjs)
+  const TIP_R = Math.max(SC, PB ? PB.detailR : SC);
+  const darkPaths = layer._darkPass ? tipMarks(washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: TIP_R, minLength: 2 * SC }), TIP_R) : null;
   const paths = shapedPaths ?? authoredPaths ?? darkPaths ?? clock('paths', () => FLOOR
     ? (() => { let rr = FLOOR, P = floorPaths(rr); const T = BUDGET ? BUDGET.target(sh) : Infinity; for (let it = 0; it < 7 && P.length > T && rr < 3 * BRUSH; it++) { rr *= 1.6; P = floorPaths(rr); } FLOOR_R = rr; return P; })()
     : (detail
@@ -634,7 +637,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // the plan's reserved lights; the edge is where the strokes end, not the mask
   const P = ctx.VALUE_PLAN?.protectedCells;
   if (touchSmall) { const d = dilate(MASK, w, h, 1); setClip(ctx.sheet, up(P ? Uint8Array.from(d, (v, i) => v && !P[i] ? 1 : 0) : d)); }
-  if (layer._darkPass) { const d = dilate(MASK, w, h, 1); setClip(ctx.sheet, up(P ? Uint8Array.from(d, (v, i) => v && !P[i] ? 1 : 0) : d)); used['final dark'] = (used['final dark'] || 0) + paths.length; }
+  if (layer._darkPass) { const c = darkClip(P), cl = c ? up(c) : null; if (cl && PROBE?.clip) for (let s = 0; s < cl.length; s++) cl[s] = cl[s] && PROBE.clip[s] ? 1 : 0; setClip(ctx.sheet, cl ?? (PROBE ? PROBE.clip : null)); used['final dark'] = (used['final dark'] || 0) + paths.length; }
   if (crispHere) {
     const baseMask=brushMask(sh),reach=sh._strokePlan?.reachCells??0;
     const clipMask=reach>0?(()=>{const g=dilate(baseMask,w,h,Math.ceil(reach*.8)+1);return P?Uint8Array.from(g,(v,i)=>v&&!P[i]?1:0):g;})():baseMask;
