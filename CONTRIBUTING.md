@@ -31,6 +31,14 @@ For release and benchmark comparisons, run `node tools/doctor.mjs --strict` firs
 
 The painter refuses to paint from uncommitted changes. Each run writes `code-state.json` with the commit, the changed files and a hash of the diff. Commit first, or pass `--allowdirty 1` for a scratch run; the run is then recorded as dirty.
 
+## No new default-off flags
+
+A change to how the painter paints is proven and becomes the behaviour, or it stays on a branch. Do not merge it behind an option that is off unless typed. Such options hide unproven work in a release, and each one is another painter nobody has rendered.
+
+`npm test` enforces this for painter options (`src/paint/option-ledger.test.mjs`). `src/paint/option-ledger.json` lists the option names that existed when the rule was made in 0.3.3. An option outside that list fails the test if it has no default, a default of zero, an empty or negative word, or a default the check cannot read. Do not add names to the list. When an option is deleted, remove its name.
+
+A new setting with a real default value, such as a width in millimetres, is not a default-off flag and passes.
+
 ## Worktrees
 
 A git worktree has no `node_modules` of its own. Link the main checkout's install, never another worktree's link:
