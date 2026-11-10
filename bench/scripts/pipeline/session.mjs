@@ -61,7 +61,7 @@ export class PaintSession {
     this.t0 = now(); this.waitS = 0; this.blockedUntil = 0;
     this.usedBefore = 0; this.endedModelS = null; this.planReady = false;
     this.pending = new Map(); this.handled = new Set();
-    this.painting = null; this.started = false; this.restarts = 0; this.rev = 0; this.looks = 0; this.checks = 0;
+    this.painting = null; this.started = false; this.restarts = 0; this.rev = 0; this.looks = 0; this.checks = 0; this.checkLog = []; this.paintings = 0;
     this.revising = []; this.ended = null; this.capped = false; this.palette = null; this.planHash = null; this.startCheck = null;
     this.strict = spec?.noTargetLooks === true; this.steps = 0; this.lookedAt = null;
     this.answers = path.join(raw, 'paint-answers.jsonl'); this.requests = new Map();
@@ -180,7 +180,7 @@ export class PaintSession {
     p.snapshot = snap;
     const t = now();
     checkPlan({ repo: this.repo, spec: this.spec, planDir: snap, variant: variantIn(snap), target: this.target, work: path.join(dir, 'work') })
-      .then(chk => { p.chk = chk; writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette, seconds: +(now() - t).toFixed(1) }); })
+      .then(chk => { p.chk = chk; this.checkLog.push({ seconds: chk.seconds, previewSeconds: chk.previewSeconds }); writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette, seconds: +(now() - t).toFixed(1) }); })
       .catch(e => { p.chk = { crash: String(e.stack || e) }; });
   }
 
@@ -203,6 +203,7 @@ export class PaintSession {
     const plan = path.join(dir, 'plan-1'); fs.cpSync(snapshot, plan, { recursive: true });
     fs.rmSync(path.join(this.raw, 'plan'), { recursive: true, force: true }); fs.cpSync(snapshot, path.join(this.raw, 'plan'), { recursive: true });
     this.painting.run(plan, variantIn(plan));
+    this.paintings++;
     this.started = true; this.palette = chk.palette; this.startCheck = chk;
     if (this.strict) this.withdrawTarget();
     this.record('start', { variant: variantIn(plan), stops: initialStop === 'end' ? 'none' : 'every passage boundary', looks: LOOKS, strict: this.strict });

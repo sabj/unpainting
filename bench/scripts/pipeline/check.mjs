@@ -10,6 +10,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolvePlan } from './plan-args.mjs';
+import { readPreview, writePreviewCompare, previewText } from './preview.mjs';
 
 /** Pigments the painter will paint with, from its planning log: the palette in order plus the drawing inks. */
 function paletteOf(log) {
@@ -26,16 +27,20 @@ function paletteOf(log) {
   return names.length ? { palette: names, inks } : null;
 }
 
-/** The planning step: paint-plate with the plan's args and --valuepreviewonly, stopped once the value plan is made. */
+/**
+ * The planning step: paint-plate with the plan's args and --valuepreviewonly. `passed` is the value plan being made (the
+ * plan is paintable); the step then goes on to write the CPU plan preview and exits by itself. previewSeconds is the
+ * time from the value plan to that exit.
+ */
 function planningStep({ repo, args, logFile, timeoutMs }) {
   return new Promise(resolve => {
     fs.writeFileSync(logFile, '');
     const child = spawn(process.execPath, args, { cwd: repo, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
-    let log = '', passed = false;
+    let log = '', passed = false, passedAt = 0;
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
-    const take = b => { const s = b.toString(); log += s; fs.appendFileSync(logFile, s); if (!passed && /^target values: /m.test(log)) { passed = true; child.kill('SIGTERM'); } };
+    const take = b => { const s = b.toString(); log += s; fs.appendFileSync(logFile, s); if (!passed && /^target values: /m.test(log)) { passed = true; passedAt = Date.now(); } };
     child.stdout.on('data', take); child.stderr.on('data', take);
-    child.on('close', code => { clearTimeout(timer); resolve({ passed, code, log }); });
+    child.on('close', code => { clearTimeout(timer); resolve({ passed, code, log, previewSeconds: passed ? +((Date.now() - passedAt) / 1000).toFixed(1) : 0 }); });
   });
 }
 
@@ -48,7 +53,8 @@ export async function checkPlan({ repo, spec, planDir, variant, target, work, ti
   fs.mkdirSync(work, { recursive: true });
   const plan = resolvePlan({ spec, planDir, variant, target, out: path.join(work, 'out'), compile: true });
   const failures = plan.problems.map(reason => ({ code: 4, reason }));
-  let palette = null;
+  let palette = null, preview = null, previewSeconds = 0;
+  const t0 = Date.now();
   if (!failures.length) {
     const r = await planningStep({ repo, args: plan.args, logFile: path.join(work, 'planning.log'), timeoutMs });
     palette = paletteOf(r.log);
@@ -59,11 +65,20 @@ export async function checkPlan({ repo, spec, planDir, variant, target, work, ti
         const seams = JSON.parse(fs.readFileSync(path.join(work, 'out', 'value-region-check.json'), 'utf8')).band1UnsupportedAxisEdges || [];
         if (seams.length) failures.push({ code: 4, reason: 'straight edges with no target edge under them (value-plan cells): ' + JSON.stringify(seams.slice(0, 8)) });
       } catch { /* no region check written */ }
+    } else {
+      // an admitted plan always has its CPU preview; a step that made the plan and not the preview is a failure, not a plan without one
+      previewSeconds = r.previewSeconds;
+      try {
+        const out = path.join(work, 'out'), found = readPreview(out), compare = path.join(work, 'preview.jpg');
+        await writePreviewCompare({ target: path.resolve(repo, target), ledger: found.ledger, dest: compare });
+        preview = { report: found.report, compare: path.relative(repo, compare) || compare, text: null };
+        preview.text = previewText({ report: found.report, compare: preview.compare });
+      } catch (e) { failures.push({ code: 4, reason: `the plan preview failed: ${e.message}` }); }
     }
   }
   return {
     ok: failures.length === 0, failures, refusal: failures.map(f => f.reason), variant: plan.variant,
-    args: plan.args, layering: plan.layering, palette,
+    args: plan.args, layering: plan.layering, palette, preview, seconds: +((Date.now() - t0) / 1000).toFixed(1), previewSeconds,
   };
 }
 
@@ -83,6 +98,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const variant = (fs.existsSync(vf) ? fs.readFileSync(vf, 'utf8') : '').replace(/\s+/g, '') || 'region_w13';
   const r = await checkPlan({ repo: root, spec: modelCheckSpec(frozen), planDir: 'bench/plan', variant, target: 'bench/plan/target.png', work: 'bench/check-out' });
   console.log(JSON.stringify({ ok: r.ok, failures: r.failures, args: r.args, layering: r.layering, palette: r.palette }, null, 1));
+  if (r.preview) console.log(r.preview.text);
+  fs.appendFileSync(path.join('bench', 'check-log.jsonl'), JSON.stringify({ ok: r.ok, seconds: r.seconds, previewSeconds: r.previewSeconds }) + '\n');
   console.log(r.ok ? 'ADMITTED' : `REFUSED: ${r.refusal.join('; ')}`);
   process.exit(r.ok ? 0 : 4);
 }

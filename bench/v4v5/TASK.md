@@ -89,7 +89,19 @@ All files go in `bench/plan/` unless stated.
    load, protected lights, edges, values, what would show failure, and (V5) what you changed and why. Recorded, not
    executed.
 
-## Before you paint: run the check
+## Before you paint: iterate on the plan preview, then render once
+
+A render is the expensive step (minutes of machine time, one painting). The plan preview is free: when the check admits
+your plan it also writes a CPU **plan preview**, your plan booked flat and rendered through the sheet's optics, and
+prints how its values compare with the target (dark share, mean lightness, the darkest and lightest tails, paper
+share). It is `bench/check-out/preview.jpg` (target left, plan preview right). It predicts the painted values. It
+shows values and colour areas, not edges, brush marks or texture, so judge those from the skills and the example. Use
+the preview as your main feedback: change the plan, run the check, look at the preview, and repeat until the values and
+colour areas are right. Then render once with `bash bench/paint.sh start`. The harness records how many checks you ran,
+their preview time, and the render's time. One render is allowed; a second start is possible only when the painter
+itself refused the plan before painting began.
+
+## Run the check
 
 `bash bench/check.sh` runs exactly the admission check `bash bench/paint.sh start` runs (a few minutes at full width):
 the refusals before any painting (it prints the painter arguments your plan resolves to, the base tokens applied or

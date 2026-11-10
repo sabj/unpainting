@@ -21,6 +21,7 @@ import { checkPlan } from './check.mjs';
 import { pngSize, SUBJECT_MEDIA } from './plan-args.mjs';
 import { writeFeedback } from './feedback.mjs';
 import { copyRecord } from './copy.mjs';
+import { costRecord } from './preview.mjs';
 
 import { benchmarkProfile, profileSubject } from '../profiles.mjs';
 import { tokenStop } from '../budget.mjs';
@@ -32,7 +33,10 @@ const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then pain
 const LITE_PROMPT = 'Read bench/TASK.md, prepare the plan deliverables and stop. This is planning only: do not run checks or the painter; the harness does both after your process exits.';
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
 const STAGE_PCT = [10, 25, 50, 75, 100];
-const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|plan-args\.mjs|copy\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|check-log\.jsonl|plan-args\.mjs|copy\.mjs|preview\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+
+/** The model's own runs of `bash bench/check.sh`, one line each in bench/check-log.jsonl. */
+const modelChecks = ws => { const f = path.join(ws, 'bench', 'check-log.jsonl'); return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : []; };
 
 /** The V4/V5 subjects. Every subject must name its drawing medium (none, pencil or pen); a missing one is an error. */
 export const loadSubjects = () => {
@@ -85,7 +89,7 @@ function seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile }) 
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
   fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile }));
   for (const f of ['check.sh', 'TOKENS.md', 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
-  for (const f of ['check.mjs', 'plan-args.mjs', 'copy.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
+  for (const f of ['check.mjs', 'plan-args.mjs', 'copy.mjs', 'preview.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
   if (profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'check.mjs'), "console.error('Lite: admission runs once, after the model exits. Save your plan and stop.'); process.exitCode = 2;\n");
     fs.writeFileSync(path.join(b, 'PAINT.md'), 'Lite planning only. Save the deliverables listed in TASK.md, then stop. The harness runs the check and painter after your process exits. No looking, waiting or repairs.\n');
@@ -184,6 +188,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
       const snap = planSnapshot(ws, path.join(dir, 'plan'));
       const chk = await checkPlan({ repo: REPO, spec, planDir: snap, variant: variantIn(snap), target, work: path.join(dir, 'work'), timeoutMs: spec.checkTimeoutMs ?? 900000 });
       writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette });
+      session.checkLog.push({ seconds: chk.seconds, previewSeconds: chk.previewSeconds });
       return { chk, snap };
     };
     // The session ended without a painting: check the plan files as they are and paint them without stops. One repair
@@ -292,6 +297,8 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     selfReviewModelMinute: selfReviewAt,
     modelSessionSeconds: record.wallSeconds, elapsedSeconds: record.totalSeconds ?? null,
     renderSeconds: p ? p.segments.reduce((a, s) => a + (s.seconds || 0), 0) : 0,
+    // what the try cost besides the model: admission checks (the model's own, its starts' and revisions', the harness's) with their CPU preview time, and painter runs
+    cost: costRecord({ checks: [...modelChecks(ws), ...session.checkLog], renders: session.paintings, renderSeconds: p ? p.segments.reduce((a, s) => a + (s.seconds || 0), 0) : 0 }),
     usageComplete: record.usageComplete ?? false, costComplete: record.costComplete ?? false, budgetStopped: record.budgetStopped ?? false,
   };
   const painted = outcome === 'painted' && fs.existsSync(path.join(p.out, 'painting.png'));
@@ -347,7 +354,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     fs.mkdirSync(rawTry, { recursive: true });
     fs.rmSync(tryDir, { recursive: true, force: true }); fs.mkdirSync(tryDir, { recursive: true });
     const cropsOut = {}, unpainted = {}, t0 = Date.now();
-    let tokens = 0, cost = 0, wall = 0, modelMin = 0, renderSeconds = 0, usageComplete = true, costComplete = true, budgetStopped = false, guardViolations = 0;
+    let tokens = 0, cost = 0, wall = 0, modelMin = 0, renderSeconds = 0, checks = 0, previewSeconds = 0, renders = 0, usageComplete = true, costComplete = true, budgetStopped = false, guardViolations = 0;
     for (const crop of crops) {
       // A dry run checks the harness, not segmentation: it paints with --segments off, so it needs no SAM python or
       // checkpoint (src/crop/segment-prep.mjs). Real runs keep the painter's default (SAM) and add nothing.
@@ -366,7 +373,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
         continue;
       }
       if (e.entry) cropsOut[crop] = e.entry; else unpainted[crop] = e.unpainted;
-      renderSeconds += r.pipeline.renderSeconds; usageComplete &&= r.record.usageComplete; costComplete &&= r.record.costComplete; budgetStopped ||= r.record.budgetStopped;
+      renderSeconds += r.pipeline.renderSeconds; checks += r.pipeline.cost.checks; previewSeconds += r.pipeline.cost.previewSeconds; renders += r.pipeline.cost.renders; usageComplete &&= r.record.usageComplete; costComplete &&= r.record.costComplete; budgetStopped ||= r.record.budgetStopped;
       tokens += r.record.tokens; cost += r.record.costUSD; wall += r.record.wallSeconds; modelMin += r.pipeline.modelMinutes; guardViolations += r.guardViolations;
       log(`${crop}: ${r.pipeline.outcome}, ${r.pipeline.looks} looks, ${r.pipeline.revisions} revisions, ${r.pipeline.modelMinutes} model minutes`);
     }
@@ -377,7 +384,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
       settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: profile.modelMinutes, modelMinutesCap: profile.modelMinutes, lookBudget: profile.planOnly ? 0 : null, selfView: profile.planOnly ? 'none' : 'gentle', targetGuard: 'gentle',
         crops, learnsBetweenTries: round.learning, strictVerdict, noTargetLooks, benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
-      session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, exitCode: null, killedAtCap: budgetStopped },
+      session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, checks, previewSeconds: +previewSeconds.toFixed(1), renders, exitCode: null, killedAtCap: budgetStopped },
       guard: { blockedImageReads: guardViolations, kitRejections: 0, auditHits: [] },
       crops: cropsOut, ...(Object.keys(unpainted).length ? { unpainted } : {}),
       score: { status: dry ? 'dry-run' : 'unscored', composite: null, complete: false },

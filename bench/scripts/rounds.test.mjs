@@ -100,6 +100,11 @@ test('dry run: V4 plans, is refused once, paints with stops, looks, revises and 
   assert.ok(Number.isFinite(p.copy.hfCorr) && p.copy.ceiling === 0.53 && typeof p.copy.over === 'boolean', JSON.stringify(p.copy));
   assert.equal(typeof p.copy.lines, 'number');
   assert.doesNotMatch(ck, /"copy"/);
+  // the preview was made and the cost is in the try record and run.json: the dry planner ran the check once itself, the
+  // refused start, the start and the revision ran it again; one render, whose segments include the revision's
+  assert.ok(p.cost.checks >= 3 && p.cost.previewSeconds > 0 && p.cost.renders === 1 && p.cost.renderSeconds > 0, JSON.stringify(p.cost));
+  assert.deepEqual([r.session.checks, r.session.renders], [p.cost.checks, 1]);
+  assert.ok(r.session.previewSeconds > 0);
   fs.rmSync(out, { recursive: true, force: true });
 });
 

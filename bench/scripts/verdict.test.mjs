@@ -71,7 +71,7 @@ test('Painting.verdict reads unused-options.txt and the log, and keeps the paint
 const collectWith = async (root, strictVerdict) => {
   const p = endedPainting(root), raw = path.join(root, `raw-${strictVerdict}`), rawTry = path.join(root, `try-${strictVerdict}`);
   fs.mkdirSync(raw, { recursive: true });
-  const session = { painting: p, ckpt: path.join(raw, 'CHECKPOINTS.jsonl'), modelS: () => 60, capped: false, ended: 'the painting finished' };
+  const session = { painting: p, ckpt: path.join(raw, 'CHECKPOINTS.jsonl'), modelS: () => 60, checkLog: [{ seconds: 30, previewSeconds: 8 }], paintings: 1, capped: false, ended: 'the painting finished' };
   const record = { turns: [], repairTurns: [] };
   return collect({ crop: 'hills', spec: {}, raw, rawTry, ws: root, session, record, outcome: null, paintedBy: 'the model', refusal: null, feedbackFiles: null, selfReviewAt: null, strictVerdict });
 };
@@ -88,6 +88,7 @@ test('collection: a painting with only notes is painted, copied for the scorer, 
   assert.equal(r.pipeline.droppedPassages, 3);
   assert.ok(fs.existsSync(path.join(r.out, 'final.png')));
   assert.equal(r.strokes, 120);
+  assert.deepEqual(r.pipeline.cost, { checks: 1, checkSeconds: 30, previewSeconds: 8, renders: 1, renderSeconds: r.pipeline.renderSeconds });
   await sharp({ create: { width: 96, height: 80, channels: 3, background: '#d8cfb8' } }).png().toFile(path.join(r.out, 'final.png'));
   const tryDir = path.join(root, 'try-folder');
   fs.mkdirSync(tryDir);
