@@ -491,6 +491,13 @@ function strokeContacts(sheet) {
   return i => { if (state.stamps[i] !== state.epoch) { state.stamps[i] = state.epoch; sheet._lastStrokeContacts++; } };
 }
 
+/** The water a lifted brush's bead may leave in each wet cell under its last contact, from the cells' standing water `W`:
+ *  what one more touch of the hairs that hold free liquid would lay there at the lift's pressure `p` (strokeImpl's
+ *  `loose`, with `freeL` their mean free-liquid share). A depth-filling brush fills to its own depth. Shared with the
+ *  GPU's stroke_end (stepfull.wgsl), which computes the same. */
+function beadRoom(brush, p, freeL, W) {
+  return W.map(Wi => brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * p) - Wi) : brush.give * p * Math.max(0, brush.wetness * freeL * (0.6 + 0.4 * p) - Wi));
+}
 function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, flowEvery = 0, candidateMask = null } = {}) {
   const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright });
@@ -710,7 +717,8 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
   sheet._contactBrush = null;
   // lifting off: hairs with free liquid leave a bead at the last contact, drawn from the tips only
   const last = path[path.length - 1], r = Math.max(1.5, brush.radius * 0.35), pool = { water: 0, pig: new Array(brush.K || K).fill(0) }; // sized to the hairs' pigment count so the bead can go back to the belly
-  for (const hr of brush.hairs) if (hr.water / (brush.capacity * hr.len || 1) > brush.free) moveMass(hr, pool, Math.min(hr.water, 0.0015 * (brush.depositDepth || brush.capacity)));
+  let freeSum = 0, freeN = 0;
+  for (const hr of brush.hairs) { const sat = hr.water / (brush.capacity * hr.len || 1); if (sat > brush.free) { freeSum += (sat - brush.free) / (1 - brush.free); freeN++; moveMass(hr, pool, Math.min(hr.water, 0.0015 * (brush.depositDepth || brush.capacity))); } }
   const cells = [];
   if (sheet._cpuDemandWindow) {
     const x0=Math.max(0,Math.floor(last.x-r)),x1=Math.min(w-1,Math.ceil(last.x+r));
@@ -718,8 +726,16 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
     if(x1>=x0 && y1>=y0)sheet._cpuDemandWindow.require([x0,y0,x1-x0+1,y1-y0+1]);
   }
   for (let yy = Math.floor(last.y - r); yy <= Math.ceil(last.y + r); yy++) for (let xx = Math.floor(last.x - r); xx <= Math.ceil(last.x + r); xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h && Math.hypot(xx - last.x, yy - last.y) <= r && sheet.M[yy * w + xx]) cells.push(yy * w + xx);
-  if (pool.water > 0 && cells.length) for (const i of cells) { countContact(i); markCpuStrokeCell(sheet, i); deposit(sheet, i, pool.water / cells.length, pool.pig.map(v => v / cells.length)); }
-  else if (pool.water > 0) moveMass(pool, belly, pool.water); // off the sheet or over dry paper, the bead stays on the brush
+  // The bead joins the wet paint there as one more touch of those hairs at the lift would (beadRoom): no deeper than their
+  // free liquid lays. What the paper there cannot take stays on the brush, as it does off the sheet or over dry paper.
+  const room = beadRoom(brush, path[path.length - 1].p ?? 1, freeN ? freeSum / freeN : 0, cells.map(i => sheet.W[i]));
+  let roomSum = 0; for (const v of room) roomSum += v;
+  const lay = Math.min(pool.water, roomSum);
+  if (lay > 0) {
+    if (lay < pool.water) moveMass(pool, belly, pool.water - lay);
+    const water = pool.water, pig = pool.pig.slice();
+    for (let q = 0; q < cells.length; q++) { if (!(room[q] > 0)) continue; const i = cells[q], f = room[q] / roomSum; countContact(i); markCpuStrokeCell(sheet, i); deposit(sheet, i, water * f, pig.map(v => v * f)); }
+  } else if (pool.water > 0) moveMass(pool, belly, pool.water);
   return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
 }
 
@@ -825,6 +841,7 @@ function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, up
   // lift-off bead cells; the GPU keeps the wet ones
   const last = path[path.length - 1], r = Math.max(1.5, brush.radius * 0.35), cells = [];
   for (let yy = Math.floor(last.y - r); yy <= Math.ceil(last.y + r); yy++) for (let xx = Math.floor(last.x - r); xx <= Math.ceil(last.x + r); xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h && Math.hypot(xx - last.x, yy - last.y) <= r) cells.push(yy * w + xx);
+  plan.F[36] = last.p ?? 1;   // the lift's pressure, for the bead's room (beadRoom)
   link.endPlan(sheet, brush, plan, cells, strokeRect(brush, sheet, path));
   return undefined;
 }

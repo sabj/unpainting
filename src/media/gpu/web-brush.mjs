@@ -376,11 +376,21 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   sheet._contactBrush = null;
   // lifting off: a brush with free liquid leaves a bead at the last contact
   const last = path[path.length - 1], r = Math.max(1.5, brush.radius * 0.35), pool = { water: 0, pig: new Array(brush.K || K).fill(0) }; // the hairs' pigment count, so the bead can go back to the belly
-  for (const hr of brush.hairs) if (hr.water / (brush.capacity * hr.len || 1) > brush.free) moveMass(hr, pool, Math.min(hr.water, 0.0015 * brush.capacity));
+  let freeSum = 0, freeN = 0;
+  for (const hr of brush.hairs) { const sat = hr.water / (brush.capacity * hr.len || 1); if (sat > brush.free) { freeSum += (sat - brush.free) / (1 - brush.free); freeN++; moveMass(hr, pool, Math.min(hr.water, 0.0015 * brush.capacity)); } }
   const cells = [];
   for (let yy = Math.floor(last.y - r); yy <= Math.ceil(last.y + r); yy++) for (let xx = Math.floor(last.x - r); xx <= Math.ceil(last.x + r); xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h && Math.hypot(xx - last.x, yy - last.y) <= r && sheet.M[yy * w + xx]) cells.push(yy * w + xx);
-  if (pool.water > 0 && cells.length) for (const i of cells) deposit(sheet, i, pool.water / cells.length, pool.pig.map(v => v / cells.length));
-  else if (pool.water > 0) moveMass(pool, belly, pool.water); // lifted off the sheet, or over dry paper: the bead stays on the brush rather than vanishing
+  // the bead joins the wet paint as one more touch of those hairs at the lift would (brush.mjs beadRoom); the rest stays
+  // on the brush, as it does lifted off the sheet or over dry paper
+  const p = last.p ?? 1, freeL = freeN ? freeSum / freeN : 0, want = brush.wetness * freeL * (0.6 + 0.4 * p);
+  const room = cells.map(i => brush.give * p * Math.max(0, want - sheet.W[i]));
+  let roomSum = 0; for (const v of room) roomSum += v;
+  const lay = Math.min(pool.water, roomSum);
+  if (lay > 0) {
+    if (lay < pool.water) moveMass(pool, belly, pool.water - lay);
+    const water = pool.water, pig = pool.pig.slice();
+    for (let q = 0; q < cells.length; q++) if (room[q] > 0) deposit(sheet, cells[q], water * room[q] / roomSum, pig.map(v => v * room[q] / roomSum));
+  } else if (pool.water > 0) moveMass(pool, belly, pool.water);
   return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
 }
 

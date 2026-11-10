@@ -10,6 +10,12 @@
 //     paint fills no more of the end's box than midway between a half-disc (pi / 4) and a square (1);
 //   delivery: the body holds the paint per cell that the reference brush lays from the same dip, within the scrap
 //     swatch's own band of 0.9 to 1.1.
+// The pass mark for any brush's stroke ends, fixed before any run (033 item 4, after the wet-fusion fix left dark dots
+// at the ends of thin strokes):
+//   ends: no end dries darker than the body's own range. The darkest cell within one mark-width of either end (the
+//     end's box, out to the margin) holds no more pigment than the darkest cell of the body (every row, over the
+//     middle half of the length), so a bead that dries as a dot at the lift or the landing fails, while the body's own
+//     grain and rims set the range.
 import { makePaper } from '../../media/paper.mjs';
 import { createSheet, thickness } from '../../media/sheet.mjs';
 
@@ -21,9 +27,10 @@ export const ROUND_END_FILL = (1 + Math.PI / 4) / 2;
  *   pigment, physics, paperOptions: the scrap. brush(): a brush maker; dipBrush(brush); path(x0, x1, y); stroke, step,
  *   dry: the caller's instruments. flowEvery, settle: as in scrap-join.mjs.
  * @returns {{ width: number, body: number, startFill: number, endFill: number, extent: [number, number],
- *   pathX: [number, number] }} width: mean painted cells across the stroke over the middle half of its length. body:
+ *   pathX: [number, number], bodyPeak: number, startPeak: number, endPeak: number }} width: mean painted cells across the stroke over the middle half of its length. body:
  *   dried pigment per cell on the stroke's centre line there. startFill, endFill: the share of its box each end fills
- *   over the last half-width. A cell is painted where it holds at least half the body's pigment, and the mark ends
+ *   over the last half-width. bodyPeak, startPeak, endPeak: the darkest cell of the body and of each end's box (one
+ *   mark-width in from the end, out to the sheet's edge). A cell is painted where it holds at least half the body's pigment, and the mark ends
  *   where it is first a tenth of its width across, so a stray speck beyond the end is not taken for the end.
  */
 export function scrapMark({ half, length, pigment, physics, paperOptions, brush, dipBrush, path, stroke, step, dry, flowEvery = 24, settle = 60, dryOptions = { levelMax: 400, dt: 4 } }) {
@@ -44,5 +51,8 @@ export function scrapMark({ half, length, pigment, physics, paperOptions, brush,
   let lo = 0, hi = w - 1; while (lo < w && column[lo] < 0.1 * width) lo++; while (hi >= 0 && column[hi] < 0.1 * width) hi--;
   const cap = Math.max(1, Math.round(width / 2));
   const fill = from => { let c = 0; for (let x = from; x < from + cap; x++) c += column[x]; return c / (cap * width); };
-  return { width, body, startFill: fill(lo), endFill: fill(hi + 1 - cap), extent: [lo, hi], pathX: [x0, x1] };
+  const peak = (xa, xb) => { let m = 0; for (let x = Math.max(0, xa); x <= Math.min(w - 1, xb); x++) for (let yy = 0; yy < h; yy++) m = Math.max(m, th[yy * w + x]); return m; };
+  const reach = Math.ceil(width);
+  return { width, body, startFill: fill(lo), endFill: fill(hi + 1 - cap), extent: [lo, hi], pathX: [x0, x1],
+    bodyPeak: peak(c0, c1), startPeak: peak(0, lo + reach), endPeak: peak(hi - reach, w - 1) };
 }
