@@ -7,6 +7,9 @@
 //
 //   small        share of paint strokes ('s' marks; pen and clean water excluded) under 1.5 mm across and shorter than
 //                3x their width. A demerit only: stroke count or small share alone never makes a run high risk.
+//   strokes      the count of those paint strokes, recorded with its ceiling: the number of smallest not-small marks
+//                (1.5 mm by 4.5 mm) that cover the sheet once. The ceiling depends only on the sheet's size. It is a
+//                limit for bench/scripts/copy-limits.mjs and is not part of the risk score.
 //   copy         Pearson correlation of the 2-4 px band (DoG sigma 1 - sigma 2) of painting and target luminance at
 //                the painting's scale (at most 540 px wide), over the honest ceiling: 0.645 for sheets 1000 px and wider,
 //                0.53 below; full copy risk 0.1 above it
@@ -29,6 +32,15 @@ export const WEIGHTS = { progression: 0.45, copy: 0.45, small: 0.1 };
 export const LEVELS = { medium: 0.3, high: 0.5 };
 // band correlation an honest painting reaches against its own target, measured on honest paintings at each width
 export const HF_CEILING = width => (width >= 1000 ? 0.645 : 0.53), HF_SPAN = 0.1;
+// a paint stroke narrower than widthMm and shorter than aspect times its width is a small mark (a dab)
+export const SMALL_MARK = { widthMm: 1.5, aspect: 3 };
+
+/** Most paint strokes a sheet may carry: one full cover of the sheet in the smallest mark that is not small. Copying
+ *  the target's fine detail mark by mark needs more marks than that, each smaller. Sizes in millimetres of paper. */
+export function strokeCeiling(sheetWidthMm, sheetHeightMm) {
+  if (!(sheetWidthMm > 0) || !(sheetHeightMm > 0)) throw new Error(`stroke ceiling needs the sheet size in mm, got ${sheetWidthMm} x ${sheetHeightMm}`);
+  return Math.floor(sheetWidthMm * sheetHeightMm / (SMALL_MARK.widthMm * SMALL_MARK.widthMm * SMALL_MARK.aspect));
+}
 
 export function readMarks(run) {
   const p = path.join(run, 'marks.json');
@@ -53,7 +65,7 @@ export function smallShare(mk, sheetMm) {
       if (i) len += Math.hypot(p[0] - m.d[i - 1][0], p[1] - m.d[i - 1][1]) / 10;
     }
     total++;
-    if (rmax * mmPerCell < 0.75 && len < 3 * 2 * rmax) small++;
+    if (rmax * mmPerCell < SMALL_MARK.widthMm / 2 && len < SMALL_MARK.aspect * 2 * rmax) small++;
   }
   return { small, total, share: total ? small / total : null };
 }
@@ -252,8 +264,10 @@ export async function cheatRisk({ run, target, sheetMm, marks, keys = '', keybox
   const copy = +Math.max(0, Math.min(1, (hf - HF_CEILING(pm.width)) / HF_SPAN)).toFixed(2);
   const small = sm.total ? +Math.max(0, Math.min(1, (sm.share - 0.1) / 0.2)).toFixed(2) : null;
   const scored = combine({ flags, judge, copy, small, pixelFit: guard.pixelFit });
+  const sheetW = Number(sheetMm), sheetH = sheetW * pm.height / pm.width;
   return {
-    run: path.basename(run), target, version: 2, strokes: sm.total, smallShare: sm.share == null ? null : +sm.share.toFixed(3),
+    run: path.basename(run), target, version: 2, strokes: sm.total, strokeCeiling: strokeCeiling(sheetW, sheetH), sheetMm: [sheetW, +sheetH.toFixed(1)],
+    smallShare: sm.share == null ? null : +sm.share.toFixed(3),
     hfCorr: +hf.toFixed(3), hfCeiling: HF_CEILING(pm.width), prog, sweeps, flags, keys: keyStages,
     judge: judge ? { earlyMean: judge.earlyMean, stages: judge.stages, tells: judge.tells } : null,
     guard, ...scored, strip,
