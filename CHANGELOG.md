@@ -70,6 +70,24 @@ The combination is worse than the default on this evidence:
 - `--paperrule 1` changes the light reference only with `--paperrel 1`, `--paperlights 1` or `--washsystem 1`, and the sheet colour only with `--paperrgb auto`.
 - The calibration reads the sheet alone only when `--notargetlooks 1` is also given.
 
+### After `32b1bfa4`: the `claude/031-final2` candidate
+
+These changes sit on `32b1bfa4`. Each was painted from the same stored plans and commands before and after, at full size.
+
+- **Lane joins in wide washes.** A plane wider than the brush is laid in lanes. The brush lays solid paint only part of the way to its edge, so the old 3.5% overlap left a bare strip at each join, and every pigment coat reused the same lanes. That made pale slashes (Mittens hair, Trumbull facade, Rembrandt dress). Lanes are now spaced so neighbours meet where the paint fades to half, midway through the brush's ragged edge (`edgeHalfWidth` in `src/media/brush.mjs`). The slashes on Mittens, the white verticals on Tramp and most of the bluish lines on Trumbull are gone; one Trumbull seam and one Rembrandt streak remain. An earlier version that met in solid paint printed dark stripes on Tramp and was replaced. (`e40893ac`, `ee0b5a85`)
+- **Specks of held white.** Cells held white because the plan gives them under half a glaze now obey the planner's size floor, like any other light. They were masked at any size and left white flecks on the Trumbull stone. Explicit holds such as fur reserves are kept at any size. On the dog-ink portrait the thinnest fur highlights come out a little greyer. (`e40893ac`)
+- **Planned lines in masses.** A line from the plan's drawing files is drawn only where at least half of it lies within one source pixel of a planned passage boundary (`--lineedges`, default 1). On Mittens the lines across the cat's fur, down the face edge and in the nose are gone; the crease above the man's right eye and the cat's tear line are lost too. A source's own pen lines are unchanged. (`d4bd4f50`)
+- **Catchlights.** A reserve box with no paper light keeps its lightest connected cells by the plan's target value, up to the smallest paint brush's footprint (21 cells at 1200 px). The man's eyes on Mittens get catchlights back. (`24511b26`)
+- **V5 with J1.** A V5 run with `--judge J1` under a benchmark profile failed to score try 1 for try 2's feedback. It now scores with J1. (`6124d06a`)
+- **Private targets.** The leaderboard names distributed targets only. (`fa0a8632`)
+
+Measured on six plates (stored Mittens Opus/1 and Trumbull Argon/1, and held-out Rembrandt, Tramp, dog-paint and dog-ink), against `32b1bfa4`:
+
+- Strokes rose 0.6% to 3.4%. hfCorr moved −0.011 to +0.013. No guard violations and no target looks.
+- J1, three repeats each in one batch: the mean of the six subject means went from 5.55 to 5.60. Mittens rose 0.63 and dog-ink fell 0.36; the other four moved by 0.15 or less. One unchanged image can score 0.3 apart between batches.
+
+Tried and not taken: a soft-edge clip opening (no visible change), clean-water edge rings (pale tidelines), three mixed-charge washes (hard islands and outlined patches on Trumbull and Mittens), and extending a named paint box (`0cf0dbfe`: strokes +18% on Mittens, over the 10% limit).
+
 ### Known defects in the default path
 
 - The stored Sargent plan does not paint (see above).
