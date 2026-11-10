@@ -71,9 +71,9 @@ function meadow() {
 
 test('widePalette with a forced sepia box: the guard records its decision and clears the gap', () => {
   const px = meadow(), { paperRGB } = paperOf(px, W, H), lean = pickPalette(px, W, H, paperRGB, { boxpick: false }).palette;
-  const plain = widePalette(px, W, H, paperRGB, lean, { keys: ['sepia', 'ochre'] });
+  const plain = widePalette(px, W, H, paperRGB, lean, { keys: ['sepia', 'ochre'], extend: false });
   assert.equal(plain.palette.box.guard, undefined);
-  const { palette, note } = widePalette(px, W, H, paperRGB, lean, { keys: ['sepia', 'ochre'], guard: { threshold: 1, mode: 'add', max: 8 } });
+  const { palette, note } = widePalette(px, W, H, paperRGB, lean, { keys: ['sepia', 'ochre'], extend: false, guard: { threshold: 1, mode: 'add', max: 8 } });
   const g = palette.box.guard;
   assert.ok(g.gap > 1, note);
   assert.notEqual(g.action, 'kept');
