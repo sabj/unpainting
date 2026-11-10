@@ -31,7 +31,7 @@
     "sharp": "^0.35.4",
     "webgpu": "^0.6.1"
   },
-  "version": "0.3.1",
+  "version": "0.3.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sabj/unpainting.git"

@@ -95,6 +95,7 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--paintguard` | dE00 threshold; `0` is off. It checks a box forced with `--paints` or `washes.paints`. A box this much worse than the painter's own pick is changed as `--paintguardmode` says. `run-card.json` records the decision | `0` | same |
 | `--paintguardmode` | `add` (add the own pick's paints; merge if that cannot close the gap), `merge` (the own pick plus the forced paints that still fit), `replace` (the own pick) | `add` | same |
 | `--paintguardmax` | most paints after `add` or `merge` | `8` | same |
+| `--paintsextend` | `0`, `1`: a box named with `--paints` gains up to two pans for a hue cluster of at least 2% of the picture that it cannot reach; `0` keeps the box as named | `1` | same |
 | `--instrumentcal` | `0`, `1`: a dry-paper passage whose brush water or pass count differs from its stock technique is charged from a scrap swatch laid with its own water and passes; `0` charges it from the stock swatch of its technique's name | `0` (off; the glaze fix delivers the full charge, and the base recipe's dark and cool gains of 1.3 were not removed, so it paints too dark with them) | same |
 | `--techcal` | `0`, `1`: charge each technique in the dark bands for what the sheet showed it lays | `0` | same |
 | `--techcalfrom`, `--techcalmax`, `--techcalmin` | first value band calibrated; factor clamp | `4`, `2.5`, `0.8` | same |
