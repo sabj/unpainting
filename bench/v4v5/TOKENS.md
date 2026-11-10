@@ -1,6 +1,6 @@
 # Recipe tokens
 
-Base (always applied, under your tokens): `region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2`.
+Base (always applied, under your tokens): `region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen`.
 
 Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlayers 3 (the examples below show the scaling). Tokens in one slot replace each other: lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. Stone-block and ground tokens of the base (blk, bmm, bka, birr, rg) act on architecture only. A setting only acts while its switch is on, so the painter reports the others as unused: rec2, rec2x, rcl and rac need the architecture preset (--recesses), eye and dg need _dp, and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Palette tokens act only on Trumbull; there `--paints` is: default ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
@@ -12,7 +12,6 @@ Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlaye
 | `_lay4` | --midlayers 4 |
 | `_dk13` | --darkgain 1.3 |
 | `_lf` | --loadfeather 1.5 |
-| `_sg12` | --stylegain 1.2 |
 | `_ls10` | --layersmooth 1 |
 | `_acc3` | --accentshare 0.3 |
 | `_lt` | --layertexture 1 |
@@ -52,7 +51,6 @@ Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlaye
 | `_rec2x` | --recesslayers 2, --recessshare .75 |
 | `_rcl` | --recessclean 1 |
 | `_ssp2` |  |
-| `_tp2` | --touchpoints 2, --touchgain .6 |
 | `_spl6` | --strokeplan 1, --lanemm 6 |
 | `_sml30` | --strokemm 30 |
 | `_wre15` | --washreach 1.5 |

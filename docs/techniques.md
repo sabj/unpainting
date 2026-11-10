@@ -181,7 +181,7 @@ They are contained this way:
 | Preset | Flags | For |
 |---|---|---|
 | `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1` | Buildings under a sky |
-| `glaze-gains` | `--darkgain 1.3 --coolgain 1.3 --touchgain .6` | Stronger shadow and cool glazes, lighter touch-ups |
+| `glaze-gains` | `--darkgain 1.3 --coolgain 1.3` | Stronger shadow and cool glazes |
 
 `examples/plans/trumbull-values.json` names both presets.
 

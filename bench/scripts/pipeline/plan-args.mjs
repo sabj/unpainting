@@ -16,7 +16,10 @@ import zlib from 'node:zlib';
 
 // rec2x, rcl and tv8 were dropped in 0.3.1: recess settings act only with --recesses 1 (the architecture preset sets
 // them itself) and texture variety acts only on dry-brush texture passages, which are never planned.
-export const BASE = 'region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen_tp2';
+// _sg (--stylegain) and _tp (--touchgain) are not model-settable: a gain that covers an engine error is a calibration, not a
+// painter's choice (docs/honesty.md). The two touch-up rounds the base always had stay a fixed painter setting below; the
+// touch-up gain is the painter's own default (--touchgain .6, tuned/default-flags.mjs).
+export const BASE = 'region_w13_lay4_sky3_cg13_rg10_blk60_bmm40_bka20_birr_skyb_cpp_dk13_pgreen';
 const DEFAULT_VARIANT = 'region_w13';
 const ARCHITECTURE_ONLY = /^(blk|bmm|bka|rg|rec)\d*x?$|^birr$|^rcl$/;
 const GLAZE_GAINS = /^(dk|cg)\d+$/;
@@ -48,7 +51,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       '--brushchoice', v.startsWith('region_w15') ? '1' : '0', '--shapedmarks', shaped ? '1' : '0',
       ...t(/_onedom/, () => ['--middomain', '0']), ...t(/_nest/, () => ['--nestedmid', '1']), ...t(/_lay(\d)/, () => ['--midlayers', m(v, /_lay(\d)/)[1]]),
       ...t(/_dk(\d+)/, () => ['--darkgain', tenth(v, /_dk(\d+)/)]), ...t(/_lf/, () => ['--loadfeather', '1.5']),
-      ...t(/_sg(\d+)/, () => ['--stylegain', tenth(v, /_sg(\d+)/)]), ...t(/_ls(\d+)/, () => ['--layersmooth', tenth(v, /_ls(\d+)/)]),
+      ...t(/_ls(\d+)/, () => ['--layersmooth', tenth(v, /_ls(\d+)/)]),
       ...t(/_acc(\d+)/, () => ['--accentshare', tenth(v, /_acc(\d+)/)]), ...t(/_lt/, () => ['--layertexture', '1']),
       ...(/_cur/.test(v) ? ['--paperlights', '1'] : /_relonly/.test(v) ? ['--paperrel', '1'] : ['--paperrel', '1', '--paperlights', '1']),
       ...(/_cur/.test(v) ? ['--paperrgb', '252,251,248'] : /_relonly/.test(v) ? [] : ['--paperrgb', 'auto']),
@@ -69,7 +72,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_bcl(\d+)/, () => ['--stoneclusters', m(v, /_bcl(\d+)/)[1]]),       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
       ...(/_rec2x/.test(v) ? ['--recesslayers', '2', '--recessshare', '.75'] : /_rec2/.test(v) ? ['--recesslayers', '2'] : []),
       ...t(/_rcl/, () => ['--recessclean', '1']), 
-      ...t(/_tp(\d)/, () => ['--touchpoints', m(v, /_tp(\d)/)[1], '--touchgain', '.6']),
+      '--touchpoints', '2',
       ...t(/_spl(\d*)/, () => ['--strokeplan', '1', '--lanemm', m(v, /_spl(\d*)/)[1] || '6']), ...t(/_sml(\d+)/, () => ['--strokemm', m(v, /_sml(\d+)/)[1]]),
       ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]), ...t(/_lit(\d+)/, () => ['--litlift', hundredth(v, /_lit(\d+)/)]),
       ...t(/_lad/, () => ['--laneadapt', '1']), ...t(/_lw/, () => ['--litwarm', '1']),
