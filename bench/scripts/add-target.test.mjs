@@ -26,15 +26,15 @@ test('addTarget writes the target, its coarse map, its crops.json entry and its 
     fs.copyFileSync(path.join(V2, 'crops.json'), path.join(root, 'v2', 'crops.json'));
     fs.copyFileSync(path.join(BENCH, 'v4v5', 'subjects.json'), path.join(root, 'v4v5', 'subjects.json'));
     const { entry } = await addTarget({ image: path.join(V2, 'targets', 'sargent.png'), task: 'harbour', name: 'Harbour',
-      style: 'loose watercolor: boats at a harbour wall', source: 'test image', licence: 'public domain', crop: [0, 0, 200, 150], width: 160, root });
+      style: 'loose watercolor: boats at a harbour wall', medium: 'none', source: 'test image', licence: 'public domain', crop: [0, 0, 200, 150], width: 160, root });
     assert.deepEqual([entry.width, entry.height], [160, 120]);
     assert.ok(fs.existsSync(path.join(root, 'v2', 'targets', 'harbour.png')));
     const map = readJson(path.join(root, 'v2', 'targets', 'harbour-coarse.json'));
     assert.equal(map.cols * map.rows, map.cells.length);
     assert.equal(readJson(path.join(root, 'v2', 'crops.json')).crops.at(-1).task, 'harbour');
     assert.equal(readJson(path.join(root, 'v4v5', 'subjects.json')).subjects.harbour.taskStyle, 'loose watercolor');
-    await assert.rejects(addTarget({ image: path.join(V2, 'targets', 'sargent.png'), task: 'harbour', name: 'H', style: 's', source: 's', licence: 'l', root }), /already exists/);
-    await assert.rejects(addTarget({ image: path.join(V2, 'targets', 'sargent.png'), task: 'Bad Name', name: 'H', style: 's', source: 's', licence: 'l', root }), /lower-case/);
+    await assert.rejects(addTarget({ image: path.join(V2, 'targets', 'sargent.png'), task: 'harbour', name: 'H', style: 's', medium: 'none', source: 's', licence: 'l', root }), /already exists/);
+    await assert.rejects(addTarget({ image: path.join(V2, 'targets', 'sargent.png'), task: 'Bad Name', name: 'H', style: 's', medium: 'none', source: 's', licence: 'l', root }), /lower-case/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

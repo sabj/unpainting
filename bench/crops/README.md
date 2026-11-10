@@ -18,11 +18,14 @@ Thumbnails of the targets: [Hills](img/hills.webp), [France](img/south-france.we
 
 ```sh
 npm run bench:add-target -- path/to/photo.jpg --task harbour --name Harbour \
-  --style "loose watercolor: boats at a harbour wall" --source "photo by ..." --licence "<licence of the image>" \
+  --style "loose watercolor: boats at a harbour wall" --medium none \
+  --source "photo by ..." --licence "<licence of the image>" \
   --crop 400,220,1600,1300 --self-score
 ```
 
-`--name`, `--style`, `--source` and `--licence` are required; there is no default licence, so state the image's own.
+`--name`, `--style`, `--medium`, `--source` and `--licence` are required; there is no default licence, so state the image's own.
+`--medium` is the drawing medium you see in the target itself: `pen` (pen-and-ink lines), `pencil` (faint graphite lines
+under the paint, no pen) or `none`. In V4 and V5 a plan's ink drawing is drawn in graphite unless the medium is `pen`.
 The script crops the image (pixels of the source: x, y, width, height), resizes it to 300 cells wide like the
 published targets, and writes:
 

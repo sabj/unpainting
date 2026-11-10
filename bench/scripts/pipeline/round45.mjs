@@ -18,7 +18,7 @@ import { verifyComparisonRun } from '../preflight.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './harness.mjs';
 import { PaintSession, planSnapshot, variantIn } from './session.mjs';
 import { checkPlan } from './check.mjs';
-import { pngSize } from './plan-args.mjs';
+import { pngSize, SUBJECT_MEDIA } from './plan-args.mjs';
 import { writeFeedback } from './feedback.mjs';
 
 import { benchmarkProfile, profileSubject } from '../profiles.mjs';
@@ -33,7 +33,18 @@ const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
 const STAGE_PCT = [10, 25, 50, 75, 100];
 const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|plan-args\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
 
-export const loadSubjects = () => readJson(path.join(V45, 'subjects.json')).subjects;
+/** The V4/V5 subjects. Every subject must name its drawing medium (none, pencil or pen); a missing one is an error. */
+export const loadSubjects = () => {
+  const subjects = readJson(path.join(V45, 'subjects.json')).subjects;
+  for (const [id, s] of Object.entries(subjects)) if (!SUBJECT_MEDIA.includes(s.medium)) throw new Error(`bench/v4v5/subjects.json: ${id} needs "medium": ${SUBJECT_MEDIA.join(', ')}`);
+  return subjects;
+};
+// What the brief says about the target's drawing medium.
+const MEDIUM_TEXT = {
+  pen: 'the target is drawn in pen and ink, so an ink drawing suits it',
+  pencil: 'the target has faint pencil lines under the paint and no pen lines, so draw in graphite or not at all',
+  none: 'the target shows no drawn lines, so draw in graphite, lightly, or not at all',
+};
 
 // What the brief says about unread settings and dropped passages: kept as notes, or failures under --strict-verdict.
 const VERDICT_TEXT = {
@@ -54,7 +65,8 @@ export function renderTask({ round, n, tries, spec, strictVerdict = false, profi
   let rules = !v5 ? bf('round-V4.md').replace('Each of the three V4 tries', `Each of the ${WORDS[tries] ?? tries} V4 tries`)
     : n === 1 ? bf('round-V5-first.md').replace('try 1 of 3', `try 1 of ${tries}`) : bf('round-V5-next.md').replace('{TRY}', String(n)).replace(` of 3:`, ` of ${tries}:`);
   const feedback = v5 && n > 1 ? bf('feedback-section.md').replace('{PREV}', String(n - 1)) : '';
-  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], ...LOOK_TEXT[spec.noTargetLooks === true ? 'strict' : 'default'], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
+  if (!MEDIUM_TEXT[spec.medium]) throw new Error(`the brief needs the subject's medium (${SUBJECT_MEDIA.join(', ')}), not ${JSON.stringify(spec.medium)}`);
+  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], ...LOOK_TEXT[spec.noTargetLooks === true ? 'strict' : 'default'], MEDIUM: spec.medium, MEDIUM_TEXT: MEDIUM_TEXT[spec.medium], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
   let t = fs.readFileSync(path.join(V45, 'TASK.md'), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
   for (const [k, v] of Object.entries(vals)) t = t.replaceAll(`{${k}}`, v);
   if (profile?.planOnly) {
@@ -268,7 +280,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     outcome, paintedBy, tokens: variantIn(p ? p.segments.at(-1).planDir : path.join(ws, 'bench')),
     starts: count('start'), looks: count('look'), revisions: count('revise'), revisionsRefused: count('revise-refused'),
     modelMinutes: +(session.modelS() / 60).toFixed(1), cappedAtModelTime: Boolean(session.capped), sessionEnd: session.ended,
-    repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null,
+    repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null, mediumOverride: v?.layering?.mediumOverride ?? null,
     optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     warnings: v?.warnings?.length ? v.warnings : undefined,

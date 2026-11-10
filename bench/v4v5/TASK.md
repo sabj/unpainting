@@ -10,6 +10,7 @@ how much its progress frames look like a person painting.
 ## The task
 
 - Target: `bench/plan/target.png`. Requested style: **{TASK_STYLE}**.
+- Drawing medium of the target: **{MEDIUM}** ({MEDIUM_TEXT}).
 - Output: {WIDTH} px wide on a sheet {SHEETMM} mm wide. These, the target and the sheet size are fixed
   (`bench/frozen.json`).
 - Your working folder is this tree. Write only the files listed under "What you deliver". Everything else you change is
@@ -47,8 +48,13 @@ All files go in `bench/plan/` unless stated.
      region styles create such edges unless they follow real edges in the target or stay small. The check below runs
      the painter's planning step and catches this.
 2. **Drawing paths: `opening-lines.json` (lines drawn before the washes) and `closing-lines.json` (lines drawn
-   last).** Set `drawing.medium: "ink"` in `config.json` for ink, or use `--outlinemedium ink`
-   in `extra-args.json`. When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
+   last).** The drawing is graphite unless you ask for ink: set `drawing.medium: "ink"` in `config.json`, or use
+   `--outlinemedium ink` in `extra-args.json`. Use ink only when the target's drawing medium (above) is pen and the
+   target itself shows pen lines. Dark painted edges, whiskers, hair and window bars are not pen lines: paint them, or
+   leave them to a light pencil drawing. When the medium is not pen, an ink drawing is not drawn in ink: the harness
+   draws your opening lines in graphite as a light preparatory drawing, drops the closing lines and pen settings, and
+   records the override in the result (the check prints it as `mediumOverride`). You may always choose no drawing.
+   When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
    Prepared paths use the harness-owned v2 ink rules: source support, smoothing, darkness caps and damp pen.
    Raw v1 ink controls and legacy ink/sep/uncap/dwg tokens are not admitted. Without a drawing file the painter
    draws from its own reading of the target. Schema:
@@ -63,8 +69,16 @@ All files go in `bench/plan/` unless stated.
    gets the same base; choose pigments with `--paints` in `extra-args.json`. `region_w15` switches to brush choice per passage. The full
    token list with the painter options each sets is in `bench/TOKENS.md`.
 4. **`extra-args.json` (optional): painter settings.** A JSON array of painter options and values, appended last (they
-   win over the recipe), e.g. `["--midlayers","3","--paints","ochre,sienna,ultramarine,cerulean,sepia"]`. There is no gain to set: the
-   painter delivers the values your plan states. Options are limited to `--midlayers` (integer 0–8),
+   win over the recipe), e.g. `["--midlayers","3"]`. There is no gain to set: the painter delivers the values your plan states. Choose pigments with `--paints`, and choose ones that can reach
+   the target's most saturated colours, not just its hues: an earth lies in the direction of an orange or a green but
+   no amount of it makes a clear one, and a palette of earths and greys turns bright fur, foliage, sky or cloth to
+   mud. Find the most saturated passages of the target first and give each a pigment that is at least as clean, then
+   add what the quiet passages and the darks need. Two example palettes for two different pictures: a sunlit garden
+   with red flowers under a blue sky, `["--paints","hansa,cadred,rose,ultramarine,phthalogreen,sienna"]`; a grey
+   stone street in rain, `["--paints","ochre,rawsienna,umber,cerulean,paynes"]`. Neither is a default: read your
+   own target. If no mix of your pigments reaches the chroma of a large colour of the target at its lightness, the
+   painter adds a box pigment that does (two at most) and logs the reason. Options are
+   limited to `--midlayers` (integer 0–8),
    `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
    `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),
    `--valuefloor` (a style name), and `--focusmap` (a `.json` file inside the plan folder).
@@ -135,7 +149,7 @@ When your plan passes the check, paint it yourself:
 
 ```bash
 P=bench/plan
-node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json               # pen lines traced from the target
+node bench/tools/trace-ink.mjs $P/target.png $P/opening-lines.json               # lines traced from the target
 cp $P/opening-lines.json $P/closing-lines.json                                  # same lines closing the painting
 cat > $P/config.json <<'JSON'
 {"subject":"EXAMPLE","name":"EXAMPLE",

@@ -1,57 +1,66 @@
 {
- "note": "V4 and V5 subjects. The target is the V2 crop (bench/v2/targets/). The painter paints it at width px on a sheet sheetmm wide.",
+ "note": "V4 and V5 subjects. The target is the V2 crop (bench/v2/targets/). The painter paints it at width px on a sheet sheetmm wide. medium: the drawing medium a person sees in the target itself: pen (pen-and-ink lines), pencil (faint graphite lines under the paint, no pen) or none (no drawn line). On a subject whose medium is not pen, a plan's ink drawing is drawn in graphite before the washes (bench/scripts/pipeline/plan-args.mjs subjectMediumRule). Trumbull is none: its darks (window bars, stone joints, the sign) change colour and width from mark to mark as brushed paint does, there is no even pen line, and no pencil line shows through the washes. Mittens is pencil: the whiskers and hair ends are thin grey lines, lighter than any pen. Sargent and the painted dog show no drawn line.",
  "subjects": {
   "hills": {
    "name": "Hills",
    "taskStyle": "loose ink and wash",
+   "medium": "pen",
    "width": 1224,
    "sheetmm": 158.04788213627992
   },
   "south-france": {
    "name": "France",
    "taskStyle": "urban sketch, pen plus light wash",
+   "medium": "pen",
    "width": 1216,
    "sheetmm": 280
   },
   "sargent": {
    "name": "Ships",
    "taskStyle": "pure watercolor, no ink",
+   "medium": "none",
    "width": 1200,
    "sheetmm": 280
   },
   "trumbull": {
    "name": "Trumbull",
    "taskStyle": "precise architectural watercolor",
+   "medium": "none",
    "width": 1200,
    "sheetmm": 280
   },
   "mittens": {
    "name": "Mittens",
-   "taskStyle": "watercolor portrait sketch, fine lines and light washes",
+   "taskStyle": "watercolor portrait sketch, light washes over a faint pencil drawing, no ink",
+   "medium": "pencil",
    "width": 1200,
    "sheetmm": 280
   },
   "h36a": {
    "name": "Yale h36-a",
    "taskStyle": "loose ink-and-watercolor field sketch, ink led",
+   "medium": "pen",
    "width": 1224,
    "sheetmm": 280
   },
   "h34a": {
    "name": "Yale h34-a",
    "taskStyle": "loose ink-and-watercolor field sketch, ink led",
+   "medium": "pen",
    "width": 1224,
    "sheetmm": 280
   },
   "dog-paint": {
    "name": "Dog, paint",
    "taskStyle": "classic transparent watercolour portrait, restrained glazes, no ink",
+   "medium": "none",
    "width": 1200,
    "sheetmm": 280
   },
   "dog-ink": {
    "name": "Dog, ink",
    "taskStyle": "loose ink and wash portrait, ink led",
+   "medium": "pen",
    "width": 1200,
    "sheetmm": 280
   }

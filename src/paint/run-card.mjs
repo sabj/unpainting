@@ -24,6 +24,7 @@ function buildRunCard({
   drawingFile = null,
   drawingOrder = "first",
   drawingMedium = "graphite",
+  subjectMedium = null,
   code = null,
   segments = null,
   linework = null,
@@ -61,6 +62,8 @@ function buildRunCard({
     drawing: {
       order: drawingOrder,
       medium: drawingMedium,
+      // --subjectmedium and, when it turned an ink drawing into graphite, what was asked for
+      ...(subjectMedium ? { subjectMedium } : {}),
       file: drawingFile || null,
       stage: linework ?? null,
     },

@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Add a benchmark target from an image: the target PNG, its coarse map, its crops.json entry and its V4/V5 subject.
 //   npm run bench:add-target -- <image> --task harbour --name Harbour \
-//     --style "loose watercolor: boats at a harbour wall" --source "photo by ..." --licence "<licence of the image>" \
+//     --style "loose watercolor: boats at a harbour wall" --medium none --source "photo by ..." \
+//     --licence "<licence of the image>" \
 //     [--crop x,y,w,h] [--width 300] [--private <dir>] [--paint-width 1200] [--sheetmm 280] [--self-score]
-// --name, --style, --source and --licence are required; there is no default licence.
+// --name, --style, --medium, --source and --licence are required; there is no default licence. --medium is the drawing
+// medium seen in the target: pen, pencil or none. A plan's ink drawing is drawn in graphite unless the medium is pen.
 // --crop takes pixels of the source image (default: all of it); the target is resized to --width cells (default 300,
 // as the published targets). --private writes the PNG to <dir> instead of bench/v2/targets and marks the target
 // not distributed; scoring then needs BENCH_PRIVATE_CROPS=<dir>. --self-score scores the target against itself
@@ -14,6 +16,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { execFileSync } from 'node:child_process';
 import { BENCH, readJson, writeJson, round2 } from './lib.mjs';
+import { SUBJECT_MEDIA } from './pipeline/plan-args.mjs';
 
 const COLS = 24, COLOURS = 8;
 
@@ -55,10 +58,12 @@ function kmeans(pts, k, lum) {
 }
 
 /** Write the target and register it. root: the bench folder (BENCH; a copy in tests). Returns the crops.json entry. */
-export async function addTarget({ image, task, name, style, source, licence, crop = null, width = 300, privateDir = null,
+export async function addTarget({ image, task, name, style, medium, source, licence, crop = null, width = 300, privateDir = null,
   paintWidth = 1200, sheetmm = 280, root = BENCH }) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(task || '')) throw new Error('--task must be lower-case letters, digits and hyphens');
   for (const [k, v] of Object.entries({ name, style, source, licence })) if (!v) throw new Error(`--${k} is required`);
+  // the drawing medium a person sees in the target: it decides whether a plan may draw in ink (plan-args.mjs)
+  if (!SUBJECT_MEDIA.includes(medium)) throw new Error(`--medium is required: ${SUBJECT_MEDIA.join(', ')} (the drawing medium seen in the target)`);
   const cropsFile = path.join(root, 'v2', 'crops.json'), subjectsFile = path.join(root, 'v4v5', 'subjects.json');
   const spec = readJson(cropsFile), subjects = readJson(subjectsFile);
   if (spec.crops.some(c => c.task === task) || subjects.subjects[task]) throw new Error(`target ${task} already exists`);
@@ -72,11 +77,11 @@ export async function addTarget({ image, task, name, style, source, licence, cro
   fs.mkdirSync(path.dirname(png), { recursive: true });
   fs.writeFileSync(png, buf);
   writeJson(path.join(root, 'v2', coarseFile), map);
-  const entry = { task, name, width: info.width, height: info.height, coarse: { cols: map.cols, rows: map.rows }, style, source,
+  const entry = { task, name, width: info.width, height: info.height, coarse: { cols: map.cols, rows: map.rows }, style, medium, source,
     distributed: !privateDir, file, coarseFile, licence };
   writeJson(cropsFile, { ...spec, crops: [...spec.crops, entry] });
   writeJson(subjectsFile, { ...subjects, subjects: { ...subjects.subjects,
-    [task]: { name, taskStyle: style.split(':')[0].trim(), width: paintWidth, sheetmm } } });
+    [task]: { name, taskStyle: style.split(':')[0].trim(), medium, width: paintWidth, sheetmm } } });
   return { entry, png };
 }
 
@@ -90,12 +95,12 @@ function selfScore(task, png, style) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const argv = process.argv.slice(2);
   const opt = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
-  const VALUE = new Set(['task', 'name', 'style', 'source', 'licence', 'crop', 'width', 'private', 'paint-width', 'sheetmm']);
+  const VALUE = new Set(['task', 'name', 'style', 'medium', 'source', 'licence', 'crop', 'width', 'private', 'paint-width', 'sheetmm']);
   const image = argv.find((a, i) => !a.startsWith('--') && !(i > 0 && VALUE.has(argv[i - 1].slice(2))));
   try {
-    if (!image || !fs.existsSync(image)) throw new Error('usage: add-target.mjs <image> --task <key> --name <Name> --style <style> --source <credit> --licence <licence>');
+    if (!image || !fs.existsSync(image)) throw new Error('usage: add-target.mjs <image> --task <key> --name <Name> --style <style> --medium <none|pencil|pen> --source <credit> --licence <licence>');
     const { entry, png } = await addTarget({
-      image, task: opt('task'), name: opt('name'), style: opt('style'), source: opt('source'), licence: opt('licence'),
+      image, task: opt('task'), name: opt('name'), style: opt('style'), medium: opt('medium'), source: opt('source'), licence: opt('licence'),
       crop: opt('crop') ? opt('crop').split(',').map(Number) : null, width: Number(opt('width', 300)), privateDir: opt('private', null),
       paintWidth: Number(opt('paint-width', 1200)), sheetmm: Number(opt('sheetmm', 280)) });
     console.log(`bench:add-target: ${entry.task} (${entry.name}), ${entry.width} x ${entry.height}, coarse ${entry.coarse.cols} x ${entry.coarse.rows}, ${png}`);

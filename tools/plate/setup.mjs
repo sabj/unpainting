@@ -41,6 +41,7 @@ import {planUniversalLinework} from '../../src/paint/methods/linework-stage.mjs'
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
+import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
 import {chooseInkRecipe, sourcePenShare, DRAWING_FLAGS, DEFAULT_INK_RECIPE} from '../../src/paint/methods/ink-recipe-auto.mjs';
 import {drawingStageIntent} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {bindLineTarget} from '../../src/crop/lines.mjs';
@@ -64,7 +65,7 @@ process.env.GPU_ASYNC_DRY ??= '1';
 const argv0 = process.argv.slice(2);
 if(await runSpeedSequence(argv0,ENTRY_FILE))process.exit(0);
 // --recipe: a named preset of flags put in front of the command line (src/paint/recipe.mjs)
-const { argv, note: RECIPE_NOTE, pipeline: PIPELINE } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(ENTRY_FILE)) });
+const { argv, note: RECIPE_NOTE, pipeline: PIPELINE, subjectMedium: SUBJECT_MEDIUM } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(ENTRY_FILE)) });
 // every option name the painter asks for, so options given but never read are reported at the end
 const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
@@ -144,6 +145,11 @@ const CPU_PROFILE = num('speedcpu', 0) > 0 ? await import('../speed/cpu-profile.
 void opt('downtrace', '0'); // tracing is selected from argv while GPU modules load
 
 if (RECIPE_NOTE) console.log(RECIPE_NOTE);
+// --subjectmedium none|pencil|pen: the drawing medium seen in the picture. With none or pencil an ink drawing, from the
+// plan or the command line, is drawn as a light graphite preparatory drawing (src/paint/subject-medium.mjs, applied in
+// expandRecipe above). Pen, the default: nothing changes.
+const NO_PEN_SUBJECT = ['none', 'pencil'].includes(opt('subjectmedium', 'pen'));
+if (SUBJECT_MEDIUM) console.log(subjectMediumNote(SUBJECT_MEDIUM.medium, SUBJECT_MEDIUM.asked));
 // The release, painter and sim versions and the git commit, recorded in frames.json and backend.json (docs/versions.md)
 const PAINTER = versionStamp();
 console.log(`${versionLine(PAINTER)}${PAINTER.commit ? ` at ${PAINTER.commit.slice(0, 12)}` : ''}`);
@@ -178,7 +184,9 @@ const INK_RECIPE = await (async () => {
   return chooseInkRecipe(INK_RECIPE_NAME, argv0, () => share, num('penfirst', 0.5));
 })();
 if (INK_RECIPE_NAME === 'auto') console.log(`ink recipe: ${INK_RECIPE.recipe} (auto: ${INK_RECIPE.why})`);
-argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
+// the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
+if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
+else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
@@ -373,7 +381,7 @@ const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [ENTRY_FILE]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
-Object.assign(ctx, { argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
+Object.assign(ctx, { SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_VALUE_ONLY, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 

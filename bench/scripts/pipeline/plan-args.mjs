@@ -253,6 +253,40 @@ export function checkPlanLimits(config, sheetmm, linesByName, targetPixels) {
 
 const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
 const STYLE_INK = { 'urban-sketch': 'black' };
+
+/** A subject's drawing medium, as a person looking at the target would name it (bench/v4v5/subjects.json `medium`). */
+export const SUBJECT_MEDIA = Object.freeze(['none', 'pencil', 'pen']);
+const isGraphite = v => v === 'graphite' || /^graphite-/.test(v);
+// settings only a pen reads; dropped with the pen so they are not held against the plan as unread
+const INK_ONLY = ['inkprofile', 'washinkfree', 'drawinghand', 'inkdarkskip'];
+/**
+ * The subject-medium rule: a target with no pen lines is not drawn in ink. An ink drawing a plan asks for (in
+ * config.drawing.medium or --outlinemedium, or left to the painter with `auto`) is then drawn as a light graphite
+ * preparatory drawing before the washes: the opening lines stay, closing lines and pen-only settings go.
+ * A plan that draws in graphite or not at all keeps its drawing as written, and every plan on a pen subject resolves
+ * to the same command as before. The painter enforces the rule itself under --subjectmedium (src/paint/subject-medium.mjs),
+ * because it gives the plan's drawing section the last word; this function makes the harness arguments and the record agree.
+ * @returns {{ outlineMedium: string, extraArgs: string[], firstOnly: boolean, override: object|null }}
+ */
+export function subjectMediumRule({ medium, planMedium, outlineMedium, extraArgs, noDrawing }) {
+  const keep = { outlineMedium, extraArgs, firstOnly: false, override: null };
+  if (medium == null) return keep;
+  if (!SUBJECT_MEDIA.includes(medium)) throw new Error(`subject medium must be none, pencil or pen, not ${JSON.stringify(medium)}`);
+  if (medium === 'pen' || noDrawing) return keep;
+  // the painter gives a plan's drawing section the last word, then extra-args, then the template (src/paint/recipe.mjs)
+  const at = extraArgs.lastIndexOf('--outlinemedium'), extraMedium = at >= 0 && at + 1 < extraArgs.length ? extraArgs[at + 1] : null;
+  const asked = planMedium ?? extraMedium ?? outlineMedium;
+  if (asked === 'none' || isGraphite(asked)) return keep;
+  const out = [], removed = [];
+  for (let i = 0; i < extraArgs.length; i += 2) {
+    const key = extraArgs[i].replace(/^--/, ''), value = extraArgs[i + 1];
+    if (INK_ONLY.includes(key)) { removed.push(`${extraArgs[i]} ${value}`); continue; }
+    out.push(extraArgs[i], ...(value === undefined ? [] : [key === 'outlinemedium' && value !== 'none' ? 'graphite' : key === 'drawing' && value !== 'none' ? 'first' : value]));
+  }
+  return { outlineMedium: 'graphite', extraArgs: out, firstOnly: true,
+    override: { subjectMedium: medium, asked, drawn: 'graphite', closingDropped: false, removed,
+      reason: `the subject's medium is ${medium}: the target shows no pen lines, so the ${asked === 'auto' ? 'drawing left to the painter' : asked + ' drawing'} is a light graphite preparatory drawing before the washes` } };
+}
 /** PNG width and height from the file header. */
 export const pngSize = file => { const b = fs.readFileSync(file); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
 
@@ -272,11 +306,17 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   let extra = null;
   if (fs.existsSync(extraFile)) { extra = readJson(extraFile); if (extra === null) problems.push('extra-args.json is not valid JSON'); }
   problems.push(...checkExtraArgs(extra, planDir));
-  const extraArgs = Array.isArray(extra) ? extra.map(String) : [];
+  const planExtraArgs = Array.isArray(extra) ? extra.map(String) : [];
   const targetPixels = pngSize(target);
   const planMedium = config?.drawing?.medium && config.drawing.medium !== 'none' ? config.drawing.medium : null;
   const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
-  const outlineMedium = planMedium ?? (isPenWash ? 'ink' : 'graphite');
+  // a subject with no pen (spec.medium none or pencil) has an ink plan drawn in graphite; see subjectMediumRule
+  const planOff = k => { const i = planExtraArgs.lastIndexOf('--' + k); return i >= 0 && planExtraArgs[i + 1] === 'none'; };
+  // a drawing section with ink stages and no medium is an ink drawing too
+  const inkStages = ['prepInk', 'finishInk'].some(k => config?.drawing?.stages?.[k]);
+  const mediumRule = subjectMediumRule({ medium: spec.medium, planMedium: planMedium ?? (inkStages ? 'ink' : null), outlineMedium: planMedium ?? (isPenWash ? 'ink' : 'graphite'), extraArgs: planExtraArgs,
+    noDrawing: config?.drawing?.medium === 'none' || planOff('drawing') });
+  const { outlineMedium, extraArgs } = mediumRule, mediumOverride = mediumRule.override;
   const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, out, compile, gpu, targetPixels, linesExist, outlineMedium });
   problems.push(...refusedTokens(safeVariant));
   if (config && typeof config === 'object') problems.push(...refusedPlanFields(config));
@@ -285,7 +325,16 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
   const layered = layerBase({ variant: safeVariant, build, sepiaInk, linesExist });
-  const args = [...layered.args];
+  let args = [...layered.args];
+  if (mediumRule.firstOnly) {
+    // a preparatory drawing comes before the washes: no closing lines
+    const last = args.indexOf('--drawinglast');
+    mediumOverride.closingDropped = last >= 0 || optionMap(args).get('drawing') !== 'first' || planExtraArgs.some((a, i) => planExtraArgs[i - 1] === '--drawing' && a !== 'first' && a !== 'none');
+    if (last >= 0) args = args.filter((_, i) => i !== last && i !== last + 1);
+    args[args.lastIndexOf('--drawing') + 1] = 'first';
+  }
+  // the painter applies the same rule to the plan's own drawing section, which the harness arguments cannot override
+  if (spec.medium === 'none' || spec.medium === 'pencil') args.push('--subjectmedium', spec.medium);
   const hasDrawingFile = args.includes('--drawingfile');
   const extraVal = name => { const i = extraArgs.lastIndexOf('--' + name); return i >= 0 && i + 1 < extraArgs.length && !extraArgs[i + 1].startsWith('--') ? extraArgs[i + 1] : null; };
   const effMedium = extraVal('outlinemedium') ?? (config?.drawing?.medium === 'none' ? 'none' : outlineMedium);
@@ -325,7 +374,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (config) problems.push(...checkPlanLimits(config, spec.sheetmm, linesByName, targetPixels));
   return {
     args, problems, variant: safeVariant, extraArgs,
-    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor },
+    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor, mediumOverride },
     modelOptions: layered.modelOptions, baseOptions: layered.baseOptions, extraOptions: extraArgs.filter(a => a.startsWith('--')).map(a => a.slice(2)),
     templateOptions: [...optionMap(build(variantParts(safeVariant).prefix)).keys()],
   };

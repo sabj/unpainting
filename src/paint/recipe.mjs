@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pipelineFlags } from './pipeline-plan.mjs';
 import { drawingFlags } from './drawing-plan.mjs';
+import { subjectMediumOf, drawingForSubject, argvForSubject } from './subject-medium.mjs';
 
 const DEFAULT_RECIPE = 'default';
 
@@ -99,9 +100,18 @@ function planSheet(plan, argv) {
 // The command line with the recipe's flags and the plan's drawing flags in front of it, and the line to log about the
 // choice. No --recipe means the default recipe, except on an --areaplan run. An unknown recipe name or any preset
 // throws. With recipe none, the plan overrides the harness template.
+// --subjectmedium none|pencil: an ink drawing, from the plan or the command line, becomes a graphite preparatory drawing
+// (subject-medium.mjs). `subjectMedium` in the result says what was asked for when that happened.
 export function expandRecipe({ argv: given0, root = process.cwd() }) {
+  const medium = subjectMediumOf(given0);
+  const written = readPlan(styleAlias(given0), root), forSubject = drawingForSubject(written?.drawing ?? null, medium);
+  const r = expandFor({ argv: given0, plan: forSubject.asked ? { ...written, drawing: forSubject.drawing } : written });
+  const fitted = argvForSubject(r.argv, medium, { planAsked: forSubject.asked }), asked = fitted.asked;
+  return { ...r, argv: fitted.argv, subjectMedium: asked ? { medium, asked, dropped: fitted.dropped } : null };
+}
+
+function expandFor({ argv: given0, plan }) {
   const argv = styleAlias(given0);
-  const plan = readPlan(argv, root);
   let drawing = drawingFlags(plan?.drawing ?? null);
   const at = argv.lastIndexOf('--recipe');
   const [given, ...typed] = at < 0 ? [argv.includes('--areaplan') ? 'none' : DEFAULT_RECIPE] : String(argv[at + 1]).split('+');

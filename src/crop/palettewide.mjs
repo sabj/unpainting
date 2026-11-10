@@ -13,6 +13,7 @@ import { channelDensity, unmix } from './pigments.mjs';
 import { renderLayers } from '../media/km.mjs';
 import { labPlanes, deltaE2000 } from '../eval/colour.mjs';
 import { guardForcedBox, guardNote } from './paint-guard.mjs';
+import { coverChroma, chromaNote } from './chroma-reach.mjs';
 
 /** Share of the sample a hue cluster needs before a named box is extended for it. */
 const EXPLICIT_MIN_SHARE = 0.02;
@@ -122,7 +123,7 @@ export function coverKeyHues(sample, colours, paints, { max = 6, library = BOX, 
  * recovered lean palette; a monochrome lean palette is returned unchanged.
  * @returns { palette, note }
  */
-export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, min = 3, max = 6, K = 8, minShare = 0.005, minChroma = 8, keys = null, add = null, guard = null, extend = true } = {}) {
+export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, min = 3, max = 6, K = 8, minShare = 0.005, minChroma = 8, keys = null, add = null, guard = null, extend = true, chroma: checkChroma = true } = {}) {
   if (!keys && (lean.monochrome || lean.pigments.length < 2)) return { palette: lean, note: `palette wide: the picture is one fluid (chroma ${lean.chroma.toFixed(3)}), kept ${lean.pigments.length} (lean)` };
   const sample = sampleSource(px, w, h, paperRGB, { stride: 3 });
   const colours = localColours(sample, { K, minChroma, minShare });
@@ -142,20 +143,29 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
   // sample that it cannot reach (rendered chroma under 0.8 of the cluster's, or hue off by more than 12 degrees).
   const named = guarded ? guarded.paints : chosen.paints, reach = { minShare: EXPLICIT_MIN_SHARE };
   const unreached = keys && extend ? keyHueCoverage(sample, colours, named, reach).hues.filter(r => r.loss > 1e-6) : [];
-  const covered = keys && !extend ? { paints: named, added: [], coverage: null } : keys ? coverKeyHues(sample, colours, named, { max: named.length + 2, ...reach }) : coverKeyHues(sample, colours, chosen.paints, { max });
+  const hueCovered = keys && !extend ? { paints: named, added: [], coverage: null } : keys ? coverKeyHues(sample, colours, named, { max: named.length + 2, ...reach }) : coverKeyHues(sample, colours, chosen.paints, { max });
+  // The same named box is then checked for chroma (chroma-reach.mjs): a cluster of that share whose nearest palette mix,
+  // thinned to the cluster's lightness, is duller than 0.8 of the cluster gains the pan that reaches it. The chroma check
+  // has its own limit of two added pans: the hue extension often spends its two, and a check that could then add
+  // nothing would not be a check.
+  const chromaCovered = keys && extend && checkChroma ? coverChroma(sample, colours, hueCovered.paints, { max: hueCovered.paints.length + 2, ...reach }) : null;
+  const covered = chromaCovered?.added.length ? { ...hueCovered, paints: chromaCovered.paints } : hueCovered;
   const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !covered.paints.some(q => q.key === p.key));
-  const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length || (guarded && guarded.decision.action !== 'kept');
+  const paints = [...covered.paints, ...extra], changed = covered.added.length || chromaCovered?.added.length || extra.length || (guarded && guarded.decision.action !== 'kept');
   const e = changed ? score(paints) : chosen.e, trail = changed ? [...chosen.trail, e] : chosen.trail;
   const n = w * h, chroma = chromaOf(channelDensity(px, n, paperRGB), n);
   const loc = localError(sample, colours, paints);
   const palette = { pigments: paints.map(p => boxPigment(p)), ink: 0, chroma, paintChroma: chroma, inkApart: 0, monochrome: false, wide: true, box: { keys: paints.map(p => p.key), sampleError: e, trail } };
   if (guarded) palette.box.guard = guarded.decision;
   if (covered.added.length || covered.coverage?.loss > 1e-6) palette.hueCoverage = covered.coverage;
+  if (chromaCovered) palette.chromaReach = { added: chromaCovered.added, loss: chromaCovered.reach.loss, colours: chromaCovered.reach.colours.map(r => ({ h: r.h, L: r.L, share: r.share, wanted: r.wanted, mixed: r.mixed, mixOf: r.mixOf })) };
   const cols = colours.map((r, q) => `${r.grey ? 'greys ' : ''}h ${r.h.toFixed(0)} C ${r.C.toFixed(0)} ${(100 * r.share).toFixed(1)}% off ${loc.per[q].toFixed(1)}`).join('; ');
   const forNote = keys && covered.added.length ? `; added ${covered.added.join(', ')} for hue ${unreached.map(r => `${r.h.toFixed(0)} C ${r.C.toFixed(0)} (${(100 * r.share).toFixed(1)}%, painted C ${r.fittedChroma.toFixed(0)})`).join(', ')}, which the named pans ${named.map(p => p.key).join(', ')} cannot reach` : '';
   const coverageNote = forNote + (palette.hueCoverage ? `; key hues ${covered.coverage.loss < 1e-6 ? 'covered' : `gap ${covered.coverage.loss.toFixed(1)} at palette limit`}${covered.added.length && !keys ? `, added ${covered.added.join(', ')}` : ''}` : '');
   const guardLine = guarded ? `\n${guardNote(guarded.decision)}` : '';
-  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${guardLine}` };
+  const chromaText = chromaCovered ? chromaNote(chromaCovered, hueCovered.paints.map(p => p.key)) : '';
+  const chromaLine = !chromaCovered ? '' : chromaText ? `; ${chromaText}` : chromaCovered.reach.colours.length ? '; chroma reached by the named pans' : '';
+  return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${chromaLine}${guardLine}` };
 }
 
 /**

@@ -12,6 +12,7 @@
     "rows": 19
    },
    "style": "very loose ink and wash: oak masses on green hills with a dirt trail",
+   "medium": "pen",
    "source": "original photograph, photo by Sam Jackson",
    "distributed": true,
    "file": "targets/hills.png",
@@ -29,6 +30,7 @@
     "rows": 20
    },
    "style": "urban sketch, pen plus light wash: Provence trees, cypresses and a few stone houses",
+   "medium": "pen",
    "source": "original photograph, photo by Sam Jackson",
    "distributed": true,
    "file": "targets/south-france.png",
@@ -46,6 +48,7 @@
     "rows": 20
    },
    "style": "pure watercolor, no ink: a white ship's hull against water, with rigging (after Sargent)",
+   "medium": "none",
    "source": "crop of John Singer Sargent, White Ships, 1908, Brooklyn Museum (09.846); public-domain source work, Wikimedia Commons reproduction marked Public Domain Mark 1.0 / PD-Art (PD-old-70)",
    "distributed": true,
    "file": "targets/sargent.png",
@@ -63,6 +66,7 @@
     "rows": 21
    },
    "style": "watercolor portrait sketch, fine lines and light washes",
+   "medium": "pencil",
    "source": "original photograph, photo by Sam Jackson",
    "distributed": true,
    "file": "targets/mittens.png",
@@ -80,6 +84,7 @@
     "rows": 21
    },
    "style": "precise architectural watercolor: a stone college facade with windows",
+   "medium": "none",
    "source": "crop of an original photograph of Trumbull College, Yale",
    "distributed": true,
    "file": "targets/trumbull.png",
@@ -97,6 +102,7 @@
     "rows": 16
    },
    "style": "loose ink-and-watercolor field sketch, ink led",
+   "medium": "pen",
    "source": "Yale photograph, public domain",
    "distributed": true,
    "file": "targets/h36a.png",
@@ -114,6 +120,7 @@
     "rows": 16
    },
    "style": "loose ink-and-watercolor field sketch, ink led",
+   "medium": "pen",
    "source": "Yale photograph, public domain",
    "distributed": true,
    "file": "targets/h34a.png",
@@ -131,6 +138,7 @@
     "rows": 32
    },
    "style": "classic transparent watercolour portrait, restrained glazes, no ink",
+   "medium": "none",
    "source": "watercolour generated from a private photo",
    "distributed": false,
    "file": "targets/dog-paint.png",
@@ -148,6 +156,7 @@
     "rows": 32
    },
    "style": "loose ink and wash portrait, ink led",
+   "medium": "pen",
    "source": "ink and wash generated from a private photo",
    "distributed": false,
    "file": "targets/dog-ink.png",
