@@ -47,6 +47,8 @@ import {createReceiverObserver} from './painter/numeric-receiver-observer.mjs';
 import {bindFinishingArea,appendFinishingLayers,finishingPaletteKeys} from './painter/finishing-area.mjs';
 import {nativeBodyCadence} from './painter/native-body-cadence.mjs';
 import {numericalGlazePasses} from './painter/numerical-glaze-passes.mjs';
+import { SWATCH, swatchMask, scrapDelivery, chargeFactor } from '../src/paint/methods/scrap-swatch.mjs';
+import { createInstrumentCal, instrumentKey } from '../src/paint/methods/instrument-cal.mjs';
 import {numericTuftEligible,calibrateNumericTuft} from './painter/numeric-tuft-calibration.mjs';
 import {validateProductionDetails,productionDetailContext,productionChargeLink,productionContinuationReady,prepareProductionDryContact,productionChargeSupported,validateCompiledAreaStop} from './painter/semantic-production-details.mjs';
 import { allocateShapeLocalCharge, ownedComponentLoad } from '../src/paint/methods/shape-local-charge.mjs';
@@ -1997,63 +1999,77 @@ let GRADED_CAL = {};
 // --loadedcontact 1: a loaded wash or detail brush touches all the paper under it, pits included; dry brush keeps its tooth-skip. Default 0.
 const LOADED_CONTACT = num('loadedcontact', 0) > 0;
 const washBridge = (T, b) => (LOADED_CONTACT && !T.name.startsWith('dry brush') ? 0 : b);
-const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!AREA_PLAN&&!FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
-  const SW = 90, SH = 90, SN = SW * SH, want = 0.3;
-  const mask = new Uint8Array(SN);
-  for (let y = 20; y < 70; y++) for (let x = 20; x < 70; x++) mask[y * SW + x] = 1;
-  const flat = new Float32Array(SN); for (let i = 0; i < SN; i++) if (mask[i]) flat[i] = 0.3;
-  const out = {};
+// --glazepasses n: brush a glaze n times in a row while its first pass is still wet. Default 2.
+const STOCK_TECHNIQUES = [
+  { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, passes: 1 },
+  { name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, passes: 1 },
+  numericalGlazePasses({ name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, passes: 2 }, num('glazepasses', 2)),
+  { name: 'dry brush', water: 0.22, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0, intoWet: false, passes: 1 },
+];
+// Each technique laid on scrap (src/paint/methods/scrap-swatch.mjs), plain and, under --gradedwash, recharged every few
+// cells along its sweep as a graded wash is. `drySwatch` dries the scrap.
+const scrapSwatches = (techniques, drySwatch) => {
+  const { width: SW, height: SH, want } = SWATCH, mask = swatchMask();
   // A graded wash is recharged every few cells along its sweep (--gradedwash), so each technique is also laid on scrap
   // recharged that way, and what it lays is kept both inside the swatch and over the whole scrap (see GRADED_CAL).
   const CHUNK = opt('gradedwash', '1') !== '0' ? Math.max(2, Math.round(GCHUNK)) : 0;
-  for (const T of [
-    { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, passes: 1 },
-    { name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, passes: 1 },
-    // --glazepasses n: brush a glaze n times in a row while its first pass is still wet. Default 2.
-    numericalGlazePasses({ name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, passes: 2 }, num('glazepasses', 2)),
-    { name: 'dry brush', water: 0.22, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0, intoWet: false, passes: 1 },
-  ].flatMap(T => (CHUNK ? [T, { ...T, name: `${T.name} graded`, chunk: CHUNK }] : [T]))) {
-    const scrapPaper = makePaper(SW, SH, { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) });
-    const scrap = createSheet(scrapPaper, [PIGS[0]]);
-    // --calpipe 1: calibrate with the sheet's own lanes, containment and pressure, not a plain sweep at default pressure.
-    let paths = washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 });
-    if (opt('calpipe', '0') !== '0') {
-      // the sheet's own brush, capped so a fifty-cell swatch is still laid in lanes as a passage that size would be
-      const lanes = brushedWashPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3, maxRadius: Math.min(BRUSH, 16), seed: 17, overlap: num('overlap', 0.15) });
-      paths = containPaths(lanes, distanceToZero(mask, SW, SH), SW, SH, { minRadius: 0.8, minLength: 2, slack: num('slack', 0.5) }).map(pts => {
-        const total = pts.reduce((a, q, i) => a + (i ? Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y) : 0), 0) || 1;
-        let run = 0;
-        return pts.map((q, i) => { if (i) run += Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y); const u = run / total;
-          return { ...q, p: Math.max(0.18, Math.min(1, (0.72 + 0.28 * Math.sin(Math.PI * u)) * Math.min(Math.min(1, u / num('land', 0.06)), Math.min(1, (1 - u) / num('lift', 0.10))))) }; });
-      });
-    }
-    for (const pts of paths) {
-      const r = Math.max(1, ...pts.map(p => p.r));
-      if (T.intoWet) { const wetB = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }); dip(wetB, { water: 1, conc: [0] }); stroke(wetB, scrap, pts, { upright: UPRIGHT }); }
-      const b = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11, ...meteredOpts(r, T) });
-      // and charged for its footprint exactly as a passage on the sheet is, so that shortfall is not counted twice
-      const under = opt('calpipe', '0') !== '0' && opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, mask, SW, SH))) : 1;
-      dip(b, { water: WET(T), conc: [want * num('strength', 2.2) * under] });
-      if (T.chunk) {
-        // the water moves on the same clock as an unbroken sweep: counted across the chunks, not restarted in each
-        let st = 0;
-        for (let q = 0; q < T.passes; q++) for (let k = 0; k < pts.length; k += T.chunk) { dip(b, { water: WET(T), conc: [want * num('strength', 2.2) * under] }); stroke(b, scrap, pts.slice(Math.max(0, k - 1), k + T.chunk + 1), { upright: UPRIGHT, between: () => { if (++st % 24 === 0) step(scrap, O); } }); }
-      } else
-      for (let q = 0; q < T.passes; q++) stroke(b, scrap, pts, { upright: UPRIGHT, between: st => { if (st % 24 === 0) step(scrap, O); } });
-    }
-    for (let q = 0; q < 60; q++) step(scrap, O);
-    dry(scrap, 20000, O, { levelMax: 400, dt: 4 });
-    const th = thickness(scrap)[0];
-    let got = 0, all = 0, c = 0; for (let i = 0; i < SN; i++) { all += th[i]; if (mask[i]) { got += th[i]; c++; } }
-    const delivered = c ? got / c / want : 1;
-    out[T.name] = delivered > 0.02 ? 1 / delivered : 1;
-    if (T.chunk) GRADED_CAL[T.name] = { all: c ? all / c / want : 1, escape: all > 1e-9 ? 1 - got / all : 0, edge: openEdgeShare(mask, SW, SH) };
-    console.log(`  ${T.name.padEnd(11)} delivers ${delivered.toFixed(2)} of its charge, so it is charged ${out[T.name].toFixed(2)}x${T.chunk ? `; ${(100 * GRADED_CAL[T.name].escape).toFixed(0)}% of what it lays runs past the swatch` : ''}`);
+  // --calpipe 1: calibrate with the sheet's own lanes, containment and pressure, not a plain sweep at default pressure.
+  let paths = washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 });
+  if (opt('calpipe', '0') !== '0') {
+    // the sheet's own brush, capped so a fifty-cell swatch is still laid in lanes as a passage that size would be
+    const lanes = brushedWashPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3, maxRadius: Math.min(BRUSH, 16), seed: 17, overlap: num('overlap', 0.15) });
+    paths = containPaths(lanes, distanceToZero(mask, SW, SH), SW, SH, { minRadius: 0.8, minLength: 2, slack: num('slack', 0.5) }).map(pts => {
+      const total = pts.reduce((a, q, i) => a + (i ? Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y) : 0), 0) || 1;
+      let run = 0;
+      return pts.map((q, i) => { if (i) run += Math.hypot(q.x - pts[i - 1].x, q.y - pts[i - 1].y); const u = run / total;
+        return { ...q, p: Math.max(0.18, Math.min(1, (0.72 + 0.28 * Math.sin(Math.PI * u)) * Math.min(Math.min(1, u / num('land', 0.06)), Math.min(1, (1 - u) / num('lift', 0.10))))) }; });
+    });
+  }
+  // and charged for its footprint exactly as a passage on the sheet is, so that shortfall is not counted twice
+  const under = opt('calpipe', '0') !== '0' && opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, mask, SW, SH))) : 1;
+  const env = { mask, paths, pigment: PIGS[0], physics: O, paperOptions: { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch,
+    waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
+    paintBrush: (r, T) => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11, ...meteredOpts(r, T) }) };
+  return techniques.map(T => ({ technique: T, plain: scrapDelivery(T, env), graded: CHUNK ? scrapDelivery({ ...T, name: `${T.name} graded`, chunk: CHUNK }, env) : null }));
+};
+const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!AREA_PLAN&&!FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
+  const out = {};
+  for (const { technique: T, plain, graded } of scrapSwatches(STOCK_TECHNIQUES, dry)) {
+    out[T.name] = chargeFactor(plain.delivered);
+    console.log(`  ${T.name.padEnd(11)} delivers ${plain.delivered.toFixed(2)} of its charge, so it is charged ${out[T.name].toFixed(2)}x`);
+    if (!graded) continue;
+    out[`${T.name} graded`] = chargeFactor(graded.delivered);
+    GRADED_CAL[`${T.name} graded`] = gradedReading(graded);
+    console.log(`  ${`${T.name} graded`.padEnd(11)} delivers ${graded.delivered.toFixed(2)} of its charge, so it is charged ${out[`${T.name} graded`].toFixed(2)}x; ${(100 * graded.escape).toFixed(0)}% of what it lays runs past the swatch`);
   }
   return {CAL:out,GRADED_CAL};
 });
 const CAL = CAL_RESULT.value.CAL;
 GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
+// --instrumentcal 0|1: a passage whose brush load or pass count is not its stock technique's is charged from a swatch
+// laid with its own load and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a
+// 0.45-water brush; the stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. 0 charges every passage
+// from the stock swatch of its technique's name. Default 1. Authored area plans keep their own calibration. A passage
+// laid into wet keeps the stock swatch too: its bed is part of the instrument, and the swatch's bed is not the sheet's.
+const INSTRUMENT_ON = num('instrumentcal', 1) > 0 && !AREA_PLAN && !FINISH_PLAN;
+const INSTRUMENT_CAL = createInstrumentCal({
+  stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
+  // the scrap dries as the stock swatches do, without touching the painting's own wet-contact records
+  measure: T => { const [{ plain, graded }] = scrapSwatches([T], (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options))); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
+  log: line => console.log(line),
+});
+const ownSwatch = (T, sh) => INSTRUMENT_ON && !sh._semantic && !T.intoWet && !T.stockSwatch;
+const instrumentOf = (T, sh) => (ownSwatch(T, sh) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name));
+// every instrument the value plan names is tried on scrap before the first wash
+if (INSTRUMENT_ON && VALUE_PLAN) {
+  const planned = [...new Map(layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan, num('glazepasses', 2))])).filter(([sh, T]) => ownSwatch(T, sh)).map(([, T]) => [instrumentKey(T), T])).values()];
+  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
+    for (const T of planned) INSTRUMENT_CAL.of(T);
+    return INSTRUMENT_CAL.entries();
+  });
+  if (saved.cached) INSTRUMENT_CAL.load(saved.value);
+}
 
 const CALIBRATION_PLAN=AREA_PLAN??FINISH_PLAN;
 const SEMANTIC_CAL_MODE=opt('semanticcalibration','legacy');
@@ -3460,8 +3476,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   }
   // --nowow: a probe switch; wet on wet laid as wet on dry, to see what the standing water does to a sheet's lights
   if (opt('nowow', '0') !== '0' && T.name === 'wet on wet') T = { ...T, name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true };
-  // --nowowpart prewet|dry|load: one factor of --nowow alone; the name stays wet on wet, so CAL[T.name] is unchanged.
-  { const part = opt('nowowpart', ''); if (part && T.name === 'wet on wet') T = part === 'prewet' ? { ...T, intoWet: false } : part === 'dry' ? { ...T, dryAfter: true } : part === 'load' ? { ...T, water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2 } : T; }
+  // --nowowpart prewet|dry|load: one factor of --nowow alone; the name stays wet on wet and the charge stays the stock wet-on-wet swatch's.
+  { const part = opt('nowowpart', ''); if (part && T.name === 'wet on wet') T = { ...(part === 'prewet' ? { ...T, intoWet: false } : part === 'dry' ? { ...T, dryAfter: true } : part === 'load' ? { ...T, water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2 } : T), stockSwatch: true }; }
   // A hard figure shape must not inherit a wet-in-wet classification from the
   // source's texture. Keep the broad opening wash soft; subsequent shapes dry.
   if (FIGURE_SHAPE && !sh.firstWash && num('figuredry', 1) > 0 && T.intoWet)
@@ -3471,6 +3487,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
   if(sh._valuePlan){T=valueTechnique(sh._valuePlan,num('glazepasses',2));VALUE_ACTIVE=sh._valuePlan;const inSession=!sh._valuePlan.washSystem&&!sh._valuePlan.mixed&&((WASH_SESSION>0&&WASH_LAST&&(WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(WASH_LAST.layer,layer))))||(num('charge',0)>0&&WASH_LAST&&WASH_LAST.L!==L&&sameCharge(WASH_LAST.layer,layer)));WASH_LAST={L,layer};if(!inSession)VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
+  // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
+  const ICAL = instrumentOf(T, sh);
   sh.dryAfter = T.dryAfter;
   MAJOR_TECHNIQUE=MAJOR_INTENT?{...T,shapeId:'numeric-L'+L+'-S'+layer.shapes.indexOf(sh),numericalValue:layer.value,shapeArea:sh.area,firstWash:Boolean(sh.firstWash),materialStatus:'existing production technique/profile consumed; actual contact/state recorded before each stroke'}:null;
   // --dryeach 1: dry the sheet before every passage not meant to go into wet, so each shape keeps a hard edge. Default 0.
@@ -3761,7 +3779,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
   for (let pts of paths) {
     if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
     const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
-    let CHARGE_CAL=SEMANTIC_CAL_MODE==='actual'&&sh._semantic?semanticCalibrationGain(SEMANTIC_CAL[sh._semantic.key],pts,PB.mmPerCell):(CAL[T.name]??1);
+    let CHARGE_CAL=SEMANTIC_CAL_MODE==='actual'&&sh._semantic?semanticCalibrationGain(SEMANTIC_CAL[sh._semantic.key],pts,PB.mmPerCell):ICAL.cal;
     const numericTuftHere=numericTuftEligible({shapeId:MAJOR_TECHNIQUE?.shapeId,selected:NUMERIC_TUFT_SHAPES,detail,dry:T.name.startsWith('dry brush'),semantic:Boolean(sh._semantic),radiusMm:r*num('sheetmm', DEFAULT_SHEET_MM)/W2});
     const brush = detail
       ? createBrush({ grainShift: num('grainshift', 0), radius: r, bristles: Math.max(8, Math.ceil(r * 3)), capacity: 26, belly: 2, feed: 0.08,
@@ -3790,7 +3808,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : layers.length); L++) {
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (useGradedCal && sh._gcal == null) {
-      const G = GRADED_CAL[`${T.name} graded`];
+      const G = ICAL.graded;
       sh._open = openEdgeShare(MASK, w, h, MB) / SC;
       const lost = G ? Math.min(0.6, G.escape * sh._open / Math.max(1e-6, G.edge)) : 0;
       sh._gcal = G ? 1 / Math.max(0.02, G.all * (1 - lost)) : CHARGE_CAL;
