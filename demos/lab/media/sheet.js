@@ -1,6 +1,7 @@
 // Generated from src/media/sheet.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.js';
 import { censusDry } from './census.js';
+import { SIZING } from './sizing.js';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
 // "Computer-Generated Watercolor" (SIGGRAPH 97): water with suspended pigment above the paper, pigment adsorbed
@@ -51,7 +52,7 @@ export const DEFAULTS = {
   slide: 0.4, slideFill: 2, repose: 0.04,         // settled grains roll into the paper's hollows (by granulation), filling them, down slopes steeper than repose / granulation;
                                                   // too low and the wash dries before the grains arrive, so granulating pigments come out smooth
   hold: 2,                                        // the most pigment a unit of water keeps suspended; a thinner film strands the rest
-  sizing: 0.9, wickFilter: 0.2,                   // sizing slows wicking into dry paper; fibres filter out a share of what pigment the water carries
+  sizing: SIZING, wickFilter: 0.2,                  // sizing slows wicking into dry paper; fibres filter out a share of what pigment the water carries
   dt: 0.1,
 };
 
@@ -260,7 +261,7 @@ export function soak(sheet, i, water, pig, free = 0) {
   recordWetCell(sheet, i);
   if (water <= 0) return;
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // sealed: everything stays on the surface
-  const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), into = sheet.M[i] ? Math.min(0.3 * room, water) : Math.min(room, water - DEFAULTS.sizing * Math.min(free, water)), f = into / water;
+  const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), into = sheet.M[i] ? Math.min(0.3 * room, water) : Math.min(room, water - SIZING * Math.min(free, water)), f = into / water;
   sheet.s[i] += into; sheet.wetDirty = 1;
   // Water a brush was deliberately drawn over the paper to leave belongs to the wash even when the pores take
   // all of it and nothing stands. A damp brush drawn along a wet edge works exactly that way, and the wash has
@@ -938,7 +939,7 @@ function stepBox(sheet, o, box, reduce = false) {
   for (let n = 0; n < nP; n++) { const k = pact[n], Pk = P[k], PN = PNext[k], dd = dDep[k]; for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) { const a = y * w + pxa[r], b = y * w + pxb[r] + 1; PN.set(Pk.subarray(a, b), a); dd.fill(0, a, b); } }
   // rate is at most 1.5: 2/3 keeps each face <= 1/4, so four donors cannot overfill a pore
   // and four outflows cannot empty one below zero. Large dt saturates this rate; it is not extra elapsed flow time.
-  const capStep = Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing = o.sizing ?? 0.85, filter = o.wickFilter ?? 0.2;
+  const capStep = Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing = o.sizing ?? SIZING, filter = o.wickFilter ?? 0.2;
   const capEps = o.capEps, capDelta = o.capDelta;
   // A neighbour along x or y reads the fibre's alignment |fdx dx + fdy dy| as |fdx| or |fdy| exactly (the other term is
   // a signed zero), so it is read once per donor; the neighbours go in DX, DY order (+x, -x, +y, -y).
