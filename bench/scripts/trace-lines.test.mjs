@@ -1,4 +1,4 @@
-// The tracer's line rules (bench/v4v5/tools/trace-lines.mjs): a pen follows the line it is on, its line carries no
+// The tracer's line rules (src/crop/pen-trace.mjs, used by bench/v4v5/tools/trace-ink.mjs): a pen follows the line it is on, its line carries no
 // pixel staircase, it lifts where the line turns back, it joins only where one piece continues another, and it goes on
 // contours, not inside dark masses.
 import test from 'node:test';
@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { walkChains, simplify, splitAtTurns, joinPieces, hasLightSide } from '../v4v5/tools/trace-lines.mjs';
+import { walkChains, simplify, splitAtTurns, joinPieces, hasLightSide } from '../../src/crop/pen-trace.mjs';
 
 test('a pixel staircase along a straight line is one straight segment', () => {
   const P = []; for (let k = 0; k < 30; k++) P.push([k, Math.floor(k / 3)]);
@@ -61,4 +61,12 @@ test('trace-ink draws a long line crossed by others as long lines, not fragments
   assert.ok(longest >= 200, `longest traced line ${longest.toFixed(0)} px of a 290 px stroke`);
   assert.ok(d.lines.length <= 14, `${d.lines.length} lines for 7 strokes`);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('the join finds its candidates near each other: thousands of pieces join quickly, in the same order', () => {
+  const many = []; for (let k = 0; k < 1500; k++) many.push([[k * 7, 0], [k * 7 + 5, 0]]);
+  const t0 = Date.now(), out = joinPieces(many, { gap: 4 });
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0][0], [0, 0]);
+  assert.ok(Date.now() - t0 < 20000, `${Date.now() - t0} ms`);
 });
