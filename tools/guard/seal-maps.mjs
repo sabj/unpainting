@@ -15,7 +15,6 @@ export const TARGET_MAPS = Object.freeze({
   HP: 'a high-pass of the target density',
   TARGET_DRAW_EDGE: 'the target luminance edge strength on the pen grid',
   SKY_WARM_RB: 'the target red minus blue (--skywarm)',
-  DRAG_TARGET: 'a copy of the target pigment plan (--drags)',
   DRAW_DENSITY: 'the target density the drawing reads',
 });
 // objects on ctx whose typed-array fields are per-cell maps of the target

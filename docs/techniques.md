@@ -65,7 +65,6 @@ Modules, with their flags:
 - `methods/crisp-edges.mjs` (`--crisp 1`): wet-on-dry glazes stopped at hard region edges.
 - `methods/detail-scale.mjs` (`--detailscale k`, `--detailseg 1`): the minimum shape shrinks with the target's 1 to 3 mm detail, optionally confined to focal foreground segments.
 - `methods/detail-passes.mjs` (`--detailpasses`, `--detailtrim`): late small passages where the detail is.
-- `methods/drags.mjs` (`--drags 1`, `--dragbox`): nearly dry flat-brush drags inside given boxes.
 - `methods/drawing-file.mjs` (`--drawingfile`, `--drawinglast`): draws a selected line file whole.
 - `methods/drawing-hand.mjs` (helper): joins drawing lines into gestures with tapered ends.
 - `methods/drawing-hybrid.mjs` (helper): redraws traced gestures along the drawing file's lines.

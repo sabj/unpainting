@@ -9,13 +9,6 @@
    "approvedBy": "anti-cheat review (bench/docs/anti-cheat.md): a shape-level mix choice is allowed"
   },
   {
-   "key": "2d5f2a3e212b",
-   "file": "tools/plate/finish.mjs",
-   "rule": "target-at-paint",
-   "reason": "--drags charges each drag from DRAG_TARGET, a copy of the target plan. Not allowed: sealed at beginPaint, so a --drags run fails in gentle and hard. No benchmark or default run sets --drags; delete with it (overfit-audit rows 21, 33).",
-   "approvedBy": "033-honest: listed only; the runtime guard blocks this read in gentle and hard (tools/guard/seal-maps.mjs)"
-  },
-  {
    "key": "65029587149d",
    "file": "tools/plate/paint.mjs",
    "rule": "target-at-paint",

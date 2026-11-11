@@ -180,7 +180,6 @@ import '../../src/paint/methods/mass-budget.mjs';
 import '../../src/paint/techniques/dark-mass.mjs';
 import '../../src/paint/methods/practice-paint.mjs';
 import '../../src/paint/methods/modulate.mjs';
-import '../../src/paint/methods/drags.mjs';
 import '../../src/paint/methods/stroke-budget.mjs';
 import '../../src/paint/methods/brushes.mjs';
 import '../../src/paint/methods/practice-style.mjs';

@@ -49,7 +49,7 @@ export const PAINT_SPANS = [
   { file: /tools[\\/]paint-plate\.mjs$/, start: /^TARGET_GUARD\.beginPaint\(\)/, end: /^phaseMark\('painting'\)/ },
 ];
 // the target (px) and the maps made from it that the guard seals (pen.mjs, tools/guard/seal-maps.mjs)
-const MAPS = 'PX_RAW|PX_SOURCE|D_SOURCE|D_AIM|HP|TARGET_DRAW_EDGE|SKY_WARM_RB|DRAG_TARGET|DRAW_DENSITY';
+const MAPS = 'PX_RAW|PX_SOURCE|D_SOURCE|D_AIM|HP|TARGET_DRAW_EDGE|SKY_WARM_RB|DRAW_DENSITY';
 const PX_READ = new RegExp(`\\bpx\\s*\\[|\\brgb\\s*:\\s*px\\b|[,{(]\\s*px\\s*[,})]|\\b(${MAPS})\\s*\\[|ctx\\.(px|A|AL|SRC|D_SOURCE)\\s*\\[|:\\s*(${MAPS})\\b|\\(\\s*(${MAPS})\\s*[,)]|\\bSEP\\.\\w+\\s*\\[`);
 
 export function lintSource(file, text) {

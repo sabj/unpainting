@@ -58,12 +58,12 @@ test('the painter seals the maps where the paint step begins and where closures 
 });
 
 test('lint: the paint step is read where it now lives, drawing.mjs from beginPaint through finish.mjs', () => {
-  const read = ['const L = px[0];', 'TARGET_GUARD.beginPaint();', 'const b = HP[i];', 'erase({ weights: DRAG_TARGET });'].join('\n');
+  const read = ['const L = px[0];', 'TARGET_GUARD.beginPaint();', 'const b = HP[i];', 'erase({ weights: D_AIM });'].join('\n');
   assert.deepEqual(lintSource('tools/plate/drawing.mjs', read).map(f => f.line), [3, 4]);
   assert.equal(lintSource('tools/plate/paint.mjs', 'const v = SKY_WARM_RB[i] > t;').length, 1);
   assert.equal(lintSource('tools/plate/finish.mjs', "const a = D_AIM[i];\nphaseMark('painting');\nconst b = D_AIM[i];").length, 1);
   assert.equal(lintSource('tools/plate/plan.mjs', 'const b = HP[i];').length, 0, 'planning may read');
-  assert.equal(lintSource('tools/plate/paint.mjs', 'const { HP, maskBox, DRAG_TARGET } = ctx;').length, 0, 'a destructure hands nothing on');
+  assert.equal(lintSource('tools/plate/paint.mjs', 'const { HP, maskBox, D_AIM } = ctx;').length, 0, 'a destructure hands nothing on');
 });
 
 test('lint: the painter\'s paint step has no target read that is not acknowledged', () => {

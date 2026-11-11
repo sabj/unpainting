@@ -50,7 +50,6 @@ import {planLines as planLineChoice} from '../../src/paint/drawing-plan.mjs';
 import {subjectBlockOptions} from '../../src/paint/methods/subject-washes.mjs';
 import {massBudget} from '../../src/paint/methods/mass-budget.mjs';
 import {planModulation} from '../../src/paint/methods/modulate.mjs';
-import {dragRegion, thinForDrags} from '../../src/paint/methods/drags.mjs';
 import {loadFocus} from '../../src/paint/methods/stroke-budget.mjs';
 import {measureStyle} from '../../src/paint/methods/practice-style.mjs';
 
@@ -353,10 +352,6 @@ const setClip=(target,mask,box=null)=>{
   physicalSetClip(target,stableClipMask(combined));
 };
 const MOD = await planModulation({ A: ctx.A, K: PIGS.length, w, h, n, px: ctx.px, image: opt('image', ''), root, fs, path, sharp, gaussian, num, opt, log: console.log, SRC: ART_DENSITY(), colourBudget: COLOUR_BUDGET });
-// --drags (src/paint/methods/drags.mjs): the washes thinned where the dry-brush drags will carry their share
-const DRAGS = dragRegion({ w, h, n, SRC: ART_DENSITY(), num, opt });
-const DRAG_TARGET = DRAGS ? Float32Array.from(ctx.A) : null;
-if (DRAGS) { thinForDrags(DRAGS, MOD ? MOD.Aw : ctx.A, PIGS.length); console.log(`drags: ${(100 * DRAGS.cells / n).toFixed(1)}% of the sheet, washes thinned by ${(100 * DRAGS.share).toFixed(0)}% there`); }
 const MASS_BUDGET = massBudget({ A: ctx.A, MOD, K: PIGS.length, SRC: ART_DENSITY(), rgb: ctx.px, w, h, gaussian, components, num, log: console.log });
 // --drawinglogic 3 draws its scribble only on an ink-led piece; the style read is the modulation's when there is one
 const DRAW_STYLE = num('drawinglogic', 0) === 3 ? (MOD?.style ?? await measureStyle({ SRC: ART_DENSITY(), w, h, n, px: ctx.px, gaussian, minFilter, maxFilter, log: console.log })) : null;
@@ -864,7 +859,7 @@ if(FINISH_FILE){
 const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DRY_VALUE,value:0,fullBoundary:false});if(EARLY_DRY_VALUE&&ctx.AREA_PLAN)throw Error('earlydryvalue supports original numeric boundaries only');
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));ctx.EARLY_DRY_CAPTURED=false;
 Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
-  SMALL, WHITE_HOLD, MIXES, setClip, MOD, DRAGS, DRAG_TARGET, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, PUDDLES, 
+  SMALL, WHITE_HOLD, MIXES, setClip, MOD, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, PUDDLES, 
   FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
   DETAIL_REGION, FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 

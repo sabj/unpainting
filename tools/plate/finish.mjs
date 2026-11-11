@@ -30,7 +30,6 @@ import {planDensityOver} from '../../src/eval/plan-optics.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {gouacheCover, dryCover} from '../../src/media/gouache.mjs';
 import {layCurls} from '../../src/crop/curlpaint.mjs';
-import {layDrags} from '../../src/paint/methods/drags.mjs';
 import {writeGuardReport} from '../guard/no-target.mjs';
 import {cheatRisk} from '../guard/cheat-risk.mjs';
 
@@ -39,7 +38,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   NATIVE_PAINT_MODE, SPEED_TRANSFERS, measurePaper, liftResist, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, 
   CPU_PROFILE, PAINTER, root, out, CODE_STATE, EARLY_LINES, VALUE_CONFIG, WALL_PHASES, phaseMark, srcMeta, PX_RAW, 
   TARGET_GUARD, w, h, n, SEGMENTS_RECORD, createBrush, paperRGB, PALETTE, PIGS, STYLE, D_AIM, GOUACHE_LIGHTS, 
-  LIGHT_SHARE, MOD, DRAGS, DRAG_TARGET, COLOUR_TRACE, reportTechniques, CURLS, SEP, FACE_INK, INK, PENCIL, 
+  LIGHT_SHARE, MOD, COLOUR_TRACE, reportTechniques, CURLS, SEP, FACE_INK, INK, PENCIL, 
   PENCIL_STAGE, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, AREA_COMPLETED, AREA_EXEC, dry, dip, stroke, SC, W2, H2, N2, PB, 
   CP_MM, PAPER_OPTS, paper, ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, penDraw, OUT_W, OUT_H, O, GPU_INFO, 
   base, SHADE, WETPOL, WETPOL_COUNT, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
@@ -55,7 +54,6 @@ if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).p
 if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))fs.writeFileSync(path.join(out,'semantic-production-details-before.json'),JSON.stringify({declaration:ctx.AREA_PLAN.doc.productionDetails,sampler:'existing production orientationField/furMarks/dryMarkPath/dryMarkBrush',calibration:CAL['wet on dry'],calibrationRole:'historical wet-on-dry gain retained; not matched dry-brush proof',demand:'existing MOD.Ad only; unplaced residual remains debt'},null,2));
 // The modulation lays no target-seeded dry-brush marks (anti-cheat rules); its wash and detail split (planning) stays.
 if (MOD && !ABLATE.has('dry')) console.log('dry brush: target-seeded dry-brush marks removed');
-if (!AWARE_SKIP_POST && DRAGS && !ABLATE.has('drags')) await layDrags(DRAGS, { count: BUDGET ? BUDGET.drags : undefined, mmPerCell: PB ? PB.mmPerCell * SC : 0, dragWmm: PB ? PB.cfg.brushes[PB.cfg.roles.drag].width_mm : 0, sheet: ctx.sheet, w, h, n, SC, W2, K: PIGS.length, SRC: ctx.SRC, A: DRAG_TARGET, gaussian, num, dip, createBrush, stroke, step, dry, O, CAL, UPRIGHT, SEED, expected, used, clock, shoot, setStage: s => { ctx.STAGE = s; }, log: console.log });
 if(ctx.AREA_PLAN)AREA_EXEC.set(null);
 colourMass('detailed');
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-after-detail.png'));
