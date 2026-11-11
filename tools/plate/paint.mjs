@@ -26,6 +26,8 @@ import {softenAndLift, softenEdge} from '../painter/soften-lift-run.mjs';
 import {hardEdgeDue, softEdgeCells} from '../painter/area-edges.mjs';
 import {SOFTEN_WATER} from '../../src/paint/techniques/soften-lift.mjs';
 import {layIntoWetBed} from '../painter/wet-bed-wait.mjs';
+import {variegatedCharge, chargeMix} from '../painter/area-washes.mjs';
+import {chargeWetPass} from '../painter/area-charge-run.mjs';
 import {semanticSameSession,compileAreaLayers, semanticTechnique, semanticBrushOptions, semanticUsesNumericClip, semanticGesture, semanticCalibrationGain, requireAuthoredCalibration, semanticFilmRemovalReady, sha256} from '../painter/semantic-areas.mjs';
 import {measurePaperDry} from '../../src/paint/methods/wetdry.mjs';
 import {earlyDryBoundary} from '../painter/early-dry-boundary.mjs';
@@ -487,7 +489,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
-  const gradedAngle = sh.graded && !sh._follow ? (sh._gradedAngle ?? null) : null;
+  // an area plan's graded or variegated wash (pass.wash) runs its lanes across its direction (area-washes.mjs)
+  const gradedAngle = sh._washAngle ?? (sh.graded && !sh._follow ? (sh._gradedAngle ?? null) : null);
   // --brushfloor R: smallest wash brush, R px at 1086 wide, until --floorfrom of the ladder (default 0.85). The sheet's clip holds the edge.
   // Under --physical, passes after --floorfrom may use the detail brush (rigger).
   // --detailfloor 1: under --physical the floor brush moves toward the detail brush by the share of cells with focus over --detailfocus.
@@ -517,7 +520,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     : (detail
     ? detailMarks(getShapeLoad(), w, h, { length: num('marklen', 11), spacing: num('markgap', 6), seed: 7 + ctx.laid + SEED, coverage: num('markcover', 0.3) })
         .map(m => m.map(p => ({ x: (p.x + 0.5) * SC, y: (p.y + 0.5) * SC, r: Math.max(SC * 0.6, num('markr', 1.6) * SC), p: 1 })))
-    : brushedWashPaths(up(brushMask(sh)), W2, H2, { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: SC, minLength: 3 * SC, maxRadius: layer._detail ? Math.max(SC, Math.round(num('detailbrush', 0.3) * BRUSH)) : BRUSH, field: getShapeLoad(), seed: 17 + ctx.laid + SEED, fallbackAngle: opt('handangle', '0') !== '0' ? handAngle(ctx.laid) : null, jitter: (handAngle(ctx.laid + 7919) - num('handmean', 0.35)) / num('handspread', 1.4) * num('handjitter', 0), overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle })).slice());
+    : brushedWashPaths(up(brushMask(sh)), W2, H2, { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: SC, minLength: 3 * SC, maxRadius: layer._detail ? Math.max(SC, Math.round(num('detailbrush', 0.3) * BRUSH)) : BRUSH, field: getShapeLoad(), seed: 17 + ctx.laid + SEED, ...(sh._washAngle != null ? { angle: sh._washAngle, walk: false } : {}), fallbackAngle: opt('handangle', '0') !== '0' ? handAngle(ctx.laid) : null, jitter: (handAngle(ctx.laid + 7919) - num('handmean', 0.35)) / num('handspread', 1.4) * num('handjitter', 0), overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle })).slice());
   // --contain: the brush disc held inside its passage at every point (see containPaths). Rescued passages below get
   // the same treatment, since a small brush can overhang a narrow passage just as a mop overhangs a ragged one.
   const crispNow = CRISP.wants(T, detail);
@@ -816,10 +819,14 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       // along one load the hand presses toward the plane's darker end, so load factor times pressure follows the plane
       const GRADED = PLANE ? LOADS.map((ch, k) => gradeLoadPressure(ch, PLANE, f[k], SC)) : LOADS;
       if (PLANE) used['graded load'] = (used['graded load'] || 0) + LOADS.length;
-      const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
+      const loadScale = (v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1);
+      const base = sh.mix.map(loadScale);
+      // an area plan's variegated wash (area-washes.mjs): each load is dipped at the mix where it lies along the wash
+      const second = sh._variegate ? sh._variegate.mix.map(loadScale) : null, loadBase = k => second ? variegatedCharge(base, second, sh._variegate.span, LOADS[k], SC) : base;
+      if (second) used['variegated load'] = (used['variegated load'] || 0) + LOADS.length;
 
       let st = 0;
-      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: base.map(v => v * f[k]) }); numericalStroke(brush, ctx.sheet, GRADED[k], { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: k === LOADS.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } }); }); });
+      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: loadBase(k).map(v => v * f[k]) }); numericalStroke(brush, ctx.sheet, GRADED[k], { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: k === LOADS.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } }); }); });
     } else if (gradedLen > 0 && !detail && (useGradedCal ? shaped.length > 1 : shaped.length > gradedLen * 2)) {
       const chunks = [];
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
@@ -961,11 +968,13 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   else{const dryFollows=NATIVE_PAINT_MODE.mode==='fast'&&!ctx.AREA_PLAN&&(wetInto||endOfValue||nextOther);const settle=dryFollows?Math.min(num('settle',60),num('fastsettle',0)):num('settle',60);clock('flow',()=>{for(let q=0;q<settle;q++)step(ctx.sheet,O);});}
   colourMass('after-flow',{pass:L+1});
   // softening, the plan's soft edges and lifting, while the pass is wet (tools/painter/soften-lift-run.mjs, area-edges.mjs)
-  if(ctx.AREA_PLAN){const sp=layer._semantic.pass,mmc=num('sheetmm',DEFAULT_SHEET_MM)/W2,softNear=sp.source!=='authored'&&['wet on wet','wet on dry'].includes(sp.move)?softEdgeCells(ctx.AREA_PLAN,layer._semantic.area.id,sp.brush.widthMm/2/(num('sheetmm',DEFAULT_SHEET_MM)/w)+1):null;if(sp.soften||sp.lights?.mode==='lift'||softNear){if(ctx.SOFTEN_LIFT?.key!==layer._semantic.key)ctx.SOFTEN_LIFT={key:layer._semantic.key,m:new Uint8Array(w*h)};const m=ctx.SOFTEN_LIFT.m;for(const sh of layer.shapes)for(let i=0;i<m.length;i++)if(sh.mask[i])m[i]=1;if(ctx.layers[L+1]?._semantic?.key!==layer._semantic.key){ctx.SOFTEN_LIFT=null;
+  if(ctx.AREA_PLAN){const sp=layer._semantic.pass,mmc=num('sheetmm',DEFAULT_SHEET_MM)/W2,softNear=sp.source!=='authored'&&['wet on wet','wet on dry'].includes(sp.move)?softEdgeCells(ctx.AREA_PLAN,layer._semantic.area.id,sp.brush.widthMm/2/(num('sheetmm',DEFAULT_SHEET_MM)/w)+1):null;if(sp.soften||sp.lights?.mode==='lift'||softNear||sp.charge){if(ctx.SOFTEN_LIFT?.key!==layer._semantic.key)ctx.SOFTEN_LIFT={key:layer._semantic.key,m:new Uint8Array(w*h),amount:0,cells:0};const m=ctx.SOFTEN_LIFT.m;for(const sh of layer.shapes){let c=0;for(let i=0;i<m.length;i++)if(sh.mask[i]){m[i]=1;c++;}ctx.SOFTEN_LIFT.amount+=(sh.amount??0)*c;ctx.SOFTEN_LIFT.cells+=c;}ctx.SOFTEN_LIFT_AMOUNT=ctx.SOFTEN_LIFT.cells?ctx.SOFTEN_LIFT.amount/ctx.SOFTEN_LIFT.cells:0;if(ctx.layers[L+1]?._semantic?.key!==layer._semantic.key){ctx.SOFTEN_LIFT=null;
    const newBrush=r=>createBrush({flat:sp.brush.kind==='flat',radius:r,bristles:Math.max(12,Math.ceil(r*2)),capacity:100,belly:12,feed:0.4,give:0.9,free:0.4,film:0.25,stiffness:8,seed:41+ctx.laid+SEED,...semanticBrushOptions(sp,mmc)}),lay=(b,path,o)=>stroke(b,ctx.sheet,path,{...o,upright:UPRIGHT});
+   // a second colour charged into the wet pass (pass.charge, area-washes.mjs), before its edges are softened
+   const charged=sp.charge?chargeWetPass({pass:sp,plan:ctx.AREA_PLAN,mask:up(m),W:W2,H:H2,r:sp.brush.widthMm/(2*mmc),mix:chargeMix(sp,PIGS,ctx.SOFTEN_LIFT_AMOUNT??0,layer._semantic.key),newBrush,dip,stroke:lay,observe:cells=>measurePaper(ctx.sheet,cells,SPEED_PAPER,{uniform:false}),as:p=>AREA_EXEC.set({...layer._semantic,pass:p}),restore:()=>AREA_EXEC.set(layer._semantic),strength:num('strength',2.2)}):null;
    const edgeStrokes=softNear?softenEdge({mask:up(m),where:up(softNear.where),W:W2,H:H2,r:sp.brush.widthMm/(2*mmc),upright:UPRIGHT,stroke:lay,damp:()=>{const b=newBrush(sp.brush.widthMm/(2*mmc));dip(b,{water:1,conc:new Array(PIGS.length).fill(0)});return thirsty(b,{water:SOFTEN_WATER});}}):0;
    const did=softenAndLift({pass:sp,plan:ctx.AREA_PLAN,mask:up(m),W:W2,H:H2,mmPerCell:mmc,K:PIGS.length,dip,thirsty,newBrush,stroke:lay,waitDamp:light=>{const cells=[];for(let i=0;i<light.length;i++)if(light[i])cells.push(i);const observe=()=>measurePaper(ctx.sheet,cells,SPEED_PAPER,{uniform:false});const {paper,wetWaits}=layIntoWetBed({paper:observe(),observe,step:o=>step(ctx.sheet,o),O,info:{lift:layer._semantic.key}});return {wetWaits,moistShare:paper.moistShare,waterTypical:paper.waterP50};}});
-   JSONL.append(path.join(out,'semantic-soften-lift.jsonl'),JSON.stringify({area:layer._semantic.key,...(did??{pass:sp.id}),...(softNear?{softEdgeStrokes:edgeStrokes,softEdges:softNear.reasons}:{})})+'\n');}}}
+   JSONL.append(path.join(out,'semantic-soften-lift.jsonl'),JSON.stringify({area:layer._semantic.key,...(did??{pass:sp.id}),...(softNear?{softEdgeStrokes:edgeStrokes,softEdges:softNear.reasons}:{}),...(charged?{charge:charged}:{})})+'\n');}}}
   // a wet session (pass.session) dries once, after its last pass; an area left wet is remembered for its hard edges
   if(ctx.AREA_PLAN){if(!layer._semantic.pass.leaveWetAfter&&!['wet on wet','wet-edge continuation'].includes(layer._semantic.pass.move)&&!semanticSameSession(layer._semantic,ctx.layers[L+1]?._semantic)){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2,...watch}));ctx.AREA_WET?.clear();}else (ctx.AREA_WET??=new Set()).add(layer._semantic.area.id);}
   else if (earlyBoundary) { /* Existing ordinary dry completed earlier, before idle flow. */ }
