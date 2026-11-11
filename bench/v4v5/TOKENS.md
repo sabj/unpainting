@@ -2,7 +2,7 @@
 
 Base (always applied, under your tokens): `region_w13_lay4_sky3_rg10_blk60_bmm40_bka20_birr_skyb_cpp_pgreen`.
 
-Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. Stone-block and ground tokens of the base (blk, bmm, bka, birr, rg) act on architecture only. A setting only acts while its switch is on, so the painter reports the others as unused: rec2, rec2x, rcl and rac need the architecture preset (--recesses), eye and dg need _dp, and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Palette tokens act only on Trumbull; there `--paints` is: default ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
+Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. Stone-block and ground tokens of the base (blk, bmm, bka, birr, rg) act on architecture only. A setting only acts while its switch is on, so the painter reports the others as unused: rec2, rec2x, rcl and rac need the architecture preset (--recesses), eye and dg need _dp (refused, a gain), and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Palette tokens act only on Trumbull; there `--paints` is: default ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia; _pgreen ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen (+_pbs adds sienna); _pwarm ochre,rawsienna,hansa,ultramarine,cerulean,sepia; _pgold ochre,hansa,ultramarine,cerulean,sepia; _rv adds rose and --roseviolet 1. Elsewhere set `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
 | token | painter options it sets (on top of the template) |
 |---|---|
@@ -12,7 +12,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_lay4` | --midlayers 4 |
 | `_lf` | --loadfeather 1.5 |
 | `_ls10` | --layersmooth 1 |
-| `_acc3` | --accentshare 0.3 |
+| `_acc3` | refused: a value gain: moves middle demand into the accent band |
 | `_lt` | --layertexture 1 |
 | `_cur` | --paperbase white, --paperrel (removed), --paperrgb 252,251,248 |
 | `_relonly` | --paperlights (removed), --paperrgb (removed) |
@@ -25,7 +25,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_blk60` | --stoneblocks 0.6 |
 | `_bka20` | --stoneblockamt 0.2 |
 | `_bmm40` | --stoneblockmm 4 |
-| `_dp80` | --deepaccent 80 |
+| `_dp80` | refused: a value gain: doubles dark weight sheet-wide wherever the target is darker than a threshold |
 | `_ms120` | --minshapecells 120 |
 | `_birr` | --stoneirregular 1 |
 | `_dg2` | --deepgrow 2 |
@@ -39,7 +39,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_cpp` | --paper coldpress |
 | `_tsh8` |  |
 | `_tfl8` | --texflow 0.8 |
-| `_novar` | --physics filmDiffuse=0 |
+| `_novar` | refused: a physics switch: turns off film diffusion, a physical process, which can hide engine faults |
 | `_sk1` | --skyonelayer 1 |
 | `_bcl3` | --stoneclusters 3 |
 | `_fs60` | --fastsettle 60 |
@@ -51,7 +51,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_spl6` | --strokeplan 1, --lanemm 6 |
 | `_sml30` | --strokemm 30 |
 | `_wre15` | --washreach 1.5 |
-| `_lit20` | --litlift 0.2 |
+| `_lit20` | refused: a value gain: removes a share of the middle layers |
 | `_lad` | --laneadapt 1 |
 | `_lw` | --litwarm 1 |
 | `_sky` | --layerhue 1, --skysplit 1 |

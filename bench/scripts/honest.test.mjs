@@ -114,3 +114,21 @@ test('V5 feedback carries the painting and the judges\' words, never a score', a
   assert.equal(scrubScores('rated 3 out of 5, mean 3.2'), 'rated , mean');
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('the plan cannot set a gain or calibration: washes.charge, _dp/_acc/_lit/_novar, any --*gain or --*cal', async () => {
+  const { resolvePlan, checkExtraArgs, ALLOWED_EXTRA_ARGS, GAIN_OPTION } = await import('./pipeline/plan-args.mjs');
+  const { BENCH } = await import('./lib.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'honest-gain-'));
+  const plan = (config, variant) => { fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(config)); return resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: dir, variant, target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' }).problems; };
+  assert.deepEqual(plan({ families: [] }, 'region_w13_lay2'), []);
+  assert.ok(plan({ families: [], washes: { charge: 0.5 } }, 'region_w13').some(p => /washes\.charge/.test(p)));
+  for (const t of ['dp80', 'acc3', 'lit20', 'novar']) {
+    const p = plan({ families: [] }, 'region_w13_' + t);
+    assert.ok(p.some(m => m.includes(`"${t}" is refused`)), t + ': ' + JSON.stringify(p));
+  }
+  for (const flag of ['touchgain', 'coolgain', 'stylegain', 'inkresgain', 'pwwetgain', 'deliverycal', 'techcalmax', 'skycal', 'semanticcalibrationmode', 'dogcal'])
+    assert.match(checkExtraArgs(['--' + flag, '1'], '/p')[0] ?? '', /may not set/, flag);
+  assert.match(checkExtraArgs(['--touchgain', '.6'], '/p')[0], /gain or calibration/);
+  for (const k of Object.keys(ALLOWED_EXTRA_ARGS)) assert.doesNotMatch(k, GAIN_OPTION, `${k} is allowed but reads as a gain`);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
