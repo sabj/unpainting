@@ -86,7 +86,7 @@ test('a device error in the GPU worker thread reaches the painter thread', t => 
 
 // Dawn itself: an invalid copy is an uncaptured validation error, even though mapping the target succeeds.
 // Use the production opener: it keeps Dawn's instance reachable for the device's lifetime.
-test('a real Dawn validation error is caught by the watch, though the read-back still succeeds', async t => {
+test('a real Dawn validation error is caught by the watch, though the read-back still succeeds', { timeout: 30000 }, async t => {
   let webgpu;
   try { webgpu = await import('webgpu'); }
   catch (error) {
@@ -103,13 +103,16 @@ test('a real Dawn validation error is caught by the watch, though the read-back 
   try {
     globalThis.gc?.(); // --expose-gc also checks that the opener retains Dawn's native owners.
     const seen = [];
-    watchDevice(device, message => seen.push(message), { fakeAfterOps: 0 });
+    // Queue completion and mapping do not fence uncapturederror event delivery. Wait for the
+    // watch itself, rather than assuming Dawn dispatches the event within 200 ms under load.
+    const reported = Promise.withResolvers();
+    watchDevice(device, message => { seen.push(message); reported.resolve(); }, { fakeAfterOps: 0 });
     const src = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC });
     const dst = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const encoder = device.createCommandEncoder();
     encoder.copyBufferToBuffer(src, 0, dst, 0, 64); device.queue.submit([encoder.finish()]);
     await device.queue.onSubmittedWorkDone(); await dst.mapAsync(GPUMapMode.READ); dst.unmap();
-    for (let i = 0; i < 20 && !seen.length; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    await reported.promise;
     assert.equal(seen.length, 1);
     assert.match(seen[0], /^validation: Copy range/);
   } finally { device.destroy(); }

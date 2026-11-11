@@ -8,7 +8,7 @@ import { GpuOpticalComposite } from './optical-gpu.mjs';
 import { createHash } from 'node:crypto';
 import { observeFrontier } from './frontier-layout.mjs';
 import { instrumentDispatches } from './dispatch-profile.mjs';
-import { watchDevice, markBroken } from './device-health.mjs';
+import { watchDevice, markBroken, assertHealthy } from './device-health.mjs';
 
 const keepAlive = setInterval(() => {}, 1000);
 if (process.env.GPU_STROKES === 'capdebug') globalThis.GPU_CAP_DEBUG = true; // say when a step in a stroke had more active tiles than it was sized for
@@ -76,6 +76,10 @@ const flushSteps = async () => {
 };
 
 async function handle(m) {
+  // An error can wake the painter before this queued message starts. Do not create
+  // more Dawn promises on the broken device while the painter closes the worker.
+  if (m.op === 'close') return handleOp(m);
+  assertHealthy(workerData.health);
   if (m.op === 'step') { pendingSteps += m.n; return; }
   if (m.op !== 'init') await flushSteps();
   if (SERIAL_PROF && m.op !== 'init' && m.op !== 'prof') {
