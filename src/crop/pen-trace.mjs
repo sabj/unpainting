@@ -1,16 +1,23 @@
 // The pen tracer: the subject's own lines drawn as a pen draws them. One module for the bench's trace-ink tool (through
 // bench/v4v5/tools/pen-trace.mjs, a link to this file, so a planning workspace gets a self-contained copy) and for the
 // painter. Pure: luminance in, lines out.
-// The subject's lightest value (paper, the 99th percentile of luminance) and darkest (the ink, the 0.1th percentile) span
-// a nine-step value scale, the painter's usual one. A pixel is line if it is at least one step of that scale darker than
-// both sides along x, y or a diagonal within 2-4 px (a thin dark line, not a dark mass), and it lies in the darker half
-// of the scale. A pen follows the line it is on, carries no pixel staircase, lifts where the line turns back on itself,
-// joins only where one piece continues another across the tracer's own gap, and goes on contours, not inside dark
-// masses. Spans shorter than MIN_LEN px are dropped, and short wiggly ones. Each line is drawn with one nib and one
-// weight from its mean darkness. Points are [x, y] in the target's pixels. Nothing is settable.
+// Every tolerance is a distance on the sheet the line will be drawn on (TRACE_MM), turned into the subject's pixels by
+// the sheet's millimetres per pixel. The subject's lightest value (paper, the 99th percentile of luminance) and darkest
+// (the ink, the 0.1th percentile) span a nine-step value scale, the painter's usual one. A pixel is line if it is at
+// least one step of that scale darker than both sides along x, y or a diagonal, TRACE_MM.flank out (a thin dark line,
+// not a dark mass), and it lies in the darker half of the scale. A pen follows the line it is on, carries no pixel
+// staircase (one pixel), lifts where the line turns back on itself, joins only where one piece continues another
+// across TRACE_MM.reach, and goes on contours, not inside dark masses: one side TRACE_MM.side out is lighter than the
+// middle of the scale. Spans shorter than TRACE_MM.minLength are dropped, and wiggly ones shorter than TRACE_MM.wiggle.
+// Each line is drawn with one nib and one weight from its mean darkness. Points are [x, y] in the target's pixels.
+// Nothing is settable. The millimetres are the tracer's pixel limits on a bench subject (300 px on its 280 mm sheet,
+// BENCH_PIXEL_MM a pixel) restated on the sheet, so a bench subject traces exactly as before.
 
-const MIN_LEN = 14;
-const REACH = 4;
+const BENCH_PIXEL_MM = 280 / 300;
+const mm = px => px * BENCH_PIXEL_MM;
+/** The tracer's tolerances in sheet millimetres: flank 1.9 to 3.7, side 2.8 to 3.7, reach 3.7, shortest line 13.1,
+ *  wiggly lines shorter than 37.3. */
+export const TRACE_MM = Object.freeze({ flank: [mm(2), mm(4)], side: [mm(3), mm(4)], reach: mm(4), minLength: mm(14), wiggle: mm(40) });
 const VALUE_STEPS = 9;
 
 const unit = (x, y) => { const m = Math.hypot(x, y); return m > 1e-9 ? [x / m, y / m] : [1, 0]; };
@@ -105,7 +112,7 @@ export function joinPieces(pieces, { gap, cos = 0.8, aim = 0.7 } = {}) {
 /** Whether the line is a contour: on at least half its points one side, `reach` pixels out across it, is lighter than
  *  the middle of the subject's value scale (`mid`). A line with dark on both sides lies inside a dark mass, where the
  *  wash states the form; ink there is shadow or texture rewritten as line. `at(x, y)` is luminance 0..1. */
-export function hasLightSide(P, at, mid, reach = [3, 4]) {
+export function hasLightSide(P, at, mid, reach) {
   const pts = [];
   for (let j = 1; j < P.length; j++) { const L = Math.hypot(P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1]), k = Math.max(1, Math.ceil(L)); for (let s = 0; s < k; s++) pts.push([P[j - 1][0] + (P[j][0] - P[j - 1][0]) * s / k, P[j - 1][1] + (P[j][1] - P[j - 1][1]) * s / k, P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1]]); }
   if (!pts.length) return false;
@@ -119,17 +126,22 @@ export function hasLightSide(P, at, mid, reach = [3, 4]) {
 }
 
 /**
- * Trace the subject's pen lines. `lum` is luminance 0..1, W by H.
- * @returns {{ lines: {points:number[][], length, weight, width}[], scale: {paper, ink, step, mid}, stats: {linePixels, inMass} }}
+ * Trace the subject's pen lines. `lum` is luminance 0..1, W by H; `pixelMm` is the sheet's millimetres per pixel of it.
+ * @returns {{ lines: {points:number[][], length, weight, width}[], scale: {paper, ink, step, mid}, px, stats: {linePixels, inMass} }}
  */
-export function tracePen(lum, W, H) {
+export function tracePen(lum, W, H, { pixelMm }) {
+  if (!(pixelMm > 0)) throw new Error('pen trace: the sheet millimetres of one pixel');
+  // a tolerance in pixels (to a millionth, so a bench subject lands on its old whole pixels); never under one pixel
+  const px = v => +(v / pixelMm).toFixed(6), f0 = Math.max(1, Math.round(px(TRACE_MM.flank[0])));
+  const P = { flank: [f0, Math.max(f0 + 1, Math.round(px(TRACE_MM.flank[1])))], side: TRACE_MM.side.map(v => Math.max(1, Math.round(px(v)))),
+    reach: Math.max(1, px(TRACE_MM.reach)), minLength: px(TRACE_MM.minLength), wiggle: px(TRACE_MM.wiggle) };
   const n = W * H, sorted = Float32Array.from(lum).sort(), q = f => sorted[Math.min(n - 1, Math.floor(f * n))];
   const paper = q(0.99), ink = q(0.001), step = (paper - ink) / (VALUE_STEPS - 1), mid = ink + (paper - ink) / 2;
   const at = (x, y) => lum[Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))];
   const M = new Uint8Array(n);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const v = at(x, y); if (v > mid) continue; let best = 0;
-    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) for (const d of [2, 3]) {
+    for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) for (let d = P.flank[0]; d < P.flank[1]; d++) {
       const a = Math.max(at(x + dx * d, y + dy * d), at(x + dx * (d + 1), y + dy * (d + 1))), b = Math.max(at(x - dx * d, y - dy * d), at(x - dx * (d + 1), y - dy * (d + 1)));
       best = Math.max(best, Math.min(a, b) - v);
     }
@@ -137,18 +149,18 @@ export function tracePen(lum, W, H) {
   }
   thin(M, W, H);
   let linePixels = 0; for (const v of M) linePixels += v;
-  const pieces = joinPieces(walkChains(M, W, H).map(p => simplify(p.map(i => [i % W + 0.5, ((i / W) | 0) + 0.5]), 1)).flatMap(splitAtTurns), { gap: REACH });
+  const pieces = joinPieces(walkChains(M, W, H).map(p => simplify(p.map(i => [i % W + 0.5, ((i / W) | 0) + 0.5]), 1)).flatMap(splitAtTurns), { gap: P.reach });
   const lines = []; let inMass = 0;
   for (const pts of pieces) {
     const len = plen(pts);
-    if (len < MIN_LEN) continue;
+    if (len < P.minLength) continue;
     const chord = Math.hypot(pts[0][0] - pts.at(-1)[0], pts[0][1] - pts.at(-1)[1]);
-    if (chord / len < 0.55 && len < 40) continue;
-    if (!hasLightSide(pts, at, mid)) { inMass++; continue; }
+    if (chord / len < 0.55 && len < P.wiggle) continue;
+    if (!hasLightSide(pts, at, mid, P.side)) { inMass++; continue; }
     const d = pts.reduce((a, [x, y]) => a + 1 - at(Math.floor(x), Math.floor(y)), 0) / pts.length;
     lines.push({ points: pts, length: len, weight: Math.min(0.85, 0.4 + 0.55 * d), width: +(1.6 + 2.4 * d).toFixed(2) });
   }
-  return { lines, scale: { paper, ink, step, mid }, stats: { linePixels, inMass } };
+  return { lines, scale: { paper, ink, step, mid }, px: P, stats: { linePixels, inMass } };
 }
 
 // Zhang-Suen thinning, in place.
