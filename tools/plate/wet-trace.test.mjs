@@ -57,7 +57,7 @@ test('the wet trace finds the lapped lane beside a stroke, its age on the sheet 
   assert.equal(s[1].nb.id, 0, 'the second lane laps the first');
   assert.ok(Math.abs(s[1].nb.dt - 20 * O.dt) < 1e-6, `20 flow steps of dt ${O.dt} between them: ${s[1].nb.dt}`);
   assert.equal(s[1].nb.driedSince, false);
-  assert.ok(s[1].nb.landW > 0 && s[1].nb.meanW <= s[1].nb.landW, 'the seam has water, no more than the lane left');
+  assert.ok(s[1].nb.landW > 0 && s[1].nb.meanW > 0, 'the neighbour left water at the seam and some stands there when the next lane comes');
   assert.equal(s[2].nb.id, 1); assert.equal(s[2].nb.driedSince, true, 'the dry came between');
   assert.equal(s[2].nb.film, 0, 'after a dry no seam cell holds a film');
   assert.ok(d[0].before.filmCells > 0 && d[0].after.wetCells === 0, 'the dry took the standing water off');
