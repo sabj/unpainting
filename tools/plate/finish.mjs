@@ -52,20 +52,11 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
 if (!AWARE_SKIP_POST) dry(ctx.sheet, 20000, O, { levelMax: 900 });
 colourMass('dried');
-if(!AWARE_SKIP_POST&&num('treelayerslate',0)===1){
- await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'broad-composition-before-treelayers.png'));
- fs.writeFileSync(path.join(out,'broad-composition-before-treelayers.json'),JSON.stringify({kind:'actual ordinary-dried numeric composition before deferred WHOLEtree passage; not final/art acceptance',completed:'numerical ladder including figure and non-tree masses',notYetExecuted:['treelayers foundation','treelayers wet/dry shadow tiers','latermodulation/accents/closingink'],target:opt('image'),width:W2,height:H2,backend:GPU_INFO,mode:NATIVE_PAINT_MODE,treeOwnership:'unchanged exact passage keepout; tree cells may still be paper',schedule:PASSAGE_HOOK.schedule},null,2));
- console.log('actual broad composition saved before treelayers');
- if(opt('treelayersstop','')==='before'){await drainFrames();if(ctx.FRAMER)ctx.FRAMER.close();ctx.sheet._gpu?.close();console.log('checkpoint before deferredtreelayers; not final');process.exit(0);}
- await PASSAGE_HOOK.run('after-broad');
-}
 
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-after-dry.png'));
 if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))fs.writeFileSync(path.join(out,'semantic-production-details-before.json'),JSON.stringify({declaration:ctx.AREA_PLAN.doc.productionDetails,sampler:'existing production orientationField/furMarks/dryMarkPath/dryMarkBrush',calibration:CAL['wet on dry'],calibrationRole:'historical wet-on-dry gain retained; not matched dry-brush proof',demand:'existing MOD.Ad only; unplaced residual remains debt'},null,2));
-if(MOD?.anatomyAudit){fs.writeFileSync(path.join(out,'modulation-anatomy-before.json'),JSON.stringify({...MOD.anatomyAudit,maxMarks:BUDGET?.dry??0,direction:MOD.furPlan?'registered regional flow blended with source orientation; existing furMarks/dryMarkPath':'existing orientationField/furMarks/dryMarkPath',materialRegions:MOD.furPlan?.regions,essentialLights:MOD.furPlan?.cores,lightScope:'physical-film and negative contact placement are distinct; stage checkpoint precedes global film lift',calibration:num('moddrycalactual',0)?null:CAL['wet on dry'],calibrationScope:num('moddrycalactual',0)?'planned actual reached min/median/max dryMark measurement/cache before this stage; factors NOT known until measurement':'historical wet-on-dry factor retained for existing shaped dryMark instrument; NOT matched dry-instrument proof',wholeContact:'fresh actual primary/lift + three-cell halo dry admission, existing physical film/paper clip remains'},null,2));await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'whole-fur-before.png'));}
 // The modulation lays no target-seeded dry-brush marks (anti-cheat rules); its wash and detail split (planning) stays.
 if (MOD && !ABLATE.has('dry')) console.log('dry brush: target-seeded dry-brush marks removed');
-if(MOD?.anatomyAudit){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'whole-fur-ordinary-dried.png'));if(opt('modanatomystop','')==='fur'){await drainFrames();if(ctx.FRAMER)ctx.FRAMER.close();ctx.sheet._gpu?.close();console.log('whole anatomical fur/face stage checkpoint, before closing; not art acceptance');process.exit(0);}}
 if (!AWARE_SKIP_POST && DRAGS && !ABLATE.has('drags')) await layDrags(DRAGS, { count: BUDGET ? BUDGET.drags : undefined, mmPerCell: PB ? PB.mmPerCell * SC : 0, dragWmm: PB ? PB.cfg.brushes[PB.cfg.roles.drag].width_mm : 0, sheet: ctx.sheet, w, h, n, SC, W2, K: PIGS.length, SRC: ctx.SRC, A: DRAG_TARGET, gaussian, num, dip, createBrush, stroke, step, dry, O, CAL, UPRIGHT, SEED, expected, used, clock, shoot, setStage: s => { ctx.STAGE = s; }, log: console.log });
 if(ctx.AREA_PLAN)AREA_EXEC.set(null);
 colourMass('detailed');

@@ -8,30 +8,6 @@
       "reason": "Judge board layouts are recognised by their fixed panel widths (776 px). It reads composed score boards, not painted subjects, and does not run in the painter."
     },
     {
-      "file": "src/paint/methods/light-to-dark.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Imports the recess, stone and ground constants from tuned/trumbull.mjs. The constants act only when the architecture preset or --recesses, --stoneblocks or --groundglaze is on; the default recipe sets none."
-    },
-    {
-      "file": "tools/plate/load-order.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Loads tuned/trumbull.mjs, as the unsplit painter's import list did, so that modules load in the same order. It names no subject and runs no subject branch."
-    },
-    {
-      "file": "tools/plate/sheet.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Imports GROUND.from from tuned/trumbull.mjs as the default of --groundfrom. It has an effect only when --groundglaze is above 0."
-    },
-    {
-      "file": "bench/scripts/add-target.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Writes trumbull: false into the spec of every new benchmark target, so a new subject never gets the Trumbull palette or stone tokens."
-    },
-    {
       "file": "bench/scripts/import-aware.mjs",
       "rule": "name",
       "count": 1,
@@ -50,18 +26,6 @@
       "reason": "Picks the Ships crop for the overview figure. Reporting only."
     },
     {
-      "file": "bench/scripts/pipeline/plan-args.mjs",
-      "rule": "name",
-      "count": 6,
-      "reason": "The spec.trumbull switch: palette tokens (--paints) and architecture tokens reach only a subject whose spec says trumbull: true. Containment of fitted settings; recorded in the overfit review."
-    },
-    {
-      "file": "bench/scripts/pipeline/tokens.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Token help text telling a model that palette tokens act only on Trumbull."
-    },
-    {
       "file": "bench/scripts/compare-release-collect.mjs",
       "rule": "name",
       "count": 1,
@@ -72,6 +36,36 @@
       "rule": "name",
       "count": 5,
       "reason": "Names which published plates the comparison page shows beside each improvement note. Reporting only; never runs in the painter."
+    },
+    {
+      "file": "tools/judge/line-fidelity.py",
+      "rule": "name",
+      "count": 4,
+      "reason": "Judge script: the line-fidelity check's fixed target list and its named comparison windows per target. Scoring only; it never runs in the painter."
+    },
+    {
+      "file": "tools/lab/build-live-examples.mjs",
+      "rule": "name",
+      "count": 1,
+      "reason": "Builds the Paint Lab's recorded examples from two named example runs. Reporting only; it never runs in the painter."
+    },
+    {
+      "file": "tools/readme/build-readme-media.mjs",
+      "rule": "name",
+      "count": 5,
+      "reason": "README media builder: takes the run folders of the two README example plates by name. Reporting only; it never runs in the painter."
+    },
+    {
+      "file": "tools/readme/build-readme-media.mjs",
+      "rule": "size",
+      "count": 2,
+      "reason": "README media builder: panel gap and font size for its two fixed figure widths. Layout of a figure, not a painting branch."
+    },
+    {
+      "file": "tools/readme/ink-figure.mjs",
+      "rule": "name",
+      "count": 3,
+      "reason": "README ink figure: its default example image, line file and caption. Reporting only; it never runs in the painter."
     }
   ]
 }

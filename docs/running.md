@@ -70,11 +70,11 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--out` | output directory | `work/plate` | same |
 | `--width` | planning width in cells | 700 | same |
 | `--mode` | `fast`, `full` | `fast` | same |
-| `--recipe` | `default`, `penwash`, `v096`, `person`, `none`, each optionally followed by `+<preset>` | omitted selects `default` | `default` |
+| `--recipe` | `default`, `penwash`, `person`, `none` | omitted selects `default` | `default` |
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
-| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first`; `--recipe v096` uses `both` |
+| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first` |
 | `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` | same; plan may override |
 | `--drawingstages` | `auto`, `off`: per-image pencil and ink stages when there is no prepared drawing | `auto` | same |
 | `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |

@@ -76,7 +76,7 @@ export async function addTarget({ image, task, name, style, source, licence, cro
     distributed: !privateDir, file, coarseFile, licence };
   writeJson(cropsFile, { ...spec, crops: [...spec.crops, entry] });
   writeJson(subjectsFile, { ...subjects, subjects: { ...subjects.subjects,
-    [task]: { name, taskStyle: style.split(':')[0].trim(), width: paintWidth, sheetmm, trumbull: false } } });
+    [task]: { name, taskStyle: style.split(':')[0].trim(), width: paintWidth, sheetmm } } });
   return { entry, png };
 }
 

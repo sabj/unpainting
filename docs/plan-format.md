@@ -111,7 +111,7 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 
 ## Other plan formats in this repository
 
-- Area plans (`tools/paint-plate.mjs --areaplan <file>`, validated by `tools/painter/semantic-areas.mjs`) describe a whole painting as 10 to 100 named areas. Each area has ordered passes (move, value range (light to dark), brush, load, lights, dependencies). Passes can carry brush paths supplied by the plan like the strokes above. `node tools/paint-plate.mjs --areahelp` prints the contract. No area plan example is bundled.
+- Area plans (`tools/paint-plate.mjs --areaplan <file>`, validated by `tools/painter/semantic-areas.mjs`) describe a whole painting as 10 to 100 named areas. Each area has ordered passes (move, value range (light to dark), brush, load, lights, dependencies). Passes can carry brush paths supplied by the plan like the strokes above. A wet on dry or dry brush pass can instead name surface marks from the technique library, `"marks": {"kind": "short-coat" | "curly-coat" | "long-hair" | "masonry", "reason": ..., "cover": share of the area the marks visit, "placement": "edge" (within two brush widths of the shape's edge, a few marks at a mass's silhouette) or "whole", "flow": [[x, y], ...] (normalized, for the coats that follow a direction), "courseAngleDeg": ... (masonry)}`: the planner picks the kind from what the subject shows, and `src/paint/techniques/surface-marks.mjs` lays it with the pass's brush, every mark size a multiple of the brush width. No field has a default. `node tools/paint-plate.mjs --areahelp` prints the contract. No area plan example is bundled.
 - Value plans (`--valueplan`) describe a subject with region families (groups of related image regions), style choices and reserved lights. Target colors determine the actual regions; family boxes supply descriptions. Example: [examples/plans/trumbull-values.json](../examples/plans/trumbull-values.json), run with `npm run example:architecture`.
 - Without a plan file, the automatic planner inside `tools/paint-plate.mjs` produces passes from the target image.
 
@@ -122,7 +122,6 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 | Field | Type and meaning | Default if omitted |
 |---|---|---|
 | `subject` | string naming the subject; it selects no style and turns on no fitted rule. The style comes from `styleSelection` | none |
-| `presets` | array of preset names from `src/paint/tuned/presets.mjs` (`architecture`); their flags go after the recipe's, and an unknown name stops the run ([tuned settings](techniques.md#tuned-settings)) | no presets |
 | `name` | string for the preview title | preview fallback title |
 | `photo` | source photo label in the preview; only its basename is used, and no photo is read | `unknown` |
 | `sheet` | optional `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match `--sheetmm` when both are given; `seed` and `targetGuard` set defaults | command-line or painter defaults |

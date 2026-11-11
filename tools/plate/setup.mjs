@@ -90,8 +90,6 @@ const STROKE_BUDGET = num('strokebudget', 0);
 for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
 // --texvariety v: how much the short texture marks vary in length and pressure (src/paint/techniques/shaped-marks.mjs)
 setTextureVariety(num('texvariety', 0));
-// --recesses 1: dark recesses as last accents, set by the architecture preset (src/paint/tuned/presets.mjs).
-const RECESSES = num('recesses', 0) > 0;
 const optTrack = {
   start() { OPT_TRACK = []; },
   stop() { const r = OPT_TRACK; OPT_TRACK = null; return r; },
@@ -281,7 +279,6 @@ ctx.WASH_LAST = null;
 const MAJOR_FILE=opt('majorintent',''), MAJOR_INTENT=MAJOR_FILE?validateLegacyIntent(JSON.parse(fs.readFileSync(path.resolve(root,MAJOR_FILE))),{imageSHA:sha256(path.resolve(root,opt('image'))),loadedContact:num('loadedcontact',0)}):null;ctx.MAJOR_TECHNIQUE=null; ctx.MAJOR_COMMAND=0; ctx.MAJOR_PREVIOUS=null; ctx.MAJOR_PLANE_CONTACT=null;
 if(MAJOR_INTENT)fs.writeFileSync(path.join(out,'major-intents-before.json'),JSON.stringify(MAJOR_INTENT,null,2));
 const NUMERIC_TUFT_SHAPES=opt('numerictuftshapes','').split(',').filter(Boolean),NUMERIC_TUFT_CAL=new Map();
-const MOD_PAINT_FLOOR_SKIP=num('modpaintfloorskip',0);if(![0,1].includes(MOD_PAINT_FLOOR_SKIP)||MOD_PAINT_FLOOR_SKIP&&!opt('modpaintplanes',''))throw Error('modpaintfloorskip requires explicit owned plane input and0or1');
 if(NUMERIC_TUFT_SHAPES.length&&!MAJOR_INTENT)throw Error('numerictuftshapes requires target-bound major material instructions');
 // where the wall clock goes between the big sections, printed at the end as `phases:` (changes no output)
 const WALL_PHASES = [`load ${process.uptime().toFixed(1)}s`]; let phaseT = performance.now();
@@ -377,12 +374,12 @@ const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(r
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
 Object.assign(ctx, { argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
-  DRAWING_STAGE_INTENT, STROKE_BUDGET, RECESSES, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
+  DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_VALUE_ONLY, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 
   CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, SPARSE_CONTACT_RECORD, VALUE_CONFIG, VALUE_ENABLED, VALUE_COUNTS, 
-  SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, NUMERIC_TUFT_CAL, MOD_PAINT_FLOOR_SKIP, WALL_PHASES, 
+  SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, NUMERIC_TUFT_CAL, WALL_PHASES, 
   phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, w, h, n, SEGMENTS_RECORD, SUBJECTS, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
   WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted });

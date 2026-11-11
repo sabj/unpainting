@@ -18,6 +18,23 @@ test('flags a benchmark name used as a literal, key, property or parameter', () 
   assert.deepEqual(rules(`run(spec.trumbull);`), ['name']);
   assert.deepEqual(rules(`id.startsWith('subject-c.cat.')`), ['name']);
   assert.deepEqual(rules(`const k = ['hills', 'sargent'];`), ['name']);
+  assert.deepEqual(rules(`load('examples/targets/rembrandt-woman-reading.jpg');`), ['name']);
+  assert.deepEqual(rules(`if (opt('dogpaint')) paintCoat();`), ['name']);
+  assert.deepEqual(rules(`const held = ['tramp', 'dog-ink'];`), ['name']);
+  assert.deepEqual(rules(`names[m] = 'dog';`), ['name']);
+});
+
+test('reads Python too, without its comments and docstrings', () => {
+  const py = text => scanSource(text, { python: true }).map(h => h.rule);
+  assert.deepEqual(py(`ORDER = ('sky', 'dog')`), ['name']);
+  assert.deepEqual(py(`# fitted on Trumbull\nx = 1  # mittens\n"""The dog: a docstring.\n'trumbull'"""\ny = 2`), []);
+  assert.deepEqual(py(`url = 'a#b'; k = 'mittens'`), ['name']);
+});
+
+test('the scan covers every source file under src/ and tools/, tests and fixtures aside', () => {
+  const files = new Set(scanRepo(ROOT).map(h => h.file));
+  for (const f of files) assert.ok(!/\.test\.m?js$|[-_]test\.py$|(^|\/)fixtures\//.test(f), f);
+  assert.ok([...files].some(f => f.endsWith('.py')), 'Python sources are scanned');
 });
 
 test('flags a target hash and an image-size branch', () => {
@@ -55,12 +72,4 @@ test('painting and harness code holds no unreviewed subject name, hash or size b
   const { unlisted, stale } = compareToAllow(scanRepo(ROOT), loadAllow(ROOT));
   assert.deepEqual(unlisted, [], 'new subject-identifying code: remove it or list it with a reason');
   assert.deepEqual(stale, [], 'allow entries that no longer match anything');
-});
-
-test('tuned modules do not pick regions by a subject-id prefix', () => {
-  const dir = path.join(ROOT, 'src/paint/tuned');
-  const found = [];
-  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.mjs') && !n.endsWith('.test.mjs')))
-    scanSource(fs.readFileSync(path.join(dir, f), 'utf8')).forEach(h => { if (/subject-[a-e]/.test(h.snippet)) found.push(`${f}:${h.line}`); });
-  assert.deepEqual(found, []);
 });

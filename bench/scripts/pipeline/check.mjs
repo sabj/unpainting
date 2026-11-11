@@ -40,7 +40,7 @@ function planningStep({ repo, args, logFile, timeoutMs }) {
 }
 
 /**
- * Check a plan. spec: {width, sheetmm, trumbull}. Returns {ok, failures, refusal, args, layering, palette, variant}.
+ * Check a plan. spec: {width, sheetmm}. Returns {ok, failures, refusal, args, layering, palette, variant}.
  * repo: the tree whose painter runs the planning step; work: a scratch folder for its output.
  */
 export async function checkPlan({ repo, spec, planDir, variant, target, work, timeoutMs = 15 * 60 * 1000 }) {

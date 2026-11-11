@@ -40,7 +40,6 @@ import {paintMasses} from '../../src/paint/methods/masses.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
 import {darkMass} from '../../src/paint/techniques/dark-mass.mjs';
-import {dogPaint} from '../../src/paint/techniques/dog-paint.mjs';
 import {paintPractice} from '../../src/paint/methods/practice-paint.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
 
@@ -52,7 +51,7 @@ const { JSONL, opt, num, NATIVE_PAINT_MODE, measurePaper, liftResist, SPEED_PROF
   GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_EXEC, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
   PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, WETPOL, render, view, BRUSH, UPRIGHT, 
   highlights, expected, sheetDensity, drainFrames, mark, WET, CAL, snap, shoot, FILM_BY_PAINT, PEN_FRAMES, 
-  PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, ML_LINES, inkTreeMask, planPen } = ctx;
+  PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, ML_LINES, planPen } = ctx;
 Object.assign(ctx, { drawPass });
 // The plan's density before anything is laid: every passage booked at its full amount, the way the loop books one it
 // lays whole. The pen-first order needs it to know what the washes will not carry.
@@ -180,7 +179,6 @@ const RESIST_BASE = await shapeFlecks(LOCAL_LIGHTS ? Uint8Array.from({ length: n
 // --softmask: the fluid thin at each light's rim, so it lifts to a soft broken edge (src/paint/methods/soft-mask.mjs)
 const RESIST_SOFT_BASE = softMask(RESIST_BASE, { w, h, n, paper, SC, gaussian, num });
 if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))MOD.lights=Uint8Array.from(ctx.AREA_PLAN.reserves,(v,i)=>v||ctx.AREA_PLAN.film[i]?1:0);
-if(MOD?.furPlan)setClip(ctx.sheet,null);
 let { R: RESIST$, S: RESIST_SOFT } = MOD&&!ctx.AREA_PLAN ? joinResist(RESIST_BASE, RESIST_SOFT_BASE, MOD, { w, h, n, distanceToZero }) : { R: RESIST_BASE, S: RESIST_SOFT_BASE }; ctx.RESIST = RESIST$;
 if(ctx.AREA_PLAN){ctx.RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(let i=0;i<n;i++)if(ctx.AREA_PLAN.film[i]){ctx.RESIST[i]=1;RESIST_SOFT[i]=1;}}
 if(ctx.VALUE_PLAN){
@@ -200,9 +198,7 @@ const used = {};
 const TECHS = [], LAST = new Uint8Array(n);
 // --darkmass: dark surfaces (black fur, hair, dark clothing, cast shadows) painted in four steps of paint spread over
 // the ladder, with the ladder and the pens kept off them (src/paint/techniques/dark-mass.mjs)
-// --dogpaint: a black curly dog painted as blots of paint in layers, in place of the dark mass
-// (src/paint/techniques/dog-paint.mjs); it takes the same hooks
-const DARK_MASS = await (opt('dogpaint', '') ? dogPaint : darkMass)({
+const DARK_MASS = await darkMass({
   sheet: ctx.sheet, w, h, n, SC, W2, H2, N2, K: PIGS.length, A: ctx.A, SRC: ctx.SRC, expected, used, O, SEED, UPRIGHT, CAL, image: opt('image', ''), path,
   thickness, gaussian, components, dilate, erode, distanceToZero, createBrush, dip, stroke, step, dry, applyResist, liftResist,
   brushedWashPaths, containPaths, sweepCover, clock, snap, setStage: s => { ctx.STAGE = s; }, opt, num, log: console.log, PIGS,
@@ -261,8 +257,6 @@ for (const L2 of ctx.layers) for (const sh of L2.shapes) if (sh.graded && !sh._f
 }
 // From here to phaseMark('painting') the target and its per-cell maps are closed (--targetguard, default gentle). The
 // only way back to the reference is TARGET_GUARD.look: shape-level means at a peek, a review or a passage.
-// treelayers and --inkofftrees find the tree region from the reference: done here, before the target is sealed
-if (opt('passages', '').split(',').includes('treelayers') || num('inkofftrees', 0) > 0) { const { precomputeTree } = await import('../../src/paint/techniques/passages/treelayers.mjs'); precomputeTree({ w, h, px: ctx.px, mmCell: num('sheetmm', DEFAULT_SHEET_MM) / w }); if (num('inkofftrees', 0) > 0) await inkTreeMask(); }
 // --touchpoints R: once the planned passes are laid, R rounds comparing each planning shape's mean with the reference (TARGET_GUARD.look).
 // A shape that reads lighter gets one corrective glaze; only deficits are glazed, nothing is read cell by cell.
 const TP_ROUNDS = Math.max(0, Math.round(num('touchpoints', 0)));
@@ -426,7 +420,6 @@ if (num('drawingonly', 0) > 0) {
   console.log('drawing-only: dry opening complete, before washes'); process.exit(0);
 }
 if(MAJOR_INTENT)await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'major-drawing-opening.png'));
-if(num('treelayerslate',0)===1&&PEN_FIRST&&DRAWING!=='none')await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'production-drawing-opening.png'));
 // A semantic run records the real preparation before washes obscure it; guide and trace stay separate source artifacts.
 if(ctx.AREA_PLAN && PEN_FIRST && opt('draw','1')!=='0' && DRAWING!=='none'){
   const guide=opt('penpencil',''),base=opt('drawingfile','');

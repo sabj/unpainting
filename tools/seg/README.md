@@ -6,9 +6,9 @@ The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs
 
 ## Index
 
-Inking (the pen drawing, [pipelines](../../docs/pipelines.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `select-drawing.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
+Inking (the pen drawing, [pipelines](../../docs/pipelines.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
 
-Painting (regions for the washes): `segments.py`, `sam_regions.py`, `sam-points.py`, `segment.py`, `subject-regions.py`, `face-mask.py`, `check-sheet.mjs`.
+Painting (regions for the washes): `segments.py`, `sam_regions.py`, `segment.py`, `subject-regions.py`, `face-mask.py`, `check-sheet.mjs`.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -23,7 +23,6 @@ Painting (regions for the washes): `segments.py`, `sam_regions.py`, `sam-points.
 |---|---|---|
 | `segment.py` | `work/masks/<base>.png`, a figure-and-ground mask from u2net | `segments.py` |
 | `segments.py` | `work/segments/<base>.png` label map, `.json` legend and `-contours.json` outlines. `--mode scene` (default) names beach-scene parts by rule; `--mode regions` is SAM's masks as general regions (`sam_regions.py`) | `src/crop/segments.mjs`, `src/crop/segment-prep.mjs` |
-| `sam-points.py` | One named region from Segment Anything, prompted by points, in the segments format | `src/crop/segments.mjs` |
 | `sketch-map.py` | published fine/coarse structural maps and fusion, with source hashes | `sketch-lines.py`, and the wash recipe's line source (`src/paint/methods/line-model.mjs`) |
 | `sketch-lines.py` | continuous hierarchical pre-paint strokes, optional sky exclusion | `--drawingfile` / `--sketchlines 1` |
 | `sketch-target.mjs` | `<cache>/<target SHA-256>.png`, an image model's pen sketch of a target (one fixed prompt, OpenRouter), and its record | `--sketchcache`, checked by `src/paint/methods/sketch-check.mjs` |
@@ -31,7 +30,6 @@ Painting (regions for the washes): `segments.py`, `sam_regions.py`, `sam-points.
 | `copy-lines.py` | observed source-ink paths and measured widths, without a sketch-detail budget | `--drawingfile` / `--copylines 1` |
 | `lines.py` | `work/lines/<base>-lines.json`, Informative Drawings line map traced to polylines (paths of connected straight segments) | `src/crop/lines.mjs` |
 | `lines-map.py` | A line file moved from a photograph onto the painting made from it, through a given 2x3 similarity transform (alignment by translation, rotation and uniform scale) | `src/crop/lines.mjs` |
-| `select-drawing.py` | The first pen drawing for the beach painting: its outlines plus the photograph's interior lines | `--drawingfile` |
 | `subject-regions.py` | A label map of named regions (person from Mask R-CNN in `pp/models.py`, parts from Segment Anything prompted by boxes or points) and its legend | `ink-lines.mjs` |
 | `ink-lines.mjs` | `<out>-lines.json`, a pen-and-wash target's estimated ink (`src/crop/inkwash.mjs`) traced to polylines, each tagged with its region | `--drawingfile` |
 | `face-mask.py` | A soft face ellipse from Keypoint R-CNN | `--litface` |
@@ -149,7 +147,7 @@ curl -sL -o work/models/u2net.onnx https://github.com/danielgatis/rembg/releases
 .venv/bin/python tools/seg/segment.py work/masks examples/targets/*.jpg
 ```
 
-`segments.py` and `sam-points.py` use Segment Anything when a checkpoint (trained model file) is present (see `segments.py` for where it looks). Without one, `segments.py --sam auto` falls back to k-means, which groups pixels by similar colors, and `--sam require` stops with an error. k-means uses Lab, a color space that separates lightness from color. `lines.py` lists its model files and cache directory in its header. `face-mask.py` and `subject-regions.py` need PyTorch and torchvision. Mask R-CNN uses torchvision's default trained model files, and Keypoint R-CNN downloads the URL in `face-mask.py`; both need network access on the first run.
+`segments.py` uses Segment Anything when a checkpoint (trained model file) is present (see `segments.py` for where it looks). Without one, `segments.py --sam auto` falls back to k-means, which groups pixels by similar colors, and `--sam require` stops with an error. k-means uses Lab, a color space that separates lightness from color. `lines.py` lists its model files and cache directory in its header. `face-mask.py` and `subject-regions.py` need PyTorch and torchvision. Mask R-CNN uses torchvision's default trained model files, and Keypoint R-CNN downloads the URL in `face-mask.py`; both need network access on the first run.
 
 u2net takes about 0.7 seconds per image on CPU. The masks are independent of object categories. That is enough for the three uses: weighting the pen to a mask's boundary over an interior fold, treating the background as a region, and keeping hatching to a form.
 

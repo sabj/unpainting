@@ -8,7 +8,6 @@ import {resolveOutlineMedium, describeOutlineMedium} from '../../src/paint/metho
 import {bindFinishingArea, finishingPaletteKeys} from '../painter/finishing-area.mjs';
 import {numericalGlazePasses} from '../painter/numerical-glaze-passes.mjs';
 import {validateProductionDetails, validateCompiledAreaStop} from '../painter/semantic-production-details.mjs';
-import {allocateShapeLocalCharge} from '../../src/paint/methods/shape-local-charge.mjs';
 import {lowerAuthoredGestures} from '../painter/authored-gestures.mjs';
 import {authoredPalette} from '../painter/authored-paint.mjs';
 import {validateAreaDocument, rasterAreaPlan, compileAreaLayers, createAreaExecution, sha256} from '../painter/semantic-areas.mjs';
@@ -55,13 +54,12 @@ import {massBudget} from '../../src/paint/methods/mass-budget.mjs';
 import {planModulation} from '../../src/paint/methods/modulate.mjs';
 import {dragRegion, thinForDrags} from '../../src/paint/methods/drags.mjs';
 import {loadFocus} from '../../src/paint/methods/stroke-budget.mjs';
-import {massPuddles} from '../../src/paint/methods/mass-wash.mjs';
 import {measureStyle} from '../../src/paint/methods/practice-style.mjs';
 
 export async function plan(ctx) {
 const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, SPEED_VALUE_ONLY, SPEED_PROFILE, 
   root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
-  MOD_PAINT_FLOOR_SKIP, phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, SUBJECTS, lum, paperRGB, CODE_HASH, 
+  phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, SUBJECTS, lum, paperRGB, CODE_HASH, 
   PALETTE_FROM_FILE, paletteFitStarted } = ctx;
 const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
   const authoredFile=opt('areaplan','');const explicit=authoredFile?authoredPalette(JSON.parse(fs.readFileSync(path.resolve(root,authoredFile)))):null;if(explicit)return {pigments:explicit,authored:true,monochrome:explicit.length===1,paintChroma:0,note:'explicit authored production palette; no source palette fit'};
@@ -333,7 +331,7 @@ const ART_DENSITY = () => { const pl0 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB
 const combinedClipCache=new WeakMap();
 let clipBaseSource=null, clipBaseWidth=0, clipBaseHeight=0, clipBase=null;
 const setClip=(target,mask,box=null)=>{
-  const excluded=target===ctx.sheet?(MOD?.furPlan?.negative??ctx.VALUE_PLAN?.protectedCells):null;
+  const excluded=target===ctx.sheet?(ctx.VALUE_PLAN?.protectedCells):null;
   if(!excluded)return physicalSetClip(target,box?stableClipMask(mask):mask);
   if(clipBaseSource!==excluded||clipBaseWidth!==target.w||clipBaseHeight!==target.h){
     clipBase=new Uint8Array(target.n);
@@ -370,7 +368,7 @@ const MASS_BUDGET = massBudget({ A: ctx.A, MOD, K: PIGS.length, SRC: ART_DENSITY
 // --drawinglogic 3 draws its scribble only on an ink-led piece; the style read is the modulation's when there is one
 const DRAW_STYLE = num('drawinglogic', 0) === 3 ? (MOD?.style ?? await measureStyle({ SRC: ART_DENSITY(), w, h, n, px: ctx.px, gaussian, minFilter, maxFilter, log: console.log })) : null;
 // the ladder's own amounts: under --modulate, the scaled plan, so its feedback does not charge the thinned washes back up
-ctx.AL = TARGET_GUARD.register('AL', MOD ? MOD.geometryAw??MOD.Aw : ctx.A);
+ctx.AL = TARGET_GUARD.register('AL', MOD ? MOD.Aw : ctx.A);
 const COLOUR_TRACE = num('colourtrace', 0) > 0;
 async function colourPlan(name, amounts) {
   if (!COLOUR_TRACE) return;
@@ -381,14 +379,12 @@ async function colourPlan(name, amounts) {
 }
 await colourPlan('unmixed', ctx.A);
 await colourPlan('wash-budget', ctx.AL);
-const PLANA = MIXED ? MIXED.AM : MOD ? MOD.geometryAw??MOD.Aw : ctx.A, PLANK = MIXES ? MIXES.length : PIGS.length;
+const PLANA = MIXED ? MIXED.AM : MOD ? MOD.Aw : ctx.A, PLANK = MIXES ? MIXES.length : PIGS.length;
 // --premix 1: charge each passage with every pigment it owes, mixed in the well. Default 0: one pan per pass, colours meet on paper.
 // --puddles K: cut each pass's regions by K local colours, each passage charged with its own mix (src/crop/palettewide.mjs). Default 0.
 const NPUDDLES = MIXES ? 0 : Math.max(0, Math.round(num('puddles', 0)));
-// --massplan 1 (src/paint/methods/mass-wash.mjs): the puddles are the mass planner's mass colours instead
-const MASSP = MIXES ? null : massPuddles({ px: ctx.px, w, h, figure: opt('fwmask', '') ? await loadSubject({ file: path.resolve(root, opt('fwmask', '')), w, h, sharp, log: () => {} }) : null, focus: await loadFocus({ opt, w, h, sharp, path, root }), gaussian, num, log: console.log });
-const PUDDLES = MASSP && PLANK > 1 ? { labels: MASSP.labels, centres: [] } : NPUDDLES > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: NPUDDLES }) : null;
-if (PUDDLES && !MASSP) console.log(`puddles: ${PUDDLES.centres.length} local mixes, each passage charged with its own: ${PUDDLES.centres.map(c => c.map((v, j) => (v >= 0.1 ? `${(100 * v).toFixed(0)}% ${PIGS[j].name ?? j}` : null)).filter(Boolean).join(' + ')).join('; ')}`);
+const PUDDLES = NPUDDLES > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: NPUDDLES }) : null;
+if (PUDDLES) console.log(`puddles: ${PUDDLES.centres.length} local mixes, each passage charged with its own: ${PUDDLES.centres.map(c => c.map((v, j) => (v >= 0.1 ? `${(100 * v).toFixed(0)}% ${PIGS[j].name ?? j}` : null)).filter(Boolean).join(' + ')).join('; ')}`);
 const FIRST_FLOOR = num('firstfloor', 0);
 // --firstfloorsubject r: keep the broad first wash on the figure (--fwmask) grown by r cells at 540 px, scaled with width. Default 0.
 const FIRST_ONLY = FIRST_FLOOR > 0 && num('firstfloorsubject', 0) > 0 && opt('fwmask', '') ? dilate(await loadSubject({ file: path.resolve(root, opt('fwmask', '')), w, h, sharp, log: () => {} }), w, h, Math.max(1, Math.round(num('firstfloorsubject', 0) * w / 540))) : null;
@@ -403,22 +399,11 @@ const AUTHORED_INPUT=opt('areaplan','')&&JSON.parse(fs.readFileSync(path.resolve
 const blockPlanStarted = performance.now();
 // The target value planner replaces this ladder before execution. Optional
 // legacy adapters that consume its demand or geometry keep the original path.
-const SKIP_DISCARDED_PLAN=SPEED_VALUE_ONLY&&VALUE_ENABLED&&!MOD&&!MIXES&&!opt('finishareaplan','')&&opt('curls','0')==='0'&&num('bgfirst',0)===0&&num('detailpasses',0)===0&&num('detailtrim',0)===0&&num('figurevalues',0)===0&&num('fieldmix',0)===0&&num('numericplanledger',0)===0&&num('plandiag',0)===0;
+const SKIP_DISCARDED_PLAN=SPEED_VALUE_ONLY&&VALUE_ENABLED&&!MOD&&!MIXES&&!opt('finishareaplan','')&&opt('curls','0')==='0'&&num('bgfirst',0)===0&&num('detailpasses',0)===0&&num('detailtrim',0)===0&&num('figurevalues',0)===0&&num('numericplanledger',0)===0&&num('plandiag',0)===0;
 let { layers: blocked, steps$, delivered: PLAN_DELIVERED } = SKIP_DISCARDED_PLAN
  ? {layers:[],steps:1,delivered:new Float32Array(PLANA.length)}
  : (await cachedStep({ ...RUN_CACHE, name:'block-plan',code:CODE_HASH,track:optTrack,inputs:{PLANA,PLANK,w,h,BLOCK_OPTIONS,AUTHORED_INPUT} },async()=>AUTHORED_INPUT?{layers:[],steps:1,delivered:new Float32Array(PLANA.length)}:blockInPigments(PLANA, PLANK, w, h, BLOCK_OPTIONS))).value; ctx.steps = steps$;
 SPEED_PROFILE?.add('setup:block-plan', performance.now() - blockPlanStarted);
-if(MOD?.paintOwnedTransfer)throw Error('--modpaintplanes was removed by the anti-cheat rules: per-cell residual charge inside a shape');
-if(MOD?.paintOwnedTransfer){MOD.paintOwnedCharge=allocateShapeLocalCharge({layers:blocked,K:PIGS.length,n,residual:MOD.paintOwnedResidual,selected:MOD.paintOwnedTransfer.selected,lights:MOD.lights,planned:PLAN_DELIVERED,fixtureCells:MOD.paintOwnedFixtureCells??[],excludeMixedFirstWash:MOD_PAINT_FLOOR_SKIP===1,ownComponents:MOD_PAINT_FLOOR_SKIP===1});fs.writeFileSync(path.join(out,'paint-owned-shape-local-allocation.json'),JSON.stringify({...MOD.paintOwnedCharge,fitPigmentChannels:PIGS.length,geometryPreserved:true,deliveredCredit:0},null,2));}
-if(MOD?.paintOwnedTransfer){
- const planned=Float32Array.from(PLAN_DELIVERED),flat=new Uint8ClampedArray(n*3);for(let i=0;i<n;i++)for(let c=0;c<3;c++)flat[i*3+c]=paperRGB[c];
- for(const L2 of blocked)for(const sh of L2.shapes)if(sh._paintOwnedComponentCharge){for(const[i,extra]of sh._paintOwnedComponentCharge)for(let j=0;j<PLANK;j++)planned[i*PLANK+j]+=extra[j];}else if(sh._paintOwnedCharge)for(const[i,extra]of sh._paintOwnedCharge)for(let j=0;j<PLANK;j++)planned[i*PLANK+j]+=extra*sh.mix[j]/sh.amount;
- const optical=field=>renderLayers([PIGS.map((_,j)=>Float32Array.from({length:n},(_,i)=>field[i*PLANK+j]))],PIGS,flat,n,1);
- await sharp(Buffer.from(optical(PLAN_DELIVERED).buffer),{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'paint-owned-before-original-plan.png'));
- await sharp(Buffer.from(optical(planned).buffer),{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'paint-owned-before-funded-plan.png'));
- fs.writeFileSync(path.join(out,'paint-owned-before-plan-meaning.json'),JSON.stringify({kind:'expected allocated original wash amounts through same optics; not actual deposition',allocationMode:MOD.paintOwnedCharge.allocationMode,geometryPreserved:true,deliveredCredit:0},null,2));
-}
-if(MOD?.paintOwnedTransfer||num('numericplanledger',0)>0)fs.writeFileSync(path.join(out,'paint-owned-original-ladder.json'),JSON.stringify({kind:'original numerical ladder compiled from unchanged pre-transfer geometryAw; scoped load hook follows paths afterward',layers:blocked.length,shapes:blocked.reduce((s,L)=>s+L.shapes.length,0),geometryAwSHA:crypto.createHash('sha256').update(Buffer.from(PLANA.buffer,PLANA.byteOffset,PLANA.byteLength)).digest('hex'),plannedDeliveredTotalSHA:crypto.createHash('sha256').update(Buffer.from(Float32Array.from({length:n},(_,i)=>{let v=0;for(let j=0;j<PLANK;j++)v+=PLAN_DELIVERED[i*PLANK+j];return v;}).buffer)).digest('hex'),plannedDeliveredSHA:crypto.createHash('sha256').update(Buffer.from(PLAN_DELIVERED.buffer,PLAN_DELIVERED.byteOffset,PLAN_DELIVERED.byteLength)).digest('hex'),newLayers:false,newShapes:false,newPathSplits:false,newPressure:false},null,2));
 // --figurevalues N: the figure gets its own ladder of N values; the background keeps its plan. Needs --figurelayers. Default 0.
 const clipPlannedRegions = (ls, inside, scope) => {
     for (const l of ls) {
@@ -470,39 +455,6 @@ if (FIG_VALUES > 0) {
   blocked.sort((a, b) => a.value - b.value);
   for (let i = 0; i < n; i++) if (FIG_MASK[i]) for (let k = 0; k < PLANK; k++) PLAN_DELIVERED[i * PLANK + k] = fp.delivered[i * PLANK + k];
   console.log(`figure values: ${fp.steps} value layers, ${fp.layers.reduce((a,l)=>a+l.shapes.length,0)} shapes`);
-}
-// --fieldmix 1: paint warm field gaps inside tree columns as their own premixed wash. Cannot combine with --mixes.
-if (num('fieldmix', 0) > 0) {
-  if (MIXES) throw new Error('--fieldmix requires pigment-space planning (without --mixes)');
-  const { treeRegion } = await import('../../src/paint/techniques/passages/treelayers.mjs');
-  const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs');
-  const imageBase = path.basename(opt('image', ''), path.extname(opt('image', '')));
-  const seg = hasSegments(imageBase) ? await loadSegments(imageBase, w, h) : null;
-  const fig = FIG_MASK || await loadSubject({ file: opt('fwmask', '') ? path.resolve(root, opt('fwmask', '')) : null, w, h, sharp, log: () => {} });
-  const mm = num('sheetmm', DEFAULT_SHEET_MM) / w, T = treeRegion({ w, h, px: ctx.px, fig, seg, mmCell: mm });
-  const sky = seg?.regions.find(r => r.name === 'sky')?.mask, band = new Uint8Array(n);
-  let count = 0;
-  for (let x = 0; x < w; x++) {
-    let top = h, bottom = -1;
-    for (let y = 0; y < h; y++) if (T.region[y * w + x]) { top = Math.min(top, y); bottom = y; }
-    for (let y = top; y <= bottom; y++) {
-      const i = y * w + x;
-      if (!T.region[i] && T.fam[i] === 2 && !(fig && fig[i]) && !(sky && sky[i])) { band[i] = 1; count++; }
-    }
-  }
-  if (count) {
-    const amounts = Float32Array.from(PLANA, (v, i) => band[Math.floor(i / PLANK)] ? v : 0);
-    const keepOut = Uint8Array.from(band, (v, i) => !v || (ctx.HOLD && ctx.HOLD[i]) ? 1 : 0);
-    const field = blockInPigments(amounts, PLANK, w, h, { ...BLOCK_OPTIONS, preMix: true, follow: 0, followMask: null,
-      maxValues: 4, minShape: Math.max(1, Math.round(0.7 / (mm * mm))), floorShape: 1, hold: keepOut,
-      firstFloor: 0.005, firstWhite: 0.002, firstOnly: band, firstLabels: null });
-    clipPlannedRegions(blocked, false, band); clipPlannedRegions(field.layers, true, band);
-    for (const l of field.layers) { l.value = 1 + Math.round((l.value - 1) * (ctx.steps - 1) / Math.max(1, field.steps - 1)); blocked.push(l); }
-    blocked.sort((a, b) => a.value - b.value);
-    for (let i = 0; i < n; i++) if (band[i]) for (let k = 0; k < PLANK; k++) PLAN_DELIVERED[i * PLANK + k] = field.delivered[i * PLANK + k];
-    console.log(`field mix: ${count} warm field cells in ${field.layers.reduce((a, l) => a + l.shapes.length, 0)} premixed shapes`);
-    await sharp(Uint8Array.from(band, v => v * 255), { raw: { width: w, height: h, channels: 1 } }).png().toFile(path.join(out, 'field-mask.png'));
-  } else console.log('field mix: no unowned warm hill band');
 }
 // Back into pan space. A pass planned in mix space is one puddle, so its charge is that puddle's recipe at the pass's
 // own strength; `pigment` stays the puddle's leading pan so the per-pan reports, the drying rule and the trace still
@@ -918,7 +870,7 @@ if(FINISH_FILE){
 const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DRY_VALUE,value:0,fullBoundary:false});if(EARLY_DRY_VALUE&&ctx.AREA_PLAN)throw Error('earlydryvalue supports original numeric boundaries only');
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));ctx.EARLY_DRY_CAPTURED=false;
 Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
-  SMALL, WHITE_HOLD, MIXES, setClip, MOD, DRAGS, DRAG_TARGET, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, MASSP, PUDDLES, 
+  SMALL, WHITE_HOLD, MIXES, setClip, MOD, DRAGS, DRAG_TARGET, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, PUDDLES, 
   FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
   DETAIL_REGION, FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 

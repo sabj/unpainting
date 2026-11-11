@@ -139,7 +139,7 @@ Review has two halves. The finished painting is compared with the target for for
 
 | Stage | Main code | Writes |
 |---|---|---|
-| Plan | `src/crop/` (regions, palette, contours), `src/paint/` ([methods, techniques and tuned settings](techniques.md)) | `plan.jpg` |
+| Plan | `src/crop/` (regions, palette, contours), `src/paint/` ([methods and techniques](techniques.md)) | `plan.jpg` |
 | Prepare | `src/media/paper.mjs`, `src/media/pen.mjs`, `src/paint/methods/pencil-line.mjs` | `ink.jpg`, opening frames |
 | Paint | `src/media/brush.mjs`, `src/media/sheet.mjs`, `src/media/km.mjs` | `painting.png`, `wash.jpg`, frames, animation |
 | Review | `src/eval/`, `tools/judge/`, `tools/guard/` | `target-guard.json`, `cheat-risk.json` |

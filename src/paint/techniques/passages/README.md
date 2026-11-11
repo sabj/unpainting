@@ -2,7 +2,7 @@
 
 A passage is a wash or group of marks with one job. The value ladder is a sequence of paint layers from light to dark.
 
-One module per section of the picture, run by `tools/paint-plate.mjs --passages sea,sand` at the point its `when` names:
+One module per section of the picture, run by `tools/paint-plate.mjs --passages sea,sky` at the point its `when` names:
 `washes` (after the first washes with the broad brush), `shapes` (after the dark shapes, before the value ladder), `finish` (after the ladder).
 
 A module exports `when` and `async paint(ctx)`. SC scales the plan grid; W2 and H2 are the simulation width and height in cells. `ctx` carries the sheet and the plan (`sheet, w, h, n, SC, W2, H2, A`: the sheet, dimensions, scale and planned
