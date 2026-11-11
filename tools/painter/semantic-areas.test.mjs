@@ -3,11 +3,11 @@ import {validateAreaDocument,rasterAreaPlan,compileAreaLayers,semanticTechnique,
 const box=(x0,y0,x1,y1)=>[[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
 const pass=(id,order,valueRange=[1,99])=>({id,order,dependsOn:[],valueRange,move:'wet on dry',edges:{kind:'hard',overlap:true},lights:{mode:'paint-owned',reason:'pale plane still receives pigment'},brush:{widthMm:4,kind:'round',contact:'belly',orientation:'sweep',pressure:[.25,.8,.25]},load:{water:.42,pigmentScale:.8,waterQuantityMm3:120,capacityMm3:160,minRemainingFraction:.15,reload:'before-stroke',rinse:'fresh-brush-per-gesture',blot:'none',concentrationSource:'solver-calibrated'},wetness:{required:'dry',neighborCells:5},stop:{after:'pass',reason:'inspect values'}});
 const fixture=()=>({version:1,coordinateSpace:'normalized-target',target:{path:'target.png',sha256:'a',width:4,height:4},areas:[{id:'scene',parent:null,intent:'connected scene',referenceCue:'broad painted scene',geometry:{polygon:box(0,0,1,1),anchors:[]},drawingRole:'none',passes:[pass('base',0)]},{id:'left',parent:'scene',intent:'pale painted plane',referenceCue:'cool light face',geometry:{polygon:box(0,0,.5,1),anchors:[]},drawingRole:'scaffold',passes:[pass('model',1)]},{id:'right',parent:'scene',intent:'focal form',referenceCue:'dark edge',geometry:{polygon:box(.5,0,1,1),anchors:[]},drawingRole:'focal',passes:[pass('model',2)]}]});
-const plan=d=>rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'a',sourceWidth:4,sourceHeight:4,minAreas:3}),4,4);
-test('hierarchy partitions solver demand without duplicating mass; explicit intent controls move/load/brush',()=>{const p=plan(fixture()),shape={mask:new Uint8Array(16).fill(1),amount:.2,mix:[.2],area:16};let c=compileAreaLayers(p,[{value:1,pigment:0,shapes:[shape]}]);assert.equal(c.layers.length,2);assert.equal(c.layers.reduce((s,l)=>s+l.shapes[0].area*.2,0),3.2);assert.equal(c.diagnostics.allocatedValueCells,16);assert.equal(c.diagnostics.planComplete,true);assert.equal(c.layers[0]._semantic.key,'left/model');let T=semanticTechnique(c.layers[0]._semantic,{name:'wet on wet',water:1});assert.equal(T.name,'wet on dry');assert.equal(T.water,.42);assert.equal(T.intoWet,false);assert.equal(c.layers[0]._semantic.pass.brush.widthMm,4);});
+const plan=d=>rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'a',sourceWidth:4,sourceHeight:4}),4,4);
+test('hierarchy partitions solver demand without duplicating mass; explicit intent controls move/load/brush',()=>{const p=plan(fixture()),shape={mask:new Uint8Array(16).fill(1),amount:.2,mix:[.2],area:16};let c=compileAreaLayers(p,[{value:1,pigment:0,shapes:[shape]}],undefined,{mmPerCell:100});assert.equal(c.layers.length,2);assert.equal(c.layers.reduce((s,l)=>s+l.shapes[0].area*.2,0),3.2);assert.equal(c.diagnostics.allocatedValueCells,16);assert.equal(c.diagnostics.planComplete,true);assert.equal(c.layers[0]._semantic.key,'left/model');let T=semanticTechnique(c.layers[0]._semantic,{name:'wet on wet',water:1});assert.equal(T.name,'wet on dry');assert.equal(T.water,.42);assert.equal(T.intoWet,false);assert.equal(c.layers[0]._semantic.pass.brush.widthMm,4);});
 test('parent bounds and ambiguous sibling ownership fail; explicit occlusion resolves deterministically',()=>{let d=fixture();d.areas[2].geometry.polygon=box(.25,0,1,1);assert.throws(()=>plan(d),/ambiguous sibling/);d.areas[2].geometry.priority=2;d.areas[2].geometry.occlusionReason='foreground occludes left plane';assert.equal(plan(d).owner[1],2);d.areas[0].geometry.polygon=box(0,0,.8,1);assert.throws(()=>plan(d),/outside parent/);});
-test('crop binding retains stable IDs; wrong image or target fails before planning',()=>{let d=fixture();d.view={crop:[0,0,2,4],imageSHA256:'b'};let p=rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'b',sourceWidth:2,sourceHeight:4,minAreas:3}),2,4);assert.equal(p.doc.areas[p.owner[0]].id,'left');assert.throws(()=>validateAreaDocument(d,{targetSHA:'a',imageSHA:'c',sourceWidth:2,sourceHeight:4,minAreas:3}),/cropped input/);assert.throws(()=>validateAreaDocument(d,{targetSHA:'c'}),/target binding/);});
-test('unassigned demand/value and unsupported operations cannot earn planned coverage',()=>{let d=fixture();d.areas[0].geometry.polygon=box(0,0,1,.8);d.areas[1].geometry.polygon=box(0,0,.5,.8);d.areas[2].geometry.polygon=box(.5,0,1,.8);assert.throws(()=>compileAreaLayers(plan(d),[{value:1,shapes:[{mask:new Uint8Array(16).fill(1),amount:1,mix:[1]}]}]),/unassigned/);d=fixture();d.areas[1].passes[0].move='lift';assert.throws(()=>plan(d),/unsupported move/);d=fixture();d.areas[1].passes[0].valueRange=[2,99];assert.throws(()=>compileAreaLayers(plan(d),[{value:1,shapes:[{mask:new Uint8Array(16).fill(1),amount:1,mix:[1]}]}]),/unassigned/);});
+test('crop binding retains stable IDs; wrong image or target fails before planning',()=>{let d=fixture();d.view={crop:[0,0,2,4],imageSHA256:'b'};let p=rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'b',sourceWidth:2,sourceHeight:4}),2,4);assert.equal(p.doc.areas[p.owner[0]].id,'left');assert.throws(()=>validateAreaDocument(d,{targetSHA:'a',imageSHA:'c',sourceWidth:2,sourceHeight:4}),/cropped input/);assert.throws(()=>validateAreaDocument(d,{targetSHA:'c'}),/target binding/);});
+test('unassigned demand/value and unsupported operations cannot earn planned coverage',()=>{let d=fixture();d.areas[0].geometry.polygon=box(0,0,1,.8);d.areas[1].geometry.polygon=box(0,0,.5,.8);d.areas[2].geometry.polygon=box(.5,0,1,.8);assert.throws(()=>compileAreaLayers(plan(d),[{value:1,shapes:[{mask:new Uint8Array(16).fill(1),amount:1,mix:[1]}]}],undefined,{mmPerCell:100}),/unassigned/);d=fixture();d.areas[1].passes[0].move='lift';assert.throws(()=>plan(d),/unsupported move/);d=fixture();d.areas[1].passes[0].valueRange=[2,99];assert.throws(()=>compileAreaLayers(plan(d),[{value:1,shapes:[{mask:new Uint8Array(16).fill(1),amount:1,mix:[1]}]}],undefined,{mmPerCell:100}),/above the value ladder/);});
 test('paper vs painted light and film are distinct; incomplete frisket fails',()=>{let d=fixture();d.areas[1].passes[0].lights={mode:'paper',polygon:box(0,0,.25,.25),reason:'reserve essential paper'};let p=plan(d);assert.equal(p.reserves[0],1);assert.equal(p.film[0],0);d.areas[1].passes[0].lights.mode='film';assert.throws(()=>plan(d),/film lifecycle/);d.areas[1].passes[0].lights.actions={apply:'dry-paper-physical-film',set:'full-strength-established',remove:'dry-paint-physical-lift',afterPasses:['left/model'],revealedEdges:'inspect'};p=plan(d);assert.equal(p.reserves[0],0);assert.equal(p.film[0],1);});
 test('actual function calls are linked to semantic IDs and execution/failure remains distinct from compilation',()=>{let events=[],e=createAreaExecution({emit:r=>events.push(r)}),p=plan(fixture());e.set(p.passes.get('left/model'));let called=0;assert.equal(e.command('stroke',{water:.42},()=>++called),1);assert.equal(events[0].status,'compiled');assert.equal(events[1].status,'executed');assert.equal(events[1].passId,'left/model');assert.throws(()=>e.command('stroke',{},()=>{throw Error('actual gate');}),/actual gate/);assert.equal(events.at(-1).status,'failed');e.set(null);e.command('legacy unassigned',{},()=>0);assert.equal(events.at(-1).semanticPlanned,false);});
 test('material gate rejects stale wet/dry or empty actual brush; drawing role controls admitted physical paths',()=>{let p=plan(fixture()),s=p.passes.get('left/model').pass;assert.equal(semanticMaterialReady(s,{cells:3,dry:false},{water:1,pigment:1}),false);assert.equal(semanticMaterialReady(s,{cells:3,dry:true},{water:1,pigment:0}),false);assert.equal(semanticMaterialReady(s,{cells:3,dry:true},{water:1,pigment:1}),true);let g=[{points:[{x:0,y:0,s:.1},{x:1,y:0,s:.1},{x:2,y:0,s:.8},{x:3,y:0,s:.8}]}];assert.equal(semanticDrawingGroups(p,g,'opening')[0].area.id,'left');assert.equal(semanticDrawingGroups(p,g,'closing')[0].area.id,'right');assert.equal(semanticDrawingGroups(p,g,'opening')[0].gesture.points[0].s,.1);});
@@ -41,15 +41,20 @@ test('semantic soft overlap executes physical pigment outside legacy numerical i
 
 test('explicit metered preparation dose rejects nonphysical quantities',async()=>{const {semanticPreparation}=await import('./semantic-areas.mjs');assert.throws(()=>semanticPreparation({preparation:{flowSteps:60,maxAttempts:3,depositDepthMm:-.1}}),/dose/);assert.throws(()=>semanticPreparation({preparation:{flowSteps:60,maxAttempts:3,depositDepthMm:'0.08'}}),/dose/);});
 
-test('bounded study scope is explicit; complete subjects retain ten-area minimum',()=>{
+test('the area count is an outcome: three areas pass without a scope, an empty plan fails loudly',()=>{
  const d=fixture(), binding={targetSHA:'a',imageSHA:'a',sourceWidth:4,sourceHeight:4};
- assert.throws(()=>validateAreaDocument(d,binding),/10.*areas/);
+ assert.equal(validateAreaDocument(d,binding).areas.size,3);
+ const one=fixture();one.areas=[one.areas[0]];assert.equal(validateAreaDocument(one,binding).areas.size,1);
+ const many=fixture();for(let k=0;k<120;k++)many.areas.push({...structuredClone(many.areas[1]),id:'piece'+k,parent:'left',passes:[{...structuredClone(many.areas[1].passes[0]),id:'p'+k}]});
+ assert.equal(validateAreaDocument(many,binding).areas.size,123);
+ for(const areas of [[],undefined]){const e=fixture();e.areas=areas;assert.throws(()=>validateAreaDocument(e,binding),/empty plan/);}
  d.scope={kind:'single-subject-study',subject:'one tree',reason:'isolate first canopy and dry branch instructions'};
  assert.equal(validateAreaDocument(d,binding).areas.size,3);
  d.scope.kind='whole-subject';
- assert.throws(()=>validateAreaDocument(d,binding),/scope|10.*areas/);
+ assert.throws(()=>validateAreaDocument(d,binding),/scope/);
  d.scope={kind:'single-subject-study',subject:'',reason:'bounded'};
  assert.throws(()=>validateAreaDocument(d,binding),/subject/);
+ assert.throws(()=>validateAreaDocument(fixture(),{...binding,minAreas:1,maxAreas:1}),/1–1 areas/);
 });
 
 test('semantic explicit native tuft model is consumed; unsupported contact cannot silently default',()=>{
@@ -70,7 +75,7 @@ test('crossing and repeated-loop polygons fail before raster ownership can hide 
 test('explicit unowned background demand stays visible in coverage diagnostics',()=>{
  const d=fixture();d.areas[2].geometry.polygon=box(.5,0,.75,1);d.areas[0].geometry.polygon=box(0,0,.75,1);
  d.allowedUnassigned=[{polygon:box(0,0,1,1),reason:'unowned external source paper'}];
- const c=compileAreaLayers(plan(d),[{value:1,shapes:[{mask:new Uint8Array(16).fill(1),amount:.2,mix:[.2]}]}]);
+ const c=compileAreaLayers(plan(d),[{value:1,shapes:[{mask:new Uint8Array(16).fill(1),amount:.2,mix:[.2]}]}],undefined,{mmPerCell:100});
  assert.equal(c.diagnostics.allowedUnassignedValueCells,4);
  assert.deepEqual(c.diagnostics.allowedUnassignedCellIndices,[3,7,11,15]);
  assert.ok(c.diagnostics.allowedUnassignedDemandMass>0);
@@ -155,4 +160,20 @@ test('a pass may name surface marks from the technique library: wet on dry or dr
   d = fixture(); d.areas[1].passes[0].marks = { ...marks, kind: 'feathers' }; assert.throws(() => plan(d), /marks.kind/);
   d = fixture(); d.areas[1].passes[0].marks = { kind: 'short-coat', reason: 'smooth coat', cover: 0.5, placement: 'edge' }; assert.throws(() => plan(d), /flow/);
   d = fixture(); d.areas[1].passes[0].move = 'wet on wet'; d.areas[1].passes[0].marks = marks; assert.throws(() => plan(d), /wet on dry or dry brush/);
+});
+
+test('one wash per pass: the ladder pieces in an area and value range become one shape holding all their paint',()=>{
+ const p=plan(fixture()),piece=(cells,mix)=>{const m=new Uint8Array(16);for(const i of cells)m[i]=1;return {mask:m,amount:mix.reduce((a,b)=>a+b,0),mix,area:cells.length};};
+ // three small pieces of value 1 and one of value 2 in the left area (columns 0-1), in two pigments
+ const layers=[{value:1,pigment:0,shapes:[piece([0,4],[.2,0]),piece([8],[.1,0]),piece([13,12],[0,.3])]},{value:2,pigment:1,shapes:[piece([4,8],[0,.4])]}];
+ const c=compileAreaLayers(p,layers,undefined,{mmPerCell:100}),left=c.layers.filter(l=>l._semantic.key==='left/model');
+ assert.equal(left.length,1);const sh=left[0].shapes[0];assert.equal(sh.area,5);
+ const mass=k=>layers.flatMap(l=>l.shapes).reduce((s,x)=>s+x.mix[k]*x.area,0);
+ for(const k of [0,1])assert.ok(Math.abs(sh.mix[k]*sh.area-mass(k))<1e-12,`pigment ${k}`);
+ assert.equal(c.diagnostics.passes.find(q=>q.id==='left/model').ladderPieces,4);
+});
+
+test('a pass whose value range lies above the ladder is a plan error, said loudly',()=>{
+ const d=fixture();d.areas[1].passes[0].valueRange=[3,9];
+ assert.throws(()=>compileAreaLayers(plan(d),[{value:1,pigment:0,shapes:[{mask:new Uint8Array(16).fill(1),amount:.2,mix:[.2],area:16}]},{value:2,pigment:0,shapes:[]}],undefined,{mmPerCell:100}),/above the value ladder \(values 1-2 on this run\): left\/model/);
 });

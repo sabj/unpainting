@@ -22,6 +22,14 @@ import { paperPlanes } from './paper-planes.mjs';
 import { mergeOf } from '../brush.mjs';
 import { deviceHealth, brokenReason, assertHealthy, markBroken } from './device-health.mjs';
 import { cpuFallbackWarning } from './backend-record.mjs';
+// one float32 step relative to 1 (2^-23): the rounding a GPU value read back as float32 can carry
+const F32_STEP = 2 ** -23;
+/** A paint or water amount read back from the GPU: within one float32 step of zero (relative to what the brush can hold) it is zero; further below zero is a fault. */
+export function readbackAmount(v, capacity, what) {
+  const floor = -F32_STEP * Math.max(1, capacity);
+  if (!(v >= floor)) throw new Error(`GPU brush readback: ${what} ${v} is below zero by more than float32 rounding (${floor})`);
+  return v < 0 ? 0 : v;
+}
 
 const PLANES = K => 4 + 3 * K;
 // DOWN_TRACE=1: count rectangle reads by caller, printed at exit
@@ -545,8 +553,11 @@ export class GpuLink {
       return;
     }
     if (p.hairs) {   // not when the brush has been dipped since: the hairs are the dip's
-      for (let j = 0; j < lanes; j++) { const hr = brush.hairs[j], b = o + H0 + j * HS; hr.water = R[b]; for (let k = 0; k < K; k++) hr.pig[k] = R[b + 4 + k]; }
-      const bb = o + H0 + lanes * HS; brush.resW = R[bb]; for (let k = 0; k < K; k++) brush.resP[k] = R[bb + 4 + k];
+      // float32 rounding can leave a hair a hair's-breadth below empty (seen: -1e-10); within one float32 step of what
+      // the brush can hold (2^-23 x its capacity) that is zero, and anything further below is a real fault and stops
+      const read = (v, what) => readbackAmount(v, brush.capacity, what);
+      for (let j = 0; j < lanes; j++) { const hr = brush.hairs[j], b = o + H0 + j * HS; hr.water = read(R[b], 'hair water'); for (let k = 0; k < K; k++) hr.pig[k] = read(R[b + 4 + k], 'hair pigment'); }
+      const bb = o + H0 + lanes * HS; brush.resW = read(R[bb], 'belly water'); for (let k = 0; k < K; k++) brush.resP[k] = read(R[bb + 4 + k], 'belly pigment');
     }
     brush.rs.s = RU[o + 23] | (RU[o + 22] << 16);
     brush._pend = null; this.owners[slot] = null; this.stats.settleMs = (this.stats.settleMs || 0) + performance.now() - t0;
