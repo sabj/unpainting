@@ -191,7 +191,6 @@ The default recipe sets `--drawing first`: the drawing goes down first and dries
 | `first` (default) | pencil, or ink if asked | nothing; an ink finish stage or a plan's `closingLines` switches to `both` |
 | `last` | nothing | ink |
 | `none` | nothing | nothing |
-| `detect` | the drawing, if the target shows pen line (`--penfirst`) | ink, if it does not |
 
 Each image run writes `ink.jpg` and `wash.jpg` next to `painting.jpg`.
 

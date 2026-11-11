@@ -16,7 +16,7 @@ Each image example needs an empty output folder. On a repeat run, move the previ
 
 The image planner is experimental. The stroke plan is the small, reproducible demonstration of brushwork and drying. The paintings in the README come from separate whole-painting plans; see [Painting sequences](examples.md).
 
-The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--inkrecipe wash` draws a pen-and-wash drawing ([Ink](ink.md#pen-and-wash-ink)); it is off by default. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none|detect` sets the order.
+The default recipe, a preset of painter settings, opens with a light pencil drawing and has no closing pen. `--inkrecipe wash` draws a pen-and-wash drawing ([Ink](ink.md#pen-and-wash-ink)); it is off by default. `--outlinemedium ink|graphite|auto` sets the medium; `auto` picks ink when the target shows its own pen line (0.5% of cells or more, `--penfirst`). `--drawing first|last|both|none` sets the order.
 
 Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
 
@@ -74,7 +74,7 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
 | `--valueplan` | JSON path; see [plan-format.md](plan-format.md#value-plan-input) | none | none |
 | `--areaplan` | JSON path; `--areahelp` prints its contract | none | none |
-| `--drawing` | `first`, `last`, `both`, `none`, `detect` | `first` | `first` |
+| `--drawing` | `first`, `last`, `both`, `none` | `first` | `first` |
 | `--outlinemedium` | `auto`, `ink`, `graphite`, or a material profile name | `graphite` | same; plan may override |
 | `--drawingstages` | `auto`, `off`: per-image pencil and ink stages when there is no prepared drawing | `auto` | same |
 | `--inkprofile` | `sepia-ink`, `black-ink` | style ink or sepia | same; plan may override |

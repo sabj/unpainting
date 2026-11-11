@@ -710,10 +710,10 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(ctx.SRC, w, h, gaussian,
 const SEP = (await cachedStep({...RUN_CACHE,name:'separator',code:codeHash(root,[],{dependencies:['src/crop/inkwash.mjs']}),track:optTrack,inputs:{PX_SOURCE,w,h,paperRGB}},async()=>separate(PX_SOURCE,w,h,paperRGB))).value;
 // the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
 if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
-// The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source, --drawing detect): one
+// The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source): one
 // reading at 1200 px wide (pen-share.mjs), so --width does not change what is pen. SEP is at the run's grid.
 // A run with a graphite outline, no line source and no ink plan never asks, so it skips the extra reading.
-const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || opt('linesource', 'none') !== 'none' || opt('drawing', 'first') === 'detect' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
+const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || opt('linesource', 'none') !== 'none' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
 const PEN_SHARE = PEN_ASKED && fs.existsSync(path.resolve(root, opt('image', ''))) ? await sourcePenShare({ image: path.resolve(root, opt('image', '')), sharp }) : SEP.stats.ink / n;
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
@@ -812,8 +812,7 @@ const INK={...INK_PROFILE.pigment,omega:INK_FAST?60:INK_PROFILE.pigment.omega,K:
 console.log('drawing material profiles:',JSON.stringify({ink:{...INK_PROFILE,pigment:INK,rewets:INK.omega<60},graphite:GRAPHITE_PROFILE}));
 // --outlinemedium graphite: pen-first outlines in pencil, not ink; graphite is a neutral grey, waterproof and light.
 // only on a sheet that will be drawn first (the same test as PEN_FIRST below), so a sheet washed first carries no unused pigment
-const DRAWS_FIRST = opt('prep', '0') !== '0' || ['first', 'both'].includes(opt('drawing', 'first'))
-  || (opt('drawing', 'first') === 'detect' && num('penfirst', 0.5) > 0 && Math.max(100 * PEN_SHARE, 100 * num('drawfloor', 0)) >= num('penfirst', 0.5));
+const DRAWS_FIRST = opt('prep', '0') !== '0' || ['first', 'both'].includes(opt('drawing', 'first'));
 // --penpencil <stage.png>: the opening drawing in dry pencil, coloured as the target stage's line (pencil-line.mjs)
 const PENCIL = opt('penpencil', '') && DRAWS_FIRST ? await (async () => {
   const m = await measureLine({ file: path.resolve(root, opt('penpencil', '')), w, h, sharp, cut: num('pencilcut', 12), log: console.log });

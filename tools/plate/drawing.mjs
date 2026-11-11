@@ -175,20 +175,18 @@ const upF = f => { if (SC === 1) return f; const m = new Float32Array(N2); for (
 const used = {};
 const TECHS = [], LAST = new Uint8Array(n);
 // --feedback: charge later passes for what the sheet lacks of each pigment, read once per pass, not what the ledger booked.
-// --drawing first|detect|last|both|none: order of the line. first (default) draws in --outlinemedium, lets it dry, then washes.
-// detect: draw first only if the source shows --penfirst per cent of line (default 0.5), else ink at the end. last: wash, then ink.
+// --drawing first|last|both|none: order of the line. first (default) draws in --outlinemedium, lets it dry, then washes.
+// last: wash, then ink.
 // both: draw first, wash, ink again. none: no line.
 // --prep 1: a full preparatory drawing: no ink budget, a lower floor so fainter contours are found, and the outline pass.
 const PREP = opt('prep', '0') !== '0'; ctx.PREP = PREP;
-const DRAWING = PREP && opt('drawing', 'first') === 'detect' ? 'first' : opt('drawing', 'first');
-if (!['detect', 'first', 'last', 'both', 'none'].includes(DRAWING)) throw new Error(`--drawing: detect, first, last, both or none, not ${DRAWING}`);
-const PEN_FIRST = DRAWING === 'first' || DRAWING === 'both' ? true
-  : DRAWING === 'last' || DRAWING === 'none' ? false
-  : num('penfirst', 0.5) > 0 && 100 * SOURCE_INK >= num('penfirst', 0.5); ctx.PEN_FIRST = PEN_FIRST;
+const DRAWING = opt('drawing', 'first');
+if (!['first', 'last', 'both', 'none'].includes(DRAWING)) throw new Error(`--drawing: first, last, both or none, not ${DRAWING}`);
+const PEN_FIRST = DRAWING === 'first' || DRAWING === 'both'; ctx.PEN_FIRST = PEN_FIRST;
 // `both` runs the closing pass as well, which a pen-first sheet otherwise skips
-const DRAW_LAST = DRAWING === 'both' || DRAWING === 'last' || (DRAWING === 'detect' && !PEN_FIRST); ctx.DRAW_LAST = DRAW_LAST;
+const DRAW_LAST = DRAWING === 'both' || DRAWING === 'last'; ctx.DRAW_LAST = DRAW_LAST;
 if (PREP) console.log(`prep: a full preparatory drawing in ${OUTLINE_MEDIUM}, every contour before any paint`);
-if (DRAWING !== 'detect') console.log(`drawing order: ${DRAWING}${DRAWING === 'none' ? '' : ` in ${OUTLINE_MEDIUM}`}, set by --drawing`);
+console.log(`drawing order: ${DRAWING}${DRAWING === 'none' ? '' : ` in ${OUTLINE_MEDIUM}`}, set by --drawing`);
 // The pen's drawing, planned before the first mark.
 const PEN_PLANS = {};
 if (opt('draw', '1') !== '0') {
