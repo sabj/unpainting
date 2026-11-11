@@ -82,10 +82,10 @@ export function renderTask({ round, n, tries, spec, strictVerdict = false, profi
 }
 
 /** The model's worktree: the brief, the target, the check and paint commands, the skills, the tools and the example. */
-function seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile }) {
+function seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile }) {
   const b = path.join(ws, 'bench');
   for (const d of ['plan', 'paint-io', 'looks', 'tools']) fs.mkdirSync(path.join(b, d), { recursive: true });
-  fs.copyFileSync(path.join(V2, 'targets', `${crop}.png`), path.join(b, 'plan', 'target.png'));
+  fs.copyFileSync(target, path.join(b, 'plan', 'target.png'));
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
   fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile }));
   for (const f of ['check.sh', 'TOKENS.md', 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
@@ -128,13 +128,17 @@ function previousTry({ outRoot, round, model, n, crop }) {
 async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile }) {
   const raw = path.join(rawTry, crop);
   fs.mkdirSync(raw, { recursive: true });
-  const target = path.join(V2, 'targets', `${crop}.png`);
+  const source = path.join(V2, 'targets', `${crop}.png`);
+  const target = dry ? path.join(raw, 'target.png') : source;
   const { ws, scratch, cleanup } = makeWorktree();
   const record = { turns: [], repairTurns: [], tokens: 0, costUSD: 0, wallSeconds: 0, usageComplete: true, costComplete: true, budgetStopped: false };
   const targetStarted = Date.now();
   let session = null;
   try {
-    seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile });
+    // Offline planning, admission and playback share one fixture at the requested
+    // native width; real sessions keep the original source and full render size.
+    if (dry) await sharp(source).resize({ width: spec.width, withoutEnlargement: true }).png().toFile(target);
+    seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile });
     let feedbackFiles = null;
     if (prev) feedbackFiles = await writeFeedback({ dest: path.join(ws, 'bench', 'feedback'), prev, prevRaw: prev.raw, prevOut: prev.out, target });
     session = new PaintSession({ repo: REPO, ws, raw, spec, target, modelMinutes: profile.modelMinutes, gpu, log, planOnly: profile.planOnly });

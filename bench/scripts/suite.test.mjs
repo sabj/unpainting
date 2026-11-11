@@ -8,6 +8,7 @@ import os from 'node:os';
 import sharp from 'sharp';
 import { suitePlan } from './suite.mjs';
 import { benchmarkProfile } from './profiles.mjs';
+import { pngSize } from './pipeline/plan-args.mjs';
 
 test('offline lite completes one plan/check/render with no self-view or repair, keeping stages and compact stroke counts', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lite-e2e-'));
@@ -18,6 +19,7 @@ test('offline lite completes one plan/check/render with no self-view or repair, 
     assert.equal(result.status, 0, result.stderr);
     const r = readJson(path.join(root, 'v4-pipeline', 'dry-run', '1', 'run.json'));
     raw = path.join(BENCH, r.raw);
+    assert.equal(pngSize(path.join(raw, 'hills', 'target.png'))[0], r.settings.paintWidth.hills, 'offline planner and renderer share the native fixture');
     assert.equal(r.settings.benchmarkProfile, 'lite-v1'); assert.equal(r.complete, true);
     assert.equal(r.session.tokens, null); assert.equal(r.session.usageComplete, false);
     const c = r.crops.hills, p = c.pipeline;
