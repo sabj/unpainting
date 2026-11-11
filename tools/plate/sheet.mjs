@@ -421,9 +421,6 @@ fillSheetBase(base, paper.height, TONE_STAGE ? WHITE_PAPER_RGB : paperRGB, SHADE
 const WETRENDER = opt('wetrender', num('wetframes', 0) > 0 ? '1' : '0') !== '0';
 // the white gouache laid last (--smalllights gouache), over the washes and not in them: null until it is laid
 ctx.GOUACHE = null;
-// --wetpolicy (see the technique choice per passage): on, whether the last passage went in wet, and the tally
-const WETPOL = num('wetpolicy', 0) > 0, WETPOL_COUNT = { wet: 0, dry: 0 };
-ctx.WETPOL_WET = false;
 const finishRGB = rgb => {
   if (WETRENDER) {
     coherent(ctx.sheet); // it reads the water, which a sheet on the GPU holds
@@ -799,7 +796,7 @@ if(SEMANTIC_CAL_MODE==='actual'){
 }
 Object.assign(ctx, { dry, dip, productionDip, stroke, pencilDraw, SC, H2, N2, GFLOOR, GCHUNK, CP_MM, paper, PROBE, 
   ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, penDraw, 
-  OUT_W, OUT_H, O, GPU_INFO, base, SHADE, TONE_STAGE, WETPOL, WETPOL_COUNT, render, LOOK_RES, view, renderFine, 
+  OUT_W, OUT_H, O, GPU_INFO, base, SHADE, TONE_STAGE, render, LOOK_RES, view, renderFine, 
   colourTrace, traceBox, traceCells, BRUSH, UPRIGHT, highlights, expected, DELIVERY, DCAL, TECH_CAL, TCAL, 
   sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, WET, MIX, 
   washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL });

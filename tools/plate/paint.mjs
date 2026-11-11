@@ -70,11 +70,11 @@ const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTra
   SPEED_COVERAGE, measurePaper, liftResist, FRAME_POLICY, SPEED_PROFILE, root, out, RUN_CACHE, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_COUNTS, SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, 
   NUMERIC_TUFT_CAL, TARGET_GUARD, paintingLook, w, h, n, createBrush, candidateContact, paperRGB, 
-  planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, FIG_MASK, GOUACHE_LIGHTS, setClip, MOD, MASS_BUDGET, 
+  planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, GOUACHE_LIGHTS, setClip, MOD, MASS_BUDGET, 
   COLOUR_TRACE, PUDDLES, FIRST_FLOOR, AUTHORED_INPUT, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, CURLS, 
   DETAIL_REGION, FINISH, FUR_FIELD, SHEET_PIGS, FINISH_FILE, AREA_FILE, AREA_COMPLETED, AREA_EXEC, EARLY_DRY_VALUE, 
   dry, dip, productionDip, stroke, SC, W2, H2, N2, PB, GFLOOR, GCHUNK, PAPER_OPTS, PROBE, INKRES, OUT_W, OUT_H, O, 
-  GPU_INFO, WETPOL, WETPOL_COUNT, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
+  GPU_INFO, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
   expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, 
   WET, MIX, washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL, FRAMES, snap, MARKTAPE, 
   AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PENWASH, LOOK_AL, 
@@ -237,7 +237,7 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, provenanceHistory: ctx.PROVENANCE_HISTORY, inkres: INKRES?.exportState()??null, prepf: PREPF, sheet: sheetFields, layersLength: ctx.layers.length, tailFrom, tail,
-    js: { framePolicy: FRAME_POLICY.state(), laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, FRAMES, marks, lastPainted: ctx.lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: new Set(ctx.VALUE_OWN_CONTACT), VALUE_PIGMENT_CONTACT: new Set(ctx.VALUE_PIGMENT_CONTACT), VALUE_COMMAND: ctx.VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, colourTrace, WETPOL_WET: ctx.WETPOL_WET, WASH_BASE: ctx.WASH_BASE },
+    js: { framePolicy: FRAME_POLICY.state(), laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, FRAMES, marks, lastPainted: ctx.lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: new Set(ctx.VALUE_OWN_CONTACT), VALUE_PIGMENT_CONTACT: new Set(ctx.VALUE_PIGMENT_CONTACT), VALUE_COMMAND: ctx.VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, colourTrace, WASH_BASE: ctx.WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state, awareProvenance(state.guard.looks.count));
@@ -278,7 +278,7 @@ const awareRestore = () => {
   }
   const j = st.js;
   FRAME_POLICY.restore(j.framePolicy);
-  ({ laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, lastPainted: ctx.lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: ctx.VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT: ctx.VALUE_PIGMENT_CONTACT, VALUE_COMMAND: ctx.VALUE_COMMAND, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, WETPOL_WET: ctx.WETPOL_WET, WASH_BASE: ctx.WASH_BASE } = j);
+  ({ laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, lastPainted: ctx.lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: ctx.VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT: ctx.VALUE_PIGMENT_CONTACT, VALUE_COMMAND: ctx.VALUE_COMMAND, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, WASH_BASE: ctx.WASH_BASE } = j);
   ctx.VALUE_OWN_CONTACT = new EpochCells(N2, ctx.VALUE_OWN_CONTACT);
   ctx.VALUE_PIGMENT_CONTACT = new EpochCells(N2, ctx.VALUE_PIGMENT_CONTACT);
   const refill = (a, b) => { a.length = 0; for (const v of b) a.push(v); };
@@ -379,56 +379,16 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   let MASK = sh.mask;
   const MB = sh._mbox = sh.box ?? sh._mbox ?? maskBox(MASK); // the loops below (and the ledger update that follows the pass) stay inside the passage's rows and columns
   if (process.env.FW_DUMP && L < num('dumppasses', 3)) { const g = Buffer.alloc(n), bm = brushMask(sh); for (let i = 0; i < n; i++) g[i] = MASK[i] ? 255 : bm[i] ? 128 : 0; fs.mkdirSync(process.env.FW_DUMP, { recursive: true }); await sharp(g, { raw: { width: w, height: h, channels: 1 } }).png().toFile(path.join(process.env.FW_DUMP, `L${L + 1}-v${layer.value}-p${layer.pigment}-s${layer.shapes.indexOf(sh)}.png`)); }
-  let figureShare = 0;
-  if (FIG_MASK) {
-    let total = 0, subject = 0;
-    for (let y = MB.y0; y <= MB.y1; y++) for (let x = MB.x0; x <= MB.x1; x++) {
-      const i = y * w + x; if (MASK[i]) { total++; subject += FIG_MASK[i]; }
-    }
-    figureShare = subject / Math.max(1, total);
-  }
-  const FIGURE_SHAPE = FIG_MASK && figureShare >= num('figureshare', 0.25);
   // --trace: every pigment's mass on the sheet before the passage, so a mixed passage is counted whole
   const TRACE_MASS = opt('trace', '0') !== '0' ? thicknessTotals(ctx.sheet) : null;
-  // what this passage asks for, read off the source inside it (techniqueOf, above)
-  let T = NATIVE_PAINT_MODE.mode==='fast'&&sh._valuePlan&&!WETPOL&&!MAJOR_INTENT&&!sh._semantic ? valueTechnique(sh._valuePlan) : techniqueOf(sh);
-  if (num('masswet',0)>0 && MASS_BUDGET?.owns(MASK, MB)) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
-  // --gradedwet (default on under --gradedwash): a graded wash goes in wet on wet unless its passage was dragged.
-  if (sh.graded && !sh._follow && opt('gradedwet', '1') !== '0' && T.name !== 'wet on wet' && T.name !== 'dry brush') T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
-  // --subjlocal: the subject's local-colour first wash goes in wet on wet, so its regions blend at their borders
-  if (sh._wow) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
-  // --firstwet 1: every first-value passage goes in wet on wet; later values keep their own technique. Default 0.
-  if (num('firstwet', 0) > 0 && layer.value <= 1) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
-  // the broad first wash (--firstfloor) goes in wet on wet unless --firstwashwet 0: wet on dry at its pale strength it lands as dots
-  const FIRSTWET = !sh._valuePlan && sh.firstWash && opt('firstwashwet', '1') !== '0';
-  if (FIRSTWET) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
-  // --wetpolicy 1: wet in wet per passage: first wash, light values (--wetlight 0.2), or large soft blends (--wetbig 0.03 of the sheet).
-  // Others go on dry paper; under --wetmin 0.004 never wet; a dry passage after wet ones waits for the dry. Replaces --prewet.
-  if (WETPOL) {
-    const thr = (layer.value - 1) / Math.max(1, ctx.steps - 1), area = sh.area ?? 0;
-    const small = area < num('wetmin', 0.004) * n, big = area >= num('wetbig', 0.03) * n;
-    // a passage mostly on the figure (over --wetsubject 0.25 of its cells in the fw subject mask) never goes wet
-    let onSubject = 0;
-    if (FW_SUBJ) { const b = sh.box; let c = 0, s = 0; if (b) { for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) { const i = y * w + x; if (MASK[i]) { c++; s += FW_SUBJ[i] > 0.5 ? 1 : 0; } } } else { for (let i = 0; i < n; i++) if (MASK[i]) { c++; s += FW_SUBJ[i] > 0.5 ? 1 : 0; } } onSubject = c ? s / c : 0; }
-    const wet = !small && onSubject <= num('wetsubject', 0.25) && (layer.value <= 1 || thr <= num('wetlight', 0.2) || !!(sh.graded && !sh._follow) || (big && T.name === 'wet on wet'));
-    if (wet) T = { ...T, name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 };
-    else if (T.name === 'wet on wet') T = { ...T, name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true };
-    if (!wet && ctx.WETPOL_WET) clock('dry', () => dry(ctx.sheet, 20000, O, { levelMax: 200 }));
-    ctx.WETPOL_WET = wet;
-    WETPOL_COUNT[wet ? 'wet' : 'dry']++;
-  }
-  // --nowow: a probe switch; wet on wet laid as wet on dry, to see what the standing water does to a sheet's lights
-  if (opt('nowow', '0') !== '0' && T.name === 'wet on wet') T = { ...T, name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true };
-  // --nowowpart prewet|dry|load: one factor of --nowow alone; the name stays wet on wet and the charge stays the stock wet-on-wet swatch's.
-  { const part = opt('nowowpart', ''); if (part && T.name === 'wet on wet') T = { ...(part === 'prewet' ? { ...T, intoWet: false } : part === 'dry' ? { ...T, dryAfter: true } : part === 'load' ? { ...T, water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2 } : T), stockSwatch: true }; }
-  // A hard figure shape must not inherit a wet-in-wet classification from the
-  // source's texture. Keep the broad opening wash soft; subsequent shapes dry.
-  if (FIGURE_SHAPE && !sh.firstWash && num('figuredry', 1) > 0 && T.intoWet)
-    T = { ...T, name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, dryAfter: true };
+  // The plan's move is final: an area pass's move (semanticTechnique below) or a value plan's (valueTechnique); only a
+  // passage no plan wrote takes the technique read off the source (techniqueOf, the automatic ladder). No switch
+  // replaces a planned move.
+  let T = sh._semantic ? {} : sh._valuePlan ? valueTechnique(sh._valuePlan) : techniqueOf(sh);
   if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation')clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));}
   T=chooseMajorBaseWash(MAJOR_INTENT,T,{value:layer.value,area:sh.area??0,cells:n,semantic:Boolean(sh._semantic)});
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
-  if(sh._valuePlan){T=valueTechnique(sh._valuePlan);ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=((WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer))))||(num('charge',0)>0&&ctx.WASH_LAST&&ctx.WASH_LAST.L!==L&&sameCharge(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  if(sh._valuePlan){if(!sh._semantic)T=valueTechnique(sh._valuePlan);ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=((WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer))))||(num('charge',0)>0&&ctx.WASH_LAST&&ctx.WASH_LAST.L!==L&&sameCharge(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
   // one passage for the dry-paper gate: its reach is looked over once, before its first lane (passage-dry-gate.mjs)
   ctx.VALUE_PASSAGE = sh._valuePlan ? {} : null;
@@ -436,11 +396,6 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   const ICAL = instrumentOf(T, sh);
   sh.dryAfter = T.dryAfter;
   ctx.MAJOR_TECHNIQUE=MAJOR_INTENT?{...T,shapeId:'numeric-L'+L+'-S'+layer.shapes.indexOf(sh),numericalValue:layer.value,shapeArea:sh.area,firstWash:Boolean(sh.firstWash),materialStatus:'existing production technique/profile consumed; actual contact/state recorded before each stroke'}:null;
-  // --dryeach 1: dry the sheet before every passage not meant to go into wet, so each shape keeps a hard edge. Default 0.
-  if (num('dryeach', 0) > 0 && !T.intoWet) clock('dry', () => dry(ctx.sheet, 20000, O, { levelMax: num('dryeachlevel', 200) }));
-  // --figurelayers (--figuredry 0 turns only this off): the same dry for passages with --figureshare of their cells on the figure.
-  else if (FIGURE_SHAPE && num('figuredry', 1) > 0 && !T.intoWet)
-    clock('dry', () => dry(ctx.sheet, 20000, O, { levelMax: num('dryeachlevel', 200) }));
   // One shape-level look per passage (TARGET_GUARD.look) gives plan and sheet means; the charge comes from their difference.
   // SHAPE_LOAD spreads that one number over the shape for path planners that take a field; it steers nothing.
   const colourMix = sh.mix.filter(v=>v>1e-9).length>1 ? shapeMix(sh) : COLOUR_BUDGET && PUDDLES ? sh.mix.map(v=>v/Math.max(1e-9,sh.amount)) : layer.mixv;
@@ -692,12 +647,12 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // --splwet: optional dampening for stroke lanes. A value plan controls its own wet/dry technique;
   // do not silently prewet its dry-base glazes. Explicit --splwet 1 still prepares a connected wet bed.
   let wetEachLane = null;
-  if (!BUDGET && !sh._semantic&&(T.intoWet || (!WETPOL && (opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', sh._valuePlan ? 0 : 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
+  if (!BUDGET && !sh._semantic&&(T.intoWet || ((opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', sh._valuePlan ? 0 : 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
     // --gradedprewet s: a graded wash's clean water reaches s of the short side past it onto equally pale paper. Default 0.03.
     const reach = sh.graded && !sh._follow ? Math.round(num('gradedprewet', 0.03) * Math.min(w, h)) : 0;
     // --prewetinset k: wet the shape shrunk by k cells at 540 px, not its paths, so its edge lands on dry paper. Default 0.
-    // --prewetwater: the water brush's load (default 1). The first wash under --firstwet is wetted over its whole shape.
-    const INSET = WETPOL || (num('firstwet', 0) > 0 && layer.value <= 1) || (sh.firstWash && opt('firstwashwet', '1') !== '0') ? 0 : num('prewetinset', 0), insetCells = INSET > 0 ? Math.max(1, Math.round(INSET * w / 540)) : 0;
+    // --prewetwater: the water brush's load (default 1).
+    const INSET = num('prewetinset', 0), insetCells = INSET > 0 ? Math.max(1, Math.round(INSET * w / 540)) : 0;
     const wetOver = reach > 0
       ? (() => { const M = up(sh._prewet ?? MASK); return containPaths(brushedWashPaths(M, W2, H2, { pad: 1.5 * SC, minRadius: SC, minLength: 3 * SC, maxRadius: BRUSH, seed: 17 + ctx.laid + SEED, overlap: num('overlap', 0.15), walk: false, angle: gradedAngle }), distanceToZero(M, W2, H2), W2, H2, { minRadius: 0.8 * SC, minLength: 2 * SC, slack: num('slack', 0.5) * SC, segments: FW }); })()
       : insetCells > 0

@@ -173,9 +173,8 @@ if (STYLE > 0) {
 // --planmasses r: plan from big shapes, an edge-preserving mean over r cells at 540 px, scaled with width (massesOf). Plan only.
 // --planmassrange: how far apart two values may be and still count as one mass. Not --masses (the mop washes).
 const PLAN_MASSES = num('planmasses', 0), PM_R = Math.max(1, Math.round(PLAN_MASSES * w / 540));
-// --figurelayers 1: paint the figure mask (--fwmask, required) in a few layers, drying before its hard-edged shapes.
+// --figurelayers 1: paint the figure mask (--fwmask, required) in a few layers.
 // On the mask: plan massed over --figuremassr cells (default 2); optional --figurefollow, --figurecap 6, --figurefloor 0.25.
-// The sheet dries before passages with --figureshare (default 0.25) of their cells on the figure; --figuredry 0 turns that off.
 const FIG_LAYERS = num('figurelayers', 0) > 0;
 const FIG_MASK = FIG_LAYERS && opt('fwmask', '') ? Uint8Array.from(await sharp(path.resolve(root, opt('fwmask', ''))).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer(), v => (v >= 128 ? 1 : 0)) : null;
 if (FIG_LAYERS && !FIG_MASK) console.log('figure layers: no --fwmask, the flag does nothing');
@@ -555,7 +554,7 @@ const reportTechniques = () => {
   for (const [name, u] of rows) console.log(`  ${name.padEnd(18)}${String(u.n).padStart(5)} passages${(100 * u.area / area).toFixed(1).padStart(7)}% of area`);
 };
 // --gradedwash 0|1: lay a smooth gradient as one graded wash, not a staircase of flat values that dry with rims. Default 1.
-// Soft passages fold into their pigment's host (gradeSmoothPassages), laid wet on wet: see --gradedwet, --gradedchunk, --gradedshare, --gradedprewet.
+// Soft passages fold into their pigment's host (gradeSmoothPassages), see --gradedchunk, --gradedshare, --gradedprewet.
 // --gradedsmooth s: fold only where the source's mean departure from its 1.6-cell blur is under s. Default 0.008.
 const SMOOTH = (() => {
   if (opt('gradedwash', '1') === '0') return null;

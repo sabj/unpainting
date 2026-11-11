@@ -118,7 +118,7 @@ Each shape gets a technique chosen from what the subject shows there.
 - Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (a wet-into-wet swatch's bed is wetted with the sheet's own clean brushes, pickup and wait, `tools/painter/wet-bed-prep.mjs`) (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`).
 - Index of every module and flag: [methods and techniques](techniques.md).
 
-The rule for choosing, in painter terms: joined wash or wet in wet for large soft areas and soft transitions; wet on dry for crisp edges and layered glazes; dry brush for broken texture. Wet on dry and dry brush are good techniques. The job is the right one per shape, not making everything wet. The choice is made in the plan (area-plan passes name the move) and logged per shape.
+The rule for choosing, in painter terms: joined wash or wet in wet for large soft areas and soft transitions; wet on dry for crisp edges and layered glazes; dry brush for broken texture. Wet on dry and dry brush are good techniques. The job is the right one per shape, not making everything wet. The choice is made in the plan (area-plan passes name the move, value-plan families their base move) and logged per shape. The paint step lays that move as written: no switch replaces it, and a value plan's technique never overrides an area pass. The source's technique reading (`src/crop/technique.mjs`) runs only for passages no plan wrote (the automatic ladder).
 
 **Inputs:** the shape, what the target shows there (read while planning). **Outputs:** a move, brush, load and edge treatment per passage.
 **Controls:** area-plan `moves`; value-plan `baseMove`; `--passages`, `--shapedmarks`.

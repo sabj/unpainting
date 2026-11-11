@@ -42,12 +42,12 @@ import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
 export async function drawing(ctx) {
-const { JSONL, opt, num, NATIVE_PAINT_MODE, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
+const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
   VALUE_CONFIG, VALUE_ENABLED, MAJOR_INTENT, phaseMark, PX_RAW, TARGET_GUARD, w, h, n, createBrush, 
   ANCHORS, paperRGB, PIGS, COLOUR_BUDGET, LIGHT_CELLS, SMALL, setClip, MOD, FIRST_FLOOR, TECHNIQUE, techniqueOf, SEP, 
   PREP_ERASE, STAGE_PLAN, STYLE_ON, INKLOAD, OUTLINE_MEDIUM, INK, PENCIL, PENCIL_STAGE, GRAPHITE, SHEET_PIGS, 
   GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_EXEC, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
-  PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, WETPOL, render, view, BRUSH, UPRIGHT, 
+  PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, render, view, BRUSH, UPRIGHT, 
   highlights, expected, sheetDensity, drainFrames, mark, WET, CAL, snap, shoot, FILM_BY_PAINT, PEN_FRAMES, 
   PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, ML_LINES, planPen } = ctx;
 Object.assign(ctx, { drawPass });
@@ -209,7 +209,8 @@ const SKY_WARM_RB = opt('skywarm', '') !== '' ? sealAtBirth(TARGET_GUARD, 'SKY_W
 // each passage's technique, read off the source inside it, is chosen here for the whole plan (planning, before the
 // first mark), not when the brush reaches it
 for (const L2 of ctx.layers) for (const sh of L2.shapes) {
-  if (!(NATIVE_PAINT_MODE.mode==='fast'&&sh._valuePlan&&!WETPOL&&!MAJOR_INTENT&&!sh._semantic) && sh.mask) techniqueOf(sh);
+  // the source's technique is read only for passages no plan wrote (the automatic ladder)
+  if (!sh._valuePlan && !sh._semantic && sh.mask) techniqueOf(sh);
   // Label-backed passages rebuild the same mask on demand. Keeping every expanded
   // mask here costs one full sheet per shape, even before the first stroke.
   if (sh.ids) dropMask(sh);

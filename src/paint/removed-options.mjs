@@ -4,7 +4,9 @@
 // setting had acted.
 const SUBJECT_WASH = 'subject washes (SAM subjects cut into wash groups) were off by default and no plan reached them; the plan\'s areas or families say what is one wash';
 const DEEP_ACCENT = 'the deep accents restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks';
+const PLAN_MOVE = 'the plan\'s move is final: this switch replaced a passage\'s planned technique (wet on wet, wet on dry, dry brush) or dried the sheet between passages by a rule of its own';
 export const REMOVED_OPTIONS = Object.freeze({
+  ...Object.fromEntries(['masswet', 'gradedwet', 'firstwet', 'firstwashwet', 'wetpolicy', 'wetlight', 'wetbig', 'wetmin', 'wetsubject', 'figuredry', 'nowow', 'nowowpart', 'dryeach', 'dryeachlevel'].map(k => [k, PLAN_MOVE])),
   subjectwash: SUBJECT_WASH, subjectform: SUBJECT_WASH, subjectbands: SUBJECT_WASH, subjectk: SUBJECT_WASH, subjectsplit: SUBJECT_WASH,
   subjectedge: SUBJECT_WASH, subjectmean: SUBJECT_WASH, subjectvalue: SUBJECT_WASH, subjectchroma: SUBJECT_WASH,
   subjectlights: SUBJECT_WASH, subjectlightgap: SUBJECT_WASH,

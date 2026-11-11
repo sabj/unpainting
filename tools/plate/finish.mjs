@@ -41,7 +41,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   LIGHT_SHARE, MOD, COLOUR_TRACE, reportTechniques, CURLS, SEP, FACE_INK, INK, PENCIL, 
   PENCIL_STAGE, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, AREA_COMPLETED, AREA_EXEC, dry, dip, stroke, SC, W2, H2, N2, PB, 
   CP_MM, PAPER_OPTS, paper, ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, penDraw, OUT_W, OUT_H, O, GPU_INFO, 
-  base, SHADE, WETPOL, WETPOL_COUNT, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
+  base, SHADE, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
   expected, sheetDensity, marks, drainFrames, mark, CAL, FRAMES, FULL_TAPE, MARKTAPE, RESUME_AT, shoot, 
   FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, FW_SUBJ, used, TECHS, LAST, DRAWING, 
   PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, PASSAGE_HOOK, BUDGET, awareProvenance, awareBoundary } = ctx;
@@ -154,7 +154,6 @@ console.log(`profile: ${Object.entries(PROF).map(([k, v]) => `${k} ${(v / 1000).
 console.log(`${ctx.laid} brush sweeps, ${ctx.frame} frames, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 
 reportTechniques();
-if (WETPOL) console.log(`wet policy: ${WETPOL_COUNT.wet} passages wet in wet (first wash, light, big blends), ${WETPOL_COUNT.dry} on dry paper`);
 if(COLOUR_TRACE) await sharp(INKRES ? INKRES.compose(render()) : render(), {raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'colour-final.png'));
 // --subgrid N: spread settled pigment over N x N sub-cells by the cold-press relief, each cell keeping its pigment. Default 0.
 // Water stays at the sheet's grid. Written as painting-fine.jpg and averaged back as reflectance. Cold-press paper only.
