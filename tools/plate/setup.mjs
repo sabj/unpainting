@@ -42,7 +42,6 @@ import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
 import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
-import {chooseInkRecipe, sourcePenShare, DRAWING_FLAGS, DEFAULT_INK_RECIPE} from '../../src/paint/methods/ink-recipe-auto.mjs';
 import {drawingStageIntent} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {bindLineTarget} from '../../src/crop/lines.mjs';
 import {prepareSegments} from '../../src/crop/segment-prep.mjs';
@@ -174,16 +173,9 @@ const CODE_STATE = checkCodeState({ root, out, allowDirty: num('allowdirty', 0) 
 // --inkrecipe v2|wash: ink flags as one switch (src/paint/methods/ink-recipe.mjs); flags typed on the command line win,
 // and the recipe's flags win over the --recipe preset's. Added before the line source is prepared, since the wash
 // recipe picks it.
-// --inkrecipe auto picks wash for a pen drawing, none otherwise (src/paint/methods/ink-recipe-auto.mjs). The default is none.
-const INK_RECIPE_NAME = opt('inkrecipe', DEFAULT_INK_RECIPE);
-const INK_RECIPE = await (async () => {
-  // the share is read at one width, so --width does not change the choice (the separator's line share depends on it)
-  // a missing image is left to fail at the normal image load below
-  const measure = INK_RECIPE_NAME === 'auto' && !DRAWING_FLAGS.some(f => argv0.includes(f)) && fs.existsSync(path.resolve(root, opt('image')));
-  const share = measure ? await sourcePenShare({ image: path.resolve(root, opt('image')), sharp }) : null;
-  return chooseInkRecipe(INK_RECIPE_NAME, argv0, () => share, num('penfirst', 0.5));
-})();
-if (INK_RECIPE_NAME === 'auto') console.log(`ink recipe: ${INK_RECIPE.recipe} (auto: ${INK_RECIPE.why})`);
+// The default is none: the drawing is pencil only.
+const INK_RECIPE_NAME = opt('inkrecipe', 'none');
+const INK_RECIPE = { recipe: INK_RECIPE_NAME };
 // the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
 if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));

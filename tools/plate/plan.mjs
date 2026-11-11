@@ -43,7 +43,7 @@ import {pigmentPhysics} from '../../src/paint/methods/pigment-physics.mjs';
 import {planLinework} from '../../src/paint/methods/linework-plan.mjs';
 import {inkCapOnScrap} from '../../src/paint/methods/ink-scrap.mjs';
 import {inkKFromSource} from '../../src/paint/methods/ink-hue.mjs';
-import {sourcePenShare} from '../../src/paint/methods/ink-recipe-auto.mjs';
+import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {chooseDrawingStages} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {eraseWeights, eraserDabs, ERASER_MM} from '../../src/paint/methods/pencil-erase.mjs';
 import {planLines as planLineChoice} from '../../src/paint/drawing-plan.mjs';
@@ -711,7 +711,7 @@ const SEP = (await cachedStep({...RUN_CACHE,name:'separator',code:codeHash(root,
 // the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
 if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
 // The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source, --drawing detect): one
-// reading at AUTO_INK_WIDTH, as --inkrecipe auto takes it, so --width does not change what is pen. SEP is at the run's grid.
+// reading at 1200 px wide (pen-share.mjs), so --width does not change what is pen. SEP is at the run's grid.
 // A run with a graphite outline, no line source and no ink plan never asks, so it skips the extra reading.
 const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || opt('linesource', 'none') !== 'none' || opt('drawing', 'first') === 'detect' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
 const PEN_SHARE = PEN_ASKED && fs.existsSync(path.resolve(root, opt('image', ''))) ? await sourcePenShare({ image: path.resolve(root, opt('image', '')), sharp }) : SEP.stats.ink / n;

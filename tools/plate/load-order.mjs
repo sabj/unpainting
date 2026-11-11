@@ -156,7 +156,7 @@ import '../../src/paint/methods/ink-scrap.mjs';
 import '../../src/paint/methods/ink-hue.mjs';
 import '../../src/paint/methods/ink-match.mjs';
 import '../../src/paint/methods/ink-recipe.mjs';
-import '../../src/paint/methods/ink-recipe-auto.mjs';
+import '../../src/paint/methods/pen-share.mjs';
 import '../../src/paint/methods/drawing-stages-auto.mjs';
 import '../../src/paint/methods/pencil-erase.mjs';
 import '../../src/crop/lines.mjs';
