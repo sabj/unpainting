@@ -14,6 +14,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
+// The sky lanes run at the painter's own radius and step and the sky wash at its pigment's own flocculation: the base
+// held the values fitted on Trumbull skies (--skylanemm 6, --skylanestep .8, --skyfloc .5), so _slane is gone.
 // rec2x, rcl and tv8 were dropped in 0.3.1: recess settings act only with --recesses 1 (the architecture preset sets
 // them itself) and texture variety acts only on dry-brush texture passages, which are never planned.
 // _sg (--stylegain) and _tp (--touchgain) are not model-settable: a gain that covers an engine error is a calibration, not a
@@ -54,7 +56,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_acc(\d+)/, () => ['--accentshare', tenth(v, /_acc(\d+)/)]), ...t(/_lt/, () => ['--layertexture', '1']),
       ...(/_cur/.test(v) ? ['--paperlights', '1'] : /_relonly/.test(v) ? ['--paperrel', '1'] : ['--paperrel', '1', '--paperlights', '1']),
       ...(/_cur/.test(v) ? ['--paperrgb', '252,251,248'] : /_relonly/.test(v) ? [] : ['--paperrgb', 'auto']),
-      ...(/_noslane/.test(v) ? [] : /_slane/.test(v) ? ['--skylanes', '1'] : ['--skylanes', '1', '--skylanemm', '6', '--skylanestep', '.8']),
+      ...(/_noslane/.test(v) ? [] : ['--skylanes', '1']),
       ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]),
       ...t(/_shw(\d+)/, () => ['--shadowwater', hundredth(v, /_shw(\d+)/)]),
       ...t(/_dkf/, () => ['--darkfirst', '1']), ...t(/_rg(\d+)/, () => ['--groundglaze', tenth(v, /_rg(\d+)/)]),
@@ -64,7 +66,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...t(/_dg(\d+)/, () => ['--deepgrow', m(v, /_dg(\d+)/)[1]]),       ...t(/_rx(\d+)/, () => ['--recessmax', m(v, /_rx(\d+)/)[1]]), ...t(/_bvar/, () => ['--stonecourses', '1']),
       ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]), ...t(/_rac/, () => ['--recessaccent', '1']),
       ...t(/_eye(\d+)/, () => ['--eyering', String(Number(m(v, /_eye(\d+)/)[1]) / targetPixels[0])]),
-      ...t(/_skyb/, () => ['--skyblue', '1', '--skyfloc', '.5']), ...t(/_cpp/, () => ['--paper', 'coldpress']),
+      ...t(/_skyb/, () => ['--skyblue', '1']), ...t(/_cpp/, () => ['--paper', 'coldpress']),
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
       ...t(/_bcl(\d+)/, () => ['--stoneclusters', m(v, /_bcl(\d+)/)[1]]),       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
@@ -100,7 +102,7 @@ const variantParts = v => { const p = v.split('_'); return { prefix: p.slice(0, 
 
 // tokens in one slot are alternatives: a model token takes every option any alternative in its slot sets
 const GROUPS = [[/^(hue|sky\d*)$/, 'hue', ['hue', 'sky', 'sky3']], [/^sep\d?$/, 'sep', ['sep', 'sep2', 'sep4', 'sep8']], [/^ink[234]d?$/, 'ink', ['ink2', 'ink3', 'ink4']],
-  [/^rec2x?$/, 'rec', ['rec2', 'rec2x']], [/^lay\d$/, 'lay', ['lay2', 'lay4']], [/^(cur|relonly)$/, 'paper', ['cur', 'relonly']], [/^(no)?slane$/, 'slane', ['slane', 'noslane']],
+  [/^rec2x?$/, 'rec', ['rec2', 'rec2x']], [/^lay\d$/, 'lay', ['lay2', 'lay4']], [/^(cur|relonly)$/, 'paper', ['cur', 'relonly']], [/^noslane$/, 'slane', ['noslane']],
   [/^softs?$/, 'soft', ['soft', 'softs']], [/^(stub2?|stone)$/, 'stub', ['stub', 'stub2', 'stone']], [/^(pwarm|pgold|pgreen|pbs|rv)$/, 'pal', ['pwarm', 'pgold', 'pgreen', 'rv']]];
 function slotOf(t) { for (const [re, name] of GROUPS) if (re.test(t)) return name; return t.replace(/\d+/g, 'N'); }
 const alternatives = t => GROUPS.find(([re]) => re.test(t))?.[2] ?? [];

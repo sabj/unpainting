@@ -132,3 +132,11 @@ test('the plan cannot set a gain or calibration: washes.charge, _dp/_acc/_lit/_n
   for (const k of Object.keys(ALLOWED_EXTRA_ARGS)) assert.doesNotMatch(k, GAIN_OPTION, `${k} is allowed but reads as a gain`);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('item 3: the bench base and template carry no sky numbers fitted to one subject', async () => {
+  const { argsBuilder, layerBase, optionMap, BASE } = await import('./pipeline/plan-args.mjs');
+  const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
+  const args = optionMap(layerBase({ variant: 'region_w13', build }).args);
+  assert.equal(args.get('skylanes'), '1', 'sky lanes stay on, at the painter\'s own radius and step');
+  for (const k of ['skylanemm', 'skylanestep', 'skyfloc']) assert.ok(!args.has(k), `the base sets --${k} (Trumbull's fitted value)`);
+});
