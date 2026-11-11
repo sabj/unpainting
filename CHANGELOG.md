@@ -9,6 +9,7 @@ Benchmark harness, V4 and V5. Checked by repainting stored 0.3.2 plans; no paint
 - Every subject in `bench/v4v5/subjects.json` and every crop in `bench/v2/crops.json` names its drawing medium as seen in the target: `pen`, `pencil` or `none`. `npm run bench:add-target` requires `--medium`. Hills, France, h36a, h34a and the ink dog are `pen`; Mittens is `pencil`; Ships, Trumbull and the painted dog are `none`.
 - On a subject whose medium is not `pen`, a plan that asks for ink is drawn in graphite before the washes. Its closing lines and pen-only settings are dropped, and the override is recorded in the check output and in the try's `pipeline.mediumOverride`. Plans on `pen` subjects resolve to the same painter command as before.
 - The brief states the target's drawing medium, says when ink is wrong, asks for pigments that reach the target's most saturated colours, and gives two contrasting example palettes in place of the single earth palette. Mittens' requested style no longer says "fine lines".
+- The try record carries `pipeline.copy`: the painter's own `hfCorr` for the finished sheet and its ceiling, with where the plan's drawn lines came from (`lines`, `tracedLines`, and whether the painter read the drawing off the target itself). Drawing lines from the subject's edges is allowed; this is reporting only, and nothing in it is told to the model.
 
 Judging painting changes. Checked with unit tests and a run without judge calls on stored plates; the pair test has not been run with live judges yet.
 

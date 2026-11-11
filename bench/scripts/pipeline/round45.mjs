@@ -20,6 +20,7 @@ import { PaintSession, planSnapshot, variantIn } from './session.mjs';
 import { checkPlan } from './check.mjs';
 import { pngSize, SUBJECT_MEDIA } from './plan-args.mjs';
 import { writeFeedback } from './feedback.mjs';
+import { copyRecord } from './copy.mjs';
 
 import { benchmarkProfile, profileSubject } from '../profiles.mjs';
 import { tokenStop } from '../budget.mjs';
@@ -31,7 +32,7 @@ const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then pain
 const LITE_PROMPT = 'Read bench/TASK.md, prepare the plan deliverables and stop. This is planning only: do not run checks or the painter; the harness does both after your process exits.';
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
 const STAGE_PCT = [10, 25, 50, 75, 100];
-const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|plan-args\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|plan-args\.mjs|copy\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
 
 /** The V4/V5 subjects. Every subject must name its drawing medium (none, pencil or pen); a missing one is an error. */
 export const loadSubjects = () => {
@@ -84,7 +85,7 @@ function seed({ ws, crop, spec, round, n, tries, dry, strictVerdict, profile }) 
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
   fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile }));
   for (const f of ['check.sh', 'TOKENS.md', 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
-  for (const f of ['check.mjs', 'plan-args.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
+  for (const f of ['check.mjs', 'plan-args.mjs', 'copy.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
   if (profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'check.mjs'), "console.error('Lite: admission runs once, after the model exits. Save your plan and stop.'); process.exitCode = 2;\n");
     fs.writeFileSync(path.join(b, 'PAINT.md'), 'Lite planning only. Save the deliverables listed in TASK.md, then stop. The harness runs the check and painter after your process exits. No looking, waiting or repairs.\n');
@@ -281,6 +282,8 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     starts: count('start'), looks: count('look'), revisions: count('revise'), revisionsRefused: count('revise-refused'),
     modelMinutes: +(session.modelS() / 60).toFixed(1), cappedAtModelTime: Boolean(session.capped), sessionEnd: session.ended,
     repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null, mediumOverride: v?.layering?.mediumOverride ?? null,
+    // the painter's own copy measurement of the finished sheet, with the plan's line sources beside it; for the record only
+    copy: outcome === 'painted' && p ? copyRecord(fs.existsSync(path.join(p.out, 'cheat-risk.json')) ? readJson(path.join(p.out, 'cheat-risk.json')) : null, v?.layering?.lines) : null,
     optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     warnings: v?.warnings?.length ? v.warnings : undefined,

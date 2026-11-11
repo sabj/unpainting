@@ -8,10 +8,12 @@
 // Settings the plan asks for that the painter never reads are noted against the painting (renderVerdict), and fail it
 // under --strict-verdict. Base settings a subject has no use for are never noted.
 //
-// This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins.
+// This file is copied into the model's worktree as bench/plan-args.mjs, so it imports only Node built-ins and
+// copy.mjs, which is copied beside it.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { lineSources } from './copy.mjs';
 
 // tv8 was dropped in 0.3.1: texture variety acts only on dry-brush texture passages, which are never planned.
 // Removed in 0.3.3 with the rules they set, all fitted on Trumbull: the stone-block, ground-glaze, recess and lit-stone
@@ -374,7 +376,9 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (config) problems.push(...checkPlanLimits(config, spec.sheetmm, linesByName, targetPixels));
   return {
     args, problems, variant: safeVariant, extraArgs,
-    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor, mediumOverride },
+    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor, mediumOverride,
+      // where the drawn lines come from (a tracer's stamp, or the painter's own reading of the target); see copy.mjs
+      lines: lineSources(linesByName, { painterOwnDrawing: effMedium !== 'none' && ((['first', 'both'].includes(effDrawing) && !hasDrawingFile) || (['both', 'last'].includes(effDrawing) && !args.includes('--drawinglast'))) }) },
     modelOptions: layered.modelOptions, baseOptions: layered.baseOptions, extraOptions: extraArgs.filter(a => a.startsWith('--')).map(a => a.slice(2)),
     templateOptions: [...optionMap(build(variantParts(safeVariant).prefix)).keys()],
   };

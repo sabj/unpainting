@@ -96,6 +96,10 @@ test('dry run: V4 plans, is refused once, paints with stops, looks, revises and 
   assert.deepEqual(p.optionCheck.model, []);
   const ck = fs.readFileSync(path.join(out, 'v4-pipeline', 'dry-run', '1', 'hills-plan', 'CHECKPOINTS.jsonl'), 'utf8');
   assert.match(ck, /start-refused/);
+  // the painter's copy measure is in the try record, with the plan's line sources beside it; the model is not told
+  assert.ok(Number.isFinite(p.copy.hfCorr) && p.copy.ceiling === 0.53 && typeof p.copy.over === 'boolean', JSON.stringify(p.copy));
+  assert.equal(typeof p.copy.lines, 'number');
+  assert.doesNotMatch(ck, /"copy"/);
   fs.rmSync(out, { recursive: true, force: true });
 });
 
