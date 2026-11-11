@@ -75,3 +75,15 @@ export function argvForSubject(argv, medium, { planAsked = null } = {}) {
 
 /** The line the painter logs when the rule changed the drawing. */
 export const subjectMediumNote = (medium, asked) => `subject medium ${medium}: the picture shows no pen lines, so the ${asked === 'auto' ? 'automatic' : asked} drawing is a light graphite preparatory drawing before the washes, with no closing lines`;
+
+/**
+ * Whether the subject's medium reads as pen: the declared --subjectmedium when given, else the measured pen-line share
+ * (pen-share.mjs) at the outline medium's threshold (--penfirst, per cent), the same reading --outlinemedium auto takes.
+ */
+export function readsAsPen({ argv, penShare, threshold }) {
+  const declared = subjectMediumOf(argv);
+  if (declared) return declared === 'pen';
+  if (!Number.isFinite(penShare) || !Number.isFinite(threshold)) throw new Error('readsAsPen: a pen share and a threshold');
+  return 100 * penShare >= threshold;
+}
+

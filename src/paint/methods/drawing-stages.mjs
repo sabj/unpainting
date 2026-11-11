@@ -6,7 +6,7 @@
 //              sideways drift, a start a little late or an end a little past), drops some pencil lines, which stay
 //              visible as pencil, and adds a few lines the pencil left out
 //   finishInk  closing accents after the washes: a share of the earlier stage's lines, chosen on the target's edges or
-//              darks at plan time, restated where they are strongest (or whole, for the architecture method)
+//              darks at plan time, each restated whole
 //
 // Every choice is made here, before the first mark, from the line file and the target's density at plan time. DOM free,
 // no file IO, deterministic: the same set and options give the same stages.
@@ -144,24 +144,6 @@ export function deviateLine(g, { scale, seed, step }) {
   return out;
 }
 
-/** The part of a line where `at` is at least its own median there, as runs of at least `minLen` source pixels. */
-export function strongRuns(g, at, { minLen, step }) {
-  const r = resampleLine(g, step), vals = r.points.map(at), sorted = [...vals].sort((a, b) => a - b), med = sorted[Math.floor(sorted.length / 2)] ?? 0;
-  const runs = [];
-  let cur = null;
-  const close = () => { if (cur && cur.points.length >= 2 && polyLength(cur.points) >= minLen) runs.push(cur); cur = null; };
-  r.points.forEach((p, k) => {
-    if (vals[k] >= med) {
-      cur ??= { ...g, points: [], ...(r.widths ? { widths: [] } : {}), ...(r.weights ? { weights: [] } : {}) };
-      cur.points.push(p);
-      if (r.widths) cur.widths.push(r.widths[k]);
-      if (r.weights) cur.weights.push(r.weights[k]);
-    } else close();
-  });
-  close();
-  return runs.map(q => ({ ...q, length: polyLength(q.points) }));
-}
-
 // Pencil passes by rank: 1 big shapes, 2 features, 3 detail (pencil-stage.mjs passOf).
 const passRanks = (n, k) => (k < Math.ceil(0.4 * n) ? 1 : k < Math.ceil(0.75 * n) ? 2 : 3);
 
@@ -224,10 +206,10 @@ export function planStages(lines, { image, stages, density = null }) {
     const sel = g => (at ? mean(resampleLine(g, step).points, at) : 1) * Math.sqrt(g.length ?? polyLength(g.points)) * (Number.isFinite(g.weight) ? g.weight : 1);
     const picked = ranked(pool, sel).slice(0, o.restate > 0 ? Math.max(pool.length ? 1 : 0, Math.round(o.restate * pool.length)) : 0).map(r => r.g);
     const architecture = o.method === 'architecture';
-    // an accent restates the strong part of each line; the architecture method restates the whole line, its width set
-    // by how dark the target is along it (1.6 to 4 source pixels, the Y1 closing pen)
-    // a line with no strong run long enough to read as a stroke is restated whole
-    const pieces = architecture || !at ? picked : picked.flatMap(g => { const runs = strongRuns(g, at, { minLen: 0.008 * short, step }); return runs.length ? runs : [g]; });
+    // a pen restates a chosen line whole (the accent), never the pieces of it where the target reads strongest; the
+    // architecture method also restates whole lines, its width set by how dark the target is along it (1.6 to 4
+    // source pixels, the Y1 closing pen)
+    const pieces = picked;
     const scale = o.deviate * 0.0025 * short;
     out.finishInk = pieces.map((g, k) => {
       const d = deviateLine(g, { scale, seed: (g.index ?? k) * 3 + 2, step });

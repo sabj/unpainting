@@ -110,3 +110,20 @@ test('a no-medium declaration cannot hide malformed or filtered-out drawing path
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the plan\'s drawing roles keep or leave out each line whole, per pen', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    const ear = { points: [[10, 70], [20, 80], [30, 90]], weight: 1 }, body = { points: [[50, 30], [70, 30], [90, 30]], weight: 1 };
+    fs.writeFileSync(path.join(dir, 'd-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, lines: [ear, body] }));
+    const families = [{ id: 'dog', bounds: [0, 0, 1, 1], drawingRole: 'structural' }, { id: 'ear', bounds: [0, 0.6, 0.4, 1], drawingRole: 'none' }];
+    const logs = [], f = flagsOf(['--drawingfile', path.join(dir, 'd'), '--drawinglast', path.join(dir, 'd'), '--drawinglastmin', '0']);
+    const first = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: m => logs.push(m), walked: 0, families });
+    assert.ok(first.length >= 1 && first.every(g => g.points.every(q => q.x >= 50)), 'only the body line, in its strokes');
+    assert.ok(logs.some(m => /1 of 2 lines left out by the plan's drawing roles \(1 under none\)/.test(m)));
+    const all = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: () => {}, walked: 0, families: [{ id: 'dog', bounds: [0, 0, 1, 1] }] });
+    assert.ok(all.some(g => g.points.some(q => q.x < 40)), 'a plan that states no role draws as before');
+    const none = selectedDrawing({ first: false, w: 100, h: 100, ...f, log: () => {}, walked: 0, families: [{ id: 'dog', bounds: [0, 0, 1, 1], drawingRole: 'scaffold' }] });
+    assert.deepEqual(none, [], 'a scaffold family gets no closing line, and that is not a failure');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
