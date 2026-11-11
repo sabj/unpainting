@@ -937,6 +937,36 @@ export class GpuSheet {
     for (let k = 0; k < K; k++) if (want(k)) out.set(all.subarray(k * n, (k + 1) * n), k * n);
     rb.unmap();
   }
+  /** Read the live top and wet sums from the same queue state with one map. */
+  async readTopAndSums(topOut, sumOut, topMask, sumMask) {
+    this.flushStrokes();
+    const d = this.device, n = this.n, pb = n * 4, sums = [], top = [];
+    for (let k = 0; k < this.K; k++) {
+      if ((sumMask >>> k) & 1) sums.push(k);
+      if (this.hasTop && (topMask >>> k) & 1) top.push(k);
+    }
+    const bytes = Math.max(16, (sums.length + top.length) * pb);
+    if (!this.topSumRb || this.topSumRb.size < bytes) {
+      this.topSumRb?.destroy();
+      this.topSumRb = d.createBuffer({size: bytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST});
+    }
+    const rb = this.topSumRb, enc = d.createCommandEncoder();
+    if (sums.length) {
+      const pass = this.timestamps.begin(enc, 'wetSums');
+      pass.setPipeline(this.p.gdp_sum); pass.setBindGroup(0, this.bg.gdp_sum);
+      pass.dispatchWorkgroups(Math.ceil(this.w / 16), Math.ceil(this.h / 16)); pass.end();
+    }
+    let at = 0;
+    for (const k of sums) { enc.copyBufferToBuffer(this.b.DD, k * pb, rb, at, pb); at += pb; }
+    for (const k of top) { enc.copyBufferToBuffer(this.b.TOP, k * pb, rb, at, pb); at += pb; }
+    d.queue.submit([enc.finish()]);
+    await rb.mapAsync(GPUMapMode.READ, 0, bytes);
+    try {
+      const data = new Float32Array(rb.getMappedRange(0, bytes)); at = 0;
+      for (const k of sums) { sumOut.set(data.subarray(at, at + n), k * n); at += n; }
+      for (const k of top) { topOut.set(data.subarray(at, at + n), k * n); at += n; }
+    } finally { rb.unmap(); }
+  }
   /**
    * What a frame is rendered from, copied out in queue order and read back without holding anything up (framer.mjs): the
    * wet sums (G + D + P) of the pigments in `sumMask`, the top dried layer's planes in `topMask`, and the water if `wantW`,
@@ -977,5 +1007,5 @@ export class GpuSheet {
     this.device.queue.writeBuffer(this.b.RESIST, 0, u);
   }
 
-  destroy() { this.allocationGeneration=(this.allocationGeneration??0)+1;this.demandSetup=null; this.optical?.destroy(); this.timestamps.destroy(); this.flushStrokes(); this.batchStaging?.destroy(); this.fixQueue?.destroy(); this.brushReadbacks?.destroy(); this.topRb?.destroy(); this.paperReadback?.destroy();this.paperGate?.destroy(); for(const a of this.archives.values()) a.buffer.destroy(); for(const v of this.brushSlots.values()) v.buffer.destroy(); for (const k of Object.keys(this.b)) this.b[k].destroy(); }
+  destroy() { this.allocationGeneration=(this.allocationGeneration??0)+1;this.demandSetup=null; this.optical?.destroy(); this.timestamps.destroy(); this.flushStrokes(); this.batchStaging?.destroy(); this.fixQueue?.destroy(); this.brushReadbacks?.destroy(); this.topRb?.destroy(); this.topSumRb?.destroy(); this.paperReadback?.destroy();this.paperGate?.destroy(); for(const a of this.archives.values()) a.buffer.destroy(); for(const v of this.brushSlots.values()) v.buffer.destroy(); for (const k of Object.keys(this.b)) this.b[k].destroy(); }
 }

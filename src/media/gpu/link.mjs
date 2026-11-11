@@ -37,7 +37,7 @@ const POST_LIMIT = 4 * 1024 * 1024; // floats: 16 MB
 const TIMEOUT_MS = 30 * 60 * 1000;
 const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
-const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
+const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topSums', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
 const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth'];
 
 export class GpuLink {
@@ -798,13 +798,19 @@ export class GpuLink {
     return new Uint8ClampedArray(this.rectData.buffer,0,this.n*3).slice();
   }
   /** The newest dried layer, brought down if the GPU has changed it (a rewet lifts a little of it back). */
-  syncTop(sheet) {
+  syncTop(sheet, withSums = false) {
     this.flushDrys(sheet);
     if (this.paused || this.stroke) return;
     this.syncLower(sheet);
     if (this.topStale && sheet.layers.length) {
       // only the planes of the pigments the layer holds: the others are zero (a rewet lifts, it never adds)
-      const mask = this.topMask >>> 0; this.call({ op: 'topDown', mask }); const top = sheet.layers[sheet.layers.length - 1], n = this.n;
+      const mask = this.topMask >>> 0;
+      const paired = withSums && this.resident && !this.needFullUp && this.stale && !this.noSums && this.sumsVersion !== this.version;
+      if (paired) {
+        const t = performance.now(), sumMask = (this.topMask | this.wetMask) >>> 0;
+        this.call({op: 'topSums', mask, sumMask}); this.storeSums(sumMask, t);
+      } else this.call({op: 'topDown', mask});
+      const top = sheet.layers[sheet.layers.length - 1], n = this.n;
       let planes = 0; for (let k = 0; k < this.K; k++) if ((mask >>> k) & 1) { top[k].set(this.layerData.subarray(k * n, (k + 1) * n)); planes++; }
       this.topStale = false; this.topPlaceholder = false; this.stats.topDown = (this.stats.topDown || 0) + 1; this.stats.topBytes = (this.stats.topBytes || 0) + planes * n * 4;
     }
@@ -844,6 +850,9 @@ export class GpuLink {
     // only the pigments that can hold anything wet or unfixed come down (wetMask and the newest layer's, which a rewet can
     // lift); a plane that held something last time and cannot now is cleared once
     const t = performance.now(), mask = (this.topMask | this.wetMask) >>> 0; this.call({ op: 'sums', mask });
+    return this.storeSums(mask, t);
+  }
+  storeSums(mask, t) {
     const K = this.K, n = this.n;
     if (!this.sums) { this.sums = Array.from({ length: K }, () => new Float32Array(n)); this.sumsLive = 0; }
     let planes = 0;

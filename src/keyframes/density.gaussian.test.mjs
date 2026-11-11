@@ -21,3 +21,11 @@ test('gaussian equals the plain clamped blur bit for bit', () => {
     for (let i = 0; i < a.length; i++) assert.ok(Object.is(a[i], b[i]), `cell ${i} at ${w}x${h} sigma ${sigma}`);
   }
 });
+
+
+test('gaussian retains clamped-edge arithmetic for narrow double-precision inputs', () => {
+  for (const [w, h, sigma] of [[1, 3, 3], [3, 4, 20], [7, 2, 2], [19, 5, 1]]) {
+    const src = Float64Array.from({length: w * h}, (_, i) => i % 3 === 0 ? -0 : Math.sin(i) * 1e-40 + Math.cos(i) * 1e4);
+    assert.deepEqual(gaussian(src, w, h, sigma), plain(src, w, h, sigma));
+  }
+});

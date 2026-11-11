@@ -109,6 +109,7 @@ function sheetHandler(sid, port) {
       case 'lowerDown': { await gpu.readArchive(m.id, layerData); break; }
       case 'topDownRect': { await gpu.readTopRect(layerData, m.rect, m.mask); break; }
       case 'topDown': { await gpu.readTop(layerData, m.mask); break; }
+    case 'topSums': { await gpu.readTopAndSums(layerData, sumData, m.mask, m.sumMask); break; }
       case 'fixedBedUp': { gpu.flushStrokes(); gpu.device.queue.writeBuffer(gpu.b.DEP, gpu.n * 8, m.bed); break; }
       case 'topUp': { fullBrushPigments ||= signedZero(layerData); if (asyncDry) { workerTopMask = m.mask ?? 0; gpu.setAct(workerWetMask | workerTopMask); } gpu.uploadTop(layerData.subarray(0, gpu.K * gpu.n)); break; }
       case 'resist': { gpu.setResist(m.mask); break; }
