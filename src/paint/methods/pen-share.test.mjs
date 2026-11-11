@@ -48,3 +48,26 @@ test('sourcePenShare reads a file path the same as its bytes and rejects an unre
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   await assert.rejects(() => sourcePenShare({ image: '/nonexistent/none.png', sharp }));
 });
+
+// A pale reed-pen drawing: sepia on cream, lines 3 and 4 cells wide at the reading width (0.7 and 0.9 mm on a 280 mm
+// sheet, inside the widest nib), read at the medium measure's width.
+const paleSketchPng = async () => {
+  const lines = [];
+  for (let k = 0; k < 10; k++) lines.push(`<path d="M ${60 + k * 45} 80 C ${110 + k * 45} 220 ${30 + k * 45} 340 ${90 + k * 45} 520" stroke="#c4a483" stroke-width="2" fill="none"/>`);
+  for (let k = 0; k < 5; k++) lines.push(`<path d="M 40 ${120 + k * 80} Q 300 ${90 + k * 80} 560 ${130 + k * 80}" stroke="#c4a483" stroke-width="1.5" fill="none"/>`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600"><rect width="600" height="600" fill="#f5e8d4"/>${lines.join('')}</svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+};
+
+test('a pale, broad-nibbed pen drawing reads as a pen source (over the 0.5% auto rule)', async () => {
+  const s = await sourcePenShare({ image: await paleSketchPng(), sharp });
+  assert.ok(s >= 0.005, `pen share ${(100 * s).toFixed(3)}%`);
+});
+
+test('a speckled wash with no drawn line reads under the 0.5% auto rule', async () => {
+  const dots = []; let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 1500; k++) dots.push(`<circle cx="${(rnd() * 600).toFixed(1)}" cy="${(rnd() * 600).toFixed(1)}" r="${(0.6 + rnd()).toFixed(2)}" fill="#6b5a48"/>`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600"><rect width="600" height="600" fill="#f5e8d4"/><rect x="60" y="60" width="480" height="480" fill="#d9c7ad"/>${dots.join('')}</svg>`;
+  const s = await sourcePenShare({ image: await sharp(Buffer.from(svg)).png().toBuffer(), sharp });
+  assert.ok(s < 0.005, `pen share ${(100 * s).toFixed(3)}%`);
+});

@@ -5,10 +5,12 @@ import { separate } from '../../crop/inkwash.mjs';
 /** The width the picture is read at: the separator's line share depends on it, and this is the width of the benchmark runs. */
 export const AUTO_INK_WIDTH = 1200;
 
-/** The share of the picture (0 to 1) that the ink separator reads as pen line. px is RGB bytes, w by h. */
+/** The share of the picture (0 to 1) that the ink separator, reading marks as drawn lines, reads as pen line: a pale
+ *  or broad pen line counts by its contrast and its width on the sheet, a speck or a short touch does not count.
+ *  px is RGB bytes, w by h. */
 export function penShare(px, w, h) {
   const paper = paperOf(px, w, h, { margin: 0.03, mode: 'auto' }).paperRGB;
-  return separate(px, w, h, paper).stats.ink / (w * h);
+  return separate(px, w, h, paper, { asDrawn: true }).stats.ink / (w * h);
 }
 
 /**
