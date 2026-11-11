@@ -83,12 +83,37 @@ test('the plan drawing section outranks extra-args, as in the painter: what it a
   const off = plan({ 'config.json': { drawing: { medium: 'ink' } }, 'extra-args.json': ['--drawing', 'none'] });
   try {
     assert.equal(resolve(inkOverGraphite, 'pencil').layering.mediumOverride.asked, 'ink');
-    assert.equal(resolve(graphiteOverInk, 'pencil').layering.mediumOverride, null);
+    assert.equal(resolve(graphiteOverInk, 'pencil').layering.mediumOverride, null, 'graphite, opening only: nothing to override');
+    assert.equal(optionMap(resolve(graphiteOverInk, 'pencil').args).get('outlinemedium'), 'graphite');
     assert.equal(resolve(stages, 'none').layering.mediumOverride.asked, 'ink');
     const none = resolve(off, 'none');
     assert.equal(none.layering.mediumOverride, null);
     assert.equal(optionMap(none.args).get('drawing'), 'none');
   } finally { for (const d of [inkOverGraphite, graphiteOverInk, stages, off]) fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('a plan that says nothing about the drawing follows the subject: Mittens is pencil, opening only; dog-ink is ink with closing lines', () => {
+  const subjects = loadSubjects();
+  const silent = plan({ 'config.json': {}, 'opening-lines.json': LINES, 'closing-lines.json': LINES });
+  const at = id => resolvePlan({ spec: { ...subjects[id], width: 96 }, planDir: silent, variant: 'region_w13_lay2', target: TARGET, out: '/out' });
+  try {
+    const mittens = at('mittens'), m = optionMap(mittens.args);
+    assert.deepEqual(mittens.problems, []);
+    assert.equal(m.get('outlinemedium'), 'graphite');
+    assert.equal(m.get('drawing'), 'first');
+    assert.ok(m.has('drawingfile') && !m.has('drawinglast'), 'pencil prep only: the opening lines stay, no closing lines');
+    for (const inkOnly of ['inkprofile', 'washinkfree', 'drawinghand']) assert.ok(!m.has(inkOnly), inkOnly);
+    assert.equal(m.get('subjectmedium'), 'pencil');
+    assert.equal(mittens.layering.mediumOverride.asked, 'graphite');
+    assert.equal(mittens.layering.mediumOverride.closingDropped, true);
+    const dog = at('dog-ink'), d = optionMap(dog.args);
+    assert.deepEqual(dog.problems, []);
+    assert.equal(d.get('outlinemedium'), 'ink', 'a pen source is drawn in ink when the plan does not say');
+    assert.equal(d.get('drawing'), 'both');
+    assert.ok(d.has('drawingfile') && d.has('drawinglast'), 'prep plus closing ink');
+    assert.ok(!d.has('subjectmedium'));
+    assert.equal(dog.layering.mediumOverride, null);
+  } finally { fs.rmSync(silent, { recursive: true, force: true }); }
 });
 
 test('a pen subject keeps its ink plan exactly; a plan may always choose graphite or no drawing', () => {
@@ -107,10 +132,19 @@ test('a pen subject keeps its ink plan exactly; a plan may always choose graphit
       const n = resolve(none, medium);
       assert.equal(n.layering.mediumOverride, null);
       assert.deepEqual(told(n.args, medium), resolve(none, null).args);
-      const g = resolve(pencil, medium);
-      assert.equal(g.layering.mediumOverride, null);
-      assert.deepEqual(told(g.args, medium), resolve(pencil, null).args, 'a graphite plan keeps its drawing as the plan wrote it');
-      assert.equal(optionMap(g.args).get('subjectmedium'), medium === 'pen' ? undefined : medium);
+      const g = resolve(pencil, medium), go = optionMap(g.args);
+      assert.equal(go.get('outlinemedium'), 'graphite', 'a graphite plan stays graphite');
+      assert.equal(go.get('subjectmedium'), medium === 'pen' ? undefined : medium);
+      if (medium === 'pen') {
+        assert.equal(g.layering.mediumOverride, null);
+        assert.deepEqual(g.args, resolve(pencil, null).args, 'on a pen subject a graphite plan keeps its drawing as the plan wrote it');
+      } else {
+        // a subject with no pen line gets a preparatory pencil drawing only: no closing lines, in graphite either
+        assert.equal(go.get('drawing'), 'first');
+        assert.ok(go.has('drawingfile') && !go.has('drawinglast'));
+        assert.equal(g.layering.mediumOverride.asked, 'graphite');
+        assert.equal(g.layering.mediumOverride.closingDropped, true);
+      }
     }
   } finally { for (const d of [ink, none, pencil]) fs.rmSync(d, { recursive: true, force: true }); }
 });

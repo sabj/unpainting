@@ -26,16 +26,16 @@ test('an ink drawing section on a subject with no pen becomes a graphite opening
   }
 });
 
-test('graphite, no drawing, a pen subject and a run without the option are left exactly as written', () => {
+test('an opening-only graphite drawing, no drawing, a pen subject and a run without the option are left exactly as written', () => {
   const ink = { medium: 'ink', inkColor: 'sepia', closingLines: 0.5 };
   for (const medium of ['pen', null]) assert.equal(drawingForSubject(ink, medium).drawing, ink);
-  for (const d of [{ medium: 'graphite', weight: 0.3 }, { medium: 'none' }, { amount: 0.4 }, { stages: { prep: {} } }, null]) {
+  for (const d of [{ medium: 'graphite', weight: 0.3 }, { medium: 'graphite', closingLines: 0 }, { medium: 'none' }, { amount: 0.4 }, { stages: { prep: {} } }, null]) {
     const r = drawingForSubject(d, 'pencil');
     assert.equal(r.drawing, d); assert.equal(r.asked, null);
   }
   const argv = ['--outlinemedium', 'ink', '--drawing', 'both', '--drawinglast', 'c', '--inkprofile', 'black-ink'];
   for (const medium of ['pen', null]) assert.equal(argvForSubject(argv, medium).argv, argv);
-  for (const quiet of [['--outlinemedium', 'graphite', '--drawing', 'both', '--drawinglast', 'c'], ['--outlinemedium', 'ink', '--drawing', 'none'], ['--outlinemedium', 'none'], ['--width', '90']]) {
+  for (const quiet of [['--outlinemedium', 'graphite', '--drawing', 'first', '--drawingfile', 'o'], ['--drawingfile', 'o'], ['--outlinemedium', 'ink', '--drawing', 'none'], ['--outlinemedium', 'none'], ['--width', '90']]) {
     const r = argvForSubject(quiet, 'pencil');
     assert.equal(r.argv, quiet); assert.equal(r.asked, null);
   }
@@ -58,6 +58,33 @@ test('ink left in the arguments is turned to graphite, first only, and pen-only 
   const off = argvForSubject(['--outlinemedium', 'graphite', '--drawing', 'none', '--inkprofile', 'black-ink'], 'pencil', { planAsked: 'ink' });
   assert.equal(flags(off.argv).get('--drawing'), 'none', 'a plan that draws nothing still draws nothing');
   assert.match(subjectMediumNote('pencil', 'ink'), /subject medium pencil: .* ink drawing is a light graphite preparatory drawing/);
+});
+
+test('a drawing that asks for no medium, or for graphite, on a subject with no pen is opening only: no closing lines', () => {
+  for (const medium of ['none', 'pencil']) {
+    for (const given of [['--drawing', 'both', '--drawingfile', 'o', '--drawinglast', 'c'], ['--outlinemedium', 'graphite', '--drawing', 'both', '--drawingfile', 'o', '--drawinglast', 'c', '--drawinghand', '1'], ['--drawing', 'last', '--drawingfile', 'o']]) {
+      const r = argvForSubject(given, medium), f = flags(r.argv);
+      assert.equal(r.asked, 'graphite');
+      assert.equal(f.get('--drawing'), 'first');
+      assert.equal(f.get('--drawingfile'), 'o');
+      assert.ok(!f.has('--drawinglast') && !f.has('--drawinghand'));
+      assert.ok(!f.has('--outlinemedium') || f.get('--outlinemedium') === 'graphite');
+    }
+    assert.deepEqual(drawingForSubject({ medium: 'graphite', closingLines: 0.5, weight: 0.3 }, medium), { drawing: { medium: 'graphite', closingLines: 0, weight: 0.3 }, asked: 'graphite' });
+  }
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'subject-medium-'));
+  try {
+    const plan = path.join(dir, 'config.json');
+    fs.writeFileSync(plan, JSON.stringify({}));
+    const r = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', plan, '--drawing', 'both', '--drawingfile', 'o', '--drawinglast', 'c', '--subjectmedium', 'pencil'], root: dir }), f = flags(r.argv);
+    assert.equal(f.get('--drawing'), 'first');
+    assert.ok(!f.has('--drawinglast'));
+    assert.equal(r.subjectMedium.asked, 'graphite');
+    fs.writeFileSync(plan, JSON.stringify({ drawing: { medium: 'graphite', closingLines: 0.5 } }));
+    const g = flags(expandRecipe({ argv: ['--recipe', 'none', '--valueplan', plan, '--drawingfile', 'o', '--drawinglast', 'c', '--subjectmedium', 'none'], root: dir }).argv);
+    assert.equal(g.get('--drawing'), 'first');
+    assert.ok(!g.has('--drawinglast') && !g.has('--closingedgemin'));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('recipe none: a value plan that asks for ink cannot put ink on a subject with no pen, whatever the other arguments say', () => {

@@ -1,8 +1,9 @@
 // --subjectmedium none|pencil|pen: the drawing medium a person sees in the picture being painted.
-// A picture with no pen lines is not drawn in ink. When the medium is none or pencil, an ink drawing (a plan's
-// drawing section, --outlinemedium ink, or the automatic choice) becomes what a watercolourist does on such a sheet:
-// a light graphite preparatory drawing before the washes, with no closing pen and no ink stages. A plan that draws in
-// graphite or not at all is left alone, and so is every run without the option or with medium pen. Pure: no I/O.
+// A picture with no pen lines is not drawn in ink. When the medium is none or pencil, any drawing (a plan's drawing
+// section, --outlinemedium ink, the automatic choice, graphite, or no medium said at all) becomes what a watercolourist
+// does on such a sheet: a light graphite preparatory drawing before the washes, with no closing lines and no ink
+// stages. A drawing that is already graphite and opening only, or no drawing, is left alone, and so is every run
+// without the option or with medium pen. Pure: no I/O.
 
 /** The media a subject can be given. */
 export const SUBJECT_MEDIA = Object.freeze(['none', 'pencil', 'pen']);
@@ -24,15 +25,20 @@ const noPen = medium => medium === 'none' || medium === 'pencil';
 
 /**
  * A plan's drawing section for a subject of this medium. An ink section (medium ink or auto, or ink stages) on a
- * subject with no pen keeps its line choices and becomes graphite, opening only.
+ * subject with no pen keeps its line choices and becomes graphite, opening only; a graphite or unstated section that
+ * asks for closing lines keeps its medium and loses them.
  * @returns {{ drawing: object|null, asked: string|null }} asked: what the plan asked for when it was changed
  */
 export function drawingForSubject(drawing, medium) {
   if (!noPen(medium) || drawing == null || typeof drawing !== 'object' || Array.isArray(drawing)) return { drawing, asked: null };
-  if (drawing.medium === 'none' || isGraphite(drawing.medium)) return { drawing, asked: null };
+  if (drawing.medium === 'none') return { drawing, asked: null };
   const inkStages = drawing.stages && typeof drawing.stages === 'object' && INK_STAGES.some(k => drawing.stages[k]);
-  const asked = drawing.medium ?? (inkStages ? 'ink' : null);
-  if (asked == null) return { drawing, asked: null };
+  const asked = isGraphite(drawing.medium) ? null : drawing.medium ?? (inkStages ? 'ink' : null);
+  if (asked == null) {
+    // graphite or no medium said: only closing lines go
+    const closing = Number(drawing.closingLines);
+    return Number.isFinite(closing) && closing > 0 ? { drawing: { ...drawing, closingLines: 0 }, asked: drawing.medium ?? 'graphite' } : { drawing, asked: null };
+  }
   const kept = Object.fromEntries(Object.entries(drawing).filter(([k]) => !PEN_KEYS.includes(k)));
   return { drawing: { ...kept, medium: 'graphite', closingLines: 0 }, asked };
 }
@@ -50,8 +56,12 @@ export function argvForSubject(argv, medium, { planAsked = null } = {}) {
   const last = name => pairs.findLast(([k]) => k === name)?.[1];
   const outline = last('--outlinemedium'), order = last('--drawing') ?? 'first';
   const stages = last('--stages'), inkStages = typeof stages === 'string' && stages.split(',').some(s => INK_STAGES.includes(s));
-  // planAsked: the plan's drawing section was already changed for this subject, so its pen leftovers go as well
-  const asked = planAsked ?? (order === 'none' || outline === 'none' ? null : outline !== undefined && !isGraphite(outline) ? outline : inkStages ? 'ink' : null);
+  // planAsked: the plan's drawing section was already changed for this subject, so its pen leftovers go as well.
+  // A graphite or unstated drawing is changed only when it would draw after the washes or carries pen-only options.
+  const drawn = order !== 'none' && outline !== 'none';
+  const ink = outline !== undefined && !isGraphite(outline) ? outline : inkStages ? 'ink' : null;
+  const closing = order !== 'first' || pairs.some(([k]) => PEN_FLAGS.includes(k));
+  const asked = planAsked ?? (!drawn ? null : ink ?? (closing ? outline ?? 'graphite' : null));
   if (asked == null) return { argv, asked: null, dropped: [] };
   const dropped = [], out = [];
   for (const [key, value] of pairs) {
@@ -64,4 +74,4 @@ export function argvForSubject(argv, medium, { planAsked = null } = {}) {
 }
 
 /** The line the painter logs when the rule changed the drawing. */
-export const subjectMediumNote = (medium, asked) => `subject medium ${medium}: the picture shows no pen lines, so the ${asked === 'auto' ? 'automatic' : asked} drawing is a light graphite preparatory drawing before the washes, with no closing pen`;
+export const subjectMediumNote = (medium, asked) => `subject medium ${medium}: the picture shows no pen lines, so the ${asked === 'auto' ? 'automatic' : asked} drawing is a light graphite preparatory drawing before the washes, with no closing lines`;

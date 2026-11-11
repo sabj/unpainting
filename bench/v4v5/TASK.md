@@ -48,12 +48,14 @@ All files go in `bench/plan/` unless stated.
      region styles create such edges unless they follow real edges in the target or stay small. The check below runs
      the painter's planning step and catches this.
 2. **Drawing paths: `opening-lines.json` (lines drawn before the washes) and `closing-lines.json` (lines drawn
-   last).** The drawing is graphite unless you ask for ink: set `drawing.medium: "ink"` in `config.json`, or use
-   `--outlinemedium ink` in `extra-args.json`. Use ink only when the target's drawing medium (above) is pen and the
-   target itself shows pen lines. Dark painted edges, whiskers, hair and window bars are not pen lines: paint them, or
-   leave them to a light pencil drawing. When the medium is not pen, an ink drawing is not drawn in ink: the harness
-   draws your opening lines in graphite as a light preparatory drawing, drops the closing lines and pen settings, and
-   records the override in the result (the check prints it as `mediumOverride`). You may always choose no drawing.
+   last).** The target's drawing medium (above) decides the drawing when your plan does not: a pen target is drawn
+   in ink, any other target in graphite. You may choose: set `drawing.medium` in `config.json`, or use
+   `--outlinemedium` in `extra-args.json`. Use ink only when the target's drawing medium is pen and the target itself
+   shows pen lines. Dark painted edges, whiskers, hair and window bars are not pen lines: paint them, or leave them to
+   a light pencil drawing. When the medium is not pen, no drawing is drawn in ink and none has closing lines: the
+   harness draws your opening lines in graphite as a light preparatory drawing, drops the closing lines and pen
+   settings, and records the override in the result (the check prints it as `mediumOverride`). You may always choose
+   no drawing.
    When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
    Prepared paths use the harness-owned v2 ink rules: source support, smoothing, darkness caps and damp pen.
    Raw v1 ink controls and legacy ink/sep/uncap/dwg tokens are not admitted. Without a drawing file the painter
