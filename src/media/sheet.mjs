@@ -1239,7 +1239,7 @@ export function wetSums(sheet) {
   return sheet.G.map((Gk, k) => { const out = new Float32Array(sheet.n), Dk = sheet.D[k], Pk = sheet.P[k]; for (let i = 0; i < sheet.n; i++) out[i] = Gk[i] + Dk[i] + Pk[i]; return out; });
 }
 /** The newest dried layer's CPU copy made current (a rewet on the GPU may have lifted some of it). */
-export const syncTopLayer = sheet => { if (sheet._gpu) sheet._gpu.syncTop(sheet); };
+export const syncTopLayer = sheet => { if (sheet._gpu) sheet._gpu.syncTop(sheet, true); };
 /** The CPU copy made current over a rectangle [x, y, w, h] of cells, for code that reads the sheet's arrays directly. */
 export const needCells = (sheet, x, y, bw, bh) => { if (sheet._gpu && !sheet._gpu.paused && !ENV.NEEDCELLS_OFF) sheet._gpu.ensureFresh(sheet, [x, y, bw, bh]); };
 function thicknessParts(sheet, materializeWet = true) {
