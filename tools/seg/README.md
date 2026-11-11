@@ -6,7 +6,7 @@ The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs
 
 ## Index
 
-Inking (the pen drawing, [pipelines](../../docs/pipelines.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
+Inking (the pen drawing, [pipelines](../../docs/how-it-paints.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
 
 Painting (regions for the washes): `segments.py`, `sam_regions.py`, `segment.py`, `subject-regions.py`, `check-sheet.mjs`.
 
@@ -146,7 +146,7 @@ curl -sL -o work/models/u2net.onnx https://github.com/danielgatis/rembg/releases
 .venv/bin/python tools/seg/segment.py work/masks examples/targets/*.jpg
 ```
 
-`segments.py` uses Segment Anything when a checkpoint (trained model file) is present (see `segments.py` for where it looks). Without one, `segments.py --sam auto` falls back to k-means, which groups pixels by similar colors, and `--sam require` stops with an error. k-means uses Lab, a color space that separates lightness from color. `lines.py` lists its model files and cache directory in its header. `subject-regions.py` needs PyTorch and torchvision. Mask R-CNN uses torchvision's default trained model files and needs network access on the first run.
+`segments.py` uses Segment Anything when a checkpoint (trained model file) is present (see `segments.py` for where it looks). Without one, `segments.py --sam auto` falls back to k-means, which groups pixels by similar colors, and `--sam require` stops with an error. k-means uses Lab, a color space that separates lightness from color. `lines.py` lists its model files and cache directory in its header. `subject-regions.py` needs PyTorch and torchvision. Mask R-CNN uses torchvision's default trained model files, and needs network access on the first run.
 
 u2net takes about 0.7 seconds per image on CPU. The masks are independent of object categories. That is enough for the three uses: weighting the pen to a mask's boundary over an interior fold, treating the background as a region, and keeping hatching to a form.
 
