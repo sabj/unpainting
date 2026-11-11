@@ -6,7 +6,7 @@ import { gaussian } from '../../keyframes/density.mjs';
 import { DEFAULTS } from '../../media/sheet.mjs';
 import { check } from '../../media/checks.mjs';
 
-export const PAPER_STATE = Object.freeze({ dryWater: 0.004, drySaturation: 0.02,
+const PAPER_STATE = Object.freeze({ dryWater: 0.004, drySaturation: 0.02,
   moistWater: 0.015, moistSaturation: 0.6, glossyWater: 0.15, moistShare: 0.7 });
 const quantile = (a, q) => a.length ? a[Math.min(a.length - 1, Math.floor(q * a.length))] : null;
 

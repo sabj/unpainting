@@ -1,41 +1,32 @@
-// Containment of overfit settings (docs/techniques.md, Tuned settings): the general recipe sets no fitted flag, and painting code
-// never branches on a benchmark subject id. Fitted rules live in src/paint/tuned/ and run only through a preset that
-// the plan or --recipe names.
+// No subject-fitted settings (docs/techniques.md, Tuned settings): the painter has no presets, no fitted-settings recipe,
+// no folder of fitted values and no module of constants fitted to one benchmark subject, and painting code never
+// branches on a benchmark subject id. The architecture preset, the V096 recipe, src/paint/tuned/ and the Trumbull,
+// dog-coat, olive-tree, mass-plan and registered-anatomy modules were removed in 0.3.3. tools/guard/subject-scan.mjs (src/paint/overfit-scan.test.mjs) covers subject names.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expandRecipe } from './recipe.mjs';
-import { PRESETS, presetFlagNames, presetFlags } from './tuned/presets.mjs';
-import { TUNED_DEFAULT_FLAGS } from './tuned/default-flags.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const TUNED_DIR = path.join(ROOT, 'src/paint/tuned');
-const names = argv => argv.filter(a => a.startsWith('--')).map(a => a.slice(2));
 
 // Subject ids of the benchmark images.
 const SUBJECT_IDS = ['Cape', 'G1', 'G2', 'G3', 'G4', 'Jones', 'SF', 'Y1', 'Y2', 'Y3', 'subject-a', 'subject-b', 'subject-c', 'subject-d', 'subject-e'];
-// Painting code: everything in src/ but the tuned folder and tests, and the painter command.
+// Painting code: everything in src/ but tests, and the painter command.
 function paintingCode() {
   const files = [path.join(ROOT, 'tools/paint-plate.mjs')];
   const walk = dir => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const p = path.join(dir, e.name);
-      if (e.isDirectory()) { if (p !== TUNED_DIR) walk(p); } else if (/\.(mjs|json)$/.test(e.name) && !e.name.endsWith('.test.mjs')) files.push(p);
+      if (e.isDirectory()) walk(p); else if (/\.(mjs|json)$/.test(e.name) && !e.name.endsWith('.test.mjs')) files.push(p);
     }
   };
   for (const dir of ['src', 'tools/plate', 'tools/speed', 'bench/scripts']) walk(path.join(ROOT, dir));
   return files;
 }
 
-test('the general recipe sets no tuned flag', () => {
-  const given = new Set(names(expandRecipe({ argv: ['--recipe', 'general'] }).argv));
-  const tuned = new Set([...presetFlagNames(), ...names(TUNED_DEFAULT_FLAGS.split(' '))]);
-  assert.deepEqual([...given].filter(n => tuned.has(n)), []);
-});
-
-test('no painting code outside src/paint/tuned branches on a subject id', () => {
+test('no painting code branches on a subject id', () => {
   const literal = new RegExp(`(['"\`])(${SUBJECT_IDS.join('|')})\\1`);
   const named = /\b(TRUMBULL_SUBJECTS?|PORTRAIT_SUBJECT|V096_SUBJECT_PRESETS)\b/;
   const found = [];
@@ -47,36 +38,45 @@ test('no painting code outside src/paint/tuned branches on a subject id', () => 
   assert.deepEqual(found, []);
 });
 
-test('presets apply only when the plan or --recipe names them', () => {
-  const plain = expandRecipe({ argv: ['--recipe', 'general', '--valueplan', 'examples/plans/trumbull-values.json', '--presetless'] });
-  assert.match(plain.note, /presets architecture(,|$)/);
-  const typed = expandRecipe({ argv: ['--recipe', 'general+architecture'] }).argv;
-  for (const flag of presetFlags(['architecture']).filter(a => a.startsWith('--'))) assert.ok(typed.includes(flag), flag);
-  assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+nosuch'] }), /unknown preset nosuch/);
-  assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+glaze-gains'] }), /unknown preset glaze-gains/);
+// A folder or file named for fitted settings is where fitted values hide under neutral names (Sam, 0.3.3).
+const FITTED_NAME = /tuned|fitted|per-?subject|subject-?specific/i;
+
+test('no folder or file under src/, tools/ or bench/scripts is named tuned, fitted or per-subject', () => {
+  const found = [];
+  const walk = rel => {
+    for (const e of fs.readdirSync(path.join(ROOT, rel), { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const p = path.join(rel, e.name);
+      if (FITTED_NAME.test(e.name)) found.push(p);
+      if (e.isDirectory()) walk(p);
+    }
+  };
+  for (const dir of ['src', 'tools', 'bench/scripts']) walk(dir);
+  assert.deepEqual(found, []);
+  assert.ok(FITTED_NAME.test('src/paint/tuned') && FITTED_NAME.test('per-subject.mjs') && FITTED_NAME.test('fitted-values.json'));
+  assert.ok(!FITTED_NAME.test('shape-refit.mjs') && !FITTED_NAME.test('fit-mix.mjs'));
 });
 
-test('no preset names a subject or turns on a per-subject rule', () => {
-  for (const [name, flags] of Object.entries(PRESETS)) {
-    assert.ok(!SUBJECT_IDS.some(id => name === id || flags.split(' ').includes(id)), name);
-    for (const flag of ['--trumbullrules', '--portraitrules', '--drawsubject']) assert.ok(!flags.includes(flag), `${name} ${flag}`);
-  }
+test('the fitted modules are gone', () => {
+  assert.ok(!fs.existsSync(path.join(ROOT, 'src/paint/tuned')), 'src/paint/tuned');
+  for (const f of ['src/paint/techniques/dog-paint.mjs', 'src/paint/techniques/passages/dog.mjs', 'src/paint/techniques/passages/sand.mjs',
+    'src/paint/techniques/passages/treelayers.mjs', 'src/paint/methods/mass-wash.mjs', 'tools/seg/select-drawing.py'])
+    assert.ok(!fs.existsSync(path.join(ROOT, f)), f);
 });
 
-test('every preset is flag and value pairs', () => {
-  for (const [name, flags] of Object.entries(PRESETS)) {
-    const t = flags.split(' ');
-    assert.equal(t.length % 2, 0, name);
-    assert.ok(t.every((a, i) => (i % 2 === 0) === a.startsWith('--')), name);
-  }
+test('presets and the v096 recipe fail the run instead of painting without them', () => {
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'general+architecture'] }), /presets were removed/);
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'v096'] }), /unknown recipe|recipe/);
+  const dir = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR ?? '/tmp'), 'overfit-')), plan = path.join(dir, 'plan.json');
+  fs.writeFileSync(plan, JSON.stringify({ presets: ['architecture'] }));
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'general', '--valueplan', plan] }), /presets were removed/);
+  fs.rmSync(dir, { recursive: true });
 });
 
-test('penwash and person recipes contain no subject switches or tuned-only flags', () => {
-  const forbidden = new Set(presetFlagNames());
+test('penwash and person recipes contain no subject switches', () => {
   for (const recipe of ['penwash', 'person']) {
-    const argv = expandRecipe({argv: ['--recipe', recipe]}).argv;
+    const argv = expandRecipe({ argv: ['--recipe', recipe] }).argv;
     assert.ok(!argv.some(v => SUBJECT_IDS.includes(v)), recipe);
-    for (const flag of ['trumbullrules', 'portraitrules', 'drawsubject', ...forbidden])
-      assert.ok(!names(argv).includes(flag), `${recipe}: ${flag}`);
+    for (const flag of ['--trumbullrules', '--portraitrules', '--drawsubject']) assert.ok(!argv.includes(flag), `${recipe}: ${flag}`);
   }
 });

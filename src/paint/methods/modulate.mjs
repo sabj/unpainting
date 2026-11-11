@@ -1,6 +1,3 @@
-import {registeredHumanSkin,returnExcludedSkinToWash,registeredFurPlan} from '../tuned/modulation-anatomy.mjs';
-import { createHash } from 'node:crypto';
-import { legacySkinCell, transferPaintOwnedResidual } from '../tuned/paint-owned-residual.mjs';
 import { recoverWash, remainingMix } from './colour-budget.mjs';
 import { needCells, thickness } from '../../media/sheet.mjs';
 // --modulate 1: the base plan and marks kept, with washes scaled by 1 - pale x field in a detail field around the focus.
@@ -39,47 +36,19 @@ export async function planModulation(c) {
   // the lights in the detail field, reserved soft
   const raw = Uint8Array.from({ length: n }, (_, i) => (field[i] > 0.25 && SRC[i] < num('modlight', 0.12) ? 1 : 0));
   const lights = shapeLights(raw, { w, h, n, gaussian, num });
-  let paintOwnedTransfer=null,geometryAw=null,paintOwnedResidual=null,paintOwnedCheckpointBounds=null,paintOwnedFixtureCells=[];
-  if(opt('modpaintplanes','')){
-    const file=path.resolve(root,opt('modpaintplanes','')),doc=JSON.parse(fs.readFileSync(file));
-    if(doc.checkpointBoundsNormalized){const b=doc.checkpointBoundsNormalized;if(!Array.isArray(b)||b.length!==4||b.some(v=>!Number.isFinite(v)||v<0||v>1)||b[0]>=b[2]||b[1]>=b[3])throw Error('paint-owned checkpoint bounds invalid');paintOwnedCheckpointBounds=b;}
-    if(doc.diagnosticPointsNormalized){if(!Array.isArray(doc.diagnosticPointsNormalized)||doc.diagnosticPointsNormalized.some(p=>!Array.isArray(p)||p.length!==2||p.some(v=>!Number.isFinite(v)||v<0||v>=1)))throw Error('paint-owned diagnostic point invalid');paintOwnedFixtureCells=doc.diagnosticPointsNormalized.map(p=>Math.floor(p[1]*h)*w+Math.floor(p[0]*w));}
-    const targetHash=createHash('sha256').update(fs.readFileSync(path.resolve(root,image))).digest('hex');
-    if(doc.target?.sha256!==targetHash||doc.target.width/doc.target.height!==w/h)throw Error('paint-owned residual target registration mismatch');
-    const B2=gaussian(SRC,w,h,2),texB=gaussian(Float32Array.from(SRC,(v,i)=>Math.abs(v-B2[i])),w,h,1.5);
-    const authoredPlaneWash=doc.operation==='transfer-authored-plane-detail-residual-to-wash';
-    const eligible=Uint8Array.from({length:n},(_,i)=>authoredPlaneWash?1:legacySkinCell(px[i*3]/255,px[i*3+1]/255,px[i*3+2]/255)&&texB[i]>=num('modtex',.035)?1:0);
-    geometryAw=Float32Array.from(Aw);paintOwnedResidual=Float32Array.from(Ad);
-    paintOwnedTransfer=transferPaintOwnedResidual({Aw,Ad,K,w,h,eligible,lights,doc});
-    for(let i=0;i<n;i++)if(!paintOwnedTransfer.selected[i])for(let j=0;j<K;j++)paintOwnedResidual[i*K+j]=0;
-    fs.writeFileSync(path.join(opt('out',''),'paint-owned-residual.json'),JSON.stringify({...paintOwnedTransfer,selected:undefined,input:file,targetHash,calibrationStatus:'unchanged legacy production calibration; allocation is not delivery'},null,2));
-    await sharp(Buffer.from(Uint8Array.from(paintOwnedTransfer.selected,v=>v?255:0)),{raw:{width:w,height:h,channels:1}}).png().toFile(path.join(opt('out',''),'paint-owned-residual-support.png'));
-  }
   let nl = 0, nf = 0; for (let i = 0; i < n; i++) { nl += lights[i]; if (field[i] > 0.25) nf++; }
   log(`modulate: style ink ${style.ink}, dry ${style.dry}, wet ${style.wet}; washes scaled to ${(100 * (1 - pale)).toFixed(0)}% at the core of a detail field over ${(100 * nf / n).toFixed(1)}% of the sheet, ${nl} light cells reserved there, dry-brush coverage ${cover.toFixed(2)}`);
-  let anatomySkin=null,anatomyAudit=null,furPlan=null,filmLights=null,bodyMaterialTransfer=null;
-  if(opt('modanatomy','')){
-    if(geometryAw)throw Error('modanatomy cannot silently combine a different paint-owned allocation adapter');
-    const file=path.resolve(root,opt('modanatomy','')),doc=JSON.parse(fs.readFileSync(file,'utf8'));
-    const targetBytes=fs.readFileSync(path.resolve(root,image)),meta=await sharp(targetBytes).metadata();
-    anatomySkin=registeredHumanSkin(doc,{sha256:createHash('sha256').update(targetBytes).digest('hex'),width:meta.width,height:meta.height,w,h,px});
-    furPlan=registeredFurPlan(doc,w,h);if(furPlan){filmLights=Uint8Array.from(lights);for(let i=0;i<n;i++)if(furPlan.cat[i]){filmLights[i]=furPlan.film[i];lights[i]=furPlan.film[i]||furPlan.negative[i]?1:0;}const body=Uint8Array.from(furPlan.fur,v=>v?0:1);bodyMaterialTransfer=returnExcludedSkinToWash({Aw,Ad,K,skin:body,lights});}
-    anatomyAudit={input:file,inputSHA256:createHash('sha256').update(fs.readFileSync(file)).digest('hex'),humanSkinCells:anatomySkin.reduce((a,b)=>a+b,0),bodyMaterialTransfer,...returnExcludedSkinToWash({Aw,Ad,K,skin:anatomySkin,lights}),referenceCue:doc.referenceCue,stageIntent:doc.stageIntent};
-    log(`modulation anatomy: ${anatomyAudit.humanSkinCells} registered human skin cells; ${anatomyAudit.transferred.toFixed(6)} existing deferred pigment returned to wash`);
-  }
-  return { style, pale, cover, field, Aw, Ad, lights, focus, paintOwnedTransfer, geometryAw, paintOwnedResidual, paintOwnedCheckpointBounds, paintOwnedFixtureCells, anatomySkin, anatomyAudit, furPlan, filmLights };
+  return { style, pale, cover, field, Aw, Ad, lights, focus };
 }
 
 // The soft reserve for the modulation's lights, joined to the painter's own resist and its soft strength.
 export function joinResist(R0, S0, M, { w, h, n, distanceToZero }) {
   if (!M || !M.lights) return { R: R0, S: S0 };
   const R = new Uint8Array(n); for (let i = 0; i < n; i++) R[i] = (R0 && R0[i]) || M.lights[i] ? 1 : 0;
-  const filmLights=M.filmLights??M.lights;for(let i=0;i<n;i++)if(M.furPlan?.cat[i])R[i]=filmLights[i]?1:0;
-  const d = distanceToZero(filmLights, w, h);
+  const d = distanceToZero(M.lights, w, h);
   const S = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     if (!R[i]) continue;
-    if(M.furPlan?.cat[i]){S[i]=1;continue;}
     if (R0 && R0[i]) { S[i] = S0 ? S0[i] : 1; continue; }
     const t = Math.min(1, Math.max(0, (d[i] - 1) / 3)); S[i] = 0.15 + 0.85 * t * t * (3 - 2 * t);
   }

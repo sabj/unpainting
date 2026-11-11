@@ -1,9 +1,0 @@
-// The tuned flags of the V096 recipe (--recipe v096). Their values were fitted by self study on benchmark subjects,
-// mostly Trumbull (Y1), and V096 ran them on every subject. The default recipe sets none of them; presets.mjs groups
-// them into explicit presets. docs/techniques.md (Tuned settings) lists them.
-export const TUNED_DEFAULT_FLAGS = [
-  '--skylanemm 6 --skylanestep .8 --skyfloc .5',
-  '--groundglaze 1',
-  '--stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1',
-  '--touchgain .6',
-].join(' ');

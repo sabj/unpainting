@@ -13,14 +13,11 @@ test('the default recipe names each flag once, as flag and value pairs', () => {
   assert.equal(new Set(names).size, names.length);
 });
 
-test('v096 keeps the old tuned flags on every subject and applies no preset by subject id', () => {
-  const v096 = expandRecipe({ argv: ['--recipe', 'v096'] }).argv;
-  for (const flag of ['--stoneblocks', '--skylanes']) assert.ok(v096.includes(flag), flag);
-  // the glaze gains were removed in 0.3.3, from v096 too: the painter delivers the planned value
-  for (const flag of ['--darkgain', '--coolgain']) assert.ok(!v096.includes(flag), flag);
-  const y1 = expandRecipe({ argv: ['--recipe', 'v096', '--valueplan', 'examples/plans/trumbull-values.json'] });
-  assert.match(y1.note, /recipe v096, presets architecture,/);
-  assert.ok(!y1.argv.includes('--trumbullrules'));
+test('v096 and presets are gone: naming either fails the run', () => {
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'v096'] }), /v096/);
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'default+architecture'] }), /presets were removed/);
+  const y1 = expandRecipe({ argv: ['--valueplan', 'examples/plans/trumbull-values.json'] });
+  assert.ok(!y1.argv.includes('--stoneblocks') && !y1.argv.includes('--recesses'));
 });
 
 test("a plan's washes.paints sets the box unless --paints is given", () => {
@@ -83,13 +80,9 @@ test('final darks require an explicit choice and command-line choices win', () =
 });
 
 // The general recipe lost connected dark masses on Hills in the release comparison.
-test('combined defaults use general washes and v096 retains fitted settings', () => {
-  const flags = args => expandRecipe({argv: args}).argv;
-  const base = flags(['--recipe','v096']), general = flags([]);
-  for (const flag of ['--stoneblocks','--skylanes']) assert.ok(base.includes(flag), flag);
-  for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) {
-    assert.ok(!base.includes(flag), flag); assert.ok(general.includes(flag), flag);
-  }
+test('combined defaults use general washes', () => {
+  const general = expandRecipe({argv: []}).argv;
+  for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) assert.ok(general.includes(flag), flag);
 });
 
 test('a plan sheet section sets --sheetmm, --seed and --targetguard defaults and checks --sheetmm', async () => {
@@ -147,9 +140,9 @@ test('recipe none: authored plan wash settings take precedence over inherited de
   try {
     const file = path.join(dir, 'plan.json');
     fs.writeFileSync(file, JSON.stringify({ subject: 'test', washes: { colour: 'layered' } }));
-    const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', file, '--huechroma', '30', '--passcap', '0.7'] });
+    const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', file, '--huechroma', '45', '--passcap', '0.7'] });
     const get = name => argv[argv.lastIndexOf('--' + name) + 1];
-    assert.equal(get('huechroma'), '20');
+    assert.equal(get('huechroma'), '30');
     // Unauthored wash keys (e.g. passcap) are NOT emitted by pipelineFlags, so inherited argv is preserved
     assert.equal(get('passcap'), '0.7');
   } finally {

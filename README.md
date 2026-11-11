@@ -49,8 +49,7 @@ unpainting/
 │   ├── media/      paper, water, pigment, brush, pen and pencil physics (CPU + WebGPU)
 │   ├── paint/
 │   │   ├── methods/     generic watercolor methods: washes, glazes, layers, drawing order
-│   │   ├── techniques/  techniques for a kind of problem: faces, dark fur, foliage, skies, sea, buildings
-│   │   └── tuned/       settings fitted to specific benchmark images
+│   │   └── techniques/  techniques for a kind of problem: faces, dark fur, coats and hair, masonry, foliage, skies, sea
 │   └── crop/       target analysis: regions, value masses, palette fitting
 ├── tools/
 │   ├── paint-plate.mjs   paint an image with target-pixel reads blocked

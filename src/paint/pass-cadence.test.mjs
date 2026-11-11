@@ -24,7 +24,7 @@ test('the mark cadence is about MARKS_PER_PAINTING a painting and every pass whe
 });
 
 test('the recipes pin the mark cadence to their old --frames, and a later --frames does not move it', () => {
-  for (const recipe of ['default', 'v096']) {
+  for (const recipe of ['default']) {
     const argv = expandRecipe({ argv: ['--recipe', recipe, '--frames', '120'] }).argv;
     const get = name => argv[argv.lastIndexOf('--' + name) + 1];
     assert.equal(get('markcadence'), '8', recipe);

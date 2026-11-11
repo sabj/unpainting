@@ -18,7 +18,6 @@ import { targetRegions } from './target-regions.mjs';
 import { subjectCovers, holdSubjectLights, subjectDomain } from './subject-washes.mjs';
 import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
-import { RECESS, STONE_WALL, STONE_BLOCK_PIGMENTS, STONE_BLOCK_SHARES, GROUND } from '../tuned/trumbull.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
 // The q quantile of G over a passage's cells.
@@ -32,8 +31,8 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,recesses=false,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,recessLayers=1,recessShare=.5,recessClean=false,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,litLift=0,litWarm=false,litL=86,litReserveL=95,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,groundGlaze=0,groundFrom=GROUND.from,stoneBlocks=0,stoneBlockMm=2.6,stoneBlockAmt=.18,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,stoneIrregular=false,deepGrow=0,recessMax=0,stoneCourses=false,recessAccent=false,skyOneLayer=false,stoneClusters=0,eyeRing=0,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null}) {
-  let coolGroup=null;setRecessMax(recessMax);
+export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,deepGrow=0,skyOneLayer=false,eyeRing=0,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null}) {
+  let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
   const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
@@ -148,7 +147,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // rims are restated while a portrait's irises, which the same threshold turns black, are left alone.
   if(deepMask&&deepAccentIn?.length){const boxes=families.filter(f=>deepAccentIn.includes(f.id)&&f.bounds).map(f=>f.bounds);
     deepMask=Uint8Array.from(deepMask,(v,i)=>{if(!v)return 0;const x=(i%w+.5)/w,y=(Math.floor(i/w)+.5)/h;return boxes.some(b=>x>=b[0]&&x<b[2]&&y>=b[1]&&y<b[3])?1:0;});}
-  const accentCells=new Uint8Array(n),groundCells=new Uint8Array(n);
+  const accentCells=new Uint8Array(n);
   // eyeRing r (share of sheet width): an eye is a lighter iris ring with a dark pupil and limbal edge, not one dark almond.
   // Around each catchlight reserve the iris centre is the centroid of dark cells within 1.5r. Deep accents stay on the
   // pupil (under .38r) and the limbal edge (over .78r); the iris body between keeps its middle planes.
@@ -169,46 +168,15 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // a smaller darker plane only where the target is darker. Each plane holds a narrow value
       // range, so its single wash value matches the target.
       if(nested){const share=Math.min(1,.32/Math.max(1e-6,v));weights[1][i]=middle*share;weights[2][i]=middle*(1-share);}
-      // --recesses 1 (the architecture preset): hard dark architectural recesses are last paint accents on the dried wall (fitted on Y1; docs/techniques.md, Tuned settings).
-      if(recesses&&rgb&&isRecess(rgb,i)){weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=1-light;if(recessAccent)accentCells[i]=1;
-        // Darks build in two dried layers, as a painter restates a window: band 4 then band 5.
-        if(recessLayers>1){const keep=recessClean?1:1-light;if(recessClean)weights[0][i]=0;weights[3][i]=keep*recessShare;weights[4][i]=keep*(1-recessShare);}}
       // accentShare: small dark features (brows, lids, iris rims, nostrils, lip line) are too small for the shadow
       // glaze support. Their share of middle demand above value accentMin moves to band 5, as last accents on dry paint.
       if(accentShare>0&&!shadowMask[i]&&v>accentMin){const a=middle*accentShare*Math.min(1,(v-accentMin)/.2);weights[1][i]-=a*weights[1][i]/Math.max(1e-6,middle);weights[2][i]-=a*weights[2][i]/Math.max(1e-6,middle);weights[4][i]+=a;accentCells[i]=1;}
       // deepAccent m: cells with max channel below m (pupils, iris rims, nostrils, brow cores, lip corners) are
       // restated last in two dried layers, band 4 then band 5, as a painter darkens an eye last.
-      if(deepMask&&!recesses&&!protectedCells[i]&&deepMask[i]&&!irisBody[i]){const keep=1-light;weights[1][i]=weights[2][i]=0;weights[3][i]=keep*.75;weights[4][i]=keep*.75;accentCells[i]=1;}
-      if(SMALL_DARK&&SMALL_DARK[i]&&!protectedCells[i]&&!accentCells[i]){const keep=1-light;weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=keep;accentCells[i]=1;}
-      // groundGlaze: a cool-neutral ground (road, pavement shadow side) is one blue-violet glaze across
-      // the whole ground on dry paint, not separate light washes; share g of its middle demand moves to band 4.
-      if(groundGlaze>0&&rgb&&!protectedCells[i]&&Math.floor(i/w)/h>groundFrom&&!isRecess(rgb,i)){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2],L=.2126*r+.7152*g+.0722*b;
-        if(b>=r-GROUND.blueUnderRed&&Math.max(r,g,b)-Math.min(r,g,b)<GROUND.maxChroma&&L>GROUND.minL&&L<GROUND.maxL){const m=weights[1][i]+weights[2][i],a=m*groundGlaze;weights[1][i]-=a*weights[1][i]/Math.max(1e-6,m);weights[2][i]-=a*weights[2][i]/Math.max(1e-6,m);weights[3][i]+=a;shadowMask[i]=1;groundCells[i]=1;}}}
+      if(deepMask&&!protectedCells[i]&&deepMask[i]&&!irisBody[i]){const keep=1-light;weights[1][i]=weights[2][i]=0;weights[3][i]=keep*.75;weights[4][i]=keep*.75;accentCells[i]=1;}
+      if(SMALL_DARK&&SMALL_DARK[i]&&!protectedCells[i]&&!accentCells[i]){const keep=1-light;weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=keep;accentCells[i]=1;}}
 
-  }
-  // litLift (luminous stone): warm stone whose squinted (1 mm) target L* is at least litL is a lit face. It keeps its
-  // pale foundation, loses share litLift of the middle layers and every shadow glaze, and stays a thin warm glaze.
-  // Lit cells at litReserveL or more are reserved as paper (sun-struck edges). One squinted threshold, cleaned to shapes.
-  const hasSunlitStone=layerLocal&&litLift===0&&families.some(f=>/stone/i.test(f.id??'')&&/sunlit/i.test(f.referenceCue??''));
-  const effLitLift=litLift>0?litLift:hasSunlitStone?.45:0,effLitWarm=litWarm||hasSunlitStone,effLitL=litLift>0?litL:hasSunlitStone?80:86,effLitReserveL=litLift>0?litReserveL:95;
-  let litStoneMask=null;
-  if(shaped&&(effLitLift>0||effLitWarm)&&rgb){
-    const Lst=Float32Array.from({length:n},(_,i)=>lstarOf(rgb,i)),sm=boxMeanValue(Lst,w,h,Math.max(1,Math.round(1/(sheetWidthMm/w))));
-    const smBroadL=hasSunlitStone?boxMeanValue(Lst,w,h,Math.max(2,Math.round(3.5/(sheetWidthMm/w)))):null;
-    const warmStone=i=>rgb[i*3]-rgb[i*3+2]>14&&rgb[i*3+1]-rgb[i*3+2]>6;
-    const lit=removeSmall(closeLocal(Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&warmStone(i)&&sm[i]>=effLitL&&!isRecess(rgb,i)?1:0),w,h,1),w,h,Math.max(12,minShape>>2));
-    if(hasSunlitStone)litStoneMask=lit;
-    const ridge=hasSunlitStone?removeSmall(Uint8Array.from({length:n},(_,i)=>lit[i]&&(sm[i]>=87||(smBroadL&&Lst[i]>=82&&Lst[i]-smBroadL[i]>=1.2))?1:0),w,h,8):null;
-    const glint=removeSmall(Uint8Array.from({length:n},(_,i)=>lit[i]&&sm[i]>=effLitReserveL?1:0),w,h,8);
-    // litWarm: on a lit face the cool and neutral demand (ultramarine, cerulean, sepia, Payne's grey) goes to warm
-    // earth (yellow ochre or raw sienna, or 82% hansa yellow + 18% quinacridone rose when ochre is absent).
-    const och=pigments.findIndex(p=>/yellow ochre|raw sienna/i.test(p?.name??'')),sienna=pigments.findIndex(p=>/raw sienna|burnt sienna/i.test(p?.name??'')),hansa=pigments.findIndex(p=>/hansa yellow|cadmium yellow/i.test(p?.name??'')),rose=pigments.findIndex(p=>/quinacridone rose|cadmium red/i.test(p?.name??''));
-    const cool=pigments.map((p,j)=>/ultramarine|cerulean|sepia|payne/i.test(p?.name??'')?j:-1).filter(j=>j>=0);
-    if(effLitWarm&&(och>=0||sienna>=0||hansa>=0)){demand=demand.slice();}
-    let a=0,g=0;for(let i=0;i<n;i++){if(!lit[i])continue;if(effLitWarm&&(och>=0||sienna>=0||hansa>=0)){let m=0;for(const j of cool){m+=demand[i*k+j];demand[i*k+j]=0;}if(och>=0){demand[i*k+och]=demand[i*k+och]+m;}else if(sienna>=0&&hansa>=0){demand[i*k+sienna]+=m*.72;demand[i*k+hansa]+=m*.28;}else if(hansa>=0&&rose>=0){const tot=demand[i*k+hansa]+demand[i*k+rose]+m;demand[i*k+hansa]=tot*.82;demand[i*k+rose]=tot*.18;}else if(hansa>=0){demand[i*k+hansa]+=m;}else if(sienna>=0){demand[i*k+sienna]+=m;}}a++;
-      if(ridge?.[i]){weights[0][i]=Math.max(weights[0][i],.82);weights[1][i]=0;weights[2][i]=0;}else{if(hasSunlitStone)weights[0][i]=Math.max(weights[0][i],.62);weights[1][i]*=1-effLitLift;weights[2][i]*=1-effLitLift;}
-      weights[3][i]=weights[4][i]=0;if(glint[i]){protectedCells[i]=1;g++;}}
-    console.log(`lit stone: ${a} cells lit (squinted L* >= ${effLitL}), ${g} reserved as paper glints (>= ${effLitReserveL})`);
+
   }
   const regionProfiles=profile?region.regions.map(r=>resolveStyle(subject,r.descriptiveFamily,styleSelection)):[];
   // cellFamilies (whole paintings): colour regions can span the whole sheet, so no region wins a small family box.
@@ -255,7 +223,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   const SQUINT=nestedBands&&stepSquint&&layerSmoothMm>0?boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))):null;
   if(nestedBands)for(let i=0;i<n;i++){
     if(profile&&cellStyle(i).name==='ink-and-wash')continue;
-    if(accentCells[i]||(recesses&&rgb&&isRecess(rgb,i))||litStoneMask?.[i]||groundCells[i])continue;
+    if(accentCells[i])continue;
     const v=SQUINT?SQUINT[i]:value.values[i];
     let asked=0;for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=Math.max(0,Math.min(v,VALUE_CAPS[band])-lo);asked+=weights[band][i];}
     for(let band=0;band<5;band++)weights[band][i]=asked>0?weights[band][i]/asked*styleGain:0;
@@ -264,7 +232,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // paleLights v: pale planes (smoothed value at most v, at least a minimum shape) are pale local colour, one clean
   // wash: their whole demand goes to band 1 and no middle layer or glaze crosses them.
   if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
-    for(let i=0;i<n;i++)if(pale[i]&&!litStoneMask?.[i]){let t=0;for(let b=0;b<5;b++){t+=weights[b][i];weights[b][i]=0;}weights[0][i]=t;}}
+    for(let i=0;i<n;i++)if(pale[i]){let t=0;for(let b=0;b<5;b++){t+=weights[b][i];weights[b][i]=0;}weights[0][i]=t;}}
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
   if(calibratedPlan)normalizeWashWeights(weights);
   let opticsReport=null;
@@ -288,7 +256,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // skyOneLayer: a large open cool plane (sky over 1.5% of the sheet) is one graded wet passage in layer 0. Later
     // layers, cut at a whole-sheet value quantile, would lay hard-edged dark patches over it.
     let skyCells=null;
-    if(skyOneLayer&&rgb){const cool=Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&rgb[i*3+2]>rgb[i*3]+10&&rgb[i*3+2]>=135&&!isRecess(rgb,i)?1:0),cc=components(cool,w,h),sz=new Int32Array(cc.count+1);
+    if(skyOneLayer&&rgb){const cool=Uint8Array.from({length:n},(_,i)=>!protectedCells[i]&&rgb[i*3+2]>rgb[i*3]+10&&rgb[i*3+2]>=135?1:0),cc=components(cool,w,h),sz=new Int32Array(cc.count+1);
       for(let i=0;i<n;i++)sz[cc.labels[i]]++;skyCells=Uint8Array.from({length:n},(_,i)=>cc.labels[i]&&sz[cc.labels[i]]>n*.015?1:0);}
     // layerLocal: the cut levels are the same quantiles of each colour region's own smoothed values (compact, detailed
     // subject regions of at least minShape*6 cells and at most 14% of the sheet), so a form whose values sit inside one
@@ -313,12 +281,6 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
-  // stoneBlocks c: sparse irregular ashlar hints on dry warm wall, courses of blocks stoneBlockMm tall, share c kept.
-  // Each is a pale single-pigment glaze at stoneBlockAmt of the cell's demand, not marks or dry brush. They are laid
-  // wet on dry between the middle layers and the shadow glazes.
-  const effStoneBlocks=stoneBlocks;
-  if(shaped&&effStoneBlocks>0&&rgb){const B=makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover:effStoneBlocks,mm:stoneBlocks>0?stoneBlockMm:3.6,pigments,irregular:stoneIrregular||hasSunlitStone,courses:stoneCourses||hasSunlitStone,clusters:stoneClusters||(hasSunlitStone?14:0)});
-    if(B){const at=steps.findIndex(s=>s.band>=4);steps.splice(at<0?steps.length:at,0,{band:3,tag:'B',wt:Float32Array.from(B,(v,i)=>v>=0?stoneBlockAmt:0),pig:B});}}
   // subjects: a subject's lit planes take its first washes only; the later middle layers go round them
   if(subjects)steps.splice(0,steps.length,...holdSubjectLights(steps,subjects.lights));
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
@@ -331,7 +293,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     for(let pigment=0;pigment<k;pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,carried=placed,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>carry[pigment][i];
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}const recess=shaped&&recesses&&rgb&&isRecess(rgb,i);mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||recess||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
+        const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
       // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
       // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
       // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
@@ -358,13 +320,12 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           const sat=hueChromaLab?Math.hypot(...labOf([r,g,b],0,[255,255,255]).slice(1)):Math.max(r,g,b)-Math.min(r,g,b);
           coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(b<=r&&hueChroma>0&&sat>=hueChroma?3:0);}}
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
-      const litDom=phase==='light'&&litStoneMask?region.regions.findIndex(r=>/stone/i.test(r.descriptiveFamily??''))+1:0;
-      const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0).concat(litDom>0?[-litDom]:[]):[];
+      const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0):[];
       const domains=subjects?[0]:groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
       // washJoin (wash-join.mjs): a domain piece under the minimum shape joins the neighbouring domain's passage
       // instead of being dropped as a bare-paper shard.
       const keyOfDomain=d=>d<0?7:groupMode?coolGroup[d]:typeof d==='string'?domains.indexOf(d)+1:d;
-      const cellGroup=i=>litDom>0&&litStoneMask?.[i]?7:groupMode?coolGroup[region.labels[i]]:typeof domains[0]==='string'?domains.indexOf(cellStyle(i).name)+1:region.labels[i];
+      const cellGroup=i=>groupMode?coolGroup[region.labels[i]]:typeof domains[0]==='string'?domains.indexOf(cellStyle(i).name)+1:region.labels[i];
       const joined=(washJoin||(stepHoles&&!step.pig))&&!subjects&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,minShape):null;
       for(const domain of domains){
         const M0=subjects?mask:joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
@@ -520,13 +481,6 @@ function boxMeanValue(src,w,h,r){const n=w*h,row=new Float32Array(n),out=new Flo
   for(let x=0;x<w;x++){let s=0,c=0;for(let y=-r;y<h+r;y++){const a=y+r,b=y-r-1;if(a>=0&&a<h){s+=row[a*w+x];c++;}if(b>=0&&b<h){s-=row[b*w+x];c--;}if(y>=0&&y<h)out[y*w+x]=s/c;}}
   return out;}
 
-function lstarOf(rgb,i){const f=c=>{c/=255;return c>.04045?((c+.055)/1.055)**2.4:c/12.92;};const Y=.2126*f(rgb[i*3])+.7152*f(rgb[i*3+1])+.0722*f(rgb[i*3+2]);return Y>.008856?116*Math.cbrt(Y)-16:903.3*Y;}
-
-// Dark architectural recess: near-black openings, or cool blue-dark window glass. Painted last
-// on the dried wall with its own fitted mixture, never averaged into the wall washes.
-let RECESS_DARK=RECESS.dark,RECESS_BLUE=RECESS.blue;
-function setRecessMax(v){RECESS_DARK=v>0?v*RECESS.dark/RECESS.blue:RECESS.dark;RECESS_BLUE=v>0?v:RECESS.blue;}
-function isRecess(rgb,i){const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2],m=Math.max(r,g,b);return m<RECESS_DARK||(b>r+RECESS.blueOverRed&&m<RECESS_BLUE);}
 
 // The target's paper: the largest connected region among the brightest 4% of cells (luminance), its mean
 // colour and mean density. Returns null when that region is under 1% of the sheet (no visible paper).
@@ -540,35 +494,6 @@ export function estimatePaper(rgb,w,h,density){
   const sum=[0,0,0];let ds=0;for(let i=0;i<n;i++)if(c.labels[i]===best){for(let q=0;q<3;q++)sum[q]+=rgb[3*i+q];ds+=density[i];}
   let edge=false;for(let i=0;i<n&&!edge;i++)if(c.labels[i]===best){const x=i%w,y=(i/w)|0;if(x===0||y===0||x===w-1||y===h-1)edge=true;}
   return {rgb:sum.map(v=>v/size[best]),density:ds/size[best],cells:size[best],touchesBorder:edge};
-}
-
-// Sparse stone block hints (see stoneBlocks). Returns Int8Array of pigment index per cell (-1 = none) or null.
-function makeStoneBlocks({rgb,w,h,protectedCells,sheetWidthMm,cover,mm,pigments,irregular=false,courses=false,clusters=0}){
-  const cell=sheetWidthMm/w;let hb=Math.max(6,Math.round(mm/cell));const _u=0,gap=Math.max(1,Math.round(.3/cell)),jit=Math.max(1,Math.round(.35/cell));
-  const warmFallback=pigments.findIndex(p=>/ochre|sienna/i.test(p?.name??''));
-  const idx=STONE_BLOCK_PIGMENTS.map(nm=>{const j=pigments.findIndex(p=>p?.name===nm);return j>=0?j:warmFallback;}),probs=STONE_BLOCK_SHARES;
-  if(warmFallback<0||idx.every(j=>j<0))return null;
-  let seed=12345;const rnd=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
-  const wall=i=>{const r=rgb[i*3],g=rgb[i*3+1],b=rgb[i*3+2],L=.2126*r+.7152*g+.0722*b;return !protectedCells[i]&&!isRecess(rgb,i)&&r-b>STONE_WALL.redOverBlue&&g-b>STONE_WALL.greenOverBlue&&L>STONE_WALL.minL&&L<STONE_WALL.maxL;};
-  const out=new Int8Array(w*h).fill(-1);let kept=0;
-  // clusters K: a painter hints a few stones in loose groups that fade out, not an even grid across the wall. K group
-  // centres on wall cells, radius ~9 block heights; keep chance falls off with distance; block heights and vertical
-  // offsets vary per block so courses do not line up.
-  let near=null;if(clusters>0){const wl=[];for(let i=0;i<w*h;i+=7)if(wall(i))wl.push(i);const C=[];for(let q=0;q<clusters&&wl.length;q++)C.push(wl[Math.floor(rnd()*wl.length)]);const R=hb*9;
-    near=(x,y)=>{let best=0;for(const c of C){const dx=x-c%w,dy=y-((c/w)|0);best=Math.max(best,Math.exp(-(dx*dx+dy*dy)/(R*R)));}return best;};}
-  for(let y0=0,hb0=hb;y0<h;y0+=hb){if(courses)hb=Math.max(6,Math.round(hb0*(.7+rnd()*.7)));let x0=-Math.floor(rnd()*hb*2);
-    while(x0<w){const bw=Math.round(hb*(courses?1.1+rnd()*2.2:1.6+rnd()*1.2));if(courses&&rnd()<.25){x0+=bw;continue;}
-      if(rnd()<(near?Math.min(1,cover*2.2*near(x0+bw/2,y0+hb/2)):cover)){
-        // irregular stones: each corner moves independently (quad, not a rectangle) when irregular is set
-        const J=()=>Math.round((rnd()-.5)*2*jit*(irregular?2.2:1));const dy=near?Math.round((rnd()-.5)*hb*.5):0,sh=near?Math.round(hb*(.25*rnd())):0;const xa=x0+gap,xb=x0+bw-gap,ya=y0+gap+dy+sh,yb=y0+hb-gap+dy;
-        const Q=irregular?[[xa+J(),ya+J()],[xb+J(),ya+J()],[xb+J(),yb+J()],[xa+J(),yb+J()]]:(()=>{const e=[J(),J(),J(),J()];return [[xa+e[0],ya+e[2]],[xb+e[1],ya+e[2]],[xb+e[1],yb+e[3]],[xa+e[0],yb+e[3]]];})();
-        const inside=(x,y)=>{let sg=0;for(let q=0;q<4;q++){const [x1,y1]=Q[q],[x2,y2]=Q[(q+1)%4],c=(x2-x1)*(y-y1)-(y2-y1)*(x-x1);if(c<0)return false;}return true;};
-        const bx0=Math.min(...Q.map(p=>p[0])),bx1=Math.max(...Q.map(p=>p[0])),by0=Math.min(...Q.map(p=>p[1])),by1=Math.max(...Q.map(p=>p[1]));
-        const cells=[];let tot=0;for(let y=Math.max(0,by0);y<Math.min(h,by1);y++)for(let x=Math.max(0,bx0);x<Math.min(w,bx1);x++){if(!inside(x+.5,y+.5))continue;tot++;const i=y*w+x;if(wall(i))cells.push(i);}
-        if(tot&&cells.length>=.75*tot){let u=rnd(),c=0;while(c<2&&(u-=probs[c])>0)c++;let pj=idx[c];if(pj<0)pj=idx.find(j=>j>=0);for(const i of cells)out[i]=pj;kept++;}}
-      x0+=bw;}}
-  console.log(`stone blocks: ${kept} kept, ${hb} cells tall`);
-  return kept?out:null;
 }
 
 // edgeWobbleMm: a wash never ends on a ruled line. Only passages over 0.4% of the sheet move, so small figures keep

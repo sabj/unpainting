@@ -147,3 +147,12 @@ test('authoritative wet-on-dry contact does not inherit an unplanned duplicate; 
  const wet={...dry,move:'wet on wet',wetness:{required:'wet'}};
  assert.equal(semanticTechnique({pass:wet},legacy).passes,2);
 });
+
+test('a pass may name surface marks from the technique library: wet on dry or dry brush, not authored, validated', () => {
+  const marks = { kind: 'curly-coat', reason: 'tight curls on the coat', cover: 0.5, placement: 'edge' };
+  let d = fixture(); d.areas[1].passes[0].marks = marks;
+  assert.ok(plan(d).passes.get('left/model').pass.marks);
+  d = fixture(); d.areas[1].passes[0].marks = { ...marks, kind: 'feathers' }; assert.throws(() => plan(d), /marks.kind/);
+  d = fixture(); d.areas[1].passes[0].marks = { kind: 'short-coat', reason: 'smooth coat', cover: 0.5, placement: 'edge' }; assert.throws(() => plan(d), /flow/);
+  d = fixture(); d.areas[1].passes[0].move = 'wet on wet'; d.areas[1].passes[0].marks = marks; assert.throws(() => plan(d), /wet on dry or dry brush/);
+});

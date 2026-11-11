@@ -5,22 +5,22 @@ import { ignoredSettings, badNumbers, isSwitchWord, GATES, INERT } from './optio
 const valueOf = flags => name => flags[name];
 
 test('a gated setting typed while its switch is off or absent is reported with the switch it needs', () => {
-  const none = ignoredSettings({ given: ['recesslayers'], value: valueOf({ recesslayers: '2' }) });
-  assert.deepEqual(none.map(r => r.flag), ['recesslayers']);
-  assert.match(none[0].reason, /--recesses/);
-  const off = ignoredSettings({ given: ['stoneblockmm'], value: valueOf({ stoneblockmm: '4', stoneblocks: '0' }) });
-  assert.deepEqual(off.map(r => r.flag), ['stoneblockmm']);
+  const none = ignoredSettings({ given: ['deepgrow'], value: valueOf({ deepgrow: '2' }) });
+  assert.deepEqual(none.map(r => r.flag), ['deepgrow']);
+  assert.match(none[0].reason, /--deepaccent/);
+  const off = ignoredSettings({ given: ['skylanemm'], value: valueOf({ skylanemm: '4', skylanes: '0' }) });
+  assert.deepEqual(off.map(r => r.flag), ['skylanemm']);
   const junk = ignoredSettings({ given: ['skyfloc'], value: valueOf({ skyfloc: '.5', skyblue: 'yes' }) });
   assert.deepEqual(junk.map(r => r.flag), ['skyfloc']);
 });
 
 test('a gated setting is fine while its switch is on, wherever the switch came from', () => {
-  assert.deepEqual(ignoredSettings({ given: ['recesslayers', 'recessshare'], value: valueOf({ recesslayers: '2', recessshare: '.75', recesses: '1' }) }), []);
+  assert.deepEqual(ignoredSettings({ given: ['skylanemm', 'skylanestep'], value: valueOf({ skylanemm: '4', skylanestep: '.8', skylanes: '1' }) }), []);
   assert.deepEqual(ignoredSettings({ given: ['deepgrow'], value: valueOf({ deepgrow: '2', deepaccent: '80' }) }), []);
 });
 
 test('only typed settings are reported, so a recipe default never fails a run', () => {
-  assert.deepEqual(ignoredSettings({ given: [], value: valueOf({ recesslayers: '2' }) }), []);
+  assert.deepEqual(ignoredSettings({ given: [], value: valueOf({ deepgrow: '2' }) }), []);
 });
 
 test('settings no switch can make act are reported whatever else is on', () => {

@@ -41,7 +41,7 @@ async function lookImages(sheetPng, target, dir, n) {
 }
 
 export class PaintSession {
-  /** raw: the try's raw folder for this target; spec: {width, sheetmm, trumbull}; modelMinutes: the model-time cap. */
+  /** raw: the try's raw folder for this target; spec: {width, sheetmm}; modelMinutes: the model-time cap. */
   constructor({ repo, ws, raw, spec, target, modelMinutes = 85, gpu = 'auto', log = () => {}, planOnly = false }) {
     Object.assign(this, { repo, ws, raw, spec, target, gpu, log, planOnly });
     this.io = path.join(ws, 'bench', 'paint-io');

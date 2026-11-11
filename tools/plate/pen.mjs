@@ -226,20 +226,6 @@ const writeInkTiers = async (D) => {
   const rgb = inkTierOverlay(D, w, h, INK_TIER_LOG, { width: num('inktierswidth', 2) });
   await sharp(Buffer.from(rgb.buffer, rgb.byteOffset, rgb.length), { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'ink-tiers.png'));
 };
-// --inkofftrees 1: keep the pen off the tree region (src/paint/techniques/passages/treelayers.mjs) widened by two cells. Default 0.
-let INK_TREES = null;
-const inkTreeMask = async () => {
-  if (INK_TREES) return INK_TREES;
-  const { treeRegion } = await import('../../src/paint/techniques/passages/treelayers.mjs');
-  const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs');
-  const image = opt('image', ''), base = image ? path.basename(image, path.extname(image)) : '';
-  const seg = base && hasSegments(base) ? await loadSegments(base, w, h) : null;
-  const T = treeRegion({ w, h, px: ctx.px, fig: ctx.FW_SUBJ || ctx.SUBJECT, seg, mmCell: num('sheetmm', DEFAULT_SHEET_MM) / w });
-  INK_TREES = dilate(T.region, w, h, 2);
-  let c = 0; for (const v of INK_TREES) c += v;
-  console.log(`ink off trees: ${(100 * c / n).toFixed(1)}% of the sheet is background trees`);
-  return INK_TREES;
-};
 // The pen's drawing is planned whole before the first mark: where every line goes and how
 // hard, from the reference and the plan, never from the sheet. drawPass, after TARGET_GUARD.beginPaint(), only draws it.
 async function planPen(planD0, opts = {}) {
@@ -451,7 +437,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --inkoffbox x0,y0,x1,y1: every pen pass drops gestures with --inkoffshare (default 0.5) of points in the box, off the figure.
   // --inkoffoutline 1: the box also drops outlines. --inkoffline r: keep gestures with --inkofflineshare of points near reference line.
   // --inkofffoliage d: the same rule on foliage cells (green beats red and blue by d), smoothed by --inkofffoliager, cut at --inkofffoliagecut.
-  const TREES_OFF = num('inkofftrees', 0) > 0 ? await inkTreeMask() : null;
   // --inkoffsand 1: keep the pen off warm ground, found from the source and its sky and figure masks.
   const SAND_OFF = num('inkoffsand', 0) > 0 ? await (async () => {
     const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs');
@@ -460,14 +445,14 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     const sky = seg?.regions.find(r => r.name === 'sky')?.mask;
     const fig = ctx.FW_SUBJ || ctx.SUBJECT;
     const m = Uint8Array.from({ length: n }, (_, i) => {
-      if ((fig && fig[i] > 0.5) || (sky && sky[i]) || (TREES_OFF && TREES_OFF[i])) return 0;
+      if ((fig && fig[i] > 0.5) || (sky && sky[i])) return 0;
       const r = ctx.px[i * 3], g = ctx.px[i * 3 + 1], b = ctx.px[i * 3 + 2];
       return i >= Math.floor(h * num('sandfrom', 0.45)) * w && r - b > 8 && r >= g - 5 ? 1 : 0;
     });
     const radius = Math.max(1, Math.round(2 / (num('sheetmm', DEFAULT_SHEET_MM) / w)));
     return closeLocal(m, w, h, radius);
   })() : null;
-  const INKOFF = opt('inkoffbox', '') !== '' || num('inkofffoliage', 0) > 0 || TREES_OFF || SAND_OFF ? (() => {
+  const INKOFF = opt('inkoffbox', '') !== '' || num('inkofffoliage', 0) > 0 || SAND_OFF ? (() => {
     const box = opt('inkoffbox', '') !== '' ? String(opt('inkoffbox', '0,0,1,1')).split(',').map(Number) : null;
     const fig = ctx.FW_SUBJ || ctx.SUBJECT, share = num('inkoffshare', 0.5);
     const at = (x, y) => Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)));
@@ -480,7 +465,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
       console.log(`ink off foliage: ${(100 * c / n).toFixed(1)}% of the sheet reads as foliage`);
       return F;
     })() : null;
-    const inBox = (x, y) => !(fig && fig[at(x, y)] > 0.5) && ((SAND_OFF && SAND_OFF[at(x, y)] === 1) || (fol && fol[at(x, y)] === 1) || (TREES_OFF && TREES_OFF[at(x, y)] === 1) || (box && x >= box[0] * w && x <= box[2] * w && y >= box[1] * h && y <= box[3] * h));
+    const inBox = (x, y) => !(fig && fig[at(x, y)] > 0.5) && ((SAND_OFF && SAND_OFF[at(x, y)] === 1) || (fol && fol[at(x, y)] === 1) || (box && x >= box[0] * w && x <= box[2] * w && y >= box[1] * h && y <= box[3] * h));
     const lineR = num('inkoffline', 0), near = lineR > 0 ? dilate(SEP.ink, w, h, Math.max(1, Math.round(lineR * K))) : null;
     const lineShare = near ? num('inkofflineshare', 0.7) : 0;
     const off = g => { let c = 0, on = 0; for (const q of g.points) if (inBox(q.x, q.y)) { c++; if (near && near[at(q.x, q.y)]) on++; } return c >= g.points.length * share && !(near && on >= c * lineShare); };
@@ -620,5 +605,5 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
   PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, CROSSHATCH_PLAN, PENWASH, PENWASH_PLAN, penWashFlat, LOOK_AL, 
-  LOOK_PLAN, SOURCE_INK, TIER_MASK, ML_LINES, inkTreeMask });
+  LOOK_PLAN, SOURCE_INK, TIER_MASK, ML_LINES });
 }

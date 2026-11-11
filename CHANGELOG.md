@@ -11,6 +11,16 @@ Judging painting changes. Checked with unit tests and a run without judge calls 
 - **The copy limits are absolute ceilings.** A plate passes or fails on its own records: guard clean, no paint-time look at the target, `hfCorr` at or under the ceiling for its width, and paint strokes at or under the sheet's stroke ceiling, which is the number of 1.5 mm by 4.5 mm marks that cover the sheet once (`strokeCeiling` in `tools/guard/cheat-risk.mjs`, written to `cheat-risk.json` with the sheet size). The earlier limits against the previous build (hfCorr up by at most 0.02, strokes up by at most 10%) are not used. Strokes and render seconds are reported as a cost beside the verdict.
 - Measured on 11 stored 1,200 px plates from 0.3.1 and 0.3.2 development commits, all painted with no target looks: 5 pass these ceilings. Five are over the `hfCorr` ceiling of 0.645 (three Mittens plates at 0.654 to 0.700 and two h36a plates at 0.734 and 0.755). One Trumbull plate lays 16,823 paint strokes against its ceiling of 10,182.
 
+### No subject-fitted settings
+
+Sam's rule: a constant, rule, option or technique fitted to one benchmark subject is cheating in both painting modes.
+
+- **Removed, with their options, presets and tokens:** `src/paint/tuned/` (the folder is gone); the `architecture` preset, the `"presets"` plan key and `--recipe x+<preset>`; the `v096` recipe; the Trumbull recess, stone-block, ground-glaze and lit-stone rules; the curly-dog-coat technique and every `--dog*` flag; the dog, sand and olive-tree passages; the mass plan fitted to one portrait; registered anatomy and plane polygons bound to one target; the layered-wash chroma split chosen for one subject's orange (both wash modes now split at 30); the beach-scene dog and ball finders and the beach-only line selection script. 232 options left the option ledger.
+- **Bench:** every subject gets the same base. The per-subject `trumbull` switch, its paint boxes, the palette, stone, recess and lit tokens, and the base's Trumbull-fitted sky lanes (6 mm, step .8) and sky mottle (.5) are gone; the painter's own defaults apply. Stored V4 and V5 plans that name a removed token or option now fail their check.
+- **Kept as general techniques, chosen by the plan:** `src/paint/techniques/surface-marks.mjs` lays masonry, short-coat, curly-coat and long-hair marks when an area-plan pass names them (`pass.marks`), every size a multiple of the pass's brush width, at the edge of the mass or over it as the plan says.
+- **Guard:** `tools/guard/subject-scan.mjs` now reads every JavaScript and Python file under `src/` and `tools/` and fails on a benchmark subject name outside tests, fixtures and reviewed target lists; `src/paint/overfit.test.mjs` fails on any folder or file named tuned, fitted or per-subject.
+- Measured at 480 px, strict (`--notargetlooks 1`), against 033-main 80413b81, one render each: Mittens and Rembrandt byte-identical; dog-paint dE76 13.48 -> 13.47, dark share 0.356 -> 0.356; Trumbull dE76 14.63 -> 15.31, dark share 0.138 -> 0.116 (target 0.143), strokes 1,369 -> 630, hfCorr 0.358 -> 0.391. Trumbull is plainer and scores worse; that is the honest plate.
+
 ## 0.3.2 — 2026-11-09
 
 Painter **V105**, simulator **104**, judges **J1**. The changes run from the 0.3.0 release commit `70ceb7c3`.

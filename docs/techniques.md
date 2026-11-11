@@ -4,7 +4,7 @@ The painter's code in `src/paint/` is grouped by purpose. This page is an index:
 
 - [General methods](#general-methods) (`src/paint/methods/`) are generic watercolor methods: paper, palette, paint order, washes, glazes, layers and the drawing.
 - [Targeted techniques](#targeted-techniques) (`src/paint/techniques/`) handle one kind of feature or surface: faces, dark fur, curly dog coats, foliage, skies, sea, sand and buildings. Most are off unless a flag turns them on.
-- [Tuned settings](#tuned-settings) (`src/paint/tuned/`) were fitted to specific benchmark images. They can help those images and hurt others.
+- [Tuned settings](#tuned-settings): what was fitted to one benchmark subject and removed in 0.3.3, and what fitted values remain.
 
 The default recipe (`src/paint/recipe.mjs`) is a preset of painter settings. A flag given after the recipe on the command line wins, so each off value below can be added to any run. `--recipe none` turns off the whole recipe. The default, `--recipe general` and `--recipe combined` are the same general process. The painting plan chooses the drawing, washes and order ([plan format](plan-format.md#value-plan-input)). Fitted settings need an explicit preset. See [linework.md](linework.md) for drawing-stage choices.
 
@@ -87,7 +87,6 @@ Modules, with their flags:
 - `methods/local-lights.mjs` (`--locallights`): masks each segment's lightest share before any wash.
 - `methods/look.mjs` (not reached): reads what the sheet still lacks to choose the next act.
 - `methods/mass-budget.mjs` (`--massbudget 1`): full wash budget for broad neutral dark masses.
-- `methods/mass-wash.mjs` (`--massplan 1`): a few coloured masses laid back to front.
 - `methods/masses.mjs` (`--masses N`): opening broad mop washes.
 - `methods/material-profiles.mjs` (always on): ink and graphite drawing materials.
 - `methods/ml-lines.mjs` (`--mllines 1`): inner lines from a trained line model.
@@ -113,7 +112,6 @@ Modules, with their flags:
 - `methods/seg-ink.mjs` (`--segink 1`): foreground segments as the ink subject.
 - `methods/segment-washes.mjs` (`--segwash 1`): mop wash regions from labelled object regions.
 - `methods/shape-deficit.mjs` (always on): charges each passage from its whole shape's colour difference.
-- `methods/shape-local-charge.mjs` (`--modpaintplanes`, refused by the CLI): shares remaining pigment among planned shapes.
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
 - `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
@@ -147,20 +145,12 @@ Modules:
 
 - `techniques/dark-mass-shape.mjs` (helper): a dark mass's shape and fur curl paths.
 - `techniques/dark-mass.mjs` (`--darkmass <segments|auto>`): black fur and dark surfaces in four steps.
-- `techniques/dog-locks.mjs` (helper): a curly coat over masked light locks.
-- `techniques/dog-paint.mjs` (`--dogpaint`): a black curly dog in loaded, dried blots.
-- `techniques/dog-ringlets.mjs` (helper): ringlets with pale sheen crescents.
-- `techniques/dog-scribble.mjs` (helper): a curly coat as looping pen scribble.
-- `techniques/dog-strands.mjs` (helper): long wavy pen strands.
 - `techniques/face-detail.mjs` (`--facedetail 1`): eyes, lids, nostrils and mouth with a small nib.
 - `techniques/face-planes.mjs` (`--faceplanes 2|3`): the face as two or three soft value planes.
 - `techniques/lit-planes.mjs` (`--litplanes`): skin cut into lit, half and shadow planes.
-- `techniques/passages/dog.mjs` (`--passages dog`): a dark-coated dog with edge flicks.
 - `techniques/passages/foliage.mjs` (`--passages foliage`): a hillside of bushes, light to dark and broken.
-- `techniques/passages/sand.mjs` (`--passages sand`): a pale warm wash with dry-brush drags.
 - `techniques/passages/sea.mjs` (`--passages sea`): a graded sea band with a masked foam line.
 - `techniques/passages/sky.mjs` (`--passages sky`): a wet-in-wet sky with lifted clouds.
-- `techniques/passages/treelayers.mjs` (`--passages treelayers`): background trees in tiers.
 - `techniques/passages/trees.mjs` (`--passages trees`): a far treeline of round-brush dabs.
 - `techniques/shaped-marks.mjs` (`--shapedmarks 1`): flat-brush planes, sky sweeps and short texture marks.
 - `techniques/subject-local.mjs` (`--subjlocal <stage.png>`): the subject's first wash in local colour, wet into wet.
@@ -168,53 +158,56 @@ Modules:
 
 ## Tuned settings
 
-Some settings were fitted by self study on a few benchmark images, mostly Trumbull (`Y1`). On those images they help. On other images they can hurt: heavy darks, pale washes, stone blocks on skin.
+Sam's rule (0.3.3): a constant, rule, option or technique fitted to one benchmark subject is cheating in both painting
+modes. Every such item was removed in 0.3.3:
 
-They are contained this way:
+- The `architecture` preset, the `"presets"` plan key and `--recipe x+<preset>`, and the `v096` recipe. A plan or recipe
+  that still names a preset, and `--recipe v096`, fail the run.
+- The Trumbull rules and their options: dark recesses (`--recesses` and its `--recess*` flags), stone-block hints
+  (`--stoneblocks` and its `--stone*` flags), the cool ground glaze (`--groundglaze`, `--groundfrom`) and lit stone
+  (`--litlift`, `--litl`, `--litreserve`, the value planner's `--litwarm`, and the lit-stone rule a plan family named
+  "stone" with a "sunlit" cue switched on).
+- The V4 and V5 harness's per-subject switch (`trumbull` in `bench/v4v5/subjects.json`) with its paint boxes and palette
+  tokens, the stone, recess and lit tokens, and the base's Trumbull-fitted sky lanes (`--skylanemm 6 --skylanestep .8`)
+  and sky mottle (`--skyfloc .5`). Every subject gets the same base.
+- The curly-dog-coat technique (`--dogpaint`, `--dogcoat` and every `--dog*` flag), `--passages dog`, `--passages sand`,
+  `--passages treelayers` with its colour thresholds, `--treelayerslate`, `--inkofftrees` and `--fieldmix`.
+- The mass planner fitted to one portrait's layout (`--massplan`).
+- Registered skin, fur and plane polygons bound to one target (`--modanatomy`, `--modpaintplanes`).
+- The layered-wash chroma split chosen for one subject's orange: both wash modes split at chroma 30.
+- The beach scene's dog and ball finders in `tools/seg/segments.py --mode scene`, and the beach-only line selection
+  `tools/seg/select-drawing.py`.
 
-- The default recipe sets only general methods. No value in it was fitted to one image.
-- Fitted values live in `src/paint/tuned/`. They run only through a named preset or the `v096` recipe.
-- A value plan opts in with `"presets": ["architecture"]`. The command line opts in with `--recipe default+architecture`.
-- No painting code outside `src/paint/tuned/` checks a subject id. `src/paint/overfit.test.mjs` fails if it does, or if the default recipe sets a tuned flag.
-- `--recipe v096` runs the V096 recipe: the general methods with sky lanes and the tuned flags below, on every subject. It leaves out `--recesses` and the recess flags that need it, and the texture flags.
+`tools/guard/subject-scan.mjs` fails `npm test` (through `src/paint/overfit-scan.test.mjs`) when any JavaScript or Python
+file under `src/` or `tools/` names a benchmark subject outside tests, fixtures and the reviewed target lists in
+`tools/guard/subject-scan-allow.json`.
 
-| Preset | Flags | For |
+`src/paint/tuned/` is gone. Its last file, the practice planner's style cut points (calibrated on about 40 artworks
+that included benchmark pieces), was replaced by the plain neutral rule: the measured ink and texture shares are used as
+they are (`src/paint/methods/practice-style.mjs`). The guard test `src/paint/overfit.test.mjs` fails on any folder or
+file under `src/`, `tools/` or `bench/scripts` named tuned, fitted or per-subject.
+
+Kept as general techniques: the painting ideas inside the removed items, restated with no subject name and no number
+from a plate, and chosen by the plan, never by the painter. An area plan's pass names them (`pass.marks`, see
+[plan-format.md](plan-format.md)); `src/paint/techniques/surface-marks.mjs` lays them, every size a multiple of the
+pass's brush width:
+
+| Technique | Came from | What it is |
 |---|---|---|
-| `architecture` | `--skylanes 1 --skyblue 1 --skysplit 1 --skylanemm 6 --skylanestep .8 --skyfloc .5 --groundglaze 1 --stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1 --recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1` | Buildings under a sky |
+| `masonry` | the Trumbull stone-block hints | block hints in level courses, one flat stroke per block, staggered by half a block |
+| `short-coat` | the dog-coat locks and flicks | short flicks along the planned flow, pressed at the root, lifted at the tip |
+| `curly-coat` | the dog ringlets and scribble | small open crescents in no single direction |
+| `long-hair` | the dog strands | long strokes along the planned flow with a slow wave |
 
-`examples/plans/trumbull-values.json` names it. The `glaze-gains` preset and the `--darkgain`, `--coolgain` and `--midgain` options were removed in 0.3.3: the painter delivers the value the plan states (below), so there is nothing for a gain to make up.
+Deleted with nothing to keep, since an area pass already says it: the ground glaze (a dried glaze over the ground
+area), recesses (the dark area's last pass), lit stone (the lit area's own pass colour), the olive-tree layers and
+colour thresholds, the mass plan's named masses, the sand passage, the registered anatomy polygons and the
+layered-wash chroma split.
 
-Preset flags, with the off value, the images they were fitted on and the risk for other subjects:
-
-- `--touchgain .6`: strength of touch-up glazes. Off: `.8`. Y1, subject-e; medium.
-- `--skylanemm 6`: 6 mm sky sweep radius. Off: `3`. Y1, subject-e skies; medium.
-- `--skylanestep .8`: closer, overlapping sky sweeps. Off: `1.5`. Y1, subject-e skies; medium.
-- `--skyfloc .5`: softer, larger sky mottle. Off: `0`. Y1 sky; low.
-- `--groundglaze 1`: cool low ground as one shadow glaze. Off: `0`. Y1; high, since any cool lower third turns into shadow.
-- `--stoneblocks 0.6`: pale cut-stone block hints on warm walls. Off: `0`. Y1; high, since the wall test also matches skin, sand, wood and fur.
-- `--stoneblockamt 0.2`: pigment per stone block glaze. Off: `.18`. Y1; high.
-- `--stoneblockmm 4`: stone block row height. Off: `2.6`. Y1; high.
-- `--stoneirregular 1`: irregular stone corners. Off: `0`. Y1; high.
-- `--recesses 1`: dark windows and doors as last accents on the dried wall. Off: `0`. Y1; medium, since any dark cell counts.
-- `--recesslayers 2`: dark recesses in two layers. Off: `1`. Y1; low. This and the next two act only with `--recesses 1`, and the painter reports them when typed without it.
-- `--recessshare .75`: demand per recess layer. Off: `.5`. Y1; low.
-- `--recessclean 1`: no light wash under recesses. Off: `0`. Y1; low.
-- `--texvariety`, `--texflow`, `--texshort`, `--texpress`: short dry-brush texture marks. No preset or recipe sets them, since the value planner lays no texture passages and they change no painting. The painter reports one that is typed.
-
-Modules:
-
-- `tuned/default-flags.mjs` (`--recipe v096`): the tuned flags of the V096 recipe.
-- `tuned/presets.mjs` (`"presets"` or `--recipe default+<preset>`): the presets above.
-- `tuned/trumbull.mjs` (`architecture` preset or `--recipe v096`): recess, wall and ground constants. Y1, subject-e; high.
-- `tuned/dog-coats.mjs` (`--dogpaint`, `--dogcoat wet|dry`): curly dog coat presets. subject-b and private photos; medium, since both assume a black curly coat.
-- `tuned/mass-plan.mjs` (`--massplan 1`, `--medium oil`): named masses for the mass planner. One portrait layout; high.
-- `tuned/modulation-anatomy.mjs` (`--modulate 1 --modanatomy <file>`): skin and fur regions for modulation, from a file that carries its target's SHA-256. One target; low.
-- `tuned/olive-families.mjs` (`--passages treelayers`): colour groups for tree layers. One olive tree study; medium.
-- `tuned/paint-owned-residual.mjs` (`--modpaintplanes`, refused by the CLI): detail pigment moved into authored polygons. One private image; low.
-- `tuned/style-cuts.mjs` (`--practice 1`, `--modulate 1`, `--drawinglogic 3`): thresholds for the practice planner. About 40 artworks; low.
-- `techniques/passages/sand.mjs` (`--passages sand`): mark sizes scaled from one beach crop; medium.
-
-Outside the painter, `bench/scripts/pipeline/plan-args.mjs` holds the V4 and V5 base settings, with stone and palette tokens fitted on Y1. The judging scripts in `tools/judge/` list fixed subjects; they do not paint.
+Fitted values that remain, each fitted on more than one subject, not switched by subject:
+- The pen-and-wash recipe (`--recipe penwash`) and `src/paint/methods/pen-wash.mjs` charge scale and gains
+  (`--pwcharge 8`, `--pwwetgain`, `--pwdrygain`), calibrated on two runs.
+- `--touchgain` (default `.8`), the touch-up strength.
 
 ## Opt-in experimental controls
 

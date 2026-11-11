@@ -8,7 +8,7 @@ import { loadSegments, silhouettes } from '../../src/crop/segments.mjs';
 
 const COLOUR = {
   sky: [157, 198, 232], sea: [63, 127, 166], sand: [226, 196, 137], trees: [74, 107, 58],
-  background: [207, 207, 207], figure: [208, 90, 60], dog: [51, 49, 58], ball: [111, 191, 58],
+  background: [207, 207, 207], figure: [208, 90, 60],
 };
 const fallback = id => [(id * 97) % 255, (id * 151) % 255, (id * 199) % 255];
 

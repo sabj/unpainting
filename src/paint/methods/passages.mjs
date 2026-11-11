@@ -1,9 +1,8 @@
-// --passages sea,sand,trees,sky,dog: named passages from src/paint/techniques/passages/<name>.mjs. Each exports
+// --passages sea,trees,sky,foliage: named passages from src/paint/techniques/passages/<name>.mjs. Each exports
 // `when` ('washes' follows the mop, 'shapes' the dark shapes, 'finish' the ladder) and `paint(ctx)`.
 // A segment with its own passage is left to it: the shape stage and the ladder keep off it.
 //   --ladderown 0.5   a ladder glaze with this share of its cells on a passage's segment is left to the passage
 import path from 'node:path';
-import {passageSchedule} from './passage-schedule.mjs';
 import { hasSegments, loadSegments } from '../../crop/segments.mjs';
 
 // ctx.share is the context every passage is handed (the sheet, the plan, the physics, the brush and the path makers);
@@ -16,10 +15,8 @@ import { hasSegments, loadSegments } from '../../crop/segments.mjs';
 export async function passageHook(ctx) {
   const { share, fg, sheet, O, w, h, n, clock, dry, snap, setStage, opt, num, log } = ctx;
   const names = opt('passages', '').split(',').map(s => s.trim()).filter(Boolean);
-  let mods = [];
+  const mods = [];
   for (const name of names) { const mod = await import(`../techniques/passages/${name}.mjs`); mods.push({ name, when: mod.when || 'shapes', paint: mod.paint, region: mod.region, dryAfter: mod.dryAfter }); }
-  const lateTrees=num('treelayerslate',0);if(![0,1].includes(lateTrees))throw Error('--treelayerslate takes 0 or 1');
-  mods=passageSchedule(mods,{lateTrees:Boolean(lateTrees)});
   const seg = names.length ? await (async () => { const image = opt('image', ''), base = image ? path.basename(image, path.extname(image)) : ''; return base && hasSegments(base) ? loadSegments(base, w, h) : null; })() : null;
   // a passage may find its own cells (export region(ctx) -> cell mask) instead of owning a segment of its name; those
   // cells are owned too
@@ -44,5 +41,5 @@ export async function passageHook(ctx) {
       snap();
     }
   };
-  return { names, owned, fg: ownFg, owns, run, exact, schedule:mods.map(p=>({name:p.name,sourceWhen:p.sourceWhen,effectiveWhen:p.when,wholeModuleDeferred:lateTrees===1&&p.name==='treelayers'})) };
+  return { names, owned, fg: ownFg, owns, run, exact };
 }
