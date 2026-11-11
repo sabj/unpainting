@@ -20,6 +20,14 @@ export function instrumentKey(T) {
 }
 
 /**
+ * Whether a passage is charged from a swatch laid with its own instrument (`of`) rather than the stock swatch of its name
+ * (`byName`). Every passage is, wet on wet included, since its swatch wets and waits on each lane as the sheet does
+ * (scrap-swatch.mjs): on sized paper a 0.55-water brush gives a wet bed far less than the stock 0.88 one. Authored area
+ * plans keep their own calibration, and a technique marked stockSwatch keeps the stock one.
+ */
+export const chargedFromOwnSwatch = (T, { instrumentOn, authored }) => Boolean(instrumentOn && !authored && !T.stockSwatch);
+
+/**
  * @param {{ stock: Record<string, { technique: object, cal: number, graded?: object | null }>, measure: (T: object) => { cal: number, graded?: object | null }, log?: (line: string) => void }} options
  *   stock: the stock techniques by name with their swatch readings (cal: the charge factor; graded: the recharged
  *   swatch's { all, escape, edge }, or null when no graded swatch is laid); measure: lays a swatch for a technique

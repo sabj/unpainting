@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInstrumentCal, instrumentKey } from './instrument-cal.mjs';
+import { createInstrumentCal, instrumentKey, chargedFromOwnSwatch } from './instrument-cal.mjs';
 
 const GLAZED = { name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, passes: 2 };
 const WET_ON_DRY = { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, passes: 1 };
@@ -89,4 +89,13 @@ test('a measured instrument is logged once with what sets it apart from the stoc
   cal.of({ ...GLAZED, water: 0.45, passes: 1 });
   assert.equal(lines.length, 1);
   assert.equal(lines[0], '  glazed at water 0.45, passes 1: its own swatch charges 1.68x (the stock glazed swatch, water 0.58, passes 2: 0.69x)');
+});
+
+test('a wet-on-wet passage at its own load is charged from its own swatch, as a dry-paper passage is', () => {
+  const plan = { name: 'wet on wet', water: 0.55, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, passes: 1 };
+  assert.equal(chargedFromOwnSwatch(plan, { instrumentOn: true, authored: false }), true);
+  assert.equal(chargedFromOwnSwatch(WET_ON_DRY, { instrumentOn: true, authored: false }), true);
+  assert.equal(chargedFromOwnSwatch(plan, { instrumentOn: true, authored: true }), false);
+  assert.equal(chargedFromOwnSwatch(plan, { instrumentOn: false, authored: false }), false);
+  assert.equal(chargedFromOwnSwatch({ ...plan, stockSwatch: true }, { instrumentOn: true, authored: false }), false);
 });

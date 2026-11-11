@@ -19,7 +19,7 @@ import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {recordGraphiteBatch} from '../painter/record-graphite.mjs';
 import {numericalGlazePasses} from '../painter/numerical-glaze-passes.mjs';
 import {SWATCH, swatchMask, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
-import {createInstrumentCal, instrumentKey} from '../../src/paint/methods/instrument-cal.mjs';
+import {createInstrumentCal, instrumentKey, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
 import {validateProductionDetails, productionChargeLink, productionContinuationReady, prepareProductionDryContact} from '../painter/semantic-production-details.mjs';
 import {legacyIntentFamily, prepareMajorDryBase, sameUnliftedMajorGesture} from '../painter/legacy-major-intents.mjs';
 import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
@@ -719,13 +719,15 @@ const scrapSwatches = (techniques, drySwatch) => {
   }
   // and charged for its footprint exactly as a passage on the sheet is, so that shortfall is not counted twice
   const under = opt('calpipe', '0') !== '0' && opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, mask, SW, SH))) : 1;
-  const env = { mask, paths, pigment: PIGS[0], physics: O, paperOptions: { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch,
+  // a value plan's wet lane waits for its shine to go off before it is charged (layIntoWetBed in the stroke wrapper above), so its swatch does too
+  const settle = ctx.VALUE_PLAN ? (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet swatch', cells: cells.length } }); } : null;
+  const env = { mask, paths, pigment: PIGS[0], physics: O, paperOptions: { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
     waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
     paintBrush: (r, T) => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11, ...meteredOpts(r, T) }) };
   return techniques.map(T => ({ technique: T, plain: scrapDelivery(T, env), graded: CHUNK ? scrapDelivery({ ...T, name: `${T.name} graded`, chunk: CHUNK }, env) : null }));
 };
 const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
-const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!ctx.AREA_PLAN&&!ctx.FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!ctx.AREA_PLAN&&!ctx.FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
   const out = {};
   for (const { technique: T, plain, graded } of scrapSwatches(STOCK_TECHNIQUES, dry)) {
     out[T.name] = chargeFactor(plain.delivered);
@@ -742,7 +744,7 @@ GRADED_CAL = CAL_RESULT.value.GRADED_CAL;
 // A passage whose brush load or pass count is not its stock technique's is charged from a swatch laid with its own load
 // and passes (src/paint/methods/instrument-cal.mjs). A value plan's shadow glaze is one pass of a 0.45-water brush; the
 // stock glazed swatch is two passes at 0.58 and lays 2.5 times as much. Authored area plans keep their own calibration. A passage
-// laid into wet keeps the stock swatch too: its bed is part of the instrument, and the swatch's bed is not the sheet's.
+// laid into wet is charged the same way (chargedFromOwnSwatch).
 const INSTRUMENT_ON = !ctx.AREA_PLAN && !ctx.FINISH_PLAN;
 const INSTRUMENT_CAL = createInstrumentCal({
   stock: Object.fromEntries(STOCK_TECHNIQUES.map(T => [T.name, { technique: T, cal: CAL[T.name], graded: GRADED_CAL[`${T.name} graded`] ?? null }])),
@@ -750,7 +752,7 @@ const INSTRUMENT_CAL = createInstrumentCal({
   measure: T => { const [{ plain, graded }] = scrapSwatches([T], (scrap, max, o, options) => physicalDry(scrap, max, o, nativeDryOptions(NATIVE_PAINT_MODE.mode, options))); return { cal: chargeFactor(plain.delivered), graded: gradedReading(graded) }; },
   log: line => console.log(line),
 });
-const ownSwatch = (T, sh) => INSTRUMENT_ON && !sh._semantic && !T.intoWet && !T.stockSwatch;
+const ownSwatch = (T, sh) => chargedFromOwnSwatch(T, { instrumentOn: INSTRUMENT_ON, authored: Boolean(sh._semantic) });
 const instrumentOf = (T, sh) => (ownSwatch(T, sh) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name));
 // every instrument the value plan names is tried on scrap before the first wash
 if (INSTRUMENT_ON && ctx.VALUE_PLAN) {
