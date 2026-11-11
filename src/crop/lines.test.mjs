@@ -75,3 +75,11 @@ test('a line file made for another image or another aspect than the bound target
     assert.equal(lineTargetMismatch({ ...DOC, image: { w: 100, h: 80 } }), null, 'nothing bound, nothing checked');
   } finally { bindLineTarget(null); }
 });
+
+test('a line with one width is drawn with that nib along its length; per-point widths win', () => {
+  const doc = { image: { w: 100, h: 100 }, lines: [{ points: [[0, 0], [50, 0], [99, 0]], width: 2 }, { points: [[0, 9], [99, 9]], width: 2, widths: [1, 3] }, { points: [[0, 20], [99, 20]] }] };
+  const [a, b, c] = scaleLines(doc, 200, 200);
+  assert.deepEqual(a.points.map(q => q.width), [4, 4, 4]);
+  assert.deepEqual(b.points.map(q => q.width), [2, 6]);
+  assert.equal(c.points[0].width, undefined);
+});

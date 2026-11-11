@@ -45,8 +45,8 @@ test('a line between two dark masses has no light side; a contour against paper 
   for (let y = 0; y < 20; y++) for (let x = 0; x < 30; x++) lum[y * W + x] = 0.3;     // dark mass, top left
   for (let y = 20; y < 40; y++) for (let x = 0; x < 30; x++) lum[y * W + x] = 0.25;   // dark mass, bottom left
   const at = (x, y) => lum[Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))];
-  assert.equal(hasLightSide([[2, 20], [26, 20]], at, 0.5), false, 'inside the dark mass');
-  assert.equal(hasLightSide([[30, 2], [30, 38]], at, 0.5), true, 'the mass\'s contour against paper');
+  assert.equal(hasLightSide([[2, 20], [26, 20]], at, 0.5, [4, 14]), false, 'inside the dark mass');
+  assert.equal(hasLightSide([[30, 2], [30, 38]], at, 0.5, [4, 14]), true, 'the mass\'s contour against paper');
 });
 
 test('trace-ink draws a long line crossed by others as long lines, not fragments', async () => {

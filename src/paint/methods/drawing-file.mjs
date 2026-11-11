@@ -2,6 +2,7 @@
 // --drawingfile <base>: the first pen draws exactly the lines of work/lines/<base>-lines.json,
 // whole, in file order, at the outline tier's pressure; no walker gestures, ink filter or silhouette pass.
 // Each line is split into strokes of --drawstroke (share of the short side), one dip each, so the pen does not run dry.
+import { linesByRole } from './family-roles.mjs';
 import fs from 'node:fs';
 import { hasLines, loadLines, linePaths, readLineText } from '../../crop/lines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
@@ -31,7 +32,7 @@ export function noDrawingDeclared(doc, { first = true } = {}) {
 // --drawinglast <base>: the closing pen (--drawing both|last, over the dry sheet) draws only lines of weight at least
 // --drawinglastmin, so the darks and features stay crisp over the glazes.
 // `prune` (pen and wash, pen-wash-lines.mjs) thins the opening pen's planned lines before they are split into strokes.
-export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, style = null, prune = null }) {
+export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, style = null, prune = null, families = null }) {
   const lastPass = !first && !fine && opt('drawinglast', '');
   if (!(first && opt('drawingfile', '')) && !lastPass) return null;
   const b = first ? opt('drawingfile', '') : opt('drawinglast', '');
@@ -52,7 +53,11 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean));
   // the plan's choice (drawing-plan.mjs planLines): --drawshare's strongest share, --drawregions' subject-first ranking
   // and --drawmax's cap
-  const candidates = loadLines(b, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), min = num('drawinglastmin', 0.6);
+  const loaded = loadLines(b, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), min = num('drawinglastmin', 0.6);
+  // the plan's drawingRole per family (family-roles.mjs): a family with role none gets no line, scaffold no closing line
+  const byRole = linesByRole(loaded, families, { w, h, stage: first ? 'opening' : 'closing' }), candidates = byRole.lines;
+  if (Object.keys(byRole.dropped).length) log(`drawing: ${loaded.length - candidates.length} of ${loaded.length} lines left out by the plan's drawing roles (${Object.entries(byRole.dropped).map(([r, c]) => `${c} under ${r}`).join(', ')})`);
+  if (loaded.length && !candidates.length) { log(first ? 'drawing: no opening line, the plan\'s drawing roles leave every line to the wash' : 'drawing, closing pen: no closing line, the plan\'s drawing roles leave every line out'); return []; }
   const planned = planLines(candidates, num), all = first && prune ? prune(planned) : planned;
   if (skip.size) log(`drawing: lines with role ${[...skip].join(', ')} left out`);
   if (all.length < candidates.length) log(`drawing: ${all.length} of ${candidates.length} lines kept (--drawshare ${num('drawshare', 1)}, --drawregions ${num('drawregions', 0)}, --drawmax ${num('drawmax', Infinity)})`);

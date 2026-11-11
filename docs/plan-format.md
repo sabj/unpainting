@@ -133,7 +133,7 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 | `washes` | wash colour, sessions and flow, [below](#the-washes-section) | family colour in passage sessions |
 | `order` | subject order, [below](#the-order-section) | whole-sheet bands |
 
-Each family can have `id`, `bounds`, `referenceCue` and `baseMove`. `bounds` is `[x0, y0, x1, y1]` in normalized target coordinates. It helps describe target-derived color regions; it does not clip a wash to a box. `referenceCue` is a note about the target, and `baseMove` is the family's move. `wet in wet` (also `wet on wet`) lays a light family's pale foundation into a prepared moist bed. The code is `src/paint/techniques/passage-plan.mjs`; later layers and other moves such as `wet on dry` or `glaze` paint on dry paper. Missing cues and moves use generated descriptions and `wet on dry`. Family fields have no separate schema validation. Use ordered bounds between 0 and 1 and distinct string ids.
+Each family can have `id`, `bounds`, `referenceCue` and `baseMove`. `bounds` is `[x0, y0, x1, y1]` in normalized target coordinates. It helps describe target-derived color regions; it does not clip a wash to a box. `referenceCue` is a note about the target, and `baseMove` is the family's move. `wet in wet` (also `wet on wet`) lays a light family's pale foundation into a prepared moist bed. The code is `src/paint/techniques/passage-plan.mjs`; later layers and other moves such as `wet on dry` or `glaze` paint on dry paper. Missing cues and moves use generated descriptions and `wet on dry`. `drawingRole` says which lines the family gets, in the words an area plan uses: `none` (no line; the wash states it), `scaffold` (opening drawing only), `structural` (opening and closing) or `focal` (closing only). Each line is kept or left out whole by the role of the family under most of it; where families overlap, the smallest box decides. A family with no role changes nothing (`src/paint/methods/family-roles.mjs`). Family fields have no other schema validation. Use ordered bounds between 0 and 1 and distinct string ids.
 
 Each reserve needs a nonempty `reason` and four finite `bounds` values between 0 and 1, with `x0 < x1` and `y0 < y1`. Invalid reserves stop planning. They protect the bounded cells as bare-paper highlights.
 
@@ -152,6 +152,7 @@ Line models (`tools/seg/lines.py`) only extract candidate lines. They are option
 | field | values | painter flags |
 |---|---|---|
 | `medium` | `none`, `graphite`, `ink`, `auto` | `none` sets `--drawing none` and the other fields are ignored; `graphite` and `ink` set `--outlinemedium` |
+| `reason` | a sentence | why this medium for this target; logged as `the plan's medium: ...`. The subject's medium can still override it (`--subjectmedium`) |
 | `inkColor` | `sepia`, `black` | `--inkprofile sepia-ink` or `black-ink` |
 | `amount` | 0 to 1 | the share of candidate lines drawn, strongest first (`--drawshare`). A line's strength is the model's mean response along it times its length. The opening and closing count caps become 100000 (`--openinglines` and `--closinglines`). Minimum lengths and other drawing filters still apply |
 | `lines` | `all`, `contours`, `subject`, `regions` | which candidates from a `--drawingfile`: `contours` leaves out dark fill (`--drawingskip "dark fill"`), `subject` leaves out setting lines (`--drawingskip setting`). `regions` ranks the lines by the region each lies in (`--drawregions 1`): head, face, hands and book first, then clothing, then the setting (chair, background and unknown regions), and lines in a dark wash last; strongest first inside a tier. It needs a line file whose lines carry a `region`, such as `tools/seg/ink-lines.mjs --regions` writes |
@@ -185,7 +186,7 @@ Without `stages`, the ordinary bounded drawing runs. A stage left out is not dra
 | `finishInk` | `from` | `prepInk`, `prep`, `lines` | which earlier lines it restates |
 | | `select` | `edges`, `darks`, `both` | where it restates: the target's strongest edges, its darks, or both |
 | | `restate` | 0 to 1 | the share of those lines restated |
-| | `method` | `accent`, `architecture` | the strongest part of each line, or whole lines at full pressure with widths from the target's darkness, and strong sepia |
+| | `method` | `accent`, `architecture` | each chosen line restated whole, or whole lines at full pressure with widths from the target's darkness, and strong sepia |
 | | `masses` | `none`, `scribble` | `scribble` adds loose scribble over the dark masses (`--finishmasses 1`); default none |
 
 The finish runs after every wash passage and the final dry gate, so it follows each subject's last wash. Graphite then finish ink is `prep` plus `finishInk: {"from": "prep"}` with no `prepInk`. `--drawing first|last|none` overrides stage timing. [ink.md](ink.md#linework-stages) says which stage and method fits which job. Code: `src/paint/methods/drawing-stages.mjs` and `linework-plan.mjs`.

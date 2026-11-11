@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { planStages, deviateLine, polyLength, resampleLine, strongRuns, stageDoc, takeLength } from './drawing-stages.mjs';
+import { planStages, deviateLine, polyLength, resampleLine, stageDoc, takeLength } from './drawing-stages.mjs';
 
 const image = { w: 400, h: 300 };
 // 30 lines: 10 long structural horizontals, 10 medium openings, 10 short ornaments
@@ -78,13 +78,10 @@ test('deviateLine keeps per-point arrays aligned and the length close', () => {
   assert.deepEqual(deviateLine(g, { scale: 0, seed: 3, step: 2 }), g);
 });
 
-test('helpers: resample, strong runs, length share and the stage document', () => {
+test('helpers: resample, length share and the stage document', () => {
   const r = resampleLine({ points: [[0, 0], [10, 0]], widths: [1, 3] }, 1);
   assert.equal(r.points.length, 11);
   assert.equal(r.widths[5], 2);
-  const runs = strongRuns({ points: [[0, 0], [100, 0]] }, ([x]) => x / 100, { minLen: 10, step: 1 });
-  assert.equal(runs.length, 1);
-  assert(runs[0].points[0][0] >= 50);
   assert.equal(takeLength([], 0.5, () => 1).length, 0);
   const doc = stageDoc([{ index: 3, added: true, points: [[0, 0], [1, 1]] }], { image, stage: 'prepInk', source: 'test' });
   assert.equal(doc.lines[0].index, undefined);
@@ -123,4 +120,12 @@ test('deviation cannot overshoot a long structural line by a percentage of its l
   const d = deviateLine(g, { scale: .4, step: 2, seed });
   assert(d.points.every(([x,y]) => x >= -.41 && x <= 1000.41 && Math.abs(y) <= .41));
  }
+});
+
+test('a closing accent restates each chosen line whole, never its strongest pieces', () => {
+  const lines = [{ points: [[0, 10], [50, 10], [100, 10]], length: 100, weight: 1 }, { points: [[0, 40], [100, 40]], length: 100, weight: 1 }];
+  // the target is dark only along the right of each line
+  const r = planStages(lines, { image: { w: 100, h: 50 }, stages: { prepInk: { from: 'lines' }, finishInk: { restate: 1, deviate: 0 } }, density: { w: 100, h: 50, D: Float32Array.from({ length: 5000 }, (_, i) => (i % 100 > 60 ? 2 : 0)) } });
+  assert.equal(r.finishInk.length, 2);
+  for (const g of r.finishInk) { const xs = g.points.map(p => p[0]); assert.ok(Math.min(...xs) < 5 && Math.max(...xs) > 95, JSON.stringify(xs)); }
 });
