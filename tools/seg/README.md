@@ -6,7 +6,7 @@ The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs
 
 ## Index
 
-Inking (the pen drawing, [pipelines](../../docs/pipelines.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `select-drawing.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
+Inking (the pen drawing, [pipelines](../../docs/how-it-paints.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `select-drawing.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
 
 Painting (regions for the washes): `segments.py`, `sam_regions.py`, `sam-points.py`, `segment.py`, `subject-regions.py`, `face-mask.py`, `check-sheet.mjs`.
 

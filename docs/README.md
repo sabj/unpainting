@@ -11,13 +11,11 @@ The [project README](../README.md) has the quick start. The [0.3.0 release notes
 
 ## How it paints
 
-- [Pipelines](pipelines.md): the inking and painting pipelines, stage by stage, and where they meet
-- [Overview](how-it-paints.md): paper, ink, paint, and the pipeline from plan to review
+- [How it paints](how-it-paints.md): the pipeline contract, stage by stage from subject to finished plate
   - [Pigments and paper](pigments-and-paper.md): pigment optics and layers, the paint box, water and drying
   - [Ink](ink.md): the dip pen, pencil, line finding and drawing order
   - [Brush and wash techniques](techniques/README.md): each wash, lifting and line technique and its code
 - [Methods, techniques and tuned settings](techniques.md): which modules and preset flags are generic, which target one kind of problem, and which were fitted to benchmark images
-- [What a plan is](plans.md): painting decisions, plan formats, the automatic planner and benchmark plans
 - [Plan format](plan-format.md): the JSON stroke plan
 
 ## Checking the work

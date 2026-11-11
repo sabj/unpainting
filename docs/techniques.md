@@ -229,3 +229,33 @@ Values are planned against the sheet's own optics and delivered as planned (0.3.
 `--paperrule 1` uses a visible sheet at the margins, otherwise a white sheet with light, near-neutral highlights measured against the lightest tenth. It changes the light reference only when `--paperrel 1` or `--paperlights 1` is also on, and it sets the sheet colour only with `--paperrgb auto`. The test compares lightness and chroma, not hue, so pale material of another hue can count as paper.
 
 The 0.3.1 candidate renders with `--notargetlooks 1` record no paint-time target looks and no guard violations.
+
+## Technique toolbox (plan access)
+
+Each tool has a use and a failure mode. None is mandatory. Paths are under `src/paint/` unless they start with `tools/` or `src/`.
+
+| Tool | Plan access and code | When it fits | When it hurts |
+|---|---|---|---|
+| Pencil preparation | `drawing.stages.prep`; `methods/drawing-stages.mjs` | Hard placement, perspective, proportions, visible graphite | Dense pencil leaves a grey web under pale washes |
+| Prep ink over pencil | `stages.prepInk.from: prep`, keep, add, deviate | Refine a placement drawing while some pencil stays | Inking every construction line makes a traced diagram |
+| Sparse finish ink | `stages.finishInk`, restate, select | Restate a few lost junctions after the wash | A second full tracing doubles contours and makes loops |
+| Waterproof ink | `drawing.ink.waterproof`; `src/media/pen.mjs` | Black pen and watercolour with set ink | It prevents the softening of soluble sepia studies |
+| Source-ink copying | `drawing.source: source-ink`; `tools/seg/copy-lines.py` | Pen drawings and masters with real narrow ink | Wash texture or broad black paint read as line becomes blotches |
+| Photo sketch | `drawing.source: photo-sketch`; `tools/seg/sketch-lines.py` | Architecture photos with sustained edges | Texture and foliage become tangled loops |
+| Structure lines | `drawing.source: structure-lines`; `tools/seg/structure-lines.py` | Clear perspective, repeated arches, openings or columns | Over-regularizes irregular buildings and organic forms |
+| Structure plus detail | `drawing.source: structure-combine`; `tools/seg/structure-combine.py` | A structural scaffold with facade details | A wrong scaffold stays wrong |
+| Map smoothing | `drawing.source: line-map`, `mapSmoothing` | About 0.75 cells reduces noisy model-map loops | 1.5 cells loses character; never smooth observed widths |
+| Contour and connected gestures | `prepInk.method` `contour` or `connected`; `methods/drawing-rank.mjs` | Contours for landmarks; long economical gestures | Long tracing looks cut out; connected walks wander |
+| Scribble and lit-edge breaks | `method: scribble` or `finishInk.masses: scribble`; `methods/drawing-scribble.mjs` | Curly black fur or dark hair with open lit edges | Ink filling a dark surface; dense scribble loses form |
+| Architecture closing pen | `finishInk.method: architecture` | Thin dark broken frames, arches, cornices and sills | Strong sepia overwhelms foliage and small figures |
+| Staged growth and prep fade | `prep.frames`, `prep.fade`; `methods/pencil-stage.mjs` | Big shapes, then features, then graphite receding under paint | Too much fade removes useful structure |
+| Flow-line hatching | `finishInk.hatch`; `src/crop/hatch.mjs` | Pen-heavy architectural shade and engraving | Mechanical fill in fur |
+| Fur locks | `finishInk.fur`; `methods/finish-texture.mjs` | Oriented accents in a dark coat with bright gaps | It does not replace the paint mass under it |
+| Fur light reserves | `washes.furReserves` | Sheen or glints kept open in a dark coat | Poor thresholds reserve speckles; use coarse bounds |
+| Fine ink sheet | `drawing.resolution: 2`; `methods/ink-res.mjs` | Thin tapers on a small sheet | More memory and time |
+| Colour-family washes | `washes.colour: family` | Saturated and muted families kept apart | Can weaken connected dark foliage; try `layered` |
+| Connected wet sessions | `washes.sessions: connected`; `methods/wash-session.mjs` | Pigments mingle in one passage with one drying edge | Joining different glazes makes mud |
+| Subject order | `order.subjects`, `strength`; `methods/subject-order.mjs` | Background first, then the focal subject | Coarse boxes make visible transitions |
+| Hole rims | `washes.physics.holeRimMm`; `src/media/sheet.mjs` | Small dry pits inside a wet wash dry without false rims | Too broad a span removes real granulating edges |
+| Marangoni flow | `washes.physics.marangoni` | Surface-tension movement inside wet passages | Strong values are unstable and disturb line edges |
+| Slope flow | `washes.physics.slope` | A wash meant to run down the sheet | Drift damages aligned architecture and reserved lights |

@@ -7,7 +7,7 @@
 * You can stop or rewind a painting at any point between blank page and finished product. At every point it should look as if a human painted it, in the painting behavior as well as the pixels. In theory.
 * It doesn't actually make the painting! It only unmakes them, so you can't start with a photo. It will almost always make something worse than where you started, but it's about the journey.
 
-How the pen drawing and the washes are made, stage by stage: [Pipelines](docs/pipelines.md).
+How the pen drawing and the washes are made, stage by stage: [How it paints](docs/how-it-paints.md), the pipeline contract.
 
 **0.3.0: less time waiting for paint to dry.** During development, the three-workload M4 reference suite fell from 12.1 minutes on the frozen control to 4.7 minutes with warm caches. A fresh final-engine run with run caching off took 6.6 minutes. The final engine retains 98.75%–99.76% local RGB SSIM on those paintings. See the [release notes](CHANGELOG.md#030--2026-11-07) for timing charts, full images, amplified differences and the exact commits. Paint Lab and Spore Studies use different browser paths; the CLI speedup is not a browser speed claim.
 

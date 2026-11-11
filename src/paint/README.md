@@ -4,7 +4,7 @@ The painter's decisions: what to paint, in what order, with which brush and mix.
 
 ## Inking
 
-The pen drawing, in `methods/` unless noted ([pipelines](../../docs/pipelines.md)):
+The pen drawing, in `methods/` unless noted ([pipelines](../../docs/how-it-paints.md)):
 
 - `linework-plan.mjs`, `line-model.mjs`, `line-python.mjs`: the line source, with `tools/seg/sketch-map.py` and `copy-lines.py`.
 - `ink-lines-file.mjs`, `ink-lines.mjs`, `ink-measure.mjs`, `ink-recipe.mjs`: holding and measuring the lines, and the `--inkrecipe` flags.
