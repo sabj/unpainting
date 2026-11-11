@@ -50,3 +50,13 @@ test('move 6: an automatic soft-edge option beside an area plan stops the run, n
   for (const k of ['softwet', 'softarcs', 'softmm', 'softsplit', 'fwsoften']) assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', `--${k}`, '1']), new RegExp(`--${k}: .*pass\\.edges\\.kind`));
   assert.doesNotThrow(() => refuseAreaOwned(['--valueplan', 'c.json', '--softwet', '1.5', '--softsplit', '1']));
 });
+
+test('move 10: the region-label ink decision beside an area plan stops the run; each area\'s drawingRole decides its lines', () => {
+  assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', '--inkdecide', '1']), /--inkdecide 1: .*drawingRole/);
+  assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', '--inkdarkrule', '1']), /--inkdarkrule 1: .*drawingRole/);
+  assert.doesNotThrow(() => refuseAreaOwned(['--areaplan', 'p.json', '--inkdecide', '0', '--linesupport', '5']));
+  assert.doesNotThrow(() => refuseAreaOwned(['--valueplan', 'c.json', '--inkdecide', '1']));
+  // the ink recipe is expanded after the first check, so the painter checks again after it
+  const SRC = painterSource();
+  assert.match(SRC, /argv\.push\(\.\.\.inkRecipeArgs\(INK_RECIPE\.recipe, argv0\)\);\n\/\/ [^\n]*\nrefuseAreaOwned\(argv\);/);
+});

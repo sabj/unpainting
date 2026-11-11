@@ -184,6 +184,8 @@ const INK_RECIPE = { recipe: INK_RECIPE_NAME };
 // the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
 if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
+// checked again: an ink recipe may switch on the region-label ink decision, which an area plan's drawing roles replace
+refuseAreaOwned(argv);
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');
