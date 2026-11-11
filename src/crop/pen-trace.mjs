@@ -17,9 +17,9 @@
 
 const BENCH_PIXEL_MM = 280 / 300;
 const mm = px => px * BENCH_PIXEL_MM;
-/** The tracer's tolerances in sheet millimetres: flank 1.9 to 3.7, reach 3.7, shortest line 13.1, wiggly lines
+/** The tracer's tolerances in sheet millimetres: its reading pixel 0.93 (readSize), flank 1.9 to 3.7, reach 3.7, shortest line 13.1, wiggly lines
  *  shorter than 37.3. A contour's side is read over the band from the reach to the shortest line. */
-export const TRACE_MM = Object.freeze({ flank: [mm(2), mm(4)], reach: mm(4), minLength: mm(14), wiggle: mm(40) });
+export const TRACE_MM = Object.freeze({ pixel: BENCH_PIXEL_MM, flank: [mm(2), mm(4)], reach: mm(4), minLength: mm(14), wiggle: mm(40) });
 const VALUE_STEPS = 9;
 
 const unit = (x, y) => { const m = Math.hypot(x, y); return m > 1e-9 ? [x / m, y / m] : [1, 0]; };
@@ -151,10 +151,12 @@ export function hasLightSide(P, at, mid, band) {
 
 /**
  * Trace the subject's pen lines. `lum` is luminance 0..1, W by H; `pixelMm` is the sheet's millimetres per pixel of it;
- * `pen`: the subject's medium reads as pen (subject-medium.mjs), so pale lines count too.
+ * `pen`: the subject's medium reads as pen (subject-medium.mjs), so pale lines count too. `full`, when the subject was
+ * read coarser than its file (readSize), is { lum, W, H, k } at the file's size (k = its width over W): each line's width
+ * is read there, since a coarser reading blurs a line wider than it is.
  * @returns {{ lines: {points:number[][], length, weight, width}[], scale: {paper, ink, step, mid}, px, stats: {linePixels, inMass} }}
  */
-export function tracePen(lum, W, H, { pixelMm, pen = false }) {
+export function tracePen(lum, W, H, { pixelMm, pen = false, full = null }) {
   if (!(pixelMm > 0)) throw new Error('pen trace: the sheet millimetres of one pixel');
   // a tolerance in pixels (to a millionth, so a bench subject lands on its old whole pixels); never under one pixel
   const px = v => +(v / pixelMm).toFixed(6), f0 = Math.max(1, Math.round(px(TRACE_MM.flank[0])));
@@ -186,7 +188,7 @@ export function tracePen(lum, W, H, { pixelMm, pen = false }) {
     if (!hasLightSide(pts, at, mid, P.side)) { inMass++; continue; }
     const points = smoothPath(pts, P.reach);
     const d = points.reduce((a, [x, y]) => a + 1 - at(Math.floor(x), Math.floor(y)), 0) / points.length;
-    lines.push({ points, length: plen(points), weight: Math.min(0.85, 0.4 + 0.55 * d), width: +markWidth(pts, lum, W, H, P.reach).toFixed(2) });
+    lines.push({ points, length: plen(points), weight: Math.min(0.85, 0.4 + 0.55 * d), width: +(full ? markWidth(pts.map(([x, y]) => [x * full.k, y * full.k]), full.lum, full.W, full.H, P.reach * full.k) / full.k : markWidth(pts, lum, W, H, P.reach)).toFixed(2) });
   }
   return { lines, scale: { paper, ink, step, mid }, px: P, stats: { linePixels, inMass } };
 }
@@ -233,6 +235,16 @@ function thin(M, W, H) {
       if (del.length) changed = true;
     }
   }
+}
+
+/** How a subject W by H pixels on a sheet `sheetMm` wide is read: at the tracer's pixel (TRACE_MM.pixel) when its file
+ *  is finer, since the one-pixel staircase and the reading itself are set at that scale (a 1600 px pen drawing read at
+ *  its own pixels traces wash grain and jagged lines), else as it is. { w, h, pixelMm, back } with back its width
+ *  over w. */
+export function readSize(W, H, sheetMm) {
+  if (!(sheetMm > 0)) throw new Error(`pen trace: the sheet width in mm, not ${sheetMm}`);
+  const w = Math.max(1, Math.min(W, Math.round(sheetMm / TRACE_MM.pixel))), h = w === W ? H : Math.max(1, Math.round(H * w / W));
+  return { w, h, pixelMm: sheetMm / w, back: W / w };
 }
 
 /** RGB bytes (W by H) to luminance 0..1. */

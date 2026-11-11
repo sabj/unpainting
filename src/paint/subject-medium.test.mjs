@@ -115,3 +115,11 @@ test('recipe none: a value plan that asks for ink cannot put ink on a subject wi
     assert.equal(expandRecipe({ argv: base, root: dir }).subjectMedium, null);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the subject reads as pen by its declared medium, else by its measured pen line at the outline threshold', async () => {
+  const { readsAsPen } = await import('./subject-medium.mjs');
+  assert.equal(readsAsPen({ argv: ['--subjectmedium', 'pen'], penShare: 0, threshold: 0.5 }), true);
+  assert.equal(readsAsPen({ argv: ['--subjectmedium', 'pencil'], penShare: 0.05, threshold: 0.5 }), false);
+  assert.equal(readsAsPen({ argv: [], penShare: 0.00559, threshold: 0.5 }), true);
+  assert.equal(readsAsPen({ argv: [], penShare: 0.00084, threshold: 0.5 }), false);
+});

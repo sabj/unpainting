@@ -17,6 +17,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { writeInkLines, inkCells } from '../../crop/ink-lines-file.mjs';
+import { writePenLines } from '../../crop/pen-trace-file.mjs';
+import { readsAsPen } from '../subject-medium.mjs';
 import { finishTexture } from './finish-texture.mjs';
 import { linePaths, scaleLines, readLineText } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
@@ -233,8 +235,11 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
     doc = JSON.parse(readLineText(linePaths(file).lines));
     setName = info.source === 'file' ? linePaths(file).lines : info.source;
   } else {
-    // no line file: the target's own dark ridges, as source-ink traces them, cleaned of shadow edges and foliage squiggles
-    const stem = path.join(out, 'lines-source-ink'), r = await writeInkLines(image, stem);
+    // no line file: the target's own lines traced as a pen draws them (pen-trace.mjs: whole contours, one nib and one
+    // weight per line, texture inside dark masses left to the wash), cleaned of shadow edges and foliage squiggles
+    const pen = readsAsPen({ argv, penShare: inkShare, threshold: num('penfirst', 0.5) });
+    const stem = path.join(out, 'lines-source-ink'), r = await writePenLines(image, stem, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), pen });
+    log(`line source pen trace: ${r.lines.length} lines${pen ? ', pale pen lines included (the subject reads as pen)' : ''}, ${r.inMass} inside dark masses left to the wash`);
     if (r.lines.length >= MIN_STAGE_LINES) {
       doc = JSON.parse(fs.readFileSync(`${stem}-lines.json`, 'utf8'));
       // --linecleanup 0 keeps every traced line; the pen-and-wash recipe does, since --linesupport drops what the
@@ -284,8 +289,9 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
   if (info.files.prepInk) argv.push('--drawingfile', info.files.prepInk);
   if (info.files.finishInk) argv.push('--drawinglast', info.files.finishInk, '--drawinglastmin', '0', '--drawinglastlogic', '0');
   // the stage files are the drawing: the line choice is spent, and the pens draw what the stages hold.
-  // When no prepared drawing file with optical widths was given, keep the fine Old Master nib pressure caps (0.3 / 0.35).
-  if (!file && num('penwash', 0) <= 0) {
+  // Edge chains (no pen line found) keep the light construction pressure caps (0.3 / 0.35). A pen-traced set carries
+  // one weight per line from the source's own darkness, so it takes the source-ink caps like any prepared pen drawing.
+  if (!file && info.source === 'edges' && num('penwash', 0) <= 0) {
     if (opt('openingpressure', '') === '') argv.push('--openingpressure', '0.3');
     if (opt('closingpressure', '') === '') argv.push('--closingpressure', '0.35');
   }
