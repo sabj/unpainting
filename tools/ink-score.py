@@ -138,8 +138,8 @@ def line_model(target, cache):
             result = np.array(detector(Image.fromarray(cv2.cvtColor(target, cv2.COLOR_BGR2RGB))))
             if result.ndim == 3:
                 result = cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
-            if cls != LineartDetector:
-                result = 255-result
+            # controlnet_aux's public detector APIs all return bright lines on black.
+            result = 255-result
             return cv2.resize(result, (target.shape[1], target.shape[0])), cls.__name__, errors
         except Exception as e:
             errors.append(f'{cls.__name__}: {e}')
