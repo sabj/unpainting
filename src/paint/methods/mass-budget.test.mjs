@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coherentMasses, massBudget } from '../../../src/paint/methods/mass-budget.mjs';
-import { cutStrokes } from '../../../src/paint/techniques/dark-mass.mjs';
-import { gaussian } from '../../../src/keyframes/density.mjs';
-import { components } from '../../../src/raster.js';
+import { coherentMasses, massBudget, cutStrokes } from './mass-budget.mjs';
+import { gaussian } from '../../keyframes/density.mjs';
+import { components } from '../../raster.js';
 const num=(k,d)=>d;
 function fixture(w=540){const h=w,S=new Float32Array(w*h);for(let y=.2*h;y<.5*h;y++)for(let x=.2*w;x<.4*w;x++)S[Math.floor(y)*w+Math.floor(x)]=1.2;for(let y=.2*h;y<.5*h;y++)for(let x=.6*w;x<.8*w;x++)S[Math.floor(y)*w+Math.floor(x)]=1.2;S[10*w+10]=4;return {w,h,S};}
 test('coherent darks stay separate and isolated point accents remain outside mass ownership',()=>{const {w,h,S}=fixture();const m=coherentMasses(S,w,h,{gaussian,components,num});assert.equal(m.length,2);assert.ok(m.every(m=>!m.mask[10*w+10]));assert.ok(m.some(m=>m.mask[150*w+150]));assert.ok(m.some(m=>m.mask[150*w+380]));assert.ok(m.every(m=>!m.mask[150*w+270]));});

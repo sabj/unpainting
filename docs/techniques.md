@@ -142,8 +142,6 @@ The `architecture` preset adds three sky flags. `--skylanes 1` lays large cool p
 
 Modules:
 
-- `techniques/dark-mass-shape.mjs` (helper): a dark mass's shape and fur curl paths.
-- `techniques/dark-mass.mjs` (`--darkmass <segments|auto>`): black fur and dark surfaces in four steps.
 - `techniques/shaped-marks.mjs` (`--shapedmarks 1`): flat-brush planes, sky sweeps and short texture marks.
 
 ## Tuned settings

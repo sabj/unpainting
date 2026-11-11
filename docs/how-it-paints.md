@@ -114,7 +114,7 @@ The value planner groups the picture into light and dark bands and shapes the pa
 Each shape gets a technique chosen from what the subject shows there.
 
 - Technique library: `src/paint/techniques/README.md` indexes it. Passage material and move names (`wet on wet`, `wet on dry`, `dry on dry`, with aliases such as `wet in wet`, `glaze`, `dry brush`) are normalised in `src/paint/techniques/passage-plan.mjs`.
-- Techniques by kind: `src/paint/techniques/shaped-marks.mjs` (flat-brush planes, sky sweeps, short texture marks), `src/paint/techniques/dark-mass.mjs` (dark surfaces), `src/paint/techniques/surface-marks.mjs` (fur, masonry and other surface marks), `src/paint/techniques/passage-plan.mjs` (named passages).
+- Techniques by kind: `src/paint/techniques/shaped-marks.mjs` (flat-brush planes, sky sweeps, short texture marks), `src/paint/techniques/surface-marks.mjs` (fur, masonry and other surface marks), `src/paint/techniques/passage-plan.mjs` (named passages).
 - Style profiles: `src/paint/styles/loader.mjs` with `src/paint/styles/ink-and-wash.json`, `src/paint/styles/precise-watercolor.json`, `src/paint/styles/urban-sketch.json`, `src/paint/styles/atmospheric-wet.json`, chosen by the plan's `styleSelection`.
 - Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (a wet-into-wet swatch is wetted and waited on as the sheet is) (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`).
 - Index of every module and flag: [methods and techniques](techniques.md).
@@ -122,7 +122,7 @@ Each shape gets a technique chosen from what the subject shows there.
 The rule for choosing, in painter terms: joined wash or wet in wet for large soft areas and soft transitions; wet on dry for crisp edges and layered glazes; dry brush for broken texture. Wet on dry and dry brush are good techniques. The job is the right one per shape, not making everything wet. The choice is made in the plan (area-plan passes name the move) and logged per shape.
 
 **Inputs:** the shape, what the target shows there (read while planning). **Outputs:** a move, brush, load and edge treatment per passage.
-**Controls:** area-plan `moves`; value-plan `baseMove`; `--passages`, `--shapedmarks`, `--faceplanes`, `--darkmass`.
+**Controls:** area-plan `moves`; value-plan `baseMove`; `--passages`, `--shapedmarks`.
 **Where choices live:** plan (which technique where) and technique library (what a technique does). A painter-side pixel classifier that overrides the plan is not allowed. A subject-fitted value is not allowed in either place: a fitted idea becomes a general technique with no subject names and no plate numbers, or is deleted.
 **Teacher's view:** hard edge is wet on dry; soft edge is wet into wet or a damp brush along it; lose an edge where two neighbours match in value. A wash is one act, not a stack of steps.
 

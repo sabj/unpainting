@@ -273,11 +273,11 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --pensimplify c: reduce each pen path to the points it needs within c cells, then resample evenly. Default 0, off.
   const SIMPLIFY = num('pensimplify', 0) * K;
   const simplifyAll = gs => (SIMPLIFY > 0 ? gs.map(g => ({ ...g, points: drawAs(g.points, { tolerance: SIMPLIFY, step: Math.max(1, 2 * K) }) })).filter(g => g.points.length >= 2) : gs);
-  // Hybrid logic and dark-mass curls consume the walker even with an authored drawing.
+  // Hybrid logic consumes the walker even with an authored drawing.
   // Diagnostic gesture dumps also promise the original walked paths.
   const fileReplacesWalk = !!(first ? opt('drawingfile','') : !fine && opt('drawinglast',''))
     && num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic',0)) === 0
-    && !(ctx.DARK_MASS && first && !fine) && !opt('dumpgestures');
+    && !opt('dumpgestures');
   const gestures = fileReplacesWalk ? [] : simplifyAll(ctx.clock('paths', () => (opt('penfrom', 'walk') === 'chains' ? chainPen() : walkPen())));
   // the ink is the darkest fluid on the palette, as walnut ink is darker than any wash made from it
   // --firstpen graphite: the first pen's drawing as a light pencil lay-in, ink kept for the closing pen. Needs a graphite
@@ -396,12 +396,9 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const penKeep = PEN_FIELD ? (g => { let inside = 0; for (const q of g.points) { const x = Math.min(w - 1, Math.max(0, Math.round(q.x))), y = Math.min(h - 1, Math.max(0, Math.round(q.y))); if (PEN_FIELD[y * w + x] >= num('pendrawat', 0.5)) inside++; } return inside >= g.points.length * num('penkeep', 0.5); }) : null;
   // --drawingfile <base>: the first pen draws a selected drawing whole, in strokes of a person's length, and nothing
   // the walker found (src/paint/methods/drawing-file.mjs)
-  // --darkmass: the pens are cut where they cross a dark mass, which is painted, not inked
   // --practice: the closing pen is cut to the focal darks (src/paint/methods/practice-paint.mjs)
   // --massbudget cuts the closing pen inside the masses; the opening drawing keeps them unless --masscutfirst 1
-  const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : ctx.DARK_MASS ? ctx.DARK_MASS.cutPen : ctx.PRACTICE_CUT && !first && !fine ? ctx.PRACTICE_CUT : g => g;
-  // --darkmasscurls walker: the first pass's walker gestures on a dark mass become its curly brush strokes
-  if (ctx.DARK_MASS && first && !fine) ctx.DARK_MASS.takeGestures(drawn);
+  const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : ctx.PRACTICE_CUT && !first && !fine ? ctx.PRACTICE_CUT : g => g;
   const penWashPrune = PENWASH_PLAN && first && !fine ? lines => { const r = prunePenLines(lines, { w, h, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w, groups: PENWASH_INK_GROUPS, seed: 1 + Math.round(num('seed', 0)), options: { tileInkMm: num('pwtileink', 9), keepAbove: num('pwkeep', 0), minMm: num('pwspeck', 0.8), vary: num('pwpenvary', 0), structMm: num('pwpenstruct', 15) } }); ctx.PENWASH_LINES = r.stats; console.log(`pen wash lines: ${r.stats.out} of ${r.stats.in} lines kept (${r.stats.short} specks, ${r.stats.omitted} omitted, ${r.stats.duplicate} repeats, ${r.stats.density} over density), ink ${r.stats.inkMmOut} of ${r.stats.inkMmIn} mm`); return r.lines; } : null;
   const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, walker: drawn, field, style: DRAW_STYLE, prune: penWashPrune }));
   let kept = SELECTED ? SELECTED : cutPen(penKeep ? drawn.filter(penKeep) : drawn);
@@ -574,8 +571,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
       .filter(g => !faceNear || faceOnLine(g))
       .filter(g => !INKOFF || !INKOFF.outlinesToo || !INKOFF.off(g))
       .filter((g, i, all) => { if (!(WIGGLE > 0)) return true; if (i === 0) console.log(`ink wiggle, ${wiggleLog(all, 'outlines')}`); return wiggleOf(g) <= WIGGLE; });
-    // --darkmass: the silhouette pass keeps off a dark mass too
-    if (ctx.DARK_MASS) { const cut = cutPen(outlineCells); outlineCells.length = 0; outlineCells.push(...cut); }
     // The silhouette pass is filtered on the same evidence: a chain traced round a patch of texture is as unwanted as
     // a walked one. Its want is a constant and its peak is already fixed at 1, so only the batch boundaries are frozen.
     const outlineVerdict = INKFILTER ? classifyInkPaths(outlineCells, DRAW_SOURCE, w, h, { scale: num('inkfilterscale', K), accent: num('inkfilteraccent', 10) * K }) : null;

@@ -1,7 +1,21 @@
 // --massbudget 1: neutral dark masses get their full wash budget, not a reduced wash
 // plus a reserved texture budget. The normal passages still paint their internal forms.
 // Their dense interior drawing is left to the paint, keeping isolated features outside.
-import { cutStrokes } from '../techniques/dark-mass.mjs';
+// pen strokes cut where they cross the mask, each surviving run kept if it has two points
+export function cutStrokes(strokes, mask, w, h) {
+  if (!strokes || !mask) return strokes;
+  const inside = q => { const x = Math.min(w - 1, Math.max(0, Math.round(q.x))), y = Math.min(h - 1, Math.max(0, Math.round(q.y))); return mask[y * w + x] === 1; };
+  const len = pts => pts.reduce((a, p, k) => a + (k ? Math.hypot(p.x - pts[k - 1].x, p.y - pts[k - 1].y) : 0), 0);
+  const out = [];
+  for (const g of strokes) {
+    let run = [];
+    const flush = () => { if (run.length >= 2) out.push({ ...g, points: run, length: len(run) }); run = []; };
+    for (const q of g.points) { if (inside(q)) flush(); else run.push(q); }
+    flush();
+  }
+  return out;
+}
+
 /** Broad dark connected regions; tiny eyes, whiskers and accents stay with the normal painter. */
 export function coherentMasses(SRC, w, h, { gaussian, components, num, rgb = null }) {
   const scale = Math.min(w, h) / 540;

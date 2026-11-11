@@ -39,7 +39,6 @@ import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {paintMasses} from '../../src/paint/methods/masses.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
-import {darkMass} from '../../src/paint/techniques/dark-mass.mjs';
 import {paintPractice} from '../../src/paint/methods/practice-paint.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
@@ -181,16 +180,6 @@ const PRACTICE = num('practice', 0) > 0;
 ctx.PRACTICE_CUT = null;
 const used = {};
 const TECHS = [], LAST = new Uint8Array(n);
-// --darkmass: dark surfaces (black fur, hair, dark clothing, cast shadows) painted in four steps of paint spread over
-// the ladder, with the ladder and the pens kept off them (src/paint/techniques/dark-mass.mjs)
-const DARK_MASS = await darkMass({
-  sheet: ctx.sheet, w, h, n, SC, W2, H2, N2, K: PIGS.length, A: ctx.A, SRC: ctx.SRC, expected, used, O, SEED, UPRIGHT, CAL, image: opt('image', ''), path,
-  thickness, gaussian, components, dilate, erode, distanceToZero, createBrush, dip, stroke, step, dry, applyResist, liftResist,
-  brushedWashPaths, containPaths, sweepCover, clock, snap, setStage: s => { ctx.STAGE = s; }, opt, num, log: console.log, PIGS,
-  drawGestures:(sh,gs,want,w,h,o)=>{const previous=ctx.AREA_DRAW_STAGE;ctx.AREA_DRAW_STAGE='closing';try{return penDraw(sh,gs,want,w,h,o);}finally{ctx.AREA_DRAW_STAGE=previous;}}, sheetK: SHEET_PIGS.length,
-  // the pen's ink: the separate ink pigment when there is one, else the palette's darkest pan, as the pen draws with
-  inkAt: INK ? PIGS.length : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0],
-}); ctx.DARK_MASS = DARK_MASS;
 // --feedback: charge later passes for what the sheet lacks of each pigment, read once per pass, not what the ledger booked.
 // --drawing first|detect|last|both|none: order of the line. first (default) draws in --outlinemedium, lets it dry, then washes.
 // detect: draw first only if the source shows --penfirst per cent of line (default 0.5), else ink at the end. last: wash, then ink.
