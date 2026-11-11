@@ -81,6 +81,8 @@ if(PRODUCTION_WATER!==1)fs.writeFileSync(path.join(out,'production-water-before.
 const productionDip=(b,o)=>{const authored=AREA_EXEC.active?.pass?.source==='authored',requested=o,prepared=productionWaterLoad(o,PRODUCTION_WATER,{authored}),result=dip(b,prepared);if(PRODUCTION_WATER!==1&&!authored){const actual=measureBrush(b),baselineWaterMass=actual.waterMass/PRODUCTION_WATER,intendedPigmentMass=actual.pigmentMass.map((_,j)=>(requested.conc[j]??0)*baselineWaterMass);JSONL.append(path.join(out,'production-water-loads.jsonl'),JSON.stringify({kind:requested.conc.some(v=>v>0)?'actual production paint load':'actual production clean prewet',factor:PRODUCTION_WATER,shapeId:ctx.MAJOR_TECHNIQUE?.shapeId??null,technique:ctx.MAJOR_TECHNIQUE?.name??null,requested,prepared,actual,baselineWaterMassAtSameBrush:baselineWaterMass,intendedPigmentMass,deliveredPigmentMass:null,meaning:'prepared brush mass only; actual deposition is measured separately; no rewet fallback'})+'\n');}return result;};
 
 ctx.RECEIVER_OBSERVER=null;
+// a clean brush made like the painting brush takes its settings, not the GPU stroke it may still have pending (b._pend)
+const brushSettings=b=>{const {_pend,...settings}=b;return settings;};
 const stroke=(b,target,points,options)=>{
  if(ctx.AREA_NUMERIC_CONTACT_STOP&&target===ctx.sheet)return;
  if(ctx.VALUE_ACTIVE&&target===ctx.sheet){
@@ -120,8 +122,8 @@ const stroke=(b,target,points,options)=>{
   const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER,fastPaperOpts);
   if(paint&&!intoOwnWash&&ctx.VALUE_ACTIVE.passageMaterial&&ctx.VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
-    const waterStroke=load=>{const p=measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'});const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+ctx.VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
-    const preparation=(()=>{try{return preparePassageBed({observe:observeBed,maxActions:16,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...b,bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+ctx.VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>ctx.clock('flow',()=>step(target,{...O,dt:2}))});}catch(e){e.message=`passage ${ctx.VALUE_ACTIVE.id} (value band ${ctx.VALUE_ACTIVE.valueBand}, ${(freshCells.length?freshCells:cells).length} cells in its footprint): ${e.message}`;throw e;}})();paper=preparation.paper;
+    const waterStroke=load=>{const p=measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'});const clean=createBrush({...brushSettings(b),bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+ctx.VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
+    const preparation=(()=>{try{return preparePassageBed({observe:observeBed,maxActions:16,wet:()=>waterStroke(.55),pickup:()=>{const clean=createBrush({...brushSettings(b),bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:0,seed:911+ctx.VALUE_COMMAND});dip(clean,{water:.08,conc:SHEET_PIGS.map(()=>0)});thirsty(clean,{water:.08});stroke(clean,target,points,prepOpts);},advance:()=>ctx.clock('flow',()=>step(target,{...O,dt:2}))});}catch(e){e.message=`passage ${ctx.VALUE_ACTIVE.id} (value band ${ctx.VALUE_ACTIVE.valueBand}, ${(freshCells.length?freshCells:cells).length} cells in its footprint): ${e.message}`;throw e;}})();paper=preparation.paper;
     JSONL.append(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:ctx.VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:fastMode?null:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }
   // A wet stroke into a fresh wash waits for the shine to go off, then is laid; uneven paper is counted, not a stop (tools/painter/wet-bed-wait.mjs).
@@ -179,7 +181,7 @@ const stroke=(b,target,points,options)=>{
   const result=prepareSemanticContact(a.pass,points,{observe:observed,waterStroke:(prepared,attempt)=>{
    const prep=semanticPreparation(a.pass),preparedPass=prep?{...a.pass,brush:prep.brush,load:{...prep.load,prewetWater:prep.load.water}}:a.pass;
    const mm=num('sheetmm', DEFAULT_SHEET_MM)/W2;
-   const wet=createBrush({...b,bristles:b.hairs.length,...(prep?{...semanticBrushOptions(preparedPass,mm),...(prep.depositDepthMm!==undefined?{depositDepth:prep.depositDepthMm}:{})}:{radius:b.radius+a.pass.wetness.neighborCells}),seed:ctx.SEED+attempt});
+   const wet=createBrush({...brushSettings(b),bristles:b.hairs.length,...(prep?{...semanticBrushOptions(preparedPass,mm),...(prep.depositDepthMm!==undefined?{depositDepth:prep.depositDepthMm}:{})}:{radius:b.radius+a.pass.wetness.neighborCells}),seed:ctx.SEED+attempt});
    semanticPrewetLoad(preparedPass,wet.free);
    const legacyAllowed=target.clip?[...contact.cells,...contact.neighborIndices].filter(i=>target.clip[i]).length:null;
    AREA_EXEC.set({...a,pass:preparedPass});try{dip(wet,{water:preparedPass.load.prewetWater??1,conc:SHEET_PIGS.map(()=>0)});const waterPoints=prep?semanticPreparationGesture(a.pass,points,mm,{predict:path=>candidateContact(wet,target,path,{...options,clip:null,neighborRadius:0}),requiredCells:materialContact.cells,width:target.w}):prepared;withSemanticWaterClip(target,setClip,()=>stroke(wet,target,waterPoints,{...options,lift:true}));}finally{AREA_EXEC.set(a);}
