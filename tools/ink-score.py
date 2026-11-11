@@ -210,7 +210,7 @@ def main():
     for p, label in zip(panels, labels):
         cv2.putText(p, label, (5, 20), cv2.FONT_HERSHEY_SIMPLEX, .42, (0,0,0), 1)
     cv2.imwrite(str(out/'sheet.jpg'), np.hstack(panels), [cv2.IMWRITE_JPEG_QUALITY, 90])
-    result = dict(version=1, run=str(run), target=str(a.target.resolve()), targetSHA256=target_hash,
+    result = dict(version=1, toolSHA256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(), run=str(run), target=str(a.target.resolve()), targetSHA256=target_hash,
                   mode='strict' if '--notargetlooks' in card['args'] and card['args'][card['args'].index('--notargetlooks')+1]=='1' else 'default',
                   model=model, modelFailures=failures,
                   tapeSHA256=hashlib.sha256(tape_file.read_bytes()).hexdigest(),

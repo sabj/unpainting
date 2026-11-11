@@ -1,6 +1,9 @@
 import unittest
+from unittest.mock import patch
+from types import SimpleNamespace
+from pathlib import Path
 import numpy as np
-from ink_score_module import measure, extract, clip_paths
+from ink_score_module import measure, extract, clip_paths, line_model
 
 class Metrics(unittest.TestCase):
     def line(self, a, b):
@@ -38,6 +41,33 @@ class Metrics(unittest.TestCase):
         self.assertEqual(m['duplicatedParallelShare'],0)
         m,_ = measure([a],ref,1,np.zeros_like(ref))
         self.assertEqual(m['inventedShare'],1); self.assertEqual(m['inventedInMassShare'],0)
+
+    def test_detector_polarity_and_fallback(self):
+        class Fine:
+            @classmethod
+            def from_pretrained(cls, name):
+                raise FileNotFoundError('fine weights absent')
+        class HED:
+            @classmethod
+            def from_pretrained(cls, name):
+                return cls()
+            def __call__(self, image):
+                raw=np.zeros((32,32),np.uint8);raw[16,4:28]=255
+                return raw
+        modules={'torch':SimpleNamespace(set_num_threads=lambda n:None),
+                 'controlnet_aux':SimpleNamespace(LineartDetector=Fine,HEDdetector=HED,PidiNetDetector=HED)}
+        with patch.dict('sys.modules',modules):
+            image,model,failures=line_model(np.zeros((32,32,3),np.uint8),Path('/unused'))
+        self.assertEqual(model,'HED');self.assertEqual(len(failures),1)
+        self.assertEqual(image[0,0],255);self.assertEqual(image[16,16],0)
+        modules['controlnet_aux']=SimpleNamespace(LineartDetector=HED,HEDdetector=Fine,PidiNetDetector=Fine)
+        with patch.dict('sys.modules',modules):
+            image,_,failures=line_model(np.zeros((32,32,3),np.uint8),Path('/unused'))
+        self.assertEqual(image[0,0],255);self.assertEqual(image[16,16],0)
+        self.assertEqual(failures,[])
+        modules['controlnet_aux']=SimpleNamespace(LineartDetector=Fine,HEDdetector=Fine,PidiNetDetector=Fine)
+        with patch.dict('sys.modules',modules), self.assertRaisesRegex(RuntimeError,'No trained line model available'):
+            line_model(np.zeros((32,32,3),np.uint8),Path('/unused'))
 
     def test_sheet_clipping(self):
         paths, widths = clip_paths([self.line([-10,20],[90,20])], [[1,3]], 80,80)
