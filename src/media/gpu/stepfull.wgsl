@@ -1430,8 +1430,10 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   if (sat < free && Wi > 0.05 && M[i] == 1u) {   // a thirsty brush drinks from wetter paper, pigment and all
     let take = min(min((Wi - 0.05) * 0.3 * contact * (1.0 - fill), Wi * 0.5), capa * len - wh[h]);
     if (take <= 0.0) { return; }
+    // the hair's own paint spreads over the liquid it joins (brush.mjs): the cell's part, Wi of Wi + hair water
+    let hw = wh[h]; let out = select(0.0, contact * Wi / (Wi + hw), hw > 0.0);
     let f = take / Wi; W[i] = Wi - take; wh[h] += take;
-    for (var ka = 0u; ka < brushPigmentCount(); ka++) { let k = brushPigmentAt(ka); let g = G[k * u.n + i] * f; G[k * u.n + i] -= g; wh[h + 4u + k] += g; }
+    for (var ka = 0u; ka < brushPigmentCount(); ka++) { let k = brushPigmentAt(ka); let o = wh[h + 4u + k] * out; let g = G[k * u.n + i] * f; G[k * u.n + i] += o - g; wh[h + 4u + k] += g - o; }
     return;
   }
   let gx = u32(max(0, min(i32(u.w) - 1, xx + i32(bu(sb + 4u)) - 1000000))); let gy = u32(max(0, min(i32(u.h) - 1, yy + i32(bu(sb + 5u)) - 1000000)));

@@ -298,3 +298,24 @@ test('two flat-brush lanes at twice the edge half-width dry as evenly across the
   // dried as a ridge when the pores drank each touch, now dries as evenly as a lane.
   assert.ok(old.join <= old.body, `at the old overlap the join strays ${old.join.toFixed(4)}, the lane body ${old.body.toFixed(4)}`);
 });
+
+// An accent is a lightly loaded point that lays paint (brush-review item 8). A small round dipped below its hairs' free
+// threshold, drawn through a wash still wet, drinks from it, but the paint on its hairs is joined to the wash's water by
+// the touch and goes into it, so it lays at least half of what it lays over the same wash dried. Before, it only drank
+// and laid a tenth of that.
+const accentThrough = wet => {
+  const pigs = [{ K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 }, { K: [0.9, 0.7, 0.4], S: [0.02, 0.02, 0.02], rho: 0.05, omega: 1.2, gamma: 0.1 }];
+  const sheet = createSheet(makePaper(120, 48, { seed: 9 }), pigs);
+  const flat = createBrush({ flat: true, radius: 14, bristles: 28, capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, seed: 5 });
+  dip(flat, { water: 0.62, conc: [0.3, 0] }); stroke(flat, sheet, [{ x: 4, y: 24, p: 0.9 }, { x: 116, y: 24, p: 0.9 }], { upright: 'sweep' });
+  if (wet) for (let j = 0; j < 10; j++) step(sheet); else dry(sheet, 30000, DEFAULTS, { levelMax: 140, dt: 2 });
+  const round = createBrush({ radius: 2.5, bristles: 8, capacity: 26, belly: 2, feed: 0.08, give: 0.7, free: 0.4, film: 0.22, wetMix: 0.15, bridge: 0.55, bridgeSoft: 1.2, seed: 31 });
+  dip(round, { water: 0.3, conc: [0, 0.5] });
+  const before = totals(sheet).pig[1];
+  stroke(round, sheet, Array.from({ length: 61 }, (_, k) => ({ x: 30 + k, y: 24 + 3 * Math.sin(k / 9), p: 0.7 })));
+  return totals(sheet).pig[1] - before;
+};
+test('a damp round carrying paint, drawn through a wet wash, lays its paint into it', () => {
+  const wet = accentThrough(true), dried = accentThrough(false);
+  assert.ok(dried > 0 && wet >= 0.5 * dried, `laid ${wet.toFixed(3)} through the wet wash against ${dried.toFixed(3)} over it dried`);
+});

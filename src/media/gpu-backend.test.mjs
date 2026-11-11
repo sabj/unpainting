@@ -160,3 +160,25 @@ test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell'
   }
 });
 
+
+// brush-review item 8: a damp round carrying paint, drawn through a wet wash, gives its paint into it as it drinks; the
+// GPU contact trades both ways as the CPU one does.
+test('a damp round carrying paint through a wet wash lays the same paint on the GPU as on the CPU', { timeout: 120000 }, t => {
+  const lay = sheet => {
+    const flat = createBrush({ flat: true, radius: 10, capacity: 100, belly: 12, give: 0.9, free: 0.4, wetMix: 0.55, seed: 5 });
+    dip(flat, { water: 0.62, conc: [0.3, 0] }); stroke(flat, sheet, [{ x: 8, y: 48, p: 0.9, r: 10 }, { x: 88, y: 48, p: 0.9, r: 10 }], { upright: 'sweep' });
+    for (let j = 0; j < 10; j++) step(sheet, DEFAULTS);
+    const round = createBrush({ radius: 2.5, bristles: 8, capacity: 26, belly: 2, feed: 0.08, give: 0.7, free: 0.4, film: 0.22, wetMix: 0.15, seed: 31 });
+    dip(round, { water: 0.3, conc: [0, 0.5] });
+    stroke(round, sheet, [{ x: 20, y: 46, p: 0.7, r: 2.5 }, { x: 76, y: 50, p: 0.7, r: 2.5 }]);
+    const T = totals(sheet); return { water: T.water, pig: T.pig };
+  };
+  const cpu = lay(fresh()), g = fresh(), info = attachGpu(g, DEFAULTS, { mode: 'auto', log: () => {} });
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+  try {
+    const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 2, 'the strokes were laid on the GPU');
+    const near = (a, b, what) => assert.ok(Math.abs(a - b) <= 1e-4 * Math.max(1, Math.abs(b)), `${what}: GPU ${a} against CPU ${b}`);
+    near(gpu.water, cpu.water, 'water'); gpu.pig.forEach((v, k) => near(v, cpu.pig[k], 'pigment ' + k));
+    assert.ok(cpu.pig[1] > 0, 'the round laid its paint');
+  } finally { g._gpu.close(); }
+});

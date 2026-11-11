@@ -339,8 +339,10 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         const want = brush.wetness * freeL * (0.6 + 0.4 * q.p);
         if (sat < brush.free && Wi > 0.05 && sheet.M[i]) { // a thirsty brush (no free liquid) drinks from wetter paper, pigment and all
           const take = Math.min((Wi - 0.05) * 0.3 * contact * (1 - fill), Wi * 0.5, brush.capacity * hr.len - hr.water); if (take <= 0) continue;
+          // the hair's own paint spreads over the liquid it joins (brush.mjs): the cell's part, Wi of Wi + hair water
+          const out = hr.water > 0 ? contact * Wi / (Wi + hr.water) : 0;
           const f = take / Wi; sheet.W[i] -= take; hr.water += take;
-          for (let kk = 0; kk < K; kk++) { const g = sheet.G[kk][i] * f; sheet.G[kk][i] -= g; hr.pig[kk] += g; }
+          for (let kk = 0; kk < K; kk++) { const o = hr.pig[kk] * out, g = sheet.G[kk][i] * f; hr.pig[kk] += g - o; sheet.G[kk][i] += o - g; }
           stamp[i] = clk; strengths[i] = fullContact;
           continue;
         }

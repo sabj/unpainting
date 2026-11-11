@@ -674,8 +674,11 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
         const want = brush.wetness * freeL * (0.6 + 0.4 * q.p);
         if (sat < brush.free && Wi > 0.05 && sheet.M[i]) { // a thirsty brush (no free liquid) drinks from wetter paper, pigment and all
           const take = Math.min((Wi - 0.05) * 0.3 * contact * (1 - fill), Wi * 0.5, brush.capacity * hr.len - hr.water); if (take <= 0) continue;
+          // the hair's own paint is joined to the cell's water by the touch: it spreads over the liquid they share
+          // (the cell's part of it, Wi of Wi + hair water), so a damp brush carrying paint charges a wet wash as it drinks
+          const out = hr.water > 0 ? contact * Wi / (Wi + hr.water) : 0;
           const f = take / Wi; sheet.W[i] -= take; hr.water += take;
-          for (let kk = 0; kk < K; kk++) { const g = sheet.G[kk][i] * f; sheet.G[kk][i] -= g; hr.pig[kk] += g; }
+          for (let kk = 0; kk < K; kk++) { const o = hr.pig[kk] * out, g = sheet.G[kk][i] * f; hr.pig[kk] += g - o; sheet.G[kk][i] += o - g; }
           if (tuft) { stamp[i]=clk;strengths[i]=fullContact; }
           continue;
         }
