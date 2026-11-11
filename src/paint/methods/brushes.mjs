@@ -30,24 +30,29 @@ export function loadPhysical({ root, opt, num, W2, H2 = W2 }) {
   return P;
 }
 
-/** A path cut into loads: the brush is reloaded where the water it released runs out. */
-export function splitLoads(pts, loadLen) {
+/**
+ * A path cut into loads: the brush is reloaded where the water it released runs out. A load is spent only on paper it
+ * paints: `lays(p)` (default: everywhere) says whether the brush at p touches paper it may paint, and a stretch over a
+ * reserve or outside the passage's edge spends none of it. So every load but the last has painted its full length, and
+ * a last stretch that paints nothing stays with the load before it rather than being dipped for.
+ */
+export function splitLoads(pts, loadLen, lays = null) {
   if (!(loadLen > 0) || pts.length < 2) return [pts];
   const out = []; let cur = [pts[0]], run = 0;
   for (let i = 1; i < pts.length; i++) {
-    run += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    if (!lays || lays(pts[i])) run += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
     cur.push(pts[i]);
     if (run >= loadLen && i < pts.length - 1) { out.push(cur); cur = [pts[i]]; run = 0; }
   }
-  if (cur.length > 1) out.push(cur); else if (out.length) out[out.length - 1].push(cur[0]);
+  if (cur.length > 1 && (!lays || run > 0 || !out.length)) out.push(cur); else if (out.length) out[out.length - 1].push(...cur.slice(1));
   return out;
 }
 
 // Loads that join without a seam: each fresh load starts `feather` cells back over the end of the
 // last one, and both sides ramp their pressure across that overlap so the two deposits sum to
 // about one. Plain splitLoads leaves a darker band at every reload across broad glazes.
-export function splitLoadsFeathered(pts, loadLen, feather) {
-  const loads = splitLoads(pts, loadLen);
+export function splitLoadsFeathered(pts, loadLen, feather, lays = null) {
+  const loads = splitLoads(pts, loadLen, lays);
   if (loads.length < 2 || !(feather > 0)) return loads;
   const len = q => { const d = [0]; for (let i = 1; i < q.length; i++) d.push(d[i - 1] + Math.hypot(q[i].x - q[i - 1].x, q[i].y - q[i - 1].y)); return d; };
   const ramp = (q, fromStart) => { const d = len(q), L = d.at(-1); return q.map((p, i) => { const t = fromStart ? d[i] / feather : (L - d[i]) / feather; const k = Math.max(0.15, Math.min(1, t)); return { ...p, p: (p.p ?? 1) * k }; }); };
@@ -60,3 +65,12 @@ export function splitLoadsFeathered(pts, loadLen, feather) {
   }
   return out;
 }
+
+/** Whether a brush at point p touches paper it may paint on this sheet: inside its clip and off any resist, the rule the
+ *  stroke's own footprint follows. Off the sheet it paints nothing. */
+export const paintsHere = sheet => p => {
+  const x = Math.round(p.x), y = Math.round(p.y);
+  if (x < 0 || y < 0 || x >= sheet.w || y >= sheet.h) return false;
+  const i = y * sheet.w + x;
+  return !sheet.resist?.[i] && (!sheet.clip || Boolean(sheet.clip[i]));
+};

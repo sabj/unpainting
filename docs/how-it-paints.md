@@ -116,7 +116,7 @@ Each shape gets a technique chosen from what the subject shows there.
 - Technique library: `src/paint/techniques/README.md` indexes it. Passage material and move names (`wet on wet`, `wet on dry`, `dry on dry`, with aliases such as `wet in wet`, `glaze`, `dry brush`) are normalised in `src/paint/techniques/passage-plan.mjs`.
 - Techniques by kind: `src/paint/techniques/shaped-marks.mjs` (flat-brush planes, sky sweeps, short texture marks), `src/paint/techniques/surface-marks.mjs` (fur, masonry and other surface marks), `src/paint/techniques/passage-plan.mjs` (named passages).
 - Style profiles: `src/paint/styles/loader.mjs` with `src/paint/styles/ink-and-wash.json`, `src/paint/styles/precise-watercolor.json`, `src/paint/styles/urban-sketch.json`, `src/paint/styles/atmospheric-wet.json`, chosen by the plan's `styleSelection`.
-- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (a wet-into-wet swatch is wetted and waited on as the sheet is) (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`).
+- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (a wet-into-wet swatch's bed is wetted with the sheet's own clean brushes, pickup and wait, `tools/painter/wet-bed-prep.mjs`) (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`). Under `--meteredbrush 1` the brush holds a real brush's water and runs short along a lane, so its swatch is a strip one load long at its brush's width, recharged once a load as the sheet's lanes are.
 - Index of every module and flag: [methods and techniques](techniques.md).
 
 The rule for choosing, in painter terms: joined wash or wet in wet for large soft areas and soft transitions; wet on dry for crisp edges and layered glazes; dry brush for broken texture. Wet on dry and dry brush are good techniques. The job is the right one per shape, not making everything wet. The choice is made in the plan (area-plan passes name the move) and logged per shape.
@@ -128,7 +128,7 @@ The rule for choosing, in painter terms: joined wash or wet in wet for large sof
 
 ## 5. Brush and stroke application
 
-The painter dips a brush, tries it on scrap, lays a stroke along a path, and reloads when the load runs out.
+The painter dips a brush, tries it on scrap, lays a stroke along a path, and reloads when the load runs out. A load is spent only on paper the brush paints: a stretch over a reserve or outside the passage's edge spends none of it (`src/paint/methods/brushes.mjs` splitLoads).
 
 - Brushes: `src/media/brush.mjs` (bristles and load), `src/paint/brushes.json` (real brush sizes), `src/paint/methods/brushes.mjs` (`--physical 1`), `src/paint/methods/passage-brush.mjs` (`--brushchoice`).
 - Paths: `src/media/wash.mjs` (wash paths, softening, prewetting), `src/paint/methods/lay.mjs` (one passage as sweeps), `src/paint/methods/stroke-plan.mjs` (`--strokeplan 1`, overlapping parallel sweeps), `src/paint/methods/mop-lanes.mjs` (a mop's overlapping, slightly curved lanes).

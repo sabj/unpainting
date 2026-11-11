@@ -59,7 +59,7 @@ import {paintShapes} from '../../src/paint/methods/shapes.mjs';
 import {passageHook} from '../../src/paint/methods/passages.mjs';
 import {leftToTheWashes} from '../../src/paint/methods/ladder-seg.mjs';
 import {loadFocus, mergeShapes, completeBudget, budgetPaths} from '../../src/paint/methods/stroke-budget.mjs';
-import {splitLoads} from '../../src/paint/methods/brushes.mjs';
+import {splitLoads,paintsHere} from '../../src/paint/methods/brushes.mjs';
 import {createPause} from '../aware/pause.mjs';
 import {writeState, readState, revisionExpectation} from '../aware/state-io.mjs';
 import {tapeState, restoreTapeState} from '../../src/media/brush.mjs';
@@ -824,10 +824,11 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // --graded c: recharge every c cells along a sweep at the strength the passage wants there, normalised to a mean of one. Default 0.
     // A graded wash (--gradedwash) is always charged this way from its own graded amount, not normalised per sweep.
     const gradedLen = BUDGET || authoredPaths || (PB && !detail) ? 0 : (useGradedCal ? (GFLOOR ? GCHUNK / SC : num('gradedchunk', 6)) : num('graded', 0)) * SC;
-    // --physical: the path is cut where the brush's released water runs out (brushes.mjs splitLoads) and each load is a
+    // --physical: the path is cut where the brush's released water runs out (brushes.mjs splitLoads), counted only over
+    // paper the brush may paint (inside the clip, off any resist; the stroke's own footprint rule), and each load is a
     // stroke of its own, dipped afresh; a graded wash is graded by the puddle's dilution between loads (the mean of its
     // graded amount under each load), not by recharging every few cells
-    const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name) * (METERED_BRUSH && !T.name.startsWith('dry brush') ? BRUSH_LOAD * WET(T) : 1)) : null;
+    const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name) * (METERED_BRUSH && !T.name.startsWith('dry brush') ? BRUSH_LOAD * WET(T) : 1), paintsHere(ctx.sheet)) : null;
     if (LOADS && (LOADS.length > 1 || useGradedCal)) {
       // One amount per shape, graded by the plan's plane (graded-demand.mjs): each load is dipped at the plane's mean
       // under it and pressed along it, never charged per-cell amounts. A passage without a plane takes its amount throughout.

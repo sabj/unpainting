@@ -43,3 +43,17 @@ test('the scrap swatch waits on each wetted lane before charging it, as the shee
   });
   assert.deepEqual(calls, ['dip water', 'water 30', 'wait true', 'dip paint', 'paint 30', 'dip water', 'water 50', 'wait true', 'dip paint', 'paint 50']);
 });
+
+test('given the sheet\'s own bed preparation, the swatch wets each lane with it, not with a generic full brush', () => {
+  const calls = [], tag = new WeakMap();
+  const paths = [[{ x: 20, y: 30, r: 5 }, { x: 70, y: 30, r: 5 }]];
+  const brush = kind => { const b = {}; tag.set(b, kind); return b; };
+  scrapDelivery({ name: 'wet on wet', water: 0.55, passes: 1, intoWet: true }, {
+    mask: swatchMask(), paths, pigment: { name: 'test' }, physics: {}, paperOptions: { seed: 5 }, charge: 1, upright: false,
+    water: T => T.water, paintBrush: () => brush('paint'), waterBrush: () => brush('water'),
+    dip: b => calls.push(`dip ${tag.get(b)}`), step: () => {}, dry: () => {},
+    stroke: (b, _s, pts) => calls.push(`${tag.get(b)} ${pts[0].y}`),
+    prepareBed: (_scrap, pts, r, T, cells) => calls.push(`prepare ${pts[0].y} r ${r} ${T.water} ${cells.length > 0}`),
+  });
+  assert.deepEqual(calls, ['prepare 30 r 5 0.55 true', 'dip paint', 'paint 30']);
+});
