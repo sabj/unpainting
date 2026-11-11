@@ -1,5 +1,5 @@
 // Turn ridges into drawn forms: pair ends by continuation, fit each as a curve, cut where the tool would change,
-// and order by intent. The hand that draws them lives in motor.mjs.
+// and order by intent.
 import { polylineLength, resample, simplify } from '../util.js';
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y), dot = (a, b) => a.x * b.x + a.y * b.y;
 const unit = (a, b) => { const d = dist(a, b) || 1; return { x: (b.x - a.x) / d, y: (b.y - a.y) / d }; };
