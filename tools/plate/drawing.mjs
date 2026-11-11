@@ -20,9 +20,7 @@ import {roleBrushMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetArea} from '../../src/media/wash.mjs';
 import {loadSubject, splitFirstWash} from '../../src/paint/methods/first-wash.mjs';
-import {localSubjectWash} from '../../src/paint/techniques/subject-local.mjs';
 import {pencilBatches, prepFade} from '../../src/paint/methods/pencil-stage.mjs';
-import {tintRegions, tintSubject} from '../../src/paint/techniques/subject-tint.mjs';
 import {painterOrder, subjectRegions} from '../../src/paint/methods/painter-order.mjs';
 import {hasLines, loadLines} from '../../src/crop/lines.mjs';
 import {deferredFirstWash} from '../../src/paint/methods/colour-budget.mjs';
@@ -142,24 +140,8 @@ if (!VALUE_ENABLED && ['painter','legacy-painter'].includes(ORDER)) {
     subjectLabels = sr?.label ?? null;
     console.log(sr ? `order painter: subject in ${sr.areas.length} drawing regions, ${sr.areas.map(a => (100 * a / sr.subjArea).toFixed(0) + '%').join(' ')} of it` : 'order painter: the drawing closes off fewer than two subject regions, subject laid whole');
   }
-  // --subjtint <stage.png>: the subject's light values cut by the finish's colour regions and weighed so each region
-  // lays its own pale local colour, measured on that stage (src/paint/techniques/subject-tint.mjs)
-  const TINT = opt('subjtint', '');
-  const tintR = TINT && subject ? await tintRegions({ finish: path.resolve(root, opt('subjtintfinish', opt('image', ''))), subject, w, h, sharp, k: Math.max(2, Math.round(num('subjtintk', 5))), blur: num('subjtintblur', 3), mode: Math.max(1, Math.round(num('subjtintmode', 3))), log: console.log }) : null;
-  if (tintR) subjectLabels = tintR.label;
-  // --subjlocal <stage.png>: the subject's first wash in each colour region's local hue at the stage's lightness, wet on
-  // wet, before the subject's other light pieces (src/paint/techniques/subject-local.mjs)
-  const LOCAL = !TINT && opt('subjlocal', '') && subject ? await tintRegions({ finish: path.resolve(root, opt('image', '')), subject, w, h, sharp, k: Math.max(2, Math.round(num('subjlocalk', 4))), blur: num('subjtintblur', 3), mode: Math.max(1, Math.round(num('subjtintmode', 3))), log: console.log }) : null;
-  if (LOCAL) subjectLabels = LOCAL.label;
   const r = painterOrder(ctx.layers, { darkFirst: num('darkfirst', 0) > 0, subject, w, n, steps: ctx.steps, light: num('orderlight', 0.25), dark: num('orderdark', 0.6), regions: Math.max(1, Math.round(num('orderregions', 4))), minPart: num('orderminpart', 0.08), minRegion: num('orderminregion', 0.1), film: FILM_MASS, subjectLabels, far: num('orderfar', 0) > 0 });
   ctx.layers = r.layers;
-  if (tintR) ctx.layers = (await tintSubject(ctx.layers, { regions: tintR, stage: path.resolve(root, TINT), PIGS, w, h, sharp, gain: num('subjtintgain', 1), max: num('subjtintmax', 1), opening: num('opening', 0.55), defer: num('subjtintdefer', 1) > 0, film: FILM_MASS, log: console.log })).layers;
-  if (LOCAL) {
-    const st = (await sharp(path.resolve(root, opt('subjlocal', ''))).removeAlpha().resize(w, h, { fit: 'fill' }).blur(1.5).raw().toBuffer({ resolveWithObject: true })).data;
-    const r2 = localSubjectWash(ctx.layers, { regions: LOCAL, st, PIGS, w, h, gain: num('subjlocalgain', 1), film: FILM_MASS });
-    ctx.layers = r2.layers;
-    console.log(`subject local: ${r2.summary.map(q => `region ${q.region} (${q.cells} cells) density ${q.want.map(v => v.toFixed(2)).join('/')} mix ${q.mix ? q.mix.map(v => v.toFixed(3)).join('/') : 'none'}`).join('; ')}`);
-  }
   console.log(`order painter: ${ctx.layers.length} passes; ${r.summary.map(s => `${s.phase} ${s.layers} passes, ${s.passages} passages, ${(100 * s.area).toFixed(1)}% of the sheet`).join('; ')}`);
   // --bgfirst 1: every background pass goes on before the first pass on the figure, each side in painter order. Default 0.
   if (num('bgfirst', 0) > 0) {

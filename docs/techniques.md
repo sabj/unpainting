@@ -145,8 +145,6 @@ Modules:
 - `techniques/dark-mass-shape.mjs` (helper): a dark mass's shape and fur curl paths.
 - `techniques/dark-mass.mjs` (`--darkmass <segments|auto>`): black fur and dark surfaces in four steps.
 - `techniques/shaped-marks.mjs` (`--shapedmarks 1`): flat-brush planes, sky sweeps and short texture marks.
-- `techniques/subject-local.mjs` (`--subjlocal <stage.png>`): the subject's first wash in local colour, wet into wet.
-- `techniques/subject-tint.mjs` (`--subjtint <stage.png>`): a pale local colour per subject region.
 
 ## Tuned settings
 
