@@ -45,6 +45,8 @@ The pen is a dip pen with a finite load of walnut ink. Four things change its li
 
 The default is `--outlinemedium graphite`, a light pencil drawing. `--outlinemedium ink` draws in ink. `--outlinemedium auto` draws in ink when the source shows at least 0.5% line, and in graphite below that. Code: `src/media/pen.mjs` and `src/paint/methods/pencil-line.mjs`. The command line does not use the separate `src/media/pencil.mjs` API, which models wear, dust and movable graphite. [Ink](ink.md) covers how the lines are chosen and the other drawing orders.
 
+A traced line is drawn whole, with one nib and one weight set by its mean darkness; the pen's own pressure curve shapes it along its length. The tracer (`bench/v4v5/tools/trace-ink.mjs`) takes its limits from the subject's own value range: a line is one step of a nine-step scale, spanning the subject's lightest and darkest values, darker than both sides, and lies in the scale's darker half. The limits are not settable. Closing ink and `--linesupport` keep or drop each line whole: a line stays if at least half of it follows a line in the target.
+
 ## 3. Paint
 
 Watercolor is transparent. Light passes through each layer of pigment, reflects off the paper and comes back, so the paper is part of every color. A light wash cannot cover a dark one. Lights have to be reserved, painted pale, or lifted while the paint still allows it.
@@ -128,6 +130,8 @@ The painter lays fresh paper, reserves the lights that must stay white, and draw
 For each passage, the painter sets the paper state the technique needs. Wet into wet prewets the region with clean water. Wet on dry and dry brush wait for a drier sheet. The painter loads the brush, follows the planned paths, and lets water and pigment move, settle and dry. Then it saves a frame and takes the next passage.
 
 While painting, the [guard](honesty.md) blocks reads of the target's pixels and of every map made from them (`tools/guard/seal-maps.mjs`). The painter works from its plan and the sheet.
+
+In default mode the painter also looks at the subject while painting, at brush and shape scale only; `--notargetlooks 1` (strict) makes no target reads after planning. The final darks are brush marks made with the detail brush's tip on the plan's accent families, each at least one tip touch, and are kept off the reserved lights only. Touch-ups are two fixed rounds that only darken. The simulator has no physical rule for lifting dried pigment, so touch-ups do not lift.
 
 ### Review
 
