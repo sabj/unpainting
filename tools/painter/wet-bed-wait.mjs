@@ -17,13 +17,18 @@ const typical = paper => { if (!Number.isFinite(paper.waterP50)) throw new Error
 export function layIntoWetBed({ paper, observe, step, O, info = {} }) {
   const fast = { ...O, dt: 2 };
   let wetWaits = 0;
-  if (paper.moistShare >= WET_BED.moistShare && typical(paper) > WET_BED.glossy) {
+  // An uneven bed is waited on too while standing water lies under the brush: a loaded brush cannot let go into water
+  // deeper than its own (charged into a puddle it keeps about half its paint, which goes back to the jar at the next
+  // dip). The wait stops once the shine is gone, or once the bed starts losing damp cells it had (below the even bed's
+  // limit, or below what an uneven bed began with), so no damp part is waited dry.
+  const keep = Math.min(paper.moistShare, WET_BED.moistShare);
+  if (typical(paper) > WET_BED.glossy) {
     while (typical(paper) > WET_BED.glossy && wetWaits < WET_BED.maxWaits) {
       const before = wetWaits;
       for (let j = 0; j < WET_BED.batch; j++) step(before >= WET_BED.slowSteps ? fast : O);
       wetWaits += WET_BED.batch;
       paper = observe();
-      if (paper.moistShare < WET_BED.moistShare) break;
+      if (paper.moistShare < keep) break;
     }
   }
   check('wet wash laid on uneven paper', paper.moistShare >= WET_BED.moistShare && typical(paper) <= WET_BED.glossy,
