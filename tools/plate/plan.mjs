@@ -31,8 +31,6 @@ import {chooseTechnique} from '../../src/crop/technique.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {setClip as physicalSetClip, stableClipMask} from '../../src/media/sheet.mjs';
 import {detailLayers} from '../../src/paint/methods/detail-passes.mjs';
-import {litPlanes} from '../../src/paint/techniques/lit-planes.mjs';
-import {facePlanes} from '../../src/paint/techniques/face-planes.mjs';
 import {styleTarget, massesOf} from '../../src/crop/styletarget.mjs';
 import {separate} from '../../src/crop/inkwash.mjs';
 import {orientationField} from '../../src/crop/fur.mjs';
@@ -320,11 +318,6 @@ if (MIXES) {
   console.log(`${MIXES.length} mixed colours on the palette, holding ${(100 * MIXED.kept).toFixed(1)}% of the picture's pigment:`);
   for (const m of MIXES) console.log(`  ${[...m].map((v, j) => (v > 0 ? `${(100 * v).toFixed(0)}% ${PIGS[j].name}` : null)).filter(Boolean).join(' + ')}`);
 }
-// --litplanes: the skin cut into lit, half and shadow planes before the plan (src/paint/techniques/lit-planes.mjs)
-{ const L = MIXED ? null : await litPlanes({ A: ctx.A, K: PIGS.length, px: ctx.px, w, h, n, paperL: 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2], image: opt('image', ''), path, gaussian, num, opt, log: console.log, root, fs, sharp }); if (L) ctx.A = L; }
-// --faceplanes: the face laid as two or three large soft value planes, not many small passages
-// (src/paint/techniques/face-planes.mjs)
-{ const F = MIXED ? null : await facePlanes({ A: ctx.A, K: PIGS.length, px: ctx.px, w, h, n, paperL: 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2], image: opt('image', ''), path, gaussian, num, log: console.log, root, fs, sharp }); if (F) ctx.A = F; }
 // --modulate: washes scaled down in the highlight and detail areas, the rest kept for dry brush
 // (src/paint/methods/modulate.mjs)
 const ART_DENSITY = () => { const pl0 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2]; return Float32Array.from({ length: n }, (_, i) => Math.max(0, -Math.log(Math.max(0.02, Math.min(1, lum(i) / pl0))))); };

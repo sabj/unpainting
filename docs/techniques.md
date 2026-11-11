@@ -145,9 +145,6 @@ Modules:
 
 - `techniques/dark-mass-shape.mjs` (helper): a dark mass's shape and fur curl paths.
 - `techniques/dark-mass.mjs` (`--darkmass <segments|auto>`): black fur and dark surfaces in four steps.
-- `techniques/face-detail.mjs` (`--facedetail 1`): eyes, lids, nostrils and mouth with a small nib.
-- `techniques/face-planes.mjs` (`--faceplanes 2|3`): the face as two or three soft value planes.
-- `techniques/lit-planes.mjs` (`--litplanes`): skin cut into lit, half and shadow planes.
 - `techniques/passages/foliage.mjs` (`--passages foliage`): a hillside of bushes, light to dark and broken.
 - `techniques/passages/sea.mjs` (`--passages sea`): a graded sea band with a masked foam line.
 - `techniques/passages/sky.mjs` (`--passages sky`): a wet-in-wet sky with lifted clouds.

@@ -21,8 +21,6 @@ import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
 import {backendLine} from '../../src/media/gpu/backend-record.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {deliveryByBand, deliveryNote} from '../../src/paint/methods/delivery-report.mjs';
-import {loadSubject} from '../../src/paint/methods/first-wash.mjs';
-import {faceDetail} from '../../src/paint/techniques/face-detail.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
 import {penEndPosition, eraseFactor} from '../../src/paint/methods/pencil-stage.mjs';
 import {retimeRun, codeForImage, concatList, phaseAt, phaseShares, PHASES, labelFrames} from '../../src/paint/film-timeline.mjs';
@@ -103,26 +101,6 @@ if (DRAW_LAST && DRAWING !== 'none') {
 if (opt('finish', '0') !== '0' && opt('draw', '1') !== '0') {
   ctx.STAGE = { stage: 'ink', step: 'fine' };
   await drawPass(null, { fine: true });
-}
-// --facedetail 1: small dark face detail, with a small nib, from the reference's thin dark ridges in the figure mask
-// (src/paint/techniques/face-detail.mjs). Tuning: --facedetailq 0.9, --facedetailnib 0.6 cells, --facedetailconc 8, and others there.
-if (num('facedetail', 0) > 0 && opt('draw', '1') !== '0') {
-  const Kd = opt('cellscale', '0') !== '0' ? w / 420 : 1;
-  const fd = faceDetail(ctx.SRC, w, h, FW_SUBJ ?? (opt('fwmask', '') ? await loadSubject({ file: path.resolve(root, opt('fwmask', '')), w, h, sharp, log: () => {} }) : null),
-    { K: Kd, sigma: num('facedetailsigma', 1), q: num('facedetailq', 0.9), lines: Math.round(num('facedetaillines', 60)), flecks: Math.round(num('facedetailflecks', 30)), margin: num('facedetailmargin', 3), tile: num('facedetailtile', 0), absfloor: num('facedetailabs', 0.25), maxLen: num('facedetailmaxlen', 0), rgb: num('facedetailskin', 0) > 0 ? ctx.px : null, blobs: Math.round(num('facedetailblobs', 0)), blobq: num('facedetailblobq', 0.97), blobmax: num('facedetailblobmax', 40), lineNear: num('facedetailmaxlen', 0) > 0 ? dilate(FACE_INK(), w, h, Math.max(1, Math.round(num('facedetailnear', 3) * Kd))) : null, seed: SEED, log: console.log });
-  const dInkPig = GRAPHITE && !INK ? GRAPHITE_AT : INK ? PIGS.length : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0];
-  const dWant = SC === 1 ? fd.field : Float32Array.from({ length: N2 }, (_, i) => fd.field[(((i / W2) | 0) / SC | 0) * w + ((i % W2) / SC | 0)]);
-  const dScale = gs => gs.map(g => ({ points: g.points.map(q => ({ x: q.x * SC, y: q.y * SC })) }));
-  const dPen = { nib: num('facedetailnib', 0.6) * Kd, flex: 1.5 * Kd, travel: 1.5 * Kd, reach: 12 * Kd, reservoir: 250 * Kd * Kd, feed: 1.2 * Kd };
-  const dInk = SHEET_PIGS.map((_, j) => (j === dInkPig ? num('facedetailconc', 8) : 0));
-  const rl = penDraw(ctx.sheet, dScale(fd.lines), dWant, W2, H2, { ink: dInk, pen: dPen, O, peak: 1 });
-  const flFull = new Float32Array(N2).fill(0.8);
-  const rf = penDraw(ctx.sheet, dScale(fd.flecks), flFull, W2, H2, { ink: dInk, pen: { ...dPen, nib: dPen.nib * 0.8 }, O, peak: 1 });
-  if (fd.dabs.length) penDraw(ctx.sheet, dScale(fd.dabs), flFull, W2, H2, { ink: dInk, pen: { ...dPen, nib: dPen.nib * 0.9 }, O, peak: 1 });
-  dry(ctx.sheet, 20000, O, { levelMax: 200 });
-  console.log(`face detail: ${rl.drawn} lines and ${rf.drawn} flecks laid on the dry sheet in pigment ${dInkPig}`);
-  ctx.STAGE = { stage: 'ink', step: 'face detail' };
-  await shoot();
 }
 // --smalllights gouache|both: white gouache last where the source has a small light and the painting reads over --gouachemargin denser.
 // --gouachefull: light share that covers a cell (default 0.5); --gouacheopacity 0.9, --gouachedry 0.5: hiding and dry-brush misses.
