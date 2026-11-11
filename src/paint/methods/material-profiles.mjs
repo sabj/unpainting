@@ -31,7 +31,8 @@ export function sourceDrawingCaps({medium,stage='opening',sourceInk=false,planne
   : {...sparse};
 }
 // `widthFloorMm` (--inkwidthfloor): no contact narrower than this, and the nib's widest contact rises to it. Default 0.
-export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeStrength,w,h,state={used:0},caps,sourceInk=false,widthFloorMm=0}){
+// edgeCut false: the runs were cut by the target edge when they were planned, so laying them reads no edge map
+export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeStrength,edgeCut=true,w,h,state={used:0},caps,sourceInk=false,widthFloorMm=0}){
  const base=materialProfile(medium),cap={...sourceDrawingCaps({medium,stage,sourceInk}),...caps};
  const profile=widthFloorMm>0?{...base,widthMm:[Math.max(base.widthMm[0],widthFloorMm),Math.max(base.widthMm[1],widthFloorMm)]}:base;
  if(!cap||!['opening','closing'].includes(stage)||!(mmPerCell>0)||!Number.isFinite(cap.lines)||cap.lines<0||!Number.isFinite(cap.pressure)||cap.pressure<0||cap.pressure>1)throw Error('Invalid drawing stage/physical scale');
@@ -44,16 +45,16 @@ export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeSt
   let length=0;for(let i=1;i<g.points.length;i++)length+=Math.hypot(g.points[i].x-g.points[i-1].x,g.points[i].y-g.points[i-1].y)*mmPerCell;
   if(stage==='opening'&&length<cap.minLengthMm&&g.reviewedOrdinal==null&&g.focalFeature==null)continue;
   const runs=[];let run=[];
-  for(const p of g.points){if(stage==='closing'&&cap.edgeMin>0&&(!(at(p)>=cap.edgeMin))){if(run.length>1)runs.push(run);run=[];continue;}const s=Math.min(cap.pressure,Math.max(0,p.s??p.weight??g.weight??cap.pressure));const width=profile.widthMm[0]+(profile.widthMm[1]-profile.widthMm[0])*s**profile.pressureExponent;const nw=p.nw==null?width/mmPerCell:Math.max(profile.widthMm[0]/mmPerCell,Math.min(profile.widthMm[1]/mmPerCell,p.nw));run.push({...p,s,p:s,nw});}
+  for(const p of g.points){if(edgeCut&&stage==='closing'&&cap.edgeMin>0&&(!(at(p)>=cap.edgeMin))){if(run.length>1)runs.push(run);run=[];continue;}const s=Math.min(cap.pressure,Math.max(0,p.s??p.weight??g.weight??cap.pressure));const width=profile.widthMm[0]+(profile.widthMm[1]-profile.widthMm[0])*s**profile.pressureExponent;const nw=p.nw==null?width/mmPerCell:Math.max(profile.widthMm[0]/mmPerCell,Math.min(profile.widthMm[1]/mmPerCell,p.nw));run.push({...p,s,p:s,nw});}
   if(run.length>1)runs.push(run);
   for(const points of runs){if(state.used>=cap.lines)break;out.push({...g,points,dip:g.dip??false,low:g.low??.25,material:medium,stage});state.used++;}
  }
  return out;
 }
-export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,dropSize=.1,drySheet,...opts}){
+export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,edgeCut=true,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,dropSize=.1,drySheet,...opts}){
  const profile=materialProfile(medium),k=sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
  if(k<0)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
- const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,w,h,state,caps,sourceInk,widthFloorMm});
+ const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,edgeCut,w,h,state,caps,sourceInk,widthFloorMm});
  const dryGate=dryPenGate({O,audit,...(drySheet?{drySheet}:{})});
  const gate=event=>{
   if(dryInk||profile.kind==='graphite')dryGate(event);

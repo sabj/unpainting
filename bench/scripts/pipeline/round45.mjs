@@ -27,7 +27,7 @@ import { tokenStop } from '../budget.mjs';
 const V45 = path.join(BENCH, 'v4v5');
 const PIPE = path.join(BENCH, 'scripts', 'pipeline');
 const REPAIR_MINUTES = 60;   // wall-clock safety limits of a session and of a repair turn
-const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then paint it with bench/paint.sh, looking at it as you like.';
+const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then paint it with bench/paint.sh; you may step back and look at it three times while it paints.';
 const LITE_PROMPT = 'Read bench/TASK.md, prepare the plan deliverables and stop. This is planning only: do not run checks or the painter; the harness does both after your process exits.';
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
 const STAGE_PCT = [10, 25, 50, 75, 100];
@@ -41,6 +41,12 @@ const VERDICT_TEXT = {
   strict: { UNREAD_OPTION: 'fails the painting', AFTER_PAINTING: 'Also failed after painting (no score): passages that end\nup with no brush path, a setting nobody read.' },
 };
 
+// What a look shows: target beside sheet by default; the sheet only in a strict run (--notargetlooks 1).
+const LOOK_TEXT = {
+  default: { LOOK_VIEW: '`bench/looks/<n>-compare.jpg` (the target and your sheet so far, side by side) and\n  `bench/looks/<n>-sheet.jpg`', STRICT_NOTE: '' },
+  strict: { LOOK_VIEW: '`bench/looks/<n>-sheet.jpg` (your sheet so far)', STRICT_NOTE: '\n- This is a strict run: no target view after planning. No look shows the target, and `bench/plan/target.png` is\n  removed from this tree when the painting starts (`bash bench/check.sh` then has no target; `revise` still checks).' },
+};
+
 /** The brief for one try: TASK.md with the round's rules and, in V5 after try 1, the feedback section. */
 export function renderTask({ round, n, tries, spec, strictVerdict = false, profile = null }) {
   const bf = f => fs.readFileSync(path.join(V45, f), 'utf8').trim();
@@ -48,7 +54,7 @@ export function renderTask({ round, n, tries, spec, strictVerdict = false, profi
   let rules = !v5 ? bf('round-V4.md').replace('Each of the three V4 tries', `Each of the ${WORDS[tries] ?? tries} V4 tries`)
     : n === 1 ? bf('round-V5-first.md').replace('try 1 of 3', `try 1 of ${tries}`) : bf('round-V5-next.md').replace('{TRY}', String(n)).replace(` of 3:`, ` of ${tries}:`);
   const feedback = v5 && n > 1 ? bf('feedback-section.md').replace('{PREV}', String(n - 1)) : '';
-  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
+  const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], ...LOOK_TEXT[spec.noTargetLooks === true ? 'strict' : 'default'], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
   let t = fs.readFileSync(path.join(V45, 'TASK.md'), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
   for (const [k, v] of Object.entries(vals)) t = t.replaceAll(`{${k}}`, v);
   if (profile?.planOnly) {
@@ -120,6 +126,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     const selfReview = path.join(ws, 'bench', 'SELF-REVIEW.md');
     const turn = async (text, repair) => {
       const k = record.turns.length + 1, events = path.join(raw, `events-${k}.jsonl`), stderr = path.join(raw, `stderr-${k}.log`);
+      fs.writeFileSync(path.join(raw, `prompt-${k}.txt`), text + '\n');
       const c = dry ? { cmd: process.execPath, args: ['bench/dry-planner.mjs', repair ? 'repair' : 'start'] }
         : turnCommand(model, { ws, raw, text, sessionId: sessionId ?? thread, resume: repair && model.runner !== 'together', turn: k, briefFile: path.join(ws, 'bench', 'TASK.md'), logFile: events, minutes: repair ? REPAIR_MINUTES : profile.wallMinutes, done: 'any', budget: profile });
       let finT = null;
@@ -209,7 +216,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
   } finally {
     if (session?.painting) session.painting.kill();
     keepScripts(ws, path.join(raw, 'scripts'), SEEDED);
-    for (const f of ['PLAN.md', 'SELF-REVIEW.md', 'variant.txt']) if (fs.existsSync(path.join(ws, 'bench', f))) fs.copyFileSync(path.join(ws, 'bench', f), path.join(raw, f));
+    for (const f of ['TASK.md', 'PLAN.md', 'SELF-REVIEW.md', 'variant.txt']) if (fs.existsSync(path.join(ws, 'bench', f))) fs.copyFileSync(path.join(ws, 'bench', f), path.join(raw, f));
     if (fs.existsSync(path.join(ws, 'bench', 'feedback'))) fs.cpSync(path.join(ws, 'bench', 'feedback'), path.join(raw, 'feedback'), { recursive: true });
     cleanup();
   }
@@ -311,7 +318,7 @@ export async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
-export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, basePalette = true, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
+export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
   const subjects = loadSubjects();
   if (profile.planOnly && (round.id !== 'V4' || tries !== 1 || fromTry !== 1)) throw new Error('lite requires V4 try 1 only; use full for repeated trials');
   const log = msg => console.error(`bench:run: ${msg}`);
@@ -329,7 +336,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
     for (const crop of crops) {
       // A dry run checks the harness, not segmentation: it paints with --segments off, so it needs no SAM python or
       // checkpoint (src/crop/segment-prep.mjs). Real runs keep the painter's default (SAM) and add nothing.
-      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off', offlineFixture: true } : {}), ...(basePalette ? {} : { basePalette: false }), noTargetLooks };
+      const spec = { ...profileSubject(subjects[crop], profile, dry ? dryWidth : null), ...(dry ? { segments: 'off', offlineFixture: true } : {}), noTargetLooks };
       const prev = round.learning && n > 1 ? previousTry({ outRoot, round, model, n, crop }) : null;
       log(`${model.name}, ${round.id}, try ${n} of ${tries}, ${crop}${dry ? ' (dry run)' : ''}`);
       let r, e;
@@ -354,7 +361,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
       settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: profile.modelMinutes, modelMinutesCap: profile.modelMinutes, lookBudget: profile.planOnly ? 0 : null, selfView: profile.planOnly ? 'none' : 'gentle', targetGuard: 'gentle',
-        crops, learnsBetweenTries: round.learning, strictVerdict, basePalette, noTargetLooks, benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
+        crops, learnsBetweenTries: round.learning, strictVerdict, noTargetLooks, benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
       session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, exitCode: null, killedAtCap: budgetStopped },
       guard: { blockedImageReads: guardViolations, kitRejections: 0, auditHits: [] },
       crops: cropsOut, ...(Object.keys(unpainted).length ? { unpainted } : {}),

@@ -1,8 +1,8 @@
 # Painting plan: {SUBJECT_NAME}, round {ROUND}, try {TRY} of {TRIES}
 
 You are preparing a plan for a fixed watercolour painter and painting it. The painter runs on this machine; you start it
-with `bash bench/paint.sh start`, and it stops at every passage boundary so you can look at your painting and change
-what is not painted yet (see "Painting and looking", below). Your painting is judged by the finished painting and by
+with `bash bench/paint.sh start`, and it stops at every passage boundary; at three stops of your choice you may step
+back, look at your painting and change what is not painted yet (see "Painting and looking", below). Your painting is judged by the finished painting and by
 how much its progress frames look like a person painting.
 
 {ROUND_RULES}
@@ -91,16 +91,16 @@ the only way to paint. Do not edit code, do not use the network except for your 
 
 ## Painting and looking (self-view)
 
-When your plan passes the check, paint it yourself and watch it as you like:
+When your plan passes the check, paint it yourself:
 
 - `bash bench/paint.sh start` runs the same admission check as `bash bench/check.sh` and starts painting your plan files
   as they are. It answers when the painter has stopped before the first wash (your opening drawing done).
 - The painter stops at every passage boundary: before the first wash, after each pass of the light-to-dark ladder (once
   the painter has dried it as it always does), and before the closing drawing. A pass is one pigment at one value step;
   a painting has about 25 to 45 passes (near the end the painter adds touch-up passes of its own).
-- At a stop, `bash bench/paint.sh look` writes `bench/looks/<n>-compare.jpg` (the target and your sheet so far, side by
-  side) and `bench/looks/<n>-sheet.jpg`, and prints the stroke count and the passes still to come. Open the image to
-  see it. Look as often as you like.
+- At a stop, `bash bench/paint.sh look` writes {LOOK_VIEW}, and prints the stroke count and the passes still to come.
+  Open the image to see it. A look is stepping back from the board, as a painter does a few times while painting:
+  you have three looks while painting (the stops are yours to choose), and one more at the finished painting.{STRICT_NOTE}
 - To go on: `bash bench/paint.sh next` (paint the next pass, stop after it), `bash bench/paint.sh run <pass>` (stop
   after that pass), `bash bench/paint.sh run closing` (stop before the closing drawing) or `bash bench/paint.sh finish`
   (no more stops). They wait for the painter (a pass takes from seconds to minutes); if one answers "still painting",
@@ -110,11 +110,12 @@ When your plan passes the check, paint it yourself and watch it as you like:
   It checks the files like `bash bench/check.sh`; then the painter plans again from them and goes on from where it is.
   What is on the paper stays: the opening drawing and the passes already painted cannot change, and the painter
   continues with the next pass of the re-planned ladder (pass k+1 when k passes are painted). The pigments cannot change
-  once painting has started. A revision the check refuses changes nothing. You may revise as often as you like.
+  once painting has started. A revision the check refuses changes nothing. A revision follows a look: once per look,
+  at the stop where you looked.
 - Time: this try has 85 minutes of your own time (planning, looking, revising). Time spent waiting in `bench/paint.sh`
   (for the painter or its check) is not counted. When the 85 minutes are up, the session ends and the painter
   finishes your current plan without stopping. `bash bench/paint.sh status` shows where the painter is and the time you have used.
-- The target guard stays on while painting: your looks are your own; the painter's own reads of the target are blocked
+- The target guard stays on while painting: your looks are counted; the painter's own reads of the target are blocked
   and recorded as before, every stroke is logged, and the plan limits still apply to every revision.
 - When the painting is finished, stop. (If you stop before starting it, the harness checks and paints your plan files
   as they are, without stops.)

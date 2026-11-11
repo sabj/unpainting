@@ -162,6 +162,8 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   softsplit: choice(['0', '1']),
   softmm: numeric(0.1, 10),
 });
+// any gain or calibration option is refused even if it is ever added to the list above
+export const GAIN_OPTION = /gain|calibrat|cal$|cal(?:from|max|min|extent|mode)$/;
 const isPathLike = (k, v) => k === 'focusmap' || path.isAbsolute(v) || v.includes('/') || v.includes('..');
 /** Problems with extra-args.json (empty = fine): locked options, and path values that leave the plan folder. */
 export function checkExtraArgs(extra, planDir) {
@@ -171,8 +173,10 @@ export function checkExtraArgs(extra, planDir) {
   for (let i = 0; i < extra.length;) {
     const flag = extra[i++];
     const key = flag.startsWith('--') ? flag.slice(2) : '';
-    const validate = Object.hasOwn(ALLOWED_EXTRA_ARGS, key) ? ALLOWED_EXTRA_ARGS[key] : null;
-    if (!validate) bad.push('extra-args.json may not set ' + flag);
+    const gain = GAIN_OPTION.test(key.replace(/=.*$/, ''));
+    const validate = !gain && Object.hasOwn(ALLOWED_EXTRA_ARGS, key) ? ALLOWED_EXTRA_ARGS[key] : null;
+    if (gain) bad.push('extra-args.json may not set ' + flag + ': a gain or calibration covers an engine error; the plan states values');
+    else if (!validate) bad.push('extra-args.json may not set ' + flag);
     if (i === extra.length || extra[i].startsWith('--')) { bad.push('extra-args.json missing value for ' + flag); continue; }
     const a = extra[i++];
     if (validate && !validate(a)) bad.push('extra-args.json invalid value for ' + flag + ': ' + a);
@@ -186,6 +190,27 @@ export function checkExtraArgs(extra, planDir) {
   }
   return bad;
 }
+// Gains and calibrations a plan may not set, in any mode: each moves paint by a factor or a threshold to cover what the
+// engine delivers, instead of stating a value or a technique (docs/honesty.md). Refused with the reason, before painting.
+export const REFUSED_TOKENS = Object.freeze({
+  dp: 'a value gain: doubles dark weight sheet-wide wherever the target is darker than a threshold',
+  acc: 'a value gain: moves middle demand into the accent band',
+  lit: 'a value gain: removes a share of the middle layers',
+  novar: 'a physics switch: turns off film diffusion, a physical process, which can hide engine faults',
+});
+const tokenName = t => t.replace(/\d+$/, '');
+/** Refused gain and calibration tokens in a variant, as plain-language problems. */
+export function refusedTokens(variant) {
+  return variantParts(variant).tokens.filter(t => Object.hasOwn(REFUSED_TOKENS, tokenName(t))).map(t => `recipe token "${t}" is refused: ${REFUSED_TOKENS[tokenName(t)]}; the plan states values, the engine delivers them`);
+}
+// plan fields with the same job: washes.charge picks the demand quantile each passage is charged at (delivery)
+export const REFUSED_PLAN_FIELDS = Object.freeze({ 'washes.charge': 'a delivery calibration: the quantile of demand each passage is charged at; the engine owns charging' });
+/** Refused plan fields present in config.json, as plain-language problems. */
+export function refusedPlanFields(config) {
+  const at = (o, k) => k.split('.').reduce((v, part) => (v && typeof v === 'object' && Object.hasOwn(v, part) ? v[part] : undefined), o);
+  return Object.entries(REFUSED_PLAN_FIELDS).filter(([k]) => at(config, k) !== undefined).map(([k, why]) => `config.json may not set ${k}: ${why}`);
+}
+
 /** Tokens that map to no painter option, and a prefix other than region_w13 or region_w15. */
 export function unknownTokens(variant, build) {
   const { prefix, tokens } = variantParts(variant);
@@ -253,7 +278,9 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
   const outlineMedium = planMedium ?? (isPenWash ? 'ink' : 'graphite');
   const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, out, compile, gpu, targetPixels, linesExist, outlineMedium });
-  problems.push(...unknownTokens(safeVariant, build).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
+  problems.push(...refusedTokens(safeVariant));
+  if (config && typeof config === 'object') problems.push(...refusedPlanFields(config));
+  problems.push(...unknownTokens(safeVariant, build).filter(t => !Object.hasOwn(REFUSED_TOKENS, tokenName(t))).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';

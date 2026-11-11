@@ -20,7 +20,7 @@ The guard is a check that blocks target-pixel reads during painting. It separate
 
 `strict` is an alias for `gentle`.
 
-The painter blocks reads of the target image and its per-cell maps when painting starts. A cell is one square of the simulation grid. A blocked read is recorded and stops the run.
+The painter blocks reads of the target image and its per-cell maps when painting starts. A cell is one square of the simulation grid. A blocked read is recorded and stops the run. Every map made from the target is sealed, in default and strict runs alike: the target and the value plan (`tools/plate/pen.mjs`) and the rest (`tools/guard/seal-maps.mjs`: the separator, the source pixels, edge, high-pass and drag maps). A raw target map still handed on at that point is refused.
 
 ## Gentle against hard
 
@@ -44,7 +44,7 @@ node tools/guard/cheat-test.mjs
 node tools/guard/lint-target-use.mjs
 ```
 
-The promotion check requires a guarded run, no target reads and a risk score. High scores pass with `review: true`. The deliberate-cheat test checks four blocked image-read routes. The source lint checks hill-climbing patterns; reviewed exceptions are in `tools/guard/target-use-allow.json`.
+The promotion check requires a guarded run, no target reads and a risk score. High scores pass with `review: true`. The deliberate-cheat test checks four blocked image-read routes. The source lint checks hill-climbing patterns and target reads in the paint step (from `TARGET_GUARD.beginPaint()` in `tools/plate/drawing.mjs` through `paint.mjs` to the end of painting in `finish.mjs`); `npm test` runs it on the tree. Reviewed exceptions are in `tools/guard/target-use-allow.json`; the three paint-step reads listed there are opt-in paths the guard blocks at run time.
 
 ## Limits
 

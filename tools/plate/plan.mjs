@@ -47,7 +47,7 @@ import {inkCapOnScrap} from '../../src/paint/methods/ink-scrap.mjs';
 import {inkKFromSource} from '../../src/paint/methods/ink-hue.mjs';
 import {sourcePenShare} from '../../src/paint/methods/ink-recipe-auto.mjs';
 import {chooseDrawingStages} from '../../src/paint/methods/drawing-stages-auto.mjs';
-import {eraseWeights} from '../../src/paint/methods/pencil-erase.mjs';
+import {eraseWeights, eraserDabs, ERASER_MM} from '../../src/paint/methods/pencil-erase.mjs';
 import {planLines as planLineChoice} from '../../src/paint/drawing-plan.mjs';
 import {subjectBlockOptions} from '../../src/paint/methods/subject-washes.mjs';
 import {massBudget} from '../../src/paint/methods/mass-budget.mjs';
@@ -741,7 +741,8 @@ DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
 // the drawing's stages for this image: planner model, rule and gate (drawing-stages-auto.mjs); the prep pencil's erase
 // weights are made now, before the target is sealed (pencil-erase.mjs)
 const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: PEN_SHARE, log: console.log, intent: DRAWING_STAGE_INTENT });
-const PREP_ERASE = num('preperase', 0.85) > 0 ? eraseWeights(PX_SOURCE, w, h) : null;
+// planned as kneaded-eraser dabs, so painting lays a plan and reads no map made from the target
+const PREP_ERASE = num('preperase', 0.85) > 0 ? eraserDabs(eraseWeights(PX_SOURCE, w, h), w, h, { tile: ERASER_MM / (num('sheetmm', DEFAULT_SHEET_MM) / w) }) : null;
 const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: PEN_SHARE, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, rgb: PX_SOURCE, log: console.log,
   edges: () => edgeChains(ctx.SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });

@@ -2,7 +2,7 @@
 
 Base (always applied, under your tokens): `region_w13_lay4_sky3_skyb_cpp`.
 
-Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: eye and dg need _dp, and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
+Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: eye and dg need _dp (refused, a gain), and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
 | token | painter options it sets (on top of the template) |
 |---|---|
@@ -12,7 +12,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_lay4` | --midlayers 4 |
 | `_lf` | --loadfeather 1.5 |
 | `_ls10` | --layersmooth 1 |
-| `_acc3` | --accentshare 0.3 |
+| `_acc3` | refused: a value gain: moves middle demand into the accent band |
 | `_lt` | --layertexture 1 |
 | `_cur` | --paperbase white, --paperrel (removed), --paperrgb 252,251,248 |
 | `_relonly` | --paperlights (removed), --paperrgb (removed) |
@@ -20,7 +20,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_st40` | --shadowthresh 0.4 |
 | `_shw45` | --shadowwater 0.45 |
 | `_dkf` | --darkfirst 1 |
-| `_dp80` | --deepaccent 80 |
+| `_dp80` | refused: a value gain: doubles dark weight sheet-wide wherever the target is darker than a threshold |
 | `_ms120` | --minshapecells 120 |
 | `_dg2` | --deepgrow 2 |
 | `_ts3` |  |
@@ -30,7 +30,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_cpp` | --paper coldpress |
 | `_tsh8` |  |
 | `_tfl8` | --texflow 0.8 |
-| `_novar` | --physics filmDiffuse=0 |
+| `_novar` | refused: a physics switch: turns off film diffusion, a physical process, which can hide engine faults |
 | `_sk1` | --skyonelayer 1 |
 | `_fs60` | --fastsettle 60 |
 | `_fl0` | --feedbacklag 0 |

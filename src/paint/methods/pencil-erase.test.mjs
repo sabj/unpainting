@@ -28,3 +28,14 @@ test('a dark contour bordering a light region on a sheet with unpainted paper ma
   assert.ok(wts[10 * w + 10] > 0.5, `contour on lit edge lifted: ${wts[10 * w + 10]}`);
   assert.equal(wts[10 * w + 3], 0);
 });
+
+test('the eraser is planned as dabs: one strength each, faded between dab centres, no per-cell target map', async () => {
+  const { eraserDabs, dabWeights } = await import('./pencil-erase.mjs');
+  const w = 8, h = 4, wts = Float32Array.from({ length: w * h }, (_, i) => (i % w < 4 ? 1 : 0));
+  const plan = eraserDabs(wts, w, h, { tile: 4 });
+  assert.deepEqual(Array.from(plan.dabs), [1, 0]);
+  const out = dabWeights(plan);
+  assert.equal(out[0], 1); assert.equal(out[7], 0);
+  assert.ok(out[3] < 1 && out[3] > out[4] && out[4] > 0, 'faded between the two dabs');
+  for (let y = 1; y < h; y++) for (let x = 0; x < w; x++) assert.equal(out[y * w + x], out[x], 'one strength per dab column');
+});

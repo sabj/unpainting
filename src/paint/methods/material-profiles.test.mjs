@@ -90,3 +90,10 @@ test('an ink width floor widens every contact, past the nib\'s widest when it mu
  assert.ok(Math.abs(floored[1].points[0].nw*.25-.6)<1e-9,'the widest contact is the floor when it is above the nib');
  assert.ok(Math.abs(plain[1].points[0].nw*.25-.45)<1e-9);
 });
+
+test('closing runs cut at planning are laid without an edge map: execution reads no target', () => {
+  const edge = new Float32Array(600); edge[8 * 30 + 3] = .8; edge[8 * 30 + 12] = .7;
+  const planned = prepareDrawing(g, { medium: 'sepia-ink', stage: 'closing', mmPerCell: .5, w: 30, h: 20, edgeStrength: edge });
+  const laid = prepareDrawing(planned, { medium: 'sepia-ink', stage: 'closing', mmPerCell: .5, w: 30, h: 20, edgeStrength: null, edgeCut: false });
+  assert.deepEqual(laid.map(x => x.points.map(p => [p.x, p.y])), planned.map(x => x.points.map(p => [p.x, p.y])));
+});

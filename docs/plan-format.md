@@ -212,7 +212,7 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 | `colour` | `family` (default), `layered` | `family` keeps saturated and muted colour families in separate mixes and carries demand across layers. `layered` mixes by layer, which can suit connected dark foliage |
 | `sessions` | `dry`, `passage` (default), `connected` | `connected` lets pigments mingle in one wet session with one drying edge. Sessions join only within one subject, region, phase and glaze step, so shadows and later glazes dry apart |
 | `inkAware` | true or false | removes planned narrow lines from the wash target before value planning. Default true for `source-ink` and `line-map`, which need a prepared drawing. Keep it false for rough construction drawings |
-| `charge` | 0 to 1, default 0.5 | each passage is charged at this quantile of its demand; what a cell still needs carries into the next band |
+| `charge` | 0 to 1, default 0.5 | each passage is charged at this quantile of its demand; what a cell still needs carries into the next band. A delivery calibration: benchmark plans may not set it (the harness refuses it) |
 | `carryMm` | 0 to 10 mm, default 2 | in `family` mode, the carried mask is averaged over this brush-sized area. Prefer 0 in new plans: 2 mm dilutes saturated colour and paints over lit areas |
 | `paleLimit` | 0 to 1, default 0.16 | pale planes up to this value get one clean first wash that no later layer crosses |
 | `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |

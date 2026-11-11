@@ -42,6 +42,7 @@ import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
 import {darkMass} from '../../src/paint/techniques/dark-mass.mjs';
 import {paintPractice} from '../../src/paint/methods/practice-paint.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
+import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
 export async function drawing(ctx) {
 const { JSONL, opt, num, NATIVE_PAINT_MODE, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
@@ -239,7 +240,7 @@ if (num('texflow', 0) > 0) {
   console.log(`texture flow: marks follow the ${R}-cell smoothed value contours (direction only), density x${num('texflow', 1)} per shape`);
 }
 // --skywarm: the warm cells (red over blue) a sky passage leaves to the ladder, read off the reference before painting
-const SKY_WARM_RB = opt('skywarm', '') !== '' ? Float32Array.from({ length: n }, (_, i) => PX_RAW[i * 3] - PX_RAW[i * 3 + 2]) : null;
+const SKY_WARM_RB = opt('skywarm', '') !== '' ? sealAtBirth(TARGET_GUARD, 'SKY_WARM_RB', Float32Array.from({ length: n }, (_, i) => PX_RAW[i * 3] - PX_RAW[i * 3 + 2])) : null;
 // each passage's technique, read off the source inside it, is chosen here for the whole plan (planning, before the
 // first mark), not when the brush reaches it
 for (const L2 of ctx.layers) for (const sh of L2.shapes) {
@@ -288,7 +289,7 @@ if (num('finaldarks', 0) > 0) {
 const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(num('prepkeep', 2)))) : null;
 SPEED_PROFILE?.add('planningAndSetup', process.uptime() * 1000);
 const PROVENANCE_TARGET_SHA = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex');
-TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step`);
+TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') { const sealed = sealTargetMaps(TARGET_GUARD, ctx); TARGET_GUARD.assertCleanContext('paint step', ctx); console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step (also ${sealed.join(', ') || 'no other map'})`); }
 if (!ctx.RESUMING && ctx.RESIST && !PRACTICE && Math.round(num('masses', 0)) <= 0) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(ctx.sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
 // Linked stages: each stage's own layer (what it laid) and the sheet as it stands after it, as layer-<stage>.jpg and
@@ -394,7 +395,7 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   console.log(`pen first: source line ${(100 * SOURCE_INK).toFixed(1)}% of cells`);
   const before = thickness(ctx.sheet).map(a => Float32Array.from(a));
   await drawPass(null, { first: true });
-  if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, weights: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
+  if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
   if (PENWASH_PLAN) {

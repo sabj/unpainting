@@ -4,7 +4,7 @@
 // bench:test checks that the file matches.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { argsBuilder, optionMap, BASE } from './plan-args.mjs';
+import { argsBuilder, optionMap, BASE, REFUSED_TOKENS } from './plan-args.mjs';
 
 const TOKENS = ['onedom', 'nest', 'lay2', 'lay4', 'lf', 'ls10', 'acc3', 'lt', 'cur', 'relonly', 'noslane', 'st40',
   'shw45', 'dkf', 'dp80', 'ms120', 'dg2', 'ts3', 'tv8', 'eye10', 'skyb', 'cpp', 'tsh8', 'tfl8',
@@ -31,10 +31,10 @@ export function tokensMarkdown() {
     'Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: '
     + 'lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. '
     + 'A setting only acts while its switch is on, so the painter reports the others as unused: '
-    + 'eye and dg need _dp, and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in '
+    + 'eye and dg need _dp (refused, a gain), and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in '
     + 'extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.', '',
     '| token | painter options it sets (on top of the template) |', '|---|---|',
-    ...TOKENS.filter(t => !/^(sep\d*|ink[234]|uncap|ol\d+|opp\d+|dw[gm]\d+)$/.test(t)).map(t => `| \`_${t}\` | ${tokenFlags(t)} |`), '',
+    ...TOKENS.filter(t => !/^(sep\d*|ink[234]|uncap|ol\d+|opp\d+|dw[gm]\d+)$/.test(t)).map(t => `| \`_${t}\` | ${REFUSED_TOKENS[t.replace(/\d+$/, '')] ? `refused: ${REFUSED_TOKENS[t.replace(/\d+$/, '')]}` : tokenFlags(t)} |`), '',
   ].join('\n');
 }
 

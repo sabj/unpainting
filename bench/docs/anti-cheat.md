@@ -5,6 +5,7 @@ Cheating here means hill-climbing toward the photo: repeatedly changing strokes 
 - Models can look at the target and at their own painting as often as they like, the way a painter glances at a reference.
 - Their code may not read the target's pixels. Node scripts that import the painting toolkit given to models or the guard (a check that blocks image reads), and Python scripts started with the benchmark runner's environment, block and log image reads. Separate Node processes are not automatically guarded. A blocked read disqualifies the run.
 - Every painting also gets a cheat-risk score: how closely its fine detail copies the photo, whether its stages go light to dark and broad to fine like a person's would, and how much of it is tiny strokes.
+- In V4 and V5 a look is stepping back from the board: three while painting and one at the end, a revision only after a look, and no target in any look in a strict run (`bench/v4v5/README.md`).
 - Gentle mode applies these checks. Hard mode adds a budget of about 100 looks per painting, so a model can't hill-climb by eye either.
 
 ## Gentle mode
