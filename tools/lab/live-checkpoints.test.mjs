@@ -47,7 +47,10 @@ test('shipped seek points contain finite physical states at the advertised strok
    assert.equal(state.tape.done,Math.floor(stop.fraction*recording.strokeCount));
    if(stop.fraction===1)assert.equal(state.tape.index,recording.marks.length,'finished stop includes trailing dry and unmask');
    assert.equal(recording.marks.slice(0,state.tape.index).filter(m=>['s','P','g'].includes(m.k)).length,state.tape.done);
-   for(const a of [state.fields.W,state.fields.s,...state.fields.G,...state.fields.D,...state.fields.P,...state.fields.layers.flat()])assert.ok(a.every(Number.isFinite),`${ex.id} ${limit} ${stop.fraction} must have finite water and paint`);
+   // Shared planes contain the same immutable values: inspect each one once. A direct
+   // loop also avoids a callback for every cell in these full-resolution fixtures.
+   const planes=new Set([state.fields.W,state.fields.s,...state.fields.G,...state.fields.D,...state.fields.P,...state.fields.layers.flat()]);
+   for(const a of planes)for(let i=0;i<a.length;i++)if(!Number.isFinite(a[i]))assert.fail(`${ex.id} ${limit} ${stop.fraction} must have finite water and paint (cell ${i})`);
    assert.ok((await fs.stat(new URL(stop.image,root))).size>0);
   }
  }
