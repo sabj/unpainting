@@ -22,7 +22,7 @@ import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
 import {semanticBrushObservation} from '../painter/semantic-brush-observation.mjs';
 import {lowerAuthoredGestures} from '../painter/authored-gestures.mjs';
 import {surfaceMarkPaths} from '../../src/paint/techniques/surface-marks.mjs';
-import {compileAreaLayers, semanticTechnique, semanticBrushOptions, semanticUsesNumericClip, semanticGesture, semanticCalibrationGain, requireAuthoredCalibration, semanticFilmRemovalReady, sha256} from '../painter/semantic-areas.mjs';
+import {semanticSameSession,compileAreaLayers, semanticTechnique, semanticBrushOptions, semanticUsesNumericClip, semanticGesture, semanticCalibrationGain, requireAuthoredCalibration, semanticFilmRemovalReady, sha256} from '../painter/semantic-areas.mjs';
 import {measurePaperDry} from '../../src/paint/methods/wetdry.mjs';
 import {earlyDryBoundary} from '../painter/early-dry-boundary.mjs';
 import {smoothUp} from '../../src/paint/methods/smoothup.mjs';
@@ -385,7 +385,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // passage no plan wrote takes the technique read off the source (techniqueOf, the automatic ladder). No switch
   // replaces a planned move.
   let T = sh._semantic ? {} : sh._valuePlan ? valueTechnique(sh._valuePlan) : techniqueOf(sh);
-  if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation')clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));}
+  if(sh._semantic){requireAuthoredCalibration(sh._semantic,SEMANTIC_CAL_MODE,SEMANTIC_CAL);T=semanticTechnique(sh._semantic,T);if(T.intoWet===false&&sh._semantic.pass.move!=='wet-edge continuation'&&!semanticSameSession(ctx.AREA_LAST,sh._semantic))clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));ctx.AREA_LAST=sh._semantic;}
   T=chooseMajorBaseWash(MAJOR_INTENT,T,{value:layer.value,area:sh.area??0,cells:n,semantic:Boolean(sh._semantic)});
   T=connectedSkyContact(MAJOR_INTENT,T,{pass:L+1,area:sh.area??0,cells:n});
   if(sh._valuePlan){if(!sh._semantic)T=valueTechnique(sh._valuePlan);ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=((WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer))))||(num('charge',0)>0&&ctx.WASH_LAST&&ctx.WASH_LAST.L!==L&&sameCharge(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
@@ -956,7 +956,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // surface is level; the idle steps before it only repeated that (--fastsettle sets how many remain, default 0)
   else{const dryFollows=NATIVE_PAINT_MODE.mode==='fast'&&!ctx.AREA_PLAN&&(wetInto||endOfValue||nextOther);const settle=dryFollows?Math.min(num('settle',60),num('fastsettle',0)):num('settle',60);clock('flow',()=>{for(let q=0;q<settle;q++)step(ctx.sheet,O);});}
   colourMass('after-flow',{pass:L+1});
-  if(ctx.AREA_PLAN){if(!layer._semantic.pass.leaveWetAfter&&!['wet on wet','wet-edge continuation'].includes(layer._semantic.pass.move))clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2,...watch}));}
+  // a wet session (pass.session) dries once, after its last pass
+  if(ctx.AREA_PLAN){if(!layer._semantic.pass.leaveWetAfter&&!['wet on wet','wet-edge continuation'].includes(layer._semantic.pass.move)&&!semanticSameSession(layer._semantic,ctx.layers[L+1]?._semantic))clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2,...watch}));}
   else if (earlyBoundary) { /* Existing ordinary dry completed earlier, before idle flow. */ }
   else if (skyBoundary) { /* Connected original sky passage: no idle wait or interpan dry. */ }
   else if (sessionNext) { /* --washsession 2: one wet session with the next pigment of this wash */ }
