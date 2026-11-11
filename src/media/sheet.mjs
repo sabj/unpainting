@@ -1275,8 +1275,12 @@ export function thicknessTotals(sheet) {
     if (parts.planes) { out[k] = parts.planes[k].reduce((a, v) => a + v, 0); continue; }
     const lower = parts.lower[k], top = parts.top?.[k], sums = parts.sums?.[k], G = sheet.G[k], D = sheet.D[k], P = sheet.P[k];
     let total = 0;
-    for (let i = 0; i < sheet.n; i++) total += Math.fround(
-      (top ? Math.fround(lower[i] + top[i]) : lower[i]) + (sums ? sums[i] : Math.fround(G[i] + D[i] + P[i])));
+    // Choose the reservoir layout once per pigment. Keep every Float32
+    // rounding and the raster reduction order of thickness() unchanged.
+    if (top && sums) for (let i = 0; i < sheet.n; i++) total += Math.fround(Math.fround(lower[i] + top[i]) + sums[i]);
+    else if (top) for (let i = 0; i < sheet.n; i++) total += Math.fround(Math.fround(lower[i] + top[i]) + Math.fround(G[i] + D[i] + P[i]));
+    else if (sums) for (let i = 0; i < sheet.n; i++) total += Math.fround(lower[i] + sums[i]);
+    else for (let i = 0; i < sheet.n; i++) total += Math.fround(lower[i] + Math.fround(G[i] + D[i] + P[i]));
     out[k] = total;
   }
   return out;
