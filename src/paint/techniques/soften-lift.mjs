@@ -19,7 +19,7 @@ export const SOFTEN_WATER = 0.48;
 /** The contract text for --areahelp. */
 export const SOFTEN_LIFT_CONTRACT = Object.freeze({
   soften: 'Optional pass.soften:{reason,polygon?} on a wet on wet or wet on dry pass (not authored, not dry brush): right after the pass, while it is wet, a clean damp brush the size of the pass brush (a little free liquid) runs along the edge of its shapes (inside polygon only, when given), so the wash creeps out and the edge goes soft.',
-  lift: 'lights.mode lift:{reason,polygon} on a wet on wet or wet on dry pass (not authored): the pass paints over the light, then a clean damp brush the size of the pass brush lifts the polygon while the paint is wet, in lanes one brush width apart.',
+  lift: 'lights.mode lift:{reason,polygon} on a wet on wet or wet on dry pass (not authored): the pass paints over the light, then, once the shine has gone off the light (damp paint), a thirsty clean brush the size of the pass brush lifts the polygon in lanes one brush width apart.',
 });
 
 /** Checks pass.soften and a lift light. key names the pass in errors. polygonCheck validates a polygon. */

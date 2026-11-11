@@ -11,7 +11,10 @@ export function polygonCells(poly, plan, W, H) {
   return Uint8Array.from({ length: W * H }, (_, i) => (insidePoly([(c[0] + (i % W + .5) * c[2] / W) / T.width, (c[1] + (Math.floor(i / W) + .5) * c[3] / H) / T.height], poly) ? 1 : 0));
 }
 
-export function softenAndLift({ pass, plan, mask, W, H, mmPerCell, newBrush, dip, thirsty, stroke, K, upright = true }) {
+// waitDamp(light): lifting is from damp paint. Glossy paint floods back into the light (scrap: a lift into a glossy
+// wash took nothing), so the painter first waits for the shine to go off the light's footprint
+// (wet-bed-wait.mjs layIntoWetBed, the wait a charge into a wet bed takes) and returns what it waited.
+export function softenAndLift({ pass, plan, mask, W, H, mmPerCell, newBrush, dip, thirsty, stroke, K, upright = true, waitDamp }) {
   const lift = pass.lights?.mode === 'lift';
   if (!pass.soften && !lift) return null;
   const r = pass.brush.widthMm / (2 * mmPerCell), damp = () => { const b = newBrush(r); dip(b, { water: 1, conc: new Array(K).fill(0) }); return thirsty(b); };
@@ -26,6 +29,8 @@ export function softenAndLift({ pass, plan, mask, W, H, mmPerCell, newBrush, dip
   if (lift) {
     const light = polygonCells(pass.lights.polygon, plan, W, H);
     for (let i = 0; i < light.length; i++) light[i] = light[i] && mask[i] ? 1 : 0;
+    if (!waitDamp) throw Error('lift: the painter must wait for the shine to go before lifting (waitDamp)');
+    if (light.some(v => v)) done.liftWait = waitDamp(light);
     for (const path of liftPaths(light, W, H, { r })) { stroke(damp(), path, { upright }); done.liftStrokes++; }
     done.liftReason = pass.lights.reason;
   }
