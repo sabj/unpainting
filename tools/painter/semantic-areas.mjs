@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import {passage} from '../../src/crop/blockin.mjs';
 import {closeLocal} from '../../src/raster.js';
 import {TECHNIQUES} from '../../src/paint/methods/lay.mjs';
-import {AREA_EDGES_CONTRACT,validateAreaEdges,bindAreaEdges} from './area-edges.mjs';
+import {AREA_EDGES_CONTRACT,PASS_EDGES_CONTRACT,validateAreaEdges,validatePassEdges,bindAreaEdges} from './area-edges.mjs';
 import {AREA_WASHES_CONTRACT,validateAreaWashes,compileAreaWash} from './area-washes.mjs';
 import {validateSurfaceMarks,SURFACE_MARKS} from '../../src/paint/techniques/surface-marks.mjs';
 import {validateSoftenLift,SOFTEN_LIFT_CONTRACT} from '../../src/paint/techniques/soften-lift.mjs';
@@ -16,7 +16,7 @@ lights:'{mode:none|paint-owned|paper|negativepaint|film|lift,reason,polygon?}. F
 soften:SOFTEN_LIFT_CONTRACT.soften,
 lift:SOFTEN_LIFT_CONTRACT.lift,
 preparation:'optional per-pass preparation:{brush,load,flowSteps:integer0..600,maxAttempts:integer1..3,depositDepthMm?:positive}; existing metered physical contact dose independent of finite reservoir/concentration; explicit clean brush/load distinct from painting; measured ordinary physics transitions, no forced dry. Candidate still needs physical calibration.',
-edges:AREA_EDGES_CONTRACT,
+edges:AREA_EDGES_CONTRACT,passEdges:PASS_EDGES_CONTRACT,
 wash:AREA_WASHES_CONTRACT.wash,
 charge:AREA_WASHES_CONTRACT.charge,
 session:'Optional pass.session:{id,reason}: passes with the same id are laid in one wet session, back to back with no drying between them or between their shapes, and the session dries once after its last pass (painting-rules 5, 8: a lost edge). At least two passes, consecutive in the schedule, not authored, not dry brush.',
@@ -61,7 +61,7 @@ export function validateAreaDocument(doc,{targetSHA,imageSHA,sourceWidth,sourceH
  const depth=id=>{const seen=new Set();let a=areas.get(id),d=0;while(a.parent!==null){if(seen.has(a.id)||!areas.has(a.parent))fail(`parent cycle/missing ${id}`);seen.add(a.id);a=areas.get(a.parent);d++;}return d;};for(const a of areas.values())a._depth=depth(a.id);const inBounds=(p,poly)=>inside(p,poly)||poly.some((a,i)=>{const b=poly[(i+1)%poly.length],dx=b[0]-a[0],dy=b[1]-a[1],d=dx*dx+dy*dy,t=d?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/d)):0;return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)<1e-8;});for(const a of areas.values())if(a.parent!==null&&a.geometry.polygon.some(p=>!inBounds(p,areas.get(a.parent).geometry.polygon)))fail(`child ${a.id} outside parent geometry`);for(const s of passes.values())if(s.pass.lights.mode==='film')for(const id of s.pass.lights.actions.afterPasses)if(!passes.has(id))fail(`unknown film removal dependency ${id}`);
  for(const x of passes.values())semanticPreparation(x.pass);
  const schedule=[...passes.values()].sort((a,b)=>a.pass.order-b.pass.order||a.key.localeCompare(b.key));const done=new Set();for(const s of schedule){for(const dep of s.pass.dependsOn)if(!done.has(dep))fail(`dependency missing/out of order ${s.key}: ${dep}`);done.add(s.key);}
- semanticSessions(schedule);const edges=validateAreaEdges(doc,areas,schedule);
+ semanticSessions(schedule);validatePassEdges(schedule);const edges=validateAreaEdges(doc,areas,schedule);
  for(const a of areas.values())for(let i=0;i<a.passes.length;i++)for(let j=i+1;j<a.passes.length;j++)if(!authored&&Math.max(a.passes[i].valueRange[0],a.passes[j].valueRange[0])<=Math.min(a.passes[i].valueRange[1],a.passes[j].valueRange[1]))fail(`overlapping valueRange ${a.id}`);
  for(const x of doc.allowedUnassigned??[]){polygon(x.polygon,'allowedUnassigned');text(x.reason,'allowedUnassigned.reason');}
  return {doc,areas,passes,schedule,crop,edges};

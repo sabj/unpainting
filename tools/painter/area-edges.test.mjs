@@ -9,7 +9,7 @@ import { createBrush, dip, stroke, thirsty } from '../../src/media/brush.mjs';
 import { BOX, boxPigment } from '../../src/crop/box.mjs';
 import { layPassage, dryFully, TECHNIQUES } from '../../src/paint/methods/lay.mjs';
 import { validateAreaDocument, rasterAreaPlan } from './semantic-areas.mjs';
-import { softEdgeCells, hardEdgeDue, areaAdjacency } from './area-edges.mjs';
+import { softEdgeCells, hardEdgeDue, areaAdjacency, passSoftCells } from './area-edges.mjs';
 import { softenEdge } from './soften-lift-run.mjs';
 import { SOFTEN_WATER } from '../../src/paint/techniques/soften-lift.mjs';
 
@@ -64,4 +64,38 @@ test('a soft edge: the damp brush along the plan boundary carries the wet wash o
   // soft: the wash fades out past the boundary (still a quarter of its body there); hard: it stops at the boundary
   assert.ok(soft.past > soft.body / 4, `soft: ${soft.past.toFixed(3)} past the boundary, body ${soft.body.toFixed(3)}`);
   assert.ok(hard.past < hard.body / 20, `hard: ${hard.past.toFixed(3)} past the boundary, body ${hard.body.toFixed(3)}`);
+});
+
+// Move 6 (reasoning inventory): a pass's own edge (pass.edges.kind) is the plan's choice and is laid as written.
+const one = (edges, extra = {}) => ({ version: 1, coordinateSpace: 'normalized-target', target: { path: 't.png', sha256: 'a', width: W, height: H },
+  areas: [area('cheek', box(0, 0, .5, 1), pass('wash', 0, { edges, ...extra })), area('shadow', box(.5, 0, 1, 1), pass('wash', 1))] });
+
+test('a pass edge the painter cannot lay as named stops the plan', () => {
+  assert.throws(() => plan(one({ kind: 'lost', overlap: true })), /cheek\/wash: a lost edge needs the pass laid in a wet session/);
+  assert.throws(() => plan(one({ kind: 'broken', overlap: true })), /cheek\/wash: a broken edge is dry brush/);
+  assert.throws(() => plan(one({ kind: 'soft', overlap: true }, { move: 'dry brush' })), /cheek\/wash: a soft edge needs a wet pass/);
+  assert.doesNotThrow(() => plan(one({ kind: 'broken', overlap: true }, { move: 'dry brush' })));
+  assert.doesNotThrow(() => plan(one({ kind: 'soft', overlap: true })));
+});
+
+test('a soft pass edge is softened while wet, except along area boundaries the plan names hard or lost', () => {
+  const R = 2;
+  // no edges list: the whole edge of the pass is soft
+  const free = passSoftCells(plan(one({ kind: 'soft', overlap: true })), 'cheek', plan(one({ kind: 'soft', overlap: true })).doc.areas[0].passes[0], R);
+  assert.ok(free.where.some(v => v), 'soft pass edge softened');
+  assert.match(free.reasons.join(' '), /pass edge soft/);
+  // a hard pass edge adds nothing; pass.soften, when given, says where instead
+  const hardDoc = one({ kind: 'hard', overlap: true }), hp = plan(hardDoc);
+  assert.equal(passSoftCells(hp, 'cheek', hp.doc.areas[0].passes[0], R), null);
+  const own = plan(one({ kind: 'soft', overlap: true }, { soften: { reason: 'turning edge' } }));
+  assert.equal(passSoftCells(own, 'cheek', own.doc.areas[0].passes[0], R), null);
+  // with the boundary named hard, the soft pass edge stops short of it
+  const named = one({ kind: 'soft', overlap: true }); named.edges = [{ areas: ['cheek', 'shadow'], kind: 'hard', reason: 'a crisp turn' }];
+  const np = plan(named), cells = passSoftCells(np, 'cheek', np.doc.areas[0].passes[0], R).where;
+  for (let y = 0; y < H; y++) for (let x = W / 2 - R; x < W / 2; x++) assert.equal(cells[y * W + x], 0, `hard boundary softened at ${x},${y}`);
+  assert.equal(cells[(H / 2) * W + 3], 1);
+  // a boundary named soft is softened by the edges list, unchanged
+  const soft = one({ kind: 'hard', overlap: true }); soft.edges = [{ areas: ['cheek', 'shadow'], kind: 'soft', reason: 'turns' }];
+  const sp = plan(soft);
+  assert.deepEqual(passSoftCells(sp, 'cheek', sp.doc.areas[0].passes[0], R).where, softEdgeCells(sp, 'cheek', R).where);
 });

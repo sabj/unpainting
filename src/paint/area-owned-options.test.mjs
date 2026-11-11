@@ -45,3 +45,8 @@ test('move 11: an automatic light rule beside an area plan stops the run, naming
 test('move 11: no automatic hold of target-light cells under an area plan; the plan\'s reserves are the lights', () => {
   assert.match(painterSource(), /const WHITE_HOLD = \(\(\) => \{\n  if \(opt\('areaplan', ''\)\) return null;/);
 });
+
+test('move 6: an automatic soft-edge option beside an area plan stops the run, naming the plan\'s edges', () => {
+  for (const k of ['softwet', 'softarcs', 'softmm', 'softsplit', 'fwsoften']) assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', `--${k}`, '1']), new RegExp(`--${k}: .*pass\\.edges\\.kind`));
+  assert.doesNotThrow(() => refuseAreaOwned(['--valueplan', 'c.json', '--softwet', '1.5', '--softsplit', '1']));
+});
