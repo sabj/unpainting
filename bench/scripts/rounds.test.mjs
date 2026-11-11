@@ -16,32 +16,20 @@ import { makeWorktree } from './pipeline/harness.mjs';
 
 const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
 
-test('a model token replaces the base token in its slot; architecture and palette tokens stay off elsewhere', () => {
+test('a model token replaces the base token in its slot; every subject gets the same base', () => {
   const l = layerBase({ variant: 'region_w13_lay2', build });
   assert.equal(optionMap(l.args).get('midlayers'), '2');
   assert.equal(l.skipped.lay4, 'plan chose lay2');
-  assert.equal(l.skipped.blk60, 'architecture only');
-  assert.equal(l.skipped.pgreen, 'Trumbull only');
   for (const gain of ['darkgain', 'coolgain', 'midgain']) assert.ok(!optionMap(l.args).has(gain), `the base sets no ${gain}`);
-  const t = layerBase({ variant: 'region_w13', build: argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true }), architecture: true, trumbull: true });
-  assert.ok(t.applied.includes('blk60') && t.applied.includes('pgreen'));
-  assert.match(optionMap(t.args).get('paints'), /sapgreen/);
-});
-
-test('basePalette false: Trumbull gets no paint box from the base, only from its own palette token', () => {
-  const tb = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true, basePalette: false });
-  const off = layerBase({ variant: 'region_w13', build: tb, architecture: true, trumbull: true, basePalette: false });
-  assert.equal(optionMap(off.args).has('paints'), false);
-  assert.match(off.skipped.pgreen, /base palette off/);
-  assert.ok(off.applied.includes('blk60'));
-  const own = layerBase({ variant: 'region_w13_pwarm', build: tb, architecture: true, trumbull: true, basePalette: false });
-  assert.equal(optionMap(own.args).get('paints'), 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia');
-  assert.equal(optionMap(layerBase({ variant: 'region_w13', build }).args).has('paints'), false);
+  // the stone, recess, lit and palette tokens and the fitted sky-lane values were removed in 0.3.3
+  const args = optionMap(layerBase({ variant: 'region_w13', build }).args);
+  for (const k of ['stoneblocks', 'groundglaze', 'recesses', 'litwarm', 'paints', 'skylanemm', 'skylanestep', 'skyfloc']) assert.ok(!args.has(k), k);
+  assert.equal(args.get('skylanes'), '1');
 });
 
 test('refusals before painting: unknown tokens, locked options, paths out of the plan folder, plan limits', () => {
   assert.deepEqual(unknownTokens('region_w13_lay2_bogus', build), ['bogus']);
-  assert.deepEqual(unknownTokens('region_w13_pwarm', build), ['pwarm']);
+  for (const token of ['pwarm', 'pgreen', 'blk60', 'rg10', 'birr', 'rec2', 'rcl', 'lw', 'lit20', 'slane']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
   assert.match(unknownTokens('region_w9_lay2', build)[0], /prefix/);
   assert.equal(checkExtraArgs(['--midlayers', '3'], '/p').length, 0);
   // a plan states values; gains were removed in 0.3.3, as tokens and as settings

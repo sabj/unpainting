@@ -3,9 +3,8 @@
 // variant.txt (recipe tokens). The painter is tools/paint-plate.mjs with no recipe of its own (--recipe none): every
 // setting comes from the fixed template below, the base recipe tokens (BASE) and the plan, in that order.
 //
-// Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4). Stone-block tokens apply to
-// architecture only, palette tokens to Trumbull only, and the base's sepia ink yields to a plan drawn in another ink.
-// With spec.basePalette false, the base adds no paint box at all: only a plan's own palette token or --paints does.
+// Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4), and the base's sepia ink
+// yields to a plan drawn in another ink. Every subject gets the same base; no token applies to one subject only.
 // Settings the plan asks for that the painter never reads are noted against the painting (renderVerdict), and fail it
 // under --strict-verdict. Base settings a subject has no use for are never noted.
 //
@@ -14,17 +13,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-// The sky lanes run at the painter's own radius and step and the sky wash at its pigment's own flocculation: the base
-// held the values fitted on Trumbull skies (--skylanemm 6, --skylanestep .8, --skyfloc .5), so _slane is gone.
-// rec2x, rcl and tv8 were dropped in 0.3.1: recess settings act only with --recesses 1 (the architecture preset sets
-// them itself) and texture variety acts only on dry-brush texture passages, which are never planned.
+// tv8 was dropped in 0.3.1: texture variety acts only on dry-brush texture passages, which are never planned.
+// Removed in 0.3.3 with the rules they set, all fitted on Trumbull: the stone-block, ground-glaze, recess and lit-stone
+// tokens (blk, bka, bmm, birr, bvar, bcl, rg, rec2, rec2x, rcl, rac, rx, lw, lit), the palette tokens (pwarm, pgold,
+// pgreen, pbs, rv) and the Trumbull-only paint box, and the fitted sky-lane radius and step (6 mm, .8) and sky mottle
+// (.5) of the base, which made _slane (sky lanes at the painter's own radius) a token of its own. A plan that names a
+// removed token gets the unknown-token problem.
 // _sg (--stylegain) and _tp (--touchgain) are not model-settable: a gain that covers an engine error is a calibration, not a
 // painter's choice (docs/honesty.md). The two touch-up rounds the base always had stay a fixed painter setting below; the
-// touch-up gain is the painter's own default (--touchgain .6, tuned/default-flags.mjs).
-export const BASE = 'region_w13_lay4_sky3_rg10_blk60_bmm40_bka20_birr_skyb_cpp_pgreen';
+// touch-up gain is the painter's own default.
+export const BASE = 'region_w13_lay4_sky3_skyb_cpp';
 const DEFAULT_VARIANT = 'region_w13';
-const ARCHITECTURE_ONLY = /^(blk|bmm|bka|rg|rec)\d*x?$|^birr$|^rcl$/;
-const PALETTE = /^(pwarm|pgold|pgreen|pbs|rv)$/;
 const LINES = name => `${name}-lines.json`;
 
 const m = (v, re) => v.match(re);
@@ -33,21 +32,15 @@ const hundredth = (v, re) => String(Number(m(v, re)[1]) / 100);
 
 /**
  * The paint-plate command for a variant, as [script, --option, value, ...]. ctx: {planDir, target, width, sheetmm,
- * trumbull, out, compile, gpu, linesExist}. The regular expressions are the recipe tokens; bench/v4v5/TOKENS.md lists them.
+ * out, compile, gpu, linesExist}. The regular expressions are the recipe tokens; bench/v4v5/TOKENS.md lists them.
  */
-export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false, basePalette = true, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true, outlineMedium = 'auto' }) {
+export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', compile = false, gpu = 'auto', targetPixels = [1, 1], linesExist = () => true, outlineMedium = 'auto' }) {
   return v => {
     const shaped = v.startsWith('region_w13') || v.startsWith('region_w15');
-    // basePalette false: Trumbull gets a box only when the variant names a palette token; otherwise the painter picks
-    const named = variantParts(v).tokens.some(t => PALETTE.test(t));
-    const paints = !trumbull || (!basePalette && !named) ? [] : ['--paints', /_rv/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,rose'
-      : /_pgreen/.test(v) ? (/_pbs/.test(v) ? 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia,sapgreen' : 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen')
-        : /_pwarm/.test(v) ? 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia' : /_pgold/.test(v) ? 'ochre,hansa,ultramarine,cerulean,sepia'
-          : 'ochre,rawsienna,sienna,hansa,ultramarine,cerulean,sepia'];
     const opening = /_opk/.test(v) ? 'closingink' : 'opening';
     const closing = (/_ink4/.test(v) ? ['closingink4', 'closing'] : /_ink[23]/.test(v) ? ['closingink', 'closing'] : ['closing']).find(f => linesExist(f));
     const t = (re, flags) => (re.test(v) ? flags() : []);
-    return ['tools/paint-plate.mjs', '--recipe', 'none', '--inkrecipe', 'v2', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1', ...paints,
+    return ['tools/paint-plate.mjs', '--recipe', 'none', '--inkrecipe', 'v2', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1',
       '--physical', '1', '--paperbase', /_cur/.test(v) ? 'white' : 'source', '--loadedcontact', '1', '--order', 'painter', '--valueplan', path.join(planDir, 'config.json'),
       '--brushchoice', v.startsWith('region_w15') ? '1' : '0', '--shapedmarks', shaped ? '1' : '0',
       ...t(/_onedom/, () => ['--middomain', '0']), ...t(/_nest/, () => ['--nestedmid', '1']), ...t(/_lay(\d)/, () => ['--midlayers', m(v, /_lay(\d)/)[1]]),
@@ -59,23 +52,20 @@ export function argsBuilder({ planDir, target, width, sheetmm, trumbull = false,
       ...(/_noslane/.test(v) ? [] : ['--skylanes', '1']),
       ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]),
       ...t(/_shw(\d+)/, () => ['--shadowwater', hundredth(v, /_shw(\d+)/)]),
-      ...t(/_dkf/, () => ['--darkfirst', '1']), ...t(/_rg(\d+)/, () => ['--groundglaze', tenth(v, /_rg(\d+)/)]),
-      ...t(/_blk(\d+)/, () => ['--stoneblocks', hundredth(v, /_blk(\d+)/)]), ...t(/_bka(\d+)/, () => ['--stoneblockamt', hundredth(v, /_bka(\d+)/)]),
-      ...t(/_bmm(\d+)/, () => ['--stoneblockmm', tenth(v, /_bmm(\d+)/)]), ...t(/_dp(\d+)/, () => ['--deepaccent', m(v, /_dp(\d+)/)[1]]),
-      ...t(/_ms(\d+)/, () => ['--minshapecells', m(v, /_ms(\d+)/)[1]]), ...t(/_birr/, () => ['--stoneirregular', '1']),
-      ...t(/_dg(\d+)/, () => ['--deepgrow', m(v, /_dg(\d+)/)[1]]),       ...t(/_rx(\d+)/, () => ['--recessmax', m(v, /_rx(\d+)/)[1]]), ...t(/_bvar/, () => ['--stonecourses', '1']),
-      ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]), ...t(/_rac/, () => ['--recessaccent', '1']),
+      ...t(/_dkf/, () => ['--darkfirst', '1']),
+      ...t(/_dp(\d+)/, () => ['--deepaccent', m(v, /_dp(\d+)/)[1]]),
+      ...t(/_ms(\d+)/, () => ['--minshapecells', m(v, /_ms(\d+)/)[1]]),
+      ...t(/_dg(\d+)/, () => ['--deepgrow', m(v, /_dg(\d+)/)[1]]),
+      ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]),
       ...t(/_eye(\d+)/, () => ['--eyering', String(Number(m(v, /_eye(\d+)/)[1]) / targetPixels[0])]),
       ...t(/_skyb/, () => ['--skyblue', '1']), ...t(/_cpp/, () => ['--paper', 'coldpress']),
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
-      ...t(/_bcl(\d+)/, () => ['--stoneclusters', m(v, /_bcl(\d+)/)[1]]),       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
-      ...(/_rec2x/.test(v) ? ['--recesslayers', '2', '--recessshare', '.75'] : /_rec2/.test(v) ? ['--recesslayers', '2'] : []),
-      ...t(/_rcl/, () => ['--recessclean', '1']), 
+      ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
       '--touchpoints', '2',
       ...t(/_spl(\d*)/, () => ['--strokeplan', '1', '--lanemm', m(v, /_spl(\d*)/)[1] || '6']), ...t(/_sml(\d+)/, () => ['--strokemm', m(v, /_sml(\d+)/)[1]]),
-      ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]), ...t(/_lit(\d+)/, () => ['--litlift', hundredth(v, /_lit(\d+)/)]),
-      ...t(/_lad/, () => ['--laneadapt', '1']), ...t(/_lw/, () => ['--litwarm', '1']),
+      ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]),
+      ...t(/_lad/, () => ['--laneadapt', '1']),
       ...(/_sky(?=\d|_|$)/.test(v) ? ['--layerhue', '1', '--skysplit', '1'] : /_hue/.test(v) ? ['--layerhue', '1'] : []),
       ...t(/_efade/, () => ['--edgefade', '1.2']), ...t(/_stone/, () => ['--layertexture', '1', '--texshort', '1', '--texpress', '.5']),
       ...(/_stub2/.test(v) ? ['--texshort', '1', '--texpress', '.6'] : /_stub/.test(v) ? ['--texshort', '1'] : []),
@@ -102,8 +92,8 @@ const variantParts = v => { const p = v.split('_'); return { prefix: p.slice(0, 
 
 // tokens in one slot are alternatives: a model token takes every option any alternative in its slot sets
 const GROUPS = [[/^(hue|sky\d*)$/, 'hue', ['hue', 'sky', 'sky3']], [/^sep\d?$/, 'sep', ['sep', 'sep2', 'sep4', 'sep8']], [/^ink[234]d?$/, 'ink', ['ink2', 'ink3', 'ink4']],
-  [/^rec2x?$/, 'rec', ['rec2', 'rec2x']], [/^lay\d$/, 'lay', ['lay2', 'lay4']], [/^(cur|relonly)$/, 'paper', ['cur', 'relonly']], [/^noslane$/, 'slane', ['noslane']],
-  [/^softs?$/, 'soft', ['soft', 'softs']], [/^(stub2?|stone)$/, 'stub', ['stub', 'stub2', 'stone']], [/^(pwarm|pgold|pgreen|pbs|rv)$/, 'pal', ['pwarm', 'pgold', 'pgreen', 'rv']]];
+  [/^lay\d$/, 'lay', ['lay2', 'lay4']], [/^(cur|relonly)$/, 'paper', ['cur', 'relonly']], [/^noslane$/, 'slane', ['noslane']],
+  [/^softs?$/, 'soft', ['soft', 'softs']], [/^(stub2?|stone)$/, 'stub', ['stub', 'stub2', 'stone']]];
 function slotOf(t) { for (const [re, name] of GROUPS) if (re.test(t)) return name; return t.replace(/\d+/g, 'N'); }
 const alternatives = t => GROUPS.find(([re]) => re.test(t))?.[2] ?? [];
 // options a token sets or removes, against the bare prefix
@@ -115,16 +105,13 @@ function delta(build, prefix, token) {
 
 /**
  * The base recipe under the plan's own tokens. Returns the args to run and an account of the layers.
- * architecture: stone blocks apply; trumbull: palette tokens apply; sepiaInk: false when the plan draws in another ink.
+ * sepiaInk: false when the plan draws in another ink.
  */
-export function layerBase({ variant, build, architecture = false, trumbull = false, basePalette = true, sepiaInk = true, linesExist = () => true, base = BASE }) {
+export function layerBase({ variant, build, sepiaInk = true, linesExist = () => true, base = BASE }) {
   const { prefix, tokens: mt } = variantParts(variant), { tokens: bt } = variantParts(base);
   const modelArgs = build(variant), modelSlots = new Set(mt.map(slotOf)), skipped = {}, applied = [];
   for (const b of bt) {
     if (modelSlots.has(slotOf(b))) { skipped[b] = 'plan chose ' + mt.filter(t => slotOf(t) === slotOf(b)).join(','); continue; }
-    if (!architecture && ARCHITECTURE_ONLY.test(b)) { skipped[b] = 'architecture only'; continue; }
-    if (!trumbull && PALETTE.test(b)) { skipped[b] = 'Trumbull only'; continue; }
-    if (!basePalette && PALETTE.test(b)) { skipped[b] = 'base palette off; the plan names none'; continue; }
     if (!sepiaInk && slotOf(b) === 'sep') { skipped[b] = 'plan draws in another ink'; continue; }
     applied.push(b);
   }
@@ -271,7 +258,7 @@ export const pngSize = file => { const b = fs.readFileSync(file); return [b.read
 
 /**
  * Everything about one plan: the paint-plate args and the refusals that come before any painting.
- * spec: {crop, width, sheetmm, trumbull}. planDir: the plan folder; variant: the tokens (variant.txt).
+ * spec: {crop, width, sheetmm}. planDir: the plan folder; variant: the tokens (variant.txt).
  * Returns {args, problems, layering, modelOptions, baseOptions, extraOptions}.
  */
 export function resolvePlan({ spec, planDir, variant, target, out, compile = false, gpu = 'auto', pausedir = null, resumestate = null }) {
@@ -287,19 +274,17 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   problems.push(...checkExtraArgs(extra, planDir));
   const extraArgs = Array.isArray(extra) ? extra.map(String) : [];
   const targetPixels = pngSize(target);
-  // spec.basePalette false: no paint box from the base tokens; a plan's own palette token or --paints still applies
-  const basePalette = spec.basePalette !== false;
   const planMedium = config?.drawing?.medium && config.drawing.medium !== 'none' ? config.drawing.medium : null;
   const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
   const outlineMedium = planMedium ?? (isPenWash ? 'ink' : 'graphite');
-  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, trumbull: spec.trumbull, basePalette, out, compile, gpu, targetPixels, linesExist, outlineMedium });
+  const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, out, compile, gpu, targetPixels, linesExist, outlineMedium });
   problems.push(...refusedTokens(safeVariant));
   if (config && typeof config === 'object') problems.push(...refusedPlanFields(config));
   problems.push(...unknownTokens(safeVariant, build).filter(t => !Object.hasOwn(REFUSED_TOKENS, tokenName(t))).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';
-  const layered = layerBase({ variant: safeVariant, build, architecture: spec.trumbull, trumbull: spec.trumbull, basePalette, sepiaInk, linesExist });
+  const layered = layerBase({ variant: safeVariant, build, sepiaInk, linesExist });
   const args = [...layered.args];
   const hasDrawingFile = args.includes('--drawingfile');
   const extraVal = name => { const i = extraArgs.lastIndexOf('--' + name); return i >= 0 && i + 1 < extraArgs.length && !extraArgs[i + 1].startsWith('--') ? extraArgs[i + 1] : null; };
@@ -340,7 +325,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   if (config) problems.push(...checkPlanLimits(config, spec.sheetmm, linesByName, targetPixels));
   return {
     args, problems, variant: safeVariant, extraArgs,
-    layering: { base: BASE, basePalette, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor },
+    layering: { base: BASE, applied: layered.applied, skipped: layered.skipped, edits: layered.edits, valueFloor },
     modelOptions: layered.modelOptions, baseOptions: layered.baseOptions, extraOptions: extraArgs.filter(a => a.startsWith('--')).map(a => a.slice(2)),
     templateOptions: [...optionMap(build(variantParts(safeVariant).prefix)).keys()],
   };

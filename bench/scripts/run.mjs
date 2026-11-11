@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Run one model through a round under protocol v2, gentle mode, and write its try folders.
-//   npm run bench:run -- --model opus --round V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict] [--no-base-palette]
+//   npm run bench:run -- --model opus --round V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict]
 //   npm run bench:run -- --dry-run [--round V4|V5]   (no model, no keys: a scripted stand-in exercises the whole path)
 // V4 and V5 write tries 1 to --tries (pipeline/round45.mjs). Rounds V1 to V3 are published history and can no longer be run.
 // A try folder (<out>/<round dir>/<model>/<try>/) gets run.json, <crop>.webp and <crop>-stages.webp. Raw outputs
@@ -20,7 +20,7 @@ const argv = process.argv.slice(2);
 const has = n => argv.includes('--' + n);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
 const fail = msg => { console.error(`bench:run: ${msg}`); process.exit(2); };
-const FLAGS = new Set(['--dry-run', '--link-v4-try1', '--force', '--strict-verdict', '--no-base-palette']);
+const FLAGS = new Set(['--dry-run', '--link-v4-try1', '--force', '--strict-verdict']);
 const OPTS = new Set(['--round', '--profile', '--judge', '--notargetlooks', '--mode', '--dry-key', '--model', '--crops', '--python', '--out', '--tries', '--from-try', '--gpu', '--dry-width']);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -92,7 +92,7 @@ const outRoot = path.resolve(opt('out', path.join(BENCH, 'work', DRY ? 'dry-run'
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), basePalette: !has('no-base-palette'), noTargetLooks: opt('notargetlooks') === '1', profile, python };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), noTargetLooks: opt('notargetlooks') === '1', profile, python };
   try {
     await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
   } catch (e) { fail(e.stack || e.message); }

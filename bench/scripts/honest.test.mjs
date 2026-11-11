@@ -139,4 +139,18 @@ test('item 3: the bench base and template carry no sky numbers fitted to one sub
   const args = optionMap(layerBase({ variant: 'region_w13', build }).args);
   assert.equal(args.get('skylanes'), '1', 'sky lanes stay on, at the painter\'s own radius and step');
   for (const k of ['skylanemm', 'skylanestep', 'skyfloc']) assert.ok(!args.has(k), `the base sets --${k} (Trumbull's fitted value)`);
+  assert.doesNotMatch(BASE, /_(rg|blk|bmm|bka)\d|_birr|_pgreen/);
+});
+
+test('item 4: plan-args has no per-subject branch: every subject resolves the same way', async () => {
+  const { resolvePlan, optionMap } = await import('./pipeline/plan-args.mjs');
+  const { BENCH } = await import('./lib.mjs');
+  const src = fs.readFileSync(new URL('./pipeline/plan-args.mjs', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(src, /trumbull|architecture|basePalette/i);
+  const subjects = JSON.parse(fs.readFileSync(path.join(BENCH, 'v4v5', 'subjects.json'), 'utf8')).subjects;
+  for (const [k, s] of Object.entries(subjects)) assert.ok(!('trumbull' in s) && !('architecture' in s), `${k} carries a subject switch`);
+  const o = { planDir: '/missing', variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' };
+  const a = optionMap(resolvePlan({ ...o, spec: { width: 96, sheetmm: 280 } }).args), b = optionMap(resolvePlan({ ...o, spec: { width: 96, sheetmm: 280, trumbull: true, architecture: true } }).args);
+  assert.deepEqual([...b], [...a]);
+  assert.ok(!a.has('paints') && !a.has('stoneblocks') && !a.has('groundglaze'));
 });

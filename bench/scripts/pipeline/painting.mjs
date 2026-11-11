@@ -20,7 +20,7 @@ export function painterFailure(log, code) {
 export const bkey = b => (String(b) === 'closing' ? 1e9 : Number(b));
 
 export class Painting {
-  /** spec: {width, sheetmm, trumbull}; dir: this painting's folder; initialStop: 0 (stop before the first wash) or 'end'. */
+  /** spec: {width, sheetmm}; dir: this painting's folder; initialStop: 0 (stop before the first wash) or 'end'. */
   constructor({ repo, spec, target, dir, gpu = 'auto', initialStop = 0, env = {} }) {
     Object.assign(this, { repo, spec, target, dir, gpu, env });
     this.aware = path.join(dir, 'aware');
