@@ -35,7 +35,7 @@ test('the edges list names every shared boundary once, each kind with the wet se
   assert.throws(() => plan(twice), /named twice/);
   const dryOnly = doc('soft'); for (const a of dryOnly.areas) a.passes[0].move = 'dry brush';
   assert.throws(() => plan(dryOnly), /wet pass to soften/);
-  const silent = doc('soft'); delete silent.edges; assert.equal(plan(silent).edgesByArea, null);
+  const silent = doc('soft'); delete silent.edges; assert.throws(() => plan(silent), /names no edges, but these areas share boundaries: cheek\|shadow/);
   assert.deepEqual([...areaAdjacency(plan(doc('soft')).owner, W, H).keys()], ['0|1']);
 });
 

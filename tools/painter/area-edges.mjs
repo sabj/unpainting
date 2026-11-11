@@ -44,12 +44,15 @@ export function areaAdjacency(owner, w, h) {
 
 /** With an edges list, every shared boundary is named and every named pair touches; returns Map areaId -> [edge]. */
 export function bindAreaEdges(plan) {
-  const edges = plan.edges;
-  if (!edges) return null;
   const ids = plan.doc.areas.map(a => a.id), touching = new Set([...areaAdjacency(plan.owner, plan.w, plan.h).keys()].map(k => pairKey(...k.split('|').map(j => ids[+j]))));
+  // every edge is decided (painting-rules 8): a plan whose areas touch must name each shared boundary; a silent plan
+  // used to get whatever its moves gave, which is a hard edge almost everywhere (pair judge 14:42, eye #10)
+  if (!plan.edges) { if (touching.size) fail(`edges: the plan names no edges, but these areas share boundaries: ${[...touching].join(', ')}; name each hard, soft or lost with a reason`); return null; }
+  const edges = plan.edges;
   const missing = [...touching].filter(k => !edges.has(k)), apart = [...edges.keys()].filter(k => !touching.has(k));
   if (missing.length) fail(`edges: shared boundaries with no edge named: ${missing.join(', ')}`);
-  if (apart.length) fail(`edges: named pairs that share no boundary: ${apart.join(', ')}`);
+  // a cropped view can hide where two areas meet, so only a full view proves a named pair apart
+  if (apart.length && !plan.doc.view) fail(`edges: named pairs that share no boundary: ${apart.join(', ')}`);
   const byArea = new Map(ids.map(id => [id, []]));
   for (const e of edges.values()) for (const [me, other] of [e.areas, [...e.areas].reverse()]) byArea.get(me).push({ ...e, other, otherIndex: ids.indexOf(other) });
   return byArea;
