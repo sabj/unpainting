@@ -110,7 +110,7 @@ export class PaintSession {
   }
   remainingText(o, limit = 60) {
     const rows = o.remaining || [];
-    const lines = rows.slice(0, limit).map(r => (r.touchRound ? `  pass ${r.pass}: touch-up round ${r.touchRound} (the painter compares its sheet with the target's shape averages and adds corrective glazes)`
+    const lines = rows.slice(0, limit).map(r => (r.touchRound ? `  pass ${r.pass}: touch-up round ${r.touchRound}${this.strict ? '' : ' (the painter compares its sheet with the target\'s shape averages and adds corrective glazes)'}`
       : `  pass ${r.pass}: value ${r.value} ${r.pigment}${r.order ? ` (${r.order})` : ''}${r.touched ? ' touch-up' : ''}, ${r.passages} passages over ${(100 * (r.areaShare || 0)).toFixed(1)}% of the sheet; ${Object.entries(r.techniques || {}).map(([k, v]) => `${k} ${v}`).join(', ')}`));
     if (rows.length > limit) lines.push(`  ... and ${rows.length - limit} more`);
     if (o.closingDrawing && !o.closing) lines.push('  then the closing drawing');
