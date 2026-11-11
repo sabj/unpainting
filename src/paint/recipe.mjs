@@ -33,7 +33,6 @@ const RECIPES = {
   default: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   combined: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   penwash: [METHOD_FLAGS, '--drawing first --penwash 1 --order ladder --touchpoints 0 --finaldarks 0 --paperlights 0 --paperrel 0 --smalllights 0 --midlayers 0 --shapedmarks 0 --palettewide 1 --pwmin 2 --pwmax 3', PENWASH_FLAGS, PENWASH_STAGE_FLAGS].join(' '),
-  person: '--masses 8 --masscap 0.15 --massload 0.5 --masswet 99 --mopgap 1.3 --masspaper 0.12 --massfeather 0.4 --massmaxlevel 1 --segwash 1 --segwashes 1 --pigphys 1 --gran 0.08 --skipheld 0.15 --skipheldmin 0.01 --whitefloor 1.0 --resistmin 0.002 --smalllights frisket --drawing both --inkfilter 1 --inktiers 1 --outlinemedium ink --segink 1 --tier3 0.15 --mllines 1 --contain 0 --cutin 0 --maxvalues 4 --minshape 80 --shapes 3 --shapedeep 1.6 --shapequant 0.6 --shapeload 0.7 --ladderseg 0.5 --boxpick 0 --texture 0 --washgrain 0.15 --marks 1',
 };
 
 // `--style penwash` names the pen-and-wash recipe. A numeric --style (a styled target, 0..1) passes through.

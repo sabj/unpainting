@@ -86,7 +86,6 @@ Modules, with their flags:
 - `methods/local-lights.mjs` (`--locallights`): masks each segment's lightest share before any wash.
 - `methods/look.mjs` (not reached): reads what the sheet still lacks to choose the next act.
 - `methods/mass-budget.mjs` (`--massbudget 1`): full wash budget for broad neutral dark masses.
-- `methods/masses.mjs` (`--masses N`): opening broad mop washes.
 - `methods/material-profiles.mjs` (always on): ink and graphite drawing materials.
 - `methods/ml-lines.mjs` (`--mllines 1`): inner lines from a trained line model.
 - `methods/modulate.mjs` (`--modulate 1`): thins washes in highlight and detail areas.
@@ -104,7 +103,6 @@ Modules, with their flags:
 - `methods/practice-style.mjs` (helper for `--modulate`): measures the target's mix of ink, dry brush, wash and paper.
 - `methods/preparation-binding.mjs` (`--preparationbinding <file>`): pencil paths from a hash-checked preparation file.
 - `methods/seg-ink.mjs` (`--segink 1`): foreground segments as the ink subject.
-- `methods/segment-washes.mjs` (`--segwash 1`): mop wash regions from labelled object regions.
 - `methods/shape-deficit.mjs` (always on): charges each passage from its whole shape's colour difference.
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
 - `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.

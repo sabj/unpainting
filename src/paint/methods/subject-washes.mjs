@@ -89,17 +89,6 @@ export function subjectDomain(mask, subjects, phase, w, h) {
   return componentsBy(mask, phase === 'shadow' ? subjects.shadow : subjects.wash, w, h);
 }
 
-/** The wash groups as segment regions for --segwash: a group is ground when most of its cells are in ground segments. */
-export function washGroupRegions(subjects, seg) {
-  const n = subjects.wash.length, fg = new Uint8Array(n);
-  for (const r of seg.regions) if (r.foreground) for (let i = 0; i < n; i++) if (r.mask[i]) fg[i] = 1;
-  return subjects.washIds.map(g => {
-    const mask = Uint8Array.from(subjects.wash, v => (v === g ? 1 : 0));
-    let cells = 0, front = 0; for (let i = 0; i < n; i++) if (mask[i]) { cells++; front += fg[i]; }
-    return { id: g, name: `wash group ${g}`, foreground: front > cells / 2, area: cells / n, mask };
-  });
-}
-
 /** The legacy ladder's options: passes cut at the wash groups, subject lights held after the first value. */
 export function subjectBlockOptions(subjects) {
   return subjects ? { regions: subjects.wash, lateHold: subjects.lights } : {};

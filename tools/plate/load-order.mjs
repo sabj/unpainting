@@ -164,7 +164,6 @@ import '../../src/paint/drawing-plan.mjs';
 import '../../src/paint/methods/ink-res.mjs';
 import '../../src/paint/methods/local-lights.mjs';
 import '../../src/paint/methods/mop-lanes.mjs';
-import '../../src/paint/methods/masses.mjs';
 import '../../src/paint/methods/pen-wash-plan.mjs';
 import '../../src/paint/methods/pen-wash-lines.mjs';
 import '../../src/paint/methods/pen-wash.mjs';

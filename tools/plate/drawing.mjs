@@ -36,7 +36,6 @@ import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {localLights} from '../../src/paint/methods/local-lights.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
-import {paintMasses} from '../../src/paint/methods/masses.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
@@ -259,7 +258,7 @@ const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(n
 SPEED_PROFILE?.add('planningAndSetup', process.uptime() * 1000);
 const PROVENANCE_TARGET_SHA = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex');
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') { const sealed = sealTargetMaps(TARGET_GUARD, ctx); TARGET_GUARD.assertCleanContext('paint step', ctx); console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step (also ${sealed.join(', ') || 'no other map'})`); }
-if (!ctx.RESUMING && ctx.RESIST && Math.round(num('masses', 0)) <= 0) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(ctx.sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
+if (!ctx.RESUMING && ctx.RESIST) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(ctx.sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
 // Linked stages: each stage's own layer (what it laid) and the sheet as it stands after it, as layer-<stage>.jpg and
 // stage-<stage>.jpg, so the stages can be judged one at a time.
@@ -442,9 +441,6 @@ const fadePrep = () => {
   layersChanged(ctx.sheet, ctx.sheet.layers.slice(0, PREPF.upto)); // it scaled dried layers in place: the cached sums of them are stale
   return faded;
 };
-// --masses: the sheet begun with a mop, a few broad washes each chosen from what the sheet still lacks at the mop's own
-// scale, before the ladder (src/paint/methods/masses.mjs); --segwash takes their regions from the segments.
-const MASSES = Math.round(num('masses', 0));
 const mopLanes = makeMopLanes({ num });
 const setStage = s => { ctx.STAGE = s; };
 if (PENWASH_PLAN) {
@@ -456,16 +452,7 @@ if (PENWASH_PLAN) {
   ctx.laid += r.laid;
   fs.writeFileSync(path.join(out, 'penwash-run.json'), JSON.stringify({ passages: r.records, lines: ctx.PENWASH_LINES }, null, 2));
 }
-if (MASSES > 0) {
-  const massLaid = await paintMasses({
-    sheet: ctx.sheet, w, h, n, SC, W2, H2, PIGS, A: ctx.A, expected, used, O, SEED, UPRIGHT, BRUSH, CAL, WET, subject: TIER_MASK, subjects: SUBJECTS,
-    masses: MASSES, mopLanes, handAngle, flowEvery, dip, up, clock, shoot, setStage, opt, num, log: console.log,
-  });
-  ctx.laid += massLaid;
-  // the masking fluid goes on here, once the broad washes have tinted the lights as a first wash does
-  if (ctx.RESIST) { applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
-}
 Object.assign(ctx, { up, t0, spent, PROF, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, FW, 
   isFirst, FILM_FRAMES, used, TECHS, LAST, DRAWING, SKY_WARM_RB, TP_ROUNDS, PROVENANCE_TARGET_SHA, PREPF, 
-  fadePrep, MASSES, mopLanes, setStage });
+  fadePrep, mopLanes, setStage });
 }

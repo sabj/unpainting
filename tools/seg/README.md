@@ -17,7 +17,7 @@ Painting (regions for the washes): `segments.py`, `sam_regions.py`, `segment.py`
 | `--samcheckpoint` | `$PAINTER_SAM_CHECKPOINT`, then `work/models/` | `sam_vit_b_01ec64.pth` |
 | `--segcache` | `work/segments/by-hash` | where the maps are kept |
 
-`--mode regions` names no parts: each region is `r1`, `r2` and so on, largest first, with its area, box, mean and spread of Lab color and the share of the frame it touches. A region that touches the frame along less than 12% of its outline is marked foreground. Hooks that look up parts by name, such as `--passages sky` or `--fleckoff sky,sea`, find nothing in these maps and keep their fallbacks; the hooks that use every region or the foreground flag (`--locallights`, `--segwash`, `--segink`, `--modulate`) use them.
+`--mode regions` names no parts: each region is `r1`, `r2` and so on, largest first, with its area, box, mean and spread of Lab color and the share of the frame it touches. A region that touches the frame along less than 12% of its outline is marked foreground. Hooks that look up parts by name, such as `--passages sky` or `--fleckoff sky,sea`, find nothing in these maps and keep their fallbacks; the hooks that use every region or the foreground flag (`--locallights`, `--segink`) use them.
 
 | Script | Writes | Read by |
 |---|---|---|

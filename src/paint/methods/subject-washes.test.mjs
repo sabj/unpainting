@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { holdSubjectLights, subjectBlockOptions, subjectCovers, washGroupRegions } from './subject-washes.mjs';
+import { holdSubjectLights, subjectBlockOptions, subjectCovers } from './subject-washes.mjs';
 import { planLightToDark } from './light-to-dark.mjs';
 import { blockInPigments } from '../../crop/blockin.mjs';
 import { writeWashPlan } from './wash-plan-image.mjs';
@@ -67,14 +67,6 @@ test('the legacy ladder cuts its passes at the wash groups and holds subject lig
     if (l.value > 1) assert.equal(m.some((v, i) => v && grown[i]), false, 'held lights are skipped after the first value');
   }
   assert.deepEqual(subjectBlockOptions(null), {});
-});
-
-test('wash groups as --segwash regions: ground unless most cells are foreground', () => {
-  const subjects = twoSubjects();
-  const seg = { regions: [{ foreground: true, mask: Uint8Array.from({ length: N }, (_, i) => (left(i) ? 1 : 0)) }, { foreground: false, mask: Uint8Array.from({ length: N }, (_, i) => (left(i) ? 0 : 1)) }] };
-  const r = washGroupRegions(subjects, seg);
-  assert.deepEqual(r.map(q => q.foreground), [true, false]);
-  assert.ok(Math.abs(r[0].area - 0.5) < 1e-9);
 });
 
 test('the wash plan picture is three panels wide, with the subject field beside it', async t => {

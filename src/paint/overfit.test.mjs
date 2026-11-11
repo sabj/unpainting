@@ -73,8 +73,8 @@ test('presets and the v096 recipe fail the run instead of painting without them'
   fs.rmSync(dir, { recursive: true });
 });
 
-test('penwash and person recipes contain no subject switches', () => {
-  for (const recipe of ['penwash', 'person']) {
+test('the penwash recipe contains no subject switches', () => {
+  for (const recipe of ['penwash']) {
     const argv = expandRecipe({ argv: ['--recipe', recipe] }).argv;
     assert.ok(!argv.some(v => SUBJECT_IDS.includes(v)), recipe);
     for (const flag of ['--trumbullrules', '--portraitrules', '--drawsubject']) assert.ok(!argv.includes(flag), `${recipe}: ${flag}`);
