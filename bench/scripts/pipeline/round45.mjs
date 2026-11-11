@@ -18,6 +18,8 @@ import { verifyComparisonRun } from '../preflight.mjs';
 import { makeWorktree, keepScripts, runTurn, minutes } from './harness.mjs';
 import { PaintSession, planSnapshot, variantIn } from './session.mjs';
 import { checkPlan } from './check.mjs';
+import { checkAreaPlan } from './area-check.mjs';
+import { AREA_PLAN_FILE } from './area-args.mjs';
 import { pngSize, SUBJECT_MEDIA } from './plan-args.mjs';
 import { writeFeedback } from './feedback.mjs';
 import { copyRecord } from './copy.mjs';
@@ -33,7 +35,14 @@ const PROMPT = 'Read bench/TASK.md and do the task: prepare your plan, then pain
 const LITE_PROMPT = 'Read bench/TASK.md, prepare the plan deliverables and stop. This is planning only: do not run checks or the painter; the harness does both after your process exits.';
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six'];
 const STAGE_PCT = [10, 25, 50, 75, 100];
-const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|check-log\.jsonl|plan-args\.mjs|copy\.mjs|preview\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+const SEEDED = /^bench\/(TASK\.md|frozen\.json|TOKENS\.md|PAINT\.md|check\.(sh|mjs)|check-log\.jsonl|plan-args\.mjs|area-args\.mjs|copy\.mjs|preview\.mjs|paint\.(sh|mjs)|dry-planner\.mjs|skills\/|example\/|example-area\/|tools\/|paint-io\/|looks\/|feedback\/|check-out\/|plan\/target\.png)|^node_modules$/;
+// The two ways a model plans: the token route (config.json + recipe tokens + painter settings over BASE, TASK.md) and the
+// area route (one area plan and the drawing section, TASK-area.md; no tokens, no BASE, no forced settings).
+export const PLAN_FORMS = Object.freeze({
+  token: { brief: 'TASK.md', planFile: 'config.json', check: checkPlan, example: 'example' },
+  area: { brief: 'TASK-area.md', planFile: AREA_PLAN_FILE, check: checkAreaPlan, example: 'example-area' },
+});
+const planFormOf = name => { if (!Object.hasOwn(PLAN_FORMS, name)) throw new Error(`plan form must be ${Object.keys(PLAN_FORMS).join(' or ')}, not ${JSON.stringify(name)}`); return PLAN_FORMS[name]; };
 
 /** The model's own runs of `bash bench/check.sh`, one line each in bench/check-log.jsonl. */
 const modelChecks = ws => { const f = path.join(ws, 'bench', 'check-log.jsonl'); return fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : []; };
@@ -64,7 +73,7 @@ const LOOK_TEXT = {
 };
 
 /** The brief for one try: TASK.md with the round's rules and, in V5 after try 1, the feedback section. */
-export function renderTask({ round, n, tries, spec, strictVerdict = false, profile = null }) {
+export function renderTask({ round, n, tries, spec, strictVerdict = false, profile = null, planForm = 'token' }) {
   const bf = f => fs.readFileSync(path.join(V45, f), 'utf8').trim();
   const v5 = round.id === 'V5';
   let rules = !v5 ? bf('round-V4.md').replace('Each of the three V4 tries', `Each of the ${WORDS[tries] ?? tries} V4 tries`)
@@ -72,39 +81,61 @@ export function renderTask({ round, n, tries, spec, strictVerdict = false, profi
   const feedback = v5 && n > 1 ? bf('feedback-section.md').replace('{PREV}', String(n - 1)) : '';
   if (!MEDIUM_TEXT[spec.medium]) throw new Error(`the brief needs the subject's medium (${SUBJECT_MEDIA.join(', ')}), not ${JSON.stringify(spec.medium)}`);
   const vals = { ...VERDICT_TEXT[strictVerdict ? 'strict' : 'notes'], ...LOOK_TEXT[spec.noTargetLooks === true ? 'strict' : 'default'], MEDIUM: spec.medium, MEDIUM_TEXT: MEDIUM_TEXT[spec.medium], SUBJECT_NAME: spec.name, ROUND: round.id, TRY: String(n), TRIES: String(tries), TASK_STYLE: spec.taskStyle, WIDTH: String(spec.width), SHEETMM: String(+spec.sheetmm.toFixed(2)) };
-  let t = fs.readFileSync(path.join(V45, 'TASK.md'), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
+  let t = fs.readFileSync(path.join(V45, planFormOf(planForm).brief), 'utf8').replace('{ROUND_RULES}', rules).replace('{FEEDBACK}', feedback);
   for (const [k, v] of Object.entries(vals)) t = t.replaceAll(`{${k}}`, v);
   if (profile?.planOnly) {
     t = t.replace(/You are preparing[\s\S]*?## The task/, `Prepare one painting plan, then stop. This is the lite planning screen: at most ${profile.modelMinutes} minutes. The harness checks and renders after your process exits. Do not start the painter, run checks or wait for images.\n\n## The task`);
-    t = t.replace(/## Before you paint[\s\S]*/, '## Deliver and stop\n\nSave bench/plan/config.json, bench/variant.txt and bench/PLAN.md, plus any drawing files and extra-args.json you choose. The harness makes one admission check and one render; there are no repair turns or model reviews. The target, physical size, painter and guards remain fixed.\n');
+    const files = planForm === 'area' ? 'bench/plan/area-plan.json and bench/PLAN.md, plus any drawing files you choose' : 'bench/plan/config.json, bench/variant.txt and bench/PLAN.md, plus any drawing files and extra-args.json you choose';
+    t = t.replace(/## Before you paint[\s\S]*/, `## Deliver and stop\n\nSave ${files}. The harness makes one admission check and one render; there are no repair turns or model reviews. The target, physical size, painter and guards remain fixed.\n`);
   }
   return t;
 }
 
 /** The model's worktree: the brief, the target, the check and paint commands, the skills, the tools and the example. */
-function seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile }) {
+function seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile, planForm = 'token', skills = null }) {
   const b = path.join(ws, 'bench');
   for (const d of ['plan', 'paint-io', 'looks', 'tools']) fs.mkdirSync(path.join(b, d), { recursive: true });
   fs.copyFileSync(target, path.join(b, 'plan', 'target.png'));
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
-  fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile }));
-  for (const f of ['check.sh', 'TOKENS.md', 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
-  for (const f of ['check.mjs', 'plan-args.mjs', 'copy.mjs', 'preview.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
+  fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile, planForm }));
+  const area = planForm === 'area';
+  for (const f of ['check.sh', ...(area ? [] : ['TOKENS.md']), 'paint.sh', 'paint.mjs', 'PAINT.md']) fs.copyFileSync(path.join(V45, f), path.join(b, f));
+  if (area) {
+    fs.copyFileSync(path.join(PIPE, 'area-check.mjs'), path.join(b, 'check.mjs'));
+    for (const f of ['area-args.mjs', 'plan-args.mjs', 'copy.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
+  } else for (const f of ['check.mjs', 'plan-args.mjs', 'copy.mjs', 'preview.mjs']) fs.copyFileSync(path.join(PIPE, f), path.join(b, f));
   if (profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'check.mjs'), "console.error('Lite: admission runs once, after the model exits. Save your plan and stop.'); process.exitCode = 2;\n");
     fs.writeFileSync(path.join(b, 'PAINT.md'), 'Lite planning only. Save the deliverables listed in TASK.md, then stop. The harness runs the check and painter after your process exits. No looking, waiting or repairs.\n');
   }
   for (const f of fs.readdirSync(path.join(V45, 'tools'))) fs.copyFileSync(path.join(V45, 'tools', f), path.join(b, 'tools', f));
-  fs.cpSync(path.join(V45, 'example'), path.join(b, 'example'), { recursive: true });
-  // the repository's current skills (.agents/skills), not the frozen V2 copy
-  fs.cpSync(path.join(REPO, '.agents', 'skills'), path.join(b, 'skills'), { recursive: true });
+  // the area route shows no worked plan of a benchmark subject: example plans in the repository named after a V4/V5
+  // subject, or bound to its target, leave the model's tree (the token route keeps its tree as its baselines had it)
+  if (area) removeSubjectPlans(ws);
+  const ex = planFormOf(planForm).example;
+  fs.cpSync(path.join(V45, ex), path.join(b, ex), { recursive: true });
+  // the repository's current skills (.agents/skills), not the frozen V2 copy, unless the run names a skills folder
+  fs.cpSync(skills ?? path.join(REPO, '.agents', 'skills'), path.join(b, 'skills'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(b, 'skills'))) if (!fs.statSync(path.join(b, 'skills', f)).isDirectory()) fs.rmSync(path.join(b, 'skills', f));
   if (dry && profile?.planOnly) {
     fs.writeFileSync(path.join(b, 'dry-planner.mjs'), `import fs from 'node:fs';
 fs.writeFileSync('bench/plan/config.json',JSON.stringify({subject:'dry',name:'Dry lite plan',styleSelection:{style:'ink-and-wash',reason:'offline fixture'},families:[],reserves:[]}));
 fs.writeFileSync('bench/variant.txt','region_w13_lay2_noslane');
 fs.writeFileSync('bench/PLAN.md','One fixed offline plan. No model calls, checks or self-review.');
 `);
-  } else if (dry) fs.copyFileSync(path.join(PIPE, 'dry-planner.mjs'), path.join(b, 'dry-planner.mjs'));
+  } else if (dry) fs.copyFileSync(path.join(PIPE, area ? 'dry-planner-area.mjs' : 'dry-planner.mjs'), path.join(b, 'dry-planner.mjs'));
+}
+
+/** Remove the repository's example plans that belong to a benchmark subject (by file name or target), from a worktree. */
+export function removeSubjectPlans(ws) {
+  const dir = path.join(ws, 'examples', 'plans'), ids = Object.keys(loadSubjects()), removed = [];
+  if (!fs.existsSync(dir)) return removed;
+  for (const f of fs.readdirSync(dir)) {
+    let target = null;
+    try { target = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))?.target?.path ?? null; } catch { /* not a JSON plan */ }
+    if (ids.some(id => f.startsWith(id + '-') || f.startsWith(id + '.') || (typeof target === 'string' && path.basename(target, '.png') === id))) { fs.rmSync(path.join(dir, f), { force: true }); removed.push(f); }
+  }
+  return removed;
 }
 
 /** Copy a file, gzipping drawing paths (they can be large). */
@@ -125,7 +156,8 @@ function previousTry({ outRoot, round, model, n, crop }) {
 }
 
 /** One try of one target: the model's session, its repair turns, the painting and the record. */
-async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile }) {
+async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile, planForm = 'token', skills = null }) {
+  const form = planFormOf(planForm);
   const raw = path.join(rawTry, crop);
   fs.mkdirSync(raw, { recursive: true });
   const source = path.join(V2, 'targets', `${crop}.png`);
@@ -138,10 +170,10 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     // Offline planning, admission and playback share one fixture at the requested
     // native width; real sessions keep the original source and full render size.
     if (dry) await sharp(source).resize({ width: spec.width, withoutEnlargement: true }).png().toFile(target);
-    seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile });
+    seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, profile, planForm, skills });
     let feedbackFiles = null;
     if (prev) feedbackFiles = await writeFeedback({ dest: path.join(ws, 'bench', 'feedback'), prev, prevRaw: prev.raw, prevOut: prev.out, target });
-    session = new PaintSession({ repo: REPO, ws, raw, spec, target, modelMinutes: profile.modelMinutes, gpu, log, planOnly: profile.planOnly });
+    session = new PaintSession({ repo: REPO, ws, raw, spec, target, modelMinutes: profile.modelMinutes, gpu, log, planOnly: profile.planOnly, planForm });
     const sessionId = ['claude', 'muse'].includes(model.runner) ? crypto.randomUUID() : null;
     let thread = null, selfReviewAt = null;
     const selfReview = path.join(ws, 'bench', 'SELF-REVIEW.md');
@@ -190,7 +222,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     const harnessCheck = async () => {
       const dir = path.join(raw, 'checks', 'final'); fs.rmSync(dir, { recursive: true, force: true });
       const snap = planSnapshot(ws, path.join(dir, 'plan'));
-      const chk = await checkPlan({ repo: REPO, spec, planDir: snap, variant: variantIn(snap), target, work: path.join(dir, 'work'), timeoutMs: spec.checkTimeoutMs ?? 900000 });
+      const chk = await form.check({ repo: REPO, spec, planDir: snap, variant: variantIn(snap), target, work: path.join(dir, 'work'), timeoutMs: spec.checkTimeoutMs ?? 900000 });
       writeJson(path.join(dir, 'check.json'), { ok: chk.ok, failures: chk.failures, layering: chk.layering, palette: chk.palette });
       session.checkLog.push({ seconds: chk.seconds, previewSeconds: chk.previewSeconds });
       return { chk, snap };
@@ -198,12 +230,12 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
     // The session ended without a painting: check the plan files as they are and paint them without stops. One repair
     // turn (the same session) is given for a missing or refused plan while the model has time.
     const finalize = async () => {
-      if (!fs.existsSync(path.join(ws, 'bench', 'plan', 'config.json')) && repairAllowed()) {
-        await repair('no plan', 'The harness check refused your preparation: no plan was written (bench/plan/config.json is missing), so nothing can be painted.\n'
+      if (!fs.existsSync(path.join(ws, 'bench', 'plan', form.planFile)) && repairAllowed()) {
+        await repair('no plan', `The harness check refused your preparation: no plan was written (bench/plan/${form.planFile} is missing), so nothing can be painted.\n`
           + 'Write every deliverable listed under "What you deliver" in bench/TASK.md, run `bash bench/check.sh` yourself until it ends with ADMITTED, then stop.');
         if (session.started) return;
       }
-      if (!fs.existsSync(path.join(ws, 'bench', 'plan', 'config.json'))) { outcome = 'no-plan'; refusal = ['the session ended without writing bench/plan/config.json']; return; }
+      if (!fs.existsSync(path.join(ws, 'bench', 'plan', form.planFile))) { outcome = 'no-plan'; refusal = [`the session ended without writing bench/plan/${form.planFile}`]; return; }
       let { chk, snap } = await harnessCheck();
       if (!chk.ok && repairAllowed()) {
         await repair('plan refused', `The harness check refused your preparation:\n${chk.refusal.join('\n')}\nFix only what is needed, run \`bash bench/check.sh\` yourself until it prints ok, then stop. (Or start the painting yourself with \`bash bench/paint.sh start\`.)`);
@@ -234,7 +266,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
       }
     }
     record.totalSeconds = (Date.now() - targetStarted) / 1000;
-    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict, gpu, verifyRun: !dry && !spec.offlineFixture });
+    return await collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict, gpu, verifyRun: !dry && !spec.offlineFixture, planForm });
   } finally {
     if (session?.painting) session.painting.kill();
     keepScripts(ws, path.join(raw, 'scripts'), SEEDED);
@@ -248,7 +280,7 @@ async function paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, d
  * The painting's outputs for the scorer and the try folder, and its record. A finished painting with only notes (unread
  * settings, dropped passages) is painted and collected; strictVerdict makes those notes fail it.
  */
-export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false, gpu = 'auto', verifyRun = false }) {
+export async function collect({ crop, spec, raw, rawTry, ws, session, record, outcome, paintedBy, refusal, feedbackFiles, selfReviewAt, strictVerdict = false, gpu = 'auto', verifyRun = false, planForm = 'token' }) {
   const p = session.painting, v = p && ['done', 'failed'].includes(p.state) ? p.verdict({ strict: strictVerdict }) : null;
   if (p) {
     const last = p.segments.at(-1);
@@ -287,7 +319,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
   const backend = backendFile && fs.existsSync(backendFile) ? readJson(backendFile) : null;
   const pipeline = {
     renderBackend: backend?.backend ?? backend?.renderBackend ?? null,
-    outcome, paintedBy, tokens: variantIn(p ? p.segments.at(-1).planDir : path.join(ws, 'bench')),
+    outcome, paintedBy, tokens: planForm === 'area' ? 'area-plan' : variantIn(p ? p.segments.at(-1).planDir : path.join(ws, 'bench')),
     starts: count('start'), looks: count('look'), revisions: count('revise'), revisionsRefused: count('revise-refused'),
     modelMinutes: +(session.modelS() / 60).toFixed(1), cappedAtModelTime: Boolean(session.capped), sessionEnd: session.ended,
     repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null, mediumOverride: v?.layering?.mediumOverride ?? null,
@@ -344,7 +376,8 @@ export async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
-export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3' }) {
+export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3', planForm = 'token', skills = null }) {
+  planFormOf(planForm);
   const subjects = loadSubjects();
   if (profile.planOnly && (round.id !== 'V4' || tries !== 1 || fromTry !== 1)) throw new Error('lite requires V4 try 1 only; use full for repeated trials');
   const log = msg => console.error(`bench:run: ${msg}`);
@@ -367,7 +400,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       log(`${model.name}, ${round.id}, try ${n} of ${tries}, ${crop}${dry ? ' (dry run)' : ''}`);
       let r, e;
       try {
-        r = await paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile });
+        r = await paintTarget({ model, round, n, tries, crop, spec, rawTry, prev, dry, gpu, log, strictVerdict, profile, planForm, skills });
         e = await tryEntry({ tryDir, r });
       }
       catch (error) {
@@ -387,7 +420,7 @@ export async function runPipeline({ round, model, tries, crops, dry, outRoot, fo
       painter: { key: model.key, name: model.name, id: model.id, effort: model.effort, runner: model.runner },
       planner: null, evaluators: { scoreJudges: [], progressionJudges: [] }, try: n,
       settings: { mode: 'gentle', strokeBudget: null, minutesPerCrop: null, sessionCapMin: profile.modelMinutes, modelMinutesCap: profile.modelMinutes, lookBudget: profile.planOnly ? 0 : null, selfView: profile.planOnly ? 'none' : 'gentle', targetGuard: 'gentle',
-        crops, learnsBetweenTries: round.learning, strictVerdict, noTargetLooks, benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
+        crops, learnsBetweenTries: round.learning, strictVerdict, noTargetLooks, planForm, skills: skills ? path.basename(skills) : 'repository', benchmarkProfile: profile.id, budget: profile, judgeProfile: `${profile.judgeVersion}-${profile.judgeProfile}`, judgeRoute: process.env.JUDGE_ROUTE || 'together', scoreProtocol: 'native-v1', paintWidth: Object.fromEntries(crops.map(c => [c, profileSubject(subjects[c], profile, dry ? dryWidth : null).width])), painter: 'tools/paint-plate.mjs', machine: 'local' },
       session: { minutes: minutes(wall), modelMinutes: +modelMin.toFixed(1), tokens: usageComplete ? tokens : null, observedTokens: tokens || null, usageComplete, costUSD: costComplete && !dry ? +cost.toFixed(6) : null, modelSessionSeconds: wall, elapsedSeconds: (Date.now() - t0) / 1000, renderSeconds, checks, previewSeconds: +previewSeconds.toFixed(1), renders, exitCode: null, killedAtCap: budgetStopped },
       guard: { blockedImageReads: guardViolations, kitRejections: 0, auditHits: [] },
       crops: cropsOut, ...(Object.keys(unpainted).length ? { unpainted } : {}),

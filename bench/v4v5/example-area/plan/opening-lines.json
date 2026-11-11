@@ -1,0 +1,552 @@
+{
+ "image": {
+  "w": 300,
+  "h": 240
+ },
+ "lines": [
+  {
+   "points": [
+    [
+     0.5,
+     108.5
+    ],
+    [
+     297.5,
+     109.5
+    ]
+   ],
+   "length": 297.0016834969122,
+   "weight": 0.8026744086295368,
+   "strength": 1,
+   "width": 3.36,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     176.5,
+     111.5
+    ],
+    [
+     201.5,
+     111.5
+    ]
+   ],
+   "length": 25,
+   "weight": 0.7673506118357183,
+   "strength": 1,
+   "width": 3.2,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     99.5,
+     123.5
+    ],
+    [
+     113.5,
+     125.5
+    ]
+   ],
+   "length": 14.142135623730951,
+   "weight": 0.7624170012772085,
+   "strength": 1,
+   "width": 3.18,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     220.5,
+     141.5
+    ],
+    [
+     213.5,
+     141.5
+    ],
+    [
+     212.5,
+     143.5
+    ],
+    [
+     207.5,
+     141.5
+    ],
+    [
+     206.5,
+     142.5
+    ]
+   ],
+   "length": 16.03544634700739,
+   "weight": 0.7810243874788285,
+   "strength": 1,
+   "width": 3.26,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     187.5,
+     148.5
+    ],
+    [
+     194.5,
+     146.5
+    ],
+    [
+     205.5,
+     148.5
+    ]
+   ],
+   "length": 18.460449776779466,
+   "weight": 0.7823817109068236,
+   "strength": 1,
+   "width": 3.27,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     204.5,
+     154.5
+    ],
+    [
+     183.5,
+     155.5
+    ]
+   ],
+   "length": 21.023796041628636,
+   "weight": 0.7900118969380856,
+   "strength": 1,
+   "width": 3.3,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     117.5,
+     180.5
+    ],
+    [
+     128.5,
+     180.5
+    ],
+    [
+     142.5,
+     183.5
+    ]
+   ],
+   "length": 25.31782106327635,
+   "weight": 0.7928632006049157,
+   "strength": 1,
+   "width": 3.31,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     56.5,
+     208.5
+    ],
+    [
+     39.5,
+     209.5
+    ]
+   ],
+   "length": 17.029386365926403,
+   "weight": 0.813522356748581,
+   "strength": 1,
+   "width": 3.4,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     155.5,
+     222.5
+    ],
+    [
+     149.5,
+     222.5
+    ],
+    [
+     142.5,
+     225.5
+    ],
+    [
+     136.5,
+     224.5
+    ]
+   ],
+   "length": 19.698535636162127,
+   "weight": 0.8211909687146546,
+   "strength": 1,
+   "width": 3.44,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     102.5,
+     213.5
+    ],
+    [
+     116.5,
+     213.5
+    ],
+    [
+     118.5,
+     214.5
+    ],
+    [
+     124.5,
+     215.5
+    ]
+   ],
+   "length": 22.31883050779801,
+   "weight": 0.8079716637730598,
+   "strength": 1,
+   "width": 3.38,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     71.5,
+     120.5
+    ],
+    [
+     59.5,
+     122.5
+    ],
+    [
+     56.5,
+     121.5
+    ],
+    [
+     46.5,
+     121.5
+    ]
+   ],
+   "length": 25.327802720764815,
+   "weight": 0.7696631915867329,
+   "strength": 1,
+   "width": 3.21,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     231.5,
+     139.5
+    ],
+    [
+     241.5,
+     138.5
+    ],
+    [
+     244.5,
+     139.5
+    ],
+    [
+     247.5,
+     139.5
+    ],
+    [
+     250.5,
+     139.5
+    ],
+    [
+     253.5,
+     139.5
+    ]
+   ],
+   "length": 22.212153281289268,
+   "weight": 0.7676855703194937,
+   "strength": 1,
+   "width": 3.2,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     129.5,
+     148.5
+    ],
+    [
+     133.5,
+     148.5
+    ],
+    [
+     136.5,
+     149.5
+    ],
+    [
+     141.5,
+     148.5
+    ],
+    [
+     147.5,
+     150.5
+    ]
+   ],
+   "length": 18.585852494097924,
+   "weight": 0.7769857898354531,
+   "strength": 1,
+   "width": 3.25,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     189.5,
+     161.5
+    ],
+    [
+     199.5,
+     161.5
+    ],
+    [
+     202.5,
+     162.5
+    ],
+    [
+     208.5,
+     162.5
+    ],
+    [
+     209.5,
+     164.5
+    ],
+    [
+     211.5,
+     164.5
+    ]
+   ],
+   "length": 23.398345637668168,
+   "weight": 0.7948167458176614,
+   "strength": 1,
+   "width": 3.32,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     238.5,
+     220.5
+    ],
+    [
+     241.5,
+     221.5
+    ],
+    [
+     244.5,
+     220.5
+    ],
+    [
+     247.5,
+     220.5
+    ],
+    [
+     249.5,
+     219.5
+    ],
+    [
+     254.5,
+     219.5
+    ]
+   ],
+   "length": 16.56062329783655,
+   "weight": 0.8169642750173808,
+   "strength": 1,
+   "width": 3.42,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     193.5,
+     167.5
+    ],
+    [
+     190.5,
+     167.5
+    ],
+    [
+     187.5,
+     165.5
+    ],
+    [
+     184.5,
+     165.5
+    ],
+    [
+     182.5,
+     164.5
+    ],
+    [
+     175.5,
+     163.5
+    ]
+   ],
+   "length": 18.912687064829257,
+   "weight": 0.7954852312803269,
+   "strength": 1,
+   "width": 3.33,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  },
+  {
+   "points": [
+    [
+     121.5,
+     173.5
+    ],
+    [
+     108.5,
+     172.5
+    ],
+    [
+     105.5,
+     174.5
+    ],
+    [
+     104.5,
+     174.5
+    ]
+   ],
+   "length": 17.643956085869288,
+   "weight": 0.7839609298855067,
+   "strength": 1,
+   "width": 3.28,
+   "closed": false,
+   "role": "subject",
+   "object": "target-hard-line",
+   "kind": "line",
+   "group": "detail",
+   "selection": {
+    "method": "traced target thin dark line, one step of the subject's own nine-step value scale (0.102) darker than both sides, in its darker half (<= 0.490), with a lighter side (a contour, not inside a dark mass); walked through crossings, joined across the tracer's reach, split where it turns back; one nib and one weight per line"
+   }
+  }
+ ],
+ "source": "bench/v4v5/example-area/plan/target.png",
+ "crop": [
+  0,
+  0,
+  300,
+  240
+ ],
+ "registration": "traced from the target crop itself"
+}
