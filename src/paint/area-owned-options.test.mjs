@@ -33,3 +33,15 @@ test('the automatic painter order never reorders or cuts the ladder under an are
   assert.match(SRC, /refuseAreaOwned\(argv\);/);
   assert.match(SRC, /if \(!VALUE_ENABLED && !ctx\.AREA_PLAN && \['painter','legacy-painter'\]\.includes\(ORDER\)\) \{/);
 });
+
+test('move 11: an automatic light rule beside an area plan stops the run, naming pass.lights', () => {
+  assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', '--whitefloor', '.5']), /--whitefloor: .*pass\.lights/);
+  assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', '--smalllights', 'frisket']), /--smalllights frisket: .*pass\.lights/);
+  assert.throws(() => refuseAreaOwned(['--areaplan', 'p.json', '--white', 'gouache']), /--white gouache/);
+  assert.doesNotThrow(() => refuseAreaOwned(['--areaplan', 'p.json', '--smalllights', '0', '--white', 'none']));
+  assert.doesNotThrow(() => refuseAreaOwned(['--valueplan', 'c.json', '--whitefloor', '.5', '--smalllights', '1']));
+});
+
+test('move 11: no automatic hold of target-light cells under an area plan; the plan\'s reserves are the lights', () => {
+  assert.match(painterSource(), /const WHITE_HOLD = \(\(\) => \{\n  if \(opt\('areaplan', ''\)\) return null;/);
+});
