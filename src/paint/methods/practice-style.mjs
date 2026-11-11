@@ -1,5 +1,4 @@
-// The target's style, measured off the art before the practice planner plans, so the mix of wash, dry brush and pen
-// follows the piece. Each measure sets the practice-loose.mjs dials below unless a dial is given on the command line:
+// The target's style, measured off the art before planning, so the mix of wash, dry brush and pen follows the piece:
 //   ink      thin darks (density above its opening at 2 cells) as a share of all tone
 //   dry      broken texture between 1 and 4 cells as a share of all tone, less the thin darks' share (pen lines are
 //            broken texture at that scale too)
@@ -32,22 +31,4 @@ export async function measureStyle({ SRC, w, h, n, px = null, gaussian, minFilte
   const style = { ink: +ink.toFixed(3), dry: +dry.toFixed(3), wet: +wet.toFixed(3), paper: +(paper / n).toFixed(3), edges: +edges.toFixed(3), thin: +thinS.toFixed(3), texture: +midS.toFixed(3), chroma: +chroma.toFixed(1) };
   log(`practice style: ink ${style.ink}, dry brush ${style.dry}, wet ${style.wet}, paper ${style.paper}, edges ${style.edges} (thin darks ${style.thin}, texture ${style.texture}, chroma ${style.chroma})`);
   return style;
-}
-
-// The dials the style sets. A dial given on the command line wins.
-export function styleDials(style, opt) {
-  const d = {
-    loosebroad: Math.max(0.3, Math.min(0.85, 0.3 + 0.6 * style.wet)),
-    loosedetail: Math.max(0.1, Math.min(0.35, 0.08 + 0.3 * style.wet)),
-    loosedrycover: Math.max(0.15, Math.min(0.85, 0.15 + 0.8 * style.dry)),
-    loosegroundry: Math.max(0.3, Math.min(1, 0.3 + 0.8 * style.dry)),
-    loosedark: Math.max(0.5, Math.min(0.9, 0.9 - 0.4 * style.ink)),
-    // the darks' share of the sheet: more where the piece is carried by its darks rather than its pen
-    loosedarks: Math.max(0.03, Math.min(0.08, 0.08 - 0.05 * style.ink)),
-    loosedrystrength: Math.max(1.5, Math.min(3, 1.5 + 2 * style.dry)),
-    // an ink-led piece keeps its whole closing pen; a wash-led one keeps it to the focal darks
-    loosepen: style.ink >= 0.6 ? 1 : 0,
-  };
-  for (const k of Object.keys(d)) if (opt(k, '') !== '') d[k] = Number(opt(k, ''));
-  return d;
 }

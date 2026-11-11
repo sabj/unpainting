@@ -396,9 +396,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const penKeep = PEN_FIELD ? (g => { let inside = 0; for (const q of g.points) { const x = Math.min(w - 1, Math.max(0, Math.round(q.x))), y = Math.min(h - 1, Math.max(0, Math.round(q.y))); if (PEN_FIELD[y * w + x] >= num('pendrawat', 0.5)) inside++; } return inside >= g.points.length * num('penkeep', 0.5); }) : null;
   // --drawingfile <base>: the first pen draws a selected drawing whole, in strokes of a person's length, and nothing
   // the walker found (src/paint/methods/drawing-file.mjs)
-  // --practice: the closing pen is cut to the focal darks (src/paint/methods/practice-paint.mjs)
   // --massbudget cuts the closing pen inside the masses; the opening drawing keeps them unless --masscutfirst 1
-  const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : ctx.PRACTICE_CUT && !first && !fine ? ctx.PRACTICE_CUT : g => g;
+  const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : g => g;
   const penWashPrune = PENWASH_PLAN && first && !fine ? lines => { const r = prunePenLines(lines, { w, h, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w, groups: PENWASH_INK_GROUPS, seed: 1 + Math.round(num('seed', 0)), options: { tileInkMm: num('pwtileink', 9), keepAbove: num('pwkeep', 0), minMm: num('pwspeck', 0.8), vary: num('pwpenvary', 0), structMm: num('pwpenstruct', 15) } }); ctx.PENWASH_LINES = r.stats; console.log(`pen wash lines: ${r.stats.out} of ${r.stats.in} lines kept (${r.stats.short} specks, ${r.stats.omitted} omitted, ${r.stats.duplicate} repeats, ${r.stats.density} over density), ink ${r.stats.inkMmOut} of ${r.stats.inkMmIn} mm`); return r.lines; } : null;
   const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, walker: drawn, field, style: DRAW_STYLE, prune: penWashPrune }));
   let kept = SELECTED ? SELECTED : cutPen(penKeep ? drawn.filter(penKeep) : drawn);

@@ -6,11 +6,54 @@ import { needCells, thickness } from '../../media/sheet.mjs';
 //   --modpale, --modcover          override the style's strengths
 //   --modreach 0.06                the detail field's blur, as a share of the short side
 //   --modlight 0.12                source density under which a cell in the detail field is a light to reserve
-import { focusMap } from './practice-plan.mjs';
 import { measureStyle } from './practice-style.mjs';
 import { shapeLights } from './practice-regions.mjs';
-import { minFilter, maxFilter } from '../../raster.js';
+import { minFilter, maxFilter, components } from '../../raster.js';
 import { orientationField, furMarks } from '../../crop/fur.mjs';
+
+const quantile = (vals, q) => {
+  if (!vals.length) return 0;
+  const s = Float32Array.from(vals).sort();
+  return s[Math.min(s.length - 1, Math.max(0, Math.floor(q * (s.length - 1))))];
+};
+const count = m => { let c = 0; for (let i = 0; i < m.length; i++) c += m[i]; return c; };
+
+// Where detail and contrast go: saliency times edge energy. Saliency is the u2net mask in work/masks when there is one,
+// the foreground segments when there are those, and a centre prior otherwise.
+async function focusMap({ SRC, w, h, n, image, gaussian, num, log, path, fs, sharp, root, fg = null }) {
+  const base = image ? path.basename(image, path.extname(image)) : '';
+  let sal = null, from = 'a centre prior';
+  const maskFile = base ? path.resolve(root, `work/masks/${base}.png`) : '';
+  if (maskFile && fs.existsSync(maskFile)) {
+    const { data } = await sharp(maskFile).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer({ resolveWithObject: true });
+    sal = Float32Array.from({ length: n }, (_, i) => data[i] / 255); from = `work/masks/${base}.png`;
+    // the u2net mask can miss a second subject that the foreground segments hold
+    if (fg) for (let i = 0; i < n; i++) sal[i] = Math.max(sal[i], fg[i]);
+  } else if (fg) { sal = gaussian(Float32Array.from(fg), w, h, 0.01 * Math.min(w, h)); from = 'the foreground segments'; }
+  if (!sal) sal = Float32Array.from({ length: n }, (_, i) => { const x = (i % w) / w - 0.5, y = ((i / w) | 0) / h - 0.45; return Math.exp(-(x * x + y * y) / (2 * 0.25 * 0.25)); });
+  const S = gaussian(SRC, w, h, 1), E = new Float32Array(n);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x;
+    const gx = S[i - w + 1] + 2 * S[i + 1] + S[i + w + 1] - S[i - w - 1] - 2 * S[i - 1] - S[i + w - 1];
+    const gy = S[i + w - 1] + 2 * S[i + w] + S[i + w + 1] - S[i - w - 1] - 2 * S[i - w] - S[i - w + 1];
+    E[i] = Math.hypot(gx, gy);
+  }
+  const raw = Float32Array.from(E, (v, i) => v * (0.25 + 0.75 * sal[i]));
+  const B = gaussian(raw, w, h, Math.max(1, 0.03 * w));
+  const top = Math.max(1e-6, quantile(Array.from(B), 0.99));
+  const F = Float32Array.from(B, v => Math.min(1, v / top));
+  const share = num('practicefocus', 0.06), cut = quantile(Array.from(F), 1 - share);
+  const { labels, count: nb } = components(Uint8Array.from(F, v => (v >= cut ? 1 : 0)), w, h);
+  const sum = new Float64Array(nb + 1); for (let i = 0; i < n; i++) if (labels[i]) sum[labels[i]] += F[i];
+  const keep = new Set([...Array(nb).keys()].map(k => k + 1).sort((a, b) => sum[b] - sum[a]).slice(0, Math.round(num('practiceblobs', 3))));
+  const focal = Uint8Array.from(labels, v => (keep.has(v) ? 1 : 0));
+  const blobs = [...keep].map(id => { let x = 0, y = 0, c = 0; for (let i = 0; i < n; i++) if (labels[i] === id) { x += i % w; y += (i / w) | 0; c++; } return { x: x / c / w, y: y / c / h, area: c / n }; });
+  log(`modulate: focus from ${from} times edges, ${(100 * count(focal) / n).toFixed(1)}% of the sheet in ${blobs.length} blobs at ${blobs.map(b => `(${b.x.toFixed(2)}, ${b.y.toFixed(2)}) ${(100 * b.area).toFixed(1)}%`).join(', ')}`);
+  // how far the second and third passes carry: 1 at the focus, falling with distance over a quarter of the sheet
+  const broad = gaussian(Float32Array.from(focal), w, h, Math.max(2, 0.12 * Math.min(w, h)));
+  const bt = Math.max(1e-6, quantile(Array.from(broad), 0.995));
+  return { F, focal, blobs, broad: Float32Array.from(broad, v => Math.min(1, v / bt)) };
+}
 
 export async function planModulation(c) {
   const { A, K, w, h, n, SRC, px, image, gaussian, num, opt, log, path, fs, sharp, root } = c;

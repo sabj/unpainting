@@ -175,7 +175,6 @@ import '../../src/paint/methods/subject-washes.mjs';
 import '../../src/paint/methods/wash-plan-image.mjs';
 import '../../src/paint/methods/ladder-seg.mjs';
 import '../../src/paint/methods/mass-budget.mjs';
-import '../../src/paint/methods/practice-paint.mjs';
 import '../../src/paint/methods/modulate.mjs';
 import '../../src/paint/methods/stroke-budget.mjs';
 import '../../src/paint/methods/brushes.mjs';

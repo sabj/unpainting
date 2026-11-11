@@ -39,7 +39,6 @@ import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {paintMasses} from '../../src/paint/methods/masses.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
-import {paintPractice} from '../../src/paint/methods/practice-paint.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -174,10 +173,6 @@ if(ctx.VALUE_PLAN){
 // box (src/paint/methods/light-reserves.mjs), not the box. Only the film record and its dry-paper check remain here.
 if(ctx.VALUE_PLAN&&VALUE_CONFIG?.reserves?.length){const paper=measurePaperDry(ctx.sheet);check('essential light film requires dry paper',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'essential-light-film-plan',paper,operation:'real applyResist through existing union lifecycle; full strength; remove after last dry shadow',cells:'the value plan protectedCells: the target light inside each reserve box',reserves:VALUE_CONFIG.reserves})+'\n');}
 const upF = f => { if (SC === 1) return f; const m = new Float32Array(N2); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) m[y * W2 + x] = f[((y / SC) | 0) * w + ((x / SC) | 0)]; return m; };
-// --practice: the practice plan: value passes over all colours in place of the ladder
-// (src/paint/methods/practice-plan.mjs); it lays its own frisket and lifts it once the first pass is done
-const PRACTICE = num('practice', 0) > 0;
-ctx.PRACTICE_CUT = null;
 const used = {};
 const TECHS = [], LAST = new Uint8Array(n);
 // --feedback: charge later passes for what the sheet lacks of each pigment, read once per pass, not what the ledger booked.
@@ -264,7 +259,7 @@ const PREP_KEEP = num('prepfade', 0) > 0 ? up(dilate(SEP.ink, w, h, Math.round(n
 SPEED_PROFILE?.add('planningAndSetup', process.uptime() * 1000);
 const PROVENANCE_TARGET_SHA = crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root,opt('image','')))).digest('hex');
 TARGET_GUARD.beginPaint(); if (TARGET_GUARD.mode !== 'off') { const sealed = sealTargetMaps(TARGET_GUARD, ctx); TARGET_GUARD.assertCleanContext('paint step', ctx); console.log(`target guard: ${TARGET_GUARD.mode}, target sealed for the paint step (also ${sealed.join(', ') || 'no other map'})`); }
-if (!ctx.RESUMING && ctx.RESIST && !PRACTICE && Math.round(num('masses', 0)) <= 0) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(ctx.sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
+if (!ctx.RESUMING && ctx.RESIST && Math.round(num('masses', 0)) <= 0) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){const paper=measurePaper(ctx.sheet,cells);check('semantic film requires actual dry paper before apply',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.command('physical film apply and establish',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,establishedStrength:1,solventDryingModel:'not separately modeled'},()=>applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT)));}else applyResist(ctx.sheet,up(ctx.RESIST),RESIST_SOFT&&upF(RESIST_SOFT));}else applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 // The planned drawing, laid (planPen made every decision before the first mark).
 // Linked stages: each stage's own layer (what it laid) and the sheet as it stands after it, as layer-<stage>.jpg and
 // stage-<stage>.jpg, so the stages can be judged one at a time.
@@ -447,13 +442,6 @@ const fadePrep = () => {
   layersChanged(ctx.sheet, ctx.sheet.layers.slice(0, PREPF.upto)); // it scaled dried layers in place: the cached sums of them are stale
   return faded;
 };
-if (PRACTICE) {
-  const r = await paintPractice({
-    sheet: ctx.sheet, w, h, n, SC, W2, H2, N2, PIGS, K: PIGS.length, A: ctx.A, SRC: ctx.SRC, expected, used, O, SEED, UPRIGHT, BRUSH, CAL, WET, RESIST: ctx.RESIST, paper,
-    image: opt('image', ''), root, fs, path, sharp, gaussian, dilate, dip, up, upF, clock, shoot, densityNow: () => sheetDensity(render()), inkCells: SEP.ink, out, setStage: s => { ctx.STAGE = s; }, mark, flowEvery, opt, num, log: console.log,
-  });
-  ctx.laid += r.laid; ctx.PRACTICE_CUT = r.cutPen;
-}
 // --masses: the sheet begun with a mop, a few broad washes each chosen from what the sheet still lacks at the mop's own
 // scale, before the ladder (src/paint/methods/masses.mjs); --segwash takes their regions from the segments.
 const MASSES = Math.round(num('masses', 0));
@@ -478,6 +466,6 @@ if (MASSES > 0) {
   if (ctx.RESIST) { applyResist(ctx.sheet, up(ctx.RESIST), RESIST_SOFT && upF(RESIST_SOFT)); ctx.STAGE = { stage: 'frisket', cells: ctx.RESIST.reduce((a, v) => a + v, 0) }; await shoot(); }
 }
 Object.assign(ctx, { up, t0, spent, PROF, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, FW, 
-  isFirst, FILM_FRAMES, PRACTICE, used, TECHS, LAST, DRAWING, SKY_WARM_RB, TP_ROUNDS, PROVENANCE_TARGET_SHA, PREPF, 
+  isFirst, FILM_FRAMES, used, TECHS, LAST, DRAWING, SKY_WARM_RB, TP_ROUNDS, PROVENANCE_TARGET_SHA, PREPF, 
   fadePrep, MASSES, mopLanes, setStage });
 }

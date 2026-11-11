@@ -101,12 +101,7 @@ Modules, with their flags:
 - `methods/pencil-line.mjs` (`--penpencil <stage.png>`): an opening dry-pencil drawing.
 - `methods/pencil-stage.mjs` (`--pencilstage 1`, `--pencilerase 1`, `--prepfade 1`): grows, erases or fades the pencil drawing.
 - `methods/pigment-physics.mjs` (`--pigphys 1`): settling, granulation and flocculation per pigment.
-- `methods/practice-keyframes.mjs` (`--practice 1 --practicemode target`): the practice plan's four stages.
-- `methods/practice-loose.mjs` (`--practice 1`): fast light washes, then dry-brush details.
-- `methods/practice-paint.mjs` (`--practice 1`): lays the practice plan's layers.
-- `methods/practice-plan.mjs` (`--practice 1`): plans paint in light-to-dark layers.
-- `methods/practice-regions.mjs` (helper): practice regions bounded by the drawing's lines.
-- `methods/practice-style.mjs` (`--practice 1`): measures the target's mix of ink, dry brush, wash and paper.
+- `methods/practice-style.mjs` (helper for `--modulate`): measures the target's mix of ink, dry brush, wash and paper.
 - `methods/preparation-binding.mjs` (`--preparationbinding <file>`): pencil paths from a hash-checked preparation file.
 - `methods/seg-ink.mjs` (`--segink 1`): foreground segments as the ink subject.
 - `methods/segment-washes.mjs` (`--segwash 1`): mop wash regions from labelled object regions.
