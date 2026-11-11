@@ -27,7 +27,8 @@ plate pixels apart; reference distance uses bilinear interpolation of the Euclid
 distance field. This is a raster measurement, with uncertainty of about one pixel.
 Null means no denominator, not a perfect score.
 
-Fragment share counts executed pen paths shorter than 5 mm. Tortuosity is path
+Centrelines are clipped to the sheet before length measurements. Fragment share
+counts the resulting pen paths shorter than 5 mm. Tortuosity is path
 length divided by endpoint distance; closed paths use a quarter-pixel denominator
 and can be large for legitimate closed contours. Median and p90 include these.
 Duplicate share is the length within 1 mm of a different path with undirected

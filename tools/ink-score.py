@@ -42,8 +42,11 @@ def measure(paths, reference, mm, mass=None):
     if len(xy):
         tree = cKDTree(xy)
         # Same line's near neighbours never count. Parallel means within 15 degrees, undirected.
-        for i, neighbours in enumerate(tree.query_ball_point(xy, 1/mm)):
-            duplicate[i] = any(ids[j] != ids[i] and abs(float(tangent[i]@tangent[j])) >= np.cos(np.pi/12) for j in neighbours)
+        parallel_cos = np.cos(np.pi/12)
+        for start in range(0, len(xy), 512):
+            for offset, neighbours in enumerate(tree.query_ball_point(xy[start:start+512], 1/mm)):
+                i = start+offset
+                duplicate[i] = any(ids[j] != ids[i] and abs(float(tangent[i]@tangent[j])) >= parallel_cos for j in neighbours)
     def share(mask):
         return float(weight[mask].sum()/total) if total else None
     inside = np.zeros(len(xy), bool)
@@ -87,6 +90,38 @@ def extract(tape):
         opts = tape['penOpts'][tape['pens'][m['pen']]]
         widths.append([q.get('nw', 2*(opts['nib']+opts['flex']*max(0, q.get('p', .5))))/res for q in points])
     return paths, widths
+
+
+def clip_paths(paths, widths, w, h):
+    """Clip centreline segments to the sheet, retaining their interpolated contact widths."""
+    result, result_widths = [], []
+    for path, ws in zip(paths, widths):
+        current, cw = [], []
+        for i, (a, b) in enumerate(zip(path[:-1], path[1:])):
+            delta = b-a
+            low, high = 0., 1.
+            for axis, limit in [(0, w-1), (1, h-1)]:
+                if delta[axis] == 0:
+                    if not 0 <= a[axis] <= limit:
+                        high = -1
+                else:
+                    u, v = sorted([-a[axis]/delta[axis], (limit-a[axis])/delta[axis]])
+                    low, high = max(low, u), min(high, v)
+            if low >= high:
+                if current:
+                    result.append(np.array(current)); result_widths.append(cw)
+                    current, cw = [], []
+                continue
+            start, end = a+low*delta, a+high*delta
+            if current and np.linalg.norm(current[-1]-start) > 1e-8:
+                result.append(np.array(current)); result_widths.append(cw)
+                current, cw = [], []
+            if not current:
+                current.append(start); cw.append(ws[i]+low*(ws[i+1]-ws[i]))
+            current.append(end); cw.append(ws[i]+high*(ws[i+1]-ws[i]))
+        if current:
+            result.append(np.array(current)); result_widths.append(cw)
+    return result, result_widths
 
 
 def line_model(target, cache):
@@ -140,6 +175,8 @@ def main():
     paths, widths = extract(tape)
     sx, sy = w/tape['w'], h/tape['h']
     paths = [p*np.array([sx, sy]) for p in paths]
+    executed_count = len(paths)
+    paths, widths = clip_paths(paths, widths, w, h)
     target = cv2.resize(cv2.imread(str(a.target)), (w, h))
     line, model, failures = line_model(target, a.models.resolve())
     # Otsu selects the foreground of the model map; no plate-specific fitted threshold.
@@ -151,7 +188,7 @@ def main():
     metrics, (xy, hit) = measure(paths, ref > 0, mm, mass > 0)
     area = w*h*mm*mm/100
     metrics['penLengthMmPer100cm2'] = metrics['penLengthMm']*100/area
-    metrics['penStrokesPer100cm2'] = len(paths)*100/area
+    metrics['penStrokesPer100cm2'] = executed_count*100/area
     metrics['allStrokesPer100cm2'] = sum(m['k'] in ['P', 's'] for m in tape['marks'])*100/area
     canvas = np.full((h, w), 255, np.uint8)
     for p, widths_i in zip(paths, widths):
@@ -175,7 +212,9 @@ def main():
     cv2.imwrite(str(out/'sheet.jpg'), np.hstack(panels), [cv2.IMWRITE_JPEG_QUALITY, 90])
     result = dict(version=1, run=str(run), target=str(a.target.resolve()), targetSHA256=target_hash,
                   mode='strict' if '--notargetlooks' in card['args'] and card['args'][card['args'].index('--notargetlooks')+1]=='1' else 'default',
-                  model=model, modelFailures=failures, sheetWidthMm=w*mm, width=w, height=h,
+                  model=model, modelFailures=failures,
+                  tapeSHA256=hashlib.sha256(tape_file.read_bytes()).hexdigest(),
+                  runCardSHA256=hashlib.sha256((run/'run-card.json').read_bytes()).hexdigest(), sheetWidthMm=w*mm, width=w, height=h,
                   extraction='Executed pen geometry replay, recorded nib widths; excludes graphite dips; not pigment transport replay', metrics=metrics)
     (out/'score.json').write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     print(json.dumps(result))

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from ink_score_module import measure, extract
+from ink_score_module import measure, extract, clip_paths
 
 class Metrics(unittest.TestCase):
     def line(self, a, b):
@@ -38,6 +38,12 @@ class Metrics(unittest.TestCase):
         self.assertEqual(m['duplicatedParallelShare'],0)
         m,_ = measure([a],ref,1,np.zeros_like(ref))
         self.assertEqual(m['inventedShare'],1); self.assertEqual(m['inventedInMassShare'],0)
+
+    def test_sheet_clipping(self):
+        paths, widths = clip_paths([self.line([-10,20],[90,20])], [[1,3]], 80,80)
+        self.assertTrue(np.allclose(paths[0],[[0,20],[79,20]]))
+        self.assertTrue(np.allclose(widths[0],[1.2,2.78]))
+        self.assertEqual(clip_paths([self.line([-10,-1],[90,-1])],[[1,1]],80,80)[0],[])
 
     def test_graphite_exclusion_and_resolution(self):
         tape=dict(pigments=[dict(name='graphite HB'),dict(name='black ink')],penOpts=[dict(nib=.2,flex=.1)],pens=[0],marks=[])
