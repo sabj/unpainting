@@ -195,4 +195,3 @@ import '../../src/media/brush.mjs';
 import '../../src/paint/pass-cadence.mjs';
 import '../../src/paint/methods/line-python.mjs';
 import '../../src/paint/methods/sheet-tone.mjs';
-import '../../src/paint/methods/crosshatch.mjs';

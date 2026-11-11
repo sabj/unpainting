@@ -46,7 +46,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   CP_MM, PAPER_OPTS, paper, ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, penDraw, OUT_W, OUT_H, O, GPU_INFO, 
   base, SHADE, WETPOL, WETPOL_COUNT, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
   expected, sheetDensity, marks, drainFrames, mark, CAL, FRAMES, FULL_TAPE, MARKTAPE, RESUME_AT, shoot, 
-  FILM_BY_PAINT, CROSSHATCH_PLAN, up, SEED, t0, spent, clock, PROF, FW_SUBJ, PRACTICE, used, TECHS, LAST, DRAWING, 
+  FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, FW_SUBJ, PRACTICE, used, TECHS, LAST, DRAWING, 
   PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, PASSAGE_HOOK, BUDGET, awareProvenance, awareBoundary } = ctx;
 // a painting taken over at the closing boundary has had everything up to the closing drawing (AWARE_SKIP_POST)
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
@@ -122,25 +122,6 @@ if (num('facedetail', 0) > 0 && opt('draw', '1') !== '0') {
   dry(ctx.sheet, 20000, O, { levelMax: 200 });
   console.log(`face detail: ${rl.drawn} lines and ${rf.drawn} flecks laid on the dry sheet in pigment ${dInkPig}`);
   ctx.STAGE = { stage: 'ink', step: 'face detail' };
-  await shoot();
-}
-if (CROSSHATCH_PLAN && opt('draw', '1') !== '0') {
-  const Kd = w / 420;
-  const ch = CROSSHATCH_PLAN;
-  const cInkPig = GRAPHITE && !INK ? GRAPHITE_AT : PIGS.map((p, j) => [j, p.K[0] + p.K[1] + p.K[2]]).sort((a, b) => b[1] - a[1])[0][0];
-  const cWant = SC === 1 ? ch.field : Float32Array.from({ length: N2 }, (_, i) => ch.field[(((i / W2) | 0) / SC | 0) * w + ((i % W2) / SC | 0)]);
-  const cScale = gs => gs.map(g => ({ weight: g.weight ?? 1, points: g.points.map(q => ({ x: q.x * SC, y: q.y * SC })) }));
-  const pigK = cInkPig < PIGS.length ? (PIGS[cInkPig].K[0] + PIGS[cInkPig].K[1] + PIGS[cInkPig].K[2]) / 3 : 1; const gain = num('crosshatchgain', 1) / Math.max(0.22, pigK);
-  const cPen = { nib: num('crosshatchnib', 0.44) * Kd, flex: 1.4 * Kd, travel: 1.5 * Kd, reach: 14 * Kd, reservoir: 260 * Kd * Kd, feed: 1.15 * Kd };
-  const cInk = c => SHEET_PIGS.map((_, j) => (j === cInkPig ? c * gain : 0));
-  const chCaps = nMax => ({ state: { used: 0 }, caps: { lines: nMax, pressure: 0.9, minLengthMm: 0.25, edgeMin: 0 } });
-  const r1 = penDraw(ctx.sheet, cScale(ch.primary), cWant, W2, H2, { ink: cInk(2.2), pen: cPen, O, peak: 1, ...chCaps(1800) });
-  const r2 = penDraw(ctx.sheet, cScale(ch.cross), cWant, W2, H2, { ink: cInk(2.7), pen: { ...cPen, nib: cPen.nib * 0.88 }, O, peak: 1, ...chCaps(1200) });
-  const r3 = penDraw(ctx.sheet, cScale(ch.accents), cWant, W2, H2, { ink: cInk(3.4), pen: { ...cPen, nib: cPen.nib * 0.95 }, O, peak: 1, ...chCaps(800) });
-  const r4 = ch.ridges.length ? penDraw(ctx.sheet, cScale(ch.ridges), cWant, W2, H2, { ink: cInk(3.8), pen: { ...cPen, nib: cPen.nib * 0.82 }, O, peak: 1, ...chCaps(600) }) : { drawn: 0 };
-  dry(ctx.sheet, 20000, O, { levelMax: 200 });
-  console.log(`crosshatch laid: ${r1.drawn} contour hatches, ${r2.drawn} cross-hatches, ${r3.drawn} core accents, ${r4.drawn} fine ridges in pigment ${cInkPig}`);
-  ctx.STAGE = { stage: 'ink', step: 'crosshatch' };
   await shoot();
 }
 // --smalllights gouache|both: white gouache last where the source has a small light and the painting reads over --gouachemargin denser.

@@ -31,7 +31,6 @@ import {selectedDrawing, drawingWant} from '../../src/paint/methods/drawing-file
 import {planPenWash, describePlan, passageAmounts} from '../../src/paint/methods/pen-wash-plan.mjs';
 import {prunePenLines} from '../../src/paint/methods/pen-wash-lines.mjs';
 import {fillSheetBase} from '../../src/paint/methods/sheet-tone.mjs';
-import {planCrosshatch} from '../../src/paint/methods/crosshatch.mjs';
 
 export async function penPlan(ctx) {
 const { opt, num, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACHE, VALUE_CONFIG, 
@@ -110,11 +109,6 @@ if (TONE_STAGE) {
   ctx.STAGE = { stage: 'tone', step: 'paper colour selected (no paint applied)' };
   await shoot();
 }
-const CROSSHATCH_PLAN = num('crosshatch', 0) > 0 ? planCrosshatch(ctx.SRC, null, w, h, {
-  K: w / 420, spacing: num('crosshatchspacing', 3.1), hatchFloor: num('crosshatchfloor', .18),
-  crossFloor: num('crosshatchcross', .36), accentFloor: num('crosshatchaccent', .56),
-  deficitGain: num('crosshatchdeficit', .65), log: console.log,
-}) : null;
 
 phaseMark('sheet');
 // --penwash 1 (--style penwash, src/paint/recipe.mjs): pen and wash. The ink drawing is drawn whole from its prepared
@@ -604,6 +598,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   return { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures };
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
-  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, CROSSHATCH_PLAN, PENWASH, PENWASH_PLAN, penWashFlat, LOOK_AL, 
+  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, PENWASH, PENWASH_PLAN, penWashFlat, LOOK_AL, 
   LOOK_PLAN, SOURCE_INK, TIER_MASK, ML_LINES });
 }

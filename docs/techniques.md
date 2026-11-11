@@ -212,7 +212,6 @@ Fitted values that remain, each fitted on more than one subject, not switched by
 ## Opt-in experimental controls
 
 - `--pigphys 1`: settling, granulation and flocculation per pigment. `--flocblue`, `--flocgrey`, `--flocviolet`, `--flocearth` and `--flocyellow` take 0 to 1 and override one colour family. An unset value keeps the pigment's own `floc`; an explicit 0 clears it. The families are absorption-channel heuristics, not chemical measurements.
-- `--crosshatch 1`: contour-following hatching as a finishing stage.
 - `--tonestage 1`: records a paper-colour choice before drawing. `auto` also detects warm source paper. It changes the paper colour and lays no pigment, so it is not a wash.
 
 ### Experimental plan values and paper
