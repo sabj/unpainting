@@ -22,6 +22,8 @@ The paper has fibers, tooth (surface texture) and, for cold-press paper, raised 
 
 Left, a real wash on moderately textured paper (Winslow Homer, 1899). Middle and right, a flat wash and a graded wash on the default paper. All three are at 0.08 mm a pixel. The real paper's tooth shows clearly through the wash, and the simulated tooth only faintly.
 
+The paper is sized. A loaded brush's free liquid, the water it holds beyond what its hairs keep, stays on the sized surface where it lands, and the dry pores take only their share of it, so a lane leaves a wet edge for the next one to join. A thin or damp brush gives little: there is little free liquid to give.
+
 Water keeps moving after the brush has gone. It spreads across the surface, soaks into the pores and evaporates fastest at the edge of a wash. Water flowing out to that edge carries pigment, so the edge dries darker. Settling pigment collects in the hollows and gives granulation, a mottled texture. The brush path sets where paint starts, and the water sets where the dried mark ends.
 
 By default the sheet fits the target inside a 6 x 4 in postcard turned to match it. Its width depends on the target's proportions. `--sheetmm` sets the physical width, for example `--sheetmm 152.4`. `--width` sets how many cells span it. A larger export of the same sheet adds no detail. A wider sheet at the same cell count makes each cell coarser, and the cold-press tooth with it.
@@ -127,7 +129,9 @@ The painter lays fresh paper, reserves the lights that must stay white, and draw
 
 ### Paint
 
-For each passage, the painter sets the paper state the technique needs. Wet into wet prewets the region with clean water. Wet on dry and dry brush wait for a drier sheet. The painter loads the brush, follows the planned paths, and lets water and pigment move, settle and dry. Then it saves a frame and takes the next passage.
+For each passage, the painter sets the paper state the technique needs. Wet into wet prewets the region with clean water and charges it once the shine goes off: when the typical cell of the bed, not its wettest puddle, holds no more than a glossy film (`tools/painter/wet-bed-wait.mjs`). Wet on dry and dry brush wait for a drier sheet; a passage waits for a neighbouring wash once, before its first lane, never between its own lanes, so its lanes join while wet.
+
+Before painting, each brush is tried on scrap: a swatch laid with the passage's own brush load and passes, on paper prepared as the sheet's will be (a wet-into-wet swatch is wetted and waited on the same way), dried and read. Each passage is charged by what its swatch delivered (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/instrument-cal.mjs`). The painter loads the brush, follows the planned paths, and lets water and pigment move, settle and dry. Then it saves a frame and takes the next passage.
 
 While painting, the [guard](honesty.md) blocks reads of the target's pixels and of every map made from them (`tools/guard/seal-maps.mjs`). The painter works from its plan and the sheet.
 

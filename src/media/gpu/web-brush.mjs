@@ -354,13 +354,15 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         }
         const proud = paper.proud ? paper.proud[gi] : paper.height[gi] - paper.valley[gi];
         const grain = 0.7 + 1.2 * proud + 0.3 * paper.valley[gi];
-        const give = Math.min(hr.water, contact * (brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)) + brush.give * Math.max(0, want - Wi) * q.p));
+        // the paint smeared off the hairs and the free liquid let go (it stands: sheet.mjs soak)
+        const smear = brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)), loose = brush.give * Math.max(0, want - Wi) * q.p;
+        const give = Math.min(hr.water, contact * (smear + loose)), free = smear + loose > 0 ? give * loose / (smear + loose) : 0;
         if (give <= 0) continue;
         const f = give / hr.water, hp = hr.pig;
         if (pigBuf.length !== hp.length) pigBuf = new Float64Array(hp.length);
         const pig = pigBuf; for (let kk = 0; kk < hp.length; kk++) pig[kk] = hp[kk] * f;
         hr.water -= give; for (let kk = 0; kk < K; kk++) hr.pig[kk] -= pig[kk];
-        soak(sheet, i, give, pig);
+        soak(sheet, i, give, pig, free);
         stamp[i] = clk; strengths[i] = fullContact;
       }
     }
@@ -374,11 +376,21 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   sheet._contactBrush = null;
   // lifting off: a brush with free liquid leaves a bead at the last contact
   const last = path[path.length - 1], r = Math.max(1.5, brush.radius * 0.35), pool = { water: 0, pig: new Array(brush.K || K).fill(0) }; // the hairs' pigment count, so the bead can go back to the belly
-  for (const hr of brush.hairs) if (hr.water / (brush.capacity * hr.len || 1) > brush.free) moveMass(hr, pool, Math.min(hr.water, 0.0015 * brush.capacity));
+  let freeSum = 0, freeN = 0;
+  for (const hr of brush.hairs) { const sat = hr.water / (brush.capacity * hr.len || 1); if (sat > brush.free) { freeSum += (sat - brush.free) / (1 - brush.free); freeN++; moveMass(hr, pool, Math.min(hr.water, 0.0015 * brush.capacity)); } }
   const cells = [];
   for (let yy = Math.floor(last.y - r); yy <= Math.ceil(last.y + r); yy++) for (let xx = Math.floor(last.x - r); xx <= Math.ceil(last.x + r); xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h && Math.hypot(xx - last.x, yy - last.y) <= r && sheet.M[yy * w + xx]) cells.push(yy * w + xx);
-  if (pool.water > 0 && cells.length) for (const i of cells) deposit(sheet, i, pool.water / cells.length, pool.pig.map(v => v / cells.length));
-  else if (pool.water > 0) moveMass(pool, belly, pool.water); // lifted off the sheet, or over dry paper: the bead stays on the brush rather than vanishing
+  // the bead joins the wet paint as one more touch of those hairs at the lift would (brush.mjs beadRoom); the rest stays
+  // on the brush, as it does lifted off the sheet or over dry paper
+  const p = last.p ?? 1, freeL = freeN ? freeSum / freeN : 0, want = brush.wetness * freeL * (0.6 + 0.4 * p);
+  const room = cells.map(i => brush.give * p * Math.max(0, want - sheet.W[i]));
+  let roomSum = 0; for (const v of room) roomSum += v;
+  const lay = Math.min(pool.water, roomSum);
+  if (lay > 0) {
+    if (lay < pool.water) moveMass(pool, belly, pool.water - lay);
+    const water = pool.water, pig = pool.pig.slice();
+    for (let q = 0; q < cells.length; q++) if (room[q] > 0) deposit(sheet, cells[q], water * room[q] / roomSum, pig.map(v => v * room[q] / roomSum));
+  } else if (pool.water > 0) moveMass(pool, belly, pool.water);
   return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
 }
 

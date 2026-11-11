@@ -16,7 +16,7 @@ const glossyWash = () => {
   return { sheet, wash, wide };
 };
 const quiet = fn => { const log = console.log, lines = []; console.log = (...a) => lines.push(a.join(' ')); try { return [fn(), lines]; } finally { console.log = log; } };
-const lay = (sheet, cells) => layIntoWetBed({ paper: measurePaper(sheet, cells), observe: () => measurePaper(sheet, cells), step: o => step(sheet, o), O: DEFAULTS, info: { id: 'test' } });
+const lay = (sheet, cells) => layIntoWetBed({ paper: measurePaper(sheet, cells, false, { uniform: false }), observe: () => measurePaper(sheet, cells, false, { uniform: false }), step: o => step(sheet, o), O: DEFAULTS, info: { id: 'test' } });
 
 test('a wet-on-wet stroke into a fresh glossy wash waits for the shine to go off, then is laid', () => {
   resetChecks();
@@ -24,7 +24,18 @@ test('a wet-on-wet stroke into a fresh glossy wash waits for the shine to go off
   assert.ok(measurePaper(sheet, wash).waterMax > .15, 'the wash starts glossy');
   const [{ paper, wetWaits }] = quiet(() => lay(sheet, wash));
   assert.ok(wetWaits > 0, 'it waited');
-  assert.ok(paper.waterMax <= .15 || paper.moistShare < .7, 'it stopped waiting at the shine or the damp limit');
+  assert.ok(paper.waterP50 <= .15 || paper.moistShare < .7, 'it stopped waiting when the typical cell lost its shine, or at the damp limit');
+  resetChecks();
+});
+
+test('the charge waits for the typical bed cell to lose its shine, not the wettest', () => {
+  // a bed as Trumbull's lanes leave it: one spot stays glossy for a long time while the typical cell drains fast
+  resetChecks();
+  let t = 0;
+  const bed = () => ({ cells: 100, moistShare: .9, waterMax: Math.max(0, .6 - .002 * t), waterP50: Math.max(0, .3 - .02 * t), saturationMax: .9 });
+  const [{ paper, wetWaits }] = quiet(() => layIntoWetBed({ paper: bed(), observe: bed, step: () => { t += .1; }, O: DEFAULTS, info: { id: 'test' } }));
+  assert.ok(wetWaits > 0, 'it waited for the shine');
+  assert.ok(paper.waterP50 <= .15 && paper.waterP50 >= DEFAULTS.filmDepth, `charged as the typical cell lost its shine, still a film: ${paper.waterP50.toFixed(3)}`);
   resetChecks();
 });
 

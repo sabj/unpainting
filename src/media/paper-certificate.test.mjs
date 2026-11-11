@@ -56,7 +56,7 @@ test('certified zero measurements need neither CPU planes nor GPU reads and pres
   s._gpu={version:0,ensurePaperFresh(){reads++;}};certifyZeroPaper(s);
   s.W[1]=NaN;s.s[1]=NaN; // poisoned stale CPU planes: a valid GPU proof must avoid them
   assert.deepEqual(measurePaperDry(s),{cells:s.n,bounds:[0,0,15,11],waterMax:0,saturationMax:0,moistShare:0,dry:true});
-  assert.deepEqual(measurePaper(s,[1,17]),{cells:2,bounds:[1,0,1,1],waterMax:0,saturationMax:0,waterP95:0,moistShare:0,dry:true});
+  assert.deepEqual(measurePaper(s,[1,17]),{cells:2,bounds:[1,0,1,1],waterMax:0,saturationMax:0,waterP95:0,waterP50:0,moistShare:0,dry:true});
   const groups=measurePaperBatch(s,[{cells:[1,17],stats:'gate'},{cells:[]}],true);
   assert.equal(groups[0].waterMax,0);assert.equal('waterP95' in groups[0],false);assert.equal(groups[1].cells,0);assert.equal(reads,0);
   invalidatePaperCertificate(s);assert.throws(()=>measurePaper(s,[1]),/Non-finite/);assert.equal(reads,1);

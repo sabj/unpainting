@@ -1,6 +1,7 @@
 // Generated from src/media/sheet.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.js';
 import { censusDry } from './census.js';
+import { SIZING } from './sizing.js';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
 // "Computer-Generated Watercolor" (SIGGRAPH 97): water with suspended pigment above the paper, pigment adsorbed
@@ -51,7 +52,7 @@ export const DEFAULTS = {
   slide: 0.4, slideFill: 2, repose: 0.04,         // settled grains roll into the paper's hollows (by granulation), filling them, down slopes steeper than repose / granulation;
                                                   // too low and the wash dries before the grains arrive, so granulating pigments come out smooth
   hold: 2,                                        // the most pigment a unit of water keeps suspended; a thinner film strands the rest
-  sizing: 0.9, wickFilter: 0.2,                   // sizing slows wicking into dry paper; fibres filter out a share of what pigment the water carries
+  sizing: SIZING, wickFilter: 0.2,                  // sizing slows wicking into dry paper; fibres filter out a share of what pigment the water carries
   dt: 0.1,
 };
 
@@ -251,13 +252,16 @@ export function depositDry(sheet, i, water, pig) {
 }
 
 /** A touch of paint on the paper: empty pores drink what they can at once, filtering their share of the pigment onto
- *  the fibres; the rest stands on the surface as water carrying its pigment. A dry-brush film soaks in where it lands;
- *  a loaded brush leaves most of its water standing, and that flows as a wash. */
-export function soak(sheet, i, water, pig) {
+ *  the fibres; the rest stands on the surface as water carrying its pigment, and the pores take it from there at the
+ *  step's absorption rate. A dry-brush film soaks in where it lands. `free` is the part of `water` that is a loaded
+ *  brush's free liquid: on dry paper the sizing holds that out of the pores (they take only its unsized share,
+ *  1 - sizing, at the moment of contact), so it stands as a bead the next stroke joins and two wet strokes fuse. Where
+ *  a film already stands the sizing is wetted through and the pores take 0.3 of their room, as before. */
+export function soak(sheet, i, water, pig, free = 0) {
   recordWetCell(sheet, i);
   if (water <= 0) return;
   if (masked(sheet, i)) { deposit(sheet, i, water, pig); return; }   // sealed: everything stays on the surface
-  const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]) * (sheet.M[i] ? 0.3 : 1), into = Math.min(room, water), f = into / water;
+  const room = Math.max(0, sheet.paper.capacity[i] - sheet.s[i]), into = sheet.M[i] ? Math.min(0.3 * room, water) : Math.min(room, water - SIZING * Math.min(free, water)), f = into / water;
   sheet.s[i] += into; sheet.wetDirty = 1;
   // Water a brush was deliberately drawn over the paper to leave belongs to the wash even when the pores take
   // all of it and nothing stands. A damp brush drawn along a wet edge works exactly that way, and the wash has
@@ -542,12 +546,15 @@ export const tapeSheet = t => { TAPE = t; };
 let STROKEFLOWS = null, STROKESTEP = null;
 export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 
+// A sheet clock a read-only trace may hang on a sheet (tools/plate/wet-trace.mjs): step adds its dt, nothing reads it here.
+export const SHEET_CLOCK = Symbol('sheetClock');
 export function step(sheet, o = DEFAULTS, reduction = null) {
   const wetValid = recordWetStep(sheet, 1);
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
   if (TAPE && sheet._tape) { if (STROKEFLOWS) STROKEFLOWS.push(STROKESTEP()); else TAPE.push({ k: 'f' }); }
   if (o !== DEFAULTS) o = { ...DEFAULTS, ...o };
   if (!Number.isFinite(o.dt) || o.dt < 0) throw new RangeError('dt must be finite and nonnegative');
+  const clock = sheet[SHEET_CLOCK]; if (clock) clock.t += o.dt;
   if (sheet._gpu && !sheet._gpu.paused) {
     const res = sheet._gpu.step(sheet, o);
     if (wetValid) syncWetReachVersion(sheet);
@@ -932,7 +939,7 @@ function stepBox(sheet, o, box, reduce = false) {
   for (let n = 0; n < nP; n++) { const k = pact[n], Pk = P[k], PN = PNext[k], dd = dDep[k]; for (let y = y0; y <= y1; y++) for (let r = prow[y], re = prow[y + 1]; r < re; r++) { const a = y * w + pxa[r], b = y * w + pxb[r] + 1; PN.set(Pk.subarray(a, b), a); dd.fill(0, a, b); } }
   // rate is at most 1.5: 2/3 keeps each face <= 1/4, so four donors cannot overfill a pore
   // and four outflows cannot empty one below zero. Large dt saturates this rate; it is not extra elapsed flow time.
-  const capStep = Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing = o.sizing ?? 0.85, filter = o.wickFilter ?? 0.2;
+  const capStep = Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing = o.sizing ?? SIZING, filter = o.wickFilter ?? 0.2;
   const capEps = o.capEps, capDelta = o.capDelta;
   // A neighbour along x or y reads the fibre's alignment |fdx dx + fdy dy| as |fdx| or |fdy| exactly (the other term is
   // a signed zero), so it is read once per donor; the neighbours go in DX, DY order (+x, -x, +y, -y).

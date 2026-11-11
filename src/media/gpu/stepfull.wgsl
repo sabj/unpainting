@@ -1370,6 +1370,14 @@ fn ground_at(xx: i32, yy: i32, tx: f32, ty: f32, L: i32, fine: f32, coarse: f32)
   return sum / select(cnt, 1.0, cnt == 0.0) + fine * (p0.x - p0.z);
 }
 
+// Dry paper's sizing (DEFAULTS.sizing): at the moment of contact it holds a loaded brush's free liquid out of the pores,
+// which take only its unsized share; the paint smeared off the hairs soaks in (sheet.mjs soak). contact-share.test.mjs
+// keeps this equal to the CPU value.
+const SOAK_SIZING: f32 = 0.9;
+fn soakInto(room: f32, give: f32, held: f32, wet: bool) -> f32 {
+  return select(min(room, give - SOAK_SIZING * min(held, give)), min(0.3 * room, give), wet);
+}
+
 // one cell under one hair: the film, the wet mix, the thirst, the soak (sheet.mjs soak)
 fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   let xx = i32(i % u.w); let yy = i32(i / u.w);
@@ -1429,8 +1437,12 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   let gx = u32(max(0, min(i32(u.w) - 1, xx + i32(bu(sb + 4u)) - 1000000))); let gy = u32(max(0, min(i32(u.h) - 1, yy + i32(bu(sb + 5u)) - 1000000)));
   let gp = BPAP[gy * u.w + gx];
   let grain = 0.7 + 1.2 * gp.w + 0.3 * gp.z;
-  var give = min(wh[h], contact * (pFilm * grain * (0.7 + 0.3 * qp) * (1.0 - min(1.0, Wi / 0.2)) + pGive * max(0.0, want - Wi) * qp));
-  if (pDepth > 0.0) { give = min(wh[h], contact * max(0.0, pDepth * (0.7 + 0.3 * qp) - Wi) * (fill + (1.0 - fill) * grain)); }
+  // the paint smeared off the hairs and the free liquid let go (brush.mjs); a depth-filling brush lays liquid only
+  var smear = pFilm * grain * (0.7 + 0.3 * qp) * (1.0 - min(1.0, Wi / 0.2));
+  var loose = pGive * max(0.0, want - Wi) * qp;
+  if (pDepth > 0.0) { smear = 0.0; loose = max(0.0, pDepth * (0.7 + 0.3 * qp) - Wi) * (fill + (1.0 - fill) * grain); }
+  let give = min(wh[h], contact * (smear + loose));
+  let liquid = select(0.0, give * loose / (smear + loose), smear + loose > 0.0);
   if (give <= 0.0) { return; }
   // paint still damp in the paper trades places with the new: the hair takes up some of it (brush.mjs mergePickup)
   if (pMerge > 0.0) {
@@ -1446,13 +1458,12 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   }
   let f = give / wh[h];
   wh[h] -= give;
-  // soak: empty pores drink what they can at once, filtering their share of the pigment onto the fibres; the rest stands
+  // soak: empty pores drink what they can at once (less the free liquid the sizing holds out), filtering their share of the pigment onto the fibres; the rest stands
   let pcap = BSTR[SB + i];
   let masked = (RESIST[i] & 1u) == 1u;
   var into = 0.0; var fr = 0.0;
   if (!masked) {
-    let room = max(0.0, pcap - S[i]) * select(1.0, 0.3, M[i] == 1u);
-    into = min(room, give); fr = into / give;
+    into = soakInto(max(0.0, pcap - S[i]), give, liquid, M[i] == 1u); fr = into / give;
     S[i] += into;
     if (pWetting && into > 0.0) { EVER[i] = 1u; }
   }
@@ -1516,41 +1527,60 @@ fn stroke_run(@builtin(local_invocation_index) li: u32) {
   if (li == 0u) { BSTR[H_CUR] = bitcast<f32>(cur); hdr_store(); }
 }
 
-// Lifting off: a hair with free liquid leaves a bead at the last contact, shared over the wet cells of the planned list.
-var<workgroup> w_cnt: atomic<u32>;
+// Lifting off: a hair with free liquid leaves a bead at the last contact. It joins the wet cells of the planned list as one
+// more touch of those hairs at the lift would (brush.mjs beadRoom: no deeper than their free liquid lays, a depth-filling
+// brush to its depth), shared by each cell's room; what the paper there cannot take goes back to the belly.
+var<workgroup> w_room: array<f32, 64>;
+var<workgroup> w_want: f32;
+fn bead_room(Wi: f32, p: f32) -> f32 {
+  if (pDepth > 0.0) { return max(0.0, pDepth * (0.7 + 0.3 * p) - Wi); }
+  return pGive * p * max(0.0, w_want - Wi);
+}
 @compute @workgroup_size(64)
 fn stroke_end(@builtin(local_invocation_index) li: u32) {
   hdr_load();
   let lanes = pLanes; let K = pK;
   let pool = lanes + 1u; let hp = hb(pool);
+  let p = BSTR[36u];
   load_hairs(li);
-  if (li == 0u) { atomicStore(&w_cnt, 0u); }
   workgroupBarrier();
   if (li == 0u) {
     wh[hp] = 0.0; for (var k = 0u; k < K; k++) { wh[hp + 4u + k] = 0.0; }
-    let capa = BSTR[H_CAPA];
+    let capa = BSTR[H_CAPA]; let fr = BSTR[H_FREE];
+    var freeSum = 0.0; var freeN = 0.0;
     for (var j = 0u; j < lanes; j++) {
       let hj = hb(j); var cl = capa * wh[hj + 1u]; if (cl == 0.0) { cl = 1.0; }
-      if (wh[hj] / cl > BSTR[H_FREE]) { move_mass(j, pool, min(wh[hj], 0.0015 * select(capa, pDepth, pDepth > 0.0))); }
+      let sat = wh[hj] / cl;
+      if (sat > fr) { freeSum += (sat - fr) / (1.0 - fr); freeN += 1.0; move_mass(j, pool, min(wh[hj], 0.0015 * select(capa, pDepth, pDepth > 0.0))); }
     }
+    w_want = pWet * select(0.0, freeSum / freeN, freeN > 0.0) * (0.6 + 0.4 * p);
   }
   workgroupBarrier();
   let nl = bu(H_NLIFT); let ol = bu(H_OFFL);
-  for (var q = li; q < nl; q += 64u) { if (M[bu(ol + q)] == 1u) { atomicAdd(&w_cnt, 1u); } }
+  var part = 0.0;
+  for (var q = li; q < nl; q += 64u) { let i = bu(ol + q); if (M[i] == 1u) { part += bead_room(W[i], p); } }
+  w_room[li] = part;
   workgroupBarrier();
-  let cnt = atomicLoad(&w_cnt);
-  if (wh[hp] > 0.0 && cnt > 0u) {
-    let fc = 1.0 / f32(cnt);
+  if (li == 0u) {
+    var tot = 0.0; for (var t = 0u; t < 64u; t++) { tot += w_room[t]; }
+    w_room[0] = tot;
+    let lay = min(wh[hp], tot);
+    if (lay < wh[hp]) { move_mass(pool, lanes, wh[hp] - lay); }   // lifted off the sheet, over dry paper, or more than the paper there takes
+  }
+  workgroupBarrier();
+  let tot = w_room[0];
+  if (wh[hp] > 0.0 && tot > 0.0) {
     for (var q = li; q < nl; q += 64u) {
       let i = bu(ol + q);
       if (M[i] == 1u) {
-        W[i] += wh[hp] * fc; EVER[i] = 1u;
-        for (var k = 0u; k < K; k++) { G[k * u.n + i] += wh[hp + 4u + k] * fc; }
-        markWet(((i / u.w) / 16u) * u.tw + (i % u.w) / 16u);
+        let f = bead_room(W[i], p) / tot;
+        if (f > 0.0) {
+          W[i] += wh[hp] * f; EVER[i] = 1u;
+          for (var k = 0u; k < K; k++) { G[k * u.n + i] += wh[hp + 4u + k] * f; }
+          markWet(((i / u.w) / 16u) * u.tw + (i % u.w) / 16u);
+        }
       }
     }
-  } else if (wh[hp] > 0.0 && li == 0u) {   // lifted off the sheet, or over dry paper: the bead goes back to the belly
-    move_mass(pool, lanes, wh[hp]);
   }
   workgroupBarrier();
   store_hairs(li);
@@ -1609,14 +1639,14 @@ fn splat_run(@builtin(local_invocation_index) li: u32) {
             for (var k = 0u; k < K; k++) { let q = k * u.n + i; G[q] = max(0.0, G[q] + ex * (BSTR[SP_CONC + k] - G[q] / water)); }
           }
           let Wi = W[i];
-          let give = fall * cs * (film * (0.7 + 0.3 * p) * (1.0 - min(1.0, Wi / 0.2)) + giveR * max(0.0, want - Wi) * p);
+          let liquid = fall * cs * giveR * max(0.0, want - Wi) * p;
+          let give = fall * cs * film * (0.7 + 0.3 * p) * (1.0 - min(1.0, Wi / 0.2)) + liquid;
           if (give <= 0.0) { continue; }
           // soak (sheet.mjs): empty pores drink what they can, filtering their share of the paint onto the fibres
           let pcap = BSTR[SB + i]; let masked = (RESIST[i] & 1u) == 1u;
           var into = 0.0; var fr = 0.0;
           if (!masked) {
-            let room = max(0.0, pcap - S[i]) * select(1.0, 0.3, M[i] == 1u);
-            into = min(room, give); fr = into / give; S[i] += into;
+            into = soakInto(max(0.0, pcap - S[i]), give, liquid, M[i] == 1u); fr = into / give; S[i] += into;
             if (wetting && into > 0.0) { EVER[i] = 1u; }
           }
           let stand = give - into; let gs = 1.0 - fr;

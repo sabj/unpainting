@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
-import { createSheet, step, dry, thickness, DEFAULTS, layersChanged } from './sheet.mjs';
+import { createSheet, step, dry, thickness, totals, DEFAULTS, layersChanged } from './sheet.mjs';
 import { createBrush, dip, stroke } from './brush.mjs';
 import { attachGpu, gpuStats } from './gpu/link.mjs';
 
@@ -53,6 +53,19 @@ test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 
   } finally { g._gpu.close(); }
 });
 
+// 033 item 4: the GPU contact holds a loaded brush's free liquid out of dry sized pores as the CPU one does (the CPU
+// stroke conserves: physics.test.mjs), so the GPU sheet must hold the same water and pigment, and as much standing
+test('a loaded stroke on dry paper leaves the same water, pigment and standing film on the GPU as on the CPU', { timeout: 120000 }, t => {
+  const lay = sheet => { const b = createBrush({ flat: true, radius: 6, capacity: 80, seed: 3 }); dip(b, { water: 1, conc: [0.8, 0.1] }); stroke(b, sheet, [{ x: 20, y: 24, p: 1, r: 6 }, { x: 74, y: 30, p: 1, r: 6 }], { upright: 'sweep' }); const T = totals(sheet); return { water: T.water, pig: T.pig, film: sheet.W.reduce((v, x) => v + x, 0) }; };
+  const cpu = lay(fresh()), g = fresh(), info = attachGpu(g, DEFAULTS, { mode: 'auto', log: () => {} });
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+  try {
+    const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 1, 'the stroke was laid on the GPU');
+    const near = (a, b, what) => assert.ok(Math.abs(a - b) <= 1e-4 * Math.max(1, Math.abs(b)), `${what}: GPU ${a} against CPU ${b}`);
+    near(gpu.water, cpu.water, 'water'); gpu.pig.forEach((v, k) => near(v, cpu.pig[k], 'pigment ' + k)); near(gpu.film, cpu.film, 'standing film');
+    assert.ok(cpu.film > cpu.water - cpu.film, `standing ${cpu.film} against pores ${cpu.water - cpu.film}`); console.log(JSON.stringify({ cpu, gpu }));
+  } finally { g._gpu.close(); }
+});
 test('--gpu off leaves the sheet on the untouched CPU path', () => {
   const off = fresh(), info = attachGpu(off, DEFAULTS, { mode: 'off' });
   assert.equal(info.backend, 'cpu'); assert.equal(off._gpu, undefined);

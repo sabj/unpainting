@@ -230,7 +230,7 @@ test('two strokes from the same brush and load are not the same rectangle', () =
   const sd = e => { const mu = e.reduce((s, v) => s + v, 0) / e.length; return Math.sqrt(e.reduce((s, v) => s + (v - mu) ** 2, 0) / e.length); };
   assert.ok(sd(a) > 0.3, `the edge is not ruled straight (sd ${sd(a).toFixed(2)} cells)`);
 });
-test('a same-load overlap on damp paint trades paint instead of stacking a second coat', t => {
+test('a same-load overlap does not stack a second coat; the merge does no harm', t => {
   // 6 mm wet-on-dry flat strokes 5 mm apart at 4.655 cells per mm
   t.after(() => setStrokeVariety(1));
   const T = TECHNIQUES['wet on dry'], cpm = 4.655;
@@ -246,8 +246,12 @@ test('a same-load overlap on damp paint trades paint instead of stacking a secon
     return (row(36) + row(37)) / (row(25) + row(26));
   };
   const stacked = lay(0), merged = lay(1);
-  assert.ok(stacked > 1.3, `without the merge the overlap is a second coat (${stacked.toFixed(2)})`);
-  assert.ok(merged < stacked - 0.07, `with it the seam is weaker (${merged.toFixed(2)} vs ${stacked.toFixed(2)})`);
+  // The second stroke's free liquid joins the first stroke's bead instead of soaking in under it (sheet.mjs soak), so
+  // even without the merge the overlap is far from a full second coat (it was 1.3 or more when the pores drank it).
+  assert.ok(stacked < 1.25, `without the merge the overlap is not a second coat (${stacked.toFixed(2)})`);
+  // The merge trades paint with damp paint only (W under 0.02); the first stroke now stands as a bead six steps on,
+  // so the merge has nothing to trade with here (it made the seam 0.07 weaker when the pores drank the first stroke).
+  assert.ok(merged <= stacked + 0.01, `with it the seam is no stronger (${merged.toFixed(2)} vs ${stacked.toFixed(2)})`);
 });
 test('paint charged into a glossy film mixes out into it (filmDiffuse); on dry paper nothing changes', () => {
   const run = (prewet, filmDiffuse) => {
@@ -289,6 +293,8 @@ test('two flat-brush lanes at twice the edge half-width dry as evenly across the
   const edge = edgeHalfWidth(r, { pressure: .9, splay: .03 });
   assert.ok(edge > .85 * r && edge < r, `edge half-width ${edge.toFixed(1)} of radius ${r}`);
   const even = lay(edge), old = lay(r / 1.035);
-  assert.ok(even.join <= even.body, `the join strays ${even.join.toFixed(3)}, the lane body ${even.body.toFixed(3)}`);
-  assert.ok(old.join > old.body, `control: at the old overlap the join should show (${old.join.toFixed(3)} vs ${old.body.toFixed(3)})`);
+  assert.ok(even.join <= even.body, `the join strays ${even.join.toFixed(4)}, the lane body ${even.body.toFixed(4)}`);
+  // The second lane's free liquid joins the first lane's bead (sheet.mjs soak), so even the old 3.5% overlap, which
+  // dried as a ridge when the pores drank each touch, now dries as evenly as a lane.
+  assert.ok(old.join <= old.body, `at the old overlap the join strays ${old.join.toFixed(4)}, the lane body ${old.body.toFixed(4)}`);
 });
