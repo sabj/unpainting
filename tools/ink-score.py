@@ -88,7 +88,7 @@ def extract(tape):
             continue
         paths.append(p)
         opts = tape['penOpts'][tape['pens'][m['pen']]]
-        widths.append([q.get('nw', 2*(opts['nib']+opts['flex']*max(0, q.get('p', .5))))/res for q in points])
+        widths.append([q.get('nw', opts['nib']+opts['flex']*max(0, q.get('p', .5)))/res for q in points])
     return paths, widths
 
 

@@ -49,8 +49,9 @@ class Metrics(unittest.TestCase):
         tape=dict(pigments=[dict(name='graphite HB'),dict(name='black ink')],penOpts=[dict(nib=.2,flex=.1)],pens=[0],marks=[])
         points=[dict(x=0,y=0),dict(x=20,y=0)]
         tape['marks']=[dict(k='D',pen=0,ink=[1,0]),dict(k='P',pen=0,points=points),dict(k='D',pen=0,ink=[0,1]),dict(k='P',pen=0,points=points,r=2)]
-        paths,_=extract(tape)
+        paths,widths=extract(tape)
         self.assertEqual(len(paths),1); self.assertEqual(paths[0][-1,0],10)
+        self.assertAlmostEqual(widths[0][0],.125)
 
 if __name__=='__main__':
     unittest.main()
