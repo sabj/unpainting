@@ -170,7 +170,6 @@ import '../../src/paint/methods/pen-wash.mjs';
 import '../../src/paint/methods/shapes.mjs';
 import '../../src/paint/methods/passages.mjs';
 import '../../src/crop/segment-prep.mjs';
-import '../../src/paint/methods/subject-washes.mjs';
 import '../../src/paint/methods/wash-plan-image.mjs';
 import '../../src/paint/methods/ladder-seg.mjs';
 import '../../src/paint/methods/mass-budget.mjs';

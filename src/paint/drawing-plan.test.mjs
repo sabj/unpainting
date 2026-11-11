@@ -98,6 +98,7 @@ test('stages: contradictions and unknown names are refused with the field named'
   assert.throws(() => drawingFlags({ closingLines: 0, stages: { prepInk: true } }), /closingLines and stages/);
   assert.throws(() => drawingFlags({ medium: 'graphite', stages: { prepInk: true } }), /stages.prep/);
   assert.throws(() => drawingFlags({ stages: { prepInk: { method: 'hatch' } } }), /prepInk.method/);
+  assert.throws(() => drawingFlags({ stages: { prepInk: { method: 'connected' } } }), /prepInk.method "connected" was removed: .+/);
   assert.throws(() => drawingFlags({ stages: { finishInk: { restate: 3 } } }), /finishInk.restate/);
 });
 

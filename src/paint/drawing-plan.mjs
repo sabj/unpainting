@@ -14,14 +14,13 @@ const LINEWORK = Object.freeze(['auto', 'off']);
 const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
 // The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
 const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
-const PREP_INK_METHODS = Object.freeze(['contour', 'connected', 'scribble']);
+const PREP_INK_METHODS = Object.freeze(['contour', 'scribble']);
 const FINISH_METHODS = Object.freeze(['accent', 'architecture']);
 const FINISH_SELECT = Object.freeze(['edges', 'darks', 'both']);
 const FINISH_MASSES = Object.freeze(['none', 'scribble']);
-// prepInk.method: contour draws the stage's lines as planned; connected lays the walker's connected gestures on them
-// (--drawinglogic 2); scribble joins them into fewer, longer strokes, opens the lit edges and scribbles the dark masses
-// (--drawinglogic 3).
-const METHOD_LOGIC = Object.freeze({ connected: '2', scribble: '3' });
+// prepInk.method: contour draws the stage's lines as planned; scribble joins them into fewer, longer strokes, opens the
+// lit edges and scribbles the dark masses (--drawinglogic 3). "connected" (--drawinglogic 2) was removed.
+const METHOD_LOGIC = Object.freeze({ scribble: '3' });
 // finishInk.method "architecture": the Y1 / V096 closing pen. Traced lines restated whole at full pressure, widths from
 // the target's darkness, a wide nib and strong ink. (--inkofftrees is left out: its tree detector read 64% of h36-a's
 // stone as trees and removed 148 of 171 opening lines.) For buildings drawn from photographs or pen sheets.
@@ -118,6 +117,7 @@ function stageFlags(stages, { inkColor = null } = {}) {
     unitFlag(prepInk, 'prepInk', 'add', '--prepinkadd');
     unitFlag(prepInk, 'prepInk', 'amount', '--prepinkamount');
     unitFlag(prepInk, 'prepInk', 'deviate', '--prepinkdeviate');
+    if (prepInk.method === 'connected') throw new Error('drawing.stages.prepInk.method "connected" was removed: it laid the walker\'s gestures on the drawing file and no plan used it; use contour or scribble');
     const method = stageChoice(prepInk, 'prepInk', 'method', PREP_INK_METHODS);
     if (METHOD_LOGIC[method]) flags.push('--drawinglogic', METHOD_LOGIC[method]);
     // a plan that asks for scribble gets it, whatever the style's ink share (logic 3 otherwise falls back to logic 1

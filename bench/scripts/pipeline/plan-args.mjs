@@ -55,11 +55,8 @@ export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', comp
       ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]),
       ...t(/_shw(\d+)/, () => ['--shadowwater', hundredth(v, /_shw(\d+)/)]),
       ...t(/_dkf/, () => ['--darkfirst', '1']),
-      ...t(/_dp(\d+)/, () => ['--deepaccent', m(v, /_dp(\d+)/)[1]]),
       ...t(/_ms(\d+)/, () => ['--minshapecells', m(v, /_ms(\d+)/)[1]]),
-      ...t(/_dg(\d+)/, () => ['--deepgrow', m(v, /_dg(\d+)/)[1]]),
       ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]),
-      ...t(/_eye(\d+)/, () => ['--eyering', String(Number(m(v, /_eye(\d+)/)[1]) / targetPixels[0])]),
       ...t(/_skyb/, () => ['--skyblue', '1']), ...t(/_cpp/, () => ['--paper', 'coldpress']),
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
@@ -178,6 +175,7 @@ export function checkExtraArgs(extra, planDir) {
     const gain = GAIN_OPTION.test(key.replace(/=.*$/, ''));
     const validate = !gain && Object.hasOwn(ALLOWED_EXTRA_ARGS, key) ? ALLOWED_EXTRA_ARGS[key] : null;
     if (gain) bad.push('extra-args.json may not set ' + flag + ': a gain or calibration covers an engine error; the plan states values');
+    else if (Object.hasOwn(REMOVED_EXTRA_ARGS, key)) bad.push(`extra-args.json: ${flag} was removed: ${REMOVED_EXTRA_ARGS[key]}`);
     else if (!validate) bad.push('extra-args.json may not set ' + flag);
     if (i === extra.length || extra[i].startsWith('--')) { bad.push('extra-args.json missing value for ' + flag); continue; }
     const a = extra[i++];
@@ -200,17 +198,32 @@ export const REFUSED_TOKENS = Object.freeze({
   lit: 'a value gain: removes a share of the middle layers',
   novar: 'a physics switch: turns off film diffusion, a physical process, which can hide engine faults',
 });
+// Tokens whose painter setting was removed (src/paint/removed-options.mjs): a stored plan that names one is refused
+// with the reason, never painted as if the setting had acted.
+const DEEP_ACCENT_REMOVED = 'the deep accents (--deepaccent) were removed: they restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks';
+export const REMOVED_TOKENS = Object.freeze({
+  dg: DEEP_ACCENT_REMOVED,
+  eye: 'the eye ring (--eyering) was removed: it drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject',
+});
+// extra-args.json options whose painter setting was removed, with the reason
+const REMOVED_EXTRA_ARGS = Object.freeze({ deepaccent: DEEP_ACCENT_REMOVED, deepgrow: DEEP_ACCENT_REMOVED, deepaccentin: DEEP_ACCENT_REMOVED, eyering: REMOVED_TOKENS.eye });
 const tokenName = t => t.replace(/\d+$/, '');
-/** Refused gain and calibration tokens in a variant, as plain-language problems. */
+const refusedReason = t => REFUSED_TOKENS[tokenName(t)] ?? REMOVED_TOKENS[tokenName(t)];
+/** Refused gain and calibration tokens, and tokens whose setting was removed, in a variant, as plain-language problems. */
 export function refusedTokens(variant) {
-  return variantParts(variant).tokens.filter(t => Object.hasOwn(REFUSED_TOKENS, tokenName(t))).map(t => `recipe token "${t}" is refused: ${REFUSED_TOKENS[tokenName(t)]}; the plan states values, the engine delivers them`);
+  return variantParts(variant).tokens.filter(t => refusedReason(t)).map(t => Object.hasOwn(REFUSED_TOKENS, tokenName(t))
+    ? `recipe token "${t}" is refused: ${REFUSED_TOKENS[tokenName(t)]}; the plan states values, the engine delivers them`
+    : `recipe token "${t}" is refused: ${REMOVED_TOKENS[tokenName(t)]}`);
 }
 // plan fields with the same job: washes.charge picks the demand quantile each passage is charged at (delivery)
 export const REFUSED_PLAN_FIELDS = Object.freeze({ 'washes.charge': 'a delivery calibration: the quantile of demand each passage is charged at; the engine owns charging' });
+// plan fields whose painter setting was removed (src/paint/pipeline-plan.mjs refuses them too)
+const REMOVED_PLAN_FIELDS = Object.freeze({ 'washes.deepAccent': DEEP_ACCENT_REMOVED });
 /** Refused plan fields present in config.json, as plain-language problems. */
 export function refusedPlanFields(config) {
   const at = (o, k) => k.split('.').reduce((v, part) => (v && typeof v === 'object' && Object.hasOwn(v, part) ? v[part] : undefined), o);
-  return Object.entries(REFUSED_PLAN_FIELDS).filter(([k]) => at(config, k) !== undefined).map(([k, why]) => `config.json may not set ${k}: ${why}`);
+  return [...Object.entries(REFUSED_PLAN_FIELDS).filter(([k]) => at(config, k) !== undefined).map(([k, why]) => `config.json may not set ${k}: ${why}`),
+    ...Object.entries(REMOVED_PLAN_FIELDS).filter(([k]) => at(config, k) !== undefined).map(([k, why]) => `config.json: ${k} was removed: ${why}`)];
 }
 
 /** Tokens that map to no painter option, and a prefix other than region_w13 or region_w15. */
@@ -324,7 +337,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const build = argsBuilder({ planDir, target, width: spec.width, sheetmm: spec.sheetmm, out, compile, gpu, targetPixels, linesExist, outlineMedium });
   problems.push(...refusedTokens(safeVariant));
   if (config && typeof config === 'object') problems.push(...refusedPlanFields(config));
-  problems.push(...unknownTokens(safeVariant, build).filter(t => !Object.hasOwn(REFUSED_TOKENS, tokenName(t))).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
+  problems.push(...unknownTokens(safeVariant, build).filter(t => !refusedReason(t)).map(t => (t.startsWith('prefix') ? t : `unknown recipe token "${t}": it maps to no painter option, so nothing would read it`)));
   const styleName = config?.styleSelection?.style;
   const extraInk = extraArgs.includes('--inkprofile') ? extraArgs[extraArgs.lastIndexOf('--inkprofile') + 1] : null;
   const sepiaInk = !(extraInk && extraInk !== 'sepia-ink') && !extraArgs.includes('--inkk') && STYLE_INK[styleName] !== 'black';

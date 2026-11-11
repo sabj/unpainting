@@ -45,7 +45,7 @@ import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
 import {drawingStageIntent} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {bindLineTarget} from '../../src/crop/lines.mjs';
 import {prepareSegments} from '../../src/crop/segment-prep.mjs';
-import {subjectWashField} from '../../src/paint/methods/subject-washes.mjs';
+import {refuseRemoved} from '../../src/paint/removed-options.mjs';
 import {strokeBudgetDefaults} from '../../src/paint/methods/stroke-budget.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
 import {linePython, resolveLinePython} from '../../src/paint/methods/line-python.mjs';
@@ -65,6 +65,8 @@ const argv0 = process.argv.slice(2);
 if(await runSpeedSequence(argv0,ENTRY_FILE))process.exit(0);
 // --recipe: a named preset of flags put in front of the command line (src/paint/recipe.mjs)
 const { argv, note: RECIPE_NOTE, pipeline: PIPELINE, subjectMedium: SUBJECT_MEDIUM } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(ENTRY_FILE)) });
+// an option the painter no longer has stops the run with its reason (src/paint/removed-options.mjs)
+refuseRemoved(argv);
 // every option name the painter asks for, so options given but never read are reported at the end
 const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
@@ -308,8 +310,6 @@ ctx.px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
 // Segments before every painting: SAM's regions of the target, cached by its hash; without SAM the run fails (src/crop/segment-prep.mjs)
 const SEGMENTS_RECORD = prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
-// --subjectwash 1: the washes cut by subject as well as by colour and value (src/paint/methods/subject-washes.mjs)
-const SUBJECTS = await subjectWashField({ image: opt('image', ''), px: ctx.px, w, h, families: VALUE_CONFIG?.families ?? [], shaped: num('shapedmarks', 0) > 0, opt, num, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
 const createBrush = o => createBrushRaw(gpuHairCap(scaleBrushForDensity(o, { renderWidth: w * num('scale', 1) })));
@@ -380,7 +380,7 @@ Object.assign(ctx, { SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, N
   CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, SPARSE_CONTACT_RECORD, VALUE_CONFIG, VALUE_ENABLED, VALUE_COUNTS, 
   SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, NUMERIC_TUFT_CAL, WALL_PHASES, 
-  phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, w, h, n, SEGMENTS_RECORD, SUBJECTS, createBrush, 
+  phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, w, h, n, SEGMENTS_RECORD, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
   WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted });
 }

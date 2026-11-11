@@ -75,20 +75,9 @@ test('toneRuns never draws in the lights and keeps where the painting needs dark
   assert.ok(r.lines[0].points.every(q => q.x >= 20));
 });
 
-test('walkOnLines lays a walker gesture on the file lines along it and bridges a short gap', async () => {
-  const { walkOnLines } = await import('./drawing-hybrid.mjs');
-  const w = 60, h = 20, field = new Float32Array(w * h).fill(1);
-  const file = [line(2, 10, 20, 10.5, 10), line(24, 10.5, 50, 10, 12), line(10, 0, 10, 19, 10)];
-  file.forEach(g => g.points.forEach(q => { q.width = 2; }));
-  const walker = [{ points: [{ x: 1, y: 9 }, { x: 25, y: 11 }, { x: 52, y: 9 }] }];
-  const r = walkOnLines(walker, file, field, w, h, { reach: 3, bridge: 8 });
-  assert.equal(r.gestures.length, 1, 'one gesture across the gap');
-  assert.deepEqual([...r.used].sort(), [0, 1], 'the crossing line is left to the toning');
-  assert.ok(r.gestures[0].points.every(q => Math.abs(q.y - 10.25) < 0.6), 'the geometry is the file\'s, not the walker\'s');
-});
 
-test('shapeHybrid: fast on a straight run, slow at the ends, a rest where the pen lands and lifts, no contact override', async () => {
-  const { shapeHybrid } = await import('./drawing-hybrid.mjs');
+test('shapePenLine: fast on a straight run, slow at the ends, a rest where the pen lands and lifts, no contact override', async () => {
+  const { shapePenLine: shapeHybrid } = await import('./drawing-scribble.mjs');
   const g = line(0, 0, 60, 0, 61); g.points.forEach(q => { q.width = 2; q.s = 0.8; });
   const r = shapeHybrid(g).points;
   assert.ok(r[0].dwell > 0 && r[r.length - 1].dwell > 0);
@@ -120,16 +109,9 @@ test('hand route joins continuations but preserves distinct roles and tapered li
  assert.ok(r.strokes.every(g=>g.points.every(p=>p.x<28||p.x>=34)));
  assert.ok(r.strokes[0].points[0].s<r.strokes[0].points[3].s);
 });
-test('hybrid walker revisits do not redraw or double back on a file contour', async () => {
- const {walkOnLines}=await import('./drawing-hybrid.mjs');
- const file=[line(5,10,70,10,66)],walk=[{points:[{x:5,y:10},{x:55,y:10},{x:15,y:10},{x:70,y:10}]}];
- const r=walkOnLines(walk,file,new Float32Array(80*20).fill(1),80,20,{reach:2,bridge:4});
- assert.equal(r.gestures.length,1);const P=r.gestures[0].points;
- assert.ok(P.every((p,i)=>i===0||p.x>=P[i-1].x));assert.equal(new Set(P.map(p=>p.x)).size,P.length);
-});
 
-test('hybrid file width inverts the actual physical material pressure law',async()=>{
- const {shapeHybrid}=await import('./drawing-hybrid.mjs');
+test('pen line: file width inverts the actual physical material pressure law',async()=>{
+ const {shapePenLine:shapeHybrid}=await import('./drawing-scribble.mjs');
  const profile={nib:.2,flex:8,pressureExponent:1.3},g=line(0,0,60,0,61);
  g.points.forEach(p=>{p.width=2;p.s=1;});
  const r=shapeHybrid(g,{...profile,pressureFloor:0,pressureGain:1,gain:1,margin:0,mix:1,want:1,land:0,lift:0,turnDwell:0}).points;
@@ -176,4 +158,10 @@ test('scaleDrawingGestures: scales point.width along with coordinates and nw', (
   assert.equal(p.y, 50);
   assert.equal(p.width, 5.0);
   assert.equal(p.nw, 3.75);
+});
+
+test('--drawinglogic 2 was removed: a run that asks for it stops with the reason', async () => {
+  const { drawingLogic } = await import('./drawing-logic.mjs');
+  const num = (k, d) => (k === 'drawinglogic' ? 2 : d);
+  assert.throws(() => drawingLogic({ base: 'x', first: true, w: 4, h: 4, opt: (k, d) => d, num, log: () => {}, D: new Float32Array(16), want: null, cells: 0 }), /--drawinglogic 2 .* was removed: .+/);
 });

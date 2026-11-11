@@ -1,6 +1,6 @@
 // Value plan keys (--valueplan): every key the painter reads, so a key it would ignore is reported, not silently
 // dropped. Three "plan" Mittens controls once matched the control byte for byte because the code they ran on read none
-// of their new keys (washes.paints, darkGain, deepAccent).
+// of their new keys (washes.paints, darkGain).
 //
 // The tree below lists the keys and where they are read. `washes` and `order` are read only by the combined recipe
 // (src/paint/pipeline-plan.mjs, recipe default/combined/general); under another recipe they count as unused. NOTES are
@@ -39,7 +39,7 @@ const DRAWING = {
 const WASHES = {
   // src/paint/methods/finish-texture.mjs furLightReserves, through --furreserves
   furReserves: { bounds: ANY, reach: ANY, drop: ANY, dark: ANY, maxDensity: ANY, minCells: ANY },
-  paints: ANY, deepAccent: { max: ANY, grow: ANY, families: ANY },
+  paints: ANY,
   colour: ANY, sessions: ANY, inkAware: ANY, charge: ANY, carryMm: ANY, paleLimit: ANY,
   physics: { holeRimMm: ANY, marangoni: ANY, slope: ANY },
 };

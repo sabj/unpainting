@@ -15,7 +15,6 @@ import {layerFractions,regionCuts} from './layer-cuts.mjs';
 // Target-value scheduling. Pure CPU planning; no paper mutation or bitmap painting.
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
-import { subjectCovers, holdSubjectLights, subjectDomain } from './subject-washes.mjs';
 import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 
@@ -31,7 +30,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,deepAccent=0,deepAccentIn=null,cellFamilies=false,minShapeCells=0,deepGrow=0,skyOneLayer=false,eyeRing=0,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,subjects=null}) {
+export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
   let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -44,7 +43,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   const referenceTest=lightRef?(paperDelta==null?paperLightTest(lightRef.lightRef):(pixels,i)=>isPaperLight(pixels,i,lightRef.lightRef,paperDelta)):null;
   let paper=paperLights&&rgb&&!lightRef?estimatePaper(rgb,w,h,density):null;
   if(paperLights&&lightRef){let total=0,cells=0;for(let i=0;i<n;i++)if(referenceTest(rgb,i)){total+=density[i];cells++;}paper={rgb:lightRef.sheet,density:cells?total/cells:0,cells};}
-  const value=targetValueMap(paper?Float32Array.from(density,v=>Math.max(0,v-paper.density)):density),region=subjects??targetRegions({w,h,rgb,demand,k,density,families}),protectedCells=Uint8Array.from({length:n},(_,i)=>hold?.[i]?1:0);
+  const value=targetValueMap(paper?Float32Array.from(density,v=>Math.max(0,v-paper.density)):density),region=targetRegions({w,h,rgb,demand,k,density,families}),protectedCells=Uint8Array.from({length:n},(_,i)=>hold?.[i]?1:0);
   validateReserves(reserves);
   // Broad target lights, simplified before any paint. Explicit glints survive the
   // area filter; inferred isolated white pixels are not a painting instruction.
@@ -138,25 +137,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     for(let p=0;p<q.length;p++){const i=q[p];if(dist[i]>=R)continue;for(const j of neighbors(i,w,n))if(dist[j]>dist[i]+1){dist[j]=dist[i]+1;q.push(j);}}
     fade=Float32Array.from(dist,d=>d>=R?1:.35+.65*d/R);}
   const weights=Array.from({length:5},()=>new Float32Array(n));
-  // deepGrow r: the deep-accent set grows by r cells into neighbours that are nearly as dark (max channel under
-  // deepAccent+45), so a brow is restated as a full tapered mass rather than its darkest core only.
-  let deepMask=null;
-  if(deepAccent>0&&rgb){deepMask=Uint8Array.from({length:n},(_,i)=>Math.max(rgb[i*3],rgb[i*3+1],rgb[i*3+2])<deepAccent?1:0);
-    for(let g=0;g<deepGrow;g++){const nx=deepMask.slice();for(let i=0;i<n;i++)if(!deepMask[i]&&Math.max(rgb[i*3],rgb[i*3+1],rgb[i*3+2])<deepAccent+45&&neighbors(i,w,n).some(j=>deepMask[j]))nx[i]=1;deepMask=nx;}}
-  // deepAccentIn: only cells inside the bounds of these named families take deep accents, so a cat nose and eye
-  // rims are restated while a portrait's irises, which the same threshold turns black, are left alone.
-  if(deepMask&&deepAccentIn?.length){const boxes=families.filter(f=>deepAccentIn.includes(f.id)&&f.bounds).map(f=>f.bounds);
-    deepMask=Uint8Array.from(deepMask,(v,i)=>{if(!v)return 0;const x=(i%w+.5)/w,y=(Math.floor(i/w)+.5)/h;return boxes.some(b=>x>=b[0]&&x<b[2]&&y>=b[1]&&y<b[3])?1:0;});}
   const accentCells=new Uint8Array(n);
-  // eyeRing r (share of sheet width): an eye is a lighter iris ring with a dark pupil and limbal edge, not one dark almond.
-  // Around each catchlight reserve the iris centre is the centroid of dark cells within 1.5r. Deep accents stay on the
-  // pupil (under .38r) and the limbal edge (over .78r); the iris body between keeps its middle planes.
-  const irisBody=new Uint8Array(n);
-  if(eyeRing>0&&deepMask&&rgb){const R=eyeRing*w;for(const res of reserves.filter(r=>/catchlight/.test(r.reason))){const cx0=(res.bounds[0]+res.bounds[2])/2*w,cy0=(res.bounds[1]+res.bounds[3])/2*h;let sx=0,sy=0,c=0;
-    for(let y=Math.max(0,Math.floor(cy0-1.5*R));y<Math.min(h,Math.ceil(cy0+1.5*R));y++)for(let x=Math.max(0,Math.floor(cx0-1.5*R));x<Math.min(w,Math.ceil(cx0+1.5*R));x++){const i=y*w+x;if((x-cx0)**2+(y-cy0)**2<2.25*R*R&&Math.max(rgb[i*3],rgb[i*3+1],rgb[i*3+2])<110){sx+=x;sy+=y;c++;}}
-    if(!c)continue;const cx=sx/c,cy=sy/c;
-    for(let y=Math.max(0,Math.floor(cy-R));y<Math.min(h,Math.ceil(cy+R));y++)for(let x=Math.max(0,Math.floor(cx-R));x<Math.min(w,Math.ceil(cx+R));x++){const d=Math.hypot(x-cx,y-cy)/R;if(d>.38&&d<.78)irisBody[y*w+x]=1;}
-    console.log(`eye ring: catchlight ${cx0.toFixed(0)},${cy0.toFixed(0)} iris centre ${cx.toFixed(0)},${cy.toFixed(0)} r ${R.toFixed(1)} cells`);}}
   for(let i=0;i<n;i++){
     const v=value.values[i],t=Math.max(0,Math.min(1,(smooth[i]-shadowThresh)/(.70-shadowThresh)));
     const shadowFull=shadowMask[i]? .72*t*t*(3-2*t):0,shadow=shadowFull*(fade?fade[i]:1);
@@ -171,9 +152,6 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // accentShare: small dark features (brows, lids, iris rims, nostrils, lip line) are too small for the shadow
       // glaze support. Their share of middle demand above value accentMin moves to band 5, as last accents on dry paint.
       if(accentShare>0&&!shadowMask[i]&&v>accentMin){const a=middle*accentShare*Math.min(1,(v-accentMin)/.2);weights[1][i]-=a*weights[1][i]/Math.max(1e-6,middle);weights[2][i]-=a*weights[2][i]/Math.max(1e-6,middle);weights[4][i]+=a;accentCells[i]=1;}
-      // deepAccent m: cells with max channel below m (pupils, iris rims, nostrils, brow cores, lip corners) are
-      // restated last in two dried layers, band 4 then band 5, as a painter darkens an eye last.
-      if(deepMask&&!protectedCells[i]&&deepMask[i]&&!irisBody[i]){const keep=1-light;weights[1][i]=weights[2][i]=0;weights[3][i]=keep*.75;weights[4][i]=keep*.75;accentCells[i]=1;}
       if(SMALL_DARK&&SMALL_DARK[i]&&!protectedCells[i]&&!accentCells[i]){const keep=1-light;weights[1][i]=weights[2][i]=weights[3][i]=0;weights[4][i]=keep;accentCells[i]=1;}}
 
 
@@ -264,25 +242,22 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // walls and grounds keep the 4 smooth sheet-wide layers.
     const localQ=layerLocal?regionCuts(region.labels,sm,i=>!protectedCells[i]&&weights[1][i]>0&&!skyCells?.[i],QF,minShape*6):null;
     const broadStride=washLayers>4?Math.max(1,Math.round(washLayers/4)):1;
-    // subjects: each subject's layers are cut at its own value quantiles of the value smoothed inside it (subject-washes.mjs)
-    const cover=subjects?subjectCovers({subjects,values:value.values,weights:weights[1],protectedCells,skyCells,count:q.length,w,h,mmPerCell:sheetWidthMm/w,minShape,smoothMm:layerSmoothMm}):q.map((t,j)=>{if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);const mask=Uint8Array.from(sm,(v,i)=>{if(skyCells?.[i])return 0;const lq=localQ?.get(region.labels[i]);if(lq)return v>lq[j]?1:0;if(j%broadStride!==0)return 0;return smBroad[i]>t?1:0;});return removeSmall(closeLocal(mask,w,h,layerSmoothMm<2?1:2),w,h,layerSmoothMm<2?minShape:minShape*4);});
+    const cover=q.map((t,j)=>{if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);const mask=Uint8Array.from(sm,(v,i)=>{if(skyCells?.[i])return 0;const lq=localQ?.get(region.labels[i]);if(lq)return v>lq[j]?1:0;if(j%broadStride!==0)return 0;return smBroad[i]>t?1:0;});return removeSmall(closeLocal(mask,w,h,layerSmoothMm<2?1:2),w,h,layerSmoothMm<2?minShape:minShape*4);});
     const count=new Uint8Array(n);for(const c of cover)for(let i=0;i<n;i++)count[i]+=c[i];
     // The layers carry all middle demand; no separate per-region band-3 patchwork.
     // layerIncrement: each layer carries the value step between its threshold and the next layer's, as a painter lays
     // one flat value over the whole form and then only darker steps where the form is darker. An equal split (the
     // default) gives a light cell all its middle demand in layer 0 while a dark neighbour puts only a quarter there, so
     // the shape's one mean charge is too dark for the light cells and too light for the dark ones.
-    const effThresholds = subjects && cover.cuts ? (i => cover.cuts.get(cover.subject[i]) ?? q) : localQ ? (i => localQ.get(region.labels[i]) ?? q) : q;
+    const effThresholds = localQ ? (i => localQ.get(region.labels[i]) ?? q) : q;
     // nestedBands: the layers carry the middle value steps, so each takes the part of that range between its own
     // threshold and the next layer's (layerShares over the range the middle bands span).
     const midLo=VALUE_CAPS[0],midHi=VALUE_CAPS[layerTexture?1:2],inMid=v=>Math.min(midHi,Math.max(midLo,v))-midLo;
-    const share=nestedBands?layerShares(cover,typeof effThresholds==='function'?i=>effThresholds(i).map(inMid):effThresholds.map(inMid),Float32Array.from(cover.sm??sm,inMid),n):layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
+    const share=nestedBands?layerShares(cover,typeof effThresholds==='function'?i=>effThresholds(i).map(inMid):effThresholds.map(inMid),Float32Array.from(sm,inMid),n):layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
     const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
-  // subjects: a subject's lit planes take its first washes only; the later middle layers go round them
-  if(subjects)steps.splice(0,steps.length,...holdSubjectLights(steps,subjects.lights));
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
   // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,
@@ -321,17 +296,16 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(b<=r&&hueChroma>0&&sat>=hueChroma?3:0);}}
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
       const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0):[];
-      const domains=subjects?[0]:groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
+      const domains=groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
       // washJoin (wash-join.mjs): a domain piece under the minimum shape joins the neighbouring domain's passage
       // instead of being dropped as a bare-paper shard.
       const keyOfDomain=d=>d<0?7:groupMode?coolGroup[d]:typeof d==='string'?domains.indexOf(d)+1:d;
       const cellGroup=i=>groupMode?coolGroup[region.labels[i]]:typeof domains[0]==='string'?domains.indexOf(cellStyle(i).name)+1:region.labels[i];
-      const joined=(washJoin||(stepHoles&&!step.pig))&&!subjects&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,minShape):null;
+      const joined=(washJoin||(stepHoles&&!step.pig))&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,minShape):null;
       for(const domain of domains){
-        const M0=subjects?mask:joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
+        const M0=joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
         const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
-        // subjects: a passage stays inside its wash group (its shadow group for a glaze)
-        const c=subjects?subjectDomain(M,subjects,phase,w,h):components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
+        const c=components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
         const shapes=[];
         for(let id=1;id<=c.count;id++){

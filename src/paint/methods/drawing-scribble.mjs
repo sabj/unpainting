@@ -71,3 +71,51 @@ export function scribbleMasses(D, w, h, gaussian, { K = 1, dark = 0.06, minMass 
   }
   return gestures;
 }
+
+/**
+ * Pressure, speed and pauses along a pen line, so the pen's own physics makes the line. The file's width becomes
+ * a pressure target through the nib law (contact = nib + flex x p, p = 0.25 + 0.6 s), mixed with the line's own pressure.
+ * Speed is fast on a straight run, slow into turns and at the ends; the pen rests where it lands, lifts and turns hard.
+ *
+ * @param nib,flex   the pen's (paint-plate's PEN) in the gesture's cells
+ * @param mix        the file width's share of the pressure; the rest is the line's own
+ * @param fast,slow  the speeds on a straight run and at a hard turn
+ * @param land,lift,turnDwell  the rests at the start, the end and a hard turn, in the pen's time units
+ */
+export function shapePenLine(g, { want = 1, inLen = 3, outLen = 5, start = 0.45, end = 0.3, gain = 1.39, margin = 0.42, nib = 0.8, flex = 1.5,
+  mix = 0.6, fast = 2.4, slow = 0.6, slowEnds = 4, land = 1.2, lift = 0.6, turnDwell = 0.5, hardTurn = 0.9,
+  pressureFloor=.25, pressureGain=.6, pressureExponent=1 } = {}) {
+  const P = g.points, n = P.length, s = [0];
+  for (let k = 1; k < n; k++) s.push(s[k - 1] + Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y));
+  const L = s[n - 1] || 1, tin = Math.min(inLen, 0.25 * L), tout = Math.min(outLen, 0.3 * L), ease = u => u * u * (3 - 2 * u);
+  const env = d => Math.min(tin > 0 && d < tin ? start + (1 - start) * ease(d / tin) : 1, tout > 0 && L - d < tout ? end + (1 - end) * ease((L - d) / tout) : 1);
+  // the turn at each point, read over about two cells either side
+  const turn = k => {
+    let a = k, b = k; while (a > 0 && s[k] - s[a] < 2) a--; while (b < n - 1 && s[b] - s[k] < 2) b++;
+    if (a === k || b === k) return 0;
+    let t = Math.atan2(P[b].y - P[k].y, P[b].x - P[k].x) - Math.atan2(P[k].y - P[a].y, P[k].x - P[a].x);
+    while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI;
+    return Math.abs(t);
+  };
+  const points = [];
+  let lastDwell = -Infinity;
+  for (let k = 0; k < n; k++) {
+    const q = P[k], e = env(s[k]), tk = turn(k);
+    const contactShare=q.width!=null?Math.max(0,Math.min(1,(q.width*gain-margin-nib)/flex)):null;
+    const sWidth = contactShare!=null ? Math.max(0, Math.min(1, (contactShare**(1/pressureExponent)-pressureFloor)/pressureGain)) : q.s ?? 1;
+    const share = Math.min(1, want * e * (mix * sWidth + (1 - mix) * (q.s ?? 1)));
+    const nearEnd = Math.min(s[k], L - s[k]) < slowEnds ? 1 - Math.min(s[k], L - s[k]) / slowEnds : 0;
+    const bend = Math.min(1, tk / hardTurn);
+    const v = Math.max(slow, fast - (fast - slow) * Math.max(bend, nearEnd)) * (1.15 - 0.3 * share);
+    const o = { x: q.x, y: q.y, s: share, v };
+    if (k === 0) o.dwell = land;
+    else if (k === n - 1) o.dwell = lift;
+    else if (tk >= hardTurn && s[k] - lastDwell > 4) { o.dwell = turnDwell; lastDwell = s[k]; }
+    // a dwell point holds the pen and is not a step of the path (penStroke draws no segment into or out of it), so
+    // the same point goes in as a step on either side
+    if (o.dwell && k > 0) points.push({ x: q.x, y: q.y, s: share, v });
+    points.push(o);
+    if (o.dwell && k < n - 1) points.push({ x: q.x, y: q.y, s: share, v });
+  }
+  return { ...g, points };
+}

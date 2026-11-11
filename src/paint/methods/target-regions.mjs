@@ -19,7 +19,7 @@ export function targetRegions({w,h,rgb,demand,k,density,families=[]}) {
 
 // Each label 1..count described for the plan: the plan family whose bounds overlap it most lends its cue and base
 // move. Bounds describe; they never cut. One pass over the cells. idOf(label) names the region.
-export function describeRegions(labels,count,families,w,h,idOf) {
+function describeRegions(labels,count,families,w,h,idOf) {
   const n=w*h,area=new Float64Array(count+1),hits=Array.from({length:count+1},()=>new Float64Array(families.length));
   for(let i=0;i<n;i++){const l=labels[i];if(l<1||l>count)continue;area[l]++;const x=(i%w+.5)/w,y=(Math.floor(i/w)+.5)/h;
     for(let j=0;j<families.length;j++){const b=families[j].bounds;if(b&&x>=b[0]&&x<b[2]&&y>=b[1]&&y<b[3])hits[l][j]++;}}

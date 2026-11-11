@@ -42,11 +42,11 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
   for (const g of gestures) {
     if (g.points.length < 2) continue;
     // `dip` on a gesture re-dips at its start; a number is the load. `low` is how empty the pen may run before a
-    // re-dip inside the gesture (--drawinglogic 2)
+    // re-dip inside the gesture (--drawinglogic 3)
     const refillBelow = allowStarvation ? (g.low ?? low) : Math.max(g.low ?? low, Math.min(.9, pen.starve * 1.2));
     if (pen.ink <= 0 || g.dip || pen.ink < pen.capacity * refillBelow) { dipPen(pen, ink, typeof g.dip === 'number' ? g.dip : 1); dips++; }
     // a point may carry its own pressure share `s`, contact width `nw`, speed `v`, and a `dwell` where ink pools
-    // (--drawinglogic 2)
+    // (--drawinglogic 3)
     const path = g.points.map(p => {
       const s = p.s != null ? Math.min(1, p.s) : Math.min(1, at(p.x, p.y) / peak);
       const q = { x: p.x + 0.5, y: p.y + 0.5, p: p.p != null ? Math.max(0,Math.min(1,p.p)) : 0.25 + 0.6 * s, v: p.v ?? 1.9 - 1.1 * s };

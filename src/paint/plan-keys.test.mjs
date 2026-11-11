@@ -28,9 +28,9 @@ test('washes and order count as unused without the combined recipe that reads th
   assert.deepEqual(unusedPlanKeys(plan, { pipeline: true }), []);
 });
 
-test('the Mittens colour5 deep-accent keys the painter never read are caught', () => {
+test('a removed washes key (deepAccent) is caught as unread', () => {
   const washes = { colour: 'layered', paints: ['sienna', 'hansa', 'paynes'], deepAccent: { max: 120, relative: 30, minCells: 6 } };
-  assert.deepEqual(unusedPlanKeys({ subject: 'mittens', washes }, { pipeline: true }), ['washes.deepAccent.relative', 'washes.deepAccent.minCells']);
+  assert.deepEqual(unusedPlanKeys({ subject: 'mittens', washes }, { pipeline: true }), ['washes.deepAccent']);
 });
 
 test('every drawing key drawingFlags reads counts as read, including linework', async () => {

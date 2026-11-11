@@ -19,15 +19,6 @@ function paints(v) {
   if (!Array.isArray(v) || !v.length || v.some(k => !keys.includes(k))) throw Error(`washes.paints: expected box keys from ${keys.join(", ")}`);
   return [...v];
 }
-// washes.deepAccent {max, grow, families}: cells whose darkest channel is under max (0..255) inside the named
-// families are restated last as dark accents, two dried layers (nose, eye rims), grown by grow cells.
-function deepAccent(v, families) {
-  if (v == null) return null;
-  object(v, 'washes.deepAccent');
-  const ids = families.map(f => f.id);
-  if (!Array.isArray(v.families) || !v.families.length || v.families.some(id => !ids.includes(id))) throw Error(`washes.deepAccent.families: expected family ids from ${ids.join(', ')}`);
-  return { max: number(v.max, 0, 1, 255, 'washes.deepAccent.max'), grow: number(v.grow, 0, 0, 4, 'washes.deepAccent.grow'), families: [...v.families] };
-}
 function choice(v, fallback, choices, name) {
   v ??= fallback;
   if (!choices.includes(v)) throw Error(`${name}: expected ${choices.join(', ')}`);
@@ -42,13 +33,13 @@ export function resolvePipeline(plan = {}) {
   const subjects = order.subjects ?? plan.subjectOrder ?? null;
   readSubjectOrder(subjects, plan.families ?? []);
   if (washes.darkGain != null) throw Error('washes.darkGain was removed in 0.3.3: the painter delivers the value the plan states, so a plan sets values, not gains');
+  if (washes.deepAccent != null) throw Error('washes.deepAccent was removed in 0.3.3: it restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks');
   const physics = object(washes.physics ?? {}, 'washes.physics');
   const resolved = {
     drawing,
     washes: {
       furReserves: washes.furReserves == null ? null : object(washes.furReserves, 'washes.furReserves'),
       paints: paints(washes.paints),
-      deepAccent: deepAccent(washes.deepAccent, plan.families ?? []),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
       inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
@@ -75,7 +66,6 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   const rawPhysics = rawW.physics ?? {};
   if (w.furReserves && (!onlyAuthored || rawW.furReserves != null)) add('furreserves', JSON.stringify(w.furReserves));
   if (w.paints && (!onlyAuthored || rawW.paints != null)) add('paints', w.paints.join(','));
-  if (w.deepAccent && (!onlyAuthored || rawW.deepAccent != null)) { add('deepaccent', w.deepAccent.max); add('deepgrow', w.deepAccent.grow); add('deepaccentin', w.deepAccent.families.join(',')); }
   if (!onlyAuthored || rawW.sessions != null) add('washsession', { dry:0, passage:1, connected:2 }[w.sessions]);
   // Honour the authored wash mode: colour-family splitting changes the passage plan. Layered
   // washes still keep light colour families apart, split on perceptual chroma, so a neutral

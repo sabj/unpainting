@@ -1,13 +1,11 @@
 // Settings that were typed but could not act, so a run says so instead of painting as if they had.
 //
 // GATES: a setting that acts only while another is on (the code reads it inside the other's branch). Each entry was
-// checked against its reader: deepaccent in src/paint/methods/light-to-dark.mjs
-// (deepMask exists only when it is above 0), skyblue in the palette step of tools/paint-plate.mjs, skylanes in
-// skyLaneRadius, touchpoints in the touch-up rounds.
+// checked against its reader: skyblue in the palette step of tools/paint-plate.mjs, skylanes in skyLaneRadius,
+// touchpoints in the touch-up rounds.
 // INERT: settings whose reader is unreachable. The short dry-brush texture marks run only when _valuePlan.texture is
 // set, and nothing sets it, so --texvariety, --texflow, --texshort and --texpress change no painting.
 export const GATES = Object.freeze({
-  deepgrow: 'deepaccent', deepaccentin: 'deepaccent', eyering: 'deepaccent',
   skyfloc: 'skyblue', skylanemm: 'skylanes', skylanestep: 'skylanes', touchgain: 'touchpoints',
 });
 const NO_TEXTURE = 'the value planner never plans dry-brush texture passages, so it changes no painting';

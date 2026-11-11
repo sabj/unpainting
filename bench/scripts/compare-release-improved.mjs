@@ -19,7 +19,7 @@ export const IMPROVED = [
     subsystem: 'Paper reserves and catchlights',
     summary: 'Fine catchlights inside dark features stay as bare paper. Midtone snow and foliage specks are no longer reserved. Plane fragments merge before rectangular reserves are cut.',
     source: 'CHANGELOG.md, 0.3.1',
-    files: ['src/paint/methods/light-to-dark.mjs', 'src/paint/methods/subject-washes.mjs'],
+    files: ['src/paint/methods/light-to-dark.mjs'],
     commits: ['86ac390', 'fdd4735'],
     look: [{ subject: 'mittens', model: 'opus' }, { subject: 'hills', model: 'argon' }],
   },

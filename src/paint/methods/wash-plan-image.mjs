@@ -2,9 +2,7 @@
 //   wash-plan.png      three panels side by side: the light washes, the middle layers and the shadow glazes. Each
 //                      passage is a pale fill with its outline in its own colour; the segments' boundaries are drawn
 //                      in red over every panel, so a wash that runs across a subject boundary shows.
-//   subject-field.png  under --subjectwash 1: the wash groups, each a flat colour, with the subject boundaries.
 // Reads no target pixels: only the plan's masks and the segment labels.
-import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { hasSegments, loadSegments } from '../../crop/segments.mjs';
@@ -29,7 +27,7 @@ function boundaryOf(labels, w, h) {
   return edge;
 }
 
-function panel(layers, phase, steps, w, h, groupOf) {
+function panel(layers, phase, steps, w, h) {
   const n = w * h, img = new Float32Array(n * 3).fill(255);
   let k = 0;
   for (const L of layers) {
@@ -38,9 +36,7 @@ function panel(layers, phase, steps, w, h, groupOf) {
       // a passage's mask is built from its label field on demand; let it go again afterwards (blockin.mjs dropMask)
       const cached = sh._mask, m = sh.mask; if (!m) continue;
       const b = sh.box ?? { x0: 0, y0: 0, x1: w - 1, y1: h - 1 };
-      let first = -1;
-      for (let y = b.y0; y <= b.y1 && first < 0; y++) for (let x = b.x0; x <= b.x1; x++) if (m[y * w + x]) { first = y * w + x; break; }
-      const col = hue(groupOf && first >= 0 ? groupOf[first] : ++k);
+      const col = hue(++k);
       for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) {
         const i = y * w + x; if (!m[i]) continue;
         const rim = x === 0 || x === w - 1 || y === 0 || y === h - 1 || !m[i - 1] || !m[i + 1] || !m[i - w] || !m[i + w];
@@ -52,25 +48,19 @@ function panel(layers, phase, steps, w, h, groupOf) {
   return img;
 }
 
-/** Writes wash-plan.png (and subject-field.png under subjects) into out. image: the target, for its segments. */
-export async function writeWashPlan({ layers, steps = 5, w, h, out, image = '', subjects = null, log }) {
+/** Writes wash-plan.png into out. image: the target, for its segments. */
+export async function writeWashPlan({ layers, steps = 5, w, h, out, image = '', log }) {
   const base = image ? path.basename(image, path.extname(image)) : '';
   const seg = base && hasSegments(base) ? await loadSegments(base, w, h) : null;
   const n = w * h, edge = seg ? boundaryOf(seg.labels, w, h) : null, W = 3 * w + 2 * GAP;
   const sheet = Buffer.alloc(W * h * 3, 255);
   PANELS.forEach((phase, p) => {
-    const img = panel(layers, phase, steps, w, h, subjects ? (phase === 'shadow' ? subjects.shadow : subjects.wash) : null);
+    const img = panel(layers, phase, steps, w, h);
     for (let i = 0; i < n; i++) {
       const x = i % w, y = (i - x) / w, o = (y * W + p * (w + GAP) + x) * 3;
       for (let c = 0; c < 3; c++) sheet[o + c] = edge?.[i] ? RED[c] : Math.round(img[i * 3 + c]);
     }
   });
   await sharp(sheet, { raw: { width: W, height: h, channels: 3 } }).png().toFile(path.join(out, 'wash-plan.png'));
-  if (subjects) {
-    const img = Buffer.alloc(n * 3);
-    for (let i = 0; i < n; i++) { const col = edge?.[i] ? [0, 0, 0] : subjects.lights[i] ? [255, 255, 255] : hue(subjects.wash[i]); for (let c = 0; c < 3; c++) img[i * 3 + c] = col[c]; }
-    await sharp(img, { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'subject-field.png'));
-    fs.writeFileSync(path.join(out, 'subject-field.json'), JSON.stringify(subjects.summary, null, 1));
-  }
-  log(`wash plan: ${layers.length} passes drawn in wash-plan.png${seg ? ', segment boundaries in red' : ''}${subjects ? '; wash groups in subject-field.png' : ''}`);
+  log(`wash plan: ${layers.length} passes drawn in wash-plan.png${seg ? ', segment boundaries in red' : ''}`);
 }

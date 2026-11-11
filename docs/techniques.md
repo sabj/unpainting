@@ -67,10 +67,9 @@ Modules, with their flags:
 - `methods/detail-passes.mjs` (`--detailpasses`, `--detailtrim`): late small passages where the detail is.
 - `methods/drawing-file.mjs` (`--drawingfile`, `--drawinglast`): draws a selected line file whole.
 - `methods/drawing-hand.mjs` (helper): joins drawing lines into gestures with tapered ends.
-- `methods/drawing-hybrid.mjs` (helper): redraws traced gestures along the drawing file's lines.
-- `methods/drawing-logic.mjs` (`--drawinglogic 1|2|3`): inking logic run over a selected drawing file.
+- `methods/drawing-logic.mjs` (`--drawinglogic 1|3`): inking logic run over a selected drawing file.
 - `methods/drawing-rank.mjs` (helper): ranks a dense drawing file's lines into tiers.
-- `methods/drawing-scribble.mjs` (helper): long open lines with dark masses as looping scribble.
+- `methods/drawing-scribble.mjs` (helper): long open lines with dark masses as looping scribble, each line laid with the pen's own pressure, speed and pauses.
 - `methods/drawing-stages-auto.mjs` and `methods/drawing-choice.mjs` (`--drawingstages auto`, the default): pencil prep, ink prep and ink finish chosen per picture. Off: `off`.
 - `methods/drawing.mjs` (not reached): pencil drawing of the figure's edge and big darks.
 - `methods/final-darks.mjs` (`--finaldarks 1`, `--fdminmm2`, `--fdtilemm`, `--fdgain`): finds the final-dark cells and groups them into families for one shape-level look each. Off by default.
@@ -115,8 +114,6 @@ Modules, with their flags:
 - `methods/subject-order.mjs` (`--subjectorder s`, `--subjectseam s`): subject-by-subject order; a wash is cut at a subject edge only along a colour edge.
 - `methods/touch-cover.mjs` (`--touchcover c`, parked): a touch-up whose sweeps touch under share c of its shape is left out.
 - `methods/subject.mjs` (not reached): the subject's big shapes in wash order.
-- `methods/subject-clusters.mjs` (`--subjectwash 1`): SAM regions cut into colour and value clusters, with wash and shadow groups and each subject's own lights.
-- `methods/subject-washes.mjs` (`--subjectwash 1`): cuts the value plan's and the ladder's passes at the wash groups and lays subject lights early.
 - `methods/target-regions.mjs` (always on): colour and value regions for the value planner.
 - `methods/wash-plan-image.mjs` (`--washplanpng 1`): the wash plan as pictures, with the segment boundaries.
 - `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.

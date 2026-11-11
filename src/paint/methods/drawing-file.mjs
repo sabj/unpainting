@@ -31,7 +31,7 @@ export function noDrawingDeclared(doc, { first = true } = {}) {
 // --drawinglast <base>: the closing pen (--drawing both|last, over the dry sheet) draws only lines of weight at least
 // --drawinglastmin, so the darks and features stay crisp over the glazes.
 // `prune` (pen and wash, pen-wash-lines.mjs) thins the opening pen's planned lines before they are split into strokes.
-export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, walker = null, field = null, style = null, prune = null }) {
+export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walked, D = null, want = null, cells = 0, K = 1, style = null, prune = null }) {
   const lastPass = !first && !fine && opt('drawinglast', '');
   if (!(first && opt('drawingfile', '')) && !lastPass) return null;
   const b = first ? opt('drawingfile', '') : opt('drawinglast', '');
@@ -47,7 +47,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // --drawinglogic 1: rank, budget, filter, connect and shape the file's lines (drawing-logic.mjs)
   // --drawinglastlogic: the closing pen's own logic (default --drawinglogic); linked stages set it to 0, since the
   // finish-ink file is already the closing drawing
-  if (num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic', 0)) > 0) return drawingLogic({ base: b, first, w, h, opt, num, log, D, want, cells, K, walker, field, style });
+  if (num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic', 0)) > 0) return drawingLogic({ base: b, first, w, h, opt, num, log, D, want, cells, K, style });
   // --drawingskip: comma list of line roles left out of both pens ('dark fill' drops hatching, leaving contours)
   const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean));
   // the plan's choice (drawing-plan.mjs planLines): --drawshare's strongest share, --drawregions' subject-first ranking

@@ -47,7 +47,6 @@ import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {chooseDrawingStages} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {eraseWeights, eraserDabs, ERASER_MM} from '../../src/paint/methods/pencil-erase.mjs';
 import {planLines as planLineChoice} from '../../src/paint/drawing-plan.mjs';
-import {subjectBlockOptions} from '../../src/paint/methods/subject-washes.mjs';
 import {massBudget} from '../../src/paint/methods/mass-budget.mjs';
 import {planModulation} from '../../src/paint/methods/modulate.mjs';
 import {loadFocus} from '../../src/paint/methods/stroke-budget.mjs';
@@ -56,7 +55,7 @@ import {measureStyle} from '../../src/paint/methods/practice-style.mjs';
 export async function plan(ctx) {
 const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, SPEED_VALUE_ONLY, SPEED_PROFILE, 
   root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
-  phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, SUBJECTS, lum, paperRGB, CODE_HASH, 
+  phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, lum, paperRGB, CODE_HASH, 
   PALETTE_FROM_FILE, paletteFitStarted } = ctx;
 const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
   const authoredFile=opt('areaplan','');const explicit=authoredFile?authoredPalette(JSON.parse(fs.readFileSync(path.resolve(root,authoredFile)))):null;if(explicit)return {pigments:explicit,authored:true,monochrome:explicit.length===1,paintChroma:0,note:'explicit authored production palette; no source palette fit'};
@@ -382,7 +381,7 @@ const PLANFOLLOW = num('planfollow', 0);
 const BLOCK_OPTIONS = { glaze: num('glaze', 0.12), maxValues: num('maxvalues', 24), deepQ: num('deepq', 0.55), headroom: num('headroom', 0.5), follow: PLANFOLLOW || (FIG_MASK ? num('figurefollow', 0) : 0), followCap: num('followcap', PLANFOLLOW > 0 ? 3 : FIG_MASK ? num('figurecap', 6) : 3), followFloor: num('followfloor', PLANFOLLOW > 0 ? 0.5 : FIG_MASK ? num('figurefloor', 0.25) : 0.5), followMask: PLANFOLLOW > 0 ? null : FIG_MASK, followMaskShare: num('figureshare', 0.25), quantileIn: num('quantilein', 0.12), maskBlur: num('maskblur', 1), minShape: num('minshape', 0) || null, finest: num('finest', 0.08), floorShape: num('floorshape', 8), washFloor: num('washfloor', 0.6), sampleSupport: MIXES && opt('mixsupport', '1') !== '0', preMix: MIXES ? false : PUDDLES ? true : opt('premix', '0') !== '0', puddles: PUDDLES?.labels ?? null, puddleFloor: PUDDLES ? num('puddlefloor', 0) : 0, reserve: opt('lightplan', '1') !== '0' ? SMALL : null, hold: ctx.HOLD,
   // --firstfloor f: open the ladder with one broad light wash of local colour over cells planned at f or more (src/crop/blockin.mjs).
   // --firstwhite w (default f/2): stays-white threshold; --firstcolours K (default 4): local colours; --firstmax m (default --glaze): deepest.
-  ...(FIRST_FLOOR > 0 ? { firstFloor: FIRST_FLOOR, firstMax: opt('firstmax', '') !== '' ? num('firstmax', 0.12) : null, firstWhite: opt('firstwhite', '') !== '' ? num('firstwhite', 0) : null, firstLabels: num('firstcolours', 4) > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: Math.round(num('firstcolours', 4)), floor: FIRST_FLOOR }).labels : null, firstOnly: FIRST_ONLY } : {}), ...subjectBlockOptions(VALUE_ENABLED ? null : SUBJECTS) };
+  ...(FIRST_FLOOR > 0 ? { firstFloor: FIRST_FLOOR, firstMax: opt('firstmax', '') !== '' ? num('firstmax', 0.12) : null, firstWhite: opt('firstwhite', '') !== '' ? num('firstwhite', 0) : null, firstLabels: num('firstcolours', 4) > 1 && PLANK > 1 ? puddleLabels(PLANA, PLANK, w, h, { K: Math.round(num('firstcolours', 4)), floor: FIRST_FLOOR }).labels : null, firstOnly: FIRST_ONLY } : {}) };
 const AUTHORED_INPUT=opt('areaplan','')&&JSON.parse(fs.readFileSync(path.resolve(root,opt('areaplan','')))).areas.some(a=>a.passes.some(p=>p.source==='authored'));
 const blockPlanStarted = performance.now();
 // The target value planner replaces this ladder before execution. Optional

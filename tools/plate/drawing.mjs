@@ -43,7 +43,7 @@ import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
 export async function drawing(ctx) {
 const { JSONL, opt, num, NATIVE_PAINT_MODE, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
-  VALUE_CONFIG, VALUE_ENABLED, MAJOR_INTENT, phaseMark, PX_RAW, TARGET_GUARD, w, h, n, SUBJECTS, createBrush, 
+  VALUE_CONFIG, VALUE_ENABLED, MAJOR_INTENT, phaseMark, PX_RAW, TARGET_GUARD, w, h, n, createBrush, 
   ANCHORS, paperRGB, PIGS, COLOUR_BUDGET, LIGHT_CELLS, SMALL, setClip, MOD, FIRST_FLOOR, TECHNIQUE, techniqueOf, SEP, 
   PREP_ERASE, STAGE_PLAN, STYLE_ON, INKLOAD, OUTLINE_MEDIUM, INK, PENCIL, PENCIL_STAGE, GRAPHITE, SHEET_PIGS, 
   GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_EXEC, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
@@ -92,7 +92,7 @@ ctx.laid = 0; ctx.dropped = 0; ctx.droppedMass = 0; ctx.plannedMass = 0;
 const brushMask = sh => (SMALL && opt('lightfill', '1') !== '0' ? (sh._brushMask ??= fillReserved(sh.mask, SMALL, w, h, { reach: LIGHT_CELLS })) : sh.mask);
 for (const L2 of ctx.layers) for (const sh of L2.shapes) ctx.plannedMass += sh.amount * sh.area;
 // --washplanpng 1: the wash plan drawn before any paint, with the segment boundaries (src/paint/methods/wash-plan-image.mjs)
-if (num('washplanpng', 0) > 0) await writeWashPlan({ layers: ctx.layers, steps: ctx.steps, w, h, out, image: opt('image', ''), subjects: SUBJECTS, log: console.log });
+if (num('washplanpng', 0) > 0) await writeWashPlan({ layers: ctx.layers, steps: ctx.steps, w, h, out, image: opt('image', ''), log: console.log });
 // each passage's booking as planned, before the finish field clips it, so the film's shares add up to the plan's mass
 const FILM_MASS = new WeakMap(); for (const L2 of ctx.layers) for (const sh of L2.shapes) FILM_MASS.set(sh, sh.amount * sh.area);
 // --firstwash: the opening wash paler, off the subject, held to its passage and softened (src/paint/methods/first-wash.mjs)

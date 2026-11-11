@@ -65,12 +65,9 @@ test('washes.darkGain was removed: a plan that sets it stops, and no plan yields
  assert.throws(()=>resolvePipeline({washes:{darkGain:2}}),/washes.darkGain was removed/);
 });
 
-test('washes.deepAccent restates darks inside named families only',()=>{
- const m=r=>new Map(Array.from({length:r.flags.length/2},(_,i)=>r.flags.slice(i*2,i*2+2)));
+test('washes.deepAccent was removed: a plan that names it is refused with the reason',()=>{
  const families=[{id:'cat-fur'},{id:'man-skin'}];
- const f=m(pipelineFlags({families,washes:{deepAccent:{max:75,families:['cat-fur']}}}));
- assert.equal(f.get('--deepaccent'),'75'); assert.equal(f.get('--deepgrow'),'0'); assert.equal(f.get('--deepaccentin'),'cat-fur');
- assert.equal(m(pipelineFlags({families})).get('--deepaccent'),undefined);
- assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:75,families:['dog']}}}),/deepAccent.families/);
- assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:300,families:['cat-fur']}}}),/deepAccent.max/);
+ assert.throws(()=>resolvePipeline({families,washes:{deepAccent:{max:75,families:['cat-fur']}}}),/washes\.deepAccent was removed in 0\.3\.3: .+/);
+ const flags=pipelineFlags({families}).flags;
+ for(const k of ['--deepaccent','--deepgrow','--deepaccentin'])assert.ok(!flags.includes(k),k);
 });

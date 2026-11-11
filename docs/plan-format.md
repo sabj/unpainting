@@ -180,7 +180,7 @@ Without `stages`, the ordinary bounded drawing runs. A stage left out is not dra
 | `prepInk` | `from` | `prep`, `lines` | ink over the pencil, or straight from the line set |
 | | `keep`, `add` | 0 to 1 | the share of pencil lines inked (the rest stay pencil), and how many more lines to add, as a share of those kept |
 | | `amount` | 0 to 1 | with `from: "lines"`, the share of the line set's length inked |
-| | `method` | `contour`, `connected`, `scribble` | as planned; joined into walker gestures (`--drawinglogic 2`); fewer longer strokes with the lit edges open and the dark masses scribbled (`--drawinglogic 3`) |
+| | `method` | `contour`, `scribble` | as planned; fewer longer strokes with the lit edges open and the dark masses scribbled (`--drawinglogic 3`) |
 | | `deviate` | 0 to 1 | bounded variation; default 0 directly from lines, 0.25 over pencil |
 | `finishInk` | `from` | `prepInk`, `prep`, `lines` | which earlier lines it restates |
 | | `select` | `edges`, `darks`, `both` | where it restates: the target's strongest edges, its darks, or both |
@@ -216,7 +216,6 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 | `carryMm` | 0 to 10 mm, default 2 | in `family` mode, the carried mask is averaged over this brush-sized area. Prefer 0 in new plans: 2 mm dilutes saturated colour and paints over lit areas |
 | `paleLimit` | 0 to 1, default 0.16 | pale planes up to this value get one clean first wash that no later layer crosses |
 | `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |
-| `deepAccent` | `{max, grow, families}` | restates cells darker than `max` (0 to 255, darkest channel) as last accents, only inside the named families |
 | `furReserves` | `{bounds, reach, drop, dark, maxDensity, minCells}` | keeps sheen and glints open inside a dark coat before the washes |
 | `physics` | `holeRimMm` 0 to 3, `marangoni` 0 to 1, `slope` -1 to 1 | material choices for hole rims, surface-tension flow and downhill flow. `--physics key=value` overrides one coefficient and keeps the others |
 

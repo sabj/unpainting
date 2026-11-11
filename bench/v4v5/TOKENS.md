@@ -2,7 +2,7 @@
 
 Base (always applied, under your tokens): `region_w13_lay4_sky3_skyb_cpp`.
 
-Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: eye and dg need _dp (refused, a gain), and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
+Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
 | token | painter options it sets (on top of the template) |
 |---|---|
@@ -22,10 +22,10 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_dkf` | --darkfirst 1 |
 | `_dp80` | refused: a value gain: doubles dark weight sheet-wide wherever the target is darker than a threshold |
 | `_ms120` | --minshapecells 120 |
-| `_dg2` | --deepgrow 2 |
+| `_dg2` | refused: the deep accents (--deepaccent) were removed: they restated every cell darker than a threshold as two late dark layers, a rule over target pixels; the plan names its last darks |
 | `_ts3` |  |
 | `_tv8` | --texvariety 0.8 |
-| `_eye10` | --eyering <n>/<target width> |
+| `_eye10` | refused: the eye ring (--eyering) was removed: it drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject |
 | `_skyb` | --skyblue 1 |
 | `_cpp` | --paper coldpress |
 | `_tsh8` |  |

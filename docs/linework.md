@@ -143,9 +143,9 @@ densities.
 - `--penreservoir` sets the nib's capacity: 250 in model units before cell scaling.
 - A pen with no ink always dips first. Speed, pause, dip and refill controls on a gesture survive the conversion to
   the sheet. A finer ink sheet (`--inkres`) scales speed as it scales width, so a pause lasts as long.
-- `--drawinglogic 2` keeps the walker's longest monotone visit to each contour instead of out-and-back knots. Its
-  width-to-pressure inversion uses the declared nib's width range and pressure exponent. `--hybridland 1.2`,
-  `--hybridlift .6` and `--hybriddwell .5` set its pauses.
+- `--drawinglogic 3` lays each line with the pen's own pressure, speed and pauses (`shapePenLine` in
+  `src/paint/methods/drawing-scribble.mjs`). Its width-to-pressure inversion uses the declared nib's width range and
+  pressure exponent. `--hybridland 1.2`, `--hybridlift .6` and `--hybriddwell .5` set its pauses.
 - `tools/judge/drawing-audit.mjs RUN ... --out audit.jsonl` summarizes a run's pen audit: contact widths, pressure,
   speed, pauses, reservoir and paper state.
 

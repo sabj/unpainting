@@ -69,7 +69,7 @@ export async function paint(ctx) {
 const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_COVERAGE, measurePaper, liftResist, FRAME_POLICY, SPEED_PROFILE, root, out, RUN_CACHE, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_COUNTS, SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, 
-  NUMERIC_TUFT_CAL, TARGET_GUARD, paintingLook, w, h, n, SUBJECTS, createBrush, candidateContact, paperRGB, 
+  NUMERIC_TUFT_CAL, TARGET_GUARD, paintingLook, w, h, n, createBrush, candidateContact, paperRGB, 
   planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, FIG_MASK, GOUACHE_LIGHTS, setClip, MOD, MASS_BUDGET, 
   COLOUR_TRACE, PUDDLES, FIRST_FLOOR, AUTHORED_INPUT, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, CURLS, 
   DETAIL_REGION, FINISH, FUR_FIELD, SHEET_PIGS, FINISH_FILE, AREA_FILE, AREA_COMPLETED, AREA_EXEC, EARLY_DRY_VALUE, 
@@ -95,7 +95,7 @@ const passageBrush = opts => {
 };
 const PASSAGE_HOOK = await passageHook({
   share: {
-    outDir: out, root, sheet: ctx.sheet, w, h, n, SC, W2, H2, N2, PIGS, K: PIGS.length, SHEET_PIGS, A: ctx.A, expected, used, O, SEED, UPRIGHT, subject: TIER_MASK, fwSubject: FW_SUBJ, paperRGB, subjects: SUBJECTS,
+    outDir: out, root, sheet: ctx.sheet, w, h, n, SC, W2, H2, N2, PIGS, K: PIGS.length, SHEET_PIGS, A: ctx.A, expected, used, O, SEED, UPRIGHT, subject: TIER_MASK, fwSubject: FW_SUBJ, paperRGB,
     thickness, gaussian, components, dilate, erode, removeSmall, distanceToZero, createBrush: passageBrush, dip, stroke, thirsty, step, dry, blot, applyResist, liftResist, setClip, render,
     mopLanes, washPaths, brushedWashPaths, containPaths, sweepCover, handAngle, clock, snap, opt, num, log: console.log, furMarks, orientationField, detailMarks,
   },

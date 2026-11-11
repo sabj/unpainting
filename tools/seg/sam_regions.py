@@ -2,8 +2,7 @@
 
 segments.py --mode regions calls this. No rule names a region and no subject is special: each region is r<n>, with
 its area, box, mean and spread of Lab colour, the share of the picture's frame it touches, and a foreground flag that
-follows from that share. The painter (src/paint/methods/subject-clusters.mjs) cuts each region into its own colour
-and value clusters and decides where a wash may cross from one region into the next.
+follows from that share. The painter reads the regions as its starting units for shapes (src/crop/segments.mjs).
 
 How the partition is built, on the working image:
   1. SAM's automatic masks. A mask under MIN_PART of the picture is detail (an eye, a button) and is left to the
