@@ -836,8 +836,8 @@ ctx.AREA_NUMERIC_SEQUENCE=null; ctx.AREA_NUMERIC_CONTACT_STOP=null; let MOD_DRY_
 const AREA_EXEC=createAreaExecution({emit:r=>{if(ctx.AREA_PLAN)JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify(r)+'\n');}});
 if(AREA_FILE){
  const doc=JSON.parse(fs.readFileSync(path.resolve(root,AREA_FILE))),imageFile=path.resolve(root,opt('image','')),meta=await sharp(imageFile).metadata();
- const targetMeta=await sharp(doc.target.path).metadata();if(targetMeta.width!==doc.target.width||targetMeta.height!==doc.target.height)throw Error('semantic target frame mismatch');
- ctx.AREA_PLAN=rasterAreaPlan(validateAreaDocument(doc,{targetSHA:sha256(doc.target.path),imageSHA:sha256(imageFile),sourceWidth:meta.width,sourceHeight:meta.height}),w,h);
+ const targetFile=path.resolve(root,doc.target.path),targetMeta=await sharp(targetFile).metadata();if(targetMeta.width!==doc.target.width||targetMeta.height!==doc.target.height)throw Error('semantic target frame mismatch');
+ ctx.AREA_PLAN=rasterAreaPlan(validateAreaDocument(doc,{targetSHA:sha256(targetFile),imageSHA:sha256(imageFile),sourceWidth:meta.width,sourceHeight:meta.height}),w,h);
  // Existing independently owned adapters cannot double-paint semantic-owned demand.
  const productionDetails=validateProductionDetails(doc);
  if(productionDetails&&(!MOD||doc.areas.some(a=>a.passes.some(p=>p.source==='authored'))))throw Error('production-modulate details require existing numeric modulation route');
