@@ -107,7 +107,9 @@ Each `crops.<crop>` entry:
 | `turns`, `repairTurns` | each model turn `{k, repair, exit, seconds, stoppedBy}`, and the reasons for repair turns |
 | `optionCheck` | settings read by nothing: `model` (chosen by the plan), `base` (from the base recipe or template; never noted) and `unknown` (asked for by nobody) |
 | `droppedPassages` | passages with no brush path |
-| `notes` | `[{code, reason}]`: unread `model` settings and `unknown` options (code 4) and dropped passages (code 5). The painting still counts. Under `--strict-verdict` these are failures instead and `notes` is empty. |
+| `notes` | `[{code, reason}]`: unread `model` settings and `unknown` options (code 4), dropped passages (code 5), and checks the painter continued past, or no record of them (code 7, from `continued-checks.json`). The painting still counts. Under `--strict-verdict` these are failures instead and `notes` is empty. |
+| `clean` | false when the painter continued past any failed physical or plan check (`continued-checks.json` total above 0) or wrote no such record. A painted but unclean painting is not a pass. |
+| `continuedChecks` | the painter's `continued-checks.json`: `{strict, total, checks: {name: {count, examples}}}`, or null. |
 | `strictVerdict` | true when the try ran with `--strict-verdict`, which fails a painting on any note, as the 0.1 results did. Also in `settings.strictVerdict`. |
 | `paintExit`, `segments` | the painter's exit code, and the number of painter processes (one more per revision) |
 | `failure` | `{failures: [{code, reason}]}` when the outcome is not `painted` |

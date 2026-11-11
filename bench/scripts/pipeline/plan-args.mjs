@@ -406,9 +406,10 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
  * (painting.png, painter exit 0 or 3) counts as painted. Settings the plan chose that nothing read, unused options
  * nobody asked for and passages with no brush path are kept as notes against the plan. strict (--strict-verdict)
  * makes those three fail the painting again, as in the published 0.1 results. A painter killed by a signal, any other
- * painter exit and a missing painting always fail.
+ * painter exit and a missing painting always fail. continued: the painter's continued-checks.json; a painting that
+ * continued past any failed check, or wrote no such record, is painted but not clean (note 7; a failure under strict).
  */
-export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true, strict = false }) {
+export function renderVerdict({ paintExit, unused = [], modelOptions = [], extraOptions = [], baseOptions = [], templateOptions = [], dropped = 0, droppedPct = 0, finished = true, strict = false, continued = null }) {
   const failures = [], notes = [], fail = (code, reason) => failures.push({ code, reason });
   const note = (code, reason) => (strict ? fail(code, reason) : notes.push({ code, reason }));
   const model = new Set([...modelOptions, ...extraOptions]), base = new Set([...baseOptions, ...templateOptions, 'valuefloor']);
@@ -420,5 +421,13 @@ export function renderVerdict({ paintExit, unused = [], modelOptions = [], extra
   if (check.unknown.length) note(4, 'unused options nobody asked for: --' + check.unknown.join(' --'));
   if (dropped > 0) note(5, `passages with no executed paths: ${dropped} dropped (${droppedPct.toFixed(1)}% of the planned mass)`);
   if (!finished) fail(6, 'no finished painting');
-  return { exit: failures.length ? failures[0].code : 0, failures, notes, optionCheck: check, strict };
+  // checks the painter continued past (src/media/checks.mjs, continued-checks.json): physics or plan checks that failed
+  // mid-painting. The painting still counts as painted, but it is not clean, and --strict-verdict fails it.
+  let clean = true;
+  if (!continued) { clean = false; note(7, 'no continued-checks.json: the run did not record the checks it continued past, so it cannot be called clean'); }
+  else if (continued.total > 0) {
+    clean = false;
+    note(7, `CONTINUED PAST ${continued.total} FAILED CHECKS: ${Object.entries(continued.checks ?? {}).map(([name, c]) => `${name} x${c.count}`).join(', ')}`);
+  }
+  return { exit: failures.length ? failures[0].code : 0, failures, notes, optionCheck: check, strict, clean, continuedChecks: continued };
 }

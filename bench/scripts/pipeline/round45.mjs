@@ -293,7 +293,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
     repairTurns: record.repairTurns, turns: record.turns, layering: v?.layering ? { applied: v.layering.applied, skipped: v.layering.skipped } : null, mediumOverride: v?.layering?.mediumOverride ?? null,
     // the painter's own copy measurement of the finished sheet, with the plan's line sources beside it; for the record only
     copy: outcome === 'painted' && p ? copyRecord(fs.existsSync(path.join(p.out, 'cheat-risk.json')) ? readJson(path.join(p.out, 'cheat-risk.json')) : null, v?.layering?.lines) : null,
-    optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
+    optionCheck: v?.optionCheck ?? null, notes: v?.notes ?? [], strictVerdict, clean: v?.clean ?? false, continuedChecks: v?.continuedChecks ?? null, droppedPassages: v ? Number([...text.matchAll(/(\d+) passages yielded no brush path/g)].at(-1)?.[1] ?? 0) : null,
     paintExit: p ? p.segments.at(-1).exit : null, segments: p ? p.segments.length : 0,
     warnings: v?.warnings?.length ? v.warnings : undefined,
     failure: outcome === 'painted' ? null : { failures: verifyError ? [...(v?.failures ?? []), { reason: verifyError }] : (v?.failures?.length ? v.failures : (refusal ?? []).map(reason => ({ reason }))) },

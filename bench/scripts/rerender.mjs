@@ -166,6 +166,7 @@ async function renderJob(opts, job, { run, verify }) {
     dropped: dm ? Number(dm[1]) : 0,
     droppedPct: dm ? Number(dm[2]) : 0,
     finished,
+    continued: fs.existsSync(path.join(jobOut, 'continued-checks.json')) ? readJson(path.join(jobOut, 'continued-checks.json')) : null,
   });
   const painted = verdict.exit === 0 && finished;
   const problems = [...verdict.failures.map(f => f.reason)];

@@ -42,11 +42,11 @@ test('refusals before painting: unknown tokens, locked options, paths out of the
 });
 
 test('strict verdict: a setting the plan chose that nothing read fails the painting; an unread base setting does not', () => {
-  assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'], strict: true }).exit, 0);
-  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: true });
+  assert.equal(renderVerdict({ paintExit: 3, unused: ['--foliagerefit'], baseOptions: ['foliagerefit'], strict: true, continued: { total: 0, checks: {} } }).exit, 0);
+  const v = renderVerdict({ paintExit: 3, unused: ['--stonewarm'], extraOptions: ['stonewarm'], strict: true, continued: { total: 0, checks: {} } });
   assert.equal(v.exit, 4);
   assert.match(v.failures[0].reason, /read by nothing: --stonewarm/);
-  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: true }).exit, 5);
+  assert.equal(renderVerdict({ paintExit: 0, dropped: 2, droppedPct: 1.5, strict: true, continued: { total: 0, checks: {} } }).exit, 5);
 });
 
 test('TOKENS.md is generated from plan-args.mjs', () => {
