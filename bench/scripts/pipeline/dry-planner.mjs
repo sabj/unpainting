@@ -1,7 +1,7 @@
 // A scripted stand-in for a model in V4 and V5, used by `run.mjs --dry-run`. It is never a contestant. It runs in the
 // try's worktree like a model would: in V5 after try 1 it writes SELF-REVIEW.md before it reads FEEDBACK.md; it writes
 // a plan (one token wrong at first, so the admission check refuses it), traces the target's pen lines, runs the check,
-// starts the painting, looks, goes one pass on, revises a painter setting, looks again and finishes.
+// starts the painting, looks, goes one pass on, looks and revises a painter setting, looks again and finishes.
 //   node bench/dry-planner.mjs start|repair
 import fs from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -39,6 +39,7 @@ say(`$ check.sh (exit ${check.status})\n${check.stdout.split('\n').slice(-2).joi
 out = until(paint('start'), stopped);
 paint('look');
 out = until(paint('next'), stopped);
+paint('look');                                     // a revision follows a look at the same stop
 write('bench/plan/extra-args.json', ['--midlayers', '2']);
 out = until(paint('revise', 'then', 'next'), stopped);
 paint('look');
