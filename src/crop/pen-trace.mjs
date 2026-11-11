@@ -7,17 +7,17 @@
 // least one step of that scale darker than both sides along x, y or a diagonal, TRACE_MM.flank out (a thin dark line,
 // not a dark mass), and it lies in the darker half of the scale. A pen follows the line it is on, carries no pixel
 // staircase (one pixel), lifts where the line turns back on itself, joins only where one piece continues another
-// across TRACE_MM.reach, and goes on contours, not inside dark masses: one side TRACE_MM.side out is lighter than the
-// middle of the scale. Spans shorter than TRACE_MM.minLength are dropped, and wiggly ones shorter than TRACE_MM.wiggle.
+// across TRACE_MM.reach, and goes on contours, not inside dark masses: on one side, the band from TRACE_MM.reach to
+// TRACE_MM.minLength out is a light shape (its median lighter than the middle of the scale). Spans shorter than TRACE_MM.minLength are dropped, and wiggly ones shorter than TRACE_MM.wiggle.
 // Each line is drawn with one nib and one weight from its mean darkness. Points are [x, y] in the target's pixels.
 // Nothing is settable. The millimetres are the tracer's pixel limits on a bench subject (300 px on its 280 mm sheet,
 // BENCH_PIXEL_MM a pixel) restated on the sheet, so a bench subject traces exactly as before.
 
 const BENCH_PIXEL_MM = 280 / 300;
 const mm = px => px * BENCH_PIXEL_MM;
-/** The tracer's tolerances in sheet millimetres: flank 1.9 to 3.7, side 2.8 to 3.7, reach 3.7, shortest line 13.1,
- *  wiggly lines shorter than 37.3. */
-export const TRACE_MM = Object.freeze({ flank: [mm(2), mm(4)], side: [mm(3), mm(4)], reach: mm(4), minLength: mm(14), wiggle: mm(40) });
+/** The tracer's tolerances in sheet millimetres: flank 1.9 to 3.7, reach 3.7, shortest line 13.1, wiggly lines
+ *  shorter than 37.3. A contour's side is read over the band from the reach to the shortest line. */
+export const TRACE_MM = Object.freeze({ flank: [mm(2), mm(4)], reach: mm(4), minLength: mm(14), wiggle: mm(40) });
 const VALUE_STEPS = 9;
 
 const unit = (x, y) => { const m = Math.hypot(x, y); return m > 1e-9 ? [x / m, y / m] : [1, 0]; };
@@ -109,17 +109,20 @@ export function joinPieces(pieces, { gap, cos = 0.8, aim = 0.7 } = {}) {
   }
 }
 
-/** Whether the line is a contour: on at least half its points one side, `reach` pixels out across it, is lighter than
- *  the middle of the subject's value scale (`mid`). A line with dark on both sides lies inside a dark mass, where the
- *  wash states the form; ink there is shadow or texture rewritten as line. `at(x, y)` is luminance 0..1. */
-export function hasLightSide(P, at, mid, reach) {
+/** Whether the line is a contour: on at least half its points one side is a light shape, i.e. the median luminance of
+ *  the band `band` = [from, to] pixels out across it is lighter than `mid`, the middle of the subject's value scale.
+ *  The band runs from the tracer's reach to its shortest line: a shape at least as wide as the shortest line it draws.
+ *  A line with dark shapes on both sides lies inside a dark mass, where the wash states the form; a white fleck or a
+ *  sheen streak beside it is not a shape. `at(x, y)` is luminance 0..1. */
+export function hasLightSide(P, at, mid, band) {
   const pts = [];
   for (let j = 1; j < P.length; j++) { const L = Math.hypot(P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1]), k = Math.max(1, Math.ceil(L)); for (let s = 0; s < k; s++) pts.push([P[j - 1][0] + (P[j][0] - P[j - 1][0]) * s / k, P[j - 1][1] + (P[j][1] - P[j - 1][1]) * s / k, P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1]]); }
   if (!pts.length) return false;
+  const rs = []; for (let r = band[0]; r <= band[1]; r++) rs.push(r);
   let lit = 0;
   for (const [x, y, dx, dy] of pts) {
     const [tx, ty] = unit(dx, dy), nx = -ty, ny = tx;
-    const side = s => Math.max(...reach.map(r => at(Math.floor(x + s * nx * r), Math.floor(y + s * ny * r))));
+    const side = s => { const v = rs.map(r => at(Math.floor(x + s * nx * r), Math.floor(y + s * ny * r))).sort((a, b) => a - b); return v[v.length >> 1]; };
     if (Math.max(side(1), side(-1)) > mid) lit++;
   }
   return lit >= pts.length / 2;
@@ -133,7 +136,7 @@ export function tracePen(lum, W, H, { pixelMm }) {
   if (!(pixelMm > 0)) throw new Error('pen trace: the sheet millimetres of one pixel');
   // a tolerance in pixels (to a millionth, so a bench subject lands on its old whole pixels); never under one pixel
   const px = v => +(v / pixelMm).toFixed(6), f0 = Math.max(1, Math.round(px(TRACE_MM.flank[0])));
-  const P = { flank: [f0, Math.max(f0 + 1, Math.round(px(TRACE_MM.flank[1])))], side: TRACE_MM.side.map(v => Math.max(1, Math.round(px(v)))),
+  const P = { flank: [f0, Math.max(f0 + 1, Math.round(px(TRACE_MM.flank[1])))], side: [Math.max(1, Math.round(px(TRACE_MM.reach))), Math.max(1, Math.round(px(TRACE_MM.minLength)))],
     reach: Math.max(1, px(TRACE_MM.reach)), minLength: px(TRACE_MM.minLength), wiggle: px(TRACE_MM.wiggle) };
   const n = W * H, sorted = Float32Array.from(lum).sort(), q = f => sorted[Math.min(n - 1, Math.floor(f * n))];
   const paper = q(0.99), ink = q(0.001), step = (paper - ink) / (VALUE_STEPS - 1), mid = ink + (paper - ink) / 2;
