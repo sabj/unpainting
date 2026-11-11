@@ -140,7 +140,7 @@ export function measurePaper(sheet, cells, paperOnly = false, options = {}) {
   finally { census.measurePaper.ms += performance.now() - t; }
 }
 function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, stats = 'full', bounds = null, fresh = false } = {}) {
-  if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, ...(stats === 'gate' ? {} : {waterP95: 0}), moistShare: 0, dry: true };
+  if (!cells.length) return { cells: 0, waterMax: 0, saturationMax: 0, ...(stats === 'gate' ? {} : {waterP95: 0, waterP50: 0}), moistShare: 0, dry: true };
   const sw = sheet.w;
   let x0 = sw, x1 = 0, y0 = sheet.h, y1 = 0;
   if (bounds) [x0, y0, x1, y1] = bounds;
@@ -149,9 +149,9 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
     if (x < x0) x0 = x; if (x > x1) x1 = x;
     if (y < y0) y0 = y; if (y > y1) y1 = y;
   }
-  if (hasZeroPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
+  if (hasZeroPaperCertificate(sheet)) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0, waterP50:0}), moistShare:0, dry:true};
   const reach = queryWetReach(sheet, cells, [x0, y0, x1, y1]);
-  if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0}), moistShare:0, dry:true};
+  if (reach?.allZero) return {cells:cells.length, bounds:[x0,y0,x1,y1], waterMax:0, saturationMax:0, ...(stats === 'gate' ? {} : {waterP95:0, waterP50:0}), moistShare:0, dry:true};
   // Flushes queued GPU strokes and reads fresh water/saturation planes over the footprint.
   const freshRect = reach?.rect ?? [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
   if(stats==='gate'&&!fresh&&sheet._gpu?.measurePaperGate){
@@ -200,7 +200,7 @@ function measurePaperImpl(sheet, cells, paperOnly = false, { uniform = false, st
     if (water >= PAPER_STATE.moistWater || saturation >= PAPER_STATE.moistSaturation) moist++;
   }
   if (waters) waters.sort((a, b) => a - b);
-  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, ...(stats === 'gate' ? {} : { waterP95: waters ? quantile(waters, 0.95) : firstWater }), moistShare: moist / cells.length,
+  return { cells: cells.length, bounds: [x0, y0, x1, y1], waterMax, saturationMax, ...(stats === 'gate' ? {} : { waterP95: waters ? quantile(waters, 0.95) : firstWater, waterP50: waters ? quantile(waters, 0.5) : firstWater }), moistShare: moist / cells.length,
     dry: waterMax <= PAPER_STATE.dryWater && saturationMax <= PAPER_STATE.drySaturation };
 }
 

@@ -8,6 +8,7 @@ import { useFlowThreads } from './wash.mjs';
 import { useUnmixThreads } from '../crop/pigments.mjs';
 import { useBlurThreads } from '../keyframes/density.mjs';
 import { runJob } from './jobs-kernel.mjs';
+import { SIZING } from './sizing.mjs';
 import {
   runChunk, claim, openPhase, PH, GEN, PHASE, SHEET, DONE, ERR, NT, READY, NCH, BOX, IT, ITERS, LAST, NA, N3, NGROUP, BAND, MAXT, MAXC,
   ACT, ACT3, GROUP, GREP, MV, AF, DF, TF, CTRL_LEN, MAXK, P, PK, PKS, PRM_LEN,
@@ -254,7 +255,7 @@ function params(C, sheet, o) {
     diffuse: Math.min(0.25, Math.max(0, o.diffuse)), cd: o.carryDepth ?? 0.08, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03, gran: o.gran ?? 1, liftDepth: o.liftDepth ?? 0.15,
     scour: o.scour ?? 0, holdCap: o.hold ?? Infinity, settle: o.settle, lift: o.lift, looseLift: o.looseLift, rewetLift: o.rewetLift,
     granFill: o.granFill ?? 0, slide: o.slide ?? 0, fill: o.slideFill ?? 1, repose: o.repose ?? 0,
-    capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing: o.sizing ?? 0.85, filter: o.wickFilter ?? 0.2,
+    capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing: o.sizing ?? SIZING, filter: o.wickFilter ?? 0.2,
     capEps: o.capEps, capDelta: o.capDelta, wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill,
     spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
     hasTop: C.top ? 1 : 0, hasResist: C.resist ? 1 : 0, enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0,

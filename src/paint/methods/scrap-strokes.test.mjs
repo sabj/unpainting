@@ -11,24 +11,24 @@ import { step, dry, DEFAULTS } from '../../media/sheet.mjs';
 import { createBrush, dip, stroke, sideReach, edgeHalfWidth } from '../../media/brush.mjs';
 import { scaleBrushForDensity } from '../../media/brush-density.mjs';
 
-const W = 540, mm = 280 / W, sc = W / 540;
+const W = 540, mm = 280 / W;
 const physics = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, gran: 0.25, granFill: 0 };
-const paperOptions = { mmPerCell: mm, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } };
+const paperAt = width => { const m = 280 / width; return { mmPerCell: m, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, coldPress: { mmPerCell: m, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }; };
 const pigment = { K: [0.25, 0.8, 1.5], S: [0.05, 0.04, 0.03], rho: 0.06, omega: 1, gamma: 0.5 };
 const WATER = 0.62, CONC = 0.66;
 
 // kit sizes in mm, as the stroke planner's kit
-const kit = (mmWide, { flat, model = 'row', seed = 0 } = {}) => {
-  const R = mmWide / 2 / mm;
-  return { R, flat, opts: s => scaleBrushForDensity({ grainShift: 0, flat, model, radius: R, bristles: Math.max(12, Math.ceil(R * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, bridge: 0, bridgeSoft: 2.4, seed: 31 + seed + s }, { renderWidth: W }) };
+const kit = (mmWide, { flat, model = 'row', seed = 0, width = W } = {}) => {
+  const R = mmWide / 2 / (280 / width);
+  return { R, flat, width, opts: s => scaleBrushForDensity({ grainShift: 0, flat, model, radius: R, bristles: Math.max(12, Math.ceil(R * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, bridge: 0, bridgeSoft: 2.4, seed: 31 + seed + s }, { renderWidth: width }) };
 };
 // the planner's footprint half-width at a pressure (flat: the row, round: the belly)
 const footprintHalf = (R, flat, p) => (flat ? R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.5)) : R * (0.25 + 0.75 * p));
 
-function instruments({ R, flat, opts }, p) {
-  const big = R * mm >= 4, spacing = (big ? 1.4 : 0.7) * sc;
+function instruments({ R, flat, opts, width }, p) {
+  const big = R * 280 / width >= 4, spacing = (big ? 1.4 : 0.7) * width / 540;
   return {
-    pigment, physics, paperOptions, step, dry,
+    pigment, physics, paperOptions: paperAt(width), step, dry,
     brush: (s = 0) => createBrush(opts(s)),
     loaded: b => b.resP[0] + b.hairs.reduce((a, hr) => a + hr.pig[0], 0),
     dipBrush: b => dip(b, { water: WATER, conc: [CONC] }),
@@ -64,19 +64,19 @@ const join = overlap => {
   if (!joins.has(overlap)) joins.set(overlap, scrapJoin({ ...instruments(FLAT, P), half, edge, overlap, length: Math.round(6 * FLAT.R) }));
   return joins.get(overlap);
 };
-const show = r => `body ${r.body.min.toFixed(3)}..${r.body.max.toFixed(3)}, join ${r.join.min.toFixed(3)}..${r.join.max.toFixed(3)}`;
+const show = r => `body ${r.body.min.toFixed(4)}..${r.body.max.toFixed(4)}, join ${r.join.min.toFixed(4)}..${r.join.max.toFixed(4)}`;
 
 test('two strokes on scrap put on the paper all the pigment that left the brushes', () => {
   for (const ov of [0, laneOverlap, 0.25]) { const r = join(ov); assert.ok(r.given > 0 && r.conserved, `overlap ${ov}: given ${r.given}, on sheet ${r.onSheet}`); }
 });
 
-test('two flat strokes lapped by the lane overlap fuse', { todo: 'pores drink a loaded touch at once on sized paper' }, () => {
+test('two flat strokes lapped by the lane overlap fuse', () => {
   const r = join(laneOverlap); assert.ok(r.fused, show(r));
 });
-test('two flat strokes lapped by a quarter fuse', { todo: 'pores drink a loaded touch at once on sized paper' }, () => {
+test('two flat strokes lapped by a quarter fuse', { todo: 'the paint smeared off the second brush soaks in over the first: the lap dries up to 6% darker than the body' }, () => {
   const r = join(0.25); assert.ok(r.fused, show(r));
 });
-test('two butted flat strokes fuse', { todo: 'the ragged fringes leave dry paper between the strokes' }, () => {
+test('two butted flat strokes fuse', { todo: 'the ragged fringes leave dry paper between the strokes, which a bead does not cross' }, () => {
   const r = join(0); assert.ok(r.fused, show(r));
 });
 
@@ -106,3 +106,21 @@ for (const p of [0.3, 0.6, 0.9]) {
     assert.ok(ratio >= 0.9 && ratio <= 1.1, `round over flat ${ratio.toFixed(3)}`);
   });
 }
+
+// Stroke ends (033 item 4): a lifted brush's last free liquid must not dry as a dot. Laid at the benchmark's render
+// width (1200 cells across the 280 mm sheet), where the dots showed on plates: the 3 mm round (the planner's thin-stroke
+// brush) and the 12 mm round at a light and a firm touch, and the 1 in flat as every passage lays it.
+const RW = 1200;
+const endMark = (k, p, half) => scrapMark({ ...instruments(k, p), half, length: Math.round(Math.max(8 * k.R, 40)) });
+const endsShow = r => `body peak ${r.bodyPeak.toFixed(4)}, start ${r.startPeak.toFixed(4)}, end ${r.endPeak.toFixed(4)}`;
+const endsInside = r => r.startPeak <= r.bodyPeak && r.endPeak <= r.bodyPeak;
+for (const mmWide of [3, 12]) for (const p of [0.4, 0.8]) {
+  test(`a ${mmWide} mm round stroke's ends dry no darker than its body at pressure ${p}`, () => {
+    const k = kit(mmWide, { flat: false, width: RW }), r = endMark(k, p, footprintHalf(k.R, false, p));
+    assert.ok(endsInside(r), endsShow(r));
+  });
+}
+test('a 1 in flat stroke\'s ends dry no darker than its body', () => {
+  const k = kit(25.4, { flat: true, width: RW }), r = scrapMark({ ...instruments(k, P), half: footprintHalf(k.R, true, P), length: Math.round(4 * k.R) });
+  assert.ok(endsInside(r), endsShow(r));
+});

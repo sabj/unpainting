@@ -116,7 +116,7 @@ Each shape gets a technique chosen from what the subject shows there.
 - Technique library: `src/paint/techniques/README.md` indexes it. Passage material and move names (`wet on wet`, `wet on dry`, `dry on dry`, with aliases such as `wet in wet`, `glaze`, `dry brush`) are normalised in `src/paint/techniques/passage-plan.mjs`.
 - Techniques by kind: `src/paint/techniques/shaped-marks.mjs` (flat-brush planes, sky sweeps, short texture marks), `src/paint/techniques/dark-mass.mjs` (dark surfaces), `src/paint/techniques/surface-marks.mjs` (fur, masonry and other surface marks), `src/paint/techniques/passage-plan.mjs` (named passages).
 - Style profiles: `src/paint/styles/loader.mjs` with `src/paint/styles/ink-and-wash.json`, `src/paint/styles/precise-watercolor.json`, `src/paint/styles/urban-sketch.json`, `src/paint/styles/atmospheric-wet.json`, chosen by the plan's `styleSelection`.
-- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`).
+- Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (a wet-into-wet swatch is wetted and waited on as the sheet is) (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`).
 - Index of every module and flag: [methods and techniques](techniques.md).
 
 The rule for choosing, in painter terms: joined wash or wet in wet for large soft areas and soft transitions; wet on dry for crisp edges and layered glazes; dry brush for broken texture. Wet on dry and dry brush are good techniques. The job is the right one per shape, not making everything wet. The choice is made in the plan (area-plan passes name the move) and logged per shape.
@@ -143,7 +143,7 @@ The painter dips a brush, tries it on scrap, lays a stroke along a path, and rel
 
 ## 6. Wet physics and drying
 
-The sheet holds five things per cell: standing water, water in the pores, pigment floating, pigment settled, pigment in the pores. Water keeps moving after the brush has gone. It spreads, soaks in and evaporates fastest at a wash's edge, so edges dry darker. Settling pigment collects in hollows and gives granulation. The brush path sets where paint starts and the water sets where the dried mark ends.
+The sheet holds five things per cell: standing water, water in the pores, pigment floating, pigment settled, pigment in the pores. The paper is sized. A loaded brush's free liquid, the water it holds beyond what its hairs keep, stays on the sized surface where it lands, and the dry pores take only their share of it, so a lane leaves a wet edge for the next one to join. A thin or damp brush gives little: there is little free liquid to give. Water keeps moving after the brush has gone. It spreads, soaks in and evaporates fastest at a wash's edge, so edges dry darker. Settling pigment collects in hollows and gives granulation. The brush path sets where paint starts and the water sets where the dried mark ends.
 
 ![A real wash by Winslow Homer beside a simulated flat wash and graded wash on the default cold-press paper](img/paper-texture.webp)
 
@@ -159,7 +159,7 @@ A dried wash becomes its own layer. A glaze is a transparent wash over dried pai
 
 - Paper: `src/media/paper.mjs` (fibres, tooth, cold-press bumps 0.5 to 2 mm), `src/media/sheet-size.mjs`. The sheet fits the target inside a 6 x 4 in postcard by default; `--sheetmm` sets the physical width and `--width` the cell count. More cells at the same width add detail; a larger export adds none.
 - Water and pigment: `src/media/sheet.mjs` with `src/media/sheet-kernel.mjs` (one step cut into row bands for the CPU) and `src/media/gpu/stepfull.mjs`, `src/media/gpu/stepfull.wgsl` (the GPU step). Pigment data comes from `src/crop/pigments.mjs`. [Pigments and paper](pigments-and-paper.md) has the details.
-- Timing: `src/paint/methods/wetdry.mjs` (paper wetness, brush load, waiting for the paper to dry) and `tools/painter/wet-bed-wait.mjs` (a wet stroke into a fresh wash waits for the shine to go off while its footprint stays damp). `src/paint/methods/wash-session.mjs` joins passages in one wet session (`--washsession`); sessions never cross a glaze, subject or shadow boundary.
+- Timing: `src/paint/methods/wetdry.mjs` (paper wetness, brush load, waiting for the paper to dry) and `tools/painter/wet-bed-wait.mjs` (a wet-into-wet passage is prewetted and charged once the shine goes off: when the typical cell of the bed, not its wettest puddle, holds no more than a glossy film. A passage waits for a neighbouring wash once, before its first lane, never between its own lanes, so its lanes join while wet). `src/paint/methods/wash-session.mjs` joins passages in one wet session (`--washsession`); sessions never cross a glaze, subject or shadow boundary.
 - Checks: `src/media/checks.mjs` counts physics violations; `--strict 1` makes them stop the run.
 
 **Inputs:** strokes with brush, load and paper state. **Outputs:** the dried and wet sheet, frames, `wash.jpg`.
@@ -250,7 +250,6 @@ Commands are in [Running the painter](running.md). Image rights are in [NOTICE](
 
 The pipeline is meant to change, and this page describes only what runs at the tip. Proposed changes are kept in a separate list, one entry per stage change: owner, branch, what moves where, why in painter terms, status. In flight, by branch:
 
-- `claude/033-drying`: stage 6, seam water so lanes of one wash fuse.
 - `claude/033-shapes`: stages 3 and 4, shapes from SAM regions, one wash each.
 - `claude/033-looks`: stage 7, looks and tracers at brush and shape scale.
 - `claude/033-unfit`: stage 4, the fitted tuned folder is gone; kept ideas are general techniques.
