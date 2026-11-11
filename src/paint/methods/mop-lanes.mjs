@@ -1,4 +1,4 @@
-// The mop's lanes over a shape, for the broad washes (masses.mjs) and the passages (src/paint/techniques/passages).
+// The mop's lanes over a shape, for the broad washes (masses.mjs).
 // The disc is never clamped to the shape: across a gap wider than the mop the hand lifts, and each sweep overhangs.
 //   --mopgap 1.0    lanes this many mop radii apart
 //   --mopover 0.2   each sweep overhangs its run of the shape by this many radii at both ends

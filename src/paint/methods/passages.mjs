@@ -1,4 +1,4 @@
-// --passages sea,trees,sky,foliage: named passages from src/paint/techniques/passages/<name>.mjs. Each exports
+// --passages <names>: named passages from src/paint/techniques/passages/<name>.mjs (none ship; a missing module stops the run). Each exports
 // `when` ('washes' follows the mop, 'shapes' the dark shapes, 'finish' the ladder) and `paint(ctx)`.
 // A segment with its own passage is left to it: the shape stage and the ladder keep off it.
 //   --ladderown 0.5   a ladder glaze with this share of its cells on a passage's segment is left to the passage

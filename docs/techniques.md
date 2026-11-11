@@ -144,10 +144,6 @@ Modules:
 
 - `techniques/dark-mass-shape.mjs` (helper): a dark mass's shape and fur curl paths.
 - `techniques/dark-mass.mjs` (`--darkmass <segments|auto>`): black fur and dark surfaces in four steps.
-- `techniques/passages/foliage.mjs` (`--passages foliage`): a hillside of bushes, light to dark and broken.
-- `techniques/passages/sea.mjs` (`--passages sea`): a graded sea band with a masked foam line.
-- `techniques/passages/sky.mjs` (`--passages sky`): a wet-in-wet sky with lifted clouds.
-- `techniques/passages/trees.mjs` (`--passages trees`): a far treeline of round-brush dabs.
 - `techniques/shaped-marks.mjs` (`--shapedmarks 1`): flat-brush planes, sky sweeps and short texture marks.
 - `techniques/subject-local.mjs` (`--subjlocal <stage.png>`): the subject's first wash in local colour, wet into wet.
 - `techniques/subject-tint.mjs` (`--subjtint <stage.png>`): a pale local colour per subject region.
