@@ -45,7 +45,7 @@ test('every drawing key drawingFlags reads counts as read, including linework', 
 test('the bundled value plans use only keys the painter reads', () => {
   const dir = path.join(root, 'examples/plans');
   const plans = fs.readdirSync(dir).filter(f => f.endsWith('.json')).map(f => [f, JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'))])
-    .filter(([, p]) => !p.commands && !p.parts); // stroke plans (tools/run-plan.mjs) and the subject-regions spec are other formats
+    .filter(([, p]) => !p.commands && !p.parts && p.coordinateSpace !== 'normalized-target'); // stroke plans (tools/run-plan.mjs), the subject-regions spec and area plans (semantic-areas.mjs) are other formats
   assert(plans.some(([f]) => f === 'trumbull-values.json'));
   for (const [f, p] of plans) assert.deepEqual(unusedPlanKeys(p, { pipeline: true }), [], f);
   const bench = JSON.parse(fs.readFileSync(path.join(root, 'bench/v4v5/example/plan/config.json'), 'utf8'));
