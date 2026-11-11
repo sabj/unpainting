@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { splitLoads, paintsHere } from './brushes.mjs';
-import { swatchMask, swatchStrip, SWATCH } from './scrap-swatch.mjs';
 
 // a lane 100 cells long whose middle 40 cells (x 30..69) lie over a reserve the brush may not paint
 const lane = Array.from({ length: 101 }, (_, x) => ({ x, y: 5 }));
@@ -35,14 +34,3 @@ test('the brush paints inside the clip, off any resist, and nowhere off the shee
   assert.equal(paintsHere({ w: 2, h: 1 })({ x: 1.4, y: 0.2 }), true);
 });
 
-test('the swatch strip is the square stretched to a load, with the same scrap margin all round', () => {
-  const square = swatchStrip(SWATCH.y1 - SWATCH.y0);
-  assert.equal(square.width, SWATCH.width); assert.equal(square.height, SWATCH.height);
-  assert.deepEqual(swatchMask(), square.mask);
-  const strip = swatchStrip(300), set = strip.mask.reduce((a, v) => a + v, 0);
-  assert.equal(strip.height, 340); assert.equal(set, 300 * (SWATCH.x1 - SWATCH.x0));
-  assert.equal(strip.mask[SWATCH.y0 * strip.width + SWATCH.x0], 1); assert.equal(strip.mask[(SWATCH.y0 + 300) * strip.width + SWATCH.x0], 0);
-  const wide = swatchStrip(300, 70);
-  assert.equal(wide.width, 110); assert.equal(wide.mask.reduce((a, v) => a + v, 0), 300 * 70);
-  assert.throws(() => swatchStrip(0), RangeError); assert.throws(() => swatchStrip(10, 2.5), RangeError);
-});

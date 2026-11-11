@@ -18,7 +18,7 @@ import {subjectField, orderBySubject, OVERLAP} from '../../src/paint/methods/sub
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {recordGraphiteBatch} from '../painter/record-graphite.mjs';
 import {numericalGlazePasses} from '../painter/numerical-glaze-passes.mjs';
-import {SWATCH, swatchStrip, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
+import {SWATCH, swatchMask, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
 import {createInstrumentCal, instrumentKey, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
 import {validateProductionDetails, productionChargeLink, productionContinuationReady, prepareProductionDryContact} from '../painter/semantic-production-details.mjs';
 import {legacyIntentFamily, prepareMajorDryBase, sameUnliftedMajorGesture} from '../painter/legacy-major-intents.mjs';
@@ -666,21 +666,6 @@ const mark = pass => {
 
 // What each technique actually delivers, measured on scrap before anything goes on the sheet; charges scale by it.
 // --waterscale: scales each technique's wash water (dry brush excepted), capped at a full load. Calibration uses the same load.
-// --meteredbrush 1: finite physical load, release depth independent of load. Needs --physical 1; cannot combine with --washsplat.
-// --brushload k: scales carried ml and reload distance, never deposited depth. One model water-depth unit is taken as 1 mm.
-const METERED_BRUSH = num('meteredbrush', 0) > 0;
-const BRUSH_LOAD = num('brushload', 1);
-if (METERED_BRUSH && (!PB || !(BRUSH_LOAD > 0) || !Number.isFinite(BRUSH_LOAD)))
-  throw new Error('--meteredbrush requires --physical 1 and a finite positive --brushload');
-if (METERED_BRUSH && num('washsplat', 0) > 0)
-  throw new Error('--meteredbrush uses bristles; omit --washsplat');
-const meteredOpts = (r, T) => {
-  if (!METERED_BRUSH || T.name.startsWith('dry brush')) return {};
-  const name = PB.pick(r), tech = T.name.replace(/ graded$/, '');
-  const uptake = PB.cfg.uptake_ml_per_cm2[tech] ?? PB.cfg.uptake_ml_per_cm2['wet on dry'];
-  return { loadWater: PB.cfg.brushes[name].water_ml * BRUSH_LOAD * 1000 / PB.mmPerCell ** 2,
-    depositDepth: uptake * 10 };
-};
 const WET = T => (T.water >= 0.3 ? Math.min(1, T.water * num('waterscale', 1)) : T.water);
 // --drymix k: scales how much a wet-on-dry or glazed brush trades paint with wet paint under it (wetMix). Default 1.
 const MIX = T => (T.intoWet ? T.wetMix : T.wetMix * num('drymix', 1));
@@ -704,10 +689,9 @@ const scrapSwatches = (techniques, drySwatch) => {
   // A graded wash is recharged every few cells along its sweep (--gradedwash), so each technique is also laid on scrap
   // recharged that way, and what it lays is kept both inside the swatch and over the whole scrap (see GRADED_CAL).
   const CHUNK = opt('gradedwash', '1') !== '0' ? Math.max(2, Math.round(GCHUNK)) : 0;
-  // The swatch's lanes over a strip `rows` long (the square is 50 rows).
   // --calpipe 1: calibrate with the sheet's own lanes, containment and pressure, not a plain sweep at default pressure.
-  const layout = (rows, cols) => {
-    const { mask, width: SW, height: SH } = swatchStrip(rows, cols);
+  const layout = () => {
+    const mask = swatchMask(), { width: SW, height: SH } = SWATCH;
     let paths = washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 });
     if (opt('calpipe', '0') !== '0') {
       // the sheet's own brush, capped so a fifty-cell swatch is still laid in lanes as a passage that size would be
@@ -721,19 +705,10 @@ const scrapSwatches = (techniques, drySwatch) => {
     }
     // and charged for its footprint exactly as a passage on the sheet is, so that shortfall is not counted twice
     const under = opt('calpipe', '0') !== '0' && opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, sweepCover(paths, mask, SW, SH))) : 1;
-    return { mask, paths, width: SW, height: SH, under };
+    return { mask, paths, under };
   };
-  const square = layout(SWATCH.y1 - SWATCH.y0);
-  // --meteredbrush 1: a brush holding a real load runs short along a lane, so it is tried over one whole load, the
-  // length the sheet cuts its lanes at (paint.mjs LOADS), at its own width: the kit brush the square's sweep calls for
-  // (PB.pick, as meteredOpts sizes its water), on a strip one load long and as wide as that brush plus the swatch's pad.
-  const stripOf = T => {
-    if (!METERED_BRUSH || T.name.startsWith('dry brush')) return null;
-    const name = PB.pick(Math.max(1, ...square.paths[0].map(p => p.r)));
-    return { rows: Math.max(1, Math.round(PB.loadCells(name, T.name.replace(/ graded$/, '')) * BRUSH_LOAD * WET(T))), cols: Math.max(4, Math.round(2 * (PB.half(name) + 1.5))) };
-  };
-  // a value plan's wet lane waits for its shine to go off before it is charged (layIntoWetBed in the stroke wrapper above), so its swatch does too
-  const paintOpts = (r, T) => ({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11, ...meteredOpts(r, T) });
+  const square = layout();
+  const paintOpts = (r, T) => ({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T), bridge: washBridge(T, T.bridge), bridgeSoft: T.bridgeSoft, seed: 11 });
   // ... and its bed is wetted as the sheet wets one (tools/painter/wet-bed-prep.mjs): a clean brush made like the swatch's
   // painting brush, its own load metered or not, a thirsty pickup and the wait, not one sweep of a full generic brush
   // read over the cells the swatch's brush touches, as the sheet reads its bed over the stroke's contact
@@ -741,17 +716,16 @@ const scrapSwatches = (techniques, drySwatch) => {
   const prepareBed = ctx.VALUE_PLAN ? (scrap, pts, r, T, _lane, cells = contactOf(scrap, pts, r, T)) => prepareWetBed({ settings: paintOpts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: 1, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
     observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke }) : null;
   const settle = ctx.VALUE_PLAN ? (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet swatch', cells: cells.length } }); } : null;
-  const envOf = T => { const strip = stripOf(T), { under, ...lanes } = strip ? layout(strip.rows, strip.cols) : square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
+  const envOf = () => { const { under, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
     waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
     paintBrush: (r, T) => createBrush(paintOpts(r, T)), prepareBed }; };
-  // a metered brush on the sheet is recharged once a load (paint.mjs LOADS), graded or not, so its graded swatch is too
   return techniques.map(T => {
-    const env = envOf(T), chunk = stripOf(T) ? Math.max(...env.paths.map(pts => pts.length)) : CHUNK;
-    return { technique: T, plain: scrapDelivery(T, env), graded: CHUNK ? scrapDelivery({ ...T, name: `${T.name} graded`, chunk }, env) : null };
+    const env = envOf();
+    return { technique: T, plain: scrapDelivery(T, env), graded: CHUNK ? scrapDelivery({ ...T, name: `${T.name} graded`, chunk: CHUNK }, env) : null };
   });
 };
 const gradedReading = g => (g ? { all: g.all, escape: g.escape, edge: g.edge } : null);
-const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!ctx.AREA_PLAN&&!ctx.FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
+const CAL_RESULT = await cachedStep({...RUN_CACHE,name:'calibration',enabled:RUN_CACHE.enabled&&!ctx.AREA_PLAN&&!ctx.FINISH_PLAN,code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,settles:Boolean(ctx.VALUE_PLAN),physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null}},async () => {
   const out = {};
   for (const { technique: T, plain, graded } of scrapSwatches(STOCK_TECHNIQUES, dry)) {
     out[T.name] = chargeFactor(plain.delivered);
@@ -781,7 +755,7 @@ const instrumentOf = (T, sh) => (ownSwatch(T, sh) ? INSTRUMENT_CAL.of(T) : INSTR
 // every instrument the value plan names is tried on scrap before the first wash
 if (INSTRUMENT_ON && ctx.VALUE_PLAN) {
   const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan, num('glazepasses', 2))])).filter(([sh, T]) => ownSwatch(T, sh)).map(([, T]) => [instrumentKey(T), T])).values()];
-  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,METERED_BRUSH,BRUSH_LOAD,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
+  const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
     for (const T of planned) INSTRUMENT_CAL.of(T);
     return INSTRUMENT_CAL.entries();
   });
@@ -798,7 +772,7 @@ if(SEMANTIC_CAL_MODE==='actual'){
  const cache=new Map(),cacheRecords=[];let sampleNumber=0;
  const instrumentCode=instrumentCodeHash(root);
  for(const {area,pass} of selectedPasses){
-  const T=semanticTechnique({area,pass},{}),r=pass.brush.widthMm/(2*PB.mmPerCell),profile={radius:r,bristles:Math.max(12,Math.ceil(r*2)),capacity:100,belly:12,feed:.4,give:.9,free:num('washfree',.4),film:.25,splay:.03,stiffness:8,wetMix:MIX(T),bridge:washBridge(T,T.bridge),bridgeSoft:T.bridgeSoft,seed:31+Math.round(num('seed',0))*7919,...meteredOpts(r,T)};
+  const T=semanticTechnique({area,pass},{}),r=pass.brush.widthMm/(2*PB.mmPerCell),profile={radius:r,bristles:Math.max(12,Math.ceil(r*2)),capacity:100,belly:12,feed:.4,give:.9,free:num('washfree',.4),film:.25,splay:.03,stiffness:8,wetMix:MIX(T),bridge:washBridge(T,T.bridge),bridgeSoft:T.bridgeSoft,seed:31+Math.round(num('seed',0))*7919};
   const binding=JSON.stringify({move:pass.move,brush:pass.brush,load:pass.load,wetness:pass.wetness,preparation:pass.preparation,authoredPaint:pass.paint,profile,paper:PAPER_OPTS,physics:O});
   if(!cache.has(binding)){
    const saved=await cachedSemanticInstrument({cache:RUN_CACHE,code:instrumentCode,track:optTrack,inputs:{binding,mmPerCell:PB.mmPerCell,referenceLengthsMm:SEMANTIC_REFERENCE_LENGTHS,pigments:PIGS,strength:num('strength',2.2),GPU_MODE,paperRGB,shade:SHADE,washSplat:WASH_SPLAT_SETTINGS},proofPath:path.join(out,'semantic-instrument-calibration.json'),pass,bypass:num('semanticcalibrationonly',0)>0,onRecord:record=>{cacheRecords.push({areaId:area.id,passId:area.id+'/'+pass.id,...record});console.log('semantic instrument cache: '+record.status+' '+area.id+'/'+pass.id+'; origin '+record.origin.proofPath);}},async images=>calibrateSemanticInstrument(pass,{mmPerCell:PB.mmPerCell,paperOptions:PAPER_OPTS,pigments:PIGS,physics:O,profile,strength:num('strength',2.2),referenceLengthsMm:SEMANTIC_REFERENCE_LENGTHS,attachBackend:sh=>attachGpu(sh,O,{mode:GPU_MODE}),onSample:async({sheet:sh,record,phase})=>{
@@ -813,7 +787,7 @@ if(SEMANTIC_CAL_MODE==='actual'){
  if(num('semanticcalibrationonly',0)){
   const normalized=[];
   for(const reference of new Set(Object.values(SEMANTIC_CAL)))for(const sample of reference.samples){
-   const p=reference.pass,r=p.brush.widthMm/(2*PB.mmPerCell),T=semanticTechnique({pass:p},{}),profile={radius:r,bristles:Math.max(12,Math.ceil(r*2)),capacity:100,belly:12,feed:.4,give:.9,free:num('washfree',.4),film:.25,splay:.03,stiffness:8,wetMix:MIX(T),bridge:washBridge(T,T.bridge),bridgeSoft:T.bridgeSoft,seed:31+Math.round(num('seed',0))*7919,...meteredOpts(r,T)};
+   const p=reference.pass,r=p.brush.widthMm/(2*PB.mmPerCell),T=semanticTechnique({pass:p},{}),profile={radius:r,bristles:Math.max(12,Math.ceil(r*2)),capacity:100,belly:12,feed:.4,give:.9,free:num('washfree',.4),film:.25,splay:.03,stiffness:8,wetMix:MIX(T),bridge:washBridge(T,T.bridge),bridgeSoft:T.bridgeSoft,seed:31+Math.round(num('seed',0))*7919};
    normalized.push(await calibrateSemanticInstrument(p,{mmPerCell:PB.mmPerCell,paperOptions:PAPER_OPTS,pigments:PIGS,physics:O,profile,strength:num('strength',2.2)*sample.gain,referenceLengthsMm:[sample.lengthMm],referenceGrid:sample.referenceGrid,attachBackend:sh=>attachGpu(sh,O,{mode:GPU_MODE}),onSample:async({sheet:sh,record,phase})=>{
     const b=new Uint8Array(sh.n*3);for(let i=0;i<sh.n;i++)for(let k=0;k<3;k++)b[i*3+k]=paperRGB[k]*(1-SHADE+SHADE*sh.paper.height[i]);
     await sharp(renderLayers(layersOf(sh),PIGS,b,sh.n,1),{raw:{width:sh.w,height:sh.h,channels:3}}).png().toFile(path.join(out,'semantic-calibration-normalized-'+normalized.length+'-'+phase+'.png'));
@@ -826,6 +800,6 @@ Object.assign(ctx, { dry, dip, productionDip, stroke, pencilDraw, SC, H2, N2, GF
   ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, penDraw, 
   OUT_W, OUT_H, O, GPU_INFO, base, SHADE, TONE_STAGE, WETPOL, WETPOL_COUNT, render, LOOK_RES, view, renderFine, 
   colourTrace, traceBox, traceCells, BRUSH, UPRIGHT, highlights, expected, DELIVERY, DCAL, TECH_CAL, TCAL, 
-  sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, METERED_BRUSH, BRUSH_LOAD, meteredOpts, WET, MIX, 
+  sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, WET, MIX, 
   washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL });
 }

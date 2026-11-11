@@ -75,8 +75,8 @@ const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTra
   DETAIL_REGION, FINISH, FUR_FIELD, SHEET_PIGS, FINISH_FILE, AREA_FILE, AREA_COMPLETED, AREA_EXEC, EARLY_DRY_VALUE, 
   dry, dip, productionDip, stroke, SC, W2, H2, N2, PB, GFLOOR, GCHUNK, PAPER_OPTS, PROBE, INKRES, OUT_W, OUT_H, O, 
   GPU_INFO, WETPOL, WETPOL_COUNT, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
-  expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, METERED_BRUSH, BRUSH_LOAD, 
-  meteredOpts, WET, MIX, washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL, FRAMES, snap, MARKTAPE, 
+  expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, 
+  WET, MIX, washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL, FRAMES, snap, MARKTAPE, 
   AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PENWASH, LOOK_AL, 
   LOOK_PLAN, TIER_MASK, up, SEED, clock, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, FW, 
   FW_SUBJ, isFirst, FILM_FRAMES, PRACTICE, used, TECHS, LAST, DARK_MASS, DRAWING, DRAW_LAST, SKY_WARM_RB, TP_ROUNDS, 
@@ -739,7 +739,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     const brush = detail
       ? createBrush({ grainShift: num('grainshift', 0), radius: r, bristles: Math.max(8, Math.ceil(r * 3)), capacity: 26, belly: 2, feed: 0.08,
           give: 0.7, free: 0.4, film: 0.22, splay: 0.06, stiffness: 5, wetMix: T.intoWet ? 0.6 : 0.15 * num('drymix', 1),
-          bridge: washBridge(T, Math.min(T.bridge, 0.55)), bridgeSoft: 1.2, streak: 0.5, seed: 31 + ctx.laid + SEED, ...meteredOpts(r, T) })
+          bridge: washBridge(T, Math.min(T.bridge, 0.55)), bridgeSoft: 1.2, streak: 0.5, seed: 31 + ctx.laid + SEED })
       : createBrush({ grainShift: num('grainshift', 0),
           flat: sh._valuePlan?.brush?.shape?sh._valuePlan.brush.shape==='flat':numericTuftHere?false:(sh._semantic?sh._semantic.pass.brush.kind==='flat':true), ...(numericTuftHere?{model:'tuft'}:{}), radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4,
           // --washfree f: the wash brush's free-liquid threshold, also on the scrap; lower lets a light load still give water. Default 0.4.
@@ -748,7 +748,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
           bridge: washBridge(T, T.bridge * num('washbridgek', 1)), bridgeSoft: T.bridgeSoft * num('washbridgesoft', 1), seed: 31 + ctx.laid + SEED,
           // --washstreak s: hair-clump streaking along a stroke (default 0.35); --washbreakup b: how fast an emptying film breaks (1.5).
           // --washbridgek k: how far the wash's liquid reaches into the tooth; below 1 the paper sparkles through. Default 1.
-          ...meteredOpts(r, T), ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}),
+          ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}),
           ...(opt('washstreak', '') !== '' ? { streak: num('washstreak', 0.35) } : {}),
           ...(opt('washbreakup', '') !== '' ? { breakup: num('washbreakup', 1.5) } : {}),
         });
@@ -828,7 +828,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // paper the brush may paint (inside the clip, off any resist; the stroke's own footprint rule), and each load is a
     // stroke of its own, dipped afresh; a graded wash is graded by the puddle's dilution between loads (the mean of its
     // graded amount under each load), not by recharging every few cells
-    const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name) * (METERED_BRUSH && !T.name.startsWith('dry brush') ? BRUSH_LOAD * WET(T) : 1), paintsHere(ctx.sheet)) : null;
+    const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name), paintsHere(ctx.sheet)) : null;
     if (LOADS && (LOADS.length > 1 || useGradedCal)) {
       // One amount per shape, graded by the plan's plane (graded-demand.mjs): each load is dipped at the plane's mean
       // under it and pressed along it, never charged per-cell amounts. A passage without a plane takes its amount throughout.
