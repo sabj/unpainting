@@ -545,8 +545,9 @@ export class GpuLink {
       return;
     }
     if (p.hairs) {   // not when the brush has been dipped since: the hairs are the dip's
-      for (let j = 0; j < lanes; j++) { const hr = brush.hairs[j], b = o + H0 + j * HS; hr.water = R[b]; for (let k = 0; k < K; k++) hr.pig[k] = R[b + 4 + k]; }
-      const bb = o + H0 + lanes * HS; brush.resW = R[bb]; for (let k = 0; k < K; k++) brush.resP[k] = R[bb + 4 + k];
+      // float32 rounding can leave a hair a hair's-breadth below empty (-1e-10); an amount of paint or water is never negative
+      for (let j = 0; j < lanes; j++) { const hr = brush.hairs[j], b = o + H0 + j * HS; hr.water = Math.max(0, R[b]); for (let k = 0; k < K; k++) hr.pig[k] = Math.max(0, R[b + 4 + k]); }
+      const bb = o + H0 + lanes * HS; brush.resW = Math.max(0, R[bb]); for (let k = 0; k < K; k++) brush.resP[k] = Math.max(0, R[bb + 4 + k]);
     }
     brush.rs.s = RU[o + 23] | (RU[o + 22] << 16);
     brush._pend = null; this.owners[slot] = null; this.stats.settleMs = (this.stats.settleMs || 0) + performance.now() - t0;
