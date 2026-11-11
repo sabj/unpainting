@@ -98,7 +98,7 @@ SAM regions are the painter's proxy for how a painter sees the subject: sky, mas
 The value planner groups the picture into light and dark bands and shapes the painter will lay.
 
 - `src/paint/methods/target-regions.mjs` builds colour and value regions. `src/paint/methods/light-to-dark.mjs` plans five light-to-dark value bands per pigment (`--order painter`), with `src/paint/methods/layer-cuts.mjs` for middle layers (`--midlayers`). `src/paint/methods/painter-order.mjs` orders passes (`--order legacy-painter`).
-- Reserved lights: `src/paint/methods/light-reserves.mjs`, `src/paint/methods/local-lights.mjs`, `src/paint/methods/small-marks.mjs` (catchlights and lit gaps under the minimum shape stay paper; small darks go once, last), `src/paint/methods/wash-join.mjs`.
+- Reserved lights: `src/paint/methods/light-reserves.mjs`, `src/paint/methods/small-marks.mjs` (catchlights and lit gaps under the minimum shape stay paper; small darks go once, last), `src/paint/methods/wash-join.mjs`.
 - Palette and demand: `src/crop/palette.mjs`, `src/crop/palettewide.mjs`, `src/crop/pigments.mjs` (the 16 pans in `src/crop/box.mjs`), `src/paint/methods/shape-deficit.mjs` (each passage is charged from its whole shape).
 - Value delivery: values are planned against the sheet's own optics and delivered as planned (`src/eval/plan-optics.mjs`, `src/eval/plan-values.mjs`). A wash that comes out too dark or light is a plan or physics fault, not something a gain can repair.
 

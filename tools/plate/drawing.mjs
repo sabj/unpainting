@@ -28,13 +28,10 @@ import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, dilate, erode} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {applyResist} from '../../src/media/sheet.mjs';
-import {breakLights} from '../../src/paint/methods/lights-shape.mjs';
-import {shapeFlecks} from '../../src/paint/methods/flecks.mjs';
 import {softMask} from '../../src/paint/methods/soft-mask.mjs';
 import {longShare} from '../../src/crop/gestures.mjs';
 import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
-import {localLights} from '../../src/paint/methods/local-lights.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
@@ -155,9 +152,7 @@ const FLUID = SMALL && opt('lightresist', '1') !== '0' ? SMALL : null;
 // --resistmin s: masking fluid only on lights of at least s of the sheet's cells; a masked speck dries as a rimmed hole. Default 0.
 const bigLights = (mask, min) => (min > 0 ? removeSmall(mask, w, h, Math.round(min * n)) : mask);
 const RESIST0 = FLUID ? Uint8Array.from(FLUID, (v, i) => (v || (ctx.masked > n * 0.01 && highlights[i]) ? 1 : 0)) : ctx.masked > n * 0.01 ? bigLights(highlights, num('resistmin', 0)) : null;
-// --locallights: the lightest share of each segment masked too (src/paint/methods/local-lights.mjs)
-const LOCAL_LIGHTS = breakLights(await localLights({ A: ctx.A, K: PIGS.length, w, h, n, image: opt('image', ''), opt, num, log: console.log, path }), { w, h, paper, SC, gaussian, num, log: console.log });
-const RESIST_BASE = await shapeFlecks(LOCAL_LIGHTS ? Uint8Array.from({ length: n }, (_, i) => ((RESIST0 && RESIST0[i]) || LOCAL_LIGHTS[i] ? 1 : 0)) : RESIST0, { w, h, n, SRC: ctx.SRC, paper, SC, gaussian, image: opt('image', ''), path, num, opt, log: console.log, seed: SEED });
+const RESIST_BASE = RESIST0;
 // --softmask: the fluid thin at each light's rim, so it lifts to a soft broken edge (src/paint/methods/soft-mask.mjs)
 const RESIST_SOFT_BASE = softMask(RESIST_BASE, { w, h, n, paper, SC, gaussian, num });
 if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))MOD.lights=Uint8Array.from(ctx.AREA_PLAN.reserves,(v,i)=>v||ctx.AREA_PLAN.film[i]?1:0);
@@ -165,8 +160,7 @@ let { R: RESIST$, S: RESIST_SOFT } = MOD&&!ctx.AREA_PLAN ? joinResist(RESIST_BAS
 if(ctx.AREA_PLAN){ctx.RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(let i=0;i<n;i++)if(ctx.AREA_PLAN.film[i]){ctx.RESIST[i]=1;RESIST_SOFT[i]=1;}}
 if(ctx.VALUE_PLAN){
  // The same target-white mask owns planning and physical film; inferred highlights include pale painted planes.
- // --locallights cells join it: they were laid in RESIST_BASE above and would otherwise be dropped here.
- ctx.RESIST=Uint8Array.from(ctx.VALUE_PLAN.protectedCells,(v,i)=>v||LOCAL_LIGHTS?.[i]?1:0);RESIST_SOFT=Float32Array.from(ctx.RESIST);
+ ctx.RESIST=Uint8Array.from(ctx.VALUE_PLAN.protectedCells);RESIST_SOFT=Float32Array.from(ctx.RESIST);
 }
 // Plan reserves are already in RESIST through the value plan's protectedCells: the target's own light inside each
 // box (src/paint/methods/light-reserves.mjs), not the box. Only the film record and its dry-paper check remain here.
