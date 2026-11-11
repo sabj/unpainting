@@ -9,7 +9,7 @@ import sharp from 'sharp';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 
-test('fix 4: trace-ink draws each line with one nib and one weight, fixed limits, no rule fitted to one plate', async () => {
+test('fix 4: trace-ink draws each line with one nib and one weight, limits not settable, no rule fitted to one plate', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'looks-trace-'));
   try {
     // one thin line whose darkness changes along its length
@@ -26,6 +26,24 @@ test('fix 4: trace-ink draws each line with one nib and one weight, fixed limits
     }
     assert.throws(() => execFileSync(process.execPath, [tool, target, out, '.08'], { cwd: ROOT, stdio: 'pipe' }), 'the contrast limit is not settable');
     assert.doesNotMatch(fs.readFileSync(tool, 'utf8'), /green|architecture/, 'no clause fitted to one plate');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('fix 4b: trace-ink limits come from the subject\'s own value range, not from one plate', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'looks-range-'));
+  try {
+    // a pale drawing: paper 0.95, lines at about 0.70, nothing darker. A constant darkness limit of .62 traces
+    // none of it; on the subject's own scale these lines are its darks.
+    const target = path.join(dir, 't.png'), out = path.join(dir, 'lines.json');
+    await sharp(Buffer.from('<svg width="80" height="40"><rect width="80" height="40" fill="#f3f3f3"/><rect x="5" y="9" width="70" height="1.4" fill="#b4b4b4"/><rect x="5" y="29" width="70" height="1.4" fill="#b4b4b4"/></svg>')).png().toFile(target);
+    const tool = path.join(ROOT, 'bench/v4v5/tools/trace-ink.mjs');
+    execFileSync(process.execPath, [tool, target, out], { cwd: ROOT, stdio: 'pipe' });
+    assert.equal(JSON.parse(fs.readFileSync(out, 'utf8')).lines.length, 2, 'both pale lines traced on their own value scale');
+    // a blank sheet has no value range, so nothing is a line
+    await sharp({ create: { width: 40, height: 40, channels: 3, background: '#f3f3f3' } }).png().toFile(target);
+    execFileSync(process.execPath, [tool, target, out], { cwd: ROOT, stdio: 'pipe' });
+    assert.equal(JSON.parse(fs.readFileSync(out, 'utf8')).lines.length, 0);
+    assert.doesNotMatch(fs.readFileSync(tool, 'utf8'), /\.12\b|\.62\b/, 'no limit constants taken from the dog-ink plan');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 

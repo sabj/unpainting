@@ -55,7 +55,7 @@ All files go in `bench/plan/` unless stated.
    `{"image":{"w":W,"h":H}, "lines":[{"points":[[x,y],...], "width":1, "weight":1, ...}], "medium":"ink"}` with
    `image` equal to the target's pixel size and points in target pixels. At most 4000 lines and 400000 points per file.
    An empty `lines` list with `"medium":"none"` draws nothing. Tracers you may run:
-   `node bench/tools/trace-ink.mjs <target.png> <out.json>` (fixed limits; one nib and one weight per line) and
+   `node bench/tools/trace-ink.mjs <target.png> <out.json>` (limits from the subject's own value range, not settable; one nib and one weight per line) and
    `node bench/tools/closing-ink.mjs` (read its header).
 3. **`bench/variant.txt` (required): recipe tokens.** `region_w13` or `region_w15` followed by `_token`s, e.g.
    `region_w13_lay2_noslane`. Write only what you want to change: the base is applied automatically. A token you write
