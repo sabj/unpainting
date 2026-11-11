@@ -98,7 +98,7 @@ SAM regions are the painter's proxy for how a painter sees the subject: sky, mas
 The value planner groups the picture into light and dark bands and shapes the painter will lay.
 
 - `src/paint/methods/target-regions.mjs` builds colour and value regions. `src/paint/methods/light-to-dark.mjs` plans five light-to-dark value bands per pigment (`--order painter`), with `src/paint/methods/layer-cuts.mjs` for middle layers (`--midlayers`). `src/paint/methods/painter-order.mjs` orders passes (`--order legacy-painter`).
-- Segment-based washes: `src/paint/methods/segment-washes.mjs` (`--segwash`), `src/paint/methods/subject-clusters.mjs` and `src/paint/methods/subject-washes.mjs` (`--subjectwash`) cut SAM regions into wash groups. `src/paint/methods/mass-wash.mjs` and `src/paint/methods/masses.mjs` lay a few big masses first.
+- Segment-based washes: `src/paint/methods/segment-washes.mjs` (`--segwash`), `src/paint/methods/subject-clusters.mjs` and `src/paint/methods/subject-washes.mjs` (`--subjectwash`) cut SAM regions into wash groups. `src/paint/methods/masses.mjs` lay a few big masses first.
 - Reserved lights: `src/paint/methods/light-reserves.mjs`, `src/paint/methods/local-lights.mjs`, `src/paint/methods/small-marks.mjs` (catchlights and lit gaps under the minimum shape stay paper; small darks go once, last), `src/paint/methods/wash-join.mjs`.
 - Palette and demand: `src/crop/palette.mjs`, `src/crop/palettewide.mjs`, `src/crop/pigments.mjs` (the 16 pans in `src/crop/box.mjs`), `src/paint/methods/shape-deficit.mjs` (each passage is charged from its whole shape).
 - Value delivery: values are planned against the sheet's own optics and delivered as planned (`src/eval/plan-optics.mjs`, `src/eval/plan-values.mjs`). A wash that comes out too dark or light is a plan or physics fault, not something a gain can repair.
@@ -114,7 +114,7 @@ The value planner groups the picture into light and dark bands and shapes the pa
 Each shape gets a technique chosen from what the subject shows there.
 
 - Technique library: `src/paint/techniques/README.md` indexes it. Passage material and move names (`wet on wet`, `wet on dry`, `dry on dry`, with aliases such as `wet in wet`, `glaze`, `dry brush`) are normalised in `src/paint/techniques/passage-plan.mjs`.
-- Techniques by kind: `src/paint/techniques/shaped-marks.mjs` (flat-brush planes, sky sweeps, short texture marks), `src/paint/techniques/face-planes.mjs`, `src/paint/techniques/lit-planes.mjs`, `src/paint/techniques/face-detail.mjs` (faces), `src/paint/techniques/dark-mass.mjs` (dark surfaces), `src/paint/techniques/passages/sky.mjs`, `src/paint/techniques/passages/sea.mjs`, `src/paint/techniques/passages/sand.mjs`, `src/paint/techniques/passages/trees.mjs`, `src/paint/techniques/passages/foliage.mjs` (named passages, `--passages`).
+- Techniques by kind: `src/paint/techniques/shaped-marks.mjs` (flat-brush planes, sky sweeps, short texture marks), `src/paint/techniques/dark-mass.mjs` (dark surfaces), `src/paint/techniques/surface-marks.mjs` (fur, masonry and other surface marks), `src/paint/techniques/passage-plan.mjs` (named passages).
 - Style profiles: `src/paint/styles/loader.mjs` with `src/paint/styles/ink-and-wash.json`, `src/paint/styles/precise-watercolor.json`, `src/paint/styles/urban-sketch.json`, `src/paint/styles/atmospheric-wet.json`, chosen by the plan's `styleSelection`.
 - Per-pass scrap swatch: the painter tries a loaded brush on a scrap of the same paper and charges each passage by what the swatch delivered (`src/paint/methods/scrap-swatch.mjs`, `src/paint/methods/scrap-mark.mjs`).
 - Index of every module and flag: [methods and techniques](techniques.md).
@@ -253,4 +253,4 @@ The pipeline is meant to change, and this page describes only what runs at the t
 - `claude/033-drying`: stage 6, seam water so lanes of one wash fuse.
 - `claude/033-shapes`: stages 3 and 4, shapes from SAM regions, one wash each.
 - `claude/033-looks`: stage 7, looks and tracers at brush and shape scale.
-- `claude/033-unfit`: stage 4, the `src/paint/tuned/` folder goes; kept ideas become general techniques.
+- `claude/033-unfit`: stage 4, the fitted tuned folder is gone; kept ideas are general techniques.
