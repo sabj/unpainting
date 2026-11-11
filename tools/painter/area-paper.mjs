@@ -1,4 +1,5 @@
-// The paper is not a shape (eye 14:45 #7; painting-rules 3, 24). A painter tones the sheet first when the subject sits
+// The paper is not a shape (eye 14:45 #7; painting-rules.md 6 and 39: nothing is painted from the border; no sheet-wide
+// first wash unless the plan names a real toned ground; Gregg, Maginnis ch. V, Barnard ch. I and IV). A painter tones the sheet first when the subject sits
 // on a toned page, and ignores the page's own blemishes: foxing, stains, a sheet border, ruled guide lines.
 //   pass.tone {paint, amount, reason}: the pass lays one wash of `paint` over its whole area (off reserved lights), at
 //     `amount` of pigment per cell in the value ladder's units, whatever the ladder holds there; it takes no ladder paint

@@ -65,3 +65,15 @@ test('a soft edge: the damp brush along the plan boundary carries the wet wash o
   assert.ok(soft.past > soft.body / 4, `soft: ${soft.past.toFixed(3)} past the boundary, body ${soft.body.toFixed(3)}`);
   assert.ok(hard.past < hard.body / 20, `hard: ${hard.past.toFixed(3)} past the boundary, body ${hard.body.toFixed(3)}`);
 });
+
+test('one edge can differ along its length: a soft stretch on a hard boundary is softened there only', () => {
+  const d = doc('hard');
+  d.edges.push({ areas: ['cheek', 'shadow'], kind: 'soft', reason: 'the cheek turns softly into shadow above the jaw', stretch: box(.4, 0, .6, .5) });
+  const p = plan(d), near = softEdgeCells(p, 'cheek', 2);
+  const rows = y => near.where.slice(y * W, (y + 1) * W).some(v => v);
+  assert.ok(rows(5) && rows(20), 'softened along the upper stretch');
+  assert.ok(!rows(30) && !rows(44), 'the lower boundary stays hard');
+  assert.equal(hardEdgeDue(p, 'shadow', new Set(['cheek'])), true, 'the hard rest still waits for dry');
+  const only = doc('soft'); only.edges[0].stretch = box(.4, 0, .6, .5);
+  assert.throws(() => plan(only), /one entry without a stretch for the rest/);
+});
