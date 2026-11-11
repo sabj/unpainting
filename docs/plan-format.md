@@ -185,7 +185,7 @@ Without `stages`, the ordinary bounded drawing runs. A stage left out is not dra
 | `finishInk` | `from` | `prepInk`, `prep`, `lines` | which earlier lines it restates |
 | | `select` | `edges`, `darks`, `both` | where it restates: the target's strongest edges, its darks, or both |
 | | `restate` | 0 to 1 | the share of those lines restated |
-| | `method` | `accent`, `architecture` | the strongest part of each line, or whole lines at full pressure with widths from the target's darkness, and strong sepia |
+| | `method` | `accent`, `architecture` | each chosen line restated whole, or whole lines at full pressure with widths from the target's darkness, and strong sepia |
 | | `masses` | `none`, `scribble` | `scribble` adds loose scribble over the dark masses (`--finishmasses 1`); default none |
 
 The finish runs after every wash passage and the final dry gate, so it follows each subject's last wash. Graphite then finish ink is `prep` plus `finishInk: {"from": "prep"}` with no `prepInk`. `--drawing first|last|none` overrides stage timing. [ink.md](ink.md#linework-stages) says which stage and method fits which job. Code: `src/paint/methods/drawing-stages.mjs` and `linework-plan.mjs`.

@@ -161,7 +161,7 @@ Each stage takes a few choices ([plan-format.md](plan-format.md#value-plans-the-
 | `prepInk.method` | `contour` (default) | clean outlines; architecture and most subjects |
 | | `connected` | longer, joined gestures over the same lines |
 | | `scribble` | black or curly coats, dark hair: fewer longer strokes, lit edges left open, dark masses as loose scribble |
-| `finishInk.method` | `accent` (default) | the strongest part of each chosen line, restated |
+| `finishInk.method` | `accent` (default) | each chosen line restated whole |
 | | `architecture` | frames, arches, cornices and sills restated whole, thin and dark at full pressure (the Y1 closing pen) |
 | `finishInk.masses` | `scribble` | a black coat that needs a pen texture over its paint; off by default, since a dark surface is paint's job |
 
