@@ -161,3 +161,14 @@ test('a pass may name surface marks from the technique library: wet on dry or dr
   d = fixture(); d.areas[1].passes[0].marks = { kind: 'short-coat', reason: 'smooth coat', cover: 0.5, placement: 'edge' }; assert.throws(() => plan(d), /flow/);
   d = fixture(); d.areas[1].passes[0].move = 'wet on wet'; d.areas[1].passes[0].marks = marks; assert.throws(() => plan(d), /wet on dry or dry brush/);
 });
+
+test('one wash per pass: the ladder pieces in an area and value range become one shape holding all their paint',()=>{
+ const p=plan(fixture()),piece=(cells,mix)=>{const m=new Uint8Array(16);for(const i of cells)m[i]=1;return {mask:m,amount:mix.reduce((a,b)=>a+b,0),mix,area:cells.length};};
+ // three small pieces of value 1 and one of value 2 in the left area (columns 0-1), in two pigments
+ const layers=[{value:1,pigment:0,shapes:[piece([0,4],[.2,0]),piece([8],[.1,0]),piece([13,12],[0,.3])]},{value:2,pigment:1,shapes:[piece([4,8],[0,.4])]}];
+ const c=compileAreaLayers(p,layers),left=c.layers.filter(l=>l._semantic.key==='left/model');
+ assert.equal(left.length,1);const sh=left[0].shapes[0];assert.equal(sh.area,5);
+ const mass=k=>layers.flatMap(l=>l.shapes).reduce((s,x)=>s+x.mix[k]*x.area,0);
+ for(const k of [0,1])assert.ok(Math.abs(sh.mix[k]*sh.area-mass(k))<1e-12,`pigment ${k}`);
+ assert.equal(c.diagnostics.passes.find(q=>q.id==='left/model').ladderPieces,4);
+});
