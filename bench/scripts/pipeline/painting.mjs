@@ -118,7 +118,8 @@ export class Painting {
     const dm = [...text.matchAll(/(\d+) passages yielded no brush path and were never painted, carrying ([\d.]+)% of the planned mass/g)].at(-1);
     const finished = fs.existsSync(path.join(this.out, 'painting.png'));
     const v = renderVerdict({ paintExit: last.exit, unused, modelOptions: union('modelOptions'), extraOptions: union('extraOptions'), baseOptions: union('baseOptions'),
-      templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict });
+      templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict,
+      continued: readJson(path.join(this.out, 'continued-checks.json')) });
     return { ...v, unused, segments: this.segments.map(s => ({ k: s.k, variant: s.variant, resumed: Boolean(s.resume), exit: s.exit, seconds: s.seconds })), layering: last.plan.layering, args: last.args };
   }
 }
