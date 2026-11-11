@@ -57,19 +57,22 @@ export function settlePassageBed({ observe, advance, maxSteps = 256 }) {
 
 // Whole-gesture preparation, like wetting a wash and picking up a puddle with a
 // clean brush. Decisions use footprint summaries. No cell gets its own action.
+// The bed is judged by its typical cell (the median standing water over the footprint), as a painter reads a bed's
+// sheen, never by its single wettest spot (tools/painter/wet-bed-wait.mjs). `observe` must give full statistics.
+const bedWater = paper => { if (!Number.isFinite(paper.waterP50)) throw new Error('passage bed: the paper was measured without its typical cell (waterP50)'); return paper.waterP50; };
 export function preparePassageBed({ observe, wet, pickup, advance = null, maxActions = 4 }) {
   const actions = [];
   let paper = observe();
   for (let attempt = 0; attempt < maxActions; attempt++) {
-    if (paper.moistShare >= .7 && paper.waterMax <= .15) return { paper, actions };
+    if (paper.moistShare >= .7 && bedWater(paper) <= .15) return { paper, actions };
     const before = paper;
-    if (paper.moistShare >= .7 && paper.waterMax > .15) {
+    if (paper.moistShare >= .7 && bedWater(paper) > .15) {
       pickup();
       paper = observe();
       actions.push({ operation: 'pick up excess surface water', before, after: paper });
-      if (advance && paper.waterMax > .15 && paper.moistShare >= .7) {
+      if (advance && bedWater(paper) > .15 && paper.moistShare >= .7) {
         let steps = 0;
-        while (paper.waterMax > .15 && paper.moistShare >= .7 && steps < 256) {
+        while (bedWater(paper) > .15 && paper.moistShare >= .7 && steps < 256) {
           advance();
           steps++;
           paper = observe();
@@ -82,6 +85,6 @@ export function preparePassageBed({ observe, wet, pickup, advance = null, maxAct
       actions.push({ operation: 'prewet the planned contact', before, after: paper });
     }
   }
-  if (paper.moistShare >= .7 && paper.waterMax <= .15) return { paper, actions };
+  if (paper.moistShare >= .7 && bedWater(paper) <= .15) return { paper, actions };
   throw Error('Technique preparation failed without a pixel correction: ' + JSON.stringify({ paper, actions }));
 }

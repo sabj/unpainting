@@ -120,7 +120,8 @@ const stroke=(b,target,points,options)=>{
     paper=initial[0];own=ownCandidate&&initial[1].dry;
     if(paint&&!wetMove&&(!own||ctx.VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
   }
-  const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER,fastPaperOpts);
+  // a wet bed is judged by its typical cell (median standing water), so it is read cell by cell, never as uniform paper
+  const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER,{uniform:false});
   if(paint&&!intoOwnWash&&ctx.VALUE_ACTIVE.passageMaterial&&ctx.VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
     const waterStroke=load=>{const p=measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'});const clean=createBrush({...brushSettings(b),bristles:b.hairs.length,bridge:0,breakup:.05,streak:0,depositDepth:p.saturationMax>=.5?.1:0,seed:911+ctx.VALUE_COMMAND});dip(clean,{water:load,conc:SHEET_PIGS.map(()=>0)});stroke(clean,target,points,prepOpts);};
@@ -129,7 +130,7 @@ const stroke=(b,target,points,options)=>{
   }
   // A wet stroke into a fresh wash waits for the shine to go off, then is laid; uneven paper is counted, not a stop (tools/painter/wet-bed-wait.mjs).
   let wetWaits=0;
-  if(paint&&!intoOwnWash&&['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move))({paper,wetWaits}=layIntoWetBed({paper,observe,step:o=>step(target,o),O,info:{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,cells:cells.length}}));
+  if(paint&&!intoOwnWash&&['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move)){const observeWet=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{uniform:false});({paper,wetWaits}=layIntoWetBed({paper:observeWet(),observe:observeWet,step:o=>step(target,o),O,info:{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,cells:cells.length}}));}
   const [primary,neighborPaper]=NATIVE_PAINT_MODE.mode==='fast'?[null,null]:measurePaperBatch(target,[{cells},{cells:neighbors}],SPEED_PAPER,{uniform:SPEED_UNIFORM_PAPER});
   const id='value-contact-'+(++ctx.VALUE_COMMAND),record={id,commandId:ctx.VALUE_COMMAND,intent:ctx.VALUE_ACTIVE.id,phase:ctx.VALUE_ACTIVE.phase,valueBand:ctx.VALUE_ACTIVE.valueBand,regions:ctx.VALUE_ACTIVE.regions,crossesRegions:ctx.VALUE_ACTIVE.crossesRegions,kind:paint?'pigment':'clean-water',ownWetEdge:own,paper,wetWaits,primary,neighbors:neighborPaper,brushBefore:load,geometry:points,options};
   if(!Number.isFinite(load.waterMass)||load.pigmentMass.some(v=>!Number.isFinite(v)))throw Error('value-plan nonfinite brush');
