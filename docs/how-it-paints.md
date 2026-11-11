@@ -152,7 +152,7 @@ The sheet holds five things per cell: standing water, water in the pores, pigmen
 |---|---|---|
 | ![Rose dropped onto paper wetted with clean water, spreading while wet](img/pipeline-wet-wash.webp) | ![Broken dry brush stroke showing bare paper](img/pipeline-dry-brush.webp) | ![The same two strokes, dried between at left and flooded at right](img/drying.webp) |
 
-A dried wash becomes its own layer. A glaze is a transparent wash over dried paint, and the layers mix optically.
+A dried wash becomes its own layer. A glaze is a transparent wash over dried paint, and the layers mix optically. Every pass is laid once: a second glaze is a second pass the plan writes, never a repeat the painter adds.
 
 ![Three transparent glazes, each dried before the next](img/glazes.webp)
 

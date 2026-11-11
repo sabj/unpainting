@@ -6,7 +6,6 @@ import {boundsOf} from '../../src/mask-bounds.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {resolveOutlineMedium, describeOutlineMedium} from '../../src/paint/methods/outline-medium.mjs';
 import {bindFinishingArea, finishingPaletteKeys} from '../painter/finishing-area.mjs';
-import {numericalGlazePasses} from '../painter/numerical-glaze-passes.mjs';
 import {validateProductionDetails, validateCompiledAreaStop} from '../painter/semantic-production-details.mjs';
 import {lowerAuthoredGestures} from '../painter/authored-gestures.mjs';
 import {authoredPalette} from '../painter/authored-paint.mjs';
@@ -541,7 +540,7 @@ const techniqueOf = sh => {
   if (!TECHNIQUE.has(sh)) {
     const win = maskWindow(sh.mask, FINE, sh.box ?? sh._mbox);
     const T = chooseTechnique(FINE.D, upTo(sh.mask, FINE, win), FINE.w, FINE.h, { win, peak: peakD, wetEdge: num('wetedge', 0.5), dryTooth: num('drytooth', 0.06), dryPieces: num('drypieces', DRY_PIECES) });
-    TECHNIQUE.set(sh, numericalGlazePasses(T, num('glazepasses', 2)));
+    TECHNIQUE.set(sh, T);
     const u = TECHNIQUE_USE.get(T.name) ?? { n: 0, area: 0 };
     u.n++; u.area += sh.area ?? 0;
     TECHNIQUE_USE.set(T.name, u);

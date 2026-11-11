@@ -17,7 +17,6 @@ import {writePlanValueCheck} from '../painter/plan-value-check.mjs';
 import {subjectField, orderBySubject, OVERLAP} from '../../src/paint/methods/subject-order.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {recordGraphiteBatch} from '../painter/record-graphite.mjs';
-import {numericalGlazePasses} from '../painter/numerical-glaze-passes.mjs';
 import {SWATCH, swatchMask, scrapDelivery, chargeFactor} from '../../src/paint/methods/scrap-swatch.mjs';
 import {createInstrumentCal, instrumentKey, chargedFromOwnSwatch} from '../../src/paint/methods/instrument-cal.mjs';
 import {validateProductionDetails, productionChargeLink, productionContinuationReady, prepareProductionDryContact} from '../painter/semantic-production-details.mjs';
@@ -678,11 +677,10 @@ let GRADED_CAL = {};
 // --loadedcontact 1: a loaded wash or detail brush touches all the paper under it, pits included; dry brush keeps its tooth-skip. Default 0.
 const LOADED_CONTACT = num('loadedcontact', 0) > 0;
 const washBridge = (T, b) => (LOADED_CONTACT && !T.name.startsWith('dry brush') ? 0 : b);
-// --glazepasses n: brush a glaze n times in a row while its first pass is still wet. Default 2.
 const STOCK_TECHNIQUES = [
   { name: 'wet on dry', water: 0.62, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, intoWet: false, passes: 1 },
   { name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, passes: 1 },
-  numericalGlazePasses({ name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, passes: 2 }, num('glazepasses', 2)),
+  { name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, passes: 1 },
   { name: 'dry brush', water: 0.22, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0, intoWet: false, passes: 1 },
 ];
 // Each technique laid on scrap (src/paint/methods/scrap-swatch.mjs), plain and, under --gradedwash, recharged every few
@@ -757,7 +755,7 @@ const ownSwatch = (T, sh) => chargedFromOwnSwatch(T, { instrumentOn: INSTRUMENT_
 const instrumentOf = (T, sh) => (ownSwatch(T, sh) ? INSTRUMENT_CAL.of(T) : INSTRUMENT_CAL.byName(T.name));
 // every instrument the value plan names is tried on scrap before the first wash
 if (INSTRUMENT_ON && ctx.VALUE_PLAN) {
-  const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan, num('glazepasses', 2))])).filter(([sh, T]) => ownSwatch(T, sh)).map(([, T]) => [instrumentKey(T), T])).values()];
+  const planned = [...new Map(ctx.layers.flatMap(l => (l.shapes ?? []).filter(sh => sh._valuePlan).map(sh => [sh, valueTechnique(sh._valuePlan)])).filter(([sh, T]) => ownSwatch(T, sh)).map(([, T]) => [instrumentKey(T), T])).values()];
   const saved = await cachedStep({...RUN_CACHE,name:'instrument-calibration',code:CODE_HASH,track:optTrack,inputs:{pigment:PIGS[0],O,PAPER_OPTS,GCHUNK,BRUSH,UPRIGHT,LOADED_CONTACT,WASH_SPLAT_SETTINGS,physical:PB?{cfg:PB.cfg,mmPerCell:PB.mmPerCell}:null,stock:CAL_RESULT.value,instruments:planned.map(instrumentKey)}},async () => {
     for (const T of planned) INSTRUMENT_CAL.of(T);
     return INSTRUMENT_CAL.entries();

@@ -11,6 +11,7 @@ export const REMOVED_OPTIONS = Object.freeze({
   deepaccent: DEEP_ACCENT, deepgrow: DEEP_ACCENT, deepaccentin: DEEP_ACCENT,
   ...Object.fromEntries(['hybridbridge', 'hybridfloor', 'hybridjoin', 'hybridkeep', 'hybridmin', 'hybridpar', 'hybridreach', 'hybridstay', 'hybridstroke', 'hybridsupport']
     .map(k => [k, 'the connected drawing (--drawinglogic 2) was removed: it laid the walker\'s gestures on the drawing file and no plan reached it'])),
+  glazepasses: 'a glaze is one pass the plan writes; the painter no longer lays a glaze twice in a row by default (the plan writes a second pass when it wants one)',
   eyering: 'the eye ring drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject; the plan names its eyes\' shapes and darks',
 });
 

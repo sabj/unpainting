@@ -49,7 +49,6 @@ import '../painter/record-graphite.mjs';
 import '../painter/numeric-receiver-observer.mjs';
 import '../painter/finishing-area.mjs';
 import '../painter/native-body-cadence.mjs';
-import '../painter/numerical-glaze-passes.mjs';
 import '../../src/paint/methods/scrap-swatch.mjs';
 import '../../src/paint/methods/instrument-cal.mjs';
 import '../painter/numeric-tuft-calibration.mjs';

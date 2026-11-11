@@ -139,13 +139,13 @@ test('actual calibration stages default to firstwash and explicit dry-shadow is 
  assert.equal(semanticMaterialReady(dry,{cells:3,dry:true},{water:1,pigment:1}),true);
 });
 
-test('authoritative wet-on-dry contact does not inherit an unplanned duplicate; firstwash repetition stays unchanged',()=>{
+test('a pass is laid once: neither wet on dry nor wet on wet inherits an unplanned duplicate',()=>{
  const dry=pass('model',3),legacy={passes:2,name:'wet on wet'};
  const actual=semanticTechnique({pass:dry},legacy);
  assert.equal(actual.passes,1);assert.equal(actual.intoWet,false);
  assert.equal(semanticMaterialReady(dry,{cells:10,dry:false},{water:1,pigment:1}),false);
  const wet={...dry,move:'wet on wet',wetness:{required:'wet'}};
- assert.equal(semanticTechnique({pass:wet},legacy).passes,2);
+ assert.equal(semanticTechnique({pass:wet},legacy).passes,1);
 });
 
 test('a pass may name surface marks from the technique library: wet on dry or dry brush, not authored, validated', () => {

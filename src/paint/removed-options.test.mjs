@@ -18,6 +18,10 @@ test('move 1: subject washes, the deep accents and the eye ring are removed opti
     assert.ok(Object.hasOwn(REMOVED_OPTIONS, k), k);
 });
 
+test('move 3: --glazepasses is a removed option', () => {
+  assert.ok(Object.hasOwn(REMOVED_OPTIONS, 'glazepasses'));
+});
+
 test('no removed option is still in the option ledger or a recipe', () => {
   const ledger = new Set(JSON.parse(fs.readFileSync(path.join(ROOT, 'src/paint/option-ledger.json'), 'utf8')).options);
   const recipes = fs.readFileSync(path.join(ROOT, 'src/paint/recipe.mjs'), 'utf8');

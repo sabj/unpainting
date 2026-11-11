@@ -56,10 +56,10 @@ test('a passage with the tooth showing through in pieces is dragged', () => {
   assert.ok(t.bridge < 0.6, 'and it rides the tooth rather than filling it');
 });
 
-test('a deep passage with a hard edge is built up over dry paint', () => {
+test('a deep passage with a hard edge is a glaze over dry paint, laid once', () => {
   const t = chooseTechnique(hardDisc(0.9), discMask(70, 60, 34), W, H, { peak: 1 });
   assert.equal(t.name, 'glazed', `depth ${t.depth.toFixed(2)}`);
-  assert.ok(t.passes > 1, 'in more than one pass');
+  assert.equal(t.passes, 1, 'one pass: a second glaze is a pass the plan writes');
   assert.equal(t.dryAfter, true);
 });
 

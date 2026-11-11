@@ -347,7 +347,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
             }
           }
           // ownSwatch: the glaze keeps its own damp one-pass brush and is charged from a scrap swatch of that brush
-          // (instrument-cal.mjs); without it a calibrated plan lays the glaze as the stock swatch does, wetter and twice.
+          // (instrument-cal.mjs); without it a calibrated plan lays the glaze as the stock swatch does, wetter.
           if(calibratedPlan&&!ownSwatch)intent.calibratedPlan=true;
           if(brushChoice){
             const pb=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});
@@ -415,11 +415,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
   return {opticsReport,paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
-export function valueTechnique(intent,glazePasses=2) {
-  if(intent.calibratedPlan&&(!Number.isInteger(glazePasses)||glazePasses<1))throw new RangeError('glazepasses must be a positive integer');
+export function valueTechnique(intent) {
   if(intent.calibratedPlan){
     const wet=intent.move==='wet on wet',shadow=intent.phase==='shadow';
-    return {name:wet?'wet on wet':shadow?'glazed':'wet on dry',water:wet?.88:shadow?.58:.62,wetMix:wet?.85:shadow?.3:.55,bridge:wet?.98:shadow?.82:.78,bridgeSoft:wet?3:shadow?2.4:2.2,intoWet:wet,dryAfter:!wet,passes:shadow&&!wet?glazePasses:1,valuePlan:intent};
+    return {name:wet?'wet on wet':shadow?'glazed':'wet on dry',water:wet?.88:shadow?.58:.62,wetMix:wet?.85:shadow?.3:.55,bridge:wet?.98:shadow?.82:.78,bridgeSoft:wet?3:shadow?2.4:2.2,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};
   }
   if(intent.style){const wetMove=['wet on wet','dry on wet'].includes(intent.move);return {name:wetMove?intent.move:intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:intent.wetMix,bridge:intent.bridge,bridgeSoft:intent.bridgeSoft,intoWet:wetMove,dryAfter:!wetMove,passes:1,valuePlan:intent};}
   const wet=intent.move==='wet on wet';return {name:wet?'wet on wet':intent.phase==='shadow'?'glazed':'wet on dry',water:intent.load.water,wetMix:wet?.85:.3,bridge:wet?.98:.82,bridgeSoft:wet?3:2.4,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};

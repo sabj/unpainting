@@ -15,7 +15,7 @@ export const TECHNIQUES = Object.freeze({
   // as white holes. Bridge 0.9 with a transition of 3 matches paint-plate's first stain.
   'first wash': { name: 'first wash', water: 0.76, wetMix: 0.7, bridge: 0.9, bridgeSoft: 3, intoWet: false, dryAfter: true, passes: 1 },
   'wet on wet': { name: 'wet on wet', water: 0.88, wetMix: 0.85, bridge: 0.98, bridgeSoft: 3, intoWet: true, dryAfter: false, passes: 1 },
-  glazed: { name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, dryAfter: true, passes: 2 },
+  glazed: { name: 'glazed', water: 0.58, wetMix: 0.3, bridge: 0.82, bridgeSoft: 2.4, intoWet: false, dryAfter: true, passes: 1 },
   'dry brush': { name: 'dry brush', water: 0.22, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0, intoWet: false, dryAfter: false, passes: 1 },
 });
 

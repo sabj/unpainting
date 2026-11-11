@@ -569,10 +569,10 @@ test('calibratedPlan: value steps are cut from the squinted picture, so one-cell
   assert.ok(!ids(run({ calibratedPlan: true })).includes('b5'), 'squinted, the stripes are one middle value');
 });
 
-test('ownSwatch: a calibrated plan keeps the glaze one damp pass; without it the glaze is laid as the stock swatch', () => {
+test('ownSwatch: a calibrated plan keeps the glaze one damp pass; without it the glaze is laid as the stock swatch, once', () => {
   const { run } = threeValues();
-  const glaze = plan => valueTechnique(plan.instructions.find(q => q.phase === 'shadow'), 2);
+  const glaze = plan => valueTechnique(plan.instructions.find(q => q.phase === 'shadow'));
   const own = glaze(run({ calibratedPlan: true, ownSwatch: true })), stock = glaze(run({ calibratedPlan: true }));
   assert.deepEqual([own.passes, own.water], [1, 0.45]);
-  assert.deepEqual([stock.passes, stock.water], [2, 0.58]);
+  assert.deepEqual([stock.passes, stock.water], [1, 0.58]);
 });
