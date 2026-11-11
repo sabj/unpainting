@@ -9,7 +9,9 @@
 // staircase (one pixel), lifts where the line turns back on itself, joins only where one piece continues another
 // across TRACE_MM.reach, and goes on contours, not inside dark masses: on one side, the band from TRACE_MM.reach to
 // TRACE_MM.minLength out is a light shape (its median lighter than the middle of the scale). Spans shorter than TRACE_MM.minLength are dropped, and wiggly ones shorter than TRACE_MM.wiggle.
-// Each line is drawn with one nib and one weight from its mean darkness. Points are [x, y] in the target's pixels.
+// Between lifts the path is rounded (corner cutting, at most half the reach from the trace): a hand makes no corners
+// inside one stroke. Each line is drawn with one nib, its mark's mean equivalent width, and one weight from its mean
+// darkness; the painter's hand gives the curve along it. Points are [x, y] in the target's pixels.
 // Nothing is settable. The millimetres are the tracer's pixel limits on a bench subject (300 px on its 280 mm sheet,
 // BENCH_PIXEL_MM a pixel) restated on the sheet, so a bench subject traces exactly as before.
 
@@ -109,6 +111,25 @@ export function joinPieces(pieces, { gap, cos = 0.8, aim = 0.7 } = {}) {
   }
 }
 
+/** The hand's path between two pen lifts: the traced vertices rounded by corner cutting (Chaikin, two rounds), ends
+ *  kept. A pen moving on makes no corner inside a stroke; a sharp turn is already a lift (splitAtTurns). A cut lies a
+ *  quarter of the segment from its corner, and no farther than half the tracer's reach, so the path stays within the
+ *  reach of the traced line. */
+export function smoothPath(P, reach, rounds = 2) {
+  let Q = P;
+  for (let r = 0; r < rounds && Q.length >= 3; r++) {
+    const R = [Q[0]];
+    for (let j = 0; j < Q.length - 1; j++) {
+      const a = Q[j], b = Q[j + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), u = L > 1e-9 ? Math.min(0.25, reach / 2 / L) : 0.25;
+      if (j > 0) R.push([a[0] + u * (b[0] - a[0]), a[1] + u * (b[1] - a[1])]);
+      if (j < Q.length - 2) R.push([b[0] - u * (b[0] - a[0]), b[1] - u * (b[1] - a[1])]);
+    }
+    R.push(Q.at(-1));
+    Q = R;
+  }
+  return Q;
+}
+
 /** Whether the line is a contour: on at least half its points one side is a light shape, i.e. the median luminance of
  *  the band `band` = [from, to] pixels out across it is lighter than `mid`, the middle of the subject's value scale.
  *  The band runs from the tracer's reach to its shortest line: a shape at least as wide as the shortest line it draws.
@@ -160,10 +181,33 @@ export function tracePen(lum, W, H, { pixelMm }) {
     const chord = Math.hypot(pts[0][0] - pts.at(-1)[0], pts[0][1] - pts.at(-1)[1]);
     if (chord / len < 0.55 && len < P.wiggle) continue;
     if (!hasLightSide(pts, at, mid, P.side)) { inMass++; continue; }
-    const d = pts.reduce((a, [x, y]) => a + 1 - at(Math.floor(x), Math.floor(y)), 0) / pts.length;
-    lines.push({ points: pts, length: len, weight: Math.min(0.85, 0.4 + 0.55 * d), width: +(1.6 + 2.4 * d).toFixed(2) });
+    const points = smoothPath(pts, P.reach);
+    const d = points.reduce((a, [x, y]) => a + 1 - at(Math.floor(x), Math.floor(y)), 0) / points.length;
+    lines.push({ points, length: plen(points), weight: Math.min(0.85, 0.4 + 0.55 * d), width: +markWidth(pts, lum, W, H, P.reach).toFixed(2) });
   }
   return { lines, scale: { paper, ink, step, mid }, px: P, stats: { linePixels, inMass } };
+}
+
+/** The line's own width, once for the whole line: across the path, the mark's darkness below both its flanks (`reach`
+ *  pixels out on either side: a line is darker than both sides, a mass edge is not) summed and divided by its peak, the equivalent width of the mark; the mean over the
+ *  line. The nib the artist chose, read once, not point by point. `lum` is luminance 0..1, read bilinearly. */
+export function markWidth(P, lum, W, H, reach) {
+  const L = (x, y) => {
+    const fx = Math.max(0, Math.min(W - 1.001, x - 0.5)), fy = Math.max(0, Math.min(H - 1.001, y - 0.5)), x0 = Math.floor(fx), y0 = Math.floor(fy), u = fx - x0, v = fy - y0, i = y0 * W + x0;
+    return (1 - v) * ((1 - u) * lum[i] + u * lum[i + 1]) + v * ((1 - u) * lum[i + W] + u * lum[i + W + 1]);
+  };
+  let sum = 0, n = 0;
+  for (let j = 1; j < P.length; j++) {
+    const dx = P[j][0] - P[j - 1][0], dy = P[j][1] - P[j - 1][1], len = Math.hypot(dx, dy), k = Math.max(1, Math.ceil(len)), [tx, ty] = unit(dx, dy), nx = -ty, ny = tx;
+    for (let s = 0; s < k; s++) {
+      const x = P[j - 1][0] + dx * s / k, y = P[j - 1][1] + dy * s / k;
+      const flank = Math.min(L(x + nx * reach, y + ny * reach), L(x - nx * reach, y - ny * reach));
+      let area = 0, peak = 0;
+      for (let t = -reach + 0.5; t < reach; t += 0.5) { const c = Math.max(0, flank - L(x + nx * t, y + ny * t)); area += 0.5 * c; peak = Math.max(peak, c); }
+      if (peak > 0) { sum += area / peak; n++; }
+    }
+  }
+  return n ? sum / n : 1;
 }
 
 // Zhang-Suen thinning, in place.

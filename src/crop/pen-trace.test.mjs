@@ -33,3 +33,26 @@ test('ticks beside white sheen streaks inside a dark coat are texture, not conto
   assert.equal(inside.length, 0, `${inside.length} ticks drawn inside the coat`);
   assert.ok(r.lines.some(l => l.points.every(([x]) => x < 22)), 'the edge line stays');
 });
+
+test('a stroke is a smooth path between lifts, within half the reach of the trace', async () => {
+  const { smoothPath } = await import('./pen-trace.mjs');
+  const P = [[0, 0], [40, 0], [80, 30], [120, 30]], S = smoothPath(P, 4);
+  assert.deepEqual(S[0], P[0]); assert.deepEqual(S.at(-1), P.at(-1));
+  let maxTurn = 0;
+  for (let j = 1; j < S.length - 1; j++) { const a = Math.atan2(S[j][1] - S[j - 1][1], S[j][0] - S[j - 1][0]), b = Math.atan2(S[j + 1][1] - S[j][1], S[j + 1][0] - S[j][0]); maxTurn = Math.max(maxTurn, Math.abs(b - a)); }
+  assert.ok(maxTurn < 0.4, `largest turn ${maxTurn.toFixed(2)} rad`);
+  const seg = (q, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); };
+  for (const q of S) assert.ok(Math.min(...P.slice(1).map((p, k) => seg(q, P[k], p))) <= 2 + 1e-9);
+});
+
+test('a line\'s one width is its mark\'s equivalent width; a dark mass beside it does not widen it', async () => {
+  const { markWidth } = await import('./pen-trace.mjs');
+  const W = 60, H = 40;
+  for (const wd of [1, 2, 3]) {
+    const lum = new Float32Array(W * H).fill(0.95);
+    for (let y = 0; y < H; y++) for (let x = 30; x < 30 + wd; x++) lum[y * W + x] = 0.2;
+    for (let y = 0; y < H; y++) for (let x = 40; x < W; x++) lum[y * W + x] = Math.min(lum[y * W + x], 0.4);
+    const got = markWidth([[30 + wd / 2, 5], [30 + wd / 2, 35]], lum, W, H, 4);
+    assert.ok(Math.abs(got - wd) <= 0.6, `a ${wd} px line reads ${got.toFixed(2)}`);
+  }
+});
