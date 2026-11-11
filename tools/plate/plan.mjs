@@ -722,6 +722,8 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('dra
 const OUTLINE_REQUESTED = opt('outlinemedium', 'graphite');
 const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : (OUTLINE_REQUESTED === 'none' ? 'graphite' : materialProfile(OUTLINE_REQUESTED).kind), share: PEN_SHARE, threshold: num('penfirst', 0.5) });
 console.log(describeOutlineMedium(OUTLINE));
+// the plan states its medium with a reason (plan drawing.reason); the subject's medium may still override it (subject-medium.mjs)
+{ const d = VALUE_CONFIG?.drawing ?? PIPELINE?.drawing; if (d?.reason != null) { if (typeof d.reason !== 'string' || !d.reason.trim()) throw new Error('drawing.reason: a sentence saying why the medium'); console.log(`the plan's medium: ${d.medium ?? 'not named'}, because ${d.reason.trim()}`); } }
 DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
 // the drawing's stages for this image: planner model, rule and gate (drawing-stages-auto.mjs); the prep pencil's erase
 // weights are made now, before the target is sealed (pencil-erase.mjs)
