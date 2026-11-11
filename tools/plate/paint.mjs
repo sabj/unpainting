@@ -703,18 +703,21 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       : insetCells > 0
         ? (() => { const M = up(erode(MASK, w, h, insetCells)); if (!M.some(v => v)) return []; return containPaths(brushedWashPaths(M, W2, H2, { pad: 0, minRadius: SC, minLength: 3 * SC, maxRadius: BRUSH, seed: 17 + ctx.laid + SEED, overlap: num('overlap', 0.15), walk: false, angle: gradedAngle }), distanceToZero(M, W2, H2), W2, H2, { minRadius: 0.8 * SC, minLength: 2 * SC, slack: 0, segments: FW }); })()
         : paths;
-    const shapeCells = sh._valuePlan?.passageMaterial?.move === 'wet on wet' ? up(MASK).reduce((a, v, i) => (v && !ctx.sheet.resist?.[i] && a.push(i), a), []) : null;
+    // every value-plan passage laid wet into wet has its bed prepared under the brush (tools/plate/sheet.mjs, prepareWetBed),
+    // as a named passage material always had: wetted at 0.55 over the shape if it is not moist, never lane by lane at a full load
+    const ownBed = Boolean(sh._valuePlan?.passageMaterial) || (Boolean(sh._valuePlan) && sh._valuePlan.move === 'wet on wet');
+    const shapeCells = sh._valuePlan?.passageMaterial?.move === 'wet on wet' || (ownBed && sh._valuePlan.move === 'wet on wet') ? up(MASK).reduce((a, v, i) => (v && !ctx.sheet.resist?.[i] && a.push(i), a), []) : null;
     const shapePaper = shapeCells?.length ? measurePaper(ctx.sheet, shapeCells, SPEED_PAPER) : null;
     const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
     const wetLane = pts => {
       if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
       const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
       const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
-      productionDip(wet, { water: num('prewetwater', sh._valuePlan?.passageMaterial?.move==='wet on wet'?.55:1), conc: PIGS.map(() => 0) });
+      productionDip(wet, { water: num('prewetwater', shapeCells ? .55 : 1), conc: PIGS.map(() => 0) });
       stroke(wet, ctx.sheet, pts, { upright: UPRIGHT });
     };
     // a passage wetted along its own lanes is wetted lane by lane just ahead of the brush, as its scrap swatch is (prewet-order.mjs)
-    if (needPrewet && wetsLaneByLane({ intoWet: Boolean(T.intoWet), wetsOwnLanes: wetOver === paths, preparesOwnBed: Boolean(sh._valuePlan?.passageMaterial) })) wetEachLane = wetLane;
+    if (needPrewet && wetsLaneByLane({ intoWet: Boolean(T.intoWet), wetsOwnLanes: wetOver === paths, preparesOwnBed: ownBed })) wetEachLane = wetLane;
     else if (needPrewet) for (const pts of wetOver) { ctx.WET_TRACE?.lane(); wetLane(pts); }
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)

@@ -95,12 +95,15 @@ const stroke=(b,target,points,options)=>{
   const fastMode=NATIVE_PAINT_MODE.mode==='fast',fastPaperOpts=fastMode?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:{uniform:SPEED_UNIFORM_PAPER};
   const contactStarted=performance.now(),contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
-  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!ctx.VALUE_ACTIVE.passageMaterial||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b,{settle:false}),paint=load.pigmentMass.some(v=>v>0);
+  // a wet-into-wet bed is read and prepared under the brush for every value-plan passage laid wet on wet, whether or not
+  // the plan names its passage material (one bed rule: tools/painter/wet-bed-prep.mjs)
+  const ownBed=Boolean(ctx.VALUE_ACTIVE.passageMaterial)||ctx.VALUE_ACTIVE.move==='wet on wet';
+  const cells=contact.cells.filter(i=>!target.resist?.[i]&&(!ownBed||((!target.clip||target.clip[i])&&contact.primaryMask[i]))),neighbors=contact.neighborIndices,load=measureBrush(b,{settle:false}),paint=load.pigmentMass.some(v=>v>0);
   let _observationCells=null;
-  const getObservationCells=()=>{if(!_observationCells)_observationCells=ctx.VALUE_ACTIVE.passageMaterial?cells:[...cells,...neighbors];return _observationCells;};
+  const getObservationCells=()=>{if(!_observationCells)_observationCells=ownBed?cells:[...cells,...neighbors];return _observationCells;};
   const observe=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,fastPaperOpts);
   const ownCandidate=contact.cells.some(i=>contact.primaryMask[i]&&ctx.VALUE_OWN_CONTACT.has(i));
-  const freshCells=paint&&ctx.VALUE_ACTIVE.passageMaterial?cells.filter(i=>!ctx.VALUE_PIGMENT_CONTACT.has(i)):cells;
+  const freshCells=paint&&ownBed?cells.filter(i=>!ctx.VALUE_PIGMENT_CONTACT.has(i)):cells;
   const intoOwnWash=paint&&freshCells.length<cells.length*.3;
   const wetMove=['wet on wet','dry on wet'].includes(ctx.VALUE_ACTIVE.move);
   let paper=null,own=false;
@@ -112,7 +115,7 @@ const stroke=(b,target,points,options)=>{
         measure:(c,kind)=>measurePaper(target,c,SPEED_PAPER,kind==='gate'?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:fastPaperOpts),dry:()=>dry(target,30000,O,{levelMax:140,dt:2})});
       paper=gate.paper;own=gate.own;if(VP?.reach)VP.checked=true;
       if(gate.dried)check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});
-    }else if(paint&&!intoOwnWash&&!(ctx.VALUE_ACTIVE.passageMaterial&&ctx.VALUE_ACTIVE.move==='wet on wet')){
+    }else if(paint&&!intoOwnWash&&!(ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet')){
       paper=observe();
     }
   }else{
@@ -122,7 +125,7 @@ const stroke=(b,target,points,options)=>{
   }
   // a wet bed is judged by its typical cell (median standing water), so it is read cell by cell, never as uniform paper
   const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER,{uniform:false});
-  if(paint&&!intoOwnWash&&ctx.VALUE_ACTIVE.passageMaterial&&ctx.VALUE_ACTIVE.move==='wet on wet'){
+  if(paint&&!intoOwnWash&&ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
     const preparation=(()=>{try{return prepareWetBed({settings:brushSettings(b),bristles:b.hairs.length,seed:911+ctx.VALUE_COMMAND,pigments:SHEET_PIGS.length,target,points,prepOpts,observe:observeBed,gate:()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'}),advance:()=>ctx.clock('flow',()=>step(target,{...O,dt:2})),createBrush,dip,thirsty,stroke});}catch(e){e.message=`passage ${ctx.VALUE_ACTIVE.id} (value band ${ctx.VALUE_ACTIVE.valueBand}, ${(freshCells.length?freshCells:cells).length} cells in its footprint): ${e.message}`;throw e;}})();paper=preparation.paper;
     JSONL.append(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:ctx.VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:fastMode?null:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');

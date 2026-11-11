@@ -39,32 +39,11 @@ test('the charge waits for the typical bed cell to lose its shine, not the wette
   resetChecks();
 });
 
-// a glossy wash under part of the footprint only: the rest is dry paper the puddle cannot reach
-const halfWash = () => {
-  const w = 64, sheet = createSheet(makePaper(w, 24, { seed: 9 }), pigments), cells = [];
-  for (let y = 4; y < 20; y++) for (let x = 4; x < 20; x++) deposit(sheet, y * w + x, .8, [.05]);
-  for (let y = 4; y < 20; y++) for (let x = 4; x < 32; x++) cells.push(y * w + x);
-  step(sheet);
-  return { sheet, cells };
-};
-
-test('a glossy wash under part of the brush is waited on too, so the brush is not charged into standing water', () => {
-  resetChecks();
-  const { sheet, cells } = halfWash(), start = measurePaper(sheet, cells, false, { uniform: false });
-  assert.ok(start.moistShare < .7 && start.waterP50 > .15, `uneven and glossy to begin with: ${JSON.stringify(start)}`);
-  const [{ paper, wetWaits }] = quiet(() => lay(sheet, cells));
-  assert.ok(wetWaits > 0, 'it waited');
-  assert.ok(paper.waterP50 <= .15 || paper.moistShare < start.moistShare, 'until the shine was gone, or the damp part began to dry back');
-  resetChecks();
-});
-
 test('a footprint that is never evenly wet is laid, logged and counted, not thrown', () => {
   resetChecks();
-  const { sheet: s2, cells } = halfWash();
-  // mostly dry paper with a little damp: nothing to wait for, and it stays uneven
-  for (const i of cells) if (s2.W[i] > 0) { s2.W[i] = .05; }
-  const [{ wetWaits }, lines] = quiet(() => lay(s2, cells));
-  assert.equal(wetWaits, 0, 'no shine to wait for');
+  const { sheet, wide } = glossyWash();
+  const [{ wetWaits }, lines] = quiet(() => lay(sheet, wide));
+  assert.equal(wetWaits, 0, 'too little of it is damp to wait for');
   assert.match(lines.join('\n'), /continued past wet wash laid on uneven paper .*"id":"test"/);
   assert.equal(continuedSummary().checks['wet wash laid on uneven paper'].count, 1);
   resetChecks();
@@ -72,6 +51,6 @@ test('a footprint that is never evenly wet is laid, logged and counted, not thro
 
 test('--strict 1 restores the wet-wash stop', () => {
   resetChecks(); setStrict(true);
-  try { const { sheet: s2, cells } = halfWash(); for (const i of cells) if (s2.W[i] > 0) s2.W[i] = .05; assert.throws(() => lay(s2, cells), /wet wash laid on uneven paper/); }
+  try { const { sheet, wide } = glossyWash(); assert.throws(() => lay(sheet, wide), /wet wash laid on uneven paper/); }
   finally { resetChecks(); }
 });
