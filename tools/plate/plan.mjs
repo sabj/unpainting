@@ -58,7 +58,7 @@ const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, 
   root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
   phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, SUBJECTS, lum, paperRGB, CODE_HASH, 
   PALETTE_FROM_FILE, paletteFitStarted } = ctx;
-const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/chroma-reach.mjs','src/paint/methods/palette-mix.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
+const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
   const authoredFile=opt('areaplan','');const explicit=authoredFile?authoredPalette(JSON.parse(fs.readFileSync(path.resolve(root,authoredFile)))):null;if(explicit)return {pigments:explicit,authored:true,monochrome:explicit.length===1,paintChroma:0,note:'explicit authored production palette; no source palette fit'};
   const from = opt('palettefrom', '');
   let source = ctx.px, sw = w, sh_ = h;
@@ -82,8 +82,7 @@ const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHas
   if (note) console.log(note);
   // --paintguard dE: check a forced box (--paints) against the painter's own pick (src/crop/paint-guard.mjs). Default 0, off.
   // --paintguardmode add|replace (default add); --paintguardmax: most paints after adding (default 8).
-  // --paintsextend 0: keep a named --paints box as it is. Default 1: it gains pans only for a large hue cluster it cannot reach
-  // in hue, or whose chroma no mix of the named pans reaches at the cluster's lightness (src/crop/chroma-reach.mjs).
+  // --paintsextend 0: keep a named --paints box as it is. Default 1: it gains pans only for a large hue cluster it cannot reach.
   // --palettewide 1: box paints chosen to reach the picture's local colours (src/crop/palettewide.mjs)
   if (num('palettewide', 0) > 0) {
     const wide = widePalette(source, sw, sh_, paperRGB, palette, { weight: num('pwweight', 1), gain: num('pwgain', 0.5), min: num('pwmin', 3), max: num('pwmax', 6), K: num('pwcolours', 8), keys: opt('paints', '') ? opt('paints', '').split(',') : null, add: opt('paintsadd', '') ? opt('paintsadd', '').split(',') : null, extend: num('paintsextend', 1) > 0, guard: paintGuardOptions(opt, num) });

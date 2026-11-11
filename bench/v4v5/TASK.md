@@ -76,8 +76,7 @@ All files go in `bench/plan/` unless stated.
    add what the quiet passages and the darks need. Two example palettes for two different pictures: a sunlit garden
    with red flowers under a blue sky, `["--paints","hansa,cadred,rose,ultramarine,phthalogreen,sienna"]`; a grey
    stone street in rain, `["--paints","ochre,rawsienna,umber,cerulean,paynes"]`. Neither is a default: read your
-   own target. If no mix of your pigments reaches the chroma of a large colour of the target at its lightness, the
-   painter adds a box pigment that does (two at most) and logs the reason. Options are
+   own target. The painter paints with the pigments you name. Options are
    limited to `--midlayers` (integer 0–8),
    `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
    `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),
