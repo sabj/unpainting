@@ -2,6 +2,7 @@ import {validateAuthoredPaint,compileAuthoredPaint} from './authored-paint.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {passage} from '../../src/crop/blockin.mjs';
+import {closeLocal} from '../../src/raster.js';
 import {TECHNIQUES} from '../../src/paint/methods/lay.mjs';
 import {AREA_EDGES_CONTRACT,validateAreaEdges,bindAreaEdges} from './area-edges.mjs';
 import {AREA_WASHES_CONTRACT,validateAreaWashes,compileAreaWash} from './area-washes.mjs';
@@ -83,7 +84,7 @@ export function rasterAreaPlan(plan,w,h){
  const out={...plan,w,h,owner,masks,reserves,film,allowed,diagnostics:{areaCount:masks.length,geometryCoveredCells:owner.reduce((s,v)=>s+(v>=0),0),unassignedCells:owner.reduce((s,v)=>s+(v<0),0),explicitOcclusionCells:overlap,areaCells:plan.doc.areas.map((a,j)=>({id:a.id,parent:a.parent,owned:owner.reduce((s,v)=>s+(v===j),0),geometry:masks[j].reduce((s,v)=>s+v,0)}))}};
  out.edgesByArea=bindAreaEdges(out);return out;
 }
-export function compileAreaLayers(plan,layers,palette){
+export function compileAreaLayers(plan,layers,palette,{mmPerCell}={}){
  const direct=compileAuthoredPaint(plan,palette??[]);if(direct)return direct;
  const scheduled=new Map(plan.schedule.map(s=>[s.key,[]])),diagnostics={...plan.diagnostics,stage:'compiled numerical regions, NOT execution proof',unassignedPaintCells:0,unassignedValueCells:0,allowedUnassignedValueCells:0,allowedUnassignedDemandMass:0,allowedUnassignedCellIndices:[],reservedDemandCells:0,compiledShapes:0,passes:plan.schedule.map(s=>({id:s.key,compiledShapes:0,executedCommands:0}))};let allocated=0,input=0;
  // One wash per pass (painting-rules 7, 14): every ladder piece in the pass's area and value range is gathered into
@@ -91,8 +92,12 @@ export function compileAreaLayers(plan,layers,palette){
  const pass=new Map(),top=Math.max(0,...layers.map(l=>l.value??0));
  // a pass whose whole value range lies above the ladder's darkest value can never be laid: a plan error, said loudly
  if(layers.length){const past=plan.schedule.filter(s=>s.pass.source!=='authored'&&s.pass.valueRange[0]>top).map(s=>s.key);if(past.length)fail(`passes above the value ladder (values 1-${top} on this run): ${past.join(', ')}`);}
- for(const layer of layers)for(const sh of layer.shapes){const mask=sh.mask;for(let i=0;i<mask.length;i++)if(mask[i]){input++;if(plan.reserves[i]||plan.film[i]){diagnostics.reservedDemandCells++;continue;}const j=plan.owner[i];if(j<0){if(!plan.allowed[i])diagnostics.unassignedPaintCells++;else{diagnostics.allowedUnassignedValueCells++;diagnostics.allowedUnassignedDemandMass+=sh.amount??0;diagnostics.allowedUnassignedCellIndices.push(i);}continue;}const a=plan.doc.areas[j],p=a.passes.find(p=>layer.value>=p.valueRange[0]&&layer.value<=p.valueRange[1]);if(!p){diagnostics.unassignedValueCells++;continue;}const key=`${a.id}/${p.id}`;let acc=pass.get(key);if(!acc){acc={cells:new Uint8Array(mask.length),mass:new Float64Array((sh.mix??[]).length),count:0,first:sh,layer};pass.set(key,acc);}if(!acc.cells[i]){acc.cells[i]=1;acc.count++;}const mx=sh.mix??[];for(let k=0;k<mx.length;k++)acc.mass[k]+=mx[k];acc.pieces=(acc.pieces??new Set()).add(sh);allocated++;}}
+ for(const layer of layers)for(const sh of layer.shapes){const mask=sh.mask;for(let i=0;i<mask.length;i++)if(mask[i]){input++;if(plan.reserves[i]||plan.film[i]){diagnostics.reservedDemandCells++;continue;}const j=plan.owner[i];if(j<0){if(!plan.allowed[i])diagnostics.unassignedPaintCells++;else{diagnostics.allowedUnassignedValueCells++;diagnostics.allowedUnassignedDemandMass+=sh.amount??0;diagnostics.allowedUnassignedCellIndices.push(i);}continue;}const a=plan.doc.areas[j],p=a.passes.find(p=>layer.value>=p.valueRange[0]&&layer.value<=p.valueRange[1]);if(!p){diagnostics.unassignedValueCells++;continue;}const key=`${a.id}/${p.id}`;let acc=pass.get(key);if(!acc){acc={key,cells:new Uint8Array(mask.length),mass:new Float64Array((sh.mix??[]).length),count:0,first:sh,layer};pass.set(key,acc);}if(!acc.cells[i]){acc.cells[i]=1;acc.count++;}const mx=sh.mix??[];for(let k=0;k<mx.length;k++)acc.mass[k]+=mx[k];acc.pieces=(acc.pieces??new Set()).add(sh);allocated++;}}
 
+ if(pass.size&&!(finite(mmPerCell)&&mmPerCell>0))fail('compiling area washes needs the sheet scale (mmPerCell) to size each pass brush');
+ // a wash covers the gaps in its shape narrower than its brush: the union is closed at the pass brush's radius, inside
+ // the area and off its reserved lights; the paint it holds is unchanged, spread over the closed shape
+ for(const acc of pass.values()){const sp=plan.passes.get(acc.key).pass,a=plan.doc.areas.indexOf(plan.passes.get(acc.key).area),closed=closeLocal(acc.cells,plan.w,plan.h,sp.brush.widthMm/2/mmPerCell);let count=0;for(let i=0;i<closed.length;i++){const keep=(acc.cells[i]||closed[i])&&plan.owner[i]===a&&!plan.reserves[i]&&!plan.film[i]?1:0;acc.cells[i]=keep;count+=keep;}acc.count=count;}
  for(const s of plan.schedule){const acc=pass.get(s.key);if(!acc)continue;const w=plan.w,box={x0:w,y0:plan.h,x1:-1,y1:-1},cells=[];for(let i=0;i<acc.cells.length;i++)if(acc.cells[i]){cells.push(i);const x=i%w,y=Math.floor(i/w);if(x<box.x0)box.x0=x;if(x>box.x1)box.x1=x;if(y<box.y0)box.y0=y;if(y>box.y1)box.y1=y;}
   const mix=Array.from(acc.mass,v=>v/acc.count),amount=mix.reduce((a,b)=>a+b,0),clone=passage(acc.cells,1,box,amount,acc.count,w),sh=acc.first;
   for(const k of Object.keys(sh))if(!['mask','ids','id','box','_mask','area','w','_brushMask','_mbox','_cover','_under','_fb','_booked','amount','mix','graded','_plane','_gradedAngle','_follow'].includes(k))clone[k]=sh[k];

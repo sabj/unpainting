@@ -24,7 +24,7 @@ const doc = extra => ({ version: 1, coordinateSpace: 'normalized-target', target
 const plan = d => rasterAreaPlan(validateAreaDocument(d, { targetSHA: 'a', imageSHA: 'a', sourceWidth: W, sourceHeight: H }), W, H);
 const square = Uint8Array.from({ length: W * H }, (_, i) => (i % W >= 8 && i % W < 56 && ((i / W) | 0) >= 8 && ((i / W) | 0) < 56 ? 1 : 0));
 const shape = mix => ({ mask: Uint8Array.from(square), amount: mix.reduce((a, b) => a + b, 0), mix, area: 48 * 48 });
-const compiled = (extra, mix) => compileAreaLayers(plan(doc(extra)), [{ value: 1, pigment: 0, shapes: [shape(mix)] }], palette).layers[0].shapes[0];
+const compiled = (extra, mix) => compileAreaLayers(plan(doc(extra)), [{ value: 1, pigment: 0, shapes: [shape(mix)] }], palette, { mmPerCell: 10 }).layers[0].shapes[0];
 const fresh = () => createSheet(makePaper(W, H, { seed: 5, scale: 1, toothScale: 0.2 }), palette);
 const r = 3, T = TECHNIQUES['wet on dry'], brush = () => brushFor(r, T, 7);
 // the pass's lanes, laid across the wash direction as the painter lays them (paint.mjs brushedWashPaths at the shape's
@@ -88,6 +88,22 @@ test('the validator: wash and charge only on wet passes, with reasons, no brush 
   bad({ charge: { paint: { rose: 1 }, strength: 1, water: .5, reason: 'x', drip: 1 } }, /unknown field drip/);
   assert.throws(() => compiled({ wash: { kind: 'variegated', direction: [0, 1], paint: { viridian: 1 }, reason: 'x' } }, [.3, 0, 0]), /not on this run's palette/);
   // a picked palette names its pans; the box key is found by name
-  const named = compileAreaLayers(plan(doc({ wash: { kind: 'variegated', direction: [0, 1], paint: { rose: 1 }, reason: 'x' } })), [{ value: 1, pigment: 0, shapes: [shape([.3, 0, 0])] }], palette.map(({ key, ...p }) => p)).layers[0].shapes[0];
+  const named = compileAreaLayers(plan(doc({ wash: { kind: 'variegated', direction: [0, 1], paint: { rose: 1 }, reason: 'x' } })), [{ value: 1, pigment: 0, shapes: [shape([.3, 0, 0])] }], palette.map(({ key, ...p }) => p), { mmPerCell: 10 }).layers[0].shapes[0];
   assert.deepEqual(named._variegate.mix.map(v => +v.toFixed(6)), [0, 0, .3]);
+});
+
+test('a pass is one closed wash: gaps narrower than its brush are filled, reserved lights stay paper, the paint is unchanged', () => {
+  const d = doc({ lights: { mode: 'paper', reason: 'a reserved light', polygon: box(.4, .4, .5, .5) } });
+  // stripes two cells wide with two-cell gaps, as the value ladder leaves them; a 4 mm brush at 1 mm a cell spans the gaps
+  const stripes = Uint8Array.from({ length: W * H }, (_, i) => (square[i] && (i % W) % 4 < 2 ? 1 : 0)), area = stripes.reduce((a, b) => a + b, 0);
+  const sh = compileAreaLayers(plan(d), [{ value: 1, pigment: 0, shapes: [{ mask: stripes, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }).layers[0].shapes[0];
+  const m = sh.mask; let inside = 0, light = 0;
+  for (let y = 10; y < 54; y++) for (let x = 10; x < 54; x++) inside += m[y * W + x];
+  for (let y = 26; y < 32; y++) for (let x = 26; x < 32; x++) light += m[y * W + x];
+  assert.ok(inside > .9 * 44 * 44 - 36, `closed: ${inside} of ${44 * 44}`);
+  assert.equal(light, 0, 'the reserved light is left out');
+  // the reserved light's own cells carry no paint into any pass (they are paper); every other cell's paint is kept
+  let kept = 0; for (let i = 0; i < W * H; i++) if (stripes[i] && !(i % W >= 26 && i % W < 32 && ((i / W) | 0) >= 26 && ((i / W) | 0) < 32)) kept++;
+  assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * kept) < 1e-9, `same paint, spread over the closed shape: ${sh.mix[0] * sh.area} vs ${.3 * kept}`);
+  assert.throws(() => compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [shape([.3, 0, 0])] }], palette), /mmPerCell/);
 });
