@@ -1,7 +1,9 @@
 // V5 feedback for try n > 1: bench/feedback/ in the model's worktree, built from the previous try's record of the same
-// target. FEEDBACK.md holds the outcome, the judges' scores and notes, the progression judge's stage scores and tells,
-// and the render record. Beside it: the previous painting, target | painting, the stage strip the judge saw, the plan
-// as it was painted at the end, and the stops, looks and revisions of that try.
+// target. FEEDBACK.md holds the outcome, the progression judges' words and the tells they named, and the render record.
+// Beside it: the previous painting, target | painting, the stage strip the judge saw, the plan as it was painted at the
+// end, and the stops, looks and revisions of that try. No score goes back to the model: no composite, judge score,
+// stage score, metric, J1, hfCorr or ceiling result. A number to beat between tries turns tries into a hill climb on
+// the score; the painting and the judges' words are what a painter learns from.
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -14,40 +16,29 @@ const TELLS = {
   i: 'lines that do not describe the subject', j: 'texture arriving as a dump, everything sharpening at once late',
   k: 'dark before light', l: 'fine detail already present in the first 25%', m: 'a pixel-grid or stair-step fill',
 };
-const SCALE = "5 unmistakably a person's painting in progress; 4 convincing with one small tell; 3 plausible but a tell a viewer would "
-  + 'notice; 2 mostly not, two or more tells; 1 a finished image being uncovered by a filter, mask, wipe or dissolve.';
 const OUTCOME = {
-  scored: 'The plan was admitted, painted and judged. Results follow.',
+  scored: 'The plan was admitted, painted and judged. The judges\' words follow; no score is given back.',
   'dry-run': 'The plan was admitted and painted. This is a dry run, so no judges were called.',
   unscored: 'The plan was admitted and painted, but the painting was not judged.',
   'plan-refused': 'The harness refused your plan even after one repair turn, so nothing was painted.',
   'no-plan': 'You finished without writing a plan (no config.json), so nothing was painted.',
   'render-failed': 'The plan was admitted but the painting failed, so there is no finished painting.',
 };
-const humanize = k => String(k).replace(/(?<=[a-z0-9])(?=[A-Z])/g, ' ').replace(/[_-]+/g, ' ').toLowerCase();
 
-function describeScore(score) {
-  if (!score) return ['(no score record)'];
-  const out = [`- composite: ${score.composite} out of 10${score.complete === false ? ' (incomplete)' : ''}`];
-  if (score.classic != null) out.push(`- classic measures: ${score.classic}`);
-  for (const [k, v] of Object.entries(score.criteria || {})) if (v != null) out.push(`- ${humanize(k)}: ${v}`);
-  for (const [j, v] of Object.entries(score.judgeScores || {})) out.push(`- judge ${j}: ${v}`);
-  return out;
-}
+// a judge's note may quote its own score ("3/5", "4 out of 5", "score: 2"): those numbers are cut, the words kept
+export const scrubScores = text => String(text)
+  .replace(/\b\d+(?:\.\d+)?\s*(?:\/|out of)\s*\d+(?:\.\d+)?\b/gi, '')
+  .replace(/\b(score[ds]?|rated?|rating|composite|mean|j1|hfcorr|ceiling)\b\s*(?:of|:|=|is)?\s*\d+(?:\.\d+)?\b/gi, '$1')
+  .replace(/\s{2,}/g, ' ').trim();
 
-function describeProgression(prog) {
-  if (!prog) return ['(the progression judges returned no scores for this painting)'];
+/** The progression judges' words: the tells they named (no counts) and their notes (no scores). */
+export function describeProgression(prog) {
+  if (!prog) return ['(the progression judges said nothing about this painting)'];
   const out = [];
-  for (const pct of [10, 25, 50, 75, 100]) {
-    const sc = prog.stages?.[pct] ?? prog.stages?.[String(pct)];
-    out.push(`- At ${pct}% of its strokes: ${sc != null ? `${sc} out of 5` : 'no score'}`);
-  }
   const tl = Object.entries(prog.tells || {}).sort((a, b) => b[1] - a[1]);
-  if (tl.length) out.push('- Tells named across the judges and stages (times named): ' + tl.map(([t, c]) => `${TELLS[t] || t} (${c})`).join('; '));
-  if (prog.mean != null) out.push(`- Mean over the five stages: ${prog.mean}; mean of the 10% and 25% stages: ${prog.earlyMean}.`);
-  if (prog.humanOrderVotes != null) out.push(`- Judges who found the order of work human: ${prog.humanOrderVotes} of ${prog.judgesN}.`);
-  for (const n of Object.values(prog.judgeNotes || {})) out.push('- judge note: ' + n);
-  return out;
+  if (tl.length) out.push('- Tells the judges named, most often first: ' + tl.map(([t]) => TELLS[t] || t).join('; '));
+  for (const n of Object.values(prog.judgeNotes || {})) if (scrubScores(n)) out.push('- judge note: ' + scrubScores(n));
+  return out.length ? out : ['(the progression judges named no tells and left no notes)'];
 }
 
 /** Side by side at one height, with a white gap. */
@@ -73,9 +64,8 @@ export async function writeFeedback({ dest, prev, prevRaw, prevOut, target }) {
   if (pipe.failure) L.push('What failed, and why:', ...(pipe.failure.failures || [pipe.failure]).map(f => `- ${f.reason || f}`), '');
   if (pipe.notes?.length) L.push('Kept against your plan (the painting still counts):', ...pipe.notes.map(f => `- ${f.reason}`), '');
   if (prev.outcome === 'scored') {
-    L.push('## The finished painting: score and judge notes', '', ...describeScore(entry.score), '',
-      '## How the painting developed (progression judge)', '',
-      `A panel of vision judges saw one strip: your target, then the painting at 10, 25, 50, 75 and 100 percent of its strokes. They did not know how it was made. They score each stage from 1 to 5 as: ${SCALE}`, '',
+    L.push('## How the painting developed (progression judges)', '',
+      'A panel of vision judges saw one strip: your target, then the painting at 10, 25, 50, 75 and 100 percent of its strokes. They did not know how it was made. They looked for signs that it was not painted by a person. Their words follow; their scores are not given back.', '',
       ...describeProgression(entry.progression), '');
   }
   L.push('## Render record', '');

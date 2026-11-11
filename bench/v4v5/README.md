@@ -18,4 +18,4 @@ Rules:
 - In 0.2.1, Trumbull gets a fixed seven-paint box from the harness's base tokens unless its plan names a palette token. `npm run bench:run -- ... --no-base-palette` drops that box, so the painter picks its own paints unless the plan asks for a box.
 - If the session ends without a painting, the harness checks the plan and paints it without stops. A missing or refused plan gets one repair turn in the same session. So does a plan the painter refuses at full size.
 - The pigments cannot change once painting has started.
-- V5 tries after the first get `bench/feedback/`: the previous try's painting, plan, stops and judges. The model is asked to write `bench/SELF-REVIEW.md` before it reads the judges. The order is asked for, not enforced.
+- V5 tries after the first get `bench/feedback/`: the previous try's painting, plan, stops and the judges' words. No score, metric or judge number goes back to the model between tries. The model is asked to write `bench/SELF-REVIEW.md` before it reads the judges. The order is asked for, not enforced.

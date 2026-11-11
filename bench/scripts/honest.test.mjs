@@ -90,3 +90,27 @@ test('the brief says what a look shows in each mode, and that looks are counted'
   assert.match(strict, /no target view after planning/);
   assert.match(loose, /compare\.jpg/);
 });
+
+test('V5 feedback carries the painting and the judges\' words, never a score', async () => {
+  const { writeFeedback, scrubScores } = await import('./pipeline/feedback.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'honest-fb-')), prevRaw = path.join(root, 'raw'), prevOut = path.join(root, 'out'), dest = path.join(root, 'fb');
+  fs.mkdirSync(path.join(prevOut, 'frames'), { recursive: true }); fs.mkdirSync(path.join(prevRaw, 'plan'), { recursive: true });
+  const target = path.join(root, 't.png'); await png(target, '#336699'); await png(path.join(prevOut, 'final.png'), '#eeeeee');
+  const entry = {
+    score: { composite: 6.42, complete: true, classic: 0.731, criteria: { valueStructure: 7.5, edges: 5.25 }, judgeScores: { 'judge-a': 6.1 }, hfCorr: 0.653, j1: 7.37, ceiling: 0.645 },
+    progression: { stages: { 10: 3.5, 25: 2.75, 50: 4, 75: 4, 100: 4.25 }, mean: 3.65, earlyMean: 3.125, humanOrderVotes: 1, judgesN: 2, tells: { e: 3, k: 1 },
+      judgeNotes: { a: 'Washes go down light to dark; the sky reads as one passage. Stage score 2/5 at 25%.', b: 'score: 4. Edges are all the same.' } },
+    pipeline: { paintExit: 0, segments: 1 }, strokes: 671,
+  };
+  await writeFeedback({ dest, prev: { n: 1, outcome: 'scored', entry }, prevRaw, prevOut, target });
+  const md = fs.readFileSync(path.join(dest, 'FEEDBACK.md'), 'utf8');
+  for (const v of ['6.42', '0.731', '7.5', '5.25', '6.1', '0.653', '7.37', '0.645', '3.65', '3.125', '2.75', '4.25', '2/5', 'out of', 'score: 4', '(3)'])
+    assert.ok(!md.includes(v), `FEEDBACK.md gives back ${v}`);
+  assert.doesNotMatch(md, /composite|judge score|hfCorr|J1|ceiling/i);
+  assert.match(md, /sky reads as one passage/);
+  assert.match(md, /Edges are all the same/);
+  assert.match(md, /the whole sheet at one faint value/);
+  assert.ok(fs.existsSync(path.join(dest, 'previous-painting.png')) && fs.existsSync(path.join(dest, 'compare.png')));
+  assert.equal(scrubScores('rated 3 out of 5, mean 3.2'), 'rated , mean');
+  fs.rmSync(root, { recursive: true, force: true });
+});
