@@ -128,7 +128,7 @@ The rule for choosing, in painter terms: joined wash or wet in wet for large sof
 
 ## 5. Brush and stroke application
 
-The painter dips a brush, tries it on scrap, lays a stroke along a path, and reloads when the load runs out. A load is spent only on paper the brush paints: a stretch over a reserve or outside the passage's edge spends none of it (`src/paint/methods/brushes.mjs` splitLoads).
+The painter dips a brush, tries it on scrap, lays a stroke along a path, and reloads when the load runs out. A light brush touches the tops of the paper's tooth: each fibre is compared with the tooth level under it in the paper's own height units (`src/media/paper.mjs` toothRange), so a dry brush marks the hills and skips the hollows. A load is spent only on paper the brush paints: a stretch over a reserve or outside the passage's edge spends none of it (`src/paint/methods/brushes.mjs` splitLoads).
 
 - Brushes: `src/media/brush.mjs` (bristles and load), `src/paint/brushes.json` (real brush sizes), `src/paint/methods/brushes.mjs` (`--physical 1`), `src/paint/methods/passage-brush.mjs` (`--brushchoice`).
 - Paths: `src/media/wash.mjs` (wash paths, softening, prewetting), `src/paint/methods/lay.mjs` (one passage as sweeps), `src/paint/methods/stroke-plan.mjs` (`--strokeplan 1`, overlapping parallel sweeps), `src/paint/methods/mop-lanes.mjs` (a mop's overlapping, slightly curved lanes).

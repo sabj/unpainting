@@ -50,10 +50,14 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
   // proud: how far a fibre stands above its surroundings, blurred at proudBlur cells at height's own scale.
   const proudLow = box(height, w, h, Math.max(1, Math.round(proudBlur * (mmPerCell > 0 ? fs : 1))));
   const proud = new Float32Array(n); for (let i = 0; i < n; i++) proud[i] = height[i] - proudLow[i];
-  const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - toothH[i];
+  // toothLo, toothSpan: the blurred tooth's own range before it was stretched to 0..1. A brush compares a fibre with the
+  // tooth level under it in the height's own units (toothLevel); compared with the stretched tooth, the coarse hills read
+  // as sunk below their own fibres and the hollows as raised, so a light brush touched the hollows and skipped the hills.
+  const toothLo = tl, toothSpan = th - tl || 1;
+  const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - (toothLo + toothSpan * toothH[i]);
   const sorted = Float32Array.from(rel).sort();
   const relief = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
-  return { w, h, n, height, capacity, valley, proud, tooth: toothH, fdx, fdy, grain, relief, mmPerCell: coldPress ? coldPress.mmPerCell : mmPerCell };
+  return { w, h, n, height, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief, mmPerCell: coldPress ? coldPress.mmPerCell : mmPerCell };
 }
 
 /**
@@ -62,6 +66,13 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
  */
 // pits p: this share of the bumps are pressed in instead of raised, so settling paint collects in pits as dark
 // grains on a lighter ground. 0: domes only.
+/** The blurred tooth's own range, [lo, span]: the tooth level under cell i in the height's own units is
+ *  lo + span x tooth[i], what a hair riding the tooth is measured against. */
+export function toothRange(paper) {
+  if (!(paper.toothSpan > 0) || !Number.isFinite(paper.toothLo)) throw new Error('paper: no tooth range (toothLo, toothSpan); make it with makePaper or the scan paper');
+  return [paper.toothLo, paper.toothSpan];
+}
+
 export function coldPressField(w, h, mmPerCell, seed = 1, { bumpMm = [0.5, 2], cover = 2.2, swell = 0.3, swellMm = [3, 6], pits = 0 } = {}) {
   const n = w * h, f = new Float32Array(n);
   let s = (Math.imul(seed | 0, 2654435761) >>> 0) || 1;

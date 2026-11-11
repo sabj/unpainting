@@ -1,3 +1,4 @@
+import { toothRange } from '../paper.mjs';
 import { fixedBedLower as sumFixedBedLower } from '../fixed-bed.mjs';
 import { recordWetCells, recordWetBox, syncWetReachVersion, invalidatePaperCertificate } from '../paper-certificate.mjs';
 const fixedBedLower = sheet => sumFixedBedLower(sheet, { skipEmpty: process.env.GPU_SKIP_ZERO_LAYER === '1' });
@@ -460,7 +461,7 @@ export class GpuLink {
     const { F, U } = plan, paper = sheet.paper;
     U[0] = lanes; U[1] = K; U[2] = nClumps; F[3] = brush.flat ? 1 : 0; F[4] = brush.capacity; F[5] = brush.free; F[6] = brush.film; F[7] = brush.give;
     F[8] = brush.wetness; F[9] = brush.bridge; F[10] = brush.bridgeSoft; F[11] = brush.breakup; F[12] = brush.fine; F[13] = brush.coarse; F[14] = brush.wetMix;
-    U[15] = brush.stiffness; F[16] = paper.relief ?? 0.2; F[17] = Math.min(1, brush.load ?? 1); F[18] = brush.bridgeStreak; F[19] = mergeOf(brush);
+    U[15] = brush.stiffness; F[16] = paper.relief ?? 0.2; [F[37], F[38]] = toothRange(paper); F[17] = Math.min(1, brush.load ?? 1); F[18] = brush.bridgeStreak; F[19] = mergeOf(brush);
     U[21] = sheet.wetting ? 1 : 0; U[23] = brush.rs.s & 65535; U[22] = brush.rs.s >>> 16; F[25] = brush.feed; U[26] = 0; U[27] = SP; U[28] = H0; U[29] = S0; U[30] = HS;
     F[34] = brush.depositDepth || 0;
     F[35] = brush.resP.some(v => Object.is(v, -0)) || brush.hairs.some(h => h.pig.some(v => Object.is(v, -0))) ? 1 : 0;

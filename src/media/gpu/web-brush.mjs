@@ -3,6 +3,7 @@ import { postureContact, POSTURES } from './web-posture.mjs';
 // fed from a belly reservoir as in DAB. Water and pigment move as separate masses. One contact model covers
 // every load: paint reaches a cell when the hair's liquid spans the depth of the paper's tooth below it.
 import { deposit, soak, collectFlows } from '../sheet.mjs';
+import { toothRange } from '../paper.mjs';
 
 export function createBrush(opts = {}) {
   const b = makeBrush(opts);
@@ -311,7 +312,7 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
             * (1 + brush.bridgeStreak * (wander - 1));
           // how sharply the liquid stops: a narrow transition covers a few cells fully and misses the rest, which
           // reads as scattered dots; a wide one grades the cover and reads as the paper showing through
-          contact *= smooth((paper.height[i] - paper.tooth[i] + reach) / (brush.bridgeSoft * relief) + 0.5);
+          const [tlo, tspan] = toothRange(paper); contact *= smooth((paper.height[i] - (tlo + tspan * paper.tooth[i]) + reach) / (brush.bridgeSoft * relief) + 0.5);
           if (contact <= 0) continue;
         }
         if (empty > 0) {

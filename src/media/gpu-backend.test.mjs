@@ -182,3 +182,16 @@ test('a damp round carrying paint through a wet wash lays the same paint on the 
     assert.ok(cpu.pig[1] > 0, 'the round laid its paint');
   } finally { g._gpu.close(); }
 });
+
+// A dry brush on cold-press tooth: the GPU reads the tooth level in the height's units from its brush plane, as the CPU
+// brush does (paper.mjs toothRange), so the same cells are touched and the same paint is laid.
+test('a dry brush over cold-press tooth lays the same paint on the GPU as on the CPU', { timeout: 120000 }, t => {
+  const m = 0.6, cold = () => createSheet(makePaper(N, N, { mmPerCell: m, seed: 9, toothScale: 0.2, coldPress: { mmPerCell: m, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } }), pigments);
+  const lay = sheet => { const b = createBrush({ flat: true, radius: 4, bristles: 12, capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, wetMix: 0, bridge: 0.38, bridgeSoft: 1, seed: 31 }); dip(b, { water: 0.22, conc: [0.5, 0] }); stroke(b, sheet, [{ x: 10, y: 48, p: 0.9, r: 4 }, { x: 86, y: 48, p: 0.9, r: 4 }], { upright: 'sweep' }); return totals(sheet).pig[0]; };
+  const cpu = lay(cold()), g = cold(), info = attachGpu(g, DEFAULTS, { mode: 'auto', log: () => {} });
+  if (info.backend !== 'gpu') { t.skip(`no GPU: ${info.reason}`); return; }
+  try {
+    const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 1, 'the stroke was laid on the GPU');
+    assert.ok(cpu > 0 && Math.abs(gpu - cpu) <= 1e-4 * cpu, `GPU ${gpu} against CPU ${cpu}`);
+  } finally { g._gpu.close(); }
+});

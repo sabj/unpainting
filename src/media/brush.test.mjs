@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
-import { createSheet, deposit, step, totals, dry, DEFAULTS } from './sheet.mjs';
+import { createSheet, deposit, step, totals, dry, DEFAULTS, thickness } from './sheet.mjs';
 import { createBrush, dip, stroke, thirsty, setStrokeVariety, edgeHalfWidth } from './brush.mjs';
 import { brushFor, TECHNIQUES } from '../paint/methods/lay.mjs';
 // exact-geometry contracts of the planned stroke: run with no stroke variety and no damp-paint merge
@@ -170,8 +170,10 @@ test('a larger metered load extends the stroke without deepening its film', t =>
     assert.ok(Math.abs(depth(a.sheet, x) - 0.2) < 1e-6, `continuous film at ${x}`);
     assert.ok(Math.abs(depth(a.sheet, x) - depth(b.sheet, x)) < 1e-6);
   }
-  const lastFull = s => { let end = 0; for (let x = 8; x < 350; x++) if (depth(s, x) > 0.19) end = x; return end; };
-  assert.ok(lastFull(b.sheet) > lastFull(a.sheet) * 1.7);
+  // where the solid film ends: past it a running-dry brush breaks on the tooth's hollows, so the last full cell says
+  // how far the broken tail reaches, not how far the load laid its film
+  const solidTo = s => { for (let x = 12; x < 350; x++) if (depth(s, x) <= 0.19) return x; return 350; };
+  assert.ok(solidTo(b.sheet) > solidTo(a.sheet) * 1.7, `solid film to ${solidTo(b.sheet)} against ${solidTo(a.sheet)}`);
   assert.ok(depth(b.sheet, 348) < 0.01, 'finite reservoir must run dry');
   assert.ok(a.brush.resW < 0.01, `only a retained lift-off bead remains: ${a.brush.resW}`);
 });
@@ -318,4 +320,23 @@ const accentThrough = wet => {
 test('a damp round carrying paint, drawn through a wet wash, lays its paint into it', () => {
   const wet = accentThrough(true), dried = accentThrough(false);
   assert.ok(dried > 0 && wet >= 0.5 * dried, `laid ${wet.toFixed(3)} through the wet wash against ${dried.toFixed(3)} over it dried`);
+});
+
+// A light, lightly loaded brush dragged side-on over cold-press touches the tops of the tooth and skips its hollows. The
+// tooth level under a fibre is read in the height's own units (paper.mjs toothRange); against the tooth stretched to 0..1
+// the coarse hills read as sunk below their own fibres, and the brush touched them less than the hollows.
+test('a dry brush touches the coarse hills of cold-press tooth more than the ground between them', () => {
+  const mmc = 280 / 480, W = 160, H = 60, by = { hill: [0, 0], low: [0, 0] };
+  for (const seed of [9, 10, 11]) {
+    const paper = makePaper(W, H, { mmPerCell: mmc, seed, toothScale: 0.2, fibres: 0.5, tooth: 0.5, coldPress: { mmPerCell: mmc, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
+    const sheet = createSheet(paper, [{ K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 }]), r = 2 / mmc, y = H / 2;
+    const b = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(2 * r)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, seed: 31, wetMix: 0, bridge: 0.38, bridgeSoft: 1.0 });
+    dip(b, { water: 0.22, conc: [0.5] }); stroke(b, sheet, [{ x: 15, y, p: 0.9 }, { x: W - 15, y, p: 0.9 }], { upright: 'sweep' });
+    const th = thickness(sheet)[0];
+    for (let yy = Math.ceil(y - 0.3 * r); yy <= Math.floor(y + 0.3 * r); yy++) for (let x = Math.ceil(15 + r); x <= Math.floor(W - 15 - r); x++) {
+      const i = yy * W + x, k = paper.tooth[i] > 2 / 3 ? 'hill' : 'low'; by[k][0]++; if (th[i] > 0) by[k][1]++;
+    }
+  }
+  const share = ([n, hit]) => hit / n;
+  assert.ok(share(by.hill) > share(by.low), `touched ${share(by.hill).toFixed(2)} of the hills against ${share(by.low).toFixed(2)} of the lower ground`);
 });

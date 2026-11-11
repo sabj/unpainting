@@ -1202,7 +1202,7 @@ const H_COARSE = 13u; const H_WETMIX = 14u; const H_L = 15u; const H_RELIEF = 16
 const H_MERGE = 19u; const H_WETTING = 21u; const H_RNG = 23u; const H_NSTEPS = 24u;
 const H_FEED = 25u; const H_CUR = 26u; const H_SP = 27u; const H_OFFH = 28u; const H_OFFS = 29u; const H_HS = 30u;
 const H_OFFC = 31u; const H_NLIFT = 32u; const H_OFFL = 33u;
-const H_OFFQ = 64u;
+const H_TLO = 37u; const H_TSPAN = 38u; const H_OFFQ = 64u;
 // the hairs' state, in workgroup memory for the run (the default limit is 16 KB): per hair water, length, clump (bits), a
 // spare word, then each pigment; the belly and the bead's pool follow the hairs. (hairs + 2) * (4 + pigments) must fit.
 var<workgroup> wh: array<f32, 4000>;
@@ -1213,7 +1213,7 @@ fn bi(i: u32) -> i32 { return bitcast<i32>(BSTR[i]); }
 // cannot keep them in registers itself.
 var<private> pHS: u32; var<private> pLanes: u32; var<private> pK: u32; var<private> pCapa: f32; var<private> pFlat: bool; var<private> pFree: f32;
 var<private> pFilm: f32; var<private> pGive: f32; var<private> pWet: f32; var<private> pBridge: f32; var<private> pBSoft: f32; var<private> pBreak: f32;
-var<private> pFine: f32; var<private> pCoarse: f32; var<private> pWetMix: f32; var<private> pL: i32; var<private> pRelief: f32; var<private> pLoad: f32;
+var<private> pFine: f32; var<private> pCoarse: f32; var<private> pWetMix: f32; var<private> pL: i32; var<private> pRelief: f32; var<private> pTLo: f32; var<private> pTSpan: f32; var<private> pLoad: f32;
 var<private> pDepth: f32;
 var<private> pBStreak: f32; var<private> pWetting: bool; var<private> pFeed: f32; var<private> pMerge: f32;
 var<private> pRng: u32;   // the brush's generator (rnd), held for the dispatch and written back by hdr_store
@@ -1221,7 +1221,7 @@ fn hdr_load() {
   pDepth = BSTR[34u];
   pHS = bu(H_HS); pLanes = bu(H_LANES); pK = bu(H_K); pCapa = BSTR[H_CAPA]; pFlat = BSTR[H_FLAT] != 0.0; pFree = BSTR[H_FREE];
   pFilm = BSTR[H_FILM]; pGive = BSTR[H_GIVE]; pWet = BSTR[H_WET]; pBridge = BSTR[H_BRIDGE]; pBSoft = BSTR[H_BSOFT]; pBreak = BSTR[H_BREAK];
-  pFine = BSTR[H_FINE]; pCoarse = BSTR[H_COARSE]; pWetMix = BSTR[H_WETMIX]; pL = i32(bu(H_L)); pRelief = BSTR[H_RELIEF]; pLoad = BSTR[H_LOAD];
+  pFine = BSTR[H_FINE]; pCoarse = BSTR[H_COARSE]; pWetMix = BSTR[H_WETMIX]; pL = i32(bu(H_L)); pRelief = BSTR[H_RELIEF]; pTLo = BSTR[H_TLO]; pTSpan = BSTR[H_TSPAN]; pLoad = BSTR[H_LOAD];
   pBStreak = BSTR[H_BSTREAK]; pWetting = bu(H_WETTING) != 0u; pFeed = BSTR[H_FEED]; pMerge = BSTR[H_MERGE];
   pRng = bu(H_RNG) | (bu(22u) << 16u);
 }
@@ -1404,7 +1404,8 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   if (bridge > 0.0 && bridge < 1.0) {
     let relief = pRelief;
     let reach = select(bridge, bridge + (1.0 - bridge) * fill, pDepth > 0.0) * relief * (0.45 + 0.55 * fill) * (0.55 + 0.45 * qp) * (1.0 + pBStreak * (wander - 1.0));
-    let bridgeContact = smooth01((pp.x - pp.y + reach) / (pBSoft * relief) + 0.5);
+    // the tooth level under the fibre in the height's own units (paper.mjs toothRange), as the CPU brush reads it
+    let bridgeContact = smooth01((pp.x - (pTLo + pTSpan * pp.y) + reach) / (pBSoft * relief) + 0.5);
     contact *= select(bridgeContact, fill + (1.0 - fill) * bridgeContact, pDepth > 0.0);
     if (contact <= 0.0) { return; }
   }

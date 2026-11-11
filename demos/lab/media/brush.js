@@ -5,6 +5,7 @@ import { censusMark } from './census.js';
 // reservoir as in DAB. Water and pigment move as separate masses. One contact model covers every load:
 // paint reaches a cell when the hair's liquid spans the depth from the hair to the paper's tooth there.
 import { deposit, soak, collectFlows } from './sheet.js';
+import { toothRange } from './paper.js';
 import { localRowPlanBound } from './gpu/local-row-plan.js';
 import { checkedStroke } from './gpu/stroke-check.js';
 import { markCpuStrokeCell } from './cpu-stroke-dirty.js';
@@ -648,7 +649,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
           const reach = (brush.depositDepth ? brush.bridge + (1 - brush.bridge) * fill : brush.bridge) * relief * (0.45 + 0.55 * fill) * (0.55 + 0.45 * q.p)
             * (1 + brush.bridgeStreak * (wander - 1));
           // bridgeSoft: how sharply the liquid stops; narrow gives scattered dots, wide gives graded cover
-          const bridgeContact = smooth((paper.height[i] - paper.tooth[i] + reach) / (brush.bridgeSoft * relief) + 0.5);
+          const [tlo, tspan] = toothRange(paper), bridgeContact = smooth((paper.height[i] - (tlo + tspan * paper.tooth[i]) + reach) / (brush.bridgeSoft * relief) + 0.5);
           contact *= brush.depositDepth ? fill + (1 - fill) * bridgeContact : bridgeContact;
           if (contact <= 0) continue;
         }
