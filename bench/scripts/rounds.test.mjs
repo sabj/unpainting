@@ -22,7 +22,7 @@ test('a model token replaces the base token in its slot; architecture and palett
   assert.equal(l.skipped.lay4, 'plan chose lay2');
   assert.equal(l.skipped.blk60, 'architecture only');
   assert.equal(l.skipped.pgreen, 'Trumbull only');
-  assert.ok(l.applied.includes('dk13') && optionMap(l.args).get('darkgain') === '1.3');
+  for (const gain of ['darkgain', 'coolgain', 'midgain']) assert.ok(!optionMap(l.args).has(gain), `the base sets no ${gain}`);
   const t = layerBase({ variant: 'region_w13', build: argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, trumbull: true }), architecture: true, trumbull: true });
   assert.ok(t.applied.includes('blk60') && t.applied.includes('pgreen'));
   assert.match(optionMap(t.args).get('paints'), /sapgreen/);
@@ -43,7 +43,10 @@ test('refusals before painting: unknown tokens, locked options, paths out of the
   assert.deepEqual(unknownTokens('region_w13_lay2_bogus', build), ['bogus']);
   assert.deepEqual(unknownTokens('region_w13_pwarm', build), ['pwarm']);
   assert.match(unknownTokens('region_w9_lay2', build)[0], /prefix/);
-  assert.equal(checkExtraArgs(['--darkgain', '1.1'], '/p').length, 0);
+  assert.equal(checkExtraArgs(['--midlayers', '3'], '/p').length, 0);
+  // a plan states values; gains were removed in 0.3.3, as tokens and as settings
+  for (const gain of ['darkgain', 'coolgain', 'midgain', 'calibratedplan']) assert.match(checkExtraArgs([`--${gain}`, '1'], '/p')[0], /may not set/);
+  for (const token of ['dk13', 'cg13', 'mg12']) assert.deepEqual(unknownTokens('region_w13_' + token, build), [token]);
   assert.match(checkExtraArgs(['--targetguard', 'off'], '/p')[0], /may not set --targetguard/);
   assert.match(checkExtraArgs(['--focusmap', '../x.json'], '/p')[0], /leaves the plan folder/);
   const bad = checkPlanLimits({ families: [{ id: 'f', bounds: [0, 0, 0.001, 1] }], reserves: [{ bounds: [0, 0, 0.5, 0.5] }] }, 140, {}, [300, 240]);
@@ -124,8 +127,8 @@ test('extra args admit only validated artistic controls, never execution or ink 
   for (const key of ['segments', 'allowdirty', 'inkrecipe', 'inkres', 'speedvaluecache', 'aware', 'awarefoo', 'physics', 'linesupport', 'inkdarkcap', 'unknown']) {
     for (const args of [[`--${key}`, '1'], [`--${key}=1`]]) assert.ok(checkExtraArgs(args, '/p').length, args.join(' '));
   }
-  for (const args of [['--darkgain'], ['--darkgain', 'NaN'], ['--darkgain', '4'], ['--drawing', 'bogus'], ['--darkgain', '--drawing', 'first'], ['orphan']]) assert.ok(checkExtraArgs(args, '/p').length);
-  assert.deepEqual(checkExtraArgs(['--outlinemedium', 'ink', '--drawing', 'both', '--darkgain', '1.2'], '/p'), []);
+  for (const args of [['--midlayers'], ['--midlayers', 'NaN'], ['--midlayers', '9'], ['--drawing', 'bogus'], ['--midlayers', '--drawing', 'first'], ['orphan']]) assert.ok(checkExtraArgs(args, '/p').length);
+  assert.deepEqual(checkExtraArgs(['--outlinemedium', 'ink', '--drawing', 'both', '--midlayers', '2'], '/p'), []);
   const args = optionMap(layerBase({variant: 'region_w13', build}).args);
   assert.equal(args.get('inkrecipe'), 'v2');
   for (const key of ['inkkscale', 'closingpressure', 'drawwidthgain', 'openinglines']) assert.ok(!args.has(key), key);
@@ -163,13 +166,18 @@ test('only explicitly offline fixture specs authorize a deliberately stripped wo
   assert.equal(optionMap(fixture.args).get('allowdirty'),'1');
 });
 
-test('extra args allow techcal, techcalfrom, lanemm auto/0..40, and reject invalid ranges', () => {
-  assert.deepEqual(checkExtraArgs(['--techcal', '1', '--techcalfrom', '1', '--lanemm', 'auto'], '/p'), []);
-  assert.deepEqual(checkExtraArgs(['--techcal', '0', '--techcalfrom', '5', '--lanemm', '0'], '/p'), []);
+test('extra args allow lanemm auto/0..40 and reject invalid ranges', () => {
+  assert.deepEqual(checkExtraArgs(['--lanemm', 'auto'], '/p'), []);
+  assert.deepEqual(checkExtraArgs(['--lanemm', '0'], '/p'), []);
   assert.deepEqual(checkExtraArgs(['--lanemm', '40'], '/p'), []);
-  assert.ok(checkExtraArgs(['--techcal', '2'], '/p').length);
-  assert.ok(checkExtraArgs(['--techcalfrom', '0'], '/p').length);
   assert.ok(checkExtraArgs(['--lanemm', '45'], '/p').length);
+});
+
+test('extra args refuse every delivery calibration: the engine owns delivery, not the plan', () => {
+  for (const flag of ['techcal', 'techcalfrom', 'techcalmax', 'techcalmin', 'deliverycal', 'deliverycalmax']) {
+    const bad = checkExtraArgs(['--' + flag, '1'], '/p');
+    assert.ok(bad.some(m => m.includes('may not set --' + flag)), flag + ': ' + JSON.stringify(bad));
+  }
 });
 
 test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.taskStyle', () => {
@@ -197,23 +205,21 @@ test('resolvePlan resolves outlineMedium from config.drawing.medium or spec.task
   }
 });
 
-test('resolvePlan preserves base glazeGains by default and enables --drawing both when closing lines exist', () => {
+test('resolvePlan sets no gain and enables --drawing both when closing lines exist', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-close-'));
   try {
     fs.writeFileSync(path.join(tmpDir, 'opening-lines.json'), '[]');
     const openOnly = resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
     const openMap = optionMap(openOnly.args);
     assert.equal(openMap.get('drawing'), 'first');
-    assert.equal(openMap.get('darkgain'), '1.3');
-    assert.equal(openMap.get('coolgain'), '1.3');
+    for (const gain of ['darkgain', 'coolgain', 'midgain']) assert.equal(openMap.has(gain), false);
     assert.equal(openMap.has('techcal'), false);
 
     fs.writeFileSync(path.join(tmpDir, 'closing-lines.json'), '[]');
-    const withClosing = resolvePlan({ spec: { width: 96, sheetmm: 280, glazeGains: false }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
+    const withClosing = resolvePlan({ spec: { width: 96, sheetmm: 280 }, planDir: tmpDir, variant: 'region_w13', target: path.join(BENCH, 'v2/targets/hills.png'), out: '/out' });
     const closeMap = optionMap(withClosing.args);
     assert.equal(closeMap.get('drawing'), 'both');
     assert.equal(closeMap.has('darkgain'), false);
-    assert.equal(closeMap.get('techcal'), '1');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

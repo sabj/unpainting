@@ -12,8 +12,6 @@ export const PRESETS = Object.freeze({
     '--stoneblocks 0.6 --stoneblockamt 0.2 --stoneblockmm 4 --stoneirregular 1',
     '--recesses 1 --recesslayers 2 --recessshare .75 --recessclean 1',
   ].join(' '),
-  // Glaze strengths fitted on Y1 and Y4: 30% more paint in shadow glazes and cool cells.
-  'glaze-gains': '--darkgain 1.3 --coolgain 1.3',
 });
 
 /** Every flag name any preset sets, without the leading dashes. */

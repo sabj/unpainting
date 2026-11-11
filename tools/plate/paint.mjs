@@ -38,6 +38,7 @@ import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
+import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
 import {softenFirstWash} from '../../src/paint/methods/first-wash.mjs';
 import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, dilate, erode, closeLocal} from '../../src/raster.js';
@@ -681,6 +682,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // --prewet 1: dampen a passage laid in more than --prewetlanes lanes first, so lanes do not dry into rims. Default 0.
   // --splwet: optional dampening for stroke lanes. A value plan controls its own wet/dry technique;
   // do not silently prewet its dry-base glazes. Explicit --splwet 1 still prepares a connected wet bed.
+  let wetEachLane = null;
   if (!BUDGET && !sh._semantic&&(T.intoWet || (!WETPOL && (opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', sh._valuePlan ? 0 : 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
     // --gradedprewet s: a graded wash's clean water reaches s of the short side past it onto equally pale paper. Default 0.03.
     const reach = sh.graded && !sh._follow ? Math.round(num('gradedprewet', 0.03) * Math.min(w, h)) : 0;
@@ -695,13 +697,16 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     const shapeCells = sh._valuePlan?.passageMaterial?.move === 'wet on wet' ? up(MASK).reduce((a, v, i) => (v && !ctx.sheet.resist?.[i] && a.push(i), a), []) : null;
     const shapePaper = shapeCells?.length ? measurePaper(ctx.sheet, shapeCells, SPEED_PAPER) : null;
     const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
-    if (needPrewet) for (let pts of wetOver) {
+    const wetLane = pts => {
       if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
       const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
       const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
       productionDip(wet, { water: num('prewetwater', sh._valuePlan?.passageMaterial?.move==='wet on wet'?.55:1), conc: PIGS.map(() => 0) });
       stroke(wet, ctx.sheet, pts, { upright: UPRIGHT });
-    }
+    };
+    // a passage wetted along its own lanes is wetted lane by lane just ahead of the brush, as its scrap swatch is (prewet-order.mjs)
+    if (needPrewet && wetsLaneByLane({ intoWet: Boolean(T.intoWet), wetsOwnLanes: wetOver === paths, preparesOwnBed: Boolean(sh._valuePlan?.passageMaterial) })) wetEachLane = wetLane;
+    else if (needPrewet) for (const pts of wetOver) wetLane(pts);
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
   const useGradedCal = Boolean(sh.graded || sh._valuePlan);
@@ -716,6 +721,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     return cachedCover=result;
   };
   for (let pts of paths) {
+    if (wetEachLane) wetEachLane(pts);
     if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
     const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
     let CHARGE_CAL=SEMANTIC_CAL_MODE==='actual'&&sh._semantic?semanticCalibrationGain(SEMANTIC_CAL[sh._semantic.key],pts,PB.mmPerCell):ICAL.cal;

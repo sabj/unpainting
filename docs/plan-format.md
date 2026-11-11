@@ -122,7 +122,7 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 | Field | Type and meaning | Default if omitted |
 |---|---|---|
 | `subject` | string naming the subject; it selects no style and turns on no fitted rule. The style comes from `styleSelection` | none |
-| `presets` | array of preset names from `src/paint/tuned/presets.mjs` (`architecture`, `glaze-gains`); their flags go after the recipe's, and an unknown name stops the run ([tuned settings](techniques.md#tuned-settings)) | no presets |
+| `presets` | array of preset names from `src/paint/tuned/presets.mjs` (`architecture`); their flags go after the recipe's, and an unknown name stops the run ([tuned settings](techniques.md#tuned-settings)) | no presets |
 | `name` | string for the preview title | preview fallback title |
 | `photo` | source photo label in the preview; only its basename is used, and no photo is read | `unknown` |
 | `sheet` | optional `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match `--sheetmm` when both are given; `seed` and `targetGuard` set defaults | command-line or painter defaults |
@@ -217,7 +217,6 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 | `carryMm` | 0 to 10 mm, default 2 | in `family` mode, the carried mask is averaged over this brush-sized area. Prefer 0 in new plans: 2 mm dilutes saturated colour and paints over lit areas |
 | `paleLimit` | 0 to 1, default 0.16 | pale planes up to this value get one clean first wash that no later layer crosses |
 | `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |
-| `darkGain` | 0.5 to 3 | charges shadow glazes above their fitted demand, since a physical wash delivers about 70% of a planned dark |
 | `deepAccent` | `{max, grow, families}` | restates cells darker than `max` (0 to 255, darkest channel) as last accents, only inside the named families |
 | `furReserves` | `{bounds, reach, drop, dark, maxDensity, minCells}` | keeps sheen and glints open inside a dark coat before the washes |
 | `physics` | `holeRimMm` 0 to 3, `marangoni` 0 to 1, `slope` -1 to 1 | material choices for hole rims, surface-tension flow and downhill flow. `--physics key=value` overrides one coefficient and keeps the others |

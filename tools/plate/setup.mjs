@@ -345,7 +345,11 @@ const PAPER_PICK = paperOf(ctx.px, w, h, { margin: num('papermargin', 0.03), mod
 const TONE_MODE = opt('tonestage', '0');
 if (!['0', '1', 'auto'].includes(TONE_MODE)) throw Error('--tonestage: 0, 1 or auto');
 const SHEET_TONE = TONE_MODE === '0' ? { toned: false } : detectSheetTone(ctx.px, w, h);
-const CALIBRATED_PLAN=num('calibratedplan',0)>0;
+// One delivery contract (0.3.3): values are planned against the sheet's own optics (cell light, value steps, mass tone;
+// plan-darkness.md) and every passage is charged from a swatch of its own brush and passes (glaze-yield.md). The plan
+// states values and the engine delivers them, so no dark, cool or middle gain exists to compensate, and no switch.
+for (const k of ['calibratedplan', 'instrumentcal', 'darkgain', 'coolgain', 'midgain']) if (optIdx(k) >= 0) throw Error(`--${k} was removed in 0.3.3: the plan is calibrated to the sheet and each passage is charged from its own swatch, so there is no gain or switch to set`);
+const CALIBRATED_PLAN=true;
 const PAPER_RULE=num('paperrule',0)>0;
 const WASH_SHEET=PAPER_RULE?sheetColour(ctx.px,w,h):null;
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(ctx.px, w, h, new Float32Array(w * h)) : null;

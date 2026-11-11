@@ -39,7 +39,7 @@ const DRAWING = {
 const WASHES = {
   // src/paint/methods/finish-texture.mjs furLightReserves, through --furreserves
   furReserves: { bounds: ANY, reach: ANY, drop: ANY, dark: ANY, maxDensity: ANY, minCells: ANY },
-  paints: ANY, darkGain: ANY, deepAccent: { max: ANY, grow: ANY, families: ANY },
+  paints: ANY, deepAccent: { max: ANY, grow: ANY, families: ANY },
   colour: ANY, sessions: ANY, inkAware: ANY, charge: ANY, carryMm: ANY, paleLimit: ANY,
   physics: { holeRimMm: ANY, marangoni: ANY, slope: ANY },
 };

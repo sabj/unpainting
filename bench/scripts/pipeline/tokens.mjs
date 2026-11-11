@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argsBuilder, optionMap, BASE } from './plan-args.mjs';
 
-const TOKENS = ['onedom', 'nest', 'lay2', 'lay4', 'dk13', 'lf', 'ls10', 'acc3', 'lt', 'cur', 'relonly', 'cg13', 'noslane', 'slane', 'st40', 'mg12',
+const TOKENS = ['onedom', 'nest', 'lay2', 'lay4', 'lf', 'ls10', 'acc3', 'lt', 'cur', 'relonly', 'noslane', 'slane', 'st40',
   'shw45', 'dkf', 'rg10', 'blk60', 'bka20', 'bmm40', 'dp80', 'ms120', 'birr', 'dg2', 'ts3', 'rx3', 'bvar', 'tv8', 'rac', 'eye10', 'skyb', 'cpp', 'tsh8', 'tfl8',
   'novar', 'sk1', 'bcl3', 'fs60', 'fl0', 'sep', 'sep2', 'sep4', 'sep8', 'ink2', 'ink3', 'ink4', 'rec2', 'rec2x', 'rcl', 'ssp2', 'spl6', 'sml30',
   'wre15', 'lit20', 'lad', 'lw', 'sky', 'sky3', 'hue', 'efade', 'stone', 'stub', 'stub2', 'soft', 'softs', 'ol36', 'uncap', 'opp25', 'och30', 'dwg200', 'dwm50',
@@ -28,7 +28,7 @@ export function tokensMarkdown() {
   return [
     '# Recipe tokens', '',
     `Base (always applied, under your tokens): \`${BASE}\`.`, '',
-    'Numbers in a token are free: `_dk11` sets --darkgain 1.1, `_lay3` sets --midlayers 3 (the examples below show the scaling). Tokens in one slot replace each other: '
+    'Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: '
     + 'lay2/lay4; rec2/rec2x; hue/sky/sky3; cur/relonly; slane/noslane; soft/softs; stub/stub2/stone; pwarm/pgold/pgreen/pbs/rv. '
     + 'Stone-block and ground tokens of the base (blk, bmm, bka, birr, rg) act on architecture only. A setting only acts while its switch is on, so the painter reports the others as unused: '
     + 'rec2, rec2x, rcl and rac need the architecture preset (--recesses), eye and dg need _dp, and the texture tokens (tv, tfl, stub, stub2) change no painting at all. Palette tokens act only on Trumbull; there `--paints` is: default '
