@@ -10,8 +10,8 @@ test('a gated setting typed while its switch is off or absent is reported with t
   assert.match(none[0].reason, /--touchpoints/);
   const off = ignoredSettings({ given: ['skylanemm'], value: valueOf({ skylanemm: '4', skylanes: '0' }) });
   assert.deepEqual(off.map(r => r.flag), ['skylanemm']);
-  const junk = ignoredSettings({ given: ['skyfloc'], value: valueOf({ skyfloc: '.5', skyblue: 'yes' }) });
-  assert.deepEqual(junk.map(r => r.flag), ['skyfloc']);
+  const junk = ignoredSettings({ given: ['skylanestep'], value: valueOf({ skylanestep: '.8', skylanes: 'yes' }) });
+  assert.deepEqual(junk.map(r => r.flag), ['skylanestep']);
 });
 
 test('a gated setting is fine while its switch is on, wherever the switch came from', () => {

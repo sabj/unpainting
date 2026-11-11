@@ -20,7 +20,7 @@ how much its progress frames look like a person painting.
 ## What is fixed for everyone
 
 - The painter code (`tools/paint-plate.mjs`) and its base recipe. Every painting starts from the base recipe
-  `region_w13_lay4_sky3_skyb_cpp`.
+  `region_w13_lay4_sky3_cpp`.
   Your recipe tokens and painter settings are layered on top of it (below).
 - Fast drying mode, seed 0, the recording (progress frames and the stroke log), the target guard in `gentle` mode (the
   painter may look at broad shape averages of the target while painting; cell-level target reads are blocked and
@@ -78,7 +78,9 @@ All files go in `bench/plan/` unless stated.
    add what the quiet passages and the darks need. Two example palettes for two different pictures: a sunlit garden
    with red flowers under a blue sky, `["--paints","hansa,cadred,rose,ultramarine,phthalogreen,sienna"]`; a grey
    stone street in rain, `["--paints","ochre,rawsienna,umber,cerulean,paynes"]`. Neither is a default: read your
-   own target. The painter paints with the pigments you name. Options are
+   own target. The painter paints with the pigments you name, and each settles as the real pigment does: ultramarine and
+   cerulean granulate heavily, the earths (ochre, siennas, umber) moderately, and the staining paints (phthalos,
+   quinacridone rose, hansa) not at all, so a textured sky wants a granulating blue and a smooth one a phthalo. Options are
    limited to `--midlayers` (integer 0–8),
    `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
    `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),

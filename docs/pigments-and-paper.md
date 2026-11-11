@@ -31,14 +31,20 @@ The painter mixes from 16 paints in `src/crop/box.mjs`:
 - Lamp black, with flat absorption.
 - Three mixes synthesized from the base paints: sap green, Payne's gray and sepia.
 
-All 16 share the same physical constants:
+The palette is picked on one set of reference constants for every paint (scattering 0.02, staining 1.4, granulation
+0.25, density 0.05), so a paint's physics cannot change which paints a picture gets. On the sheet each paint then
+settles as its pigment does. `src/paint/methods/pigment-physics.mjs` gives it its published granulation, flocculation,
+staining and density from the table Paint Lab shares (`demos/lab/media/pigment-physical.js`, sources listed there);
+its colour and scattering stay as picked.
 
-| property | constant | value |
-|---|---|---|
-| opacity | S (scattering) | 0.02, so all are transparent |
-| staining (resistance to lifting) | omega | 1.4 |
-| granulation (mottled pigment texture) | gamma | 0.25 |
-| density | rho | 0.05 |
+| pigment | granulation (gamma) | flocculation | staining (omega) |
+|---|---|---|---|
+| French ultramarine, cerulean blue | heavy (0.85) | yes (0.3) | non-staining (0.5) |
+| yellow ochre, raw and burnt sienna | moderate (0.55) | ochre slight, siennas none | non-staining |
+| burnt umber | slight (0.25) | none | non-staining |
+| phthalo blue and green, hansa yellow, quinacridone rose | none (0) | none | staining (20) |
+| cadmium yellow and red, lamp black | none | none | non-staining |
+| sap green, Payne's grey, sepia | their parents' shares | | |
 
 Opaque white sits outside the Kubelka-Munk model. `src/media/gouache.mjs` lays opaque paint over the finished render, outside the physics simulation, and only when you ask for it.
 
@@ -46,7 +52,7 @@ Opaque white sits outside the Kubelka-Munk model. `src/media/gouache.mjs` lays o
 
 `src/media/paper.mjs` builds a height map of curved fibers and fine tooth, the paper's surface texture. By default (`--paper coldpress --paperphysical 1`) it adds cold-press bumps 0.5 to 2 mm across, plus broad swells and pits. Fiber lengths, density and brush relief are in millimeters. `--paper flat` and `--paperphysical 0` turn these off. The hollows hold more water in the pores.
 
-Granulation follows the paper. Settling pigment is pushed toward the hollows, and settled grains slide downhill. A render-time pass (`microAmps`) adds the same effect below one cell.
+Granulation follows the pigment and the paper. A granulating pigment settles faster in the hollows than on the peaks, and settled grains roll downhill into the hollows while the wash is wet; a flocculating one gathers as clumps in the broader hollows of the tooth. A wetter wash, or one that dries more slowly, gives the grains longer to move, so it granulates more. A staining pigment is rated non-granulating, so it dries smooth. There is no scale on any of this: the pigment's rating is the number the sheet uses. Grains stop rolling once the slope they roll down is gone, so a heavily granulated wash keeps to the tooth and never trades grains back and forth into a one-cell checkerboard. A render-time pass (`microAmps`, `--micro`) adds the same effect below one cell.
 
 ## Water and drying
 

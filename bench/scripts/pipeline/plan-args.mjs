@@ -24,7 +24,7 @@ import { lineSources } from './copy.mjs';
 // _sg (--stylegain) and _tp (--touchgain) are not model-settable: a gain that covers an engine error is a calibration, not a
 // painter's choice (docs/honesty.md). The two touch-up rounds the base always had stay a fixed painter setting below; the
 // touch-up gain is the painter's own default.
-export const BASE = 'region_w13_lay4_sky3_skyb_cpp';
+export const BASE = 'region_w13_lay4_sky3_cpp';
 const DEFAULT_VARIANT = 'region_w13';
 const LINES = name => `${name}-lines.json`;
 
@@ -57,7 +57,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', comp
       ...t(/_dkf/, () => ['--darkfirst', '1']),
       ...t(/_ms(\d+)/, () => ['--minshapecells', m(v, /_ms(\d+)/)[1]]),
       ...t(/_tv(\d+)/, () => ['--texvariety', tenth(v, /_tv(\d+)/)]),
-      ...t(/_skyb/, () => ['--skyblue', '1']), ...t(/_cpp/, () => ['--paper', 'coldpress']),
+      ...t(/_cpp/, () => ['--paper', 'coldpress']),
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
@@ -204,6 +204,7 @@ const DEEP_ACCENT_REMOVED = 'the deep accents (--deepaccent) were removed: they 
 export const REMOVED_TOKENS = Object.freeze({
   dg: DEEP_ACCENT_REMOVED,
   eye: 'the eye ring (--eyering) was removed: it drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject',
+  skyb: 'the sky tube (--skyblue) was removed: it swapped the blue of sky cells for a second, heavily granulating tube, a switch by region; each pigment now granulates as published, so choose a granulating blue (ultramarine, cerulean) for a textured sky',
 });
 // extra-args.json options whose painter setting was removed, with the reason
 const REMOVED_EXTRA_ARGS = Object.freeze({ deepaccent: DEEP_ACCENT_REMOVED, deepgrow: DEEP_ACCENT_REMOVED, deepaccentin: DEEP_ACCENT_REMOVED, eyering: REMOVED_TOKENS.eye });

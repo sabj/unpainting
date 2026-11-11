@@ -91,24 +91,12 @@ const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHas
 })).value;
 SPEED_PROFILE?.add('setup:palette-fit', performance.now() - paletteFitStarted);
 // --pigphys: each pigment given a physics by its hue (src/paint/methods/pigment-physics.mjs)
-// --skyblue 1: a second, granulating tube of the palette's blue, used for the sky only.
-// --skygran: its granulation as a multiple of --gran (default 1.2); --skybluewick: stain on the paper's peaks (default 0.6).
+// Box paints carry their published settling physics (granulation, flocculation, staining, density): pigment-physics.mjs.
 const PIGS = (() => {
   const planFile=opt('areaplan','');const direct=planFile?authoredPalette(JSON.parse(fs.readFileSync(path.resolve(root,planFile)))):null;
   if(direct)return pigmentPhysics({pigments:direct,opt,num,log:console.log});
   const existing = pigmentPhysics({ pigments: PALETTE.pigments, opt, num, log: console.log });
-  const base=opt('finishareaplan','')?finishingPaletteKeys(existing):existing;
-  if (!(num('skyblue', 0) > 0)) return base;
-  let jb = -1, best = 0;
-  // the blue: the pan that absorbs red and green and passes blue (a phthalo green absorbs red too, but not green)
-  base.forEach((p, j) => { const [r, g, b] = Array.from(p.K), s = (r + g) / 2 - b; if (s > best) { best = s; jb = j; } });
-  if (jb < 0) { console.log('sky blue: the palette has no blue; no second tube'); return base; }
-  const gamma = num('skygran', 1.2) / Math.max(1e-3, num('gran', 0.25));
-  // --skyfloc f: flocculation of the sky tube, 0..1, so it granulates as a soft larger mottle. Default 0.
-  const floc = Math.min(1, Math.max(0, num('skyfloc', 0) || 0));
-  const tube = { ...base[jb], name: `${base[jb].name || 'blue'}, granulating, for the sky`, rho: 0.08, gamma, wick: num('skybluewick', 0.6), kind: 'blue', _skyOf: jb, ...(floc > 0 ? { floc } : {}) };
-  console.log(`sky blue: a second tube of ${base[jb].name || 'pigment ' + jb} for the sky, granulation ${gamma.toFixed(2)} x ${num('gran', 0.25)}, stain ${tube.wick}${floc > 0 ? `, floc ${floc}` : ''}`);
-  return [...base, tube];
+  return opt('finishareaplan','')?finishingPaletteKeys(existing):existing;
 })();
 const COLOUR_BUDGET = num('colourbudget', 0) > 0 && PIGS.length > 1;
 console.log(`palette: ${PIGS.length} pigments, ${PALETTE.authored ? 'explicit authored BOX mixtures; source chroma not fitted' : PALETTE.monochrome ? 'one fluid' : `paint chroma ${PALETTE.paintChroma.toFixed(2)}`}`);
@@ -212,23 +200,6 @@ let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
 return A;
 })).value;
 SPEED_PROFILE?.add('setup:pigment-fit', performance.now() - pigmentFitStarted);
-// --skyblue: the plan's blue in the sky cells comes from the granulating tube. The sky is the plate's sky segment
-// (work/segments); without one, the blue cells off the figure mask.
-if (PIGS.length && PIGS[PIGS.length - 1]._skyOf !== undefined) {
-  const K = PIGS.length, js = K - 1, jb = PIGS[js]._skyOf;
-  const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs');
-  const image = opt('image', ''), base = image ? path.basename(image, path.extname(image)) : '';
-  const seg = base && hasSegments(base) ? await loadSegments(base, w, h) : null;
-  const skySeg = seg?.regions.find(r => r.name === 'sky') ?? null;
-  const fig = opt('fwmask', '') ? (await sharp(path.resolve(root, opt('fwmask', ''))).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer()) : null;
-  // the blue cells of the sky: its pale and grey edges keep the plain blue, since a pale wash shows little grain
-  // --skywide 1: every sky cell takes the granulating tube, so texture fades with the wash, not at a hard edge. Default 0.
-  const WIDE = num('skywide', 0) > 0;
-  const isSky = i => (skySeg ? skySeg.mask[i] === 1 : !(fig && fig[i] >= 128)) && (WIDE || ctx.px[i * 3 + 2] - ctx.px[i * 3] > 8);
-  let c = 0;
-  for (let i = 0; i < n; i++) { const t = ctx.A[i * K + jb] + ctx.A[i * K + js], sky = isSky(i); ctx.A[i * K + jb] = sky ? 0 : t; ctx.A[i * K + js] = sky ? t : 0; if (sky && t > 0) c++; }
-  console.log(`sky blue: ${c} cells (${(100 * c / n).toFixed(1)}%) take their blue from the granulating tube, the blue cells of ${skySeg ? 'the sky segment' : 'the ground off the figure (no sky segment)'}`);
-}
 // --paperkeep L: book no pigment where the source is within L of the paper's lightness and under --paperchroma (default 8).
 // Unmixing does not know paper white is a colour and would lay a weak pan there. Default 0, off.
 if (num('paperkeep', 0) > 0) {

@@ -17,6 +17,7 @@ import { createSheet, step, dry, layersOf, DEFAULTS } from '../../src/media/shee
 import { createBrush, dip, stroke } from '../../src/media/brush.mjs';
 import { renderLayers } from '../../src/media/km.mjs';
 import { BOX, boxPigment } from '../../src/crop/box.mjs';
+import { physicsFields } from '../../demos/lab/media/pigment-physical.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const args = process.argv.slice(2);
@@ -42,14 +43,16 @@ const paperOptions = mm => ({
   seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm,
   coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 },
 });
-// The painter's default sheet constants (paint-plate.mjs O): fixed bed, edge drying 0.0012, granulation 0.25.
-const PHYSICS = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, gran: 0.25, granFill: 0 };
+// The painter's default sheet constants (tools/plate/sheet.mjs O): fixed bed, edge drying 0.0012, grains stop rolling
+// when the slope is gone (slide cap 1); each pigment granulates by its own rating, with no scale.
+const PHYSICS = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, granFill: 0, slideCap: 1 };
 // The painter's bare-paper shade, --papershade 0.04: the relief darkens the sheet by up to 4%.
 const PAPER_SHADE = 0.04;
 const STEP_EVERY = 8, DRY_OPTIONS = { levelMax: 140, dt: 14 };
 
 const PALETTE = ['ultramarine', 'sienna'];
-const pigments = PALETTE.map(k => ({ ...boxPigment(BOX.find(p => p.key === k)), key: k }));
+// each paint as the painter's sheet holds it (src/paint/methods/pigment-physics.mjs): picked colour, published settling
+const pigments = PALETTE.map(k => { const paint = BOX.find(p => p.key === k); return { ...boxPigment(paint), ...physicsFields(paint.physics), key: k }; });
 
 function paperBase(paper, n) {
   const base = Buffer.alloc(n * 3);
@@ -185,6 +188,6 @@ if (DEBUG) {
   await grey(graded.paper.height, graded.w, graded.h).toFile(path.join(DEBUG, 'graded-height.png'));
   await raw(paperBase(flat.paper, flat.w * flat.h), flat.w, flat.h).png().toFile(path.join(DEBUG, 'bare.png'));
   if (refPng) await fs.promises.writeFile(path.join(DEBUG, 'ref.png'), refPng);
-  fs.writeFileSync(path.join(DEBUG, 'stats.json'), JSON.stringify({ mm: MM, panel: [PANEL_W, PANEL_H], paper: paperOptions(MM), physics: { fixedBed: 1, edgeEvap: 0.0012, gran: 0.25 },
+  fs.writeFileSync(path.join(DEBUG, 'stats.json'), JSON.stringify({ mm: MM, panel: [PANEL_W, PANEL_H], paper: paperOptions(MM), physics: { fixedBed: 1, edgeEvap: 0.0012, slideCap: 1 },
     pigmentVsPaper: { flat: pigmentVsPaper(flat), graded: pigmentVsPaper(graded) }, seconds: (Date.now() - t0) / 1000 }, null, 2));
 }
