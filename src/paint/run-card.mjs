@@ -71,6 +71,8 @@ function buildRunCard({
       ? {
           backend: segments.backend,
           model: segments.model ?? null,
+          device: segments.device ?? null,
+          deviceChoice: segments.deviceChoice ?? null,
           regions: segments.regions,
           foreground: segments.foreground,
           cached: segments.cached,

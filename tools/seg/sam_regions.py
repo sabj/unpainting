@@ -14,6 +14,7 @@ How the partition is built, on the working image:
   5. Past MAX_REGIONS, the smallest region joins its neighbour nearest in colour, until the count fits.
 The k-means backend (kmeans_regions) is the same partition cut by Lab colour alone; segments.py uses it only when asked.
 """
+import os
 import time
 
 import cv2
@@ -42,6 +43,24 @@ def odd(n):
     return max(3, n + 1 - n % 2)
 
 
+DEVICES = ('mps', 'cpu', 'cuda')
+
+
+def pick_device(torch, env=None):
+    """The device SAM runs on. PAINTER_SEG_DEVICE=mps|cpu|cuda is an explicit choice that must be available and
+    fails loudly otherwise; unset keeps the automatic choice (mps, else cuda, else cpu). Returns (device, how)."""
+    env = os.environ if env is None else env
+    asked = env.get('PAINTER_SEG_DEVICE', '').strip()
+    if asked:
+        if asked not in DEVICES:
+            raise RuntimeError(f"PAINTER_SEG_DEVICE={asked!r}: one of {', '.join(DEVICES)}")
+        have = {'mps': lambda: torch.backends.mps.is_available(), 'cuda': lambda: torch.cuda.is_available(), 'cpu': lambda: True}
+        if not have[asked]():
+            raise RuntimeError(f'PAINTER_SEG_DEVICE={asked} but torch reports no {asked} device here')
+        return asked, 'PAINTER_SEG_DEVICE'
+    return ('mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')), 'auto'
+
+
 def sam_masks(rgb, checkpoint, model_type='vit_b', points=32):
     """SAM's automatic masks over an RGB image, largest first, and a note on how they were made.
 
@@ -59,7 +78,7 @@ def sam_masks(rgb, checkpoint, model_type='vit_b', points=32):
     original = ResizeLongestSide.apply_coords
     ResizeLongestSide.apply_coords = lambda self, c, s: original(self, c, s).astype(np.float32)
     try:
-        device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+        device, chosen = pick_device(torch)
         sam = sam_model_registry[model_type](checkpoint=checkpoint).to(device)
         H, W = rgb.shape[:2]
         gen = SamAutomaticMaskGenerator(
@@ -70,7 +89,7 @@ def sam_masks(rgb, checkpoint, model_type='vit_b', points=32):
         ResizeLongestSide.apply_coords = original
     seconds = time.time() - started
     masks = sorted(masks, key=lambda m: -m['area'])
-    return masks, {'backend': 'sam', 'model': model_type, 'device': device, 'masks': len(masks),
+    return masks, {'backend': 'sam', 'model': model_type, 'device': device, 'deviceChoice': chosen, 'masks': len(masks),
                    'points': points, 'seconds': round(seconds, 1)}
 
 

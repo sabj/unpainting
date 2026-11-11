@@ -188,7 +188,7 @@ def sam_masks(bgr, checkpoint, model_type='vit_b'):
     # The point grid arrives as float64 and Metal refuses it; the only change SAM needs to run on a Mac's GPU.
     original = ResizeLongestSide.apply_coords
     ResizeLongestSide.apply_coords = lambda self, c, s: original(self, c, s).astype(np.float32)
-    device = 'mps' if torch.backends.mps.is_available() else ('cuda' if torch.cuda.is_available() else 'cpu')
+    device, _ = sam_regions.pick_device(torch)
     sam = sam_model_registry[model_type](checkpoint=checkpoint).to(device)
     H, W = bgr.shape[:2]
     gen = SamAutomaticMaskGenerator(
@@ -430,7 +430,7 @@ def segment_regions(path, args):
             masks, info = sam_regions.sam_masks(cv2.cvtColor(small, cv2.COLOR_BGR2RGB), checkpoint, args.model, args.points)
             field, used = sam_regions.sam_partition(masks, lab)
             backend = {**info, 'laid': used, 'checkpoint': os.path.basename(checkpoint)}
-            notes.append(f"SAM {info['model']} on {info['device']}: {info['masks']} masks, {used} laid, {info['seconds']} s")
+            notes.append(f"SAM {info['model']} on {info['device']}{' (PAINTER_SEG_DEVICE)' if info.get('deviceChoice') != 'auto' else ''}: {info['masks']} masks, {used} laid, {info['seconds']} s")
         except RuntimeError as e:
             if args.sam == 'require':
                 raise SystemExit(f'segments: SAM required and it did not run: {e}')
