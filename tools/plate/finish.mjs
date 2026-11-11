@@ -200,7 +200,7 @@ if (marks.length) {
   if (cov < 0.9) console.log(`  ! ${(100 * (1 - cov)).toFixed(0)}% of the planned wash never arrived: passages dropped, or laid as marks with paper between`);
 }
 phaseMark('painting');
-if (TARGET_GUARD.mode !== 'off') { TARGET_GUARD.endPaint(); ctx.px = PX_RAW; const g = TARGET_GUARD.summary(); console.log(`target guard: ${g.violations} paint-time target reads${g.violations ? ' (' + Object.keys(g.byName).join(', ') + ')' : ''}`); }
+if (TARGET_GUARD.mode !== 'off') { TARGET_GUARD.endPaint(); ctx.px = TARGET_GUARD.opened(PX_RAW); const g = TARGET_GUARD.summary(); console.log(`target guard: ${g.violations} paint-time target reads${g.violations ? ' (' + Object.keys(g.byName).join(', ') + ')' : ''}`); }
 console.log(`time: ${Object.entries(spent).map(([k, v]) => `${k} ${(v / 1000).toFixed(0)}s`).join(', ')}`);
 console.log(`profile: ${Object.entries(PROF).map(([k, v]) => `${k} ${(v / 1000).toFixed(1)}s`).join(', ')}`);
 console.log(`${ctx.laid} brush sweeps, ${ctx.frame} frames, ${((Date.now() - t0) / 1000).toFixed(0)} s`);

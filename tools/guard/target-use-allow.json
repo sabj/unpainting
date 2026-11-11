@@ -7,6 +7,27 @@
    "rule": "fit-score-loop",
    "reason": "fitMix chooses a 1-3 pan box mix for a set of cells from the set's mean colour against the sheet's mean colour there: a mix choice at shape level, not a mark kept for lowering error. It runs only with --passages treelayers, not in any default run.",
    "approvedBy": "anti-cheat review (bench/docs/anti-cheat.md): a shape-level mix choice is allowed"
+  },
+  {
+   "key": "2d5f2a3e212b",
+   "file": "tools/plate/finish.mjs",
+   "rule": "target-at-paint",
+   "reason": "--drags charges each drag from DRAG_TARGET, a copy of the target plan. Not allowed: sealed at beginPaint, so a --drags run fails in gentle and hard. No benchmark or default run sets --drags; delete with it (overfit-audit rows 21, 33).",
+   "approvedBy": "033-honest: listed only; the runtime guard blocks this read in gentle and hard (tools/guard/seal-maps.mjs)"
+  },
+  {
+   "key": "65029587149d",
+   "file": "tools/plate/paint.mjs",
+   "rule": "target-at-paint",
+   "reason": "--skywarm splits sky passages by the target's red minus blue per cell at paint time. Not allowed: SKY_WARM_RB is sealed where it is made, so a --skywarm run fails in gentle and hard. No benchmark or default run sets it; restate it at planning or delete.",
+   "approvedBy": "033-honest: listed only; the runtime guard blocks this read in gentle and hard (tools/guard/seal-maps.mjs)"
+  },
+  {
+   "key": "a3a1514c17df",
+   "file": "tools/plate/paint.mjs",
+   "rule": "target-at-paint",
+   "reason": "--texture 1 places dry-brush marks from HP, a per-cell high-pass of the target, at paint time. Not allowed: HP is sealed at beginPaint, so a --texture 1 run fails in gentle and hard. Benchmark runs pass --texture 0; delete it (--texflow gives one texture number per shape; overfit-audit row 19).",
+   "approvedBy": "033-honest: listed only; the runtime guard blocks this read in gentle and hard (tools/guard/seal-maps.mjs)"
   }
  ]
 }

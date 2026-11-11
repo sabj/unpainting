@@ -61,6 +61,7 @@ import {sampledInkAbsorbance, matchInkLoad, sampleGestures} from '../../src/pain
 import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
 import {loadPhysical} from '../../src/paint/methods/brushes.mjs';
 import {fillSheetBase, WHITE_PAPER_RGB} from '../../src/paint/methods/sheet-tone.mjs';
+import {sealAtBirth} from '../guard/seal-maps.mjs';
 
 export async function sheetAndBrushes(ctx) {
 const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, RECESSES, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
@@ -320,8 +321,12 @@ const ABLATE = new Set(opt('ablate', '').split(',').filter(Boolean));
 const INKRES = num('inkres', 1) > 1 ? await (async () => { if (opt('paperscan', '')) throw new Error('--inkres: not with --paperscan'); const N=Math.round(num('inkres',1)),opts={...PAPER_OPTS,scale:(PAPER_OPTS.scale??1)*N};const finePaper=(await cachedStep({...RUN_CACHE,name:'fine-paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2:W2*N,H2:H2*N,PAPER_OPTS:opts}},async()=>makePaper(W2*N,H2*N,opts))).value; return makeInkRes({paper:finePaper, N: num('inkres', 1), W2, H2, paperOpts: PAPER_OPTS, pigments: SHEET_PIGS, inkAt: PIGS.length, main: ctx.sheet, pad: opt('inkrespad', '') === '' ? null : num('inkrespad', 0.25) * (Math.round(num('inkres', 1)) - 1), gain: num('inkresgain', 1.3 * Math.pow(540 / W2, 0.78)) }); })() : null;
 const PEN_STATE_GATE = true, PEN_STATE_AUDIT = [];
 
-const TARGET_DRAW_EDGE=new Float32Array(N2);
-for(let y=1;y<H2-1;y++)for(let x=1;x<W2-1;x++){const i=y*W2+x;const lum=j=>{const sx=Math.min(w-1,Math.floor((j%W2)*w/W2)),sy=Math.min(h-1,Math.floor(Math.floor(j/W2)*h/H2)),k=3*(sy*w+sx);return (ctx.px[k]+ctx.px[k+1]+ctx.px[k+2])/765;};TARGET_DRAW_EDGE[i]=Math.min(1,Math.hypot(lum(i+1)-lum(i-1),lum(i+W2)-lum(i-W2)));}
+const TARGET_EDGE_FILL=new Float32Array(N2);
+for(let y=1;y<H2-1;y++)for(let x=1;x<W2-1;x++){const i=y*W2+x;const lum=j=>{const sx=Math.min(w-1,Math.floor((j%W2)*w/W2)),sy=Math.min(h-1,Math.floor(Math.floor(j/W2)*h/H2)),k=3*(sy*w+sx);return (ctx.px[k]+ctx.px[k+1]+ctx.px[k+2])/765;};TARGET_EDGE_FILL[i]=Math.min(1,Math.hypot(lum(i+1)-lum(i-1),lum(i+W2)-lum(i-W2)));}
+// planning reads it freely; the pen's closures keep it, so it is sealed here for the paint step (tools/guard/seal-maps.mjs)
+const TARGET_DRAW_EDGE=sealAtBirth(ctx.TARGET_GUARD,'TARGET_DRAW_EDGE',TARGET_EDGE_FILL);
+// The pen cuts closing runs where the target edge is weak when it plans them (pen.mjs, prepareDrawing); it lays the
+// planned runs with no edge map (edgeCut false), so execution reads no target.
 const DRAW_MATERIAL_STATE={opening:{used:0},closing:{used:0}};
 // Use one policy in planning and execution. The source's own ink is drawn with its short descriptive marks when the
 // plan says the target is drawn in pen: a pen-and-wash style, an ink medium in its drawing section, or a prepared line
@@ -346,7 +351,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
  if(!(A>0)){INK_MATCH[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark match, ${stage}: no measured target lines, load unchanged`);return 1;}
  const sample=sampleGestures(gs,60), N=INKRES?.N??1, fw=w*N, fh=h*N;
  const baseOpts=(()=>{const {edgeStrength,state,audit,O:o,...rest}=optionsAt(1);return rest;})();
- const r=cachedStepSync({...RUN_CACHE,name:`ink-dark-match-${stage}`,code:codeHash(root,[],{dependencies:['src/paint/methods/ink-match.mjs','src/paint/methods/fine-material.mjs','src/paint/methods/material-profiles.mjs','src/media/draw.mjs','src/media/pen.mjs']}),track:optTrack,inputs:{stage,A,sample,N,w,h,PAPER_OPTS,INK,baseOpts,EDGE:TARGET_DRAW_EDGE,...(INKRES?{}:{want})}},()=>{
+ const r=cachedStepSync({...RUN_CACHE,name:`ink-dark-match-${stage}`,code:codeHash(root,[],{dependencies:['src/paint/methods/ink-match.mjs','src/paint/methods/fine-material.mjs','src/paint/methods/material-profiles.mjs','src/media/draw.mjs','src/media/pen.mjs']}),track:optTrack,inputs:{stage,A,sample,N,w,h,PAPER_OPTS,INK,baseOpts,...(INKRES?{}:{want})}},()=>{
   const paper=INKRES?INKRES.fine.paper:makePaper(w,h,PAPER_OPTS);
   if(paper.w!==fw||paper.h!==fh)throw Error('Ink calibration paper dimensions differ');
   const absorbance=sampledInkAbsorbance(fw,fh,N>1?fineGestures(sample,N):sample);
@@ -372,8 +377,8 @@ const penDraw = (sh,gs,want,w,h,o0) => {
  const stage=ctx.AREA_DRAW_STAGE, graphite=o0.ink?.[GRAPHITE_AT]>0, inkAt=PIGS.length;
  const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
  const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0;
- const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
-  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:TARGET_DRAW_EDGE,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
+ const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
+  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
  if(!ctx.AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(ctx.AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };

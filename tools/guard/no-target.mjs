@@ -78,6 +78,7 @@ export function createTargetGuard({ mode = DEFAULT_MODE, targetPaths = [], log =
   const budget = mode === 'hard' ? (lookBudget ?? HARD_LOOK_BUDGET) : null;
   const targets = new Set(targetPaths.filter(Boolean).map(p => path.resolve(p)));
   const registered = new WeakMap(); // array -> name
+  const views = new WeakMap(); // sealed view -> the array it seals
   const violations = [];
   const seen = new Set();
   const reads = {}; // element reads while painting, per sealed name (warn mode keeps counting past the first record)
@@ -120,7 +121,7 @@ export function createTargetGuard({ mode = DEFAULT_MODE, targetPaths = [], log =
     seal(name, arr) {
       if (mode === 'off' || arr == null || typeof arr !== 'object') return arr;
       registered.set(arr, name);
-      return new Proxy(arr, {
+      const view = new Proxy(arr, {
         get(t, k) {
           if (phase === 'paint' && ((typeof k === 'string' && k.length && k.charCodeAt(0) >= 48 && k.charCodeAt(0) <= 57) || (k !== 'length' && k !== 'constructor' && k !== 'byteLength' && k !== 'byteOffset' && k !== 'BYTES_PER_ELEMENT' && k !== 'keys' && k !== 'set' && k !== 'fill' && (typeof k === 'string' || k === Symbol.iterator) && (k in t) && !/^\d/.test(String(k))))) {
             reads[name] = (reads[name] || 0) + 1;
@@ -131,6 +132,15 @@ export function createTargetGuard({ mode = DEFAULT_MODE, targetPaths = [], log =
         },
         set(t, k, v) { return Reflect.set(t, k, v, t); },
       });
+      views.set(view, arr);
+      return view;
+    },
+    /** The array a sealed view closes, for native code (sharp) once painting is over. While painting it is a blocked read. */
+    opened(v) {
+      const arr = views.get(v);
+      if (!arr) return v;
+      if (phase === 'paint') record('element read', registered.get(arr) ?? 'sealed map', 'opened while painting');
+      return arr;
     },
     /** Blocks (gentle, hard) or logs (warn) when an executor's context carries the target or a registered target map. */
     assertCleanContext(label, ctx) {

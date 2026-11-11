@@ -127,7 +127,7 @@ The painter lays fresh paper, reserves the lights that must stay white, and draw
 
 For each passage, the painter sets the paper state the technique needs. Wet into wet prewets the region with clean water. Wet on dry and dry brush wait for a drier sheet. The painter loads the brush, follows the planned paths, and lets water and pigment move, settle and dry. Then it saves a frame and takes the next passage.
 
-While painting, the [guard](honesty.md) blocks reads of the target's pixels. The painter works from its plan and the sheet.
+While painting, the [guard](honesty.md) blocks reads of the target's pixels and of every map made from them (`tools/guard/seal-maps.mjs`). The painter works from its plan and the sheet.
 
 ### Review
 
