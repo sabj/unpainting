@@ -27,7 +27,7 @@ function rectOf(cells, w) {
   return x1 < 0 ? null : [x0, y0, x1 - x0 + 1, y1 - y0 + 1];
 }
 
-export function createWetTrace({ file, sheet, contact = null, film = DEFAULTS.filmDepth, wet = DEFAULTS.wetEps }) {
+export function createWetTrace({ file, sheet, contact = null, film = DEFAULTS.filmDepth, wet = DEFAULTS.wetEps, pigment = null }) {
   const { w, h, n } = sheet;
   const clock = { t: 0, dries: 0 };
   // the clock is not enumerable, so nothing that walks the sheet's fields (saved states, tapes) sees it
@@ -106,8 +106,9 @@ export function createWetTrace({ file, sheet, contact = null, film = DEFAULTS.fi
       fresh(rect);
       const [rx, ry, rw, rh] = rect, before = new Float32Array(rw * rh), bW = new Float32Array(rw * rh), bS = new Float32Array(rw * rh);
       for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) { const i = (ry + y) * w + rx + x, k = y * rw + x; bW[k] = sheet.W[i]; bS[k] = sheet.s[i]; before[k] = bW[k] + bS[k]; }
-      const t0 = clock.t, d0 = clock.dries;
+      const t0 = clock.t, d0 = clock.dries, p0 = pigment ? pigment() : 0;
       const result = fn(b, target, points, options);
+      const dPig = pigment ? pigment() - p0 : null;
       fresh(rect);
       let cells = predicted;
       if (!cells?.length) { cells = []; for (let y = 0; y < rh; y++) for (let x = 0; x < rw; x++) { const i = (ry + y) * w + rx + x; if (sheet.W[i] + sheet.s[i] > before[y * rw + x] + wet) cells.push(i); } }
@@ -134,6 +135,7 @@ export function createWetTrace({ file, sheet, contact = null, film = DEFAULTS.fi
       rec.nb = seam(nb); rec.prev = seam(prev);
       const after = waterStats(sheet, cells, { film, wet });
       rec.after = { meanW: after.meanW, film: after.film, wet: after.wet };
+      if (pigment) rec.dPig = +dPig.toFixed(3);
       strokes.push({ passage: here, lane, t: clock.t, dries: clock.dries });
       if (kind === 'paint' && here) for (const i of cells) { owner[i] = id; landW[i] = sheet.W[i]; }
       emit(rec);

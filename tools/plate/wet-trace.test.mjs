@@ -63,3 +63,19 @@ test('the wet trace finds the lapped lane beside a stroke, its age on the sheet 
   assert.ok(d[0].before.filmCells > 0 && d[0].after.wetCells === 0, 'the dry took the standing water off');
   fs.rmSync(dir, { recursive: true });
 });
+
+test('with a pigment reader the trace records what each stroke put on the sheet', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wet-trace-')), file = path.join(dir, 't.jsonl');
+  const sheet = createSheet(makePaper(W, H, { seed: 5, scale: 1, toothScale: 0.2 }), [sienna]);
+  const total = () => sheet.G[0].reduce((a, v) => a + v, 0) + sheet.D[0].reduce((a, v) => a + v, 0) + sheet.P[0].reduce((a, v) => a + v, 0);
+  const t = createWetTrace({ file, sheet, contact: candidateContact, pigment: total });
+  t.passage({ pass: 1, shape: 0, technique: 'wet on dry', move: 'wet on dry', value: 1 }); t.lane();
+  const b = createBrush({ flat: true, radius: 4, bristles: 12, capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 3 });
+  dip(b, { water: 0.62, conc: [0.6] }); t.dipped(b, true);
+  const before = total();
+  t.stroke(b, sheet, lane(20), {}, (bb, s, p, o) => stroke(bb, s, p, o));
+  t.close();
+  const rec = fs.readFileSync(file, 'utf8').trim().split('\n').map(l => JSON.parse(l)).find(r => r.k === 's');
+  assert.ok(rec.dPig > 0);
+  assert.ok(Math.abs(rec.dPig - (total() - before)) < 1e-2);
+});

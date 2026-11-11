@@ -37,7 +37,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import sharp from 'sharp';
 import {makePaper, coldPressField} from '../../src/media/paper.mjs';
-import {createSheet, step, dry as physicalDry, layersOf, thickness, DEFAULTS, coherent} from '../../src/media/sheet.mjs';
+import {createSheet, step, dry as physicalDry, layersOf, thickness, thicknessTotals, DEFAULTS, coherent} from '../../src/media/sheet.mjs';
 import {attachGpu} from '../../src/media/gpu/link.mjs';
 import {backendLine} from '../../src/media/gpu/backend-record.mjs';
 import {renderLayers, renderLayersCached, renderCells, microAmps} from '../../src/media/km.mjs';
@@ -305,7 +305,8 @@ const paper = opt('paperscan', '') ? await (async () => {
 const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS) && k !== 'edgeFlowDepth') throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
 // --gran: granulation strength, default 0.25. The relief never changes, so every sweep lays the same pattern and it compounds.
 ctx.sheet = createSheet(paper, SHEET_PIGS); ctx.sheet._tape = 1;
-ctx.WET_TRACE = process.env.WET_TRACE ? createWetTrace({ file: process.env.WET_TRACE, sheet: ctx.sheet, contact: candidateContact }) : null;
+// WET_TRACE_PIGMENT=1 also records the whole sheet's pigment change under each stroke (slow: a full-sheet read per stroke)
+ctx.WET_TRACE = process.env.WET_TRACE ? createWetTrace({ file: process.env.WET_TRACE, sheet: ctx.sheet, contact: candidateContact, pigment: process.env.WET_TRACE_PIGMENT === '1' ? () => thicknessTotals(ctx.sheet).reduce((a, v) => a + v, 0) : null }) : null;
 if (ctx.WET_TRACE) process.once('exit', () => ctx.WET_TRACE.close());
 // --probebox x0,y0,x1,y1[;...] (sheet fractions, diagnostic): paint only inside the boxes; compare only with a crop run of the same boxes.
 // --ablate dry,accents: skip those passes (diagnostic).
