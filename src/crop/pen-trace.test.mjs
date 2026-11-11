@@ -56,3 +56,12 @@ test('a line\'s one width is its mark\'s equivalent width; a dark mass beside it
     assert.ok(Math.abs(got - wd) <= 0.6, `a ${wd} px line reads ${got.toFixed(2)}`);
   }
 });
+
+test('a pale line counts on a subject drawn in pen, and only there', () => {
+  const W = 120, H = 80, lum = sheet(W, H);
+  stroke(lum, W, 20, 40, 100, 40, 0.68); // 0.27 darker than paper, lighter than the middle of the scale
+  assert.equal(tracePen(lum, W, H, BENCH).lines.length, 0, 'a painted subject: pale texture is not traced');
+  const pen = tracePen(lum, W, H, { ...BENCH, pen: true });
+  assert.equal(pen.lines.length, 1);
+  assert.ok(pen.lines[0].length >= 70);
+});

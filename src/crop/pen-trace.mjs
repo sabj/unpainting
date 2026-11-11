@@ -5,7 +5,7 @@
 // the sheet's millimetres per pixel. The subject's lightest value (paper, the 99th percentile of luminance) and darkest
 // (the ink, the 0.1th percentile) span a nine-step value scale, the painter's usual one. A pixel is line if it is at
 // least one step of that scale darker than both sides along x, y or a diagonal, TRACE_MM.flank out (a thin dark line,
-// not a dark mass), and it lies in the darker half of the scale. A pen follows the line it is on, carries no pixel
+// not a dark mass), and, unless the subject is drawn in pen, it lies in the darker half of the scale. A pen follows the line it is on, carries no pixel
 // staircase (one pixel), lifts where the line turns back on itself, joins only where one piece continues another
 // across TRACE_MM.reach, and goes on contours, not inside dark masses: on one side, the band from TRACE_MM.reach to
 // TRACE_MM.minLength out is a light shape (its median lighter than the middle of the scale). Spans shorter than TRACE_MM.minLength are dropped, and wiggly ones shorter than TRACE_MM.wiggle.
@@ -150,10 +150,11 @@ export function hasLightSide(P, at, mid, band) {
 }
 
 /**
- * Trace the subject's pen lines. `lum` is luminance 0..1, W by H; `pixelMm` is the sheet's millimetres per pixel of it.
+ * Trace the subject's pen lines. `lum` is luminance 0..1, W by H; `pixelMm` is the sheet's millimetres per pixel of it;
+ * `pen`: the subject's medium reads as pen (subject-medium.mjs), so pale lines count too.
  * @returns {{ lines: {points:number[][], length, weight, width}[], scale: {paper, ink, step, mid}, px, stats: {linePixels, inMass} }}
  */
-export function tracePen(lum, W, H, { pixelMm }) {
+export function tracePen(lum, W, H, { pixelMm, pen = false }) {
   if (!(pixelMm > 0)) throw new Error('pen trace: the sheet millimetres of one pixel');
   // a tolerance in pixels (to a millionth, so a bench subject lands on its old whole pixels); never under one pixel
   const px = v => +(v / pixelMm).toFixed(6), f0 = Math.max(1, Math.round(px(TRACE_MM.flank[0])));
@@ -164,7 +165,9 @@ export function tracePen(lum, W, H, { pixelMm }) {
   const at = (x, y) => lum[Math.max(0, Math.min(H - 1, y)) * W + Math.max(0, Math.min(W - 1, x))];
   const M = new Uint8Array(n);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const v = at(x, y); if (v > mid) continue; let best = 0;
+    // on a subject drawn in pen a line is a line by its contrast, however pale (a reed or quill line); on any other
+    // subject only a line in the darker half of the scale is one, so pale painted texture is not traced
+    const v = at(x, y); if (!pen && v > mid) continue; let best = 0;
     for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) for (let d = P.flank[0]; d < P.flank[1]; d++) {
       const a = Math.max(at(x + dx * d, y + dy * d), at(x + dx * (d + 1), y + dy * (d + 1))), b = Math.max(at(x - dx * d, y - dy * d), at(x - dx * (d + 1), y - dy * (d + 1)));
       best = Math.max(best, Math.min(a, b) - v);
