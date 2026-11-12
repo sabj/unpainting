@@ -139,7 +139,8 @@ test('the token route is unchanged: the same args for the same plan', () => {
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ subject: 'dry', name: 'd', styleSelection: { style: 'precise-watercolor', reason: 'r' }, families: [], reserves: [] }));
   const r = resolvePlan({ spec: { ...loadSubjects().trumbull, width: 300 }, planDir: dir, variant: 'region_w13', target: path.join(V2, 'targets', 'trumbull.png'), out: '/o' });
   const o = optionMap(r.args);
-  assert.deepEqual(['touchpoints', 'skylanes', 'skyblue', 'midlayers'].map(k => o.get(k)), ['2', '1', '1', '4']);
+  assert.deepEqual(['touchpoints', 'skylanes', 'midlayers'].map(k => o.get(k)), ['2', '1', '4']);
+  assert.ok(!o.has('skyblue'), 'the sky tube was removed; the base no longer carries it');
   assert.ok(!o.has('areaplan'));
   fs.rmSync(dir, { recursive: true, force: true });
 });
