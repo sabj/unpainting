@@ -134,7 +134,13 @@ export function semanticMaterialReady(pass,paper,brush){
 export const sha256=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 export function semanticDrawingGroups(plan,gestures,stage,scale=1){const groups=[];for(const g of gestures){let run=[],last=-2;const flush=()=>{if(run.length>1){const a=plan.doc.areas[last];groups.push({area:a,key:`${a.id}/drawing-${stage}`,gesture:{...g,points:run}});}run=[];};for(const p of g.points){const x=Math.floor(p.x/scale),y=Math.floor(p.y/scale),j=x<0||y<0||x>=plan.w||y>=plan.h?-1:plan.owner[y*plan.w+x],a=plan.doc.areas[j];const allowed=a&&(stage==='opening'?['scaffold','structural']:['structural','focal']).includes(a.drawingRole);if(j!==last||!allowed){flush();last=allowed?j:-1;}if(allowed)run.push(p);}flush();}return groups;}
 
-export function semanticBrushOptions(pass,mmPerCell){return {model:pass.brush.model??'row',...(pass.brush.lag!==undefined?{lag:pass.brush.lag}:{}),flat:pass.brush.kind==='flat',radius:pass.brush.widthMm/(2*mmPerCell),loadWater:pass.load.capacityMm3/mmPerCell**2};}
+// How far one load of an area pass reaches, in sheet cells: the water the plan's load carries (load.water of
+// waterQuantityMm3) over the paper's uptake per cm2 for the move times the brush width, the same law as the kit's
+// brushes (src/paint/methods/brushes.mjs loadCm). The lane is cut where the plan's own load runs out, not a kit brush's.
+export function semanticLoadCells(pass,uptakeMlPerCm2,mmPerCell){const up=uptakeMlPerCm2[pass.move]??uptakeMlPerCm2['wet on dry'];if(!finite(up)||up<=0||!finite(mmPerCell)||mmPerCell<=0)fail('semantic load reach needs the paper uptake and sheet scale');const ml=pass.load.water*pass.load.waterQuantityMm3/1000;return ml/(up*pass.brush.widthMm/10)*10/mmPerCell;}
+// An authored pass carries its own reservoir (capacityMm3); a pass the ladder fills is laid with the production wash
+// brush, the instrument its scrap swatch measures, dipped at its load.water fraction (tools/plate/sheet.mjs dip).
+export function semanticBrushOptions(pass,mmPerCell){return {model:pass.brush.model??'row',...(pass.brush.lag!==undefined?{lag:pass.brush.lag}:{}),flat:pass.brush.kind==='flat',radius:pass.brush.widthMm/(2*mmPerCell),...(pass.source==='authored'?{loadWater:pass.load.capacityMm3/mmPerCell**2}:{})};}
 // Authored physical clean sweep, predicted with the same native brush as execution.
 // Planning bounds guide the hand pose; they never fill water arrays or clip pigment.
 export function semanticPreparationGesture(pass,points,mmPerCell,{predict,requiredCells,width}={}){
