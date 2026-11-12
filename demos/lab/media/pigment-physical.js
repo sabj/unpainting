@@ -1,3 +1,4 @@
+// Generated from src/media/pigment-physical.mjs by tools/lab/sync-site-media.mjs. Edit the source.
 // The physical properties of the paints, in one table the painter (src/crop/box.mjs) and Paint Lab (pigments.js) both read.
 // DOM free.
 //
@@ -24,7 +25,7 @@
 // colour. Lab pigments keep their own K and S, fitted to how painters' swatches look; only the physics below is shared.
 
 /** Category to number, one rule for every paint. */
-export const CLASS_VALUES = Object.freeze({
+const CLASS_VALUES = Object.freeze({
   granulation: Object.freeze({ none: 0, slight: 0.25, moderate: 0.55, heavy: 0.85 }),
   staining: Object.freeze({ non: 0.5, moderate: 3, staining: 20 }),
   flocculation: Object.freeze({ none: 0, slight: 0.15, yes: 0.3 }),

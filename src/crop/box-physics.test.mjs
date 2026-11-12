@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BOX, boxPigment, physicalPigment } from './box.mjs';
-import { PHYSICAL_KEYS, physicalOf, labKeyOf } from '../../demos/lab/media/pigment-physical.js';
+import { PHYSICAL_KEYS, physicalOf, labKeyOf } from '../media/pigment-physical.mjs';
 import { PIGMENTS } from '../../demos/lab/media/pigments.js';
 
 const byKey = Object.fromEntries(BOX.map(p => [p.key, p]));

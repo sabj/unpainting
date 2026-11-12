@@ -21,7 +21,7 @@ test('explicit zero clears a pigment floc while unset overrides preserve it', ()
 
 // Box paints always settle with their published physics; colour, scattering and picking are not touched.
 import { BOX, boxPigment } from '../../crop/box.mjs';
-import { physicalOf } from '../../../demos/lab/media/pigment-physical.js';
+import { physicalOf } from '../../media/pigment-physical.mjs';
 const boxed = keys => keys.map(k => boxPigment(BOX.find(p => p.key === k)));
 test('each box paint carries its own granulation, flocculation, staining and density; colour and scattering kept', () => {
  const keys = ['ultramarine', 'phthaloblue', 'cadyellow', 'sienna'], ps = boxed(keys);
