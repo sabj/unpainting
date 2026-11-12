@@ -187,3 +187,17 @@ test('an area pass load reaches as far as its own water goes, by the kit brushes
  assert.ok(Math.abs(semanticLoadCells({...p,brush:{widthMm:10}},{'wet on dry':.02},.5)-744)<1e-9,'a narrower brush reaches further');
  assert.throws(()=>semanticLoadCells(p,{},.5),/uptake/);
 });
+
+test('hooks for the area route owners: forms reshapes a later pass, split lays one pass as several washes holding its paint',()=>{
+ const d=fixture();d.areas[1].passes=[{...d.areas[1].passes[0],id:'light',valueRange:[1,1]},{...structuredClone(d.areas[1].passes[0]),id:'dark',order:3,valueRange:[2,2]}];
+ const p=plan(d),full=new Uint8Array(16).fill(1),layers=[{value:1,pigment:0,shapes:[{mask:full,amount:.2,mix:[.2,0],area:16}]},{value:2,pigment:0,shapes:[{mask:full,amount:.4,mix:[.1,.3],area:16}]}];
+ const seen=[];
+ const forms=(s,acc,{earlier})=>{seen.push([s.key,earlier.map(e=>e.key)]);if(s.key!=='left/dark')return acc;const cells=Uint8Array.from(acc.cells,(v,i)=>v&&i%4===0?1:0),count=cells.reduce((a,b)=>a+b,0);return {cells,count,mass:Float64Array.from(acc.mass,m=>m*count/acc.count)};};
+ const split=(s,shape)=>{if(s.key!=='left/light')return [{cells:shape.cells,mix:Array.from(shape.mass,m=>m/shape.count)}];const a=Uint8Array.from(shape.cells,(v,i)=>v&&i<8?1:0),b=Uint8Array.from(shape.cells,(v,i)=>v&&i>=8?1:0),na=a.reduce((x,y)=>x+y,0),nb=b.reduce((x,y)=>x+y,0);return [{cells:a,mix:[shape.mass[0]/na,0]},{cells:b,mix:[0,shape.mass[1]/nb]}];};
+ const c=compileAreaLayers(p,layers,undefined,{mmPerCell:100,forms,split}),by=k=>c.layers.filter(l=>l._semantic.key===k).flatMap(l=>l.shapes);
+ assert.deepEqual(seen.filter(([k])=>k.startsWith('left')),[['left/light',[]],['left/dark',['left/light']]]);
+ assert.equal(by('left/dark')[0].area,4,'forms gave the dark pass its own shape (the first column)');
+ assert.equal(by('left/light').length,2,'split laid the light pass as two washes');
+ assert.throws(()=>compileAreaLayers(p,layers,undefined,{mmPerCell:100,split:(s,shape)=>[{cells:shape.cells,mix:[0,0]}]}),/is not the pass's/);
+ assert.throws(()=>compileAreaLayers(p,layers,undefined,{mmPerCell:100,forms:()=>({cells:new Uint8Array(16)})}),/must return/);
+});
