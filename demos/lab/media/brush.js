@@ -369,7 +369,7 @@ function splatCpu(sheet, x, y, r, want, c, brush, p, conc, pig) {
       for (let k = 0; k < K; k++) sheet.G[k][i] = Math.max(0, sheet.G[k][i] + ex * (conc[k] - sheet.G[k][i] / water));
     }
     // the paint smeared off the hairs, and the free liquid a loaded brush lets go (it stands: sheet.mjs soak)
-    const Wi = sheet.W[i], free = fall * c * brush.give * Math.max(0, want - Wi) * p, give = fall * c * brush.film * (0.7 + 0.3 * p) * (1 - Math.min(1, Wi / 0.2)) + free;
+    const Wi = sheet.W[i], free = fall * c * brush.give * Math.max(0, want - Wi), give = fall * c * brush.film * (0.7 + 0.3 * p) * (1 - Math.min(1, Wi / 0.2)) + free;
     if (give <= 0) continue;
     for (let k = 0; k < K; k++) pig[k] = conc[k] * give;
     soak(sheet, i, give, pig, free); used += give;
@@ -379,7 +379,7 @@ function splatCpu(sheet, x, y, r, want, c, brush, p, conc, pig) {
 // the water a hair aims for here (strokeImpl's `want`), from the brush's free liquid
 const splatWant = (brush, Wb, cap, p) => {
   const sat = cap > 0 ? Wb / cap : 0, freeL = Math.max(0, (sat - brush.free) / (1 - brush.free));
-  return brush.wetness * freeL * (0.6 + 0.4 * p);
+  return brush.wetness * freeL;
 };
 function splatStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false } = {}) {
   const link = sheet._gpu, prior = brush._pend;
@@ -673,7 +673,9 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
           }
         }
         const Wi = sheet.W[i], freeL = Math.max(0, (sat - brush.free) / (1 - brush.free));
-        const want = brush.wetness * freeL * (0.6 + 0.4 * q.p);
+        // a hair lets its free liquid go by contact: pressure is already in the footprint, the contact share and the
+        // bridge, and counting it again here made a landing or lifting hand lay a pale band (scrap-seam.mjs)
+        const want = brush.wetness * freeL;
         if (sat < brush.free && Wi > 0.05 && sheet.M[i]) { // a thirsty brush (no free liquid) drinks from wetter paper, pigment and all
           const take = Math.min((Wi - 0.05) * 0.3 * contact * (1 - fill), Wi * 0.5, brush.capacity * hr.len - hr.water); if (take <= 0) continue;
           // the hair's own paint is joined to the cell's water by the touch: it spreads over the liquid they share
@@ -696,7 +698,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
         // the paint smeared off the hairs and the free liquid let go (it stands: sheet.mjs soak); a depth-filling brush
         // lays liquid only
         const smear = brush.depositDepth ? 0 : brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2));
-        const loose = brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * q.p) - Wi) * (fill + (1 - fill) * grain) : brush.give * Math.max(0, want - Wi) * q.p;
+        const loose = brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * q.p) - Wi) * (fill + (1 - fill) * grain) : brush.give * Math.max(0, want - Wi);
         const give = Math.min(hr.water, contact * (smear + loose)), free = smear + loose > 0 ? give * loose / (smear + loose) : 0;
         if (give <= 0) continue;
         // only the outer hairs merge, where a stroke laps over its neighbour; merging the whole body stripes overlapping lanes

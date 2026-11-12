@@ -337,7 +337,7 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
           }
         }
         const Wi = sheet.W[i], freeL = Math.max(0, (sat - brush.free) / (1 - brush.free));
-        const want = brush.wetness * freeL * (0.6 + 0.4 * q.p);
+        const want = brush.wetness * freeL;   // free liquid goes by contact, not again by pressure (brush.mjs)
         if (sat < brush.free && Wi > 0.05 && sheet.M[i]) { // a thirsty brush (no free liquid) drinks from wetter paper, pigment and all
           const take = Math.min((Wi - 0.05) * 0.3 * contact * (1 - fill), Wi * 0.5, brush.capacity * hr.len - hr.water); if (take <= 0) continue;
           // the hair's own paint spreads over the liquid it joins (brush.mjs): the cell's part, Wi of Wi + hair water
@@ -358,7 +358,7 @@ export function stroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         const proud = paper.proud ? paper.proud[gi] : paper.height[gi] - paper.valley[gi];
         const grain = 0.7 + 1.2 * proud + 0.3 * paper.valley[gi];
         // the paint smeared off the hairs and the free liquid let go (it stands: sheet.mjs soak)
-        const smear = brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)), loose = brush.give * Math.max(0, want - Wi) * q.p;
+        const smear = brush.film * grain * (0.7 + 0.3 * q.p) * (1 - Math.min(1, Wi / 0.2)), loose = brush.give * Math.max(0, want - Wi);
         const give = Math.min(hr.water, contact * (smear + loose)), free = smear + loose > 0 ? give * loose / (smear + loose) : 0;
         if (give <= 0) continue;
         const f = give / hr.water, hp = hr.pig;

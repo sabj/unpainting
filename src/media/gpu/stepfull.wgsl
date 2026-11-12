@@ -1427,7 +1427,7 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   }
   let Wi = W[i];
   let freeL = max(0.0, (sat - free) / (1.0 - free));
-  let want = pWet * freeL * (0.6 + 0.4 * qp);
+  let want = pWet * freeL;   // free liquid goes by contact, not again by pressure (brush.mjs)
   if (sat < free && Wi > 0.05 && M[i] == 1u) {   // a thirsty brush drinks from wetter paper, pigment and all
     let take = min(min((Wi - 0.05) * 0.3 * contact * (1.0 - fill), Wi * 0.5), capa * len - wh[h]);
     if (take <= 0.0) { return; }
@@ -1442,7 +1442,7 @@ fn hair_cell(j: u32, sb: u32, i: u32, across: f32, tx: f32, ty: f32) {
   let grain = 0.7 + 1.2 * gp.w + 0.3 * gp.z;
   // the paint smeared off the hairs and the free liquid let go (brush.mjs); a depth-filling brush lays liquid only
   var smear = pFilm * grain * (0.7 + 0.3 * qp) * (1.0 - min(1.0, Wi / 0.2));
-  var loose = pGive * max(0.0, want - Wi) * qp;
+  var loose = pGive * max(0.0, want - Wi);
   if (pDepth > 0.0) { smear = 0.0; loose = max(0.0, pDepth * (0.7 + 0.3 * qp) - Wi) * (fill + (1.0 - fill) * grain); }
   let give = min(wh[h], contact * (smear + loose));
   let liquid = select(0.0, give * loose / (smear + loose), smear + loose > 0.0);
@@ -1619,7 +1619,7 @@ fn splat_run(@builtin(local_invocation_index) li: u32) {
     if (li == 0u) {
       let Wb = BSTR[SP_W]; let cap = BSTR[SP_CAP]; let free = BSTR[SP_FREE];
       let sat = select(0.0, Wb / cap, cap > 0.0); let freeL = max(0.0, (sat - free) / (1.0 - free));
-      spA = select(0.0, BSTR[SP_WET] * freeL * (0.6 + 0.4 * p), Wb > 0.0);
+      spA = select(0.0, BSTR[SP_WET] * freeL, Wb > 0.0);
       spC = select(0.0, BSTR[SP_SCALE] * sp / (1.25 * r), Wb > 0.0);
     }
     workgroupBarrier();
@@ -1642,7 +1642,7 @@ fn splat_run(@builtin(local_invocation_index) li: u32) {
             for (var k = 0u; k < K; k++) { let q = k * u.n + i; G[q] = max(0.0, G[q] + ex * (BSTR[SP_CONC + k] - G[q] / water)); }
           }
           let Wi = W[i];
-          let liquid = fall * cs * giveR * max(0.0, want - Wi) * p;
+          let liquid = fall * cs * giveR * max(0.0, want - Wi);
           let give = fall * cs * film * (0.7 + 0.3 * p) * (1.0 - min(1.0, Wi / 0.2)) + liquid;
           if (give <= 0.0) { continue; }
           // soak (sheet.mjs): empty pores drink what they can, filtering their share of the paint onto the fibres
