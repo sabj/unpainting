@@ -41,3 +41,13 @@ test('ink on a pencil subject fails the medium contract', t => {
   write('run-card.json', { args: ['--subjectmedium', 'pencil'], drawing: { medium: 'ink' } });
   assert.equal(checkDesignedPaths(dir).rows.find(r => r.row === 3).status, 'DID NOT RUN');
 });
+
+test('an aborted run still writes all 23 results and fails its contract', t => {
+  const { dir } = fixture(t);
+  const aborted = path.join(dir, 'aborted');
+  const report = reportDesignedPaths(aborted);
+  assert.equal(report.ok, false);
+  assert.equal(report.rows.length, 23);
+  assert.ok(report.rows.every(r => r.status === 'DID NOT RUN'));
+  assert.match(fs.readFileSync(path.join(aborted, 'designed-paths-check.txt'), 'utf8'), /run-card.json missing or invalid/);
+});

@@ -45,6 +45,7 @@ export function checkDesignedPaths(folder, { registry = read(registryFile), logF
 
 export function reportDesignedPaths(folder, options = {}) {
   const result = checkDesignedPaths(folder, options);
+  fs.mkdirSync(folder, { recursive: true });
   const text = result.rows.map(r => `${r.row}. ${r.id}: ${r.status} [${r.required ? 'required' : 'not yet on'}${r.applicable ? '' : '; not applicable'}] — ${r.evidence}`).join('\n') + '\n';
   fs.writeFileSync(path.join(folder, 'designed-paths-check.txt'), text);
   fs.writeFileSync(path.join(folder, 'designed-paths-check.json'), JSON.stringify(result, null, 2) + '\n');

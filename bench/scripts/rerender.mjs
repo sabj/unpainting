@@ -169,7 +169,7 @@ async function renderJob(opts, job, { run, verify }) {
     finished,
     continued: fs.existsSync(path.join(jobOut, 'continued-checks.json')) ? readJson(path.join(jobOut, 'continued-checks.json')) : null,
   });
-  if (!opts.compileOnly && finished) {
+  if (!opts.compileOnly) {
     verdict.designedPaths = reportDesignedPaths(jobOut);
     if (!verdict.designedPaths.ok) { verdict.exit ||= 4; verdict.failures.push({ code: 4, reason: 'required designed paths did not run; see designed-paths-check.txt' }); }
   }

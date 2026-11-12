@@ -124,7 +124,7 @@ export class Painting {
     const v = renderVerdict({ paintExit: last.exit, unused, modelOptions: union('modelOptions'), extraOptions: union('extraOptions'), baseOptions: union('baseOptions'),
       templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict,
       continued: readJson(path.join(this.out, 'continued-checks.json')) });
-    if (finished) {
+    {
       const designed = reportDesignedPaths(this.out, { logFiles: this.segments.map(s => s.log) });
       v.designedPaths = designed;
       if (!designed.ok) { v.exit ||= 4; v.failures.push({ code: 4, reason: 'required designed paths did not run; see designed-paths-check.txt' }); }
