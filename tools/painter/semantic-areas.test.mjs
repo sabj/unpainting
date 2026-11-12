@@ -201,3 +201,10 @@ test('hooks for the area route owners: forms reshapes a later pass, split lays o
  assert.throws(()=>compileAreaLayers(p,layers,undefined,{mmPerCell:100,split:(s,shape)=>[{cells:shape.cells,mix:[0,0]}]}),/is not the pass's/);
  assert.throws(()=>compileAreaLayers(p,layers,undefined,{mmPerCell:100,forms:()=>({cells:new Uint8Array(16)})}),/must return/);
 });
+
+test('a damp bed is judged by its typical cell for a ladder-filled pass, by its wettest for an authored one',()=>{
+ const b={water:12,pigment:1},paper={cells:30,moistShare:.95,waterMax:.17,waterP50:.12};
+ assert.equal(semanticMaterialReady({wetness:{required:'moist'}},paper,b),true);
+ assert.equal(semanticMaterialReady({wetness:{required:'moist'},source:'authored'},paper,b),false);
+ assert.equal(semanticMaterialReady({wetness:{required:'moist'}},{...paper,waterP50:.16},b),false);
+});

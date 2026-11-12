@@ -147,7 +147,10 @@ export function semanticMaterialReady(pass,paper,brush){
  if(required==='dry')return paper.dry===true;
  if(!finite(paper.moistShare)||paper.moistShare<.7||paper.moistShare>1)return false;
  if(required==='wet')return paper.waterMax===undefined||(finite(paper.waterMax)&&paper.waterMax>=0);
- return finite(paper.waterMax)&&paper.waterMax>=0&&paper.waterMax<=.15;
+ // a bed is judged by its typical cell for a pass the ladder fills, as a value-plan wash judges it (wet-bed-wait.mjs);
+ // an authored pass keeps the strict wettest-cell gate
+ const water=pass.source!=='authored'&&finite(paper.waterP50)?paper.waterP50:paper.waterMax;
+ return finite(water)&&water>=0&&water<=.15;
 }
 export const sha256=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 export function semanticDrawingGroups(plan,gestures,stage,scale=1){const groups=[];for(const g of gestures){let run=[],last=-2;const flush=()=>{if(run.length>1){const a=plan.doc.areas[last];groups.push({area:a,key:`${a.id}/drawing-${stage}`,gesture:{...g,points:run}});}run=[];};for(const p of g.points){const x=Math.floor(p.x/scale),y=Math.floor(p.y/scale),j=x<0||y<0||x>=plan.w||y>=plan.h?-1:plan.owner[y*plan.w+x],a=plan.doc.areas[j];const allowed=a&&(stage==='opening'?['scaffold','structural']:['structural','focal']).includes(a.drawingRole);if(j!==last||!allowed){flush();last=allowed?j:-1;}if(allowed)run.push(p);}flush();}return groups;}
