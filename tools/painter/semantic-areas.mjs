@@ -2,7 +2,7 @@ import {validateAuthoredPaint,compileAuthoredPaint} from './authored-paint.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {passage} from '../../src/crop/blockin.mjs';
-import {closeLocal} from '../../src/raster.js';
+import {closeLocal,erode,dilate} from '../../src/raster.js';
 import {TECHNIQUES} from '../../src/paint/methods/lay.mjs';
 import {AREA_EDGES_CONTRACT,validateAreaEdges,bindAreaEdges} from './area-edges.mjs';
 import {AREA_WASHES_CONTRACT,validateAreaWashes,compileAreaWash} from './area-washes.mjs';
@@ -105,7 +105,12 @@ export function compileAreaLayers(plan,layers,palette,{mmPerCell,forms=null,spli
  if(pass.size&&!(finite(mmPerCell)&&mmPerCell>0))fail('compiling area washes needs the sheet scale (mmPerCell) to size each pass brush');
  // a wash covers the gaps in its shape narrower than its brush: the union is closed at the pass brush's radius, inside
  // the area and off its reserved lights; the paint it holds is unchanged, spread over the closed shape
- for(const acc of pass.values()){const sp=plan.passes.get(acc.key).pass,a=plan.doc.areas.indexOf(plan.passes.get(acc.key).area),closed=closeLocal(acc.cells,plan.w,plan.h,sp.brush.widthMm/2/mmPerCell);let count=0;for(let i=0;i<closed.length;i++){const keep=(acc.cells[i]||closed[i])&&plan.owner[i]===a&&!plan.reserves[i]&&!plan.film[i]?1:0;acc.cells[i]=keep;count+=keep;}acc.count=count;}
+ for(const acc of pass.values()){const sp=plan.passes.get(acc.key).pass,a=plan.doc.areas.indexOf(plan.passes.get(acc.key).area),r=sp.brush.widthMm/2/mmPerCell,closed=closeLocal(acc.cells,plan.w,plan.h,r);for(let i=0;i<closed.length;i++)closed[i]=(acc.cells[i]||closed[i])&&plan.owner[i]===a&&!plan.reserves[i]&&!plan.film[i]?1:0;
+  // and its outline is the brush's, not the ladder's pixels (eye #10, stair-stepped edges): parts narrower than the
+  // brush are opened away and their paint stays in the pass, spread over the rest. A pass with no part as wide as its
+  // brush lays nothing (a wide brush leaves specks out, rule 24); its paint is logged and counted, never laid unseen.
+  const opened=dilate(erode(closed,plan.w,plan.h,r),plan.w,plan.h,r);let count=0;for(let i=0;i<closed.length;i++){const keep=closed[i]&&opened[i]?1:0;acc.cells[i]=keep;count+=keep;}
+  acc.count=count;if(!count&&closed.some(v=>v)){const lost=Array.from(acc.mass).reduce((a,b)=>a+b,0);(diagnostics.narrowerThanBrush??=[]).push({pass:acc.key,brushMm:sp.brush.widthMm,cells:closed.reduce((a,b)=>a+b,0),paint:lost});console.log(`semantic areas: pass ${acc.key} lays nothing: no part of its shape is as wide as its ${sp.brush.widthMm} mm brush (paint ${lost.toFixed(1)} left out)`);}}
  for(const s of plan.schedule){
   // a tone pass (area-paper.mjs): one wash of the named paint over its whole area, laid at the amount the plan states
   if(s.pass.tone){const t=toneShape(plan,s,palette??[]);if(!t.count)continue;const w=plan.w,box={x0:w,y0:plan.h,x1:-1,y1:-1};for(let i=0;i<t.cells.length;i++)if(t.cells[i]){const x=i%w,y=Math.floor(i/w);if(x<box.x0)box.x0=x;if(x>box.x1)box.x1=x;if(y<box.y0)box.y0=y;if(y>box.y1)box.y1=y;}

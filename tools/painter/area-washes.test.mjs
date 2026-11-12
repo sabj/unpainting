@@ -107,3 +107,17 @@ test('a pass is one closed wash: gaps narrower than its brush are filled, reserv
   assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * kept) < 1e-9, `same paint, spread over the closed shape: ${sh.mix[0] * sh.area} vs ${.3 * kept}`);
   assert.throws(() => compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [shape([.3, 0, 0])] }], palette), /mmPerCell/);
 });
+
+test('a wash outline is the brush\'s: spurs narrower than the brush are opened away with their paint kept; a shape too thin for its brush is left out, counted', () => {
+  // a square with one-cell spurs sticking out of it, as a ladder band leaves its pixels
+  const ragged = Uint8Array.from(square); for (let y = 10; y < 56; y += 12) for (let x = 56; x < 60; x++) ragged[y * W + x] = 1;
+  const area = ragged.reduce((a, b) => a + b, 0);
+  const sh = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: ragged, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }).layers[0].shapes[0];
+  let spur = 0; for (let y = 10; y < 56; y += 12) spur += sh.mask[y * W + 59];
+  assert.equal(spur, 0, 'the spur tips are gone (a brush leaves only a fillet at the root)');
+  assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * area) < 1e-9, 'and their paint stays in the wash');
+  const line = Uint8Array.from({ length: W * H }, (_, i) => ((i / W) | 0) === 30 && i % W > 8 && i % W < 56 ? 1 : 0);
+  const thin = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: line, amount: .3, mix: [.3, 0, 0], area: 47 }] }], palette, { mmPerCell: 1 });
+  assert.equal(thin.layers.length, 0, 'a line narrower than the brush is left out');
+  assert.deepEqual(thin.diagnostics.narrowerThanBrush.map(x => [x.pass, x.cells]), [['sky/sky', 47]]);
+});
