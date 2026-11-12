@@ -1,6 +1,6 @@
 # Recipe tokens
 
-Base (always applied, under your tokens): `region_w13_lay4_sky3_cpp`.
+Base (always applied, under your tokens): `region_w13`.
 
 Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
@@ -16,7 +16,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_lt` | --layertexture 1 |
 | `_cur` | --paperbase white, --paperrel (removed), --paperrgb 252,251,248 |
 | `_relonly` | --paperlights (removed), --paperrgb (removed) |
-| `_noslane` | --skylanes (removed) |
+| `_noslane` | --skylanes 0 |
 | `_st40` | --shadowthresh 0.4 |
 | `_shw45` | --shadowwater 0.45 |
 | `_dkf` | --darkfirst 1 |

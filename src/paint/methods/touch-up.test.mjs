@@ -24,6 +24,8 @@ test('the painter takes the touch-up lack from the darken-only rule, once, at it
   // no second round is inserted after the first one's glazes (look, correct, look again)
   assert.doesNotMatch(paint, /_touch: layer\._touch \+ 1/);
   const planArgs = fs.readFileSync(new URL('../../../bench/scripts/pipeline/plan-args.mjs', import.meta.url), 'utf8');
-  assert.match(planArgs, /'--touchpoints', '2'/);
+  assert.match(planArgs, /'--recipe', 'default'/);
+  const recipe = fs.readFileSync(new URL('../recipe.mjs', import.meta.url), 'utf8');
+  assert.match(recipe, /--touchpoints 2/);
   assert.doesNotMatch(planArgs.slice(planArgs.indexOf('ALLOWED_EXTRA_ARGS')), /touch(points|gain|dmin):/);
 });
