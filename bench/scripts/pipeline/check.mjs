@@ -93,6 +93,13 @@ export const modelCheckSpec = frozen => ({ ...frozen, offlineFixture: true });
 // CLI, from the worktree root: node bench/check.mjs (bash bench/check.sh)
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = process.cwd();
+  // A finished run can be checked with the same bench check command. Planning alone cannot prove execution.
+  if (process.argv[2]) {
+    const { reportDesignedPaths } = await import(path.join(root, 'tools/designed-paths-check.mjs'));
+    const result = reportDesignedPaths(path.resolve(process.argv[2]));
+    process.stdout.write(result.text);
+    process.exit(result.ok ? 0 : 4);
+  }
   const frozen = JSON.parse(fs.readFileSync(path.join(root, 'bench', 'frozen.json'), 'utf8'));
   const vf = path.join(root, 'bench', 'variant.txt');
   const variant = (fs.existsSync(vf) ? fs.readFileSync(vf, 'utf8') : '').replace(/\s+/g, '') || 'region_w13';

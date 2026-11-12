@@ -259,3 +259,7 @@ The pipeline is meant to change, and this page describes only what runs at the t
 - `claude/033-shapes`: stages 3 and 4, shapes from SAM regions, one wash each.
 - `claude/033-looks`: stage 7, looks and tracers at brush and shape scale.
 - `claude/033-unfit`: stage 4, the fitted tuned folder is gone; kept ideas are general techniques.
+
+## Designed paths must leave execution evidence
+
+The benchmark uses the default recipe plus the authored plan. `bench/designed-paths.json` is the 23-row execution contract: required paths must leave evidence; every remaining row says “not yet on” and why. Run `node tools/designed-paths-check.mjs <finished-run-folder>` (or `node bench/scripts/pipeline/check.mjs <finished-run-folder>`). It writes `designed-paths-check.txt` and JSON, reports RAN or DID NOT RUN for every row with its evidence, and exits 4 if required execution evidence is absent. Missing or invalid run cards fail. Subject-medium and brush-lane checks apply only to the relevant medium or selected method. A requested flag alone never proves execution. Run cards retain the expanded arguments and lane execution counts are recorded after actual stroke calls. Benchmark completion, rerenders and the shared evaluation runner invoke this check; planning admission is separate because it has not painted yet.

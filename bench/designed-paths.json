@@ -1,0 +1,598 @@
+{
+  "note": "Designed paths and how to tell each ran (SWARM rule 0f). Built 2026-11-11 22:40 by ua-033-unrun from ~/wt/final/designed-not-run.md (row numbers match). unrun-coverage.md did not exist yet: fold it in when it lands. Checks read one render's output folder: paint log (stdout of tools/paint-plate.mjs), run-card.json and the named files. 'signal: seen' means the log line or file was seen in a real run of main 14acd991 (~/wt/final/harvest/renders/main); 'signal: from docs' means it is what the docs or code say the path writes and was not seen run. 'today' is main 14acd991 on the frozen eval args.",
+  "routes": {
+    "bench": "strict token route: --recipe none --inkrecipe v2 --valueplan (mittens, trumbull, dog-ink, dog-paint, h36a eval args)",
+    "default": "default recipe, no plan (rembrandt eval args)"
+  },
+  "paths": [
+    {
+      "row": 1,
+      "id": "ink-model-lines",
+      "stage": "8 lines",
+      "designed": "docs/ink.md:35,92,101,108",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "pen subjects (dog-ink, h36a, rembrandt)"
+      },
+      "ran_if": [
+        {
+          "file": "linework.json",
+          "test": "extractor names the lineart model, not the pen tracer"
+        },
+        {
+          "file": "ink-labels.json",
+          "test": "exists (written by --inkdecide)"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "^line source pen trace:"
+        },
+        {
+          "file": "linework.json",
+          "test": "source == 'file' and requested == 'none'"
+        }
+      ],
+      "signal": "from docs (not_ran_if lines seen)",
+      "today": "fail",
+      "owner": "lines (LEAD 22:14)",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Owned by cxink",
+      "check": "ink-model-lines"
+    },
+    {
+      "row": 2,
+      "id": "sam-regions-as-shapes",
+      "stage": "2 segmentation, 3 shapes",
+      "designed": "docs/how-it-paints.md:87,97,113",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "log": "no signal exists today: the shape planner must log how many shapes came from SAM regions"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "^segments: SAM .* regions",
+          "and": "^target values: \\d+ pigment/region passes, \\d+ connected shapes; five light-to-dark bands"
+        }
+      ],
+      "signal": "seen (not_ran_if)",
+      "today": "fail",
+      "owner": "shapes / areashapes (parked)",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Needs shape design",
+      "check": "sam-regions-as-shapes"
+    },
+    {
+      "row": 3,
+      "id": "subject-medium",
+      "stage": "8 lines",
+      "designed": "docs/how-it-paints.md:206; bench/v4v5/subjects.json",
+      "applies": {
+        "routes": [
+          "bench"
+        ],
+        "subjects": "mittens (pencil), trumbull (none), dog-paint (none)"
+      },
+      "ran_if": [
+        {
+          "file": "run-card.json",
+          "test": "args include --subjectmedium none|pencil, and drawing.medium != 'ink'"
+        },
+        {
+          "log": "^subject medium (none|pencil):"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "^the line: ink, set by --outlinemedium"
+        },
+        {
+          "log": "^drawing: \\d+ pen gestures"
+        }
+      ],
+      "signal": "seen (not_ran_if); ran_if log line from src/paint/subject-medium.mjs:77",
+      "today": "fail on mittens and trumbull (eval args lack the flag)",
+      "owner": "evalbot (args), harness already does it",
+      "required": true,
+      "status": "required",
+      "reason": "Merged painter contract",
+      "check": "subject-medium"
+    },
+    {
+      "row": 4,
+      "id": "small-marks-wash-join",
+      "stage": "3 shapes",
+      "designed": "docs/how-it-paints.md:106; docs/techniques.md:39,41",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "log": "^small marks: \\d+ small lights reserved, \\d+ small darks laid once, last"
+        }
+      ],
+      "signal": "seen (rembrandt only)",
+      "today": "fail on bench, pass on default",
+      "owner": "none",
+      "required": true,
+      "status": "required",
+      "reason": "Merged painter contract",
+      "check": "small-marks"
+    },
+    {
+      "row": 5,
+      "id": "edges-decided",
+      "stage": "4 technique",
+      "designed": "docs/how-it-paints.md:126,131",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "log": "^techniques: line counts fewer 'crisp edge' than the 'connected shapes' count of '^target values:', or names a soft or lost edge"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "crisp edge N equals connected shapes N"
+        }
+      ],
+      "signal": "seen (not_ran_if, all six runs)",
+      "today": "fail",
+      "owner": "none on the value route",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Needs edge design",
+      "check": "edges-decided"
+    },
+    {
+      "row": 6,
+      "id": "dry-brush-laid",
+      "stage": "4 technique, 5 brush",
+      "designed": "docs/how-it-paints.md:126",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "any whose '^source technique inference' block gives dry brush 10% of area or more"
+      },
+      "ran_if": [
+        {
+          "log": "^techniques:.*dry brush"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "^  dry brush +\\d+ passages +\\d",
+          "and_not": "^techniques:.*dry brush"
+        }
+      ],
+      "signal": "seen (not_ran_if, all six runs)",
+      "today": "fail",
+      "owner": "texture",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Owned by cxtech",
+      "check": "dry-brush-laid"
+    },
+    {
+      "row": 7,
+      "id": "wash-plan-rules",
+      "stage": "3 shapes",
+      "designed": "docs/plan-format.md:204-229; docs/techniques.md:44-51",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "pipeline-plan.json",
+          "test": "exists and washes.colour is set"
+        },
+        {
+          "file": "run-card.json",
+          "test": "args or recipe expansion carry --huechroma 30 --lightfamilies 1"
+        }
+      ],
+      "signal": "seen (pipeline-plan.json on rembrandt, absent on the five bench plates)",
+      "today": "fail on bench, pass on default",
+      "owner": "none",
+      "required": true,
+      "status": "required",
+      "reason": "Merged painter contract",
+      "check": "wash-rules"
+    },
+    {
+      "row": 8,
+      "id": "area-plan",
+      "stage": "1 planning",
+      "designed": "docs/how-it-paints.md:19,72,77",
+      "applies": {
+        "routes": [
+          "bench --planform area"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "semantic-coverage.json",
+          "test": "exists"
+        },
+        {
+          "file": "semantic-soften-lift.jsonl",
+          "test": "exists when the plan names soften or lift"
+        }
+      ],
+      "signal": "from docs",
+      "today": "not on the token route (opt-in)",
+      "owner": "areaplan / contract",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "area-plan"
+    },
+    {
+      "row": 9,
+      "id": "final-darks",
+      "stage": "9 finish",
+      "designed": "docs/how-it-paints.md:189,223",
+      "applies": {
+        "routes": [
+          "default, looks on"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "step-backs.json",
+          "test": "planned has id 'accents' and taken has it"
+        }
+      ],
+      "signal": "from docs",
+      "today": "fail (--finaldarks 0 on both routes; strict has no look)",
+      "owner": "accents",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Owned by cxtech",
+      "check": "final-darks"
+    },
+    {
+      "row": 10,
+      "id": "detail-passes",
+      "stage": "3 shapes",
+      "designed": "docs/techniques.md:66-67",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "log": "^techniques:.*detail marks"
+        },
+        {
+          "file": "run-card.json",
+          "test": "args carry --detailpasses or --detailscale above 0"
+        }
+      ],
+      "signal": "from code (tools/plate/paint.mjs:649)",
+      "today": "fail",
+      "owner": "none",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Needs detail design",
+      "check": "detail-passes"
+    },
+    {
+      "row": 11,
+      "id": "linked-drawing-stages",
+      "stage": "8 lines",
+      "designed": "docs/ink.md:145-155,172-182",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "any drawn subject"
+      },
+      "ran_if": [
+        {
+          "file": "linework.json",
+          "test": "stages != null"
+        },
+        {
+          "log": "^prep stage: \\d+ pencil lines"
+        }
+      ],
+      "signal": "seen (rembrandt)",
+      "today": "fail on bench, pass on default",
+      "owner": "drawplan",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "linked-drawing-stages"
+    },
+    {
+      "row": 12,
+      "id": "linework-stage",
+      "stage": "8 lines",
+      "designed": "docs/linework.md:11-37",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "any drawn subject"
+      },
+      "ran_if": [
+        {
+          "file": "linework-stage.json",
+          "test": "exists"
+        }
+      ],
+      "signal": "from docs",
+      "today": "fail",
+      "owner": "lines",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "linework-stage"
+    },
+    {
+      "row": 13,
+      "id": "plan-fields-in-brief",
+      "stage": "1 planning",
+      "designed": "docs/plan-format.md:136,163-190",
+      "applies": {
+        "routes": [
+          "bench"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "bench/v4v5/TASK.md",
+          "test": "names washes, order, drawing.stages and drawingRole"
+        },
+        {
+          "file": "plan config.json",
+          "test": "some family carries drawingRole"
+        }
+      ],
+      "signal": "seen (0 of 5 stored plans)",
+      "today": "fail",
+      "owner": "benchplan",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "plan-fields-in-brief"
+    },
+    {
+      "row": 14,
+      "id": "paper-state-checks",
+      "stage": "6 physics",
+      "designed": "docs/pigments-and-paper.md:83",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "run-card.json",
+          "test": "continuedChecks.total == 0"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "^continued past \\d+ checks"
+        }
+      ],
+      "signal": "seen",
+      "today": "fail on trumbull (2)",
+      "owner": "drying",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "paper-state-checks"
+    },
+    {
+      "row": 15,
+      "id": "stroke-gate",
+      "stage": "10 eval",
+      "designed": "docs/stroke-stats.md; docs/how-it-paints.md:239",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "stroke-gate.json",
+          "test": "status != 'unverified'"
+        }
+      ],
+      "not_ran_if": [
+        {
+          "log": "^stroke gate: unverified"
+        }
+      ],
+      "signal": "seen",
+      "today": "fail",
+      "owner": "none",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "stroke-gate"
+    },
+    {
+      "row": 16,
+      "id": "graded-washes",
+      "stage": "5 brush",
+      "designed": "docs/how-it-paints.md:150",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "any with a sky or a family in a wet or atmospheric style"
+      },
+      "ran_if": [
+        {
+          "log": "^graded washes: [1-9]\\d* soft passages"
+        }
+      ],
+      "signal": "seen (0 in all six)",
+      "today": "fail",
+      "owner": "none",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Owned by cxtech",
+      "check": "graded-washes"
+    },
+    {
+      "row": 17,
+      "id": "brush-choice-lanes",
+      "stage": "5 brush",
+      "designed": "docs/how-it-paints.md:138,144",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "ran_if": [
+        {
+          "file": "run-card.json",
+          "test": "args carry --brushchoice 1 or --strokeplan 1"
+        }
+      ],
+      "signal": "seen (dog-paint only)",
+      "today": "fail except dog-paint",
+      "owner": "none",
+      "required": true,
+      "status": "required",
+      "reason": "Merged painter contract",
+      "check": "brush-lanes"
+    },
+    {
+      "row": 18,
+      "id": "lift-tone-slope",
+      "why": "area-plan or plan-physics only; no log line known",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "lift-tone-slope"
+    },
+    {
+      "row": 19,
+      "id": "vision-stage-choice",
+      "stage": "8 lines",
+      "designed": "docs/ink.md:182",
+      "applies": {
+        "routes": [
+          "default"
+        ],
+        "subjects": "all"
+      },
+      "not_ran_if": [
+        {
+          "log": "^drawing stages: model unavailable"
+        }
+      ],
+      "signal": "seen",
+      "today": "fail (no key)",
+      "owner": "none",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "vision-stage-choice"
+    },
+    {
+      "row": 20,
+      "id": "drawing-hand-joins",
+      "stage": "8 lines",
+      "designed": "docs/ink.md:100",
+      "applies": {
+        "routes": [
+          "bench",
+          "default"
+        ],
+        "subjects": "any ink subject"
+      },
+      "ran_if": [
+        {
+          "log": "^drawing hand: \\d+ reviewed lines, [1-9]\\d* joins"
+        }
+      ],
+      "signal": "seen (0 joins in all eight pen passes)",
+      "today": "fail",
+      "owner": "lines",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "drawing-hand-joins"
+    },
+    {
+      "row": 21,
+      "id": "other-line-tools",
+      "why": "coverage's list of spawned Python tools is the check",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "other-line-tools"
+    },
+    {
+      "row": 22,
+      "id": "hatching",
+      "why": "no log line known",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "hatching"
+    },
+    {
+      "row": 23,
+      "id": "painter-loop",
+      "why": "unreachable code; coverage's never-executed list is the check",
+      "required": false,
+      "status": "not yet on",
+      "reason": "Not enabled by the shared recipe",
+      "check": "painter-loop"
+    }
+  ],
+  "schemaVersion": 1,
+  "contract": "Execution evidence only. Required paths fail closed. Applicability is explicit; disabled paths remain visible as not yet on. Flags alone never establish execution."
+}

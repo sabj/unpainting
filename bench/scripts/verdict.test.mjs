@@ -52,7 +52,9 @@ function endedPainting(root) {
   fs.writeFileSync(path.join(p.out, 'painting.png'), 'png');
   fs.writeFileSync(path.join(p.out, 'continued-checks.json'), JSON.stringify(NONE));
   const log = path.join(dir, 'segment-1.log');
-  fs.writeFileSync(log, 'marks: 120 strokes\n' + DROPPED_LINE);
+  fs.writeFileSync(log, 'small marks: 0 small lights reserved, 4 small darks laid once, last\nmarks: 120 strokes\n' + DROPPED_LINE);
+  fs.writeFileSync(path.join(p.out, 'run-card.json'), JSON.stringify({ args: [], expandedArgs: ['--washjoin','1','--huechroma','30','--lightfamilies','1'] }));
+  fs.writeFileSync(path.join(p.out, 'pipeline-plan.json'), JSON.stringify({ plan: { washes: { colour: 'family' } } }));
   const plan = { modelOptions: [], extraOptions: ['stonewarm'], baseOptions: [], templateOptions: [], layering: { applied: [], skipped: {} } };
   p.segments.push({ k: 1, planDir, variant: 'region_w13_lay2', resume: null, args: [], plan, exit: 3, seconds: 4, log });
   p.state = 'done';

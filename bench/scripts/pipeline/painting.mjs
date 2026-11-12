@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { reportDesignedPaths } from '../../../tools/designed-paths-check.mjs';
 import { resolvePlan, renderVerdict } from './plan-args.mjs';
 import { resolveAreaPlan } from './area-args.mjs';
 
@@ -123,6 +124,11 @@ export class Painting {
     const v = renderVerdict({ paintExit: last.exit, unused, modelOptions: union('modelOptions'), extraOptions: union('extraOptions'), baseOptions: union('baseOptions'),
       templateOptions: union('templateOptions'), dropped: dm ? Number(dm[1]) : 0, droppedPct: dm ? Number(dm[2]) : 0, finished, strict,
       continued: readJson(path.join(this.out, 'continued-checks.json')) });
+    if (finished) {
+      const designed = reportDesignedPaths(this.out, { logFiles: this.segments.map(s => s.log) });
+      v.designedPaths = designed;
+      if (!designed.ok) { v.exit ||= 4; v.failures.push({ code: 4, reason: 'required designed paths did not run; see designed-paths-check.txt' }); }
+    }
     return { ...v, unused, segments: this.segments.map(s => ({ k: s.k, variant: s.variant, resumed: Boolean(s.resume), exit: s.exit, seconds: s.seconds })), layering: last.plan.layering, args: last.args };
   }
 }
