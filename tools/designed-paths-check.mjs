@@ -15,9 +15,10 @@ export function checkDesignedPaths(folder, { registry = read(registryFile), logF
   const lines = logs.flatMap(f => fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').map((text, i) => ({ text, evidence: `${f}:${i + 1}: ${text}` })) : []);
   const line = re => lines.find(l => re.test(l.text))?.evidence;
   const opts = options(card?.expandedArgs ?? card?.args);
+  const expectedMedium = registry.subjectMedia?.[String(card?.subject ?? '').trim().toLowerCase()];
   const jsonEvidence = (file, test, show = d => d) => { const d = read(path.join(folder, file)); return d && test(d) ? `${file}: ${JSON.stringify(show(d)).slice(0, 640)}` : null; };
   const checks = {
-    'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(options(c.args).get('subjectmedium')) && c.drawing?.medium !== 'ink', c => ({ subjectMedium: options(c.args).get('subjectmedium'), drawingMedium: c.drawing?.medium })),
+    'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(options(c.args).get('subjectmedium')) && (!expectedMedium || options(c.args).get('subjectmedium') === expectedMedium) && c.drawing?.medium !== 'ink', c => ({ expectedMedium, subjectMedium: options(c.args).get('subjectmedium'), drawingMedium: c.drawing?.medium })),
     'small-marks': () => opts.get('washjoin') === '1' && line(/^small marks: \d+ small lights reserved, \d+ small darks laid once, last/),
     'wash-rules': () => jsonEvidence('pipeline-plan.json', d => d.plan?.washes?.colour && opts.get('huechroma') === '30' && opts.get('lightfamilies') === '1', d => ({ washes: d.plan.washes, huechroma: opts.get('huechroma'), lightfamilies: opts.get('lightfamilies') })),
     'brush-lanes': () => jsonEvidence('designed-execution.json', d => d.laneStrokes > 0 || d.brushChoiceStrokes > 0),
@@ -33,7 +34,7 @@ export function checkDesignedPaths(folder, { registry = read(registryFile), logF
   };
   const rows = registry.paths.map(r => {
     let applicable = !([4,7,17].includes(r.row) && opts.has('areaplan'));
-    if (r.row === 3) applicable = ['none', 'pencil'].includes(opts.get('subjectmedium')) || ['none', 'pencil'].includes(card?.drawing?.subjectMedium?.medium);
+    if (r.row === 3) applicable = ['none', 'pencil'].includes(expectedMedium) || ['none', 'pencil'].includes(opts.get('subjectmedium')) || ['none', 'pencil'].includes(card?.drawing?.subjectMedium?.medium);
     if (r.row === 17) applicable = opts.get('brushchoice') === '1' || opts.get('strokeplan') === '1' || read(path.join(folder, 'designed-execution.json'))?.plannedStyle === 'ink-and-wash';
     if ([11,12].includes(r.row)) applicable = card?.drawing?.medium === 'ink' && card?.drawing?.order !== 'none';
     const evidence = card ? checks[r.check ?? r.id]?.() : null;

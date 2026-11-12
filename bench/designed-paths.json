@@ -594,5 +594,16 @@
     }
   ],
   "schemaVersion": 1,
-  "contract": "Execution evidence only. Required paths fail closed. Applicability is explicit; disabled paths remain visible as not yet on. Flags alone never establish execution."
+  "contract": "Execution evidence only. Required paths fail closed. Applicability is explicit; disabled paths remain visible as not yet on. Flags alone never establish execution.",
+  "subjectMedia": {
+    "hills": "pen",
+    "south-france": "pen",
+    "sargent": "none",
+    "trumbull": "none",
+    "mittens": "pencil",
+    "h36a": "pen",
+    "h34a": "pen",
+    "dog-paint": "none",
+    "dog-ink": "pen"
+  }
 }

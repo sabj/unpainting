@@ -51,3 +51,18 @@ test('an aborted run still writes all 23 results and fails its contract', t => {
   assert.ok(report.rows.every(r => r.status === 'DID NOT RUN'));
   assert.match(fs.readFileSync(path.join(aborted, 'designed-paths-check.txt'), 'utf8'), /run-card.json missing or invalid/);
 });
+
+test('dropping subjectmedium on a known paint or pencil subject cannot evade the required check', t => {
+  const { dir, write } = fixture(t);
+  write('run-card.json', { subject: 'MITTENS', args: ['--outlinemedium', 'ink'], expandedArgs: ['--washjoin','1','--huechroma','30','--lightfamilies','1'], drawing: { medium: 'ink' } });
+  const report = checkDesignedPaths(dir), medium = report.rows.find(r => r.row === 3);
+  assert.equal(medium.applicable, true);
+  assert.equal(medium.status, 'DID NOT RUN');
+  assert.equal(report.ok, false);
+});
+
+test('the registry medium scopes agree with the benchmark source declarations', () => {
+  const registry = JSON.parse(fs.readFileSync(new URL('../bench/designed-paths.json', import.meta.url)));
+  const subjects = JSON.parse(fs.readFileSync(new URL('../bench/v4v5/subjects.json', import.meta.url))).subjects;
+  assert.deepEqual(registry.subjectMedia, Object.fromEntries(Object.entries(subjects).map(([id, spec]) => [id, spec.medium])));
+});
