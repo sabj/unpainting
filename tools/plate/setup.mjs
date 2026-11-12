@@ -171,9 +171,13 @@ const out = path.resolve(root, opt('out', 'work/plate'));
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
 // the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
-// --strict 1 (or the older --wetgate 1): failed mid-painting checks stop the run. Default 0: they are counted, logged and
-// written to continued-checks.json at exit (src/media/checks.mjs).
-setStrict(opt('strict', '0') === '1' || opt('wetgate', '0') === '1'); process.on('exit', () => writeContinuedChecks(out));
+// Failed mid-painting checks stop by default. Explicit --strict 0 is diagnostic continuation;
+// its run cannot satisfy the required paper-state contract. --wetgate 1 also forces stops.
+const strictCheckSetting = opt('strict', '1'), wetGateSetting = opt('wetgate', '0');
+for (const [name, value] of [['strict', strictCheckSetting], ['wetgate', wetGateSetting]]) {
+  if (value !== '0' && value !== '1') throw new Error(`--${name} expects 0 or 1; received ${String(value)}`);
+}
+setStrict(strictCheckSetting === '1' || wetGateSetting === '1'); process.on('exit', () => writeContinuedChecks(out));
 const CODE_STATE = checkCodeState({ root, out, allowDirty: num('allowdirty', 0) > 0 });
 // --inkrecipe v2|wash: ink flags as one switch (src/paint/methods/ink-recipe.mjs); flags typed on the command line win,
 // and the recipe's flags win over the --recipe preset's. Added before the line source is prepared, since the wash

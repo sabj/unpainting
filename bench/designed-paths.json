@@ -409,20 +409,20 @@
       "ran_if": [
         {
           "file": "run-card.json",
-          "test": "continuedChecks.total == 0"
+          "test": "continuedChecks.strict === true && continuedChecks.total === 0"
         }
       ],
       "not_ran_if": [
         {
-          "log": "^continued past \\d+ checks"
+          "log": "^continued past [1-9]\\d* checks"
         }
       ],
       "signal": "seen",
-      "today": "fail on trumbull (2)",
+      "today": "Historical baseline: failed on trumbull (2); current execution requires strict checks",
       "owner": "drying",
-      "required": false,
-      "status": "not yet on",
-      "reason": "Not enabled by the shared recipe",
+      "required": true,
+      "status": "required",
+      "reason": "Default paper-state checks must stop on failure",
       "check": "paper-state-checks"
     },
     {

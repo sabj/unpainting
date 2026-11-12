@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { checkDesignedPaths, reportDesignedPaths } from './designed-paths-check.mjs';
 
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'designed-paths-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const write = (file, value) => fs.writeFileSync(path.join(dir, file), JSON.stringify(value));
+  const write = (file, value) => fs.writeFileSync(path.join(dir, file), JSON.stringify(file === 'run-card.json' ? { continuedChecks: { strict: true, total: 0, checks: {} }, ...value } : value));
   write('run-card.json', { args: ['--subjectmedium', 'pencil'], expandedArgs: ['--subjectmedium', 'pencil', '--washjoin', '1', '--huechroma', '30', '--lightfamilies', '1'], drawing: { medium: 'graphite' } });
   write('pipeline-plan.json', { plan: { washes: { colour: 'family' } } });
   fs.writeFileSync(path.join(dir, 'paint.log'), 'subject medium pencil: graphite drawing\nsmall marks: 0 small lights reserved, 12 small darks laid once, last\n');
@@ -65,4 +66,32 @@ test('the registry medium scopes agree with the benchmark source declarations', 
   const registry = JSON.parse(fs.readFileSync(new URL('../bench/designed-paths.json', import.meta.url)));
   const subjects = JSON.parse(fs.readFileSync(new URL('../bench/v4v5/subjects.json', import.meta.url))).subjects;
   assert.deepEqual(registry.subjectMedia, Object.fromEntries(Object.entries(subjects).map(([id, spec]) => [id, spec.medium])));
+});
+
+test('required paper-state proof rejects diagnostic continuation, missing and malformed summaries', t => {
+  const { dir } = fixture(t);
+  const card = JSON.parse(fs.readFileSync(path.join(dir, 'run-card.json')));
+  const get = () => checkDesignedPaths(dir).rows.find(r => r.row === 14);
+  assert.equal(get().required, true);
+  assert.equal(get().applicable, true);
+  assert.equal(get().status, 'RAN');
+  for (const summary of [undefined, null, {strict:false,total:0}, {strict:true,total:1}, {strict:'true',total:0}, {strict:true,total:'0'}, {strict:true,total:-1}]) {
+    fs.writeFileSync(path.join(dir, 'run-card.json'), JSON.stringify({...card,continuedChecks:summary}));
+    assert.equal(get().status, 'DID NOT RUN', JSON.stringify(summary));
+    assert.equal(checkDesignedPaths(dir).ok, false);
+  }
+  fs.writeFileSync(path.join(dir, 'run-card.json'), JSON.stringify({...card,args:['--areaplan','area.json']}));
+  assert.equal(get().applicable, true);
+  assert.equal(get().status, 'RAN');
+});
+
+test('malformed paper-check switches fail before painting, including the legacy alias beside strict mode', t => {
+  const { dir } = fixture(t);
+  for (const flags of [['--strict','banana'], ['--strict','2'], ['--strict'], ['--strict','1','--wetgate','bad']]) {
+    const out = path.join(dir, 'invalid-' + flags.join('_'));
+    const result = spawnSync(process.execPath, ['tools/paint-plate.mjs','--out',out,...flags], {encoding:'utf8'});
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /--(?:strict|wetgate) expects 0 or 1/);
+    assert.equal(fs.existsSync(path.join(out,'painting.png')), false);
+  }
 });
