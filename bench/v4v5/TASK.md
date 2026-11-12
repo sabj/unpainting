@@ -20,7 +20,8 @@ how much its progress frames look like a person painting.
 ## What is fixed for everyone
 
 - The painter code (`tools/paint-plate.mjs`) and its base recipe. Every painting starts from the base recipe
-  `region_w13_lay4_sky3_cpp`.
+  `region_w13`, running `--recipe default` from `src/paint/recipe.mjs` plus your plan.
+  Washes and order inherit that recipe, just as a normal painter run does.
   Your recipe tokens and painter settings are layered on top of it (below).
 - Fast drying mode, seed 0, the recording (progress frames and the stroke log), the target guard in `gentle` mode (the
   painter may look at broad shape averages of the target while painting; cell-level target reads are blocked and
@@ -40,6 +41,13 @@ All files go in `bench/plan/` unless stated.
      bounds as fractions 0..1 of the target. The painter's own colour/value segmentation of the target is assigned to
      the family whose bounds overlap it most, and a family with its own style in `styleSelection.regions` paints its
      cells in that style. Empty `[]` leaves the painter's own segmentation unlabelled.
+   - `washes`: optional wash rules. `colour` is `family` (default) or `layered`;
+     `sessions` is `passage` (default), `dry` or `connected`; `carryMm` defaults to 2 and
+     `paleLimit` to 0.16. `paints` names the pigment box. Omitted fields use the default recipe.
+   - `order`: optional `{subjects, strength}`; `subjects` orders family ids and `strength`
+     controls that ordering. See `docs/plan-format.md` for the subject-order format.
+   - `drawing`: medium, source and `stages` can state the drawing stages explicitly.
+     A family may name its `drawingRole`; see `docs/plan-format.md`.
    - `reserves`: paper whites kept out of every wash. Each `{reason, bounds:[x0,y0,x1,y1]}` (fractions). The painter
      also keeps near-paper target lights on its own.
    - Limits: at most 64 families (short side at least 2 mm on the sheet) and 64 reserves (short side at least 1 mm).
@@ -57,7 +65,7 @@ All files go in `bench/plan/` unless stated.
    settings, and records the override in the result (the check prints it as `mediumOverride`). You may always choose
    no drawing.
    When `closing-lines.json` is present, `--drawing both` is enabled automatically unless overridden.
-   Prepared paths use the harness-owned v2 ink rules: source support, smoothing, darkness caps and damp pen.
+   Prepared paths use the default painter’s ink rules.
    Raw v1 ink controls and legacy ink/sep/uncap/dwg tokens are not admitted. Without a drawing file the painter
    draws from its own reading of the target. Schema:
    `{"image":{"w":W,"h":H}, "lines":[{"points":[[x,y],...], "width":1, "weight":1, ...}], "medium":"ink"}` with
@@ -81,13 +89,15 @@ All files go in `bench/plan/` unless stated.
    own target. The painter paints with the pigments you name, and each settles as the real pigment does: ultramarine and
    cerulean granulate heavily, the earths (ochre, siennas, umber) moderately, and the staining paints (phthalos,
    quinacridone rose, hansa) not at all, so a textured sky wants a granulating blue and a smooth one a phthalo. Options are
-   limited to `--midlayers` (integer 0–8),
+   Small dark pieces are painted once, last (`--smallmarks 1`); small wash pieces join their neighbouring
+   wash (`--washjoin 1`). Both are inherited from the default recipe and may be set to 0 or 1 in this file.
+   Other options are limited to `--midlayers` (integer 0–8),
    `--paints` (comma-separated pigment names), `--drawing` (first/both/last/none),
    `--outlinemedium` (graphite/ink/none/auto), `--inkprofile` (sepia-ink/black-ink),
    `--valuefloor` (a style name), and `--focusmap` (a `.json` file inside the plan folder).
    Every option needs a separate value. All other options are refused, including segmentation, dirty-code
-   bypasses, ink recipes/resolution, speed, awareness and physics controls. The config drawing takes precedence
-   over template and extra drawing flags. An option nothing reads
+   bypasses, ink recipes/resolution, speed, awareness and physics controls. Explicit tokens and extra flags override recipe defaults; avoid conflicting drawing flags
+   when declaring the drawing in config.json. An option nothing reads
    {UNREAD_OPTION}. Pigment names: `src/paint/methods/material-profiles.mjs`.
 5. **`bench/PLAN.md` (required): your plan in words.** Reference cues, each region's technique and order, moisture and
    load, protected lights, edges, values, what would show failure, and (V5) what you changed and why. Recorded, not

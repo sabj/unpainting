@@ -137,7 +137,7 @@ test('item 3: the bench base and template carry no sky numbers fitted to one sub
   const { argsBuilder, layerBase, optionMap, BASE } = await import('./pipeline/plan-args.mjs');
   const build = argsBuilder({ planDir: '/p', target: '/t.png', width: 600, sheetmm: 140, targetPixels: [300, 240] });
   const args = optionMap(layerBase({ variant: 'region_w13', build }).args);
-  assert.equal(args.get('skylanes'), '1', 'sky lanes stay on, at the painter\'s own radius and step');
+  assert.equal(args.get('skylanes'), undefined, 'sky lanes inherit the default painter');
   for (const k of ['skylanemm', 'skylanestep', 'skyfloc']) assert.ok(!args.has(k), `the base sets --${k} (Trumbull's fitted value)`);
   assert.doesNotMatch(BASE, /_(rg|blk|bmm|bka)\d|_birr|_pgreen/);
 });

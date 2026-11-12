@@ -1,7 +1,7 @@
 // The painter command for a V4 or V5 plan, and the checks on it. A plan is the model's files in one folder:
 // config.json (regions, reserves, styles), drawing paths (*-lines.json), extra-args.json (painter settings), and
-// variant.txt (recipe tokens). The painter is tools/paint-plate.mjs with no recipe of its own (--recipe none): every
-// setting comes from the fixed template below, the base recipe tokens (BASE) and the plan, in that order.
+// variant.txt (recipe tokens). The painter is tools/paint-plate.mjs with the default recipe plus the plan: shared painter defaults live in
+// src/paint/recipe.mjs; the template supplies execution settings and explicit plan overrides.
 //
 // Layering: a model token replaces the base token in the same slot (_lay2 replaces _lay4), and the base's sepia ink
 // yields to a plan drawn in another ink. Every subject gets the same base; no token applies to one subject only.
@@ -22,9 +22,9 @@ import { lineSources } from './copy.mjs';
 // (.5) of the base, which made _slane (sky lanes at the painter's own radius) a token of its own. A plan that names a
 // removed token gets the unknown-token problem.
 // _sg (--stylegain) and _tp (--touchgain) are not model-settable: a gain that covers an engine error is a calibration, not a
-// painter's choice (docs/honesty.md). The two touch-up rounds the base always had stay a fixed painter setting below; the
+// painter's choice (docs/honesty.md). The two touch-up rounds the base always had stay a fixed default recipe setting; the
 // touch-up gain is the painter's own default.
-export const BASE = 'region_w13_lay4_sky3_cpp';
+export const BASE = 'region_w13';
 const DEFAULT_VARIANT = 'region_w13';
 const LINES = name => `${name}-lines.json`;
 
@@ -42,16 +42,16 @@ export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', comp
     const opening = /_opk/.test(v) ? 'closingink' : 'opening';
     const closing = (/_ink4/.test(v) ? ['closingink4', 'closing'] : /_ink[23]/.test(v) ? ['closingink', 'closing'] : ['closing']).find(f => linesExist(f));
     const t = (re, flags) => (re.test(v) ? flags() : []);
-    return ['tools/paint-plate.mjs', '--recipe', 'none', '--inkrecipe', 'v2', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1',
+    return ['tools/paint-plate.mjs', '--recipe', 'default', '--image', target, '--width', String(width), '--scale', '1', '--sheetmm', String(sheetmm), '--palettewide', '1',
       '--physical', '1', '--paperbase', /_cur/.test(v) ? 'white' : 'source', '--loadedcontact', '1', '--order', 'painter', '--valueplan', path.join(planDir, 'config.json'),
-      '--brushchoice', v.startsWith('region_w15') ? '1' : '0', '--shapedmarks', shaped ? '1' : '0',
+      ...(v.startsWith('region_w15') ? ['--brushchoice', '1'] : []), '--shapedmarks', shaped ? '1' : '0',
       ...t(/_onedom/, () => ['--middomain', '0']), ...t(/_nest/, () => ['--nestedmid', '1']), ...t(/_lay(\d)/, () => ['--midlayers', m(v, /_lay(\d)/)[1]]),
       ...t(/_lf/, () => ['--loadfeather', '1.5']),
       ...t(/_ls(\d+)/, () => ['--layersmooth', tenth(v, /_ls(\d+)/)]),
       ...t(/_acc(\d+)/, () => ['--accentshare', tenth(v, /_acc(\d+)/)]), ...t(/_lt/, () => ['--layertexture', '1']),
       ...(/_cur/.test(v) ? ['--paperlights', '1'] : /_relonly/.test(v) ? ['--paperrel', '1'] : ['--paperrel', '1', '--paperlights', '1']),
       ...(/_cur/.test(v) ? ['--paperrgb', '252,251,248'] : /_relonly/.test(v) ? [] : ['--paperrgb', 'auto']),
-      ...(/_noslane/.test(v) ? [] : ['--skylanes', '1']),
+      ...t(/_noslane/, () => ['--skylanes', '0']),
       ...t(/_st(\d+)/, () => ['--shadowthresh', hundredth(v, /_st(\d+)/)]),
       ...t(/_shw(\d+)/, () => ['--shadowwater', hundredth(v, /_shw(\d+)/)]),
       ...t(/_dkf/, () => ['--darkfirst', '1']),
@@ -61,7 +61,6 @@ export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', comp
       ...t(/_tfl(\d+)/, () => ['--texflow', tenth(v, /_tfl(\d+)/)]),
       ...t(/_novar/, () => ['--physics', 'filmDiffuse=0']), ...t(/_sk1/, () => ['--skyonelayer', '1']),
       ...t(/_fs60/, () => ['--fastsettle', '60']), ...t(/_fl0/, () => ['--feedbacklag', '0']),
-      '--touchpoints', '2',
       ...t(/_spl(\d*)/, () => ['--strokeplan', '1', '--lanemm', m(v, /_spl(\d*)/)[1] || '6']), ...t(/_sml(\d+)/, () => ['--strokemm', m(v, /_sml(\d+)/)[1]]),
       ...t(/_wre(\d+)/, () => ['--washreach', tenth(v, /_wre(\d+)/)]),
       ...t(/_lad/, () => ['--laneadapt', '1']),
@@ -148,6 +147,8 @@ export const ALLOWED_EXTRA_ARGS = Object.freeze({
   valuefloor: choice(['ink-and-wash', 'precise-watercolor', 'urban-sketch', 'atmospheric-wet']),
   focusmap: v => /\.json$/i.test(v),
   brushchoice: choice(['0', '1']),
+  smallmarks: choice(['0', '1']),
+  washjoin: choice(['0', '1']),
   strokeplan: choice(['0', '1']),
   lanemm: v => v === 'auto' || numeric(0, 40)(v),
   strokemm: numeric(0, 300),
@@ -374,8 +375,6 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   // Offline scripted fixtures deliberately remove tracked benchmark data from their worktree.
   // Keep the dirty-tree evidence; ordinary contestant runs retain the painter's refusal.
   if (spec.offlineFixture === true) args.push('--allowdirty', '1');
-  // Since 0.1.1 a wet-on-wet stroke on uneven paper is logged, not a stop that loses the painting (tag v0.1.0 has the old rule)
-  if (!args.includes('--wetgate')) args.push('--wetgate', '0');
   if (pausedir) args.push('--pausedir', pausedir);
   if (resumestate) args.push('--resumestate', resumestate);
   const linesByName = {};

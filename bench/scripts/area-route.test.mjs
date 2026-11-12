@@ -133,13 +133,14 @@ test('the plan snapshot keeps an area plan', () => {
   fs.rmSync(ws, { recursive: true, force: true });
 });
 
-test('the token route is unchanged: the same args for the same plan', () => {
+test('the token route uses the default recipe without area settings', () => {
   // a plan as the dry planner writes it, resolved as before; the area work adds nothing to it
   const dir = tmp();
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ subject: 'dry', name: 'd', styleSelection: { style: 'precise-watercolor', reason: 'r' }, families: [], reserves: [] }));
   const r = resolvePlan({ spec: { ...loadSubjects().trumbull, width: 300 }, planDir: dir, variant: 'region_w13', target: path.join(V2, 'targets', 'trumbull.png'), out: '/o' });
   const o = optionMap(r.args);
-  assert.deepEqual(['touchpoints', 'skylanes', 'midlayers'].map(k => o.get(k)), ['2', '1', '4']);
+  assert.equal(o.get('recipe'), 'default');
+  assert.deepEqual(['touchpoints', 'skylanes', 'midlayers'].map(k => o.get(k)), [undefined, undefined, undefined]);
   assert.ok(!o.has('skyblue'), 'the sky tube was removed; the base no longer carries it');
   assert.ok(!o.has('areaplan'));
   fs.rmSync(dir, { recursive: true, force: true });
