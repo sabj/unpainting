@@ -29,7 +29,7 @@ import {SOFTEN_WATER} from '../../src/paint/techniques/soften-lift.mjs';
 import {layIntoWetBed} from '../painter/wet-bed-wait.mjs';
 import {variegatedCharge, chargeMix} from '../painter/area-washes.mjs';
 import {chargeWetPass} from '../painter/area-charge-run.mjs';
-import {semanticSameSession,compileAreaLayers, semanticTechnique, semanticBrushOptions, semanticUsesNumericClip, semanticGesture, semanticCalibrationGain, requireAuthoredCalibration, semanticFilmRemovalReady, sha256} from '../painter/semantic-areas.mjs';
+import {semanticLoadCells,semanticSameSession,compileAreaLayers, semanticTechnique, semanticBrushOptions, semanticUsesNumericClip, semanticGesture, semanticCalibrationGain, requireAuthoredCalibration, semanticFilmRemovalReady, sha256} from '../painter/semantic-areas.mjs';
 import {measurePaperDry} from '../../src/paint/methods/wetdry.mjs';
 import {earlyDryBoundary} from '../painter/early-dry-boundary.mjs';
 import {smoothUp} from '../../src/paint/methods/smoothup.mjs';
@@ -511,14 +511,17 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // --brushfloor R: smallest wash brush, R px at 1086 wide, until --floorfrom of the ladder (default 0.85). The sheet's clip holds the edge.
   // Under --physical, passes after --floorfrom may use the detail brush (rigger).
   // --detailfloor 1: under --physical the floor brush moves toward the detail brush by the share of cells with focus over --detailfocus.
-  const FLOOR = (() => { const f = num('brushfloor', 0); if (layer._darkPass || authoredPaths || (f <= 0 && !PB) || detail) return 0; if (through > num('floorfrom', 0.85)) return PB ? Math.max(SC, PB.detailR) : 0; const base = Math.max(SC, PB ? PB.floorR : f * W2 / 1086); if (PB && FOCUS && num('detailfloor', 0) > 0) { const thr = num('detailfocus', 0.5); let a = 0, c = 0; for (let i = 0; i < n; i++) if (sh.mask[i]) { a++; if (FOCUS[i] > thr) c++; } const q = a ? c / a : 0; return Math.max(SC, base + (Math.max(SC, PB.detailR) - base) * q); } return base; })();
+  // an area pass's lanes are planned for the brush that lays them (its pass.brush width), not for a kit brush whose
+  // lanes it would then paint with gaps or pile-ups between them
+  const PASS_R = sh._semantic && !authoredPaths && !detail ? sh._semantic.pass.brush.widthMm / (2 * (num('sheetmm', DEFAULT_SHEET_MM) / W2)) : null;
+  const FLOOR = PASS_R ?? (() => { const f = num('brushfloor', 0); if (layer._darkPass || authoredPaths || (f <= 0 && !PB) || detail) return 0; if (through > num('floorfrom', 0.85)) return PB ? Math.max(SC, PB.detailR) : 0; const base = Math.max(SC, PB ? PB.floorR : f * W2 / 1086); if (PB && FOCUS && num('detailfloor', 0) > 0) { const thr = num('detailfocus', 0.5); let a = 0, c = 0; for (let i = 0; i < n; i++) if (sh.mask[i]) { a++; if (FOCUS[i] > thr) c++; } const q = a ? c / a : 0; return Math.max(SC, base + (Math.max(SC, PB.detailR) - base) * q); } return base; })();
   let _floorMask = null;
   const getFloorMask = () => (_floorMask ??= up(brushMask(sh)));
   let FLOOR_R = FLOOR;
   // under --strokebudget the passage gets its share of the strokes: the brush and the closing radius grow together
   // until its sweeps fit (stroke-budget.mjs)
   const floorPaths = rr => {
-   const baseOpts = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), seed: 17 + ctx.laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
+   const baseOpts = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: PASS_R ?? Math.max(rr, BRUSH), seed: 17 + ctx.laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
    const bm = brushMask(sh), row0 = MB.y0 * w, row1 = (MB.y1 + 1) * w;
    // Cache geometry only; paper observation, charge, contact and drying still execute.
    return prof('floor lanes', () => cachedStepSync({...RUN_CACHE,name:'floor-paths',code:CODE_HASH,track:optTrack,
@@ -810,7 +813,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // paper the brush may paint (inside the clip, off any resist; the stroke's own footprint rule), and each load is a
     // stroke of its own, dipped afresh; a graded wash is graded by the puddle's dilution between loads (the mean of its
     // graded amount under each load), not by recharging every few cells
-    const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name), paintsHere(ctx.sheet)) : null;
+    const LOADS = !authoredPaths && !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, (sh._semantic?semanticLoadCells(sh._semantic.pass,PB.cfg.uptake_ml_per_cm2,PB.mmPerCell):PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name)), paintsHere(ctx.sheet)) : null;
     if (LOADS && (LOADS.length > 1 || useGradedCal)) {
       // One amount per shape, graded by the plan's plane (graded-demand.mjs): each load is dipped at the plane's mean
       // under it and pressed along it, never charged per-cell amounts. A passage without a plane takes its amount throughout.
