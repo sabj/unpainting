@@ -172,23 +172,25 @@ A dried wash becomes its own layer. A glaze is a transparent wash over dried pai
 
 ## 7. Looks
 
-A look is the painter stepping back to compare a whole shape with the subject. There are two modes.
+A look is the painter stepping back to compare whole shapes with the subject. A painter steps back a few times, at set points fixed before the first mark, usually after a layer dries. There are two modes.
 
 | | Default | Strict (`--notargetlooks 1`) |
 |---|---|---|
-| Target reads after planning | shape-level looks only (mean colour over a whole shape of at least 64 cells) | none |
-| Looks that run | charge correction, kept-colour recharge, touch-ups, final darks, sky lane selection, texture darkness | none: every passage uses the charge frozen at planning |
-| Use | the painter as a painter works; 0.1.x winners ran this way | the benchmark switch |
+| Target reads after planning | only at the planned step-backs, each shape once, as its mean (a whole shape of at least 64 cells) | none |
+| Step-backs | `washes` (with `--touchpoints` > 0): after the planned washes dry, each planning family once; `accents` (with `--finaldarks` > 0): before the last small darks, each accent family once | the same plan, with no look |
+| Passages | keep the charge frozen at planning; a passage is never a step-back | the same |
+| Use | the painter as a painter works; 0.1.x winners ran this way (with more looks) | the benchmark switch |
 
-- `src/paint/painting-look.mjs` is the switch: with `--notargetlooks 1` every painting-time look returns null and each caller falls back to the frozen charge. Planning looks before the first mark are not affected. `tools/plate/setup.mjs` and `tools/plate/paint.mjs` call it.
-- The target guard blocks cell-level reads of the target, and of every map made from them (`tools/guard/seal-maps.mjs`), when painting starts and records every look (`tools/guard/no-target.mjs`; modes `gentle` default, `hard` with `--lookbudget`, `warn`, `off`). [Honesty](honesty.md) has the modes and records: `target-guard.json`.
+- `src/paint/step-backs.mjs` plans the step-backs from the options before painting and is the only way to a painting-time look: outside an open step-back every look returns null, a step-back not in the plan or taken twice stops the run, and a shape read twice stops the run. It writes `step-backs.json` (planned, taken, shape looks, looks declined outside a step-back). `src/paint/painting-look.mjs` is the strict switch under it: with `--notargetlooks 1` every look returns null. Planning looks before the first mark are not affected. `tools/plate/setup.mjs` makes both.
+- The target guard blocks cell-level reads of the target, and of every map made from them (`tools/guard/seal-maps.mjs`), when painting starts and records every look (`tools/guard/no-target.mjs`; modes `gentle` default, `hard` with `--lookbudget`, `warn`, `off`). [Honesty](honesty.md) has the modes and records: `target-guard.json`. `tools/guard/step-backs.test.mjs` checks that the guard's looks are exactly the step-backs' shape looks.
 - Frozen replay for a benchmark: `--notargetlooks 1 --feedback 0 --touchpoints 0 --finaldarks 0 --targetguard strict`.
-- Touch-ups: `src/paint/methods/shape-refit.mjs` (`--touchpoints`), `src/paint/methods/touch-cover.mjs`. Final darks: `src/paint/methods/final-darks.mjs` (`--finaldarks`, off in the default recipe). When on, they are brush marks made with the detail brush's tip on the plan's accent families, each at least one tip touch, kept off the reserved lights only. Touch-ups are two fixed rounds that only darken; the simulator has no physical rule for lifting dried pigment.
+- Touch-ups (`--touchpoints`, `src/paint/methods/touch-up.mjs`, families from `src/paint/methods/shape-refit.mjs`): one step-back after the washes, whatever the number given; a second round would look again at what the first corrected. A family that reads at least one value step lighter than the subject (one step of the subject's own nine-step scale, the pen tracer's rule) gets one glaze of the mixed lack, filed under its leading pan. Darken only: the simulator has no physical rule for lifting dried pigment. Final darks: `src/paint/methods/final-darks.mjs` (`--finaldarks`, off in the default recipe), brush marks made with the detail brush's tip on the plan's accent families, each at least one tip touch, kept off the reserved lights only.
+- The passage charge look (`--feedback`), the kept-colour recharge (`--keeprecharge`) and the texture look (`--texflow`) are passages, not step-backs: they get no look and use their planned values. `--feedback` still reads the painter's own sheet.
 
-**Inputs:** the sealed target (shape means only). **Outputs:** corrections at shape scale, `target-guard.json`.
-**Controls:** `--notargetlooks`, `--targetguard`, `--lookbudget`, `--feedback`, `--touchpoints`, `--finaldarks`.
+**Inputs:** the sealed target (shape means only, at step-backs). **Outputs:** corrections at shape scale, `target-guard.json`, `step-backs.json`.
+**Controls:** `--notargetlooks`, `--targetguard`, `--lookbudget`, `--feedback`, `--touchpoints`, `--touchgain`, `--touchdmin`, `--finaldarks`.
 **Where choices live:** painter rule. Looks are few and fixed in advance at set points, such as after a layer dries.
-**Rules here:** no per-cell target reads in either mode. No loop of look, correct, look until a score stops improving. Every score names its mode.
+**Rules here:** no per-cell target reads in either mode. No loop of look, correct, look until a score stops improving: each step-back is taken once and reads each shape once. Every score names its mode.
 **Teacher's view:** step back a few times; compare shapes, not pixels. A last layer is few and deliberate.
 
 ## 8. Lines

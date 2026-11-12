@@ -29,7 +29,7 @@ Default recipe flags, with the value that turns each off:
 - `--paper coldpress`: cold-press tooth at physical size. Off: `flat`.
 - `--paperphysical 1`: paper fibre and relief in millimetres, not cells. Off: `0`.
 - `--texture 0`: per-passage dry-brush texture marks stay off.
-- `--touchpoints 2`: two touch-up glaze passes on shapes that read too light. Off: `0`.
+- `--touchpoints 2`: one step-back after the washes dry (any number above 0 is one): a planning shape that reads a whole value step lighter than the subject gets one darkening glaze. Off: `0`. See [How it paints, section 7](how-it-paints.md#7-looks).
 - `--layerhue 1`: keeps wash layers apart by colour group. Off: `0`.
 - `--drawing first`: the drawing goes down first, in pencil unless the plan or the automatic stage choice asks for ink. Either can add a closing pass. Off: `none`.
 - `--frames 8`: about 8 recorded frames of the washes. Off: `40`.

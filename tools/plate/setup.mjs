@@ -19,7 +19,7 @@ import {sha256} from '../painter/semantic-areas.mjs';
 import {measurePaper as physicalMeasurePaper} from '../../src/paint/methods/wetdry.mjs';
 import {codeHash, digest} from '../../src/paint/run-cache.mjs';
 import {cachedEarlyLines, outputRelative, planFileDigest} from '../../src/paint/early-lines-cache.mjs';
-import {paintingLooks} from '../../src/paint/painting-look.mjs';
+import {createStepBacks, planStepBacks} from '../../src/paint/step-backs.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -304,7 +304,11 @@ const PX_RAW = num('washinkfree', 0) > 0 && (opt('washinkfile', '') !== '' || op
 // --targetguard gentle|hard|warn|off (tools/guard/no-target.mjs): from the first mark on, px and maps made from it are sealed.
 // gentle (default) blocks reads but allows shape-level looks; hard also caps looks (--lookbudget, default 100); warn only records.
 const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE), targetPaths: [path.resolve(root, opt('image', ''))], log: null, lookBudget: opt('lookbudget', '') === '' ? null : num('lookbudget', HARD_LOOK_BUDGET) });
-const paintingLook = paintingLooks(TARGET_GUARD, num('notargetlooks', 0));
+// Painting-time looks happen only at the step-backs planned here, before the first mark (src/paint/step-backs.mjs); with
+// --notargetlooks 1 they return null too, so strict mode takes none.
+const STEP_BACKS = createStepBacks(TARGET_GUARD, num('notargetlooks', 0), planStepBacks({ touchpoints: num('touchpoints', 0), finalDarks: num('finaldarks', 0) }));
+const paintingLook = STEP_BACKS.look;
+process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(path.join(out, 'step-backs.json'), JSON.stringify(STEP_BACKS.record(), null, 2)); } catch (e) { console.error(`step-backs: could not write step-backs.json: ${e.message}`); } });
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });
 ctx.px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
@@ -380,7 +384,7 @@ Object.assign(ctx, { SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, N
   CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, SPARSE_CONTACT_RECORD, VALUE_CONFIG, VALUE_ENABLED, VALUE_COUNTS, 
   SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, NUMERIC_TUFT_CAL, WALL_PHASES, 
-  phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, w, h, n, SEGMENTS_RECORD, createBrush, 
+  phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, SEGMENTS_RECORD, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
   WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted });
 }

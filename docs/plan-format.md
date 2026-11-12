@@ -199,7 +199,7 @@ For a pen-and-wash target, `tools/seg/ink-lines.mjs` takes the candidates from t
 
 For the stroke gate, annotate intended broad wash interiors with `broadAreas` polygons and optional `detailPolygons`; see [stroke statistics](stroke-stats.md). Count share is diagnostic. Only area and visible contribution from tiny paint inside these planned interiors can trigger the gate.
 
-Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen at planning. It skips every optional shape-average reference look during painting (charge correction, kept-colour recharge, touch-ups, final darks, sky lane selection and texture darkness). With `--feedback 0 --touchpoints 0 --finaldarks 0` it paints with no target look at all. Check `target-guard.json` for zero looks, zero element reads and zero violations. Use the same flags on both arms of a comparison. The default, 0, keeps the looks the strict guard allows.
+Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen at planning. It skips every optional shape-average reference look during painting (charge correction, kept-colour recharge, touch-ups, final darks, sky lane selection and texture darkness). With `--feedback 0 --touchpoints 0 --finaldarks 0` it paints with no target look at all. Check `target-guard.json` for zero looks, zero element reads and zero violations. Use the same flags on both arms of a comparison. The default, 0, looks only at the step-backs planned before painting (touch-ups after the washes, final darks); every passage keeps its frozen charge in both modes.
 
 ## The washes section
 
