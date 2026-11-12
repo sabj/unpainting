@@ -180,6 +180,9 @@ const stroke=(b,target,points,options)=>{
  // (tools/painter/wet-bed-prep.mjs: a clean brush like the painting brush, pickup, the wait for the shine), skipped where
  // the stroke lands mostly in its own wet wash (under 30% fresh cells, as a value-plan wash), then gated as that wash is
  let intoOwnWet=false;
+ // a wet on dry or dry brush pass the ladder fills is laid in lanes that join its own wet lanes: like a value-plan
+ // wash (passage-dry-gate.mjs) its paper must be dry only where its own paint has not been (the fresh part of the stroke)
+ if(a&&paint&&['wet on dry','dry brush'].includes(a.pass.move)&&a.pass.source!=='authored'){const fresh=semanticMaterialContact(target,contact,b).cells.filter(i=>!ctx.VALUE_PIGMENT_CONTACT.has(i)&&!(target.resist?.[i]===1&&(target.resistStrength?.[i]??1)===1));if(fresh.length)paper=measurePaper(target,fresh);}
  if(a&&paint&&a.pass.move==='wet on wet'&&a.pass.source!=='authored'&&!a.pass.preparation){
   const bed=contact.cells.filter(i=>contact.primaryMask[i]&&!target.resist?.[i]&&(!target.clip||target.clip[i])),fresh=bed.filter(i=>!ctx.VALUE_PIGMENT_CONTACT.has(i));
   if(bed.length&&fresh.length>=bed.length*.3){
