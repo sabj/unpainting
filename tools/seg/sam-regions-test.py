@@ -49,5 +49,29 @@ class Partition(unittest.TestCase):
         self.assertEqual([r['foreground'] for r in regions], [False, True])
 
 
+class Torch:
+    """A stand-in for torch with chosen devices available."""
+    def __init__(self, mps=False, cuda=False):
+        self.backends = type('B', (), {'mps': type('M', (), {'is_available': staticmethod(lambda: mps)})})
+        self.cuda = type('C', (), {'is_available': staticmethod(lambda: cuda)})
+
+
+class Device(unittest.TestCase):
+    def test_unset_keeps_the_automatic_choice(self):
+        self.assertEqual(sr.pick_device(Torch(mps=True, cuda=True), {}), ('mps', 'auto'))
+        self.assertEqual(sr.pick_device(Torch(cuda=True), {}), ('cuda', 'auto'))
+        self.assertEqual(sr.pick_device(Torch(), {}), ('cpu', 'auto'))
+
+    def test_an_explicit_device_wins_and_is_named(self):
+        self.assertEqual(sr.pick_device(Torch(mps=True), {'PAINTER_SEG_DEVICE': 'cpu'}), ('cpu', 'PAINTER_SEG_DEVICE'))
+        self.assertEqual(sr.pick_device(Torch(mps=True), {'PAINTER_SEG_DEVICE': 'mps'}), ('mps', 'PAINTER_SEG_DEVICE'))
+
+    def test_a_wrong_value_or_an_absent_device_fails_loudly(self):
+        with self.assertRaisesRegex(RuntimeError, 'one of mps, cpu, cuda'):
+            sr.pick_device(Torch(), {'PAINTER_SEG_DEVICE': 'gpu'})
+        with self.assertRaisesRegex(RuntimeError, 'no cuda device'):
+            sr.pick_device(Torch(mps=True), {'PAINTER_SEG_DEVICE': 'cuda'})
+
+
 if __name__ == '__main__':
     unittest.main()

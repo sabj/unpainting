@@ -150,7 +150,7 @@ export async function holdInkLines({ opt, num, argv, image, root = '.', out, she
   const flags = inkLineFlags(num);
   if (!flags.measure) return null;
   // the regions the ink decision reads: SAM's, cached by the target's hash (the painter asks for them again later)
-  const decide = flags.decide > 0 ? { segments: prepareSegments({ image, root, out, opt, log }), judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')) } : null;
+  const decide = flags.decide > 0 ? { segments: await prepareSegments({ image, root, out, opt, log }), judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')) } : null;
   const targetW = (await sharp(image).metadata()).width, res = { flags };
   for (const [stage, key] of [['opening', 'drawingfile'], ['closing', 'drawinglast']]) {
     const base = opt(key, '');

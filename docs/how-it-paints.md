@@ -88,7 +88,10 @@ SAM regions are the painter's proxy for how a painter sees the subject: sky, mas
 - `src/crop/segments.mjs` reads the regions; `src/crop/blockin.mjs` and `src/crop/form.mjs` build region and form data.
 
 **Inputs:** target image. **Outputs:** a region map, cached by hash.
-**Controls:** `--segments`, `--segcache`; the SAM checkpoint is checked by `npm run doctor`.
+- **SAM device and hangs.** `PAINTER_SEG_DEVICE=mps|cpu|cuda` makes the device an explicit choice: a wrong value, or a device torch does not have, fails the run; unset keeps `mps`, else `cuda`, else `cpu`. The device is logged (`SAM vit_b on cpu (PAINTER_SEG_DEVICE)`) and written to `segments.json` and the run card (`segments.device`, `segments.deviceChoice`). A map made on an explicit device has its own cache entry. A SAM job that uses no CPU for 10 minutes (CPU time is sampled, so a slow CPU run is not mistaken for a hang) is killed and the run fails naming the image, the device and the minutes waited; there is no retry and no switch of device. Many concurrent SAM jobs on Metal (MPS) can wedge in a command buffer: that is what the watchdog catches (2026-11-11, seven jobs at 0% CPU for 5 to 45 minutes).
+- **SAM previews and bench checks are renders too.** Any run that starts `segments.py` (a painter run, a bench workspace, a preview) takes a render lock (`~/wt/locks/a` or `b`, see RULES) like a painting does. When Metal is busy or both locks are held, run SAM on the CPU: `PAINTER_SEG_DEVICE=cpu node tools/paint-plate.mjs ...` (minutes, not seconds, on a 1024 px image, and a CPU map is cached apart from an mps one). Do not hide MPS with wrappers.
+
+**Controls:** `--segments`, `--segcache`, `PAINTER_SEG_DEVICE`; the SAM checkpoint is checked by `npm run doctor`.
 **Where choices live:** painter rule (SAM regions are the starting units for shapes, see 3).
 **Rules here:** the regions are computed before painting and sealed with the target. A missing checkpoint is a loud failure, never a silent fall back to colour cuts.
 **Teacher's view:** look at the subject as a few big shapes, light and dark, before touching paper.

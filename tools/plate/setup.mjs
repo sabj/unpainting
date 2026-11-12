@@ -309,7 +309,7 @@ if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(o
 ctx.px = TARGET_GUARD.register('px', PX_RAW);
 const w = info.width, h = info.height, n = w * h;
 // Segments before every painting: SAM's regions of the target, cached by its hash; without SAM the run fails (src/crop/segment-prep.mjs)
-const SEGMENTS_RECORD = prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
+const SEGMENTS_RECORD = await prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
 const createBrush = o => createBrushRaw(gpuHairCap(scaleBrushForDensity(o, { renderWidth: w * num('scale', 1) })));
