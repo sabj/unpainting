@@ -96,7 +96,7 @@ test('a pass is one closed wash: gaps narrower than its brush are filled, reserv
   const d = doc({ lights: { mode: 'paper', reason: 'a reserved light', polygon: box(.4, .4, .5, .5) } });
   // stripes two cells wide with two-cell gaps, as the value ladder leaves them; a 4 mm brush at 1 mm a cell spans the gaps
   const stripes = Uint8Array.from({ length: W * H }, (_, i) => (square[i] && (i % W) % 4 < 2 ? 1 : 0)), area = stripes.reduce((a, b) => a + b, 0);
-  const sh = compileAreaLayers(plan(d), [{ value: 1, pigment: 0, shapes: [{ mask: stripes, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }).layers[0].shapes[0];
+  const compiled1 = compileAreaLayers(plan(d), [{ value: 1, pigment: 0, shapes: [{ mask: stripes, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }), sh = compiled1.layers[0].shapes[0], left = (compiled1.diagnostics.narrowerThanBrush ?? []).reduce((a, x) => a + x.paint, 0);
   const m = sh.mask; let inside = 0, light = 0;
   for (let y = 10; y < 54; y++) for (let x = 10; x < 54; x++) inside += m[y * W + x];
   for (let y = 26; y < 32; y++) for (let x = 26; x < 32; x++) light += m[y * W + x];
@@ -104,18 +104,22 @@ test('a pass is one closed wash: gaps narrower than its brush are filled, reserv
   assert.equal(light, 0, 'the reserved light is left out');
   // the reserved light's own cells carry no paint into any pass (they are paper); every other cell's paint is kept
   let kept = 0; for (let i = 0; i < W * H; i++) if (stripes[i] && !(i % W >= 26 && i % W < 32 && ((i / W) | 0) >= 26 && ((i / W) | 0) < 32)) kept++;
-  assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * kept) < 1e-9, `same paint, spread over the closed shape: ${sh.mix[0] * sh.area} vs ${.3 * kept}`);
+  assert.ok(Math.abs(sh.mix[0] * sh.area - (.3 * kept - left)) < 1e-9, `same paint less what was left as paper, spread over the closed shape: ${sh.mix[0] * sh.area} vs ${.3 * kept - left}`);
   assert.throws(() => compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [shape([.3, 0, 0])] }], palette), /mmPerCell/);
 });
 
-test('a wash outline is the brush\'s: spurs narrower than the brush are opened away with their paint kept; a shape too thin for its brush is left out, counted', () => {
+test('a wash outline is the brush\'s: spurs narrower than the brush are left as paper with their own paint, counted; a shape too thin for its brush is left out, counted', () => {
   // a square with one-cell spurs sticking out of it, as a ladder band leaves its pixels
   const ragged = Uint8Array.from(square); for (let y = 10; y < 56; y += 12) for (let x = 56; x < 60; x++) ragged[y * W + x] = 1;
   const area = ragged.reduce((a, b) => a + b, 0);
   const sh = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: ragged, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }).layers[0].shapes[0];
   let spur = 0; for (let y = 10; y < 56; y += 12) spur += sh.mask[y * W + 59];
   assert.equal(spur, 0, 'the spur tips are gone (a brush leaves only a fillet at the root)');
-  assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * area) < 1e-9, 'and their paint stays in the wash');
+  // the spur cells opened away keep their own paint out of the wash: what is laid is the paint of the cells laid
+  const c2 = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: ragged, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 });
+  const gone = c2.diagnostics.narrowerThanBrush[0];
+  assert.ok(gone.cells > 0 && Math.abs(gone.paint - .3 * gone.cells) < 1e-9, 'the left-out cells and their paint are counted');
+  assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * (area - gone.cells)) < 1e-9, 'the wash holds only the paint of the cells it keeps');
   const line = Uint8Array.from({ length: W * H }, (_, i) => ((i / W) | 0) === 30 && i % W > 8 && i % W < 56 ? 1 : 0);
   const thin = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: line, amount: .3, mix: [.3, 0, 0], area: 47 }] }], palette, { mmPerCell: 1 });
   assert.equal(thin.layers.length, 0, 'a line narrower than the brush is left out');
