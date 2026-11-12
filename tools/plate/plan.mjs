@@ -265,7 +265,9 @@ if (SMALL) { let c = 0; for (let i = 0; i < n; i++) c += SMALL[i]; console.log(`
   console.log(`range: plan's darkest note ${deepest.toFixed(2)} shortened to ${want.toFixed(2)} (x${keep}), curve ${num('shortencurve', 0.75)}`);
 })();
 // --whitefloor f: cells whose whole planned depth is under f of one glaze join no mask, so no sweep aims at them. Default 0.5.
+// An area plan's lights are the ones it lists (pass.lights); no target-light cell is held out of its passes.
 const WHITE_HOLD = (() => {
+  if (opt('areaplan', '')) return null;
   const f = num('whitefloor', 0.5);
   if (f <= 0) return null;
   const floor = f * num('glaze', 0.12), k = PIGS.length, held = new Uint8Array(n);

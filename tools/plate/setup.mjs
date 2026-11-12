@@ -46,6 +46,7 @@ import {drawingStageIntent} from '../../src/paint/methods/drawing-stages-auto.mj
 import {bindLineTarget} from '../../src/crop/lines.mjs';
 import {prepareSegments} from '../../src/crop/segment-prep.mjs';
 import {refuseRemoved} from '../../src/paint/removed-options.mjs';
+import {refuseAreaOwned} from '../../src/paint/area-owned-options.mjs';
 import {strokeBudgetDefaults} from '../../src/paint/methods/stroke-budget.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
 import {linePython, resolveLinePython} from '../../src/paint/methods/line-python.mjs';
@@ -67,6 +68,8 @@ if(await runSpeedSequence(argv0,ENTRY_FILE))process.exit(0);
 const { argv, note: RECIPE_NOTE, pipeline: PIPELINE, subjectMedium: SUBJECT_MEDIUM } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(ENTRY_FILE)) });
 // an option the painter no longer has stops the run with its reason (src/paint/removed-options.mjs)
 refuseRemoved(argv);
+// with an area plan, order and wet sessions are the plan's: an order or session option stops the run (src/paint/area-owned-options.mjs)
+refuseAreaOwned(argv);
 // every option name the painter asks for, so options given but never read are reported at the end
 const OPTS_READ = new Set(['recipe']);
 // OPT_TRACK: while a cached step runs (src/paint/run-cache.mjs), every option it reads and the raw value it found
@@ -181,6 +184,8 @@ const INK_RECIPE = { recipe: INK_RECIPE_NAME };
 // the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
 if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
+// checked again: an ink recipe may switch on the region-label ink decision, which an area plan's drawing roles replace
+refuseAreaOwned(argv);
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');

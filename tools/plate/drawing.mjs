@@ -120,7 +120,8 @@ if(COLOUR_LATER.length) {
 // --ordermask: the subject (default --fwmask); --orderlight, --orderdark place the bands; --orderregions: rows of ground regions.
 const ORDER = opt('order', 'painter');
 if (!['ladder', 'painter', 'legacy-painter'].includes(ORDER)) throw new Error(`--order: ladder or painter, not ${ORDER}`);
-if (!VALUE_ENABLED && ['painter','legacy-painter'].includes(ORDER)) {
+// An area plan's passes keep the plan's schedule (pass.order, dependsOn, pass.session): the ladder is not reordered or cut.
+if (!VALUE_ENABLED && !ctx.AREA_PLAN && ['painter','legacy-painter'].includes(ORDER)) {
   const file = opt('ordermask', opt('fwmask', ''));
   const subject = FW_SUBJ ?? (file ? await loadSubject({ file: path.resolve(root, file), w, h, sharp, log: console.log }) : null);
   // --ordersubject whole|drawing: drawing lays the subject's light washes by regions the drawing file's lines close off.

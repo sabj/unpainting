@@ -94,3 +94,39 @@ function insideCell(plan, i, poly) {
   for (let k = 0, j = poly.length - 1; k < poly.length; j = k++) { const a = poly[k], b = poly[j]; if ((a[1] > py) !== (b[1] > py) && px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0]) yes = !yes; }
   return yes;
 }
+
+// A pass's own edge (pass.edges.kind; reasoning inventory move 6) is the plan's choice, laid as written:
+//   soft: right after the pass, while it is wet, the clean damp brush runs along the pass's edge (the move pass.soften
+//         makes), except along an area boundary the edges list names hard or lost; pass.soften, when given, says where.
+//   lost: the pass is laid in a wet session (pass.session).  broken: the pass is dry brush.  hard: nothing is added.
+const WET = ['wet on wet', 'wet on dry'];
+export const PASS_EDGES_CONTRACT = 'pass.edges:{kind:hard|soft|lost|broken,overlap} is the edge of the pass\'s own wash, laid as named: soft, right after the pass while it is wet a clean damp brush the size of the pass brush runs along its edge (all of it, or where pass.soften.polygon says), never along an area boundary the edges list names hard or lost; hard, nothing added (wet on dry); lost, the pass is in a wet session (pass.session); broken, the pass is dry brush. Soft needs a wet on wet or wet on dry pass.';
+
+/** Fails on a pass edge the painter cannot lay as named (authored passes carry their own gestures). */
+export function validatePassEdges(schedule) {
+  for (const s of schedule) {
+    const p = s.pass, k = p.edges?.kind;
+    if (p.source === 'authored') continue;
+    if (k === 'lost' && !p.session) fail(`${s.key}: a lost edge needs the pass laid in a wet session (pass.session)`);
+    if (k === 'broken' && p.move !== 'dry brush') fail(`${s.key}: a broken edge is dry brush; this pass is ${p.move}`);
+    if (k === 'soft' && !WET.includes(p.move)) fail(`${s.key}: a soft edge needs a wet pass to soften; this pass is ${p.move}`);
+  }
+}
+
+/** Plan-grid cells where a pass's edge is softened while wet: the soft boundaries of its area (softEdgeCells) and, for
+ *  a soft pass edge with no pass.soften, its whole edge except within `reach` of a boundary named hard or lost. */
+export function passSoftCells(plan, areaId, pass, reach) {
+  const near = softEdgeCells(plan, areaId, reach);
+  if (pass.edges?.kind !== 'soft' || pass.soften || pass.source === 'authored' || !WET.includes(pass.move)) return near;
+  const { w, h, owner } = plan, me = plan.doc.areas.findIndex(a => a.id === areaId), R = Math.max(1, Math.ceil(reach));
+  const keep = (plan.edgesByArea?.get(areaId) ?? []).filter(e => e.kind !== 'soft').map(e => e.otherIndex), block = new Set(keep);
+  const where = new Uint8Array(w * h).fill(1);
+  if (block.size) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (owner[i] !== me) continue;
+    if (!((x > 0 && block.has(owner[i - 1])) || (x + 1 < w && block.has(owner[i + 1])) || (y > 0 && block.has(owner[i - w])) || (y + 1 < h && block.has(owner[i + w])))) continue;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h) where[yy * w + xx] = 0; }
+  }
+  if (near) for (let i = 0; i < where.length; i++) if (near.where[i]) where[i] = 1;
+  return { where, reasons: [...(near?.reasons ?? []), `pass edge soft: ${pass.id}`] };
+}
