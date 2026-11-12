@@ -246,6 +246,11 @@ if (MARKTAPE) {
   const empty = () => after.map(a => new Float32Array(a.length));
   const inkLayer = PEN_FIRST ? (ctx.INK_THK ?? empty()) : ctx.WASH_THK ? after.map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - ctx.WASH_THK[j][i]))) : empty();
   await sharp(Buffer.from(renderLayers([inkLayer], SHEET_PIGS, base, N2, 1).buffer), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'ink.jpg'));
+  // Proof export at the actual pen-sheet resolution; the legacy ink.jpg remains the coarse layer.
+  const inkOnlyLayers = inkLayer.map((a, j) => j === GRAPHITE_AT ? new Float32Array(a.length) : a);
+  const nativeInk = INKRES ? INKRES.nativeInk() : { width: W2, height: H2, pixels: renderLayers([inkOnlyLayers], SHEET_PIGS, Buffer.alloc(N2 * 3, 255), N2, 1) };
+  await sharp(nativeInk.pixels, { raw: { width: nativeInk.width, height: nativeInk.height, channels: 3 } }).png().toFile(path.join(out, 'ink-native.png'));
+  fs.writeFileSync(path.join(out, 'ink-native.json'), JSON.stringify({ width: nativeInk.width, height: nativeInk.height, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), kind: INKRES ? 'deposited ink on native pen sheet, before wash redistribution' : 'deposited coarse ink layer', resized: false }) + '\n');
   if (PEN_FIRST) {
     const washLayer = after.map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - (ctx.INK_THK ? ctx.INK_THK[j][i] : 0))));
     await sharp(Buffer.from(renderLayers([washLayer], SHEET_PIGS, base, N2, 1).buffer), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'wash.jpg'));

@@ -119,3 +119,22 @@ test('scale rounding before check: N <= 1.4 returns null', () => {
   assert.equal(makeInkRes({ N: 1.000001, W2: W, H2: H, paperOpts: {}, pigments, main }), null);
   assert.equal(makeInkRes({ N: 1.2, W2: W, H2: H, paperOpts: {}, pigments, main }), null);
 });
+
+test('native ink export contains deposited pigment at the pen sheet resolution', () => {
+  const { main, R } = setup();
+  const blank = R.nativeInk();
+  assert.equal(blank.width, W * 3); assert.equal(blank.height, H * 3);
+  assert.ok(blank.pixels.every(v => v === 255));
+  R.draw([line], new Float32Array(W * H).fill(1), W, H, { ink: [10], peak: 1 });
+  const drawn = R.nativeInk();
+  assert.equal(drawn.pixels.length, W * H * 27);
+  assert.ok(drawn.pixels.some(v => v < 250));
+  const before = thickness(R.fine)[0].slice();
+  const mainBefore = thickness(main)[0].slice();
+  const base = Buffer.alloc(W * H * 3, 230);
+  const paintingBefore = R.compose(base).slice();
+  R.nativeInk();
+  assert.deepEqual(thickness(R.fine)[0], before, 'export does not change fine pigment');
+  assert.deepEqual(thickness(main)[0], mainBefore, 'export does not change carried pigment');
+  assert.deepEqual(R.compose(base), paintingBefore, 'export preserves every painting pixel');
+});

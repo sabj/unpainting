@@ -266,6 +266,11 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     return out;
   }
 
+  // Actual deposited ink on the pen's own grid, on white. No upsampling or geometry replay.
+  function nativeInk() {
+    return { width: WH, height: HH, pixels: renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1) };
+  }
+
   function exportState() {
     coherent(fine);
     const fields=Object.fromEntries(Object.entries(fine).filter(([k,v])=>!['paper','pigments','_gpu','_gpuInfo','_renderCaches'].includes(k)&&typeof v!=='function'));
@@ -278,6 +283,6 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
     wetOn=st.wetOn;Object.assign(stats,st.stats);
     changed();totalVersion=-1;renderVersion=-1;
   }
-  return { N, width: WH, height: HH, draw, settle, compose, carry, wet, stats, fine, remapInk, changed, exportState, importState };
+  return { N, width: WH, height: HH, draw, settle, compose, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState };
 }
 
