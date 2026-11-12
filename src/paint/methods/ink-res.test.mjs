@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from '../../media/paper.mjs';
 import { createSheet, thickness } from '../../media/sheet.mjs';
-import { makeInkRes } from './ink-res.mjs';
+import { makeInkRes, renderInkProof } from './ink-res.mjs';
 
 const ink = { K: [1.2, 1.3, 1.4], S: [0.02, 0.02, 0.02], rho: 0.02, omega: 5.5, gamma: 0.15 };
 const W = 60, H = 20;
@@ -137,4 +137,20 @@ test('native ink export contains deposited pigment at the pen sheet resolution',
   assert.deepEqual(thickness(R.fine)[0], before, 'export does not change fine pigment');
   assert.deepEqual(thickness(main)[0], mainBefore, 'export does not change carried pigment');
   assert.deepEqual(R.compose(base), paintingBefore, 'export preserves every painting pixel');
+});
+
+test('coarse proof keeps final opening and closing ink, excludes paint and graphite, and is read-only', () => {
+  const paint = new Float32Array([5, 5, 5, 5]);
+  const finalInk = new Float32Array([0.1, 0, 0.2, 0]);
+  const graphite = new Float32Array([4, 4, 4, 4]);
+  const thickness = [paint, finalInk, graphite];
+  const before = thickness.map(a => a.slice());
+  const proof = renderInkProof({ thickness, pigments: [ink, ink, ink], inkAt: 1, width: 4, height: 1 });
+  assert.equal(proof.width, 4); assert.equal(proof.height, 1);
+  assert.ok(proof.pixels[0] < 255, 'opening ink is present');
+  assert.ok(proof.pixels[6] < 255, 'closing ink is present');
+  assert.equal(proof.pixels[3], 255, 'paint and graphite do not appear as ink');
+  assert.deepEqual(thickness, before);
+  assert.deepEqual(renderInkProof({ thickness: [paint, new Float32Array(4), graphite], pigments: [ink, ink, ink], inkAt: 1, width: 4, height: 1 }).pixels, new Uint8ClampedArray(12).fill(255));
+  assert.throws(() => renderInkProof({ thickness, pigments: [ink, ink, ink], inkAt: 3, width: 4, height: 1 }), /valid native ink channel/);
 });

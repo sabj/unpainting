@@ -286,3 +286,10 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
   return { N, width: WH, height: HH, draw, settle, compose, nativeInk, carry, wet, stats, fine, remapInk, changed, exportState, importState };
 }
 
+
+// Proof only: read the dedicated ink channel, never paint or graphite.
+export function renderInkProof({ thickness, pigments, inkAt, width, height }) {
+  if (!Number.isInteger(inkAt) || !pigments[inkAt] || thickness[inkAt]?.length !== width * height)
+    throw new Error('Ink proof requires a valid native ink channel');
+  return { width, height, pixels: renderLayers([[thickness[inkAt]]], [pigments[inkAt]], Buffer.alloc(width * height * 3, 255), width * height, 1) };
+}
