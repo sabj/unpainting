@@ -96,6 +96,7 @@ function seed({ ws, crop, target, spec, round, n, tries, dry, strictVerdict, pro
   const b = path.join(ws, 'bench');
   for (const d of ['plan', 'paint-io', 'looks', 'tools']) fs.mkdirSync(path.join(b, d), { recursive: true });
   fs.copyFileSync(target, path.join(b, 'plan', 'target.png'));
+  fs.copyFileSync(path.join(BENCH, 'designed-paths.json'), path.join(b, 'designed-paths.json'));
   writeJson(path.join(b, 'frozen.json'), { subject: crop, ...spec, targetPixels: pngSize(path.join(b, 'plan', 'target.png')) });
   fs.writeFileSync(path.join(b, 'TASK.md'), renderTask({ round, n, tries, spec, strictVerdict, profile, planForm }));
   const area = planForm === 'area';
