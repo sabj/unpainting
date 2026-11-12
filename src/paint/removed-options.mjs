@@ -14,6 +14,10 @@ export const REMOVED_OPTIONS = Object.freeze({
   ...Object.fromEntries(['hybridbridge', 'hybridfloor', 'hybridjoin', 'hybridkeep', 'hybridmin', 'hybridpar', 'hybridreach', 'hybridstay', 'hybridstroke', 'hybridsupport']
     .map(k => [k, 'the connected drawing (--drawinglogic 2) was removed: it laid the walker\'s gestures on the drawing file and no plan reached it'])),
   glazepasses: 'a glaze is one pass the plan writes; the painter no longer lays a glaze twice in a row by default (the plan writes a second pass when it wants one)',
+  ...Object.fromEntries(['skyblue', 'skygran', 'skyfloc', 'skybluewick', 'skywide'].map(k => [k, 'the sky tube was removed: it swapped the blue of sky cells for a second, heavily granulating tube, a switch by region; every box paint now granulates, flocculates and stains as published (src/paint/methods/pigment-physics.mjs)'])),
+  gran: 'the sheet-wide granulation scale was removed: each pigment granulates by its own published rating on the paper, with no scale',
+  slidecap: 'settled grains always stop rolling when the slope is gone (slideCap 1): without it heavy granulation dried as a one-cell checkerboard',
+  boxphys: 'box paints always settle with their published physics (granulation, flocculation, staining, density), so there is nothing to switch',
   eyering: 'the eye ring drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject; the plan names its eyes\' shapes and darks',
 });
 

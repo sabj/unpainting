@@ -19,6 +19,12 @@ Judging painting changes. Checked with unit tests and a run without judge calls 
 - **The copy limits are absolute ceilings.** A plate passes or fails on its own records: guard clean, no paint-time look at the target, `hfCorr` at or under the ceiling for its width, and paint strokes at or under the sheet's stroke ceiling, which is the number of 1.5 mm by 4.5 mm marks that cover the sheet once (`strokeCeiling` in `tools/guard/cheat-risk.mjs`, written to `cheat-risk.json` with the sheet size). The earlier limits against the previous build (hfCorr up by at most 0.02, strokes up by at most 10%) are not used. Strokes and render seconds are reported as a cost beside the verdict.
 - Measured on 11 stored 1,200 px plates from 0.3.1 and 0.3.2 development commits, all painted with no target looks: 5 pass these ceilings. Five are over the `hfCorr` ceiling of 0.645 (three Mittens plates at 0.654 to 0.700 and two h36a plates at 0.734 and 0.755). One Trumbull plate lays 16,823 paint strokes against its ceiling of 10,182.
 
+### Granulation from the pigment
+
+- **Each box paint settles as its pigment does, always.** The sheet takes each paint's published granulation, flocculation, staining and density (`demos/lab/media/pigment-physical.js`); colour and scattering stay as picked, and picking is unchanged. Before, every paint settled at granulation 0.25 under a sheet-wide scale of 0.25, so an ultramarine wash dried smooth with its pigment slightly on the paper's peaks. `--boxphys` and `--gran` are removed.
+- **The sky tube is removed** (`--skyblue`, `--skygran`, `--skyfloc`, `--skybluewick`, `--skywide`, and the bench base token `_skyb`). It swapped the blue of "sky" cells for a heavily granulating second tube, a switch by region: with no sky segment it took every blue cell off the figure (69% of the painted dog's sheet) and made phthalo blue granulate. A sky now granulates when its pigment does.
+- **Grains stop rolling when the slope is gone** (slide cap 1 on the painter's sheet; `--slidecap` removed). Without it heavy granulation dried as a one-cell checkerboard (the Trumbull sky stipple).
+
 ### No subject-fitted settings
 
 Sam's rule: a constant, rule, option or technique fitted to one benchmark subject is cheating in both painting modes.

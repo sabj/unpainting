@@ -304,7 +304,9 @@ const paper = opt('paperscan', '') ? await (async () => {
 })() : (await cachedStep({...RUN_CACHE,name:'paper',code:codeHash(root,[],{dependencies:['src/media/paper.mjs']}),track:optTrack,inputs:{W2,H2,PAPER_OPTS}},async()=>makePaper(W2,H2,PAPER_OPTS))).value;
 // --physics key=value,...: override any sheet constant (src/media/sheet.mjs DEFAULTS)
 const PHYS = Object.fromEntries((opt('physics', '') || '').split(',').filter(Boolean).map(kv => { const [k, v] = kv.split('='); if (!(k in DEFAULTS) && k !== 'edgeFlowDepth') throw new Error(`--physics: no sheet constant ${k}`); return [k, Number(v)]; }));
-// --gran: granulation strength, default 0.25. The relief never changes, so every sweep lays the same pattern and it compounds.
+// Granulation is each pigment's own (gamma, floc from src/paint/methods/pigment-physics.mjs) on this paper, with no scale.
+// Settled grains roll into the hollows only until the slope is gone (slideCap 1, sheet.mjs): with no cap, heavy
+// granulation overfilled a neighbour, rolled back the next step, and dried as a one-cell checkerboard, not granulation.
 ctx.sheet = createSheet(paper, SHEET_PIGS); ctx.sheet._tape = 1;
 // WET_TRACE_PIGMENT=1 also records the whole sheet's pigment change under each stroke (slow: a full-sheet read per stroke)
 ctx.WET_TRACE = process.env.WET_TRACE ? createWetTrace({ file: process.env.WET_TRACE, sheet: ctx.sheet, contact: candidateContact, pigment: process.env.WET_TRACE_PIGMENT === '1' ? () => thicknessTotals(ctx.sheet).reduce((a, v) => a + v, 0) : null }) : null;
@@ -388,11 +390,10 @@ const penDraw = (sh,gs,want,w,h,o0) => {
 };
 const OUT_W = INKRES ? INKRES.width : W2, OUT_H = INKRES ? INKRES.height : H2;
 // --encloseease e: a dry cell held by water on more sides fills more easily (src/media/sheet.mjs). Set only when used.
-const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', 0.0012), gran: num('gran', 0.25), granFill: num('granfill', 0), ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}), ...(num('slidecap', 0) > 0 ? { slideCap: num('slidecap', 0) } : {}),
+const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', 0.0012), granFill: num('granfill', 0), slideCap: 1, ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}),
   ...(num('holerim', 0) > 0 ? { holeSpan: Math.max(1, Math.round(num('holerim', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}),
   ...(num('holefill', 0) > 0 ? { holeFill: Math.max(1, Math.round(num('holefill', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}) };
 // --holefill mm: a dry hollow the wash surrounds within mm fills where it is lower than the wet paper beside it.
-// --slidecap c: settled grains rolling into hollows may not reverse the slope they rolled down (src/media/sheet.mjs).
 // --holerim mm: a dry hole the wash holds on all four sides within mm dries without a dark rim.
 // Each is set only when used.
 // --gpu auto|on|off: sheet backend (Metal on Macs via optional `webgpu`); auto falls back to CPU. Written to backend.json.

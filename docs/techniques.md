@@ -125,7 +125,7 @@ Default recipe flag:
 
 - `--shapedmarks 1`: each value plane as one flat-brush stroke. Off: `0`.
 
-The `architecture` preset adds three sky flags. `--skylanes 1` lays large cool planes as horizontal wet sweeps. `--skyblue 1` adds a mottled second blue. `--skysplit 1` lays the sky's pale wash apart from warm ground.
+Sky flags: `--skylanes 1` lays large cool planes as horizontal wet sweeps. `--skysplit 1` lays the sky's pale wash apart from warm ground. A sky granulates when its pigment does (ultramarine, cerulean), as every wash does; there is no sky-only tube.
 
 Modules:
 

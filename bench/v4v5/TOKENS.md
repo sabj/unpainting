@@ -1,6 +1,6 @@
 # Recipe tokens
 
-Base (always applied, under your tokens): `region_w13_lay4_sky3_skyb_cpp`.
+Base (always applied, under your tokens): `region_w13_lay4_sky3_cpp`.
 
 Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowthresh .35 (the examples below show the scaling). There is no dark, cool or middle gain: the painter delivers the value the plan states. Tokens in one slot replace each other: lay2/lay4; hue/sky/sky3; cur/relonly; soft/softs; stub/stub2/stone. A setting only acts while its switch is on, so the painter reports the others as unused: the texture tokens (tv, tfl, stub, stub2) change no painting at all. Every subject gets the same base. Choose pigments with `--paints` in extra-args.json (pigment names: src/paint/methods/material-profiles.mjs). `<plan>` is bench/plan.
 
@@ -26,7 +26,7 @@ Numbers in a token are free: `_lay3` sets --midlayers 3, `_st35` sets --shadowth
 | `_ts3` |  |
 | `_tv8` | --texvariety 0.8 |
 | `_eye10` | refused: the eye ring (--eyering) was removed: it drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject |
-| `_skyb` | --skyblue 1 |
+| `_skyb` | refused: the sky tube (--skyblue) was removed: it swapped the blue of sky cells for a second, heavily granulating tube, a switch by region; each pigment now granulates as published, so choose a granulating blue (ultramarine, cerulean) for a textured sky |
 | `_cpp` | --paper coldpress |
 | `_tsh8` |  |
 | `_tfl8` | --texflow 0.8 |
