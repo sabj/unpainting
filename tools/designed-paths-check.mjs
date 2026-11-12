@@ -15,15 +15,15 @@ export function checkDesignedPaths(folder, { registry = read(registryFile), logF
   const lines = logs.flatMap(f => fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').map((text, i) => ({ text, evidence: `${f}:${i + 1}: ${text}` })) : []);
   const line = re => lines.find(l => re.test(l.text))?.evidence;
   const opts = options(card?.expandedArgs ?? card?.args);
-  const jsonEvidence = (file, test) => { const d = read(path.join(folder, file)); return d && test(d) ? `${file}: ${JSON.stringify(d).slice(0, 320)}` : null; };
+  const jsonEvidence = (file, test, show = d => d) => { const d = read(path.join(folder, file)); return d && test(d) ? `${file}: ${JSON.stringify(show(d)).slice(0, 640)}` : null; };
   const checks = {
-    'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(options(c.args).get('subjectmedium')) && c.drawing?.medium !== 'ink'),
+    'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(options(c.args).get('subjectmedium')) && c.drawing?.medium !== 'ink', c => ({ subjectMedium: options(c.args).get('subjectmedium'), drawingMedium: c.drawing?.medium })),
     'small-marks': () => opts.get('washjoin') === '1' && line(/^small marks: \d+ small lights reserved, \d+ small darks laid once, last/),
-    'wash-rules': () => jsonEvidence('pipeline-plan.json', d => d.plan?.washes?.colour && opts.get('huechroma') === '30' && opts.get('lightfamilies') === '1'),
+    'wash-rules': () => jsonEvidence('pipeline-plan.json', d => d.plan?.washes?.colour && opts.get('huechroma') === '30' && opts.get('lightfamilies') === '1', d => ({ washes: d.plan.washes, huechroma: opts.get('huechroma'), lightfamilies: opts.get('lightfamilies') })),
     'brush-lanes': () => jsonEvidence('designed-execution.json', d => d.laneStrokes > 0 || d.brushChoiceStrokes > 0),
     'linked-drawing-stages': () => jsonEvidence('linework.json', d => d.stages != null) && line(/^(prep stage:|drawing stages:|opening stage:|closing stage:)/),
     'linework-stage': () => jsonEvidence('linework-stage.json', d => d != null),
-    'paper-state-checks': () => jsonEvidence('run-card.json', c => c.continuedChecks?.strict === true && c.continuedChecks.total === 0),
+    'paper-state-checks': () => jsonEvidence('run-card.json', c => c.continuedChecks?.strict === true && c.continuedChecks.total === 0, c => c.continuedChecks),
     'stroke-gate': () => jsonEvidence('stroke-gate.json', d => d.status !== 'unverified' && Array.isArray(d.flags)),
     'graded-washes': () => line(/^graded washes: [1-9]\d* soft passages/),
     'dry-brush-laid': () => line(/^techniques:.*dry brush [1-9]\d*/),
