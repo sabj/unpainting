@@ -8,13 +8,13 @@
 
 // Box paints settle as their pigments do (always on): each box paint on the sheet carries its published granulation,
 // flocculation, staining and density (gamma, floc, omega, rho from the table Paint Lab shares,
-// demos/lab/media/pigment-physical.js). A granulating pigment (ultramarine, cerulean, the earths) settles into the
+// src/media/pigment-physical.mjs). A granulating pigment (ultramarine, cerulean, the earths) settles into the
 // paper's hollows as the wash dries; a staining, non-granulating one (phthalos, quinacridone, hansa) does not. The
 // colour (K) and scattering (S) are the pigment's own as picked, so only what the sheet does with the paint changes,
 // and picking is not affected. Pigments with no box name pass unchanged. The hue heuristic below keeps these
 // authored properties; an explicit --gamma* or --floc* flag still wins.
 import { BOX } from '../../crop/box.mjs';
-import { physicsFields } from '../../../demos/lab/media/pigment-physical.js';
+import { physicsFields } from '../../media/pigment-physical.mjs';
 
 const FLOC_FLAGS = ['flocblue', 'flocgrey', 'flocviolet', 'flocearth', 'flocyellow'];
 const flocOf = (num, flag) => Math.min(1, Math.max(0, num(flag, 0) || 0));

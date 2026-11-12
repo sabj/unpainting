@@ -17,7 +17,7 @@ import { createSheet, step, dry, layersOf, DEFAULTS } from '../../src/media/shee
 import { createBrush, dip, stroke } from '../../src/media/brush.mjs';
 import { renderLayers } from '../../src/media/km.mjs';
 import { BOX, boxPigment } from '../../src/crop/box.mjs';
-import { physicsFields } from '../../demos/lab/media/pigment-physical.js';
+import { physicsFields } from '../../src/media/pigment-physical.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const args = process.argv.slice(2);

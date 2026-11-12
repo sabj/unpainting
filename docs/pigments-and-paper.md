@@ -34,7 +34,7 @@ The painter mixes from 16 paints in `src/crop/box.mjs`:
 The palette is picked on one set of reference constants for every paint (scattering 0.02, staining 1.4, granulation
 0.25, density 0.05), so a paint's physics cannot change which paints a picture gets. On the sheet each paint then
 settles as its pigment does. `src/paint/methods/pigment-physics.mjs` gives it its published granulation, flocculation,
-staining and density from the table Paint Lab shares (`demos/lab/media/pigment-physical.js`, sources listed there);
+staining and density from the table Paint Lab shares (`src/media/pigment-physical.mjs`, sources listed there);
 its colour and scattering stay as picked.
 
 | pigment | granulation (gamma) | flocculation | staining (omega) |

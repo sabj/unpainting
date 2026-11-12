@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Copy the painter's physical media (src/media) into Paint Lab as .js files with './name.js' imports, so the lab paints
 // with the painter's own paper, sheet, brush, pen, pencil and optics. The painter repo is the source; the lab's copy is
-// generated. It follows each module's relative imports, so a helper the brush comes to need is copied with it; a
+// generated, and so is the table of published pigment properties the painter and the lab share. It follows each module's relative imports, so a helper the brush comes to need is copied with it; a
 // module that imports Node (node:*, sharp) stops the copy, since the browser could not load it.
 //   node tools/lab/sync-site-media.mjs                 write demos/lab/media
 //   node tools/lab/sync-site-media.mjs --check         exit 1 if demos/lab/media differs from src/media
@@ -11,7 +11,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const SRC = path.join(ROOT, 'src', 'media');
-export const ROOTS = ['paper', 'sheet', 'brush', 'pen', 'pencil', 'graphite', 'km'];
+export const ROOTS = ['paper', 'sheet', 'brush', 'pen', 'pencil', 'graphite', 'km', 'pigment-physical'];
 const HEADER = from => `// Generated from src/media/${from} by tools/lab/sync-site-media.mjs. Edit the source.\n`;
 
 const relImports = code => [...code.matchAll(/^\s*(?:import|export)\s[^'"]*?from\s+'([^']+)'|^\s*import\s+'([^']+)'/gm)].map(m => m[1] ?? m[2]);
