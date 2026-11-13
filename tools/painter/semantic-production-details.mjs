@@ -1,11 +1,14 @@
 // Bind the existing production modulation gestures to semantic owners without
 // replacing their sampler, points, brush, dip, calibration or allocation.
+// Existing numerical-charge contract, previously validated inline as .6.
+// Shared by declared production sequences and ordinary numerical wash sequences.
+const NUMERIC_WASH_MAX_SURFACE_WATER = .6;
 export function validateProductionDetails(doc){
  const d=doc.productionDetails;if(!d)return null;
  if(d.source!=='production-modulate'||d.lightAuthority!=='semantic-only'||!Array.isArray(d.regionIds)||!d.regionIds.length||new Set(d.regionIds).size!==d.regionIds.length)throw Error('unsupported production detail declaration');
  for(const id of d.regionIds)if(!doc.areas.some(a=>a.id===id))throw Error('unknown production detail owner '+id);
  if(d.numericWashSequence?.dryPreparation){const p=d.numericWashSequence.dryPreparation;if(p.operation!=='ordinary-dry'||p.maxSteps!==30000||p.dt!==2||p.levelMax!==140)throw Error('unsupported production dry preparation');}
- if(d.numericWashSequence&&(d.numericWashSequence.mode!=='dry-start-linked-adjacent-charges'||d.numericWashSequence.maxSurfaceWater!==.6))throw Error('unsupported production numerical charge sequence');
+ if(d.numericWashSequence&&(d.numericWashSequence.mode!=='dry-start-linked-adjacent-charges'||d.numericWashSequence.maxSurfaceWater!==NUMERIC_WASH_MAX_SURFACE_WATER))throw Error('unsupported production numerical charge sequence');
  return d;
 }
 export function productionDetailContext(plan,{mid,brush,mmPerCell,width,scale=1,water,calibration}){
@@ -59,4 +62,22 @@ export function validateCompiledAreaStop(stop,layers){
  if(!stop||stop==='drawing-opening')return;
  const matches=layers.some(layer=>{const a=layer._semantic;return a&&(stop===a.key||stop===a.area.id||stop===`stage:${a.pass.stage??a.pass.id}`);});
  if(!matches)throw Error('semantic checkpoint has no compiled paint layers: '+stop);
+}
+
+// Numerical wet-on-dry wash charges share only their own executed shape.
+// Authored gestures and ordinary dry-brush details retain their separate contracts.
+export function semanticNumericSequence(doc, active, layerIndex, shapeIndex) {
+ const declared=validateProductionDetails(doc)?.numericWashSequence;
+ const ordinary=active&&!active.productionLegacyDetail&&active.pass.source!=='authored'&&active.pass.move==='wet on dry'&&active.pass.wetness.required==='dry';
+ if(!active||(!declared&&!ordinary))return null;
+ const settings=declared??{maxSurfaceWater:NUMERIC_WASH_MAX_SURFACE_WATER,dryPreparation:{operation:'ordinary-dry',maxSteps:30000,dt:2,levelMax:140}};
+ return {key:active.key,shapeKey:active.key+'/layer-'+layerIndex+'/shape-'+shapeIndex,history:[],settings,declared:!!declared};
+}
+
+// Observe all material recipients, not merely fresh pigment-free cells.
+// Existing helpers retain executed-primary ownership, film limits and physical drying.
+export function prepareSemanticNumericContact({sequence,contact,observe,dry,record}) {
+ const continuation=productionChargeLink(sequence.history,sequence.shapeKey,contact,sequence.settings.maxSurfaceWater);
+ const result=prepareProductionDryContact({continuation,preparation:sequence.settings.dryPreparation,observe,dry,record});
+ return {...result,continuation};
 }

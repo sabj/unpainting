@@ -16,7 +16,7 @@ import {createReceiverObserver} from '../painter/numeric-receiver-observer.mjs';
 import {appendFinishingLayers} from '../painter/finishing-area.mjs';
 import {nativeBodyCadence} from '../painter/native-body-cadence.mjs';
 import {numericTuftEligible, calibrateNumericTuft} from '../painter/numeric-tuft-calibration.mjs';
-import {validateProductionDetails, productionChargeSupported, validateCompiledAreaStop} from '../painter/semantic-production-details.mjs';
+import {validateProductionDetails, productionChargeSupported, validateCompiledAreaStop, semanticNumericSequence} from '../painter/semantic-production-details.mjs';
 import {connectedSkyBoundary, connectedSkyContact, chooseMajorBaseWash} from '../painter/legacy-major-intents.mjs';
 import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
 import {semanticBrushObservation} from '../painter/semantic-brush-observation.mjs';
@@ -377,7 +377,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   for (const sh of layer.shapes) {
   if(DELIVERY||TECH_CAL)sh._paintExecuted=false;
   if(BUDGET && !BUDGET.target(sh)) continue;
-  ctx.AREA_NUMERIC_SEQUENCE=ctx.AREA_PLAN&&validateProductionDetails(ctx.AREA_PLAN.doc)?.numericWashSequence&&sh._semantic?{key:sh._semantic.key,shapeKey:sh._semantic.key+'/layer-'+L+'/shape-'+layer.shapes.indexOf(sh),history:[]}:null;
+  ctx.AREA_NUMERIC_SEQUENCE=ctx.AREA_PLAN?semanticNumericSequence(ctx.AREA_PLAN.doc,sh._semantic,L,layer.shapes.indexOf(sh)):null;
   if (PROBE) {
     const m = sh.mask, cut = new Uint8Array(n); let area = 0;
     for (let i = 0; i < n; i++) if (m[i] && PROBE.m[i]) { cut[i] = 1; area++; }

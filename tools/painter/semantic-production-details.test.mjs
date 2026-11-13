@@ -98,3 +98,119 @@ test('real compiled checkpoint rejects declared-but-empty pass before unrelated 
  // the numeric contact stop is handled in the paint stage, which runs before the finish stage's dry-brush notice
  assert.ok(paint.includes('if(ctx.AREA_NUMERIC_CONTACT_STOP){')&&finish.includes('target-seeded dry-brush marks removed'));
 });
+
+
+import {semanticNumericSequence,prepareSemanticNumericContact} from './semantic-production-details.mjs';
+test('ordinary numerical wash selection inherits the existing declared film bound and isolates shape histories',()=>{
+ const active={key:'wash/foundation',pass:{source:'numeric',move:'wet on dry',wetness:{required:'dry'}}};
+ const seq=semanticNumericSequence({areas:[]},active,0,0);
+ assert.ok(seq);assert.equal(seq.settings.maxSurfaceWater,.6);
+ const declared={areas:[{id:'wash'}],productionDetails:{source:'production-modulate',lightAuthority:'semantic-only',regionIds:['wash'],numericWashSequence:{mode:'dry-start-linked-adjacent-charges',maxSurfaceWater:.6}}};
+ assert.equal(seq.settings.maxSurfaceWater,validateProductionDetails(declared).numericWashSequence.maxSurfaceWater);
+ const explicit=semanticNumericSequence(declared,active,0,0);
+ assert.equal(explicit.declared,true);assert.equal(explicit.settings,declared.productionDetails.numericWashSequence);
+ assert.equal(seq.declared,false);
+ assert.equal(semanticNumericSequence(declared,{...active,pass:{...active.pass,move:'wet on wet',wetness:{required:'wet'}}},0,0).settings,explicit.settings);
+ assert.equal(semanticNumericSequence({areas:[]},{...active,pass:{...active.pass,source:'authored'}},0,0),null);
+ assert.equal(semanticNumericSequence({areas:[]},{...active,pass:{...active.pass,move:'dry brush'}},0,0),null);
+ const other=semanticNumericSequence({areas:[]},active,0,1);
+ assert.notEqual(seq.shapeKey,other.shapeKey);assert.notEqual(seq.history,other.history);
+});
+test('ordinary contact preparation forwards complete observations and does not manufacture ownership',()=>{
+ const active={key:'wash/foundation',pass:{source:'numeric',move:'wet on dry',wetness:{required:'dry'}}};
+ const sequence=semanticNumericSequence({areas:[]},active,0,0);
+ const contact={cells:[1],primaryMask:Uint8Array.from([0,1])};
+ let calls=0;
+ const observed={cells:2,dry:false,waterMax:.45,waterP95:.44,saturationMax:.9,moistShare:.95};
+ sequence.history.push({id:'executed-1',status:'executed',shapeKey:sequence.shapeKey,primary:new Set([1])});
+ const linked=prepareSemanticNumericContact({sequence,contact,observe:()=>observed,dry:()=>{calls++;}});
+ assert.equal(linked.paper,observed);assert.equal(linked.continuation.priorExecutedCommandId,'executed-1');assert.equal(calls,0);
+ assert.equal(productionContinuationReady({...observed,waterMax:.61},{water:1,pigment:1},linked.continuation),false);
+ const other=semanticNumericSequence({areas:[]},active,0,1);other.history.push(...sequence.history);
+ const failed=prepareSemanticNumericContact({sequence:other,contact,observe:()=>observed,dry:()=>{calls++;return 0;}});
+ assert.equal(failed.continuation,null);assert.equal(calls,1);assert.equal(failed.paper.dry,false);assert.equal(failed.ready,false);
+});
+
+import {fileURLToPath} from 'node:url';
+import {sheetAndBrushes} from '../plate/sheet.mjs';
+import {EpochCells} from '../../src/paint/epoch-cells.mjs';
+import {createAreaExecution} from './semantic-areas.mjs';
+import {setStrict,strictChecks} from '../../src/media/checks.mjs';
+
+test('ordinary wash real production strokes link executed contacts and actual dry clears ownership',async()=>{
+ const root=fileURLToPath(new URL('../../',import.meta.url)),out=fs.mkdtempSync(nodePath.join(os.tmpdir(),'ordinary-wash-')),wasStrict=strictChecks();
+ setStrict(true);
+ try{
+ const w=48,h=48,n=w*h,events=[],records=[];
+ const pigment={name:'test earth',K:[.4,.2,.1],S:[.02,.02,.02],rho:.05,omega:1.4,gamma:.25};
+ const flags={gpu:'off',paper:'flat',paperphysical:0,physical:0,look:0,marks:0,frames:0,cal:0};
+ const opt=(k,d)=>k in flags?String(flags[k]):d,num=(k,d)=>Number(opt(k,d));
+ const area={id:'wash',intent:'one connected pale foundation'};
+ const pass={id:'foundation',source:'numeric',move:'wet on dry',brush:{orientation:'sweep'},load:{water:.45,pigmentScale:1,minRemainingFraction:0},wetness:{required:'dry',neighborCells:2},edges:{overlap:true}};
+ const active={area,pass,key:'wash/foundation'};
+ const ctx={root,out,w,h,n,opt,num,optTrack:{},WASH_FLAT_SPLAY:.03,ENTRY_FILE:nodePath.join(root,'tools/paint-plate.mjs'),
+  JSONL:{append:(_p,line)=>records.push(JSON.parse(line))},NATIVE_PAINT_MODE:{mode:'fast'},RUN_CACHE:{enabled:false},CODE_HASH:'test',
+  measurePaper,createBrush,physicalStroke:stroke,candidateContact,setClip,PIGS:[pigment],SHEET_PIGS:[pigment],paperRGB:[255,255,255],
+  phaseMark:()=>{},clock:(_name,fn)=>fn(),VALUE_OWN_CONTACT:new EpochCells(n),VALUE_PIGMENT_CONTACT:new EpochCells(n),
+  AREA_EXEC:createAreaExecution({emit:e=>events.push(e)}),AREA_LOADS:new Map(),AREA_PLAN:{doc:{areas:[area]},film:new Uint8Array(n),reserves:new Uint8Array(n)},
+  TONE_MODE:'0',SHEET_TONE:{toned:false},px:new Uint8Array(n*3).fill(220),SRC:new Float32Array(n).fill(.2),layers:[],SEED:3,
+  REQUESTED_DRAW_MEDIUM:'graphite',OUTLINE:{medium:'graphite'},GPU_INFO:{backend:'cpu'}};
+ await sheetAndBrushes(ctx);
+ events.length=0;records.length=0; // Scene assertions exclude completed scrap calibration.
+ ctx.AREA_EXEC.set(active);ctx.AREA_NUMERIC_SEQUENCE=semanticNumericSequence(ctx.AREA_PLAN.doc,active,0,0);
+ const brush=createBrush({radius:3,bristles:12,capacity:30,belly:3,feed:.25,give:.5,free:.4,film:.1,seed:7});
+ const points=[{x:14,y:24,r:3,p:.6},{x:25,y:24,r:3,p:.6}];
+ const paint=()=>{ctx.dip(brush,{water:.45,conc:[.08]});return ctx.stroke(brush,ctx.sheet,points,{upright:'sweep',lift:false,spacing:.7});};
+ paint();
+ assert.equal(ctx.AREA_NUMERIC_SEQUENCE.history.length,1);
+ assert.ok(ctx.sheet.G[0].some(v=>v>0),'physical first stroke deposits pigment');
+ const first=events.find(e=>e.operation==='physical brush stroke'&&e.status==='executed');
+ assert.ok(first?.paper.dry);
+ paint();
+ const strokes=events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed');
+ assert.equal(strokes.length,2);assert.equal(strokes[1].numericalChargeState.priorExecutedCommandId,first.id);
+ assert.ok(strokes[1].numericalChargeState.overlapCells>0);
+ assert.equal(events.filter(e=>e.operation==='ordinary physical drying').length,0,'own linked wet edge is not dried');
+ // The same coordinates on a calibration sheet cannot borrow or change scene history.
+ const sceneIds=ctx.AREA_NUMERIC_SEQUENCE.history.map(r=>r.id);
+ const scrap=createSheet(makePaper(w,h,{seed:9}),[pigment]);
+ ctx.dip(brush,{water:.45,conc:[.08]});
+ ctx.stroke(brush,scrap,points,{upright:'sweep',lift:false,spacing:.7});
+ const scrapCommand=events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').at(-1);
+ assert.equal(scrapCommand.targetSurface,'calibration-or-other');
+ assert.equal(scrapCommand.numericalChargeState.priorExecutedCommandId,undefined);
+ assert.deepEqual(ctx.AREA_NUMERIC_SEQUENCE.history.map(r=>r.id),sceneIds);
+ ctx.dry(scrap,30000,ctx.O,{levelMax:140,dt:2});
+ assert.deepEqual(ctx.AREA_NUMERIC_SEQUENCE.history.map(r=>r.id),sceneIds);
+
+ ctx.dry(ctx.sheet,30000,ctx.O,{levelMax:140,dt:2});
+ assert.equal(ctx.AREA_NUMERIC_SEQUENCE.history.length,0,'the production dry wrapper clears ownership');
+ paint();
+ const afterDry=events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').at(-1);
+ assert.equal(afterDry.numericalChargeState.priorExecutedCommandId,undefined);
+ assert.equal(afterDry.paper.dry,true);
+ // A new shape at the still-wet contact cannot borrow the old shape's edge.
+ ctx.AREA_NUMERIC_SEQUENCE=semanticNumericSequence(ctx.AREA_PLAN.doc,active,0,1);
+ paint();
+ const final=events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').at(-1);
+ assert.equal(final.numericalChargeState.priorExecutedCommandId,undefined);
+ assert.equal(final.paper.dry,true);
+ assert.ok(records.some(r=>r.status==='ordinary-dry-requested'));
+ assert.ok(records.some(r=>r.status==='ordinary-dry-observed'&&r.ready));
+ // Physically flood the contact: no direct water-field mutation and no limit relaxation.
+ const wet=createBrush({radius:5,bristles:20,capacity:120,belly:12,feed:.5,give:.9,free:.4,seed:11});
+ let observed;
+ for(let k=0;k<20;k++){
+  dip(wet,{water:.95,conc:[0]});
+  stroke(wet,ctx.sheet,points,{upright:'sweep',lift:false,spacing:.7});
+  const c=candidateContact(brush,ctx.sheet,points,{upright:'sweep',lift:false,neighborRadius:2});
+  observed=measurePaper(ctx.sheet,[...c.cells,...c.neighborIndices]);
+  if(observed.waterMax>.6)break;
+ }
+ assert.ok(observed.waterMax>.6,'real clean-water strokes exceed the existing film bound');
+ const owned=ctx.AREA_NUMERIC_SEQUENCE.history.map(r=>r.id),before=events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').length;
+ assert.throws(paint,/semantic material gate failed/);
+ assert.equal(events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').length,before);
+ assert.deepEqual(ctx.AREA_NUMERIC_SEQUENCE.history.map(r=>r.id),owned,'failed admission does not create ownership');
+ }finally{setStrict(wasStrict);fs.rmSync(out,{recursive:true,force:true});}
+});
