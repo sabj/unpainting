@@ -3,7 +3,8 @@
 // full playback, scores, provenance from run records, and a browser-stored human vote per pair.
 // Usage: node bench/scripts/compare-release.mjs --plates <dir>[,<dir>] --out comparison.html
 //   [--runs bench/runs] [--expect 0.3.2=<sha|tag>] [--expect 0.1.1=<sha|tag>] [--releases 0.1.1,0.2.1,0.1.1] [--rounds V4,V5]
-//   [--strict] [--improved file.mjs|file.json] [--scores file.json] [--targets dir] [--frame-width 560] [--final-width 1400]
+//   [--strict] [--improved file.mjs|file.json] [--scores file.json] [--targets dir] [--frame-width <preview px>] [--final-width <preview px>]
+// Finals and every recorded frame retain their original bytes by default; widths opt into JPEG92 previews.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -18,7 +19,7 @@ const REPO = path.resolve(HERE, '..', '..');
 const list = v => v.split(',').map(s => s.trim()).filter(Boolean);
 
 export function parseArgs(argv = process.argv.slice(2)) {
-  const o = { runs: path.join(REPO, 'bench', 'runs'), plateRoots: [], out: path.resolve('comparison.html'), expected: {}, releases: null, rounds: null, strict: false, relabel: {}, improved: null, scores: null, targetsDir: null, frameWidth: 560, finalWidth: 1400, title: 'Release comparison' };
+  const o = { runs: path.join(REPO, 'bench', 'runs'), plateRoots: [], out: path.resolve('comparison.html'), expected: {}, releases: null, rounds: null, strict: false, relabel: {}, improved: null, scores: null, targetsDir: null, frameWidth: null, finalWidth: null, title: 'Release comparison' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], next = () => { if (i + 1 >= argv.length) throw new Error(`${a} requires a value`); return argv[++i]; };
     if (a === '--runs') o.runs = path.resolve(next());
@@ -37,7 +38,14 @@ export function parseArgs(argv = process.argv.slice(2)) {
     else if (a === '--title') o.title = next();
     else throw new Error(`unknown option: ${a}`);
   }
+  validateWidths(o);
   return o;
+}
+
+function validateWidths(o) {
+  for (const [name, value] of [['frame-width', o.frameWidth], ['final-width', o.finalWidth]]) {
+    if (value != null && (!Number.isSafeInteger(value) || value <= 0)) throw new Error(`--${name} requires a positive integer`);
+  }
 }
 
 const git = (args, cwd = REPO) => { const r = spawnSync('git', args, { cwd, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : null; };
@@ -50,8 +58,9 @@ const resolveRef = (v, cwd) => (/^[0-9a-f]{7,40}$/i.test(v) ? v : git(['rev-pars
 const dataUri = (buf, mime) => `data:${mime};base64,${buf.toString('base64')}`;
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 const rawUri = f => dataUri(fs.readFileSync(f), MIME[path.extname(f).toLowerCase()] ?? 'application/octet-stream');
-async function jpegUri(f, width, quality) {
-  const buf = await sharp(f).resize({ width, withoutEnlargement: true }).jpeg({ quality, mozjpeg: true }).toBuffer();
+async function imageUri(f, width) {
+  if (width == null) return rawUri(f);
+  const buf = await sharp(f).resize({ width, withoutEnlargement: true }).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
   return dataUri(buf, 'image/jpeg');
 }
 
@@ -68,17 +77,61 @@ async function plateRecord(p, { expected, selfScores, frameWidth, finalWidth, ex
   const rec = {
     release: p.release, model: p.model, try: p.try, commit: p.commit, labelledCommit: expected[p.release] ?? null,
     gpu: p.gpu, sam: p.sam, paintWidth: p.paintWidth, sourceWidth: p.sourceWidth, seconds: p.seconds, dir: p.dir,
-    score, marks: p.gate.marks, refused: p.gate.refused, alsoAt: p.alsoAt ?? [],
+    score, marks: [...p.gate.marks], refused: p.gate.refused, alsoAt: p.alsoAt ?? [],
   };
   if (!p.gate.admitted) return rec;
-  rec.final = p.painting ? await jpegUri(p.painting, finalWidth, 85) : null;
-  const frames = [];
+  rec.delivery = { final: finalWidth == null ? 'original bytes' : `JPEG92 preview, maximum width ${finalWidth}px`, frames: frameWidth == null ? 'original bytes' : `JPEG92 previews, maximum width ${frameWidth}px` };
+  if (finalWidth != null || frameWidth != null) rec.marks.push({ code: 'preview-delivery', text: `Explicit preview delivery: final ${rec.delivery.final}; frames ${rec.delivery.frames}. Source render widths above describe the original files.` });
+  rec.final = p.painting ? await imageUri(p.painting, finalWidth) : null;
+  const frames = [], missingFrames = [], nonNativeFrames = [];
   for (const f of p.frames) {
-    if (!fs.existsSync(f.file)) continue;
-    frames.push({ src: await jpegUri(f.file, frameWidth, 60), stage: [f.stage, f.step].filter(Boolean).join(' '), position: f.position ?? null });
+    if (!fs.existsSync(f.file)) { missingFrames.push(f.src); continue; }
+    const sourceDimensions = readImageSize(fs.readFileSync(f.file));
+    if (!sourceDimensions || sourceDimensions.w !== p.imageWidth || sourceDimensions.h !== p.imageHeight) nonNativeFrames.push(f.src);
+    const { file, ...metadata } = f;
+    frames.push({ ...metadata, sourceFile: f.src, sourceDimensions, src: await imageUri(file, frameWidth), stage: [f.stage, f.step].filter(Boolean).join(' '), position: f.position ?? null });
   }
   rec.frames = frames;
+  rec.playback = { kind: 'recorded frames', listed: p.frames.length, delivered: frames.length, missingFrames, nonNativeFrames, nativeFramesComplete: p.frames.length > 0 && !missingFrames.length && !nonNativeFrames.length && frameWidth == null };
+  rec.checkpoints = await retainedCheckpoints(p, frameWidth);
+  if ((!p.frames.length || missingFrames.length) && rec.checkpoints.images.length) {
+    rec.playback.kind = 'grouped retained checkpoint evidence, not chronological playback';
+    rec.recordedFrames = frames;
+    rec.frames = [...rec.checkpoints.images, { src: rec.final, stage: 'actual final painting endpoint (not a recorded frame)', position: null }];
+    rec.marks.push({ code: 'checkpoint-evidence', text: 'Scrubber shows grouped retained checkpoint evidence: percentage checkpoints, then dried bands, then the actual final painting. This is not chronological playback and does not replace missing recorded frames.' });
+  }
+  if (rec.checkpoints.images.length && (rec.checkpoints.missing.length || rec.checkpoints.nonNative.length || !rec.checkpoints.expectedBands.length)) rec.marks.push({ code: 'checkpoint-incomplete', text: `Retained checkpoint proof incomplete: ${rec.checkpoints.missing.length} missing files, ${rec.checkpoints.nonNative.length} dimension mismatches; completed-band ledger ${rec.checkpoints.expectedBands.length ? 'present' : 'unavailable'}.` });
+  if (nonNativeFrames.length) rec.marks.push({ code: 'frame-resolution', text: `${nonNativeFrames.length} recorded frames are unreadable or differ from the native painting dimensions; playback is not complete native proof.` });
   return rec;
+}
+
+// Retained files are separate evidence, never replacements claiming to be missing recorded frames.
+async function retainedCheckpoints(p, width) {
+  const specs = [];
+  const progress = [10, 25, 50, 75, 100];
+  const missing = [];
+  for (const percent of progress) {
+    const stem = `stages/stage-${String(percent).padStart(3, '0')}`;
+    const file = ['.png', '.jpg'].map(ext => stem + ext).find(name => fs.existsSync(path.join(p.dir, name)));
+    if (file) specs.push({ file, kind: 'progress-checkpoint', percent, stage: `retained ${percent}% checkpoint — ${file}` });
+    else missing.push(stem);
+  }
+  const bands = fs.readdirSync(p.dir).map(file => ({ file, match: /^value-band-(\d+)-dried\.png$/.exec(file) })).filter(x => x.match).map(x => ({ file: x.file, band: Number(x.match[1]) })).sort((a,b) => a.band - b.band);
+  const countsFile = path.join(p.dir, 'value-executed-counts.json');
+  const counted = fs.existsSync(countsFile) ? JSON.parse(fs.readFileSync(countsFile, 'utf8')).bands : [];
+  if (!Array.isArray(counted) || counted.some(b => !b || !Number.isSafeInteger(b.band) || b.band <= 0 || !Number.isSafeInteger(b.strokes) || b.strokes < 0)) throw new Error(`Invalid completed-band counts: ${countsFile}`);
+  const boundaryBands = p.frames.filter(f => f.boundary === 'value').map(f => f.value);
+  if (boundaryBands.some(b => !Number.isSafeInteger(b) || b <= 0)) throw new Error(`Invalid completed-band boundary: ${p.dir}/frames.json`);
+  const expectedBands = [...new Set([...counted.filter(b => b.strokes > 0).map(b => b.band), ...boundaryBands])].sort((a,b) => a-b);
+  for (const band of expectedBands) if (!bands.some(b => b.band === band)) missing.push(`value-band-${band}-dried.png`);
+  specs.push(...bands.map(b => ({...b,kind:'dried-band-checkpoint',stage:`retained dried band ${b.band} — ${b.file}`})));
+  const images = [], nonNative = [];
+  for (const spec of specs) {
+    const file = path.join(p.dir, spec.file), sourceDimensions = readImageSize(fs.readFileSync(file));
+    if (!sourceDimensions || sourceDimensions.w !== p.imageWidth || sourceDimensions.h !== p.imageHeight) nonNative.push(spec.file);
+    images.push({...spec,sourceDimensions,src:await imageUri(file,width),position:null});
+  }
+  return { images, missing, nonNative, expectedBands, nativeComplete: !missing.length && !nonNative.length && expectedBands.length > 0 && width == null };
 }
 
 async function priorRecord(p) {
@@ -99,6 +152,7 @@ async function loadImproved(file) {
 
 export async function generate(opts) {
   const o = { ...parseArgs([]), ...opts };
+  validateWidths(o);
   const expected = Object.fromEntries(Object.entries(o.expected).map(([k, v]) => [k, resolveRef(v, REPO)]));
   const selfScores = loadSelfScores(o.runs);
   const targetsDir = o.targetsDir ?? path.join(o.runs, '..', 'v2', 'targets');

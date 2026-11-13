@@ -3,11 +3,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const MIN_SOURCE_WIDTH = 600;
+// Benchmark target crops include 300px Yale sources; painting resolution is gated separately.
+export const MIN_SOURCE_WIDTH = 300;
 export const MIN_RENDER_WIDTH = 540;
 const SUBJECT_ALIASES = { france: 'south-france', sf: 'south-france' };
 
 const readJsonIf = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
+const SUBJECTS = JSON.parse(fs.readFileSync(new URL('../v4v5/subjects.json', import.meta.url), 'utf8')).subjects;
 
 /** Width and height from a PNG, JPEG or WebP header, or null. */
 export function readImageSize(b) {
@@ -86,7 +88,8 @@ export function parsePlateDir(dir) {
   const imageArg = argAfter(args, '--image');
   const dims = card.dimensions ?? null;
   const frames = (framesDoc.frames ?? []).map(f => ({ ...f, file: path.join(dir, f.src) }));
-  const painting = ['painting.jpg', 'painting.png'].map(n => path.join(dir, n)).find(f => fs.existsSync(f)) ?? null;
+  const painting = ['painting.png', 'painting.jpg'].map(n => path.join(dir, n)).find(f => fs.existsSync(f)) ?? null;
+  const imageSize = painting ? sizeOfFile(painting) : null;
   return {
     ...id,
     dir,
@@ -100,6 +103,7 @@ export function parsePlateDir(dir) {
     gpu: gpuName(card, backendDoc),
     sam: samName(card.segments),
     paintWidth: dims?.paintWidth ?? framesDoc.width ?? null,
+    paintHeight: dims?.paintHeight ?? framesDoc.height ?? null,
     sourceWidth: dims?.sourceWidth ?? (imageArg ? sizeOfFile(imageArg)?.w ?? null : null),
     seconds: card.seconds ?? null,
     exit: card.exit ?? null,
@@ -109,6 +113,8 @@ export function parsePlateDir(dir) {
     framesFound: frames.filter(f => fs.existsSync(f.file)).length,
     frames,
     painting,
+    imageWidth: imageSize?.w ?? null,
+    imageHeight: imageSize?.h ?? null,
     score: readJsonIf(path.join(dir, 'score.json')) ?? card.score ?? null,
   };
 }
@@ -127,7 +133,13 @@ export function gatePlate(p, { expectedCommit = null, minSourceWidth = MIN_SOURC
   else if (!p.commit) R('commit-missing', `run card records no commit; ${p.release} is labelled ${expectedCommit}`);
   else if (!commitMatches(p.commit, expectedCommit)) R('commit-mismatch', `run card commit ${p.commit.slice(0, 7)} differs from the labelled ${p.release} commit ${expectedCommit.slice(0, 7)}`);
   if (p.backend !== 'gpu' || p.fallback || p.argsGpuOff) R('cpu', `CPU or fallback run (backend ${p.backend ?? 'unknown'}, fallback ${p.fallback}, --gpu off ${p.argsGpuOff})`);
-  if (!(p.paintWidth >= minRenderWidth)) R('low-res-render', `rendered ${p.paintWidth ?? 'unknown'} px wide, under the ${minRenderWidth} px minimum`);
+  if (!Number.isInteger(p.exit) || p.exit !== 0) R('run-failed', `run exit ${p.exit ?? 'missing'} is not a recorded successful integer exit 0`);
+  const requiredWidth = Math.max(minRenderWidth, SUBJECTS[p.subject]?.width ?? 0);
+  if (!(p.paintWidth >= requiredWidth)) R('low-res-render', `rendered ${p.paintWidth ?? 'unknown'} px wide, under the ${requiredWidth} px requirement`);
+  if ('painting' in p) {
+    if (!p.painting || !(p.imageWidth >= requiredWidth)) R('low-res-image', `painting file is ${p.imageWidth ?? 'missing or unreadable'} px wide, under the ${requiredWidth} px requirement`);
+    if (p.painting && (p.imageWidth !== p.paintWidth || (p.paintHeight != null && p.imageHeight !== p.paintHeight))) R('render-size-mismatch', `painting file ${p.imageWidth}x${p.imageHeight} differs from recorded ${p.paintWidth}x${p.paintHeight ?? '?'}`);
+  }
   if (targetSha256 && p.targetSHA256 && targetSha256 !== p.targetSHA256) R('target-mismatch', 'painted from a different target file than the comparison target');
   if (p.sourceWidth == null) M('source-unknown', 'source target width is not recorded');
   else if (p.sourceWidth < minSourceWidth) {
