@@ -108,16 +108,41 @@ test('coverage is a clipped union and repeated coats do not inflate covered area
  const t=depositTape();t.marks=[{k:'d',b:1,w:1,c:[1]},{k:'s',b:1,d:[[500,300,100],[510,300,100]]}];
  const one=weighted(t);t.marks.push(t.marks[1]);const two=weighted(t);
  assert.equal(two.composition.tinyCoveredSheetShare,one.composition.tinyCoveredSheetShare);
- t.marks.unshift({k:'c',r:[0,100*20]});assert.equal(weighted(t).composition.coveredSheetShare,0);
+ t.marks.unshift({k:'c',r:[0,100*20]});assert.equal(weighted(t).composition.coveredSheetShare,null);
  const masked=depositTape();masked.marks.unshift({k:'r',m:Array(6000).fill(1)});
- assert.equal(weighted(masked).composition.coveredSheetShare,0);
+ assert.equal(weighted(masked).composition.coveredSheetShare,null);
 });
-test('clean water, zero pressure and an observed zero deposit do not carry paint',()=>{
+test('clean water does not carry paint and absent attribution stays unmeasured',()=>{
  const t=depositTape();t.marks.push({k:'d',b:1,w:1,c:[0]},{k:'s',b:1,d:[[500,300,100],[510,300,100]]});
  const s=weighted(t);assert.equal(s.counts.water,1);assert.equal(s.composition.tinyVisibleShare,0);
- const zero=depositTape();zero.marks[1].d=zero.marks[1].d.map(p=>[p[0],p[1],0]);assert.equal(weighted(zero).composition.coveredSheetShare,0);
+ const zero=depositTape();zero.marks[1].d=zero.marks[1].d.map(p=>[p[0],p[1],0]);assert.equal(weighted(zero).composition.coveredSheetShare,null);
  const observed=depositTape(),command={status:'EXECUTED',intent:'wall',geometry:[{x:10,y:30},{x:90,y:30}],brushBefore:{pigmentMass:[1]},brushAfter:{pigmentMass:[1]}};
- assert.equal(weighted(observed,[broadArea],{commands:[command]}).composition.coveredSheetShare,0);
+ assert.equal(weighted(observed,[broadArea],{commands:[command]}).composition.coveredSheetShare,null);
+});
+test('unchanged positive CPU reservoir snapshots cannot claim zero deposits on a painted final',()=>{
+ const t=depositTape(),w=512,h=Math.round(w*.6),rgb=Buffer.alloc(w*h*3,180);
+ const command={status:'EXECUTED',intent:'wall',geometry:[{x:10,y:30},{x:90,y:30}],brushBefore:{pigmentMass:[1]},brushAfter:{pigmentMass:[1]}};
+ const s=weighted(t,[broadArea],{commands:[command],finalRGB:rgb,paperRGB:t.base}),c=s.composition;
+ assert.equal(c.finalImageMeasured,true);assert.equal(c.depositMeasured,false);
+ for(const key of ['coveredSheetShare','tinyCoveredSheetShare','tinyOnlySheetShare','tinyVisibleShare','tinyFinalPaperDifferenceShare','attributedVisibleShare'])assert.equal(c[key],null,key);
+ for(const group of c.classes)for(const key of ['coveredSheetShare','visibleShare'])assert.equal(group[key],null,key);
+ for(const area of c.broadAreas)for(const key of ['coveredShare','tinyCoveredShare','tinyOnlyShare','tinyCarriedAreaShare','tinyVisibleShare','attributedVisibleShare','windshieldWiperShare'])assert.equal(area[key],null,key);
+ assert.equal(c.observations.observedBrushDeltaMarks,1);
+ assert.equal(c.observations.zeroOpticalDensityMarks,1);
+ assert.equal(c.observations.zeroDepositMarks,null);
+ assert.equal(c.observations.observedDepositMarks,null);
+ assert.equal(c.observations.estimatedDepositMarks,null);
+ assert.match(c.unmeasuredReason,/not evidence of zero/);
+ const gate=evaluateGate(s,{mode:'reject'});
+ assert.equal(gate.status,'unverified');assert.equal(gate.ok,false);assert.equal(gate.blocks,true);
+ // The recorded load must not silently replace the contradictory observation.
+ assert.equal(c.observations.estimatedLoadMarks,0);
+ const positive=structuredClone(command);positive.brushAfter.pigmentMass=[.5];
+ const measured=weighted(t,[broadArea],{commands:[positive],finalRGB:rgb,paperRGB:t.base}).composition;
+ assert.equal(measured.depositMeasured,true);assert.equal(measured.unmeasuredReason,null);
+ assert.ok(measured.coveredSheetShare>0);assert.ok(measured.attributedVisibleShare>0);
+ assert.equal(measured.tinyVisibleShare,0);assert.equal(measured.observations.observedDepositMarks,1);
+ assert.equal(measured.observations.zeroDepositMarks,0);
 });
 test('only broad-area weighted thresholds gate; equality passes and old count configs are errors',()=>{
  const s=weighted(depositTape());s.metrics.tinyPaintShare=1;s.metrics.broadWashAreaShare=0;s.metrics.earlyBroadWashCount=0;

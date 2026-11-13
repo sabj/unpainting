@@ -257,12 +257,19 @@ export function composition(normalized,{tape,commands=[],plan,finalRGB,inkRGB,pa
   }
   const fraction=(v,t)=>t?v/t:null;
   const wipers=regionResults.map(a=>detectWipers(a,strokeRecords,{sheet,w,h,footprint}));
+  // CPU reservoir snapshots can remain unchanged while the GPU sheet receives paint. With no
+  // attributable contribution, zero in these accumulators is missing deposition evidence, not
+  // a measured clean sheet or clean tiny-stroke result. Do not substitute a load estimate.
+  const depositMeasured=attributedVisible>0,measured=value=>depositMeasured?value:null;
   return {method:'clipped CPU contact raster; observed brush pigment loss where matched, finite-load film estimate otherwise; per-channel pigment absorption apportions final optical distance from paper after subtracting ink-first distance; no wet-transport replay',
-    finalImageMeasured:!!finalRGB,depositMeasured:attributedVisible>0,grid:{width:w,height:h,cellMm:sheet.widthMm/w},observations:{matchedCommands:matched,observedDepositMarks:observed,estimatedDepositMarks:estimated,zeroDepositMarks:zeroDeposit},
-    classes:keys.map(k=>({kind:k,coveredSheetShare:coverage[k]/n,visibleShare:fraction(visible[k],totalVisible)})),
-    coveredSheetShare:covered/n,tinyCoveredSheetShare:coverage.tiny/n,tinyOnlySheetShare:tinyOnly/n,tinyVisibleShare:fraction(visible.tiny,totalVisible),tinyFinalPaperDifferenceShare:fraction(visible.tiny,paperDifference),attributedVisibleShare:fraction(attributedVisible,totalVisible),
+    finalImageMeasured:!!finalRGB,depositMeasured,
+    unmeasuredReason:depositMeasured?null:'No visible paint contribution could be attributed to recorded deposits; zero CPU reservoir loss is not evidence of zero sheet deposition.',
+    grid:{width:w,height:h,cellMm:sheet.widthMm/w},
+    observations:{matchedCommands:matched,observedBrushDeltaMarks:observed,estimatedLoadMarks:estimated,zeroOpticalDensityMarks:zeroDeposit,observedDepositMarks:measured(observed),estimatedDepositMarks:measured(estimated),zeroDepositMarks:measured(zeroDeposit)},
+    classes:keys.map(k=>({kind:k,coveredSheetShare:measured(coverage[k]/n),visibleShare:measured(fraction(visible[k],totalVisible))})),
+    coveredSheetShare:measured(covered/n),tinyCoveredSheetShare:measured(coverage.tiny/n),tinyOnlySheetShare:measured(tinyOnly/n),tinyVisibleShare:measured(fraction(visible.tiny,totalVisible)),tinyFinalPaperDifferenceShare:measured(fraction(visible.tiny,paperDifference)),attributedVisibleShare:measured(fraction(attributedVisible,totalVisible)),
     broadAreasMeasured:explicit!==undefined||areas.length>0,broadAreaSource:explicit?'authored broadAreas':'saved value-plan broad value shapes and command clips',
-    broadAreas:regionResults.map((a,j)=>({windshieldWiperShare:wipers[j].share,sweeps:wipers[j].sweeps,id:a.id,planIds:a.planIds??[a.id],label:a.label,source:a.source,areaMm2:a.cells*(sheet.widthMm/w)**2,coveredShare:fraction(a.covered,a.cells),tinyCoveredShare:fraction(a.tinyCovered,a.cells),tinyOnlyShare:fraction(a.tinyOnly,a.cells),tinyCarriedAreaShare:fraction(a.tinyCarried,a.cells),tinyVisibleShare:fraction(a.tinyVisible,a.visible),attributedVisibleShare:fraction(a.attributedVisible,a.visible)})),
+    broadAreas:regionResults.map((a,j)=>({windshieldWiperShare:measured(wipers[j].share),sweeps:measured(wipers[j].sweeps),id:a.id,planIds:a.planIds??[a.id],label:a.label,source:a.source,areaMm2:a.cells*(sheet.widthMm/w)**2,coveredShare:measured(fraction(a.covered,a.cells)),tinyCoveredShare:measured(fraction(a.tinyCovered,a.cells)),tinyOnlyShare:measured(fraction(a.tinyOnly,a.cells)),tinyCarriedAreaShare:measured(fraction(a.tinyCarried,a.cells)),tinyVisibleShare:measured(fraction(a.tinyVisible,a.visible)),attributedVisibleShare:measured(fraction(a.attributedVisible,a.visible))})),
     limitations:'Spatial attribution is an estimate: contact discs and uniform per-mark deposits omit bristle gaps, pigment pickup, wet spreading and later lifting. Final image supplies visible weights, not measured pigment ancestry. Overlaps share one cell; repeated coats do not inflate sheet coverage. Edge/feature exclusions come from the plan, never from noisy final pixels.'};
 }
 
