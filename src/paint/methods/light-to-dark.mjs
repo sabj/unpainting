@@ -1,4 +1,5 @@
 // Pipeline: painting, stage 5 (glazes and darks).
+import {TECHNIQUES} from './lay.mjs';
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {matchCellLight,createMassTone} from './mass-tone.mjs';
@@ -416,6 +417,8 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   return {opticsReport,paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
+  // An authored dry contact takes precedence over phase, calibration and style defaults.
+  if(normalizePassageMove(intent.move)==='dry on dry')return {...TECHNIQUES['dry brush'],water:intent.load?.water??TECHNIQUES['dry brush'].water,valuePlan:intent};
   if(intent.calibratedPlan){
     const wet=intent.move==='wet on wet',shadow=intent.phase==='shadow';
     return {name:wet?'wet on wet':shadow?'glazed':'wet on dry',water:wet?.88:shadow?.58:.62,wetMix:wet?.85:shadow?.3:.55,bridge:wet?.98:shadow?.82:.78,bridgeSoft:wet?3:shadow?2.4:2.2,intoWet:wet,dryAfter:!wet,passes:1,valuePlan:intent};

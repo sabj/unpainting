@@ -2,6 +2,7 @@
 const ALIASES = Object.freeze({
   'wet in wet': 'wet on wet', 'wet-in-wet': 'wet on wet', 'wet-on-wet': 'wet on wet',
   'glaze': 'wet on dry', 'glazed': 'wet on dry', 'glazing': 'wet on dry', 'dry brush': 'dry on dry',
+  'dry-brush': 'dry on dry', 'dry-on-dry': 'dry on dry',
 });
 
 export function normalizePassageMove(move) {
@@ -29,11 +30,12 @@ export function passageFamily(cells, w, h, families) {
 export function passageMaterial({ phase, family, fallbackMove, texture = false }) {
   const requested = normalizePassageMove(family?.baseMove ?? fallbackMove);
   const wet = phase === 'light' && requested === 'wet on wet';
+  const dry = texture || requested === 'dry on dry';
   return {
     family: family?.id ?? null,
-    technique: texture ? 'dry-brush' : wet ? 'wet-foundation' : phase === 'shadow' ? 'glaze' : 'local-colour',
-    move: texture ? 'dry on dry' : wet ? 'wet on wet' : 'wet on dry',
-    water: texture ? .22 : wet ? .55 : phase === 'shadow' ? .45 : .62,
+    technique: dry ? 'dry-brush' : wet ? 'wet-foundation' : phase === 'shadow' ? 'glaze' : 'local-colour',
+    move: dry ? 'dry on dry' : wet ? 'wet on wet' : 'wet on dry',
+    water: dry ? .22 : wet ? .55 : phase === 'shadow' ? .45 : .62,
     requestedMove: requested,
     referenceCue: family?.referenceCue ?? null,
   };
