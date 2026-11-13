@@ -100,7 +100,7 @@ test('real compiled checkpoint rejects declared-but-empty pass before unrelated 
 });
 
 
-import {semanticNumericSequence,prepareSemanticNumericContact} from './semantic-production-details.mjs';
+import {semanticNumericSequence,prepareSemanticNumericContact,semanticChargeFeasible} from './semantic-production-details.mjs';
 test('ordinary numerical wash selection inherits the existing declared film bound and isolates shape histories',()=>{
  const active={key:'wash/foundation',pass:{source:'numeric',move:'wet on dry',wetness:{required:'dry'}}};
  const seq=semanticNumericSequence({areas:[]},active,0,0);
@@ -135,6 +135,8 @@ import {fileURLToPath} from 'node:url';
 import {sheetAndBrushes} from '../plate/sheet.mjs';
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {createAreaExecution} from './semantic-areas.mjs';
+import {gradeLoadPressure} from '../../src/paint/methods/graded-demand.mjs';
+import {recordMarks,tapeState} from '../../src/media/brush.mjs';
 import {setStrict,strictChecks} from '../../src/media/checks.mjs';
 
 test('ordinary wash real production strokes link executed contacts and actual dry clears ownership',async()=>{
@@ -212,5 +214,57 @@ test('ordinary wash real production strokes link executed contacts and actual dr
  assert.throws(paint,/semantic material gate failed/);
  assert.equal(events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').length,before);
  assert.deepEqual(ctx.AREA_NUMERIC_SEQUENCE.history.map(r=>r.id),owned,'failed admission does not create ownership');
+ ctx.dry(ctx.sheet,30000,ctx.O,{levelMax:140,dt:2});
+ const reserveBrush=createBrush({radius:5,bristles:16,capacity:30,belly:3,seed:19});
+ const ungraded=[{x:10,y:8,r:5,p:.2},{x:25,y:8,r:5,p:.2}];
+ const finalPoints=gradeLoadPressure(ungraded,{cx:0,cy:0,gx:0,gy:0,shift:.5,lo:.5,hi:1.5},.5);
+ const load={water:.45,conc:[.08]},options={upright:'sweep',lift:false,spacing:.7},observations=[];
+ let low,high;
+ const predict=(b,t,ps,o)=>{const c=candidateContact(b,t,ps,o);if(ps===ungraded)low=c;else high=c;return c;};
+ const feasible=ps=>semanticChargeFeasible({brush:reserveBrush,sheet:ctx.sheet,points:ps,options,load:ctx.dipLoad(reserveBrush,load),predict,reserved:i=>!!ctx.AREA_PLAN.reserves[i],record:r=>observations.push(r)});
+ assert.equal(feasible(ungraded),true);assert.equal(feasible(finalPoints),true);
+ const reserved=high.cells.find(i=>high.primaryMask[i]&&!low.primaryMask[i]);
+ assert.notEqual(reserved,undefined,'grading increases actual contact beyond the ungraded path');
+ ctx.AREA_PLAN.reserves[reserved]=1;
+ const reserveBefore=ctx.AREA_PLAN.reserves.slice(),beforePig=ctx.sheet.G[0].slice(),beforeDips=reserveBrush.dips,beforeHistory=ctx.AREA_NUMERIC_SEQUENCE.history.slice();
+ assert.equal(feasible(ungraded),true);assert.equal(feasible(finalPoints),false,'admission uses final graded pressure');
+ assert.equal(reserveBrush.dips,beforeDips);assert.deepEqual(ctx.sheet.G[0],beforePig);
+ assert.deepEqual(ctx.AREA_NUMERIC_SEQUENCE.history,beforeHistory);
+ assert.ok(observations.at(-1).reserveHitCount>0);assert.equal(observations.at(-1).omittedPaint.expectedLedgerCredit,0);
+ assert.deepEqual(observations.at(-1).geometry,finalPoints);
+ // The safe neighboring charge still uses the real wrapper and physical deposition.
+ ctx.dip(reserveBrush,load);ctx.stroke(reserveBrush,ctx.sheet,ungraded,options);
+ assert.ok(ctx.sheet.G[0].some((v,i)=>v>beforePig[i]));
+ assert.equal(ctx.sheet.G[0][reserved],beforePig[reserved]);
+ assert.deepEqual(ctx.AREA_PLAN.reserves,reserveBefore);
+ const countBeforeUnsafe=events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').length;
+ assert.throws(()=>ctx.stroke(reserveBrush,ctx.sheet,finalPoints,options),/bare-paper contact/,'direct unsafe contact remains strict');
+ assert.equal(events.filter(e=>e.operation==='physical brush stroke'&&e.status==='executed').length,countBeforeUnsafe);
+
  }finally{setStrict(wasStrict);fs.rmSync(out,{recursive:true,force:true});}
+});
+
+
+test('before-charge prediction uses the real dip on isolated row and tuft state without live dip or tape changes',()=>{
+ for(const model of ['row','tuft']){
+  recordMarks(true);
+  try{
+   const sheet=createSheet(makePaper(40,40,{seed:9}),[{K:[.4,.2,.1],S:[.02,.02,.02],rho:.05,omega:1.4,gamma:.25}]);
+   const b=createBrush({model,radius:4,bristles:16,capacity:30,belly:3,seed:17,variety:.3});
+   dip(b,{water:.1,conc:[.02]});
+   const pts=[{x:8,y:16,r:4,p:.6},{x:28,y:16,r:4,p:.7}],load={water:.7,conc:[.08]},options={upright:'sweep',lift:false,spacing:.7};
+   const before=JSON.stringify(b),tape=tapeState();let predicted;
+   assert.equal(semanticChargeFeasible({brush:b,sheet,points:pts,options,load,reserved:()=>false,predict:(copy,target,path,o)=>{predicted=candidateContact(copy,target,path,o);return predicted;}}),true);
+   assert.equal(JSON.stringify(b),before);assert.deepEqual(tapeState(),tape);
+   dip(b,load);
+   const actual=candidateContact(b,sheet,pts,{...options,clip:null,neighborRadius:0});
+   assert.deepEqual(predicted.primaryMask,actual.primaryMask,'prediction equals actual loaded footprint for '+model);
+  }finally{recordMarks(false);}
+ }
+});
+test('production final-charge branch checks graded geometry and marks partial demand uncredited',()=>{
+ const source=fs.readFileSync(new URL('../plate/paint.mjs',import.meta.url),'utf8');
+ assert.match(source,/runCharge\(GRADED\[k\]/);
+ assert.match(source,/if\(!reserveFeasibility\)productionDip\(brush,initialLoad\)/);
+ assert.match(source,/if\(sh\._numericOmissions\).*expectedLedgerCredit:0.*continue;/);
 });

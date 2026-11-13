@@ -16,7 +16,7 @@ import {createReceiverObserver} from '../painter/numeric-receiver-observer.mjs';
 import {appendFinishingLayers} from '../painter/finishing-area.mjs';
 import {nativeBodyCadence} from '../painter/native-body-cadence.mjs';
 import {numericTuftEligible, calibrateNumericTuft} from '../painter/numeric-tuft-calibration.mjs';
-import {validateProductionDetails, productionChargeSupported, validateCompiledAreaStop, semanticNumericSequence} from '../painter/semantic-production-details.mjs';
+import {validateProductionDetails, productionChargeSupported, validateCompiledAreaStop, semanticNumericSequence, semanticChargeFeasible} from '../painter/semantic-production-details.mjs';
 import {connectedSkyBoundary, connectedSkyContact, chooseMajorBaseWash} from '../painter/legacy-major-intents.mjs';
 import {nativeDryOptions} from '../painter/native-paint-mode.mjs';
 import {semanticBrushObservation} from '../painter/semantic-brush-observation.mjs';
@@ -81,7 +81,7 @@ const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTra
   planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, GOUACHE_LIGHTS, setClip, MOD, MASS_BUDGET, 
   COLOUR_TRACE, PUDDLES, FIRST_FLOOR, AUTHORED_INPUT, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, CURLS, 
   DETAIL_REGION, FINISH, FUR_FIELD, SHEET_PIGS, FINISH_FILE, AREA_FILE, AREA_COMPLETED, AREA_EXEC, EARLY_DRY_VALUE, 
-  dry, dip, productionDip, stroke, SC, W2, H2, N2, PB, GFLOOR, GCHUNK, PAPER_OPTS, PROBE, INKRES, OUT_W, OUT_H, O, 
+  dry, dip, dipLoad, productionDip, stroke, SC, W2, H2, N2, PB, GFLOOR, GCHUNK, PAPER_OPTS, PROBE, INKRES, OUT_W, OUT_H, O,
   GPU_INFO, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
   expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, 
   WET, MIX, washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL, FRAMES, snap, MARKTAPE, 
@@ -783,7 +783,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       });
     }
     const supportedCharge=gesturePoints=>!ctx.AREA_NUMERIC_CONTACT_STOP&&(!ctx.AREA_NUMERIC_SEQUENCE||productionChargeSupported({predict:()=>candidateContact(brush,ctx.sheet,gesturePoints,{upright:sh._semantic.pass.brush.orientation==='sweep'?'sweep':sh._semantic.pass.brush.orientation==='follow'?false:true,neighborRadius:0}),record:event=>JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:event.status==='not-executed'?'production-numeric-contact-omitted':'production-numeric-contact-support',areaId:sh._semantic.area.id,passId:sh._semantic.key,shapeKey:ctx.AREA_NUMERIC_SEQUENCE.shapeKey,geometry:gesturePoints,clipApplied:!!ctx.sheet.clip,...event})+'\n')}));
-    if(!supportedCharge(shaped))continue;
+    const reserveFeasibility=!!ctx.AREA_NUMERIC_SEQUENCE&&!ctx.AREA_NUMERIC_SEQUENCE.declared;
+    if(!reserveFeasibility&&!supportedCharge(shaped))continue;
     const numericTuftLoads=numericTuftHere&&PB?splitLoads(shaped,PB.loadCells(PB.pick(r),T.name)):null;
     if(numericTuftHere){
       const key=JSON.stringify({shapeId:ctx.MAJOR_TECHNIQUE.shapeId,r,water:WET(T),passes:T.passes,wetMix:MIX(T)});
@@ -795,7 +796,8 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       CHARGE_CAL=NUMERIC_TUFT_CAL.get(key).gain;JSONL.append(path.join(out,'numeric-tuft-consumed.jsonl'),JSON.stringify({shapeId:ctx.MAJOR_TECHNIQUE.shapeId,radius:r,calibration:CHARGE_CAL,water:WET(T),passes:T.passes,originalGeometry:true,profile:semanticBrushObservation(brush)})+'\n');
     }
 
-    productionDip(brush, { water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) });
+    const initialLoad={ water: detail ? Math.min(T.water, num('detailwater', 0.3)) : WET(T), conc: sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * CHARGE_CAL * opening * PF / sh._cover * sh._under * (sh._fb ?? 1) * (detail ? num('detailstrength', 2.0) : 1)) };
+    if(!reserveFeasibility)productionDip(brush,initialLoad);
     const cadence=nativeBodyCadence({mode:NATIVE_PAINT_MODE.mode,enabled:Boolean(FAST_BODY_ENABLED),detail,instructionBound:!!sh._semantic,technique:T.name,radiusCells:r,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/W2,every:flowEvery(paths.length),spacing:FAST_BODY_SPACING});
     if(cadence.approximated)BODY_CADENCE_RECORD.sourceSweepsSelected++;
     const every=cadence.every;
@@ -809,6 +811,19 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       if((DELIVERY||TECH_CAL)&&target===ctx.sheet&&points.length)sh._paintExecuted=true;
       if(cadence.approximated)BODY_CADENCE_RECORD.approximatedCallsReturned++;
       return result;
+    };
+    let executedCharges=0,omittedCharges=0;
+    const runCharge=(points,load,options,execute,{alreadyLoaded=false}={})=>{
+      if(ctx.AREA_NUMERIC_CONTACT_STOP)return;
+      if(reserveFeasibility){
+        const actualOptions={...options,spacing:cadence.spacing,upright:sh._semantic.pass.brush.orientation==='follow'?false:sh._semantic.pass.brush.orientation==='sweep'?'sweep':true};
+        const ready=semanticChargeFeasible({brush,sheet:ctx.sheet,points,options:actualOptions,load:dipLoad(brush,load),predict:candidateContact,
+          reserved:i=>!!ctx.AREA_PLAN.reserves[Math.floor(i/W2/SC)*w+Math.floor(i%W2/SC)],
+          record:event=>JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:'semantic-numeric-charge-feasibility',areaId:sh._semantic.area.id,passId:sh._semantic.key,shapeKey:ctx.AREA_NUMERIC_SEQUENCE.shapeKey,...event})+'\n')});
+        if(!ready){omittedCharges++;sh._numericOmissions=(sh._numericOmissions??0)+1;return;}
+      }else if(!supportedCharge(points))return;
+      if(reserveFeasibility||!alreadyLoaded)productionDip(brush,load);
+      execute(options);executedCharges++;
     };
     // --graded c: recharge every c cells along a sweep at the strength the passage wants there, normalised to a mean of one. Default 0.
     // A graded wash (--gradedwash) is always charged this way from its own graded amount, not normalised per sweep.
@@ -850,7 +865,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       if (second) used['variegated load'] = (used['variegated load'] || 0) + LOADS.length;
 
       let st = 0;
-      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: loadBase(k).map(v => v * f[k]) }); numericalStroke(brush, ctx.sheet, GRADED[k], { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: k === LOADS.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } }); }); });
+      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) LOADS.forEach((ch, k) => { runCharge(GRADED[k], { water: WET(T), conc: loadBase(k).map(v => v * f[k]) }, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: k === LOADS.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, GRADED[k], o)); }); });
     } else if (gradedLen > 0 && !detail && (useGradedCal ? shaped.length > 1 : shaped.length > gradedLen * 2)) {
       const chunks = [];
       for (let k = 0; k < shaped.length; k += Math.max(2, Math.round(gradedLen))) chunks.push(shaped.slice(Math.max(0, k - 1), k + Math.round(gradedLen) + 1));
@@ -859,9 +874,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       const base = sh.mix.map((v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1));
       // The water moves on the sweep's clock, counted across its chunks, so the sheet flows while a chunked sweep is laid.
       let st = 0;
-      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { if(!supportedCharge(ch))return; productionDip(brush, { water: WET(T), conc: base.map(v => v * f[k] / mean) }); numericalStroke(brush, ctx.sheet, ch, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } }); }); });
+      clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) chunks.forEach((ch, k) => { runCharge(ch, { water: WET(T), conc: base.map(v => v * f[k] / mean) }, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, lift: !GFLOOR || k === chunks.length - 1, between: () => { if (++st % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, ch, o)); }); });
     } else
-    clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) numericalStroke(brush, ctx.sheet, shaped, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, between: s => { if (s % every === 0) clock('flow', () => step(ctx.sheet, O)); } }); });
+    clock('strokes', () => { for (let pass = 0; pass < T.passes; pass++) runCharge(shaped, initialLoad, { upright: UPRIGHT, flowEvery: every, gpuBetween: true, between: s => { if (s % every === 0) clock('flow', () => step(ctx.sheet, O)); } },o=>numericalStroke(brush, ctx.sheet, shaped, o),{alreadyLoaded:true}); });
     if(ctx.AREA_NUMERIC_CONTACT_STOP){
       const {pixels,...contactRecord}=ctx.AREA_NUMERIC_CONTACT_STOP;
       await sharp(pixels,{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'numeric-first-contact-immediate.png'));
@@ -870,6 +885,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       fs.writeFileSync(path.join(out,'numeric-first-contact-checkpoint.json'),JSON.stringify({...contactRecord,kind:'one actual numeric pigment command then recorded ordinary dry; NOT completed area/pass',ordinaryDryCommandId:AREA_EXEC.records.at(-1)?.id,paper:measurePaper(ctx.sheet,contactRecord.primaryCells),backend:GPU_INFO,remainingNumericAndModulation:'NOT EXECUTED'},null,2));
       await drainFrames();if(ctx.FRAMER)ctx.FRAMER.close();ctx.sheet._gpu?.close();console.log('numeric first actual contact checkpoint; not completed pass or artistic acceptance');process.exit(0);
     }
+    if(reserveFeasibility&&!executedCharges)continue;
     ctx.laid++;
     // --filmby paint: a frame each time the planned mass laid crosses the next equal share of the plan's; each sweep
     // of the passage is booked an equal part of the passage's mass
@@ -877,7 +893,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       // Authored passes have no numerical-mask mass budget. Count actual completed
       // gestures for playback; zero fitted mass must never create an infinite loop.
       const filmTotal = AUTHORED_INPUT ? ctx.AREA_COMPILED.diagnostics.authoredPaintGestures : ctx.plannedMass;
-      ctx.filmLaid += AUTHORED_INPUT ? 1 : (FILM_MASS.get(sh) ?? 0) / Math.max(1, paths.length);
+      ctx.filmLaid += omittedCharges?0:AUTHORED_INPUT ? 1 : (FILM_MASS.get(sh) ?? 0) / Math.max(1, paths.length);
       if (filmTotal > 0 && ctx.filmLaid >= filmTotal * ctx.filmNext / FILM_FRAMES) {
         while (ctx.filmNext <= FILM_FRAMES && ctx.filmLaid >= filmTotal * ctx.filmNext / FILM_FRAMES) ctx.filmNext++;
         ctx.STAGE = { stage: 'paint', step: `value ${layer.value} of ${ctx.steps}`, pass: L + 1, of: ctx.layers.length, value: layer.value, of_values: ctx.steps, pigment: layer.mixIndex ?? layer.pigment, laying: true };
@@ -1013,6 +1029,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   if (filmed) await shoot();
   for (const sh of layer.shapes) {
     if (process.env.CHECKBOX && sh.mask && sh._mbox) { let out = 0; const b = sh._mbox; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (sh.mask[y * w + x] && (y < b.y0 || y > b.y1 || x < b.x0 || x > b.x1)) out++; if (out) console.log(`BOXCHECK ${out} mask cells outside the box (booked ${!!sh._booked})`); }
+    if(sh._numericOmissions){JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:'semantic-numeric-incomplete-demand',areaId:sh._semantic.area.id,passId:sh._semantic.key,omittedCharges:sh._numericOmissions,expectedLedgerCredit:0,plannedShapeDemand:sh.amount*sh.area,reason:'partial or wholly omitted numerical shape; full-mask delivery unproven'})+'\n');continue;}
     if(sh._authoredDose){JSONL.append(path.join(out,'semantic-commands.jsonl'),JSON.stringify({kind:'semantic-authored-demand',areaId:sh._semantic.area.id,passId:sh._semantic.key,expectedLedgerCredit:0,reason:'explicit dose is not full ownership-mask delivery'})+'\n');continue;}
     if (sh._booked||((DELIVERY||TECH_CAL)&&!sh._paintExecuted)) continue; const m = sh.mask, sk = sh._skip, mb = sh._mbox ?? FULLBOX, P = PIGS.length, share = sh.laidShare ?? 1, amt = Math.max(1e-6, sh.amount), gr = sh.graded, mix = sh.mix;
     for (let y = mb.y0; y <= mb.y1; y++) for (let i = y * w + mb.x0, e = y * w + mb.x1; i <= e; i++) if (m[i] && !(sk && sk[i])) {

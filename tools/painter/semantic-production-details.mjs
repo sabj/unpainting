@@ -1,3 +1,6 @@
+import {createBrush,dip,tapeState,restoreTapeState,TAPE} from '../../src/media/brush.mjs';
+import {measureBrush} from '../../src/paint/methods/wetdry.mjs';
+
 // Bind the existing production modulation gestures to semantic owners without
 // replacing their sampler, points, brush, dip, calibration or allocation.
 // Existing numerical-charge contract, previously validated inline as .6.
@@ -80,4 +83,30 @@ export function prepareSemanticNumericContact({sequence,contact,observe,dry,reco
  const continuation=productionChargeLink(sequence.history,sequence.shapeKey,contact,sequence.settings.maxSurfaceWater);
  const result=prepareProductionDryContact({continuation,preparation:sequence.settings.dryPreparation,observe,dry,record});
  return {...result,continuation};
+}
+
+// A real dip changes travel, clumping and tuft saturation. Predict its exact load
+// on an isolated brush, never by dipping the live instrument or hiding a tape dip.
+export function semanticChargeFeasible({brush,sheet,points,options,load,predict,reserved,record=()=>{}}) {
+ if(brush._pend)brush._pend.link.settleBrush(brush);
+ const tape=tapeState();let copy;
+ try{
+  copy=createBrush({...brush,bristles:brush.hairs.length});
+  const rs=copy.rs;
+  const state=Object.fromEntries(Object.entries(brush).filter(([k,v])=>typeof v!=='function'&&!['_pend','_tapeId','_cont','_restore'].includes(k)));
+  Object.assign(copy,structuredClone(state));copy.rs=rs;rs.s=brush.rs.s;
+  delete copy._tapeId;
+  dip(copy,load);
+ }finally{
+  if(tape){restoreTapeState(tape);TAPE.length=tape.tape;}
+ }
+ const material=measureBrush(copy),target={...sheet,_contactBrush:sheet._contactBrush===brush?copy:sheet._contactBrush};
+ const contact=predict(copy,target,points,{...options,clip:null,neighborRadius:0});
+ const primary=contact.cells.filter(i=>contact.primaryMask[i]),hits=primary.filter(reserved);
+ const supported=primary.filter(i=>!sheet.clip||sheet.clip[i]);
+ const ready=!hits.length&&supported.length>0;
+ record({status:ready?'supported-before-load':'not-executed',reason:hits.length?'loaded primary contact reaches reserved paper':supported.length?'loaded primary contact clears reserves':'zero supported primary contact',
+  geometry:points,contactOptions:options,primaryCells:primary.length,supportedPrimaryCells:supported.length,reserveHitCount:hits.length,
+  omittedPaint:ready?null:{preparedPigmentMass:material.pigmentMass,preparedWaterMass:material.waterMass,expectedLedgerCredit:0,meaning:'hypothetical prepared load omitted before actual dip; not measured deposited mass'}});
+ return ready;
 }
