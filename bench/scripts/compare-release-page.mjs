@@ -64,9 +64,9 @@ export function renderPage({ rows, improved, meta }) {
 <li>Each row is one subject and model: target, best prior painting from the published runs (by J1 composite, any round, any try), the 0.1.1 repaint, and the 0.3.2 plate.</li>
 <li>Labelled commits: ${labelled}. A plate whose run card commit differs, or records no commit, is refused: no image, no vote.</li>
 <li>A CPU run, a GPU fallback or a render narrower than 540 px is refused.</li>
-<li>A source target narrower than 600 px is marked <code>low-res-source</code> on every plate, because it is enlarged to paint size. Pass <code>--strict</code> to refuse these.</li>
+<li>300 px benchmark source crops are supported. Source resolution and painting resolution are checked separately: paintings must match their recorded dimensions and meet the subject’s full declared width (540 px minimum for unknown subjects). Sources narrower than 300 px are marked <code>low-res-source</code>; <code>--strict</code> refuses them. Missing, malformed or nonzero render exits are refused.</li>
 <li>Prior paintings come from published records. Their releases here: ${esc(m.priorReleases.join(', ') || 'none')}. ${esc(m.priorNote ?? '')}</li>
-<li>The scrubber plays every frame in the plate's <code>frames.json</code>. Published runs keep five stages only, so the prior shows its stage strip.</li>
+<li>The scrubber plays available recorded frames. Missing or non-native frames are disclosed. When recorded frames are unavailable, retained percentage checkpoints and dried bands are shown as explicitly labelled grouped evidence, not chronological playback. Default delivery preserves original image bytes; explicit width options produce JPEG92 previews. Published priors show their archived stage strip.</li>
 <li>J1 and progression show "not scored" when no record holds them. Seconds are single runs on different machines, and noisy when a machine is shared.</li>
 <li>Votes are stored in this browser only. Export them before clearing site data.</li>
 </ul></details>
