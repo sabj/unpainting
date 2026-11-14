@@ -134,3 +134,43 @@ test('refill boundaries capture every physical ink segment without changing gest
  verifyNativeMarkCoverage(on.tape,{ink:on.segments.length,brush:0,graphite:0});
  const {manifest,rgb}=await reconstruct(directory);assert.deepEqual(Buffer.from(rgb),on.pixels);assert.deepEqual(manifest.events.filter(e=>e.operation==='ink').map(e=>e.pixelSHA256),on.segments.map(e=>hash(e.pixels)));
 });
+
+for(const demand of ['0','1'])test('main GPU refill frames read current ink and flowed layers, not the version memo (demand '+demand+')', {skip:process.platform!=='darwin',timeout:120000},async t=>{
+ const {attachGpu}=await import('../../src/media/gpu/link.mjs'),{coherent,step}=await import('../../src/media/sheet.mjs');
+ const priorDemand=process.env.GPU_DEMAND_READBACK;process.env.GPU_DEMAND_READBACK=demand;t.after(()=>{if(priorDemand===undefined)delete process.env.GPU_DEMAND_READBACK;else process.env.GPU_DEMAND_READBACK=priorDemand;});
+ const {readActiveStroke}=await import('./sheet.mjs'),{renderSheet}=await import('../../src/media/render-cache.mjs');
+ const source=fs.readFileSync(new URL('./sheet.mjs',import.meta.url),'utf8');
+ const raw=source.slice(source.indexOf('const renderRaw = () => {'),source.indexOf('const render = () =>'));
+ const w=100,h=60,pigments=[materialProfile('drawing-ink').pigment],base=Buffer.alloc(w*h*3,250),directory=dir(t);
+ function run(record){
+  const main=createSheet(makePaper(w,h,{seed:23}),pigments);attachGpu(main,DEFAULTS,{mode:'on',log:()=>{}});
+  const ctx={sheet:main,RENDER_REUSED:0},view=new Function('ctx','renderSheet','readActiveStroke','SHEET_PIGS','base','N2','NATIVE_PAINT_MODE','SPEED_GPU_OPTICS','WETRENDER','num',raw+';return renderRaw;')(ctx,renderSheet,readActiveStroke,pigments,base,w*h,{mode:'strict'},false,false,()=>0);
+  let writer=null;
+  try{
+   const brush=createBrush({radius:8,flat:true,capacity:40,seed:9});dip(brush,{water:.7,conc:[.4]});stroke(brush,main,[{x:8,y:40,p:.6},{x:90,y:40,p:.8}],{upright:'sweep'});
+   dry(main,30000,DEFAULTS,{levelMax:90,dt:14,analyticTail:true});dip(brush,{water:.7,conc:[.1]});stroke(brush,main,[{x:8,y:40,p:.6},{x:90,y:40,p:.8}],{upright:'sweep'});step(main,DEFAULTS);
+   const tape=recordMarks(true);main._tape=true;
+   writer=record?createNativeOperationRecorder({directory,width:w,height:h,diskFloor:21*1024**3}):null;writer?.capture(view(),{operation:'initial'});
+   const events=[],audit=[];let gestures=0;
+   drawMaterial(main,[{points:[{x:4,y:12,s:.6,nw:.8},{x:94,y:12,s:.6,nw:.8}]}],new Float32Array(w*h),w,h,{medium:'drawing-ink',mmPerCell:.25,O:DEFAULTS,pen:{reservoir:.5},dryInk:false,audit,afterStroke:()=>gestures++,...(record?{afterSegment:e=>{const topStale=main._gpu.topStale,version=main._gpu.version,rgb=view(),reference=renderLayers(layersOf(main),pigments,base,w*h,1);assert.equal(hash(rgb),hash(reference),'production frame equals current physical pigment');assert.equal(main._gpu.version,version,'observation cannot advance GPU physics');events.push({version,topStale,hash:hash(rgb),reason:e.reason});writer.capture(rgb,{operation:'ink',reason:e.reason});}}:{})});
+   const pixels=Buffer.from(view());writer?.finish(pixels);coherent(main);
+   return {pixels,tape:structuredClone(tape),audit,gestures,events,fields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(main[k])]))};
+  }finally{recordMarks(false);main._gpu.close();}
+ }
+ const off=run(false),on=run(true);assert.deepEqual(on.pixels,off.pixels);assert.deepEqual(on.fields,off.fields);assert.deepEqual(on.tape,off.tape);assert.deepEqual(on.audit,off.audit);assert.equal(on.gestures,1);
+ assert(on.events.length>3);assert(on.events.some((e,i,a)=>i&&e.version===a[i-1].version&&e.hash!==a[i-1].hash),'two real segments between GPU flow steps must have different frames');
+ assert(on.events.some(e=>e.topStale),'fixture must refresh a GPU-changed dried layer');
+ assert(new Set(on.events.map(e=>e.version)).size>2,'fixture must cross GPU flow boundaries');
+ verifyNativeMarkCoverage(on.tape,{ink:on.events.length,brush:0,graphite:0});const {rgb}=await reconstruct(directory);assert.deepEqual(Buffer.from(rgb),on.pixels);
+});
+
+test('empty first refill segment remains an explicit unchanged native event',async t=>{
+ const w=30,h=20,pigments=[materialProfile('drawing-ink').pigment],sheet=createSheet(makePaper(w,h,{seed:4}),pigments),directory=dir(t),tape=recordMarks(true);sheet._tape=true;
+ const view=()=>renderLayers(layersOf(sheet),pigments,Buffer.alloc(w*h*3,255),w*h,1),writer=createNativeOperationRecorder({directory,width:w,height:h,diskFloor:0});
+ writer.capture(view(),{operation:'initial'});let segments=0,gestures=0;
+ try{
+  drawMaterial(sheet,[{points:[{x:3,y:10,s:.6},{x:25,y:10,s:.6}]}],new Float32Array(w*h),w,h,{medium:'drawing-ink',mmPerCell:.25,sourceInk:true,O:DEFAULTS,beforeStroke:({pen})=>{pen.ink=0;pen.drop=0;},afterSegment:e=>{segments++;writer.capture(view(),{operation:'ink',reason:e.reason});},afterStroke:()=>gestures++});
+  writer.finish(view());verifyNativeMarkCoverage(tape,{ink:segments,brush:0,graphite:0});assert.equal(gestures,1);assert.equal(segments,2);
+  const {manifest}=await reconstruct(directory);assert.equal(manifest.events[1].reason,'refill');assert.equal(manifest.events[1].file,null);assert.equal(manifest.events[1].pixelSHA256,manifest.events[0].pixelSHA256);assert.notEqual(manifest.events[2].pixelSHA256,manifest.events[1].pixelSHA256);
+ }finally{recordMarks(false);}
+});

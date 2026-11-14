@@ -39,6 +39,7 @@ import sharp from 'sharp';
 import {makePaper, coldPressField} from '../../src/media/paper.mjs';
 import {createSheet, step, dry as physicalDry, layersOf, thickness, thicknessTotals, DEFAULTS, coherent} from '../../src/media/sheet.mjs';
 import {attachGpu} from '../../src/media/gpu/link.mjs';
+import {CpuDemandWindow} from '../../src/media/gpu/cpu-demand-window.mjs';
 import {backendLine} from '../../src/media/gpu/backend-record.mjs';
 import {renderLayers, renderLayersCached, renderCells, microAmps} from '../../src/media/km.mjs';
 import {renderSheet} from '../../src/media/render-cache.mjs';
@@ -63,6 +64,20 @@ import {fillSheetBase, WHITE_PAPER_RGB} from '../../src/paint/methods/sheet-tone
 import {sealAtBirth} from '../guard/seal-maps.mjs';
 import {createWetTrace} from './wet-trace.mjs';
 import {wetOnDryGate, passageReach} from '../painter/passage-dry-gate.mjs';
+
+// Observe CPU pen contact while its GPU stroke is still open. Readbacks must
+// preserve unuploaded ink; they never advance, upload or end the physical stroke.
+export function readActiveStroke(sheet) {
+ const link=sheet._gpu;if(!link?.stroke)return false;
+ const stroke=link.stroke;
+ // Ink does not edit dried layers. Refresh their GPU truth without syncAll,
+ // whose wet readback would overwrite the current CPU pen contact.
+ try{link.stroke=null;link.syncTop(sheet);}finally{link.stroke=stroke;}
+ let window=sheet._cpuDemandWindow;
+ if(!window){window=new CpuDemandWindow(sheet.w,sheet.h,[sheet.W,sheet.s,sheet.M,sheet.ever,...sheet.G,...sheet.P,...sheet.D],rect=>link.down(sheet,rect));window.rect=stroke.slice();}
+ window.require([0,0,sheet.w,sheet.h]);
+ return true;
+}
 
 export async function sheetAndBrushes(ctx) {
 const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
@@ -478,7 +493,7 @@ const getOpticalUnder = (baseBuf, micro = null) => {
 };
 const renderRaw = () => {
   const link = ctx.sheet._gpu;
-  if (!link) return renderSheet(ctx.sheet, SHEET_PIGS, base, N2, 1);
+  if (!link || readActiveStroke(ctx.sheet)) return renderSheet(ctx.sheet, SHEET_PIGS, base, N2, 1);
   const key = `${link.version}|${ctx.sheet._layerVer || 0}|${ctx.sheet.layers.length}`;
   if (ctx.RENDER_MEMO && ctx.RENDER_MEMO.key === key) { ctx.RENDER_REUSED++; return ctx.RENDER_MEMO.rgb.slice(); }
   const rgb = (NATIVE_PAINT_MODE.mode==='fast' || SPEED_GPU_OPTICS) && link.resident && process.env.GPU_COMPOSITE==='1' && !WETRENDER && num('pencilerase',0)===0 ? (()=>{
@@ -537,13 +552,14 @@ const lookUp = (a, w0, h0, N) => {
 ctx.LOOK1 = null;
 const view = () => {
   if (!LOOK) return render();
+  readActiveStroke(ctx.sheet);
   ctx.LOOK1 ??= { base: LOOK_RELIEF > 0 || LOOK_GRAIN > 0 ? lookBase(paper.height, W2, H2, LOOK_MM) : base, micro: LOOK_MICRO > 0 ? lookMicro(paper.height, W2, H2, LOOK_MC) : null };
-  if (ctx.sheet._gpu?.resident && process.env.GPU_COMPOSITE === '1' && num('pencilerase',0) === 0) {
+  if (ctx.sheet._gpu?.resident && !ctx.sheet._gpu.stroke && process.env.GPU_COMPOSITE === '1' && num('pencilerase',0) === 0) {
     const link=ctx.sheet._gpu;link.initOptical(ctx.sheet,ctx.LOOK1.micro);
     // Only the preparatory ink can change below the immutable paint stack; keep its unrounded reflectance.
     return finishRGB(link.opticalFrame(ctx.sheet,getOpticalUnder(ctx.LOOK1.base,ctx.LOOK1.micro)));
   }
-  if (ctx.sheet._gpu?.resident && process.env.GPU_OPTICS !== '0') {
+  if (ctx.sheet._gpu?.resident && !ctx.sheet._gpu.stroke && process.env.GPU_OPTICS !== '0') {
     // Keeps the reference's double-precision pigment sum and KM arithmetic; only completed lower layers are cached.
     return finishRGB(renderLayersCached(layersOf(ctx.sheet), SHEET_PIGS, ctx.LOOK1.base, N2, 1, ctx.LOOK1.micro));
   }
