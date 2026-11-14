@@ -9,7 +9,7 @@ import {createNativeOperationRecorder,verifyNativeMarkCoverage} from './native-o
 import {applyNativeOperation} from '../../demos/lab/targets/film.js';
 import {makePaper} from '../../src/media/paper.mjs';
 import {createSheet,layersOf,dry,DEFAULTS} from '../../src/media/sheet.mjs';
-import {createBrush,dip,stroke} from '../../src/media/brush.mjs';
+import {createBrush,dip,stroke,recordMarks} from '../../src/media/brush.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {materialProfile,drawMaterial} from '../../src/paint/methods/material-profiles.mjs';
 import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
@@ -108,4 +108,29 @@ test('saved native prefix resumes complete chronology, verifies payloads and pre
  const result=await reconstruct(out);assert.deepEqual(Buffer.from(result.rgb),rgb);assert.deepEqual(result.manifest.events.map(e=>e.operation),['initial','ink','brush','final']);assert(result.manifest.events.every((e,i,a)=>!i||e.elapsedMs>=a[i-1].elapsedMs));
  fs.writeFileSync(path.join(snapshot,'resume-frame.png'),Buffer.from('bad'));
  assert.throws(()=>createNativeOperationRecorder({directory:dir(t),width:8,height:4,diskFloor:0,resumeFrom:snapshot}),/Native recording failed/);
+});
+
+
+test('refill boundaries capture every physical ink segment without changing gesture audits or state',async t=>{
+ const {attachGpu}=await import('../../src/media/gpu/link.mjs');
+ const {coherent}=await import('../../src/media/sheet.mjs');
+ const w=80,h=30,pigments=[materialProfile('drawing-ink').pigment],directory=dir(t);
+ function run(record){
+  const tape=recordMarks(true),main=createSheet(makePaper(w,h,{seed:19}),pigments);main._tape=true;
+  if(process.platform==='darwin'){const info=attachGpu(main,DEFAULTS,{mode:'on',log:()=>{}});assert.equal(info.backend,'gpu');assert.equal(info.fallback,false);}
+  const fine=makeInkRes({N:2,W2:w,H2:h,paperOpts:{seed:19},pigments,main}),audit=[],segments=[],gestureCallbacks=[];
+  const view=()=>fine.compose(renderLayers(layersOf(main),pigments,Buffer.alloc(w*h*3,255),w*h,1));
+  const writer=record?createNativeOperationRecorder({directory,width:w*2,height:h*2,diskFloor:0}):null;
+  writer?.capture(view(),{operation:'initial'});
+  try{
+   drawFineMaterial(fine,[{points:[{x:3,y:12,s:.6,nw:.8},{x:74,y:12,s:.6,nw:.8}]}],{w,h,medium:'drawing-ink',sourceInk:true,mmPerCell:.25,O:DEFAULTS,pen:{reservoir:2},audit,afterStroke:e=>gestureCallbacks.push(e.reloads),...(record?{afterSegment:e=>{segments.push({reason:e.reason,pixels:Buffer.from(view())});writer.capture(view(),{operation:'ink',reason:e.reason});}}:{})});
+   const pixels=Buffer.from(view());writer?.finish(pixels);coherent(main);
+   return {pixels,tape:structuredClone(tape),audit,segments,gestureCallbacks,fields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(fine.fine[k])])),mainFields:Object.fromEntries(['W','s','G','P','D','layers'].map(k=>[k,structuredClone(main[k])]))};
+  }finally{recordMarks(false);main._gpu?.close();}
+ }
+ const off=run(false),on=run(true);assert.deepEqual(on.pixels,off.pixels);assert.deepEqual(on.tape,off.tape);assert.deepEqual(on.fields,off.fields);assert.deepEqual(on.mainFields,off.mainFields);assert.deepEqual(on.audit,off.audit);assert.deepEqual(on.gestureCallbacks,off.gestureCallbacks);assert.equal(on.gestureCallbacks.length,1);
+ const penMarks=on.tape.filter(m=>m.k==='P');assert(penMarks.length>1,'fixture must refill inside one gesture');assert.equal(new Set(penMarks.map(m=>m.gestureId)).size,1);assert.equal(on.segments.length,penMarks.length);assert.equal(on.segments.at(-1).reason,'gesture-end');assert(on.segments.slice(0,-1).every(e=>e.reason==='refill'));
+ assert.equal(on.audit[0].reloadsWithinStroke,penMarks.length-1);for(let i=1;i<on.segments.length;i++)assert.notEqual(hash(on.segments[i-1].pixels),hash(on.segments[i].pixels),'each completed segment must deposit visible ink');
+ verifyNativeMarkCoverage(on.tape,{ink:on.segments.length,brush:0,graphite:0});
+ const {manifest,rgb}=await reconstruct(directory);assert.deepEqual(Buffer.from(rgb),on.pixels);assert.deepEqual(manifest.events.filter(e=>e.operation==='ink').map(e=>e.pixelSHA256),on.segments.map(e=>hash(e.pixels)));
 });

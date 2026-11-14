@@ -28,7 +28,7 @@ export function lineField(D, residual, w, h, { sigmas = [0.8, 1.2, 1.8] } = {}) 
  * @param opts.ink  concentration per pigment of the ink in the pen, as dipPen takes it
  * @param opts.peak the want that means a full-pressure line; defaults to the 95th percentile of the gestures' own
  */
-export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pen: penOpts = {}, low = 0.25, allowStarvation = false, flowEvery = 60, O, beforeStroke = null, afterStroke = null } = {}) {
+export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pen: penOpts = {}, low = 0.25, allowStarvation = false, flowEvery = 60, O, beforeStroke = null, afterStroke = null, afterSegment = null } = {}) {
   const at = (x, y) => want[Math.max(0, Math.min(h - 1, Math.round(y))) * w + Math.max(0, Math.min(w - 1, Math.round(x)))];
   if (peak == null) {
     const v = [];
@@ -58,7 +58,9 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     pen.damp = g.damp != null ? Math.max(0, Math.min(1, g.damp)) : dryDamp;
     if (beforeStroke) beforeStroke({ sheet, pen, path, gesture: g, footprint: penRect(pen, sheet, path), index: drawn });
     const startDips = dips;
-    penStroke(pen, sheet, path, { refillBelow, refill: p => { dipPen(p, ink); dips++; }, gpuBetween: true, flowEvery: O ? flowEvery : 0, between: n => { if (O && n % flowEvery === 0) step(sheet, O); } });
+    penStroke(pen, sheet, path, { refillBelow, refill: p => { afterSegment?.({pen:p,gesture:g,reason:'refill'}); dipPen(p, ink); dips++; }, gpuBetween: true, flowEvery: O ? flowEvery : 0, between: n => { if (O && n % flowEvery === 0) step(sheet, O); } });
+    // A refill ends one deposited tape segment; gesture audits still run once.
+    afterSegment?.({pen,gesture:g,reason:'gesture-end'});
     afterStroke?.({pen, gesture:g, reloads:dips-startDips});
     drawn++;
   }
