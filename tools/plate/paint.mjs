@@ -258,10 +258,11 @@ const awareSave = async (dir, at) => {
   });
   const state = {
     at, provenanceHistory: ctx.PROVENANCE_HISTORY, inkres: INKRES?.exportState()??null, prepf: PREPF, sheet: sheetFields, layersLength: ctx.layers.length, tailFrom, tail,
-    js: { designedExecution: ctx.DESIGNED_EXECUTION, framePolicy: FRAME_POLICY.state(), laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, FRAMES, marks, lastPainted: ctx.lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: new Set(ctx.VALUE_OWN_CONTACT), VALUE_PIGMENT_CONTACT: new Set(ctx.VALUE_PIGMENT_CONTACT), VALUE_COMMAND: ctx.VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, colourTrace, WASH_BASE: ctx.WASH_BASE },
+    js: { nativeMarkCounts:ctx.NATIVE_MARK_COUNTS, designedExecution: ctx.DESIGNED_EXECUTION, framePolicy: FRAME_POLICY.state(), laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, FRAMES, marks, lastPainted: ctx.lastPainted, expected, used, TECHS, LAST, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, feedbackStats, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: new Set(ctx.VALUE_OWN_CONTACT), VALUE_PIGMENT_CONTACT: new Set(ctx.VALUE_PIGMENT_CONTACT), VALUE_COMMAND: ctx.VALUE_COMMAND, VALUE_COUNTS, BODY_CADENCE_RECORD, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, colourTrace, WASH_BASE: ctx.WASH_BASE },
     tape: MARKTAPE ? { marks: MARKTAPE, ...tapeState() } : null, guard: TARGET_GUARD.exportState(),
   };
   const r = writeState(dir, state, awareProvenance(state.guard.looks.count));
+  ctx.NATIVE_RECORDER?.checkpoint(path.join(dir,'native-operations'));
   fs.writeFileSync(path.join(dir, 'boundary.json'), JSON.stringify(at));
   console.log(`aware: painting saved at ${awareWhere(at)} (${r.arrays} arrays, ${r.zeros} empty, ${(r.bytes / 1e6).toFixed(1)} MB, ${r.milliseconds.toFixed(1)} ms IO) in ${dir}`);
 };
@@ -299,6 +300,7 @@ const awareRestore = () => {
   }
   const j = st.js;
   ctx.DESIGNED_EXECUTION = j.designedExecution;
+  if(ctx.NATIVE_RECORDER){if(!j.nativeMarkCounts)throw Error('Missing native recording prefix counts');ctx.NATIVE_MARK_COUNTS={...j.nativeMarkCounts};}
   FRAME_POLICY.restore(j.framePolicy);
   ({ laid: ctx.laid, dropped: ctx.dropped, droppedMass: ctx.droppedMass, filmLaid: ctx.filmLaid, filmNext: ctx.filmNext, filmPass: ctx.filmPass, drawnCount: ctx.drawnCount, STAGE: ctx.STAGE, LAST_FRAME_STAGE: ctx.LAST_FRAME_STAGE, frame: ctx.frame, lastPainted: ctx.lastPainted, ONSHEET, FEEDBACK_BASE, FEEDBACK_FRESH, VALUE_ACTIVE: ctx.VALUE_ACTIVE, VALUE_OWN_CONTACT: ctx.VALUE_OWN_CONTACT, VALUE_PIGMENT_CONTACT: ctx.VALUE_PIGMENT_CONTACT, VALUE_COMMAND: ctx.VALUE_COMMAND, PASS_LATE_DONE, INK_THK: ctx.INK_THK, WASH_THK: ctx.WASH_THK, WASH_BASE: ctx.WASH_BASE } = j);
   ctx.VALUE_OWN_CONTACT = new EpochCells(N2, ctx.VALUE_OWN_CONTACT);
@@ -1026,7 +1028,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   else if (layer.shapes.some(sh => sh.dryAfter)) clock('dry', () => dry(ctx.sheet, 3000, O, { levelMax: 90, dt: 6, ...watch }));
   ctx.WET_TRACE?.boundary('next', { pass: L + 1, value: layer.value }); ctx.WET_TRACE?.passage(null);
   ctx.RECEIVER_OBSERVER?.ordinaryDry(L+1,ctx.sheet,{actualBoundary:!!(earlyBoundary||wetInto||endOfValue||nextOther||layer.shapes.some(sh=>sh.dryAfter)),endOfValue,nextOther,wetInto,earlyBoundary:!!earlyBoundary});
-  if (filmed && PREPF) fadePrep();
+  if (filmed && PREPF){fadePrep();ctx.NATIVE_CAPTURE?.('preparation-fade');}
   if (filmed) await shoot();
   for (const sh of layer.shapes) {
     if (process.env.CHECKBOX && sh.mask && sh._mbox) { let out = 0; const b = sh._mbox; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (sh.mask[y * w + x] && (y < b.y0 || y > b.y1 || x < b.x0 || x > b.x1)) out++; if (out) console.log(`BOXCHECK ${out} mask cells outside the box (booked ${!!sh._booked})`); }

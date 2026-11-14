@@ -831,12 +831,11 @@ Object.assign(ctx, { dry, dip, dipLoad, productionDip, stroke, pencilDraw, SC, H
   washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL });
 if(opt('marks','0')!=='0'){
  ctx.NATIVE_UNOBSERVED_ROUTES=[...(ctx.CURLS?.area?['legacy curls']:[]),...(num('shapes',0)>0?['legacy shapes']:[])];
- if(opt('resumestate',''))throw Error('Complete native operation recording requires the painting start, not a resumed boundary');
- ctx.NATIVE_RECORDER=createNativeOperationRecorder({directory:path.join(out,'native-operations'),width:OUT_W,height:OUT_H,provenance:{code:CODE_HASH,backend:GPU_INFO}});
+ ctx.NATIVE_RECORDER=createNativeOperationRecorder({directory:path.join(out,'native-operations'),width:OUT_W,height:OUT_H,provenance:{code:CODE_HASH,backend:GPU_INFO},resumeFrom:opt('resumestate','')?path.join(opt('resumestate',''),'native-operations'):null});
  ctx.NATIVE_MARK_COUNTS={brush:0,ink:0,graphite:0};
- ctx.NATIVE_CAPTURE=operation=>{ctx.NATIVE_RECORDER.capture(INKRES?INKRES.compose(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'}});if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;};
+ ctx.NATIVE_CAPTURE=operation=>{if(ctx.NATIVE_RECORDING_FAILURE)return;try{ctx.NATIVE_RECORDER.capture(INKRES?INKRES.compose(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'}});if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;}catch(error){ctx.NATIVE_RECORDING_FAILURE=error.message;console.error('NATIVE RECORDING FAILED: '+error.message+'; capture stopped, painting continues to retain its final image, and this run will fail.');}};
  if(INKRES)for(const name of ['wet','carry','settle']){const original=INKRES[name];INKRES[name]=(...args)=>{const value=original(...args);ctx.NATIVE_CAPTURE('ink-'+name);return value;};}
- ctx.NATIVE_CAPTURE('initial');
+ if(!opt('resumestate',''))ctx.NATIVE_CAPTURE('initial');
 }
 
 }

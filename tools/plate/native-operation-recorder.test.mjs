@@ -100,3 +100,12 @@ test('completion refuses any physical tape mark absent from native observations'
  assert.throws(()=>verifyNativeMarkCoverage(tape,{brush:0,ink:1,graphite:1}),/Incomplete native recording: brush/);
  assert.throws(()=>verifyNativeMarkCoverage(tape,{brush:1,ink:1,graphite:2}),/Incomplete native recording: graphite/);
 });
+
+test('saved native prefix resumes complete chronology, verifies payloads and preserves final bytes',async t=>{
+ const directory=dir(t),snapshot=path.join(dir(t),'prefix'),out=dir(t),rgb=Buffer.alloc(96,240);
+ const a=createNativeOperationRecorder({directory,width:8,height:4,diskFloor:0});a.capture(rgb,{operation:'initial'});rgb[10]=45;a.capture(rgb,{operation:'ink'});a.checkpoint(snapshot);a.abort('saved boundary');
+ const b=createNativeOperationRecorder({directory:out,width:8,height:4,diskFloor:0,resumeFrom:snapshot});rgb[42]=56;b.capture(rgb,{operation:'brush'});b.finish(rgb);
+ const result=await reconstruct(out);assert.deepEqual(Buffer.from(result.rgb),rgb);assert.deepEqual(result.manifest.events.map(e=>e.operation),['initial','ink','brush','final']);assert(result.manifest.events.every((e,i,a)=>!i||e.elapsedMs>=a[i-1].elapsedMs));
+ fs.writeFileSync(path.join(snapshot,'resume-frame.png'),Buffer.from('bad'));
+ assert.throws(()=>createNativeOperationRecorder({directory:dir(t),width:8,height:4,diskFloor:0,resumeFrom:snapshot}),/Native recording failed/);
+});

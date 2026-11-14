@@ -8,11 +8,11 @@ const hash = b => crypto.createHash('sha256').update(b).digest('hex');
 const FLOOR = 21 * 1024 ** 3, CAP = 512 * 1024 ** 2;
 
 /** The synchronous painter cannot queue unbounded raw frames. One shared slot, one acknowledgement. */
-export function createNativeOperationRecorder({directory,width,height,provenance={},byteCap=CAP,diskFloor=FLOOR,timeoutMs=120000}) {
+export function createNativeOperationRecorder({directory,width,height,provenance={},resumeFrom=null,byteCap=CAP,diskFloor=FLOOR,timeoutMs=120000}) {
  if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('Invalid native recording dimensions');
  const pixels=new SharedArrayBuffer(width*height*3),control=new SharedArrayBuffer(8),error=new SharedArrayBuffer(8192);
  const state=new Int32Array(control);let closed=false;
- const worker=new Worker(new URL(import.meta.url),{execArgv:[],workerData:{nativeRecorder:true,directory,width,height,provenance,byteCap,diskFloor,pixels,control,error}});
+ const worker=new Worker(new URL(import.meta.url),{execArgv:[],workerData:{nativeRecorder:true,directory,width,height,provenance,resumeFrom,byteCap,diskFloor,pixels,control,error}});
  worker.unref();worker.on('error',()=>{}); // Fatal startup is also bounded by the acknowledgement timeout.
  function send(message,rgb){
   if(closed)throw Error('Native recording already closed');
@@ -25,6 +25,7 @@ export function createNativeOperationRecorder({directory,width,height,provenance
  send({kind:'start'});
  return {
   capture(rgb,event={}){send({kind:'capture',event},rgb);},
+  checkpoint(destination){send({kind:'checkpoint',destination});},
   finish(rgb,event={}){send({kind:'finish',event},rgb);closed=true;worker.terminate();},
   abort(reason='Painting did not complete'){if(!closed){send({kind:'abort',reason});closed=true;worker.terminate();}},
  };
@@ -39,8 +40,8 @@ export function verifyNativeMarkCoverage(tape,observed){
 }
 
 if(!isMainThread&&workerData?.nativeRecorder){
- const {directory,width,height,provenance,byteCap,diskFloor,pixels,control,error}=workerData,state=new Int32Array(control);
- let previous=null,used=0,overheadBytes=0,events=[],started=false;const began=Date.now();
+ const {directory,width,height,provenance,resumeFrom,byteCap,diskFloor,pixels,control,error}=workerData,state=new Int32Array(control);
+ let previous=null,used=0,overheadBytes=0,events=[],started=false,elapsedOffset=0;const began=Date.now();
  const manifest={version:1,kind:'native-operation-recording',width,height,provenance,complete:false,events};
  function room(n){const s=fs.statfsSync(directory);if(used+overheadBytes+n>byteCap)throw Error('Native recording byte cap exceeded');if(s.bavail*s.bsize-n<diskFloor)throw Error('Native recording disk floor reached');}
  function write(name,b){room(b.length);fs.writeFileSync(path.join(directory,name),b);used+=b.length;}
@@ -59,14 +60,38 @@ if(!isMainThread&&workerData?.nativeRecorder){
   }
   let file=null,payloadSHA256=null;
   if(payload){payloadSHA256=hash(payload);file=payloadSHA256+'.png';if(!fs.existsSync(path.join(directory,file)))write(file,payload);}
-  const record={...event,elapsedMs:Date.now()-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?hash(previous):null,pixelSHA256:hash(rgb)};
+  const record={...event,elapsedMs:elapsedOffset+Date.now()-began,index:events.length,keyframe:key,rectangle:rect,encoding,file,payloadSHA256,previousSHA256:previous?hash(previous):null,pixelSHA256:hash(rgb)};
   const line=Buffer.from(JSON.stringify(record)+'\n');room(line.length);fs.appendFileSync(path.join(directory,'events.jsonl'),line);used+=line.length;events.push(record);previous=Buffer.from(rgb);
+ }
+ function copyPrefix(source,destination){
+  fs.mkdirSync(destination,{recursive:true});
+  for(const file of fs.readdirSync(source)){
+   if(file==='resume-frame.png'||file==='film.json')continue;
+   const a=path.join(source,file),b=path.join(destination,file);
+   if(!file.endsWith('.png')&&!['operations.json','events.jsonl'].includes(file))throw Error('Unexpected native prefix file');
+   const bytes=fs.readFileSync(a);room(bytes.length);
+   if(fs.existsSync(b)){if(hash(fs.readFileSync(b))!==hash(bytes))throw Error('Native prefix output differs from saved boundary');continue;}
+   if(file.endsWith('.png'))fs.linkSync(a,b);else fs.copyFileSync(a,b);
+  }
+ }
+ async function restorePrefix(){
+  const saved=JSON.parse(fs.readFileSync(path.join(resumeFrom,'operations.json')));
+  if(saved.complete||saved.kind!==manifest.kind||saved.width!==width||saved.height!==height||JSON.stringify(saved.provenance)!==JSON.stringify(provenance)||!saved.events.length)throw Error('Native recording prefix mismatch');
+  previous=await sharp(path.join(resumeFrom,'resume-frame.png')).removeAlpha().raw().toBuffer();
+  if(previous.length!==width*height*3||hash(previous)!==saved.events.at(-1).pixelSHA256)throw Error('Native recording prefix pixels mismatch');
+  // Verify every admitted payload before copying a prefix; no dangling provenance.
+  for(const event of saved.events)if(event.file&&hash(fs.readFileSync(path.join(resumeFrom,event.file)))!==event.payloadSHA256)throw Error('Native prefix payload mismatch');
+  copyPrefix(resumeFrom,directory);elapsedOffset=saved.events.at(-1).elapsedMs??0;events=saved.events;manifest.events=events;
+  used=fs.statSync(path.join(directory,'events.jsonl')).size;
+  for(const file of new Set(events.filter(e=>e.file).map(e=>e.file)))used+=fs.statSync(path.join(directory,file)).size;
+  overheadBytes=fs.statSync(path.join(directory,'operations.json')).size;room(0);
  }
  parentPort.on('message',async m=>{
   try{
-   if(m.kind==='start'){fs.mkdirSync(directory,{recursive:true});if(fs.existsSync(path.join(directory,'operations.json')))throw Error('Native recording output already exists');room(width*height*3+65536);started=true;save();}
+   if(m.kind==='start'){fs.mkdirSync(directory,{recursive:true});if(resumeFrom){await restorePrefix();started=true;}else{if(fs.existsSync(path.join(directory,'operations.json')))throw Error('Native recording output already exists');room(width*height*3+65536);started=true;save();}}
    else if(m.kind==='capture')await capture(m.event);
-   else if(m.kind==='finish'){await capture({...m.event,operation:'final'},true);manifest.seconds=(Date.now()-began)/1000;const keys=events.filter(e=>e.keyframe);write('film.json',Buffer.from(JSON.stringify({operations:'operations.json',frames:keys.map(e=>e.file),frameNumbers:keys.map(e=>e.index),aspect:width/height,seconds:manifest.seconds,keyframes:keys.map(e=>({fraction:e.index/(events.length-1),image:e.file})),nativeWidth:width,nativeHeight:height,operationCount:events.length})));manifest.complete=true;save();}
+   else if(m.kind==='checkpoint'){if(!previous)throw Error('No native prefix to save');save();copyPrefix(directory,m.destination);const frame=await png(previous,width,height);room(frame.length);fs.writeFileSync(path.join(m.destination,'resume-frame.png'),frame);}
+   else if(m.kind==='finish'){await capture({...m.event,operation:'final'},true);manifest.seconds=(elapsedOffset+Date.now()-began)/1000;const keys=events.filter(e=>e.keyframe);write('film.json',Buffer.from(JSON.stringify({operations:'operations.json',frames:keys.map(e=>e.file),frameNumbers:keys.map(e=>e.index),aspect:width/height,seconds:manifest.seconds,keyframes:keys.map(e=>({fraction:e.index/(events.length-1),image:e.file})),nativeWidth:width,nativeHeight:height,operationCount:events.length})));manifest.complete=true;save();}
    else if(m.kind==='abort'){manifest.error=m.reason;save();}
    else throw Error('Unknown native recording command');
    Atomics.store(state,0,1);
