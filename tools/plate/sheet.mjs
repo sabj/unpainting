@@ -1,5 +1,6 @@
 // Brush and pen strokes, the value plan, the sheet of paper, looks, marks and scrap calibration.
 // Stage 3 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
+import {createNativeOperationRecorder} from './native-operation-recorder.mjs';
 import {compactLowerLayers} from '../../src/media/layer-storage.mjs';
 import {certifyZeroPaper} from '../../src/media/paper-certificate.mjs';
 import {check} from '../../src/media/checks.mjs';
@@ -74,9 +75,9 @@ const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MOD
   AREA_EXEC } = ctx;
 Object.assign(ctx, { colourMass });
 // WET_TRACE=<file.jsonl>: a read-only record of the sheet's water under each stroke at landing and around each dry (wet-trace.mjs)
-const physicalStroke=(b,t,p,o)=>ctx.WET_TRACE&&t===ctx.sheet?ctx.WET_TRACE.stroke(b,t,p,o,untracedStroke):untracedStroke(b,t,p,o);
+const physicalStroke=(b,t,p,o)=>{const result=ctx.WET_TRACE&&t===ctx.sheet?ctx.WET_TRACE.stroke(b,t,p,o,untracedStroke):untracedStroke(b,t,p,o);if(t===ctx.sheet)ctx.NATIVE_CAPTURE?.('brush');return result;};
 const tracedDry=(...args)=>ctx.WET_TRACE&&args[0]===ctx.sheet?ctx.WET_TRACE.dry(args,physicalDry):physicalDry(...args);
-const dry=(...args)=>{ctx.VALUE_OWN_CONTACT.clear();ctx.VALUE_PIGMENT_CONTACT.clear();if(args[0]===ctx.sheet&&ctx.AREA_NUMERIC_SEQUENCE)ctx.AREA_NUMERIC_SEQUENCE.history.length=0;const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);const result=ctx.AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>tracedDry(...args)):tracedDry(...args);if(args[0]._layerStoragePolicy)compactLowerLayers(args[0],args[0]._layerStoragePolicy());return result;};
+const dry=(...args)=>{ctx.VALUE_OWN_CONTACT.clear();ctx.VALUE_PIGMENT_CONTACT.clear();if(args[0]===ctx.sheet&&ctx.AREA_NUMERIC_SEQUENCE)ctx.AREA_NUMERIC_SEQUENCE.history.length=0;const requested=args[3];args[3]=nativeDryOptions(NATIVE_PAINT_MODE.mode,requested);const result=ctx.AREA_PLAN?AREA_EXEC.command('ordinary physical drying',{maxSteps:args[1],options:args[3],requestedOptions:requested,nativeMode:NATIVE_PAINT_MODE},()=>tracedDry(...args)):tracedDry(...args);if(args[0]._layerStoragePolicy)compactLowerLayers(args[0],args[0]._layerStoragePolicy());if(args[0]===ctx.sheet)ctx.NATIVE_CAPTURE?.('dry');return result;};
 const dipLoad=(b,o)=>{const a=AREA_EXEC.active,paint=o.conc.some(v=>v>0);const load=a&&!a.productionLegacyDetail?{...o,water:paint&&a.pass.source!=='authored'?a.pass.load.water:(paint?a.pass.load.water:(a.pass.load.prewetWater??1))*a.pass.load.waterQuantityMm3/a.pass.load.capacityMm3,conc:o.conc.map(v=>v*(paint?a.pass.load.pigmentScale:1))}:o;const padded=(INK||GRAPHITE)&&load.conc.length<SHEET_PIGS.length?{...load,conc:[...load.conc,...new Array(SHEET_PIGS.length-load.conc.length).fill(0)]}:load;return padded;};
 const dip=(b,o)=>{const a=AREA_EXEC.active,paint=o.conc.some(v=>v>0);ctx.WET_TRACE?.dipped(b,paint);const padded=dipLoad(b,o);if(!ctx.AREA_PLAN)return dipBrush(b,padded);const before=measureBrush(b);const value=AREA_EXEC.command('physical brush dip/refill',{load:padded,brushBefore:before,passIntent:a?.pass??null},()=>dipBrush(b,padded));AREA_LOADS.set(b,{load:padded,waterMass:measureBrush(b).waterMass});return value;};
 // Opt-in actual numeric production loads only: calibration and pen loads stay unchanged.
@@ -232,7 +233,7 @@ check('semantic material gate failed',false,{pass:a.key,paper});}
 };
 const pencilDraw=(target,gs,pigment,options)=>{
  const recorded=num('recordgraphite',0)>0||!!opt('preparationbinding','');
- const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:ctx.AREA_DRAW_STAGE,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[ctx.AREA_DRAW_STAGE],caps:drawingCapsFor(ctx.AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,
+ const execute=strokes=>drawMaterial(target,strokes,new Float32Array(target.n).fill(.25),target.w,target.h,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),stage:ctx.AREA_DRAW_STAGE,mmPerCell:num('sheetmm', DEFAULT_SHEET_MM)/target.w,state:DRAW_MATERIAL_STATE[ctx.AREA_DRAW_STAGE],caps:drawingCapsFor(ctx.AREA_DRAW_STAGE,true),O,audit:PEN_STATE_AUDIT,graphiteOptions:options,...(ctx.NATIVE_CAPTURE&&target===ctx.sheet?{afterStroke:e=>ctx.NATIVE_CAPTURE(e.skipped?'graphite-skipped':'graphite'),afterDry:()=>ctx.NATIVE_CAPTURE('drawing-dry')}:{}),
   ...(recorded?{graphiteExecute:(sh,paths,k,profileOptions)=>recordGraphiteBatch({sheet:sh,strokes:paths,pigment:k,options:{...profileOptions,seed:options.seed},material:SHEET_PIGS[k],source:{binding:opt('preparationbinding','')||null,target:opt('image',''),guide:opt('penpencil',''),drawing:opt('drawingfile',''),frame:[target.w,target.h],sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)},execute:physicalPencilDraw,observe:measurePaper,record:r=>JSONL.append(path.join(out,'preparation-graphite.jsonl'),JSON.stringify(r)+'\n')})}: {})});
  if(!ctx.AREA_PLAN)return execute(gs);
  let cells=0;for(const g of semanticDrawingGroups(ctx.AREA_PLAN,gs,ctx.AREA_DRAW_STAGE,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('actual dry graphite',{geometry:g.gesture.points,options,drawingRole:g.area.drawingRole,material:GRAPHITE_PROFILE},()=>execute([g.gesture]));cells+=r.cellsLaid??r.cells??0;}AREA_EXEC.set(null);return {cellsLaid:cells};};
@@ -410,7 +411,7 @@ const penDraw = (sh,gs,want,w,h,o0) => {
  const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
  const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0;
  const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
-  const execute=paths=>{const options={...o,medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
+  const execute=paths=>{const options={...o,...(ctx.NATIVE_CAPTURE&&sh===ctx.sheet?{afterStroke:e=>ctx.NATIVE_CAPTURE(e.skipped?'graphite-skipped':graphite?'graphite':'ink'),afterDry:()=>ctx.NATIVE_CAPTURE('drawing-dry')}:{}),medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
  if(!ctx.AREA_PLAN)return execute(gs);
  let drawn=0,dips=0;for(const g of semanticDrawingGroups(ctx.AREA_PLAN,gs,stage,SC)){AREA_EXEC.set({area:g.area,key:g.key});const r=AREA_EXEC.command('physical pen gesture',{geometry:g.gesture.points,drawingRole:g.area.drawingRole,material:graphite?GRAPHITE_PROFILE:INK_PROFILE},()=>execute([g.gesture]));drawn+=r.drawn??0;dips+=r.dips??0;}AREA_EXEC.set(null);return {drawn,dips};
 };
@@ -828,4 +829,14 @@ Object.assign(ctx, { dry, dip, dipLoad, productionDip, stroke, pencilDraw, SC, H
   colourTrace, traceBox, traceCells, BRUSH, UPRIGHT, highlights, expected, DELIVERY, DCAL, TECH_CAL, TCAL, 
   sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, WET, MIX, 
   washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL });
+if(opt('marks','0')!=='0'){
+ ctx.NATIVE_UNOBSERVED_ROUTES=[...(ctx.CURLS?.area?['legacy curls']:[]),...(num('shapes',0)>0?['legacy shapes']:[])];
+ if(opt('resumestate',''))throw Error('Complete native operation recording requires the painting start, not a resumed boundary');
+ ctx.NATIVE_RECORDER=createNativeOperationRecorder({directory:path.join(out,'native-operations'),width:OUT_W,height:OUT_H,provenance:{code:CODE_HASH,backend:GPU_INFO}});
+ ctx.NATIVE_MARK_COUNTS={brush:0,ink:0,graphite:0};
+ ctx.NATIVE_CAPTURE=operation=>{ctx.NATIVE_RECORDER.capture(INKRES?INKRES.compose(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'}});if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;};
+ if(INKRES)for(const name of ['wet','carry','settle']){const original=INKRES[name];INKRES[name]=(...args)=>{const value=original(...args);ctx.NATIVE_CAPTURE('ink-'+name);return value;};}
+ ctx.NATIVE_CAPTURE('initial');
+}
+
 }

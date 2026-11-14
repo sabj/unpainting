@@ -1,3 +1,4 @@
+import {verifyNativeMarkCoverage} from './native-operation-recorder.mjs';
 import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
 // Lifting, the closing pen, gouache, and the files a finished painting writes.
 // Stage 7 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
@@ -47,6 +48,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, FW_SUBJ, used, TECHS, LAST, DRAWING, 
   PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, PASSAGE_HOOK, BUDGET, awareProvenance, awareBoundary } = ctx;
 // a painting taken over at the closing boundary has had everything up to the closing drawing (AWARE_SKIP_POST)
+const removeFilm=()=>{const value=liftResist(ctx.sheet);ctx.NATIVE_CAPTURE?.('film-remove');return value;};
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
 if (!AWARE_SKIP_POST) dry(ctx.sheet, 20000, O, { levelMax: 900 });
 colourMass('dried');
@@ -73,7 +75,7 @@ if (CURLS?.area) {
 }
 // the mask comes off last, and the paper under it is untouched
 if(!AWARE_SKIP_POST&&ctx.VALUE_PLAN&&ctx.RESIST){dry(ctx.sheet,30000,O,{levelMax:140,dt:2});const paper=measurePaperDry(ctx.sheet);check('value-plan film removal requires dry base',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'physical-film-remove',paper,operation:'existing real liftResist after final shadow; no white overlay'})+'\n');}
-if (!AWARE_SKIP_POST && ctx.RESIST && !ctx.AREA_FILM_REMOVED) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){for(const a of ctx.AREA_PLAN.doc.areas)for(const p of a.passes)if(p.lights.mode==='film')for(const dep of p.lights.actions.afterPasses)check('film removal prerequisite unexecuted',AREA_COMPLETED.has(dep),{pass:dep});dry(ctx.sheet,30000,O,{levelMax:140,dt:2});const paper=measurePaper(ctx.sheet,cells);check('semantic film requires dry paint before removal',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.set(null);AREA_EXEC.command('physical film remove',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,revealedEdges:'inspection pending; no automatic softening'},()=>liftResist(ctx.sheet));}else liftResist(ctx.sheet);}else liftResist(ctx.sheet); dry(ctx.sheet, 20000, O, { levelMax: 200 }); ctx.STAGE = { stage: 'lift', step: 'frisket off' }; if (!FILM_BY_PAINT) await shoot(); }
+if (!AWARE_SKIP_POST && ctx.RESIST && !ctx.AREA_FILM_REMOVED) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){for(const a of ctx.AREA_PLAN.doc.areas)for(const p of a.passes)if(p.lights.mode==='film')for(const dep of p.lights.actions.afterPasses)check('film removal prerequisite unexecuted',AREA_COMPLETED.has(dep),{pass:dep});dry(ctx.sheet,30000,O,{levelMax:140,dt:2});const paper=measurePaper(ctx.sheet,cells);check('semantic film requires dry paint before removal',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.set(null);AREA_EXEC.command('physical film remove',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,revealedEdges:'inspection pending; no automatic softening'},()=>removeFilm());}else removeFilm();}else removeFilm(); dry(ctx.sheet, 20000, O, { levelMax: 200 }); ctx.STAGE = { stage: 'lift', step: 'frisket off' }; if (!FILM_BY_PAINT) await shoot(); }
 
 if (PREPF) { const f = fadePrep(); let a = 0; for (const v of PREPF.applied) a += v; console.log(`prep fade: the drawing held at ${(100 * a / N2).toFixed(1)}% on average before the closing pen (${f} cells faded in the last step)`); }
 // --pencilerase 1: the pencil the finish does not keep, lifted with a kneaded eraser once the washes are dry and before
@@ -87,7 +89,7 @@ if (!AWARE_SKIP_POST && PENCIL && num('pencilerase', 0) > 0) {
   for (const L of [ctx.sheet.G, ctx.sheet.D, ctx.sheet.P, ...ctx.sheet.layers]) { const a = L[GRAPHITE_AT]; for (let i = 0; i < N2; i++) { before += a[i]; a[i] *= f[i]; after += a[i]; } }
   layersChanged(ctx.sheet);
   console.log(`pencil erase: ${(100 * (1 - after / Math.max(1e-9, before))).toFixed(1)}% of the graphite lifted, ${(100 * keep.reduce((a, v) => a + (v ? 1 : 0), 0) / N2).toFixed(1)}% of the sheet kept as the finish's line`);
-  ctx.STAGE = { stage: 'lift', step: 'pencil erased' };
+  ctx.STAGE = { stage: 'lift', step: 'pencil erased' };ctx.NATIVE_CAPTURE?.('pencil-erased');
   await shoot();
 }
 if (DRAW_LAST && DRAWING !== 'none' && !AWARE_SKIP_POST) await awareBoundary({ kind: 'closing' });
@@ -110,7 +112,7 @@ if (GOUACHE_LIGHTS) {
   let cells = 0, sum = 0; for (let i = 0; i < n; i++) if (want[i] > 0) cells++; for (let i = 0; i < N2; i++) sum += cover[i];
   ctx.GOUACHE = { cover, rgb: paperRGB.map(c => c + (252 - c) * 0.7) };
   console.log(`gouache: white over ${cells} cells (${(100 * cells / n).toFixed(2)}% of the sheet), mean cover ${(sum / Math.max(1, cells * SC * SC)).toFixed(2)} where laid`);
-  ctx.STAGE = { stage: 'gouache' };
+  ctx.STAGE = { stage: 'gouache' };ctx.NATIVE_CAPTURE?.('gouache-layer');
   if (!FILM_BY_PAINT) await shoot();
 }
 colourMass('finished');
@@ -212,6 +214,7 @@ if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); await sharp(F.buf, { raw:
 const FINAL_PIXELS=INKRES ? INKRES.compose(view()) : FINAL.coarse;
 assertDeviceHealthy(ctx.sheet); // a broken GPU device never writes a painting (src/media/gpu/device-health.mjs)
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png'));
+if(ctx.NATIVE_RECORDER){try{if(ctx.NATIVE_UNOBSERVED_ROUTES?.length)throw Error('Incomplete native recording: direct marks in '+ctx.NATIVE_UNOBSERVED_ROUTES.join(', '));verifyNativeMarkCoverage(MARKTAPE,ctx.NATIVE_MARK_COUNTS);}catch(error){ctx.NATIVE_RECORDER.abort(error.message);throw error;}const decoded=await sharp(path.join(out,'painting.png')).removeAlpha().raw().toBuffer();if(!decoded.equals(Buffer.from(FINAL_PIXELS)))throw Error('Native recording final PNG pixel mismatch');ctx.NATIVE_RECORDER.finish(decoded,{stage:ctx.STAGE});}
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
 if (STROKE_BUDGET) {
  const count=MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length;

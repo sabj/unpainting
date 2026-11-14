@@ -14,10 +14,10 @@ export function createPlaybackUI(seek){
   hide:()=>{sequence.hidden=true;preview.hidden=true;materials.hidden=true;},
   example:(ex,limit,mode)=>{
    recording=mode==='replay';sequence.hidden=false;
-   document.getElementById('sequence-title').textContent=recording?'Recording · jump to a saved frame':`${Number(limit).toLocaleString()}-stroke painting · jump in anywhere`;
+   document.getElementById('sequence-title').textContent=recording?(ex.film.operations?'Recording · completed operations; thumbnails are keyframes':'Recording · jump to a saved frame'):`${Number(limit).toLocaleString()}-stroke painting · jump in anywhere`;
    document.getElementById('sequence-target').src=new URL(ex.target,BASE);document.getElementById('sequence-target').alt=ex.title+' target';
    const next=ex.id+limit+mode;if(next===key)return;key=next;thumbs.replaceChildren();
-   stops=recording?[.1,.25,.5,.75,.9,1].map(f=>({fraction:f,image:ex.film.frames[Math.min(ex.film.frames.length-1,Math.floor(f*(ex.film.frames.length-1)))]})):ex.checkpoints?.[limit]||[];
+   stops=recording&&ex.film.operations?(ex.film.keyframes||[]):recording?[.1,.25,.5,.75,.9,1].map(f=>({fraction:f,image:ex.film.frames[Math.min(ex.film.frames.length-1,Math.floor(f*(ex.film.frames.length-1)))]})):ex.checkpoints?.[limit]||[];
    for(const stop of stops){const b=document.createElement('button');b.type='button';b.dataset.seek=stop.fraction;const im=new Image();im.src=new URL(stop.image,BASE);im.alt='';const label=document.createElement('span');label.textContent=stop.fraction===1?'Finished':Math.round(stop.fraction*100)+'%';b.append(im,label);b.setAttribute('aria-label',`Jump to ${label.textContent.toLowerCase()} of ${ex.title}`);b.addEventListener('click',()=>seek(stop.fraction));thumbs.append(b);}
    update(0);
   },

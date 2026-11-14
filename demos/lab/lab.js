@@ -296,11 +296,11 @@ async function playExampleFilm(example, carry=false, seek=0) {
     }catch(error){if(alive()){playbackUI.ready();lab.seeking=false;setPlaying(false);state.textContent='Could not load this painting state. Try another thumbnail.';console.error(error);}}
     return true;
   }
-  caption.textContent='Recording · saved frames. Overlay: stroke path.';
-  const film={...example.film, frames:example.film.frames.map(f=>new URL(f,base).href),paths:example.film.paths?new URL(example.film.paths,base).href:null};
+  caption.textContent=example.film.operations?'Recording · completed physical operations':'Recording · saved frames. Overlay: stroke path.';
+  const film={...example.film, operations:example.film.operations?new URL(example.film.operations,base).href:null, frames:example.film.frames.map(f=>new URL(f,base).href),paths:example.film.paths?new URL(example.film.paths,base).href:null};
   lab.target={id:example.id,film:true,frames:film.frames.length,started:performance.now()};
   worker.postMessage({type:'pause',on:true});
-  playFilm(film,filmCanvas,W,H,{progress:(d,t)=>{playbackUI.ready();lab.seeking=false;playbackUI.update(d/t);document.getElementById('skip').disabled=false;playProgress.value=d/t;lab.replayProgress=d/t;operations.log.write(recordedStatus(film,d/t));}, skipped:()=>filmSkip,alive,
+  playFilm(film,filmCanvas,W,H,{progress:(d,t)=>{playbackUI.ready();lab.seeking=false;playbackUI.update(d/t);document.getElementById('skip').disabled=false;playProgress.value=d/t;lab.replayProgress=d/t;operations.log.write(film.operations?{phase:'Recording',done:d,total:t,unit:'operation'}:recordedStatus(film,d/t));}, skipped:()=>filmSkip,alive,
     seek,paused:()=>replayPaused,speed:()=>Number(replaySpeed.value),brush:()=>document.getElementById('show-brush').checked})
     .then(({final,box})=>{if(!alive())return;state.textContent='Ready to carry on painting';worker.postMessage({type:'base',width:W,height:H,rgba:sheetPixels(final,box,W,H),white:SURFACES.cold.colour,surface:'cold'});})
     .catch(error=>{if(!alive())return;console.error(error);filmCanvas.hidden=true;setPlaying(false);state.textContent='The recording could not be loaded';worker.postMessage({type:'pause',on:false});});
