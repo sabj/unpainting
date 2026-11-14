@@ -17,12 +17,12 @@ test('the option takes none, pencil or pen and nothing else', () => {
   assert.throws(() => subjectMediumOf(['--subjectmedium']), /none, pencil, pen/);
 });
 
-test('an ink drawing section on a subject with no pen becomes a graphite opening drawing and keeps its line choices', () => {
+test('an ink drawing section on a subject with no pen is removed without substituting graphite', () => {
   for (const medium of ['none', 'pencil']) {
     const r = drawingForSubject({ medium: 'ink', inkColor: 'black', ink: { waterproof: true }, closingLines: 0.6, resolution: 2, amount: 0.5, lines: 'contours' }, medium);
-    assert.deepEqual(r, { drawing: { amount: 0.5, lines: 'contours', medium: 'graphite', closingLines: 0 }, asked: 'ink' });
-    assert.equal(drawingForSubject({ medium: 'auto' }, medium).drawing.medium, 'graphite');
-    assert.deepEqual(drawingForSubject({ stages: { prep: {}, finishInk: {} }, weight: 0.4 }, medium), { drawing: { weight: 0.4, medium: 'graphite', closingLines: 0 }, asked: 'ink' });
+    assert.deepEqual(r, { drawing: { amount: 0.5, lines: 'contours', medium: 'none', closingLines: 0 }, asked: 'ink' });
+    assert.equal(drawingForSubject({ medium: 'auto' }, medium).drawing.medium, 'none');
+    assert.deepEqual(drawingForSubject({ stages: { prep: {}, finishInk: {} }, weight: 0.4 }, medium), { drawing: { weight: 0.4, medium: 'none', closingLines: 0 }, asked: 'ink' });
   }
 });
 
@@ -41,23 +41,23 @@ test('an opening-only graphite drawing, no drawing, a pen subject and a run with
   }
 });
 
-test('ink left in the arguments is turned to graphite, first only, and pen-only options are dropped', () => {
+test('ink left in the arguments is removed without graphite substitution, and pen-only options are dropped', () => {
   const r = argvForSubject(['--width', '90', '--outlinemedium', 'ink', '--drawing', 'both', '--drawingfile', 'o', '--drawinglast', 'c', '--inkprofile', 'black-ink', '--washinkfree', '1', '--drawinghand', '1', '--stages', 'prep,finishInk', '--video'], 'none');
   const f = flags(r.argv);
   assert.equal(r.asked, 'ink');
-  assert.equal(f.get('--outlinemedium'), 'graphite');
-  assert.equal(f.get('--drawing'), 'first');
-  assert.equal(f.get('--drawingfile'), 'o');
-  assert.equal(f.get('--stages'), 'prep');
+  assert.equal(f.get('--outlinemedium'), 'none');
+  assert.equal(f.get('--drawing'), 'none');
+  assert.equal(f.get('--drawingfile'), undefined);
+  assert.equal(f.get('--stages'), undefined);
   assert.equal(f.get('--width'), '90');
   assert.equal(f.get('--video'), true);
   for (const k of ['--drawinglast', '--inkprofile', '--washinkfree', '--drawinghand']) assert.ok(!f.has(k), k);
-  assert.deepEqual(r.dropped, ['--drawinglast', '--inkprofile', '--washinkfree', '--drawinghand']);
+  assert.deepEqual(r.dropped, ['--drawingfile', '--drawinglast', '--inkprofile', '--washinkfree', '--drawinghand', '--stages']);
   assert.equal(argvForSubject(['--outlinemedium', 'auto'], 'pencil').asked, 'auto');
-  assert.equal(flags(argvForSubject(['--outlinemedium', 'auto'], 'pencil').argv).get('--drawing'), 'first');
+  assert.equal(flags(argvForSubject(['--outlinemedium', 'auto'], 'pencil').argv).get('--drawing'), 'none');
   const off = argvForSubject(['--outlinemedium', 'graphite', '--drawing', 'none', '--inkprofile', 'black-ink'], 'pencil', { planAsked: 'ink' });
   assert.equal(flags(off.argv).get('--drawing'), 'none', 'a plan that draws nothing still draws nothing');
-  assert.match(subjectMediumNote('pencil', 'ink'), /subject medium pencil: .* ink drawing is a light graphite preparatory drawing/);
+  assert.match(subjectMediumNote('pencil', 'ink'), /subject medium pencil: .*ink drawing request is removed, without substituting graphite/);
 });
 
 test('a drawing that asks for no medium, or for graphite, on a subject with no pen is opening only: no closing lines', () => {
@@ -99,9 +99,9 @@ test('recipe none: a value plan that asks for ink cannot put ink on a subject wi
     assert.deepEqual(expandRecipe({ argv: [...base, '--subjectmedium', 'pen'], root: dir }).argv.filter(a => a !== '--subjectmedium' && a !== 'pen'), expandRecipe({ argv: base, root: dir }).argv);
     for (const medium of ['none', 'pencil']) {
       const r = expandRecipe({ argv: [...base, '--subjectmedium', medium], root: dir }), f = flags(r.argv);
-      assert.equal(f.get('--outlinemedium'), 'graphite');
-      assert.equal(f.get('--drawing'), 'first');
-      assert.equal(f.get('--drawingfile'), 'o');
+      assert.equal(f.get('--outlinemedium'), 'none');
+      assert.equal(f.get('--drawing'), 'none');
+      assert.equal(f.get('--drawingfile'), undefined);
       assert.equal(f.get('--subjectmedium'), medium);
       for (const k of ['--drawinglast', '--inkprofile', '--closingedgemin']) assert.ok(!f.has(k), k);
       assert.equal(r.subjectMedium.asked, 'ink');
@@ -110,7 +110,7 @@ test('recipe none: a value plan that asks for ink cannot put ink on a subject wi
     assert.equal(flags(expandRecipe({ argv: [...base, '--subjectmedium', 'pencil'], root: dir }).argv).get('--drawing'), 'none');
     fs.writeFileSync(plan, JSON.stringify({}));
     const ext = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', plan, '--outlinemedium', 'ink', '--drawing', 'both', '--drawinglast', 'c', '--subjectmedium', 'pencil'], root: dir });
-    assert.equal(flags(ext.argv).get('--outlinemedium'), 'graphite');
+    assert.equal(flags(ext.argv).get('--outlinemedium'), 'none');
     assert.equal(ext.subjectMedium.asked, 'ink');
     assert.equal(expandRecipe({ argv: base, root: dir }).subjectMedium, null);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

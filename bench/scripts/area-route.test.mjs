@@ -76,17 +76,21 @@ test('the area route forces none of the token route\'s settings and keeps the ha
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('the subject medium decides on the area route too: no ink and no closing lines on a pencil subject', () => {
+test('the area route removes incompatible ink requests and their paths without substituting graphite', () => {
   const d = example(); d.drawing = { medium: 'ink', reason: 'asked for ink', ink: 'black-ink' };
   const dir = planDir(d);
   fs.copyFileSync(path.join(dir, 'opening-lines.json'), path.join(dir, 'closing-lines.json'));
-  const pencil = resolveAreaPlan({ spec: spec('pencil'), planDir: dir, target: TARGET, out: path.join(dir, 'o1') });
-  const p = optionMap(pencil.args);
-  assert.equal(p.get('outlinemedium'), 'graphite');
-  assert.equal(p.get('drawing'), 'first');
-  assert.ok(!p.has('drawinglast') && !p.has('inkprofile') && !p.has('washinkfree'));
-  assert.equal(pencil.layering.mediumOverride.drawn, 'graphite');
-  assert.equal(pencil.layering.mediumOverride.closingDropped, true);
+  for (const medium of ['pencil', 'none']) {
+    const rejected = resolveAreaPlan({ spec: spec(medium), planDir: dir, target: TARGET, out: path.join(dir, 'rejected-' + medium) });
+    const p = optionMap(rejected.args);
+    assert.deepEqual(rejected.problems, []);
+    assert.equal(p.get('outlinemedium'), 'none');
+    assert.equal(p.get('drawing'), 'none');
+    for (const key of ['drawingfile', 'drawinglast', 'inkprofile', 'washinkfree']) assert.ok(!p.has(key), key);
+    assert.equal(rejected.layering.mediumOverride.asked, 'ink');
+    assert.equal(rejected.layering.mediumOverride.drawn, 'none');
+    assert.equal(rejected.layering.mediumOverride.closingDropped, true);
+  }
   const pen = resolveAreaPlan({ spec: spec('pen'), planDir: dir, target: TARGET, out: path.join(dir, 'o2') });
   const q = optionMap(pen.args);
   assert.deepEqual([q.get('outlinemedium'), q.get('drawing'), q.get('inkprofile'), q.get('washinkfree')], ['ink', 'both', 'black-ink', '1']);

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { BENCH, V2, readJson } from './lib.mjs';
 import { resolvePlan, optionMap, SUBJECT_MEDIA } from './pipeline/plan-args.mjs';
 import { renderTask, loadSubjects } from './pipeline/round45.mjs';
+import { expandRecipe } from '../../src/paint/recipe.mjs';
 import { addTarget } from './add-target.mjs';
 
 const TARGET = path.join(BENCH, 'v2/targets/hills.png');
@@ -38,16 +39,16 @@ test('a subject file entry with no medium, or an unknown one, is an error', () =
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('an ink plan on a subject with no pen is drawn in graphite before the washes, and the override is recorded', () => {
+test('an ink plan on a subject with no pen is removed without graphite substitution, and the override is recorded', () => {
   const dir = plan({ 'config.json': { drawing: { medium: 'ink' } }, 'opening-lines.json': LINES, 'closing-lines.json': LINES,
     'extra-args.json': ['--inkprofile', 'black-ink', '--midlayers', '3'] });
   try {
     for (const medium of ['pencil', 'none']) {
       const r = resolve(dir, medium), o = optionMap(r.args);
       assert.deepEqual(r.problems, []);
-      assert.equal(o.get('outlinemedium'), 'graphite');
-      assert.equal(o.get('drawing'), 'first');
-      assert.ok(o.has('drawingfile') && !o.has('drawinglast'), 'the opening lines stay, the closing pen lines go');
+      assert.equal(o.get('outlinemedium'), 'none');
+      assert.equal(o.get('drawing'), 'none');
+      assert.ok(!o.has('drawingfile') && !o.has('drawinglast'), 'incompatible opening and closing paths are removed');
       for (const inkOnly of ['inkprofile', 'washinkfree', 'drawinghand', 'inkdarkskip']) assert.ok(!o.has(inkOnly), inkOnly);
       assert.equal(o.get('midlayers'), '3');
       assert.equal(o.get('subjectmedium'), medium, 'the painter is told, because a plan drawing section outranks every argument');
@@ -55,10 +56,14 @@ test('an ink plan on a subject with no pen is drawn in graphite before the washe
       const m = r.layering.mediumOverride;
       assert.equal(m.subjectMedium, medium);
       assert.equal(m.asked, 'ink');
-      assert.equal(m.drawn, 'graphite');
+      assert.equal(m.drawn, 'none');
       assert.equal(m.closingDropped, true);
       assert.deepEqual(m.removed, ['--inkprofile black-ink']);
       assert.match(m.reason, /no pen/);
+      const actual = optionMap([r.args[0], ...expandRecipe({ argv: r.args.slice(1), root: path.resolve(BENCH, '..') }).argv]);
+      assert.equal(actual.get('drawing'), 'none', 'real recipe expansion cannot resurrect the rejected plan drawing');
+      assert.equal(actual.get('outlinemedium'), 'none');
+      assert.ok(!actual.has('drawingfile') && !actual.has('drawinglast'));
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
@@ -68,10 +73,10 @@ test('ink asked for through extra-args, or left to the painter (auto), is overri
     const dir = plan({ 'config.json': {}, 'opening-lines.json': LINES, 'extra-args.json': ['--outlinemedium', asked, '--drawing', 'both'] });
     try {
       const r = resolve(dir, 'pencil'), o = optionMap(r.args);
-      assert.equal(o.get('outlinemedium'), 'graphite');
-      assert.equal(o.get('drawing'), 'first');
+      assert.equal(o.get('outlinemedium'), 'none');
+      assert.equal(o.get('drawing'), 'none');
       assert.equal(r.layering.mediumOverride.asked, asked);
-      assert.deepEqual([...new Set(r.args.filter((_, i) => r.args[i - 1] === '--outlinemedium'))], ['graphite'], 'no ink request is left for the painter to read');
+      assert.deepEqual([...new Set(r.args.filter((_, i) => r.args[i - 1] === '--outlinemedium'))], ['none'], 'no ink request is left for the painter to read');
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
 });

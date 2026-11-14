@@ -1,9 +1,6 @@
-// --subjectmedium none|pencil|pen: the drawing medium a person sees in the picture being painted.
-// A picture with no pen lines is not drawn in ink. When the medium is none or pencil, any drawing (a plan's drawing
-// section, --outlinemedium ink, the automatic choice, graphite, or no medium said at all) becomes what a watercolourist
-// does on such a sheet: a light graphite preparatory drawing before the washes, with no closing lines and no ink
-// stages. A drawing that is already graphite and opening only, or no drawing, is left alone, and so is every run
-// without the option or with medium pen. Pure: no I/O.
+// The source decides the medium. An ink request on a source without pen is
+// removed, never converted to graphite. Explicit graphite remains opening-only.
+// Pure: no I/O.
 
 /** The media a subject can be given. */
 export const SUBJECT_MEDIA = Object.freeze(['none', 'pencil', 'pen']);
@@ -25,7 +22,7 @@ const noPen = medium => medium === 'none' || medium === 'pencil';
 
 /**
  * A plan's drawing section for a subject of this medium. An ink section (medium ink or auto, or ink stages) on a
- * subject with no pen keeps its line choices and becomes graphite, opening only; a graphite or unstated section that
+ * subject with no pen is disabled without substituting graphite; a graphite or unstated section that
  * asks for closing lines keeps its medium and loses them.
  * @returns {{ drawing: object|null, asked: string|null }} asked: what the plan asked for when it was changed
  */
@@ -40,12 +37,12 @@ export function drawingForSubject(drawing, medium) {
     return Number.isFinite(closing) && closing > 0 ? { drawing: { ...drawing, closingLines: 0 }, asked: drawing.medium ?? 'graphite' } : { drawing, asked: null };
   }
   const kept = Object.fromEntries(Object.entries(drawing).filter(([k]) => !PEN_KEYS.includes(k)));
-  return { drawing: { ...kept, medium: 'graphite', closingLines: 0 }, asked };
+  return { drawing: { ...kept, medium: 'none', closingLines: 0 }, asked };
 }
 
 /**
- * The expanded argument list for a subject of this medium: an ink or automatic outline becomes graphite, the drawing
- * comes first only, and pen-only options are dropped (so nothing is left unread).
+ * Remove an incompatible ink/automatic request and its drawing paths. An explicit
+ * graphite drawing keeps its opening paths; closing and pen-only options go.
  * @param {{ planAsked?: string|null }} [options] what the plan's drawing section asked for, when drawingForSubject changed it
  * @returns {{ argv: string[], asked: string|null, dropped: string[] }}
  */
@@ -63,18 +60,22 @@ export function argvForSubject(argv, medium, { planAsked = null } = {}) {
   const closing = order !== 'first' || pairs.some(([k]) => PEN_FLAGS.includes(k));
   const asked = planAsked ?? (!drawn ? null : ink ?? (closing ? outline ?? 'graphite' : null));
   if (asked == null) return { argv, asked: null, dropped: [] };
+  const disabled = !isGraphite(asked);
   const dropped = [], out = [];
   for (const [key, value] of pairs) {
-    if (PEN_FLAGS.includes(key)) { dropped.push(key); continue; }
+    if (PEN_FLAGS.includes(key) || (disabled && ['--drawingfile', '--stages'].includes(key))) { dropped.push(key); continue; }
     if (key === '--stages') { const keep = value.split(',').filter(s => !INK_STAGES.includes(s)); if (keep.length) out.push(key, keep.join(',')); else dropped.push(key); continue; }
-    out.push(key, ...(value === undefined ? [] : [key === '--outlinemedium' && value !== 'none' ? 'graphite' : key === '--drawing' && value !== 'none' ? 'first' : value]));
+    out.push(key, ...(value === undefined ? [] : [key === '--outlinemedium' && value !== 'none' ? (disabled ? 'none' : 'graphite') : key === '--drawing' && value !== 'none' ? (disabled ? 'none' : 'first') : value]));
   }
-  if (last('--drawing') === undefined) out.push('--drawing', 'first');
+  if (last('--drawing') === undefined) out.push('--drawing', disabled ? 'none' : 'first');
+  if (disabled && outline === undefined) out.push('--outlinemedium', 'none');
   return { argv: out, asked, dropped };
 }
 
 /** The line the painter logs when the rule changed the drawing. */
-export const subjectMediumNote = (medium, asked) => `subject medium ${medium}: the picture shows no pen lines, so the ${asked === 'auto' ? 'automatic' : asked} drawing is a light graphite preparatory drawing before the washes, with no closing lines`;
+export const subjectMediumNote = (medium, asked) => isGraphite(asked)
+  ? `subject medium ${medium}: graphite remains a preparatory drawing before the washes, with no closing lines`
+  : `subject medium ${medium}: the picture shows no pen lines; the ${asked === 'auto' ? 'automatic' : asked} drawing request is removed, without substituting graphite`;
 
 /**
  * Whether the subject's medium reads as pen: the declared --subjectmedium when given, else the measured pen-line share

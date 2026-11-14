@@ -277,13 +277,9 @@ const isGraphite = v => v === 'graphite' || /^graphite-/.test(v);
 // settings only a pen reads; dropped with the pen so they are not held against the plan as unread
 const INK_ONLY = ['inkprofile', 'washinkfree', 'drawinghand', 'inkdarkskip'];
 /**
- * The subject-medium rule: the source decides the drawing medium, whether or not the plan asks. A target with no pen
- * lines is not drawn in ink: any drawing a plan asks for or leaves to the template (ink in config.drawing.medium or
- * --outlinemedium, `auto`, graphite, or nothing said) is drawn as a light graphite preparatory drawing before the
- * washes: the opening lines stay, closing lines and pen-only settings go. A plan may draw nothing. On a pen subject a
- * plan that says nothing is drawn in ink (resolvePlan), and a plan that chooses a medium keeps it. The painter enforces the rule itself under --subjectmedium (src/paint/subject-medium.mjs),
- * because it gives the plan's drawing section the last word; this function makes the harness arguments and the record agree.
- * @returns {{ outlineMedium: string, extraArgs: string[], firstOnly: boolean, override: object|null }}
+ * The source decides the medium. Remove an incompatible ink request; never
+ * reinterpret its paths as graphite. Explicit graphite remains opening-only.
+ * The painter enforces the same rule on config.drawing, which outranks CLI.
  */
 export function subjectMediumRule({ medium, planMedium, outlineMedium, extraArgs, noDrawing }) {
   const keep = { outlineMedium, extraArgs, firstOnly: false, override: null };
@@ -294,15 +290,18 @@ export function subjectMediumRule({ medium, planMedium, outlineMedium, extraArgs
   const at = extraArgs.lastIndexOf('--outlinemedium'), extraMedium = at >= 0 && at + 1 < extraArgs.length ? extraArgs[at + 1] : null;
   const asked = planMedium ?? extraMedium ?? outlineMedium;
   if (asked === 'none') return keep;
+  const drawn = isGraphite(asked) ? 'graphite' : 'none';
   const out = [], removed = [];
   for (let i = 0; i < extraArgs.length; i += 2) {
     const key = extraArgs[i].replace(/^--/, ''), value = extraArgs[i + 1];
-    if (INK_ONLY.includes(key)) { removed.push(`${extraArgs[i]} ${value}`); continue; }
-    out.push(extraArgs[i], ...(value === undefined ? [] : [key === 'outlinemedium' && value !== 'none' ? 'graphite' : key === 'drawing' && value !== 'none' ? 'first' : value]));
+    if (INK_ONLY.includes(key) || (drawn === 'none' && ['drawingfile', 'drawinglast', 'stages'].includes(key))) { removed.push(`${extraArgs[i]} ${value}`); continue; }
+    out.push(extraArgs[i], ...(value === undefined ? [] : [key === 'outlinemedium' && value !== 'none' ? drawn : key === 'drawing' && value !== 'none' ? (drawn === 'none' ? 'none' : 'first') : value]));
   }
-  return { outlineMedium: 'graphite', extraArgs: out, firstOnly: true,
-    override: { subjectMedium: medium, asked, drawn: 'graphite', closingDropped: false, removed,
-      reason: `the subject's medium is ${medium}: the target shows no pen lines, so the ${asked === 'auto' ? 'drawing left to the painter' : asked + ' drawing'} is a light graphite preparatory drawing before the washes, with no closing lines` } };
+  return { outlineMedium: drawn, extraArgs: out, firstOnly: drawn === 'graphite',
+    override: { subjectMedium: medium, asked, drawn, closingDropped: false, removed,
+      reason: drawn === 'none'
+        ? `the subject's medium is ${medium}: no pen lines; the ${asked} drawing request is removed without substituting graphite`
+        : `the subject's medium is ${medium}: graphite remains a preparatory drawing with no closing lines` } };
 }
 /** PNG width and height from the file header. */
 export const pngSize = file => { const b = fs.readFileSync(file); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
@@ -328,7 +327,7 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
   const planMedium = config?.drawing?.medium && config.drawing.medium !== 'none' ? config.drawing.medium : null;
   const isPenWash = spec?.taskStyle === 'penwash' || (typeof spec?.taskStyle === 'string' && (spec.taskStyle.includes('penwash') || spec.taskStyle.includes('ink-and-watercolor')));
   // the subject's medium decides when the plan does not: a pen subject is drawn in ink, a subject with no pen
-  // (spec.medium none or pencil) gets a graphite preparatory drawing only, whatever the plan asks; see subjectMediumRule
+  // (spec.medium none or pencil) may use graphite prep, but an ink request is removed, never converted.
   const planOff = k => { const i = planExtraArgs.lastIndexOf('--' + k); return i >= 0 && planExtraArgs[i + 1] === 'none'; };
   // a drawing section with ink stages and no medium is an ink drawing too
   const inkStages = ['prepInk', 'finishInk'].some(k => config?.drawing?.stages?.[k]);
@@ -353,6 +352,11 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
     args[args.lastIndexOf('--drawing') + 1] = 'first';
     // a graphite drawing that was opening only already, with nothing removed, was not overridden
     if (isGraphite(mediumOverride.asked) && !mediumOverride.closingDropped && !mediumOverride.removed.length) mediumOverride = null;
+  }
+  if (mediumOverride?.drawn === 'none') {
+    mediumOverride.closingDropped = args.includes('--drawinglast') || optionMap(args).get('drawing') !== 'first';
+    args = args.filter((arg, i, all) => !['--drawingfile', '--drawinglast'].includes(arg) && !['--drawingfile', '--drawinglast'].includes(all[i - 1]));
+    args[args.lastIndexOf('--drawing') + 1] = 'none';
   }
   // the painter applies the same rule to the plan's own drawing section, which the harness arguments cannot override
   if (spec.medium === 'none' || spec.medium === 'pencil') args.push('--subjectmedium', spec.medium);

@@ -82,9 +82,10 @@ export function resolveAreaPlan({ spec, planDir, target, out, work, compile = fa
   for (const stray of ['config.json', 'extra-args.json']) if (fs.existsSync(path.join(planDir, stray))) problems.push(`${stray} belongs to the token route; an area plan is ${AREA_PLAN_FILE} and the line files only`);
   const has = name => fs.existsSync(path.join(planDir, `${name}-lines.json`)) || fs.existsSync(path.join(planDir, `${name}-lines.json.gz`));
   const asked = DRAWING_MEDIA.includes(doc?.drawing?.medium) ? doc.drawing.medium : 'none';
-  const noDrawing = asked === 'none';
+  const requestedNoDrawing = asked === 'none';
   // the subject's medium decides when the plan asks for ink on a subject that shows none (same rule as the token route)
-  const rule = subjectMediumRule({ medium: spec.medium, planMedium: noDrawing ? null : asked, outlineMedium: noDrawing ? 'none' : asked, extraArgs: [], noDrawing });
+  const rule = subjectMediumRule({ medium: spec.medium, planMedium: requestedNoDrawing ? null : asked, outlineMedium: requestedNoDrawing ? 'none' : asked, extraArgs: [], noDrawing: requestedNoDrawing });
+  const noDrawing = requestedNoDrawing || rule.outlineMedium === 'none';
   const medium = noDrawing ? 'none' : rule.outlineMedium;
   const opening = !noDrawing && has('opening') ? path.join(planDir, 'opening') : null;
   const closing = !noDrawing && !rule.firstOnly && has('closing') ? path.join(planDir, 'closing') : null;
