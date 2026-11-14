@@ -1,9 +1,11 @@
 // Pipeline: inking, stage 2 (hold and measure the lines): the ink-or-wash decision for every candidate line.
 // A point of a candidate line is drawn only when the ink rule of the ground under it allows it (ink-labels.mjs) and the
-// source shows a pen line there, not a mass edge (line-class.mjs). A long, smooth line that is mostly pen line is
-// structure and is kept whatever the ground says. Pure: arrays in, arrays out, with a record of every cut.
-import { resample, turning } from './ink-lines.mjs';
-import { classifyPathDetail, CLASS, MASS_DEFAULTS } from './line-class.mjs';
+// source shows a pen line there (line-class.mjs). Long, smooth, mostly pen lines keep their global exception.
+// Source-model contours may also retain supported dark/light mass boundaries in architecture or ground; explicit
+// semantic exclusions still cut them. Physical-scale coherence assessment never straightens emitted geometry.
+// Pure: arrays in, arrays out, with a record of every cut.
+import { resample, turning, smoothPath } from './ink-lines.mjs';
+import { classifyPathDetail, crossProfile, CLASS, MASS_DEFAULTS } from './line-class.mjs';
 import { ruleAt } from './ink-labels.mjs';
 
 const median = (v, a, b) => { const s = Array.from(v.slice(a, b)).sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
@@ -20,24 +22,24 @@ export const DECIDE_DEFAULTS = Object.freeze({
 
 /**
  * Decide `lines` ({ points: [{x, y, width?, weight?}], ... }).
- * @param ctx { L, w, h, pxMm, cellLabel(x, y) -> label, shadow? (0/1 plane) }
+ * @param ctx { L, w, h, pxMm, cellLabel(x, y) -> label, inputKind?, shadow? (0/1 plane) }
  * @returns { lines, stats } stats: { lengthPx, keptPx, massBefore, massAfter, dropped: { mass, faint, label, short, squiggle }, byLabel }
  */
 export function decideLines(lines, ctx, options = {}) {
   const o = { ...DECIDE_DEFAULTS, ...options };
   const { L, w, h, pxMm } = ctx, reach = Math.max(1, o.reachMm / pxMm);
-  const labelAt = (x, y) => {
+  const labelAt = (x, y, toneShadow = true) => {
     const xi = Math.max(0, Math.min(w - 1, Math.floor(x))), yi = Math.max(0, Math.min(h - 1, Math.floor(y)));
     const base = ctx.cellLabel(xi, yi), i = yi * w + xi;
     // a face or a hand is never taken for a shadow or for leaves by the tone and colour passes
     if (base === 'face' || base === 'hands') return base;
     // leaves found by colour and texture are wash even where a region's label missed them; a trunk's own region stays a trunk
     if (ctx.foliage && ctx.foliage[i] && base !== 'tree_trunk') return 'foliage';
-    return ctx.shadow && ctx.shadow[i] ? 'shadow_mass' : base;
+    return toneShadow && ctx.shadow && ctx.shadow[i] ? 'shadow_mass' : base;
   };
   const DROP_REASON = { LIVE: 0, MASS: 1, FAINT: 2, CONTRAST: 3, LABEL_NONE: 4 };
   const drop = { mass: 0, faint: 0, label: {}, short: 0 }, byLabel = {}, out = [];
-  let lengthPx = 0, keptPx = 0, massLen = 0, keptMass = 0;
+  let lengthPx = 0, keptPx = 0, massLen = 0, keptMass = 0, retainedStructuralMass = 0;
   const add = (label, key, px) => { (byLabel[label] ??= { keptPx: 0, droppedPx: 0 })[key] += px; };
   for (const g of lines) {
     const rawPts = (g.points || []).map((p, k) => {
@@ -54,11 +56,35 @@ export function decideLines(lines, ctx, options = {}) {
     for (let k = 1; k < R.length; k++) { const s = d[k] - d[k - 1]; if (cls[k] === CLASS.pen) pen += s; else if (cls[k] === CLASS.mass) { mass += s; massLen += s; } }
     const structural = total * pxMm >= o.structureMm && turning(R) / pxMm <= o.structureDegPerMm && pen >= o.keepPenShare * total;
     const rules = R.map(p => ruleAt(labelAt, p.x, p.y, reach));
+    // INK-SPEC step 3: model structure between a dark mass and a light one is still drawn.
+    // Assess raster staircases at the existing physical smoothing scale; never move emitted points.
+    const modelStructure = ctx.inputKind === 'line-map' && total * pxMm >= o.structureMm &&
+      turning(smoothPath(R, { sigma: o.smoothMm / pxMm })) / pxMm <= o.structureDegPerMm;
+    const structuralMass = new Uint8Array(R.length);
+    const semanticRules = modelStructure ? R.map(p => ruleAt((x, y) => labelAt(x, y, false), p.x, p.y, reach)) : null;
     const live = new Uint8Array(R.length);
     const reason = new Uint8Array(R.length);
     for (let k = 0; k < R.length; k++) {
       const seg = k ? d[k] - d[k - 1] : 0, r = rules[k];
       if (structural) { live[k] = 1; continue; }
+      if (modelStructure) {
+        const semantic = semanticRules[k];
+        if (semantic.label === 'architecture' || semantic.label === 'ground') {
+          const a = R[Math.max(0, k - 2)], b = R[Math.min(R.length - 1, k + 2)];
+          const tl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          const support = crossProfile(L, w, h, R[k], -(b.y - a.y) / tl, (b.x - a.x) / tl, pxMm, o);
+          if (support.contrast >= o.penContrast || support.step >= o.stepContrast) {
+            // A derived tone-shadow mask is not a semantic shadow region. Explicit shadow/foliage still veto mass contours.
+            rules[k] = semantic; live[k] = 1; structuralMass[k] = cls[k] === CLASS.mass ? 1 : 0; continue;
+          }
+        } else if (cls[k] !== CLASS.pen && ['foliage', 'sky', 'water', 'shadow_mass'].includes(semantic.label)) {
+          // Neither mass nor faint gaps in explicit wash-only regions may bridge structural runs.
+          // Pen-supported marks still follow the existing rules (including the global pen exception).
+          reason[k] = DROP_REASON.LABEL_NONE;
+          drop.label[semantic.label] = (drop.label[semantic.label] ?? 0) + seg;
+          add(semantic.label, 'droppedPx', seg); continue;
+        }
+      }
       if (r.ink === 'none') { reason[k] = DROP_REASON.LABEL_NONE; const name = labelAt(R[k].x, R[k].y); drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
       if (r.ink !== 'none' && r.penContrast && contrast[k] < r.penContrast) { reason[k] = DROP_REASON.CONTRAST; const name = r.label; drop.label[name] = (drop.label[name] ?? 0) + seg; add(name, 'droppedPx', seg); continue; }
       if (cls[k] === CLASS.mass) { reason[k] = DROP_REASON.MASS; drop.mass += seg; add(r.label ?? 'none', 'droppedPx', seg); continue; }
@@ -111,7 +137,10 @@ export function decideLines(lines, ctx, options = {}) {
           const { widths: _w, weights: _wt, ...restG } = g;
           out.push({ ...restG, points: piece, inkLabel: mid.label ?? 'none', inkMinMm: structural ? 0 : (Number.isFinite(mid.minMm) ? mid.minMm : 0) });
           keptPx += pl; add(mid.label ?? 'none', 'keptPx', pl);
-          for (let j = start + 1; j < k; j++) if (cls[j] === CLASS.mass) keptMass += d[j] - d[j - 1];
+          for (let j = start + 1; j < k; j++) if (cls[j] === CLASS.mass) {
+            keptMass += d[j] - d[j - 1];
+            if (structuralMass[j]) retainedStructuralMass += d[j] - d[j - 1];
+          }
         }
         start = -1;
       }
@@ -119,7 +148,7 @@ export function decideLines(lines, ctx, options = {}) {
   }
   const mm = px => px * pxMm;
   return { lines: out, stats: {
-    lines: lines.length, pieces: out.length, lengthPx, keptPx,
+    lines: lines.length, pieces: out.length, lengthPx, keptPx, retainedStructuralMassMm: mm(retainedStructuralMass),
     massBefore: lengthPx ? massLen / lengthPx : 0, massAfter: keptPx ? keptMass / keptPx : 0,
     droppedMm: { mass: mm(drop.mass), faint: mm(drop.faint), short: mm(drop.short), label: Object.fromEntries(Object.entries(drop.label).map(([k, v]) => [k, mm(v)])) },
     byLabelMm: Object.fromEntries(Object.entries(byLabel).map(([k, v]) => [k, { kept: mm(v.keptPx), dropped: mm(v.droppedPx) }])),

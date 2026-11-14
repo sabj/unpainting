@@ -49,7 +49,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
   const cellLabel = (x, y) => (seg ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
   // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
   if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }
-  const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, cellLabel, shadow, foliage: foliageCells }, o);
+  const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, inputKind: doc.inputKind, cellLabel, shadow, foliage: foliageCells }, o);
   let kept = r.lines, geometry = null;
   // --inkgeom 1: straight runs and arcs where the source shows them; squiggles that are not forms or features are left to the wash
   if (geom) {

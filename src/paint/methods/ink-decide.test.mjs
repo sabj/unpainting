@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
 import { parseLabelReply, simpleLabel, ruleAt, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
-import { cutMassEdges } from './line-class.mjs';
+import { cutMassEdges, classifyPathDetail, CLASS } from './line-class.mjs';
 
 const W = 160, H = 100, PX = 0.15;
 // paper 90; a pen line (L 40, 2 px) along row 20; a dark wash block (L 55) on rows 60..99 whose top edge at row 60 has no line
@@ -81,4 +81,84 @@ test('partial options object merges with defaults without dropping unmentioned o
   const r = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' }, { bridgeMm: 0.5 });
   assert.ok(r.stats != null);
   assert.ok(r.stats.lines === 1);
+});
+
+const structuralCtx = (extra = {}) => ({ L: plane(), w: W, h: H, pxMm: PX, inputKind: 'line-map', cellLabel: () => 'architecture', ...extra });
+test('source-model structural dark/light boundary survives with endpoints and pressure, including a tone shadow mask', () => {
+  for (const label of ['architecture', 'ground']) {
+    const g = line(60); g.widths = g.points.map((_, i) => 1 + i / 30); g.weights = g.points.map((_, i) => .2 + i / 30);
+    const r = decideLines([g], structuralCtx({ cellLabel: () => label, shadow: new Uint8Array(W * H).fill(1) }));
+    assert.equal(r.lines.length, 1);
+    assert.deepEqual(r.lines[0].points[0], { x: 5, y: 60, width: 1, weight: .2 });
+    assert.deepEqual(r.lines[0].points.at(-1), { x: 155, y: 60, width: 2, weight: 1.2 });
+    assert.ok(r.stats.retainedStructuralMassMm > 20);
+  }
+});
+test('structural exception is source-provenance bounded and rejects short, unsupported and wash-only contours', () => {
+  assert.equal(decideLines([line(60)], structuralCtx({ inputKind: undefined })).lines.length, 0);
+  assert.equal(decideLines([line(60, 5, 40)], structuralCtx()).lines.length, 0);
+  assert.equal(decideLines([line(60)], structuralCtx({ L: new Float32Array(W * H).fill(90) })).lines.length, 0);
+  for (const label of ['sky', 'water', 'foliage', 'shadow_mass']) {
+    assert.equal(decideLines([line(60)], structuralCtx({ cellLabel: () => label })).lines.length, 0, label);
+  }
+  assert.equal(decideLines([line(60)], structuralCtx({ foliage: new Uint8Array(W * H).fill(1) })).lines.length, 0);
+});
+test('structural contours do not bridge explicit semantic gaps', () => {
+  for (const label of ['sky', 'foliage', 'shadow_mass']) {
+    const r = decideLines([line(60)], structuralCtx({ cellLabel: x => x > 55 && x < 105 ? label : 'architecture' }), { bridgeMm: 100 });
+    assert.equal(r.lines.length, 2, label);
+    assert.ok(r.lines.every(g => g.points.every(p => p.x < 65 || p.x > 95)), label);
+  }
+});
+function rasterContour(pxMm, kind) {
+  const w = Math.round(48 / pxMm), h = Math.round(40 / pxMm), L = new Float32Array(w * h);
+  const edge = x => kind === 'diagonal' ? 10 + .35 * x : kind === 'irregular' ? 20 + 3 * Math.sin(x * 2) : 20 - Math.sqrt(Math.max(0, 16 ** 2 - (x - 24) ** 2));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) L[y * w + x] = y * pxMm >= edge(x * pxMm) ? 55 : 90;
+  const points = [];
+  for (let x = Math.round(12 / pxMm); x <= Math.round(36 / pxMm); x++) points.push({ x, y: Math.round(edge(x * pxMm) / pxMm) });
+  return { g: { points }, ctx: { L, w, h, pxMm, inputKind: 'line-map', cellLabel: () => 'architecture' } };
+}
+test('quantized diagonals and smooth rims retain connected endpoints across physical image grids', () => {
+  for (const pxMm of [.1, .2, .3]) for (const kind of ['diagonal', 'rim']) {
+    const { g, ctx } = rasterContour(pxMm, kind), r = decideLines([g], ctx);
+    assert.equal(r.lines.length, 1, kind + ' ' + pxMm);
+    assert.deepEqual(r.lines[0].points[0], g.points[0]);
+    assert.deepEqual(r.lines[0].points.at(-1), g.points.at(-1));
+  }
+});
+test('irregular source mass contours gain no structural exemption', () => {
+  const { g, ctx } = rasterContour(.15, 'irregular'), r = decideLines([g], ctx);
+  assert.equal(r.stats.retainedStructuralMassMm ?? 0, 0);
+  assert.ok(r.stats.keptPx < r.stats.lengthPx / 2);
+});
+test('decideFile forwards source-model provenance into the structural decision', async () => {
+  const { decideFile } = await import('./ink-decide-file.mjs');
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'structural-provenance-'));
+  try {
+    for (const inputKind of [undefined, 'line-map']) {
+      const doc = { image: { w: W, h: H }, inputKind, lines: [{ points: line(60).points.map(p => [p.x, p.y]) }] };
+      const r = await decideFile({ doc, L: plane(), image: path.join(out, 'source.png'), out, stage: 'opening', pxMm: PX, shadowMask: false });
+      assert.equal(r.lines.length, inputKind ? 1 : 0);
+    }
+  } finally { fs.rmSync(out, { recursive: true, force: true }); }
+});
+
+test('unsupported faint semantic gaps cannot reconnect structural mass contours', () => {
+  const L = plane();
+  for (let y = 0; y < H; y++) for (let x = 55; x <= 105; x++) L[y * W + x] = 90;
+  assert.equal(classifyPathDetail(Array.from({ length: 151 }, (_, k) => ({ x: k + 5, y: 60 })), L, W, H, PX).cls[75], CLASS.faint);
+  for (const label of ['foliage', 'sky', 'water', 'shadow_mass']) {
+    const r = decideLines([line(60)], structuralCtx({ L, cellLabel: x => x >= 55 && x <= 105 ? label : 'architecture' }), { bridgeMm: 100 });
+    assert.equal(r.lines.length, 2, label);
+    assert.ok(r.lines.every(g => g.points.every(p => p.x < 65 || p.x > 95)), label);
+  }
+});
+
+test('local pen support through foliage keeps its ordinary rule inside a model structural contour', () => {
+  const L = plane();
+  for (let x = 45; x <= 115; x++) { L[59 * W + x] = 30; L[60 * W + x] = 30; }
+  const r = decideLines([line(60)], structuralCtx({ L, cellLabel: x => x >= 45 && x <= 115 ? 'foliage' : 'architecture' }));
+  assert.ok(r.lines.some(g => g.points.some(p => p.x > 65 && p.x < 95)), 'pen marks inside foliage remain eligible');
+  assert.ok(r.stats.retainedStructuralMassMm > 0, 'not the old global mostly-pen exception');
 });
