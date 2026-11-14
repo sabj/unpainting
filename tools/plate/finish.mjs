@@ -214,7 +214,21 @@ if (LOOK_RES > 1 && !INKRES) { const F = renderFine(); await sharp(F.buf, { raw:
 const FINAL_PIXELS=INKRES ? INKRES.compose(view()) : FINAL.coarse;
 assertDeviceHealthy(ctx.sheet); // a broken GPU device never writes a painting (src/media/gpu/device-health.mjs)
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'painting.png'));
-if(ctx.NATIVE_RECORDER){try{if(ctx.NATIVE_RECORDING_FAILURE)throw Error(ctx.NATIVE_RECORDING_FAILURE);if(ctx.NATIVE_UNOBSERVED_ROUTES?.length)throw Error('Incomplete native recording: direct marks in '+ctx.NATIVE_UNOBSERVED_ROUTES.join(', '));verifyNativeMarkCoverage(MARKTAPE,ctx.NATIVE_MARK_COUNTS);}catch(error){ctx.NATIVE_RECORDER.abort(error.message);throw error;}const decoded=await sharp(path.join(out,'painting.png')).removeAlpha().raw().toBuffer();if(!decoded.equals(Buffer.from(FINAL_PIXELS)))throw Error('Native recording final PNG pixel mismatch');ctx.NATIVE_RECORDER.finish(decoded,{stage:ctx.STAGE});}
+if(ctx.NATIVE_RECORDER){
+ try{
+  if(ctx.NATIVE_RECORDING_FAILURE)throw Error(ctx.NATIVE_RECORDING_FAILURE);
+  if(ctx.NATIVE_UNOBSERVED_ROUTES?.length)throw Error('Incomplete native recording: direct marks in '+ctx.NATIVE_UNOBSERVED_ROUTES.join(', '));
+  verifyNativeMarkCoverage(MARKTAPE,ctx.NATIVE_MARK_COUNTS);
+  const decoded=await sharp(path.join(out,'painting.png')).removeAlpha().raw().toBuffer();
+  if(!decoded.equals(Buffer.from(FINAL_PIXELS)))throw Error('Native recording final PNG pixel mismatch');
+  ctx.NATIVE_RECORDER.finish(decoded,{stage:ctx.STAGE});
+ }catch(error){
+  ctx.NATIVE_RECORDER.abort(error.message);
+  fs.writeFileSync(path.join(out,'native-recording-failure.json'),JSON.stringify({complete:false,error:error.message,paintingRetained:true}));
+  console.error('NATIVE RECORDING INCOMPLETE: '+error.message+'; painting and physical tape retained; run FAILED');
+  process.exitCode=4;
+ }
+}
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
 if (STROKE_BUDGET) {
  const count=MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length;
