@@ -14,8 +14,9 @@ export function pointOnPath(xy, fraction) {
   for(let j=0;j<lengths.length;j++) { const d=lengths[j]; if(left<=d) {const t=d?left/d:0;return [xy[j*2]+(xy[j*2+2]-xy[j*2])*t,xy[j*2+1]+(xy[j*2+3]-xy[j*2+1])*t];} left-=d; }
   return xy.slice(-2);
 }
-export async function playFilm(film, overlay, W, H, {progress, skipped, alive, paused=()=>false, speed=()=>1, brush=()=>true,seek=0}) {
-  if(film.operations)return playNativeOperations(film,overlay,W,H,{progress,skipped,alive,paused,speed,seek});
+export async function playFilm(film, overlay, W, H, {progress, skipped, alive, paused=()=>false, speed=()=>1, brush=()=>true,seek=0,onFrame}) {
+  if(!Number.isFinite(seek)||seek<0||seek>1)throw Error('Film seek must be finite and between 0 and 1');
+  if(film.operations)return playNativeOperations(film,overlay,W,H,{progress,skipped,alive,paused,speed,seek,onFrame});
   const [images,tape] = await Promise.all([Promise.all(film.frames.map(loadImage)), film.paths?fetch(film.paths).then(r=>{if(!r.ok)throw Error(`Stroke paths: ${r.status}`);return r.json();}):Promise.resolve({strokes:[]})]);
   const final=images.at(-1), box=placeOnSheet(film.aspect,W,H);
   if(!alive()) return {final,box};
@@ -60,7 +61,7 @@ export function applyNativeOperation(rgb,width,height,event,patch) {
  for(let y=0;y<r.height;y++)for(let x=0;x<r.width*3;x++){const to=((r.y+y)*width+r.x)*3+x,from=y*r.width*3+x;rgb[to]=event.encoding==='xor'?rgb[to]^patch[from]:patch[from];}
 }
 const pixelHash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
-async function playNativeOperations(film,overlay,W,H,{progress,skipped,alive,paused,speed,seek}) {
+async function playNativeOperations(film,overlay,W,H,{progress,skipped,alive,paused,speed,seek,onFrame}) {
  const response=await fetch(film.operations);if(!response.ok)throw Error(`Native recording: ${response.status}`);
  const m=await response.json();if(m.kind!=='native-operation-recording'||m.complete!==true||!m.events?.length||!m.events[0].keyframe||!m.events.at(-1).keyframe)throw Error('Incomplete native operation recording');
  const width=m.width,height=m.height;if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)throw Error('Invalid native recording dimensions');
@@ -82,6 +83,8 @@ async function playNativeOperations(film,overlay,W,H,{progress,skipped,alive,pau
   applyNativeOperation(rgb,width,height,e,patch);prior=await pixelHash(rgb);if(prior!==e.pixelSHA256)throw Error('Native decoded pixel hash mismatch');
   if(i<target)continue;
   for(let a=0,b=0;a<rgb.length;a+=3,b+=4){rgba[b]=rgb[a];rgba[b+1]=rgb[a+1];rgba[b+2]=rgb[a+2];rgba[b+3]=255;}g.putImageData(new ImageData(rgba,width,height),0,0);
+  // Await the consumer before this native framebuffer is reused for the next operation.
+  await onFrame?.(surface,e);
   visible.fillStyle='#fff';visible.fillRect(0,0,W,H);visible.drawImage(surface,box.x,box.y,box.w,box.h);overlay.hidden=false;progress(i+1,m.events.length);
   if(!skipped())await new Promise(r=>setTimeout(r,Math.max(0,100/Math.max(.01,speed()))));
  }

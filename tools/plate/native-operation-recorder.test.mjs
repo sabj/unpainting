@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import {createNativeOperationRecorder,verifyNativeMarkCoverage} from './native-operation-recorder.mjs';
-import {applyNativeOperation} from '../../demos/lab/targets/film.js';
+import {applyNativeOperation,playFilm} from '../../demos/lab/targets/film.js';
 import {makePaper} from '../../src/media/paper.mjs';
 import {createSheet,layersOf,dry,DEFAULTS} from '../../src/media/sheet.mjs';
 import {createBrush,dip,stroke,recordMarks} from '../../src/media/brush.mjs';
@@ -173,4 +173,31 @@ test('empty first refill segment remains an explicit unchanged native event',asy
   writer.finish(view());verifyNativeMarkCoverage(tape,{ink:segments,brush:0,graphite:0});assert.equal(gestures,1);assert.equal(segments,2);
   const {manifest}=await reconstruct(directory);assert.equal(manifest.events[1].reason,'refill');assert.equal(manifest.events[1].file,null);assert.equal(manifest.events[1].pixelSHA256,manifest.events[0].pixelSHA256);assert.notEqual(manifest.events[2].pixelSHA256,manifest.events[1].pixelSHA256);
  }finally{recordMarks(false);}
+});
+
+test('native player awaits each exact native surface and rejects invalid seeks before fetching',async t=>{
+ const directory=dir(t),width=8,height=4,rgb=Buffer.alloc(width*height*3,240),writer=createNativeOperationRecorder({directory,width,height,diskFloor:0});
+ writer.capture(rgb,{operation:'initial'});writer.capture(rgb,{operation:'unchanged'});rgb[9]=25;writer.capture(rgb,{operation:'ink'});writer.finish(rgb);
+ const manifest=JSON.parse(fs.readFileSync(path.join(directory,'operations.json'))),saved=new Map(['fetch','OffscreenCanvas','ImageData','createImageBitmap'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]));
+ t.after(()=>{for(const [k,d]of saved)if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];});
+ class Canvas{
+  constructor(w,h){this.width=w;this.height=h;this.pixels=new Uint8ClampedArray(w*h*4);}
+  getContext(){const c=this;return {putImageData(image){c.pixels=new Uint8ClampedArray(image.data);},getImageData(){return {data:new Uint8ClampedArray(c.pixels)};},fillRect(){},drawImage(image){c.pixels=new Uint8ClampedArray(image.pixels??image.data);}};}
+ }
+ let requests=0;
+ globalThis.OffscreenCanvas=Canvas;globalThis.ImageData=class{constructor(data,w,h){this.data=data;this.width=w;this.height=h;}};
+ globalThis.createImageBitmap=async blob=>{const d=await sharp(Buffer.from(await blob.arrayBuffer())).ensureAlpha().raw().toBuffer({resolveWithObject:true});return {width:d.info.width,height:d.info.height,data:d.data,close(){}};};
+ globalThis.fetch=async url=>{requests++;const name=path.basename(new URL(url).pathname);if(name==='operations.json')return {ok:true,json:async()=>manifest};const b=fs.readFileSync(path.join(directory,name));return {ok:true,arrayBuffer:async()=>b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength)};};
+ const film={operations:'https://fixture.invalid/operations.json'},options={progress:()=>{},skipped:()=>true,alive:()=>true};
+ const surfaceRGB=surface=>{const a=surface.getContext('2d').getImageData().data,b=Buffer.alloc(a.length/4*3);for(let i=0,j=0;i<a.length;i+=4,j+=3){b[j]=a[i];b[j+1]=a[i+1];b[j+2]=a[i+2];}return b;};
+ const order=[];
+ const result=await playFilm(film,new Canvas(40,30),40,30,{...options,onFrame:async(surface,event)=>{
+  order.push('start'+event.index);assert.equal(surface.width,width);assert.equal(surface.height,height);assert.equal(hash(surfaceRGB(surface)),event.pixelSHA256);
+  await new Promise(resolve=>setTimeout(resolve,5));assert.equal(hash(surfaceRGB(surface)),event.pixelSHA256,'surface cannot advance before consumer finishes');order.push('end'+event.index);
+ }});
+ assert.deepEqual(order,manifest.events.flatMap(e=>['start'+e.index,'end'+e.index]));assert.deepEqual(surfaceRGB(result.final),rgb);
+ const without=await playFilm(film,new Canvas(40,30),40,30,options);assert.deepEqual(surfaceRGB(without.final),rgb);
+ for(const seek of [0,.5,1]){const seen=[];await playFilm(film,new Canvas(40,30),40,30,{...options,seek,onFrame:(_,e)=>seen.push(e.index)});assert.equal(seen[0],Math.floor(seek*(manifest.events.length-1)));assert.equal(seen.at(-1),manifest.events.length-1);}
+ const before=requests;for(const seek of [NaN,Infinity,-Infinity,-.1,1.1])await assert.rejects(()=>playFilm(film,null,40,30,{...options,seek}),/seek must be finite/);assert.equal(requests,before);
+ let rejected=0;await assert.rejects(()=>playFilm(film,new Canvas(40,30),40,30,{...options,onFrame:async()=>{rejected++;throw Error('consumer failed');}}),/consumer failed/);assert.equal(rejected,1);
 });
