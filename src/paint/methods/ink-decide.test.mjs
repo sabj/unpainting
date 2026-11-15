@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
-import { parseLabelReply, simpleLabel, ruleAt, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
+import { parseLabelReply, labelIdentity, simpleLabel, ruleAt, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
 import { cutMassEdges, classifyPathDetail, CLASS } from './line-class.mjs';
 
 const W = 160, H = 100, PX = 0.15;
@@ -51,12 +51,125 @@ test('labels: replies are checked, the rules cover every label, a shadow mask fi
   assert.equal(m[5 * W + 80], 0);
 });
 
-test('without a vision model the regions take the simple classifier and the record says so', async () => {
-  const warn = [];
-  const run = () => ({ status: 1, stdout: '', stderr: 'not signed in' });
-  const r = await labelRegions({ image: new URL(import.meta.url).pathname, regions: [{ id: 1, area: 0.5, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 5, 5] }], labelMap: new Uint8Array(4), w: 2, h: 2, judge: 'codex', cacheDir: '/nonexistent', log: s => warn.push(s), run }).catch(e => e);
-  // the overlay needs a real image; either way the failure is loud, never silent
-  assert.ok(r instanceof Error || r.judge === 'simple');
+
+async function labelFixture(t) {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { default: sharp } = await import('sharp');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-label-test-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const image = path.join(dir, 'source.png');
+  await sharp({ create: { width: 8, height: 8, channels: 3, background: '#dfdac9' } }).png().toFile(image);
+  const regions = [1, 2].map(id => ({ id, area: .5, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 8, 8] }));
+  const opts = { image, regions, labelMap: Uint16Array.from({ length: 64 }, (_, i) => i < 32 ? 1 : 2), w: 8, h: 8,
+    judge: 'codex', cacheDir: path.join(dir, 'cache'), env: { CODEX_BIN: process.execPath, AGY_BIN: process.execPath, INK_LABEL_MODEL: 'test-model' } };
+  const good = () => ({ status: 0, stdout: '{"1":"architecture","2":"tree"}' });
+  const cacheFile = () => path.join(opts.cacheDir, fs.readdirSync(opts.cacheDir)[0]);
+  return { fs, dir, opts, good, cacheFile };
+}
+
+test('vision labels fail closed on process, image, parse and incomplete label failures', async t => {
+  const { opts, fs } = await labelFixture(t);
+  for (const run of [
+    () => ({ status: 1, stderr: 'private provider output' }),
+    () => ({ status: null, error: { code: 'ETIMEDOUT' } }),
+    () => ({ status: 0, stdout: 'not JSON' }),
+    () => ({ status: 0, stdout: '{"1":"architecture"}' }),
+    () => ({ status: 0, stdout: '{"1":"architecture","2":"banana"}' }),
+    () => ({ status: 0, stdout: '{"1":"architecture","2":{}}' }),
+  ]) {
+    await assert.rejects(labelRegions({ ...opts, run }), /ink labels \(codex\):.*(process failed|no valid|missing or unknown)/);
+    assert.equal(fs.existsSync(opts.cacheDir), false);
+  }
+  fs.writeFileSync(opts.image, 'not an image');
+  let called = false;
+  await assert.rejects(labelRegions({ ...opts, run: () => { called = true; } }), /ink labels \(codex\):/);
+  assert.equal(called, false, 'invalid source image must not reach the model');
+});
+
+test('explicit simple classification is unchanged and unknown or unresolved judges fail', async t => {
+  const { opts, good, fs } = await labelFixture(t);
+  const r = await labelRegions({ ...opts, judge: 'simple', run: () => assert.fail('simple must not invoke vision') });
+  assert.deepEqual(r, { labels: { 1: 'sky', 2: 'sky' }, source: { 1: 'simple', 2: 'simple' }, judge: 'simple', cached: false });
+  assert.equal(fs.existsSync(opts.cacheDir), false);
+  await assert.rejects(labelRegions({ ...opts, judge: 'typo', run: good }), /unknown judge/);
+  await assert.rejects(labelRegions({ ...opts, env: { CODEX_BIN: process.execPath }, run: good }), /set INK_LABEL_MODEL explicitly/);
+});
+
+test('complete vision labels retain aliases, pin model and reuse only valid vision cache', async t => {
+  const { opts, good, fs, cacheFile } = await labelFixture(t);
+  let called = 0;
+  const r = await labelRegions({ ...opts, run: (command, args) => {
+    called++; assert.equal(command, fs.realpathSync(process.execPath));
+    assert.equal(args[args.indexOf('--model') + 1], 'test-model');
+    assert.ok(fs.readFileSync(args[args.indexOf('-i') + 1]).subarray(1, 4).equals(Buffer.from('PNG')));
+    return good();
+  } });
+  assert.deepEqual(r.labels, { 1: 'architecture', 2: 'tree_trunk' });
+  assert.deepEqual(r.source, { 1: 'vision', 2: 'vision' });
+  assert.equal(r.identity.model, 'test-model');
+  assert.ok(r.identity.executable.sha256);
+  const cached = await labelRegions({ ...opts, run: () => assert.fail('valid cache must not call model') });
+  assert.deepEqual(cached, { ...r, cached: true }); assert.equal(called, 1);
+  const original = fs.readFileSync(cacheFile(), 'utf8');
+  for (const mutate of [
+    d => { d.source[2] = 'simple'; }, d => { delete d.labels[2]; },
+    d => { d.labels[2] = 'banana'; }, d => { d.labels[99] = 'sky'; },
+    d => { d.identity.model = 'wrong-model'; }, d => { d.judge = 'simple'; },
+  ]) {
+    const d = JSON.parse(original); mutate(d); fs.writeFileSync(cacheFile(), JSON.stringify(d));
+    await assert.rejects(labelRegions({ ...opts, run: () => assert.fail('corrupt cache must fail closed') }), /cached vision labels/);
+  }
+  fs.writeFileSync(cacheFile(), '{broken');
+  await assert.rejects(labelRegions({ ...opts, run: good }), /ink labels \(codex\):/);
+});
+
+test('vision cache changes with model, actual map, dimensions, metadata, source and executable', async t => {
+  const { opts, good, fs, dir } = await labelFixture(t);
+  const { default: sharp } = await import('sharp');
+  let calls = 0; const run = () => { calls++; return good(); };
+  const first = await labelRegions({ ...opts, run });
+  const changedMap = opts.labelMap.slice(); changedMap[0] = 2;
+  const variants = [
+    { env: { ...opts.env, INK_LABEL_MODEL: 'another-model' } },
+    { labelMap: changedMap },
+    { w: 16, h: 4 },
+    { regions: opts.regions.map(r => ({ ...r, area: .4 })) },
+  ];
+  const ids = new Set([JSON.stringify(first.identity)]);
+  for (const change of variants) {
+    const r = await labelRegions({ ...opts, ...change, run });
+    assert.equal(r.cached, false); ids.add(JSON.stringify(r.identity));
+  }
+  const exe = dir + '/runner'; fs.writeFileSync(exe, '#!/bin/sh\nexit 0\n'); fs.chmodSync(exe, 0o700);
+  const custom = { ...opts, env: { ...opts.env, CODEX_BIN: exe }, run };
+  ids.add(JSON.stringify((await labelRegions(custom)).identity));
+  fs.writeFileSync(exe, '#!/bin/sh\nexit 1\n');
+  ids.add(JSON.stringify((await labelRegions(custom)).identity));
+  await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ffffff' } }).png().toFile(opts.image);
+  ids.add(JSON.stringify((await labelRegions({ ...opts, run })).identity));
+  assert.equal(calls, 8); assert.equal(ids.size, 8);
+});
+
+test('prompt identity changes and map views hash only their actual bytes', async t => {
+  const { opts } = await labelFixture(t);
+  const args = { ...opts, model: 'test-model', executable: { path: '/runner', sha256: 'digest' }, prompt: 'first prompt' };
+  const a = labelIdentity(args), b = labelIdentity({ ...args, prompt: 'revised prompt' });
+  assert.notEqual(a.promptSHA256, b.promptSHA256);
+  const backing = new Uint16Array(66); backing.set(opts.labelMap, 1);
+  const view = backing.subarray(1, 65);
+  assert.deepEqual(labelIdentity({ ...args, labelMap: view }), a);
+  backing[0] = 99; assert.deepEqual(labelIdentity({ ...args, labelMap: view }), a);
+  assert.throws(() => labelIdentity({ ...args, labelMap: new Uint8Array(1) }), /w \* h/);
+});
+
+test('agy pins the existing default model and cannot substitute simple on failure', async t => {
+  const { opts, good } = await labelFixture(t);
+  const r = await labelRegions({ ...opts, judge: 'agy', env: { AGY_BIN: process.execPath }, run: (_command, args) => {
+    assert.equal(args[args.indexOf('--model') + 1], 'claude-sonnet-4-6'); return good();
+  } });
+  assert.equal(r.identity.model, 'claude-sonnet-4-6');
+  assert.equal(r.judge, 'agy');
+  await assert.rejects(labelRegions({ ...opts, judge: 'agy', run: () => ({ status: 1 }) }), /ink labels \(agy\): label process failed/);
 });
 
 test('bridging does not cross intentional semantic label cuts', () => {
