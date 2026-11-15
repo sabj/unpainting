@@ -624,8 +624,12 @@ test('fine layered forms retain original later ownership at two physical densiti
    calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
   const at=(X,Y)=>Math.floor(Y/mm)*w+Math.floor(X/mm);
   const darkCell=at(33.5,10),lightCell=at(50.5,10);
-  assert.ok(p.layers.some(l=>l.value===5&&l.shapes.some(s=>s.mask[darkCell]&&s.amount>0)),
-   nativeWidth+' dark form has real allocated paint in its original late band, not only a mask');
+  const middleAt=cell=>p.layers.filter(l=>l._valuePhase==='mid').flatMap(l=>l.shapes).reduce((sum,s)=>sum+(s.mask[cell]?s.amount:0),0);
+  assert.ok(middleAt(darkCell)>middleAt(at(31,10)),nativeWidth+' original middle allocation develops the dark form');
+  const unlayered=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,sheetWidthMm:70,
+   calibratedPlan:true,cellLight:false,massTone:false,layers:0,layerSmoothMm:2});
+  const outer=plan=>plan.layers.filter(l=>l._valuePhase!=='mid').map(l=>({value:l.value,shapes:l.shapes.map(s=>({amount:s.amount,mask:Array.from(s.mask)}))}));
+  assert.deepEqual(outer(p),outer(unlayered),'foundation and shadow geometry and pre-mass-tone charges remain exactly original');
   const baseMask=new Uint8Array(n);for(const l of p.layers.filter(l=>l.value===1))for(const s of l.shapes)for(let i=0;i<n;i++)if(s.mask[i])baseMask[i]=1;
   for(let i=0;i<n;i++)assert.equal(baseMask[i],hold[i]?0:1,'connected foundation geometry is unchanged');
   const paintAt=(cell,first=1)=>p.layers.filter(l=>l.value>=first).flatMap(l=>l.shapes).reduce((sum,s)=>sum+(s.mask[cell]?s.amount:0),0);
@@ -695,4 +699,17 @@ test('fine ownership does not split a continuous shadow glaze', () => {
   assert.equal(layer.shapes.length,1,'shadow remains one connected passage');
   if(layer.value===4)assert.ok(layer.shapes[0].mask[80*w+142]&&layer.shapes[0].mask[80*w+130],'eligible glaze crosses the fine ownership boundary');
  }
+});
+
+
+test('a real narrow dark remainder beside an explicit reserve stays paintable without new demand', () => {
+ const w=240,h=180,n=w*h,density=Float32Array.from({length:n},(_,i)=>i%w<80?.8:.3);
+ const hold=Uint8Array.from({length:n},(_,i)=>i%w<76?1:0);
+ const p=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,sheetWidthMm:56,
+  calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
+ assert.ok(p.layers.filter(l=>l._valuePhase==='mid').some(l=>l.shapes.some(s=>s.mask[90*w+78]&&s.amount>0)),
+  'remaining physical paint support is not rejected merely for touching a reserve');
+ for(const l of p.layers)for(const sh of l.shapes)for(let i=0;i<n;i++)assert.ok(!hold[i]||!sh.mask[i]);
+ const booked=p.instructions.reduce((a,q)=>a+q.plannedPigmentMass,0)+p.omittedDemand;
+ assert.ok(Math.abs(booked-density.reduce((a,v)=>a+v,0))<1e-3,'reserve-adjacent classification invents no demand');
 });

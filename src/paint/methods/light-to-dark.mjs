@@ -241,14 +241,14 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // step from that band's cap to its own, so each passage's one mean charge fits all of its cells. Without it a light
   // cell and a dark neighbour share a band in different proportions and the mean charge muddies the light one.
   // stepSquint: the value steps are cut from the squinted picture, the value smoothed over layerSmoothMm as the middle
-  // layers' own cuts are. Whole brush-sized fine forms retain the local field; isolated cells and broad edges stay coarse.
+  // layers' broad cuts are. Fine middle geometry below divides this original middle allocation without moving paint between phases.
   // Each cell still asks for its own paint, so a wash's charge is the mass tone of the cells it covers.
   const SQUINT=nestedBands&&stepSquint&&layerSmoothMm>0?boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))):null;
-  const fineLayers=SQUINT&&shaped?fineLayerOwnership(SQUINT,smooth,{w,h,minShape,mmPerCell:sheetWidthMm/w,eligible:i=>!protectedCells[i]&&value.values[i]>0&&!accentCells[i]&&!(profile&&cellStyle(i).name==='ink-and-wash')}):null;
+  const fineLayers=SQUINT&&shaped&&washLayers>0?fineLayerOwnership(SQUINT,smooth,{w,h,minShape,mmPerCell:sheetWidthMm/w,eligible:i=>!protectedCells[i]&&value.values[i]>0&&!accentCells[i]&&!(profile&&cellStyle(i).name==='ink-and-wash')}):null;
   if(nestedBands)for(let i=0;i<n;i++){
     if(profile&&cellStyle(i).name==='ink-and-wash')continue;
     if(accentCells[i])continue;
-    const v=fineLayers?fineLayers.values[i]:SQUINT?SQUINT[i]:value.values[i];
+    const v=SQUINT?SQUINT[i]:value.values[i];
     let asked=0;for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=Math.max(0,Math.min(v,VALUE_CAPS[band])-lo);asked+=weights[band][i];}
     for(let band=0;band<5;band++)weights[band][i]=asked>0?weights[band][i]/asked*styleGain:0;
     if(!shadowMask[i]){weights[1][i]+=weights[3][i]+weights[4][i];weights[3][i]=0;weights[4][i]=0;}
