@@ -162,3 +162,93 @@ test('local pen support through foliage keeps its ordinary rule inside a model s
   assert.ok(r.lines.some(g => g.points.some(p => p.x > 65 && p.x < 95)), 'pen marks inside foliage remain eligible');
   assert.ok(r.stats.retainedStructuralMassMm > 0, 'not the old global mostly-pen exception');
 });
+
+// Exercise the production raster tracer, not hand-smoothed polylines. Fifteen L* of
+// contrast is visible pen evidence without activating the strong-ink exemption.
+async function tracedPenFixtures() {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const { resolveLinePython } = await import('./line-python.mjs');
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const script = String.raw`
+import sys, importlib.util, json, cv2, numpy as np
+sys.path.insert(0, 'tools/seg')
+spec = importlib.util.spec_from_file_location('copylines', 'tools/seg/copy-lines.py')
+copylines = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(copylines)
+fixtures = []
+for px in [.15, 280/1080, 280/720]:
+    w, h = int(80/px), int(50/px)
+    for kind in ['straight', 'arc', 'S', 'wave', 'corner', 'fork', 'parallel', 'loop', 'erratic']:
+        x = np.linspace(10, 70, 1201)
+        y = 25 + .2*(x-40)
+        if kind == 'arc': y = 35-np.sqrt(35**2-(x-40)**2)
+        if kind == 'S': y = 25+8*np.sin((x-40)*np.pi/40)
+        if kind == 'wave': y = 25+2*np.sin(x*np.pi/4)
+        if kind == 'corner': y = 15+abs(x-40)*.4
+        if kind == 'erratic': y = 25+3*np.sin(x*2)
+        paths = [np.stack([x,y], axis=1)]
+        if kind == 'fork': paths = [np.array([[10,40],[40,25],[70,25]]), np.array([[40,25],[60,10]])]
+        if kind == 'parallel': paths.append(paths[0]+[0,2])
+        if kind == 'loop':
+            a = np.linspace(0, 2*np.pi, 1001)
+            paths = [np.stack([40+15*np.cos(a),25+15*np.sin(a)], axis=1)]
+        raster = np.full((h,w,3), 255, np.uint8)
+        for path in paths: cv2.polylines(raster, [np.round(path/px).astype(np.int32)], False, (0,0,0), 1, cv2.LINE_8)
+        lines, _, _, _ = copylines.plan(raster, kind='line-map', map_tolerance=.15)
+        distance = cv2.distanceTransform((raster[:,:,0]>0).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)*px
+        L = 90-15*np.exp(-.5*(distance/.2)**2)
+        fixtures.append(dict(kind=kind, pxMm=px, w=w, h=h, lines=lines, L=L.flatten().tolist()))
+print(json.dumps(fixtures))
+`;
+  const result = spawnSync(resolveLinePython({ root }).path, ['-c', script], {
+    cwd: root, encoding: 'utf8', timeout: 60000, maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' },
+  });
+  assert.equal(result.status, 0, `production trace fixture failed: ${result.error?.message ?? result.stderr}`);
+  return JSON.parse(result.stdout);
+}
+
+test('sampled pen contours use physical curvature without rewriting the traced geometry', async t => {
+  const { resample, turning, smoothPath } = await import('./ink-lines.mjs');
+  const fixtures = await tracedPenFixtures();
+  for (const f of fixtures) {
+    const lines = f.lines.map((g, i) => ({ ...g, id: `${f.kind}-${i}` }));
+    const before = structuredClone(lines);
+    const ctx = { ...f, inputKind: 'line-map', cellLabel: () => 'tree_trunk' };
+    const result = decideLines(lines, ctx);
+    const name = `${f.kind} at ${f.pxMm} mm/cell`;
+    assert.deepEqual(lines, before, name + ': source candidates are read-only');
+    for (const piece of result.lines) {
+      const source = lines.find(g => g.id === piece.id);
+      assert.ok(source, name + ': retain source identity');
+      const expected = resample(source.points.map(([x, y], k) => ({ x, y, width: source.widths[k], weight: source.weights[k] })), 1);
+      const start = expected.findIndex(p => p.x === piece.points[0].x && p.y === piece.points[0].y && p.width === piece.points[0].width && p.weight === piece.points[0].weight);
+      assert.ok(start >= 0, name + ': no invented starting point');
+      assert.deepEqual(piece.points, expected.slice(start, start + piece.points.length), name + ': a retained piece never rewrites geometry or contact');
+    }
+    if (f.kind === 'erratic') {
+      assert.ok(result.stats.keptPx < result.stats.lengthPx / 2, name + ': genuinely erratic geometry still fails');
+      continue;
+    }
+    // Coarse weak curved ridges still fail local optical support. This change
+    // must not pretend that physical curvature recovers absent source detail.
+    if (f.pxMm > .3 && ['arc', 'wave'].includes(f.kind)) {
+      t.diagnostic(`${name}: retained ${(100 * result.stats.keptPx / result.stats.lengthPx).toFixed(1)}%; coarse optical-support limit, not a required failure`);
+      continue;
+    }
+    assert.equal(result.lines.length, lines.length, name + ': keep each contour/branch separately');
+    assert.ok(Math.abs(result.stats.keptPx - result.stats.lengthPx) < 1e-7, name + ': no lost contour length');
+    for (let i = 0; i < lines.length; i++) {
+      const g = lines[i];
+      const expected = resample(g.points.map(([x, y], k) => ({ x, y, width: g.widths[k], weight: g.weights[k] })), 1);
+      assert.equal(result.lines[i].id, g.id, name);
+      assert.deepEqual(result.lines[i].points, expected, name + ': endpoints, corners, loop and width/pressure stay on the original trace');
+      if (f.kind === 'straight' && f.pxMm < .3) {
+        assert.ok(turning(expected) / f.pxMm > DECIDE_DEFAULTS.elongatedDegPerMm, 'fixture reproduces raw staircase rejection');
+        assert.ok(turning(smoothPath(expected, { sigma: DECIDE_DEFAULTS.smoothMm / f.pxMm })) / f.pxMm < DECIDE_DEFAULTS.structureDegPerMm);
+      }
+    }
+    assert.deepEqual(lines, before, name + ': source candidates are read-only');
+  }
+});

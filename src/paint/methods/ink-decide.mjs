@@ -54,12 +54,16 @@ export function decideLines(lines, ctx, options = {}) {
     lengthPx += total;
     let pen = 0, mass = 0;
     for (let k = 1; k < R.length; k++) { const s = d[k] - d[k - 1]; if (cls[k] === CLASS.pen) pen += s; else if (cls[k] === CLASS.mass) { mass += s; massLen += s; } }
-    const structural = total * pxMm >= o.structureMm && turning(R) / pxMm <= o.structureDegPerMm && pen >= o.keepPenShare * total;
+    // Assess curvature at the existing physical scale, not the raster staircase.
+    // These assessment points never replace the emitted trace or its pressure.
+    const physicalTurning = pts => turning(smoothPath(pts, { sigma: o.smoothMm / pxMm })) / pxMm;
+    const contourTurning = physicalTurning(R);
+    const structural = total * pxMm >= o.structureMm && contourTurning <= o.structureDegPerMm && pen >= o.keepPenShare * total;
     const rules = R.map(p => ruleAt(labelAt, p.x, p.y, reach));
     // INK-SPEC step 3: model structure between a dark mass and a light one is still drawn.
     // Assess raster staircases at the existing physical smoothing scale; never move emitted points.
     const modelStructure = ctx.inputKind === 'line-map' && total * pxMm >= o.structureMm &&
-      turning(smoothPath(R, { sigma: o.smoothMm / pxMm })) / pxMm <= o.structureDegPerMm;
+      contourTurning <= o.structureDegPerMm;
     const structuralMass = new Uint8Array(R.length);
     const semanticRules = modelStructure ? R.map(p => ruleAt((x, y) => labelAt(x, y, false), p.x, p.y, reach)) : null;
     const live = new Uint8Array(R.length);
@@ -129,7 +133,7 @@ export function decideLines(lines, ctx, options = {}) {
         // front of a hedge) is not a leaf, whatever the ground's colour: it stays.
         const strong = median(contrast, start, k) >= o.strongContrast;
         const lenMm = pl * pxMm, tooShort = piece.length < 2 || lenMm < 0.3 || (!structural && !strong && mid.ink === 'elongated' && lenMm < (mid.minMm ?? 0));
-        const tooTurny = !structural && !strong && mid.ink === 'elongated' && turning(piece) / pxMm > o.elongatedDegPerMm;
+        const tooTurny = !structural && !strong && mid.ink === 'elongated' && physicalTurning(piece) > o.elongatedDegPerMm;
         if (tooShort || tooTurny) { drop.short += pl; add(mid.label ?? 'none', 'droppedPx', pl); }
         else {
           // the shortest piece the ground allows (ink-labels.mjs minMm) is applied by the salience step, after collinear
