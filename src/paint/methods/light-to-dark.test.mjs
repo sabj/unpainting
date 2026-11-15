@@ -608,3 +608,91 @@ test('paintable thin mid planes keep their original bands, charge and protected 
   assert.ok(!actual.layers.some(l=>l.value>=4&&l.shapes.some(s=>s.mask.some((v,i)=>v&&feature[i]))),'no appended terminal repair');
  }
 });
+
+test('fine layered forms retain original later ownership at two physical densities', () => {
+ for(const nativeWidth of [1200,2448]){
+  const w=Math.round(70*nativeWidth/280),h=Math.round(42*nativeWidth/280),mm=70/w,n=w*h;
+  const density=new Float32Array(n).fill(.4),hold=new Uint8Array(n),dark=new Uint8Array(n),channel=new Uint8Array(n);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   const i=y*w+x,X=(x+.5)*mm,Y=(y+.5)*mm;
+   if(X<14)density[i]=.8; // broad edge touching the sheet must keep broad-wash geometry
+   if(Y>5&&Y<37&&X>33&&X<34){density[i]=.65;dark[i]=1;if(Y>20&&Y<22)hold[i]=1;}
+   if(Y>5&&Y<37&&X>50&&X<51){density[i]=.15;channel[i]=1;}
+  }
+  density[Math.floor(3/mm)*w+Math.floor(60/mm)]=.65; // sub-footprint isolated fleck
+  const p=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,sheetWidthMm:70,
+   calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
+  const at=(X,Y)=>Math.floor(Y/mm)*w+Math.floor(X/mm);
+  const darkCell=at(33.5,10),lightCell=at(50.5,10);
+  assert.ok(p.layers.some(l=>l.value===5&&l.shapes.some(s=>s.mask[darkCell]&&s.amount>0)),
+   nativeWidth+' dark form has real allocated paint in its original late band, not only a mask');
+  const baseMask=new Uint8Array(n);for(const l of p.layers.filter(l=>l.value===1))for(const s of l.shapes)for(let i=0;i<n;i++)if(s.mask[i])baseMask[i]=1;
+  for(let i=0;i<n;i++)assert.equal(baseMask[i],hold[i]?0:1,'connected foundation geometry is unchanged');
+  const paintAt=(cell,first=1)=>p.layers.filter(l=>l.value>=first).flatMap(l=>l.shapes).reduce((sum,s)=>sum+(s.mask[cell]?s.amount:0),0);
+  assert.ok(p.layers.filter(l=>l.value===1).some(l=>l.shapes.some(s=>s.mask[lightCell]&&s.amount>0)),'base paint still owns the light channel');
+  assert.ok(paintAt(lightCell,2)<paintAt(at(49,10),2),'later painting preserves the light channel relative to its neighbor: '+paintAt(lightCell,2)+' vs '+paintAt(at(49,10),2));
+  const fleck=Math.floor(3/mm)*w+Math.floor(60/mm);
+  assert.ok(!p.layers.some(l=>l.value===5&&l.shapes.some(s=>s.mask[fleck])),'isolated sub-footprint noise is not restored as a dark detail');
+  for(const l of p.layers)for(const s of l.shapes)for(let i=0;i<n;i++)assert.ok(!hold[i]||!s.mask[i],'held gap remains free');
+  const requested=density.reduce((a,v)=>a+v,0),booked=p.instructions.reduce((a,p)=>a+p.plannedPigmentMass,0)+p.omittedDemand;
+  assert.ok(Math.abs(booked-requested)<1e-3*requested,'pre-mass-tone allocation neither duplicates nor drops demand');
+ }
+});
+
+test('nested fine components do not discard their previously paintable halo', () => {
+ for(const light of [false,true,'zero-core']){
+  const w=180,h=140,n=w*h,density=new Float32Array(n).fill(light==='zero-core'?.8:light?.6:.2);
+  for(let y=0;y<h;y++)for(let x=0;x<40;x++)density[y*w+x]=.8;
+  for(let y=40;y<80;y++)for(let x=100;x<106;x++)density[y*w+x]=light==='zero-core'?(x<104?.12:.5):light?(x<104?.05:.3):(x<104?.75:.5);
+  const p=planLightToDark({w,h,k:1,density,demand:density.slice(),shaped:true,sheetWidthMm:w*280/1200,
+   calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
+  assert.equal(p.omittedDemand,0,'nested '+(light?'light':'dark')+' ownership cannot create omitted demand');
+  assert.ok(p.layers.filter(l=>l._valuePhase==='mid').some(l=>l.shapes.some(s=>s.mask[60*w+105])),
+   'the halo retains its original middle-paint owner');
+ }
+});
+
+
+test('fine layers preserve explicit pale treatment and noncalibrated style allocation', () => {
+ const w=300,h=180,n=w*h,density=new Float32Array(n).fill(.4);
+ for(let y=0;y<h;y++)for(let x=0;x<60;x++)density[y*w+x]=.8;
+ for(let y=20;y<160;y++)for(let x=140;x<145;x++)density[y*w+x]=.15;
+ const args={w,h,k:1,density,demand:density.slice(),shaped:true,sheetWidthMm:70,
+  nestedBands:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2};
+ const p=planLightToDark({...args,styleGain:.7});
+ const total=p.instructions.reduce((a,q)=>a+q.plannedPigmentMass,0)+p.omittedDemand;
+ assert.ok(Math.abs(total-density.reduce((a,v)=>a+v,0)*.7)<1e-3,'explicit style allocation is not normalized to one');
+ const pale=planLightToDark({...args,paleLights:.55});
+ const lightCell=80*w+142;
+ assert.ok(pale.layers.filter(l=>l.value===1).some(l=>l.shapes.some(s=>s.mask[lightCell])));
+ assert.ok(!pale.layers.filter(l=>l.value>1).some(l=>l.shapes.some(s=>s.mask[lightCell])),'explicit pale wash is not crossed by fine middle paint');
+});
+
+
+test('broad straight and diagonal boundaries are not promoted as narrow difference rims', () => {
+ for(const diagonal of [false,true]){
+  const w=240,h=180,n=w*h,density=Float32Array.from({length:n},(_,i)=>
+   i%w<(diagonal?40+Math.floor(i/w)/2:90)?.8:.3);
+  const p=planLightToDark({w,h,k:1,density,demand:density.slice(),shaped:true,sheetWidthMm:56,
+   calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
+  for(const layer of p.layers)for(const sh of layer.shapes){
+   const cells=[];for(let i=0;i<n;i++)if(sh.mask[i])cells.push(i);
+   let boundary=0;for(const i of cells)if(i%w===0||i%w===w-1||i<w||i>=n-w||!sh.mask[i-1]||!sh.mask[i+1]||!sh.mask[i-w]||!sh.mask[i+w])boundary++;
+   assert.ok(2*cells.length/boundary*56/w>7,'ordinary broad boundary stays a broad passage, not a fine difference rim');
+  }
+ }
+});
+
+test('fine ownership does not split a continuous shadow glaze', () => {
+ const w=300,h=180,n=w*h,density=new Float32Array(n).fill(.6);
+ for(let y=0;y<h;y++)for(let x=0;x<60;x++)density[y*w+x]=.8;
+ for(let y=20;y<160;y++)for(let x=140;x<145;x++)density[y*w+x]=.5;
+ const p=planLightToDark({w,h,k:1,density,demand:density.slice(),shaped:true,sheetWidthMm:70,
+  calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
+ const shadows=p.layers.filter(l=>l._valuePhase==='shadow');
+ assert.ok(shadows.length);
+ for(const layer of shadows){
+  assert.equal(layer.shapes.length,1,'shadow remains one connected passage');
+  if(layer.value===4)assert.ok(layer.shapes[0].mask[80*w+142]&&layer.shapes[0].mask[80*w+130],'eligible glaze crosses the fine ownership boundary');
+ }
+});

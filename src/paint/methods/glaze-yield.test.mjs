@@ -19,7 +19,7 @@ const WIDTH = 1200, MM = 280 / WIDTH, STRENGTH = 2.2, CHUNK = Math.round(Math.ma
 const PIGMENT = { K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 };
 const PHYSICS = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, gran: 0.25, granFill: 0 };
 // the wash brush of paint-plate's lay loop and of its swatch, under --loadedcontact 1 (a loaded brush reaches every pit)
-const washBrush = (r, T, seed = 31) => createBrush(scaleBrushForDensity({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: T.wetMix, bridge: 0, bridgeSoft: T.bridgeSoft, seed }, { renderWidth: WIDTH }));
+const washBrush = (r, T, seed = 31, renderWidth = WIDTH) => createBrush(scaleBrushForDensity({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: T.wetMix, bridge: 0, bridgeSoft: T.bridgeSoft, seed }, { renderWidth }));
 const waterBrush = r => createBrush(scaleBrushForDensity({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }, { renderWidth: WIDTH }));
 
 const STOCK = [
@@ -125,5 +125,53 @@ test('fitted thin mid paint deposits continuously on the physical sheet and keep
     t.diagnostic(JSON.stringify({backend,form,rows,minDepositedRow:minRow,gpu:backend==='gpu'?gpuStats(sheet):null}));
    }finally{sheet._gpu?.close();}
   }
+ }
+});
+
+
+test('multiscale original layers physically retain dark form and light channel at two densities', {timeout:240000}, async t => {
+ const {planLightToDark}=await import('./light-to-dark.mjs');
+ const {attachGpu,gpuStats}=await import('../../media/gpu/link.mjs');
+ const {coherent,applyResist,liftResist}=await import('../../media/sheet.mjs');
+ for(const nativeWidth of [1200,2448]){
+  const w=Math.round(70*nativeWidth/280),h=Math.round(42*nativeWidth/280),mm=70/w,n=w*h;
+  const density=new Float32Array(n).fill(.4),hold=new Uint8Array(n);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   const i=y*w+x,X=(x+.5)*mm,Y=(y+.5)*mm;
+   if(X<14)density[i]=.8;
+   if(Y>5&&Y<37&&X>33&&X<34){density[i]=.65;if(Y>20&&Y<22)hold[i]=1;}
+   if(Y>5&&Y<37&&X>50&&X<51)density[i]=.15;
+  }
+  const plan=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,sheetWidthMm:70,
+   calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
+  const sheet=createSheet(makePaper(w,h,{mmPerCell:mm,seed:9,scale:1,toothScale:.2,fibres:.5,tooth:.5,proudBlur:1,coldPress:{mmPerCell:mm,bumpMm:[.5,2],cover:2.2,swell:.3}}),[PIGMENT]);
+  const info=attachGpu(sheet,PHYSICS,{mode:'auto',log:()=>{}});
+  if(info.backend!=='gpu'){t.skip('no GPU for physical multiscale coupon');return;}
+  assert.equal(info.fallback,false);
+  try{
+   applyResist(sheet,hold); // Explicit essential reserve, as in the production film lifecycle.
+   for(const layer of plan.layers){
+    for(const sh of layer.shapes){
+     const T=valueTechnique(sh._valuePlan),paths=shapedPlanePaths(sh.mask,w,h,{mmPerCell:mm,protect:hold});
+     setClip(sheet,sh.mask);
+     for(const pts of paths){
+      const b=washBrush(Math.max(1,...pts.map(p=>p.r)),T,31,nativeWidth);
+      dip(b,{water:T.water,conc:[sh.amount]});
+      stroke(b,sheet,pts,{upright:'sweep',spacing:1.4,lift:true});
+     }
+    }
+    setClip(sheet,null);dry(sheet,30000,PHYSICS,{levelMax:140,dt:2});
+   }
+   liftResist(sheet);coherent(sheet);const pigment=thickness(sheet)[0];
+   const mean=(x0,x1,y0,y1)=>{let sum=0,count=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const X=(x+.5)*mm,Y=(y+.5)*mm;if(X>x0&&X<x1&&Y>y0&&Y<y1){sum+=pigment[y*w+x];count++;}
+   }return sum/count;};
+   const dark=mean(33,34,8,17),besideDark=mean(31,32,8,17),light=mean(50,51,8,17),besideLight=mean(48,49,8,17);
+   assert.ok(dark>besideDark,'original later layers physically develop the dark form');
+   assert.ok(light<besideLight,'channel remains lighter after all original layers');
+   assert.ok(light>0,'light channel retains its pale foundation');
+   assert.equal(mean(33,34,20.8,21.2),0,'held gap stays bare');
+   t.diagnostic(JSON.stringify({nativeWidth,backend:info.backend,dark,besideDark,light,besideLight,gpu:gpuStats(sheet)}));
+  }finally{sheet._gpu?.close();}
  }
 });
