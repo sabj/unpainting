@@ -576,3 +576,35 @@ test('ownSwatch: a calibrated plan keeps the glaze one damp pass; without it the
   assert.deepEqual([own.passes, own.water], [1, 0.45]);
   assert.deepEqual([stock.passes, stock.water], [1, 0.58]);
 });
+
+test('paintable thin mid planes keep their original bands, charge and protected gaps without ink', () => {
+ for (const form of ['straight','diagonal','curved']) {
+  const w=180,h=240,n=w*h,cellMm=280/1200,density=new Float32Array(n),hold=new Uint8Array(n),feature=new Uint8Array(n);
+  for(let y=20;y<220;y++)for(let x=20;x<70;x++)density[y*w+x]=.8;
+  for(let y=20;y<220;y++){
+   const cx=110+(form==='diagonal'?Math.round((y-120)/5):form==='curved'?Math.round(14*Math.sin((y-20)/200*Math.PI)):0);
+   for(let x=cx;x<cx+3;x++){density[y*w+x]=.4;feature[y*w+x]=1;}
+   if(y>=110&&y<120)for(let x=cx-3;x<cx+6;x++)hold[y*w+x]=1;
+  }
+  // Isolated noise remains below the existing shape floor, not promoted as a stroke.
+  density[10*w+160]=.4;
+  const args={w,h,k:1,density,demand:density.slice(),hold,shadowThresh:.9,sheetWidthMm:w*cellMm};
+  const control=density.slice();for(let i=0;i<n;i++)if(feature[i])control[i]=0;
+  const actual=planLightToDark({...args,shaped:true}), reference=planLightToDark({...args,density:control,demand:control.slice(),shaped:true});
+  for(const band of [2,3]){
+   const shapes=actual.layers.filter(l=>l.value===band).flatMap(l=>l.shapes);
+   const retained=shapes.filter(s=>s.mask.some((v,i)=>v&&feature[i]));
+   assert.ok(retained.length>=2,form+' retains the two sides of the protected gap in original mid band '+band);
+
+   for(const s of retained)for(let i=0;i<n;i++)assert.ok(!hold[i]||!s.mask[i],'protected gap stays clear');
+   const broad=shapes.find(s=>s.mask[50*w+40]),refBroad=reference.layers.find(l=>l.value===band).shapes.find(s=>s.mask[50*w+40]);
+   assert.equal(broad.amount,refBroad.amount,'broad foundation charge unchanged');
+   assert.ok(!shapes.some(s=>s.mask[10*w+160]),'isolated noise stays rejected');
+  }
+  for(let y=30;y<210;y++){if(y>=108&&y<122)continue;const cx=110+(form==='diagonal'?Math.round((y-120)/5):form==='curved'?Math.round(14*Math.sin((y-20)/200*Math.PI)):0),i=y*w+cx+1;
+   const charge=actual.layers.flatMap(l=>l.shapes).reduce((sum,s)=>sum+(s.mask[i]?s.amount:0),0);
+   assert.ok(Math.abs(charge-density[i])<1e-7,form+' full original charge exactly once across original bands');
+  }
+  assert.ok(!actual.layers.some(l=>l.value>=4&&l.shapes.some(s=>s.mask.some((v,i)=>v&&feature[i]))),'no appended terminal repair');
+ }
+});

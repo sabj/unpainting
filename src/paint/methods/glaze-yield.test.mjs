@@ -93,3 +93,37 @@ test('stacked plan glazes land what the ledger books for them, as the base wash 
     assert.ok(Math.abs(row.inside / base.inside - 1) < 0.1, `a glaze holds ${row.inside.toFixed(3)} of its booking, the base wash ${base.inside.toFixed(3)}`);
   }
 });
+
+test('fitted thin mid paint deposits continuously on the physical sheet and keeps a reserved gap', {timeout:120000}, async t => {
+ const {planLightToDark}=await import('./light-to-dark.mjs');
+ const {attachGpu,gpuStats}=await import('../../media/gpu/link.mjs');
+ const {coherent}=await import('../../media/sheet.mjs');
+ for(const backend of ['cpu','gpu']){
+  for(const form of ['straight','diagonal','curved']){
+   const w=180,h=240,n=w*h,density=new Float32Array(n),hold=new Uint8Array(n);
+   const center=y=>110+(form==='diagonal'?Math.round((y-120)/5):form==='curved'?Math.round(14*Math.sin((y-20)/200*Math.PI)):0);
+   for(let y=20;y<220;y++)for(let x=20;x<70;x++)density[y*w+x]=.8;
+   for(let y=20;y<220;y++){for(let x=center(y);x<center(y)+3;x++)density[y*w+x]=.4;if(y>=110&&y<120)for(let x=center(y)-3;x<center(y)+6;x++)hold[y*w+x]=1;}
+   const plan=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,shadowThresh:.9,sheetWidthMm:w*MM});
+   const shapes=plan.layers.filter(l=>l.value===2).flatMap(l=>l.shapes);
+   const sheet=createSheet(makePaper(w,h,{mmPerCell:MM,seed:9,scale:1,toothScale:.2,fibres:.5,tooth:.5,proudBlur:1,coldPress:{mmPerCell:MM,bumpMm:[.5,2],cover:2.2,swell:.3}}),[PIGMENT]);
+   if(backend==='gpu'){
+    const info=attachGpu(sheet,PHYSICS,{mode:'auto',log:()=>{}});
+    if(info.backend!=='gpu'){t.skip('no GPU for physical thin-plane coupon');return;}
+    assert.equal(info.fallback,false);t.diagnostic('physical coupon backend GPU, '+form);
+   }
+   try{
+    for(const sh of shapes){
+     const T=valueTechnique(sh._valuePlan),paths=shapedPlanePaths(sh.mask,w,h,{mmPerCell:MM,protect:hold});
+     setClip(sheet,sh.mask);
+     for(const pts of paths){const b=washBrush(Math.max(1,...pts.map(p=>p.r)),T);dip(b,{water:T.water,conc:[sh.amount]});stroke(b,sheet,pts,{upright:'sweep',spacing:1.4,lift:true});}
+    }
+    setClip(sheet,null);dry(sheet,30000,PHYSICS,{levelMax:140,dt:2});coherent(sheet);
+    const pigment=thickness(sheet)[0];let rows=0,minRow=Infinity;
+    for(let y=30;y<210;y++){if(y>=106&&y<124)continue;let total=0;for(let x=center(y);x<center(y)+3;x++)total+=pigment[y*w+x];assert.ok(total>0,backend+' '+form+' has deposited paint at row '+y);minRow=Math.min(minRow,total);rows++;}
+    for(let y=113;y<117;y++)for(let x=center(y);x<center(y)+3;x++)assert.equal(pigment[y*w+x],0,'reserved gap remains bare');
+    t.diagnostic(JSON.stringify({backend,form,rows,minDepositedRow:minRow,gpu:backend==='gpu'?gpuStats(sheet):null}));
+   }finally{sheet._gpu?.close();}
+  }
+ }
+});
