@@ -713,3 +713,124 @@ test('a real narrow dark remainder beside an explicit reserve stays paintable wi
  const booked=p.instructions.reduce((a,q)=>a+q.plannedPigmentMass,0)+p.omittedDemand;
  assert.ok(Math.abs(booked-density.reduce((a,v)=>a+v,0))<1e-3,'reserve-adjacent classification invents no demand');
 });
+
+function samFixture(scale=1){
+ const w=Math.round(120*scale),h=Math.round(80*scale),n=w*h,k=2;
+ const density=new Float32Array(n).fill(1),demand=new Float32Array(n*k),labels=new Uint8Array(n);
+ for(let i=0;i<n;i++){const left=i%w<w/2;labels[i]=left?1:2;demand[2*i]=left?.8:.2;demand[2*i+1]=left?.2:.8;}
+ return {w,h,k,density,demand,formLabels:labels,shaped:true,sheetWidthMm:28,layers:4,calibratedPlan:true,cellLight:false,massTone:false,midDomains:false};
+}
+function samOuter(plan){return plan.layers.filter(l=>l._valuePhase!=='mid').map(l=>({value:l.value,pigment:l.pigment,shapes:l.shapes.map(s=>({amount:s.amount,mix:s.mix,mask:Buffer.from(s.mask).toString('hex')}))}));}
+function samBooking(plan,n,k){const a=new Float64Array(n*k);for(const l of plan.layers)for(const s of l.shapes)for(let i=0;i<n;i++)if(s.mask[i])a[i*k+l.pigment]+=s.amount;return a;}
+for(const scale of [1,2448/1200])test('SAM middle forms retain equal-value local colours at density '+Math.round(1200*scale),()=>{
+ const o=samFixture(scale),base=planLightToDark({...o,formLabels:null}),p=planLightToDark(o);
+ const mids=p.layers.filter(l=>l._valuePhase==='mid').flatMap(l=>l.shapes);
+ assert.ok(mids.length>0);
+ for(const s of mids){const ids=new Set();for(let i=0;i<o.w*o.h;i++)if(s.mask[i])ids.add(o.formLabels[i]);assert.equal(ids.size,1,'one accepted whole SAM form per middle passage');}
+ assert.deepEqual(samOuter(p),samOuter(base),'outer geometry and charge stay identical');
+ const b=samBooking(base,o.w*o.h,o.k),a=samBooking(p,o.w*o.h,o.k);
+ for(let q=0;q<o.k;q++){let x=0,y=0;for(let i=q;i<a.length;i+=o.k){x+=a[i];y+=b[i];assert.equal(a[i]>0,b[i]>0,'positive demand retains an owner');}assert.ok(Math.abs(x-y)<1e-5,'per-pan planned allocation preserved');}
+ assert.equal(p.omittedDemand,base.omittedDemand);
+ assert.ok(p.formPlanning.stages.some(s=>s.acceptedForms>0),'returned plan records actual form admission');
+ assert.ok(p.formPlanning.stages.every(s=>s.valueBand===2||s.valueBand===3),'only middle ownership is considered');
+ assert.ok(mids.every(s=>s._valuePlan.formOwnership?.source==='sam'),'executable intents retain SAM ownership provenance');
+});
+test('SAM form ownership keeps constant and zero-label controls unchanged; rejects malformed labels',()=>{
+ const o=samFixture(),base=planLightToDark({...o,formLabels:null});
+ const zero=planLightToDark({...o,formLabels:new Uint8Array(o.w*o.h)});
+ assert.deepEqual(samBooking(zero,o.w*o.h,o.k),samBooking(base,o.w*o.h,o.k));
+ const flat={...o,demand:new Float32Array(o.w*o.h*o.k).fill(.5)};
+ assert.equal(planLightToDark(flat).instructions.length,planLightToDark({...flat,formLabels:null}).instructions.length,'constant paint has no form boundary to retain');
+ assert.throws(()=>planLightToDark({...o,formLabels:new Uint8Array(2)}),/form label/);
+});
+test('SAM tiny unselected labels remain in their coherent parent with original demand',()=>{
+ const o=samFixture(),hold=new Uint8Array(o.w*o.h);hold[20*o.w+20]=1;
+ const labels=o.formLabels.slice();labels[30*o.w+30]=3;
+ const base=planLightToDark({...o,hold}),p=planLightToDark({...o,hold,formLabels:labels});
+ const actual=samBooking(p,o.w*o.h,o.k),expected=samBooking(base,o.w*o.h,o.k);
+ assert.ok(actual.every((v,i)=>v===expected[i]),'tiny label remains with its original coherent remainder');
+ assert.deepEqual(samOuter(p),samOuter(base));
+});
+
+test('SAM hierarchy keeps accepted forms when a finer intersection is under the existing floor',()=>{
+ const o=samFixture(),n=o.w*o.h;
+ for(let y=0;y<o.h;y++)for(let x=0;x<o.w;x++){
+  const i=y*o.w+x,v=x<15?.8:x>=58&&x<62&&y>=10&&y<70?.65:.4;
+  o.density[i]=v;o.demand[2*i]=v*(x<o.w/2?.8:.2);o.demand[2*i+1]=v*(x<o.w/2?.2:.8);
+ }
+ const p=planLightToDark(o),base=planLightToDark({...o,formLabels:null});
+ const mids=p.layers.filter(l=>l._valuePhase==='mid').flatMap(l=>l.shapes);
+ assert.ok(mids.some(s=>s.mask[40*o.w+59]&&s.mask[40*o.w+40]),'fine sliver veto keeps its accepted SAM parent');
+ for(const s of mids){const labels=new Set();for(let i=0;i<n;i++)if(s.mask[i])labels.add(o.formLabels[i]);assert.equal(labels.size,1,'fine refinement never reunites accepted SAM forms');}
+ assert.ok(p.omittedDemand<=base.omittedDemand+1e-8);
+ assert.deepEqual(samOuter(p),samOuter(base));
+});
+test('SAM splitting preserves authored family material decisions',()=>{
+ const o=samFixture(),family={id:'wash',bounds:[0,0,1,1],baseMove:'dry brush',referenceCue:'broken pigment'};
+ const p=planLightToDark({...o,families:[family]});
+ const mid=p.instructions.filter(x=>x.phase==='mid');
+ assert.ok(mid.length>0&&mid.every(x=>x.passageMaterial.family==='wash'&&x.move==='dry on dry'));
+ const local={id:'local',bounds:[0,0,.5,1],baseMove:'dry brush'};
+ const base=planLightToDark({...o,formLabels:null,families:[local]}),veto=planLightToDark({...o,families:[local]});
+ assert.deepEqual(veto.instructions.map(x=>[x.id,x.move,x.passageMaterial]),base.instructions.map(x=>[x.id,x.move,x.passageMaterial]),'new form boundaries cannot change family assignment');
+});
+test('SAM label loading is fail-closed, cache-bound and consumed before the source seal',async()=>{
+ const fs=await import('node:fs/promises'),os=await import('node:os'),path=await import('node:path'),sharp=(await import('sharp')).default;
+ const {loadSegments}=await import('../../crop/segments.mjs'),{inputHash}=await import('../run-cache.mjs');
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'sam-middle-'));
+ try{
+  const o=samFixture(),stem=path.join(dir,'source');
+  await assert.rejects(loadSegments(stem,o.w,o.h),/no label map/);
+  await sharp(Buffer.from(o.formLabels),{raw:{width:o.w,height:o.h,channels:1}}).png().toFile(stem+'.png');
+  await fs.writeFile(stem+'.json',JSON.stringify({regions:[{id:1},{id:2}]}));
+  const loaded=await loadSegments(stem,o.w,o.h);
+  assert.deepEqual(loaded.labels,o.formLabels);
+  assert.notEqual(inputHash({...o,formLabels:loaded.labels}),inputHash({...o,formLabels:new Uint8Array(o.w*o.h)}),'SAM labels participate in the existing cache input hash');
+  let sealed=false;
+  const source=new Proxy(Array.from(loaded.labels),{get(target,key){assert.equal(sealed,false,'source labels cannot be consulted during execution');return Reflect.get(target,key);}});
+  const {createHash}=await import('node:crypto'),formSource={backend:'sam',planningLabelsSHA256:createHash('sha256').update(loaded.labels).digest('hex'),width:o.w,height:o.h};
+  const p=planLightToDark({...o,formLabels:source,formSource});sealed=true;
+  assert.deepEqual(p.formPlanning.source,formSource,'source identity survives in returned plan diagnostics');
+  assert.deepEqual(JSON.parse(JSON.stringify(p.formPlanning)).source,formSource,'serialized value-plan metadata retains the hash');
+  for(const l of p.layers)for(const s of l.shapes){assert.ok(s.mask.length===o.w*o.h);valueTechnique(s._valuePlan);}
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+
+test('SAM calibrated children retain pre-optical band mass and report real optical charge changes',async t=>{
+ const {BOX,physicalPigment}=await import('../../crop/box.mjs');
+ const o={...samFixture(),pigments:['ochre','ultramarine'].map(key=>physicalPigment(BOX.find(p=>p.key===key))),paperRGB:[252,251,248],massTone:true};
+ const base=planLightToDark({...o,demand:o.demand.slice(),formLabels:null}),p=planLightToDark({...o,demand:o.demand.slice()});
+ const outerGeometry=plan=>samOuter(plan).map(l=>({...l,shapes:l.shapes.map(({mask})=>mask)}));
+ assert.deepEqual(outerGeometry(p),outerGeometry(base),'calibrated outer geometry remains connected and unchanged');
+ const amounts=plan=>{const a={};for(const l of plan.layers)for(const s of l.shapes){const key=l.value+'/'+l.pigment;if(!a[key])a[key]={before:0,after:0};a[key].after+=s.amount*s.area;a[key].before+=s.amount*s.area/(s._tone??1);}return a;};
+ const a=amounts(p),b=amounts(base),report=[];
+ for(const key of Object.keys(b)){assert.ok(Math.abs(a[key].before-b[key].before)<1e-5,'original per-band/per-pan allocation '+key);report.push({bandPan:key,before:b[key].after,after:a[key].after});}
+ assert.equal(p.omittedDemand,base.omittedDemand);
+ assert.ok(report.some(r=>r.before!==r.after),'existing optical calibration genuinely evaluates the changed passages');
+ t.diagnostic('Existing massTone calibrated charges (not forced to match): '+JSON.stringify(report));
+});
+
+test('SAM null and zero maps preserve activated fine-form geometry, booking and order',()=>{
+ const w=240,h=180,n=w*h,density=new Float32Array(n).fill(.4);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(x<40)density[y*w+x]=.8;if(y>20&&y<160&&x>=110&&x<115)density[y*w+x]=.65;if(y>20&&y<160&&x>=180&&x<185)density[y*w+x]=.15;}
+ const o={w,h,k:1,density,demand:density.slice(),shaped:true,sheetWidthMm:56,calibratedPlan:true,cellLight:false,massTone:false,layers:4};
+ const plain=planLightToDark(o),zero=planLightToDark({...o,formLabels:new Uint8Array(n)});
+ const snap=p=>p.layers.map(l=>({band:l.value,pigment:l.pigment,shapes:l.shapes.map(s=>({intent:s._valuePlan,amount:s.amount,mix:s.mix,mask:Buffer.from(s.mask).toString('hex')}))}));
+ assert.deepEqual(snap(zero),snap(plain));
+ const feature=80*w+112;
+ assert.ok(plain.layers.filter(l=>l._valuePhase==='mid').some(l=>l.shapes.some(s=>s.mask[feature]&&!s.mask[80*w+100])),'fine source form is actually separated from its coarse neighbor');
+});
+
+test('SAM binary proposal veto keeps a genuinely under-floor positive remainder',()=>{
+ const o=samFixture(),labels=new Uint8Array(o.w*o.h).fill(1);labels[30*o.w+30]=2;
+ const base=planLightToDark({...o,formLabels:null}),p=planLightToDark({...o,formLabels:labels});
+ const a=samBooking(p,o.w*o.h,o.k),b=samBooking(base,o.w*o.h,o.k);
+ assert.ok(a.every((v,i)=>v===b[i]));assert.deepEqual(samOuter(p),samOuter(base));
+});
+test('SAM topology uses the existing eight-connected diagonal support',()=>{
+ const o=samFixture();o.formLabels.fill(1);
+ for(let y=20;y<40;y++)for(let x=70;x<90;x++)if((x<80&&y<30)||(x>=80&&y>=30))o.formLabels[y*o.w+x]=2;
+ for(let i=0;i<o.w*o.h;i++){o.demand[2*i]=o.formLabels[i]===1?.8:.2;o.demand[2*i+1]=1-o.demand[2*i];}
+ const p=planLightToDark(o),mids=p.layers.filter(l=>l._valuePhase==='mid').flatMap(l=>l.shapes);
+ assert.ok(mids.some(s=>s.area===200&&s.mask[25*o.w+75]&&s.mask[35*o.w+85]),'diagonally connected form remains one admissible support');
+});

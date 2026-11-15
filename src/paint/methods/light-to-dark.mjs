@@ -55,19 +55,83 @@ function fineLayerOwnership(coarse,fine,{w,h,minShape,mmPerCell,eligible}){
 
 // Split the actual middle support after domain and demand masking. A split
 // stranding an under-floor positive passage leaves its connected parent intact.
-function fineMiddleComponents(mask,fine,G,w,h,minimum){
- const parent=components(mask,w,h),parts=new Map();
+// SAM forms are considered one at a time, largest first. Small unselected
+// fragments stay with their current parent; they are never dropped or reassigned.
+function formMiddleComponents(mask,owner,G,w,h,minimum,accept){
+ const parent=components(mask,w,h),labels=parent.labels.slice(),parents=new Map(),seen=new Uint8Array(mask.length);
+ for(let i=0;i<mask.length;i++)if(mask[i]){const id=labels[i];if(!parents.has(id))parents.set(id,[]);parents.get(id).push(i);}
+ const adjacent=i=>{
+  const out=[],x=i%w,y=Math.floor(i/w);
+  // Match raster.components' existing eight-connected support semantics.
+  for(let yy=Math.max(0,y-1);yy<=Math.min(h-1,y+1);yy++)for(let xx=Math.max(0,x-1);xx<=Math.min(w-1,x+1);xx++)if(xx!==x||yy!==y)out.push(yy*w+xx);
+  return out;
+ };
+ const forms=[];
+ for(const whole of parents.values())for(const start of whole){
+  if(seen[start])continue;
+  const id=labels[start],key=owner[start],list=[start];seen[start]=1;
+  for(let at=0;at<list.length;at++)for(const i of adjacent(list[at]))
+   if(mask[i]&&!seen[i]&&labels[i]===id&&owner[i]===key){seen[i]=1;list.push(i);}
+  if(key>0&&list.length>=minimum(list)&&list.reduce((sum,i)=>sum+G[i],0)>1e-8)forms.push(list);
+ }
+ forms.sort((a,b)=>b.length-a.length||a[0]-b[0]);
+ const selected=new Uint8Array(mask.length),changedParents=new Uint8Array(parent.count+1);seen.fill(0);let count=parent.count;
+ const stats={parents:parent.count,coherentCandidates:forms.length,acceptedForms:0,areaVeto:0,decisionVeto:0,sameSupport:0};
+ for(const form of forms){
+  const id=labels[form[0]],whole=parents.get(id);
+  if(form.length===whole.length){stats.sameSupport++;continue;}
+  for(const i of form)selected[i]=1;
+  const parts=[form];
+  // Only walk this current parent, not a full-sheet component scan per form.
+  for(const start of whole){
+   if(selected[start]||seen[start])continue;
+   const list=[start];seen[start]=1;
+   for(let at=0;at<list.length;at++)for(const i of adjacent(list[at]))
+    if(labels[i]===id&&!selected[i]&&!seen[i]){seen[i]=1;list.push(i);}
+   parts.push(list);
+  }
+  for(const i of whole)seen[i]=0;
+  for(const i of form)selected[i]=0;
+  if(parts.some(list=>list.reduce((sum,i)=>sum+G[i],0)>1e-8&&list.length<minimum(list))){stats.areaVeto++;continue;}
+  if(!accept(parts)){stats.decisionVeto++;continue;}
+  stats.acceptedForms++;changedParents[parent.labels[form[0]]]=1;
+  // Stable geometric enumeration. The first piece retains its parent's id.
+  for(const list of parts)list.sort((a,b)=>a-b);
+  parts.sort((a,b)=>a[0]-b[0]);parents.delete(id);
+  for(let q=0;q<parts.length;q++){const next=q?++count:id;parents.set(next,parts[q]);for(const i of parts[q])labels[i]=next;}
+ }
+ return {labels,count,changedParents,stats:{...stats,resultingPassages:count}};
+}
+
+function fineMiddleComponents(mask,fine,G,w,h,minimum,parent=null){
+ if(parent){
+  // Refine each accepted SAM child independently with the unchanged binary rule.
+  const labels=parent.labels.slice(),lists=new Map();let count=parent.count;
+  for(let i=0;i<mask.length;i++)if(mask[i]){const id=labels[i];if(!lists.has(id))lists.set(id,[]);lists.get(id).push(i);}
+  for(const [id,list] of lists){
+   let x0=w,y0=h,x1=-1,y1=-1;for(const i of list){x0=Math.min(x0,i%w);x1=Math.max(x1,i%w);y0=Math.min(y0,Math.floor(i/w));y1=Math.max(y1,Math.floor(i/w));}
+   const cw=x1-x0+1,ch=y1-y0+1,local=i=>(Math.floor(i/w)-y0)*cw+i%w-x0,global=i=>(Math.floor(i/cw)+y0)*w+i%cw+x0;
+   const M=new Uint8Array(cw*ch),F=new Uint8Array(cw*ch),g=new Float32Array(cw*ch);
+   for(const i of list){const j=local(i);M[j]=1;F[j]=fine[i]?1:0;g[j]=G[i];}
+   const split=fineMiddleComponents(M,F,g,cw,ch,part=>minimum(part.map(global)));
+   if(split.count<=1)continue;
+   const ids=new Map([[split.labels[local(list[0])],id]]);
+   for(const i of list){const key=split.labels[local(i)];if(!ids.has(key))ids.set(key,++count);labels[i]=ids.get(key);}
+  }
+  return {labels,count};
+ }
+ const parentCC=components(mask,w,h),parts=new Map();
  for(const selected of [false,true]){
   const cc=components(Uint8Array.from(mask,(v,i)=>v&&Boolean(fine[i])===selected?1:0),w,h);
   const lists=Array.from({length:cc.count+1},()=>[]);
   for(let i=0;i<mask.length;i++)if(cc.labels[i])lists[cc.labels[i]].push(i);
   for(const list of lists)if(list.length){
-   const id=parent.labels[list[0]];
+   const id=parentCC.labels[list[0]];
    if(!parts.has(id))parts.set(id,[]);
    parts.get(id).push(list);
   }
  }
- const labels=parent.labels.slice();let count=parent.count;
+ const labels=parentCC.labels.slice();let count=parentCC.count;
  for(const lists of parts.values()){
   if(lists.length<2||lists.some(list=>list.reduce((sum,i)=>sum+G[i],0)>1e-8&&list.length<minimum(list)))continue;
   for(let q=1;q<lists.length;q++){++count;for(const i of lists[q])labels[i]=count;}
@@ -75,13 +139,15 @@ function fineMiddleComponents(mask,fine,G,w,h,minimum){
  return {labels,count};
 }
 
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
+export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,formLabels=null,formSource=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
   let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
   const profile=styleSelection?resolveStyle(subject,null,styleSelection):null;
   const n=w*h;if(demand.length!==n*k||density.length!==n||k<1)throw Error('target/demand grid mismatch');
   if(demand.some(v=>!Number.isFinite(v)||v<0))throw Error('invalid pigment demand');
+  if(formLabels&&(formLabels.length!==n||formLabels.some(v=>!Number.isInteger(v)||v<0)))throw Error('invalid form label grid');
+  const formPlanning=formLabels?{source:formSource,scope:'SAM candidate forms in original middle supports; planning counts, not executed contacts',stages:[]}:null;
   // paperLights: a cream target sheet is paper, not paint. Estimate it from the brightest large connected region,
   // measure values against it, and reserve near-paper cells as bare paper.
   const lightRef=paperRule&&rgb&&(paperRel||paperLights)?paperLightReference(rgb,w,h,paperRGB):null;
@@ -351,7 +417,38 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       for(const domain of domains){
         const M0=joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
         const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
-        const c=phase==='mid'&&fineLayers?fineMiddleComponents(M,fineLayers.owner,G,w,h,list=>n>100?(DETAIL?localMinShape(minShape,meanOver(list,DETAIL),detailScale):minShape):0):components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
+        const minimum=list=>n>100?(DETAIL?localMinShape(minShape,meanOver(list,DETAIL),detailScale):minShape):0;
+        let c=components(M,w,h);const original=c;let formParents=null;
+        if(phase==='mid'&&shaped&&formLabels&&!step.pig){
+          c=formMiddleComponents(M,formLabels,G,w,h,minimum,lists=>{
+            const whole=lists.flat().sort((a,b)=>a-b),first=G[whole[0]];
+            if(!whole.some(i=>formLabels[i]>0)||whole.every(i=>G[i]===first))return false;
+            // Splitting must not change an authored family's material decision.
+            const family=passageFamily(whole,w,h,families);
+            const styleOf=list=>{
+              const family=profile&&[...new Set(list.slice().sort((a,b)=>a-b).map(i=>region.labels[i]))].map(id=>region.regions[id-1].descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name);
+              return (typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile)?.name;
+            };
+            const style=styleOf(whole);
+            if(lists.some(list=>passageFamily(list,w,h,families)!==family||styleOf(list)!==style))return false;
+            const mask=new Uint8Array(n);
+            for(const list of lists){
+              if(list.reduce((sum,i)=>sum+G[i],0)<=1e-8)continue;
+              const box={x0:w,y0:h,x1:-1,y1:-1};
+              for(const i of list){mask[i]=1;box.x0=Math.min(box.x0,i%w);box.x1=Math.max(box.x1,i%w);box.y0=Math.min(box.y0,Math.floor(i/w));box.y1=Math.max(box.y1,Math.floor(i/w));}
+              const paths=shapedPlanePaths(mask,w,h,{box,mmPerCell:sheetWidthMm/w,protect:protectedCells});
+              for(const i of list)mask[i]=0;
+              if(!paths.some(path=>path.length>1))return false;
+            }
+            return true;
+          });
+          formParents=c.changedParents;
+          formPlanning.stages.push({valueBand:band,step:step.tag,pigment,domain,...c.stats});
+        }
+        if(phase==='mid'&&fineLayers)c=c.count===original.count
+          ?fineMiddleComponents(M,fineLayers.owner,G,w,h,minimum)
+          :fineMiddleComponents(M,fineLayers.owner,G,w,h,minimum,c);
+        const cells=Array.from({length:c.count+1},()=>[]);
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
         const shapes=[];
         for(let id=1;id<=c.count;id++){
@@ -386,6 +483,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
             resolution:{question:'wash',minimumWashBodyCells:4,estimatedSupportWidthCells:2*list.length/Math.max(1,hard.length+soft.length),estimateMethod:'twice area over boundary length; not a measured lid or mullion width',mmPerCell:sheetWidthMm/w,detail:'narrow paint uses fitted brush geometry; physical contact and moisture are checked during execution'},layer:band,break:wet?'reference requests a connected soft first wet passage':null,load:{water:wet?.88:phase==='shadow'?(shadowWater>0?shadowWater:.45):.62,pigment:'fitted target band demand; calibrated delivery',reload:'existing finite instrument route'},
             edges:{hardCells:hard,softCells:soft,policy:'dry placement; clean damp brush only on selected soft boundaries'},
             protectedLights:reserves.map(r=>r.reason).concat('held target paper whites'),failureSigns:'Lost lights, disconnected value shapes, uniform blur, pale unpainted interiors.',stop:'after band'};
+          if(formParents?.[original.labels[list[0]]])intent.formOwnership={source:'sam',labels:[...new Set(list.map(i=>formLabels[i]))].sort((a,b)=>a-b)};
           if(chosen){
             intent.styleName=chosen.name;intent.styleReason=chosen.reason;
             intent.regionStyleDecisions=touched.map(r=>{const q=resolveStyle(subject,r.descriptiveFamily,styleSelection);return {region:r.id,family:r.descriptiveFamily,style:q.name,reason:q.reason};});
@@ -465,7 +563,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   }
   if(TONE)console.log(`mass tone: ${instructions.length} washes charged at a mean ${(toneSum/Math.max(1,toneArea)).toFixed(3)} of their cells' mean paint (by area)`);
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
-  return {opticsReport,paper,style:profile,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
+  return {opticsReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
   // An authored dry contact takes precedence over phase, calibration and style defaults.
