@@ -15,7 +15,9 @@ import { labPlanes } from './line-evidence.mjs';
 import { holdLinesToTarget } from './ink-lines.mjs';
 import { strokesPeakAbsorbance } from './ink-match.mjs';
 import { separate } from '../../crop/inkwash.mjs';
-import { decideFile } from './ink-decide-file.mjs';
+import { decideFileByMeaning } from './ink-decide-file.mjs';
+import { readDrawPlan } from './draw-plan-file.mjs';
+import { drawPlanPath } from './draw-plan-stage.mjs';
 import { DECIDE_DEFAULTS } from './ink-decide.mjs';
 import { prepareSegments } from '../../crop/segment-prep.mjs';
 
@@ -79,11 +81,14 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // --inkres N, N times as fine), so the support test's one to two pixels beside a line are as wide as the pen line it will draw
   let doc = flags.lineMeasure > 0 && gridW > 0 && doc0.image.w > 1.25 * gridW ? onGrid(doc0, gridW) : doc0;
   const im = doc.image, L = await lPlane(image, im.w, im.h), pxMm = sheetMm / im.w;
-  // --inkdecide 1: a lineart map's candidate lines are drawn only where the ink rule of the ground under them allows it and
-  // the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made from decided lines is not decided again.
+  // --inkdecide 1: a lineart map's lines decided by meaning: structure and landmarks drawn, texture, shadow edges and the
+  // border left out, drawn straight or as clean arcs where man-made (ink-decide-file.mjs decideFileByMeaning). Once: a
+  // stage file made from decided lines is not decided again.
   let decided = doc.inkDecided === true;
   if (decide && MODEL_KINDS.includes(doc0.inputKind) && !decided) {
-    const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
+    // decided by meaning (INK-SPEC.md, ink-decide-file.mjs decideFileByMeaning): the line model's resolution is the
+    // detector's own pixel on the physical sheet, independent of export and pen-grid width
+    const r = await decideFileByMeaning({ doc, L, image, out, stage, pxMm, tolMm: sheetMm / (doc0.lineMap?.width ?? doc0.image.w), sheetMm, ...decide, log });
     doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
   }
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this
@@ -99,7 +104,10 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // a traced pen stroke carries its own width: up to --linestrokemax mm, no detail ratio, no darkness shrink
   const stroke = doc0.inputKind === 'stroke';
   const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: (stroke ? flags.strokeMaxMm : flags.widthMaxMm) / pxMm, detail: stroke ? 1 : flags.detailRatio, darkWidth: !stroke, paperWeight: stroke, paperL: stroke ? quantileOf(L, 0.9) : null, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
-  const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
+  const r0 = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
+  // a line decided by meaning carries the width the source's pen drew it (line-meaning.mjs): that is its width, not the
+  // map contour's held one
+  const r = { ...r0, lines: r0.lines.map(g => (Number.isFinite(g.inkWidth) ? { ...g, widths: g.points.map(() => g.inkWidth) } : g)) };
   // the target's line cores, as --inkdarkmatch reads the pen's strokes on its scrap
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));
   const stats = flags.darkMatch > 0 ? { ...r.stats, peakAbsorbance: strokesPeakAbsorbance(L, im.w, im.h, gestures) } : r.stats;
@@ -107,7 +115,7 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   const changed = support > 0 || flags.smoothMm > 0 || flags.lineMeasure > 0 || decided;
   if (changed) {
     const stem = path.join(out, `ink-${stage}`), next = { ...doc, lines: r.lines, ...(decided ? { inkDecided: true } : {}), inkLines: { source: file, support, smoothMm: flags.smoothMm, cornerDeg: flags.cornerDeg, measured: flags.lineMeasure > 0 } };
-    if (!r.lines.length) next.empty = `no line of ${path.basename(file)} follows a line in the target (--linesupport ${support})`;
+    if (!r.lines.length) next.empty = decided && !doc0.inkDecided ? `ink by meaning: no line of ${path.basename(file)} is structure or a landmark, so the pen draws nothing (ink-meaning.json)` : `no line of ${path.basename(file)} follows a line in the target (--linesupport ${support})`;
     fs.writeFileSync(`${stem}-lines.json`, JSON.stringify(next) + '\n');
     record.out = stem;
   }
@@ -128,7 +136,7 @@ async function holdLineFile(args) {
   const seg = args.decide?.segments?.stem;
   const key = JSON.stringify([args.stage, file, digest(file), path.resolve(args.image), digest(args.image),
     path.resolve(args.out), args.sheetMm, args.targetW, args.gridW, args.flags,
-    args.decide && [args.decide.judge, args.decide.cacheDir, seg,
+    args.decide && [args.decide.judge, args.decide.budgetScale, args.decide.cacheDir, seg, args.decide.plan ? JSON.stringify(args.decide.plan) : null,
       seg && digest(seg+'.json'), seg && digest(seg+'.png')]]);
   const cached = heldStages.get(key);
   // Output belongs to this stage: another input may have overwritten its stem.
@@ -148,9 +156,16 @@ async function holdLineFile(args) {
  */
 export async function holdInkLines({ opt, num, argv, image, root = '.', out, sheetMm, log = () => {} }) {
   const flags = inkLineFlags(num);
+  if (opt('inkdecide', '') === '' && (opt('outlinemedium', '') === 'ink' || opt('linesource', '') === 'source-ink' || opt('inkrecipe', '') === 'wash' || (opt('drawingfile', '') && /source-ink|line-map/i.test(opt('drawingfile', ''))))) {
+    flags.decide = 1;
+    flags.measure = true;
+  }
   if (!flags.measure) return null;
   // the regions the ink decision reads: SAM's, cached by the target's hash (the painter asks for them again later)
-  const decide = flags.decide > 0 ? { segments: await prepareSegments({ image, root, out, opt, log }), judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')) } : null;
+  // --drawplan: the planning model's reading of the subject gives meaning to the lines along its named lines
+  const planFile = flags.decide > 0 ? drawPlanPath(opt, root) : null;
+  const plan = planFile ? await readDrawPlan({ file: planFile, image, sheetMm }) : null;
+  const decide = flags.decide > 0 ? { segments: await prepareSegments({ image, root, out, opt, log }), judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')), budgetScale: num('inkbudget', 1), plan } : null;
   const targetW = (await sharp(image).metadata()).width, res = { flags };
   for (const [stage, key] of [['opening', 'drawingfile'], ['closing', 'drawinglast']]) {
     const base = opt(key, '');
