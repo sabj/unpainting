@@ -424,7 +424,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           // hueChromaLab: RGB range confuses a dark muted brown with a saturated orange. Perceptual
           // chroma keeps their shared warm hue from pooling one charge (layered washes only).
           const sat=hueChromaLab?Math.hypot(...labOf([r,g,b],0,[255,255,255]).slice(1)):Math.max(r,g,b)-Math.min(r,g,b);
-          const isCool=(b>r+12&&(hue>180||hue<40));coolGroup[L]=(isCool?2:hue>=50&&hue<170?3:1)+(!isCool&&hueChroma>0&&sat>=hueChroma?3:0);}}
+          coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(b<=r&&hueChroma>0&&sat>=hueChroma?3:0);}}
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
       const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0):[];
       const domains=puddles?[0]:groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];

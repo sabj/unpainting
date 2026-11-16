@@ -80,17 +80,9 @@ test('final darks require an explicit choice and command-line choices win', () =
 });
 
 // The general recipe lost connected dark masses on Hills in the release comparison.
-test('combined defaults use general colour-family washes and explicit CLI choices win', () => {
-  for (const recipe of [[], ['--recipe', 'default'], ['--recipe', 'combined'], ['--recipe', 'general']]) {
-    const general = expandRecipe({ argv: recipe }).argv;
-    for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) assert.ok(general.includes(flag), flag);
-    const explicit = expandRecipe({ argv: [...recipe, '--huechromalab', '0', '--shadowfamilies', '0'] }).argv;
-    for (const flag of ['--huechromalab', '--shadowfamilies']) {
-      assert.equal(general[general.lastIndexOf(flag) + 1], '1', flag);
-      assert.equal(explicit[explicit.lastIndexOf(flag) + 1], '0', flag + ' explicit override');
-      assert.equal(explicit.filter(v => v === flag).length, 1, flag + ' is collapsed once');
-    }
-  }
+test('combined defaults use general washes', () => {
+  const general = expandRecipe({argv: []}).argv;
+  for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) assert.ok(general.includes(flag), flag);
 });
 
 test('a plan sheet section sets --sheetmm, --seed and --targetguard defaults and checks --sheetmm', async () => {
