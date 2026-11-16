@@ -21,6 +21,7 @@ import {pickPalette, paletteOptions} from '../../src/crop/palettepick.mjs';
 import {widePalette, puddleLabels} from '../../src/crop/palettewide.mjs';
 import {paintGuardOptions} from '../../src/crop/paint-guard.mjs';
 import {channelDensity, unmix} from '../../src/crop/pigments.mjs';
+import {localPans} from '../../src/paint/methods/local-pans.mjs';
 import {blockInPigments, gradeSmoothPassages} from '../../src/crop/blockin.mjs';
 import {planPuddles} from '../../src/paint/methods/puddles.mjs';
 import {choosePlateMixes, toMixAmounts, panMix} from '../../src/crop/mixes.mjs';
@@ -179,7 +180,12 @@ if (FIG_MASK && PLAN_MASSES <= 0) {
 // each pixel as amounts of those pigments: this is what a painter mixes, not a grey level
 const pigmentFitStarted = performance.now();
 ctx.A = (await cachedStep({ ...RUN_CACHE, name:'pigment-fit', code:CODE_HASH, track:optTrack, inputs:{D_PLAN,D_AIM,px: ctx.px,n,PIGS,paperRGB,PLAN_MASSES,COLOUR_BUDGET,SHAPE_REFIT:[num("shaperefit",0),num("refitfamilies",24),num("refitmin",0.0005)]} }, async()=>{
-let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
+const LOCAL = VALUE_ENABLED && PIGS.length > 1 ? localPans(D_PLAN, w, h, PIGS, paperRGB) : null;
+let A = LOCAL ? LOCAL.A : unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
+if (LOCAL) {
+  console.log(`local pans: ${LOCAL.colours.length} local colours; ${LOCAL.colours.filter(c => c.side === 'across').length} greyed or darkened across the wheel`);
+  for (const c of LOCAL.colours.slice(0, 12)) console.log(`  ${(100 * c.cells / n).toFixed(1)}% rgb ${c.rgb.map(v => v.toFixed(0)).join(',')}: ${c.pans.map((j, q) => `${PIGS[j].name ?? j} ${(100 * c.shares[q]).toFixed(0)}%`).join(' + ') || 'paper'}${c.side === 'across' ? ' (across)' : ''}, dE ${c.dE.toFixed(2)}, farthest ${c.span.toFixed(0)} deg`);
+}
 // Under --planmasses the shape refit aims at the simplified plan, not the source, so the speckle stays out.
 {
   const Ks = PIGS.map(p => p.K.map(v => v / 0.55)), D0 = (PLAN_MASSES > 0 || D_PLAN !== D_AIM) ? D_PLAN : channelDensity(ctx.px, n, paperRGB);
