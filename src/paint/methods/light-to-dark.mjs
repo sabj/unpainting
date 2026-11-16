@@ -209,6 +209,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     return value.values[i] < .055 ? 1 : 0;
   });
   if(paper&&!lightRef)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=(paperDelta??10))inferred[i]=1;}
+  if(rgb&&families?.length){for(const f of families){const cue=(f.referenceCue??'').toLowerCase();const isWhiteCue=cue.includes('white shirt')||cue.includes('sail')||cue.includes('white reserve')||(f.id==='boy'&&cue.includes('shirt'));if(isWhiteCue&&f.bounds){const bd=f.bounds,x0=Math.floor(bd[0]*w),y0=Math.floor(bd[1]*h),x1=Math.ceil(bd[2]*w),y1=Math.ceil(bd[3]*h);for(let y=Math.max(0,y0);y<Math.min(h,y1);y++)for(let x=Math.max(0,x0);x<Math.min(w,x1);x++){const i=y*w+x,r=rgb[3*i],g=rgb[3*i+1],b=rgb[3*i+2],lum=.2126*r+.7152*g+.0722*b,chroma=Math.max(r,g,b)-Math.min(r,g,b);if(lum>=195&&chroma<35)inferred[i]=1;}}}}
   // detailScale k (detail-scale.mjs): the minimum shape shrinks with the target's mid-scale detail, down to share 1-k.
   const DETAIL0=detailScale>0?detailField(value.values,w,h,sheetWidthMm/w):null;
   const DETAIL=DETAIL0&&detailSegments?detailField(value.values,w,h,sheetWidthMm/w,segmentDetailMask(detailSegments,rgb,DETAIL0,w,h)):DETAIL0;
@@ -407,7 +408,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,carried=placed,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>carry[pigment][i];
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=puddles?(stepShape.slab[i]===pigment?cellMass[i]:0):demand[i*k+pigment];if(puddles&&!fitted)continue;if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
         const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(shaped&&G[i]<=1e-8)mask[i]=0;if(elig)elig[i]=mask[i]&&step.wt[i]>0&&G[i]>1e-8?1:0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
-      if(stepShape&&phase==='light'){const lap=dilate(mask,w,h,1);for(let i=0;i<n;i++)if(lap[i]&&!mask[i]&&stepShape.any[i]&&stepShape.slab[i]>=0&&stepShape.slab[i]<pigment)mask[i]=1;}
+      if(stepShape&&(phase==='light'||phase==='mid')){const lap=dilate(mask,w,h,Math.max(1,Math.round(.75/(sheetWidthMm/w))));for(let i=0;i<n;i++)if(lap[i]&&!mask[i]&&!protectedCells[i]&&stepShape.any[i]&&stepShape.slab[i]>=0&&stepShape.slab[i]!==pigment)mask[i]=1;}
       if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,minShape);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       if(elig){const g=Float32Array.from(G,(v,i)=>v+carryAt(i)),sm=boxMeanValue(g,w,h,Math.max(1,Math.round(maskMm/(sheetWidthMm/w))));for(let i=0;i<n;i++)mask[i]=elig[i]&&sm[i]>1e-8?1:0;}
       if(carried&&shaped&&phase!=='light'&&holeFill){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(phase!=='shadow'||shadowMask[i])&&step.wt[i]>0?1:0),big=removeSmall(hole,w,h,Math.round(minShape*holeFill));for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
@@ -418,17 +419,17 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // with the stone wall it touches.
       // shadowFamilies: a shadow glaze keeps the colour families apart too, so the grey shirt shadow
       // does not pool its blue charge across the saturated orange cat it touches.
-      const groupMode=layerHue&&(step.tag||((skySplit||lightFamilies)&&phase==='light')||(shadowFamilies&&phase==='shadow'));
+      const groupMode=!puddles&&layerHue&&(step.tag||((skySplit||lightFamilies)&&phase==='light')||(shadowFamilies&&phase==='shadow'));
       if(groupMode&&!coolGroup){coolGroup=new Uint8Array(region.regions.length+1);const sr=new Float64Array(region.regions.length+1),sb=new Float64Array(region.regions.length+1),cnt=new Float64Array(region.regions.length+1);for(let q=0;q<n;q++){const L=region.labels[q];sr[L]+=rgb[q*3];sb[L]+=rgb[q*3+2];cnt[L]++;}const sg=new Float64Array(region.regions.length+1);for(let q=0;q<n;q++)sg[region.labels[q]]+=rgb[q*3+1];
         // Three families: cool (sky, glass), yellow-green foliage (hue >= 50 deg), warm stone.
         for(let L=1;L<=region.regions.length;L++){const r=sr[L]/Math.max(1,cnt[L]),g=sg[L]/Math.max(1,cnt[L]),b=sb[L]/Math.max(1,cnt[L]),hue=Math.atan2(Math.sqrt(3)*(g-b),2*r-g-b)*180/Math.PI;
           // hueChromaLab: RGB range confuses a dark muted brown with a saturated orange. Perceptual
           // chroma keeps their shared warm hue from pooling one charge (layered washes only).
           const sat=hueChromaLab?Math.hypot(...labOf([r,g,b],0,[255,255,255]).slice(1)):Math.max(r,g,b)-Math.min(r,g,b);
-          coolGroup[L]=(b>r?2:hue>=50&&hue<170?3:1)+(b<=r&&hueChroma>0&&sat>=hueChroma?3:0);}}
+          const isCool=(b>r+12&&(hue>180||hue<40));coolGroup[L]=(isCool?2:hue>=50&&hue<170?3:1)+(!isCool&&hueChroma>0&&sat>=hueChroma?3:0);}}
       // Group domains use a real region id of that group so downstream ordering sees a valid region.
       const groupIds=groupMode?[1,2,3,4,5,6].map(g=>coolGroup.findIndex((v,L)=>L>0&&v===g)).filter(L=>L>0):[];
-      const domains=groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
+      const domains=puddles?[0]:groupMode?groupIds:phase==='mid'&&midDomains&&!step.tag?region.regions.map((_,i)=>i+1):styleNames.length>1?styleNames:[0];
       // washJoin (wash-join.mjs): a domain piece under the minimum shape joins the neighbouring domain's passage
       // instead of being dropped as a bare-paper shard.
       const keyOfDomain=d=>d<0?7:groupMode?coolGroup[d]:typeof d==='string'?domains.indexOf(d)+1:d;

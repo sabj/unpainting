@@ -567,7 +567,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // --contain: the brush disc held inside its passage at every point (see containPaths). Rescued passages below get
   // the same treatment, since a small brush can overhang a narrow passage just as a mop overhangs a ragged one.
   const crispNow = CRISP.wants(T, detail);
-  if (!BUDGET && !shapedPaths && !sh._semantic?.pass.edges.overlap && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
+  if (!BUDGET && !shapedPaths && !sh._semantic?.pass.edges.overlap && !sh._valuePlan && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
     // --washfloor in: the main wash sweep is never narrowed below this on a 9-inch-wide sheet (wash.mjs).
     // --washfloorout 1: only outside the subject (--fwmask), where the broad washes are.
     const WF = num('washfloor', 0) * W2 / 9, WFOUT = num('washfloorout', 0) > 0 && FW_SUBJ ? up(FW_SUBJ) : null;
@@ -576,7 +576,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     paths.length = 0; paths.push(...held);
   }
   // --cutin 0|1: run a small brush along the inside of the passage's edge before filling it, as a painter cuts in. Default 1.
-  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
+  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !sh._valuePlan && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutbandin n: cut-in band inside the subject (--fwmask); --cutband (default 2) elsewhere.
     const cellMmHigh = num('sheetmm', DEFAULT_SHEET_MM) / W2;

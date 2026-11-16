@@ -446,7 +446,8 @@ const penDraw = (sh,gs,want,w,h,o0) => {
 };
 const OUT_W = INKRES ? INKRES.width : W2, OUT_H = INKRES ? INKRES.height : H2;
 // --encloseease e: a dry cell held by water on more sides fills more easily (src/media/sheet.mjs). Set only when used.
-const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', 0.0012), granFill: num('granfill', 0), slideCap: 1, ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}),
+const edgeEvapDefault = (ctx.VALUE_PLAN || ctx.VALUE_PUDDLES) ? 0.0001 : 0.0012;
+const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', edgeEvapDefault), granFill: num('granfill', 0), slideCap: 1, ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}),
   ...(num('holerim', 0) > 0 ? { holeSpan: Math.max(1, Math.round(num('holerim', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}),
   ...(num('holefill', 0) > 0 ? { holeFill: Math.max(1, Math.round(num('holefill', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}) };
 // --holefill mm: a dry hollow the wash surrounds within mm fills where it is lower than the wet paper beside it.
