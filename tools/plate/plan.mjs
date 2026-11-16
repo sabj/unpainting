@@ -203,7 +203,7 @@ return A;
 SPEED_PROFILE?.add('setup:pigment-fit', performance.now() - pigmentFitStarted);
 // A value plan is laid puddle by puddle: one puddle per local colour, its pans chosen once (src/paint/methods/puddles.mjs),
 // as many local colours as the palette was chosen to reach (--pwcolours chromatic colours plus the greys). Planning only.
-ctx.VALUE_PUDDLES = VALUE_ENABLED && PIGS.length > 1 ? planPuddles(D_PLAN, w, h, PIGS, paperRGB, { count: num('pwcolours', 8) + 1 }) : null;
+ctx.VALUE_PUDDLES = VALUE_ENABLED && num('puddles', 0) > 0 && PIGS.length > 1 ? planPuddles(D_PLAN, w, h, PIGS, paperRGB, { count: num('pwcolours', 8) + 1 }) : null;
 if (ctx.VALUE_PUDDLES) {
   ctx.A = ctx.VALUE_PUDDLES.A;
   console.log(`puddles: ${ctx.VALUE_PUDDLES.count} local colours, one puddle each: ${ctx.VALUE_PUDDLES.colours.map(c => `${c.pans.map((j, q) => `${(100 * c.shares[q]).toFixed(0)}% ${PIGS[j].name ?? j}`).join(' + ')} (${c.cells} cells, ${c.side}, dE ${c.dE.toFixed(1)})`).join('; ')}`);

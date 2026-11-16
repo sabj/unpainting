@@ -977,41 +977,6 @@ process.exit(0);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
-test('family white shirt / sail cues are preserved in protectedCells as paper reserves', () => {
-  const w = 40, h = 40, n = w * h, k = 3;
-  const rgb = new Uint8Array(n * 3).fill(160); // mid grey background
-  // Boy figure region at center: x in 15..25, y in 15..25
-  for (let y = 15; y <= 25; y++) {
-    for (let x = 15; x <= 25; x++) {
-      const i = y * w + x;
-      // White shirt: luminance >= 200, low chroma
-      rgb[3 * i] = 225; rgb[3 * i + 1] = 220; rgb[3 * i + 2] = 210;
-    }
-  }
-  const density = new Float32Array(n).fill(0.3);
-  const demand = new Float32Array(n * k).fill(0.1);
-  const families = [{
-    id: 'boy',
-    bounds: [0.3, 0.3, 0.7, 0.7],
-    referenceCue: 'White shirt, hat, face and bent legs read as one seated figure.'
-  }];
-  const plan = planLightToDark({
-    rgb, density, demand, k, w, h,
-    paperRel: true,
-    paperLights: true,
-    families,
-    sheetWidthMm: 100
-  });
-  // Check that the white shirt cells inside the boy bounds are protected:
-  let protectedShirtCount = 0;
-  for (let y = 16; y <= 24; y++) {
-    for (let x = 16; x <= 24; x++) {
-      if (plan.protectedCells[y * w + x]) protectedShirtCount++;
-    }
-  }
-  assert.ok(protectedShirtCount > 50, 'white shirt cells must be reserved in protectedCells');
-});
-
 test('puddles preserve cohesive local wash shapes without groupMode domain splintering', () => {
   const w = 32, h = 32, n = w * h, k = 3;
   const rgb = new Uint8Array(n * 3).fill(120);

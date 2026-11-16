@@ -654,7 +654,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
     // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
     // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
-    const softMm = num('softclipmm', num('softchoice', 1) > 0 ? 0.75 : (sh._valuePlan?.washSystem ? 0.75 : 0));
+    const softMm = num('softclipmm', num('softchoice', 0) > 0 ? 0.75 : (sh._valuePlan?.washSystem ? 0.75 : 0));
     const cellMm = num('sheetmm', DEFAULT_SHEET_MM) / w;
     const softReach = familyMarks || SOFT_WET_MM > 0 || reach > 0 || !sh._valuePlan?.edges || sh._valuePlan.texture || softMm <= 0 ? 0 : Math.max(1, Math.round(softMm / cellMm));
     const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;
