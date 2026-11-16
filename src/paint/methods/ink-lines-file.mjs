@@ -150,6 +150,9 @@ export async function holdInkLines({ opt, num, argv, image, root = '.', out, she
   const flags = inkLineFlags(num);
   if (opt('inkdecide', '') === '' && (opt('outlinemedium', '') === 'ink' || opt('linesource', '') === 'source-ink' || opt('inkrecipe', '') === 'wash' || (opt('drawingfile', '') && /source-ink|line-map/i.test(opt('drawingfile', ''))))) {
     flags.decide = 1;
+    if (opt('inkjoin', '') === '') flags.joinMm = 2.5;
+    if (opt('inkfoliage', '') === '') flags.foliage = 1;
+    if (opt('inkdarkrule', '') === '') flags.inkDarkRule = 1;
     flags.measure = true;
   }
   if (!flags.measure) return null;
