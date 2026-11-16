@@ -72,8 +72,13 @@ export function choosePans(colourRGB, pigments, under, { maxPans = 3 } = {}) {
   if (!Array.isArray(pigments) || !pigments.length) throw new RangeError('pan choice needs at least one pan');
   if (!(maxPans >= 1 && maxPans <= 3)) throw new RangeError('a puddle holds one to three pans');
   const angles = wheelAngles(colourRGB, pigments, under);
-  const near = [], far = [];
-  angles.forEach((a, j) => (a === null || a < 90 ? near : far).push(j));
+  const chromatic = angles.some(a => a !== null);
+  const close = [], near = [], far = [];
+  angles.forEach((a, j) => {
+    if (a === null) (chromatic ? far : near).push(j);
+    else if (a < 90) { near.push(j); if (a < 38) close.push(j); }
+    else far.push(j);
+  });
   const targetLab = labOfColour(Array.from(colourRGB));
   const rank = found => {
     let least = Infinity; for (const c of found) if (c.dE < least) least = c.dE;
@@ -82,20 +87,30 @@ export function choosePans(colourRGB, pigments, under, { maxPans = 3 } = {}) {
       if (c.dE > least + JND) continue;
       const used = c.indices.filter(j => c.mix[j] > 0);
       // each pan's offset from where it pulls cleanly: a near pan from the colour's hue, a greying pan from its complement
-      const span = Math.max(0, ...used.map(j => angles[j] === null ? 0 : angles[j] < 90 ? angles[j] : 180 - angles[j]));
+      const span = Math.max(0, ...used.map(j => {
+        if (angles[j] === null) return chromatic ? 60 : 0;
+        if (angles[j] < 90) return angles[j];
+        const scatterPenalty = (pigments[j].rho ?? 0) >= 0.085 ? 30 : 0;
+        return (180 - angles[j]) + scatterPenalty;
+      }));
       const d = used.length ? drift(c.mix, used, pigments, under, c.lab) : 0;
       const better = !pick || span < pick.span || (span === pick.span && (d < pick.d - 1e-9 || (Math.abs(d - pick.d) <= 1e-9 && (used.length < pick.used.length || (used.length === pick.used.length && c.mass < pick.c.mass)))));
       if (better) pick = { c, d, span, used };
     }
     return pick;
   };
-  let side = 'near', pick = near.length ? rank(mixCandidates(colourRGB, pigments, under, { maxPigments: maxPans, allowed: near })) : null;
+  let side = 'near', pick = close.length ? rank(mixCandidates(colourRGB, pigments, under, { maxPigments: maxPans, allowed: close })) : null;
+  if ((!pick || pick.c.dE > 7.0 * JND) && near.length > close.length) {
+    const widerNear = rank(mixCandidates(colourRGB, pigments, under, { maxPigments: maxPans, allowed: near }));
+    if (widerNear && (!pick || widerNear.c.dE < pick.c.dE)) pick = widerNear;
+  }
   if (!pick || pick.c.dE > JND) {
     // across the wheel: the near puddles and those with exactly one far pan
-    const across = pick ? mixCandidates(colourRGB, pigments, under, { maxPigments: maxPans, allowed: near }) : [];
+    const across = pick && pick.c.dE <= JND ? [pick.c] : [];
     for (const f of far) across.push(...mixCandidates(colourRGB, pigments, under, { maxPigments: maxPans, allowed: [f, ...near], must: f }));
     const wider = rank(across);
-    if (wider && (!pick || wider.c.dE < pick.c.dE)) { pick = wider; side = wider.used.some(j => far.includes(j)) ? 'across' : 'near'; }
+    const lowChroma = targetLab[1] * targetLab[1] + targetLab[2] * targetLab[2] < 144;
+    if (wider && (!pick || (pick.c.dE > 7.0 * JND && wider.c.dE < pick.c.dE) || (lowChroma && wider.c.dE < pick.c.dE))) { pick = wider; side = wider.used.some(j => far.includes(j)) ? 'across' : 'near'; }
     // still more than one just-noticeable difference away: the puddle takes a second far pan (a dark muted colour on a
     // palette of primaries needs both of the colour's far primaries to grey and darken it), still at most three pans
     if (pick && pick.c.dE > JND && maxPans >= 2) {

@@ -36,9 +36,14 @@ export function localPans(D, w, h, pigments, paper, { families = 24, partition =
     // A puddle greyed across the wheel is greyed once, in the well: its cells are unmixed over the greyed puddle as
     // one paint and its near pans, so no cell takes more of the greying pan, for its paint, than the puddle holds.
     const greying = pick.indices.filter(j => pick.far.includes(j)), nearPans = pick.indices.filter(j => !greying.includes(j));
+    if (!greying.length && !ownPans && nearPans.length > 0 && nearPans.length < 3) {
+      const extra = pick.angles.map((a, j) => ({ a, j })).filter(x => x.a !== null && x.a < 38 && !nearPans.includes(x.j)).sort((p, q) => p.a - q.a);
+      while (nearPans.length < 3 && extra.length) nearPans.push(extra.shift().j);
+    }
     // ownPans (a mass plan): a mass is one puddle, and its colour varies wet inside it: each cell takes its own share of
     // every pan in the puddle, the greying one included, so a warm face and a grey coat in one mass keep their colours
-    const parts = greying.length && !ownPans ? [pick.indices.map((j, q) => [j, pick.shares[q]]), ...nearPans.map(j => [[j, 1]])] : pick.indices.map(j => [[j, 1]]);
+    const darkShadow = Math.max(...rgb) < 110;
+    const parts = greying.length && !ownPans && !darkShadow ? [pick.indices.map((j, q) => [j, pick.shares[q]]), ...nearPans.map(j => [[j, 1]])] : (greying.length ? pick.indices : nearPans).map(j => [[j, 1]]);
     const dirs = parts.map(part => [0, 1, 2].map(c => part.reduce((t, [j, f]) => t + f * Ks[j][c], 0)));
     const m = parts.length, a = unmix(sub, cells.length, dirs);
     cells.forEach((i, q) => { for (let p = 0; p < m; p++) for (const [j, f] of parts[p]) A[i * k + j] += f * a[q * m + p]; });

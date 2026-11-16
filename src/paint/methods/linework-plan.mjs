@@ -54,7 +54,7 @@ export function stagesFromFlags(opt, num) {
 }
 
 /** auto's choice from the separator's line share (0..1) and whether the sketch planner can run. */
-export function chooseLineSource(mode, { inkShare, threshold = 0.10, sketchAvailable }) {
+export function chooseLineSource(mode, { inkShare, threshold = 0.40, sketchAvailable }) {
   if (!LINE_SOURCES.includes(mode)) throw new Error(`--linesource: ${LINE_SOURCES.join(', ')}, not ${mode}`);
   if (mode !== 'auto') return mode;
   if (100 * inkShare >= threshold) return 'source-ink';
@@ -85,8 +85,8 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
   if (!opt('drawingfile', '') && mode !== 'none') {
     const lp = linePython({ flag: opt('sketchpython', ''), log }), python = lp.path;
     info.python = lp;
-    const canSketch = mode === 'photo-sketch' || (mode === 'auto' && 100 * inkShare < num('penfirst', 0.10) && lp.ready);
-    const choice = chooseLineSource(mode, { inkShare, threshold: num('penfirst', 0.10), sketchAvailable: canSketch });
+    const canSketch = mode === 'photo-sketch' || (mode === 'auto' && 100 * inkShare < num('penfirst', 0.40) && lp.ready);
+    const choice = chooseLineSource(mode, { inkShare, threshold: num('penfirst', 0.40), sketchAvailable: canSketch });
     if (choice === 'source-ink') {
       const stem = path.join(out, 'lines-source-ink');
       const observed = fs.existsSync(image) ? await inkCells(image) : null;
@@ -170,7 +170,7 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
       }
       argv.push('--drawingfile',stem); info.source=choice; info.extractor=choice;
     } else log(`line source auto: ${(100 * inkShare).toFixed(2)}% pen line in the target and no sketch planner (${python} lacks numpy or OpenCV); the pen finds its own lines`);
-    if (mode === 'auto' && choice === 'none' && 100 * inkShare < num('penfirst', 0.10)) {
+    if (mode === 'auto' && choice === 'none' && 100 * inkShare < num('penfirst', 0.40)) {
       info.warning = `photo-sketch skipped: ${python} cannot import cv2 and numpy`;
       log(`WARNING line source auto: photo-sketch skipped, ${python} cannot import cv2 and numpy (pass --sketchpython with a python that has them); the pen finds its own lines instead`);
     }
@@ -237,7 +237,7 @@ export async function planLinework({ opt, num, argv, out, root, inkShare, densit
   } else {
     // no line file: the target's own lines traced as a pen draws them (pen-trace.mjs: whole contours, one nib and one
     // weight per line, texture inside dark masses left to the wash), cleaned of shadow edges and foliage squiggles
-    const pen = readsAsPen({ argv, penShare: inkShare, threshold: num('penfirst', 0.10) });
+    const pen = readsAsPen({ argv, penShare: inkShare, threshold: num('penfirst', 0.40) });
     const stem = path.join(out, 'lines-source-ink'), r = await writePenLines(image, stem, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), pen });
     log(`line source pen trace: ${r.lines.length} lines${pen ? ', pale pen lines included (the subject reads as pen)' : ''}, ${r.inMass} inside dark masses left to the wash`);
     if (r.lines.length >= MIN_STAGE_LINES) {
