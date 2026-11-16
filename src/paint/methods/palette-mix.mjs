@@ -116,6 +116,26 @@ function triple(ids, pigments, under, targetRGB, targetLab) {
 }
 
 /**
+ * Every puddle of one, two and three paints from `allowed` (all pigments when null) fitted to one colour: each single
+ * paint thinned to its value, each pair at its nearest share, each triple that matches exactly; with `must`, only the
+ * puddles holding that pigment. Unranked; solveMix and pan-choice.mjs rank them.
+ * @returns {{ indices: number[], mix: Float64Array, mass: number, rgb: number[], lab: number[], dE: number, valueReached: boolean }[]}
+ */
+export function mixCandidates(targetRGB, pigments, under, { maxPigments = 3, allowed = null, must = null } = {}) {
+  const ids = allowed ? [...new Set(allowed)] : pigments.map((_, j) => j);
+  const target = Array.from(targetRGB), targetLab = labOfColour(target), found = [];
+  const take = (...js) => must === null || js.includes(must);
+  for (const j of ids) if (take(j)) found.push(single(j, pigments, under, targetLab));
+  if (maxPigments >= 2) for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) if (take(ids[a], ids[b])) found.push(pair(ids[a], ids[b], pigments, under, targetLab));
+  if (maxPigments >= 3) for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) for (let c = b + 1; c < ids.length; c++) {
+    if (!take(ids[a], ids[b], ids[c])) continue;
+    const t = triple([ids[a], ids[b], ids[c]], pigments, under, target, targetLab);
+    if (t) found.push(t);
+  }
+  return found;
+}
+
+/**
  * The palette mix for one colour.
  *
  * Every single paint, pair and triple from `pigments` (or from `allowed`, a list of indices) is tried. Mixes within
@@ -142,13 +162,7 @@ export function solveMix(targetRGB, pigments, under, { maxPigments = 3, allowed 
   if (maxMass !== null && !(maxMass > 0)) throw new RangeError('the heaviest charge must be a positive mass');
   const ids = allowed ? [...new Set(allowed)] : pigments.map((_, j) => j);
   if (!ids.length || ids.some(j => !Number.isInteger(j) || j < 0 || j >= pigments.length)) throw new RangeError('allowed pigments must be indices into the pigment list');
-  const target = Array.from(targetRGB), targetLab = labOfColour(target), found = [];
-  for (const j of ids) found.push(single(j, pigments, under, targetLab));
-  if (maxPigments >= 2) for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) found.push(pair(ids[a], ids[b], pigments, under, targetLab));
-  if (maxPigments >= 3) for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) for (let c = b + 1; c < ids.length; c++) {
-    const t = triple([ids[a], ids[b], ids[c]], pigments, under, target, targetLab);
-    if (t) found.push(t);
-  }
+  const targetLab = labOfColour(Array.from(targetRGB)), found = mixCandidates(targetRGB, pigments, under, { maxPigments, allowed: ids });
   let least = Infinity; for (const c of found) if (c.dE < least) least = c.dE;
   let pick = null;
   for (const c of found) {

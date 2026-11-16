@@ -22,6 +22,7 @@ import {widePalette, puddleLabels} from '../../src/crop/palettewide.mjs';
 import {paintGuardOptions} from '../../src/crop/paint-guard.mjs';
 import {channelDensity, unmix} from '../../src/crop/pigments.mjs';
 import {blockInPigments, gradeSmoothPassages} from '../../src/crop/blockin.mjs';
+import {planPuddles} from '../../src/paint/methods/puddles.mjs';
 import {choosePlateMixes, toMixAmounts, panMix} from '../../src/crop/mixes.mjs';
 import {loadSubject} from '../../src/paint/methods/first-wash.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
@@ -200,6 +201,13 @@ let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
 return A;
 })).value;
 SPEED_PROFILE?.add('setup:pigment-fit', performance.now() - pigmentFitStarted);
+// A value plan is laid puddle by puddle: one puddle per local colour, its pans chosen once (src/paint/methods/puddles.mjs),
+// as many local colours as the palette was chosen to reach (--pwcolours chromatic colours plus the greys). Planning only.
+ctx.VALUE_PUDDLES = VALUE_ENABLED && PIGS.length > 1 ? planPuddles(D_PLAN, w, h, PIGS, paperRGB, { count: num('pwcolours', 8) + 1 }) : null;
+if (ctx.VALUE_PUDDLES) {
+  ctx.A = ctx.VALUE_PUDDLES.A;
+  console.log(`puddles: ${ctx.VALUE_PUDDLES.count} local colours, one puddle each: ${ctx.VALUE_PUDDLES.colours.map(c => `${c.pans.map((j, q) => `${(100 * c.shares[q]).toFixed(0)}% ${PIGS[j].name ?? j}`).join(' + ')} (${c.cells} cells, ${c.side}, dE ${c.dE.toFixed(1)})`).join('; ')}`);
+}
 // --paperkeep L: book no pigment where the source is within L of the paper's lightness and under --paperchroma (default 8).
 // Unmixing does not know paper white is a colour and would lay a weak pan there. Default 0, off.
 if (num('paperkeep', 0) > 0) {

@@ -9,6 +9,7 @@ import {paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mj
 import {normalizeWashWeights} from './wash-weights.mjs';
 import {reserveLights,validateReserves,brushFootprintCells} from './light-reserves.mjs';
 import {choosePassageBrush} from './passage-brush.mjs';
+import {unreachedParts} from './brush-reach.mjs';
 import {mergePlaneFragments,shapedPlanePaths} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
 import {joinDomainFragments} from './wash-join.mjs';
@@ -159,7 +160,7 @@ export function allocateFamilyMarks({family,mask,list,G,w,h,mmPerCell,seedKey,el
  return {paths,visited,decision:{...decision,status:'accepted',reason:family.marks.reason,pathCount:paths.length,allocatedArea:visited.length,allocatedDemand:mass,intentionalGapDemand:decision.originalDemand-mass,accounting:'nominal swept support; physical deposition measured separately'}};
 }
 
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,formLabels=null,formSource=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
+export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,formLabels=null,formSource=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0,puddles=null,softChoice=true,paintdetails=false}) {
   for(const family of families)if(family.marks){validateSurfaceMarks(family.marks,`family ${family.id}`);if(!Number.isFinite(family.brushWidthMm)||family.brushWidthMm<=0)throw Error('family marks require positive brushWidthMm');}
   let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
@@ -395,21 +396,19 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
   // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,
   // and paint cannot be taken back: carrying only the lack into the next band would lay it twice.
-  const carry=passCap>0&&!massTone?Array.from({length:k},()=>new Float32Array(n)):null;
+  if(puddles&&!(puddles.labels?.length===n&&puddles.count>=1))throw Error('puddles: one label per cell and at least one puddle');
+  const plab=puddles?majorityLabels(puddles.labels,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))):null,units=puddles?puddles.count:k,cellMass=puddles?Float32Array.from({length:n},(_,i)=>{let t=0;for(let j=0;j<k;j++)t+=demand[i*k+j];return t;}):null;
+  const carry=passCap>0&&!massTone?Array.from({length:units},()=>new Float32Array(n)):null;
   for(const step of steps){const band=step.band;
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
-    for(let pigment=0;pigment<k;pigment++){
+    const stepShape=puddles?(()=>{const any=new Uint8Array(n);for(let i=0;i<n;i++){if(protectedCells[i]||(!rgb&&value.values[i]===0)||puddles.labels[i]<0||!(cellMass[i]*step.wt[i]>1e-8))continue;any[i]=cellStyle(i)?.name==='ink-and-wash'?1:phase==='shadow'?(shadowMask[i]||accentCells[i]?1:0):1;}
+      return {any,slab:joinSmallPieces(plab,any,w,h,units,minShape,phase==='mid')};})():null;
+    for(let pigment=0;pigment<units;pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,carried=placed,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>carry[pigment][i];
-      for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
-      // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
-      // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
-      // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
+      for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=puddles?(stepShape.slab[i]===pigment?cellMass[i]:0):demand[i*k+pigment];if(puddles&&!fitted)continue;if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
+        const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(shaped&&G[i]<=1e-8)mask[i]=0;if(elig)elig[i]=mask[i]&&step.wt[i]>0&&G[i]>1e-8?1:0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
+      if(stepShape&&phase==='light'){const lap=dilate(mask,w,h,1);for(let i=0;i<n;i++)if(lap[i]&&!mask[i]&&stepShape.any[i]&&stepShape.slab[i]>=0&&stepShape.slab[i]<pigment)mask[i]=1;}
       if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,minShape);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
-      // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
-      // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
-      // maskMm: where a carried glaze goes is judged over a brush-sized area, not cell by cell: the mask is the
-      // signed demand left (what is still needed less what was over-laid) averaged over maskMm.
       if(elig){const g=Float32Array.from(G,(v,i)=>v+carryAt(i)),sm=boxMeanValue(g,w,h,Math.max(1,Math.round(maskMm/(sheetWidthMm/w))));for(let i=0;i<n;i++)mask[i]=elig[i]&&sm[i]>1e-8?1:0;}
       if(carried&&shaped&&phase!=='light'&&holeFill){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(phase!=='shadow'||shadowMask[i])&&step.wt[i]>0?1:0),big=removeSmall(hole,w,h,Math.round(minShape*holeFill));for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // Middle local colors belong to regions. Shadow connectivity ignores ownership boundaries.
@@ -498,11 +497,11 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
             list=marks.visited;total=marks.decision.allocatedDemand;amount=total/list.length;
             sh=passage(markIds,id,box,amount,list.length,w);sh._markSupport=support;
           }
-          sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);
+          sh.mix=puddles?puddleMix(list,G,demand,cellMass,k,amount):Array.from({length:k},(_,j)=>j===pigment?amount:0);
           // massTone: the flat charge is brought to the strength that returns the light its cells asked for
-          if(TONE){const f=TONE.strength(list,sh.mix,(i,q)=>q===pigment?G[i]:0);sh.mix=sh.mix.map(v=>v*f);sh.amount=amount*f;sh._tone=f;TONE.lay(list,sh.mix);toneSum+=f*list.length;toneArea+=list.length;}
+          if(TONE){const f=TONE.strength(list,sh.mix,puddles?(i,q)=>cellMass[i]>0?G[i]*demand[i*k+q]/cellMass[i]:0:(i,q)=>q===pigment?G[i]:0);sh.mix=sh.mix.map(v=>v*f);sh.amount=amount*f;sh._tone=f;TONE.lay(list,sh.mix);toneSum+=f*list.length;toneArea+=list.length;}
           if(placed)for(const i of list)placed[i]=sh.amount;sh.graded=null;sh._follow=true;
-          const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
+          const key=`${phase}/b${band}${step.tag}/${puddles?'m':'p'}${pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
           const wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
@@ -532,6 +531,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           if(calibratedPlan&&!ownSwatch)intent.calibratedPlan=true;
           if(brushChoice&&!sh._markSupport){
             const pb=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});
+            if(pb)for(const part of unreachedParts(sh.mask,w,h,pb.paths,minShape)){const nid=++c.count;for(const i of part)c.labels[i]=nid;cells[nid]=part;sh._mask=null;}
             if(pb){
               intent.brush={...intent.brush,...pb,passageBrush:pb};
               sh.mask.passageBrush=pb;
@@ -586,7 +586,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           if(marks){intent.markDecision=marks.decision;if(sh._markSupport)intent.brush={...intent.brush,paths:marks.paths,sizeMm:familyMatch.brushWidthMm,shape:'flat',contact:'side/belly',kind:'explicit middle surface marks'};}
           sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
         }
-        if(shapes.length)layers.push({value:band,pigment,shapes,mix:Array.from({length:k},(_,j)=>j===pigment?1:0),amount:shapes.reduce((s,q)=>s+q.amount*q.area,0)/shapes.reduce((s,q)=>s+q.area,0),area:shapes.reduce((s,q)=>s+q.area,0),_order:{phase:phase==='light'?'ground':phase==='shadow'?'dark':'mid',region:typeof domain==='string'?(regionProfiles.findIndex(p=>p.name===domain)+1||0):Math.abs(domain),shoot:true},_valuePhase:phase});
+        if(shapes.length)layers.push({value:band,...(puddles?puddleLayer(shapes,k,pigment,`${pigment}/${domain}`):{pigment,mix:Array.from({length:k},(_,j)=>j===pigment?1:0)}),shapes,amount:shapes.reduce((s,q)=>s+q.amount*q.area,0)/shapes.reduce((s,q)=>s+q.area,0),area:shapes.reduce((s,q)=>s+q.area,0),_order:{phase:phase==='light'?'ground':phase==='shadow'?'dark':'mid',region:typeof domain==='string'?(regionProfiles.findIndex(p=>p.name===domain)+1||0):Math.abs(domain),shoot:true},_valuePhase:phase});
       }
       // Over or under what each cell asked is carried to that pigment's next band, smoothed over a brush-sized area.
       const settleCarry=(q,own,laid)=>{for(let i=0;i<n;i++)carry[q][i]+=own[i]-laid[i];if(carryMm>0){const r=Math.max(1,Math.round(carryMm/(sheetWidthMm/w))),c=boxMeanValue(carry[q],w,h,r);for(let i=0;i<n;i++)carry[q][i]=protectedCells[i]?0:c[i];}};
@@ -594,8 +594,9 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     }
   }
   if(TONE)console.log(`mass tone: ${instructions.length} washes charged at a mean ${(toneSum/Math.max(1,toneArea)).toFixed(3)} of their cells' mean paint (by area)`);
+  const paintDetails=(shaped&&paintdetails)?appendPaintDetails({layers,instructions,demand,k,w,h,value,protectedCells,minShape,sheetWidthMm,region}):null;
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
-  return {opticsReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
+  return {paintDetails,opticsReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
   // An authored dry contact takes precedence over phase, calibration and style defaults.
@@ -677,4 +678,85 @@ export function layerShares(cover,thresholds,sm,n){
     if(total>0)for(const j of on)share[j][i]/=total;else share[on[0]][i]=1;
   }
   return share;
+}
+
+// Puddle labels with shape-scale edges: each cell takes the most common label over a (2r+1) square, r the finest shape a
+// wash holds (layerSmoothMm, the value steps' own squint), so a puddle's edge follows a colour's edge and not the grain. Cells with no puddle stay -1.
+function majorityLabels(labels,w,h,r){
+  let m=0;for(const v of labels)if(v+1>m)m=v+1;const out=Int32Array.from(labels),votes=new Int32Array(m);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(labels[i]<0)continue;votes.fill(0);
+    for(let yy=Math.max(0,y-r);yy<=Math.min(h-1,y+r);yy++)for(let xx=Math.max(0,x-r);xx<=Math.min(w-1,x+r);xx++){const v=labels[yy*w+xx];if(v>=0)votes[v]++;}
+    let b=labels[i];for(let q=0;q<m;q++)if(votes[q]>votes[b])b=q;out[i]=b;}
+  return out;
+}
+// Step labels: each piece of one puddle under the minimum shape (or, in the middle values, too thin for a wash: support
+// under four cells, the planner's own test) takes the puddle most of its painted neighbours have, so its cells are laid (and charged) with the wash around it. Cells nothing paints are -1.
+function joinSmallPieces(plab,any,w,h,units,minShape,thinJoin=false){
+  const n=w*h,slab=Int32Array.from(plab,(v,i)=>any[i]?v:-1),votes=new Int32Array(units);
+  for(let q=0;q<units;q++){const c=components(Uint8Array.from(slab,v=>v===q?1:0),w,h);if(!c.count)continue;const cells=Array.from({length:c.count+1},()=>[]);
+    for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
+    for(let id=1;id<=c.count;id++){const list=cells[id];let edge=0;for(const i of list)if(neighbors(i,w,n).length<4||neighbors(i,w,n).some(j=>c.labels[j]!==id))edge++;const thin=thinJoin&&2*list.length/Math.max(1,edge)<4;if(list.length>=minShape&&!thin)continue;votes.fill(0);
+      for(const i of list)for(const j of neighbors(i,w,n))if(c.labels[j]!==id&&slab[j]>=0&&slab[j]!==q)votes[slab[j]]++;
+      let b=-1,bv=0;for(let r=0;r<units;r++)if(votes[r]>bv){bv=votes[r];b=r;}if(b>=0)for(const i of list)slab[i]=b;}}
+  return slab;
+}
+// A puddle passage's charge: the pans its cells ask for, in their shares over the shape, at the passage's strength.
+function puddleMix(list,G,demand,cellMass,k,amount){
+  const m=new Float64Array(k);let t=0;
+  for(const i of list)if(cellMass[i]>0&&G[i]>0)for(let j=0;j<k;j++){const v=G[i]*demand[i*k+j]/cellMass[i];m[j]+=v;t+=v;}
+  return Array.from(m,v=>t>0?amount*v/t:0);
+}
+// A puddle layer names its leading pan (for the per-pan reports), the puddle's mixture, and which wash it is (puddle and
+// domain): the paint loop dries the sheet before a different wash (tools/plate/paint.mjs nextOther), so two touching
+// washes of one puddle split by region or style are not laid wet against each other.
+function puddleLayer(shapes,k,puddle,wash){
+  const m=new Float64Array(k);for(const sh of shapes)for(let j=0;j<k;j++)m[j]+=sh.mix[j]*sh.area;
+  const t=m.reduce((a,v)=>a+v,0),mixv=Array.from(m,v=>t>0?v/t:0);let lead=0;for(let j=1;j<k;j++)if(mixv[j]>mixv[lead])lead=j;
+  return {pigment:lead,mix:mixv,mixv,puddle,mixIndex:wash};
+}
+// A final paint passage is planned from unsatisfied source demand, never from a render.
+function appendPaintDetails({layers,instructions,demand,k,w,h,value,protectedCells,minShape,sheetWidthMm,region}) {
+ const n=w*h,laid=Array.from({length:k},()=>new Float64Array(n));
+ for(const layer of layers)for(const sh of layer.shapes){
+  const factor=Math.max(1,1+Math.abs(sh._rampVec?.delta??0),...(sh._strokePlan?.factors??[]),...(sh._strokePlan?.ramps??[]).flatMap(r=>[r.start,r.end]));
+  for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){
+   const i=y*w+x;if(sh.ids[i]===sh.id)for(let q=0;q<k;q++)laid[q][i]+=(sh.mix[q]??0)*factor;
+  }
+ }
+ const report={shapes:0,plannedPigmentMass:0,source:'positive remaining source demand after compiled washes',dispatch:'existing dry physical passage brush'};
+ for(let q=0;q<k;q++){
+  const remaining=Float64Array.from({length:n},(_,i)=>protectedCells[i]?0:Math.max(0,demand[i*k+q]-laid[q][i]));
+  const shapes=[];
+  for(let b=1;b<=VALUE_CAPS.length;b++){
+   const mask=Uint8Array.from(remaining,(v,i)=>v>1e-8&&value.bands[i]===b?1:0),cc=components(mask,w,h);
+   const body=erode(mask,w,h,1),lists=Array.from({length:cc.count+1},()=>[]);
+   for(let i=0;i<n;i++)if(cc.labels[i])lists[cc.labels[i]].push(i);
+   for(let id=1;id<=cc.count;id++){
+    const list=lists[id];if(list.length<12||!list.some(i=>body[i]))continue;
+    const edge=list.filter(i=>neighbors(i,w,n).some(j=>cc.labels[j]!==id));
+    const support=2*list.length/Math.max(1,edge.length);
+    if(list.length>=minShape&&support>=4)continue;
+    const box={x0:w,y0:h,x1:-1,y1:-1};
+    let amount=Infinity;
+    for(const i of list){box.x0=Math.min(box.x0,i%w);box.x1=Math.max(box.x1,i%w);box.y0=Math.min(box.y0,Math.floor(i/w));box.y1=Math.max(box.y1,Math.floor(i/w));amount=Math.min(amount,remaining[i]);}
+    if(!(amount>1e-8))continue;
+    const sh=passage(cc.labels,id,box,amount,list.length,w);
+    const brush=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,texture:true,referenceCue:'Connected source paint detail retained beyond broad wash support.',phase:'detail'});
+    if(!brush||brush.classification!=='detail')continue;
+    sh.mix=Array.from({length:k},(_,j)=>j===q?amount:0);sh.graded=null;
+    const intent={id:'paint-detail/b5/p' + q + '/v' + b + '/s' + id,phase:'shadow',valueBand:5,valueRange:[(b===1?0:VALUE_CAPS[b-2])*value.peak,VALUE_CAPS[b-1]*value.peak],regions:[...new Set(list.map(i=>region.regions[region.labels[i]-1]?.id).filter(Boolean))],paintDetail:true,texture:true,shaped:true,
+     referenceCue:'Connected source value feature with pigment still owed after broad layers.',
+     intendedResult:'Directional broken paint detail over the dry foundation; retain paper gaps.',
+     move:'dry brush',paperBefore:'fully dry',baseBefore:'fully dry',brush,
+     load:{water:TECHNIQUES['dry brush'].water,pigment:'one uniform charge bounded by remaining demand throughout the feature',reload:'existing finite physical instrument'},
+     resolution:{question:'paint detail',estimatedSupportWidthCells:support,mmPerCell:sheetWidthMm/w,directionSource:brush.directionSource},
+     edges:{hardCells:edge,softCells:[],policy:'dry broken contact; no damp edge softening'},protectedLights:['held target paper whites'],layer:5,stop:'after band'};
+    sh._valuePlan=intent;shapes.push(sh);
+    instructions.push({...intent,area:list.length,plannedPigmentMass:amount*list.length});
+    report.shapes++;report.plannedPigmentMass+=amount*list.length;
+   }
+  }
+  if(shapes.length)layers.push({value:5,pigment:q,shapes,mix:Array.from({length:k},(_,j)=>j===q?1:0),amount:shapes.reduce((s,a)=>s+a.amount*a.area,0)/shapes.reduce((s,a)=>s+a.area,0),area:shapes.reduce((s,a)=>s+a.area,0),_valuePhase:'shadow',_paintDetail:true});
+ }
+ return report;
 }
