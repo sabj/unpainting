@@ -818,6 +818,7 @@
   "smoothmassradius",
   "softarclen",
   "softarcs",
+  "softchoice",
   "softclipmm",
   "softfloor",
   "softmask",

@@ -46,6 +46,7 @@ import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
 import {touchLack, touchDue} from '../../src/paint/methods/touch-up.mjs';
 import {lumOf} from '../../src/paint/step-backs.mjs';
+import {accentStroke} from '../../src/paint/methods/accents.mjs';
 import {tipMarks, darkClip} from '../../src/paint/methods/final-dark-marks.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
@@ -556,7 +557,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // a final dark goes on with a small round brush drawn through the accent itself, held to it by the clip below
   // a final dark is laid as touches and strokes of the detail brush's tip over its accent family (final-dark-marks.mjs)
   const TIP_R = Math.max(SC, PB ? PB.detailR : SC);
-  const darkPaths = layer._darkPass ? tipMarks(washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: TIP_R, minLength: 2 * SC }), TIP_R) : null;
+  const darkPaths = sh._accentPath ? [accentStroke(sh._accentPath, w, { SC, tipR: TIP_R })] : layer._darkPass ? tipMarks(washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: TIP_R, minLength: 2 * SC }), TIP_R) : null;
   const paths = shapedPaths ?? authoredPaths ?? darkPaths ?? clock('paths', () => FLOOR
     ? (() => { let rr = FLOOR, P = floorPaths(rr); const T = BUDGET ? BUDGET.target(sh) : Infinity; for (let it = 0; it < 7 && P.length > T && rr < 3 * BRUSH; it++) { rr *= 1.6; P = floorPaths(rr); } FLOOR_R = rr; return P; })()
     : (detail
@@ -566,7 +567,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // --contain: the brush disc held inside its passage at every point (see containPaths). Rescued passages below get
   // the same treatment, since a small brush can overhang a narrow passage just as a mop overhangs a ragged one.
   const crispNow = CRISP.wants(T, detail);
-  if (!BUDGET && !shapedPaths && !sh._semantic?.pass.edges.overlap && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
+  if (!BUDGET && !shapedPaths && !sh._semantic?.pass.edges.overlap && !sh._valuePlan && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
     // --washfloor in: the main wash sweep is never narrowed below this on a 9-inch-wide sheet (wash.mjs).
     // --washfloorout 1: only outside the subject (--fwmask), where the broad washes are.
     const WF = num('washfloor', 0) * W2 / 9, WFOUT = num('washfloorout', 0) > 0 && FW_SUBJ ? up(FW_SUBJ) : null;
@@ -575,7 +576,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     paths.length = 0; paths.push(...held);
   }
   // --cutin 0|1: run a small brush along the inside of the passage's edge before filling it, as a painter cuts in. Default 1.
-  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
+  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !sh._valuePlan && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutbandin n: cut-in band inside the subject (--fwmask); --cutband (default 2) elsewhere.
     const cellMmHigh = num('sheetmm', DEFAULT_SHEET_MM) / W2;
@@ -653,7 +654,9 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
     // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
     // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
-    const softReach=familyMarks||SOFT_WET_MM>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
+    const softMm = num('softclipmm', num('softchoice', 0) > 0 ? 0.75 : (sh._valuePlan?.washSystem ? 0.75 : 0));
+    const cellMm = num('sheetmm', DEFAULT_SHEET_MM) / w;
+    const softReach = familyMarks || SOFT_WET_MM > 0 || reach > 0 || !sh._valuePlan?.edges || sh._valuePlan.texture || softMm <= 0 ? 0 : Math.max(1, Math.round(softMm / cellMm));
     const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;
     const grow=soft?.ring?softReach*SC:0;
     const box=baseMask===MASK&&reach<=0?{x0:Math.max(0,MB.x0*SC-grow),y0:Math.max(0,MB.y0*SC-grow),x1:Math.min(W2-1,(MB.x1+1)*SC-1+grow),y1:Math.min(H2-1,(MB.y1+1)*SC-1+grow)}:null;

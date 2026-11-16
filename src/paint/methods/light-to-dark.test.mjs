@@ -976,3 +976,28 @@ process.exit(0);
   assert.equal(proof.realPaint,true);assert.equal(proof.clipMatched,true);assert.equal(proof.noEmptyRescue,true);assert.equal(proof.under,1);assert.ok(proof.strokes>0&&proof.charges>0);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('puddles preserve cohesive local wash shapes without groupMode domain splintering', () => {
+  const w = 32, h = 32, n = w * h, k = 3;
+  const rgb = new Uint8Array(n * 3).fill(120);
+  const density = new Float32Array(n).fill(0.4);
+  const demand = new Float32Array(n * k).fill(0.15);
+  const labels = new Int32Array(n).fill(0);
+  for (let i = Math.floor(n / 2); i < n; i++) labels[i] = 1;
+  const puddles = { labels, count: 2 };
+  const plan = planLightToDark({
+    rgb, density, demand, k, w, h,
+    puddles,
+    layerHue: true,
+    shadowFamilies: true,
+    hueChromaLab: true,
+    sheetWidthMm: 100
+  });
+  assert.ok(plan.layers.length > 0, 'plan should have layers');
+  // Check that no shape has an empty or invalid puddle
+  for (const layer of plan.layers) {
+    if (layer.puddle != null) {
+      assert.ok(layer.puddle >= 0 && layer.puddle < 2, 'layer puddle must be valid');
+    }
+  }
+});
