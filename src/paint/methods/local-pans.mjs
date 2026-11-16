@@ -35,7 +35,7 @@ export function localPans(D, w, h, pigments, paper, { families = 24, partition =
     cells.forEach((i, q) => { for (let c = 0; c < 3; c++) sub[q * 3 + c] = D[i * 3 + c]; });
     // A puddle greyed across the wheel is greyed once, in the well: its cells are unmixed over the greyed puddle as
     // one paint and its near pans, so no cell takes more of the greying pan, for its paint, than the puddle holds.
-    const greying = pick.indices.filter(j => pick.far.includes(j)), nearPans = pick.indices.filter(j => !greying.includes(j));
+    const greying = pick.indices.filter(j => pick.far.includes(j) || (pick.angles[j] === null && pick.indices.some(q => pick.angles[q] !== null))), nearPans = pick.indices.filter(j => !greying.includes(j));
     if (!greying.length && !ownPans && nearPans.length > 0 && nearPans.length < 3) {
       const extra = pick.angles.map((a, j) => ({ a, j })).filter(x => x.a !== null && x.a < 38 && !nearPans.includes(x.j)).sort((p, q) => p.a - q.a);
       while (nearPans.length < 3 && extra.length) nearPans.push(extra.shift().j);
