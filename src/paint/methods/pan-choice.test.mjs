@@ -87,3 +87,12 @@ test('a dark muted green on a palette of primaries takes both far primaries, and
   assert.ok(r.indices.length <= 3);
   assert.ok(names(keys, r).includes('rose'), 'the rose that greys it');
 });
+
+test("chromatic stone prefers pure complement over black-heavy Payne's grey, and warm ginger fur excludes sap green across the wheel", () => {
+  const h36Keys = ["ultramarine", "hansa", "ochre", "sienna", "umber", "phthalogreen", "paynes"], Ph36 = box(h36Keys);
+  const stone = choosePans([165, 153, 133], Ph36, SHEET);
+  assert.ok(names(h36Keys, stone).includes("ultramarine") && !names(h36Keys, stone).includes("paynes"), names(h36Keys, stone).join("+"));
+  const mitKeys = ["ochre", "sienna", "umber", "ultramarine", "lampblack", "sapgreen"], Pmit = box(mitKeys);
+  const fur = choosePans([177, 135, 89], Pmit, SHEET);
+  assert.ok(!names(mitKeys, fur).includes("sapgreen"), names(mitKeys, fur).join("+"));
+});

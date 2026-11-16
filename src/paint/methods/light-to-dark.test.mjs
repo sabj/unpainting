@@ -1001,3 +1001,16 @@ test('puddles preserve cohesive local wash shapes without groupMode domain splin
     }
   }
 });
+
+test("full-bleed sunlit yellow-ochre and cream passages (L* < 90 or C* > 24) are not punched out as bare paper on a white sheet", () => {
+  const w = 30, h = 30, n = w * h;
+  const rgb = new Uint8Array(n * 3), density = new Float32Array(n).fill(0.18);
+  for (let i = 0; i < n; i++) {
+    const top = i < n * 0.15;
+    rgb.set(top ? [233, 208, 152] : [140, 135, 80], 3 * i);
+    density[i] = top ? 0.08 : 0.45;
+  }
+  const p = planLightToDark({ w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, paperRel: true, paperLights: true, paperRGB: [252, 251, 248], minShapeCells: 4 });
+  assert.equal(p.protectedCells[2 * w + 2], 0, "sunlit yellow-ochre village wall is painted, not bare white paper");
+  assert.equal(p.paper, null, "non-neutral yellow top 4% is not estimated as bare paper");
+});
