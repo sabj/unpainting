@@ -52,7 +52,7 @@ function planKeyTree({ pipeline }) {
     name: ANY, photo: ANY, // tools/painter/value-plan-preview.mjs
     sheet: { widthMm: ANY, seed: ANY, targetGuard: ANY }, // src/paint/recipe.mjs planSheet; tools/paint-plate.mjs --sheetmm
     // light-to-dark.mjs, target-regions.mjs, subject-order.mjs; referenceCue and baseMove describe the target regions
-    families: list({ id: ANY, bounds: ANY, referenceCue: ANY, baseMove: ANY, drawingRole: ANY }), // drawingRole: family-roles.mjs
+    families: list({ id: ANY, bounds: ANY, referenceCue: ANY, baseMove: ANY, drawingRole: ANY, brushWidthMm: ANY, marks: {kind: ANY, reason: ANY, cover: ANY, placement: ANY, flow: ANY, courseAngleDeg: ANY} }), // drawingRole: family-roles.mjs
     reserves: list({ bounds: ANY, reason: ANY }), // light-to-dark.mjs; tools/paint-plate.mjs resists
     styleSelection: { style: ANY, reason: ANY, regions: named({ style: ANY, reason: ANY }) }, // src/paint/styles/loader.mjs
     view: { wholeOf: ANY }, // tools/paint-plate.mjs --cellfamilies default

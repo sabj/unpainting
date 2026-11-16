@@ -4,7 +4,7 @@
 const OUTLINE_MEDIA = Object.freeze(['auto', 'ink', 'graphite']);
 
 /** @returns {{ medium: 'ink' | 'graphite', chosen: boolean, percent: number }} */
-export function resolveOutlineMedium({ requested = 'auto', share, threshold = 0.5 }) {
+export function resolveOutlineMedium({ requested = 'auto', share, threshold = 0.10 }) {
   if (!OUTLINE_MEDIA.includes(requested)) throw new Error(`--outlinemedium: auto, ink or graphite, not ${requested}`);
   if (!Number.isFinite(share) || share < 0 || share > 1) throw new Error(`outline medium: line share must be in [0, 1], not ${share}`);
   if (!Number.isFinite(threshold)) throw new Error(`outline medium: threshold must be a number, not ${threshold}`);

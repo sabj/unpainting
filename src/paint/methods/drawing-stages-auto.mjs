@@ -68,8 +68,8 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   const features = { edgeShare: +(edges / (w * h)).toFixed(4), penLine: +penLine.toFixed(4), perspective: perspectiveOf(python, root, image, w) };
   // One reading of "a pen source": the threshold that asks for ink also allows the ink prep, or a run could ask for ink
   // and be refused it (--penprepmin, per cent, moves the gate alone for comparisons).
-  const penThreshold = Number(opt('penfirst', 0.5)) / 100;
-  const rule = ruleChoice(features, { penSource: Number(opt('penprepmin', opt('penfirst', 0.5))) / 100 });
+  const penThreshold = Number(opt('penfirst', 0.10)) / 100;
+  const rule = ruleChoice(features, { penSource: Number(opt('penprepmin', opt('penfirst', 0.10))) / 100 });
   const model = await plannerChoice({ image, root, model: opt('drawingplanner', PLANNER_MODEL), fetcher, log });
   const gated = gateChoice(model.choice ?? null, rule, { style });
   const { verdicts } = gated;

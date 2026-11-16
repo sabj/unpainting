@@ -304,7 +304,8 @@ const paperSetupStarted = performance.now();
 // --washinkfile <base>: the line file of the target's own ink to remove, when the pen draws a different drawing
 // (a cleaner opening file). Default: the --drawingfile.
 const PX_RAW = num('washinkfree', 0) > 0 && (opt('washinkfile', '') !== '' || opt('drawing', 'first') !== 'none') ? (() => {
-  const base = opt('washinkfile', '') || opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
+  const base = opt('washinkfile', '') || opt('drawingfile', '');
+  if (!base) { console.log('washinkfree: no line file present, proceeding without ink removal'); return PX_SOURCE; }
   const doc = JSON.parse(readLineText(path.resolve(root, linePaths(base).lines)));
   const r = removePlannedInk(PX_SOURCE, info.width, info.height, doc, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marginMm: num('washinkmargin', 0.3) });
   console.log(`wash target: planned ink removed from ${r.changed} cells (${(100 * r.changed / (info.width * info.height)).toFixed(1)}% of the sheet)`);

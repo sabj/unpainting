@@ -1,4 +1,6 @@
 // Pipeline: painting, stage 5 (glazes and darks).
+import {validateSurfaceMarks,surfaceMarkPaths} from '../techniques/surface-marks.mjs';
+import {sweepCount} from '../../media/wash.mjs';
 import {TECHNIQUES} from './lay.mjs';
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
@@ -139,7 +141,26 @@ function fineMiddleComponents(mask,fine,G,w,h,minimum,parent=null){
  return {labels,count};
 }
 
+// Explicit source-selected geometry only. Footprints are nominal allocations, not deposited paint.
+export function allocateFamilyMarks({family,mask,list,G,w,h,mmPerCell,seedKey,eligible=true}) {
+ if(!family?.marks)return null;
+ validateSurfaceMarks(family.marks,`family ${family.id}`);
+ if(!Number.isFinite(family.brushWidthMm)||family.brushWidthMm<=0)throw Error('family marks require positive brushWidthMm');
+ const decision={kind:family.marks.kind,brushWidthMm:family.brushWidthMm,originalArea:list.length,originalDemand:list.reduce((a,i)=>a+G[i],0)};
+ const reject=reason=>({decision:{...decision,status:'rejected',reason,allocatedArea:list.length,allocatedDemand:decision.originalDemand,intentionalGapDemand:0}});
+ if(!eligible)return reject('existing carry, brush-size or authored style is incompatible with middle marks');
+ if(normalizePassageMove(family.baseMove)!=='wet on dry')return reject('marks preserve an explicitly wet-on-dry family; no material override');
+ // Different children vary by their geometry; identical supports across pans stay registered.
+ let geometry=2166136261;for(const i of list)geometry=Math.imul(geometry^i,16777619)>>>0;
+ const paths=surfaceMarkPaths(family.marks,{mask,w,h,mmPerCell,brushMm:family.brushWidthMm,toCell:p=>[p[0]*w,p[1]*h],seedKey:`${seedKey}/${geometry}`});
+ if(!paths.length)return reject('no requested marks fit this original support');
+ const counts=sweepCount(paths,w,h),visited=list.filter(i=>counts[i]>0),mass=visited.reduce((a,i)=>a+G[i],0);
+ if(!visited.length||mass<=1e-8)return reject('requested marks have no positive nominal allocation');
+ return {paths,visited,decision:{...decision,status:'accepted',reason:family.marks.reason,pathCount:paths.length,allocatedArea:visited.length,allocatedDemand:mass,intentionalGapDemand:decision.originalDemand-mass,accounting:'nominal swept support; physical deposition measured separately'}};
+}
+
 export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,formLabels=null,formSource=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
+  for(const family of families)if(family.marks){validateSurfaceMarks(family.marks,`family ${family.id}`);if(!Number.isFinite(family.brushWidthMm)||family.brushWidthMm<=0)throw Error('family marks require positive brushWidthMm');}
   let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -450,14 +471,14 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           :fineMiddleComponents(M,fineLayers.owner,G,w,h,minimum,c);
         const cells=Array.from({length:c.count+1},()=>[]);
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
-        const shapes=[];
+        const shapes=[];let markIds=null;
         for(let id=1;id<=c.count;id++){
-          const list=cells[id];if(!list.length)continue;if(n>100&&list.length<(DETAIL?localMinShape(minShape,meanOver(list,DETAIL),detailScale):minShape)&&!(phase==='shadow'&&list.length>=SMALL_MIN&&list.some(i=>accentCells[i]))){omittedDemand+=list.reduce((sum,i)=>sum+G[i],0);continue;}
+          let list=cells[id];const originalList=list;if(!list.length)continue;if(n>100&&list.length<(DETAIL?localMinShape(minShape,meanOver(list,DETAIL),detailScale):minShape)&&!(phase==='shadow'&&list.length>=SMALL_MIN&&list.some(i=>accentCells[i]))){omittedDemand+=list.reduce((sum,i)=>sum+G[i],0);continue;}
           const touched=[...new Set(list.map(i=>region.labels[i]))].map(i=>region.regions[i-1]);
           const box={x0:w,y0:h,x1:-1,y1:-1},soft=[],hard=[];let total=0;
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
             const out=neighbors(i,w,n).filter(j=>c.labels[j]!==id);if(out.length){const contrast=Math.max(...out.map(j=>Math.abs(value.values[i]-value.values[j])));(contrast<.14&&out.every(j=>colorEdge(i,j)<.45)?soft:hard).push(i);}}
-          if(total<=1e-8)continue;const amount=carried?quantileOf(list,G,passCap):total/list.length;const sh=passage(c.labels,id,box,amount,list.length,w);
+          if(total<=1e-8)continue;let amount=carried?quantileOf(list,G,passCap):total/list.length,sh=passage(c.labels,id,box,amount,list.length,w);
           if(shaped&&phase==='mid'&&2*list.length/Math.max(1,hard.length+soft.length)<(DETAIL?Math.max(1.1,4*(1-detailScale*meanOver(list,DETAIL))):4)){
             // Thin paint is still paint: propose the executor's fitted geometry in this original band.
             // Require continuous fitted geometry, not an implicit handoff to ink. This is not a
@@ -465,17 +486,27 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
             const paths=shapedPlanePaths(sh.mask,w,h,{box,mmPerCell:sheetWidthMm/w,protect:protectedCells});
             if(!paths.some(ps=>ps.length>1)){omittedDemand+=total;continue;}
           }
+          const family=profile&&touched.map(r=>r.descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name),
+            chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
+          const familyMatch=passageFamily(originalList,w,h,families);
+          const marks=phase==='mid'&&shaped&&!step.pig?allocateFamilyMarks({family:familyMatch,mask:sh.mask,list,G,w,h,mmPerCell:sheetWidthMm/w,
+            seedKey:`${familyMatch?.id}/b${band}${step.tag}/r${domain}`,eligible:!carried&&identity&&(!smallestBrushMm||familyMatch?.brushWidthMm>=smallestBrushMm)}):null;
+          if(marks?.decision.status==='accepted'){
+            markIds??=c.labels.slice();const visited=new Set(marks.visited);
+            for(const i of list)if(!visited.has(i))markIds[i]=0;
+            const support={ids:c.labels,id,box:{...box}};
+            list=marks.visited;total=marks.decision.allocatedDemand;amount=total/list.length;
+            sh=passage(markIds,id,box,amount,list.length,w);sh._markSupport=support;
+          }
           sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);
           // massTone: the flat charge is brought to the strength that returns the light its cells asked for
           if(TONE){const f=TONE.strength(list,sh.mix,(i,q)=>q===pigment?G[i]:0);sh.mix=sh.mix.map(v=>v*f);sh.amount=amount*f;sh._tone=f;TONE.lay(list,sh.mix);toneSum+=f*list.length;toneArea+=list.length;}
           if(placed)for(const i of list)placed[i]=sh.amount;sh.graded=null;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
-          const family=profile&&touched.map(r=>r.descriptiveFamily).find(id=>id&&resolveStyle(subject,id,styleSelection).name!==profile.name),
-            chosen=typeof domain==='string'&&styleByName[domain]&&domain!==profile?.name?styleByName[domain]:family?resolveStyle(subject,family,styleSelection):profile,identity=!chosen||chosen.name==='precise-watercolor';
           // Light washes may use wet-in-wet where the reference plan explicitly requests it.
-          const familyMatch=passageFamily(list,w,h,families),wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
-          const isCoolSky = Boolean(rgb && list.length > n * .015 && list.filter(i => rgb[i * 3 + 2] > rgb[i * 3] + 10).length > list.length * .6);
+          const wet=phase==='light'&&(familyMatch?normalizePassageMove(familyMatch.baseMove)==='wet on wet':touched.every(r=>normalizePassageMove(r.baseMove)==='wet on wet'));
+          const isCoolSky = Boolean(rgb && originalList.length > n * .015 && originalList.filter(i => rgb[i * 3 + 2] > rgb[i * 3] + 10).length > originalList.length * .6);
           const intent={id:key,phase,valueBand:band,valueRange:[lo*value.peak,hi*value.peak],regions:touched.map(r=>r.id),crossesRegions:touched.length>1,referenceCue:cue,
             intendedResult:phase==='shadow'?'Connected target shadow over dry local colors; retain lit planes.':phase==='light'?'Large pale local-color foundation.':'Target middle values within the named region.',cool:isCoolSky,
             shaped,subject,move:wet?'wet on wet':'wet on dry',paperBefore:wet?'moist, not glossy':'fully dry; own same-passage wet overlap allowed',baseBefore:'fully dry',
@@ -499,7 +530,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           // ownSwatch: the glaze keeps its own damp one-pass brush and is charged from a scrap swatch of that brush
           // (instrument-cal.mjs); without it a calibrated plan lays the glaze as the stock swatch does, wetter.
           if(calibratedPlan&&!ownSwatch)intent.calibratedPlan=true;
-          if(brushChoice){
+          if(brushChoice&&!sh._markSupport){
             const pb=choosePassageBrush(sh.mask,w,h,{mmPerCell:sheetWidthMm/w,referenceCue:intent.referenceCue,phase});
             if(pb){
               intent.brush={...intent.brush,...pb,passageBrush:pb};
@@ -514,10 +545,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           // one fitted gesture and an exact edge.
           const supportMm=2*list.length/Math.max(1,hard.length+soft.length)*(sheetWidthMm/w);
           const laneHere=laneMax>0?Math.min(laneMax,Math.max(laneMm,supportMm*.5)):Math.min(laneMm,Math.max(2,supportMm*.9));
-          if(strokePlan&&shaped&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!isCoolSky){
+          if(!sh._markSupport&&strokePlan&&shaped&&!step.pig&&supportMm>=(laneAdapt?2:laneMm)&&list.length>=minShape*(laneAdapt?2:3)&&!isCoolSky){
             const sp=planLanes(list,w,h,G,amount,{cellMm:sheetWidthMm/w,laneMm:laneAdapt?laneHere:laneMm,strokeMm,reachMm:washReachMm,seed:(id*7919+band*131+pigment*17+1)>>>0});
             if(sp){sh._strokePlan=sp;sh.graded=null;intent.strokes={count:sp.paths.length,laneMm:laneAdapt?+laneHere.toFixed(2):laneMm,strokeMm,reachMm:washReachMm,factorRange:[+Math.min(...sp.factors).toFixed(2),+Math.max(...sp.factors).toFixed(2)]};}}
-          else if(shaped && list.length >= 4) {
+          else if(!sh._markSupport&&shaped && list.length >= 4) {
             let sx = 0, sy = 0;
             for (const idx of list) {
               sx += (idx % w) + 0.5;
@@ -552,6 +583,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
             intent.passageMaterial=decision;intent.move=decision.move;intent.load.water=decision.water;if(decision.move==='wet on wet'){intent.wetMix=.85;intent.bridge=.98;intent.bridgeSoft=3;}intent.paperBefore=decision.move==='wet on wet'?'moist across contact and neighbors; clean preparation if needed':'fully dry underlayer; own connected wet overlap allowed';
             if(familyMatch)intent.referenceCue=familyMatch.referenceCue??intent.referenceCue;
           }
+          if(marks){intent.markDecision=marks.decision;if(sh._markSupport)intent.brush={...intent.brush,paths:marks.paths,sizeMm:familyMatch.brushWidthMm,shape:'flat',contact:'side/belly',kind:'explicit middle surface marks'};}
           sh._valuePlan=intent;if(sh._rampVec)intent.rampVec=sh._rampVec;intent.cool=isCoolSky;sh._valuePlan.cool=isCoolSky;sh.firstWash=phase==='light';sh._opening=1;shapes.push(sh);instructions.push({...intent,area:list.length,plannedPigmentMass:total});
         }
         if(shapes.length)layers.push({value:band,pigment,shapes,mix:Array.from({length:k},(_,j)=>j===pigment?1:0),amount:shapes.reduce((s,q)=>s+q.amount*q.area,0)/shapes.reduce((s,q)=>s+q.area,0),area:shapes.reduce((s,q)=>s+q.area,0),_order:{phase:phase==='light'?'ground':phase==='shadow'?'dark':'mid',region:typeof domain==='string'?(regionProfiles.findIndex(p=>p.name===domain)+1||0):Math.abs(domain),shoot:true},_valuePhase:phase});

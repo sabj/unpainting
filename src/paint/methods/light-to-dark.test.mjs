@@ -834,3 +834,145 @@ test('SAM topology uses the existing eight-connected diagonal support',()=>{
  const p=planLightToDark(o),mids=p.layers.filter(l=>l._valuePhase==='mid').flatMap(l=>l.shapes);
  assert.ok(mids.some(s=>s.area===200&&s.mask[25*o.w+75]&&s.mask[35*o.w+85]),'diagonally connected form remains one admissible support');
 });
+
+const familyMarksFixture=()=>({id:'surface',bounds:[0,0,1,1],baseMove:'wet on dry',brushWidthMm:1.2,marks:{kind:'masonry',reason:'source shows selected stone joints',cover:.3,placement:'whole',courseAngleDeg:0}});
+test('family marks allocate only their nominal footprint before optical calibration',async()=>{
+ const {familyMarkClip,familyMarkCharge}=await import('../../../tools/plate/paint.mjs');
+ const family=familyMarksFixture(),o={...samFixture(),formLabels:null,families:[family],smallestBrushMm:1.2};
+ const base=planLightToDark({...o,families:[{id:family.id,bounds:family.bounds,baseMove:family.baseMove}]}),p=planLightToDark(o);
+ assert.deepEqual(samOuter(p),samOuter(base),'unmarked foundations and shadows retain original booking');
+ const marked=p.layers.filter(l=>l._valuePhase==='mid').flatMap(l=>l.shapes).filter(s=>s._valuePlan.markDecision?.status==='accepted');
+ assert.ok(marked.length>0);
+ for(const s of marked){
+  const d=s._valuePlan.markDecision,clip=familyMarkClip(s,o.w,o.h),instruction=p.instructions.find(i=>i.id===s._valuePlan.id);
+  assert.equal(s.mask.reduce((a,v)=>a+v,0),s.area);assert.equal(s.area,d.allocatedArea);
+  assert.ok(d.intentionalGapDemand>0);assert.ok(Math.abs(d.originalDemand-d.allocatedDemand-d.intentionalGapDemand)<1e-10);
+  assert.ok(Math.abs(s.amount*s.area-d.allocatedDemand)<1e-5);assert.equal(instruction.plannedPigmentMass,d.allocatedDemand);
+  assert.equal(clip.reduce((a,v)=>a+v,0),d.originalArea);assert.ok(clip.some((v,i)=>v&&!s.mask[i]),'physical clip does not stencil the nominal footprint');
+  assert.equal(s.mix.filter(v=>v>0).length,1);assert.equal(s._rampVec,undefined);assert.equal(s._strokePlan,undefined);
+  assert.equal(s._valuePlan.move,'wet on dry');assert.equal(s._valuePlan.brush.shape,'flat');
+  assert.equal(familyMarkCharge(s._valuePlan.brush.paths,s.mask,o.w,o.h).under,1);
+ }
+});
+test('family marks reject unfitting children explicitly without changing ordinary geometry or demand',()=>{
+ const family={...familyMarksFixture(),brushWidthMm:100},o={...samFixture(),formLabels:null,families:[family]},base=planLightToDark({...o,families:[{id:family.id,bounds:family.bounds,baseMove:family.baseMove}]}),p=planLightToDark(o);
+ assert.deepEqual(samBooking(p,o.w*o.h,o.k),samBooking(base,o.w*o.h,o.k));assert.deepEqual(samOuter(p),samOuter(base));
+ const rejected=p.instructions.filter(i=>i.markDecision);assert.ok(rejected.length>0);
+ assert.ok(rejected.every(i=>i.markDecision.status==='rejected'&&i.markDecision.intentionalGapDemand===0));
+ for(const l of p.layers)for(const s of l.shapes)assert.equal(s._markSupport,undefined);
+ assert.throws(()=>planLightToDark({...o,families:[{...family,marks:{...family.marks,kind:'typo'}}]}),/surface marks/);
+});
+test('family marks use physical widths at both native densities and preserve the input demand',async()=>{
+ const {allocateFamilyMarks}=await import('./light-to-dark.mjs');
+ for(const width of [1200,2448]){
+  const mm=280/width,w=Math.round(28/mm),h=Math.round(20/mm),mask=new Uint8Array(w*h).fill(1),list=Array.from({length:w*h},(_,i)=>i),G=new Float32Array(w*h).fill(.3),saved=G.slice();
+  const result=allocateFamilyMarks({family:familyMarksFixture(),mask,list,G,w,h,mmPerCell:mm,seedKey:'same-family/b2'});
+  assert.equal(result.decision.status,'accepted');assert.deepEqual(G,saved);
+  for(const path of result.paths)for(const q of path)assert.ok(Math.abs(q.r*2*mm-1.2)<1e-10);
+  const rejected=allocateFamilyMarks({family:familyMarksFixture(),mask,list,G,w,h,mmPerCell:mm,seedKey:'same',eligible:false});assert.equal(rejected.decision.status,'rejected');
+ }
+});
+test('family mark charge never concentrates gaps and accounts for repeated path overlap',async()=>{
+ const {familyMarkCharge}=await import('../../../tools/plate/paint.mjs');
+ const {sweepCount}=await import('../../media/wash.mjs');
+ const w=40,h=30,path=Array.from({length:20},(_,i)=>({x:10+i,y:15,r:2,p:1})),mask=Uint8Array.from(sweepCount([path],w,h),v=>v?1:0);
+ const once=familyMarkCharge([path],mask,w,h),twice=familyMarkCharge([path,path],mask,w,h);
+ assert.equal(once.under,1);assert.equal(twice.under,1);assert.equal(once.cover,1);assert.equal(twice.cover,2);
+ assert.throws(()=>familyMarkCharge([],mask,w,h),/nonempty/);assert.throws(()=>familyMarkCharge([path],new Uint8Array(w*h),w,h),/coverage/);
+});
+test('family mark optical accounting calibrates only allocated cells and keeps outer support',async()=>{
+ const {BOX,physicalPigment}=await import('../../crop/box.mjs');
+ const family=familyMarksFixture(),o={...samFixture(),formLabels:null,pigments:['ochre','ultramarine'].map(k=>physicalPigment(BOX.find(p=>p.key===k))),paperRGB:[252,251,248],massTone:true,families:[family]};
+ const p=planLightToDark(o),base=planLightToDark({...o,demand:o.demand.slice(),families:[{id:family.id,bounds:family.bounds,baseMove:family.baseMove}]});
+ const geometry=p=>p.layers.filter(l=>l._valuePhase!=='mid').map(l=>l.shapes.map(s=>Buffer.from(s.mask).toString('hex')));
+ assert.deepEqual(geometry(p),geometry(base));
+ for(const l of p.layers)for(const s of l.shapes)if(s._markSupport)assert.ok(Math.abs(s.amount*s.area/(s._tone??1)-s._valuePlan.markDecision.allocatedDemand)<1e-5,'raw allocation precedes optical strength');
+});
+test('family marks retain separate physical support through the actual plan cache',async()=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const {cachedStep}=await import('../run-cache.mjs'),{familyMarkClip}=await import('../../../tools/plate/paint.mjs');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'family-mark-cache-'));
+ try{
+  const o={...samFixture(),formLabels:null,families:[familyMarksFixture()]},track={start(){},stop(){return []},current(){return null},replay(){}};
+  const options={dir,name:'plan',code:'family-mark-test',track,inputs:o};
+  let calls=0;const compute=async()=>{calls++;return planLightToDark(o);};
+  const a=await cachedStep(options,compute),b=await cachedStep({...options,inputs:{...samFixture(),formLabels:null,families:[familyMarksFixture()]}},compute);assert.equal(calls,1);
+  assert.equal(b.cached,true);
+  for(let j=0;j<a.value.layers.length;j++)for(let k=0;k<a.value.layers[j].shapes.length;k++){
+   const x=a.value.layers[j].shapes[k],y=b.value.layers[j].shapes[k];assert.deepEqual(y.mask,x.mask);
+   if(x._markSupport){assert.deepEqual(familyMarkClip(y,o.w,o.h),familyMarkClip(x,o.w,o.h));assert.deepEqual(y._valuePlan.brush.paths,x._valuePlan.brush.paths);}
+  }
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('family marks use the production expected-ledger loop without crediting intentional gaps',async()=>{
+ const fs=await import('node:fs'),{familyMarkClip}=await import('../../../tools/plate/paint.mjs');
+ const p=planLightToDark({...samFixture(),formLabels:null,families:[familyMarksFixture()]}),sh=p.layers.flatMap(l=>l.shapes).find(s=>s._markSupport),w=sh.w,h=sh.ids.length/w;
+ const source=fs.readFileSync(new URL('../../../tools/plate/paint.mjs',import.meta.url),'utf8'),start=source.indexOf('    for (let y = mb.y0;',source.indexOf('if(sh._authoredDose)')),end=source.indexOf('\n  }\n  if(ctx.VALUE_PLAN)',start);
+ assert.ok(start>0&&end>start);
+ const expected=new Float64Array(w*h*2);
+ new Function('mb','w','m','sk','P','expected','mix','share','DELIVERY','TECH_CAL','sh','const gr=null,amt=0;'+source.slice(start,end))(sh.box,w,sh.mask,null,2,expected,sh.mix,1,null,null,sh);
+ const clip=familyMarkClip(sh,w,h);let mass=0,gaps=0;
+ for(let i=0;i<clip.length;i++)for(let j=0;j<2;j++){mass+=expected[i*2+j];if(clip[i]&&!sh.mask[i]){gaps++;assert.equal(expected[i*2+j],0);}}
+ assert.ok(gaps>0);assert.ok(Math.abs(mass-sh.amount*sh.area)<1e-6);
+});
+test('family mark seeds vary child geometry but retain cross-pan registration',async()=>{
+ const {allocateFamilyMarks}=await import('./light-to-dark.mjs');const w=140,h=60;
+ const make=(x0,charge)=>{const mask=Uint8Array.from({length:w*h},(_,i)=>i%w>=x0&&i%w<x0+50&&Math.floor(i/w)>=5&&Math.floor(i/w)<55?1:0),list=Array.from({length:w*h},(_,i)=>i).filter(i=>mask[i]);return allocateFamilyMarks({family:familyMarksFixture(),mask,list,G:new Float32Array(w*h).fill(charge),w,h,mmPerCell:.2,seedKey:'family/b2'}).paths;};
+ assert.deepEqual(make(5,.2),make(5,.4),'pigment amount does not change shared geometry');
+ const relative=(paths,x)=>paths.map(ps=>ps.map(q=>({...q,x:Math.round((q.x-x)*1e9)/1e9})));
+ assert.notDeepEqual(relative(make(5,.2),5),relative(make(75,.2),75),'translated children do not repeat one random pattern');
+});
+test('family marks preserve protected paper and reject below-kit source widths',async()=>{
+ const {familyMarkClip}=await import('../../../tools/plate/paint.mjs');const o=samFixture(),hold=new Uint8Array(o.w*o.h);hold[40*o.w+60]=1;
+ const plan=planLightToDark({...o,formLabels:null,hold,families:[familyMarksFixture()],smallestBrushMm:1.2});
+ const shapes=plan.layers.flatMap(l=>l.shapes).filter(s=>s._markSupport);assert.ok(shapes.length);
+ for(const sh of shapes){const clip=familyMarkClip(sh,o.w,o.h);for(let i=0;i<clip.length;i++)if(plan.protectedCells[i]){assert.equal(clip[i],0);assert.equal(sh.mask[i],0);}}
+ for(const width of [.5,.65]){const p=planLightToDark({...samFixture(),formLabels:null,families:[{...familyMarksFixture(),brushWidthMm:width}],smallestBrushMm:1.2});const decisions=p.instructions.filter(i=>i.markDecision).map(i=>i.markDecision);assert.ok(decisions.length);assert.ok(decisions.every(d=>d.status==='rejected'));}
+});
+
+test('family marks execute the real numeric paint path with original clip and no empty rescue',{timeout:120000},async()=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path'),url=await import('node:url'),{execFileSync}=await import('node:child_process'),sharp=(await import('sharp')).default;
+ const root=url.fileURLToPath(new URL('../../../',import.meta.url)),dir=fs.mkdtempSync(path.join(os.tmpdir(),'family-marks-paint-'));
+ try{
+  await sharp(Buffer.from('<svg width="64" height="48"><rect width="64" height="48" fill="#a78c69"/><rect x="4" y="4" width="20" height="16" fill="#dfbb7c"/><rect x="37" y="22" width="22" height="21" fill="#735b4b"/></svg>')).png().toFile(path.join(dir,'target.png'));
+  fs.writeFileSync(path.join(dir,'plan.json'),JSON.stringify({families:[familyMarksFixture()]}));
+  // Synthetic CPU integration: segmentation is not under test; no native-quality claim.
+  let script=String.raw`import './tools/plate/load-order.mjs';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {setup} from './tools/plate/setup.mjs';
+import {plan} from './tools/plate/plan.mjs';
+import {sheetAndBrushes} from './tools/plate/sheet.mjs';
+import {penPlan} from './tools/plate/pen.mjs';
+import {drawing} from './tools/plate/drawing.mjs';
+import {paint,familyMarkClip} from './tools/plate/paint.mjs';
+import {createJSONLWriter} from './tools/painter/jsonl-writer.mjs';
+const dir=process.env.FAMILY_MARK_TEST_DIR;
+process.argv=[process.execPath,import.meta.filename,'--recipe','none','--image',dir+'/target.png','--valueplan',dir+'/plan.json','--width','64','--scale','1','--sheetmm','16','--palettewide','1','--physical','1','--order','painter','--shapedmarks','1','--midlayers','2','--drawing','none','--linesource','none','--sourcelines','0','--texture','0','--mode','fast','--video','0','--frames','0','--gpu','off','--threads','1','--segments','off','--runcache','0','--allowdirty','1','--out',dir+'/out'];
+const JSONL=createJSONLWriter(),ctx={WASH_FLAT_SPLAY:.03,ENTRY_FILE:new URL('./tools/paint-plate.mjs',import.meta.url).pathname,JSONL,sheet:null};
+try{
+ await setup(ctx);await plan(ctx);await sheetAndBrushes(ctx);await penPlan(ctx);await drawing(ctx);
+ const layer=ctx.layers.find(l=>l.shapes.some(s=>s._markSupport));assert.ok(layer,'actual setup produced accepted marks');const sh=layer.shapes.find(s=>s._markSupport),clip=familyMarkClip(sh,ctx.w,ctx.h),allocation=sh.mask.slice();ctx.layers=[{...layer,shapes:[sh]}];
+ const realClip=ctx.setClip,realStroke=ctx.stroke;let clipMatched=false,strokes=0;
+ ctx.setClip=(sheet,m,...args)=>{if(m&&m.length===clip.length&&m.every((v,i)=>v===clip[i]))clipMatched=true;return realClip(sheet,m,...args);};
+ ctx.stroke=(...args)=>{strokes++;return realStroke(...args);};
+ const savedPaths=sh._valuePlan.brush.paths;sh._valuePlan.brush.paths=[];
+ await assert.rejects(()=>paint(ctx),/empty-path rescue/);assert.equal(strokes,0,'empty accepted paths cannot execute rescue');
+ sh._valuePlan.brush.paths=savedPaths;await paint(ctx);JSONL.flush();
+ const records=fs.readFileSync(dir+'/out/value-commands.jsonl','utf8').trim().split('\n').map(JSON.parse),charges=records.filter(r=>r.kind==='family-mark-charge');
+ assert.ok(clipMatched);assert.ok(strokes>0);assert.ok(charges.length);assert.ok(charges.every(r=>r.under===1&&r.overlap>=1));
+ for(let i=0;i<allocation.length;i++)if(clip[i]&&!allocation[i])for(let j=0;j<ctx.PIGS.length;j++)assert.equal(ctx.expected[i*ctx.PIGS.length+j],0);
+ fs.writeFileSync(dir+'/proof.json',JSON.stringify({realPaint:true,backend:'cpu',width:64,selectedShapes:1,clipMatched,noEmptyRescue:true,strokes,charges:charges.length,under:charges[0].under,scope:'actual numeric paint integration; not native-density coupon or visual acceptance'},null,2));
+ console.log('REAL_PAINT_INTEGRATION_PASS');
+}finally{ctx.sheet?._gpu?.close();JSONL.close();}
+process.exit(0);
+`;
+  const toolsURL=url.pathToFileURL(path.join(root,'tools')+path.sep).href;
+  script=script.replaceAll("'./tools/","'"+toolsURL);
+  const runner=path.join(dir,'run.mjs');fs.writeFileSync(runner,script);
+  try{execFileSync(process.execPath,[runner],{cwd:root,env:{...process.env,FAMILY_MARK_TEST_DIR:dir},encoding:'utf8',timeout:110000,maxBuffer:4*1024*1024});}
+  catch(e){throw Error(String(e.stdout??'').slice(-2500)+String(e.stderr??'').slice(-2500));}
+  const proof=JSON.parse(fs.readFileSync(path.join(dir,'proof.json'),'utf8'));
+  assert.equal(proof.realPaint,true);assert.equal(proof.clipMatched,true);assert.equal(proof.noEmptyRescue,true);assert.equal(proof.under,1);assert.ok(proof.strokes>0&&proof.charges>0);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});

@@ -84,7 +84,7 @@
         "routes": [
           "bench"
         ],
-        "subjects": "mittens (pencil), trumbull (none), dog-paint (none)"
+        "subjects": "mittens (pencil), dog-paint (none), sargent (none)"
       },
       "ran_if": [
         {
@@ -599,7 +599,7 @@
     "hills": "pen",
     "south-france": "pen",
     "sargent": "none",
-    "trumbull": "none",
+    "trumbull": "pen",
     "mittens": "pencil",
     "h36a": "pen",
     "h34a": "pen",

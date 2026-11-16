@@ -229,3 +229,25 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 `subjects` is a list of `{id, families: [family ids]}` or `{id, bounds: [[x0, y0, x1, y1]]}`, with an optional `{"id": "rest"}`. `strength` from 0 to 1 holds later subjects back while each stays light to dark. It defaults to 0.5 with subjects. Without `order`, every band goes across the whole sheet. A top-level `subjectOrder` list is read the same way when `order.subjects` is absent. [What a plan is](plans.md) describes the subject-order outputs.
 
 The painter compiles every target-derived path and mask before the strict target guard seals the target. It records the resolved plan and any command-line overrides in `pipeline-plan.json`.
+
+### Explicit family surface marks in middle passages
+
+A value-plan family may request `marks` and a positive physical `brushWidthMm`:
+
+```json
+{"id":"stone","bounds":[0,0,1,1],"baseMove":"wet on dry","brushWidthMm":1.2,
+ "marks":{"kind":"masonry","reason":"selected joints visible in the source",
+          "cover":0.3,"placement":"whole","courseAngleDeg":0}}
+```
+
+The source planner must choose the family, kind and direction; the painter does not infer them from the subject or SAM label. `kind` uses the existing surface-mark library: `short-coat`, `long-hair`, `curly-coat`, or `masonry`. All require `reason`, `cover` in `(0,1]`, and `placement` (`edge` or `whole`). Hair kinds require normalized source `flow` points; masonry requires `courseAngleDeg` in `[-45,45]`.
+
+Only shaped middle passages use the request. Foundations and shadow support remain unchanged. The bounded bridge retains the existing flat physical brush and an explicitly wet-on-dry family; incompatible material/style, carry mode, undersized brushes or unfitting children retain their original passage with a serialized rejection reason. Malformed requests fail. Accepted paths cannot silently become rescue dabs. Accepted marks override automatic brush-choice/stroke-plan geometry for that child.
+
+Before optical calibration, the planner allocates this pan's demand only to the nominal swept footprint inside the original support. Each pass records original, allocated and intentional-gap demand. The accounting mask, area and expected ledger use the allocated footprint; the physical clip remains the original connected support, so it does not stencil each mark. Intentional gaps receive no ledger credit and no undercoverage boost. An explicit aggregate overlap divisor prevents repeated nominal footprints from increasing the booking. These are planned expectations, not measured pigment deposition.
+
+Optical strength is computed over the allocation only. Later shadow charges may consequently change even though their geometry does not. The existing material swatch is an estimate for these gestures; physical delivery must be measured on a paired coupon at native1200/2448 density before a frozen scene comparison. No exact-mass or quality claim follows from allocation arithmetic.
+
+Initial execution requires native scale (`--scale 1`), physical brushes and untrimmed numeric supports. Budgets, diagnostic clipping, competing passage ownership or added automatic texture are incompatible and fail before executing accepted marks. The existing source seal remains in force; only frozen paths and derived geometry reach painting.
+
+The default physical kit minimum is1.2mm. Source plans requesting0.5–0.65mm marks are explicitly rejected for those children; this bridge never lowers the kit floor to make a source proposal fit. Identical supports across pans share mark geometry, while different child supports seed different patterns. Marks always normalize overlap, unlike ordinary passages with the default `cover=0`; record this distinction in paired comparisons.
