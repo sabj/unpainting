@@ -42,8 +42,7 @@ export function localPans(D, w, h, pigments, paper, { families = 24, partition =
     }
     // ownPans (a mass plan): a mass is one puddle, and its colour varies wet inside it: each cell takes its own share of
     // every pan in the puddle, the greying one included, so a warm face and a grey coat in one mass keep their colours
-    const darkShadow = Math.max(...rgb) < 110;
-    const parts = greying.length && !ownPans && !darkShadow ? [pick.indices.map((j, q) => [j, pick.shares[q]]), ...nearPans.map(j => [[j, 1]])] : (greying.length ? pick.indices : nearPans).map(j => [[j, 1]]);
+    const parts = greying.length && !ownPans ? [pick.indices.map((j, q) => [j, pick.shares[q]]), ...nearPans.map(j => [[j, 1]])] : nearPans.map(j => [[j, 1]]);
     const dirs = parts.map(part => [0, 1, 2].map(c => part.reduce((t, [j, f]) => t + f * Ks[j][c], 0)));
     const m = parts.length, a = unmix(sub, cells.length, dirs);
     cells.forEach((i, q) => { for (let p = 0; p < m; p++) for (const [j, f] of parts[p]) A[i * k + j] += f * a[q * m + p]; });
