@@ -21,7 +21,7 @@ function boxMean(src, w, h, r) {
 // A region whose frame contact is at least this share of its own outline is part of the setting, not a form inside
 // the picture: the same rule, and the same share, as the foreground flag tools/seg/sam_regions.py writes
 // (FOREGROUND_FRAME). Measured here from the region's own mask so a map without the flag is judged the same way.
-export const FRAME_SHARE = 0.12;
+const FRAME_SHARE = 0.12;
 
 /**
  * Mask of the picture's foreground forms (faces, heads, figures, animals, buildings), so detail-scaled shapes stay inside
