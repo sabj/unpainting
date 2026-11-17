@@ -120,6 +120,7 @@ test('the default recipe carries the technique rules: seams on colour edges, iso
   assert.equal(value('--detailseg'), '1');
   assert.equal(value('--brushchoice'), '1');
   assert.equal(value('--pigshare'), '0.1');
+  assert.equal(value('--paperrule'), '1');
   assert.equal(value('--washjoin'), '1');
   assert.equal(value('--undercover'), '0');
 });
