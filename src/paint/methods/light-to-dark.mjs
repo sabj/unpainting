@@ -178,7 +178,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   const referenceTest=lightRef?(paperDelta==null?paperLightTest(lightRef.lightRef):(pixels,i)=>isPaperLight(pixels,i,lightRef.lightRef,paperDelta)):null;
   const sheetToned=Boolean(paperRGB&&(paperRGB[0]-paperRGB[2]>=15||.2126*paperRGB[0]+.7152*paperRGB[1]+.0722*paperRGB[2]<242));
   let paper=paperLights&&rgb&&!lightRef?estimatePaper(rgb,w,h,density):null;
-  if(paper&&!lightRef&&!sheetToned){const [pL,pa,pb]=labOf(Uint8ClampedArray.from(paper.rgb),0,[255,255,255]);if(pL<90||Math.hypot(pa,pb)>24)paper=null;}
+  if(paper&&!lightRef&&!sheetToned){const [pL,pa,pb]=labOf(Uint8ClampedArray.from(paper.rgb),0,[255,255,255]);if(pL<90||Math.hypot(pa,pb)>(paperRGB?8:24))paper=null;}
   if(paperLights&&lightRef){let total=0,cells=0;for(let i=0;i<n;i++)if(referenceTest(rgb,i)){total+=density[i];cells++;}paper={rgb:lightRef.sheet,density:cells?total/cells:0,cells};}
   const value=targetValueMap(paper?Float32Array.from(density,v=>Math.max(0,v-paper.density)):density),region=targetRegions({w,h,rgb,demand,k,density,families}),protectedCells=Uint8Array.from({length:n},(_,i)=>hold?.[i]?1:0);
   validateReserves(reserves);
@@ -198,9 +198,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     PAP = [...paperRGB];
   }
   const [papL,papA,papB]=PAP?labOf(Uint8ClampedArray.from(PAP),0,[255,255,255]):[0,0,0];
-  const tonedPap = Boolean(PAP && (sheetToned || (papL >= 90 && Math.hypot(papA, papB) <= 24)) && PAP[0] - PAP[2] >= 18 && 252 - PAP[2] >= 20);
-  const papTol = tonedPap ? [14, 14, 18] : [9, 9, 12];
-  const papDark = Boolean(PAP && (0.2126 * PAP[0] + 0.7152 * PAP[1] + 0.0722 * PAP[2] < 180 || PAP[0] < 180 || PAP[1] < 200 || PAP[2] < 145 || (!sheetToned && (papL < 90 || Math.hypot(papA, papB) > 24))));
+  const tonedPap = Boolean(PAP && (sheetToned || (!paperRGB && papL >= 90 && Math.hypot(papA, papB) <= 24)) && PAP[0] - PAP[2] >= 18 && 252 - PAP[2] >= 20);
+  const papTol = tonedPap ? [14, 14, 18] : [6, 6, 8];
+  const papMismatch = Boolean(PAP && paperRGB && !sheetToned && Math.max(Math.abs(PAP[0] - paperRGB[0]), Math.abs(PAP[1] - paperRGB[1]), Math.abs(PAP[2] - paperRGB[2])) > 16);
+  const papDark = Boolean(PAP && (papMismatch || 0.2126 * PAP[0] + 0.7152 * PAP[1] + 0.0722 * PAP[2] < 180 || PAP[0] < 180 || PAP[1] < 200 || PAP[2] < 145 || (!sheetToned && (papL < 90 || Math.hypot(papA, papB) > 24))));
   const inferred = Uint8Array.from({ length: n }, (_, i) => {
     if (hold?.[i] || paleHold?.[i]) return 1;
     if(referenceTest)return referenceTest(rgb,i)?1:0;

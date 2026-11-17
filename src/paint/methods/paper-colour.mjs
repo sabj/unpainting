@@ -24,6 +24,7 @@ export const PAPER_RULE = Object.freeze({
   minL: 75,               // paper is light
   maxChroma: 24,          // and near neutral
   minHighlightL: 90,      // highlights on a crop without visible paper must be light
+  maxHighlightChroma: 8,  // and neutral enough for a white sheet (yellow-ochre stone or cream is a pale wash, not bare white paper)
   toleranceL: 5,          // a cell this far below the paper in L* is still bare paper (one tea glaze)...
   toleranceC: 6,          // ...when it is no more than this much more chromatic than the paper (delta E > 5 is a different colour)...
   fullToleranceL: 85,     // ...at the full L* tolerance on a sheet this light or lighter...
@@ -110,8 +111,8 @@ export function sheetColour(rgb, w, h, opts = {}) {
  * The reference colours for paper and lights. Returns { sheet, lightRef, detected, fallback, reason }.
  * - When the target shows a visible sheet (pass across border and area), both sheet and lights follow that sheet.
  * - When no sheet shows (a crop painted edge-to-edge), the plate is painted on white paper (WHITE_SHEET), while
- *   reserved lights fall back to the lightest tenth of the target when that material is light (L* >= 90) and near-neutral
- *   (chroma <= 24); otherwise lights require true near-white cells (WHITE_SHEET).
+ *   reserved lights fall back to the lightest tenth of the target when that material is light (L* >= 90) and neutral
+ *   enough for a white sheet (chroma <= maxHighlightChroma = 8); otherwise lights require true near-white cells (WHITE_SHEET).
  */
 export function paperLightReference(rgb, w, h, paperRGB = null, opts = {}) {
   const o = { ...PAPER_RULE, ...opts };
@@ -124,8 +125,8 @@ export function paperLightReference(rgb, w, h, paperRGB = null, opts = {}) {
     if (rgbArr.every((v, j) => v === WHITE_SHEET[j])) {
       const lt = lightestTenth(rgb, w, h);
       const [L, a, b] = labOfColour(lt), chroma = Math.hypot(a, b);
-      const minHighlightL = o.minHighlightL ?? 90;
-      if (L >= minHighlightL && chroma <= o.maxChroma) {
+      const minHighlightL = o.minHighlightL ?? 90, maxHighlightChroma = o.maxHighlightChroma ?? 8;
+      if (L >= minHighlightL && chroma <= maxHighlightChroma) {
         const ref = lt.map(v => Math.round(v));
         return {
           sheet: rgbArr,
@@ -143,8 +144,8 @@ export function paperLightReference(rgb, w, h, paperRGB = null, opts = {}) {
   }
   const lt = lightestTenth(rgb, w, h);
   const [L, a, b] = labOfColour(lt), chroma = Math.hypot(a, b);
-  const minHighlightL = o.minHighlightL ?? 90;
-  if (L >= minHighlightL && chroma <= o.maxChroma) {
+  const minHighlightL = o.minHighlightL ?? 90, maxHighlightChroma = o.maxHighlightChroma ?? 8;
+  if (L >= minHighlightL && chroma <= maxHighlightChroma) {
     const ref = lt.map(v => Math.round(v));
     return {
       sheet: [...WHITE_SHEET],
