@@ -97,6 +97,23 @@ test('trace pans, three primaries: a neutral keeps all three and a greying trace
   assert.ok(e < 1, `orange moved dE00 ${e.toFixed(2)}`);
 });
 
+test('trace pans, Caratheodory bound: 6 collinear pans each holding 15-20% reduce to at most 3 pans per cell', () => {
+  // Simulates unmix spreading a brown/dark across all 6 pans so every pan has share >= 0.10.
+  const W = 20, N = W * W, d = new Float32Array(N * k);
+  for (let i = 0; i < N; i++) {
+    d[i * k + 0] = 0.25; d[i * k + 1] = 0.22; d[i * k + 2] = 0.20;
+    d[i * k + 3] = 0.28; d[i * k + 4] = 0.24; d[i * k + 5] = 0.21;
+  }
+  const r = pruneTracePans(d, k, 0.1, { pigments: PIGS, w: W, h: W, radius: 2 });
+  for (let i = 0; i < N; i++) {
+    let kept = 0;
+    for (let j = 0; j < k; j++) if (r.demand[i * k + j] > 0) kept++;
+    assert.ok(kept >= 1 && kept <= 3, `cell ${i} kept ${kept} pans (Caratheodory bound <= 3)`);
+    const e = deltaE2000(labOf(filmRGB(d.subarray(i * k, i * k + k)), 0, PAPER), labOf(filmRGB(r.demand.subarray(i * k, i * k + k)), 0, PAPER));
+    assert.ok(e < 1.5, `cell ${i} colour shift dE00 ${e.toFixed(2)}`);
+  }
+});
+
 test('trace pans, squinted: neighbours share pans and no cell visibly changes colour', () => {
   const r = pruneTracePans(demand, k, 0.1, { pigments: PIGS, w, h, radius: 2 });
   let sum = 0, worst = 0, count = 0;
