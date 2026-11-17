@@ -4,8 +4,8 @@
 // A painter changes brush and mark size with the detail an area holds. Here the minimum shape shrinks where the
 // target holds mid-scale structure (features 1 to 3 mm across), measured from the value field alone, so busy
 // areas keep their small planes and broad areas keep their broad washes. When SAM segments are given (--detailseg 1),
-// the detail scaling is confined to compact, interior foreground segments with high feature density (such as faces and
-// hands), leaving coats, foliage and ground as broad washes. Planning only.
+// the detail scaling is confined to foreground forms with high feature density (faces, heads, figures, animals; see
+// segmentDetailMask), leaving the setting's coats, foliage, skies and ground as broad washes. Planning only.
 
 function boxMean(src, w, h, r) {
   let a = Float32Array.from(src);
@@ -18,28 +18,38 @@ function boxMean(src, w, h, r) {
   return a;
 }
 
+// A region whose frame contact is at least this share of its own outline is part of the setting, not a form inside
+// the picture: the same rule, and the same share, as the foreground flag tools/seg/sam_regions.py writes
+// (FOREGROUND_FRAME). Measured here from the region's own mask so a map without the flag is judged the same way.
+export const FRAME_SHARE = 0.12;
+
 /**
- * Mask of compact, non-border foreground segments with high 1 to 3 mm feature detail and warmth (faces, hands, focal
- * heads), so detail-scaled shapes do not break background coats or foliage into speckle.
+ * Mask of the foreground forms whose 1 to 3 mm feature detail is high (faces, eyes, heads, figures, animals), so
+ * detail-scaled shapes stay inside them and do not break a background coat, sky or ground into speckle. A region
+ * qualifies when it is flagged foreground, touches the picture's frame along under FRAME_SHARE of its outline, holds at
+ * least `minArea` of the sheet and has a mean detail of at least `minDetail`. Colour and size do not count: a grey cat,
+ * a black dog or a blue coat is as much a subject as a face, and a portrait's head may fill a third of the sheet.
+ * Inside an accepted form the detail field still decides cell by cell how far the minimum shape shrinks.
+ * @returns {Uint8Array} the mask, with `.regions` the ids accepted
  */
-export function segmentDetailMask(seg, rgb, detail, w, h, { minDetail = 0.55, minWarm = 12, minArea = 0.001, maxArea = 0.1, maxSpan = 0.45 } = {}) {
-  const n = w * h, out = new Uint8Array(n);
+export function segmentDetailMask(seg, detail, w, h, { minDetail = 0.55, minArea = 0.001 } = {}) {
+  const n = w * h, out = new Uint8Array(n), accepted = [];
+  out.regions = accepted;
   if (!seg?.regions?.length) return out;
-  const spanCap = maxSpan * Math.max(w, h);
   for (const r of seg.regions) {
-    if (!r.foreground || r.area < minArea || r.area > maxArea) continue;
-    let x0 = w, y0 = h, x1 = 0, y1 = 0, warm = 0, det = 0, cnt = 0;
+    if (!r.foreground || r.area < minArea) continue;
+    let det = 0, cnt = 0, outline = 0, frame = 0;
     for (let i = 0; i < n; i++) if (r.mask[i]) {
       const x = i % w, y = (i / w) | 0;
-      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
-      if (rgb) warm += rgb[3 * i] - rgb[3 * i + 2];
-      det += detail[i];
-      cnt++;
+      det += detail[i]; cnt++;
+      // Outline edges: each side of the cell that is the frame or a cell outside the region.
+      const sides = [x === 0 || !r.mask[i - 1], x === w - 1 || !r.mask[i + 1], y === 0 || !r.mask[i - w], y === h - 1 || !r.mask[i + w]];
+      const onFrame = [x === 0, x === w - 1, y === 0, y === h - 1];
+      for (let s = 0; s < 4; s++) if (sides[s]) { outline++; if (onFrame[s]) frame++; }
     }
-    if (!cnt || x0 === 0 || y0 === 0 || x1 === w - 1 || y1 === h - 1) continue;
-    if (Math.max(x1 - x0, y1 - y0) > spanCap) continue;
-    if (det / cnt < minDetail || (rgb && warm / cnt < minWarm)) continue;
+    if (!cnt || frame >= FRAME_SHARE * outline || det / cnt < minDetail) continue;
     for (let i = 0; i < n; i++) if (r.mask[i]) out[i] = 1;
+    accepted.push(r.id);
   }
   return out;
 }

@@ -32,10 +32,33 @@ test('segmentDetailMask picks compact warm foreground feature regions and skips 
     { id: 1, foreground: true, area: 16 * 16 / n, mask: faceMask },
     { id: 2, foreground: true, area: 40 * H / n, mask: coatMask },
   ] };
-  const m = segmentDetailMask(seg, rgb, d0, W, H);
+  const m = segmentDetailMask(seg, d0, W, H);
   assert.equal(m[18 * W + 58], 1, 'compact interior feature region kept');
   assert.equal(m[5 * W + 58], 0, 'border-spanning coat skipped');
   const dSeg = detailField(values, W, H, CELL, m);
   assert.ok(dSeg[18 * W + 58] > 0.5);
   assert.equal(dSeg[5 * W + 58], 0);
+});
+
+// A focal form is a subject whatever its colour and size, and touching the frame a little does not make it the setting.
+test('segmentDetailMask keeps a cool, large focal form that touches one edge, and skips the setting', () => {
+  const d0 = detailField(values, W, H, CELL), n = W * H;
+  // A grey-blue animal filling the right half, its neck running off the bottom edge: a third of the sheet.
+  const animal = new Uint8Array(n), ground = new Uint8Array(n), flat = new Uint8Array(n);
+  for (let y = 6; y < 34; y++) for (let x = 42; x < 78; x++) animal[y * W + x] = 1;
+  for (let y = 34; y < H; y++) for (let x = 56; x < 64; x++) animal[y * W + x] = 1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < 40; x++) ground[y * W + x] = 1;
+  for (let y = 10; y < 30; y++) for (let x = 10; x < 30; x++) flat[y * W + x] = 1;
+  const area = m => m.reduce((a, v) => a + v, 0) / n;
+  const seg = { regions: [
+    { id: 1, foreground: true, area: area(animal), mask: animal },
+    { id: 2, foreground: true, area: area(ground), mask: ground },
+    { id: 3, foreground: true, area: area(flat), mask: flat },
+    { id: 4, foreground: false, area: area(animal), mask: animal },
+  ] };
+  const m = segmentDetailMask(seg, d0, W, H);
+  assert.deepEqual(m.regions, [1], 'the animal; not the frame-spanning ground, the even-wash patch or an unflagged copy');
+  assert.ok(area(animal) > 0.3);
+  assert.equal(m[20 * W + 60], 1);
+  assert.equal(m[20 * W + 20], 0);
 });

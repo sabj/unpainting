@@ -215,7 +215,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   if(paper&&!lightRef)for(let i=0;i<n;i++){let d=0;for(let q=0;q<3;q++)d=Math.max(d,Math.abs(rgb[3*i+q]-paper.rgb[q]));if(d<=(paperDelta??10))inferred[i]=1;}
   // detailScale k (detail-scale.mjs): the minimum shape shrinks with the target's mid-scale detail, down to share 1-k.
   const DETAIL0=detailScale>0?detailField(value.values,w,h,sheetWidthMm/w):null;
-  const DETAIL=DETAIL0&&detailSegments?detailField(value.values,w,h,sheetWidthMm/w,segmentDetailMask(detailSegments,rgb,DETAIL0,w,h)):DETAIL0;
+  // detailSegments: the scaling stays inside the focal foreground forms; the log says how much of the sheet that is.
+  const FOCAL=DETAIL0&&detailSegments?segmentDetailMask(detailSegments,DETAIL0,w,h):null;let detailReport=null;
+  if(FOCAL){let c=0;for(let i=0;i<n;i++)c+=FOCAL[i];detailReport={focalSegments:FOCAL.regions.length,focalShare:c/n};console.log(`detail scale: ${FOCAL.regions.length} focal segments, ${(100*c/n).toFixed(1)}% of the sheet${c?'':'; none qualified, so the minimum shape is the same everywhere'}`);}
+  const DETAIL=FOCAL?detailField(value.values,w,h,sheetWidthMm/w,FOCAL):DETAIL0;
   const closedInferred=closeLocal(inferred,w,h,1);
   const lights=removeSmall(closedInferred,w,h,minShape);
   const cc=components(closedInferred,w,h),compCells=Array.from({length:cc.count+1},()=>[]);
@@ -604,7 +607,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   if(TONE)console.log(`mass tone: ${instructions.length} washes charged at a mean ${(toneSum/Math.max(1,toneArea)).toFixed(3)} of their cells' mean paint (by area)`);
   const paintDetails=(shaped&&paintdetails)?appendPaintDetails({layers,instructions,demand,k,w,h,value,protectedCells,minShape,sheetWidthMm,region}):null;
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
-  return {paintDetails,opticsReport,traceReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
+  return {paintDetails,opticsReport,traceReport,detailReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
   // An authored dry contact takes precedence over phase, calibration and style defaults.
