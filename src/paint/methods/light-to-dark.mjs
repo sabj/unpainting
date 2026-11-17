@@ -6,6 +6,7 @@ import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {matchCellLight,createMassTone} from './mass-tone.mjs';
 import {pruneTracePans} from './trace-pans.mjs';
+import {washStats} from './wash-stats.mjs';
 import {paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mjs';
 import {normalizeWashWeights} from './wash-weights.mjs';
 import {reserveLights,validateReserves,brushFootprintCells} from './light-reserves.mjs';
@@ -216,7 +217,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // detailScale k (detail-scale.mjs): the minimum shape shrinks with the target's mid-scale detail, down to share 1-k.
   const DETAIL0=detailScale>0?detailField(value.values,w,h,sheetWidthMm/w):null;
   // detailSegments: the scaling stays inside the focal foreground forms; the log says how much of the sheet that is.
-  const FOCAL=DETAIL0&&detailSegments?segmentDetailMask(detailSegments,DETAIL0,w,h):null;let detailReport=null;
+  const FOCAL=DETAIL0&&detailSegments?segmentDetailMask(detailSegments,w,h):null;let detailReport=null;
   if(FOCAL){let c=0;for(let i=0;i<n;i++)c+=FOCAL[i];detailReport={focalSegments:FOCAL.regions.length,focalShare:c/n};console.log(`detail scale: ${FOCAL.regions.length} focal segments, ${(100*c/n).toFixed(1)}% of the sheet${c?'':'; none qualified, so the minimum shape is the same everywhere'}`);}
   const DETAIL=FOCAL?detailField(value.values,w,h,sheetWidthMm/w,FOCAL):DETAIL0;
   const closedInferred=closeLocal(inferred,w,h,1);
@@ -419,9 +420,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,carried=placed,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>carry[pigment][i];
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=puddles?(stepShape.slab[i]===pigment?cellMass[i]:0):demand[i*k+pigment];if(puddles&&!fitted)continue;if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
         const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(shaped&&G[i]<=1e-8)mask[i]=0;if(elig)elig[i]=mask[i]&&step.wt[i]>0&&G[i]>1e-8?1:0;if(tracePruned&&!puddles&&!step.pig&&mask[i]&&tracePruned[i*k+pigment])mask[i]=0;}
-      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,minShape);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
+      const dropped=i=>tracePruned&&!puddles&&tracePruned[i*k+pigment];
+      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&!dropped(i)&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,minShape);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       if(elig){const g=Float32Array.from(G,(v,i)=>v+carryAt(i)),sm=boxMeanValue(g,w,h,Math.max(1,Math.round(maskMm/(sheetWidthMm/w))));for(let i=0;i<n;i++)mask[i]=elig[i]&&sm[i]>1e-8?1:0;}
-      if(carried&&shaped&&phase!=='light'&&holeFill){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(phase!=='shadow'||shadowMask[i])&&step.wt[i]>0?1:0),big=removeSmall(hole,w,h,Math.round(minShape*holeFill));for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
+      if(carried&&shaped&&phase!=='light'&&holeFill){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&!dropped(i)&&(phase!=='shadow'||shadowMask[i])&&step.wt[i]>0?1:0),big=removeSmall(hole,w,h,Math.round(minShape*holeFill));for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // Middle local colors belong to regions. Shadow connectivity ignores ownership boundaries.
       // midDomains=false: a middle plane follows the target value, not the colour-cluster boundary,
       // so smooth skin is not split into flat posterized patches along invisible cluster lines.
@@ -607,7 +609,8 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   if(TONE)console.log(`mass tone: ${instructions.length} washes charged at a mean ${(toneSum/Math.max(1,toneArea)).toFixed(3)} of their cells' mean paint (by area)`);
   const paintDetails=(shaped&&paintdetails)?appendPaintDetails({layers,instructions,demand,k,w,h,value,protectedCells,minShape,sheetWidthMm,region}):null;
   const lightComponents=components(protectedCells,w,h),lightShapes=Array.from({length:lightComponents.count},(_,j)=>({id:j+1,category:'bare paper',reason:'simplified connected target light plane, sheen or glint',toneAt:'retain paper; pale painted planes outside this mask receive band 1',cells:0}));for(const id of lightComponents.labels)if(id)lightShapes[id-1].cells++;
-  return {paintDetails,opticsReport,traceReport,detailReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
+  const washes=washStats(layers,n);console.log(`plan washes: ${washes.passes.mean} passes (p95 ${washes.passes.p95}, max ${washes.passes.max}) and ${washes.pans.mean} pans (max ${washes.pans.max}) per painted cell`);
+  return {washStats:washes,paintDetails,opticsReport,traceReport,detailReport,paper,style:profile,formPlanning,layers,instructions,protectedCells,value,regions:region,omittedDemand,lightShapes,geometry:'Target-derived color/value regions, never crop rectangles; continuous pale bases and dry middle planes; two final glazes share simplified connected shadow support across region boundaries.'};
 }
 export function valueTechnique(intent) {
   // An authored dry contact takes precedence over phase, calibration and style defaults.

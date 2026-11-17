@@ -160,5 +160,13 @@ for (const calibratedPlan of [false, true]) {
     // Measured: omitted demand 0.03% -> 0.26% (calibrated 0% -> 0.16%) of the sheet's demand, from pan masks broken
     // where two areas choose different pans.
     assert.ok(pruned.omittedDemand / total < 0.005, `omitted ${(100 * pruned.omittedDemand / total).toFixed(2)}%`);
+    // A pan dropped from a cell is not laid there by any passage: the small-hole fills (stepHoles, holeFill) leave a
+    // dropped cell alone, since its kept pans paint it. Measured before that exclusion: 0 (calibrated, where stepHoles is
+    // on: 155) such cell-passages put the trace back.
+    const gone = pruneTracePans(demand, k, 0.1, { pigments: PIGS, w, h, radius: 2 }).pruned;
+    let leaks = 0;
+    for (const L of pruned.layers) for (const sh of L.shapes) for (let i = 0; i < n; i++) if (sh.mask[i] && gone[i * k + L.pigment]) leaks++;
+    if (MEASURE) console.log({ calibratedPlan, leaks });
+    assert.equal(leaks, 0, `cell-passages laying a dropped pan: ${leaks}`);
   });
 }

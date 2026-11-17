@@ -32,7 +32,7 @@ test('segmentDetailMask picks compact warm foreground feature regions and skips 
     { id: 1, foreground: true, area: 16 * 16 / n, mask: faceMask },
     { id: 2, foreground: true, area: 40 * H / n, mask: coatMask },
   ] };
-  const m = segmentDetailMask(seg, d0, W, H);
+  const m = segmentDetailMask(seg, W, H);
   assert.equal(m[18 * W + 58], 1, 'compact interior feature region kept');
   assert.equal(m[5 * W + 58], 0, 'border-spanning coat skipped');
   const dSeg = detailField(values, W, H, CELL, m);
@@ -41,24 +41,37 @@ test('segmentDetailMask picks compact warm foreground feature regions and skips 
 });
 
 // A focal form is a subject whatever its colour and size, and touching the frame a little does not make it the setting.
-test('segmentDetailMask keeps a cool, large focal form that touches one edge, and skips the setting', () => {
-  const d0 = detailField(values, W, H, CELL), n = W * H;
+// Shapes on a W x H grid; `f` scales them to a finer grid.
+function forms(f) {
+  const w = W * f, h = H * f, n = w * h, animal = new Uint8Array(n), ground = new Uint8Array(n), flat = new Uint8Array(n);
   // A grey-blue animal filling the right half, its neck running off the bottom edge: a third of the sheet.
-  const animal = new Uint8Array(n), ground = new Uint8Array(n), flat = new Uint8Array(n);
-  for (let y = 6; y < 34; y++) for (let x = 42; x < 78; x++) animal[y * W + x] = 1;
-  for (let y = 34; y < H; y++) for (let x = 56; x < 64; x++) animal[y * W + x] = 1;
-  for (let y = 0; y < H; y++) for (let x = 0; x < 40; x++) ground[y * W + x] = 1;
-  for (let y = 10; y < 30; y++) for (let x = 10; x < 30; x++) flat[y * W + x] = 1;
+  for (let y = 6 * f; y < 34 * f; y++) for (let x = 42 * f; x < 78 * f; x++) animal[y * w + x] = 1;
+  for (let y = 34 * f; y < h; y++) for (let x = 56 * f; x < 64 * f; x++) animal[y * w + x] = 1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < 40 * f; x++) ground[y * w + x] = 1;
+  for (let y = 10 * f; y < 30 * f; y++) for (let x = 10 * f; x < 30 * f; x++) flat[y * w + x] = 1;
   const area = m => m.reduce((a, v) => a + v, 0) / n;
-  const seg = { regions: [
+  return { w, h, area, seg: { regions: [
     { id: 1, foreground: true, area: area(animal), mask: animal },
     { id: 2, foreground: true, area: area(ground), mask: ground },
     { id: 3, foreground: true, area: area(flat), mask: flat },
     { id: 4, foreground: false, area: area(animal), mask: animal },
-  ] };
-  const m = segmentDetailMask(seg, d0, W, H);
-  assert.deepEqual(m.regions, [1], 'the animal; not the frame-spanning ground, the even-wash patch or an unflagged copy');
-  assert.ok(area(animal) > 0.3);
-  assert.equal(m[20 * W + 60], 1);
-  assert.equal(m[20 * W + 20], 0);
+  ] } };
+}
+
+test('segmentDetailMask keeps a cool, large focal form that touches one edge, and skips the setting', () => {
+  const { seg, area } = forms(1), d0 = detailField(values, W, H, CELL);
+  const m = segmentDetailMask(seg, W, H);
+  assert.deepEqual(m.regions, [1, 3], 'the animal and the patch inside the picture; not the frame-spanning ground or an unflagged copy');
+  assert.ok(area(seg.regions[0].mask) > 0.3);
+  // Inside the accepted even-wash patch the detail is still nil, so its minimum shape does not shrink.
+  const d = detailField(values, W, H, CELL, m);
+  assert.ok(d[20 * W + 60] > 0.5 && d[20 * W + 20] < 0.1, `animal ${d[20 * W + 60]}, patch ${d[20 * W + 20]}`);
+  assert.ok(d0[20 * W + 20] < 0.1);
+});
+
+test('segmentDetailMask accepts the same forms on the render grid and on half of it', () => {
+  for (const f of [1, 2, 3]) {
+    const { seg, w, h } = forms(f);
+    assert.deepEqual(segmentDetailMask(seg, w, h).regions, [1, 3], `grid x${f}`);
+  }
 });
