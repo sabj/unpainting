@@ -47,6 +47,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     const rgb = await sharp(image).flatten({ background: '#fff' }).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer(), lab = labPlanes(rgb, w, h);
     foliageCells = foliageMask(L, lab.A, lab.B, w, h, pxMm);
   }
+  if (!seg) log('ink decide: no SAM regions (--segments off): every cell is read as architecture, so no semantic ink rule (foliage, shadow, sky, water) applies');
   const cellLabel = (x, y) => (seg ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
   // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
   if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }

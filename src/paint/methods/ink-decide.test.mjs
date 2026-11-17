@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
-import { parseLabelReply, labelIdentity, simpleLabel, ruleAt, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
+import { parseLabelReply, labelIdentity, simpleLabel, ruleAt, toneShadowTakes, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
 import { cutMassEdges, classifyPathDetail, CLASS } from './line-class.mjs';
 
 const W = 160, H = 100, PX = 0.15;
@@ -364,4 +364,62 @@ test('sampled pen contours use physical curvature without rewriting the traced g
     }
     assert.deepEqual(lines, before, name + ': source candidates are read-only');
   }
+});
+
+// A pen line drawn inside a dark wash: wash L 55 everywhere, pen L 45 on rows 20..21. Its own contrast is a pen line's (>= penContrast 5)
+// but under the shadow rule's floor (10): the case a tone-mass shadow over trunk or foliage used to wipe out (cma: 6.7% of the pen kept).
+const inWash = () => { const L = new Float32Array(W * H).fill(55); for (let x = 0; x < W; x++) { L[20 * W + x] = 45; L[21 * W + x] = 45; } return L; };
+const dark = () => new Uint8Array(W * H).fill(1);
+const mmPx = mm => mm / PX;
+const seg = (mm, y = 21, x0 = 5) => line(y, x0, x0 + mmPx(mm));
+test('a pen line in a dark wash is the right kind to test: pen class, under the shadow floor', () => {
+  const { cls, contrast } = classifyPathDetail(Array.from({ length: 40 }, (_, k) => ({ x: 20 + k, y: 20.5 })), inWash(), W, H, PX);
+  assert.ok(cls.slice(4, -4).every(c => c === CLASS.pen));
+  assert.ok(contrast.slice(4, -4).every(c => c >= DECIDE_DEFAULTS.penContrast && c < INK_RULES.shadow_mass.penContrast), `${[...contrast.slice(4, 8)]}`);
+});
+
+test('a tone-mass shadow never takes wash-only or trunk ground, only ground that draws structure or outline', () => {
+  assert.equal(toneShadowTakes('tree_trunk'), false);
+  assert.equal(toneShadowTakes('foliage'), false);
+  assert.equal(toneShadowTakes('sky'), false);
+  assert.equal(toneShadowTakes('water'), false);
+  for (const label of ['architecture', 'ground', 'figure', 'drapery', 'shadow_mass']) assert.equal(toneShadowTakes(label), true, label);
+  assert.equal(toneShadowTakes(undefined), false);
+  const ctx = label => ({ L: inWash(), w: W, h: H, pxMm: PX, inputKind: 'line-map', cellLabel: () => label, shadow: dark() });
+  // a trunk stroke (7 mm, over the trunk's 6 mm) inside a dark wash keeps the trunk's rule, with no shadow floor
+  const trunk = decideLines([seg(7)], ctx('tree_trunk'));
+  assert.equal(trunk.lines.length, 1);
+  assert.equal(trunk.lines[0].inkLabel, 'tree_trunk');
+  assert.equal(trunk.stats.droppedMm.label.shadow_mass ?? 0, 0);
+  // the same stroke on architecture in a dark wash still meets the shadow's floor: a wash edge there is not drawn
+  const arch = decideLines([seg(7)], ctx('architecture'));
+  assert.equal(arch.lines.length, 0);
+  assert.ok(arch.stats.droppedMm.label.shadow_mass > 5);
+});
+
+test('observed source ink is pen by construction: short, turning pen strokes in foliage and under a shadow stay, wash edges and faint marks still go', async () => {
+  const ctx = (inputKind, extra = {}) => ({ L: inWash(), w: W, h: H, pxMm: PX, inputKind, cellLabel: () => 'foliage', shadow: dark(), ...extra });
+  // a 3 mm stroke is under the foliage minimum (8 mm): wash for a learned line map, a drawn stroke in observed ink
+  for (const kind of [undefined, 'line-map']) assert.equal(decideLines([seg(3)], ctx(kind)).lines.length, 0, String(kind));
+  const stroke = decideLines([seg(3)], ctx('stroke'));
+  assert.equal(stroke.lines.length, 1);
+  assert.equal(stroke.lines[0].inkMinMm, 0, 'the salience step does not undo it');
+  assert.ok(Math.abs(stroke.stats.keptPx * PX - 3) < 0.3);
+  // a scallop (two loops of 1.2 mm radius, 15 mm of pen) turns faster than a branch may: drawn only in observed ink
+  const loopL = inWash(), loop = { points: [] };
+  for (let k = 0; k <= 80; k++) { const a = k / 80 * 4 * Math.PI, x = 60 + 8 * Math.cos(a), y = 50 + 8 * Math.sin(a); loop.points.push({ x, y }); for (const [dx, dy] of [[0, 0], [1, 0], [0, 1]]) loopL[Math.round(y + dy) * W + Math.round(x + dx)] = 35; }
+  const { resample, turning, smoothPath } = await import('./ink-lines.mjs');
+  assert.ok(turning(smoothPath(resample(loop.points, 1), { sigma: DECIDE_DEFAULTS.smoothMm / PX })) / PX > DECIDE_DEFAULTS.elongatedDegPerMm, 'the loop turns too fast for a branch');
+  const turny = kind => decideLines([loop], { L: loopL, w: W, h: H, pxMm: PX, inputKind: kind, cellLabel: () => 'tree_trunk' });
+  assert.equal(turny('line-map').lines.length, 0, 'a learned line map: too turny for a branch');
+  assert.ok(turny('stroke').stats.keptPx > 0.95 * turny('stroke').stats.lengthPx, 'observed ink: drawn');
+  // a wash edge with no pen line of its own (the plane's L 55 to 90 step on row 60) is still cut from observed ink
+  const edgeL = plane();
+  const edge = decideLines([line(60, 5, 60)], { L: edgeL, w: W, h: H, pxMm: PX, inputKind: 'stroke', cellLabel: () => 'foliage' });
+  assert.equal(edge.lines.length, 0);
+  // no ink at all: nothing to draw, in any ground that is wash-only
+  const none = decideLines([seg(3, 40)], { L: new Float32Array(W * H).fill(90), w: W, h: H, pxMm: PX, inputKind: 'stroke', cellLabel: () => 'foliage' });
+  assert.equal(none.lines.length, 0);
+  // sky stays wash only, observed ink or not
+  assert.equal(decideLines([seg(3)], { ...ctx('stroke'), cellLabel: () => 'sky' }).lines.length, 0);
 });

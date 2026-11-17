@@ -209,6 +209,14 @@ export function boxBlur(P, w, h, r) {
 }
 
 /**
+ * Whether the tone-mass shadow pass (shadowMassMask) may take a cell whose region label is `label`. It adds the shadow's
+ * stricter rule (shadow_mass: structure drawn only with a pen line's own contrast) over ground that draws structure or
+ * outline. It never replaces a wash-only region or trunk and branch ground: a pen stroke in a dark wash over foliage is
+ * not a shadow edge, and the shadow rule would also outrank the foliage rule (RANK) and wipe those strokes out.
+ */
+export const toneShadowTakes = label => (RANK[INK_RULES[label]?.ink] ?? 0) >= RANK.structure;
+
+/**
  * The ink rule that applies at a point: the most permissive rule among the labels within `reachPx` of it (a contour is
  * drawn when either side is ink-worthy). `cellLabel(x, y)` is the label at a cell. Order of permissiveness follows
  * RANK; a shadow mass takes a cell only where no region label says ink within reach and the tone-mass mask says shadow.
