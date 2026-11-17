@@ -16,6 +16,9 @@
 // 3. While the fit misses that absorption by more than REFIT_TOLERANCE of its size, the cell's own trace that best
 //    closes the gap comes back and the fit is repeated. A trace that is real colour (the blue that greys an orange)
 //    stays; a trace the kept pans can stand in for goes.
+// With a smoothing radius, steps 1 to 3 run on the squinted demand to choose the area's pans, so neighbours share
+// pans and a pan's wash is one shape; then each cell is fitted from those pans, and step 3 runs again on the cell's
+// own colour, so a small accent the area does not share keeps its pan.
 //
 // Only the cell's own pans are used; no pan is added to a cell the unmix left it out of. Where the pans carry no K
 // (unit tests of the planner), mass stands in for absorption and the kept pans are scaled by one factor to the cell's
@@ -47,7 +50,7 @@ export function pruneTracePans(demand, k, share, { pigments = null, protect = nu
   // so neighbouring cells keep the same pans and a pan's wash is one shape, not salt and pepper; each cell's amounts are
   // then refitted to its own colour with the pans its neighbourhood chose.
   const area = radius > 0 ? boxMeanPans(demand, k, w, h, radius) : demand;
-  const keep = new Uint8Array(k), own = new Uint8Array(k), mine = new Uint8Array(k);
+  const keep = new Uint8Array(k), own = new Uint8Array(k), mine = new Uint8Array(k), cell = new Uint8Array(k);
   for (let i = 0; i < n; i++) {
     if (protect?.[i]) continue;
     const o = i * k;
@@ -65,9 +68,11 @@ export function pruneTracePans(demand, k, share, { pigments = null, protect = nu
     if (fit) {
       // The neighbourhood's pans: kept ones, plus traces its colour needs back.
       report.restored += fit(area, o, keep, own, null);
-      let any = 0; for (let j = 0; j < k; j++) { mine[j] = fit.chosen[j] && demand[o + j] > 0 ? 1 : 0; any += mine[j]; }
+      let any = 0; for (let j = 0; j < k; j++) { mine[j] = fit.chosen[j] && demand[o + j] > 0 ? 1 : 0; cell[j] = demand[o + j] > 0 ? 1 : 0; any += mine[j]; }
       if (!any) continue;
-      fit(demand, o, mine, mine, out);
+      // The cell's own fit from those pans; a pan the area left out comes back here when this cell's colour needs it
+      // (a small red accent inside a blue area is not a trace of the blue area's mix).
+      report.restored += fit(demand, o, mine, cell, out);
     } else {
       let cellKept = 0, cellTotal = 0;
       for (let j = 0; j < k; j++) { cellTotal += demand[o + j]; if (keep[j]) cellKept += demand[o + j]; }

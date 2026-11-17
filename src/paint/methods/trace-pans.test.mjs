@@ -106,10 +106,25 @@ test('trace pans, squinted: neighbours share pans and no cell visibly changes co
     sum += e; worst = Math.max(worst, e); count++;
   }
   if (MEASURE) console.log({ meanDE: sum / count, worstDE: worst });
-  // Measured (share 0.1, radius 2): mean dE00 0.36, worst 3.84 where two colour areas meet. One scale on the kept pans
-  // instead of the refit measured mean 4.94.
-  assert.ok(sum / count < 0.6, `mean dE00 ${(sum / count).toFixed(2)}`);
-  assert.ok(worst < 5, `worst dE00 ${worst.toFixed(2)}`);
+  // Measured (share 0.1, radius 2, cell restore): mean dE00 0.20, worst 1.94. Without the cell's own restore the area's
+  // choice measured mean 0.36, worst 3.84; one scale on the kept pans instead of the refit measured mean 4.94.
+  assert.ok(sum / count < 0.35, `mean dE00 ${(sum / count).toFixed(2)}`);
+  assert.ok(worst < 2.5, `worst dE00 ${worst.toFixed(2)}`);
+});
+
+test('trace pans, squinted: a small accent keeps the pan its area drops', () => {
+  // A 2 x 2 rose accent (an eye, a flower) inside a 30 x 30 ultramarine-and-sienna field: rose is a trace of the area.
+  const W = 30, N = W * W, d = new Float32Array(N * k);
+  for (let i = 0; i < N; i++) { d[i * k + 2] = 0.8; d[i * k + 3] = 0.6; d[i * k + 0] = 0.02; }
+  const accent = [];
+  for (let y = 14; y < 16; y++) for (let x = 14; x < 16; x++) { const i = y * W + x; accent.push(i); d[i * k + 1] = 0.8; d[i * k + 2] = 0.05; d[i * k + 3] = 0.05; }
+  const r = pruneTracePans(d, k, 0.1, { pigments: PIGS, w: W, h: W, radius: 4 });
+  for (const i of accent) {
+    assert.ok(r.demand[i * k + 1] > 0.5, `rose kept in the accent: ${r.demand[i * k + 1]}`);
+    const e = deltaE2000(labOf(filmRGB(d.subarray(i * k, i * k + k)), 0, PAPER), labOf(filmRGB(r.demand.subarray(i * k, i * k + k)), 0, PAPER));
+    assert.ok(e < 1, `accent moved dE00 ${e.toFixed(2)}`);
+  }
+  assert.equal(r.demand[2 * k + 0], 0, 'the yellow trace leaves the field');
 });
 
 const BASE = { demand, k, density, w, h, rgb, pigments: PIGS, paperRGB: PAPER, shaped: true, sheetWidthMm: 120, layerHue: true, layers: 4 };
@@ -151,15 +166,15 @@ for (const calibratedPlan of [false, true]) {
     if (MEASURE) console.log({ calibratedPlan, passes: [a.mean, b.mean], max: [a.max, b.max], err: [ea, eb], omitted: [all.omittedDemand / total, pruned.omittedDemand / total] });
     assert.equal(all.traceReport, null);
     assert.ok(pruned.traceReport.traces > 0 && pruned.traceReport.restored > 0);
-    // Measured: mean passes per painted cell 32.2 -> 14.6 (calibrated 21.6 -> 9.9).
+    // Measured: mean passes per painted cell 32.2 -> 14.9 (calibrated 21.6 -> 10.1).
     assert.ok(b.mean < 0.6 * a.mean, `mean passes per cell ${b.mean.toFixed(1)} vs ${a.mean.toFixed(1)}`);
-    // Measured: light error 0.081 -> 0.053 (calibrated 0.079 -> 0.049); signed +0.001 (calibrated -0.000). Both sides:
+    // Measured: light error 0.081 -> 0.049 (calibrated 0.079 -> 0.047); signed +0.005 (calibrated +0.001). Both sides:
     // no worse a value match, and no paling.
     assert.ok(eb.abs <= ea.abs + 0.005, `light error ${eb.abs.toFixed(4)} vs ${ea.abs.toFixed(4)}`);
     assert.ok(eb.signed < 0.01, `pruned plan paler by ${eb.signed.toFixed(4)}`);
-    // Measured: omitted demand 0.03% -> 0.26% (calibrated 0% -> 0.16%) of the sheet's demand, from pan masks broken
-    // where two areas choose different pans.
-    assert.ok(pruned.omittedDemand / total < 0.005, `omitted ${(100 * pruned.omittedDemand / total).toFixed(2)}%`);
+    // Measured: omitted demand 0.03% -> 0.49% (calibrated 0% -> 0.41%) of the sheet's demand: pan masks broken where two
+    // areas choose different pans, and single cells that keep a pan their area dropped, under the minimum shape.
+    assert.ok(pruned.omittedDemand / total < 0.007, `omitted ${(100 * pruned.omittedDemand / total).toFixed(2)}%`);
     // A pan dropped from a cell is not laid there by any passage: the small-hole fills (stepHoles, holeFill) leave a
     // dropped cell alone, since its kept pans paint it. Measured before that exclusion: 0 (calibrated, where stepHoles is
     // on: 155) such cell-passages put the trace back.
