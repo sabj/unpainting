@@ -1,34 +1,31 @@
 // Trace pans (--pigshare s). The plan's per-cell unmix (src/crop/pigments.mjs) fits k pans to three channel
 // densities. With more than three pans that fit is not unique, and the projected-gradient solver returns a spread
-// one: a few percent of nearly every pan in nearly every cell, or five collinear earth/dark pans each holding 12% to
-// 20% of the same brown. The light-to-dark planner lays one wet passage per pan and band, so each redundant pan
-// becomes its own wash over the same cells: more rewetting of the layers below and complementary traces mixing to mud.
-// A painter mixes a colour from the two or three pans that carry it.
+// one: a few percent of nearly every pan in nearly every cell. The light-to-dark planner lays one wet passage per pan
+// and band, so each trace becomes its own wash over the same cells: more rewetting of the layers below and
+// complementary traces mixing to mud. A painter mixes a colour from the two or three pans that carry it.
 //
 // Three channel densities never need more than three pans (Caratheodory: a non-negative fit to three numbers has an
-// optimum with at most three pans in it). So a cell's traces and redundant collinear pans are dropped and its colour
-// refitted from at most three of the pans it holds, in each channel, not by one scale on the kept pans (that keeps the
-// summed absorption but moves light between channels and so moves hue and value):
+// optimum with at most three pans in it). So a cell's traces are dropped and its colour refitted from the pans it
+// keeps, in each channel, not by one scale on the kept pans (that keeps the summed absorption but moves light between
+// channels and so moves hue and value):
 //
-// 1. With optics (3-channel K), the fit starts from the cell's strongest pan (by absorption, amount times summed K) and
-//    runs Lawson-Hanson NNLS to the cell's whole per-channel absorption sum_j a_j K_jc.
-// 2. While the fit misses that absorption by more than REFIT_TOLERANCE of its size and holds fewer than CARATHEODORY_MAX
-//    (3) pans, the cell's own pan that best closes the gap comes back and the fit is repeated. A trace that is real
-//    colour (the blue that greys an orange) stays; redundant collinear pans and traces the kept pans can stand in for go.
-// With a smoothing radius, steps 1 and 2 run on the squinted demand to choose the area's pans (at most 3), so
-// neighbours share pans and a pan's wash is one shape; then each cell is fitted from those pans, and step 2 runs again
-// on the cell's own colour (also capped at 3 pans), so a small accent the area does not share keeps its pan.
+// 1. A pan is a trace when it carries under share s of the cell's absorption (amount times the pan's summed K, so a
+//    strong blue at 8% of the mass need not be a trace while a weak yellow at 10% may be). The others are kept.
+// 2. The kept pans are refitted (non-negative least squares, Lawson-Hanson) to the cell's whole per-channel
+//    absorption sum_j a_j K_jc. In a thin transparent film the colour follows that absorption.
+// 3. While the fit misses that absorption by more than REFIT_TOLERANCE of its size, the cell's own trace that best
+//    closes the gap comes back and the fit is repeated. A trace that is real colour (the blue that greys an orange)
+//    stays; a trace the kept pans can stand in for goes.
+// With a smoothing radius, steps 1 to 3 run on the squinted demand to choose the area's pans, so neighbours share
+// pans and a pan's wash is one shape; then each cell is fitted from those pans, and step 3 runs again on the cell's
+// own colour, so a small accent the area does not share keeps its pan.
 //
 // Only the cell's own pans are used; no pan is added to a cell the unmix left it out of. Where the pans carry no K
-// (unit tests of the planner), mass stands in for absorption and pans at or above share s of the cell's mass are
-// scaled by one factor to the cell's mass. Plan time only, before cellLight, which then brings each cell's kept mix to
-// the exact light of its target.
+// (unit tests of the planner), mass stands in for absorption and the kept pans are scaled by one factor to the cell's
+// mass. Plan time only, before cellLight, which then brings each cell's kept mix to the exact light of its target.
 
 /** A refit within this share of the cell's absorption (Euclidean over the three channels) is close enough. */
 export const REFIT_TOLERANCE = 0.02;
-
-/** Three channel densities lie in a 3D cone, so an exact non-negative fit needs at most 3 pans (Caratheodory). */
-const CARATHEODORY_MAX = 3;
 
 /**
  * @param {Float32Array} demand n*k amounts
@@ -36,9 +33,9 @@ const CARATHEODORY_MAX = 3;
  * @param {number} share 0 <= share < 1; 0 keeps every pan
  * @returns {{demand: Float32Array, pruned: Uint8Array, cells: number, traces: number, restored: number, maxScale: number}}
  *   pruned[i*k+j] = 1 where pan j was dropped from cell i; cells = cells that lost a pan; traces = pans dropped;
- *   restored = pans added back by greedy Lawson-Hanson because the colour needed them; maxScale = largest kept/original mass in a cell.
+ *   restored = traces brought back because the colour needed them; maxScale = largest kept/original mass in a cell.
  */
-export function pruneTracePans(demand, k, share, { pigments = null, protect = null, tolerance = REFIT_TOLERANCE, maxPans = CARATHEODORY_MAX, w = 0, h = 0, radius = 0 } = {}) {
+export function pruneTracePans(demand, k, share, { pigments = null, protect = null, tolerance = REFIT_TOLERANCE, w = 0, h = 0, radius = 0 } = {}) {
   if (!Number.isFinite(share) || share < 0 || share >= 1) throw Error(`--pigshare: a share in [0, 1), not ${share}`);
   if (!Number.isInteger(k) || k < 1 || demand.length % k) throw Error('trace pans: demand is not n cells of k pans');
   const n = demand.length / k, out = Float32Array.from(demand), pruned = new Uint8Array(n * k);
@@ -47,7 +44,7 @@ export function pruneTracePans(demand, k, share, { pigments = null, protect = nu
   const optics = Array.isArray(pigments) && pigments.length === k && pigments.every(p => p?.K?.length === 3);
   const s = Array.from({ length: k }, (_, j) => optics ? pigments[j].K[0] + pigments[j].K[1] + pigments[j].K[2] : 1);
   if (s.some(v => !(v > 0))) throw Error('trace pans: every pan needs a positive summed K');
-  const K = optics ? pigments.map(p => p.K) : null, fit = optics ? createFit(K, k, tolerance, maxPans) : null;
+  const K = optics ? pigments.map(p => p.K) : null, fit = optics ? createFit(K, k, tolerance) : null;
   if (radius > 0 && !(Number.isInteger(w) && Number.isInteger(h) && w * h === n)) throw Error('trace pans: a smoothing radius needs the grid w x h');
   // The choice of pans is made on the squinted demand (a box mean over `radius` cells, the scale the washes are cut at),
   // so neighbouring cells keep the same pans and a pan's wash is one shape, not salt and pepper; each cell's amounts are
@@ -60,19 +57,16 @@ export function pruneTracePans(demand, k, share, { pigments = null, protect = nu
     let total = 0, top = -1, topA = 0, cellOwn = 0;
     for (let j = 0; j < k; j++) { if (demand[o + j] > 0) cellOwn++; const a = area[o + j] * s[j]; if (a > 0) { total += a; if (a > topA) { topA = a; top = j; } } }
     if (!(total > 0) || cellOwn < 2) continue;
+    let dropped = 0, keptA = 0;
+    for (let j = 0; j < k; j++) {
+      const a = area[o + j] * s[j];
+      own[j] = a > 0 ? 1 : 0;
+      keep[j] = a > 0 && (j === top || a >= share * total) ? 1 : 0;
+      if (own[j] && !keep[j]) dropped++; else if (keep[j]) keptA += a;
+    }
+    if (!dropped) continue;
     if (fit) {
-      let dropped = 0;
-      for (let j = 0; j < k; j++) {
-        const a = area[o + j] * s[j];
-        own[j] = a > 0 && (j === top || a >= share * total) ? 1 : 0;
-        keep[j] = j === top ? 1 : 0;
-        if (a > 0 && (!own[j] || !keep[j])) dropped++;
-      }
-      if (!dropped && cellOwn <= maxPans) continue;
-      // The neighbourhood's pans: starts from the dominant pan, adds non-trace pans (>= share) up to maxPans, and
-      // only takes back a trace pan (< share) if the non-trace pans still miss the absorption by more than tolerance.
-      report.restored += fit(area, o, keep, own, null);
-      for (let j = 0; j < k; j++) { keep[j] = fit.chosen[j]; own[j] = area[o + j] > 0 ? 1 : 0; }
+      // The neighbourhood's pans: kept ones, plus traces its colour needs back.
       report.restored += fit(area, o, keep, own, null);
       let any = 0; for (let j = 0; j < k; j++) { mine[j] = fit.chosen[j] && demand[o + j] > 0 ? 1 : 0; cell[j] = demand[o + j] > 0 ? 1 : 0; any += mine[j]; }
       if (!any) continue;
@@ -80,21 +74,14 @@ export function pruneTracePans(demand, k, share, { pigments = null, protect = nu
       // (a small red accent inside a blue area is not a trace of the blue area's mix).
       report.restored += fit(demand, o, mine, cell, out);
     } else {
-      let dropped = 0;
-      for (let j = 0; j < k; j++) {
-        const a = area[o + j] * s[j];
-        own[j] = a > 0 ? 1 : 0;
-        keep[j] = a > 0 && (j === top || a >= share * total) ? 1 : 0;
-        if (own[j] && !keep[j]) dropped++;
-      }
-      if (!dropped) continue;
       let cellKept = 0, cellTotal = 0;
       for (let j = 0; j < k; j++) { cellTotal += demand[o + j]; if (keep[j]) cellKept += demand[o + j]; }
       if (!(cellKept > 0)) continue;
       for (let j = 0; j < k; j++) out[o + j] = keep[j] ? demand[o + j] * cellTotal / cellKept : 0;
     }
+    void keptA;
     let before = 0, after = 0, lost = 0;
-    for (let j = 0; j < k; j++) { before += demand[o + j]; after += out[o + j]; if (demand[o + j] > 0 && !(out[o + j] > 0)) { pruned[o + j] = 1; lost++; } }
+    for (let j = 0; j < k; j++) { before += demand[o + j]; after += out[o + j]; if (own[j] && !(out[o + j] > 0)) { pruned[o + j] = 1; lost++; } }
     if (!lost) continue;
     report.cells++; report.traces += lost; if (after / before > report.maxScale) report.maxScale = after / before;
   }
@@ -102,9 +89,9 @@ export function pruneTracePans(demand, k, share, { pigments = null, protect = nu
 }
 
 // The per-cell refit: Lawson-Hanson NNLS on the 3 x k absorption matrix, started from the kept pans and allowed to
-// take back the cell's own pans (up to maxPans total) while the miss is over the tolerance. Writes the cell's amounts
-// into out[o..o+k). Returns how many pans were added beyond the initial seed.
-function createFit(K, k, tolerance, maxPans) {
+// take back the cell's own traces while the miss is over the tolerance. Writes the cell's amounts into out[o..o+k).
+// Returns how many traces came back.
+function createFit(K, k, tolerance) {
   const b = [0, 0, 0], r = [0, 0, 0], x = new Float64Array(k), z = new Float64Array(k), inP = new Uint8Array(k);
   const P = [];
   // Least squares on the columns in P (at most 3 have full rank; more are handled by the tiny ridge), into z.
@@ -146,7 +133,7 @@ function createFit(K, k, tolerance, maxPans) {
     for (let j = 0; j < k; j++) if (keep[j]) { P.push(j); inP[j] = 1; }
     inner();
     let back = 0;
-    for (let guard = 0; guard < k && P.length < maxPans && residual() > tolerance * size; guard++) {
+    for (let guard = 0; guard < k && residual() > tolerance * size; guard++) {
       let best = -1, bestG = 0;
       for (let j = 0; j < k; j++) {
         if (!own[j] || inP[j]) continue;
