@@ -80,7 +80,7 @@ export function parseLabelReply(text, ids) {
 export function simpleLabel(r, { w, h }) {
   const [L, A, B] = r.lab, [sL] = r.labSpread ?? [0], top = r.bbox[1] / h < 0.05;
   if (A < -6 && B > 4) return 'foliage';
-  if (top && r.area > 0.08 && sL < 12 && L > 55) return 'sky';
+  if (top && r.area > 0.08 && r.area <= 0.65 && sL < 12 && L > 55) return 'sky';
   if (B < -4 && sL < 12) return 'water';
   return 'architecture';
 }

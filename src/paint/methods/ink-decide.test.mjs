@@ -45,6 +45,8 @@ test('labels: replies are checked, the rules cover every label, a shadow mask fi
   assert.equal(parseLabelReply('nothing', [1]), null);
   for (const l of LABELS) assert.ok(INK_RULES[l], l);
   assert.equal(simpleLabel({ area: 0.2, lab: [70, -10, 20], labSpread: [20], bbox: [0, 0, 10, 10] }, { w: 100, h: 100 }), 'foliage');
+  assert.equal(simpleLabel({ area: 0.5, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 10, 10] }, { w: 100, h: 100 }), 'sky');
+  assert.equal(simpleLabel({ area: 0.96, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 10, 10] }, { w: 100, h: 100 }), 'architecture', 'a whole-sheet paper ground (> 65% of the image) is not mistaken for a wash-only sky');
   assert.equal(ruleAt(() => 'face', 5, 5, 2).ink, 'features');
   const m = shadowMassMask(plane(), W, H, PX, { sigmaMm: 0.3, drop: 20, minAreaMm2: 0.5 });
   assert.equal(m[80 * W + 80], 1);
