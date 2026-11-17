@@ -153,6 +153,7 @@ export async function holdInkLines({ opt, num, argv, image, root = '.', out, she
     if (opt('inkjoin', '') === '') flags.joinMm = 2.5;
     if (opt('inkfoliage', '') === '') flags.foliage = 1;
     if (opt('inkdarkrule', '') === '') flags.inkDarkRule = 1;
+    if (opt('inkdarkmatch', '') === '') flags.darkMatch = 1;
     flags.measure = true;
   }
   if (!flags.measure) return null;

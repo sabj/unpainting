@@ -429,7 +429,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
    else drawMaterial(scrap,sample,want,w,h,{...options,ink});
    return absorbance(scrap);
   };
-  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
+  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0),measure});
   console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${res.before.toFixed(2)}, so the load is scaled by ${res.factor.toFixed(3)} (now ${res.after.toFixed(2)})`);
   return res;
  }).value;
@@ -440,7 +440,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
 const penDraw = (sh,gs,want,w,h,o0) => {
  const stage=ctx.AREA_DRAW_STAGE, graphite=o0.ink?.[GRAPHITE_AT]>0, inkAt=PIGS.length;
  const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
- const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0;
+ const matched=!graphite&&INK&&num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0)>0&&o0.ink?.[inkAt]>0;
  const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
   const execute=paths=>{const options={...o,...(ctx.NATIVE_CAPTURE&&sh===ctx.sheet?{...(graphite?{afterStroke:e=>ctx.NATIVE_CAPTURE(e.skipped?'graphite-skipped':'graphite')}:{afterSegment:()=>ctx.NATIVE_CAPTURE('ink')}),afterDry:()=>ctx.NATIVE_CAPTURE('drawing-dry')}:{}),medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
  if(!ctx.AREA_PLAN)return execute(gs);
