@@ -46,7 +46,6 @@ import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
 import {touchLack, touchDue} from '../../src/paint/methods/touch-up.mjs';
 import {lumOf} from '../../src/paint/step-backs.mjs';
-import {accentStroke} from '../../src/paint/methods/accents.mjs';
 import {tipMarks, darkClip} from '../../src/paint/methods/final-dark-marks.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
@@ -557,7 +556,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // a final dark goes on with a small round brush drawn through the accent itself, held to it by the clip below
   // a final dark is laid as touches and strokes of the detail brush's tip over its accent family (final-dark-marks.mjs)
   const TIP_R = Math.max(SC, PB ? PB.detailR : SC);
-  const darkPaths = sh._accentPath ? [accentStroke(sh._accentPath, w, { SC, tipR: TIP_R })] : layer._darkPass ? tipMarks(washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: TIP_R, minLength: 2 * SC }), TIP_R) : null;
+  const darkPaths = layer._darkPass ? tipMarks(washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: TIP_R, minLength: 2 * SC }), TIP_R) : null;
   const paths = shapedPaths ?? authoredPaths ?? darkPaths ?? clock('paths', () => FLOOR
     ? (() => { let rr = FLOOR, P = floorPaths(rr); const T = BUDGET ? BUDGET.target(sh) : Infinity; for (let it = 0; it < 7 && P.length > T && rr < 3 * BRUSH; it++) { rr *= 1.6; P = floorPaths(rr); } FLOOR_R = rr; return P; })()
     : (detail
@@ -654,7 +653,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
     // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
     // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
-    const softMm = num('softclipmm', num('softchoice', 0) > 0 ? 0.75 : (sh._valuePlan?.washSystem ? 0.75 : 0));
+    const softMm = num('softclipmm', sh._valuePlan?.washSystem ? 0.75 : 0);
     const cellMm = num('sheetmm', DEFAULT_SHEET_MM) / w;
     const softReach = familyMarks || SOFT_WET_MM > 0 || reach > 0 || !sh._valuePlan?.edges || sh._valuePlan.texture || softMm <= 0 ? 0 : Math.max(1, Math.round(softMm / cellMm));
     const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;

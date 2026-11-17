@@ -24,7 +24,7 @@ export const PAPER_RULE = Object.freeze({
   minL: 75,               // paper is light
   maxChroma: 24,          // and near neutral
   minHighlightL: 90,      // highlights on a crop without visible paper must be light
-  maxHighlightChroma: 8,  // and neutral enough for a white sheet (yellow-ochre stone or cream is a pale wash, not bare white paper)
+  maxHighlightChroma: 14,  // and neutral enough for a white sheet (yellow-ochre stone or cream is a pale wash, not bare white paper)
   toleranceL: 5,          // a cell this far below the paper in L* is still bare paper (one tea glaze)...
   toleranceC: 6,          // ...when it is no more than this much more chromatic than the paper (delta E > 5 is a different colour)...
   fullToleranceL: 85,     // ...at the full L* tolerance on a sheet this light or lighter...
@@ -125,7 +125,7 @@ export function paperLightReference(rgb, w, h, paperRGB = null, opts = {}) {
     if (rgbArr.every((v, j) => v === WHITE_SHEET[j])) {
       const lt = lightestTenth(rgb, w, h);
       const [L, a, b] = labOfColour(lt), chroma = Math.hypot(a, b);
-      const minHighlightL = o.minHighlightL ?? 90, maxHighlightChroma = o.maxHighlightChroma ?? 8;
+      const minHighlightL = o.minHighlightL ?? 90, maxHighlightChroma = o.maxHighlightChroma ?? 14;
       if (L >= minHighlightL && chroma <= maxHighlightChroma) {
         const ref = lt.map(v => Math.round(v));
         return {
@@ -144,7 +144,7 @@ export function paperLightReference(rgb, w, h, paperRGB = null, opts = {}) {
   }
   const lt = lightestTenth(rgb, w, h);
   const [L, a, b] = labOfColour(lt), chroma = Math.hypot(a, b);
-  const minHighlightL = o.minHighlightL ?? 90, maxHighlightChroma = o.maxHighlightChroma ?? 8;
+  const minHighlightL = o.minHighlightL ?? 90, maxHighlightChroma = o.maxHighlightChroma ?? 14;
   if (L >= minHighlightL && chroma <= maxHighlightChroma) {
     const ref = lt.map(v => Math.round(v));
     return {

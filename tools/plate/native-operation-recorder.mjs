@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import {Worker, isMainThread, parentPort, workerData} from 'node:worker_threads';
 import sharp from 'sharp';
 const hash = b => crypto.createHash('sha256').update(b).digest('hex');
-const FLOOR = 21 * 1024 ** 3, CAP = 512 * 1024 ** 2;
+const FLOOR = 10 * 1024 ** 3, CAP = 512 * 1024 ** 2;
 
 /** The synchronous painter cannot queue unbounded raw frames. One shared slot, one acknowledgement. */
 export function createNativeOperationRecorder({directory,width,height,provenance={},resumeFrom=null,byteCap=CAP,diskFloor=FLOOR,timeoutMs=120000}) {

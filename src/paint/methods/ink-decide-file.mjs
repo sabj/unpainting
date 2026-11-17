@@ -16,7 +16,6 @@ import { prunePenLines } from './pen-wash-lines.mjs';
 import { estimateInkDark } from './line-class.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import sharp from 'sharp';
-import { decideByMeaning, planReader } from './line-meaning.mjs';
 
 const toPoints = g => g.points.map(([x, y], k) => ({ x, y, ...(Array.isArray(g.widths) && g.widths.length === g.points.length ? { width: g.widths[k] } : {}), ...(Array.isArray(g.weights) && g.weights.length === g.points.length ? { weight: g.weights[k] } : {}) }));
 const r2 = v => Math.round(v * 100) / 100;
@@ -47,7 +46,6 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     const rgb = await sharp(image).flatten({ background: '#fff' }).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer(), lab = labPlanes(rgb, w, h);
     foliageCells = foliageMask(L, lab.A, lab.B, w, h, pxMm);
   }
-  if (!seg) log('ink decide: no SAM regions (--segments off): every cell is read as architecture, so no semantic ink rule (foliage, shadow, sky, water) applies');
   const cellLabel = (x, y) => (seg ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
   // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
   if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }
@@ -98,36 +96,4 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
   if (sal) log(`ink salience, ${stage}: ${sal.sets} connected sets (${sal.closedSets} closed); ${sal.linesDropped} isolated pieces, ${sal.droppedMm.toFixed(0)} mm, left to the wash`);
   if (geometry) log(`ink geometry, ${stage}: ${geometry.fragmentsBefore} fragments to ${geometry.fragmentsAfter}; mean curvature energy per stroke ${geometry.energyBefore.toFixed(4)} to ${geometry.energyAfter.toFixed(4)} rad2/mm2; ${geometry.geometry} traces replaced by straight runs and arcs, ${geometry.kept} form or feature contours kept, ${geometry.droppedSquiggle} squiggles left to the wash (${geometry.offSource} off the source, ${geometry.tooManyPieces} too many pieces)`);
   return { lines, record, labelsOf: LABELS };
-}
-
-/**
- * Decide the line model's pool `doc` by meaning (INK-SPEC.md; line-meaning.mjs): each contour's class from the SAM
- * regions either side and their semantic labels, structure and landmarks drawn, texture, shadow edges and the sheet
- * border left out, each kept contour drawn straight or as a clean arc when it belongs to a made thing and as one smooth
- * curve otherwise, within the line model's resolution `tolMm` (the subject's pixel). Writes <out>/ink-meaning[-stage].json.
- * @returns { lines, record }
- */
-export async function decideFileByMeaning({ doc, L, image, out, stage, pxMm, tolMm, sheetMm, segments, judge = 'codex', cacheDir, run, plan = null, budgetScale = 1, log = () => {} }) {
-  const { w, h } = doc.image, base = path.basename(image, path.extname(image));
-  // Semantic classification requires actual region labels; never substitute an invented region.
-  let seg = { labels: new Uint8Array(w * h) }, regions = [], lab = { judge: 'none', labels: {} };
-  if (segments?.stem) {
-    registerSegments(base, segments.stem);
-    seg = await loadSegments(base, w, h);
-    regions = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8')).regions.map(r => ({ ...r, id: Number(r.id) }));
-    lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}) });
-  } else throw new Error('ink meaning: SAM semantic regions are required; --segments off cannot label the candidate pool');
-  const lum = Float32Array.from(L, v => v / 100), s = Float32Array.from(lum).sort();
-  const step = (s[Math.floor(0.99 * (s.length - 1))] - s[Math.floor(0.001 * (s.length - 1))]) / 8;
-  const regionAt = (x, y) => seg.labels[Math.max(0, Math.min(h - 1, Math.round(y / pxMm))) * w + Math.max(0, Math.min(w - 1, Math.round(x / pxMm)))];
-  // Bare paper is a semantic decision, never inferred by relabelling light architecture or sky.
-  const paper = new Set(Object.keys(lab.labels).filter(id => lab.labels[id] === 'paper').map(Number));
-  const labelOf = id => (paper.has(id) ? 'paper' : lab.labels[id] ?? (() => { throw new Error(`ink meaning: unlabelled region ${id}; provide SAM semantic labels`); })());
-  const r = decideByMeaning(doc.lines, { lum, W: w, H: h, pxMm, regionAt, labelOf, shadow: shadowMassMask(L, w, h, pxMm), step, sheet: { W: sheetMm, H: sheetMm * h / w }, tolMm, budgetMm: plan?.budgetMm != null ? plan.budgetMm * budgetScale : doc.lines.reduce((sum, g) => sum + g.points.slice(1).reduce((len, p, i) => len + Math.hypot(p[0] - g.points[i][0], p[1] - g.points[i][1]), 0) * pxMm, 0) * budgetScale, planAt: plan ? planReader(plan) : null });
-  if (paper.size) log(`ink by meaning: ${paper.size} region${paper.size > 1 ? 's' : ''} labelled as bare paper by the semantic model`);
-  const record = { stage, judge: lab.judge, regions: regions.map(rg => ({ id: rg.id, label: labelOf(rg.id), area: rg.area })), ...r.record };
-  fs.writeFileSync(path.join(out, `ink-meaning${stage === 'opening' ? '' : '-' + stage}.json`), JSON.stringify(record, null, 1) + '\n');
-  const c = r.record.byClass;
-  log(`ink by meaning, ${stage}: ${r.record.pieces} model pieces as ${r.record.contours} contours; drawn: structure ${c.structure.lines} (${c.structure.mm} mm), landmark ${c.landmark.lines} (${c.landmark.mm} mm); left out: texture ${c.texture.lines} (${c.texture.mm} mm), shadow and value edges ${c.shadow.lines} (${c.shadow.mm} mm), border ${c.border.lines}, specks below detector resolution ${r.record.specks} (${r.record.specksMm} mm); ${r.record.kept} strokes, ${r.record.keptMm} mm, fitted within ${r.record.tolMm} mm`);
-  return { lines: r.lines, record };
 }

@@ -80,7 +80,7 @@ test('GPU recording parity through brush, fine carry, drawing dry and graphite',
   const sheet=createSheet(makePaper(width,height,{seed:15}),pigments),info=attachGpu(sheet,DEFAULTS,{mode:'on',log:()=>{}});assert.equal(info.backend,'gpu');assert.equal(info.fallback,false);
   const fine=makeInkRes({N:2,W2:width,H2:height,paperOpts:{seed:15},pigments,main:sheet,inkAt:1});
   const view=()=>fine.compose(renderLayers(layersOf(sheet),pigments,Buffer.alloc(width*height*3,248),sheet.n,1));
-  const writer=record?createNativeOperationRecorder({directory,width:width*2,height:height*2,diskFloor:21*1024**3}):null;
+  const writer=record?createNativeOperationRecorder({directory,width:width*2,height:height*2,diskFloor:10*1024**3}):null;
   const capture=operation=>writer?.capture(view(),{operation});
   if(record)for(const name of ['wet','carry','settle']){const original=fine[name];fine[name]=(...args)=>{const value=original(...args);capture('ink-'+name);return value;};}
   try{
@@ -150,7 +150,7 @@ for(const demand of ['0','1'])test('main GPU refill frames read current ink and 
    const brush=createBrush({radius:8,flat:true,capacity:40,seed:9});dip(brush,{water:.7,conc:[.4]});stroke(brush,main,[{x:8,y:40,p:.6},{x:90,y:40,p:.8}],{upright:'sweep'});
    dry(main,30000,DEFAULTS,{levelMax:90,dt:14,analyticTail:true});dip(brush,{water:.7,conc:[.1]});stroke(brush,main,[{x:8,y:40,p:.6},{x:90,y:40,p:.8}],{upright:'sweep'});step(main,DEFAULTS);
    const tape=recordMarks(true);main._tape=true;
-   writer=record?createNativeOperationRecorder({directory,width:w,height:h,diskFloor:21*1024**3}):null;writer?.capture(view(),{operation:'initial'});
+   writer=record?createNativeOperationRecorder({directory,width:w,height:h,diskFloor:10*1024**3}):null;writer?.capture(view(),{operation:'initial'});
    const events=[],audit=[];let gestures=0;
    drawMaterial(main,[{points:[{x:4,y:12,s:.6,nw:.8},{x:94,y:12,s:.6,nw:.8}]}],new Float32Array(w*h),w,h,{medium:'drawing-ink',mmPerCell:.25,O:DEFAULTS,pen:{reservoir:.5},dryInk:false,audit,afterStroke:()=>gestures++,...(record?{afterSegment:e=>{const topStale=main._gpu.topStale,version=main._gpu.version,rgb=view(),reference=renderLayers(layersOf(main),pigments,base,w*h,1);assert.equal(hash(rgb),hash(reference),'production frame equals current physical pigment');assert.equal(main._gpu.version,version,'observation cannot advance GPU physics');events.push({version,topStale,hash:hash(rgb),reason:e.reason});writer.capture(rgb,{operation:'ink',reason:e.reason});}}:{})});
    const pixels=Buffer.from(view());writer?.finish(pixels);coherent(main);

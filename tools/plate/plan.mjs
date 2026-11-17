@@ -22,7 +22,6 @@ import {widePalette, puddleLabels} from '../../src/crop/palettewide.mjs';
 import {paintGuardOptions} from '../../src/crop/paint-guard.mjs';
 import {channelDensity, unmix} from '../../src/crop/pigments.mjs';
 import {blockInPigments, gradeSmoothPassages} from '../../src/crop/blockin.mjs';
-import {planPuddles} from '../../src/paint/methods/puddles.mjs';
 import {choosePlateMixes, toMixAmounts, panMix} from '../../src/crop/mixes.mjs';
 import {loadSubject} from '../../src/paint/methods/first-wash.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
@@ -201,13 +200,6 @@ let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
 return A;
 })).value;
 SPEED_PROFILE?.add('setup:pigment-fit', performance.now() - pigmentFitStarted);
-// A value plan is laid puddle by puddle: one puddle per local colour, its pans chosen once (src/paint/methods/puddles.mjs),
-// as many local colours as the palette was chosen to reach (--pwcolours chromatic colours plus the greys). Planning only.
-ctx.VALUE_PUDDLES = VALUE_ENABLED && num('puddles', 0) > 0 && PIGS.length > 1 ? planPuddles(D_PLAN, w, h, PIGS, paperRGB, { count: num('pwcolours', 8) + 1 }) : null;
-if (ctx.VALUE_PUDDLES) {
-  ctx.A = ctx.VALUE_PUDDLES.A;
-  console.log(`puddles: ${ctx.VALUE_PUDDLES.count} local colours, one puddle each: ${ctx.VALUE_PUDDLES.colours.map(c => `${c.pans.map((j, q) => `${(100 * c.shares[q]).toFixed(0)}% ${PIGS[j].name ?? j}`).join(' + ')} (${c.cells} cells, ${c.side}, dE ${c.dE.toFixed(1)})`).join('; ')}`);
-}
 // --paperkeep L: book no pigment where the source is within L of the paper's lightness and under --paperchroma (default 8).
 // Unmixing does not know paper white is a colour and would lay a weak pan there. Default 0, off.
 if (num('paperkeep', 0) > 0) {
@@ -272,11 +264,11 @@ if (SMALL) { let c = 0; for (let i = 0; i < n; i++) c += SMALL[i]; console.log(`
   }
   console.log(`range: plan's darkest note ${deepest.toFixed(2)} shortened to ${want.toFixed(2)} (x${keep}), curve ${num('shortencurve', 0.75)}`);
 })();
-// --whitefloor f: cells whose whole planned depth is under f of one glaze join no mask, so no sweep aims at them. Default 0.2.
+// --whitefloor f: cells whose whole planned depth is under f of one glaze join no mask, so no sweep aims at them. Default 0.5.
 // An area plan's lights are the ones it lists (pass.lights); no target-light cell is held out of its passes.
 const WHITE_HOLD = (() => {
   if (opt('areaplan', '')) return null;
-  const f = num('whitefloor', 0.2);
+  const f = num('whitefloor', 0.5);
   if (f <= 0) return null;
   const floor = f * num('glaze', 0.12), k = PIGS.length, held = new Uint8Array(n);
   let c = 0;
@@ -687,7 +679,7 @@ const FUR_FIELD = () => (FUR_CACHE ??= orientationField(ctx.SRC, w, h, gaussian,
 // line budget and the gate on the pen all use it.
 const SEP = (await cachedStep({...RUN_CACHE,name:'separator',code:codeHash(root,[],{dependencies:['src/crop/inkwash.mjs']}),track:optTrack,inputs:{PX_SOURCE,w,h,paperRGB}},async()=>separate(PX_SOURCE,w,h,paperRGB))).value;
 // the pen-and-wash ink recipe is for pen drawings; on a brush or photo source it adds pen lines the source lacks
-if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.40)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.40)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
+if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * SEP.stats.ink / n < num('penfirst', 0.5)) console.log(`!!! --inkrecipe wash: the target shows ${(100 * SEP.stats.ink / n).toFixed(2)}% pen line, under --penfirst ${num('penfirst', 0.5)}%; the recipe is meant for pen drawings and pen-and-wash, and will draw pen lines this source may not have`);
 // The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source): one
 // reading at 1200 px wide (pen-share.mjs), so --width does not change what is pen. SEP is at the run's grid.
 // A run with a graphite outline, no line source and no ink plan never asks, so it skips the extra reading.
@@ -701,7 +693,7 @@ const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('dra
 // unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
 // shows --penfirst per cent of line or more, else graphite.
 const OUTLINE_REQUESTED = opt('outlinemedium', 'graphite');
-const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : (OUTLINE_REQUESTED === 'none' ? 'graphite' : materialProfile(OUTLINE_REQUESTED).kind), share: PEN_SHARE, threshold: num('penfirst', 0.40) });
+const OUTLINE = resolveOutlineMedium({ requested: ['auto', 'ink', 'graphite'].includes(OUTLINE_REQUESTED) ? OUTLINE_REQUESTED : (OUTLINE_REQUESTED === 'none' ? 'graphite' : materialProfile(OUTLINE_REQUESTED).kind), share: PEN_SHARE, threshold: num('penfirst', 0.5) });
 console.log(describeOutlineMedium(OUTLINE));
 // the plan states its medium with a reason (plan drawing.reason); the subject's medium may still override it (subject-medium.mjs)
 { const d = VALUE_CONFIG?.drawing ?? PIPELINE?.drawing; if (d?.reason != null) { if (typeof d.reason !== 'string' || !d.reason.trim()) throw new Error('drawing.reason: a sentence saying why the medium'); console.log(`the plan's medium: ${d.medium ?? 'not named'}, because ${d.reason.trim()}`); } }

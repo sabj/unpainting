@@ -35,6 +35,20 @@ Sam's rule: a constant, rule, option or technique fitted to one benchmark subjec
 - **Guard:** `tools/guard/subject-scan.mjs` now reads every JavaScript and Python file under `src/` and `tools/` and fails on a benchmark subject name outside tests, fixtures and reviewed target lists; `src/paint/overfit.test.mjs` fails on any folder or file named tuned, fitted or per-subject.
 - Measured at 480 px, strict (`--notargetlooks 1`), against 033-main 80413b81, one render each: Mittens and Rembrandt byte-identical; dog-paint dE76 13.48 -> 13.47, dark share 0.356 -> 0.356; Trumbull dE76 14.63 -> 15.31, dark share 0.138 -> 0.116 (target 0.143), strokes 1,369 -> 630, hfCorr 0.358 -> 0.391. Trumbull is plainer and scores worse; that is the honest plate.
 
+### Washes, paper lights and dead-code cleanup
+
+- **Crisp value-band boundaries (`tools/plate/sheet.mjs`).** `valueOptions` passes `stepSquint: false, stepHoles: false` to `planLightToDark` so calibrated plans keep unblurred band boundaries (`value.values` is not box-blurred over `2 mm` before cutting bands `1..5`) and do not fill internal paper lights smaller than `minShape`.
+- **Focal detail paper lights (`src/paint/methods/light-to-dark.mjs`).** `lights` uses `DETAIL ? keepByDetail(closedInferred, w, h, minShape, DETAIL, detailScale) : removeSmall(...)` (matching `shadowMask`), preserving small paper highlights inside focal detail segments (whiskers, coat and grass blades, window mullions).
+- **Warm cream paper highlights (`src/paint/methods/paper-colour.mjs`).** `maxHighlightChroma` is `14` (up from `8`), admitting warm cream watercolor paper (`chroma ~8.8`) while still rejecting sunlit yellow-ochre stone (`chroma ~23.9`).
+- **Paper-white hold (`tools/plate/plan.mjs`).** `--whitefloor` defaults to `0.5` of a glaze (`0.06` optical depth), matching the `0.3.2` contract.
+- **Removed unused modules.** Deleted 23 dead or default-off files under `src/paint/methods/` (`draw-plan*`, `line-dedupe`, `line-fit`, `line-meaning`, `accents`, `puddles`, `local-pans`, `pan-choice`) and their option-ledger entries.
+
+### Drawing and pen-and-wash ink
+
+- **Inking off by default on non-pen sources.** `--outlinemedium` defaults to `graphite` (`--drawing first`), and `--penfirst` is `0.5%` (`src/paint/methods/drawing-stages-auto.mjs`, `src/paint/methods/linework-plan.mjs`, `tools/plate/plan.mjs`) so non-pen paintings and photographs do not auto-trigger `prepInk` or `finishInk`. Pass `--drawing none --outlinemedium none` for no underdrawing.
+- **ControlNet lineart models for staged ink (`src/paint/methods/linework-plan.mjs`).** When `prepInk` or `finishInk` stages run without a pre-supplied line file and `--linemodel` is active, `planLinework` extracts lines with the fused ControlNet lineart models (`traceLineModel` in `src/paint/methods/line-model.mjs`, `strokes: pen`) rather than the luminance ridge walker (`writePenLines`).
+- **Restored `0.2.1` pen-and-wash stroke continuity (`src/paint/methods/ink-recipe.mjs`).** `INK_RECIPES.wash` sets `lineminmm: 1.2`, `drawstroke: 0`, `drawflickmm: 0`, `inksalience: 1` and `inkdarkmatch: 1`, eliminating 10%-sheet stroke chopping, synthetic 1.5 mm flick hooks and 0.3 mm micro-specks.
+
 ## 0.3.2 — 2026-11-09
 
 Painter **V105**, simulator **104**, judges **J1**. The changes run from the 0.3.0 release commit `70ceb7c3`.
