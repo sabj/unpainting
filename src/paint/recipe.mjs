@@ -15,7 +15,7 @@ import { subjectMediumOf, drawingForSubject, argvForSubject } from './subject-me
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 1 --midlayers 4 --paperrule 1 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 120 --smallisolation 4 --detailscale 0.5 --detailseg 1 --pigshare 0.1 --washjoin 1 --undercover 0';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrule 1 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 2 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 120 --smallisolation 4 --detailscale 0.5 --detailseg 1 --pigshare 0.1 --washjoin 1 --undercover 0';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
