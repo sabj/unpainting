@@ -10,6 +10,7 @@ import {planeAtCell, gradeLoadPressure, softClipMask} from '../../src/paint/meth
 import {shapedPlanePaths} from '../../src/paint/techniques/shaped-marks.mjs';
 import {valueTechnique, softBoundaryPaths} from '../../src/paint/methods/light-to-dark.mjs';
 import {softRing} from '../../src/paint/methods/soft-edges.mjs';
+import {softenWhere, growReserve, softenBrushCells} from '../../src/paint/methods/value-soften.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {createReceiverObserver} from '../painter/numeric-receiver-observer.mjs';
 import {appendFinishingLayers} from '../painter/finishing-area.mjs';
@@ -815,14 +816,20 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   if(ctx.FINISH_PLAN&&L===ctx.FINISH_START){await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-glaze-deposition-immediate.png'));coherent(ctx.sheet);const after=thicknessTotals(ctx.sheet),commands=AREA_EXEC.records.filter(r=>r.operation==='physical brush stroke'&&r.status==='executed'),command=commands.at(-1);fs.writeFileSync(path.join(out,'finishing-dose-proof.json'),JSON.stringify({kind:'actual all-sheet pigment inventory delta over one finishing pass; per-contact brush loss separately logged',areaId:command?.areaId,passId:command?.passId,commandId:command?.id,commandIds:commands.map(r=>r.id),gestureIds:commands.map(r=>r.geometry?.[0]?.gestureId??null),paperBeforeByContact:commands.map(r=>r.paper),primaryCellsByContact:commands.map(r=>r.primaryCells?.length??0),primaryCells:command?.primaryCells?.length,requestedDepth:sh.amount,requestedMass:sh.amount*commands.reduce((s,r)=>s+(r.primaryCells?.length??0),0),beforePigmentMass:ctx.FINISH_MASS_BEFORE,afterPigmentMass:after,depositedPigmentMass:after.map((v,j)=>v-ctx.FINISH_MASS_BEFORE[j]),paperBefore:command?.paper,limit:'all-sheet conserved pigment delta, not percell depth/value/coverage proof; ordinary transport remains active'},null,2));}
   if (SOFT_RING) clock('flow', () => { for (let q = 0; q < num('softwetsteps', 60); q++) step(ctx.sheet, O); });
   if (crispHere || FLOOR || layer._darkPass || touchSmall) setClip(ctx.sheet, PROBE ? PROBE.clip : null);
-  if(!BUDGET&&!sh._valuePlan?.texture&&sh._valuePlan?.edges.softCells.length&&paths.length){
-    const softSplit=num('softsplit',0)>0,hardNear=softSplit?(()=>{const near=new Set(),R=Math.ceil(num('softmm',.35)/(num('sheetmm', DEFAULT_SHEET_MM)/w))+1;for(const i of sh._valuePlan.edges.hardCells){const x=i%w,y=(i/w)|0;for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<w&&yy*w+xx<n)near.add(yy*w+xx);}}return near;})():null;
-    // softsplit: a turning edge is softened up to, not across, the nearby hard edges: the arc is cut
-    // where it comes within one brush radius of a hard boundary instead of being dropped whole.
-    const splitArcs=arcs=>arcs.flatMap(a=>{const out=[];let cur=[];for(const q of a){if(hardNear.has(Math.floor(q.y)*w+Math.floor(q.x))){if(cur.length>=3)out.push(cur);cur=[];}else cur.push(q);}if(cur.length>=3)out.push(cur);return out;});
-    const allArcs0=softBoundaryPaths(sh._valuePlan.edges.softCells,w,n),allArcs=softSplit?splitArcs(allArcs0):allArcs0,arcs=shapedPaths?allArcs.sort((a,b)=>b.length-a.length).slice(0,num('softarcs',1)).map(a=>a.slice(0,num('softarclen',16))):allArcs,hard=new Set(sh._valuePlan.edges.hardCells),radius=Math.max(.5,num('softmm',.35)/(num('sheetmm', DEFAULT_SHEET_MM)/W2));let executedArcs=0,omittedHardOverlap=0;
-    for(const arc of arcs){const points=arc.map(q=>({x:q.x*SC,y:q.y*SC,r:radius,p:.45}));const clean=createBrush({flat:false,radius,bristles:12,capacity:24,belly:3,feed:.25,give:.9,free:.4,film:.25,stiffness:6,seed:SEED+ctx.laid});const footprint=candidateContact(clean,ctx.sheet,points,{upright:false,lift:true});if(footprint.cells.some(i=>hard.has(Math.floor((i/W2|0)/SC)*w+Math.floor((i%W2)/SC)))){omittedHardOverlap++;continue;}dip(clean,{water:.48,conc:SHEET_PIGS.map(()=>0)});stroke(clean,ctx.sheet,points,{upright:false,lift:true});executedArcs++;}
-    JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'selected-edge-softening',intent:sh._valuePlan.id,plannedArcs:arcs.length,executedArcs,omittedHardOverlap,radiusMm:radius*num('sheetmm', DEFAULT_SHEET_MM)/W2,operation:'actual clean damp physical brush; hard-edge overlap predicted and skipped; no optical blur'})+'\n');
+  // Soft-classified boundary cells (light-to-dark.mjs: low contrast, low colour edge) take the area route's soft edge: a clean
+  // damp brush run along them right after the wash while it is wet (soften-lift-run.mjs softenEdge). The brush is the largest
+  // round of the kit that fits inside the shape and is no wider than the passage's own brush (--softmm caps its width), so a
+  // shape narrower than the finest round keeps its dry edge. A soft cell within one brush of a hard cell of the passage or
+  // of a reserved light is left as cut. --softsplit 0 and a plan's soften:false turn it off.
+  if(num('softsplit',1)>0&&PB&&!BUDGET&&!detail&&!sh._valuePlan?.texture&&sh._valuePlan?.edges?.softCells?.length&&paths.length){
+    const mmc=num('sheetmm', DEFAULT_SHEET_MM)/W2,halves=(ctx._softRounds??=['rigger','round4','round8','round12'].filter(k=>PB.cfg.brushes[k]).map(k=>PB.half(k)));
+    const washR=sh._valuePlan.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*mmc):Math.max(SC,...paths.map(pts=>Math.max(...pts.map(q=>q.r))));
+    const rS=softenBrushCells(halves,{ownCells:washR,supportCells:(sh._valuePlan.resolution?.estimatedSupportWidthCells??Infinity)*SC,cap:num('softmm',Infinity)/(2*mmc)}),reach=Math.ceil(rS/SC)+1;
+    const reserve=ctx.VALUE_PLAN?.protectedCells,near=reserve&&rS>0?((ctx._softReserve??=new Map()).get(reach)??(ctx._softReserve.set(reach,growReserve(reserve,w,h,reach)),ctx._softReserve.get(reach))):null;
+    const where=rS>0?softenWhere({softCells:sh._valuePlan.edges.softCells,hardCells:sh._valuePlan.edges.hardCells,nearReserve:near,w,h,reach}):null;
+    const strokes=where?softenEdge({mask:up(brushMask(sh)),where:up(where),W:W2,H:H2,r:rS,upright:UPRIGHT,stroke:(b,path,o)=>stroke(b,ctx.sheet,path,o),damp:()=>{const b=createBrush({flat:false,radius:rS,bristles:Math.max(12,Math.ceil(rS*2)),capacity:100,belly:12,feed:.4,give:.9,free:.4,film:.25,stiffness:8,seed:SEED+ctx.laid});dip(b,{water:1,conc:SHEET_PIGS.map(()=>0)});return thirsty(b,{water:SOFTEN_WATER});}}):0;
+    if(strokes)used['soft edge, damp brush']=(used['soft edge, damp brush']||0)+strokes;
+    JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'selected-edge-softening',intent:sh._valuePlan.id,softCells:sh._valuePlan.edges.softCells.length,softened:where?where.reduce((a,v)=>a+v,0):0,strokes,radiusMm:rS*mmc,operation:'actual clean damp physical brush along soft-classified boundary cells; hard cells and reserved lights keep the cut; no optical blur'})+'\n');
   }
   // --firstwash: the opening wash's edge taken out into clear water while it is wet
   if (FW && sh._fwSoften && !detail && paths.length && num('fwsoften', 0.6) > 0 && sh.area >= num('fwsoftmin', 0.002) * n) {

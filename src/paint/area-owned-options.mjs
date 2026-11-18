@@ -18,7 +18,7 @@ export const AREA_OWNED_OPTIONS = Object.freeze({
     'ordermask', 'orderlight', 'orderdark', 'orderregions', 'orderminpart', 'orderminregion', 'orderfar'].map(k => [k, ORDER])),
   ...Object.fromEntries(['washsession', 'charge', 'wetmix', 'wetmixshare', 'drypigment', 'orderdry'].map(k => [k, SESSION])),
   whitefloor: LIGHTS,
-  ...Object.fromEntries(['softwet', 'softwetphases', 'softwetsteps', 'softwetwater', 'softarcs', 'softarclen', 'softmm', 'softsplit', 'softclipmm', 'fwsoften', 'fwsoftmin', 'fwsoftr'].map(k => [k, EDGES])),
+  ...Object.fromEntries(['softwet', 'softwetphases', 'softwetsteps', 'softwetwater', 'softmm', 'softsplit', 'softclipmm', 'fwsoften', 'fwsoftmin', 'fwsoftr'].map(k => [k, EDGES])),
 });
 // switches whose off value is harmless (a recipe may set it) but whose on value adds automatic reserves
 const LIGHT_SWITCHES = Object.freeze({ smalllights: ['0'], white: ['none'] }), INK_SWITCHES = Object.freeze({ inkdecide: ['0'], inkdarkrule: ['0'] });
