@@ -41,6 +41,7 @@ import {planUniversalLinework} from '../../src/paint/methods/linework-stage.mjs'
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
+import {graphitePoolWanted, prepareGraphitePool} from '../../src/paint/methods/graphite-pool.mjs';
 import {inkHoldArgs} from '../../src/paint/methods/ink-hold-defaults.mjs';
 import {mediumForRun} from '../../src/paint/medium-run.mjs';
 import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
@@ -230,6 +231,10 @@ if (opt('linework','off') !== 'off' && opt('drawing','first') !== 'none') {
 }
 const SWEEP_CACHE = path.dirname(root) === '/root/sweepwork' ? '/root/sweepwork/cache' : null;
 const RUN_CACHE = {dir:process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root,'work','cache'),enabled:opt('runcache','1')!=='0'};
+// the graphite drawing carries the structure of the subject: the line model's pool, held and decided by meaning, drawn light
+// (src/paint/methods/graphite-pool.mjs). It leaves the run alone when a line source, stages, the models or segments are named off.
+const GRAPHITE_POOL_CHOICE = graphitePoolWanted(argv);
+const GRAPHITE_POOL = GRAPHITE_POOL_CHOICE.wanted && opt('image', '') ? await prepareGraphitePool({ opt, num, argv, out, root, image: path.resolve(root, opt('image','')), sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
 const EARLY_LINES = !['none','auto'].includes(opt('linesource','none')) ? await cachedEarlyLines({
   cache:RUN_CACHE, code:RUN_CACHE.enabled ? codeHash(root,fs.readdirSync(path.join(root,'tools/seg')).filter(f=>f.endsWith('.py')).map(f=>'tools/seg/'+f),{dependencies:['src/paint/methods/linework-plan.mjs','src/paint/early-lines-cache.mjs']}) : '',
   track:optTrack, argv, out,
@@ -394,7 +399,7 @@ const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [ENTRY_FILE]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
-Object.assign(ctx, { MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
+Object.assign(ctx, { GRAPHITE_POOL, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_VALUE_ONLY, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 
