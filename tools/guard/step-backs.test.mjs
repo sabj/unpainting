@@ -1,6 +1,6 @@
-// Default mode looks only at its planned step-backs (src/paint/step-backs.mjs): a painting takes no more step-backs than
-// it planned before the first mark, each shape is read once, and no look is taken outside a step-back (no passage
-// charge look, no second touch-up round that looks again at what the first corrected). Strict mode takes none.
+// Default mode looks at shape scale only (src/paint/step-backs.mjs): each passage takes one look of its own, and the
+// touch-up and accent step-backs are fixed before the first mark, a painting takes no more of them than it planned, and each
+// shape is read once. Strict mode takes no look at all.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,23 +22,23 @@ async function paint(dir, extra) {
   return { guard: JSON.parse(fs.readFileSync(path.join(out, 'target-guard.json'), 'utf8')), steps: JSON.parse(fs.readFileSync(path.join(out, 'step-backs.json'), 'utf8')), png: fs.readFileSync(path.join(out, 'painting.png')) };
 }
 
-test('default mode takes no more looks than its planned step-backs; strict takes none', { timeout: 600000 }, async () => {
+test('default mode looks at shape scale, in its planned step-backs and once a passage; strict takes none', { timeout: 600000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'step-backs-'));
   try {
     const d = await paint(dir, []);
-    assert.deepEqual(d.steps.planned.map(p => p.id), ['washes', 'accents'], 'planned before painting from --touchpoints and --finaldarks');
+    assert.deepEqual(d.steps.planned.map(p => p.id), ['washes', 'washes-2', 'accents'], 'planned before painting from --touchpoints and --finaldarks');
     assert.ok(d.steps.taken.length <= d.steps.planned.length, 'no step-back beyond the plan');
     const ids = d.steps.taken.map(t => t.id);
     assert.equal(ids[0], 'washes');
     assert.ok(ids.every(id => d.steps.planned.some(p => p.id === id)) && new Set(ids).size === ids.length, `each taken once and planned: ${ids}`);
-    assert.ok(d.steps.shapeLooks > 0, 'default mode does look at its step-backs');
-    assert.equal(d.guard.looks.count, d.steps.shapeLooks, 'every look the guard saw was inside a step-back');
+    assert.ok(d.steps.passageLooks > 0, 'default mode looks once at each passage');
+    assert.equal(d.guard.looks.count, d.steps.shapeLooks + d.steps.passageLooks, 'every look the guard saw was a passage or inside a step-back');
     const labels = d.guard.looks.entries.map(e => e.label);
     assert.equal(new Set(labels).size, labels.length, 'each shape is read once');
-    assert.ok(labels.every(l => /^(touch|darks)\//.test(l)), `only step-back reads: ${labels.join(' ')}`);
+    assert.ok(labels.every(l => /^(L\d+\/s\d+|touch\d+\/s\d+|darks\/s\d+)$/.test(l)), `only passage and step-back reads: ${labels.join(' ')}`);
     const s = await paint(dir, ['--notargetlooks', '1']);
     assert.equal(s.guard.looks.count, 0);
-    assert.equal(s.steps.shapeLooks, 0);
+    assert.equal(s.steps.shapeLooks + s.steps.passageLooks, 0);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

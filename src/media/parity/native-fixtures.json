@@ -137,8 +137,6 @@
         "0.8",
         "--touchpoints",
         "2",
-        "--touchgain",
-        ".6",
         "--paints",
         "ochre,sienna,ultramarine,cerulean,sepia,sapgreen",
         "--wetgate",

@@ -6,28 +6,20 @@
 // falling: no look, correct, look again.
 //
 // The plan of step-backs is made before painting from the options alone:
-//   - 'washes'  (--touchpoints > 0): after the planned washes dry, each planning family is read once; a family that
-//     reads at least one value step lighter than the subject gets one darkening glaze (src/paint/methods/touch-up.mjs).
+//   - 'washes'  (--touchpoints R > 0): R rounds, each after the last one's glazes dry; every planning family is read once a
+//     round, and a family the sheet still shows lighter or less chromatic than the subject gets one glaze of the mixed lack
+//     (src/paint/methods/touch-up.mjs). The rounds are fixed before the first mark; a round after a round that corrected
+//     nothing is skipped, since the sheet is as the round before it left it.
 //   - 'accents' (--finaldarks > 0): before the last small darks, each accent family is read once (final-darks.mjs).
-// Outside an open step-back every painting-time look returns null, so passages keep the charge frozen at planning,
-// exactly as in strict mode. Strict mode (--notargetlooks 1) keeps the same plan and takes no look at all.
+// A passage takes one shape-level look of its own as it is laid, and its charge follows what the sheet already holds of
+// its pans (tools/plate/paint.mjs, src/paint/methods/shape-deficit.mjs). Every other look (kept-colour recharge, texture)
+// is null outside an open step-back. Strict mode (--notargetlooks 1) keeps the same plan and takes no look at all.
 import { paintingLooks } from './painting-look.mjs';
-
-/** The subject's own value step: its lightest (the 99th percentile of luminance, the paper) to its darkest (the 0.1th,
- *  the ink) on a nine-step value scale, the painter's usual one (the pen tracer's rule, src/crop/pen-trace.mjs). */
-export function subjectValueStep(lum) {
-  const n = lum.length; if (!n) throw new Error('step-backs: an empty subject has no value scale');
-  const s = Float32Array.from(lum).sort(), q = f => s[Math.min(n - 1, Math.floor(f * n))];
-  return (q(0.99) - q(0.001)) / 8;
-}
-
-/** Luminance 0..1 of an RGB mean (0..255). */
-export const lumOf = c => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
 
 /** The step-backs of one painting, fixed before the first mark. */
 export function planStepBacks({ touchpoints = 0, finalDarks = 0 } = {}) {
   const plan = [];
-  if (touchpoints > 0) plan.push({ id: 'washes', when: 'after the planned washes dry', reads: 'planning families', corrects: 'darken only, families a value step lighter than the subject' });
+  for (let round = 1; round <= Math.max(0, Math.round(touchpoints)); round++) plan.push({ id: round === 1 ? 'washes' : `washes-${round}`, when: round === 1 ? 'after the planned washes dry' : 'after the last round\'s glazes dry', reads: 'planning families', corrects: 'darken only, families the sheet shows visibly lighter or less chromatic than the subject' });
   if (finalDarks > 0) plan.push({ id: 'accents', when: 'after the touch-ups, before the last small darks', reads: 'accent families', corrects: 'a dark mark where the accent reads lighter' });
   return plan;
 }
@@ -39,6 +31,7 @@ export function planStepBacks({ touchpoints = 0, finalDarks = 0 } = {}) {
  */
 export function createStepBacks(guard, noLooks, plan) {
   const planned = new Map(plan.map(p => [p.id, p])), taken = [], declined = {}, readLabels = new Set();
+  let passageLooks = 0;
   const see = paintingLooks(guard, noLooks);
   let current = null;
   const api = {
@@ -57,15 +50,16 @@ export function createStepBacks(guard, noLooks, plan) {
     },
     look(checkpoint, label, mask, options) {
       if (noLooks > 0) return null;
-      if (!current) { declined[checkpoint] = (declined[checkpoint] ?? 0) + 1; return null; }
+      const own = !current && checkpoint === 'passage';
+      if (!current && !own) { declined[checkpoint] = (declined[checkpoint] ?? 0) + 1; return null; }
       if (readLabels.has(label)) throw new Error(`step-backs: '${label}' was read already; each shape is looked at once`);
       readLabels.add(label);
       const out = see(checkpoint, label, mask, options);
-      if (out) current.looks++;
+      if (out) { if (own) passageLooks++; else current.looks++; }
       return out;
     },
     record() {
-      return { planned: plan, taken: taken.map(t => ({ ...t })), shapeLooks: taken.reduce((a, t) => a + t.looks, 0), declinedOutsideStepBacks: { ...declined }, strict: noLooks > 0 };
+      return { planned: plan, taken: taken.map(t => ({ ...t })), shapeLooks: taken.reduce((a, t) => a + t.looks, 0), passageLooks, declinedOutsideStepBacks: { ...declined }, strict: noLooks > 0 };
     },
   };
   return api;

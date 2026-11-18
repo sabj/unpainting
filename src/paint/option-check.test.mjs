@@ -5,9 +5,9 @@ import { ignoredSettings, badNumbers, isSwitchWord, GATES, INERT } from './optio
 const valueOf = flags => name => flags[name];
 
 test('a gated setting typed while its switch is off or absent is reported with the switch it needs', () => {
-  const none = ignoredSettings({ given: ['touchgain'], value: valueOf({ touchgain: '.6' }) });
-  assert.deepEqual(none.map(r => r.flag), ['touchgain']);
-  assert.match(none[0].reason, /--touchpoints/);
+  const none = ignoredSettings({ given: ['skylanemm'], value: valueOf({ skylanemm: '4' }) });
+  assert.deepEqual(none.map(r => r.flag), ['skylanemm']);
+  assert.match(none[0].reason, /--skylanes/);
   const off = ignoredSettings({ given: ['skylanemm'], value: valueOf({ skylanemm: '4', skylanes: '0' }) });
   assert.deepEqual(off.map(r => r.flag), ['skylanemm']);
   const junk = ignoredSettings({ given: ['skylanestep'], value: valueOf({ skylanestep: '.8', skylanes: 'yes' }) });
@@ -16,11 +16,10 @@ test('a gated setting typed while its switch is off or absent is reported with t
 
 test('a gated setting is fine while its switch is on, wherever the switch came from', () => {
   assert.deepEqual(ignoredSettings({ given: ['skylanemm', 'skylanestep'], value: valueOf({ skylanemm: '4', skylanestep: '.8', skylanes: '1' }) }), []);
-  assert.deepEqual(ignoredSettings({ given: ['touchgain'], value: valueOf({ touchgain: '.6', touchpoints: '2' }) }), []);
 });
 
 test('only typed settings are reported, so a recipe default never fails a run', () => {
-  assert.deepEqual(ignoredSettings({ given: [], value: valueOf({ touchgain: '.6' }) }), []);
+  assert.deepEqual(ignoredSettings({ given: [], value: valueOf({ skylanemm: '4' }) }), []);
 });
 
 test('settings no switch can make act are reported whatever else is on', () => {

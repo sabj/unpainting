@@ -1,12 +1,11 @@
 // Settings that were typed but could not act, so a run says so instead of painting as if they had.
 //
 // GATES: a setting that acts only while another is on (the code reads it inside the other's branch). Each entry was
-// checked against its reader: skylanes in skyLaneRadius,
-// touchpoints in the touch-up rounds.
+// checked against its reader: skylanes in skyLaneRadius.
 // INERT: settings whose reader is unreachable. The short dry-brush texture marks run only when _valuePlan.texture is
 // set, and nothing sets it, so --texvariety, --texflow, --texshort and --texpress change no painting.
 export const GATES = Object.freeze({
-  skylanemm: 'skylanes', skylanestep: 'skylanes', touchgain: 'touchpoints',
+  skylanemm: 'skylanes', skylanestep: 'skylanes',
 });
 const NO_TEXTURE = 'the value planner never plans dry-brush texture passages, so it changes no painting';
 export const INERT = Object.freeze({ texvariety: NO_TEXTURE, texflow: NO_TEXTURE, texshort: NO_TEXTURE, texpress: NO_TEXTURE });
