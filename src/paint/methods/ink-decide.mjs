@@ -116,13 +116,15 @@ export function decideLines(lines, ctx, options = {}) {
     const strong = (liveContrast.length ? median(liveContrast, 0, liveContrast.length) : 0) >= o.strongContrast;
     let penPx = 0; for (let j = 1; j < R.length; j++) if (cls[j] === CLASS.pen) penPx += d[j] - d[j - 1];
     const drawnPen = observedInk && penPx >= o.keepPenShare * total;
-    const lenMm = total * pxMm, tooShort = lenMm < 0.3 || (!structural && !strong && !drawnPen && mid?.ink === 'elongated' && lenMm < (mid.minMm ?? 0));
-    const tooTurny = !structural && !strong && !drawnPen && mid?.ink === 'elongated' && physicalTurning(R) > o.elongatedDegPerMm;
+    // leaves are wash even where the source drew them in pen, however dark: only a branch (long, smooth) crosses foliage
+    const leaves = mid?.label === 'foliage', excused = !leaves && (strong || drawnPen);
+    const lenMm = total * pxMm, tooShort = lenMm < 0.3 || (!structural && !excused && mid?.ink === 'elongated' && lenMm < (mid.minMm ?? 0));
+    const tooTurny = !structural && !excused && mid?.ink === 'elongated' && physicalTurning(R) > o.elongatedDegPerMm;
     const keep = share >= o.keepLineShare && !tooShort && !tooTurny;
     const midName = mid?.label ?? 'none';
     if (keep) {
       const { widths: _w, weights: _wt, ...restG } = g;
-      out.push({ ...restG, points: R, inkLabel: midName, inkMinMm: structural || drawnPen ? 0 : (Number.isFinite(mid?.minMm) ? mid.minMm : 0) });
+      out.push({ ...restG, points: R, inkLabel: midName, inkMinMm: structural || (drawnPen && !leaves) ? 0 : (Number.isFinite(mid?.minMm) ? mid.minMm : 0) });
       keptPx += total; add(midName, 'keptPx', total); why(midName, 'kept', total);
       for (let j = 1; j < R.length; j++) if (cls[j] === CLASS.mass) { keptMass += d[j] - d[j - 1]; if (structuralMass[j]) retainedStructuralMass += d[j] - d[j - 1]; }
       continue;

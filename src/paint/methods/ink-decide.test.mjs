@@ -27,8 +27,9 @@ test('the label of the ground decides: foliage is wash only, architecture keeps 
   const arch = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' });
   assert.ok(arch.stats.keptPx > 60);
   const leaves = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }, { ...DECIDE_DEFAULTS, strongContrast: Infinity });
-  // a strong ink stroke is not a leaf: it stays
-  assert.ok(decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx > 20);
+  // leaves are wash even for a strong stroke; a long smooth line through them is a branch and stays
+  assert.equal(decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx, 0);
+  assert.ok(decideLines([line(21, 5, 90)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx > 80);
   assert.equal(leaves.lines.length, 0);
   assert.ok(leaves.stats.droppedMm.short > 4, "a piece too short to be a branch is wash");
   const edge = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: (x, y) => (y < 21 ? 'sky' : 'architecture') });
@@ -397,14 +398,21 @@ test('a tone-mass shadow never takes wash-only or trunk ground, only ground that
   assert.ok(arch.stats.droppedMm.label.shadow_mass > 5);
 });
 
-test('observed source ink is pen by construction: short, turning pen strokes in foliage and under a shadow stay, wash edges and faint marks still go', async () => {
+test('observed source ink is pen by construction, except on leaves: foliage takes only a long smooth branch, a trunk keeps its turning strokes, wash edges and faint marks go', async () => {
   const ctx = (inputKind, extra = {}) => ({ L: inWash(), w: W, h: H, pxMm: PX, inputKind, cellLabel: () => 'foliage', shadow: dark(), ...extra });
-  // a 3 mm stroke is under the foliage minimum (8 mm): wash for a learned line map, a drawn stroke in observed ink
-  for (const kind of [undefined, 'line-map']) assert.equal(decideLines([seg(3)], ctx(kind)).lines.length, 0, String(kind));
-  const stroke = decideLines([seg(3)], ctx('stroke'));
-  assert.equal(stroke.lines.length, 1);
-  assert.equal(stroke.lines[0].inkMinMm, 0, 'the salience step does not undo it');
-  assert.ok(Math.abs(stroke.stats.keptPx * PX - 3) < 0.3);
+  // a 3 mm stroke is under the foliage minimum (8 mm): leaves are wash, whatever made the line (Sam: ink goes on branches, not on leaves)
+  for (const kind of [undefined, 'line-map', 'stroke']) assert.equal(decideLines([seg(3)], ctx(kind)).lines.length, 0, String(kind));
+  // a long smooth stroke through the leaves is a branch and stays, drawn in observed ink
+  const branch = decideLines([seg(12)], ctx('stroke'));
+  assert.equal(branch.lines.length, 1);
+  // the same 3 mm stroke on a trunk is drawn in observed ink
+  const trunk = decideLines([seg(3)], ctx('stroke', { cellLabel: () => 'tree_trunk' }));
+  assert.equal(trunk.lines.length, 1);
+  assert.equal(trunk.lines[0].inkMinMm, 0, 'the salience step does not undo it');
+  assert.ok(Math.abs(trunk.stats.keptPx * PX - 3) < 0.3);
+  // a strong dark stroke in foliage is still a leaf
+  const strongL = inWash(); for (let x = 5; x < 25; x++) { strongL[20 * W + x] = 10; strongL[21 * W + x] = 10; }
+  assert.equal(decideLines([seg(3)], { ...ctx('stroke'), L: strongL }).lines.length, 0);
   // a scallop (two loops of 1.2 mm radius, 15 mm of pen) turns faster than a branch may: drawn only in observed ink
   const loopL = inWash(), loop = { points: [] };
   for (let k = 0; k <= 80; k++) { const a = k / 80 * 4 * Math.PI, x = 60 + 8 * Math.cos(a), y = 50 + 8 * Math.sin(a); loop.points.push({ x, y }); for (const [dx, dy] of [[0, 0], [1, 0], [0, 1]]) loopL[Math.round(y + dy) * W + Math.round(x + dx)] = 35; }
