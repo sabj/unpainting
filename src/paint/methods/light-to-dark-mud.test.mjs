@@ -17,7 +17,8 @@ for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
   density[i] = demand[i * k] + demand[i * k + 1] + demand[i * k + 2];
 }
 const pigments = [{ name: 'hansa yellow', K: [0, 0.06, 0.55] }, { name: 'quinacridone rose', K: [0, 0.45, 0.32] }, { name: 'French ultramarine', K: [0.46, 0.29, 0.05] }];
-const BASE = { demand, k, density, w, h, rgb, pigments, shaped: true, sheetWidthMm: 120, paperRel: true, paperLights: true, layerHue: true, layers: 4 };
+// puddles: false holds the cut by local mix off, so each option below is measured against a baseline that does mix
+const BASE = { demand, k, density, w, h, rgb, pigments, shaped: true, sheetWidthMm: 120, paperRel: true, paperLights: true, layerHue: true, layers: 4, puddles: false };
 const plan = o => planLightToDark({ ...BASE, ...o });
 const orange = i => i % w < w / 2 && Math.floor(i / w) >= TOP;
 
@@ -72,4 +73,9 @@ test('paleLights: a pale plane gets only the first wash, away from its smoothed 
   const later = p => { let c = 0; for (const L of p.layers) if (L._valuePhase !== 'light') for (const sh of L.shapes) for (let i = 0; i < n; i++) if (sh.mask[i] && inside(i)) c++; return c; };
   assert.ok(later(plan({ passCap: 0.5, maskMm: 2 })) > 0);
   assert.equal(later(plan({ paleLights: 0.16, passCap: 0.5, maskMm: 2 })), 0);
+});
+
+test('puddles: the cut by local mix keeps the blue of the grey off the orange in the middle layers without any family flag', () => {
+  const mixed = blueOnOrange(plan({})).mid, cut = blueOnOrange(plan({ puddles: true })).mid;
+  assert.ok(cut < mixed / 4, `blue on orange in the middle layers ${cut} vs ${mixed}`);
 });

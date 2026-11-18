@@ -20,6 +20,7 @@ import {layerFractions,regionCuts} from './layer-cuts.mjs';
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
 import { passage } from '../../crop/blockin.mjs';
+import { puddleLabels, splitByPuddle } from '../../crop/palettewide.mjs';
 import { labOf } from '../../eval/colour.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
@@ -35,7 +36,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=0,floorBrushMm=roleBrushMm(REPO,'floor'),detailBrushMm=roleBrushMm(REPO,'detail'),accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
+export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=0,floorBrushMm=roleBrushMm(REPO,'floor'),detailBrushMm=roleBrushMm(REPO,'detail'),accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
   let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -238,6 +239,8 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   const inkWashCell=i=>cellStyle(i)?.name==='ink-and-wash';
   const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rFloor):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?weights[3][i]+weights[4][i]>0:deep?weights[4][i]>0:weights[3][i]>0&&!(weights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1&&'fine'))}):null;
   const layers=[],instructions=[];let omittedDemand=0;
+  // local colour (palettewide.mjs puddles): a wash that keeps families apart is cut again by the mix of the cells it covers, so a shirt and a face of one family are never one mean wash
+  let PUDDLE_LABELS=null;const puddles=()=>PUDDLE_LABELS??=puddleLabels(demand,k,w,h).labels;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
   // layers>0: the middle values are built as several wide connected wash layers, each dried
   // before the next. Layer 0 covers the whole middle form; each later layer covers only the
@@ -327,7 +330,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       for(const domain of domains){
         const M0=joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
         const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
-        const c=components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
+        const c=groupMode&&cutByMix&&k>1?splitByPuddle(components(M,w,h).labels,puddles(),w,h,step.floor):components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
         const shapes=[];
         for(let id=1;id<=c.count;id++){
