@@ -1,7 +1,7 @@
 // The graphite drawing carries the structure of the subject: the line model's pool, pruned by meaning, drawn whole and light.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { graphitePoolWanted, mergeAuthored } from './graphite-pool.mjs';
+import { graphitePoolWanted, mergeAuthored, edgeStep } from './graphite-pool.mjs';
 import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 test('a graphite drawing from the pool is wanted unless a line source, stages, no drawing or the models are asked off', () => {
@@ -50,4 +50,22 @@ test('the graphite drawing is the longest pool lines up to the prep amount of th
   assert.equal(r.stats.poolKept, 1);
   assert.equal(mergeAuthored(pool, null, { sheetMm: 1000, amount: 1 }).lines.length, 5);
   assert.equal(mergeAuthored(pool, null, { sheetMm: 1000, amount: 0.9 }).lines.length, 3, '100 + 50 + 30 reach 90% of 195');
+});
+
+test('edge step: the tone difference across a line, so a window edge outranks a mortar joint', () => {
+  const w = 100, h = 100, L = new Float32Array(w * h).fill(90);
+  for (let y = 0; y < h; y++) for (let x = 50; x < w; x++) L[y * w + x] = 40;      // a strong edge at x 50
+  for (let y = 0; y < h; y++) for (let x = 20; x < 30; x++) L[y * w + x] = 86;      // a faint step at x 20
+  const vertical = x => ({ points: Array.from({ length: 30 }, (_, k) => [x, 10 + k * 2]) });
+  assert.ok(edgeStep(vertical(50), L, w, h, 0.5) > 40);
+  assert.ok(edgeStep(vertical(20), L, w, h, 0.5) < 6);
+  assert.equal(edgeStep(vertical(75), L, w, h, 0.5), 0, 'a line inside a flat mass has no step');
+});
+
+test('with an edge score the budget keeps the strongest edges, not the longest lines', () => {
+  const mk = (n, y) => L([0, y], [n, y]);
+  const pool = { image: { w: 1000, h: 1000 }, lines: [mk(100, 0), mk(60, 100), mk(40, 200)] };
+  const score = g => (g.points[0][1] === 100 ? 10 : 1) * (g.points.at(-1)[0] - g.points[0][0]);   // the middle line is on a strong edge
+  const r = mergeAuthored(pool, null, { sheetMm: 1000, amount: 0.3, score });
+  assert.deepEqual(r.lines.map(g => g.points[0][1]), [100]);
 });
