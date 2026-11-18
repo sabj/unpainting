@@ -3,6 +3,7 @@ import {TECHNIQUES} from './lay.mjs';
 import {normalizePassageMove,passageFamily,passageMaterial} from '../techniques/passage-plan.mjs';
 import {resolveStyle,profileTechnique,loadStyle} from '../styles/loader.mjs';
 import {matchCellLight,createMassTone} from './mass-tone.mjs';
+import {createShadowGlazes,MAX_GLAZES} from './shadow-glaze.mjs';
 import {paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mjs';
 import {normalizeWashWeights} from './wash-weights.mjs';
 import {reserveLights,validateReserves,brushFootprintCells} from './light-reserves.mjs';
@@ -233,6 +234,9 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   if(cellLight){if(!rgb||!pigments.length)throw Error('cellLight needs the target colours and the pigments');const fit=matchCellLight({demand,rgb,pigments,paperRGB:paperRGB??[252,251,248],k,protect:protectedCells});demand=fit.demand;opticsReport={rule:'cell light',matched:fit.matched,unmatched:fit.unmatched,meanScale:fit.meanScale};console.log(`plan optics: ${fit.matched} cells matched to their light at a mean ${fit.meanScale.toFixed(3)} of the fitted paint; ${fit.unmatched} out of reach and left as fitted`);}
   if(massTone&&!pigments.length)throw Error('massTone needs the pigments');
   const TONE=massTone?createMassTone({n,pigments,paperRGB:paperRGB??[252,251,248]}):null;let toneSum=0,toneArea=0;
+  // shadow glazes (shadow-glaze.mjs): the shadow bands are charged against the paint the earlier passes have laid, a value step at a time
+  const inkWashCell=i=>cellStyle(i)?.name==='ink-and-wash';
+  const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rFloor):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?weights[3][i]+weights[4][i]>0:deep?weights[4][i]>0:weights[3][i]>0&&!(weights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1))}):null;
   const layers=[],instructions=[];let omittedDemand=0;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
   // layers>0: the middle values are built as several wide connected wash layers, each dried
@@ -274,17 +278,19 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
+  if(GLAZE){const at=steps.findIndex(s=>s.band===4),G=(g,band,tag,deep)=>({band,tag,glaze:g,deep,last:g===MAX_GLAZES-1&&deep!==false,floor:minShape,wt:null});steps.splice(at,2,G(0,4,''),...Array.from({length:MAX_GLAZES-1},(_,q)=>[G(q+1,4,'G'+(q+1),false),G(q+1,5,q?'D'+(q+1):'',true)]).flat());}
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
   // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,
   // and paint cannot be taken back: carrying only the lack into the next band would lay it twice.
   const carry=passCap>0&&!massTone?Array.from({length:k},()=>new Float32Array(n)):null;
   for(const step of steps){const band=step.band;
+    if(step.glaze!==undefined){const gl=GLAZE.glaze({last:step.last,deep:step.deep,remaining:MAX_GLAZES-step.glaze}),old=step.glaze===0||(step.glaze===1&&step.deep)?weights[band-1]:null;step.ask=gl.ask;step.wt=Float32Array.from(gl.wt,(v,i)=>inkWashCell(i)?(old?old[i]:0):v);console.log(`shadow glaze ${step.glaze+1}${step.deep===true?' (deepest cells)':step.deep===false?' (middle-dark cells)':''}: ${gl.cells} cells still too light, by ${gl.gap95.toFixed(1)} L* at the 95th percentile; one value step is ${GLAZE.step.toFixed(1)} L*`);}
     const phase=band===1?'light':band<=3?'mid':'shadow',lo=band===1?0:VALUE_CAPS[band-2],hi=VALUE_CAPS[band-1];
     for(let pigment=0;pigment<k;pigment++){
       const G=new Float32Array(n),mask=new Uint8Array(n),placed=carry&&!step.pig?new Float32Array(n):null,carried=placed,elig=carried&&maskMm>0&&shaped&&phase!=='light'?new Uint8Array(n):null,carryAt=i=>carry[pigment][i];
       for(let i=0;i<n;i++){const v=value.values[i];if(protectedCells[i]||(!rgb&&v===0))continue;let fitted=demand[i*k+pigment];if(step.pig){if(step.pig[i]!==pigment)continue;let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];fitted=mass;}
-        const cellScale=step.wt[i];G[i]=fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
+        const cellScale=step.wt[i];G[i]=step.ask&&!inkWashCell(i)?step.ask[i*k+pigment]:fitted*cellScale;if(placed){const g=G[i]+carry[pigment][i];G[i]=keepMask&&G[i]>1e-8?Math.max(1e-6,g):Math.max(0,g);carry[pigment][i]=Math.min(0,g-(keepMask&&G[i]===1e-6?1e-6:0));}mask[i]=cellStyle(i)?.name==='ink-and-wash'?(step.wt[i]>0?1:0):phase==='shadow'?((shadowMask[i]||accentCells[i])&&step.wt[i]>0?1:0):1;if(elig)elig[i]=mask[i]&&step.wt[i]>0?1:0;if(shaped&&G[i]<=1e-8)mask[i]=0;if(pigShare>0&&!step.pig&&mask[i]){let mass=0;for(let q=0;q<k;q++)mass+=demand[i*k+q];if(!(demand[i*k+pigment]>=pigShare*mass&&mass>0))mask[i]=0;}}
       // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
       // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
       // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
@@ -337,7 +343,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
           if(total<=1e-8)continue;const amount=carried?quantileOf(list,G,passCap):total/list.length;const sh=passage(c.labels,id,box,amount,list.length,w);
           sh.mix=Array.from({length:k},(_,j)=>j===pigment?amount:0);
           // massTone: the flat charge is brought to the strength that returns the light its cells asked for
-          if(TONE){const f=TONE.strength(list,sh.mix,(i,q)=>q===pigment?G[i]:0);sh.mix=sh.mix.map(v=>v*f);sh.amount=amount*f;sh._tone=f;TONE.lay(list,sh.mix);toneSum+=f*list.length;toneArea+=list.length;}
+          if(TONE){const f=TONE.strength(list,sh.mix,(i,q)=>q===pigment?G[i]:0);sh.mix=sh.mix.map(v=>v*f);sh.amount=amount*f;sh._tone=f;TONE.lay(list,sh.mix);GLAZE.lay(list,sh.mix);toneSum+=f*list.length;toneArea+=list.length;}
           if(placed)for(const i of list)placed[i]=sh.amount;sh.graded=null;sh._follow=true;
           const key=`${phase}/b${band}${step.tag}/p${pigment}/r${domain<0?'lit'+(-domain):domain}/s${id}`;
           const cue=touched.map(r=>r.referenceCue).join(' ');
