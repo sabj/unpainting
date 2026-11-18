@@ -236,7 +236,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   const TONE=massTone?createMassTone({n,pigments,paperRGB:paperRGB??[252,251,248]}):null;let toneSum=0,toneArea=0;
   // shadow glazes (shadow-glaze.mjs): the shadow bands are charged against the paint the earlier passes have laid, a value step at a time
   const inkWashCell=i=>cellStyle(i)?.name==='ink-and-wash';
-  const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rFloor):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?weights[3][i]+weights[4][i]>0:deep?weights[4][i]>0:weights[3][i]>0&&!(weights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1))}):null;
+  const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rFloor):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?weights[3][i]+weights[4][i]>0:deep?weights[4][i]>0:weights[3][i]>0&&!(weights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1&&'fine'))}):null;
   const layers=[],instructions=[];let omittedDemand=0;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
   // layers>0: the middle values are built as several wide connected wash layers, each dried
@@ -278,7 +278,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
-  if(GLAZE){const at=steps.findIndex(s=>s.band===4),G=(g,band,tag,deep)=>({band,tag,glaze:g,deep,last:g===MAX_GLAZES-1&&deep!==false,floor:minShape,wt:null});steps.splice(at,2,G(0,4,''),...Array.from({length:MAX_GLAZES-1},(_,q)=>[G(q+1,4,'G'+(q+1),false),G(q+1,5,q?'D'+(q+1):'',true)]).flat());}
+  if(GLAZE){const at=steps.findIndex(s=>s.band===4),G=(g,band,tag,deep)=>({band,tag,glaze:g,deep,last:g===MAX_GLAZES-1&&deep!==false,floor:minShape,holeFloor:smallShape,wt:null});steps.splice(at,2,G(0,4,''),...Array.from({length:MAX_GLAZES-1},(_,q)=>[G(q+1,4,'G'+(q+1),false),G(q+1,5,q?'D'+(q+1):'',true)]).flat());}
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
   // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,

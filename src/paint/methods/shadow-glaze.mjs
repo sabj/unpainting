@@ -38,7 +38,7 @@ export function valueStepL(lightness) {
 
 /**
  * The ledger of one plan. `demand` is the fitted paint per cell (n * k, after the cell-light match); `eligible(i, glaze)`
- * (glaze is the options object glaze() was called with) says which cells a glaze may cover; `squint(field)` blurs a per-cell field over the distance a wash can hold (the
+ * (glaze is the options object glaze() was called with) says which cells a glaze may cover: false, true, or 'fine' for a small dark that is read cell by cell; `squint(field)` blurs a per-cell field over the distance a wash can hold (the
  * planner's own squint), so a glaze answers the shape of the gap and never traces a feature finer than a wash.
  * lay(list, mix) books a pass as the planner makes it. glaze({ last }) returns, for the cells still too light, `wt` (1
  * where the glaze covers), `ask` (n * k, the paint each cell asks) and the gap seen.
@@ -62,8 +62,10 @@ export function createShadowGlazes({ n, k, pigments, paperRGB, demand, eligible,
       for (let i = 0; i < n; i++) { sums(i, (q, j) => laid[q * k + j], kx, sx); now[i] = filmLight(kx, sx, paper); }
       const nowSquint = squint(now), seen = [];
       for (let i = 0; i < n; i++) {
-        if (!eligible(i, options)) continue;
-        const gap = lightnessOf(nowSquint[i], paperLight) - lightnessOf(idealSquint[i], paperLight);
+        const kind = eligible(i, options);
+        if (!kind) continue;
+        // a small dark (kind 'fine') is read cell by cell: squinting would blur it away, and it asks only for its own gap
+        const gap = kind === 'fine' ? lightnessOf(now[i], paperLight) - lightnessOf(ideal[i], paperLight) : lightnessOf(nowSquint[i], paperLight) - lightnessOf(idealSquint[i], paperLight);
         if (gap >= floorL) { gapAt[i] = gap; seen.push(gap); }
       }
       // A glaze closes one value step. When the glazes still to come could not close the gap seen at that rate, the
