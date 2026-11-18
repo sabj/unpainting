@@ -49,7 +49,13 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
   const cellLabel = (x, y) => (seg ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
   // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
   if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }
-  const r = decideLines(doc.lines.map(g => ({ ...g, points: toPoints(g) })), { L, w, h, pxMm, inputKind: doc.inputKind, cellLabel, shadow, foliage: foliageCells }, o);
+  // a traced pool arrives in pieces cut at junctions and fades. Pieces of one contour join first (collinear across a gap of up
+  // to --inkjoin mm, never a squiggle), so a contour is decided as one line and then drawn whole or left off whole.
+  let candidates = doc.lines.map(g => { const { widths: _w, weights: _g, ...rest } = g; return { ...rest, points: toPoints(g) }; });
+  const chained = { before: candidates.length, after: candidates.length };
+  if (joinMm > 0) { candidates = joinCollinear(candidates, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm }); chained.after = candidates.length; }
+  const r = decideLines(candidates, { L, w, h, pxMm, inputKind: doc.inputKind, cellLabel, shadow, foliage: foliageCells }, o);
+  r.stats.chained = chained;
   let kept = r.lines, geometry = null;
   // --inkgeom 1: straight runs and arcs where the source shows them; squiggles that are not forms or features are left to the wash
   if (geom) {

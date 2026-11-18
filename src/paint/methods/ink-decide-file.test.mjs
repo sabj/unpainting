@@ -56,3 +56,15 @@ test('face and hands are never taken for shadow: a pen line in a dark face regio
   const r = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: () => {}, run: replying({ 1: 'face', 2: 'sky' }) });
   assert.ok(r.lines.some(g => g.points[0][0] < W / 2));
 });
+
+test('pieces of one contour are joined before the decision, so a contour is decided and drawn as one line', async () => {
+  const s = await setup();
+  const piece = (x0, x1) => ({ points: Array.from({ length: 12 }, (_, k) => [x0 + (x1 - x0) * k / 11, 30.5]), inputKind: 'line-map' });
+  const doc = { image: { w: W, h: H }, inputKind: 'line-map', lines: [piece(5, 25), piece(32, 52), piece(59, 75)] };
+  const joined = await decideFile({ doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false, joinMm: 2.5 });
+  assert.equal(joined.lines.length, 1);
+  assert.equal(joined.record.stats.chained.before, 3);
+  assert.equal(joined.record.stats.chained.after, 1);
+  const apart = await decideFile({ doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false });
+  assert.equal(apart.lines.length, 3, 'with no join distance the pieces stay as they came');
+});
