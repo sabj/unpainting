@@ -6,6 +6,8 @@ import {matchCellLight,createMassTone} from './mass-tone.mjs';
 import {paperLightReference,paperLightTest,isPaperLight} from './paper-colour.mjs';
 import {normalizeWashWeights} from './wash-weights.mjs';
 import {reserveLights,validateReserves,brushFootprintCells} from './light-reserves.mjs';
+import {roleBrushMm} from './brush-footprint.mjs';
+import {fileURLToPath} from 'node:url';
 import {choosePassageBrush} from './passage-brush.mjs';
 import {mergePlaneFragments} from '../techniques/shaped-marks.mjs';
 import {planLanes} from './stroke-plan.mjs';
@@ -20,6 +22,7 @@ import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
+const REPO=fileURLToPath(new URL('../../..',import.meta.url));
 // The q quantile of G over a passage's cells.
 function quantileOf(list,G,q){const v=Float32Array.from(list,i=>G[i]).sort();return v[Math.min(v.length-1,Math.max(0,Math.floor(q*(v.length-1))))];}
 const neighbors = (i,w,n) => [i%w?i-1:-1,i%w<w-1?i+1:-1,i>=w?i-w:-1,i+w<n?i+w:-1].filter(j=>j>=0);
@@ -31,7 +34,7 @@ function targetValueMap(density) {
   const bands=Uint8Array.from(values,v=>v<=0?0:VALUE_CAPS.findIndex(t=>v<=t)+1||5);
   return {peak,values,bands};
 }
-export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=2,accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
+export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=calibratedPlan,massTone=calibratedPlan,smallLightMax=120,detailScale=0,detailSegments=null,layerLocal=false,smallMarks=false,smallIsolationMm=0,washJoin=false,bandRound=false,valueFloor=null,demand,k,density,w,h,hold=null,families=[],reserves=[],paleHold=null,sheetWidthMm=280,rgb=null,paperRGB=null,shaped=false,subject=null,pigments=[],brushChoice=false,midDomains=true,nested=false,layers:washLayers=0,layerHue=false,edgeFadeMm=0,edgeWobbleMm=0,strokePlan=false,laneMm=6,laneAdapt=false,strokeMm=30,washReachMm=0,layerTexture=false,skySplit=false,styleSelection=null,styleGain=1,layerSmoothMm=0,floorBrushMm=roleBrushMm(REPO,'floor'),detailBrushMm=roleBrushMm(REPO,'detail'),accentShare=0,accentMin=.55,paperLights=false,paperDelta=null,paperRel=false,shadowThresh=.38,shadowWater=0,cellFamilies=false,minShapeCells=0,skyOneLayer=false,layerIncrement=false,nestedBands=calibratedPlan,ownSwatch=false,stepHoles=nestedBands,stepSquint=nestedBands,pigShare=0,hueChroma=0,hueChromaLab=false,shadowFamilies=false,passCap=0,carryMm=0,holeFill=0,keepMask=false,maskMm=0,paleLights=0,smallestBrushMm=0,lightFamilies=false,laneMax=0}) {
   let coolGroup=null;
   // A plan with a styleSelection reads its decisions from the profile. precise-watercolor is the identity profile
   // (the shaped planner's own weights and water); every other style replaces them from its JSON.
@@ -48,9 +51,15 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   validateReserves(reserves);
   // Broad target lights, simplified before any paint. Explicit glints survive the
   // area filter; inferred isolated white pixels are not a painting instruction.
-  // minShapeCells (whole paintings): a fixed shape floor in cells. The automatic floor grows with sheet area and drops
-  // small face shadow shapes.
-  const minShape=minShapeCells>0?minShapeCells:Math.max(shaped?144:4,Math.round(w*h*.00015));
+  // Shape floors come from the brushes on this sheet (brushes.json), not from the canvas area: the least a wash may hold, and
+  // the least paper it may go round, is one touch of the smallest brush that lays that step. The first wash and the first
+  // middle layer are laid with the floor brush (round4), so they stay broad and connected. Later layers and the darks may
+  // use the detail brush (the rigger), so small lights and mid shapes appear where the form is built up.
+  // minShapeCells: a fixed floor in cells for every step, instead of the brushes'.
+  const cellMm=sheetWidthMm/w,minShape=minShapeCells>0?minShapeCells:brushFootprintCells(floorBrushMm,cellMm),smallShape=minShapeCells>0?minShapeCells:brushFootprintCells(detailBrushMm,cellMm);
+  // A wash holds no shape finer than the brush that lays it: values are squinted over that brush's width (layerSmoothMm
+  // overrides both with one radius in mm).
+  const radiusOf=mm=>Math.max(1,Math.round(mm/cellMm)),rFloor=radiusOf(layerSmoothMm>0?layerSmoothMm:floorBrushMm/2),rDetail=radiusOf(layerSmoothMm>0?layerSmoothMm:detailBrushMm/2);
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 (or 14/14/18 on warm cream paper) below it per channel is a light. With --paperbase source the sheet takes that colour too.
   let PAP = null;
@@ -199,21 +208,25 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // stepSquint: the value steps are cut from the squinted picture, the value smoothed over layerSmoothMm as the middle
   // layers' own cuts are. A wash holds no shape finer than that; cut cell by cell, each step is a tracing of the target.
   // Each cell still asks for its own paint, so a wash's charge is the mass tone of the cells it covers.
-  const SQUINT=nestedBands&&stepSquint&&layerSmoothMm>0?boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))):null;
-  if(nestedBands)for(let i=0;i<n;i++){
+  // The first wash and the first middle layer take the steps squinted over the floor brush; later layers and the darks
+  // take them squinted over the detail brush (fineWeights).
+  const SQUINT=nestedBands&&stepSquint?boxMeanValue(value.values,w,h,rFloor):null,SQUINT_FINE=nestedBands&&stepSquint?boxMeanValue(value.values,w,h,rDetail):null;
+  const fineWeights=weights.map(a=>Float32Array.from(a));
+  const cutSteps=(set,field)=>{for(let i=0;i<n;i++){
     if(profile&&cellStyle(i).name==='ink-and-wash')continue;
     if(accentCells[i])continue;
-    const v=SQUINT?SQUINT[i]:value.values[i];
-    let asked=0;for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;weights[band][i]=Math.max(0,Math.min(v,VALUE_CAPS[band])-lo);asked+=weights[band][i];}
-    for(let band=0;band<5;band++)weights[band][i]=asked>0?weights[band][i]/asked*styleGain:0;
-    if(!shadowMask[i]){weights[1][i]+=weights[3][i]+weights[4][i];weights[3][i]=0;weights[4][i]=0;}
-  }
+    const v=field?field[i]:value.values[i];
+    let asked=0;for(let band=0;band<5;band++){const lo=band?VALUE_CAPS[band-1]:0;set[band][i]=Math.max(0,Math.min(v,VALUE_CAPS[band])-lo);asked+=set[band][i];}
+    for(let band=0;band<5;band++)set[band][i]=asked>0?set[band][i]/asked*styleGain:0;
+    if(!shadowMask[i]){set[1][i]+=set[3][i]+set[4][i];set[3][i]=0;set[4][i]=0;}
+  }};
+  if(nestedBands){cutSteps(weights,SQUINT);cutSteps(fineWeights,SQUINT_FINE);}
   // paleLights v: pale planes (smoothed value at most v, at least a minimum shape) are pale local colour, one clean
   // wash: their whole demand goes to band 1 and no middle layer or glaze crosses them.
-  if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w)))),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
+  if(paleLights>0&&shaped){const sv=boxMeanValue(value.values,w,h,rFloor),pale=removeSmall(closeLocal(Uint8Array.from(sv,(v,i)=>v<=paleLights&&!protectedCells[i]?1:0),w,h,1),w,h,minShape);
     for(let i=0;i<n;i++)if(pale[i]){let t=0;for(let b=0;b<5;b++){t+=weights[b][i];weights[b][i]=0;}weights[0][i]=t;}}
   const styleNames=profile?(cellProf?Object.keys(styleByName):[...new Set(regionProfiles.map(p=>p.name))]):[];
-  if(calibratedPlan)normalizeWashWeights(weights);
+  if(calibratedPlan){normalizeWashWeights(weights);normalizeWashWeights(fineWeights);}
   let opticsReport=null;
   // cellLight and massTone (mass-tone.mjs): each cell's paint is the film that returns its light, and each wash is
   // charged at its shape's mass tone, not at the mean paint of its cells.
@@ -225,10 +238,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // layers>0: the middle values are built as several wide connected wash layers, each dried
   // before the next. Layer 0 covers the whole middle form; each later layer covers only the
   // darker part of the smoothed value field, so value builds gradually.
-  const steps=[1,2,3,4,5].map(band=>({band,wt:weights[band-1],tag:''}));
+  // The darks keep the floor brush's scale: the dark end is not built from the small brushes here.
+  const steps=[1,2,3,4,5].map(band=>({band,wt:(band===3?fineWeights:weights)[band-1],tag:'',floor:band===3?smallShape:minShape}));
   if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'){
-    const r=Math.max(1,Math.round(layerSmoothMm/(sheetWidthMm/w))),sm=boxMeanValue(value.values,w,h,r);
-    const rBroad=Math.max(r,Math.round(2/(sheetWidthMm/w))),smBroad=rBroad>r?boxMeanValue(value.values,w,h,rBroad):sm;
+    const sm=boxMeanValue(value.values,w,h,rDetail),smBroad=sm;
     const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(smBroad[i]);live.sort((a,b)=>a-b);
     const QF=layerFractions(washLayers);
     const q=QF.map(f=>live[Math.floor(f*(live.length-1))]??0);
@@ -243,7 +256,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // walls and grounds keep the 4 smooth sheet-wide layers.
     const localQ=layerLocal?regionCuts(region.labels,sm,i=>!protectedCells[i]&&weights[1][i]>0&&!skyCells?.[i],QF,minShape*6):null;
     const broadStride=washLayers>4?Math.max(1,Math.round(washLayers/4)):1;
-    const cover=q.map((t,j)=>{if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);const mask=Uint8Array.from(sm,(v,i)=>{if(skyCells?.[i])return 0;const lq=localQ?.get(region.labels[i]);if(lq)return v>lq[j]?1:0;if(j%broadStride!==0)return 0;return smBroad[i]>t?1:0;});return removeSmall(closeLocal(mask,w,h,layerSmoothMm<2?1:2),w,h,layerSmoothMm<2?minShape:minShape*4);});
+    const cover=q.map((t,j)=>{if(j===0)return Uint8Array.from(sm,(v,i)=>weights[1][i]>0?1:0);const mask=Uint8Array.from(sm,(v,i)=>{if(skyCells?.[i])return 0;const lq=localQ?.get(region.labels[i]);if(lq)return v>lq[j]?1:0;if(j%broadStride!==0)return 0;return smBroad[i]>t?1:0;});return dropHalos(removeSmall(closeLocal(mask,w,h,rDetail),w,h,smallShape),w,h,value.values,t,smallShape);});
     const count=new Uint8Array(n);for(const c of cover)for(let i=0;i<n;i++)count[i]+=c[i];
     // The layers carry all middle demand; no separate per-region band-3 patchwork.
     // layerIncrement: each layer carries the value step between its threshold and the next layer's, as a painter lays
@@ -255,7 +268,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // threshold and the next layer's (layerShares over the range the middle bands span).
     const midLo=VALUE_CAPS[0],midHi=VALUE_CAPS[layerTexture?1:2],inMid=v=>Math.min(midHi,Math.max(midLo,v))-midLo;
     const share=nestedBands?layerShares(cover,typeof effThresholds==='function'?i=>effThresholds(i).map(inMid):effThresholds.map(inMid),Float32Array.from(sm,inMid),n):layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
-    const layerSteps=cover.map((c,j)=>({band:2,tag:'L'+j,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(weights[1][i]+(layerTexture?0:weights[2][i]))*(share?share[j][i]:1/count[i]):0)}));
+    const layerSteps=cover.map((c,j)=>{const W=j?fineWeights:weights;return {band:2,tag:'L'+j,floor:j?smallShape:minShape,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(W[1][i]+(layerTexture?0:W[2][i]))*(share?share[j][i]:1/count[i]):0)};});
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
@@ -273,7 +286,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
       // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
       // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
-      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,minShape);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
+      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,step.floor);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
       // maskMm: where a carried glaze goes is judged over a brush-sized area, not cell by cell: the mask is the
@@ -302,7 +315,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // instead of being dropped as a bare-paper shard.
       const keyOfDomain=d=>d<0?7:groupMode?coolGroup[d]:typeof d==='string'?domains.indexOf(d)+1:d;
       const cellGroup=i=>groupMode?coolGroup[region.labels[i]]:typeof domains[0]==='string'?domains.indexOf(cellStyle(i).name)+1:region.labels[i];
-      const joined=(washJoin||(stepHoles&&!step.pig))&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,minShape):null;
+      const joined=(washJoin||(stepHoles&&!step.pig))&&domains.length>1?joinDomainFragments(mask,w,h,cellGroup,step.floor):null;
       for(const domain of domains){
         const M0=joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
         const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
@@ -310,7 +323,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
         const shapes=[];
         for(let id=1;id<=c.count;id++){
-          const list=cells[id];if(!list.length)continue;if(n>100&&list.length<(DETAIL?localMinShape(minShape,meanOver(list,DETAIL),detailScale):minShape)&&!(phase==='shadow'&&list.length>=SMALL_MIN&&list.some(i=>accentCells[i]))){omittedDemand+=list.reduce((sum,i)=>sum+G[i],0);continue;}
+          const list=cells[id];if(!list.length)continue;if(n>100&&list.length<(DETAIL?localMinShape(step.floor,meanOver(list,DETAIL),detailScale):step.floor)&&!(phase==='shadow'&&list.length>=SMALL_MIN&&list.some(i=>accentCells[i]))){omittedDemand+=list.reduce((sum,i)=>sum+G[i],0);continue;}
           const touched=[...new Set(list.map(i=>region.labels[i]))].map(i=>region.regions[i-1]);
           const box={x0:w,y0:h,x1:-1,y1:-1},soft=[],hard=[];let total=0;
           for(const i of list){const x=i%w,y=Math.floor(i/w);box.x0=Math.min(box.x0,x);box.x1=Math.max(box.x1,x);box.y0=Math.min(box.y0,y);box.y1=Math.max(box.y1,y);total+=G[i];
@@ -451,6 +464,10 @@ export function softBoundaryPaths(cells,w,n){
  while(remaining.size){let i=remaining.values().next().value;const chain=[];while(remaining.has(i)){remaining.delete(i);chain.push({x:i%w+.5,y:Math.floor(i/w)+.5});const x=i%w,y=Math.floor(i/w),adj=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy,j=yy*w+xx;if((dx||dy)&&xx>=0&&xx<w&&yy>=0&&j<n&&remaining.has(j))adj.push(j);}if(!adj.length)break;i=adj[0];}if(chain.length>=3)paths.push(chain);}
  return paths;
 }
+
+// Components of a layer cover with fewer than `min` unsquinted cells above the cut: the halo the squint grows round a speck, not a
+// shape the brush can lay. A speck smaller than the brush is left to the layer below.
+function dropHalos(mask,w,h,raw,cut,min){const c=components(mask,w,h),count=new Int32Array(c.count+1);for(let i=0;i<mask.length;i++)if(c.labels[i]&&raw[i]>cut)count[c.labels[i]]++;return Uint8Array.from(mask,(v,i)=>v&&count[c.labels[i]]>=min?1:0);}
 
 function boxMeanValue(src,w,h,r){const n=w*h,row=new Float32Array(n),out=new Float32Array(n);
   for(let y=0;y<h;y++){let s=0,c=0;for(let x=-r;x<w+r;x++){const a=x+r,b=x-r-1;if(a>=0&&a<w){s+=src[y*w+a];c++;}if(b>=0&&b<w){s-=src[y*w+b];c--;}if(x>=0&&x<w)row[y*w+x]=s/c;}}
