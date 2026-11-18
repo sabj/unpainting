@@ -12,7 +12,7 @@ import { linePaths, readLineText } from '../../crop/lines.mjs';
 import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 /** The graphite opening pressure of the pool drawing: a drawing, not a finish. */
-export const GRAPHITE_POOL_PRESSURE = '0.35';
+const GRAPHITE_POOL_PRESSURE = '0.35';
 
 const last = (argv, name) => { const at = argv.lastIndexOf(name); return at >= 0 ? argv[at + 1] : undefined; };
 const isGraphite = v => v === undefined || v === 'graphite' || /^graphite-/.test(String(v));
