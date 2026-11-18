@@ -121,3 +121,17 @@ test('a glaze limits itself to one value step, unless the glazes left could not 
   assert.ok(Math.abs(after(last.ask) - ideal) < 0.2);
   assert.ok(Math.abs(after(many.ask) - (before - ledger.step)) < 0.5);
 });
+
+test('a small dark asks only for its own gap: read cell by cell it is covered, squinted it is blurred away', () => {
+  const n = 24, pale = [0.05, 0.02], dark = [2.4, 1.6];
+  const demand = Float32Array.from({ length: n * 2 }, (_, q) => ((q >> 1) === 12 ? dark : pale)[q % 2]);
+  const box = field => Float32Array.from(field, (_, i) => { let s = 0, c = 0; for (let d = -12; d <= 12; d++) { const j = i + d; if (j >= 0 && j < n) { s += field[j]; c++; } } return s / c; });
+  // the washes laid the pale paint everywhere but on the small dark
+  const covered = kind => { const ledger = createShadowGlazes({ n, k: 2, pigments: PIGS, paperRGB: PAPER, demand, eligible: i => (i === 12 ? kind : false), squint: box }); ledger.lay(Array.from({ length: n }, (_, i) => i).filter(i => i !== 12), pale); return ledger.glaze(); };
+  assert.equal(covered(true).wt[12], 0, 'a one-cell dark under the squint of the whole strip is no gap');
+  const own = covered('fine');
+  assert.equal(own.wt[12], 1);
+  // nothing is laid on it, so its gap is the whole of its own paint: no more than its fitted paint is asked
+  for (let j = 0; j < 2; j++) assert.ok(own.ask[12 * 2 + j] <= demand[12 * 2 + j] + 1e-6);
+});
+
