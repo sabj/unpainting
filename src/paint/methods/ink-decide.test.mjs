@@ -472,3 +472,12 @@ test('a line with a wash-only label under most of it is dropped whole; with the 
   assert.equal(littleSky.lines.length, 1);
   assert.ok(Math.abs(arcMm(littleSky.lines[0].points, PX) - arcMm(g.points, PX)) < 0.01);
 });
+
+test('the lines dropped are returned with the reason that mostly cut them, so a joint between kept lines can be restored', () => {
+  const mass = decideLines([poly([21, 5, 30], [60, 30, 140])], ARCH);
+  assert.equal(mass.dropped.length, 1);
+  assert.equal(mass.dropped[0].dropWhy, 'mass');
+  const sky = decideLines([poly([21, 5, 150])], { ...ARCH, cellLabel: () => 'sky' }, { ...DECIDE_DEFAULTS, strongContrast: Infinity, structureMm: Infinity });
+  assert.equal(sky.dropped[0].dropWhy, 'label');
+  assert.equal(decideLines([poly([21, 5, 150])], ARCH).dropped.length, 0, 'a kept line is not in it');
+});

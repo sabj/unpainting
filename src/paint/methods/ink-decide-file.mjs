@@ -13,11 +13,14 @@ import { hatchShadows, HATCH_DEFAULTS } from './line-hatch.mjs';
 import { salience } from './line-salience.mjs';
 import { joinCollinear } from './line-geometry.mjs';
 import { fairLines, dropWandering } from './line-fair.mjs';
+import { restoreBridges } from './line-bridge.mjs';
 import { prunePenLines } from './pen-wash-lines.mjs';
 import { estimateInkDark } from './line-class.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import sharp from 'sharp';
 
+// a gnarled line this long and this dark is a trunk or a main branch
+const LONG_DARK_MM = 20;
 const toPoints = g => g.points.map(([x, y], k) => ({ x, y, ...(Array.isArray(g.widths) && g.widths.length === g.points.length ? { width: g.widths[k] } : {}), ...(Array.isArray(g.weights) && g.weights.length === g.points.length ? { weight: g.weights[k] } : {}) }));
 const r2 = v => Math.round(v * 100) / 100;
 function fromPoints(g, pts) {
@@ -57,10 +60,13 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
   // to --inkjoin mm, never a squiggle), so a contour is decided as one line and then drawn whole or left off whole.
   let candidates = doc.lines.map(g => { const { widths: _w, weights: _g, ...rest } = g; return { ...rest, points: toPoints(g) }; });
   const chained = { before: candidates.length, after: candidates.length };
-  if (joinMm > 0) { candidates = joinCollinear(candidates, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm }); chained.after = candidates.length; }
+  // each piece is faired first: the trace grid's tremor reads as a squiggle and keeps a piece from being chained to its own ridge
+  if (joinMm > 0) { candidates = joinCollinear(fairLines(candidates, { pxMm }).lines, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm }); chained.after = candidates.length; }
   const r = decideLines(candidates, { L, w, h, pxMm, inputKind: authored ? 'line-map' : doc.inputKind, cellLabel, shadow, foliage: foliageCells }, o);
   r.stats.chained = chained;
-  let kept = r.lines, geometry = null;
+  // a short line the evidence cut, whose ends both meet kept lines, is structure that joins what is drawn: restored (line-bridge.mjs)
+  const bridged = restoreBridges(r.dropped, r.lines, { pxMm });
+  let kept = [...r.lines, ...bridged.lines.map(({ dropWhy: _why, ...g }) => g)], geometry = null;
   // --inkgeom 1: straight runs and arcs where the source shows them; squiggles that are not forms or features are left to the wash
   if (geom) {
     const isFeature = (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y)))));
@@ -71,8 +77,13 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
   if (joinMm > 0) kept = joinCollinear(kept, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm });
   // a kept line follows its ridge and is drawn as a straight run, a clean arc or one smooth curve, with corners kept (line-fair.mjs):
   // the ridge is traced on a grid of a quarter millimetre or more, and no pen shakes as that grid does
+  // a long line as dark as the source's own ink may reverse its curvature: a gnarled trunk is no scribble
+  // the tone on the line: the darkest cell within two of each point, since fairing moves a point a fraction of a line width
+  const darkestNear = p => { let m = Infinity; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) m = Math.min(m, L[Math.max(0, Math.min(h - 1, Math.round(p.y) + dy)) * w + Math.max(0, Math.min(w - 1, Math.round(p.x) + dx))]); return m; };
+  const meanOn = g => g.points.reduce((t, p) => t + darkestNear(p), 0) / g.points.length;
+  const longDark = g => Number.isFinite(o.inkDark) && g.points.reduce((t, p, k) => (k ? t + Math.hypot(p.x - g.points[k - 1].x, p.y - g.points[k - 1].y) : 0), 0) * pxMm >= LONG_DARK_MM && meanOn(g) <= o.inkDark;
   // (a plan's authored curls are its design: they are faired within the same limit, never dropped as scribbles)
-  const fairing = fairLines(kept, { pxMm }), wandering = authored ? { lines: fairing.lines, stats: { dropped: 0, droppedMm: 0 } } : dropWandering(fairing.lines, { pxMm, isFeature: (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y))))) });
+  const fairing = fairLines(kept, { pxMm }), wandering = authored ? { lines: fairing.lines, stats: { dropped: 0, droppedMm: 0 } } : dropWandering(fairing.lines, { pxMm, exempt: longDark, isFeature: (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y))))) });
   kept = wandering.lines; fairing.stats.wanderingDropped = wandering.stats.dropped; fairing.stats.wanderingDroppedMm = Math.round(wandering.stats.droppedMm);
   // --inkeconomy 1: a draughtsman's economy (pen-wash-lines.mjs) without its random omission. Specks under 0.8 mm go; a
   // small mark that nearly repeats a neighbour goes; no 4 mm square carries more than 9 mm of small marks, longest kept
@@ -102,6 +113,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
     stats: r.stats,
     ...(geometry ? { geometry } : {}),
     ...(hatch ? { hatchStrokes: hatched } : {}),
+    bridged: bridged.stats.restored,
     fair: fairing.stats,
     ...(economyStats ? { economy: economyStats } : {}),
     ...(sal ? { salience: sal } : {}),

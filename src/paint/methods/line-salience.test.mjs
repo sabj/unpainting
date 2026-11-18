@@ -29,3 +29,10 @@ test('a short stub on a long line is left to the wash; a closed set and a face f
   assert.equal(salience(tri, { pxMm: PX }).lines.length, 3);
   assert.equal(salience([line([[0, 0], [10, 0]])], { pxMm: PX, isFeature: () => true }).lines.length, 1);
 });
+
+test('pieces of one contour 2 mm apart are one set: a broken arch is not a row of ticks', () => {
+  const a = line([[0, 0], [30, 0]]), b = line([[43, 0], [73, 0]]);          // 4.5 mm pieces, 2 mm gap at 0.15 mm a pixel
+  assert.equal(salience([a, b], { pxMm: PX }).lines.length, 2);
+  const far = line([[0, 0], [30, 0]]), far2 = line([[80, 0], [110, 0]]);   // 7.5 mm apart: still separate, still ticks
+  assert.equal(salience([far, far2], { pxMm: PX }).lines.length, 0);
+});

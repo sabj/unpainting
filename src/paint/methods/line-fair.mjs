@@ -165,14 +165,14 @@ const WANDER_FLIPS = 2;
 
 /**
  * Leave wandering lines to the wash: a line (already faired) whose curvature reverses WANDER_FLIPS times or more, unless
- * `isFeature(x, y)` says its middle is a face or a hand.
+ * `isFeature(x, y)` says its middle is a face or a hand, or `exempt(line)` says it is long and dark (a gnarled trunk).
  * @returns {{ lines, stats: { dropped, droppedMm } }}
  */
-export function dropWandering(lines, { pxMm, isFeature = () => false }) {
+export function dropWandering(lines, { pxMm, isFeature = () => false, exempt = () => false }) {
   const out = []; let dropped = 0, droppedMm = 0;
   for (const g of lines) {
     const mid = g.points[g.points.length >> 1];
-    if (curvatureFlips(g.points, pxMm) >= WANDER_FLIPS && !isFeature(mid.x, mid.y)) { dropped++; droppedMm += pathLen(g.points) * pxMm; } else out.push(g);
+    if (curvatureFlips(g.points, pxMm) >= WANDER_FLIPS && !isFeature(mid.x, mid.y) && !exempt(g)) { dropped++; droppedMm += pathLen(g.points) * pxMm; } else out.push(g);
   }
   return { lines: out, stats: { dropped, droppedMm } };
 }

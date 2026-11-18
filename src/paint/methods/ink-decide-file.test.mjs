@@ -106,3 +106,43 @@ test('a wandering line is a scribble when a model traced it and a curl when the 
   assert.equal((await decideFile({ ...common, doc: doc(true), authored: true })).lines.length, 1, 'authored curls stay');
   assert.equal((await decideFile({ ...common, doc: doc(false) })).lines.length, 0, 'a traced scribble goes');
 });
+
+test('pieces of one ridge join even when each carries the trace grid tremor: they are faired first, then chained into one line', async () => {
+  const s = await setup();
+  let st = 7; const r0 = () => (st = (st * 1664525 + 1013904223) >>> 0) / 4294967296 - 0.5;
+  const piece = (x0, x1) => ({ points: Array.from({ length: 24 }, (_, k) => [x0 + (x1 - x0) * k / 23 + 0.3 * r0(), 30.5 + 1.8 * r0()]), inputKind: 'line-map' });
+  const doc = { image: { w: W, h: H }, inputKind: 'line-map', lines: [piece(5, 25), piece(28, 48), piece(51, 71)] };
+  const r = await decideFile({ doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false, joinMm: 2.5 });
+  assert.equal(r.lines.length, 1, 'one ridge, one line');
+  assert.equal(r.record.fair.line, 1, 'drawn as one straight run');
+});
+
+test('a short line the evidence cut that joins two kept lines is restored: a voussoir joint between two mouldings', async () => {
+  const s = await setup();
+  const L = new Float32Array(W * H).fill(90);
+  for (const y of [30, 31, 70, 71]) for (let x = 5; x < 155; x++) L[y * W + x] = 40;
+  const row = y => ({ points: Array.from({ length: 150 }, (_, k) => [5 + k, y + 0.5]), inputKind: 'line-map' });
+  const joint = { points: Array.from({ length: 38 }, (_, k) => [80.5, 32 + k]), inputKind: 'line-map' };
+  const doc = { image: { w: W, h: H }, inputKind: 'line-map', lines: [row(30), row(70), joint] };
+  const r = await decideFile({ doc, L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false });
+  assert.equal(r.lines.length, 3, 'the joint is back');
+  assert.equal(r.record.bridged, 1);
+});
+
+test('a long line as dark as the source\'s ink may wander, a short or pale one may not: the gnarled trunk stays, the scribble goes', async () => {
+  const s = await setup();
+  const L = new Float32Array(W * H).fill(90);
+  const wave = (y0, x0, n, amp) => Array.from({ length: n }, (_, k) => [x0 + k * 0.5, y0 + amp * Math.sin(k / (n - 1) * Math.PI * 6)]);
+  const dark = wave(22, 5, 280, 6), pale = wave(60, 5, 280, 6), short = wave(42, 20, 90, 6);
+  const paint = (pts, v) => { for (const [x, y] of pts) for (const dy of [-1, 0, 1]) L[Math.round(y + dy) * W + Math.round(x)] = v; };
+  paint(dark, 20); paint(pale, 60); paint(short, 20);
+  // confident pen lines at L 20 make the source's ink level 20; the pale line is lighter than that
+  const rows = [74, 80, 86, 92, 98];
+  for (const y of rows) for (let x = 5; x < 155; x++) L[y * W + x] = 20;
+  const doc = { image: { w: W, h: H }, inputKind: 'stroke', lines: [{ points: dark }, { points: pale }, { points: short }, ...rows.map(y => ({ points: Array.from({ length: 150 }, (_, k) => [5 + k, y + 0.5]) }))] };
+  const r = await decideFile({ doc, L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false, inkDarkRule: true });
+  const mids = r.lines.map(g => Math.round(g.points[g.points.length >> 1][1]));
+  assert.ok(mids.some(y => y >= 16 && y <= 28), 'the long dark wandering line is kept');
+  assert.ok(!mids.some(y => y >= 54 && y <= 66), 'the pale one goes');
+  assert.ok(!mids.some(y => y >= 36 && y <= 48), 'the short one goes');
+});

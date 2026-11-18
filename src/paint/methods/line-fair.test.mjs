@@ -88,3 +88,10 @@ test('a line that reverses its curvature twice or more is a wandering scribble a
   const f = dropWandering(faired, { pxMm: PX, isFeature: () => true });
   assert.equal(f.lines.length, 3, 'a face or hand feature keeps its line');
 });
+
+test('a long dark line may reverse its curvature: a gnarled trunk is not a scribble', () => {
+  const trunk = { points: Array.from({ length: 330 }, (_, k) => ({ x: 20 + k * 0.9, y: 100 + 14 * Math.sin(k / 329 * Math.PI * 6) })) };   // 77 mm long, three waves
+  const faired = fairLines([trunk], { pxMm: PX }).lines;
+  assert.equal(dropWandering(faired, { pxMm: PX }).lines.length, 0, 'unexempted, it is a scribble');
+  assert.equal(dropWandering(faired, { pxMm: PX, exempt: () => true }).lines.length, 1, 'exempted, it stays');
+});

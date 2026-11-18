@@ -1,11 +1,11 @@
 // Pipeline: inking, stage 2 (hold and measure the lines): salience.
 // What makes a subject read first is closed and connected geometry: a gate's frame, bars and arch, a figure's outline.
-// Lines are grouped into connected sets (ends within a short gap). A set is kept when it is long enough to be a form, or
+// Lines are grouped into connected sets (ends within the join distance, 2.5 mm, so a broken arch is one set). A set is kept when it is long enough to be a form, or
 // closed, or a face or hand feature; an isolated short piece is texture that belongs to no form and is left to the wash.
 // Each line is also held to the shortest piece its ground allows (ink-labels.mjs), and to 3 mm: a shorter piece is a tick. Sets that are long or closed are drawn first.
 // Pure: arrays in, arrays out. Coordinates are the line file's image pixels.
 
-const SALIENCE_DEFAULTS = Object.freeze({ gapMm: 0.6, componentMm: 6, firstMm: 20, pieceMm: 3 });
+const SALIENCE_DEFAULTS = Object.freeze({ gapMm: 2.5, componentMm: 6, firstMm: 20, pieceMm: 3 });
 
 const pathMm = (pts, pxMm) => { let s = 0; for (let k = 1; k < pts.length; k++) s += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return s * pxMm; };
 

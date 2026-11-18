@@ -8,8 +8,8 @@ export const INK_HOLD_FLAGS = Object.freeze({
   inkdecide: '1', inkshadowmask: '0', inkdropfaint: '0', inklabeljudge: 'simple', inkdarkrule: '1', inkjoin: '2.5', inkeconomy: '1',
   inksalience: '1', inkfoliage: '1', linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '1.2',
 });
-/** With a source-ink line source (an auto source may choose another, which would leave these unread): the line model is the pool, and the source's pen strokes are traced where it sees a line. */
-export const INK_POOL_FLAGS = Object.freeze({ linemodel: 'strict', linestroke: '1', copylinesmin: '0' });
+/** With a source-ink line source (an auto source may choose another, which would leave these unread): the line model's contours are the pool. Tracing the source's own pen strokes (--linestroke 1) is for pen drawings, and stays with the wash recipe. */
+export const INK_POOL_FLAGS = Object.freeze({ linemodel: 'strict', copylinesmin: '0' });
 
 const last = (argv, name) => { const at = argv.lastIndexOf(name); return at >= 0 ? argv[at + 1] : undefined; };
 const isGraphite = v => v === 'graphite' || /^graphite-/.test(String(v));

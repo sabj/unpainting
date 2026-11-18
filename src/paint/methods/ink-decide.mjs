@@ -45,7 +45,7 @@ export function decideLines(lines, ctx, options = {}) {
     return toneShadow && ctx.shadow && ctx.shadow[i] && toneShadowTakes(base) ? 'shadow_mass' : base;
   };
   const DROP_REASON = { LIVE: 0, MASS: 1, FAINT: 2, CONTRAST: 3, LABEL_NONE: 4 };
-  const drop = { mass: 0, faint: 0, label: {}, short: 0, whole: 0 }, byLabel = {}, out = [];
+  const drop = { mass: 0, faint: 0, label: {}, short: 0, whole: 0 }, byLabel = {}, out = [], droppedLines = [];
   let lengthPx = 0, keptPx = 0, massLen = 0, keptMass = 0, retainedStructuralMass = 0;
   const add = (label, key, px) => { (byLabel[label] ??= { keptPx: 0, droppedPx: 0 })[key] += px; };
   // why each label lost or kept its length: reasonPx[label][reason] (reason: kept, label_none, contrast, mass, faint, short, turny)
@@ -129,6 +129,8 @@ export function decideLines(lines, ctx, options = {}) {
       for (let j = 1; j < R.length; j++) if (cls[j] === CLASS.mass) { keptMass += d[j] - d[j - 1]; if (structuralMass[j]) retainedStructuralMass += d[j] - d[j - 1]; }
       continue;
     }
+    const why$ = {}; for (let k = 1; k < R.length; k++) { const seg = d[k] - d[k - 1], x = dead[k], w = x ? (x.t === 'label' ? 'label' : x.t) : (tooShort ? 'short' : tooTurny ? 'turny' : 'whole'); why$[w] = (why$[w] ?? 0) + seg; }
+    droppedLines.push({ ...(({ widths: _w, weights: _wt, ...r }) => r)(g), points: R, inkLabel: midName, dropWhy: (why$.label ?? 0) >= 0.5 * total ? 'label' : Object.entries(why$).sort((a, b) => b[1] - a[1])[0][0] });
     for (let k = 1; k < R.length; k++) {
       const seg = d[k] - d[k - 1], x = dead[k];
       if (!x) {
@@ -143,7 +145,7 @@ export function decideLines(lines, ctx, options = {}) {
     }
   }
   const mm = px => px * pxMm;
-  return { lines: out, stats: {
+  return { lines: out, dropped: droppedLines, stats: {
     lines: lines.length, pieces: out.length, lengthPx, keptPx, retainedStructuralMassMm: mm(retainedStructuralMass),
     massBefore: lengthPx ? massLen / lengthPx : 0, massAfter: keptPx ? keptMass / keptPx : 0,
     droppedMm: { mass: mm(drop.mass), faint: mm(drop.faint), short: mm(drop.short), whole: mm(drop.whole), label: Object.fromEntries(Object.entries(drop.label).map(([k, v]) => [k, mm(v)])) },
