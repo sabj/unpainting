@@ -26,8 +26,8 @@ test('--stages reads each stage and its options', () => {
 
 test('auto picks source ink on a pen drawing, the sketch on a photograph when it can run, else the walker', () => {
   assert.equal(chooseLineSource('auto', { inkShare: 0.02, sketchAvailable: true }), 'source-ink');
-  assert.equal(chooseLineSource('auto', { inkShare: 0.0005, sketchAvailable: true }), 'photo-sketch');
-  assert.equal(chooseLineSource('auto', { inkShare: 0.0005, sketchAvailable: false }), 'none');
+  assert.equal(chooseLineSource('auto', { inkShare: 0.001, sketchAvailable: true }), 'photo-sketch');
+  assert.equal(chooseLineSource('auto', { inkShare: 0.001, sketchAvailable: false }), 'none');
   assert.equal(chooseLineSource('photo-sketch', { inkShare: 0.02, sketchAvailable: false }), 'photo-sketch');
   assert.throws(() => chooseLineSource('hed', { inkShare: 0, sketchAvailable: false }), /--linesource/);
 });

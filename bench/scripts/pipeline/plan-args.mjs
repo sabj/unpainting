@@ -358,6 +358,8 @@ export function resolvePlan({ spec, planDir, variant, target, out, compile = fal
     args = args.filter((arg, i, all) => !['--drawingfile', '--drawinglast'].includes(arg) && !['--drawingfile', '--drawinglast'].includes(all[i - 1]));
     args[args.lastIndexOf('--drawing') + 1] = 'none';
   }
+  // the painter applies the same rule to the plan's own drawing section, which the harness arguments cannot override
+  if (spec.medium === 'none' || spec.medium === 'pencil') args.push('--subjectmedium', spec.medium);
   const hasDrawingFile = args.includes('--drawingfile');
   const extraVal = name => { const i = extraArgs.lastIndexOf('--' + name); return i >= 0 && i + 1 < extraArgs.length && !extraArgs[i + 1].startsWith('--') ? extraArgs[i + 1] : null; };
   const effMedium = extraVal('outlinemedium') ?? (config?.drawing?.medium === 'none' ? 'none' : outlineMedium);

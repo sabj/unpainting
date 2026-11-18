@@ -21,7 +21,6 @@ import {dropMask} from '../../src/crop/blockin.mjs';
 import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetArea} from '../../src/media/wash.mjs';
 import {loadSubject, splitFirstWash} from '../../src/paint/methods/first-wash.mjs';
 import {pencilBatches, prepFade} from '../../src/paint/methods/pencil-stage.mjs';
-import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
 import {painterOrder, subjectRegions} from '../../src/paint/methods/painter-order.mjs';
 import {hasLines, loadLines} from '../../src/crop/lines.mjs';
 import {deferredFirstWash} from '../../src/paint/methods/colour-budget.mjs';
@@ -72,10 +71,6 @@ phaseMark('drawing');
 const up = mask => { if (SC === 1) return mask; const m = new Uint8Array(N2); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) m[y * W2 + x] = mask[((y / SC) | 0) * w + ((x / SC) | 0)]; return m; };
 // --seed s: seeds every random choice of the process; paper and scrap calibration stay fixed, so seeds compare process only.
 const SEED = Math.round(num('seed', 0)) * 7919; ctx.SEED = SEED;
-opt('linemodel', '');
-num('copylinesmin', 0);
-num('copylinesfloor', 0);
-num('linestroke', 0);
 const t0 = Date.now();
 // where the time goes, so a slow run is diagnosed rather than guessed at
 const spent = { paths: 0, strokes: 0, flow: 0, dry: 0, frames: 0 };
@@ -340,21 +335,15 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
     const peakMain = peak ?? (inkVerdict ? frozenPeak(main) : null), peakThin = peak ?? (inkVerdict ? frozenPeak(thin) : null);
     const drawMain = inkVerdict ? main.filter(g => g.draw) : main, drawThin = inkVerdict ? thin.filter(g => g.draw) : thin;
     const drawT1 = inkVerdict ? first1.filter(g => g.draw) : first1;
+    if (drawT1.length && PENCIL && first && SELECTED) { const r1 = clock('strokes', () => pencilDraw(ctx.sheet, drawT1, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1), pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k })); ctx.drawnCount += r1.drawn; }
+    else if (drawT1.length) { const r1 = clock('strokes', () => penDraw(ctx.sheet, drawT1, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); ctx.drawnCount += r1.drawn; }
     // --mlwant: a line from the learned map is drawn at a constant pressure, like the outline tier (ml-lines.mjs)
     const mlWant = ML_LINES ? ML_LINES.want : 0;
     const drawML = mlWant ? drawMain.filter(g => g.ml) : [], drawRest = mlWant ? drawMain.filter(g => !g.ml) : drawMain;
-    if (PENCIL) {
-      if (drawT1.length) { const r1 = clock('strokes', () => pencilDraw(ctx.sheet, drawT1, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1), pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k })); ctx.drawnCount += r1.drawn; }
-      if (drawML.length) { const rm = clock('strokes', () => pencilDraw(ctx.sheet, drawML, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1), pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k + 1 })); ctx.drawnCount += rm.drawn; }
-      if (drawRest.length) { const r = clock('strokes', () => pencilDraw(ctx.sheet, drawRest, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1), pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k + 2 })); ctx.drawnCount += r.drawn; }
-      if (drawThin.length) { const r2 = clock('strokes', () => pencilDraw(ctx.sheet, drawThin, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1) * 0.7, pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC * 0.7, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k + 3 })); ctx.drawnCount += r2.drawn; }
-    } else if (INK || graphiteFirst) {
-      if (drawT1.length) { const r1 = clock('strokes', () => penDraw(ctx.sheet, drawT1, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); ctx.drawnCount += r1.drawn; }
-      if (drawML.length) { const wantML = new Float32Array(N2).fill(mlWant); const rm = clock('strokes', () => penDraw(ctx.sheet, drawML, wantML, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); ctx.drawnCount += rm.drawn; }
-      const r = clock('strokes', () => penDraw(ctx.sheet, drawRest, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: peakMain }));
-      if (drawThin.length) { const r2 = clock('strokes', () => penDraw(ctx.sheet, drawThin, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : num('outlineconc', 6.5)) : 0)), pen: PEN, O, peak: peakThin })); ctx.drawnCount += r2.drawn; }
-      ctx.drawnCount += r.drawn;
-    }
+    if (drawML.length) { const wantML = new Float32Array(N2).fill(mlWant); const rm = clock('strokes', () => penDraw(ctx.sheet, drawML, wantML, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); ctx.drawnCount += rm.drawn; }
+    const r = clock('strokes', () => penDraw(ctx.sheet, drawRest, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: peakMain }));
+    if (drawThin.length) { const r2 = clock('strokes', () => penDraw(ctx.sheet, drawThin, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : num('outlineconc', 6.5)) : 0)), pen: PEN, O, peak: peakThin })); ctx.drawnCount += r2.drawn; }
+    ctx.drawnCount += r.drawn;
     ctx.STAGE = { stage: first ? (GRAPHITE && !PENCIL ? 'prep' : 'pen') : 'ink', step: fine ? 'fine' : 'gestures', batch: k / per + 1, of: Math.ceil(scaled.length / per) };
     // under --filmby paint the pen is filmed about PEN_FRAMES times, the last batch always
     const ofB = Math.ceil(scaled.length / per), bi = k / per + 1;
@@ -391,10 +380,6 @@ if (num('drawingonly', 0) > 0) {
   assertDeviceHealthy(ctx.sheet);
   if (noPenLines) await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'painting.png'));
   else fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
-  const after = thickness(ctx.sheet);
-  const nativeInk = INKRES ? INKRES.nativeInk() : renderInkProof({ thickness: after, pigments: SHEET_PIGS, inkAt: PIGS.length, width: W2, height: H2 });
-  await sharp(nativeInk.pixels, { raw: { width: nativeInk.width, height: nativeInk.height, channels: 3 } }).png().toFile(path.join(out, "ink-native.png"));
-  fs.writeFileSync(path.join(out, "ink-native.json"), JSON.stringify({ width: nativeInk.width, height: nativeInk.height, sheetWidthMm: PB?.mm ?? num("sheetmm", DEFAULT_SHEET_MM), kind: INKRES ? "deposited ink on native pen sheet, before wash redistribution" : "final deposited coarse ink, including wash redistribution", resized: false }) + "\n");
   fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
   fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: ctx.drawnCount, backend: GPU_INFO }));
   await drainFrames(); if (ctx.FRAMER) ctx.FRAMER.close(); ctx.sheet._gpu?.close();

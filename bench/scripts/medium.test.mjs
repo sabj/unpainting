@@ -27,7 +27,7 @@ test('every subject and every crop names its medium, and the two lists agree', (
     if (subjects[c.task]) assert.equal(c.medium, subjects[c.task].medium, c.task);
   }
   const pen = Object.entries(subjects).filter(([, s]) => s.medium === 'pen').map(([id]) => id).sort();
-  assert.deepEqual(pen, ['dog-ink', 'h34a', 'h36a', 'hills', 'south-france', 'trumbull']);
+  assert.deepEqual(pen, ['dog-ink', 'h34a', 'h36a', 'hills', 'south-france']);
   // a subject with no pen is not described in words that read as pen lines
   for (const [id, s] of Object.entries(subjects)) if (s.medium !== 'pen') assert.doesNotMatch(s.taskStyle, /\bfine lines\b|\bpen\b|\bink (and|led)\b/i, id);
 });
@@ -51,7 +51,7 @@ test('an ink plan on a subject with no pen is removed without graphite substitut
       assert.ok(!o.has('drawingfile') && !o.has('drawinglast'), 'incompatible opening and closing paths are removed');
       for (const inkOnly of ['inkprofile', 'washinkfree', 'drawinghand', 'inkdarkskip']) assert.ok(!o.has(inkOnly), inkOnly);
       assert.equal(o.get('midlayers'), '3');
-      assert.ok(!o.has('subjectmedium'), 'harness does not inject subjectmedium override');
+      assert.equal(o.get('subjectmedium'), medium, 'the painter is told, because a plan drawing section outranks every argument');
       assert.ok(!r.extraOptions.includes('inkprofile'), 'a removed ink setting is not held against the plan as unread');
       const m = r.layering.mediumOverride;
       assert.equal(m.subjectMedium, medium);
@@ -108,7 +108,7 @@ test('a plan that says nothing about the drawing follows the subject: Mittens is
     assert.equal(m.get('drawing'), 'first');
     assert.ok(m.has('drawingfile') && !m.has('drawinglast'), 'pencil prep only: the opening lines stay, no closing lines');
     for (const inkOnly of ['inkprofile', 'washinkfree', 'drawinghand']) assert.ok(!m.has(inkOnly), inkOnly);
-    assert.ok(!m.has('subjectmedium'), 'harness does not inject subjectmedium override');
+    assert.equal(m.get('subjectmedium'), 'pencil');
     assert.equal(mittens.layering.mediumOverride.asked, 'graphite');
     assert.equal(mittens.layering.mediumOverride.closingDropped, true);
     const dog = at('dog-ink'), d = optionMap(dog.args);
@@ -132,14 +132,14 @@ test('a pen subject keeps its ink plan exactly; a plan may always choose graphit
     assert.equal(optionMap(pen.args).get('drawing'), 'both');
     assert.equal(optionMap(pen.args).get('inkprofile'), 'black-ink');
     assert.equal(pen.layering.mediumOverride, null);
-    const told = (args, _medium) => args;
+    const told = (args, medium) => (medium === 'pen' ? args : args.filter((a, i) => a !== '--subjectmedium' && args[i - 1] !== '--subjectmedium'));
     for (const medium of ['none', 'pencil', 'pen']) {
       const n = resolve(none, medium);
       assert.equal(n.layering.mediumOverride, null);
       assert.deepEqual(told(n.args, medium), resolve(none, null).args);
       const g = resolve(pencil, medium), go = optionMap(g.args);
       assert.equal(go.get('outlinemedium'), 'graphite', 'a graphite plan stays graphite');
-      assert.ok(!go.has('subjectmedium'), 'harness does not inject subjectmedium override');
+      assert.equal(go.get('subjectmedium'), medium === 'pen' ? undefined : medium);
       if (medium === 'pen') {
         assert.equal(g.layering.mediumOverride, null);
         assert.deepEqual(g.args, resolve(pencil, null).args, 'on a pen subject a graphite plan keeps its drawing as the plan wrote it');

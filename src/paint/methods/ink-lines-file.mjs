@@ -148,14 +148,6 @@ async function holdLineFile(args) {
  */
 export async function holdInkLines({ opt, num, argv, image, root = '.', out, sheetMm, log = () => {} }) {
   const flags = inkLineFlags(num);
-  if (opt('inkdecide', '') === '' && (opt('outlinemedium', '') === 'ink' || opt('linesource', '') === 'source-ink' || opt('inkrecipe', '') === 'wash' || (opt('drawingfile', '') && /source-ink|line-map/i.test(opt('drawingfile', ''))))) {
-    flags.decide = 1;
-    if (opt('inkjoin', '') === '') flags.joinMm = 2.5;
-    if (opt('inkfoliage', '') === '') flags.foliage = 1;
-    if (opt('inkdarkrule', '') === '') flags.inkDarkRule = 1;
-    if (opt('inkdarkmatch', '') === '') flags.darkMatch = 1;
-    flags.measure = true;
-  }
   if (!flags.measure) return null;
   // the regions the ink decision reads: SAM's, cached by the target's hash (the painter asks for them again later)
   const decide = flags.decide > 0 ? { segments: await prepareSegments({ image, root, out, opt, log }), judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')) } : null;

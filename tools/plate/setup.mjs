@@ -304,8 +304,7 @@ const paperSetupStarted = performance.now();
 // --washinkfile <base>: the line file of the target's own ink to remove, when the pen draws a different drawing
 // (a cleaner opening file). Default: the --drawingfile.
 const PX_RAW = num('washinkfree', 0) > 0 && (opt('washinkfile', '') !== '' || opt('drawing', 'first') !== 'none') ? (() => {
-  const base = opt('washinkfile', '') || opt('drawingfile', '');
-  if (!base) { console.log('washinkfree: no line file present, proceeding without ink removal'); return PX_SOURCE; }
+  const base = opt('washinkfile', '') || opt('drawingfile', ''); if (!base) throw Error('--washinkfree needs --drawingfile');
   const doc = JSON.parse(readLineText(path.resolve(root, linePaths(base).lines)));
   const r = removePlannedInk(PX_SOURCE, info.width, info.height, doc, { sheetMm: num('sheetmm', DEFAULT_SHEET_MM), marginMm: num('washinkmargin', 0.3) });
   console.log(`wash target: planned ink removed from ${r.changed} cells (${(100 * r.changed / (info.width * info.height)).toFixed(1)}% of the sheet)`);
@@ -361,7 +360,7 @@ const SHEET_TONE = TONE_MODE === '0' ? { toned: false } : detectSheetTone(ctx.px
 // states values and the engine delivers them, so no dark, cool or middle gain exists to compensate, and no switch.
 for (const k of ['calibratedplan', 'instrumentcal', 'darkgain', 'coolgain', 'midgain']) if (optIdx(k) >= 0) throw Error(`--${k} was removed in 0.3.3: the plan is calibrated to the sheet and each passage is charged from its own swatch, so there is no gain or switch to set`);
 const CALIBRATED_PLAN=true;
-const PAPER_RULE=num('paperrule',1)>0;
+const PAPER_RULE=num('paperrule',0)>0;
 const WASH_SHEET=PAPER_RULE?sheetColour(ctx.px,w,h):null;
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(ctx.px, w, h, new Float32Array(w * h)) : null;
 const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (WASH_SHEET?WASH_SHEET.rgb:SHEET_TONE.toned ? SHEET_TONE.paperRGB : PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;

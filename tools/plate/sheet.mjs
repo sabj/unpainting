@@ -12,7 +12,6 @@ import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
-import {detailSegments} from '../../src/paint/methods/detail-segments.mjs';
 import {unsupportedAxisEdges} from '../../src/paint/methods/target-regions.mjs';
 import {writeValuePreview} from '../painter/value-plan-preview.mjs';
 import {writePlanValueCheck} from '../painter/plan-value-check.mjs';
@@ -33,7 +32,6 @@ import {productionWaterLoad} from '../painter/production-water-load.mjs';
 import {cachedStep, cachedStepSync, codeHash} from '../../src/paint/run-cache.mjs';
 import {cachedSemanticInstrument, instrumentCodeHash} from '../painter/semantic-instrument-cache.mjs';
 import fs from 'node:fs';
-import crypto from 'node:crypto';
 import zlib from 'node:zlib';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
@@ -142,12 +140,10 @@ const stroke=(b,target,points,options)=>{
     if(paint&&!wetMove&&(!own||ctx.VALUE_ACTIVE.texture)&&!paper.dry){dry(target,30000,O,{levelMax:140,dt:2});paper=observe();check('value-plan dry-paper contact gate failed',paper.dry,{id:ctx.VALUE_ACTIVE.id,band:ctx.VALUE_ACTIVE.valueBand,waterMax:paper.waterMax,saturationMax:paper.saturationMax});}
   }
   // a wet bed is judged by its typical cell (median standing water), so it is read cell by cell, never as uniform paper
-  // Prepare the same allowed contact the strict wait admits, including its already-painted overlap.
-  // Judging only fresh cells can leave glossy overlap waiting while the fresh bed dries out.
-  const observeBed=()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{uniform:false});
+  const observeBed=()=>measurePaper(target,freshCells.length?freshCells:cells,SPEED_PAPER,{uniform:false});
   if(paint&&!intoOwnWash&&ownBed&&ctx.VALUE_ACTIVE.move==='wet on wet'){
     const prepOpts={upright:options.upright,lift:false,spacing:options.spacing};
-    const preparation=(()=>{try{return prepareWetBed({settings:brushSettings(b),bristles:b.hairs.length,seed:911+ctx.VALUE_COMMAND,pigments:SHEET_PIGS.length,target,points,prepOpts,observe:observeBed,gate:()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'}),advance:()=>ctx.clock('flow',()=>step(target,{...O,dt:2})),createBrush,dip,thirsty,stroke});}catch(e){e.message=`passage ${ctx.VALUE_ACTIVE.id} (value band ${ctx.VALUE_ACTIVE.valueBand}, ${getObservationCells().length} cells in its footprint): ${e.message}`;throw e;}})();paper=preparation.paper;
+    const preparation=(()=>{try{return prepareWetBed({settings:brushSettings(b),bristles:b.hairs.length,seed:911+ctx.VALUE_COMMAND,pigments:SHEET_PIGS.length,target,points,prepOpts,observe:observeBed,gate:()=>measurePaper(target,getObservationCells(),SPEED_PAPER,{stats:'gate'}),advance:()=>ctx.clock('flow',()=>step(target,{...O,dt:2})),createBrush,dip,thirsty,stroke});}catch(e){e.message=`passage ${ctx.VALUE_ACTIVE.id} (value band ${ctx.VALUE_ACTIVE.valueBand}, ${(freshCells.length?freshCells:cells).length} cells in its footprint): ${e.message}`;throw e;}})();paper=preparation.paper;
     JSONL.append(path.join(out,'passage-material-preparation.jsonl'),JSON.stringify({intent:ctx.VALUE_ACTIVE.id,admission:'actual allowed paint footprint; adjacent paper inspected separately',neighbors:fastMode?null:measurePaper(target,neighbors,SPEED_PAPER),...preparation})+'\n');
   }
   // A wet stroke into a fresh wash waits for the shine to go off, then is laid; uneven paper is counted, not a stop (tools/painter/wet-bed-wait.mjs).
@@ -265,20 +261,8 @@ if(VALUE_ENABLED){
   ctx.HOLD=Uint8Array.from(reserves,(v,i)=>v||(ctx.HOLD?.[i]??0)?1:0);ctx.FUR_HOLD=reserves;
   fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
  }
- // SAM supplies candidate form ownership only; loading is setup-time and
- // the labels enter the value-plan cache key. Missing requested maps fail loudly.
- const FORM_INPUT = ctx.SEGMENTS_RECORD?.backend==='sam' ? await (async()=>{
-  const {loadSegments}=await import('../../src/crop/segments.mjs');
-  const stem=ctx.SEGMENTS_RECORD.stem;
-  if(!stem)throw Error('SAM middle forms require the prepared segment stem');
-  const {labels}=await loadSegments(stem,w,h),sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
-  return {labels,source:{backend:'sam',stem,targetSHA256:RUN_CACHE.context.targetSHA256,
-   labelFileSHA256:sha(fs.readFileSync(stem+'.png')),legendFileSHA256:sha(fs.readFileSync(stem+'.json')),
-   planningLabelsSHA256:sha(labels),width:w,height:h}};
- })() : null;
- // --detailseg 1: --detailscale confined to the focal forms of the run's own segment map (detail-segments.mjs).
- const DETAIL_SEG = await detailSegments({ detailseg: num('detailseg',1), detailscale: num('detailscale',0.5), record: ctx.SEGMENTS_RECORD, segmentsMode: opt('segments','sam'), w, h, load: async (stem, W, H) => (await import('../../src/crop/segments.mjs')).loadSegments(stem, W, H), log: console.log });
-  const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,ownSwatch:true,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0.5),detailSegments:DETAIL_SEG,formLabels:FORM_INPUT?.labels??null,formSource:FORM_INPUT?.source??null,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),edgeWobbleMm:num('edgewobble',0),shadowThresh:num('shadowthresh',.38),shadowWater:num('shadowwater',0),skyOneLayer:num('skyonelayer',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0.1),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,stepHoles:false,stepSquint:false,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,hold:ctx.FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
+ const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
+  const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,ownSwatch:true,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),edgeWobbleMm:num('edgewobble',0),shadowThresh:num('shadowthresh',.38),shadowWater:num('shadowwater',0),skyOneLayer:num('skyonelayer',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',2),styleGain:num('stylegain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,hold:ctx.FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
 
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
@@ -315,7 +299,7 @@ if(VALUE_ENABLED){
  // --charge 1 (src/paint/methods/charge-layers.mjs): a region's middle layers laid in one wet session, darker into lighter.
  if(num('charge',0)>0){ctx.layers=chargeOrder(ctx.layers);console.log('charge: middle layers of each region laid wet into its first layer');}
  ctx.HOLD=ctx.VALUE_PLAN.protectedCells;
- fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,formPlanning:ctx.VALUE_PLAN.formPlanning,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,washStats:ctx.VALUE_PLAN.washStats,traces:ctx.VALUE_PLAN.traceReport,detailScale:ctx.VALUE_PLAN.detailReport,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
+ fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  // --valuemaps 1: the value plan as maps for diagnosis (value band per cell, colour region, reserved lights) and every
  // passage's cells in paint order, to value-maps.json.gz. Read by nothing in the painter.
  if(num('valuemaps',0)>0){const caps=[.16,.32,.50,.75,1],vv=ctx.VALUE_PLAN.value.values,band=Array.from(vv,v=>v<=0?0:caps.findIndex(t=>v<=t)+1||5);
@@ -429,7 +413,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
    else drawMaterial(scrap,sample,want,w,h,{...options,ink});
    return absorbance(scrap);
   };
-  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0),measure});
+  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',0),measure});
   console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${res.before.toFixed(2)}, so the load is scaled by ${res.factor.toFixed(3)} (now ${res.after.toFixed(2)})`);
   return res;
  }).value;
@@ -440,7 +424,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
 const penDraw = (sh,gs,want,w,h,o0) => {
  const stage=ctx.AREA_DRAW_STAGE, graphite=o0.ink?.[GRAPHITE_AT]>0, inkAt=PIGS.length;
  const withLoad=f=>({...o0,ink:o0.ink.map((v,j)=>j===inkAt?v*f:v)});
- const matched=!graphite&&INK&&num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0)>0&&o0.ink?.[inkAt]>0;
+ const matched=!graphite&&INK&&num('inkdarkmatch',0)>0&&o0.ink?.[inkAt]>0;
  const o=matched?withLoad(inkDarkMatch(stage,gs,f=>({...withLoad(f),medium:opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:{used:0},caps:drawingCapsFor(stage,false),audit:[],allowStarvation:num('penstarve',0)>0,dryInk:true,O:undefined,widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o0.pen,damp:INK_DAMP}}),want,w,h)):o0;
   const execute=paths=>{const options={...o,...(ctx.NATIVE_CAPTURE&&sh===ctx.sheet?{...(graphite?{afterStroke:e=>ctx.NATIVE_CAPTURE(e.skipped?'graphite-skipped':'graphite')}:{afterSegment:()=>ctx.NATIVE_CAPTURE('ink')}),afterDry:()=>ctx.NATIVE_CAPTURE('drawing-dry')}:{}),medium:graphite?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage,mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/w,edgeStrength:null,edgeCut:false,state:DRAW_MATERIAL_STATE[stage],caps:drawingCapsFor(stage,graphite),audit:PEN_STATE_AUDIT,allowStarvation:num('penstarve',0)>0,dryInk:stage!=='closing'||num('finishinkdamp',0)<=0,...(graphite?{}:{widthFloorMm:INK_WIDTH_FLOOR_MM,pen:{...o.pen,damp:INK_DAMP}})};return INKRES&&!graphite?drawFineMaterial(INKRES,paths,{w,h,...options,cache:{...RUN_CACHE,code:CODE_HASH,track:optTrack}}):drawMaterial(sh,paths,want,w,h,options);};
  if(!ctx.AREA_PLAN)return execute(gs);

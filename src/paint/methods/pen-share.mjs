@@ -20,8 +20,6 @@ export function penShare(px, w, h) {
  * `sharp` is passed in so this file stays free of the image library.
  */
 export async function sourcePenShare({ image, sharp, width = AUTO_INK_WIDTH }) {
-  const meta = await sharp(image).metadata();
-  const w = meta.width ? Math.min(width, Math.round(meta.width * 2.4)) : width;
-  const { data, info } = await sharp(image).flatten({ background: '#ffffff' }).resize({ width: w }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(image).flatten({ background: '#ffffff' }).resize({ width }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   return penShare(data, info.width, info.height);
 }

@@ -268,8 +268,6 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
 
   // Actual deposited ink on the pen's own grid, on white. No upsampling or geometry replay.
   function nativeInk() {
-    const isGraphite = /graphite|pencil/i.test(pigments[inkAt]?.kind ?? pigments[inkAt]?.name ?? '');
-    if (isGraphite) return { width: WH, height: HH, pixels: Buffer.alloc(WH * HH * 3, 255) };
     return { width: WH, height: HH, pixels: renderLayers([[fineTotal(0)]], finePigments, whiteH, nH, 1) };
   }
 
@@ -293,7 +291,5 @@ export function makeInkRes({ N, W2, H2, paperOpts, pigments, main, inkAt = 0, ga
 export function renderInkProof({ thickness, pigments, inkAt, width, height }) {
   if (!Number.isInteger(inkAt) || !pigments[inkAt] || thickness[inkAt]?.length !== width * height)
     throw new Error('Ink proof requires a valid native ink channel');
-  const isGraphite = /graphite|pencil/i.test(pigments[inkAt]?.kind ?? pigments[inkAt]?.name ?? '');
-  if (isGraphite) return { width, height, pixels: Buffer.alloc(width * height * 3, 255) };
   return { width, height, pixels: renderLayers([[thickness[inkAt]]], [pigments[inkAt]], Buffer.alloc(width * height * 3, 255), width * height, 1) };
 }

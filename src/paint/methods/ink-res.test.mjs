@@ -154,12 +154,3 @@ test('coarse proof keeps final opening and closing ink, excludes paint and graph
   assert.deepEqual(renderInkProof({ thickness: [paint, new Float32Array(4), graphite], pigments: [ink, ink, ink], inkAt: 1, width: 4, height: 1 }).pixels, new Uint8ClampedArray(12).fill(255));
   assert.throws(() => renderInkProof({ thickness, pigments: [ink, ink, ink], inkAt: 3, width: 4, height: 1 }), /valid native ink channel/);
 });
-
-test('graphite or pure watercolor channel produces an empty proof with zero ink marks', () => {
-  const graphite = { name: 'graphite', kind: 'graphite', K: [1.0, 1.0, 1.0], S: [0.1, 0.1, 0.1] };
-  const paint = new Float32Array([1, 2, 3, 4]);
-  const proof = renderInkProof({ thickness: [paint], pigments: [graphite], inkAt: 0, width: 2, height: 2 });
-  assert.equal(proof.width, 2);
-  assert.equal(proof.height, 2);
-  assert.ok(proof.pixels.every(v => v === 255), 'proof must be completely blank white for non-ink channels');
-});

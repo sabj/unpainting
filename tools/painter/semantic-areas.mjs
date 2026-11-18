@@ -2,7 +2,7 @@ import {validateAuthoredPaint,compileAuthoredPaint} from './authored-paint.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import {passage} from '../../src/crop/blockin.mjs';
-import {closeLocal,erode,dilate,distanceToZero} from '../../src/raster.js';
+import {closeLocal,erode,dilate} from '../../src/raster.js';
 import {TECHNIQUES} from '../../src/paint/methods/lay.mjs';
 import {AREA_EDGES_CONTRACT,PASS_EDGES_CONTRACT,validateAreaEdges,validatePassEdges,bindAreaEdges} from './area-edges.mjs';
 import {AREA_WASHES_CONTRACT,validateAreaWashes,compileAreaWash} from './area-washes.mjs';
@@ -58,7 +58,7 @@ export function validateAreaDocument(doc,{targetSHA,imageSHA,sourceWidth,sourceH
  if(!Array.isArray(doc.areas)||!doc.areas.length)fail('empty plan: no areas');
  if(doc.areas.length<minAreas||doc.areas.length>maxAreas)fail(`requires ${minAreas}–${maxAreas} areas`);
  const authored=validateAuthoredPaint(doc);const areas=new Map(),passes=new Map();
- for(const a of doc.areas){text(a.id,'area.id');if(areas.has(a.id))fail(`duplicate area ${a.id}`);areas.set(a.id,a);text(a.intent,`${a.id}.intent`);text(a.referenceCue,`${a.id}.referenceCue`);polygon(a.geometry?.polygon,a.id);if(!Array.isArray(a.geometry.anchors)||a.geometry.anchors.some(x=>!x.name||!point(x.point)))fail(`anchors ${a.id}`);if(a.geometry.priority!==undefined&&(!Number.isInteger(a.geometry.priority)||!a.geometry.occlusionReason))fail(`explicit occlusion reason ${a.id}`);if(!['none','scaffold','structural','focal'].includes(a.drawingRole))fail(`drawing role ${a.id}`);if(a.geometry.snap!==undefined&&a.geometry.snap!=='segments')fail(`geometry.snap ${a.id}: only 'segments'`);
+ for(const a of doc.areas){text(a.id,'area.id');if(areas.has(a.id))fail(`duplicate area ${a.id}`);areas.set(a.id,a);text(a.intent,`${a.id}.intent`);text(a.referenceCue,`${a.id}.referenceCue`);polygon(a.geometry?.polygon,a.id);if(!Array.isArray(a.geometry.anchors)||a.geometry.anchors.some(x=>!x.name||!point(x.point)))fail(`anchors ${a.id}`);if(a.geometry.priority!==undefined&&(!Number.isInteger(a.geometry.priority)||!a.geometry.occlusionReason))fail(`explicit occlusion reason ${a.id}`);if(!['none','scaffold','structural','focal'].includes(a.drawingRole))fail(`drawing role ${a.id}`);
  if(!Array.isArray(a.passes)||!a.passes.length)fail(`passes ${a.id}`);
  for(const p of a.passes){text(p.id,'pass.id');if(p.leaveWetAfter!==undefined&&(typeof p.leaveWetAfter!=='boolean'||p.source!=='authored'))fail('explicit authored leaveWetAfter boolean required');const key=`${a.id}/${p.id}`;if(passes.has(key))fail(`duplicate pass ${key}`);passes.set(key,{area:a,pass:p,key});if(!finite(p.order)||!Array.isArray(p.dependsOn)||!p.dependsOn.every(x=>typeof x==='string'))fail(`order/dependencies ${key}`);if(p.source!=='authored'&&p.tone===undefined&&(!Array.isArray(p.valueRange)||p.valueRange.length!==2||!p.valueRange.every(Number.isInteger)||p.valueRange[0]<1||p.valueRange[1]<p.valueRange[0]))fail(`valueRange ${key}`);if(!['wet on wet','wet on dry','dry brush','wet-edge continuation'].includes(p.move))fail(`unsupported move ${key}: ${p.move}`);if(p.marks!==undefined){if(p.source==='authored')fail(`marks on an authored pass ${key}: its gestures are already explicit`);if(!['wet on dry','dry brush'].includes(p.move))fail(`marks need a wet on dry or dry brush pass ${key}`);validateSurfaceMarks(p.marks,key);}if(!['soft','hard','broken','lost'].includes(p.edges?.kind)||typeof p.edges?.overlap!=='boolean')fail(`edges ${key}`);if(!['none','paint-owned','paper','negativepaint','film','lift'].includes(p.lights?.mode))fail(`unsupported lights ${key}`);validateSoftenLift(p,key,polygon);validateAreaWashes(p,key,polygon);validateTone(p,key);text(p.lights.reason,`${key}.lights.reason`);if(!['none','paint-owned'].includes(p.lights.mode))polygon(p.lights.polygon,`${key}.lights`);if(p.lights.mode==='film'&&(p.lights.actions?.apply!=='dry-paper-physical-film'||p.lights.actions?.set!=='full-strength-established'||p.lights.actions?.remove!=='dry-paint-physical-lift'||!Array.isArray(p.lights.actions.afterPasses)||p.lights.actions.revealedEdges!=='inspect'))fail(`unsupported/incomplete film lifecycle ${key}`);if(p.brush?.model!==undefined&&!['row','tuft'].includes(p.brush.model))fail('unsupported brush model '+key);if(p.brush?.lag!==undefined&&(!finite(p.brush.lag)||p.brush.lag<0||p.brush.lag>1))fail('unsupported brush lag '+key);if(!['round','flat'].includes(p.brush?.kind)||!finite(p.brush.widthMm)||p.brush.widthMm<=0)fail(`brush ${key}`);if(!['point','side','belly'].includes(p.brush.contact)||!['follow','sweep','vertical'].includes(p.brush.orientation)||!Array.isArray(p.brush.pressure)||p.brush.pressure.length!==3||!p.brush.pressure.every(x=>finite(x)&&x>=0&&x<=1)||(p.brush.contact==='side'&&p.brush.kind!=='flat')||(p.brush.contact==='point'&&p.brush.kind!=='round'))fail(`unsupported brush contact/pose ${key}`);if(!finite(p.load?.water)||p.load.water<0||p.load.water>1||!finite(p.load.pigmentScale)||p.load.pigmentScale<=0)fail(`load ${key}`);if(!finite(p.load.waterQuantityMm3)||p.load.waterQuantityMm3<=0||!finite(p.load.capacityMm3)||p.load.capacityMm3<p.load.waterQuantityMm3||!finite(p.load.minRemainingFraction)||p.load.minRemainingFraction<0||p.load.minRemainingFraction>=1||p.load.reload!=='before-stroke'||p.load.rinse!=='fresh-brush-per-gesture'||!['none','water-fraction'].includes(p.load.blot)||p.load.concentrationSource!=='solver-calibrated')fail(`unsupported load management ${key}`);if(!['dry','moist','wet','dry-or-wet-edge'].includes(p.wetness?.required)||!Number.isInteger(p.wetness.neighborCells)||p.wetness.neighborCells<0)fail(`wetness ${key}`);if(p.stop?.after!=='pass'||!p.stop.reason)fail(`stop ${key}`);if(p.move==='wet-edge continuation'&&(p.source!=='authored'||p.wetness.required!=='dry-or-wet-edge'||!finite(p.wetness.maxSurfaceWater)||p.wetness.maxSurfaceWater<=0)||p.move!=='wet-edge continuation'&&(p.move==='wet on wet'&&p.wetness.required==='dry'||p.move!=='wet on wet'&&p.wetness.required!=='dry'))fail(`move/state mismatch ${key}`);}}
  const depth=id=>{const seen=new Set();let a=areas.get(id),d=0;while(a.parent!==null){if(seen.has(a.id)||!areas.has(a.parent))fail(`parent cycle/missing ${id}`);seen.add(a.id);a=areas.get(a.parent);d++;}return d;};for(const a of areas.values())a._depth=depth(a.id);const inBounds=(p,poly)=>inside(p,poly)||poly.some((a,i)=>{const b=poly[(i+1)%poly.length],dx=b[0]-a[0],dy=b[1]-a[1],d=dx*dx+dy*dy,t=d?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/d)):0;return Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)<1e-8;});for(const a of areas.values())if(a.parent!==null&&a.geometry.polygon.some(p=>!inBounds(p,areas.get(a.parent).geometry.polygon)))fail(`child ${a.id} outside parent geometry`);for(const s of passes.values())if(s.pass.lights.mode==='film')for(const id of s.pass.lights.actions.afterPasses)if(!passes.has(id))fail(`unknown film removal dependency ${id}`);
@@ -80,37 +80,19 @@ export function semanticSessions(schedule){
 }
 /** True when two compiled pass records (or the same one) belong to one wet session: no drying between them. */
 export const semanticSameSession=(a,b)=>Boolean(a&&b&&a.pass?.session&&b.pass?.session&&a.pass.session.id===b.pass.session.id);
-// An area marked geometry.snap 'segments' takes the subject's outline from the run's segments (SAM), not the planner's
-// rough polygon (eye 19:32 #1, #10: washes with ruled sides). Each segment's owner is the area holding most of it. A snap
-// area that wins a segment takes its cells from other snap areas and from its own ancestors; a snap area's cells in a
-// segment its ancestor wins go back to that ancestor (it shrinks to its subject). Other areas keep theirs.
-export function snapToSegments(plan,owner,labels){
- const snap=new Set(plan.doc.areas.map((a,j)=>a.geometry.snap==='segments'?j:-1).filter(j=>j>=0));if(!snap.size)return 0;
- if(!labels||labels.length!==owner.length)fail('geometry.snap segments needs the run\'s segments (SAM); run without --segments off');
- const ancMemo=new Map(),anc=j=>{if(!ancMemo.has(j)){const out=new Set();let a=plan.doc.areas[j];while(a.parent!==null){const k=plan.doc.areas.findIndex(x=>x.id===a.parent);out.add(k);a=plan.doc.areas[k];}ancMemo.set(j,out);}return ancMemo.get(j);};
- const votes=new Map();for(let i=0;i<owner.length;i++)if(owner[i]>=0){const v=votes.get(labels[i])??new Map();v.set(owner[i],(v.get(owner[i])??0)+1);votes.set(labels[i],v);}
- const winner=new Map();for(const [l,v] of votes)winner.set(l,[...v].sort((a,b)=>b[1]-a[1]||a[0]-b[0])[0][0]);
- let moved=0;
- for(let i=0;i<owner.length;i++){const o=owner[i],j=winner.get(labels[i]);if(j===undefined||o===j||o<0)continue;
-  if((snap.has(j)&&(snap.has(o)||anc(j).has(o)))||(snap.has(o)&&anc(o).has(j))){owner[i]=j;moved++;}}
- return moved;
-}
-export function rasterAreaPlan(plan,w,h,{labels=null}={}){
+export function rasterAreaPlan(plan,w,h){
  const n=w*h,at=i=>[(plan.crop[0]+(i%w+.5)*plan.crop[2]/w)/plan.doc.target.width,(plan.crop[1]+(Math.floor(i/w)+.5)*plan.crop[3]/h)/plan.doc.target.height],owner=new Int16Array(n).fill(-1),masks=plan.doc.areas.map(a=>Uint8Array.from({length:n},(_,i)=>inside(at(i),a.geometry.polygon)?1:0)),index=new Map(plan.doc.areas.map((a,i)=>[a.id,i]));let overlap=0;
  for(let i=0;i<n;i++){const candidates=[];for(let j=0;j<masks.length;j++)if(masks[j][i]){const a=plan.doc.areas[j];if(a.parent!==null&&!masks[index.get(a.parent)][i])fail(`child ${a.id} outside parent at cell ${i}`);candidates.push(j);}const chain=j=>{let a=plan.doc.areas[j],out=[a];while(a.parent!==null){a=plan.areas.get(a.parent);out.unshift(a);}return out;};const compare=(j,k)=>{const a=chain(j),b=chain(k);for(let q=0;q<Math.min(a.length,b.length);q++)if(a[q].id!==b[q].id){const d=(b[q].geometry.priority??0)-(a[q].geometry.priority??0);if(!d)fail(`ambiguous sibling overlap ${a[q].id}/${b[q].id} cell ${i}`);return d;}return b.length-a.length;};candidates.sort(compare);if(candidates.length){if(candidates.length>1)overlap++;owner[i]=candidates[0];}}
- const snapped=snapToSegments(plan,owner,labels);
  const reserves=new Uint8Array(n),film=new Uint8Array(n);for(const a of plan.areas.values())for(const p of a.passes)if(!['none','paint-owned','lift'].includes(p.lights.mode))for(let i=0;i<n;i++)if(inside(at(i),p.lights.polygon)){if(!masks[index.get(a.id)][i])fail(`lights outside ${a.id}`);(p.lights.mode==='film'?film:reserves)[i]=1;}
  const allowed=Uint8Array.from({length:n},(_,i)=>(plan.doc.allowedUnassigned??[]).some(x=>inside(at(i),x.polygon))?1:0),ignored=Uint8Array.from({length:n},(_,i)=>(plan.doc.ignore??[]).some(x=>inside(at(i),x.polygon))?1:0);
- const out={...plan,w,h,owner,masks,reserves,film,allowed,ignored,diagnostics:{snappedCells:snapped,areaCount:masks.length,geometryCoveredCells:owner.reduce((s,v)=>s+(v>=0),0),unassignedCells:owner.reduce((s,v)=>s+(v<0),0),explicitOcclusionCells:overlap,areaCells:plan.doc.areas.map((a,j)=>({id:a.id,parent:a.parent,owned:owner.reduce((s,v)=>s+(v===j),0),geometry:masks[j].reduce((s,v)=>s+v,0)}))}};
+ const out={...plan,w,h,owner,masks,reserves,film,allowed,ignored,diagnostics:{areaCount:masks.length,geometryCoveredCells:owner.reduce((s,v)=>s+(v>=0),0),unassignedCells:owner.reduce((s,v)=>s+(v<0),0),explicitOcclusionCells:overlap,areaCells:plan.doc.areas.map((a,j)=>({id:a.id,parent:a.parent,owned:owner.reduce((s,v)=>s+(v===j),0),geometry:masks[j].reduce((s,v)=>s+v,0)}))}};
  out.edgesByArea=bindAreaEdges(out);return out;
 }
 // What a forms hook returns: a pass's cells, their count and the paint they hold (one amount per pigment, summed over cells).
 function checkGathered(a,key){if(!a||!(a.cells instanceof Uint8Array)||!Number.isInteger(a.count)||!a.mass||a.count!==a.cells.reduce((s,v)=>s+v,0))fail(`forms hook for ${key} must return {cells, count, mass}`);return a;}
 // What a split hook returns: washes [{cells, mix}] inside the pass's cells, holding the same paint (mix is per cell).
 function checkSplit(ws,acc,key){if(!Array.isArray(ws)||!ws.length)fail(`split hook for ${key} returned no washes`);const held=new Float64Array(acc.mass.length);for(const x of ws){if(!(x.cells instanceof Uint8Array)||!Array.isArray(x.mix)&&!ArrayBuffer.isView(x.mix))fail(`split hook for ${key}: each wash needs cells and mix`);let n=0;for(let i=0;i<x.cells.length;i++)if(x.cells[i]){if(!acc.cells[i])fail(`split hook for ${key}: a wash reaches outside its pass`);n++;}x.mix=Array.from(x.mix);for(let k=0;k<held.length;k++)held[k]+=x.mix[k]*n;}for(let k=0;k<held.length;k++)if(Math.abs(held[k]-acc.mass[k])>1e-6*Math.max(1,acc.mass[k]))fail(`split hook for ${key}: pigment ${k} paint ${held[k]} is not the pass's ${acc.mass[k]}`);return ws;}
-/** The brush widths an area pass's detail may take: the kit's brushes (src/paint/brushes.json) but the drag brush and the pen nib. */
-export const areaBrushKit=cfg=>Object.entries(cfg.brushes??{}).filter(([k,b])=>k!==cfg.roles?.drag&&k!=='pen'&&b.width_mm>0).map(([,b])=>b.width_mm);
-export function compileAreaLayers(plan,layers,palette,{mmPerCell,forms=null,split=null,brushKit=null}={}){const formsDone=new Map();
+export function compileAreaLayers(plan,layers,palette,{mmPerCell,forms=null,split=null}={}){const formsDone=new Map();
  const direct=compileAuthoredPaint(plan,palette??[]);if(direct)return direct;
  const scheduled=new Map(plan.schedule.map(s=>[s.key,[]])),diagnostics={...plan.diagnostics,stage:'compiled numerical regions, NOT execution proof',unassignedPaintCells:0,unassignedValueCells:0,allowedUnassignedValueCells:0,allowedUnassignedDemandMass:0,allowedUnassignedCellIndices:[],reservedDemandCells:0,compiledShapes:0,passes:plan.schedule.map(s=>({id:s.key,compiledShapes:0,executedCommands:0}))};let allocated=0,input=0;
  // One wash per pass (painting-rules 7, 14): every ladder piece in the pass's area and value range is gathered into
@@ -124,23 +106,13 @@ export function compileAreaLayers(plan,layers,palette,{mmPerCell,forms=null,spli
  // a wash covers the gaps in its shape narrower than its brush: the union is closed at the pass brush's radius, inside
  // the area and off its reserved lights; the paint it holds is unchanged, spread over the closed shape
  for(const acc of pass.values()){const sp=plan.passes.get(acc.key).pass,a=plan.doc.areas.indexOf(plan.passes.get(acc.key).area),r=sp.brush.widthMm/2/mmPerCell,closed=closeLocal(acc.cells,plan.w,plan.h,r);for(let i=0;i<closed.length;i++)closed[i]=(acc.cells[i]||closed[i])&&plan.owner[i]===a&&!plan.reserves[i]&&!plan.film[i]?1:0;
-  // and its outline is the brush's, not the ladder's pixels (eye #10, stair-stepped edges). A part narrower than the
-  // pass brush is not left out (LEAD, Sam 20:49: detail is painted at brush scale): it is laid in the same pass as its
-  // own wash with the biggest kit brush that fits it (rule 17), the smallest kit brush at least, holding its own paint.
-  const opened=dilate(erode(closed,plan.w,plan.h,r),plan.w,plan.h,r),goneMask=new Uint8Array(closed.length),gonePaint=new Map();let count=0;
-  for(let i=0;i<closed.length;i++){const keep=closed[i]&&opened[i]?1:0;if(acc.cells[i]&&!keep){goneMask[i]=1;const g=new Float64Array(acc.mass.length);for(const pc of acc.pieces)if(pc.mask[i])for(let k=0;k<g.length;k++)g[k]+=pc.mix?.[k]??0;gonePaint.set(i,g);}acc.cells[i]=keep;count+=keep;}
-  acc.count=count;acc.details=[];
-  if(gonePaint.size){
-   if(!Array.isArray(brushKit)||!brushKit.length)fail('compiling area detail needs the brush kit widths (brushKit)');
-   const kit=[...brushKit].sort((x,y)=>y-x),depth=distanceToZero(goneMask,plan.w,plan.h),seen=new Uint8Array(closed.length),groups=new Map();
-   for(const start of gonePaint.keys()){if(seen[start])continue;const comp=[start];seen[start]=1;let deepest=0;
-    for(let q=0;q<comp.length;q++){const i=comp[q];deepest=Math.max(deepest,depth[i]);const x=i%plan.w;for(const j of [x>0?i-1:-1,x+1<plan.w?i+1:-1,i-plan.w,i+plan.w])if(j>=0&&j<closed.length&&goneMask[j]&&!seen[j]){seen[j]=1;comp.push(j);}}
-    const fit=2*deepest*mmPerCell,width=kit.find(k=>k<=fit&&k<sp.brush.widthMm)??kit.at(-1);
-    const g=groups.get(width)??{widthMm:width,cells:new Uint8Array(closed.length),count:0,mass:new Float64Array(acc.mass.length)};
-    for(const i of comp){g.cells[i]=1;g.count++;const pm=gonePaint.get(i);for(let k=0;k<pm.length;k++){g.mass[k]+=pm[k];acc.mass[k]=Math.max(0,acc.mass[k]-pm[k]);}}groups.set(width,g);}
-   acc.details=[...groups.values()];
-   for(const g of acc.details)(diagnostics.detailWashes??=[]).push({pass:acc.key,brushMm:g.widthMm,cells:g.count,paint:g.mass.reduce((a,b)=>a+b,0)});
-  }}
+  // and its outline is the brush's, not the ladder's pixels (eye #10, stair-stepped edges): a part narrower than the
+  // brush is opened away and left as paper on purpose, its own paint left out with it (never moved onto the rest), and
+  // logged: a smaller brush in a later pass of the plan can take it. Gaps the closing fills hold no paint of their own.
+  const opened=dilate(erode(closed,plan.w,plan.h,r),plan.w,plan.h,r),gone=new Float64Array(acc.mass.length);let count=0,goneCells=0;
+  for(let i=0;i<closed.length;i++){const keep=closed[i]&&opened[i]?1:0;if(acc.cells[i]&&!keep){goneCells++;for(const pc of acc.pieces)if(pc.mask[i])for(let k=0;k<gone.length;k++)gone[k]+=pc.mix?.[k]??0;}acc.cells[i]=keep;count+=keep;}
+  acc.count=count;for(let k=0;k<gone.length;k++)acc.mass[k]=Math.max(0,acc.mass[k]-gone[k]);
+  if(goneCells){const paint=gone.reduce((a,b)=>a+b,0);(diagnostics.narrowerThanBrush??=[]).push({pass:acc.key,brushMm:sp.brush.widthMm,cells:goneCells,paint,passLaid:count>0});console.log(`semantic areas: pass ${acc.key}: ${goneCells} cells narrower than its ${sp.brush.widthMm} mm brush left as paper (paint ${paint.toFixed(1)} left out)${count?'':'; the pass lays nothing'}`);}}
  for(const s of plan.schedule){
   // a tone pass (area-paper.mjs): one wash of the named paint over its whole area, laid at the amount the plan states
   if(s.pass.tone){const t=toneShape(plan,s,palette??[]);if(!t.count)continue;const w=plan.w,box={x0:w,y0:plan.h,x1:-1,y1:-1};for(let i=0;i<t.cells.length;i++)if(t.cells[i]){const x=i%w,y=Math.floor(i/w);if(x<box.x0)box.x0=x;if(x>box.x1)box.x1=x;if(y<box.y0)box.y0=y;if(y>box.y1)box.y1=y;}
@@ -150,16 +122,14 @@ export function compileAreaLayers(plan,layers,palette,{mmPerCell,forms=null,spli
   // hooks for the area route's owners (LEAD 17:26): forms may give a later pass its own shape and paint (shapes,
   // area-forms.mjs); split may lay one pass as several washes, one per local colour (colour, area-puddles.mjs)
   const acc=forms?checkGathered(forms(s,acc0,{plan,mmPerCell,earlier}),s.key):acc0;formsDone.set(areaId,[...earlier,{key:s.key,cells:acc.cells,count:acc.count,mass:acc.mass}]);
-  const details=acc0.details??[];if(!acc.count&&!details.length)continue;
-  const washes=!acc.count?[]:split?checkSplit(split(s,{cells:acc.cells,count:acc.count,mass:acc.mass},{plan,palette:palette??[]}),acc,s.key):[{cells:acc.cells,mix:Array.from(acc.mass,v=>v/acc.count)}],clones=[];
-  // the pass's detail washes, each laid with its own brush (the semantic record carries that brush for the painter)
-  for(const g of details)washes.push({cells:g.cells,mix:Array.from(g.mass,v=>v/g.count),brushMm:g.widthMm});
+  if(!acc.count)continue;
+  const washes=split?checkSplit(split(s,{cells:acc.cells,count:acc.count,mass:acc.mass},{plan,palette:palette??[]}),acc,s.key):[{cells:acc.cells,mix:Array.from(acc.mass,v=>v/acc.count)}],clones=[];
   for(const wsh of washes){const box={x0:w,y0:plan.h,x1:-1,y1:-1},cells=[];for(let i=0;i<wsh.cells.length;i++)if(wsh.cells[i]){cells.push(i);const x=i%w,y=Math.floor(i/w);if(x<box.x0)box.x0=x;if(x>box.x1)box.x1=x;if(y<box.y0)box.y0=y;if(y>box.y1)box.y1=y;}
    const mix=wsh.mix,amount=mix.reduce((a,b)=>a+b,0),clone=passage(wsh.cells,1,box,amount,cells.length,w),sh=acc0.first;
    for(const k of Object.keys(sh))if(!['mask','ids','id','box','_mask','area','w','_brushMask','_mbox','_cover','_under','_fb','_booked','amount','mix','graded','_plane','_gradedAngle','_follow'].includes(k))clone[k]=sh[k];
-   const base=plan.passes.get(s.key);clone.mix=mix;clone._pieces=acc0.pieces.size;clone._semantic=wsh.brushMm?{...base,pass:{...base.pass,brush:{...base.pass.brush,widthMm:wsh.brushMm}},detail:true}:base;compileAreaWash(plan,clone._semantic,clone,cells,palette??[]);clones.push(clone);}
+   clone.mix=mix;clone._pieces=acc0.pieces.size;clone._semantic=plan.passes.get(s.key);compileAreaWash(plan,clone._semantic,clone,cells,palette??[]);clones.push(clone);}
   const total=clones[0].mix.map((_,k)=>clones.reduce((a,c)=>a+c.mix[k]*c.area,0)),lead=total.indexOf(Math.max(...total));
-  scheduled.get(s.key).push({...acc0.layer,shapes:clones,value:s.pass.valueRange[1],pigment:lead,mixIndex:undefined,_semantic:plan.passes.get(s.key)});diagnostics.compiledShapes+=clones.length;const d=diagnostics.passes.find(p=>p.id===s.key);d.compiledShapes+=clones.length;d.ladderPieces=acc0.pieces.size;}
+  scheduled.get(s.key).push({...acc0.layer,shapes:clones,value:s.pass.valueRange[1],pigment:lead,mixIndex:undefined,_semantic:clones[0]._semantic});diagnostics.compiledShapes+=clones.length;const d=diagnostics.passes.find(p=>p.id===s.key);d.compiledShapes+=clones.length;d.ladderPieces=acc0.pieces.size;}
  diagnostics.allowedUnassignedCellIndices=Array.from(new Set(diagnostics.allowedUnassignedCellIndices)).sort((a,b)=>a-b);diagnostics.inputValueCells=input;diagnostics.allocatedValueCells=allocated;diagnostics.planComplete=diagnostics.unassignedPaintCells===0&&diagnostics.unassignedValueCells===0;
  // which ladder values of which area no pass takes, so a planner can see what to widen
  diagnostics.ladderTop=top;diagnostics.unassignedValues=Object.fromEntries(Object.entries(missing).map(([k,v])=>[k,[...v].sort((x,y)=>x-y)]));

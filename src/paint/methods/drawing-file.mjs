@@ -40,8 +40,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   if (first && opt('preparationbinding','')) return boundPreparation({bindingFile:opt('preparationbinding',''),base:b,image:opt('image',''),guide:opt('penpencil',''),w,h,num,log});
   // A declared no-drawing file is read before the logic branch and the line loader, for both pens, so --drawinglogic,
   // --drawinglastlogic, --finishmasses and the loader's target check of an empty file add or refuse nothing.
-  const rawDoc = JSON.parse(readLineText(linePaths(b).lines));
-  const declared = noDrawingDeclared(rawDoc, { first });
+  const declared = noDrawingDeclared(JSON.parse(readLineText(linePaths(b).lines)), { first });
   if (declared) {
     log(first ? `drawing: no opening ink, since ${declared}; the walker's ${walked} gestures are not used` : `drawing, closing pen: no closing ink, since ${declared}`);
     return [];
@@ -55,9 +54,8 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   // the plan's choice (drawing-plan.mjs planLines): --drawshare's strongest share, --drawregions' subject-first ranking
   // and --drawmax's cap
   const loaded = loadLines(b, w, h, { keepOrder: true }).filter(g => !skip.has(g.role)), min = num('drawinglastmin', 0.6);
-  // the plan's drawingRole per family (family-roles.mjs): a family with role none gets no line, scaffold no closing line;
-  // when the file has already been decided by semantic SAM regions (inkDecided), family bounding boxes do not clip it again
-  const byRole = rawDoc.inkDecided === true ? { lines: loaded, dropped: {} } : linesByRole(loaded, families, { w, h, stage: first ? 'opening' : 'closing' }), candidates = byRole.lines;
+  // the plan's drawingRole per family (family-roles.mjs): a family with role none gets no line, scaffold no closing line
+  const byRole = linesByRole(loaded, families, { w, h, stage: first ? 'opening' : 'closing' }), candidates = byRole.lines;
   if (Object.keys(byRole.dropped).length) log(`drawing: ${loaded.length - candidates.length} of ${loaded.length} lines left out by the plan's drawing roles (${Object.entries(byRole.dropped).map(([r, c]) => `${c} under ${r}`).join(', ')})`);
   if (loaded.length && !candidates.length) { log(first ? 'drawing: no opening line, the plan\'s drawing roles leave every line to the wash' : 'drawing, closing pen: no closing line, the plan\'s drawing roles leave every line out'); return []; }
   const planned = planLines(candidates, num), all = first && prune ? prune(planned) : planned;
@@ -67,7 +65,7 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
   const file = linePaths(b).lines;
   // Linked stages can explicitly omit prep ink; pure-watercolor plans declare medium none.
   // Recognize medium none only for an empty source file, not malformed or filtered-out paths.
-  const doc = first && !candidates.length ? rawDoc : null;
+  const doc = first && !candidates.length ? JSON.parse(readLineText(file)) : null;
   const empty = doc?.empty || (doc?.medium === 'none' && Array.isArray(doc.lines) && doc.lines.length === 0
     ? 'the drawing explicitly declares medium none' : null);
   if (empty) { log(`drawing: no opening ink, since ${empty}; the walker's ${walked} gestures are not used`); return []; }

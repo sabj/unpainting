@@ -102,7 +102,7 @@ export function cutMassEdges(lines, L, w, h, pxMm, o = MASS_DEFAULTS) {
 
 /**
  * The darkness (L*) that the source's own pen lines reach: the level at or under which a line that only just beats a dark wash
- * beside it is still ink. It is the 75th percentile of the on-line tone over points whose contrast is at least 12 L*.
+ * beside it is still ink. It is the 30th percentile of the on-line tone over points whose contrast is at least 12 L*.
  * @returns the level, or null when the lines give too few confident points
  */
 export function estimateInkDark(lines, L, w, h, pxMm, o = MASS_DEFAULTS) {
@@ -116,5 +116,5 @@ export function estimateInkDark(lines, L, w, h, pxMm, o = MASS_DEFAULTS) {
   }
   if (vals.length < 200) return null;
   vals.sort((x, y) => x - y);
-  return vals[Math.floor(0.75 * vals.length)];
+  return vals[Math.floor(0.3 * vals.length)];
 }

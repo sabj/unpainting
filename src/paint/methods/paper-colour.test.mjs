@@ -70,14 +70,6 @@ test('crops with no visible paper: light neutral highlights fall back to lightes
   assert.equal(refC.detected, false);
   assert.equal(refC.fallback, false, 'saturated grass does not become white paper highlights');
   assert.deepEqual(refC.lightRef, [...WHITE_SHEET]);
-
-  // Case D: Sunlit yellow-ochre stone crop ([249, 229, 185], L* ~91.5, chroma ~23.9): light enough for a toned sheet,
-  // but too chromatic to be bare white paper on a white sheet.
-  const ochreCrop = image(w, h, (x, y) => (y < 6 ? [249, 229, 185] : [160, 130, 95]));
-  const refD = paperLightReference(ochreCrop, w, h, [...WHITE_SHEET]);
-  assert.equal(refD.detected, false);
-  assert.equal(refD.fallback, false, 'sunlit ochre stone is a warm wash, not bare white paper');
-  assert.deepEqual(refD.lightRef, [...WHITE_SHEET]);
 });
 
 test('a low-key picture whose lightest region is mid grey shows no paper', () => {

@@ -28,17 +28,6 @@ const ROLE_GAIN = { structure: 1.5, silhouette: 1.5, subject: 1.2, opening: 1, s
 
 const hash = i => { let s = (Math.imul(i + 1, 0x9e3779b1) ^ 0x85ebca6b) >>> 0; s = Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) >>> 0; return ((s ^ (s >>> 13)) >>> 0) / 4294967296; };
 
-// A contour's variation must not change when another contour is inserted or ranked.
-// Ignore contact attributes; reversed duplicates share an identity, while deviateLine
-// still follows each gesture's actual direction for its late start and overshoot.
-function contourSeed(points) {
-  const forward = JSON.stringify(points), reverse = JSON.stringify(points.toReversed());
-  const key = forward < reverse ? forward : reverse;
-  let seed = 0x811c9dc5;
-  for (let i = 0; i < key.length; i++) seed = Math.imul(seed ^ key.charCodeAt(i), 0x01000193) >>> 0;
-  return seed;
-}
-
 export function polyLength(points) {
   let L = 0;
   for (let k = 1; k < points.length; k++) L += Math.hypot(points[k][0] - points[k - 1][0], points[k][1] - points[k - 1][1]);
@@ -176,8 +165,6 @@ export function planStages(lines, { image, stages, density = null }) {
   const E = D ? edgeField(D, density.w, density.h) : null;
   const edge = E ? fieldSampler(E, density.w, density.h, image.w, image.h) : null;
   const set = lines.filter(g => g.points?.length >= 2).map((g, index) => ({ ...g, index, length: g.length ?? polyLength(g.points) }));
-  // The existing index carries this original identity through prep and finish; it is not the seed.
-  const sourceSeeds = set.map(g => contourSeed(g.points));
   const score = g => placementScore(g, { dark, edge });
   const step = Math.max(1, 0.004 * short), summary = {};
   const out = { prep: null, prepInk: null, finishInk: null };
@@ -206,7 +193,7 @@ export function planStages(lines, { image, stages, density = null }) {
       added = ranked(rest, g => score(g) / Math.sqrt(Math.max(1, g.length))).slice(0, n).map(r => ({ ...r.g, added: true }));
     } else base = takeLength(set, o.amount, score).map(r => r.g);
     const scale = (stages.prepInk.deviate ?? (from === 'lines' ? 0 : o.deviate)) * 0.0025 * short;
-    out.prepInk = [...base, ...added].map(g => ({ ...deviateLine(g, { scale, seed: sourceSeeds[g.index] * 3 + 1, step }), rank: g.rank ?? 1 }));
+    out.prepInk = [...base, ...added].map(g => ({ ...deviateLine(g, { scale, seed: g.index * 3 + 1, step }), rank: g.rank ?? 1 }));
     summary.prepInk = { from, lines: out.prepInk.length, kept: base.length, added: added.length, dropped: from === 'prep' ? out.prep.length - base.length : 0, drift: +scale.toFixed(2) };
   }
 
@@ -224,8 +211,8 @@ export function planStages(lines, { image, stages, density = null }) {
     // source pixels, the Y1 closing pen)
     const pieces = picked;
     const scale = o.deviate * 0.0025 * short;
-    out.finishInk = pieces.map(g => {
-      const d = deviateLine(g, { scale, seed: sourceSeeds[g.index] * 3 + 2, step });
+    out.finishInk = pieces.map((g, k) => {
+      const d = deviateLine(g, { scale, seed: (g.index ?? k) * 3 + 2, step });
       if (architecture && dark) d.widths = d.points.map(p => +(1.6 + 2.4 * Math.min(1, dark(p) / 1.2)).toFixed(3));
       return { ...d, rank: 1 };
     });

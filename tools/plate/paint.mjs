@@ -73,20 +73,6 @@ import {writeState, readState, revisionExpectation} from '../aware/state-io.mjs'
 import {tapeState, restoreTapeState} from '../../src/media/brush.mjs';
 import {passDue, markDue} from '../../src/paint/pass-cadence.mjs';
 
-// Intentional gaps are not underdelivery. Normalize only aggregate nominal overlap.
-export function familyMarkCharge(paths,mask,w,h){
- if(!paths?.length||paths.some(p=>p.length<2))throw Error('accepted family marks require nonempty frozen paths');
- const cover=sweepCover(paths,mask,w,h);
- if(!(cover>0&&Number.isFinite(cover)))throw Error('accepted family marks have no nominal coverage');
- return {under:1,cover:Math.max(1,cover)};
-}
-export function familyMarkClip(sh,w,h){
- const source=sh._markSupport;if(!source)throw Error('accepted family marks lost their original support');
- const mask=new Uint8Array(w*h),b=source.box;
- for(let y=b.y0;y<=b.y1;y++)for(let x=b.x0;x<=b.x1;x++){const i=y*w+x;if(source.ids[i]===source.id)mask[i]=1;}
- return mask;
-}
-
 export async function paint(ctx) {
 const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_COVERAGE, measurePaper, liftResist, FRAME_POLICY, SPEED_PROFILE, root, out, RUN_CACHE, FAST_BODY_ENABLED, 
@@ -392,10 +378,6 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // Each passage in the pass is charged for itself: one colour, loaded stronger or weaker as the passage asks.
   let shIdx = 0; const shQuarter = Math.max(1, Math.ceil(layer.shapes.length / 4));
   for (const sh of layer.shapes) {
-  const familyMarks=sh._valuePlan?.markDecision?.status==='accepted';
-  if(familyMarks&&(!PB||SC!==1||BUDGET||PROBE||FINISH||DARK_MASS||PASSAGE_HOOK.names.length||num('detailtrim',0)>0||num('skipheld',0)>0||num('ladderseg',0)>0||opt('texture','0')!=='0'))throw Error('explicit family marks require native scale and original untrimmed numeric supports');
-  const markClip=familyMarks?familyMarkClip(sh,w,h):null;
-  if(familyMarks&&!sh._valuePlan.brush?.paths?.length)throw Error('accepted family marks cannot enter empty-path rescue');
   if(DELIVERY||TECH_CAL)sh._paintExecuted=false;
   if(BUDGET && !BUDGET.target(sh)) continue;
   ctx.AREA_NUMERIC_SEQUENCE=ctx.AREA_PLAN?semanticNumericSequence(ctx.AREA_PLAN.doc,sh._semantic,L,layer.shapes.indexOf(sh)):null;
@@ -522,7 +504,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
   // the plan's graded plane (graded-demand.mjs) carries the grade through the physical loads below; the single-sweep
   // pressure ramp stands in for it only where there are no physical loads
-  const attachPlaneRamp = raw => attachRampToPaths(raw, familyMarks || PB && sh._plane ? null : (sh._rampVec ?? sh._valuePlan?.rampVec), SC, PATH_RAMP);
+  const attachPlaneRamp = raw => attachRampToPaths(raw, PB && sh._plane ? null : (sh._rampVec ?? sh._valuePlan?.rampVec), SC, PATH_RAMP);
   const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38,protect:ctx.VALUE_PLAN?.protectedCells,edgeHalf:(r,p)=>edgeHalfWidth(r,{pressure:p,splay:WASH_FLAT_SPLAY})});
   const rawShapedPaths = () => (sh._valuePlan.brush?.paths ? passageBrushPaths(sh._valuePlan.brush, SC) : makeShapedPlanePaths());
   const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
@@ -566,7 +548,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // --contain: the brush disc held inside its passage at every point (see containPaths). Rescued passages below get
   // the same treatment, since a small brush can overhang a narrow passage just as a mop overhangs a ragged one.
   const crispNow = CRISP.wants(T, detail);
-  if (!BUDGET && !shapedPaths && !sh._semantic?.pass.edges.overlap && !sh._valuePlan && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
+  if (!BUDGET && !shapedPaths && !sh._semantic?.pass.edges.overlap && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
     // --washfloor in: the main wash sweep is never narrowed below this on a 9-inch-wide sheet (wash.mjs).
     // --washfloorout 1: only outside the subject (--fwmask), where the broad washes are.
     const WF = num('washfloor', 0) * W2 / 9, WFOUT = num('washfloorout', 0) > 0 && FW_SUBJ ? up(FW_SUBJ) : null;
@@ -575,7 +557,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     paths.length = 0; paths.push(...held);
   }
   // --cutin 0|1: run a small brush along the inside of the passage's edge before filling it, as a painter cuts in. Default 1.
-  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !sh._valuePlan && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
+  if (!BUDGET && !layer._darkPass && !shapedPaths && !authoredPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutbandin n: cut-in band inside the subject (--fwmask); --cutband (default 2) elsewhere.
     const cellMmHigh = num('sheetmm', DEFAULT_SHEET_MM) / W2;
@@ -605,7 +587,6 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   // under --touchbroad a touch-up glaze too small for a sweep of the floor brush goes on as a final dark does: a small
   // round brush drawn through the shape, clipped to it. A single dab of a corrective charge would land as a blot.
   let touchSmall = false;
-  if(familyMarks&&!paths.length)throw Error('accepted family marks cannot enter empty-path rescue');
   if (!paths.length && layer._touched && !layer._darkPass && num('touchbroad', 0) > 0) {
     paths.push(...washPaths(up(MASK), W2, H2, { pad: 0.2 * SC, minRadius: 0.5 * SC, minLength: 2 * SC }).map(pts => pts.map(p => ({ ...p, r: Math.min(p.r, Math.max(SC, PB ? PB.detailR : SC)) }))));
     if (!paths.length) { used['touch-up too small, left'] = (used['touch-up too small, left'] || 0) + 1; continue; }
@@ -647,15 +628,13 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   if (touchSmall) { const d = dilate(MASK, w, h, 1); setClip(ctx.sheet, up(P ? Uint8Array.from(d, (v, i) => v && !P[i] ? 1 : 0) : d)); }
   if (layer._darkPass) { const c = darkClip(P), cl = c ? up(c) : null; if (cl && PROBE?.clip) for (let s = 0; s < cl.length; s++) cl[s] = cl[s] && PROBE.clip[s] ? 1 : 0; setClip(ctx.sheet, cl ?? (PROBE ? PROBE.clip : null)); used['final dark'] = (used['final dark'] || 0) + paths.length; }
   if (crispHere) {
-    const baseMask=markClip??brushMask(sh),reach=sh._strokePlan?.reachCells??0;
+    const baseMask=brushMask(sh),reach=sh._strokePlan?.reachCells??0;
     const clipMask=reach>0?(()=>{const g=dilate(baseMask,w,h,Math.ceil(reach*.8)+1);return P?Uint8Array.from(g,(v,i)=>v&&!P[i]?1:0):g;})():baseMask;
     // --softclipmm r: along the plan's soft boundary cells the clip opens r mm past the passage (graded-demand.mjs
     // softClipMask), so the bead runs out there and the edge takes the brush's own fall-off; hard boundary cells and
     // reserved lights keep the cut. Default 0 (every edge cut): at 0.75 mm the plan calls nearly every boundary soft
     // (4820 of 4999 passages on Trumbull opus/1) and the stone hints and glazes spread into soft blots. Not with --softwet.
-    const softMm = num('softclipmm', sh._valuePlan?.washSystem ? 0.75 : 0);
-    const cellMm = num('sheetmm', DEFAULT_SHEET_MM) / w;
-    const softReach = familyMarks || SOFT_WET_MM > 0 || reach > 0 || !sh._valuePlan?.edges || sh._valuePlan.texture || softMm <= 0 ? 0 : Math.max(1, Math.round(softMm / cellMm));
+    const softReach=SOFT_WET_MM>0||reach>0||!sh._valuePlan?.edges||sh._valuePlan.texture?0:Math.round(num('softclipmm',0)/(num('sheetmm', DEFAULT_SHEET_MM)/w));
     const soft=softReach>0?softClipMask(clipMask,sh._valuePlan.edges,w,h,softReach,P):null;
     const grow=soft?.ring?softReach*SC:0;
     const box=baseMask===MASK&&reach<=0?{x0:Math.max(0,MB.x0*SC-grow),y0:Math.max(0,MB.y0*SC-grow),x1:Math.min(W2-1,(MB.x1+1)*SC-1+grow),y1:Math.min(H2-1,(MB.y1+1)*SC-1+grow)}:null;
@@ -674,7 +653,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   if (detail) used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] = (used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] || 0) + paths.length;
   ctx.WET_TRACE?.passage({ pass: L + 1, shape: layer.shapes.indexOf(sh), technique: T.name, move: sh._valuePlan?.move ?? null, texture: !!sh._valuePlan?.texture, value: layer.value, paths: paths.length });
   let SOFT_RING = null;
-  if (!familyMarks && SOFT_WET_MM > 0 && crispHere && !BUDGET && !detail && !(sh._strokePlan?.reachCells > 0) && sh._valuePlan && !sh._valuePlan.texture && sh._valuePlan.edges?.softCells?.length && paths.length && opt('softwetphases', 'light,mid,shadow').split(',').includes(sh._valuePlan.phase)) {
+  if (SOFT_WET_MM > 0 && crispHere && !BUDGET && !detail && !(sh._strokePlan?.reachCells > 0) && sh._valuePlan && !sh._valuePlan.texture && sh._valuePlan.edges?.softCells?.length && paths.length && opt('softwetphases', 'light,mid,shadow').split(',').includes(sh._valuePlan.phase)) {
     const rc = SOFT_WET_MM / (num('sheetmm', DEFAULT_SHEET_MM) / w);
     const ring = softRing(brushMask(sh), sh._valuePlan.edges.softCells, sh._valuePlan.edges.hardCells, w, h, rc, ctx.VALUE_PLAN?.protectedCells);
     if (ring.some(v => v)) {
@@ -731,8 +710,6 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   const useGradedCal = Boolean(sh.graded || sh._valuePlan);
   const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = useGradedCal && !detail && SHARE > 0 ? sweepCount(paths, W2, H2) : null;
   SPEED_PROFILE?.add('painting:sweep-count', performance.now() - coverStarted);
-  const markCharge=familyMarks?familyMarkCharge(paths,MASK,W2,H2):null;
-  if(markCharge){sh._under=markCharge.under;sh._cover=markCharge.cover;}
   let cachedCover;
   const passageCover = () => {
     if(cachedCover!==undefined)return cachedCover;
@@ -776,7 +753,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (useGradedCal && sh._gcal == null) {
       const G = ICAL.graded;
-      sh._open = openEdgeShare(markClip??MASK, w, h, MB) / SC;
+      sh._open = openEdgeShare(MASK, w, h, MB) / SC;
       const lost = G ? Math.min(0.6, G.escape * sh._open / Math.max(1e-6, G.edge)) : 0;
       sh._gcal = G ? 1 / Math.max(0.02, G.all * (1 - lost)) : CHARGE_CAL;
     }
@@ -886,7 +863,6 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
       if (PLANE) used['graded load'] = (used['graded load'] || 0) + LOADS.length;
       const loadScale = (v, j) => v * DCAL(sh, j) * TCAL(sh, T, detail, layer.value) * num('strength', 2.2) * (useGradedCal ? sh._gcal : CHARGE_CAL) * opening * PF / sh._cover * sh._under * (sh._fb ?? 1);
       const base = sh.mix.map(loadScale);
-      if(familyMarks&&pts===paths[0])JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'family-mark-charge',intent:sh._valuePlan.id,allocation:sh._valuePlan.markDecision,under:sh._under,overlap:sh._cover,calibration:useGradedCal?sh._gcal:CHARGE_CAL,baseConcentration:base,scope:'nominal allocation and physical load; not measured deposited mass'})+'\n');
       // an area plan's variegated wash (area-washes.mjs): each load is dipped at the mix where it lies along the wash
       const second = sh._variegate ? sh._variegate.mix.map(loadScale) : null, loadBase = k => second ? variegatedCharge(base, second, sh._variegate.span, LOADS[k], SC) : base;
       if (second) used['variegated load'] = (used['variegated load'] || 0) + LOADS.length;
@@ -1069,7 +1045,7 @@ for (let L = L_START; L < (PRACTICE || PENWASH ? 0 : ctx.layers.length); L++) {
   }
   if(ctx.VALUE_PLAN){const next=ctx.layers[L+1];if(!next||next.value!==layer.value){ctx.VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));const bandRgb=Buffer.from(render());PENDING_IO.push(sharp(bandRgb,{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png')));}}
   // Nothing after a pass reads its passages again (the ledger holds what it laid), so its sheet-sized fields are freed.
-  for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh._markSupport = null; sh.ids = null; }
+  for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh.ids = null; }
   layer.mask = null; layer.ids = null;
   const endOfTouch = Boolean(layer._touched && ctx.layers[L + 1]?._touched !== layer._touched);
   // Playback gets a frame at every value-band boundary (the band complete and dried) and at the end of each touch-up

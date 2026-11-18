@@ -208,27 +208,3 @@ test('a damp bed is judged by its typical cell for a ladder-filled pass, by its 
  assert.equal(semanticMaterialReady({wetness:{required:'moist'},source:'authored'},paper,b),false);
  assert.equal(semanticMaterialReady({wetness:{required:'moist'}},{...paper,waterP50:.16},b),false);
 });
-
-test('an area snapped to segments takes the subject outline: a segment goes whole to the snap area holding most of it',()=>{
- const d=fixture();for(const a of d.areas.slice(1))a.geometry.snap='segments';
- // segment 1 covers columns 0-2 (8 cells in left, 4 in right), segment 2 column 3
- const labels=Uint8Array.from({length:16},(_,i)=>i%4<3?1:2);
- const p=rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'a',sourceWidth:4,sourceHeight:4}),4,4,{labels});
- const ids=Array.from(p.owner,j=>p.doc.areas[j].id);
- assert.deepEqual(ids.filter((_,i)=>i%4===2),['left','left','left','left'],'the right area gives up its share of the left subject');
- assert.deepEqual(ids.filter((_,i)=>i%4===3),['right','right','right','right']);
- assert.equal(p.diagnostics.snappedCells,4);
- assert.throws(()=>rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'a',sourceWidth:4,sourceHeight:4}),4,4),/needs the run's segments/);
- const bad=fixture();bad.areas[1].geometry.snap='edges';assert.throws(()=>plan(bad),/only 'segments'/);
-});
-
-test('a snap area shrinks to its subject: its cells in a segment its ancestor holds most of go back to that ancestor',()=>{
- const d=fixture();for(const a of d.areas.slice(1))a.geometry.snap='segments';d.areas[2].geometry.polygon=box(.5,0,.75,1);
- // column 3 is the page (scene); segment 2 covers columns 2-3 with one more page cell than right cells
- const labels=Uint8Array.from({length:16},(_,i)=>i%4<2?1:i===2?1:2);
- // after the snap right holds nothing, so only the page and left meet
- d.edges=[{areas:['scene','left'],kind:'hard',reason:'x'}];
- const p=rasterAreaPlan(validateAreaDocument(d,{targetSHA:'a',imageSHA:'a',sourceWidth:4,sourceHeight:4}),4,4,{labels});
- const ids=Array.from(p.owner,j=>p.doc.areas[j].id);
- assert.deepEqual(ids.filter((_,i)=>i%4===2),['left','scene','scene','scene'],'right gave its cells back to the page');
-});

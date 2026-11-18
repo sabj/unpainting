@@ -24,7 +24,7 @@ const doc = extra => ({ version: 1, coordinateSpace: 'normalized-target', target
 const plan = d => rasterAreaPlan(validateAreaDocument(d, { targetSHA: 'a', imageSHA: 'a', sourceWidth: W, sourceHeight: H }), W, H);
 const square = Uint8Array.from({ length: W * H }, (_, i) => (i % W >= 8 && i % W < 56 && ((i / W) | 0) >= 8 && ((i / W) | 0) < 56 ? 1 : 0));
 const shape = mix => ({ mask: Uint8Array.from(square), amount: mix.reduce((a, b) => a + b, 0), mix, area: 48 * 48 });
-const compiled = (extra, mix) => compileAreaLayers(plan(doc(extra)), [{ value: 1, pigment: 0, shapes: [shape(mix)] }], palette, { mmPerCell: 10, brushKit: [25, 7, 4, 3, 1.2] }).layers[0].shapes[0];
+const compiled = (extra, mix) => compileAreaLayers(plan(doc(extra)), [{ value: 1, pigment: 0, shapes: [shape(mix)] }], palette, { mmPerCell: 10 }).layers[0].shapes[0];
 const fresh = () => createSheet(makePaper(W, H, { seed: 5, scale: 1, toothScale: 0.2 }), palette);
 const r = 3, T = TECHNIQUES['wet on dry'], brush = () => brushFor(r, T, 7);
 // the pass's lanes, laid across the wash direction as the painter lays them (paint.mjs brushedWashPaths at the shape's
@@ -96,36 +96,32 @@ test('a pass is one closed wash: gaps narrower than its brush are filled, reserv
   const d = doc({ lights: { mode: 'paper', reason: 'a reserved light', polygon: box(.4, .4, .5, .5) } });
   // stripes two cells wide with two-cell gaps, as the value ladder leaves them; a 4 mm brush at 1 mm a cell spans the gaps
   const stripes = Uint8Array.from({ length: W * H }, (_, i) => (square[i] && (i % W) % 4 < 2 ? 1 : 0)), area = stripes.reduce((a, b) => a + b, 0);
-  const compiled1 = compileAreaLayers(plan(d), [{ value: 1, pigment: 0, shapes: [{ mask: stripes, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1, brushKit: [25, 7, 4, 3, 1.2] }), shapes1 = compiled1.layers.flatMap(l => l.shapes), sh = shapes1.find(x => !x._semantic.detail);
+  const compiled1 = compileAreaLayers(plan(d), [{ value: 1, pigment: 0, shapes: [{ mask: stripes, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }), sh = compiled1.layers[0].shapes[0], left = (compiled1.diagnostics.narrowerThanBrush ?? []).reduce((a, x) => a + x.paint, 0);
   const m = sh.mask; let inside = 0, light = 0;
   for (let y = 10; y < 54; y++) for (let x = 10; x < 54; x++) inside += m[y * W + x];
   for (let y = 26; y < 32; y++) for (let x = 26; x < 32; x++) light += m[y * W + x];
   assert.ok(inside > .9 * 44 * 44 - 36, `closed: ${inside} of ${44 * 44}`);
-  for (const x of shapes1) { let l = 0; for (let y = 26; y < 32; y++) for (let xx = 26; xx < 32; xx++) l += x.mask[y * W + xx]; assert.equal(l, 0, 'the reserved light is left out of every wash'); }
-  // the reserved light's own cells carry no paint into any pass (they are paper); every other cell's paint is laid
+  assert.equal(light, 0, 'the reserved light is left out');
+  // the reserved light's own cells carry no paint into any pass (they are paper); every other cell's paint is kept
   let kept = 0; for (let i = 0; i < W * H; i++) if (stripes[i] && !(i % W >= 26 && i % W < 32 && ((i / W) | 0) >= 26 && ((i / W) | 0) < 32)) kept++;
-  const laid = shapes1.reduce((a, x) => a + x.mix[0] * x.area, 0);
-  assert.ok(Math.abs(laid - .3 * kept) < 1e-9, `all the paint is laid, main wash and detail washes: ${laid} vs ${.3 * kept}`);
+  assert.ok(Math.abs(sh.mix[0] * sh.area - (.3 * kept - left)) < 1e-9, `same paint less what was left as paper, spread over the closed shape: ${sh.mix[0] * sh.area} vs ${.3 * kept - left}`);
   assert.throws(() => compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [shape([.3, 0, 0])] }], palette), /mmPerCell/);
 });
 
-test('a wash outline is the brush\'s; parts narrower than the brush are laid at brush scale, with the biggest kit brush that fits, holding their own paint', () => {
+test('a wash outline is the brush\'s: spurs narrower than the brush are left as paper with their own paint, counted; a shape too thin for its brush is left out, counted', () => {
   // a square with one-cell spurs sticking out of it, as a ladder band leaves its pixels
   const ragged = Uint8Array.from(square); for (let y = 10; y < 56; y += 12) for (let x = 56; x < 60; x++) ragged[y * W + x] = 1;
-  const area = ragged.reduce((a, b) => a + b, 0), kit = [25, 7, 4, 3, 1.2];
-  const c = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: ragged, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1, brushKit: kit });
-  const shapes = c.layers.flatMap(l => l.shapes), main = shapes.find(x => !x._semantic.detail), detail = shapes.filter(x => x._semantic.detail);
-  let spur = 0; for (let y = 10; y < 56; y += 12) spur += main.mask[y * W + 59];
-  assert.equal(spur, 0, 'the main wash has a brush-scale outline');
-  assert.ok(detail.length && detail.every(x => x._semantic.pass.brush.widthMm < 4 && kit.includes(x._semantic.pass.brush.widthMm)), 'the spurs are laid by smaller kit brushes');
-  let laidSpur = 0; for (const x of detail) for (let y = 10; y < 56; y += 12) laidSpur += x.mask[y * W + 59];
-  assert.ok(laidSpur > 0, 'the spur ends are painted');
-  assert.ok(Math.abs(shapes.reduce((a, x) => a + x.mix[0] * x.area, 0) - .3 * area) < 1e-9, 'every cell\'s paint is laid');
-  assert.equal(c.layers.length, 1, 'one pass, one layer');
+  const area = ragged.reduce((a, b) => a + b, 0);
+  const sh = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: ragged, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 }).layers[0].shapes[0];
+  let spur = 0; for (let y = 10; y < 56; y += 12) spur += sh.mask[y * W + 59];
+  assert.equal(spur, 0, 'the spur tips are gone (a brush leaves only a fillet at the root)');
+  // the spur cells opened away keep their own paint out of the wash: what is laid is the paint of the cells laid
+  const c2 = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: ragged, amount: .3, mix: [.3, 0, 0], area }] }], palette, { mmPerCell: 1 });
+  const gone = c2.diagnostics.narrowerThanBrush[0];
+  assert.ok(gone.cells > 0 && Math.abs(gone.paint - .3 * gone.cells) < 1e-9, 'the left-out cells and their paint are counted');
+  assert.ok(Math.abs(sh.mix[0] * sh.area - .3 * (area - gone.cells)) < 1e-9, 'the wash holds only the paint of the cells it keeps');
   const line = Uint8Array.from({ length: W * H }, (_, i) => ((i / W) | 0) === 30 && i % W > 8 && i % W < 56 ? 1 : 0);
-  const thin = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: line, amount: .3, mix: [.3, 0, 0], area: 47 }] }], palette, { mmPerCell: 1, brushKit: kit });
-  const ts = thin.layers.flatMap(l => l.shapes);
-  assert.equal(ts.length, 1); assert.equal(ts[0]._semantic.pass.brush.widthMm, 1.2, 'a one-cell line is laid with the smallest kit brush');
-  assert.equal(ts[0].area, 47);
-  assert.throws(() => compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: line, amount: .3, mix: [.3, 0, 0], area: 47 }] }], palette, { mmPerCell: 1 }), /brushKit/);
+  const thin = compileAreaLayers(plan(doc({})), [{ value: 1, pigment: 0, shapes: [{ mask: line, amount: .3, mix: [.3, 0, 0], area: 47 }] }], palette, { mmPerCell: 1 });
+  assert.equal(thin.layers.length, 0, 'a line narrower than the brush is left out');
+  assert.deepEqual(thin.diagnostics.narrowerThanBrush.map(x => [x.pass, x.cells]), [['sky/sky', 47]]);
 });

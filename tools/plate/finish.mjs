@@ -380,7 +380,7 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
     fs.writeFileSync(path.join(out, 'unused-options.txt'), unused.map(k => `--${k}`).join('\n') + '\n');
     console.log(`UNUSED OPTIONS (read by nothing in this run): ${unused.map(k => `--${k}`).join(' ')}`);
     // the job recipe always passes these two and only some paths read them: listed, but they do not fail a run
-    const optional = new Set(['closeclean', 'drawstage', 'linemodel', 'copylinesmin', 'copylinesfloor', 'linestroke', 'washinkfree', 'washinkfile', 'washinkmargin']);
+    const optional = new Set(['closeclean', 'drawstage']);
     if (opt('allowunused', '0') === '0' && unused.some(k => !optional.has(k))) process.exitCode = 3;
   }
 }

@@ -127,16 +127,3 @@ test('the plan\'s drawing roles keep or leave out each line whole, per pen', () 
     assert.deepEqual(none, [], 'a scaffold family gets no closing line, and that is not a failure');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
-
-test('an inkDecided line file is not clipped again by coarse value-plan family drawingRole boxes', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
-  try {
-    const ear = { points: [[10, 70], [20, 80], [30, 90]], weight: 1 }, body = { points: [[50, 30], [70, 30], [90, 30]], weight: 1 };
-    fs.writeFileSync(path.join(dir, 'decided-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, inkDecided: true, lines: [ear, body] }));
-    const families = [{ id: 'bg', bounds: [0, 0, 1, 1], drawingRole: 'none' }, { id: 'mid', bounds: [0.4, 0, 1, 1], drawingRole: 'structural' }];
-    const logs = [], f = flagsOf(['--drawingfile', path.join(dir, 'decided')]);
-    const res = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: m => logs.push(m), walked: 0, families });
-    assert.ok(res.some(g => g.points.some(q => q.x < 40)), 'the decided line outside the family box stays');
-    assert.ok(!logs.some(m => /left out by the plan's drawing roles/.test(m)), 'no linesByRole drop logged on inkDecided file');
-  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
-});

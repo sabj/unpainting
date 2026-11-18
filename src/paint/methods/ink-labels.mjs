@@ -1,7 +1,7 @@
 // Pipeline: inking, stage 2 (hold and measure the lines): what is ink-worthy and what is wash.
 // The source's SAM regions are labelled (architecture, figure, face, hands, drapery, tree trunk, foliage, sky, water,
-// ground, shadow mass) by a vision model reading an overlay, cached by source/map/model provenance, or by an explicit
-// simple classifier of each region's own colour and size. Requested vision fails closed. A tone-mass pass adds shadow
+// ground, shadow mass) by a vision model reading an overlay of the regions, cached by the target's SHA-256, or by a simple
+// classifier of each region's own colour and size when no model can run (logged loudly). A tone-mass pass adds shadow
 // masses that no region isolates. Each label carries an ink rule. A candidate line is drawn only where the label of
 // the ground under it says ink (a contour counts when either side is ink-worthy) and it also passes the line-or-mass test
 // (line-class.mjs). Planning only: it reads the target before the first mark.
@@ -80,108 +80,50 @@ export function parseLabelReply(text, ids) {
 export function simpleLabel(r, { w, h }) {
   const [L, A, B] = r.lab, [sL] = r.labSpread ?? [0], top = r.bbox[1] / h < 0.05;
   if (A < -6 && B > 4) return 'foliage';
-  if (top && r.area > 0.08 && r.area <= 0.65 && sL < 12 && L > 55) return 'sky';
+  if (top && r.area > 0.08 && sL < 12 && L > 55) return 'sky';
   if (B < -4 && sL < 12) return 'water';
   return 'architecture';
 }
 
-const PROMPT = ids => `This image is a drawing with its regions outlined in magenta and numbered. For each region number, identify the visible physical material or form, choosing one label from: ${LABELS.join(', ')}. Architecture includes manufactured solid structures and objects and built surfaces. Ground means unbuilt natural terrain. Water means an exposed liquid surface, not its solid enclosure or a dark reflection or shadow on a solid. Tree_trunk means trunks and branches; foliage means leaf masses; drapery means clothing or cloth. Use figure, face and hands for the corresponding visible human forms. Shadow_mass means a broad cast or form shadow, not a solid structure merely seen in shadow. Use these specific human, natural and material categories where they fit; solidity or darkness alone does not make a region architecture. If a region mixes a visible solid built form with liquid, sky or shadow, preserve the visible solid structural meaning rather than labelling the entire region as a wash-only surface. Judge what is visibly present, not just its colour or what surrounds it. Regions: ${ids.join(', ')}. Reply with JSON only: a complete mapping from every listed region number to one allowed label, with no omitted or additional region keys.`;
+const PROMPT = ids => `This image is a drawing with its regions outlined in magenta and numbered. For each region number, say what the region is, choosing one label from: ${LABELS.join(', ')}. (tree_trunk is trunks and branches; foliage is leaf masses; shadow_mass is a broad cast or form shadow; drapery is clothing or cloth; architecture is buildings, walls, columns, arches, steps.) Regions: ${ids.join(', ')}. Reply with JSON only, like {"1": "sky", "2": "architecture"}, with every region number as a key.`;
 
-const DEFAULT_AGY_MODEL = 'claude-sonnet-4-6';
-const canonical = value => JSON.stringify(value, function (_key, v) {
-  return v && typeof v === 'object' && !Array.isArray(v)
-    ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v;
-});
-
-function executableIdentity(command, env) {
-  const candidates = command.includes(path.sep) ? [path.resolve(command)]
-    : String(env.PATH ?? '').split(path.delimiter).map(dir => path.join(dir, command));
-  for (const candidate of candidates) {
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      const resolved = fs.realpathSync(candidate);
-      if (fs.statSync(resolved).isFile()) return { path: resolved, sha256: sha(fs.readFileSync(resolved)) };
-    } catch { /* try the next PATH entry */ }
-  }
-  throw new Error(`executable not found or unreadable: ${command}`);
-}
-
-/** Cache provenance contains input hashes and public configuration, never credentials. */
-export function labelIdentity({ image, regions, labelMap, w, h, judge, model, executable, prompt }) {
-  if (!Number.isInteger(w) || w < 1 || !Number.isInteger(h) || h < 1 ||
-      !ArrayBuffer.isView(labelMap) || labelMap instanceof DataView || labelMap.length !== w * h)
-    throw new Error('label map must be a typed array with exactly w * h cells');
-  const bytes = Buffer.from(labelMap.buffer, labelMap.byteOffset, labelMap.byteLength);
-  return { version: 1, imageSHA256: sha(fs.readFileSync(image)),
-    map: { w, h, type: labelMap.constructor.name, sha256: sha(bytes) },
-    regionsSHA256: sha(canonical(regions)), promptSHA256: sha(prompt), judge, model, executable };
-}
-
-function validateVision(record, ids, identity, context) {
-  const fail = reason => { throw new Error(`${context}: ${reason}`); };
-  if (!record || record.judge !== identity.judge || canonical(record.identity) !== canonical(identity))
-    fail('cache identity or judge mismatch');
-  if (record.note) fail('vision record contains a fallback/error note');
-  for (const key of ['labels', 'source']) {
-    if (!record[key] || typeof record[key] !== 'object' || Array.isArray(record[key]) ||
-        Object.keys(record[key]).length !== ids.length ||
-        Object.keys(record[key]).some(id => !ids.some(wanted => String(wanted) === id)))
-      fail(`${key} must cover exactly every requested region`);
-  }
-  for (const id of ids) {
-    if (!LABELS.includes(record.labels[id])) fail(`region ${id} has a missing or unknown label`);
-    if (record.source[id] !== 'vision') fail(`region ${id} is not vision-labelled`);
-  }
-  return record;
-}
-
-function askJudge(judge, png, ids, { run = spawnSync, command, model, prompt, env } = {}) {
+function askJudge(judge, png, ids, { run = spawnSync, env = process.env } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-labels-')), file = path.join(dir, 'regions.png');
+  fs.writeFileSync(file, png);
   try {
-    fs.writeFileSync(file, png);
-    const args = judge === 'codex'
-      ? ['exec', '-i', file, '--model', model, '--sandbox', 'read-only', '--skip-git-repo-check', prompt]
-      : ['-p', `Open the image file ${file} with your file-viewing tool (do not run shell commands). ${prompt}`, '--model', model, '--mode', 'plan', '--add-dir', dir];
-    const r = run(command, args, { cwd: dir, env, encoding: 'utf8', timeout: 600000 });
-    if (r.error || r.status !== 0) throw new Error(`label process failed (${r.error?.code ?? r.signal ?? r.status ?? 'unknown status'})`);
+    const prompt = PROMPT(ids);
+    const r = judge === 'codex'
+      ? run(env.CODEX_BIN || 'codex', ['exec', '-i', file, '--sandbox', 'read-only', '--skip-git-repo-check', prompt], { cwd: dir, encoding: 'utf8', timeout: 600000 })
+      : run(env.AGY_BIN || 'agy', ['-p', `Open the image file ${file} with your file-viewing tool (do not run shell commands). ${prompt}`, '--model', env.INK_LABEL_MODEL || 'claude-sonnet-4-6', '--mode', 'plan', '--add-dir', dir], { encoding: 'utf8', timeout: 600000 });
+    if (r.error || r.status !== 0) throw new Error(r.error?.message ?? (String(r.stderr ?? '').trim().split('\n').at(-1) || `exit ${r.status}`));
     const labels = parseLabelReply(r.stdout, ids);
-    if (!labels) throw new Error('label reply contained no valid region labels');
+    if (!labels) throw new Error(`no labels in the reply: ${String(r.stdout).slice(0, 200)}`);
     return labels;
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
-/** Explicit simple classification stays local. Requested vision is complete or fails closed. */
-export async function labelRegions({ image, regions, labelMap, w, h, judge = 'codex', cacheDir, run = spawnSync, env = process.env }) {
-  if (!['simple', 'codex', 'agy'].includes(judge)) throw new Error(`ink labels: unknown judge ${JSON.stringify(judge)}; use simple, codex or agy`);
+/**
+ * Labels for the regions of the target's SAM map. From the cache when this target, region map and judge were labelled
+ * before; else by the vision model `judge` ('codex' or 'agy'); a region it leaves out, or all of them when it cannot run,
+ * take the simple classifier, and the record says so.
+ * @returns { labels: { [id]: label }, source: { [id]: 'vision'|'simple' }, judge, cached, note? }
+ */
+export async function labelRegions({ image, regions, labelMap, w, h, judge = 'codex', cacheDir, segKey = '', log = () => {}, run = spawnSync, env = process.env }) {
   const ids = regions.map(r => r.id);
-  if (judge === 'simple') return {
-    labels: Object.fromEntries(regions.map(r => [r.id, simpleLabel(r, { w, h })])),
-    source: Object.fromEntries(ids.map(id => [id, 'simple'])), judge, cached: false,
-  };
-  if (ids.some(id => !Number.isInteger(id) || id < 0) || new Set(ids).size !== ids.length)
-    throw new Error('ink labels: region IDs must be distinct nonnegative integers');
-  const context = `ink labels (${judge})`;
-  try {
-    const model = String(env.INK_LABEL_MODEL ?? (judge === 'agy' ? DEFAULT_AGY_MODEL : '')).trim();
-    if (!model) throw new Error('set INK_LABEL_MODEL explicitly for the requested vision judge; an unresolved model cannot identify a cache');
-    const command = env[judge === 'codex' ? 'CODEX_BIN' : 'AGY_BIN'] || judge;
-    const prompt = PROMPT(ids), executable = executableIdentity(command, env);
-    const identity = labelIdentity({ image, regions, labelMap, w, h, judge, model, executable, prompt });
-    const file = path.join(cacheDir, `${identity.imageSHA256}-${sha(canonical(identity))}.json`);
-    if (fs.existsSync(file)) {
-      const record = validateVision(JSON.parse(fs.readFileSync(file, 'utf8')), ids, identity, 'cached vision labels');
-      return { ...record, cached: true };
+  const key = `${sha(fs.readFileSync(image))}-${segKey}-${judge}`, file = path.join(cacheDir, `${key}.json`);
+  if (judge !== 'simple' && fs.existsSync(file)) return { ...JSON.parse(fs.readFileSync(file, 'utf8')), cached: true };
+  let vision = null, note = null;
+  if (judge !== 'simple') {
+    try { vision = askJudge(judge, await overlayPng({ image, labels: labelMap, w, h, ids }), ids, { run, env }); } catch (e) {
+      note = `${judge} could not label the regions: ${e.message}`;
+      log(`!!! ink labels: ${note}; every region takes the simple classifier of its colour and size`);
     }
-    const labels = askJudge(judge, await overlayPng({ image, labels: labelMap, w, h, ids }), ids, { run, command: executable.path, model, prompt, env });
-    const missing = ids.filter(id => !Object.hasOwn(labels, id));
-    if (missing.length) throw new Error(`label reply has missing or unknown labels for regions ${missing.join(', ')}`);
-    const out = validateVision({ labels, source: Object.fromEntries(ids.map(id => [id, 'vision'])), judge, identity, cached: false }, ids, identity, 'vision labels');
-    fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(out) + '\n');
-    return out;
-  } catch (e) {
-    throw new Error(`${context}: ${e.message}`, { cause: e });
   }
+  const labels = {}, source = {};
+  for (const r of regions) { if (vision?.[r.id]) { labels[r.id] = vision[r.id]; source[r.id] = 'vision'; } else { labels[r.id] = simpleLabel(r, { w, h }); source[r.id] = 'simple'; } }
+  const out = { labels, source, judge: vision ? judge : 'simple', ...(note ? { note } : {}), cached: false };
+  if (vision) { fs.mkdirSync(cacheDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify(out) + '\n'); }
+  return out;
 }
 
 /** Cells under a broad, dark tone mass (a shadow or dark wash), as a 0/1 plane: blurred L* well under the paper's. */
@@ -207,14 +149,6 @@ export function boxBlur(P, w, h, r) {
   for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let y = -r; y < h; y++) { const a = y + r, b = y - r - 1; if (a < h) { s += tmp[a * w + x]; c++; } if (b >= 0) { s -= tmp[b * w + x]; c--; } if (y >= 0) out[y * w + x] = s / c; } }
   return out;
 }
-
-/**
- * Whether the tone-mass shadow pass (shadowMassMask) may take a cell whose region label is `label`. It adds the shadow's
- * stricter rule (shadow_mass: structure drawn only with a pen line's own contrast) over ground that draws structure or
- * outline. It never replaces a wash-only region or trunk and branch ground: a pen stroke in a dark wash over foliage is
- * not a shadow edge, and the shadow rule would also outrank the foliage rule (RANK) and wipe those strokes out.
- */
-export const toneShadowTakes = label => (RANK[INK_RULES[label]?.ink] ?? 0) >= RANK.structure;
 
 /**
  * The ink rule that applies at a point: the most permissive rule among the labels within `reachPx` of it (a contour is
