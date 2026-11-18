@@ -288,6 +288,9 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
       // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
       // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
+      // A dark glaze goes round a light of the target that the detail brush can leave, though the light is still deep enough to
+      // sit in the shadow support or the squinted band: cells under the dark bands' floor in a piece of one touch or more.
+      if(phase==='shadow'&&stepHoles&&!step.pig){const lit=Uint8Array.from(mask,(v,i)=>v&&!protectedCells[i]&&value.values[i]<VALUE_CAPS[2]?1:0),bare=removeSmall(lit,w,h,smallShape);for(let i=0;i<n;i++)if(bare[i])mask[i]=0;}
       if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,step.holeFloor);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.

@@ -91,3 +91,11 @@ test('a dark glaze goes round a thin light the detail brush can leave, and paint
   assert.equal(painted(dark(p), gap4), true, 'a 4x4 gap (16 cells, under a rigger touch) is painted through');
   assert.ok(dark(p).length > 0);
 });
+
+test('a dark glaze goes round a thin light that is still deep enough for the shadow support', () => {
+  // the same 4x20 line, but at value .44: darker than the shadow threshold, lighter than the dark bands
+  const d = field(q => { rect(q, 100, 100, 60, 1); for (let y = 110; y < 130; y++) for (let x = 120; x < 124; x++) q[y * W + x] = 0.4; });
+  const p = plan(d), dark = p.layers.flatMap(l => l.shapes).filter(sh => sh._valuePlan.phase === 'shadow');
+  assert.equal(painted(dark, 120 * W + 121), false, 'the glaze leaves the line bare');
+  assert.equal(painted(dark, 130 * W + 130), true, 'and still covers the dark form');
+});
