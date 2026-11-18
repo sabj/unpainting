@@ -72,6 +72,16 @@ export function mergeAuthored(pool, authored, { sheetMm, nearMm = 1, share = 0.6
 }
 
 /**
+ * The flags that point the drawing at the pool file: no stage planner, a light opening pressure, and no planned-passage filter
+ * (--lineedges 0: that filter leaves off a line inside one planned wash passage, and a pencil line under a wash is still drawing).
+ * A flag the run already sets stays.
+ */
+export function graphiteDrawingArgs(argv, target) {
+  const has = name => argv.includes(name);
+  return ['--drawingfile', target, '--drawingstages', 'off', ...(has('--openingpressure') ? [] : ['--openingpressure', GRAPHITE_POOL_PRESSURE]), ...(has('--lineedges') ? [] : ['--lineedges', '0'])];
+}
+
+/**
  * Trace the pool, hold and decide it, merge the plan's opening lines, write <out>/graphite-lines.json and point the drawing at it.
  * Pushes --drawingfile, --drawingstages off and, if absent, --openingpressure onto argv. Throws when the models cannot run.
  */
@@ -97,8 +107,7 @@ export async function prepareGraphitePool({ opt, num, argv, out, root, image, sh
   const target = path.join(out, 'graphite-lines');
   fs.writeFileSync(`${target}-lines.json`, JSON.stringify({ ...merged, medium: 'graphite' }) + '\n');
   fs.writeFileSync(path.join(out, 'graphite-pool.json'), JSON.stringify({ stem, pool: pool.lines.length, ...merged.stats }, null, 1) + '\n');
-  argv.push('--drawingfile', target, '--drawingstages', 'off');
-  if (opt('openingpressure', '') === '') argv.push('--openingpressure', GRAPHITE_POOL_PRESSURE);
+  argv.push(...graphiteDrawingArgs(argv, target));
   log(`graphite drawing: ${merged.lines.length} lines, ${merged.stats.lengthMm} mm, ${Math.round(100 * merged.stats.amount)}% of the length, strongest edges first, of ${pool.lines.length} pool lines held and decided by meaning${own ? `, ${merged.stats.authored} authored lines kept` : ''}`);
   return { ...merged.stats, file: `${target}-lines.json` };
 }
