@@ -576,3 +576,23 @@ test('ownSwatch: a calibrated plan keeps the glaze one damp pass; without it the
   assert.deepEqual([own.passes, own.water], [1, 0.45]);
   assert.deepEqual([stock.passes, stock.water], [1, 0.58]);
 });
+
+test('a wash that keeps a colour family apart is cut again by the mix of the cells it covers: a red and an orange of one family are not one mean wash', () => {
+  // two warm saturated halves, one family: the left asks mostly the first pan, the right mostly the second
+  const w = 48, h = 24, n = w * h, paperRGB = [255, 255, 255];
+  const pigments = [{ K: [0.05, 0.6, 0.5], S: [0, 0, 0] }, { K: [0.05, 0.15, 0.6], S: [0, 0, 0] }];
+  const left = i => i % w < 24;
+  const rgb = Uint8ClampedArray.from({ length: n * 3 }, (_, q) => (left((q / 3) | 0) ? [205, 70, 60] : [215, 140, 45])[q % 3]);
+  const density = Float32Array.from({ length: n }, (_, i) => -Math.log(Math.max(1, rgb[i * 3 + 1]) / 255));
+  const demand = Float32Array.from({ length: n * 2 }, (_, q) => (left((q / 2) | 0) ? [0.5, 0.05] : [0.05, 0.5])[q % 2]);
+  const log = console.log; console.log = () => {};
+  let plan; try { plan = planLightToDark({ w, h, k: 2, density, demand, rgb, shaped: true, minShapeCells: 10, pigments, paperRGB, calibratedPlan: true, layerHue: true, lightFamilies: true, hueChroma: 30 }); } finally { console.log = log; }
+  const light = plan.layers.filter(L => L._valuePhase === 'light').flatMap(L => L.shapes.map(sh => ({ pigment: L.pigment, sh })));
+  for (const pigment of [0, 1]) {
+    const shapes = light.filter(q => q.pigment === pigment).map(q => q.sh);
+    assert.ok(shapes.length >= 2, `pigment ${pigment}: ${shapes.length} light shapes, one wash across both colours`);
+    const at = x => shapes.find(sh => sh.mask[12 * w + x]);
+    assert.notEqual(at(6), at(40), `pigment ${pigment}: the left and the right are different shapes`);
+  }
+});
+
