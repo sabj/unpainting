@@ -51,6 +51,13 @@ test('a glint qualifies, a dot of the same size in a pale area does not', () => 
   assert.equal(thinLights(D, W, H, { pixelMm: PX }).strokes.length, 0, 'a light on a pale ground is not a light over dark');
 });
 
+test('a fleck in fur is not a glint: a glint sits in a smooth dark, not among many lights', () => {
+  const D = field(1.0);
+  for (let y = 60; y < 140; y += 6) for (let x = 60; x < 200; x += 7) for (let dy = 0; dy < 3; dy++) for (let dx = 0; dx < 3; dx++) D[(y + dy) * W + x + dx] = 0.3 + 0.1 * ((x + y) % 3);
+  for (let y = 100; y < 105; y++) for (let x = 180; x < 185; x++) D[y * W + x] = 0.05;
+  assert.equal(thinLights(D, W, H, { pixelMm: PX }).strokes.filter(s => s.kind === 'glint').length, 0);
+});
+
 test('a light wider than a rigger touch is the planner\'s, not the rigger\'s', () => {
   const D = field(1.0); line(D, 30, 100, 150, 104, 12, 0.1, 0);
   assert.ok(12 * PX > TOUCH_MM);

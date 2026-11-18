@@ -20,7 +20,7 @@ const MIN_LENGTH_MM = 4;                // a stroke shorter than this is a fragm
 const ASPECT = 8;                       // length over width
 const FIT_MM = 0.3;                     // the most a stroke may leave its ridge
 const MAX_TURNS_PER_CM = 0.75;          // curvature sign changes per cm of a laid stroke
-const GLINT = Object.freeze({ maxMm: 1.8, lightOd: 0.2, stepOd: 0.5, darkOd: 0.7 });
+const GLINT = Object.freeze({ maxMm: 1.8, lightOd: 0.2, stepOd: 0.5, darkOd: 0.7, smoothSd: 0.2, aroundMm: 2.5 });
 const CHAINS_MAX = 1500;                // chains kept for joining, longest and clearest first (joining is the costly step)
 const CLUSTER_MM = 10;                  // a hair stands among others: a short stroke with no neighbour is a fleck
 
@@ -192,6 +192,16 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
       if (Math.max(at(ring), at(ring + 1)) < GLINT.darkOd) ringed = false;
     }
     if (!ringed) continue;
+    // an eye, a nose or a pane is a smooth dark with one light in it; fur and hair are dark with many lights in it
+    const rIn = ring, rOut = Math.max(rIn + 2, GLINT.aroundMm / pixelMm);
+    let sum = 0, sum2 = 0, cnt = 0;
+    for (let dy = -Math.ceil(rOut); dy <= Math.ceil(rOut); dy++) for (let dx = -Math.ceil(rOut); dx <= Math.ceil(rOut); dx++) {
+      const d = Math.hypot(dx, dy); if (d < rIn || d > rOut) continue;
+      const xx = Math.round(cx + dx), yy = Math.round(cy + dy); if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+      const v = D[yy * w + xx]; sum += v; sum2 += v * v; cnt++;
+    }
+    const mean = cnt ? sum / cnt : 0, sd = cnt ? Math.sqrt(Math.max(0, sum2 / cnt - mean * mean)) : 1;
+    if (mean < GLINT.darkOd || sd > GLINT.smoothSd) continue;
     const half = Math.max(ext, RIGGER_MM.min) / 2 / pixelMm;
     const pts = [[cx - half * 0.5, cy], [cx + half * 0.5, cy]];
     glints.push({ kind: 'glint', points: pts, widthMm: Math.min(RIGGER_MM.max, Math.max(RIGGER_MM.min, ext)), lengthMm: Math.max(ext, RIGGER_MM.min), lightOd: c.minD, surroundOd: closed[ci], rgb: null, fit: { maxMm: 0, meanMm: 0, turnsPerCm: 0 }, score: contrast });
