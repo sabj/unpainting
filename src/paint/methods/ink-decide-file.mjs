@@ -12,6 +12,7 @@ import { foliageMask } from './line-foliage.mjs';
 import { hatchShadows, HATCH_DEFAULTS } from './line-hatch.mjs';
 import { salience } from './line-salience.mjs';
 import { joinCollinear } from './line-geometry.mjs';
+import { fairLines, dropWandering } from './line-fair.mjs';
 import { prunePenLines } from './pen-wash-lines.mjs';
 import { estimateInkDark } from './line-class.mjs';
 import { labPlanes } from './line-evidence.mjs';
@@ -68,6 +69,10 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
   }
   // --inkjoin mm: pieces that continue one another in a straight line join across a gap of up to mm (nothing is dropped)
   if (joinMm > 0) kept = joinCollinear(kept, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm });
+  // a kept line follows its ridge and is drawn as a straight run, a clean arc or one smooth curve, with corners kept (line-fair.mjs):
+  // the ridge is traced on a grid of a quarter millimetre or more, and no pen shakes as that grid does
+  const fairing = fairLines(kept, { pxMm }), wandering = dropWandering(fairing.lines, { pxMm, isFeature: (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y))))) });
+  kept = wandering.lines; fairing.stats.wanderingDropped = wandering.stats.dropped; fairing.stats.wanderingDroppedMm = Math.round(wandering.stats.droppedMm);
   // --inkeconomy 1: a draughtsman's economy (pen-wash-lines.mjs) without its random omission. Specks under 0.8 mm go; a
   // small mark that nearly repeats a neighbour goes; no 4 mm square carries more than 9 mm of small marks, longest kept
   // first; every mark 3 mm across or more stays.
@@ -96,6 +101,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
     stats: r.stats,
     ...(geometry ? { geometry } : {}),
     ...(hatch ? { hatchStrokes: hatched } : {}),
+    fair: fairing.stats,
     ...(economyStats ? { economy: economyStats } : {}),
     ...(sal ? { salience: sal } : {}),
   };

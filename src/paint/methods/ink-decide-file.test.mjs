@@ -84,3 +84,15 @@ test('authored plan lines are pruned by the target, not by region labels: a sky 
   const model = await decideFile({ ...common, authored: false });
   assert.ok(!ys(model).includes(31), 'a model line under a sky label is wash');
 });
+
+test('kept lines are faired: a traced line with a quarter millimetre of tremor leaves as a straight run, and the record counts it', async () => {
+  const s = await setup();
+  let st = 99; const r0 = () => (st = (st * 1664525 + 1013904223) >>> 0) / 4294967296 - 0.5;
+  const tremor = { points: Array.from({ length: 70 }, (_, k) => [5 + k + 0.5 * r0() / PX * 0.4, 30.5 + 0.4 * r0() / PX]), inputKind: 'line-map' };
+  const doc = { image: { w: W, h: H }, inputKind: 'line-map', lines: [tremor] };
+  const r = await decideFile({ doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false });
+  assert.equal(r.lines.length, 1);
+  assert.equal(r.record.fair.line, 1);
+  const ys = r.lines[0].points.map(([, y]) => y);
+  assert.ok(Math.max(...ys) - Math.min(...ys) < 0.15 / PX, 'straight to within 0.15 mm');
+});
