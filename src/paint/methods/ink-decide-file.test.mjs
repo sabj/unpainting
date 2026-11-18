@@ -96,3 +96,13 @@ test('kept lines are faired: a traced line with a quarter millimetre of tremor l
   const ys = r.lines[0].points.map(([, y]) => y);
   assert.ok(Math.max(...ys) - Math.min(...ys) < 0.15 / PX, 'straight to within 0.15 mm');
 });
+
+test('a wandering line is a scribble when a model traced it and a curl when the plan drew it: only the traced one is left to the wash', async () => {
+  const s = await setup();
+  const curl = { points: Array.from({ length: 200 }, (_, k) => [20 + k * 0.5, 30.5 + 7 * Math.sin(k / 199 * Math.PI * 6)]) };
+  const doc = authored => ({ image: { w: W, h: H }, inputKind: authored ? undefined : 'line-map', lines: [curl] });
+  for (const [x, y] of curl.points) for (const dy of [-1, 0, 1]) s.L[Math.round(y + dy) * W + Math.round(x)] = 40;   // a pen line along it
+  const common = { L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false };
+  assert.equal((await decideFile({ ...common, doc: doc(true), authored: true })).lines.length, 1, 'authored curls stay');
+  assert.equal((await decideFile({ ...common, doc: doc(false) })).lines.length, 0, 'a traced scribble goes');
+});

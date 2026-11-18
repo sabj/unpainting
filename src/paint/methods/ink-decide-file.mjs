@@ -71,7 +71,8 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
   if (joinMm > 0) kept = joinCollinear(kept, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm });
   // a kept line follows its ridge and is drawn as a straight run, a clean arc or one smooth curve, with corners kept (line-fair.mjs):
   // the ridge is traced on a grid of a quarter millimetre or more, and no pen shakes as that grid does
-  const fairing = fairLines(kept, { pxMm }), wandering = dropWandering(fairing.lines, { pxMm, isFeature: (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y))))) });
+  // (a plan's authored curls are its design: they are faired within the same limit, never dropped as scribbles)
+  const fairing = fairLines(kept, { pxMm }), wandering = authored ? { lines: fairing.lines, stats: { dropped: 0, droppedMm: 0 } } : dropWandering(fairing.lines, { pxMm, isFeature: (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y))))) });
   kept = wandering.lines; fairing.stats.wanderingDropped = wandering.stats.dropped; fairing.stats.wanderingDroppedMm = Math.round(wandering.stats.droppedMm);
   // --inkeconomy 1: a draughtsman's economy (pen-wash-lines.mjs) without its random omission. Specks under 0.8 mm go; a
   // small mark that nearly repeats a neighbour goes; no 4 mm square carries more than 9 mm of small marks, longest kept
