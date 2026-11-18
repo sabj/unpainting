@@ -166,7 +166,6 @@ layered-wash chroma split.
 Fitted values that remain, each fitted on more than one subject, not switched by subject:
 - The pen-and-wash recipe (`--recipe penwash`) and `src/paint/methods/pen-wash.mjs` charge scale and gains
   (`--pwcharge 8`, `--pwwetgain`, `--pwdrygain`), calibrated on two runs.
-- `--touchgain` (default `.8`), the touch-up strength.
 
 ## Opt-in experimental controls
 

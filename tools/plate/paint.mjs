@@ -42,8 +42,7 @@ import {thirsty, edgeHalfWidth} from '../../src/media/brush.mjs';
 import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
-import {touchLack, touchDue} from '../../src/paint/methods/touch-up.mjs';
-import {lumOf} from '../../src/paint/step-backs.mjs';
+import {touchLack, touchGap, touchDue, touchFilmUnits} from '../../src/paint/methods/touch-up.mjs';
 import {tipMarks, darkClip} from '../../src/paint/methods/final-dark-marks.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
@@ -117,23 +116,24 @@ const semanticMarks = (sh, mask) => {
   console.log(`surface marks: ${pass.marks.kind} on ${sh._semantic.key}, ${paths.length} marks`);
   return paths.map((pts, k) => pts.map(p => ({ ...p, gestureId: `${sh._semantic.key}/${pass.marks.kind}-${ctx.laid}-${k}`, areaId: sh._semantic.area.id, passId: sh._semantic.key, contact: pass.brush.contact, brushModel: pass.brush.model ?? 'row' })));
 };
-// The 'washes' step-back (src/paint/step-backs.mjs): once, after the planned washes dry, each planning family is read
-// once at shape scale. A family that reads at least one value step of the subject's own scale lighter than the subject
-// gets one darkening glaze of the mixed lack (touch-up.mjs); it is not read again after its glaze.
-const touchCorrections = () => {
+// A 'washes' step-back (src/paint/step-backs.mjs), one a round: after the planned washes (round 1) or the last round's
+// glazes dry, each planning family is read once at shape scale. A family the sheet shows visibly lighter or less
+// chromatic than the subject (touch-up.mjs) gets one darkening glaze of the mixed lack, sized from the gap through the
+// sheet's own film optics; it is read again only in the next round.
+const touchCorrections = round => {
   dry(ctx.sheet, 20000, O, { levelMax: 200 });
-  const rgb = render(), Ks = PIGS.map(p => p.K.map(v => v / 0.55)), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
+  const rgb = render(), Ks = touchFilmUnits(PIGS), od = c => [0, 1, 2].map(q => -Math.log(Math.max(1, c[q]) / paperRGB[q]));
   const glazes = [];
   let looked = 0;
-  STEP_BACKS.open('washes');
+  STEP_BACKS.open(round === 1 ? 'washes' : `washes-${round}`);
   ctx.TP_SHAPES.forEach((t, k) => {
-    const lk = paintingLook('passage', `touch/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
+    const lk = paintingLook('passage', `touch${round}/s${k}`, t._look, { ref: ['px'] }); if (!lk) return; looked++;
     const m = [0, 0, 0]; let c = 0; for (let i = 0; i < n; i++) if (t._look[i]) { m[0] += rgb[i * 3]; m[1] += rgb[i * 3 + 1]; m[2] += rgb[i * 3 + 2]; c++; }
     const have = m.map(v => v / Math.max(1, c));
-    if (!touchDue(lumOf(have), lumOf(lk.ref.px), ctx.TOUCH_VALUE_STEP)) return;
+    if (!touchDue(touchGap(have, lk.ref.px, paperRGB))) return;
     const d = touchLack(od(lk.ref.px), od(have)); // darken only (src/paint/methods/touch-up.mjs)
     if (Math.max(...d) < num('touchdmin', 0.04)) return;
-    const a = unmix(Float32Array.from(d), 1, Ks), mix = PIGS.map((_, j) => (a[j] > 0.004 ? a[j] * num('touchgain', 0.8) : 0));
+    const a = unmix(Float32Array.from(d), 1, Ks), mix = PIGS.map((_, j) => (a[j] > 0.004 ? a[j] : 0));
     const amount = mix.reduce((x, v) => x + v, 0); if (!(amount > 0)) return;
     const sh = { mask: t.mask, area: t.area, amount, mix }; TECHNIQUE.set(sh, TECHNIQUE.get(t)); glazes.push(sh);
   });
@@ -141,8 +141,8 @@ const touchCorrections = () => {
   // one glaze of the mixed lack per family, filed under its leading pan
   const byPig = PIGS.map(() => []); for (const sh of glazes) byPig[sh.mix.indexOf(Math.max(...sh.mix))].push(sh);
   const maxV = Math.max(...ctx.layers.filter(l => !l._touch && !l._touched && !l._darks).map(l => l.value || 0));
-  const add = byPig.map((shapes, j) => { if (!shapes.length) return null; const tmpl = ctx.layers.filter(l => l.pigment === j && !l._touch && !l._darks && !l._detail).at(-1) ?? ctx.layers.find(l => !l._touch && !l._darks); return { ...tmpl, pigment: j, value: maxV + 1, shapes, _touched: 1 }; }).filter(Boolean);
-  console.log(`step-back after the washes: looked at ${looked} families once; ${glazes.length} read a value step (${ctx.TOUCH_VALUE_STEP.toFixed(3)} luminance) or more lighter than the subject and get one darkening glaze each`);
+  const add = byPig.map((shapes, j) => { if (!shapes.length) return null; const tmpl = ctx.layers.filter(l => l.pigment === j && !l._touch && !l._darks && !l._detail).at(-1) ?? ctx.layers.find(l => !l._touch && !l._darks); return { ...tmpl, pigment: j, value: maxV + round, shapes, _touched: round }; }).filter(Boolean);
+  console.log(`touchpoint ${round}: looked at ${looked} families once; ${glazes.length} read visibly lighter or less chromatic than the subject and get one glaze of the mixed lack each (${add.reduce((a, l) => a + l.shapes.length, 0)} passages over ${add.length} pans)`);
   return add;
 };
 if (ctx.TP_SHAPES) ctx.layers.push({ _touch: 1, shapes: [], value: 0, pigment: 0 });
@@ -304,7 +304,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // --finishsnaps 1: the sheet as the finish begins (the planned ladder laid, before the touch-up rounds), for review
   if (layer._touch === 1 && num('finishsnaps', 0) > 0) { dry(ctx.sheet, 20000, O, { levelMax: 200 }); await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'finish-start.png')); }
   if (layer._darks) { if (num('finishsnaps', 0) > 0) { dry(ctx.sheet, 20000, O, { levelMax: 200 }); await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'finish-touched.png')); } const add = finalDarks(); if (add.length) ctx.layers.splice(L + 1, 0, ...add); continue; }
-  if (layer._touch) { const add = touchCorrections(); if (add.length) ctx.layers.splice(L + 1, 0, ...add); continue; }
+  if (layer._touch) { const add = touchCorrections(layer._touch); if (add.length) { ctx.layers.splice(L + 1, 0, ...add); if (layer._touch < TP_ROUNDS) ctx.layers.splice(L + 1 + add.length, 0, { _touch: layer._touch + 1, shapes: [], value: 0, pigment: 0 }); } continue; }
   if(ctx.AREA_PLAN)AREA_EXEC.set(layer._semantic);
   colourMass('before-pass', {pass:L+1,value:layer.value,pigment:layer.pigment});
   if (opt('feedback', '1') !== '0') {
@@ -369,7 +369,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
 
   const LEDGER = ONSHEET ?? expected;
   const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
-  const LOOK = paintingLook('passage', `L${L + 1}/s${shIdx}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
+  const LOOK = paintingLook('passage', `L${L + 1}/s${layer.shapes.indexOf(sh)}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
   const SHAPE_LACK = LOOK ? shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.ledger, { mix: colourMix, pigment: layer.pigment }) : sh.amount;
   let shapeLoad=null;
   const getShapeLoad=()=>{

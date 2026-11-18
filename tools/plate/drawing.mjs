@@ -36,7 +36,6 @@ import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
-import {subjectValueStep, lumOf} from '../../src/paint/step-backs.mjs';
 
 export async function drawing(ctx) {
 const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
@@ -226,9 +225,7 @@ if (TP_ROUNDS > 0) {
   const PENCELLS = lineMask([...new Set([lf(opt('drawingfile', '')), lf(opt('drawinglast', ''))])], w, h, { pad: Math.round(num('touchlinepad', 1)), fs });
   const groups = planningShapes(channelDensity(ctx.px, n, paperRGB), w, h, { families: num('touchfamilies', 24), minCells: Math.max(64, Math.round(num('touchmincells', 0.0008) * n)), pool: false, smooth: Math.round(num('touchsmoothmm', 1) / (num('sheetmm', DEFAULT_SHEET_MM) / w)) });
   ctx.TP_SHAPES = groups.map(cells => { const mask = new Uint8Array(n), look = new Uint8Array(n); for (const i of cells) { mask[i] = 1; if (!PENCELLS[i]) look[i] = 1; } const t = { mask, area: cells.length, amount: 0, mix: PIGS.map(() => 0), _look: look }; techniqueOf(t); return t; });
-  // the subject's own value step, read before painting: a family is corrected only a whole step lighter (touch-up.mjs)
-  ctx.TOUCH_VALUE_STEP = subjectValueStep(Float32Array.from({ length: n }, (_, i) => lumOf([ctx.px[3 * i], ctx.px[3 * i + 1], ctx.px[3 * i + 2]])));
-  console.log(`touchpoints: one step-back after the washes over ${ctx.TP_SHAPES.length} planning shapes (${ctx.TP_SHAPES.reduce((a, t) => a + t.area, 0)} cells), cut before painting`);
+  console.log(`touchpoints: up to ${TP_ROUNDS} rounds, each a step-back, over ${ctx.TP_SHAPES.length} planning shapes (${ctx.TP_SHAPES.reduce((a, t) => a + t.area, 0)} cells), cut before painting`);
 }
 // --finaldarks 1: after the touch-up rounds, one round of small decisive darks (src/paint/methods/final-darks.mjs), laid
 // as marks of the detail brush's tip, accent pieces no smaller than one tip touch (final-dark-marks.mjs). The
