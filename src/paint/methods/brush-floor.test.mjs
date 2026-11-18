@@ -80,3 +80,14 @@ test('the same physical sheet gives the same floor at another native density', (
   };
   assert.equal(run(1), run(2), 'the spot is a hole at both densities or at neither');
 });
+
+test('a dark glaze goes round a thin light the detail brush can leave, and paints through a pinhole', () => {
+  // the 60x60 form is dark here; a 4x20 light line (1 mm by 5 mm: a mullion, 80 cells) and a 4x4 and a 2x2 gap in it
+  const d = field(q => { rect(q, 100, 100, 60, 1); for (let y = 110; y < 130; y++) for (let x = 120; x < 124; x++) q[y * W + x] = 0.2; rect(q, 140, 140, 4, 0.2); rect(q, 150, 150, 2, 0.2); });
+  const dark = p => p.layers.flatMap(l => l.shapes).filter(sh => sh._valuePlan.phase === 'shadow');
+  const p = plan(d), line = 120 * W + 121, gap4 = 142 * W + 142, gap2 = 150 * W + 150;
+  assert.equal(painted(dark(p), line), false, 'the glaze leaves the mullion bare');
+  assert.equal(painted(dark(p), gap2), true, 'a 2x2 pinhole is painted through');
+  assert.equal(painted(dark(p), gap4), true, 'a 4x4 gap (16 cells, under a rigger touch) is painted through');
+  assert.ok(dark(p).length > 0);
+});

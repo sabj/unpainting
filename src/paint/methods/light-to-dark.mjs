@@ -238,8 +238,10 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
   // layers>0: the middle values are built as several wide connected wash layers, each dried
   // before the next. Layer 0 covers the whole middle form; each later layer covers only the
   // darker part of the smoothed value field, so value builds gradually.
-  // The darks keep the floor brush's scale: the dark end is not built from the small brushes here.
-  const steps=[1,2,3,4,5].map(band=>({band,wt:(band===3?fineWeights:weights)[band-1],tag:'',floor:band===3?smallShape:minShape}));
+  // The darks keep the floor brush's scale for their passages and weights; only their holes follow the detail brush.
+  // holeFloor: the least paper a step goes round. A dark glaze goes round a light the detail brush can leave (a mullion in a window),
+  // though its own passages keep the floor brush's size.
+  const steps=[1,2,3,4,5].map(band=>({band,wt:(band===3?fineWeights:weights)[band-1],tag:'',floor:band===3?smallShape:minShape,holeFloor:band===3||band>=4?smallShape:minShape}));
   if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'){
     const sm=boxMeanValue(value.values,w,h,rDetail),smBroad=sm;
     const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(smBroad[i]);live.sort((a,b)=>a-b);
@@ -268,7 +270,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
     // threshold and the next layer's (layerShares over the range the middle bands span).
     const midLo=VALUE_CAPS[0],midHi=VALUE_CAPS[layerTexture?1:2],inMid=v=>Math.min(midHi,Math.max(midLo,v))-midLo;
     const share=nestedBands?layerShares(cover,typeof effThresholds==='function'?i=>effThresholds(i).map(inMid):effThresholds.map(inMid),Float32Array.from(sm,inMid),n):layerIncrement?layerShares(cover,effThresholds,cover.sm ?? sm,n):null;
-    const layerSteps=cover.map((c,j)=>{const W=j?fineWeights:weights;return {band:2,tag:'L'+j,floor:j?smallShape:minShape,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(W[1][i]+(layerTexture?0:W[2][i]))*(share?share[j][i]:1/count[i]):0)};});
+    const layerSteps=cover.map((c,j)=>{const W=j?fineWeights:weights;return {band:2,tag:'L'+j,floor:j?smallShape:minShape,holeFloor:j?smallShape:minShape,wt:Float32Array.from(c,(v,i)=>v&&count[i]?(W[1][i]+(layerTexture?0:W[2][i]))*(share?share[j][i]:1/count[i]):0)};});
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
@@ -286,7 +288,7 @@ export function planLightToDark({paperRule=false,calibratedPlan=false,cellLight=
       // stepHoles: a wash goes round a light only where the light is a shape the plan would paint. A gap under the minimum
       // shape that is not a reserved light is painted through, as an island under the minimum shape is not painted: a
       // value step cut cell by cell otherwise leaves bare flecks in a wall and pinholes in every wash.
-      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,step.floor);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
+      if(stepHoles&&!step.pig){const hole=Uint8Array.from(mask,(v,i)=>!v&&!protectedCells[i]&&(rgb||value.values[i]>0)?1:0),big=removeSmall(hole,w,h,step.holeFloor);for(let i=0;i<n;i++)if(hole[i]&&!big[i])mask[i]=1;}
       // With carried demand a cell over-charged earlier drops out of the next mask. Holes under the minimum shape are
       // filled again, so a passage skips only light shapes a painter would reserve, not single cells.
       // maskMm: where a carried glaze goes is judged over a brush-sized area, not cell by cell: the mask is the
