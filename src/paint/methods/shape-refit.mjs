@@ -26,7 +26,7 @@ export function planningShapes(D, w, h, { families: K = 24, minCells = 200, pool
     const { labels, areas, count } = components(m, w, h);
     const runs = Array.from({ length: count + 1 }, () => []);
     for (let i = 0; i < n; i++) if (labels[i] > 0) runs[labels[i]].push(i);
-    for (let c = 1; c <= count; c++) { if (!runs[c].length) continue; if (areas[c] >= minCells) groups.push(runs[c]); else { if (!pooled.has(k)) pooled.set(k, []); pooled.get(k).push(...runs[c]); } }
+    for (let c = 1; c <= count; c++) { if (!runs[c].length) continue; if (areas[c] >= minCells) groups.push(runs[c]); else { let p = pooled.get(k); if (!p) { p = []; pooled.set(k, p); } for (let j = 0; j < runs[c].length; j++) p.push(runs[c][j]); } }
   }
   if (pool) for (const g of pooled.values()) if (g.length) groups.push(g);
   return groups;

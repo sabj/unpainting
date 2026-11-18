@@ -330,7 +330,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     const t3cand = gestures.filter(g => !spentOn2.has(g)).map(g => ({ ...g, tier: 3 }));
     const t3 = lineBudget(t3cand, t3Cells, { width: NIB });
     console.log(`ink tier 1 outline:  ${t1.length}/${maskC.length + stepC.length} paths, ${Math.round(cellsOf(t1))} of ${Math.round(t1Cells)} cells (mask boundary ${a.length + c.length} of ${maskC.length}, step edges ${b.length} of ${stepC.length})`);
-    console.log(`ink tier 2 features: ${t2.length}/${t2cand.length} paths, ${Math.round(cellsOf(t2))} of ${Math.round(t2Cells)} cells${ml ? ', from the model\'s line map, any length' : `, at ${featLen.toFixed(0)} cells or shorter`}`);
+    console.log(`ink tier 2 features: ${t2.length}/${t2cand.length} paths, ${Math.round(cellsOf(t2))} of ${Math.round(t2Cells)} cells, at ${featLen.toFixed(0)} cells or shorter`);
     console.log(`ink tier 3 rest:     ${t3.length}/${t3cand.length} paths, ${Math.round(cellsOf(t3))} of ${Math.round(t3Cells)} cells`);
     // Short marks cost few cells, so the tiers may not draw more marks than the plain budget would keep.
     // The excess comes off the tail of the greedy walk, the least structural part of the set.

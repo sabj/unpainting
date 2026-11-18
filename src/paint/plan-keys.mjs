@@ -41,7 +41,7 @@ const WASHES = {
   furReserves: { bounds: ANY, reach: ANY, drop: ANY, dark: ANY, maxDensity: ANY, minCells: ANY },
   paints: ANY,
   colour: ANY, sessions: ANY, inkAware: ANY, charge: ANY, carryMm: ANY, paleLimit: ANY,
-  skyOneLayer: ANY, lanes: ANY, soften: { maxArcMm: ANY, minShare: ANY }, edgeFadeMm: ANY, edgeWobbleMm: ANY, smallMarks: ANY, joinSmall: ANY,
+  skyOneLayer: ANY, lanes: ANY, soften: { enabled: ANY, maxArcMm: ANY }, edgeFadeMm: ANY, edgeWobbleMm: ANY, smallMarks: ANY, joinSmall: ANY,
   physics: { holeRimMm: ANY, marangoni: ANY, slope: ANY },
 };
 

@@ -202,7 +202,7 @@ export function drawingFlags(drawing) {
   }
   if (drawing.damp != null) {
     if (!Number.isFinite(drawing.damp) || drawing.damp < 0 || drawing.damp > 1) throw Error('drawing.damp: 0..1');
-    flags.push('--pendamp', round(drawing.damp));
+    flags.push('--inkdamp', round(drawing.damp));
   }
   if (medium) flags.push('--outlinemedium', medium);
   const colour = choice(drawing, 'inkColor', INK_COLOURS);

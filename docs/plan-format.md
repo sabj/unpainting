@@ -217,9 +217,9 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 | `carryMm` | 0 to 10 mm, default 2 | in `family` mode, the carried mask is averaged over this brush-sized area. Prefer 0 in new plans: 2 mm dilutes saturated colour and paints over lit areas |
 | `paleLimit` | 0 to 1, default 0.16 | pale planes up to this value get one clean first wash that no later layer crosses |
 | `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |
-| `skyOneLayer` | true or false | lays the sky in one clean wash (`--skysplit 0`) instead of splitting it across layers |
-| `lanes` | true or false | plans explicit brush lanes and chooses the largest fitting brush per passage (`--strokeplan 1 --laneadapt 1 --brushchoice 1`) |
-| `soften` | true, false or `{maxArcMm, minShare}` | splits soft boundary arcs for wet softening (`--softsplit`, `--softmm`, `--softshare`) |
+| `skyOneLayer` | true or false | lays the sky in one clean wash (`--skyonelayer 1`) instead of splitting it across layers |
+| `lanes` | true or false | plans explicit brush lanes and chooses the largest fitting brush per passage (`--strokeplan 1 --laneadapt 1`) |
+| `soften` | true, false or `{enabled, maxArcMm}` | splits soft boundary arcs for wet softening (`--softsplit`, `--softmm`) |
 | `edgeFadeMm`, `edgeWobbleMm` | millimetres | fades (`--edgefade`) or wobbles (`--edgewobble`) wash edges at physical scale |
 | `smallMarks`, `joinSmall` | true or false | lays small darks once last (`--smallmarks`) and joins sub-minimum pieces into neighbouring washes (`--washjoin`) |
 | `furReserves` | `{bounds, reach, drop, dark, maxDensity, minCells}` | keeps sheen and glints open inside a dark coat before the washes |

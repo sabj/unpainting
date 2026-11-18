@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { decideLines, DECIDE_DEFAULTS } from './ink-decide.mjs';
-import { parseLabelReply, simpleLabel, ruleAt, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
+import { parseLabelReply, labelIdentity, simpleLabel, ruleAt, toneShadowTakes, shadowMassMask, labelRegions, INK_RULES, LABELS } from './ink-labels.mjs';
 import { cutMassEdges, classifyPathDetail, CLASS } from './line-class.mjs';
 
 const W = 160, H = 100, PX = 0.15;
@@ -45,18 +45,133 @@ test('labels: replies are checked, the rules cover every label, a shadow mask fi
   assert.equal(parseLabelReply('nothing', [1]), null);
   for (const l of LABELS) assert.ok(INK_RULES[l], l);
   assert.equal(simpleLabel({ area: 0.2, lab: [70, -10, 20], labSpread: [20], bbox: [0, 0, 10, 10] }, { w: 100, h: 100 }), 'foliage');
+  assert.equal(simpleLabel({ area: 0.5, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 10, 10] }, { w: 100, h: 100 }), 'sky');
+  assert.equal(simpleLabel({ area: 0.96, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 10, 10] }, { w: 100, h: 100 }), 'architecture', 'a whole-sheet paper ground (> 65% of the image) is not mistaken for a wash-only sky');
   assert.equal(ruleAt(() => 'face', 5, 5, 2).ink, 'features');
   const m = shadowMassMask(plane(), W, H, PX, { sigmaMm: 0.3, drop: 20, minAreaMm2: 0.5 });
   assert.equal(m[80 * W + 80], 1);
   assert.equal(m[5 * W + 80], 0);
 });
 
-test('without a vision model the regions take the simple classifier and the record says so', async () => {
-  const warn = [];
-  const run = () => ({ status: 1, stdout: '', stderr: 'not signed in' });
-  const r = await labelRegions({ image: new URL(import.meta.url).pathname, regions: [{ id: 1, area: 0.5, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 5, 5] }], labelMap: new Uint8Array(4), w: 2, h: 2, judge: 'codex', cacheDir: '/nonexistent', log: s => warn.push(s), run }).catch(e => e);
-  // the overlay needs a real image; either way the failure is loud, never silent
-  assert.ok(r instanceof Error || r.judge === 'simple');
+
+async function labelFixture(t) {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { default: sharp } = await import('sharp');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-label-test-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const image = path.join(dir, 'source.png');
+  await sharp({ create: { width: 8, height: 8, channels: 3, background: '#dfdac9' } }).png().toFile(image);
+  const regions = [1, 2].map(id => ({ id, area: .5, lab: [70, 0, 5], labSpread: [5], bbox: [0, 0, 8, 8] }));
+  const opts = { image, regions, labelMap: Uint16Array.from({ length: 64 }, (_, i) => i < 32 ? 1 : 2), w: 8, h: 8,
+    judge: 'codex', cacheDir: path.join(dir, 'cache'), env: { CODEX_BIN: process.execPath, AGY_BIN: process.execPath, INK_LABEL_MODEL: 'test-model' } };
+  const good = () => ({ status: 0, stdout: '{"1":"architecture","2":"tree"}' });
+  const cacheFile = () => path.join(opts.cacheDir, fs.readdirSync(opts.cacheDir)[0]);
+  return { fs, dir, opts, good, cacheFile };
+}
+
+test('vision labels fail closed on process, image, parse and incomplete label failures', async t => {
+  const { opts, fs } = await labelFixture(t);
+  for (const run of [
+    () => ({ status: 1, stderr: 'private provider output' }),
+    () => ({ status: null, error: { code: 'ETIMEDOUT' } }),
+    () => ({ status: 0, stdout: 'not JSON' }),
+    () => ({ status: 0, stdout: '{"1":"architecture"}' }),
+    () => ({ status: 0, stdout: '{"1":"architecture","2":"banana"}' }),
+    () => ({ status: 0, stdout: '{"1":"architecture","2":{}}' }),
+  ]) {
+    await assert.rejects(labelRegions({ ...opts, run }), /ink labels \(codex\):.*(process failed|no valid|missing or unknown)/);
+    assert.equal(fs.existsSync(opts.cacheDir), false);
+  }
+  fs.writeFileSync(opts.image, 'not an image');
+  let called = false;
+  await assert.rejects(labelRegions({ ...opts, run: () => { called = true; } }), /ink labels \(codex\):/);
+  assert.equal(called, false, 'invalid source image must not reach the model');
+});
+
+test('explicit simple classification is unchanged and unknown or unresolved judges fail', async t => {
+  const { opts, good, fs } = await labelFixture(t);
+  const r = await labelRegions({ ...opts, judge: 'simple', run: () => assert.fail('simple must not invoke vision') });
+  assert.deepEqual(r, { labels: { 1: 'sky', 2: 'sky' }, source: { 1: 'simple', 2: 'simple' }, judge: 'simple', cached: false });
+  assert.equal(fs.existsSync(opts.cacheDir), false);
+  await assert.rejects(labelRegions({ ...opts, judge: 'typo', run: good }), /unknown judge/);
+  await assert.rejects(labelRegions({ ...opts, env: { CODEX_BIN: process.execPath }, run: good }), /set INK_LABEL_MODEL explicitly/);
+});
+
+test('complete vision labels retain aliases, pin model and reuse only valid vision cache', async t => {
+  const { opts, good, fs, cacheFile } = await labelFixture(t);
+  let called = 0;
+  const r = await labelRegions({ ...opts, run: (command, args) => {
+    called++; assert.equal(command, fs.realpathSync(process.execPath));
+    assert.equal(args[args.indexOf('--model') + 1], 'test-model');
+    assert.ok(fs.readFileSync(args[args.indexOf('-i') + 1]).subarray(1, 4).equals(Buffer.from('PNG')));
+    return good();
+  } });
+  assert.deepEqual(r.labels, { 1: 'architecture', 2: 'tree_trunk' });
+  assert.deepEqual(r.source, { 1: 'vision', 2: 'vision' });
+  assert.equal(r.identity.model, 'test-model');
+  assert.ok(r.identity.executable.sha256);
+  const cached = await labelRegions({ ...opts, run: () => assert.fail('valid cache must not call model') });
+  assert.deepEqual(cached, { ...r, cached: true }); assert.equal(called, 1);
+  const original = fs.readFileSync(cacheFile(), 'utf8');
+  for (const mutate of [
+    d => { d.source[2] = 'simple'; }, d => { delete d.labels[2]; },
+    d => { d.labels[2] = 'banana'; }, d => { d.labels[99] = 'sky'; },
+    d => { d.identity.model = 'wrong-model'; }, d => { d.judge = 'simple'; },
+  ]) {
+    const d = JSON.parse(original); mutate(d); fs.writeFileSync(cacheFile(), JSON.stringify(d));
+    await assert.rejects(labelRegions({ ...opts, run: () => assert.fail('corrupt cache must fail closed') }), /cached vision labels/);
+  }
+  fs.writeFileSync(cacheFile(), '{broken');
+  await assert.rejects(labelRegions({ ...opts, run: good }), /ink labels \(codex\):/);
+});
+
+test('vision cache changes with model, actual map, dimensions, metadata, source and executable', async t => {
+  const { opts, good, fs, dir } = await labelFixture(t);
+  const { default: sharp } = await import('sharp');
+  let calls = 0; const run = () => { calls++; return good(); };
+  const first = await labelRegions({ ...opts, run });
+  const changedMap = opts.labelMap.slice(); changedMap[0] = 2;
+  const variants = [
+    { env: { ...opts.env, INK_LABEL_MODEL: 'another-model' } },
+    { labelMap: changedMap },
+    { w: 16, h: 4 },
+    { regions: opts.regions.map(r => ({ ...r, area: .4 })) },
+  ];
+  const ids = new Set([JSON.stringify(first.identity)]);
+  for (const change of variants) {
+    const r = await labelRegions({ ...opts, ...change, run });
+    assert.equal(r.cached, false); ids.add(JSON.stringify(r.identity));
+  }
+  const exe = dir + '/runner'; fs.writeFileSync(exe, '#!/bin/sh\nexit 0\n'); fs.chmodSync(exe, 0o700);
+  const custom = { ...opts, env: { ...opts.env, CODEX_BIN: exe }, run };
+  ids.add(JSON.stringify((await labelRegions(custom)).identity));
+  fs.writeFileSync(exe, '#!/bin/sh\nexit 1\n');
+  ids.add(JSON.stringify((await labelRegions(custom)).identity));
+  await sharp({ create: { width: 8, height: 8, channels: 3, background: '#ffffff' } }).png().toFile(opts.image);
+  ids.add(JSON.stringify((await labelRegions({ ...opts, run })).identity));
+  assert.equal(calls, 8); assert.equal(ids.size, 8);
+});
+
+test('prompt identity changes and map views hash only their actual bytes', async t => {
+  const { opts } = await labelFixture(t);
+  const args = { ...opts, model: 'test-model', executable: { path: '/runner', sha256: 'digest' }, prompt: 'first prompt' };
+  const a = labelIdentity(args), b = labelIdentity({ ...args, prompt: 'revised prompt' });
+  assert.notEqual(a.promptSHA256, b.promptSHA256);
+  const backing = new Uint16Array(66); backing.set(opts.labelMap, 1);
+  const view = backing.subarray(1, 65);
+  assert.deepEqual(labelIdentity({ ...args, labelMap: view }), a);
+  backing[0] = 99; assert.deepEqual(labelIdentity({ ...args, labelMap: view }), a);
+  assert.throws(() => labelIdentity({ ...args, labelMap: new Uint8Array(1) }), /w \* h/);
+});
+
+test('agy pins the existing default model and cannot substitute simple on failure', async t => {
+  const { opts, good } = await labelFixture(t);
+  const r = await labelRegions({ ...opts, judge: 'agy', env: { AGY_BIN: process.execPath }, run: (_command, args) => {
+    assert.equal(args[args.indexOf('--model') + 1], 'claude-sonnet-4-6'); return good();
+  } });
+  assert.equal(r.identity.model, 'claude-sonnet-4-6');
+  assert.equal(r.judge, 'agy');
+  await assert.rejects(labelRegions({ ...opts, judge: 'agy', run: () => ({ status: 1 }) }), /ink labels \(agy\): label process failed/);
 });
 
 test('bridging does not cross intentional semantic label cuts', () => {
@@ -161,4 +276,152 @@ test('local pen support through foliage keeps its ordinary rule inside a model s
   const r = decideLines([line(60)], structuralCtx({ L, cellLabel: x => x >= 45 && x <= 115 ? 'foliage' : 'architecture' }));
   assert.ok(r.lines.some(g => g.points.some(p => p.x > 65 && p.x < 95)), 'pen marks inside foliage remain eligible');
   assert.ok(r.stats.retainedStructuralMassMm > 0, 'not the old global mostly-pen exception');
+});
+
+// Exercise the production raster tracer, not hand-smoothed polylines. Fifteen L* of
+// contrast is visible pen evidence without activating the strong-ink exemption.
+async function tracedPenFixtures() {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const { resolveLinePython } = await import('./line-python.mjs');
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const script = String.raw`
+import sys, importlib.util, json, cv2, numpy as np
+sys.path.insert(0, 'tools/seg')
+spec = importlib.util.spec_from_file_location('copylines', 'tools/seg/copy-lines.py')
+copylines = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(copylines)
+fixtures = []
+for px in [.15, 280/1080, 280/720]:
+    w, h = int(80/px), int(50/px)
+    for kind in ['straight', 'arc', 'S', 'wave', 'corner', 'fork', 'parallel', 'loop', 'erratic']:
+        x = np.linspace(10, 70, 1201)
+        y = 25 + .2*(x-40)
+        if kind == 'arc': y = 35-np.sqrt(35**2-(x-40)**2)
+        if kind == 'S': y = 25+8*np.sin((x-40)*np.pi/40)
+        if kind == 'wave': y = 25+2*np.sin(x*np.pi/4)
+        if kind == 'corner': y = 15+abs(x-40)*.4
+        if kind == 'erratic': y = 25+3*np.sin(x*2)
+        paths = [np.stack([x,y], axis=1)]
+        if kind == 'fork': paths = [np.array([[10,40],[40,25],[70,25]]), np.array([[40,25],[60,10]])]
+        if kind == 'parallel': paths.append(paths[0]+[0,2])
+        if kind == 'loop':
+            a = np.linspace(0, 2*np.pi, 1001)
+            paths = [np.stack([40+15*np.cos(a),25+15*np.sin(a)], axis=1)]
+        raster = np.full((h,w,3), 255, np.uint8)
+        for path in paths: cv2.polylines(raster, [np.round(path/px).astype(np.int32)], False, (0,0,0), 1, cv2.LINE_8)
+        lines, _, _, _ = copylines.plan(raster, kind='line-map', map_tolerance=.15)
+        distance = cv2.distanceTransform((raster[:,:,0]>0).astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)*px
+        L = 90-15*np.exp(-.5*(distance/.2)**2)
+        fixtures.append(dict(kind=kind, pxMm=px, w=w, h=h, lines=lines, L=L.flatten().tolist()))
+print(json.dumps(fixtures))
+`;
+  const result = spawnSync(resolveLinePython({ root }).path, ['-c', script], {
+    cwd: root, encoding: 'utf8', timeout: 60000, maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, OMP_NUM_THREADS: '2', OPENBLAS_NUM_THREADS: '2' },
+  });
+  assert.equal(result.status, 0, `production trace fixture failed: ${result.error?.message ?? result.stderr}`);
+  return JSON.parse(result.stdout);
+}
+
+test('sampled pen contours use physical curvature without rewriting the traced geometry', async t => {
+  const { resample, turning, smoothPath } = await import('./ink-lines.mjs');
+  const fixtures = await tracedPenFixtures();
+  for (const f of fixtures) {
+    const lines = f.lines.map((g, i) => ({ ...g, id: `${f.kind}-${i}` }));
+    const before = structuredClone(lines);
+    const ctx = { ...f, inputKind: 'line-map', cellLabel: () => 'tree_trunk' };
+    const result = decideLines(lines, ctx);
+    const name = `${f.kind} at ${f.pxMm} mm/cell`;
+    assert.deepEqual(lines, before, name + ': source candidates are read-only');
+    for (const piece of result.lines) {
+      const source = lines.find(g => g.id === piece.id);
+      assert.ok(source, name + ': retain source identity');
+      const expected = resample(source.points.map(([x, y], k) => ({ x, y, width: source.widths[k], weight: source.weights[k] })), 1);
+      const start = expected.findIndex(p => p.x === piece.points[0].x && p.y === piece.points[0].y && p.width === piece.points[0].width && p.weight === piece.points[0].weight);
+      assert.ok(start >= 0, name + ': no invented starting point');
+      assert.deepEqual(piece.points, expected.slice(start, start + piece.points.length), name + ': a retained piece never rewrites geometry or contact');
+    }
+    if (f.kind === 'erratic') {
+      assert.ok(result.stats.keptPx < result.stats.lengthPx / 2, name + ': genuinely erratic geometry still fails');
+      continue;
+    }
+    // Coarse weak curved ridges still fail local optical support. This change
+    // must not pretend that physical curvature recovers absent source detail.
+    if (f.pxMm > .3 && ['arc', 'wave'].includes(f.kind)) {
+      t.diagnostic(`${name}: retained ${(100 * result.stats.keptPx / result.stats.lengthPx).toFixed(1)}%; coarse optical-support limit, not a required failure`);
+      continue;
+    }
+    assert.equal(result.lines.length, lines.length, name + ': keep each contour/branch separately');
+    assert.ok(Math.abs(result.stats.keptPx - result.stats.lengthPx) < 1e-7, name + ': no lost contour length');
+    for (let i = 0; i < lines.length; i++) {
+      const g = lines[i];
+      const expected = resample(g.points.map(([x, y], k) => ({ x, y, width: g.widths[k], weight: g.weights[k] })), 1);
+      assert.equal(result.lines[i].id, g.id, name);
+      assert.deepEqual(result.lines[i].points, expected, name + ': endpoints, corners, loop and width/pressure stay on the original trace');
+      if (f.kind === 'straight' && f.pxMm < .3) {
+        assert.ok(turning(expected) / f.pxMm > DECIDE_DEFAULTS.elongatedDegPerMm, 'fixture reproduces raw staircase rejection');
+        assert.ok(turning(smoothPath(expected, { sigma: DECIDE_DEFAULTS.smoothMm / f.pxMm })) / f.pxMm < DECIDE_DEFAULTS.structureDegPerMm);
+      }
+    }
+    assert.deepEqual(lines, before, name + ': source candidates are read-only');
+  }
+});
+
+// A pen line drawn inside a dark wash: wash L 55 everywhere, pen L 45 on rows 20..21. Its own contrast is a pen line's (>= penContrast 5)
+// but under the shadow rule's floor (10): the case a tone-mass shadow over trunk or foliage used to wipe out (cma: 6.7% of the pen kept).
+const inWash = () => { const L = new Float32Array(W * H).fill(55); for (let x = 0; x < W; x++) { L[20 * W + x] = 45; L[21 * W + x] = 45; } return L; };
+const dark = () => new Uint8Array(W * H).fill(1);
+const mmPx = mm => mm / PX;
+const seg = (mm, y = 21, x0 = 5) => line(y, x0, x0 + mmPx(mm));
+test('a pen line in a dark wash is the right kind to test: pen class, under the shadow floor', () => {
+  const { cls, contrast } = classifyPathDetail(Array.from({ length: 40 }, (_, k) => ({ x: 20 + k, y: 20.5 })), inWash(), W, H, PX);
+  assert.ok(cls.slice(4, -4).every(c => c === CLASS.pen));
+  assert.ok(contrast.slice(4, -4).every(c => c >= DECIDE_DEFAULTS.penContrast && c < INK_RULES.shadow_mass.penContrast), `${[...contrast.slice(4, 8)]}`);
+});
+
+test('a tone-mass shadow never takes wash-only or trunk ground, only ground that draws structure or outline', () => {
+  assert.equal(toneShadowTakes('tree_trunk'), false);
+  assert.equal(toneShadowTakes('foliage'), false);
+  assert.equal(toneShadowTakes('sky'), false);
+  assert.equal(toneShadowTakes('water'), false);
+  for (const label of ['architecture', 'ground', 'figure', 'drapery', 'shadow_mass']) assert.equal(toneShadowTakes(label), true, label);
+  assert.equal(toneShadowTakes(undefined), false);
+  const ctx = label => ({ L: inWash(), w: W, h: H, pxMm: PX, inputKind: 'line-map', cellLabel: () => label, shadow: dark() });
+  // a trunk stroke (7 mm, over the trunk's 6 mm) inside a dark wash keeps the trunk's rule, with no shadow floor
+  const trunk = decideLines([seg(7)], ctx('tree_trunk'));
+  assert.equal(trunk.lines.length, 1);
+  assert.equal(trunk.lines[0].inkLabel, 'tree_trunk');
+  assert.equal(trunk.stats.droppedMm.label.shadow_mass ?? 0, 0);
+  // the same stroke on architecture in a dark wash still meets the shadow's floor: a wash edge there is not drawn
+  const arch = decideLines([seg(7)], ctx('architecture'));
+  assert.equal(arch.lines.length, 0);
+  assert.ok(arch.stats.droppedMm.label.shadow_mass > 5);
+});
+
+test('observed source ink is pen by construction: short, turning pen strokes in foliage and under a shadow stay, wash edges and faint marks still go', async () => {
+  const ctx = (inputKind, extra = {}) => ({ L: inWash(), w: W, h: H, pxMm: PX, inputKind, cellLabel: () => 'foliage', shadow: dark(), ...extra });
+  // a 3 mm stroke is under the foliage minimum (8 mm): wash for a learned line map, a drawn stroke in observed ink
+  for (const kind of [undefined, 'line-map']) assert.equal(decideLines([seg(3)], ctx(kind)).lines.length, 0, String(kind));
+  const stroke = decideLines([seg(3)], ctx('stroke'));
+  assert.equal(stroke.lines.length, 1);
+  assert.equal(stroke.lines[0].inkMinMm, 0, 'the salience step does not undo it');
+  assert.ok(Math.abs(stroke.stats.keptPx * PX - 3) < 0.3);
+  // a scallop (two loops of 1.2 mm radius, 15 mm of pen) turns faster than a branch may: drawn only in observed ink
+  const loopL = inWash(), loop = { points: [] };
+  for (let k = 0; k <= 80; k++) { const a = k / 80 * 4 * Math.PI, x = 60 + 8 * Math.cos(a), y = 50 + 8 * Math.sin(a); loop.points.push({ x, y }); for (const [dx, dy] of [[0, 0], [1, 0], [0, 1]]) loopL[Math.round(y + dy) * W + Math.round(x + dx)] = 35; }
+  const { resample, turning, smoothPath } = await import('./ink-lines.mjs');
+  assert.ok(turning(smoothPath(resample(loop.points, 1), { sigma: DECIDE_DEFAULTS.smoothMm / PX })) / PX > DECIDE_DEFAULTS.elongatedDegPerMm, 'the loop turns too fast for a branch');
+  const turny = kind => decideLines([loop], { L: loopL, w: W, h: H, pxMm: PX, inputKind: kind, cellLabel: () => 'tree_trunk' });
+  assert.equal(turny('line-map').lines.length, 0, 'a learned line map: too turny for a branch');
+  assert.ok(turny('stroke').stats.keptPx > 0.95 * turny('stroke').stats.lengthPx, 'observed ink: drawn');
+  // a wash edge with no pen line of its own (the plane's L 55 to 90 step on row 60) is still cut from observed ink
+  const edgeL = plane();
+  const edge = decideLines([line(60, 5, 60)], { L: edgeL, w: W, h: H, pxMm: PX, inputKind: 'stroke', cellLabel: () => 'foliage' });
+  assert.equal(edge.lines.length, 0);
+  // no ink at all: nothing to draw, in any ground that is wash-only
+  const none = decideLines([seg(3, 40)], { L: new Float32Array(W * H).fill(90), w: W, h: H, pxMm: PX, inputKind: 'stroke', cellLabel: () => 'foliage' });
+  assert.equal(none.lines.length, 0);
+  // sky stays wash only, observed ink or not
+  assert.equal(decideLines([seg(3)], { ...ctx('stroke'), cellLabel: () => 'sky' }).lines.length, 0);
 });

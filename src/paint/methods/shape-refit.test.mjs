@@ -8,3 +8,12 @@ test('small painted colour families survive when evenly spaced seeds all hit bla
  const painted=groups.filter(g=>g.some(i=>i%w>=4&&i%w<14));
  assert.ok(painted.length>=2,'distinct painted families should not collapse into one');
 });
+
+test('planningShapes does not exceed call stack size on large pooled components (> 130,000 cells)', () => {
+  const w = 400, h = 350, n = w * h;
+  const D = new Float32Array(n * 3);
+  D.fill(0.5);
+  const groups = planningShapes(D, w, h, { families: 1, minCells: Infinity });
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].length, n);
+});

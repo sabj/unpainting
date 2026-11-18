@@ -66,9 +66,9 @@ export function resolvePipeline(plan = {}) {
   for (const k of ['skyOneLayer', 'lanes', 'smallMarks', 'joinSmall']) {
     if (resolved.washes[k] != null && typeof resolved.washes[k] !== 'boolean') throw Error(`washes.${k}: expected boolean`);
   }
-  if (resolved.washes.soften && resolved.washes.soften.enabled === undefined) {
+  if (resolved.washes.soften) {
+    if (resolved.washes.soften.enabled != null && typeof resolved.washes.soften.enabled !== 'boolean') throw Error('washes.soften.enabled: expected boolean');
     if (resolved.washes.soften.maxArcMm != null) number(resolved.washes.soften.maxArcMm, 25, 0, 200, 'washes.soften.maxArcMm');
-    if (resolved.washes.soften.minShare != null) number(resolved.washes.soften.minShare, .35, 0, 1, 'washes.soften.minShare');
   }
   if (!subjects && resolved.order.strength) throw Error('order.strength needs order.subjects');
   return resolved;
@@ -102,13 +102,12 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   if (onlyAuthored && rawW.paleLimit != null && rawW.colour == null) add('palelights', w.colour === 'family' ? w.paleLimit : 0);
   if (!onlyAuthored || rawW.inkAware != null || (plan?.drawing?.source && ['source-ink', 'line-map'].includes(plan.drawing.source))) add('washinkfree', +w.inkAware);
   if (!onlyAuthored || rawOrder.strength != null || rawOrder.subjects != null || plan?.subjectOrder != null) add('subjectorder', p.order.strength);
-  if (w.skyOneLayer != null) add('skysplit', w.skyOneLayer ? 0 : 1);
-  if (w.lanes != null) { add('strokeplan', +w.lanes); add('laneadapt', +w.lanes); add('brushchoice', +w.lanes); }
+  if (w.skyOneLayer != null) add('skyonelayer', +w.skyOneLayer);
+  if (w.lanes != null) { add('strokeplan', +w.lanes); add('laneadapt', +w.lanes); }
   if (w.soften != null) {
     const on = w.soften.enabled ?? true;
     add('softsplit', +on);
     if (w.soften.maxArcMm != null) add('softmm', w.soften.maxArcMm);
-    if (w.soften.minShare != null) add('softshare', w.soften.minShare);
   }
   if (w.edgeFadeMm != null) add('edgefade', w.edgeFadeMm);
   if (w.edgeWobbleMm != null) add('edgewobble', w.edgeWobbleMm);
