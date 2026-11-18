@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { graphitePoolWanted, mergeAuthored } from './graphite-pool.mjs';
+import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 test('a graphite drawing from the pool is wanted unless a line source, stages, no drawing or the models are asked off', () => {
   assert.equal(graphitePoolWanted(['--image', 'x.png']).wanted, true);
@@ -36,4 +37,17 @@ test('with no authored file the pool is the drawing', () => {
   const r = mergeAuthored(pool, null, { sheetMm: 100 });
   assert.equal(r.lines.length, 1);
   assert.equal(r.stats.authored, 0);
+});
+
+test('the graphite drawing is the longest pool lines up to the prep amount of the length, whole; authored lines are never cut', () => {
+  assert.equal(STAGE_DEFAULTS.prep.amount, 0.5);
+  const mk = n => L([0, 0], [n, 0]);
+  const pool = { image: { w: 1000, h: 1000 }, lines: [mk(10), mk(100), mk(5), mk(50), mk(30)].map((g, i) => ({ ...g, points: g.points.map(([x, y]) => [x, y + 100 * i]) })) };
+  const authored = { image: { w: 1000, h: 1000 }, lines: [L([0, 900], [20, 900])] };
+  const r = mergeAuthored(pool, authored, { sheetMm: 1000, amount: 0.5 });
+  const lens = r.lines.map(g => Math.round(g.points.at(-1)[0] - g.points[0][0])).sort((a, b) => b - a);
+  assert.deepEqual(lens, [100, 20], 'the 100 line is half of the 195 of pool length; the authored line stays');
+  assert.equal(r.stats.poolKept, 1);
+  assert.equal(mergeAuthored(pool, null, { sheetMm: 1000, amount: 1 }).lines.length, 5);
+  assert.equal(mergeAuthored(pool, null, { sheetMm: 1000, amount: 0.9 }).lines.length, 3, '100 + 50 + 30 reach 90% of 195');
 });

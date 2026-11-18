@@ -9,6 +9,7 @@ import { linePython } from './line-python.mjs';
 import { holdInkLines } from './ink-lines-file.mjs';
 import { INK_HOLD_FLAGS } from './ink-hold-defaults.mjs';
 import { linePaths, readLineText } from '../../crop/lines.mjs';
+import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 /** The graphite opening pressure of the pool drawing: a drawing, not a finish. */
 export const GRAPHITE_POOL_PRESSURE = '0.35';
@@ -36,19 +37,23 @@ const pathMm = (pts, pxMm) => { let s = 0; for (let k = 1; k < pts.length; k++) 
 
 /**
  * The drawing's line file: the plan's authored lines (scaled onto the pool's grid), then every pool line the authored ones
- * do not already draw (at least `share` of its points within `nearMm` of an authored line).
+ * do not already draw (at least `share` of its points within `nearMm` of an authored line), longest first up to `amount`
+ * of the pool's length.
  * @returns {{ image, lines, inputKind, inkDecided, stats }}
  */
-export function mergeAuthored(pool, authored, { sheetMm, nearMm = 1, share = 0.6 }) {
+export function mergeAuthored(pool, authored, { sheetMm, nearMm = 1, share = 0.6, amount = 1 }) {
   const { w, h } = pool.image, pxMm = sheetMm / w, f = authored ? w / authored.image.w : 1;
   const own = authored ? authored.lines.map(g => ({ ...g, points: g.points.map(([x, y]) => [x * f, y * f]), ...(Array.isArray(g.widths) ? { widths: g.widths.map(v => v * f) } : {}) })) : [];
   const cell = Math.max(1, nearMm / pxMm), bins = new Map(), key = (x, y) => `${Math.floor(x / cell)},${Math.floor(y / cell)}`;
   for (const g of own) for (const [x, y] of g.points) { const k = key(x, y); (bins.get(k) ?? bins.set(k, []).get(k)).push([x, y]); }
   const near = ([x, y]) => { for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const [a, b] of bins.get(key(x + dx * cell, y + dy * cell)) ?? []) if (Math.hypot(a - x, b - y) <= cell) return true; return false; };
-  const added = pool.lines.filter(g => g.points.filter(near).length < share * g.points.length);
+  const fresh = pool.lines.filter(g => g.points.filter(near).length < share * g.points.length);
+  // the drawing is the longest lines, whole, up to `amount` of the pool's length: big shapes first, the rest left to the brush
+  const len = g => pathMm(g.points, pxMm), total = fresh.reduce((s, g) => s + len(g), 0), added = [];
+  for (const g of [...fresh].sort((a, b) => len(b) - len(a))) { if (added.length && added.reduce((s, q) => s + len(q), 0) >= amount * total) break; added.push(g); }
   const lines = [...own, ...added];
   return { image: pool.image, lines, inputKind: 'line-map', inkDecided: true,
-    stats: { authored: own.length, poolKept: added.length, poolDropped: pool.lines.length - added.length, lengthMm: Math.round(lines.reduce((s, g) => s + pathMm(g.points, pxMm), 0)) } };
+    stats: { authored: own.length, poolKept: added.length, poolDropped: pool.lines.length - added.length, amount, lengthMm: Math.round(lines.reduce((s, g) => s + pathMm(g.points, pxMm), 0)) } };
 }
 
 /**
@@ -70,12 +75,12 @@ export async function prepareGraphitePool({ opt, num, argv, out, root, image, sh
   const rec = await holdInkLines({ opt: gopt, num: gnum, argv: held, image, root, out, sheetMm, log });
   const pool = JSON.parse(fs.readFileSync(rec?.opening?.out ? linePaths(rec.opening.out).lines : `${stem}-lines.json`, 'utf8'));
   const own = opt('drawingfile', '') ? JSON.parse(readLineText(linePaths(path.resolve(root, opt('drawingfile', ''))).lines)) : null;
-  const merged = mergeAuthored(pool, own, { sheetMm });
+  const merged = mergeAuthored(pool, own, { sheetMm, amount: num('prepamount', STAGE_DEFAULTS.prep.amount) });
   const target = path.join(out, 'graphite-lines');
   fs.writeFileSync(`${target}-lines.json`, JSON.stringify({ ...merged, medium: 'graphite' }) + '\n');
   fs.writeFileSync(path.join(out, 'graphite-pool.json'), JSON.stringify({ stem, pool: pool.lines.length, ...merged.stats }, null, 1) + '\n');
   argv.push('--drawingfile', target, '--drawingstages', 'off');
   if (opt('openingpressure', '') === '') argv.push('--openingpressure', GRAPHITE_POOL_PRESSURE);
-  log(`graphite drawing: ${merged.lines.length} lines, ${merged.stats.lengthMm} mm, from ${pool.lines.length} pool lines held and decided by meaning${own ? `, ${merged.stats.authored} authored lines kept and ${merged.stats.poolDropped} pool lines they already draw dropped` : ''}`);
+  log(`graphite drawing: ${merged.lines.length} lines, ${merged.stats.lengthMm} mm, the longest ${Math.round(100 * merged.stats.amount)}% of the length of ${pool.lines.length} pool lines held and decided by meaning${own ? `, ${merged.stats.authored} authored lines kept and ${merged.stats.poolDropped} pool lines they already draw dropped` : ''}`);
   return { ...merged.stats, file: `${target}-lines.json` };
 }
