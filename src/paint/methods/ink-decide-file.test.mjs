@@ -68,3 +68,19 @@ test('pieces of one contour are joined before the decision, so a contour is deci
   const apart = await decideFile({ doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, shadowMask: false });
   assert.equal(apart.lines.length, 3, 'with no join distance the pieces stay as they came');
 });
+
+test('authored plan lines are pruned by the target, not by region labels: a sky label does not cut them, a mass edge is structure, a mass interior is not', async () => {
+  const s = await setup();
+  for (let y = 50; y < H; y++) for (let x = 20; x < 155; x++) s.L[y * W + x] = 40; // a dark mass, its top edge at row 50 has no pen line
+  const mk = (y, x0, x1) => ({ points: Array.from({ length: 36 }, (_, k) => [x0 + (x1 - x0) * k / 35, y + 0.5]) });
+  const doc = { image: { w: W, h: H }, lines: [mk(30, 5, 75), mk(50, 25, 150), mk(80, 25, 150)] };
+  const run = replying({ 1: 'sky', 2: 'architecture' });
+  const ys = r => r.lines.map(g => Math.round(g.points[0][1])).sort((a, b) => a - b);
+  const common = { doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: () => {}, run, shadowMask: false };
+  const authored = await decideFile({ ...common, authored: true });
+  assert.deepEqual(ys(authored), [31, 51], 'the line under a sky label and the mass edge stay; the line across the mass goes');
+  const rec = JSON.parse(fs.readFileSync(path.join(s.dir, 'ink-labels.json'), 'utf8'));
+  assert.match(rec.note, /authored/);
+  const model = await decideFile({ ...common, authored: false });
+  assert.ok(!ys(model).includes(31), 'a model line under a sky label is wash');
+});

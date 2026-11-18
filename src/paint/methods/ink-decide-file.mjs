@@ -28,11 +28,14 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, authored = false, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false }) {
   let o = o0;
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   let seg = null, regions = [], lab = { judge: 'none', cached: true, labels: {}, source: {}, note: 'segments off' };
-  if (segments?.stem) {
+  // a plan's authored lines are its own reading of the subject: the target decides them (support, mass interior, foliage colour), the
+  // region labels do not (a colour classifier can call a dog's coat sky). They are drawn as model structure is.
+  if (authored) lab.note = 'authored lines: the plan\'s reading stands; region labels do not cut them';
+  if (segments?.stem && !authored) {
     registerSegments(base, segments.stem);
     seg = await loadSegments(base, w, h);
     const segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
@@ -46,7 +49,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
     const rgb = await sharp(image).flatten({ background: '#fff' }).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer(), lab = labPlanes(rgb, w, h);
     foliageCells = foliageMask(L, lab.A, lab.B, w, h, pxMm);
   }
-  const cellLabel = (x, y) => (seg ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
+  const cellLabel = (x, y) => (seg && !authored ? lab.labels[seg.labels[y * w + x]] : null) ?? 'architecture';
   // --inkdarkrule 1: ink is darker than any wash. The darkness of the source's own confident pen lines sets the level.
   if (inkDarkRule) { const dark = estimateInkDark(doc.lines.map(g => ({ points: toPoints(g) })), L, w, h, pxMm, o); if (dark != null) o = { ...o, inkDark: dark }; }
   // a traced pool arrives in pieces cut at junctions and fades. Pieces of one contour join first (collinear across a gap of up
@@ -54,7 +57,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, ju
   let candidates = doc.lines.map(g => { const { widths: _w, weights: _g, ...rest } = g; return { ...rest, points: toPoints(g) }; });
   const chained = { before: candidates.length, after: candidates.length };
   if (joinMm > 0) { candidates = joinCollinear(candidates, { pxMm }, { ...GEOM_DEFAULTS, gapMm: joinMm }); chained.after = candidates.length; }
-  const r = decideLines(candidates, { L, w, h, pxMm, inputKind: doc.inputKind, cellLabel, shadow, foliage: foliageCells }, o);
+  const r = decideLines(candidates, { L, w, h, pxMm, inputKind: authored ? 'line-map' : doc.inputKind, cellLabel, shadow, foliage: foliageCells }, o);
   r.stats.chained = chained;
   let kept = r.lines, geometry = null;
   // --inkgeom 1: straight runs and arcs where the source shows them; squiggles that are not forms or features are left to the wash
