@@ -29,7 +29,6 @@ import {components, dilate, minFilter, maxFilter} from '../../src/raster.js';
 import {chooseTechnique} from '../../src/crop/technique.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {setClip as physicalSetClip, stableClipMask} from '../../src/media/sheet.mjs';
-import {detailLayers} from '../../src/paint/methods/detail-passes.mjs';
 import {styleTarget, massesOf} from '../../src/crop/styletarget.mjs';
 import {separate} from '../../src/crop/inkwash.mjs';
 import {orientationField} from '../../src/crop/fur.mjs';
@@ -357,7 +356,7 @@ const AUTHORED_INPUT=opt('areaplan','')&&JSON.parse(fs.readFileSync(path.resolve
 const blockPlanStarted = performance.now();
 // The target value planner replaces this ladder before execution. Optional
 // legacy adapters that consume its demand or geometry keep the original path.
-const SKIP_DISCARDED_PLAN=SPEED_VALUE_ONLY&&VALUE_ENABLED&&!MOD&&!MIXES&&!opt('finishareaplan','')&&opt('curls','0')==='0'&&num('bgfirst',0)===0&&num('detailpasses',0)===0&&num('detailtrim',0)===0&&num('figurevalues',0)===0&&num('numericplanledger',0)===0&&num('plandiag',0)===0;
+const SKIP_DISCARDED_PLAN=SPEED_VALUE_ONLY&&VALUE_ENABLED&&!MOD&&!MIXES&&!opt('finishareaplan','')&&opt('curls','0')==='0'&&num('bgfirst',0)===0&&num('figurevalues',0)===0&&num('numericplanledger',0)===0&&num('plandiag',0)===0;
 let { layers: blocked, steps$, delivered: PLAN_DELIVERED } = SKIP_DISCARDED_PLAN
  ? {layers:[],steps:1,delivered:new Float32Array(PLANA.length)}
  : (await cachedStep({ ...RUN_CACHE, name:'block-plan',code:CODE_HASH,track:optTrack,inputs:{PLANA,PLANK,w,h,BLOCK_OPTIONS,AUTHORED_INPUT} },async()=>AUTHORED_INPUT?{layers:[],steps:1,delivered:new Float32Array(PLANA.length)}:blockInPigments(PLANA, PLANK, w, h, BLOCK_OPTIONS))).value; ctx.steps = steps$;
@@ -530,7 +529,7 @@ const reportTechniques = () => {
 // Soft passages fold into their pigment's host (gradeSmoothPassages), see --gradedchunk, --gradedshare, --gradedprewet.
 // --gradedsmooth s: fold only where the source's mean departure from its 1.6-cell blur is under s. Default 0.008.
 const SMOOTH = (() => {
-  if (opt('gradedwash', '1') === '0') return null;
+  if (SKIP_DISCARDED_PLAN || opt('gradedwash', '1') === '0') return null;
   const B = gaussian(ctx.SRC, w, h, 1.6), cache = new WeakMap();
   return sh => {
     if (!cache.has(sh)) {
@@ -548,7 +547,7 @@ const VALUE_ORDER = SMOOTH
   ? gradeSmoothPassages(blocked, ctx.A, PIGS.length, w, h, { soft: sh => SMOOTH(sh) && techniqueOf(sh).name === 'wet on wet', host: SMOOTH, blur: gaussian, contain: num('gradedcontain', 0.9) })
   : blocked;
 // --layerorder colour: one colour at a time, lightest colour first, light to dark within each. Default colour; other values order by value.
-const ORDERED = opt('layerorder', 'colour') === 'colour'
+const ORDERED = !SKIP_DISCARDED_PLAN && opt('layerorder', 'colour') === 'colour'
   ? (() => {
       const weight = j => PIGS[j].K[0] + PIGS[j].K[1] + PIGS[j].K[2];
       // under --mixes a colour is a puddle, not a pan: order by the puddle's own weight so the palest mix goes down
@@ -571,9 +570,7 @@ const CURLS = opt('curls', '0') !== '0'
   ? planCurls(ctx.px, w, h, ORDERED, ctx.SRC, PIGS, gaussian, { box: opt('curlbox', '') ? opt('curlbox').split(',').map(Number) : null, share: opt('curlshare', '') === '' ? null : num('curlshare', 0.4), shareMin: num('curlsharemin', 0.5), shareMax: num('curlsharemax', 0.75), split: num('curlsplit', 0) > 0 })
   : null;
 if (CURLS) console.log(`curls: ${(100 * CURLS.area / n).toFixed(1)}% of the sheet, curl radius ${CURLS.radius.toFixed(1)} cells, glazes carry ${(100 * CURLS.share).toFixed(0)}% of its dark, ${CURLS.parts.filter(p => p.curly).length} of ${CURLS.parts.length} dark regions curly`);
-// --detailpasses: small late passages where the detail is (src/paint/methods/detail-passes.mjs)
-const { layers: DETAIL_LAYERS, region: DETAIL_REGION } = MIXES ? { layers: [], region: null } : await detailLayers({ A: ctx.A, K: PIGS.length, delivered: PLAN_DELIVERED, SRC: ctx.SRC, w, h, n, steps: ctx.steps, image: opt('image', ''), root, path, fs, sharp, gaussian, num, log: console.log });
-ctx.layers = DETAIL_LAYERS.length ? [...(CURLS ? CURLS.layers : ORDERED), ...DETAIL_LAYERS] : CURLS ? CURLS.layers : ORDERED;
+ctx.layers = CURLS ? CURLS.layers : ORDERED;
 
 // The way the source's hair and grain lie, for --fur: read once, when a fur pass first asks for it.
 // --finish f: how far each part of the sheet is carried (src/crop/finish.mjs); f is the background's finish. Default 0, off.
@@ -816,7 +813,7 @@ if(AREA_FILE){
  // Existing independently owned adapters cannot double-paint semantic-owned demand.
  const productionDetails=validateProductionDetails(doc);
  if(productionDetails&&(!MOD||doc.areas.some(a=>a.passes.some(p=>p.source==='authored'))))throw Error('production-modulate details require existing numeric modulation route');
- for(const key of ['passages','shapes','modulate','curls'])if(!(key==='modulate'&&productionDetails)&&opt(key,'')&&!['0','none'].includes(opt(key,'')))throw Error(`--areaplan conflicts with legacy adapter --${key}`);
+ for(const key of ['modulate','curls'])if(!(key==='modulate'&&productionDetails)&&opt(key,'')&&!['0','none'].includes(opt(key,'')))throw Error(`--areaplan conflicts with legacy adapter --${key}`);
  fs.writeFileSync(path.join(out,'semantic-area-plan.json'),JSON.stringify(doc,null,2));
  for(const [name,a] of [['ownership',ctx.AREA_PLAN.owner],['paper-reserves',ctx.AREA_PLAN.reserves],['film',ctx.AREA_PLAN.film]])fs.writeFileSync(path.join(out,`semantic-${name}.json`),JSON.stringify({w,h,coordinateSpace:'execution-grid',data:Array.from(a)}));
  if(num('areaplanonly',0)){let c;try{c=compileAreaLayers(ctx.AREA_PLAN,ctx.layers,PIGS,{mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w});}catch(e){fs.writeFileSync(path.join(out,'semantic-coverage.json'),JSON.stringify(e.diagnostics??{error:e.message},null,2));throw e;}validateCompiledAreaStop(opt('areastop',''),c.layers);fs.writeFileSync(path.join(out,'semantic-coverage.json'),JSON.stringify({...c.diagnostics,stage:'CPU pre-sheet compiler; physical execution NOT RUN'},null,2));fs.writeFileSync(path.join(out,'semantic-numerical-shapes.json'),JSON.stringify({w,h,stage:'CPU numerical shapes; not executed gestures',shapes:c.layers.flatMap(l=>l.shapes.map(sh=>({areaId:l._semantic.area.id,passId:l._semantic.key,pass:l._semantic.pass,value:l.value,amount:sh.amount,mix:sh.mix,cells:Array.from(sh.mask,(v,i)=>v?i:-1).filter(i=>i>=0)})))}));if(c.diagnostics.numericFitBypassed){const executionWidth=w*num('scale',1),executionHeight=h*num('scale',1);fs.writeFileSync(path.join(out,'semantic-authored-paths.json'),JSON.stringify({executionWidth,executionHeight,physicalExecution:false,passes:c.layers.map(l=>({passId:l._semantic.key,paths:lowerAuthoredGestures(l._semantic,{target:ctx.AREA_PLAN.doc.target,crop:ctx.AREA_PLAN.crop,width:executionWidth,height:executionHeight,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)*ctx.AREA_PLAN.doc.target.width/ctx.AREA_PLAN.crop[2]})}))}));}const first=c.layers[0];if(first)fs.writeFileSync(path.join(out,'semantic-first-numerical-shape.json'),JSON.stringify({w,h,areaId:first._semantic.area.id,passId:first._semantic.key,value:first.value,cells:Array.from(first.shapes[0].mask,(v,i)=>v?i:-1).filter(i=>i>=0)}));process.exit(0);}
@@ -832,7 +829,7 @@ if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.
 Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
   SMALL, WHITE_HOLD, MIXES, setClip, MOD, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, PUDDLES, 
   FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
-  DETAIL_REGION, FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
+  FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 
   PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
   EARLY_DRY_VALUE });

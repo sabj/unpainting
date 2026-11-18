@@ -28,13 +28,11 @@ import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, dilate, erode} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {applyResist} from '../../src/media/sheet.mjs';
-import {softMask} from '../../src/paint/methods/soft-mask.mjs';
 import {longShare} from '../../src/crop/gestures.mjs';
 import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
 import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
-import {writeWashPlan} from '../../src/paint/methods/wash-plan-image.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 import {subjectValueStep, lumOf} from '../../src/paint/step-backs.mjs';
@@ -47,7 +45,7 @@ const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, EAR
   GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_EXEC, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
   PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, render, view, BRUSH, UPRIGHT, 
   highlights, expected, sheetDensity, drainFrames, mark, WET, CAL, snap, shoot, FILM_BY_PAINT, PEN_FRAMES, 
-  PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, ML_LINES, planPen } = ctx;
+  PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, planPen } = ctx;
 Object.assign(ctx, { drawPass });
 // The plan's density before anything is laid: every passage booked at its full amount, the way the loop books one it
 // lays whole. The pen-first order needs it to know what the washes will not carry.
@@ -89,8 +87,6 @@ ctx.laid = 0; ctx.dropped = 0; ctx.droppedMass = 0; ctx.plannedMass = 0;
 // and goes over the masking fluid on them rather than round them
 const brushMask = sh => (SMALL && opt('lightfill', '1') !== '0' ? (sh._brushMask ??= fillReserved(sh.mask, SMALL, w, h, { reach: LIGHT_CELLS })) : sh.mask);
 for (const L2 of ctx.layers) for (const sh of L2.shapes) ctx.plannedMass += sh.amount * sh.area;
-// --washplanpng 1: the wash plan drawn before any paint, with the segment boundaries (src/paint/methods/wash-plan-image.mjs)
-if (num('washplanpng', 0) > 0) await writeWashPlan({ layers: ctx.layers, steps: ctx.steps, w, h, out, image: opt('image', ''), log: console.log });
 // each passage's booking as planned, before the finish field clips it, so the film's shares add up to the plan's mass
 const FILM_MASS = new WeakMap(); for (const L2 of ctx.layers) for (const sh of L2.shapes) FILM_MASS.set(sh, sh.amount * sh.area);
 // --firstwash: the opening wash paler, off the subject, held to its passage and softened (src/paint/methods/first-wash.mjs)
@@ -155,8 +151,7 @@ const FLUID = SMALL && opt('lightresist', '1') !== '0' ? SMALL : null;
 const bigLights = (mask, min) => (min > 0 ? removeSmall(mask, w, h, Math.round(min * n)) : mask);
 const RESIST0 = FLUID ? Uint8Array.from(FLUID, (v, i) => (v || (ctx.masked > n * 0.01 && highlights[i]) ? 1 : 0)) : ctx.masked > n * 0.01 ? bigLights(highlights, num('resistmin', 0)) : null;
 const RESIST_BASE = RESIST0;
-// --softmask: the fluid thin at each light's rim, so it lifts to a soft broken edge (src/paint/methods/soft-mask.mjs)
-const RESIST_SOFT_BASE = softMask(RESIST_BASE, { w, h, n, paper, SC, gaussian, num });
+const RESIST_SOFT_BASE = null;
 if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))MOD.lights=Uint8Array.from(ctx.AREA_PLAN.reserves,(v,i)=>v||ctx.AREA_PLAN.film[i]?1:0);
 let { R: RESIST$, S: RESIST_SOFT } = MOD&&!ctx.AREA_PLAN ? joinResist(RESIST_BASE, RESIST_SOFT_BASE, MOD, { w, h, n, distanceToZero }) : { R: RESIST_BASE, S: RESIST_SOFT_BASE }; ctx.RESIST = RESIST$;
 if(ctx.AREA_PLAN){ctx.RESIST??=new Uint8Array(n);RESIST_SOFT??=new Float32Array(n);for(let i=0;i<n;i++)if(ctx.AREA_PLAN.film[i]){ctx.RESIST[i]=1;RESIST_SOFT[i]=1;}}
@@ -337,11 +332,7 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
     const drawT1 = inkVerdict ? first1.filter(g => g.draw) : first1;
     if (drawT1.length && PENCIL && first && SELECTED) { const r1 = clock('strokes', () => pencilDraw(ctx.sheet, drawT1, GRAPHITE_AT, { amount: PENCIL.pig.strength * num('pencilgain', 1), pressureReference: num('pencilpressure', 0) > 0 ? num('pencilpressure', 0) : null, width: num('pencilw', 1.2) * SC, vary: num('pencilvary', 0.35), tooth: num('penciltooth', 0.4), seed: SEED + k })); ctx.drawnCount += r1.drawn; }
     else if (drawT1.length) { const r1 = clock('strokes', () => penDraw(ctx.sheet, drawT1, wantT1, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); ctx.drawnCount += r1.drawn; }
-    // --mlwant: a line from the learned map is drawn at a constant pressure, like the outline tier (ml-lines.mjs)
-    const mlWant = ML_LINES ? ML_LINES.want : 0;
-    const drawML = mlWant ? drawMain.filter(g => g.ml) : [], drawRest = mlWant ? drawMain.filter(g => !g.ml) : drawMain;
-    if (drawML.length) { const wantML = new Float32Array(N2).fill(mlWant); const rm = clock('strokes', () => penDraw(ctx.sheet, drawML, wantML, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: 1 })); ctx.drawnCount += rm.drawn; }
-    const r = clock('strokes', () => penDraw(ctx.sheet, drawRest, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: peakMain }));
+    const r = clock('strokes', () => penDraw(ctx.sheet, drawMain, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst && !preparing ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : INKLOAD()) : 0)), pen: PEN, O, peak: peakMain }));
     if (drawThin.length) { const r2 = clock('strokes', () => penDraw(ctx.sheet, drawThin, big, W2, H2, { ink: SHEET_PIGS.map((_, j) => (j === inkPig ? (graphiteFirst ? (STYLE_ON()?3*ctx.VALUE_PLAN.style.graphite:num('graphiteconc', 3)) : num('outlineconc', 6.5)) : 0)), pen: PEN, O, peak: peakThin })); ctx.drawnCount += r2.drawn; }
     ctx.drawnCount += r.drawn;
     ctx.STAGE = { stage: first ? (GRAPHITE && !PENCIL ? 'prep' : 'pen') : 'ink', step: fine ? 'fine' : 'gestures', batch: k / per + 1, of: Math.ceil(scaled.length / per) };

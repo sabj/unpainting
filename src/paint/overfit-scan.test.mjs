@@ -34,7 +34,6 @@ test('reads Python too, without its comments and docstrings', () => {
 test('the scan covers every source file under src/ and tools/, tests and fixtures aside', () => {
   const files = new Set(scanRepo(ROOT).map(h => h.file));
   for (const f of files) assert.ok(!/\.test\.m?js$|[-_]test\.py$|(^|\/)fixtures\//.test(f), f);
-  assert.ok([...files].some(f => f.endsWith('.py')), 'Python sources are scanned');
 });
 
 test('flags a target hash and an image-size branch', () => {

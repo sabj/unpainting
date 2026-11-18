@@ -32,7 +32,7 @@ import { traceLineModel } from './line-model.mjs';
 import sharp from 'sharp';
 
 const lin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch', 'structure-lines', 'structure-combine', 'line-map']);
+const LINE_SOURCES = Object.freeze(['none', 'auto', 'source-ink', 'photo-sketch', 'line-map']);
 // fewer source-ink lines than this and the stages fall back to edge chains
 const MIN_STAGE_LINES = 12;
 const STAGE_KEYS = Object.freeze({ prep: 'prep', prepink: 'prepInk', finishink: 'finishInk' });
@@ -151,23 +151,12 @@ export async function prepareLineSource({opt,num,argv,out,root,inkShare=0,log=()
       runSketch({ python, root, image, stem, map: opt('sketchmap', '') ? path.resolve(root, opt('sketchmap', '')) : null, segments: opt('sketchsegments', '') ? path.resolve(root, opt('sketchsegments', '')) : null, log });
       argv.push('--drawingfile', stem);
       info.source = 'photo-sketch';
-    } else if (['structure-lines', 'structure-combine', 'line-map'].includes(choice)) {
-      const stem = path.join(out, 'lines-' + choice);
-      const run = args => {
-        const r = spawnSync(python, args, {encoding:'utf8', timeout:900000, env:{...process.env, OMP_NUM_THREADS:'2', OPENBLAS_NUM_THREADS:'2'}});
-        if (r.error || r.status !== 0) throw Error(`${choice} failed: ${r.error?.message ?? r.stderr}`);
-      };
-      if (choice === 'line-map') {
-        if (!opt('sketchmap','')) throw Error('line-map needs drawing.map or --sketchmap');
-        run([path.join(root,'tools/seg/copy-lines.py'), path.resolve(root,opt('sketchmap')), '--out',stem,'--width',String(num('width',540)), '--kind','line-map','--map-tolerance',String(num('mapsmoothing',.25))]);
-      } else {
-        run([path.join(root,'tools/seg/structure-lines.py'),image,'--out',stem,'--width',String(num('width',540)), '--seed',String(num('seed',0))]);
-        if (choice === 'structure-combine') {
-          const traced=stem+'-detail';
-          runSketch({python,root,image,stem:traced,map:opt('sketchmap','')||null,segments:opt('sketchsegments','')||null,log});
-          run([path.join(root,'tools/seg/structure-combine.py'),stem+'-lines.json',traced+'-lines.json','--out',stem]);
-        }
-      }
+    } else if (choice === 'line-map') {
+      const stem = path.join(out, 'lines-line-map');
+      if (!opt('sketchmap','')) throw Error('line-map needs drawing.map or --sketchmap');
+      const args = [path.join(root,'tools/seg/copy-lines.py'), path.resolve(root,opt('sketchmap')), '--out',stem,'--width',String(num('width',540)), '--kind','line-map','--map-tolerance',String(num('mapsmoothing',.25))];
+      const r = spawnSync(python, args, {encoding:'utf8', timeout:900000, env:{...process.env, OMP_NUM_THREADS:'2', OPENBLAS_NUM_THREADS:'2'}});
+      if (r.error || r.status !== 0) throw Error(`line-map failed: ${r.error?.message ?? r.stderr}`);
       argv.push('--drawingfile',stem); info.source=choice; info.extractor=choice;
     } else log(`line source auto: ${(100 * inkShare).toFixed(2)}% pen line in the target and no sketch planner (${python} lacks numpy or OpenCV); the pen finds its own lines`);
     if (mode === 'auto' && choice === 'none' && 100 * inkShare < num('penfirst', 0.5)) {

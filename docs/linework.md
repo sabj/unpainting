@@ -46,8 +46,6 @@ thinning it has (OpenCV contrib, scikit-image or NumPy) changes the traced paths
 | Copy an existing pen drawing or ink-led sketch | `copy-lines.py`, then a prepared drawing file | Short marks, curved contours and measured widths survive. Inspect the extracted ink mask: dark wash texture can look like ink. |
 | Draw architecture from a photo | `sketch-lines.py` with a learned map | Recognizable silhouette, openings and structural junctions. Avoid turning every stone or leaf into ink. |
 | Preserve a prepared photo line map | `copy-lines.py --kind line-map` | Connected pale model strokes survive, and confidence corridors get restrained pen widths. This reads declared model confidence, never raw photo brightness. Inspect dark clusters. |
-| Establish perspective, arches and repeated openings | `structure-lines.py` | Correct vanishing directions and repeated units. Reject unsupported regularity. |
-| Add facade description to a sparse scaffold | `structure-combine.py` with the photo sketch | Uncovered frames, mouldings and ornaments, with no double tracing along the scaffold. |
 | Place difficult proportions | `prep` pencil, then linked `prepInk` | Most pen lies over pencil, and some construction stays visible. Use less pencil for simple silhouettes. |
 | Restate a few softened edges after washes | `finishInk` with `accent`; `architecture` for whole frames and sills | Selective reinforcement, not a second complete drawing. |
 | Dark hair or curly coats | `scribble` method, only when the subject calls for it | Open lit edges and form-following marks. Dark surface value is still a paint job. |
@@ -101,12 +99,9 @@ See [plan format](plan-format.md#stages) for the schema.
 
 ## Dry drawing measurements
 
-`tools/judge/drawing-stats.py` measures reference scans and executed drawing checkpoints with the same analysis
 settings. It needs NumPy and OpenCV:
 
 ```sh
-python tools/judge/drawing-stats.py reference.jpg drawing-opening.png --out stats.jsonl
-python tools/judge/drawing-stats-test.py
 ```
 
 The tool scales the long edge to 1000 pixels. It reports:
@@ -146,7 +141,6 @@ densities.
 - `--drawinglogic 3` lays each line with the pen's own pressure, speed and pauses (`shapePenLine` in
   `src/paint/methods/drawing-scribble.mjs`). Its width-to-pressure inversion uses the declared nib's width range and
   pressure exponent. `--hybridland 1.2`, `--hybridlift .6` and `--hybriddwell .5` set its pauses.
-- `tools/judge/drawing-audit.mjs RUN ... --out audit.jsonl` summarizes a run's pen audit: contact widths, pressure,
   speed, pauses, reservoir and paper state.
 
 The audit and the material swatches are diagnostics, not a quality gate.

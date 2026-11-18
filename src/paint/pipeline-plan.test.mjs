@@ -71,3 +71,27 @@ test('washes.deepAccent was removed: a plan that names it is refused with the re
  const flags=pipelineFlags({families}).flags;
  for(const k of ['--deepaccent','--deepgrow','--deepaccentin'])assert.ok(!flags.includes(k),k);
 });
+
+test('hierarchical washes and drawing controls emit flags when authored and validate types',()=>{
+ const { flags } = pipelineFlags({
+  drawing: { hand: true, joinGap: 3.5, damp: 0.25 },
+  washes: { skyOneLayer: true, lanes: true, soften: { maxArcMm: 18, minShare: 0.4 }, edgeFadeMm: 1.5, edgeWobbleMm: 0.8, smallMarks: true, joinSmall: true }
+ });
+ const m = new Map(Array.from({length:flags.length/2},(_,i)=>flags.slice(i*2,i*2+2)));
+ assert.equal(m.get('--drawinghand'), '1');
+ assert.equal(m.get('--drawjoingap'), '3.5');
+ assert.equal(m.get('--pendamp'), '0.25');
+ assert.equal(m.get('--skysplit'), '0');
+ assert.equal(m.get('--strokeplan'), '1');
+ assert.equal(m.get('--laneadapt'), '1');
+ assert.equal(m.get('--brushchoice'), '1');
+ assert.equal(m.get('--softsplit'), '1');
+ assert.equal(m.get('--softmm'), '18');
+ assert.equal(m.get('--softshare'), '0.4');
+ assert.equal(m.get('--edgefade'), '1.5');
+ assert.equal(m.get('--edgewobble'), '0.8');
+ assert.equal(m.get('--smallmarks'), '1');
+ assert.equal(m.get('--washjoin'), '1');
+ assert.throws(()=>resolvePipeline({washes:{skyOneLayer:'yes'}}), /washes\.skyOneLayer/);
+ assert.throws(()=>resolvePipeline({drawing:{damp:2}}), /drawing\.damp/);
+});

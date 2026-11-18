@@ -60,22 +60,18 @@ Modules, with their flags:
 - `run-cache.mjs` (always on): caches slow, input-determined steps on disk.
 - `styles/loader.mjs` (`--valueplan <json>`): loads watercolor style profiles and subject mappings.
 - `methods/brushes.mjs` (`--physical 1`): sizes brushes from real ones and splits strokes where water runs out.
-- `methods/charge-layers.mjs` (`--charge 1`, parked): a region's middle layers laid in one wet session.
 - `methods/colour-budget.mjs` (`--colourbudget 1`, `--fwrepay 1`): defers colour held back from a pale first wash to a later glaze.
 - `methods/crisp-edges.mjs` (`--crisp 1`): wet-on-dry glazes stopped at hard region edges.
 - `methods/detail-scale.mjs` (`--detailscale k`, `--detailseg 1`): the minimum shape shrinks with the target's 1 to 3 mm detail, optionally confined to focal foreground segments.
-- `methods/detail-passes.mjs` (`--detailpasses`, `--detailtrim`): late small passages where the detail is.
 - `methods/drawing-file.mjs` (`--drawingfile`, `--drawinglast`): draws a selected line file whole.
 - `methods/drawing-hand.mjs` (helper): joins drawing lines into gestures with tapered ends.
 - `methods/drawing-logic.mjs` (`--drawinglogic 1|3`): inking logic run over a selected drawing file.
 - `methods/drawing-rank.mjs` (helper): ranks a dense drawing file's lines into tiers.
 - `methods/drawing-scribble.mjs` (helper): long open lines with dark masses as looping scribble, each line laid with the pen's own pressure, speed and pauses.
 - `methods/drawing-stages-auto.mjs` and `methods/drawing-choice.mjs` (`--drawingstages auto`, the default): pencil prep, ink prep and ink finish chosen per picture. Off: `off`.
-- `methods/drawing.mjs` (not reached): pencil drawing of the figure's edge and big darks.
 - `methods/final-darks.mjs` (`--finaldarks 1`, `--fdminmm2`, `--fdtilemm`, `--fdgain`): finds the final-dark cells and groups them into families for one shape-level look each. Off by default.
 - `methods/first-wash.mjs` (`--firstwash 1`): a paler opening wash split at the subject mask.
 - `methods/ink-res.mjs` (`--inkres N`): pens drawn on a finer sheet and averaged down.
-- `methods/ladder-seg.mjs` (`--ladderseg`): leaves glazes on ground segments to the washes.
 - `methods/layer-cuts.mjs` (`--layerlocal 1`, `--midlayers N` above 4): middle-layer cut levels per colour region; evenly spaced cuts for more layers.
 - `methods/lay.mjs` (not reached): one passage from one mixing well, in sweeps.
 - `methods/light-to-dark.mjs` (`--order painter`): five light-to-dark value bands per pigment.
@@ -83,37 +79,25 @@ Modules, with their flags:
 - `methods/look.mjs` (not reached): reads what the sheet still lacks to choose the next act.
 - `methods/mass-budget.mjs` (`--massbudget 1`): full wash budget for broad neutral dark masses.
 - `methods/material-profiles.mjs` (always on): ink and graphite drawing materials.
-- `methods/ml-lines.mjs` (`--mllines 1`): inner lines from a trained line model.
 - `methods/modulate.mjs` (`--modulate 1`): thins washes in highlight and detail areas.
 - `methods/mop-lanes.mjs` (helper): a mop's overlapping, slightly curved sweeps.
 - `methods/outline-medium.mjs` (always on): resolves `--outlinemedium`, graphite by default; `auto` chooses ink or pencil from the target.
 - `methods/painter-order.mjs` (`--order legacy-painter`): reorders passes into a painter's order.
-- `methods/painter.mjs` (not reached): a look, decide, paint loop.
-- `methods/palette.mjs` (not reached): mixtures in wells reused at several dilutions.
 - `methods/passage-brush.mjs` (`--brushchoice 1`): a real brush per value passage.
 - `methods/passage-schedule.mjs` (helper): schedules passage modules by phase.
-- `methods/passages.mjs` (`--passages <names>`): loads the named section passages.
 - `methods/pencil-line.mjs` (`--penpencil <stage.png>`): an opening dry-pencil drawing.
 - `methods/pencil-stage.mjs` (`--pencilstage 1`, `--pencilerase 1`, `--prepfade 1`): grows, erases or fades the pencil drawing.
 - `methods/pigment-physics.mjs` (`--pigphys 1`): settling, granulation and flocculation per pigment.
 - `methods/practice-style.mjs` (helper for `--modulate`): measures the target's mix of ink, dry brush, wash and paper.
 - `methods/preparation-binding.mjs` (`--preparationbinding <file>`): pencil paths from a hash-checked preparation file.
-- `methods/seg-ink.mjs` (`--segink 1`): foreground segments as the ink subject.
 - `methods/shape-deficit.mjs` (always on): charges each passage from its whole shape's colour difference.
 - `methods/shape-refit.mjs` (`--touchpoints R`, `--shaperefit R`): planning shapes for the touch-up passes.
-- `methods/shapes.mjs` (`--shapes N`): each dark region laid once as a loaded mass.
 - `methods/small-marks.mjs` (`--smallmarks 1`): catchlights and lit gaps under the minimum shape kept as paper; small darks laid once, last.
 - `methods/soft-edges.mjs` (`--softwet mm`, `--softwetwater`, `--softwetsteps`, `--softwetphases`): clean water past a passage's soft edges before its colour. Off by default.
-- `methods/smoothup.mjs` (`--keepsmooth`, `--foliagesmooth`): smooth-edged masks on the finer sheet grid.
-- `methods/soft-mask.mjs` (`--softmask`): thins masking fluid at a light's rim.
 - `methods/stroke-budget.mjs` (`--passmerge 1`, `--strokebudget N`, `--focusmap`): limits total strokes toward a focus.
 - `methods/stroke-plan.mjs` (`--strokeplan 1`): a passage as overlapping parallel sweeps.
 - `methods/subject-order.mjs` (`--subjectorder s`, `--subjectseam s`): subject-by-subject order; a wash is cut at a subject edge only along a colour edge.
-- `methods/touch-cover.mjs` (`--touchcover c`, parked): a touch-up whose sweeps touch under share c of its shape is left out.
-- `methods/subject.mjs` (not reached): the subject's big shapes in wash order.
 - `methods/target-regions.mjs` (always on): colour and value regions for the value planner.
-- `methods/wash-plan-image.mjs` (`--washplanpng 1`): the wash plan as pictures, with the segment boundaries.
-- `methods/well.mjs` (helper): a non-negative paint mix for a wanted colour.
 - `methods/wetdry.mjs` (always on): paper wetness, brush load and waiting for the paper to dry.
 - `methods/wash-join.mjs` (`--washjoin 1`): a colour-domain piece under the minimum shape joins the neighbouring passage instead of leaving a bare-paper shard.
 
@@ -209,8 +193,6 @@ Each tool has a use and a failure mode. None is mandatory. Paths are under `src/
 | Waterproof ink | `drawing.ink.waterproof`; `src/media/pen.mjs` | Black pen and watercolour with set ink | It prevents the softening of soluble sepia studies |
 | Source-ink copying | `drawing.source: source-ink`; `tools/seg/copy-lines.py` | Pen drawings and masters with real narrow ink | Wash texture or broad black paint read as line becomes blotches |
 | Photo sketch | `drawing.source: photo-sketch`; `tools/seg/sketch-lines.py` | Architecture photos with sustained edges | Texture and foliage become tangled loops |
-| Structure lines | `drawing.source: structure-lines`; `tools/seg/structure-lines.py` | Clear perspective, repeated arches, openings or columns | Over-regularizes irregular buildings and organic forms |
-| Structure plus detail | `drawing.source: structure-combine`; `tools/seg/structure-combine.py` | A structural scaffold with facade details | A wrong scaffold stays wrong |
 | Map smoothing | `drawing.source: line-map`, `mapSmoothing` | About 0.75 cells reduces noisy model-map loops | 1.5 cells loses character; never smooth observed widths |
 | Contour and connected gestures | `prepInk.method` `contour` or `connected`; `methods/drawing-rank.mjs` | Contours for landmarks; long economical gestures | Long tracing looks cut out; connected walks wander |
 | Scribble and lit-edge breaks | `method: scribble` or `finishInk.masses: scribble`; `methods/drawing-scribble.mjs` | Curly black fur or dark hair with open lit edges | Ink filling a dark surface; dense scribble loses form |

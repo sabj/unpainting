@@ -56,7 +56,6 @@ import {gaussian} from '../../src/keyframes/density.mjs';
 import {overlay} from '../../src/media/gouache.mjs';
 // Optional stages, one module each, off unless their flag is given.
 import {furLightReserves} from '../../src/paint/methods/finish-texture.mjs';
-import {chargeOrder} from '../../src/paint/methods/charge-layers.mjs';
 import {sampledInkAbsorbance, matchInkLoad, sampleGestures} from '../../src/paint/methods/ink-match.mjs';
 import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
 import {loadPhysical} from '../../src/paint/methods/brushes.mjs';
@@ -296,8 +295,6 @@ if(VALUE_ENABLED){
   if(r.summary){ctx.layers=r.layers;fs.writeFileSync(path.join(out,'subject-order.json'),JSON.stringify({strength:so,overlap:OVERLAP,subjects:r.summary,passes:r.order},null,1));
    {const pal=[[230,159,0],[86,180,233],[0,158,115],[240,228,66],[0,114,178],[213,94,0],[204,121,167],[120,120,120]],img=Buffer.alloc(n*3);for(let i=0;i<n;i++){const c=pal[field.rank[i]%pal.length];img[3*i]=c[0];img[3*i+1]=c[1];img[3*i+2]=c[2];}await sharp(img,{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'subject-order.png'));}
    console.log(`subject order ${so}: ${ctx.layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
- // --charge 1 (src/paint/methods/charge-layers.mjs): a region's middle layers laid in one wet session, darker into lighter.
- if(num('charge',0)>0){ctx.layers=chargeOrder(ctx.layers);console.log('charge: middle layers of each region laid wet into its first layer');}
  ctx.HOLD=ctx.VALUE_PLAN.protectedCells;
  fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  // --valuemaps 1: the value plan as maps for diagnosis (value band per cell, colour region, reserved lights) and every
@@ -846,7 +843,7 @@ Object.assign(ctx, { dry, dip, dipLoad, productionDip, stroke, pencilDraw, SC, H
   sheetDensity, marks, PENDING_IO, framer, drainFrames, mark, WET, MIX, 
   washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL });
 if(opt('marks','0')!=='0'){
- ctx.NATIVE_UNOBSERVED_ROUTES=[...(ctx.CURLS?.area?['legacy curls']:[]),...(num('shapes',0)>0?['legacy shapes']:[])];
+ ctx.NATIVE_UNOBSERVED_ROUTES=ctx.CURLS?.area?['legacy curls']:[];
  ctx.NATIVE_RECORDER=createNativeOperationRecorder({directory:path.join(out,'native-operations'),width:OUT_W,height:OUT_H,provenance:{code:CODE_HASH,backend:GPU_INFO},resumeFrom:opt('resumestate','')?path.join(opt('resumestate',''),'native-operations'):null});
  ctx.NATIVE_MARK_COUNTS={brush:0,ink:0,graphite:0};
  ctx.NATIVE_CAPTURE=operation=>{if(ctx.NATIVE_RECORDING_FAILURE)return;try{ctx.NATIVE_RECORDER.capture(INKRES?INKRES.compose(view()):view(),{operation,stage:ctx.STAGE??{stage:'paper'}});if(Object.hasOwn(ctx.NATIVE_MARK_COUNTS,operation))ctx.NATIVE_MARK_COUNTS[operation]++;}catch(error){ctx.NATIVE_RECORDING_FAILURE=error.message;console.error('NATIVE RECORDING FAILED: '+error.message+'; capture stopped, painting continues to retain its final image, and this run will fail.');}};

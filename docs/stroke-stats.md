@@ -78,6 +78,5 @@ The reader accepts a run directory, a plain or compressed tape, an explicit stro
 
 The plate painter writes stats, panel and gate beside its tape after rendering. Partial checkpoints do not establish final admission. Its generated paths do not exist before execution. Hard gating requires `--marks 1`. The stroke-plan painter checks projected broad-area reliance before allocation.
 
-`tools/stroke-stats-gallery.mjs manifest.json directory` builds cards with the composition bar, per-area reports, secondary counts and provenance, plus a keyboard and touch lightbox. Records may supply `tape` and `compositionInputs` for preserved tapes. `archivedStats` keeps cached measured results when tapes are unavailable. Archived count-only data is unmeasured and never approved by the weighted gate. The generator writes `comparison.json` and `summary.json`.
 
 Human process references lack calibrated stroke paths and deposits, so they stay unmeasured.

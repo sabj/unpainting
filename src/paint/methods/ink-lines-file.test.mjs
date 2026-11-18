@@ -79,7 +79,7 @@ test('--inkrecipe wash turns ink on and picks the source lines, and the command 
   const add = inkRecipeArgs('wash', ['--inkbleed', '0']), opt = n => add[add.indexOf('--' + n) + 1];
   assert.equal(opt('outlinemedium'), 'ink');
   assert.equal(opt('linesource'), 'source-ink');
-  assert.equal(opt('inkdarkmatch'), '1.3');
+  assert.equal(opt('inkdarkmatch'), '1');
   assert.ok(!add.includes('--inkbleed'));
   assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');
 });
@@ -101,7 +101,7 @@ test('the wash recipe draws on a fine sheet by width, by a hand that chains stro
   assert.equal(opt(['--width', '2400'], 'inkres'), '1');
   assert.ok(!inkRecipeArgs('wash', ['--width', '540', '--inkres', '2']).includes('--inkres'), 'a flag on the command line wins');
   assert.equal(INK_RECIPES.wash.drawinghand, '1');
-  assert.equal(INK_RECIPES.wash.drawstroke, '0.1');
+  assert.equal(INK_RECIPES.wash.drawstroke, '0');
   assert.equal(INK_RECIPES.wash.inkdecide, '1');
   assert.equal(INK_RECIPES.wash.inklabeljudge, 'simple', 'no region image leaves the machine by default');
   assert.equal(INK_RECIPES.wash.inkshadowmask, '0');
@@ -112,7 +112,8 @@ test('the wash recipe draws on a fine sheet by width, by a hand that chains stro
   const fl = (argv) => { const a = inkRecipeArgs('wash', argv); return a[a.indexOf('--inkwidthfloor') + 1]; };
   assert.equal(fl(['--width', '540']), '0', 'on a fine sheet no floor');
   assert.equal(fl(['--width', '2400']), '1');
-  for (const k of ['inkgeom', 'inksalience', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
+  assert.equal(INK_RECIPES.wash.inksalience, '1');
+  for (const k of ['inkgeom', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
 });
 
 test('lineart map lines are measured and never cut or marked soft, whatever --linesupport says', async () => {

@@ -7,8 +7,6 @@ The WebGPU backend for the sheet in `src/media/sheet.mjs`. It keeps the sheet on
 - `stepfull.mjs` and `stepfull.wgsl`: a whole sheet step and `dry` on the GPU. `permeability.mjs` holds the paper permeability they share.
 - `stroke-check.mjs`: `--gpustrokes check` compares eligible ordinary GPU strokes on both backends. CPU fallback strokes and wash splats (soft round deposits of water and pigment) bypass it. The check omits within-stroke flow, so it can change the resulting painting.
 - `framer.mjs` and `frame-worker.mjs`: animation frames rendered off the painter's thread.
-- `sheet-batch.mjs` and `batch-server.mjs`: many sheets of one size advanced together on one device, for `tools/gpu/paint-batch.mjs`.
-- `web-brush.mjs`: the brush for the browser build.
 
 `node tools/paint-plate.mjs` uses the GPU by default when an adapter is present (`--gpu auto|on|off`) and prints `sheet backend: gpu` or `cpu`. CPU and GPU runs are each repeatable, but they differ from each other.
 

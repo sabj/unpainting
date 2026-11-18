@@ -11,7 +11,7 @@ const LINE_SETS = Object.freeze(['all', 'contours', 'subject', 'regions']);
 // the lines and gates whether to draw, the medium and how much; "off" (the default) leaves the source to drawing.source.
 const LINEWORK = Object.freeze(['auto', 'off']);
 // Where the line set comes from (--linesource, src/paint/methods/linework-plan.mjs).
-const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'structure-lines', 'structure-combine', 'line-map']);
+const LINE_SOURCES = Object.freeze(['auto', 'none', 'photo-sketch', 'source-ink', 'line-map']);
 // The linked stages (src/paint/methods/drawing-stages.mjs) and the few choices each takes.
 const STAGES = Object.freeze(['prep', 'prepInk', 'finishInk']);
 const PREP_INK_METHODS = Object.freeze(['contour', 'scribble']);
@@ -191,6 +191,18 @@ export function drawingFlags(drawing) {
   if (drawing.mapSmoothing != null) {
     if (!Number.isFinite(drawing.mapSmoothing) || drawing.mapSmoothing < 0 || drawing.mapSmoothing > 2) throw Error('drawing.mapSmoothing: 0..2 cells');
     flags.push('--mapsmoothing', String(drawing.mapSmoothing));
+  }
+  if (drawing.hand != null) {
+    if (typeof drawing.hand !== 'boolean') throw Error('drawing.hand: expected boolean');
+    flags.push('--drawinghand', drawing.hand ? '1' : '0');
+  }
+  if (drawing.joinGap != null) {
+    if (!Number.isFinite(drawing.joinGap) || drawing.joinGap < 0 || drawing.joinGap > 20) throw Error('drawing.joinGap: 0..20 cells');
+    flags.push('--drawjoingap', round(drawing.joinGap));
+  }
+  if (drawing.damp != null) {
+    if (!Number.isFinite(drawing.damp) || drawing.damp < 0 || drawing.damp > 1) throw Error('drawing.damp: 0..1');
+    flags.push('--pendamp', round(drawing.damp));
   }
   if (medium) flags.push('--outlinemedium', medium);
   const colour = choice(drawing, 'inkColor', INK_COLOURS);

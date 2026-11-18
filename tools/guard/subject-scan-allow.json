@@ -8,12 +8,6 @@
       "reason": "Judge board layouts are recognised by their fixed panel widths (776 px). It reads composed score boards, not painted subjects, and does not run in the painter."
     },
     {
-      "file": "bench/scripts/import-aware.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Maps short run names to crop names when importing published V4 and V5 runs. Reporting only."
-    },
-    {
       "file": "bench/scripts/lib.mjs",
       "rule": "name",
       "count": 2,
@@ -38,12 +32,6 @@
       "reason": "Names which published plates the comparison page shows beside each improvement note. Reporting only; never runs in the painter."
     },
     {
-      "file": "tools/judge/line-fidelity.py",
-      "rule": "name",
-      "count": 4,
-      "reason": "Judge script: the line-fidelity check's fixed target list and its named comparison windows per target. Scoring only; it never runs in the painter."
-    },
-    {
       "file": "tools/lab/build-live-examples.mjs",
       "rule": "name",
       "count": 1,
@@ -60,12 +48,6 @@
       "rule": "size",
       "count": 2,
       "reason": "README media builder: panel gap and font size for its two fixed figure widths. Layout of a figure, not a painting branch."
-    },
-    {
-      "file": "tools/readme/ink-figure.mjs",
-      "rule": "name",
-      "count": 3,
-      "reason": "README ink figure: its default example image, line file and caption. Reporting only; it never runs in the painter."
     }
   ]
 }

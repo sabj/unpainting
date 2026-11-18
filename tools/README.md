@@ -11,7 +11,6 @@ Command-line tools. Run each from the repository root with `node tools/<path>`. 
 | `judge/` | classic measures against a target, stage checks, the wash scorer, and blind evaluations of saved stages with model judges in `rounds/` | `judge-plate.mjs`, `stage-check.mjs`, `wash-score.mjs --dir DUMP` |
 | `lab/` | builds Paint Lab's recorded examples in `demos/lab/examples/`, copies `src/media/` into the lab, builds the site, and records the lab's demo animation | `build-live-examples.mjs`; `sync-site-media.mjs`; `build-site.mjs`; `record-demo.mjs` |
 | `readme/` | builds the README figures and the demo animations in `demos/thumbs/` | `build-readme-media.mjs`; `demo-animations.mjs` |
-| `gpu/` | the batch painter (many sheets on one GPU) and CPU-against-GPU checks | `paint-batch.mjs --config FILE`, `step-check.mjs` |
 | `cloud/` | render batches on rented machines (optional; needs a paid account) | `render-batch.py`; see [docs/CLOUD.md](../docs/CLOUD.md) |
 | `seg/` | figure masks and line extraction in Python (u2net, SAM and line models) | [seg/README.md](seg/README.md) |
 

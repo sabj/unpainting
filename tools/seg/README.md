@@ -6,9 +6,7 @@ The painter runs one of them itself. Before planning, `src/crop/segment-prep.mjs
 
 ## Index
 
-Inking (the pen drawing, [pipelines](../../docs/how-it-paints.md)): `sketch-map.py`, `copy-lines.py`, `sketch-lines.py`, `lines.py`, `lines-map.py`, `ink-lines.mjs`, `structure-lines.py`, `structure-combine.py`, `structure-filter.mjs`, `late-lines.mjs`, `register-lines.mjs`, `residual_lines.py`, `perspective.py`.
 
-Painting (regions for the washes): `segments.py`, `sam_regions.py`, `segment.py`, `subject-regions.py`, `check-sheet.mjs`.
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -29,12 +27,8 @@ Painting (regions for the washes): `segments.py`, `sam_regions.py`, `segment.py`
 | `perspective.py` | JSON: vanishing points and the share of long edges that converge on them | the linework gate, `src/paint/methods/line-gate.mjs` |
 | `copy-lines.py` | observed source-ink paths and measured widths, without a sketch-detail budget | `--drawingfile` / `--copylines 1` |
 | `lines.py` | `work/lines/<base>-lines.json`, Informative Drawings line map traced to polylines (paths of connected straight segments) | `src/crop/lines.mjs` |
-| `lines-map.py` | A line file moved from a photograph onto the painting made from it, through a given 2x3 similarity transform (alignment by translation, rotation and uniform scale) | `src/crop/lines.mjs` |
 | `subject-regions.py` | A label map of named regions (person from Mask R-CNN in `pp/models.py`, parts from Segment Anything prompted by boxes or points) and its legend | `ink-lines.mjs` |
 | `ink-lines.mjs` | `<out>-lines.json`, a pen-and-wash target's estimated ink (`src/crop/inkwash.mjs`) traced to polylines, each tagged with its region | `--drawingfile` |
-| `structure-filter.mjs` | A structural opening drawing from a dense traced line file: long straight lines, plus lines inside detail regions where the trace is dense and local value contrast is high (one rule, no hand boxes) | `--drawingfile` |
-| `late-lines.mjs` | A late closing-pen line file: the long straight lines of a dense trace that a cleaner opening file does not already draw | `--drawingfile` for the closing pen |
-| `check-sheet.mjs` | A sheet of source, label map and outlines, read back through the JavaScript loader | you |
 
 ## Setup
 
@@ -62,7 +56,6 @@ precedence. Omit `--drawingonly 1` for a wash check and inspect the saved
 preparation; the painter deposits ink through the physical pen. The existing
 wash pipeline's strict guard still permits aggregate, shape-level reference looks.
 
-`tools/judge/line-fidelity.py` produces registered overlays, native crops, and
 pixel/continuity/width diagnostics after rendering.
 
 ### Lineart models for the wash recipe

@@ -27,6 +27,7 @@ function choice(v, fallback, choices, name) {
 export function resolvePipeline(plan = {}) {
   const drawing = structuredClone(plan.drawing ?? {});
   object(drawing, 'drawing');
+  drawingFlags(drawing);
   const washes = object(plan.washes ?? {}, 'washes');
   const order = plan.order && typeof plan.order === 'object' && !Array.isArray(plan.order) ? plan.order : {};
   if (plan.subjectOrder && order.subjects) throw Error('use order.subjects, not both order.subjects and subjectOrder');
@@ -46,6 +47,13 @@ export function resolvePipeline(plan = {}) {
       charge: number(washes.charge, .5, 0, 1, 'washes.charge'),
       carryMm: number(washes.carryMm, 2, 0, 10, 'washes.carryMm'),
       paleLimit: number(washes.paleLimit, .16, 0, 1, 'washes.paleLimit'),
+      skyOneLayer: washes.skyOneLayer == null ? null : washes.skyOneLayer,
+      lanes: washes.lanes == null ? null : washes.lanes,
+      soften: washes.soften == null ? null : (typeof washes.soften === 'boolean' ? { enabled: washes.soften } : object(washes.soften, 'washes.soften')),
+      edgeFadeMm: washes.edgeFadeMm == null ? null : number(washes.edgeFadeMm, 0, 0, 10, 'washes.edgeFadeMm'),
+      edgeWobbleMm: washes.edgeWobbleMm == null ? null : number(washes.edgeWobbleMm, 0, 0, 5, 'washes.edgeWobbleMm'),
+      smallMarks: washes.smallMarks == null ? null : washes.smallMarks,
+      joinSmall: washes.joinSmall == null ? null : washes.joinSmall,
       physics: {
         holeRimMm: number(physics.holeRimMm, 0, 0, 3, 'washes.physics.holeRimMm'),
         marangoni: number(physics.marangoni, 0, 0, 1, 'washes.physics.marangoni'),
@@ -55,6 +63,13 @@ export function resolvePipeline(plan = {}) {
     order: { subjects, strength: number(order.strength, subjects ? .5 : 0, 0, 1, 'order.strength') },
   };
   if (typeof resolved.washes.inkAware !== 'boolean') throw Error('washes.inkAware: expected boolean');
+  for (const k of ['skyOneLayer', 'lanes', 'smallMarks', 'joinSmall']) {
+    if (resolved.washes[k] != null && typeof resolved.washes[k] !== 'boolean') throw Error(`washes.${k}: expected boolean`);
+  }
+  if (resolved.washes.soften && resolved.washes.soften.enabled === undefined) {
+    if (resolved.washes.soften.maxArcMm != null) number(resolved.washes.soften.maxArcMm, 25, 0, 200, 'washes.soften.maxArcMm');
+    if (resolved.washes.soften.minShare != null) number(resolved.washes.soften.minShare, .35, 0, 1, 'washes.soften.minShare');
+  }
   if (!subjects && resolved.order.strength) throw Error('order.strength needs order.subjects');
   return resolved;
 }
@@ -87,6 +102,18 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   if (onlyAuthored && rawW.paleLimit != null && rawW.colour == null) add('palelights', w.colour === 'family' ? w.paleLimit : 0);
   if (!onlyAuthored || rawW.inkAware != null || (plan?.drawing?.source && ['source-ink', 'line-map'].includes(plan.drawing.source))) add('washinkfree', +w.inkAware);
   if (!onlyAuthored || rawOrder.strength != null || rawOrder.subjects != null || plan?.subjectOrder != null) add('subjectorder', p.order.strength);
+  if (w.skyOneLayer != null) add('skysplit', w.skyOneLayer ? 0 : 1);
+  if (w.lanes != null) { add('strokeplan', +w.lanes); add('laneadapt', +w.lanes); add('brushchoice', +w.lanes); }
+  if (w.soften != null) {
+    const on = w.soften.enabled ?? true;
+    add('softsplit', +on);
+    if (w.soften.maxArcMm != null) add('softmm', w.soften.maxArcMm);
+    if (w.soften.minShare != null) add('softshare', w.soften.minShare);
+  }
+  if (w.edgeFadeMm != null) add('edgefade', w.edgeFadeMm);
+  if (w.edgeWobbleMm != null) add('edgewobble', w.edgeWobbleMm);
+  if (w.smallMarks != null) add('smallmarks', +w.smallMarks);
+  if (w.joinSmall != null) add('washjoin', +w.joinSmall);
   if (!onlyAuthored || rawPhysics.holeRimMm != null) add('holerim', w.physics.holeRimMm);
   if (!onlyAuthored) {
     add('physics', `marangoni=${w.physics.marangoni},slope=${w.physics.slope}`);

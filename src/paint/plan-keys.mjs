@@ -27,7 +27,7 @@ const TEXTURE = { bounds: ANY, budget: ANY, spacing: ANY, minDensity: ANY, reser
 // src/paint/drawing-plan.mjs drawingFlags
 const DRAWING = {
   medium: ANY, reason: ANY, inkColor: ANY, ink: { color: ANY, waterproof: ANY }, linework: ANY, source: ANY, amount: ANY, lines: ANY, maxLines: ANY,
-  weight: ANY, closingLines: ANY, resolution: ANY, map: ANY, mapSmoothing: ANY,
+  weight: ANY, closingLines: ANY, resolution: ANY, map: ANY, mapSmoothing: ANY, hand: ANY, joinGap: ANY, damp: ANY,
   stages: {
     prep: { amount: ANY, weight: ANY, fade: ANY, frames: ANY },
     prepInk: { from: ANY, keep: ANY, add: ANY, amount: ANY, deviate: ANY, method: ANY },
@@ -41,6 +41,7 @@ const WASHES = {
   furReserves: { bounds: ANY, reach: ANY, drop: ANY, dark: ANY, maxDensity: ANY, minCells: ANY },
   paints: ANY,
   colour: ANY, sessions: ANY, inkAware: ANY, charge: ANY, carryMm: ANY, paleLimit: ANY,
+  skyOneLayer: ANY, lanes: ANY, soften: { maxArcMm: ANY, minShare: ANY }, edgeFadeMm: ANY, edgeWobbleMm: ANY, smallMarks: ANY, joinSmall: ANY,
   physics: { holeRimMm: ANY, marangoni: ANY, slope: ANY },
 };
 

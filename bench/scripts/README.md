@@ -19,4 +19,3 @@ npm run bench:run -- --dry-run
 
 [bench/README.md](../README.md) lists the rounds and docs. [Adding a model](../docs/adding-a-model.md) walks through a new run.
 
-`import-aware.mjs` imports only subjects listed in `v4v5/subjects.json` and replaces local paths in published text. Set `UNPAINTING_PRIVATE_SUBJECTS` to a comma-separated list of additional names that must cause an import to fail. Keep that list outside the repository.

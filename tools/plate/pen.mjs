@@ -25,8 +25,6 @@ import {pathLength, straightness, meanContrast, insideShare, onShare, inkTierOve
 import {silhouette, traceOutlines} from '../../src/crop/outline.mjs';
 import {edgeChains} from '../../src/crop/contours.mjs';
 import {drawAs} from '../../src/crop/simplify.mjs';
-import {segmentInk} from '../../src/paint/methods/seg-ink.mjs';
-import {mlLines} from '../../src/paint/methods/ml-lines.mjs';
 import {selectedDrawing, drawingWant} from '../../src/paint/methods/drawing-file.mjs';
 import {planPenWash, describePlan, passageAmounts} from '../../src/paint/methods/pen-wash-plan.mjs';
 import {prunePenLines} from '../../src/paint/methods/pen-wash-lines.mjs';
@@ -192,18 +190,11 @@ const writeInkFilter = async (D) => {
 const INKTIERS = opt('inktiers', '0') !== '0';
 const INK_TIER_LOG = [];
 // Where the subject is, for the tiers alone: without --mask, the source's mask is read as a ranking priority, never a veto.
-// --segink: the subject is every foreground segment, and the lines between ground segments are tier-1 lines
-// (src/paint/methods/seg-ink.mjs)
-const SEG_LINES = [];
-// --ladderseg: the foreground segments, for the ladder (src/paint/methods/ladder-seg.mjs)
-ctx.SEG_FG = null;
 const TIER_MASK = await (async () => {
   if (!INKTIERS) return null;
   if (ctx.SUBJECT) { console.log('ink tiers: the subject comes from --mask'); return ctx.SUBJECT; }
   const image = opt('image', '');
   const base = image ? path.basename(image, path.extname(image)) : '';
-  const segInk = await segmentInk({ base, w, h, n, opt, num, log: console.log });
-  if (segInk) { ctx.SEG_FG = segInk.fg; SEG_LINES.push(...segInk.lines); return segInk.mask; }
   const file = base ? path.resolve(root, `work/masks/${base}.png`) : '';
   if (!file || !fs.existsSync(file)) { console.log(`ink tiers: no subject mask for ${base || 'this source'}; tier 1 is edges only and tier 2 is the whole sheet`); return null; }
   const { data } = await sharp(file).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer({ resolveWithObject: true });
@@ -213,9 +204,6 @@ const TIER_MASK = await (async () => {
   console.log(`ink tiers: subject from work/masks/${base}.png, ${(100 * subj / n).toFixed(1)}% of the sheet, for ranking only`);
   return m;
 })();
-// --mllines, --mllinesfile, --mlwant: tier 2 and 3 candidates from a learned line map instead of the ridge walker
-// (src/paint/methods/ml-lines.mjs)
-const ML_LINES = mlLines({ w, h, opt, num, log: console.log });
 const writeInkTiers = async (D) => {
   const rgb = inkTierOverlay(D, w, h, INK_TIER_LOG, { width: num('inktierswidth', 2) });
   await sharp(Buffer.from(rgb.buffer, rgb.byteOffset, rgb.length), { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'ink-tiers.png'));
@@ -306,7 +294,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     // Tier 1b: long near-straight runs through the ground, away from gated pen line (a horizon), let past --inkgate here only.
     const gated = dilate(SEP.ink, w, h, Math.round(num('inkgate', 7) * K));
     const longMin = num('tier1long', 0.10) * Math.min(w, h);
-    const stepC = [...SEG_LINES.filter(g => g.length >= longMin), ...edgeChains(DRAW_SOURCE, w, h, gaussian, { sigma: num('edgesigma', 1.5) * K, minLength: Math.round(num('edgemin', 20) * K), margin: num('silmargin', 0.04), step: stride, high: num('edgehigh', 0.85) })
+    const stepC = [...edgeChains(DRAW_SOURCE, w, h, gaussian, { sigma: num('edgesigma', 1.5) * K, minLength: Math.round(num('edgemin', 20) * K), margin: num('silmargin', 0.04), step: stride, high: num('edgehigh', 0.85) })
       .filter(g => pathLength(g.points) >= longMin
         && straightness(g.points) >= num('tier1straight', 0.85)
         && onShare(g.points, gated, w, h) < num('tier1gated', 0.5)
@@ -322,18 +310,13 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     // Tier 2: short paths inside the subject, ranked by how far they stand above their lighter flank, not by darkness.
     // A faint-scale walk restricted to the subject adds short candidates, since the main walk's gestures are mostly long.
     const featLen = num('featlen', 0.08) * Math.min(w, h);
-    // --mllines: the model's lines stand in for the walker's in both of the tiers the walker is bad at, split by the
-    // subject mask and ranked by strength times length (src/paint/methods/ml-lines.mjs)
-    const ml = ML_LINES ? ML_LINES.candidates(TIER_MASK) : null;
-    const featField = ml ? null : Float32Array.from(field, (v, i) => (TIER_MASK && TIER_MASK[i] < num('pendrawat', 0.5) ? 0 : v));
-    const fnz = ml ? [] : Array.from(featField).filter(v => v > 0).sort((p, q) => p - q);
+    const featField = Float32Array.from(field, (v, i) => (TIER_MASK && TIER_MASK[i] < num('pendrawat', 0.5) ? 0 : v));
+    const fnz = Array.from(featField).filter(v => v > 0).sort((p, q) => p - q);
     const featWalk = fnz.length
       ? planGestures(featField, w, h, { seed: 17 + ctx.SEED, floor: fnz[Math.floor(fnz.length * num('featfloorq', 0.35))], keep: num('keep', 400),
           claimRadius: 2 * K, reachShare: num('featrun', 0.05), turn: 1, carry: num('outlinecarry', 6) * K, scales: [0], tries: 3000 }).gestures
       : [];
-    const t2cand = ml
-      ? ml.t2
-      : [...gestures, ...featWalk]
+    const t2cand = [...gestures, ...featWalk]
         .filter(g => g.points.length >= 2 && (g.length ?? pathLength(g.points)) <= featLen
           && (!TIER_MASK || insideShare(g.points, TIER_MASK, w, h, num('pendrawat', 0.5)) >= num('featinside', 0.6)))
         .map(g => ({ from: g, contrast: meanContrast(DRAW_SOURCE, w, h, g.points, { reach: num('featreach', 4) * K }) }))
@@ -344,9 +327,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     const spentOn2 = new Set(t2.map(g => g.from));
     // --tier3: cap on the greedy walk's share of the budget. Default 1.
     const t3Cells = Math.min(CELLS * num('tier3', 1), Math.max(0, CELLS - cellsOf(t1) - cellsOf(t2) - FAINT_CELLS));
-    const t3cand = ml
-      ? ml.t3
-      : gestures.filter(g => !spentOn2.has(g)).map(g => ({ ...g, tier: 3 }));
+    const t3cand = gestures.filter(g => !spentOn2.has(g)).map(g => ({ ...g, tier: 3 }));
     const t3 = lineBudget(t3cand, t3Cells, { width: NIB });
     console.log(`ink tier 1 outline:  ${t1.length}/${maskC.length + stepC.length} paths, ${Math.round(cellsOf(t1))} of ${Math.round(t1Cells)} cells (mask boundary ${a.length + c.length} of ${maskC.length}, step edges ${b.length} of ${stepC.length})`);
     console.log(`ink tier 2 features: ${t2.length}/${t2cand.length} paths, ${Math.round(cellsOf(t2))} of ${Math.round(t2Cells)} cells${ml ? ', from the model\'s line map, any length' : `, at ${featLen.toFixed(0)} cells or shorter`}`);
@@ -593,5 +574,5 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
   PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, PENWASH, PENWASH_PLAN, penWashFlat, LOOK_AL, 
-  LOOK_PLAN, SOURCE_INK, TIER_MASK, ML_LINES });
+  LOOK_PLAN, SOURCE_INK, TIER_MASK });
 }

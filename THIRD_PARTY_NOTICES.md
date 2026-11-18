@@ -62,7 +62,6 @@ These projects and sources informed the code. No code from them is included.
 - Deegan et al., "Capillary flow as the cause of ring stains from dried liquid drops", Nature 1997 (`src/media/sheet.mjs`, `wash.mjs`).
 - Chu and Tai, "MoXi: Real-time ink dispersion in absorbent paper", SIGGRAPH 2005 (`src/media/sheet.mjs`).
 - Kim, Moon, Lee, Mahadevan and Kim, "Hydrodynamics of Writing with Ink", Physical Review Letters 2011 (`src/media/pen.mjs`).
-- Strassmann, "Hairy Brushes", SIGGRAPH 1986, and Baxter, Scheib, Lin and Manocha, "DAB", SIGGRAPH 2001 (`src/media/brush.mjs`, `src/media/gpu/web-brush.mjs`).
 - Sousa and Buchanan, "Observational models of graphite pencil materials", Computer Graphics Forum 2000 (`src/media/pencil.mjs`).
 - Chen et al., "Inverse Painting: Reconstructing the Painting Process", SIGGRAPH Asia 2024 (`src/paint/tuned/mass-plan.mjs`).
 - Kirillov et al., "Segment Anything", ICCV 2023 (`tools/seg/`).

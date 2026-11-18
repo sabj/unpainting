@@ -22,7 +22,6 @@ import {gpuStats} from '../../src/media/gpu/link.mjs';
 import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
 import {backendLine} from '../../src/media/gpu/backend-record.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
-import {deliveryByBand, deliveryNote} from '../../src/paint/methods/delivery-report.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
 import {penEndPosition, eraseFactor} from '../../src/paint/methods/pencil-stage.mjs';
 import {retimeRun, codeForImage, concatList, phaseAt, phaseShares, PHASES, labelFrames} from '../../src/paint/film-timeline.mjs';
@@ -46,7 +45,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   base, SHADE, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
   expected, sheetDensity, marks, drainFrames, mark, CAL, FRAMES, FULL_TAPE, MARKTAPE, RESUME_AT, shoot, 
   FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, FW_SUBJ, used, TECHS, LAST, DRAWING, 
-  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, PASSAGE_HOOK, BUDGET, awareProvenance, awareBoundary } = ctx;
+  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, BUDGET, awareProvenance, awareBoundary } = ctx;
 // a painting taken over at the closing boundary has had everything up to the closing drawing (AWARE_SKIP_POST)
 const removeFilm=()=>{const value=liftResist(ctx.sheet);ctx.NATIVE_CAPTURE?.('film-remove');return value;};
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
@@ -131,12 +130,6 @@ for (const f of judged.flags) console.log(`  ! ${f}`);
   const th = thickness(ctx.sheet), rows = [];
   for (let j = 0; j < PIGS.length; j++) { let planned = 0, got = 0; for (let i = 0; i < n; i++) planned += expected[i * PIGS.length + j]; for (let i = 0; i < N2; i++) got += th[j][i]; rows.push(`${j} ${(got / Math.max(1e-6, planned * SC * SC)).toFixed(2)}`); }
   console.log(`pigment delivered over planned: ${rows.join(', ')}`);
-  // --deliveryreport 1: the same ratio split by how much paint the ledger booked per cell (delivery-by-band.json)
-  if (num('deliveryreport', 0) > 0) {
-    const report = deliveryByBand({ expected, held: th, n, P: PIGS.length, SC, w, W2 });
-    console.log(deliveryNote(report));
-    fs.writeFileSync(path.join(out, 'delivery-by-band.json'), JSON.stringify({ kind: 'sheet over ledger by booked amount; no target reads', pigments: PIGS.map(p => p.name ?? null), ...report }, null, 1));
-  }
 }
 if (marks.length) {
   // covered: of the cells the plan washes, the share holding at least half of it by tone. Both sides through the same

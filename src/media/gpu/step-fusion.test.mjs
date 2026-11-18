@@ -4,7 +4,6 @@ import {createSheet, DEFAULTS} from '../sheet.mjs';
 import {makePaper} from '../paper.mjs';
 import {GpuSheet, openGpu, analyse, SRC} from './stepfull.mjs';
 import {FINISH_WET_SCAN} from './finish-wet-scan.mjs';
-import {SheetBatch} from './sheet-batch.mjs';
 
 const pigments=[{K:[.4,.2,.1],S:[.02,.02,.02],rho:.05,omega:1.4,gamma:.25},
   {K:[.1,.3,.5],S:[.03,.03,.03],rho:.3,omega:.9,gamma:.7}];
@@ -70,26 +69,5 @@ test('GPU fusion and tight frontier retain fields across boundaries, drying and 
       else assert.equal(counts[0],counts[1],'low capillary threshold must retain conservative halo');
       t.diagnostic(JSON.stringify({persistent,special,peak,tileSteps:counts}));
     }
-    // Two independent sheets exercise the shared tile queue and per-sheet halo offsets.
-    process.env.GPU_RESIDENT='1';process.env.GPU_PERSISTENT='1';
-    const batched=[];
-    for(const optimized of [false,true]) {
-      process.env.GPU_FUSE_FACES=optimized?'1':'0';process.env.GPU_FUSE_WETSCAN=optimized?'1':'0';process.env.GPU_SPARSE_TIGHT=optimized?'1':'0';
-      const sheets=[fixture(),fixture()];for(const a of fields(sheets[1]))a.reverse();
-      const core=await SheetBatch.create(device,2,sheets[0],DEFAULTS);
-      const views=[];
-      try {
-        for(let i=0;i<2;i++)views.push(await core.attach(i,sheets[i],DEFAULTS));
-        views.forEach(v=>v.step(40));await views[0].idle();
-        for(let i=0;i<2;i++)await views[i].download(sheets[i]);
-        batched.push(sheets.map(s=>fields(s).map(a=>a.slice())));
-      } finally {
-        views.forEach(v=>v.destroy());Object.values(core.b).forEach(b=>b.destroy());core.sel.destroy();core.arenaBuf?.destroy();
-      }
-    }
-    let batchPeak=0;
-    for(let s=0;s<2;s++)for(let p=0;p<batched[0][s].length;p++)for(let i=0;i<batched[0][s][p].length;i++)
-      batchPeak=Math.max(batchPeak,Math.abs(batched[0][s][p][i]-batched[1][s][p][i]));
-    assert(batchPeak<2e-6,`batched field error ${batchPeak}`);t.diagnostic(`batch max field error ${batchPeak}`);
   } finally {device?.destroy();keys.forEach((k,i)=>{if(saved[i]===undefined)delete process.env[k];else process.env[k]=saved[i];});}
 });
