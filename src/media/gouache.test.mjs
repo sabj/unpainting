@@ -34,3 +34,52 @@ test('opaque white hides a dark wash it lies on', () => {
   assert.deepEqual([...out.subarray(3)], [40, 30, 20], 'the cell with no white is as it was');
   assert.deepEqual([...rgb], [40, 30, 20, 40, 30, 20], 'the painting given is not changed');
 });
+
+// --- rigger gouache in the sheet's physics ---------------------------------------------------------------------
+import { renderLayers } from './km.mjs';
+import { GOUACHE_PIGMENT, GOUACHE_FILM, HIDING, gouacheTint, riggerPoints } from './gouache.mjs';
+
+const COAT = { K: [1.6, 1.5, 1.2], S: [0.02, 0.02, 0.02] };            // a dark coat glaze
+const OCHRE = { K: [0.35, 0.8, 2.2], S: [0.02, 0.02, 0.02] };          // a warm earth
+const PAPER = [252, 251, 248];
+const paperOf = n => Uint8Array.from({ length: n * 3 }, (_, i) => PAPER[i % 3]);
+
+test('a loaded stroke of gouache hides a dark coat, because it is thick: Kubelka-Munk, not a composite', () => {
+  const dark = new Float32Array([1.5, 0]), white = new Float32Array([GOUACHE_FILM, GOUACHE_FILM]);
+  const rgb = renderLayers([[dark, new Float32Array(2)], [new Float32Array(2), white]], [COAT, GOUACHE_PIGMENT], paperOf(2), 2, 1);
+  assert.ok(rgb[0] > 215 && rgb[1] > 215 && rgb[2] > 210, `over the coat it reads white: ${rgb[0]}/${rgb[1]}/${rgb[2]}`);
+  assert.ok(rgb[3] > 225, `over bare paper it is white too: ${rgb[3]}`);
+  const bare = renderLayers([[dark, new Float32Array(2)]], [COAT, GOUACHE_PIGMENT], paperOf(2), 2, 1);
+  assert.ok(bare[0] < 60, `the coat alone is dark: ${bare[0]}`);
+});
+
+test('a thin film hides less: the stroke thins with pressure and at its tip', () => {
+  const read = x => renderLayers([[new Float32Array([1.5]), new Float32Array(1)], [new Float32Array(1), new Float32Array([x])]], [COAT, GOUACHE_PIGMENT], paperOf(1), 1, 1)[0];
+  const full = read(GOUACHE_FILM), half = read(GOUACHE_FILM / 2), tenth = read(GOUACHE_FILM / 10);
+  assert.ok(full > half && half > tenth, `${full} > ${half} > ${tenth}`);
+  assert.ok(Math.abs(HIDING - GOUACHE_PIGMENT.S[0] * GOUACHE_FILM) < 1e-9, 'the film is the hiding thickness');
+});
+
+test('a light near paper white takes pure white; a warm light takes a little of the warm paint that gives its colour', () => {
+  assert.deepEqual(gouacheTint([250, 249, 246], PAPER, [COAT, OCHRE]), { pigment: null, amount: 0, residual: 0 });
+  const t = gouacheTint([236, 214, 160], PAPER, [COAT, OCHRE]);
+  assert.equal(t.pigment, 1, 'ochre, not the dark coat paint');
+  assert.ok(t.amount > 0 && t.amount < 1, `a little: ${t.amount}`);
+  // laid as the film and the tint in one layer, it reads that colour
+  const rgb = renderLayers([[new Float32Array([1.5]), new Float32Array(1), new Float32Array(1)], [new Float32Array(1), new Float32Array([t.amount]), new Float32Array([GOUACHE_FILM])]], [COAT, OCHRE, GOUACHE_PIGMENT], paperOf(1), 1, 1);
+  assert.ok(Math.abs(rgb[0] - 236) < 30 && Math.abs(rgb[1] - 214) < 25 && Math.abs(rgb[2] - 160) < 20 && rgb[2] < rgb[0] - 30, `tinted white reads ${rgb[0]}/${rgb[1]}/${rgb[2]}`);
+});
+
+test('a light is never taken darker than the floor, so a stroke stays lighter than the coat it lies on', () => {
+  const t = gouacheTint([60, 50, 40], PAPER, [COAT, OCHRE], { floor: 0.6 });
+  const R = gouacheTint([60, 50, 40], PAPER, [COAT, OCHRE], { floor: 0.9 });
+  assert.ok(R.amount < t.amount + 1e-9, 'a higher floor asks for less tint');
+});
+
+test('a rigger stroke is pressed at the root and lifts to the tip', () => {
+  const pts = riggerPoints(Array.from({ length: 20 }, (_, i) => [i, 0]), { widthCells: 2, scale: 2 });
+  assert.equal(pts[0].x, 0); assert.equal(pts[19].x, 38);
+  assert.ok(pts[2].nw > pts[19].nw, 'wider near the root than at the tip');
+  assert.ok(pts[0].nw < pts[3].nw, 'it enters the paper, it does not start at full width');
+  assert.ok(pts.every(p => p.nw >= 0.5 && p.s > 0 && p.s <= 1));
+});

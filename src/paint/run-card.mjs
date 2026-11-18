@@ -33,6 +33,7 @@ function buildRunCard({
   dimensions = null,
   palette = null,
   phases = [],
+  gouache = null,
   seconds = 0,
   exitCode = 0,
 } = {}) {
@@ -100,6 +101,8 @@ function buildRunCard({
     // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)
     palette,
     phases,
+    // the final lights: the rule, what the planning data gave, and what was laid (tools/plate/gouache-plan.mjs)
+    gouache,
     continuedChecks: continuedSummary(),
   };
 }
