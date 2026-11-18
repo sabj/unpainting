@@ -20,11 +20,19 @@ test('a plan that names an ink style asks for ink and the source is not measured
   assert.equal(r.decision.evidence.penSharePct, null);
 }));
 
-test('no plan and no ink request: nothing changes and the source is not measured', withDir(async dir => {
-  const argv = ['--image', 'x.png', '--outlinemedium', 'graphite'];
+test('no plan and no ink request: a graphite subject, the source is not measured, and no ink option can reach the washes', withDir(async dir => {
+  const argv = ['--recipe', 'none', '--image', 'x.png', '--outlinemedium', 'graphite', '--washinkfree', '1', '--drawing', 'both', '--drawinglast', 'c'];
   const r = await mediumForRun({ argv, root: dir, penShareOf: never });
-  assert.deepEqual(r.argv, argv);
-  assert.deepEqual([r.decision.medium, r.decision.basis], ['pencil', 'default']);
+  assert.deepEqual([r.decision.medium, r.decision.basis, r.decision.vetoed], ['pencil', 'default', false]);
+  const f = flags(expandRecipe({ argv: r.argv, root: dir }).argv);
+  assert.equal(f.get('--outlinemedium'), 'graphite');
+  for (const k of ['--washinkfree', '--drawinglast']) assert.ok(!f.has(k), k);
+  assert.equal(f.get('--drawing'), 'first');
+}));
+
+test('a plain graphite run with no ink option is not changed beyond the subject medium', withDir(async dir => {
+  const r = await mediumForRun({ argv: ['--image', 'x.png'], root: dir, penShareOf: never });
+  assert.deepEqual(r.argv, ['--image', 'x.png', '--subjectmedium', 'pencil']);
 }));
 
 test('an ink request on a source with little pen line becomes the graphite drawing, with no ink-only option left', withDir(async dir => {

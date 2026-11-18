@@ -104,7 +104,7 @@ test('the decision lists its evidence for the run card', () => {
 test('which flags ask for ink', () => {
   assert.deepEqual(inkRequestedBy(['--outlinemedium', 'auto']), ['--outlinemedium auto']);
   assert.deepEqual(inkRequestedBy(['--stages', 'prep,finishink']), ['--stages finishink']);
-  assert.deepEqual(inkRequestedBy(['--drawinglast', 'x']), ['--drawinglast']);
+  assert.deepEqual(inkRequestedBy(['--drawinglast', 'x']), [], 'a closing file is graphite unless the outline medium says ink');
   assert.deepEqual(inkRequestedBy(['--outlinemedium', 'graphite', '--drawing', 'first']), []);
   assert.deepEqual(inkRequestedBy(['--outlinemedium', 'none']), []);
 });

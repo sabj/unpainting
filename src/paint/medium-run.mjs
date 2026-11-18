@@ -25,10 +25,11 @@ export async function mediumForRun({ argv, root, penShareOf, log = () => {} }) {
   }
   const decision = decideMedium({ argv, plan, penSharePct, penFirstPct });
   log(decision.note);
-  if (decision.vetoed) {
-    // graphite stays as the drawing unless the plan declares no drawing at all; the pen-only options go with the subject medium
-    const base = planDeclaration(plan).medium === 'none' ? argv : argvWithoutInk(argv);
-    return { argv: [...base, '--subjectmedium', 'pencil'], decision };
+  if (decision.subjectMedium) {
+    // a graphite subject: an ink request becomes the graphite drawing (unless the plan declares no drawing at all), and the
+    // pen-only options, closing file and wash-side ink options go with the subject medium (subject-medium.mjs)
+    const base = decision.vetoed && planDeclaration(plan).medium !== 'none' ? argvWithoutInk(argv) : argv;
+    return { argv: [...base, '--subjectmedium', decision.subjectMedium], decision };
   }
   return { argv: [...argv, ...decision.addArgs], decision };
 }

@@ -3,7 +3,7 @@
 //   2. A plan that declares a medium wins: drawing.medium, or a style selection of ink-and-wash or urban-sketch (global or
 //      on one region). Free-text reasons are never read.
 //   3. With no declaration the painter lays graphite and no ink. An ink request on the command line (--outlinemedium
-//      ink or auto, --inkrecipe wash, an ink stage, --drawinglast) is honoured only when the source shows pen line at
+//      ink or auto, --inkrecipe wash, an ink stage) is honoured only when the source shows pen line at
 //      --penfirst per cent or more; below that it is removed, and the washes are not touched by ink flags (subject-medium.mjs).
 // The pen share is evidence for that veto. It never switches ink on.
 import { subjectMediumOf } from './../subject-medium.mjs';
@@ -46,7 +46,6 @@ export function inkRequestedBy(argv) {
   if (last(argv, '--inkrecipe') === 'wash') out.push('--inkrecipe wash');
   const stages = String(last(argv, '--stages') ?? '').split(',').map(s => s.trim().toLowerCase()).filter(s => INK_STAGE_WORDS.includes(s));
   for (const s of stages) out.push(`--stages ${s}`);
-  if (argv.includes('--drawinglast')) out.push('--drawinglast');
   return out;
 }
 
@@ -54,8 +53,9 @@ export function inkRequestedBy(argv) {
  * @param {{ argv: string[], plan: object|null, penSharePct: number|null, penFirstPct: number }} input penSharePct is the
  *   source's pen-line share in per cent (pen-share.mjs); it is read only when an ink request has no plan declaration.
  * @returns {{ medium: 'pen'|'pencil', basis: 'flag'|'plan'|'source'|'default', vetoed: boolean, addArgs: string[],
- *   subjectMedium: string|null, evidence: object, note: string }} subjectMedium is what to hand to expandRecipe when
- *   ink is removed; addArgs are the flags a declared style adds.
+ *   subjectMedium: string|null, evidence: object, note: string }} subjectMedium is what to hand to expandRecipe for a
+ *   graphite subject, so no ink option or closing file survives and no ink flag can reach the washes; addArgs are the flags
+ *   a declared style adds.
  */
 export function decideMedium({ argv, plan, penSharePct = null, penFirstPct }) {
   const declared = planDeclaration(plan), requested = inkRequestedBy(argv), flag = subjectMediumOf(argv);
@@ -63,7 +63,7 @@ export function decideMedium({ argv, plan, penSharePct = null, penFirstPct }) {
     planDeclared: declared.medium ? `${declared.medium} (${declared.by})` : null, planStyles: declared.styles,
     inkRequestedBy: requested, penSharePct: Number.isFinite(penSharePct) ? penSharePct : null, penFirstPct,
   };
-  const out = (medium, basis, { vetoed = false, addArgs = [], note }) => ({ medium, basis, vetoed, addArgs, subjectMedium: vetoed ? 'pencil' : null, evidence, note: `medium ${medium}: ${note}` });
+  const out = (medium, basis, { vetoed = false, addArgs = [], note }) => ({ medium, basis, vetoed, addArgs, subjectMedium: medium === 'pencil' && basis !== 'flag' ? 'pencil' : null, evidence, note: `medium ${medium}: ${note}` });
   if (flag) return out(flag === 'pen' ? 'pen' : 'pencil', 'flag', { note: `--subjectmedium ${flag} given on the command line` });
   if (declared.medium === 'ink') {
     const addArgs = declared.by === 'style' && !argv.includes('--outlinemedium') ? ['--outlinemedium', 'ink'] : [];

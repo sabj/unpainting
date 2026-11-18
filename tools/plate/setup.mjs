@@ -41,6 +41,7 @@ import {planUniversalLinework} from '../../src/paint/methods/linework-stage.mjs'
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
+import {inkHoldArgs} from '../../src/paint/methods/ink-hold-defaults.mjs';
 import {mediumForRun} from '../../src/paint/medium-run.mjs';
 import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
@@ -195,6 +196,8 @@ if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: was
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
 // checked again: an ink recipe may switch on the region-label ink decision, which an area plan's drawing roles replace
 refuseAreaOwned(argv);
+// an ink drawing is held to the target and decided by meaning whatever made its lines (src/paint/methods/ink-hold-defaults.mjs)
+argv.push(...inkHoldArgs(argv));
 // Legacy extraction flags remain CLI aliases; the plan has one source choice.
 if (!argv0.includes('--linesource')) {
   if (num('copylines',0)>0) argv.push('--linesource','source-ink');

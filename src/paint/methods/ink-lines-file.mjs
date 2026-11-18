@@ -79,10 +79,11 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // --inkres N, N times as fine), so the support test's one to two pixels beside a line are as wide as the pen line it will draw
   let doc = flags.lineMeasure > 0 && gridW > 0 && doc0.image.w > 1.25 * gridW ? onGrid(doc0, gridW) : doc0;
   const im = doc.image, L = await lPlane(image, im.w, im.h), pxMm = sheetMm / im.w;
-  // --inkdecide 1: a lineart map's candidate lines are drawn only where the ink rule of the ground under them allows it and
-  // the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made from decided lines is not decided again.
+  // --inkdecide 1: a candidate line, from the lineart map or authored by the plan, is drawn whole only where the ink rule of the
+  // ground under it allows it and the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made
+  // from decided lines is not decided again.
   let decided = doc.inkDecided === true;
-  if (decide && MODEL_KINDS.includes(doc0.inputKind) && !decided) {
+  if (decide && !decided) {
     const r = await decideFile({ doc, L, image, out, stage, pxMm, ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
     doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
   }
