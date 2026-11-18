@@ -41,6 +41,8 @@ import {planUniversalLinework} from '../../src/paint/methods/linework-stage.mjs'
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
+import {mediumForRun} from '../../src/paint/medium-run.mjs';
+import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
 import {drawingStageIntent} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {bindLineTarget} from '../../src/crop/lines.mjs';
@@ -65,7 +67,10 @@ process.env.GPU_ASYNC_DRY ??= '1';
 const argv0 = process.argv.slice(2);
 if(await runSpeedSequence(argv0,ENTRY_FILE))process.exit(0);
 // --recipe: a named preset of flags put in front of the command line (src/paint/recipe.mjs)
-const { argv, note: RECIPE_NOTE, pipeline: PIPELINE, subjectMedium: SUBJECT_MEDIUM } = expandRecipe({ argv: argv0, root: path.dirname(path.dirname(ENTRY_FILE)) });
+// the drawing medium: the plan's declaration, else graphite; the source's pen share only vetoes an ink request (src/paint/medium-run.mjs)
+const REPO_ROOT = path.dirname(path.dirname(ENTRY_FILE));
+const { argv: argvMedium, decision: MEDIUM_DECISION } = await mediumForRun({ argv: argv0, root: REPO_ROOT, penShareOf: image => sourcePenShare({ image, sharp }), log: console.log });
+const { argv, note: RECIPE_NOTE, pipeline: PIPELINE, subjectMedium: SUBJECT_MEDIUM } = expandRecipe({ argv: argvMedium, root: REPO_ROOT });
 // an option the painter no longer has stops the run with its reason (src/paint/removed-options.mjs)
 refuseRemoved(argv);
 // with an area plan, order and wet sessions are the plan's: an order or session option stops the run (src/paint/area-owned-options.mjs)
@@ -386,7 +391,7 @@ const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [ENTRY_FILE]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
-Object.assign(ctx, { SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
+Object.assign(ctx, { MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_VALUE_ONLY, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 

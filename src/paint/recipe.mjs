@@ -47,7 +47,7 @@ export function styleAlias(argv) {
 }
 
 // The value plan the command line names, or null when there is none.
-function readPlan(argv, root) {
+export function readPlan(argv, root) {
   const at = argv.lastIndexOf('--valueplan');
   if (at < 0 || !argv[at + 1]) return null;
   try {

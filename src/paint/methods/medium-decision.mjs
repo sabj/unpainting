@@ -80,3 +80,25 @@ export function decideMedium({ argv, plan, penSharePct = null, penFirstPct }) {
     ? `no plan declares a medium; ${requested.join(', ')} asks for ink and the ${share} is at least ${penFirstPct}%`
     : `no plan declares a medium; ${requested.join(', ')} asks for ink but the ${share} is under ${penFirstPct}%, so ink is removed and the drawing is graphite` });
 }
+
+/**
+ * The command line with its ink requests turned into the graphite drawing: the outline medium becomes graphite, the wash
+ * recipe, the ink stages and the closing file go. Pen-only options such as --washinkfree go with --subjectmedium pencil
+ * (subject-medium.mjs).
+ */
+export function argvWithoutInk(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length;) {
+    const key = argv[i++], value = i < argv.length && !argv[i].startsWith('--') ? argv[i++] : undefined;
+    if (key === '--outlinemedium' && value !== undefined && value !== 'none' && !isGraphite(value)) { out.push(key, 'graphite'); continue; }
+    if (key === '--inkrecipe' && value === 'wash') continue;
+    if (key === '--drawinglast') continue;
+    if (key === '--stages' && value !== undefined) {
+      const keep = value.split(',').filter(s => !INK_STAGE_WORDS.includes(s.trim().toLowerCase()));
+      if (keep.length) out.push(key, keep.join(','));
+      continue;
+    }
+    out.push(key, ...(value === undefined ? [] : [value]));
+  }
+  return out;
+}
