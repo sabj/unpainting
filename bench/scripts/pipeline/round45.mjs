@@ -297,7 +297,7 @@ export async function collect({ crop, spec, raw, rawTry, ws, session, record, ou
         requireSegments: spec.segments !== 'off',
         requireStages: true,
         requireDistinctStages: true,
-        minWidth: spec.width || 540,
+        width: spec.width,
       });
       if (spec.noTargetLooks) {
         const guardFile = path.join(p.out, 'target-guard.json');

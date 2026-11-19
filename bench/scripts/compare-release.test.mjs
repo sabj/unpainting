@@ -53,10 +53,11 @@ test('readImageSize reads png, jpeg and webp headers', async () => {
 });
 
 // ---------- gates
-const base = () => ({ release: '0.3.2', commit: COMMIT, exit: 0, backend: 'gpu', fallback: false, argsGpuOff: false, sourceWidth: 300, paintWidth: 1200, cleanTree: true, targetSHA256: null, framesListed: 4, framesFound: 4 });
+// a plate at source scale: a 300 px target painted 300 cells wide
+const base = () => ({ release: '0.3.2', commit: COMMIT, exit: 0, backend: 'gpu', fallback: false, argsGpuOff: false, sourceWidth: 300, paintWidth: 300, cleanTree: true, targetSHA256: null, framesListed: 4, framesFound: 4 });
 const codes = l => l.map(x => x.code);
 
-test('gate: matching commit prefix and a supported 300px source are admitted', () => {
+test('gate: matching commit prefix and a 300px source painted at its own width are admitted', () => {
   const g = gatePlate(base(), { expectedCommit: '6c6faa6' });
   assert.equal(g.admitted, true);
   assert.deepEqual(codes(g.refused), []);
@@ -81,15 +82,26 @@ test('gate: CPU backend, fallback and --gpu off are all refused', () => {
     assert.ok(codes(g.refused).includes('cpu'), JSON.stringify(patch));
   }
 });
-test('gate: render narrower than 540 px is refused; strict also refuses low-res sources', () => {
-  assert.ok(codes(gatePlate({ ...base(), paintWidth: 300 }, { expectedCommit: '6c6faa6' }).refused).includes('low-res-render'));
-  assert.ok(codes(gatePlate({ ...base(), sourceWidth: 299 }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('low-res-source'));
+test('gate: a plate painted from an enlarged source is marked and strict refuses it; there is no least width', () => {
+  // the benchmark's old size: a 300 px target painted 1200 cells wide
+  const old = gatePlate({ ...base(), paintWidth: 1200 }, { expectedCommit: '6c6faa6' });
+  assert.equal(old.admitted, true);
+  assert.deepEqual(codes(old.marks), ['enlarged-source']);
+  assert.match(old.marks[0].text, /a 300 px target painted 1200 cells wide, 4 cells for each source pixel; plates are compared at source scale/);
+  assert.ok(codes(gatePlate({ ...base(), paintWidth: 1200 }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('enlarged-source'));
+  assert.ok(codes(gatePlate({ ...base(), paintWidth: 301 }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('enlarged-source'), 'one cell over is over');
+  // source scale passes strict whatever the size: a thumbnail at its own width, a large original painted smaller
   assert.equal(gatePlate(base(), { expectedCommit: '6c6faa6', strict: true }).admitted, true);
-  assert.equal(gatePlate({ ...base(), sourceWidth: 1600 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  assert.equal(gatePlate({ ...base(), sourceWidth: 120, paintWidth: 120 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  assert.equal(gatePlate({ ...base(), sourceWidth: 1600, paintWidth: 1200 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  // the pens' fine sheet (--inkres) widens the output, not the sheet
+  assert.equal(gatePlate({ ...base(), paintWidth: 1200, sheetWidth: 300 }, { expectedCommit: '6c6faa6', strict: true }).admitted, true);
+  assert.ok(codes(gatePlate({ ...base(), paintWidth: null }, { expectedCommit: '6c6faa6' }).refused).includes('render-unknown'));
 });
-test('gate: unknown source width is marked, not silently passed', () => {
+test('gate: unknown source width is marked, not silently passed, and strict refuses it', () => {
   const g = gatePlate({ ...base(), sourceWidth: null }, { expectedCommit: '6c6faa6' });
   assert.ok(codes(g.marks).includes('source-unknown'));
+  assert.ok(codes(gatePlate({ ...base(), sourceWidth: null }, { expectedCommit: '6c6faa6', strict: true }).refused).includes('source-unknown'));
 });
 test('gate: wrong target hash is refused; dirty tree and missing frames are marked', () => {
   const g = gatePlate({ ...base(), targetSHA256: 'aa', cleanTree: false, framesFound: 2 }, { expectedCommit: '6c6faa6', targetSha256: 'bb' });
@@ -354,13 +366,14 @@ test('improved data names files and commits that exist in this checkout', async 
 });
 
 
-test('every benchmark target including Yale 300px sources is accepted with a full-size painting', async () => {
+test('every benchmark target including Yale 300px sources is accepted painted at its subject width, and marked when enlarged', async () => {
   const targets = new URL('../v2/targets/', import.meta.url);
   const specs = JSON.parse(fs.readFileSync(new URL('../v4v5/subjects.json', import.meta.url))).subjects;
   for (const file of fs.readdirSync(targets).filter(f => /\.(png|jpe?g|webp)$/.test(f))) {
     const { width } = await sharp(fs.readFileSync(new URL(file, targets))).metadata();
     const subject = file.replace(/\.[^.]+$/, '');
     assert.equal(gatePlate({ ...base(), subject, paintWidth: specs[subject].width, sourceWidth: width }, { expectedCommit: COMMIT, strict: true }).admitted, true, file);
+    assert.deepEqual(codes(gatePlate({ ...base(), subject, paintWidth: 4 * width, sourceWidth: width }, { expectedCommit: COMMIT }).marks), ['enlarged-source'], file);
   }
 });
 
@@ -368,15 +381,19 @@ test('actual painting dimensions gate proof and lossless PNG wins over a JPEG si
   const root = tmp(); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const dir = await makePlate(path.join(root, 'argon1-mittens'));
   fs.writeFileSync(path.join(dir, 'painting.jpg'), await jpg(300, 259));
-  const rejected = gatePlate(parsePlateDir(dir), { expectedCommit: COMMIT, strict: true });
-  assert.ok(codes(rejected.refused).includes('low-res-image'), '1200px metadata cannot legitimize a 300px preview');
+  const rejected = gatePlate(parsePlateDir(dir), { expectedCommit: COMMIT });
+  assert.ok(codes(rejected.refused).includes('render-size-mismatch'), '1200px metadata cannot legitimize a 300px preview');
   fs.writeFileSync(path.join(dir, 'painting.png'), await png(1200, 1036));
   const plate = parsePlateDir(dir);
   assert.equal(plate.painting, path.join(dir, 'painting.png'));
   assert.equal(plate.imageWidth, 1200);
-  assert.equal(gatePlate(plate, { expectedCommit: COMMIT, strict: true }).admitted, true);
+  // the fixture is a plate of the old size, 1200 px from a 300 px target: shown with its mark, refused under strict
+  const shown = gatePlate(plate, { expectedCommit: COMMIT });
+  assert.equal(shown.admitted, true);
+  assert.deepEqual(codes(shown.marks), ['enlarged-source']);
+  assert.deepEqual(codes(gatePlate(plate, { expectedCommit: COMMIT, strict: true }).refused), ['enlarged-source']);
   fs.unlinkSync(path.join(dir, 'painting.png')); fs.unlinkSync(path.join(dir, 'painting.jpg'));
-  assert.ok(codes(gatePlate(parsePlateDir(dir), { expectedCommit: COMMIT }).refused).includes('low-res-image'));
+  assert.ok(codes(gatePlate(parsePlateDir(dir), { expectedCommit: COMMIT }).refused).includes('painting-missing'));
 });
 
 const pageData = file => JSON.parse(/<script type="application\/json" id="cmp-data">([\s\S]*?)<\/script>/.exec(fs.readFileSync(file, 'utf8'))[1]);
@@ -395,7 +412,8 @@ test('default delivery preserves native PNG, JPEG frames, targets, prior images 
   manifest.frames[0] = {...manifest.frames[0], stage:'wash',step:'band 1 dry',valueBand:1,dried:true};
   fs.writeFileSync(manifestFile, JSON.stringify(manifest));
   const out = path.join(w.root, 'native.html');
-  await generate({ runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'},targetsDir:w.targets,strict:true });
+  // the fixture plates are of the old size, enlarged from 300 px targets: shown marked, and refused only under --strict
+  await generate({ runs:w.runs,plateRoots:[w.ab],out,expected:{'0.3.2':COMMIT,'0.1.1':'70ceb7c'},targetsDir:w.targets });
   const row = pageData(out).rows.find(r => r.model === 'argon');
   assert.deepEqual(uriBytes(row.plate.final), final);
   assert.deepEqual(readImageSize(uriBytes(row.plate.final)), {w:1600,h:1380});
@@ -431,9 +449,9 @@ test('native is the default and invalid preview widths fail loudly', async () =>
 });
 
 
-test('full benchmark width and both recorded image dimensions are required', async t => {
-  assert.ok(codes(gatePlate({...base(), subject:'h36a',paintWidth:1200},{expectedCommit:COMMIT}).refused).includes('low-res-render'));
-  assert.equal(gatePlate({...base(),subject:'h36a',paintWidth:1224},{expectedCommit:COMMIT,strict:true}).admitted,true);
+test('a plate at its subject width passes strict, and both recorded image dimensions are required', async t => {
+  assert.ok(codes(gatePlate({...base(), subject:'h36a',paintWidth:1224},{expectedCommit:COMMIT,strict:true}).refused).includes('enlarged-source'));
+  assert.equal(gatePlate({...base(),subject:'h36a',paintWidth:300},{expectedCommit:COMMIT,strict:true}).admitted,true);
   const root=tmp(); t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const dir=await makePlate(path.join(root,'argon1-mittens'));
   for(const [w,h] of [[600,518],[1200,1000]]) {
@@ -548,7 +566,7 @@ test('only a recorded successful integer exit qualifies, including actual parsed
   const dir=await makePlate(path.join(root,'argon1-mittens'),{exit:3});
   const parsed=parsePlateDir(dir);
   assert.equal(parsed.exit,3);
-  assert.equal(gatePlate(parsed,{expectedCommit:COMMIT,strict:true}).admitted,false);
+  assert.deepEqual(codes(gatePlate(parsed,{expectedCommit:COMMIT}).refused),['run-failed']);
   const scanned=scanPlates([root],{expected:{'0.3.2':COMMIT}});
   assert.equal(scanned.length,1);
   assert.ok(scanned[0].gate.refused.some(r=>r.code==='run-failed'));

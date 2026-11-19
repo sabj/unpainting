@@ -3,13 +3,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-// Benchmark target crops include 300px Yale sources; painting resolution is gated separately.
-export const MIN_SOURCE_WIDTH = 300;
-export const MIN_RENDER_WIDTH = 540;
+// Source scale: a plate is painted no wider in cells than its source is in pixels, and plates are compared at that
+// scale. There is no least width for a source or a render: a 300 px target painted 300 cells wide is a whole plate
+// of that target. The painter enforces the same rule before it paints (tools/plate/source-scale.mjs).
+const MAX_SOURCE_SCALE = 1;
 const SUBJECT_ALIASES = { france: 'south-france', sf: 'south-france' };
 
 const readJsonIf = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
-const SUBJECTS = JSON.parse(fs.readFileSync(new URL('../v4v5/subjects.json', import.meta.url), 'utf8')).subjects;
 
 /** Width and height from a PNG, JPEG or WebP header, or null. */
 export function readImageSize(b) {
@@ -103,6 +103,8 @@ export function parsePlateDir(dir) {
     gpu: gpuName(card, backendDoc),
     sam: samName(card.segments),
     paintWidth: dims?.paintWidth ?? framesDoc.width ?? null,
+    // the sheet's cells across; a card from before it was recorded has only the output's width, which --inkres widens
+    sheetWidth: dims?.sheetWidth ?? null,
     paintHeight: dims?.paintHeight ?? framesDoc.height ?? null,
     sourceWidth: dims?.sourceWidth ?? (imageArg ? sizeOfFile(imageArg)?.w ?? null : null),
     seconds: card.seconds ?? null,
@@ -123,9 +125,10 @@ const commitMatches = (got, want) => Boolean(got && want && want.length >= 7 && 
 
 /**
  * Refusals stop a plate being compared at all. Marks stay visible on a plate that is shown.
- * strict turns a low-resolution source into a refusal.
+ * A plate painted from an enlarged source, or one whose source width is not recorded, is marked; strict refuses it.
+ * The plates painted before the rule (1200 px from 300 px targets) are all enlarged, so they are shown marked.
  */
-export function gatePlate(p, { expectedCommit = null, minSourceWidth = MIN_SOURCE_WIDTH, minRenderWidth = MIN_RENDER_WIDTH, strict = false, targetSha256 = null } = {}) {
+export function gatePlate(p, { expectedCommit = null, maxSourceScale = MAX_SOURCE_SCALE, strict = false, targetSha256 = null } = {}) {
   const refused = [], marks = [];
   const R = (code, text) => refused.push({ code, text });
   const M = (code, text) => marks.push({ code, text });
@@ -134,18 +137,16 @@ export function gatePlate(p, { expectedCommit = null, minSourceWidth = MIN_SOURC
   else if (!commitMatches(p.commit, expectedCommit)) R('commit-mismatch', `run card commit ${p.commit.slice(0, 7)} differs from the labelled ${p.release} commit ${expectedCommit.slice(0, 7)}`);
   if (p.backend !== 'gpu' || p.fallback || p.argsGpuOff) R('cpu', `CPU or fallback run (backend ${p.backend ?? 'unknown'}, fallback ${p.fallback}, --gpu off ${p.argsGpuOff})`);
   if (!Number.isInteger(p.exit) || p.exit !== 0) R('run-failed', `run exit ${p.exit ?? 'missing'} is not a recorded successful integer exit 0`);
-  const requiredWidth = Math.max(minRenderWidth, SUBJECTS[p.subject]?.width ?? 0);
-  if (!(p.paintWidth >= requiredWidth)) R('low-res-render', `rendered ${p.paintWidth ?? 'unknown'} px wide, under the ${requiredWidth} px requirement`);
+  if (!(p.paintWidth > 0)) R('render-unknown', 'no painting width is recorded');
   if ('painting' in p) {
-    if (!p.painting || !(p.imageWidth >= requiredWidth)) R('low-res-image', `painting file is ${p.imageWidth ?? 'missing or unreadable'} px wide, under the ${requiredWidth} px requirement`);
-    if (p.painting && (p.imageWidth !== p.paintWidth || (p.paintHeight != null && p.imageHeight !== p.paintHeight))) R('render-size-mismatch', `painting file ${p.imageWidth}x${p.imageHeight} differs from recorded ${p.paintWidth}x${p.paintHeight ?? '?'}`);
+    if (!p.painting || !(p.imageWidth > 0)) R('painting-missing', 'painting file is missing or unreadable');
+    else if (p.imageWidth !== p.paintWidth || (p.paintHeight != null && p.imageHeight !== p.paintHeight)) R('render-size-mismatch', `painting file ${p.imageWidth}x${p.imageHeight} differs from recorded ${p.paintWidth}x${p.paintHeight ?? '?'}`);
   }
   if (targetSha256 && p.targetSHA256 && targetSha256 !== p.targetSHA256) R('target-mismatch', 'painted from a different target file than the comparison target');
-  if (p.sourceWidth == null) M('source-unknown', 'source target width is not recorded');
-  else if (p.sourceWidth < minSourceWidth) {
-    const text = `low-resolution source: ${p.sourceWidth} px target enlarged to ${p.paintWidth ?? '?'} px`;
-    if (strict) R('low-res-source', text); else M('low-res-source', text);
-  }
+  const scaled = (code, text) => (strict ? R(code, text) : M(code, text));
+  const sheetWidth = p.sheetWidth ?? p.paintWidth;
+  if (p.sourceWidth == null) scaled('source-unknown', 'source target width is not recorded, so the plate cannot be shown to be painted at source scale');
+  else if (sheetWidth > p.sourceWidth * maxSourceScale) scaled('enlarged-source', `enlarged source: a ${p.sourceWidth} px target painted ${sheetWidth} cells wide, ${+(sheetWidth / p.sourceWidth).toFixed(2)} cells for each source pixel; plates are compared at source scale`);
   if (p.cleanTree === false) M('dirty-tree', 'the code tree was dirty when this plate was painted');
   if (p.framesListed > 0 && p.framesFound < p.framesListed) M('frames-missing', `playback incomplete: ${p.framesFound} of ${p.framesListed} frame files exist`);
   if (p.framesListed === 0) M('frames-missing', 'no playback frames recorded');
@@ -163,7 +164,7 @@ function* walk(dir, depth = 0) {
 }
 
 /** Plates of every labelled release under the roots, gated, with duplicates folded (an admitted copy wins). */
-export function scanPlates(roots, { relabel = {}, expected = {}, strict = false, minSourceWidth = MIN_SOURCE_WIDTH, targetOf = () => null } = {}) {
+export function scanPlates(roots, { relabel = {}, expected = {}, strict = false, targetOf = () => null } = {}) {
   const byKey = new Map();
   for (const root of roots) {
     for (const dir of walk(root)) {
@@ -174,7 +175,7 @@ export function scanPlates(roots, { relabel = {}, expected = {}, strict = false,
       const target = targetOf(p.subject);
       // The card's own width wins. Without one, the comparison target's width counts only when the card's target hash matches it.
       if (p.sourceWidth == null && target?.width && p.targetSHA256 && p.targetSHA256 === target.sha) { p.sourceWidth = target.width; }
-      p.gate = gatePlate(p, { expectedCommit: expected[p.release], strict, minSourceWidth, targetSha256: target?.sha ?? null });
+      p.gate = gatePlate(p, { expectedCommit: expected[p.release], strict, targetSha256: target?.sha ?? null });
       const key = [p.release, p.subject, p.model, p.try].join('|');
       const prev = byKey.get(key);
       if (!prev) { p.alsoAt = []; byKey.set(key, p); continue; }
