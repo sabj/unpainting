@@ -12,7 +12,7 @@ import { BRUSH_SETTINGS, LOAD_FILMS } from '../../src/paint/methods/brush-swatch
 import { lstar } from '../../src/crop/thin-lights.mjs';
 
 export const LOAD = LOAD_FILMS;  // gouache paste on the brush, in hiding films, as the swatch loads it: a dry brush leaves about a tenth of it on the tooth's hills
-export const DEPOSIT = 0.06;     // the share of a dry brush's load that stays on the paper (measured on the engine's brush, water 0.5)
+export const DEPOSIT = 0.09;     // thickness a dry brush leaves, as a share of its load, at the pixels that take paint: 0.11, 0.09, 0.07 at loads of 3, 6, 12 (measured on the engine's brush, water 0.5)
 const { water: WATER, ...BRUSH } = BRUSH_SETTINGS, MARGIN_OD = 0.15, MIN_NEED = 0.1;
 
 const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
@@ -68,14 +68,14 @@ export async function layCoats(ctx) {
   const up = [], down = []; let changed = 0;
   for (let i = 0; i < N2; i++) { const d = Ls(after, i) - Ls(before, i); if (Math.abs(d) > 2) { changed++; (d > 0 ? up : down).push(d); } }
   const q = (a, f) => { const s = [...a].sort((x, y) => x - y); return s.length ? +s[Math.floor(f * (s.length - 1))].toFixed(1) : null; };
-  // planned against painted lightness, on the strokes laid: the strand's L* from its planned colour, the paint's L* at its
-  // lightest (light strokes) or darkest (dark strokes) along the path in the sheet's own render, and the ground's before
+  // planned against painted lightness, on the strokes laid: the strand's planned step over the ground, and the step the paint made
+  // where it took (the 90th percentile of the per-pixel gain along a light stroke, the 10th of the loss along a dark one)
   const Lb = lstarOf(before), La = lstarOf(after), gap = pol => {
     const rows = mine.filter(s => s.polarity === pol).map(s => {
-      const idx = s.points.map(p => Math.min(H2 - 1, Math.round(p.y * SC)) * W2 + Math.min(W2 - 1, Math.round(p.x * SC))), along = idx.map(La).sort((a, b) => a - b), ground = median(idx.map(Lb));
-      return { planned: lstar(-Math.log(Math.max(0.02, Math.min(1, (0.2126 * s.rgb[0] + 0.7152 * s.rgb[1] + 0.0722 * s.rgb[2]) / Math.max(1, 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2]))))), painted: pol === 'light' ? along[Math.floor(0.9 * (along.length - 1))] : along[Math.floor(0.1 * (along.length - 1))], ground };
+      const idx = s.points.map(p => Math.min(H2 - 1, Math.round(p.y * SC)) * W2 + Math.min(W2 - 1, Math.round(p.x * SC))), ground = median(idx.map(Lb)), change = idx.map(i => La(i) - Lb(i)).sort((a, b) => a - b);
+      return { planned: lstar(-Math.log(Math.max(0.02, Math.min(1, (0.2126 * s.rgb[0] + 0.7152 * s.rgb[1] + 0.0722 * s.rgb[2]) / Math.max(1, 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2]))))), ground, step: pol === 'light' ? change[Math.floor(0.9 * (change.length - 1))] : change[Math.floor(0.1 * (change.length - 1))] };
     });
-    return rows.length ? { strokes: rows.length, plannedLstar: +median(rows.map(r => r.planned)).toFixed(1), paintedLstar: +median(rows.map(r => r.painted)).toFixed(1), groundLstar: +median(rows.map(r => r.ground)).toFixed(1), plannedStep: +median(rows.map(r => r.planned - r.ground)).toFixed(1), paintedStep: +median(rows.map(r => r.painted - r.ground)).toFixed(1) } : null;
+    return rows.length ? { strokes: rows.length, plannedLstar: +median(rows.map(r => r.planned)).toFixed(1), groundLstar: +median(rows.map(r => r.ground)).toFixed(1), plannedStep: +median(rows.map(r => r.planned - r.ground)).toFixed(1), paintedStep: +median(rows.map(r => r.step)).toFixed(1) } : null;
   };
   laid.plannedAgainstPainted = { light: gap('light'), dark: gap('dark') };
   laid.lengthMm = +laid.lengthMm.toFixed(1); laid.changedShareOfSheet = +(changed / N2).toFixed(5);
