@@ -5,6 +5,7 @@
 import { joinLines } from '../../crop/joinlines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
 import { breakOnLights } from './drawing-scribble.mjs';
+import { strokeWeight, splitAtCorners } from './stroke-weight.mjs';
 
 function interpPoint(p0, p1, t) {
   const p = { ...p0 };
@@ -68,8 +69,9 @@ export function scaleDrawingGestures(gestures, scale) {
 
 // Hand handling of a reviewed file without the form/toning budget changing its selection.
 export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength = Infinity,
-  D = null, w, h, lit = 0, reach = 2, ...shape } = {}) {
-  const normLines = lines.map(g => ({ ...g, tier: g.tier ?? 1 }));
+  D = null, w, h, lit = 0, reach = 2, corner = null, ...shape } = {}) {
+  // `corner` { span, deg, spur } in cells: a line is cut where it turns a sharp corner, so each stroke runs one way
+  const normLines = lines.map(g => ({ ...g, tier: g.tier ?? 1 })).flatMap(g => (corner ? splitAtCorners(g, corner) : [g]));
   const groups = new Map();
   for (const g of normLines) {
     const key = [g.role, g.kind, g.object, g.region, g.tier].join('|');
@@ -158,11 +160,14 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
     const b = tout > 0 && L - d < tout ? end + (1 - end) * ease((L - d) / tout) : 1;
     return Math.min(a, b);
   };
-  const lineWeight = g.weight ?? 1;
+  // one weight for the stroke (stroke-weight.mjs): its width and darkness are decided once from the subject's line along
+  // it, and only the hand's envelope varies them from the landing to the lift
+  const own = strokeWeight(P), lineWeight = own.weight ?? g.weight ?? 1;
+  const dark = floor + (1 - floor) * Math.max(0, Math.min(1, lineWeight));
   const points = P.map((q, k) => {
-    const e = env(s[k]), dark = floor + (1 - floor) * Math.max(0, Math.min(1, q.weight ?? lineWeight));
+    const e = env(s[k]);
     const out = { ...q, s: Math.min(1, base * dark * e * scale) };
-    if (q.width != null) out.nw = Math.max(minNib, (q.width * gain - margin) * (0.5 + 0.5 * e) * ws);
+    if (q.width != null) out.nw = Math.max(minNib, (own.width * gain - margin) * (0.5 + 0.5 * e) * ws);
     return out;
   });
   return { ...g, points };
