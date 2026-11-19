@@ -2,7 +2,52 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## 0.3.3-rc.1 (not released)
+## 0.3.3-rc.2 (not released)
+
+Painter **V106-dev**, simulator **105**, judges **J1**. Assembled on 2026-11-19.
+
+rc.1 copied its subject. Its wash plan unmixed the subject cell by cell into three pigments, cut thousands of small washes and charged each from its own cells. 0.3.2 worked the same way with larger washes. rc.2 replaces that plan.
+
+| On one 100 x 75 mm piece | rc.1 | rc.2 |
+|---|---|---|
+| Faint planted pattern copied, 1.8 mm blobs | 0.73 | -0.04 |
+| Faint planted pattern copied, 3.4 mm blobs | 0.81 | 0.03 |
+| Washes | 2,131 | 29 |
+| Paint strokes | 2,196 | 74 |
+| Mixes | one pigment at a time | 12 mixed puddles |
+| Strokes clipped to a cell mask | all | none |
+
+### Changed in rc.2
+
+- The wash plan is a few mixed puddles and whole shapes, laid light to dark in three stages (`src/paint/methods/puddles.mjs`, `wash-shapes.mjs`, `fair-wash.mjs`, `wash-strokes.mjs`).
+- A wash has a smooth outline in millimetres and strokes that follow it. No stroke is clipped to cells.
+- Gone for washes: charges taken from the cells under a wash, dabs at a wash's centre, the pressure ramp along demand, per-cell edge classes, the per-cell sky test.
+- The touch-up rounds are off in the default recipe. They glazed any area that read lighter than the subject, which is a correction loop toward the subject's colour.
+- Coat strokes are loaded from a swatch and laid in two passes. They were 2.6 to 3 times darker than planned.
+- A recorded run sees every thin-dark pencil stroke, so recorded benchmark runs finish.
+
+### Known problems in rc.2
+
+- Plates are plain sketches. Windows, stone and other detail are gone until stroke techniques are wired into the new plan.
+- White Ships comes out grey: no lights are reserved, and one colour laid over another goes to mud.
+- The plan is unstable. A faint pattern in the subject changes which washes are laid (clean and planted plates correlate at 0.73).
+- The widest brush used is 7 mm.
+- The 1.0 and 0.26 mm sheets plan separately, and paint laid depends on the cell (1.14 of plan at 1 mm).
+- A plan that names a style still takes the old separation planner. Benchmark plans from models do this.
+- The pictures and tables under rc.1 below show the old plan and are withdrawn as evidence of quality.
+
+### Subject to change
+
+- How shapes are chosen, so the same picture gives the same washes.
+- Reserved lights, and choosing a wash for what it makes over the wash beneath it.
+- Brush sizes for large washes.
+- One plan in millimetres for every cell size.
+- Removing the old planner from styled and benchmark plans.
+- Stroke techniques for detail: lines, blades, locks, stones.
+- The copy limits: the planted-pattern test and counts of puddles and washes are to replace the correlation and stroke ceilings.
+- Thin dark lines, gouache lights and coat strands still read the subject at fine scale and have not been reviewed against these rules.
+
+## 0.3.3-rc.1 (withdrawn: its plates were painted by the separation plan)
 
 Painter **V106-dev**, simulator **105**, judges **J1**. Measured on 2026-11-19 at `bac75526`, in the default mode, on the GPU.
 
