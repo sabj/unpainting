@@ -19,7 +19,7 @@ import { targetRegions } from './target-regions.mjs';
 import { targetValueMap, estimatePaper } from './light-to-dark.mjs';
 
 /** Two shapes whose mean colours are within this CIEDE2000 meet at a soft edge. */
-export const SOFT_EDGE = 10;
+const SOFT_EDGE = 10;
 /** A wash over this share of the sheet whose colour is cool (blue over red by 10 of 255) is laid as a sky is, in wide lanes. */
 const SKY_SHARE = 0.015;
 
