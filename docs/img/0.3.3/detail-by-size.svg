@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 942 328" width="942" height="328" role="img" aria-label="Detail in the right place, by its size on the sheet">
+<rect width="942" height="328" rx="8" fill="#fcfcfb"/>
+<text x="16" y="26" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#0b0b0b">Detail in the right place, by its size on the sheet</text>
+<text x="16" y="45" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#52514e">0.3.3 at each subject’s own size. 1 is a perfect match with the subject; 0 is no relation.</text>
+<line x1="16" y1="66" x2="42" y2="66" stroke="#2a78d6" stroke-width="2"/>
+<circle cx="29" cy="66" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="48" y="70" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#0b0b0b">1 cell a source pixel (0.26 mm cells)</text>
+<line x1="304.2" y1="66" x2="330.2" y2="66" stroke="#2a78d6" stroke-width="2" stroke-dasharray="5 4"/>
+<circle cx="317.2" cy="66" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"/>
+<text x="336.2" y="70" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#0b0b0b">2 cells a source pixel (0.13 mm cells)</text>
+<g transform="translate(64 96)">
+<text x="0" y="-8" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0b0b0b">Overlook</text>
+<line x1="0" y1="170.0" x2="196" y2="170.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="-8" y="174.0" text-anchor="end" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0</text>
+<line x1="0" y1="127.5" x2="196" y2="127.5" stroke="#e4e3df" stroke-width="1"/>
+<text x="-8" y="131.5" text-anchor="end" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.25</text>
+<line x1="0" y1="85.0" x2="196" y2="85.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="-8" y="89.0" text-anchor="end" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.5</text>
+<line x1="0" y1="42.5" x2="196" y2="42.5" stroke="#e4e3df" stroke-width="1"/>
+<text x="-8" y="46.5" text-anchor="end" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.75</text>
+<line x1="0" y1="0.0" x2="196" y2="0.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="-8" y="4.0" text-anchor="end" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">1</text>
+<text x="18.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">under 0.5</text>
+<text x="71.3" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.5–1</text>
+<text x="124.7" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">1–2</text>
+<text x="178.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">2–4</text>
+<polyline points="18.0,128.0 71.3,47.1 124.7,21.6 178.0,9.0" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="18.0" cy="128.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Overlook, 1 cell a source pixel (0.26 mm cells), under 0.5: 0.25</title></circle>
+<circle cx="71.3" cy="47.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Overlook, 1 cell a source pixel (0.26 mm cells), 0.5–1: 0.72</title></circle>
+<circle cx="124.7" cy="21.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Overlook, 1 cell a source pixel (0.26 mm cells), 1–2: 0.87</title></circle>
+<circle cx="178.0" cy="9.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Overlook, 1 cell a source pixel (0.26 mm cells), 2–4: 0.95</title></circle>
+<polyline points="18.0,101.1 71.3,39.6 124.7,19.2 178.0,8.5" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 4"/>
+<circle cx="18.0" cy="101.1" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Overlook, 2 cells a source pixel (0.13 mm cells), under 0.5: 0.41</title></circle>
+<circle cx="71.3" cy="39.6" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Overlook, 2 cells a source pixel (0.13 mm cells), 0.5–1: 0.77</title></circle>
+<circle cx="124.7" cy="19.2" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Overlook, 2 cells a source pixel (0.13 mm cells), 1–2: 0.89</title></circle>
+<circle cx="178.0" cy="8.5" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Overlook, 2 cells a source pixel (0.13 mm cells), 2–4: 0.95</title></circle>
+<text x="18.0" y="92.1" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.41</text>
+<text x="18.0" y="145.0" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.25</text>
+</g>
+<g transform="translate(286 96)">
+<text x="0" y="-8" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0b0b0b">Mittens</text>
+<line x1="0" y1="170.0" x2="196" y2="170.0" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="127.5" x2="196" y2="127.5" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="85.0" x2="196" y2="85.0" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="42.5" x2="196" y2="42.5" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="0.0" x2="196" y2="0.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="18.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">under 0.5</text>
+<text x="71.3" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.5–1</text>
+<text x="124.7" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">1–2</text>
+<text x="178.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">2–4</text>
+<polyline points="18.0,81.6 71.3,14.3 124.7,5.1 178.0,2.0" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="18.0" cy="81.6" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Mittens, 1 cell a source pixel (0.26 mm cells), under 0.5: 0.52</title></circle>
+<circle cx="71.3" cy="14.3" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Mittens, 1 cell a source pixel (0.26 mm cells), 0.5–1: 0.92</title></circle>
+<circle cx="124.7" cy="5.1" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Mittens, 1 cell a source pixel (0.26 mm cells), 1–2: 0.97</title></circle>
+<circle cx="178.0" cy="2.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Mittens, 1 cell a source pixel (0.26 mm cells), 2–4: 0.99</title></circle>
+<polyline points="18.0,53.9 71.3,11.4 124.7,4.4 178.0,1.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 4"/>
+<circle cx="18.0" cy="53.9" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Mittens, 2 cells a source pixel (0.13 mm cells), under 0.5: 0.68</title></circle>
+<circle cx="71.3" cy="11.4" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Mittens, 2 cells a source pixel (0.13 mm cells), 0.5–1: 0.93</title></circle>
+<circle cx="124.7" cy="4.4" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Mittens, 2 cells a source pixel (0.13 mm cells), 1–2: 0.97</title></circle>
+<circle cx="178.0" cy="1.9" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>Mittens, 2 cells a source pixel (0.13 mm cells), 2–4: 0.99</title></circle>
+<text x="18.0" y="44.9" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.68</text>
+<text x="18.0" y="98.6" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.52</text>
+</g>
+<g transform="translate(508 96)">
+<text x="0" y="-8" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0b0b0b">White Ships</text>
+<line x1="0" y1="170.0" x2="196" y2="170.0" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="127.5" x2="196" y2="127.5" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="85.0" x2="196" y2="85.0" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="42.5" x2="196" y2="42.5" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="0.0" x2="196" y2="0.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="18.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">under 0.5</text>
+<text x="71.3" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.5–1</text>
+<text x="124.7" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">1–2</text>
+<text x="178.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">2–4</text>
+<polyline points="18.0,104.0 71.3,21.8 124.7,9.0 178.0,3.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="18.0" cy="104.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>White Ships, 1 cell a source pixel (0.26 mm cells), under 0.5: 0.39</title></circle>
+<circle cx="71.3" cy="21.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>White Ships, 1 cell a source pixel (0.26 mm cells), 0.5–1: 0.87</title></circle>
+<circle cx="124.7" cy="9.0" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>White Ships, 1 cell a source pixel (0.26 mm cells), 1–2: 0.95</title></circle>
+<circle cx="178.0" cy="3.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>White Ships, 1 cell a source pixel (0.26 mm cells), 2–4: 0.98</title></circle>
+<polyline points="18.0,81.4 71.3,19.7 124.7,8.3 178.0,3.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="5 4"/>
+<circle cx="18.0" cy="81.4" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>White Ships, 2 cells a source pixel (0.13 mm cells), under 0.5: 0.52</title></circle>
+<circle cx="71.3" cy="19.7" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>White Ships, 2 cells a source pixel (0.13 mm cells), 0.5–1: 0.88</title></circle>
+<circle cx="124.7" cy="8.3" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>White Ships, 2 cells a source pixel (0.13 mm cells), 1–2: 0.95</title></circle>
+<circle cx="178.0" cy="3.9" r="4" fill="#fcfcfb" stroke="#2a78d6" stroke-width="2"><title>White Ships, 2 cells a source pixel (0.13 mm cells), 2–4: 0.98</title></circle>
+<text x="18.0" y="72.4" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.52</text>
+<text x="18.0" y="121.0" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.39</text>
+</g>
+<g transform="translate(730 96)">
+<text x="0" y="-8" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0b0b0b">Trumbull, painted</text>
+<line x1="0" y1="170.0" x2="196" y2="170.0" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="127.5" x2="196" y2="127.5" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="85.0" x2="196" y2="85.0" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="42.5" x2="196" y2="42.5" stroke="#e4e3df" stroke-width="1"/>
+<line x1="0" y1="0.0" x2="196" y2="0.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="18.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">under 0.5</text>
+<text x="71.3" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">0.5–1</text>
+<text x="124.7" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">1–2</text>
+<text x="178.0" y="187" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">2–4</text>
+<polyline points="18.0,92.5 71.3,20.2 124.7,8.8 178.0,3.9" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="18.0" cy="92.5" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Trumbull, painted, 1 cell a source pixel (0.26 mm cells), under 0.5: 0.46</title></circle>
+<circle cx="71.3" cy="20.2" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Trumbull, painted, 1 cell a source pixel (0.26 mm cells), 0.5–1: 0.88</title></circle>
+<circle cx="124.7" cy="8.8" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Trumbull, painted, 1 cell a source pixel (0.26 mm cells), 1–2: 0.95</title></circle>
+<circle cx="178.0" cy="3.9" r="4" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"><title>Trumbull, painted, 1 cell a source pixel (0.26 mm cells), 2–4: 0.98</title></circle>
+<text x="18.0" y="83.5" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#0b0b0b">0.46</text>
+</g>
+<text x="64" y="308" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" fill="#52514e">Feature size on the sheet, mm. The smallest brush lays a line about 0.5 to 0.8 mm wide.</text>
+<text transform="translate(18 181.0) rotate(-90)" text-anchor="middle" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11" fill="#52514e">agreement with the subject</text>
+</svg>
