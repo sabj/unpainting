@@ -35,7 +35,7 @@ test('every wash is a whole shape charged from a puddle at a named dilution', ()
   assert.ok(charges.size <= 3 * p.puddles.length);
   assert.ok(p.puddles.every(q => q.dilutions.length <= 3));
   assert.ok(washes.some(sh => sh.mix.filter(v => v > 1e-6).length > 1), 'a wash carries a mix, not one pigment');
-  assert.ok(Math.max(...p.layers.map(l => l.value)) <= 5);
+  assert.ok(Math.max(...p.layers.map(l => l.value)) <= 3);
 });
 
 test('grain in the subject does not multiply the charges', () => {
@@ -52,7 +52,7 @@ test('the first wash of a puddle covers every shape the puddle paints, and the s
   for (const sh of washesOf(p)) if (sh._valuePlan.stage > 1) { later++; const m = first.get(sh._valuePlan.puddle); for (let i = 0; i < n; i++) if (sh.mask[i]) assert.equal(m[i], 1); }
   assert.ok(later > 0);
   const stages = p.layers.map(l => l.value); assert.deepEqual(stages, [...stages].sort((a, b) => a - b));
-  for (const l of p.layers) for (const sh of l.shapes) assert.equal(sh._valuePlan.dilution, ['pale', 'pale', 'middle', 'full', 'full'][l.value - 1]);
+  for (const l of p.layers) for (const sh of l.shapes) assert.equal(sh._valuePlan.dilution, ['pale', 'middle', 'full'][l.value - 1]);
 });
 
 test('reserves are whole shapes', () => {

@@ -1,8 +1,8 @@
-// The wash plan: a few puddles, and whole shapes washed from them in at most five stages, light to dark.
+// The wash plan: a few puddles, and whole shapes washed from them in at most three stages, light to dark.
 //
 // The plan studies the subject as a whole and decides everything once a shape (wash-shapes.mjs): which puddle the shape
-// takes (puddles.mjs), and which of the stages wash it. A stage lays each puddle at one dilution, and touching shapes
-// that take the same puddle in a stage are one wash. A wash's charge is the puddle's at a named
+// takes (puddles.mjs) and which of its three value steps. A stage lays each puddle at one dilution over the shapes that
+// reach that step, and touching shapes that take the same puddle in a stage are one wash. A wash's charge is the puddle's at a named
 // dilution: nothing is fitted to the cells a wash covers and no pigment is laid alone. A wash reaches the paint step as
 // an outline in millimetres and the strokes that fill it (wash-strokes.mjs); the brush is not clipped to a mask. A
 // boundary between two shapes is soft when their mean colours are within SOFT_EDGE of each other and hard otherwise; a
@@ -29,7 +29,10 @@ const SKY_SHARE = 0.015;
 /** The plan's grid: this many plan cells across the smallest wash brush. */
 const PLAN_CELLS_PER_BRUSH = 3;
 
-const phaseOf = stage => (stage === 1 ? 'light' : stage <= 3 ? 'mid' : 'shadow');
+/** An outline is simplified to half the smallest wash brush's radius, and never to less than this many plan cells: under that the plan grid's own steps would stay in it. */
+const OUTLINE_PLAN_CELLS = 1.25;
+
+const phaseOf = stage => (stage === 1 ? 'light' : 'mid');
 
 /** The subject averaged onto the plan's grid (light averaged as light). */
 function onPlanGrid(rgb, w, h, pw, ph) {
@@ -59,7 +62,7 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
   const puddles = chosen.puddles.map((p, q) => {
     const mine = shapes.filter((_, i) => chosen.assign[i] === q), ladder = dilutionLadder(p.mix, mine.map(s => strengthFor(p.mix, s.mean, pigments, paperCol)), pigments, paperCol);
     mine.forEach((s, j) => { s.puddle = q; s.steps = ladder.steps[j]; });
-    return { mix: p.mix, dilutions: ladder.dilutions, strengths: ladder.strengths, lead: p.mix.indexOf(Math.max(...p.mix)), L: filmLab(p.mix.map(v => v * ladder.strengths[MAX_STAGES - 1]), pigments, paperCol)[0], area: mine.reduce((a, s) => a + s.area, 0) };
+    return { mix: p.mix, dilutions: ladder.dilutions, strengths: ladder.strengths, lead: p.mix.indexOf(Math.max(...p.mix)), L: filmLab(p.mix.map(v => v * (ladder.levels.at(-1) ?? 0)), pigments, paperCol)[0], area: mine.reduce((a, s) => a + s.area, 0) };
   });
   for (const s of shapes) { s.puddle ??= -1; s.steps ??= []; s.reserved = !s.steps.length; }
   // touching shapes that take one puddle to one value step are one shape (reserved shapes that touch are one too)
@@ -100,7 +103,7 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
         for (const s of members[id]) area += shapes[s - 1].area;
         for (const s of members[id]) for (let ch = 0; ch < 3; ch++) mean[ch] += shapes[s - 1].mean[ch] * shapes[s - 1].area / area;
         // the wash as the brush gets it: its outline in mm, the strokes that fill it, and the soft parts of its edge
-        const outline = outlineLoops(c.labels, id, boxes[id], pw, ph, { cellMm: planMm, tolMm: washBrushMm / 4, soft: (i, j) => j >= 0 && !planReserved[j] && soft(labels[i], labels[j]) });
+        const outline = outlineLoops(c.labels, id, boxes[id], pw, ph, { cellMm: planMm, tolMm: Math.max(washBrushMm / 4, OUTLINE_PLAN_CELLS * planMm), soft: (i, j) => j >= 0 && !planReserved[j] && soft(labels[i], labels[j]) });
         const laid = planWashStrokes(outline, { kitMm: washKitMm, pointMm: pointBrushMm }), softEdges = softLines(outline);
         let rim = 0; for (const l of outline) for (let v = 0; v < l.points.length; v++) { const A = l.points[v], B = l.points[(v + 1) % l.points.length]; rim += Math.hypot(B[0] - A[0], B[1] - A[1]); }
         strokeCount += laid.strokes.length; bare += laid.uncovered * area; planArea += area;
