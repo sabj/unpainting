@@ -25,6 +25,7 @@ import {blockInPigments, gradeSmoothPassages} from '../../src/crop/blockin.mjs';
 import {choosePlateMixes, toMixAmounts, panMix} from '../../src/crop/mixes.mjs';
 import {loadSubject} from '../../src/paint/methods/first-wash.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
+import {heldWhites} from '../../src/paint/methods/paper-colour.mjs';
 import {components, dilate, minFilter, maxFilter} from '../../src/raster.js';
 import {chooseTechnique} from '../../src/crop/technique.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
@@ -263,16 +264,15 @@ if (SMALL) { let c = 0; for (let i = 0; i < n; i++) c += SMALL[i]; console.log(`
   }
   console.log(`range: plan's darkest note ${deepest.toFixed(2)} shortened to ${want.toFixed(2)} (x${keep}), curve ${num('shortencurve', 0.75)}`);
 })();
-// --whitefloor f: cells whose whole planned depth is under f of one glaze join no mask, so no sweep aims at them. Default 0.5.
+// --whitefloor f: cells whose whole planned depth is under f of one glaze, and that are bare paper by the paper rule, join no mask,
+// so no sweep aims at them. A pale tint under the floor that the paper rule does not call paper takes its pale wash. Default 0.5.
 // An area plan's lights are the ones it lists (pass.lights); no target-light cell is held out of its passes.
 const WHITE_HOLD = (() => {
   if (opt('areaplan', '')) return null;
   const f = num('whitefloor', 0.5);
   if (f <= 0) return null;
-  const floor = f * num('glaze', 0.12), k = PIGS.length, held = new Uint8Array(n);
-  let c = 0;
-  for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < k; j++) t += ctx.A[i * k + j]; if (t < floor) { held[i] = 1; c++; } }
-  console.log(`whites: ${c} cells (${(100 * c / n).toFixed(1)}% of the sheet) under ${floor.toFixed(3)} held out of every pass`);
+  const floor = f * num('glaze', 0.12), { held, count: c } = heldWhites({ demand: ctx.A, k: PIGS.length, rgb: ctx.px, paperRGB, floor });
+  console.log(`whites: ${c} cells (${(100 * c / n).toFixed(1)}% of the sheet) under ${floor.toFixed(3)} of paint and within the paper's tolerance held out of every pass`);
   return c ? held : null;
 })();
 // Plan reserves (VALUE_CONFIG.reserves) are not boxes on the hold: the value planner reserves the target's own light

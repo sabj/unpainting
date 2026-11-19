@@ -186,3 +186,19 @@ export function paperLightTest(paper, tol = lightTolerance(paper)) {
 
 /** --paperdelta d: cell i is bare paper when no channel is more than d below the paper (a plan's own tolerance). */
 export const isPaperLight = (rgb, i, paper, d) => rgb[3 * i] >= paper[0] - d && rgb[3 * i + 1] >= paper[1] - d && rgb[3 * i + 2] >= paper[2] - d;
+
+/**
+ * The whites held out of every pass: cells whose whole fitted paint is under `floor` and that are bare paper by the paper
+ * rule (paperLightTest: no more than the tolerance below the sheet in L*, no more than the chroma tolerance above it).
+ * A pale tint that asks little paint but is darker or more coloured than the paper is a pale wash, not bare white.
+ * @returns { held (Uint8Array, n), count }
+ */
+export function heldWhites({ demand, k, rgb, paperRGB, floor }) {
+  const n = demand.length / k, isPaper = paperLightTest(paperRGB), held = new Uint8Array(n);
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    let t = 0; for (let j = 0; j < k; j++) t += demand[i * k + j];
+    if (t < floor && isPaper(rgb, i)) { held[i] = 1; count++; }
+  }
+  return { held, count };
+}

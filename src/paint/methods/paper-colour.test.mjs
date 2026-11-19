@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sheetColour, lightTolerance, paperLightTest, isPaperLight, lightestTenth, paperLightReference, WHITE_SHEET, PAPER_RULE } from './paper-colour.mjs';
+import { sheetColour, lightTolerance, paperLightTest, isPaperLight, lightestTenth, paperLightReference, heldWhites, WHITE_SHEET, PAPER_RULE } from './paper-colour.mjs';
 
 const image = (w, h, at) => { const rgb = new Uint8Array(w * h * 3); for (let i = 0; i < w * h; i++) rgb.set(at(i % w, (i / w) | 0), 3 * i); return rgb; };
 
@@ -105,3 +105,16 @@ test('bare paper is within the tolerance of the sheet in L* and chroma; lighter 
   assert.equal(isPaperLight([240, 239, 236], 0, [252, 251, 248], 12), true);
   assert.equal(isPaperLight([239, 239, 236], 0, [252, 251, 248], 12), false);
 });
+
+test('the held whites are bare paper by the paper rule: a pale tint that asks little paint is a pale wash, not blazing white', () => {
+  const paper = [252, 251, 248], k = 1;
+  // four cells: the paper itself, a cell 3 L* under it, a pale yellow 9 L* under it, a pale yellow that asks almost no paint
+  const rgb = Uint8Array.of(252, 251, 248, 244, 243, 240, 236, 232, 190, 238, 235, 205);
+  const demand = Float32Array.of(0.01, 0.03, 0.05, 0.05);
+  const { held, count } = heldWhites({ demand, k, rgb, paperRGB: paper, floor: 0.06 });
+  assert.deepEqual(Array.from(held), [1, 1, 0, 0]);
+  assert.equal(count, 2);
+  // the old hold took every cell under the floor of paint whatever its colour
+  assert.equal(Array.from(demand).filter(v => v < 0.06).length, 4);
+});
+
