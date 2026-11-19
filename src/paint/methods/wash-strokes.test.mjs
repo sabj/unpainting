@@ -51,7 +51,7 @@ test('a wash is laid from its edge inward by one brush chosen from its size, in 
   }
 });
 
-test('strokes follow a slanted edge as a line, not as steps, and a thin tail takes the detail brush', () => {
+test('strokes follow a slanted edge as a line, not as steps, and a thin tail takes the detail brush or a closing stroke', () => {
   const tri = planWashStrokes([{ points: [[10, 10], [70, 10], [10, 50]], soft: [] }], { kitMm: KIT, pointMm: 1.2 });
   assert.ok(tri.uncovered < .03, `${tri.uncovered} of a triangle left bare`);
   // along the slanted side the first round stays one radius from it, within the planning grid's pitch
@@ -59,7 +59,8 @@ test('strokes follow a slanted edge as a line, not as steps, and a thin tail tak
   assert.ok(off.length >= 5); for (const d of off) assert.ok(Math.abs(d - r) < 1, `${d} mm from the slanted side`);
   const loops = [{ points: [[10, 10], [40, 10], [40, 30], [26, 30], [26, 32], [60, 32], [60, 34], [10, 34]], soft: [] }];   // a block with a 2 mm tail
   const without = planWashStrokes(loops, { kitMm: KIT }), withPoint = planWashStrokes(loops, { kitMm: KIT, pointMm: 1.2 });
-  assert.ok(without.uncovered > .03 && withPoint.uncovered < without.uncovered / 2, `${without.uncovered} then ${withPoint.uncovered}`);
+  assert.ok(without.uncovered < .03 && withPoint.uncovered < .03, `${without.uncovered} and ${withPoint.uncovered}`);
+  assert.ok(without.strokes.some(s => s.kind === 'close'), 'with no detail brush the tail is closed by one stroke of the smallest wash brush');
   assert.ok(withPoint.strokes.some(s => s.kind === 'point' && s.radiusMm === .6));
   assert.ok(!without.strokes.some(s => s.kind === 'point'));
 });
@@ -73,4 +74,11 @@ test('an outline is a smooth curve that keeps only long sharp corners', () => {
   const turns = disc.map((p, q) => { const a = disc[(q + n - 1) % n], b = disc[(q + 1) % n], u = [p[0] - a[0], p[1] - a[1]], v = [b[0] - p[0], b[1] - p[1]]; return Math.acos(Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v))))) * 180 / Math.PI; });
   assert.ok(Math.max(...turns) < 50, `sharpest turn on a disc ${Math.max(...turns)} degrees over ${n} points`);
   for (const p of disc) assert.ok(Math.abs(Math.hypot(p[0] - 30.5, p[1] - 30.5) - 18) < 2);
+});
+
+test('a wash laid past its outline meets its neighbour, and no wash is left with an open middle', () => {
+  const loops = [{ points: [[10, 10], [22, 10], [22, 20], [10, 20]], soft: [] }], plain = planWashStrokes(loops, { kitMm: KIT }), grown = planWashStrokes(loops, { kitMm: KIT, growMm: 2 });
+  assert.ok(Math.abs(plain.areaMm2 - 120) < 6 && grown.areaMm2 > 200 && grown.areaMm2 < 16 * 14 + 6, `${plain.areaMm2} then ${grown.areaMm2} mm2`);
+  assert.ok(Math.min(...grown.strokes.flatMap(s => s.points.map(p => p[0] - s.radiusMm))) < 9, 'its strokes reach past the outline');
+  for (const size of [4, 5, 6, 7, 9, 11, 14]) { const s = planWashStrokes([{ points: [[10, 10], [10 + size, 10], [10 + size, 10 + size], [10, 10 + size]], soft: [] }], { kitMm: KIT, pointMm: 1.2 }); assert.ok(s.uncovered < .08, `${s.uncovered} of a ${size} mm square left bare`); }
 });

@@ -100,17 +100,17 @@ export function softLines(loops) {
 /**
  * The strokes that lay a wash inside its outline.
  * @param loops outlineLoops' result. @param kitMm the wash brushes' belly widths in mm. @param pointMm the detail brush's belly width.
- * @returns {{strokes: Array<{kind:'contour'|'edge'|'point', radiusMm:number, points:number[][]}>, brushMm:number, areaMm2:number, uncovered:number}}
+ * @returns {{strokes: Array<{kind:'contour'|'edge'|'point'|'close', radiusMm:number, points:number[][]}>, brushMm:number, areaMm2:number, uncovered:number}}
  *   uncovered is the share of the outline's area no stroke's footprint reaches.
  */
-export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
+export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0 }) {
   const kit = [...kitMm].sort((a, b) => b - a), small = kit[kit.length - 1], pitch = small / 6;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const l of loops) for (const [x, y] of l.points) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   if (!(x1 > x0) || !(y1 > y0)) return { strokes: [], areaMm2: 0, uncovered: 0 };
   // lanes run along the longer side: work in a frame whose u axis is that side
   const tall = y1 - y0 > x1 - x0, U = p => (tall ? [p[1], p[0]] : p);
-  const ou = (tall ? y0 : x0) - pitch, ov = (tall ? x0 : y0) - pitch, gw = Math.ceil(((tall ? y1 - y0 : x1 - x0)) / pitch) + 2, gh = Math.ceil(((tall ? x1 - x0 : y1 - y0)) / pitch) + 2, gn = gw * gh;
+  const pad = pitch * (1 + Math.ceil(growMm / pitch)), ou = (tall ? y0 : x0) - pad, ov = (tall ? x0 : y0) - pad, gw = Math.ceil(((tall ? y1 - y0 : x1 - x0) + 2 * pad) / pitch), gh = Math.ceil(((tall ? x1 - x0 : y1 - y0) + 2 * pad) / pitch), gn = gw * gh;
   const inside = new Uint8Array(gn), rows = Array.from({ length: gh }, () => []);
   for (const l of loops) for (let q = 0; q < l.points.length; q++) {
     const P = U(l.points[q]), Q = U(l.points[(q + 1) % l.points.length]); if (P[1] === Q[1]) continue;
@@ -120,6 +120,15 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
   let area = 0;
   for (let gy = 0; gy < gh; gy++) { const xs = rows[gy].sort((a, b) => a - b); for (let q = 0; q + 1 < xs.length; q += 2) for (let gx = Math.max(0, Math.ceil((xs[q] - ou) / pitch - .5)); gx < gw && ou + (gx + .5) * pitch < xs[q + 1]; gx++) { inside[gy * gw + gx] = 1; area++; } }
   if (!area) return { strokes: [], areaMm2: 0, uncovered: 0 };
+  // growMm: the wash is laid this far past its outline, so that it meets its neighbours; rounding an outline must not
+  // leave paper between two washes
+  if (growMm > 0) {
+    const far = new Float32Array(gn), R2g = Math.SQRT2;
+    for (let i = 0; i < gn; i++) far[i] = inside[i] ? 0 : 1e9;
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; let d = far[i]; if (!d) continue; if (x) d = Math.min(d, far[i - 1] + 1); if (y) { d = Math.min(d, far[i - gw] + 1); if (x) d = Math.min(d, far[i - gw - 1] + R2g); if (x < gw - 1) d = Math.min(d, far[i - gw + 1] + R2g); } far[i] = d; }
+    for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; let d = far[i]; if (!d) continue; if (x < gw - 1) d = Math.min(d, far[i + 1] + 1); if (y < gh - 1) { d = Math.min(d, far[i + gw] + 1); if (x < gw - 1) d = Math.min(d, far[i + gw + 1] + R2g); if (x) d = Math.min(d, far[i + gw - 1] + R2g); } far[i] = d; }
+    for (let y = 1; y < gh - 1; y++) for (let x = 1; x < gw - 1; x++) { const i = y * gw + x; if (!inside[i] && far[i] * pitch <= growMm) { inside[i] = 1; area++; } }
+  }
   // distance in mm from each inside cell to the outline
   const D = new Float32Array(gn), R2 = Math.SQRT2;
   for (let i = 0; i < gn; i++) D[i] = inside[i] ? 1e9 : 0;
@@ -172,5 +181,18 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
   // then the smallest brush where the wash is too narrow for that one, and the detail brush where it is narrower still
   if (brush > small) inward('edge', small / 2, LEAST_NEW);
   if (pointMm > 0 && pointMm < small) follow('point', pointMm / 2, pointMm / 2, LEAST_NEW);
+  // A wash covers its whole outline: where a patch as large as a touch of the smallest brush is still bare (the middle of
+  // a round too small to trace), one more stroke of that brush is drawn through it, end to end.
+  {
+    const seenBare = new Uint8Array(gn), stack = new Int32Array(gn), r = small / 2, touch = Math.PI * (r / pitch) ** 2 / 2;
+    for (let s0 = 0; s0 < gn; s0++) {
+      if (!inside[s0] || covered[s0] || seenBare[s0]) continue;
+      let sp = 0, count = 0, ax = gw, bx = -1, ay = gh, by = -1, sx = 0, sy = 0; stack[sp++] = s0; seenBare[s0] = 1;
+      while (sp) { const i = stack[--sp], x = i % gw, y = (i / gw) | 0; count++; sx += x; sy += y; if (x < ax) ax = x; if (x > bx) bx = x; if (y < ay) ay = y; if (y > by) by = y; for (const j of [x ? i - 1 : -1, x < gw - 1 ? i + 1 : -1, i - gw, i + gw]) if (j >= 0 && j < gn && inside[j] && !covered[j] && !seenBare[j]) { seenBare[j] = 1; stack[sp++] = j; } }
+      if (count < touch) continue;
+      const cx = sx / count, cy = sy / count, half = Math.max(r / pitch, (Math.max(bx - ax, by - ay)) / 2), pts = bx - ax >= by - ay ? [[cx - half, cy], [cx, cy], [cx + half, cy]] : [[cx, cy - half], [cx, cy], [cx, cy + half]];
+      stamp(pts, r, true); strokes.push({ kind: 'close', radiusMm: r, points: pts.map(toMm) });
+    }
+  }
   return { strokes, brushMm: brush, areaMm2: area * pitch * pitch, uncovered: 1 - coveredCount / area };
 }
