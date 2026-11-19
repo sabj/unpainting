@@ -29,12 +29,16 @@
     "round4": {
       "width_mm": 3.0,
       "water_ml": 0.03,
-      "note": "Round #4: belly about 2.5-3.2 mm. Holds about 0.05 ml, releases about 0.03 ml per load."
+      "note": "Round #4: belly about 2.5-3.2 mm. Holds about 0.05 ml, releases about 0.03 ml per load.",
+      "point_width_mm": 0.8,
+      "point_note": "Point width, measured as the rigger's: 0.78 mm at 0.129 mm a cell (1.03 mm at 0.258, four cells), taken as 0.8."
     },
     "rigger": {
       "width_mm": 1.2,
       "water_ml": 0.015,
-      "note": "Rigger / liner #2: long hair, about 1-1.5 mm wide, holds a long line's worth for its width."
+      "note": "Rigger / liner #2: long hair, about 1-1.5 mm wide, holds a long line's worth for its width.",
+      "point_width_mm": 0.5,
+      "point_note": "Point width: the narrowest continuous line the engine's brush contact lays on dry cold-press paper at the lowest stable pressure (0.05; 95 percent of the line's length is paint). It is 0.52 mm at both 0.129 and 0.258 mm a cell, taken as 0.5. Measured with tools/painter/brush-point-swatch.mjs on the engine's own contact model; not fitted to any target."
     },
     "dry": {
       "width_mm": 4.0,

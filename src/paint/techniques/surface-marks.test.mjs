@@ -74,3 +74,13 @@ test('placement edge keeps marks to the edge of the mass, as painters suggest a 
     assert.ok(d < 2 * W + 1.5 * W + 1, 'centre within two widths of the edge (plus the crescent radius)');
   }
 });
+
+// --- an unplanned run's marks: direction from a function, density from a weight map ---------------------------------
+test('a growth direction function replaces the plan\'s flow line, and a weight map keeps marks out of the cells it zeroes', () => {
+  const w = 120, h = 60, mask = new Uint8Array(w * h).fill(1), weight = new Float32Array(w * h).fill(1);
+  for (let y = 0; y < h; y++) for (let x = 0; x < 60; x++) weight[y * w + x] = 0;
+  const marks = { kind: 'short-coat', reason: 'fur', cover: 0.8, placement: 'whole' };
+  const paths = surfaceMarkPaths(marks, { mask, w, h, mmPerCell: 0.25, brushMm: 1, scale: 1, seedKey: 'a', flowAt: () => [0, 1], weight });
+  assert.ok(paths.length > 10);
+  for (const p of paths) { assert.ok(p[0].x >= 55, 'none where the weight is zero'); const dx = Math.abs(p.at(-1).x - p[0].x), dy = Math.abs(p.at(-1).y - p[0].y); assert.ok(dy > 2 * dx, 'along the function\'s direction, straight down'); }
+});

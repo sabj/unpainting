@@ -46,7 +46,7 @@ its colour and scattering stay as picked.
 | cadmium yellow and red, lamp black | none | none | non-staining |
 | sap green, Payne's grey, sepia | their parents' shares | | |
 
-Opaque white sits outside the Kubelka-Munk model. `src/media/gouache.mjs` lays opaque paint over the finished render, outside the physics simulation, and only when you ask for it.
+White gouache is a pigment on the sheet. `src/media/gouache.mjs` defines it: almost no absorption, the paint table's scatter for an opaque paint, laid dry in the top layer in a film thick enough to hide (scatter times thickness 12), so the same Kubelka-Munk composite that draws every glaze draws it. The finish lays it with a rigger, tinted by a mix of up to three palette paints, for thin lights that no wash can reserve (see [How it paints](how-it-paints.md#9-finish)). `--smalllights gouache` is an older per-cell overlay outside the physics; it is off and kept only to read old runs.
 
 ## Paper
 

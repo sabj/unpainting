@@ -8,7 +8,7 @@ The physical media: paper, water, pigment, brush, pen and pencil. Everything the
 - `brush.mjs`: a bristle brush with a load of water and pigment.
 - `wash.mjs`: wash paths around reserved highlights, graded sweeps and softened edges.
 - `pen.mjs`, `pencil.mjs` and `draw.mjs`: the dip pen, the graphite pencil, and planned gestures drawn with the pen.
-- `gouache.mjs`: optional white gouache laid last, outside the physics simulation.
+- `gouache.mjs`: white gouache as a pigment (Kubelka-Munk, dry deposit in the top layer), the tint solver and the rigger stroke; `overlay` and `gouacheCover` are the older per-cell overlay, off.
 - `sheet-size.mjs`: the default 6 x 4 in postcard sheet.
 - `sheet-par.mjs`, `sheet-worker.mjs` and the `*-kernel.mjs` files: a thread pool that runs large sheet steps in row bands.
 

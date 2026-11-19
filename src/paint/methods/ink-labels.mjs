@@ -59,12 +59,12 @@ async function overlayPng({ image, labels, w, h, ids }) {
 }
 
 /** The model's { "<id>": "<label>" } reply, checked: only known ids and labels count. */
-export function parseLabelReply(text, ids) {
+export function parseLabelReply(text, ids, allowed = LABELS) {
   const s = String(text ?? '');
   for (let b = s.lastIndexOf('}'), a = s.indexOf('{'); a >= 0 && b > a; b = s.lastIndexOf('}', b - 1)) {
     try {
       const j = JSON.parse(s.slice(a, b + 1)), out = {};
-      for (const id of ids) { const v = String(j[id] ?? j[`r${id}`] ?? '').toLowerCase().replace(/[^a-z_]/g, '_').replace(/^tree$|^trunk$|^branches$|^tree_trunk_and_branches$/, 'tree_trunk').replace(/^shadow$|^shadow_mass_?$/, 'shadow_mass'); if (LABELS.includes(v)) out[id] = v; }
+      for (const id of ids) { const v = String(j[id] ?? j[`r${id}`] ?? '').toLowerCase().replace(/[^a-z_]/g, '_').replace(/^tree$|^trunk$|^branches$|^tree_trunk_and_branches$/, 'tree_trunk').replace(/^shadow$|^shadow_mass_?$/, 'shadow_mass'); if (allowed.includes(v)) out[id] = v; }
       if (Object.keys(out).length) return out;
     } catch { /* try a shorter span */ }
   }
@@ -117,7 +117,7 @@ export function labelIdentity({ image, regions, labelMap, w, h, judge, model, ex
     regionsSHA256: sha(canonical(regions)), promptSHA256: sha(prompt), judge, model, executable };
 }
 
-function validateVision(record, ids, identity, context) {
+function validateVision(record, ids, identity, context, allowed = LABELS) {
   const fail = reason => { throw new Error(`${context}: ${reason}`); };
   if (!record || record.judge !== identity.judge || canonical(record.identity) !== canonical(identity))
     fail('cache identity or judge mismatch');
@@ -129,13 +129,13 @@ function validateVision(record, ids, identity, context) {
       fail(`${key} must cover exactly every requested region`);
   }
   for (const id of ids) {
-    if (!LABELS.includes(record.labels[id])) fail(`region ${id} has a missing or unknown label`);
+    if (!allowed.includes(record.labels[id])) fail(`region ${id} has a missing or unknown label`);
     if (record.source[id] !== 'vision') fail(`region ${id} is not vision-labelled`);
   }
   return record;
 }
 
-function askJudge(judge, png, ids, { run = spawnSync, command, model, prompt, env } = {}) {
+function askJudge(judge, png, ids, { run = spawnSync, command, model, prompt, env, vocabulary = LABELS } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-labels-')), file = path.join(dir, 'regions.png');
   try {
     fs.writeFileSync(file, png);
@@ -144,16 +144,17 @@ function askJudge(judge, png, ids, { run = spawnSync, command, model, prompt, en
       : ['-p', `Open the image file ${file} with your file-viewing tool (do not run shell commands). ${prompt}`, '--model', model, '--mode', 'plan', '--add-dir', dir];
     const r = run(command, args, { cwd: dir, env, encoding: 'utf8', timeout: 600000 });
     if (r.error || r.status !== 0) throw new Error(`label process failed (${r.error?.code ?? r.signal ?? r.status ?? 'unknown status'})`);
-    const labels = parseLabelReply(r.stdout, ids);
+    const labels = parseLabelReply(r.stdout, ids, vocabulary);
     if (!labels) throw new Error('label reply contained no valid region labels');
     return labels;
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 /** Explicit simple classification stays local. Requested vision is complete or fails closed. */
-export async function labelRegions({ image, regions, labelMap, w, h, judge = 'codex', cacheDir, run = spawnSync, env = process.env }) {
+export async function labelRegions({ image, regions, labelMap, w, h, judge = 'codex', cacheDir, run = spawnSync, env = process.env, vocabulary = LABELS, promptFor = PROMPT, overlayFor = overlayPng }) {
   if (!['simple', 'codex', 'agy'].includes(judge)) throw new Error(`ink labels: unknown judge ${JSON.stringify(judge)}; use simple, codex or agy`);
   const ids = regions.map(r => r.id);
+  if (judge === 'simple' && vocabulary !== LABELS) throw new Error('labels: the simple classifier labels the ink vocabulary only; a vision judge is needed for this one');
   if (judge === 'simple') return {
     labels: Object.fromEntries(regions.map(r => [r.id, simpleLabel(r, { w, h })])),
     source: Object.fromEntries(ids.map(id => [id, 'simple'])), judge, cached: false,
@@ -165,17 +166,17 @@ export async function labelRegions({ image, regions, labelMap, w, h, judge = 'co
     const model = String(env.INK_LABEL_MODEL ?? (judge === 'agy' ? DEFAULT_AGY_MODEL : '')).trim();
     if (!model) throw new Error('set INK_LABEL_MODEL explicitly for the requested vision judge; an unresolved model cannot identify a cache');
     const command = env[judge === 'codex' ? 'CODEX_BIN' : 'AGY_BIN'] || judge;
-    const prompt = PROMPT(ids), executable = executableIdentity(command, env);
+    const prompt = promptFor(ids), executable = executableIdentity(command, env);
     const identity = labelIdentity({ image, regions, labelMap, w, h, judge, model, executable, prompt });
     const file = path.join(cacheDir, `${identity.imageSHA256}-${sha(canonical(identity))}.json`);
     if (fs.existsSync(file)) {
-      const record = validateVision(JSON.parse(fs.readFileSync(file, 'utf8')), ids, identity, 'cached vision labels');
+      const record = validateVision(JSON.parse(fs.readFileSync(file, 'utf8')), ids, identity, 'cached vision labels', vocabulary);
       return { ...record, cached: true };
     }
-    const labels = askJudge(judge, await overlayPng({ image, labels: labelMap, w, h, ids }), ids, { run, command: executable.path, model, prompt, env });
+    const labels = askJudge(judge, await overlayFor({ image, labels: labelMap, w, h, ids }), ids, { run, command: executable.path, model, prompt, env, vocabulary });
     const missing = ids.filter(id => !Object.hasOwn(labels, id));
     if (missing.length) throw new Error(`label reply has missing or unknown labels for regions ${missing.join(', ')}`);
-    const out = validateVision({ labels, source: Object.fromEntries(ids.map(id => [id, 'vision'])), judge, identity, cached: false }, ids, identity, 'vision labels');
+    const out = validateVision({ labels, source: Object.fromEntries(ids.map(id => [id, 'vision'])), judge, identity, cached: false }, ids, identity, 'vision labels', vocabulary);
     fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(file, JSON.stringify(out) + '\n');
     return out;
