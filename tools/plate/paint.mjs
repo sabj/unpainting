@@ -418,7 +418,10 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // A wash of the wash plan arrives as strokes in millimetres inside its outline (wash-strokes.mjs). They are laid as
   // written and nothing clips them: the wash's edge is where the brush's footprint ends.
   const CELLS_PER_MM = W2 / num('sheetmm', DEFAULT_SHEET_MM);
-  const vectorPaths = !BUDGET && sh._valuePlan?.strokes ? sh._valuePlan.strokes.map(st => st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: Math.max(SC, st.radiusMm * CELLS_PER_MM), p: 1 }))) : null;
+  // The plan gives each stroke the half-width it is to lay. The brush that lays that half-width on this sheet is a little
+  // wider (the engine's own edgeHalfWidth, which the lanes of every wash are spaced by), so it is sized through that.
+  const brushFor = half => { let r = half + 1; for (let it = 0; it < 6; it++) r += half - edgeHalfWidth(r, { pressure: 1, splay: WASH_FLAT_SPLAY }); return Math.max(SC, r); };
+  const vectorPaths = !BUDGET && sh._valuePlan?.strokes ? sh._valuePlan.strokes.map(st => { const r = brushFor(st.radiusMm * CELLS_PER_MM); return st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1 })); }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
@@ -604,7 +607,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
     const wetLane = pts => {
       if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
-      const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
+      const r = vectorPaths ? pts[0].r : !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
       const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
       productionDip(wet, { water: num('prewetwater', shapeCells ? .55 : 1), conc: PIGS.map(() => 0) });
       stroke(wet, ctx.sheet, pts, { upright: UPRIGHT });
@@ -629,7 +632,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     ctx.WET_TRACE?.lane();
     if (wetEachLane) wetEachLane(pts);
     if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
-    const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
+    const r = vectorPaths ? pts[0].r : !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
     let CHARGE_CAL=SEMANTIC_CAL_MODE==='actual'&&sh._semantic?semanticCalibrationGain(SEMANTIC_CAL[sh._semantic.key],pts,PB.mmPerCell):ICAL.cal;
     const numericTuftHere=numericTuftEligible({shapeId:ctx.MAJOR_TECHNIQUE?.shapeId,selected:NUMERIC_TUFT_SHAPES,detail,dry:T.name.startsWith('dry brush'),semantic:Boolean(sh._semantic),radiusMm:r*num('sheetmm', DEFAULT_SHEET_MM)/W2});
     const brush = detail
