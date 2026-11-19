@@ -253,7 +253,8 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
   // layers>0: the middle values are built as several wide connected wash layers, each dried
   // before the next. Layer 0 covers the whole middle form; each later layer covers only the
   // darker part of the smoothed value field, so value builds gradually.
-  // The darks keep the floor brush's scale for their passages and weights; only their holes follow the detail brush.
+  // The first wash keeps the floor brush's scale; the middle band built up over it and the darks take the detail brush's:
+  // their weights, their smallest shape and the lights they go round.
   // holeFloor: the least paper a step goes round. A dark glaze goes round a light the detail brush can leave (a mullion in a window),
   // though its own passages keep the floor brush's size.
   const steps=[1,2,3,4,5].map(band=>({band,wt:(band>=3?fineWeights:weights)[band-1],tag:'',floor:band>=3?smallShape:minShape,holeFloor:band>=3?smallShape:minShape,holeWidth:band>=3?markCells:0}));
