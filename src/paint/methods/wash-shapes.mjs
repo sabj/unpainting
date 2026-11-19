@@ -68,12 +68,11 @@ function heapOf(order) {
  * @param leastMm2 the least area of a shape (default: the brush's least wash). @param barrier cells (1) that belong to no shape.
  * @param start shapes to begin from, one number a cell (negative: no shape), in place of single cells: the things of the
  *   picture. They are joined only where two that touch are within `contrast`, and are not cut.
- * @param zone one number a cell: two shapes join by contrast only inside one zone (a later stage cuts inside a thing).
  * @returns {{labels: Int32Array, shapes: Array<{id:number, area:number, areaMm2:number, mean:number[], lab:number[], paper:boolean}>,
  *   least: {washMm2:number, reserveMm2:number}}} labels are 1..shapes.length (0 on the barrier); `mean` is the shape's
  *   mean colour, averaged as light and given as sRGB 0..255.
  */
-export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, contrast = LEAST_CONTRAST, leastMm2 = null, barrier = null, start = null, zone = null }) {
+export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, contrast = LEAST_CONTRAST, leastMm2 = null, barrier = null, start = null }) {
   const n = w * h;
   if (!rgb || rgb.length !== n * 3) throw new Error('wash shapes need the subject colours');
   if (!(cellMm > 0) || !(brushMm > 0)) throw new Error('wash shapes need a positive cell size and brush width');
@@ -92,7 +91,7 @@ export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, contrast = LE
     const apart = (a, b) => Math.hypot(sum[0][a] / size[a] - sum[0][b] / size[b], sum[1][a] / size[a] - sum[1][b] / size[b], sum[2][a] / size[a] - sum[2][b] / size[b]);
     for (let round = 0, joined = 1; joined && round < 8; round++) {
       joined = 0; const heap = heapOf(3), seen = new Set();
-      for (let i = 0; i < n; i++) { if (!open(i)) continue; const x = i % w, a = find(i); for (const j of [x < w - 1 ? i + 1 : -1, i + w < n ? i + w : -1]) { if (j < 0 || !open(j) || (zone && zone[i] !== zone[j])) continue; const b = find(j); if (a === b) continue; const key = a < b ? a * n + b : b * n + a; if (seen.has(key)) continue; seen.add(key); const d = apart(a, b); if (d < contrast) heap.push([d, Math.min(a, b), Math.max(a, b)]); } }
+      for (let i = 0; i < n; i++) { if (!open(i)) continue; const x = i % w, a = find(i); for (const j of [x < w - 1 ? i + 1 : -1, i + w < n ? i + w : -1]) { if (j < 0 || !open(j)) continue; const b = find(j); if (a === b) continue; const key = a < b ? a * n + b : b * n + a; if (seen.has(key)) continue; seen.add(key); const d = apart(a, b); if (d < contrast) heap.push([d, Math.min(a, b), Math.max(a, b)]); } }
       while (heap.size) {
         const [was, p, q] = heap.pop(), a = find(p), b = find(q); if (a === b) continue;
         // a pair whose shapes have changed since it was filed is filed again at what it is now
@@ -108,9 +107,9 @@ export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, contrast = LE
 
   // 2. regions into shapes: contrast first, then the smallest shape under the least area into its nearest neighbour
   const settle = () => {
-    const area = new Float64Array(count), zoneOf = new Int32Array(count), sums = Array.from({ length: 7 }, () => new Float64Array(count)), touch = Array.from({ length: count }, () => new Set());
+    const area = new Float64Array(count), sums = Array.from({ length: 7 }, () => new Float64Array(count)), touch = Array.from({ length: count }, () => new Set());
     for (let i = 0; i < n; i++) {
-      const a = labels[i]; if (a < 0) continue; if (!area[a] && zone) zoneOf[a] = zone[i]; area[a]++;
+      const a = labels[i]; if (a < 0) continue; area[a]++;
       for (let c = 0; c < 3; c++) { sums[c][a] += lin[c][i]; sums[3 + c][a] += lab[i * 3 + c]; sums[6][a] += lab[i * 3 + c] ** 2; }
       const x = i % w; for (const j of [x < w - 1 ? i + 1 : -1, i + w < n ? i + w : -1]) if (j >= 0 && labels[j] >= 0 && labels[j] !== a) { touch[a].add(labels[j]); touch[labels[j]].add(a); }
     }
@@ -124,7 +123,7 @@ export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, contrast = LE
     };
     for (;;) {
       let pa = -1, pb = -1, bd = contrast;
-      for (let a = 0; a < count; a++) if (alive[a]) for (const b of touch[a]) if (b > a) { const d = far(a, b); if (d < bd && zoneOf[a] === zoneOf[b] && slack(a, b) <= spread) { bd = d; pa = a; pb = b; } }
+      for (let a = 0; a < count; a++) if (alive[a]) for (const b of touch[a]) if (b > a) { const d = far(a, b); if (d < bd && slack(a, b) <= spread) { bd = d; pa = a; pb = b; } }
       if (pa < 0) {
         let small = -1; for (let a = 0; a < count; a++) if (alive[a] && area[a] < leastCells && touch[a].size && (small < 0 || area[a] < area[small])) small = a;
         if (small < 0) break;

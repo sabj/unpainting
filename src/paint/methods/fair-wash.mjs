@@ -10,8 +10,8 @@
 // lights (its lighter half, as one colour), so the first wash is clean and nothing lighter inside the shape is lost. It
 // is laid a little past its outline so that neighbours meet, with the widest brush that fits it. After it no unreserved
 // paper shows.
-// Stage 2 and stage 3. The subject is squinted (about 2 mm, then 1 mm) and cut by contrast inside each first-wash
-// shape, each stage with its own least wash. A shape is washed only if it must be darker, by a visible step, than what the plan has laid
+// Stage 2 and stage 3. The subject is squinted (about 2 mm, then 1 mm) and cut by contrast over the whole sheet, each
+// stage with its own least wash: a shadow that crosses several things is one shape and one glaze, not one a thing. A shape is washed only if it must be darker, by a visible step, than what the plan has laid
 // under it so far. Its mix is solved for the shape as a whole over what is under it (puddles.mjs mixOver): the paints
 // and the strength that bring the film under the shape to the shape's colour (stage 2: to its lights; the last stage:
 // to its mean). These washes lie over the first wash;
@@ -177,7 +177,7 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
     const total = washes.reduce((a, s) => a + s.area, 0); byStage[stage - 1] = (byStage[stage - 1] ?? 0) + washes.length;
     layers.push({ value: stage, pigment: amounts.indexOf(Math.max(...amounts)), mixId, shapes: washes, mix: amounts.map(v => v / strength), amount: strength, area: total, _order: { phase: stage === 1 ? 'ground' : 'mid', region: 0, shoot: true }, _valuePhase: stage === 1 ? 'light' : 'mid' });
   };
-  const cuts = [], paperL = filmLab(new Array(k).fill(0), pigments, paperCol)[0]; let things = null;
+  const cuts = [], paperL = filmLab(new Array(k).fill(0), pigments, paperCol)[0];
   // A shape's lights: the mean colour of its lighter half, as the last stage's squint sees it. One colour for the shape.
   const fine = squint(light, pw, ph, planMm, STAGES[STAGES.length - 1].squintMm), fineL = Float32Array.from({ length: pn }, (_, i) => labOf(fine, i, paperCol)[0]);
   const lightsOf = cells => {
@@ -196,8 +196,8 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
       for (const cells of byThing.values()) for (const list of partsOf(cells, lab)) { for (const i of list) part[i] = next; next++; }
       const start = new Int32Array(pn).fill(-1), stack = new Int32Array(pn); let pieces = 0;
       for (let s0 = 0; s0 < pn; s0++) { if (part[s0] < 0 || start[s0] >= 0) continue; let sp = 0; stack[sp++] = s0; start[s0] = pieces; while (sp) { const i = stack[--sp], x = i % pw; for (const j of [x ? i - 1 : -1, x < pw - 1 ? i + 1 : -1, i - pw, i + pw]) if (j >= 0 && j < pn && start[j] < 0 && part[j] === part[i]) { start[j] = pieces; stack[sp++] = j; } } pieces++; }
-      cut = washShapes({ ...shared, contrast: SAME_THING, start }); things = cut.labels;
-    } else cut = washShapes({ ...shared, contrast: S.contrast, zone: things });
+      cut = washShapes({ ...shared, contrast: SAME_THING, start });
+    } else cut = washShapes({ ...shared, contrast: S.contrast });   // a shadow is one shape across the things it falls on
     cuts.push(cut.shapes.length);
     // the largest shape first; each shape's mix is judged from its colour and from what the plan has laid under it
     const order = cut.shapes.map((_, a) => a).sort((a, b) => cut.shapes[b].area - cut.shapes[a].area || a - b);
