@@ -3,11 +3,13 @@
 //   npm run bench:add-target -- <image> --task harbour --name Harbour \
 //     --style "loose watercolor: boats at a harbour wall" --medium none --source "photo by ..." \
 //     --licence "<licence of the image>" \
-//     [--crop x,y,w,h] [--width 300] [--private <dir>] [--paint-width 1200] [--sheetmm 280] [--self-score]
+//     [--crop x,y,w,h] [--width 300] [--private <dir>] [--paint-width <cells>] [--sheetmm <mm>] [--self-score]
 // --name, --style, --medium, --source and --licence are required; there is no default licence. --medium is the drawing
 // medium seen in the target: pen, pencil or none. A plan's ink drawing is drawn in graphite unless the medium is pen.
 // --crop takes pixels of the source image (default: all of it); the target is resized to --width cells (default 300,
-// as the published targets). --private writes the PNG to <dir> instead of bench/v2/targets and marks the target
+// as the published targets) and never enlarged: a crop narrower than --width is refused. The V4/V5 subject is painted
+// at source scale, the target's own width at mmPerCell (0.259 mm) a cell; --paint-width and --sheetmm state another
+// size, and a --paint-width above the target's width is refused. --private writes the PNG to <dir> instead of bench/v2/targets and marks the target
 // not distributed; scoring then needs BENCH_PRIVATE_CROPS=<dir>. --self-score scores the target against itself
 // (TOGETHER_API_KEY), the 100% mark for indexed scores; without it the target has no indexed score yet.
 // Every round picks the new target up from crops.json; the V1/V2 brief gets its row from the style given here.
@@ -59,7 +61,7 @@ function kmeans(pts, k, lum) {
 
 /** Write the target and register it. root: the bench folder (BENCH; a copy in tests). Returns the crops.json entry. */
 export async function addTarget({ image, task, name, style, medium, source, licence, crop = null, width = 300, privateDir = null,
-  paintWidth = 1200, sheetmm = 280, root = BENCH }) {
+  paintWidth = null, sheetmm = null, root = BENCH }) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(task || '')) throw new Error('--task must be lower-case letters, digits and hyphens');
   for (const [k, v] of Object.entries({ name, style, source, licence })) if (!v) throw new Error(`--${k} is required`);
   // the drawing medium a person sees in the target: it decides whether a plan may draw in ink (plan-args.mjs)
@@ -69,8 +71,16 @@ export async function addTarget({ image, task, name, style, medium, source, lice
   if (spec.crops.some(c => c.task === task) || subjects.subjects[task]) throw new Error(`target ${task} already exists`);
   let img = sharp(image).rotate().removeAlpha();
   if (crop) img = img.extract({ left: crop[0], top: crop[1], width: crop[2], height: crop[3] });
+  // a target is a section of the image at its own pixels or fewer: an enlarged target holds no more than the crop did
+  const cropWidth = (await sharp(await img.png().toBuffer()).metadata()).width;
+  if (width > cropWidth) throw new Error(`the crop is ${cropWidth} px wide and --width ${width} would enlarge it: pass --width ${cropWidth} or less, or crop a larger image`);
   const buf = await img.resize({ width, kernel: 'lanczos3' }).png().toBuffer();
   const { data, info } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  // the subject is painted at source scale: one sheet cell for each target pixel, at the crops' cell size
+  const subjectWidth = paintWidth ?? info.width;
+  if (!(subjectWidth > 0)) throw new Error(`--paint-width must be a width in cells above 0, not ${paintWidth}`);
+  if (subjectWidth > info.width) throw new Error(`--paint-width ${subjectWidth} is wider than the ${info.width} px target: a subject is painted at its target's width or less`);
+  const subjectSheet = sheetmm ?? +(subjectWidth * spec.mmPerCell).toFixed(3);
   const map = coarseMap(task, data, info.width, info.height);
   const file = `targets/${task}.png`, coarseFile = `targets/${task}-coarse.json`;
   const png = privateDir ? path.join(path.resolve(privateDir), `${task}.png`) : path.join(root, 'v2', file);
@@ -81,7 +91,7 @@ export async function addTarget({ image, task, name, style, medium, source, lice
     distributed: !privateDir, file, coarseFile, licence };
   writeJson(cropsFile, { ...spec, crops: [...spec.crops, entry] });
   writeJson(subjectsFile, { ...subjects, subjects: { ...subjects.subjects,
-    [task]: { name, taskStyle: style.split(':')[0].trim(), medium, width: paintWidth, sheetmm } } });
+    [task]: { name, taskStyle: style.split(':')[0].trim(), medium, width: subjectWidth, sheetmm: subjectSheet } } });
   return { entry, png };
 }
 
@@ -102,7 +112,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const { entry, png } = await addTarget({
       image, task: opt('task'), name: opt('name'), style: opt('style'), medium: opt('medium'), source: opt('source'), licence: opt('licence'),
       crop: opt('crop') ? opt('crop').split(',').map(Number) : null, width: Number(opt('width', 300)), privateDir: opt('private', null),
-      paintWidth: Number(opt('paint-width', 1200)), sheetmm: Number(opt('sheetmm', 280)) });
+      paintWidth: opt('paint-width') ? Number(opt('paint-width')) : null, sheetmm: opt('sheetmm') ? Number(opt('sheetmm')) : null });
     console.log(`bench:add-target: ${entry.task} (${entry.name}), ${entry.width} x ${entry.height}, coarse ${entry.coarse.cols} x ${entry.coarse.rows}, ${png}`);
     if (argv.includes('--self-score')) {
       const s = selfScore(entry.task, png, entry.style), f = path.join(BENCH, 'v2', 'crops.json'), spec = readJson(f);

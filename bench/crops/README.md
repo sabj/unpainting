@@ -33,8 +33,10 @@ published targets, and writes:
   24 columns, an 8-colour palette and a lightness value per cell.
 - An entry in [crops.json](../v2/crops.json), which every round reads: the toolkit, the briefs (the V1/V2 target table
   gets a row from `--style`), the prompts, the scorer and the result builders.
-- A V4/V5 subject in [subjects.json](../v4v5/subjects.json), painted 1200 px wide on a 280 mm sheet unless
-  `--paint-width` and `--sheetmm` say otherwise.
+- A V4/V5 subject in [subjects.json](../v4v5/subjects.json), painted at source scale: the target's own width, one
+  sheet cell for each target pixel at 0.259 mm a cell (a 300 px target is a 77.7 mm sheet). `--paint-width` and
+  `--sheetmm` state another size; a `--paint-width` above the target's width is refused, and so is a `--crop`
+  narrower than the target width, because the painter does not paint from an enlarged source.
 
 `--self-score` scores the target against itself (needs `TOGETHER_API_KEY`). That score is the 100% mark for indexed
 scores; without it the target's paintings are scored but not indexed. `--private <dir>` keeps the image out of the
