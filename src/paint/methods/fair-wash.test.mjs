@@ -5,7 +5,7 @@ import { BOX, boxPigment } from '../../crop/box.mjs';
 import { unmix, channelDensity } from '../../crop/pigments.mjs';
 
 const PAPER = [252, 251, 248], pigments = ['hansa', 'ultramarine', 'cadred'].map(key => boxPigment(BOX.find(p => p.key === key)));
-function plan(w, h, ground, rects, { noise = 0, sheetMm = w, pattern = 0 } = {}) {
+function plan(w, h, ground, rects, { noise = 0, sheetMm = w, pattern = 0, things = null } = {}) {
   const n = w * h, rgb = new Uint8ClampedArray(n * 3);
   for (let i = 0; i < n; i++) rgb.set(ground, i * 3);
   for (const [x0, y0, x1, y1, c] of rects) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) rgb.set(c, (y * w + x) * 3);
@@ -14,7 +14,7 @@ function plan(w, h, ground, rects, { noise = 0, sheetMm = w, pattern = 0 } = {})
   if (pattern) for (let i = 0; i < n; i++) { const d = pattern * Math.sin((i % w) * 1.9 * 80 / w + 1) * Math.sin(((i / w) | 0) * 1.7 * 80 / w + 2); for (let c = 0; c < 3; c++) rgb[i * 3 + c] = Math.max(0, Math.min(255, rgb[i * 3 + c] + d)); }
   const D = channelDensity(rgb, n, PAPER), demand = unmix(D, n, pigments.map(p => p.K.map(v => v / .55))), density = Float32Array.from({ length: n }, (_, i) => Math.max(0, (D[i * 3] + D[i * 3 + 1] + D[i * 3 + 2]) / 3));
   const log = console.log; console.log = () => {};
-  try { return planFairWashes({ demand, k: pigments.length, density, w, h, rgb, paperRGB: PAPER, pigments, sheetWidthMm: sheetMm, washBrushMm: 3, washKitMm: [38, 25.4, 7, 5, 3], pointBrushMm: 1.2 }); } finally { console.log = log; }
+  try { return planFairWashes({ demand, k: pigments.length, density, w, h, rgb, paperRGB: PAPER, pigments, sheetWidthMm: sheetMm, washBrushMm: 3, washKitMm: [38, 25.4, 7, 5, 3], pointBrushMm: 1.2, segments: things ? Uint8Array.from({ length: n }, (_, i) => things(i % w, (i / w) | 0)) : null }); } finally { console.log = log; }
 }
 // a sky, a wall in two values, a large sheet of bare paper and a dark window
 const SCENE = [[0, 0, 80, 20, [150, 175, 215]], [0, 20, 40, 60, [205, 170, 125]], [40, 20, 80, 60, [150, 124, 92]], [4, 26, 30, 50, PAPER], [52, 32, 66, 46, [50, 45, 50]]];
@@ -131,4 +131,32 @@ test('a wash reaches the brush as an outline and strokes in millimetres, with no
     assert.ok(q.outline.length >= 1 && q.outline.every(l => l.points.length >= 3 && l.soft.length === l.points.length));
     assert.ok(q.strokes.length >= 1 && q.strokes.length <= 16, `${q.strokes.length} strokes for a wash of ${q.areaMm2} mm2`);
   }
+});
+
+const chromaOf = c => { const D = channelDensity(Uint8ClampedArray.from(c), 1, PAPER); return Math.max(...D) - Math.min(...D); };
+
+test('the first shapes are the picture\'s things: a textured thing is one wash, and two things of one colour are one', () => {
+  // a wall of varied stone that the run found as one thing, under a sky it found as two
+  const blocks = []; for (let q = 0; q < 12; q++) blocks.push([(q % 4) * 20, 30 + ((q / 4) | 0) * 10, (q % 4) * 20 + 20, 40 + ((q / 4) | 0) * 10, q % 2 ? [205, 170, 125] : [178, 146, 104]]);
+  const scene = [[0, 0, 80, 30, [150, 175, 215]], ...blocks], things = (x, y) => (y >= 30 ? 3 : x < 40 ? 1 : 2);
+  const held = plan(80, 60, [205, 170, 125], scene, { things }), first = washesOf(held).filter(sh => sh._valuePlan.stage === 1), w = 80;
+  assert.equal(first.length, 2, 'the wall is one wash and the two halves of the sky are one');
+  assert.ok(first.some(sh => sh.mask[10 * w + 10] && sh.mask[10 * w + 70]) && first.some(sh => sh.mask[35 * w + 10] && sh.mask[55 * w + 70]));
+});
+
+test('a thing that spans two hues is cut by hue before it gets a mix, a thing with a light and a shadow side in two, and no thing in more than three', () => {
+  // one thing over the whole sheet: lavender strips and warm strips of one value, whose mean is a grey
+  const strips = []; for (let q = 0; q < 4; q++) strips.push([q * 20, 0, q * 20 + 20, 60, q % 2 ? [205, 170, 125] : [170, 168, 222]]);
+  const p = plan(80, 60, [200, 200, 200], strips, { things: () => 1 }), first = washesOf(p).filter(sh => sh._valuePlan.stage === 1), w = 80;
+  assert.equal(first.length, 4, 'each strip is its own wash');
+  const mixAt = x => first.find(sh => sh.mask[30 * w + x]).mix;
+  assert.ok(mixAt(10)[1] > 3 * mixAt(10)[0], 'the lavender strip is a blue mix'); assert.ok(mixAt(30)[0] > 1.5 * mixAt(30)[1], 'the warm strip holds more yellow than blue');
+  assert.ok(chromaOf([188, 169, 174]) < .5 * chromaOf([170, 168, 222]), 'their mean would have been mud');
+  // a lit and a shadowed side of one hue
+  const sides = plan(80, 60, [205, 170, 125], [[40, 0, 80, 60, [150, 124, 92]]], { things: () => 1 });
+  assert.equal(washesOf(sides).filter(sh => sh._valuePlan.stage === 1).length, 2);
+  // six bands of one thing: three parts at most
+  const bands = []; for (let q = 0; q < 6; q++) bands.push([0, q * 10, 80, q * 10 + 10, [205 - 22 * q, 170 - 18 * q, 125 - 13 * q]]);
+  const many = plan(80, 60, [205, 170, 125], bands, { things: () => 1 });
+  assert.ok(washesOf(many).filter(sh => sh._valuePlan.stage === 1).length <= 3);
 });

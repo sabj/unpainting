@@ -4,8 +4,9 @@
 // the radius of the smallest wash brush), with each segment marked soft or hard from the two shapes it lies between.
 // planWashStrokes: the strokes that lay the wash as one wet film, with the widest brush of the kit that fits it. A flat
 // or a mop (a brush of LANE_FROM_MM or wider) lays a band as wide as itself with square ends. It fits a wash it can be
-// swept across in a straight lane at least LANE_LEAST of its width long with its whole width inside the outline, and it
-// is swept in such lanes from edge to edge, side by side. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
+// swept across in a straight lane at least LANE_LEAST of its width long, and it is swept in such lanes side by side.
+// A lane never runs outside its wash and its square ends are never the wash's edge: it stops a round's radius inside
+// the outline, and the round, steered along the outline, closes the ends and lays the edge. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
 // outline, its radius inside it, then round again further in until the middle is closed. Each smaller brush of the kit
 // then goes round where the wash is too narrow for the one before, and the detail brush inside parts narrower than
 // that. So a wall or a sky is laid with a flat or a mop and only its edge and corners with a round. The edge of the wash is where the brush's own footprint ends: a curve, never a cut. What no
@@ -193,9 +194,12 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut
     for (; level <= deepest; level += step) follow(kind, radius, level, least);
     if (deepest > level - step + radius) follow(kind, radius, Math.max(level - step + radius / 2, deepest - pitch), least);
   };
-  // A flat or a mop lays a band as wide as itself and as long as it travels, with square ends. Where one of this radius
-  // can be put down with its whole width inside the wash: by row, the runs of the grid it can be swept along.
-  const column = new Int32Array((gh + 1) * gw); for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) column[(gy + 1) * gw + gx] = column[gy * gw + gx] + inside[gy * gw + gx];
+  // A flat or a mop lays a band as wide as itself and as long as it travels, with square ends. A square end is never the
+  // edge of a wash: the band stays the radius of the widest round inside the outline, and that round, steered along the
+  // outline, lays the edge over the band's ends and sides. Where a flat of this radius can be put down so: by row, the
+  // runs of the grid it can be swept along.
+  const rounds = kit.filter(width => width < LANE_FROM_MM), inset = rounds.length ? rounds[0] / 2 : 0;
+  const column = new Int32Array((gh + 1) * gw); for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) column[(gy + 1) * gw + gx] = column[gy * gw + gx] + (D[gy * gw + gx] >= inset ? 1 : 0);
   const runsFor = radius => {
     const rc = Math.floor(radius / pitch), rows = [];
     for (let gy = rc; gy < gh - rc; gy++) { let from = -1; for (let gx = 0; gx <= gw; gx++) { const ok = gx < gw && column[(gy + rc + 1) * gw + gx] - column[(gy - rc) * gw + gx] === 2 * rc + 1; if (ok && from < 0) from = gx; else if (!ok && from >= 0) { (rows[gy] ??= []).push([from, gx - 1]); from = -1; } } }

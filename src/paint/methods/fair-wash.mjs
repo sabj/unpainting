@@ -2,13 +2,16 @@
 //
 // Reserved lights. Before any wash the plan finds the shapes that stay paper (wash-shapes.mjs reservedLights): shapes
 // near the picture's own lightest tone that are clearly lighter than what is around them. The first wash goes round them.
-// Stage 1, the first wash. The subject is squinted hard (blurred about 4 mm) and cut into a few large shapes by contrast
-// (wash-shapes.mjs). Each shape is one wash of its own mix: the paints whose film returns the colour of the shape's
+// Stage 1, the first wash. Its shapes are the things of the picture: the segments the run found in the subject (a
+// hull, a sail, the water), or, without segments, the shapes of a hard squint cut by contrast. A thing is cut only where
+// it holds two things to a painter: a light side and a shadow side, or two hue families (its mean colour is much duller
+// than its cells, which is how a wash goes to mud). It is cut into three parts at most. Two things that touch join only
+// when they are one hue and value. Each shape is one wash of its own mix: the paints whose film returns the colour of the shape's
 // lights (its lighter half, as one colour), so the first wash is clean and nothing lighter inside the shape is lost. It
 // is laid a little past its outline so that neighbours meet, with the widest brush that fits it. After it no unreserved
 // paper shows.
-// Stage 2 and stage 3. The subject is squinted less (about 2 mm, then 1 mm) and cut into shapes again, each stage with
-// its own least wash. A shape is washed only if it must be darker, by a visible step, than what the plan has laid
+// Stage 2 and stage 3. The subject is squinted (about 2 mm, then 1 mm) and cut by contrast inside each first-wash
+// shape, each stage with its own least wash. A shape is washed only if it must be darker, by a visible step, than what the plan has laid
 // under it so far. Its mix is solved for the shape as a whole over what is under it (puddles.mjs mixOver): the paints
 // and the strength that bring the film under the shape to the shape's colour (stage 2: to its lights; the last stage:
 // to its mean). These washes lie over the first wash;
@@ -53,7 +56,53 @@ const LIGHTS = Object.freeze({ squintMm: 2, brushMm: 7 });
  * least contrast between two of its shapes. The first wash is a few large shapes; the darker things inside them come
  * back in the later stages.
  */
-const STAGES = Object.freeze([{ squintMm: 4, shapeBrushMm: 7, contrast: 16 }, { squintMm: 2, shapeBrushMm: 7, contrast: 10 }, { squintMm: 1, shapeBrushMm: 3, contrast: 10 }]);
+const STAGES = Object.freeze([{ squintMm: 2, shapeBrushMm: 7, contrast: 16 }, { squintMm: 2, shapeBrushMm: 7, contrast: 10 }, { squintMm: 1, shapeBrushMm: 3, contrast: 10 }]);
+/** A thing is cut into this many parts at most. */
+const MOST_PARTS = 3;
+/** A thing has a light side and a shadow side when its two halves by colour are this far apart (Lab) and the smaller is this share of it. */
+const TWO_SIDES = Object.freeze({ apart: 16, share: 0.15 });
+/** A thing spans hues when its mean colour has under this share of the chroma its cells typically have (their median), and that is at least `chroma`. */
+const SPANS_HUES = Object.freeze({ share: 0.6, chroma: 6 });
+/** Two things that touch are one shape when their mean colours are within this (Lab distance). */
+const SAME_THING = 6;
+
+/**
+ * The cells of one thing sorted into two by colour: two means along `dims` of Lab, begun from the two sides of the mean
+ * on the dimension that varies most. Returns the side (0 or 1) of each cell and how far apart the two means are.
+ */
+function twoSides(cells, lab, dims) {
+  const mean = dims.map(d => cells.reduce((a, i) => a + lab[i * 3 + d], 0) / cells.length), spread = dims.map((d, q) => cells.reduce((a, i) => a + (lab[i * 3 + d] - mean[q]) ** 2, 0));
+  const widest = spread.indexOf(Math.max(...spread)); let side = Uint8Array.from(cells, i => (lab[i * 3 + dims[widest]] > mean[widest] ? 1 : 0)), centres = null;
+  for (let it = 0; it < 8; it++) {
+    const sum = [dims.map(() => 0), dims.map(() => 0)], count = [0, 0];
+    cells.forEach((i, q) => { count[side[q]]++; dims.forEach((d, c) => { sum[side[q]][c] += lab[i * 3 + d]; }); });
+    if (!count[0] || !count[1]) return null;
+    centres = sum.map((v, q) => v.map(x => x / count[q]));
+    side = Uint8Array.from(cells, i => { let a = 0, b = 0; dims.forEach((d, c) => { a += (lab[i * 3 + d] - centres[0][c]) ** 2; b += (lab[i * 3 + d] - centres[1][c]) ** 2; }); return b < a ? 1 : 0; });
+  }
+  const size = [0, 0]; for (const v of side) size[v]++;
+  return { side, apart: Math.hypot(...centres[0].map((v, c) => v - centres[1][c])), least: Math.min(size[0], size[1]) / cells.length };
+}
+/**
+ * One thing's parts: lists of its cells, three at most. A part is cut in two by hue when it spans hues, else by colour
+ * when it has a light side and a shadow side; the largest part that needs it is cut first.
+ */
+function partsOf(cells, lab) {
+  const parts = [cells];
+  const cut = part => {
+    if (part.length < 8) return null;
+    const mean = [0, 0, 0], chroma = []; for (const i of part) { for (let c = 0; c < 3; c++) mean[c] += lab[i * 3 + c] / part.length; chroma.push(Math.hypot(lab[i * 3 + 1], lab[i * 3 + 2])); }
+    const typical = chroma.sort((a, b) => a - b)[part.length >> 1];
+    if (typical >= SPANS_HUES.chroma && Math.hypot(mean[1], mean[2]) < SPANS_HUES.share * typical) { const hue = twoSides(part, lab, [1, 2]); if (hue) return hue.side; }
+    const sides = twoSides(part, lab, [0, 1, 2]);
+    return sides && sides.apart >= TWO_SIDES.apart && sides.least >= TWO_SIDES.share ? sides.side : null;
+  };
+  for (let done = false; !done && parts.length < MOST_PARTS;) {
+    done = true;
+    for (const q of parts.map((_, q) => q).sort((a, b) => parts[b].length - parts[a].length)) { const side = cut(parts[q]); if (!side) continue; const part = parts[q]; parts.splice(q, 1, part.filter((_, c) => !side[c]), part.filter((_, c) => side[c])); done = false; break; }
+  }
+  return parts;
+}
 
 /** The subject on the plan's grid, as light (three planes, 0..1). */
 function lightOnPlanGrid(rgb, w, h, pw, ph) {
@@ -75,7 +124,7 @@ function squint(light, pw, ph, planMm, mm) {
   return out;
 }
 
-export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], pointBrushMm = 0, hold = null, families = [], subject = null, shaped = true }) {
+export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], pointBrushMm = 0, hold = null, families = [], subject = null, shaped = true, segments = null }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
   if (demand.length !== n * k || density.length !== n || k < 1) throw Error('target/demand grid mismatch');
   if (!rgb || pigments.length !== k) throw Error('the wash plan needs the subject colours and the pigments');
@@ -128,7 +177,7 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
     const total = washes.reduce((a, s) => a + s.area, 0); byStage[stage - 1] = (byStage[stage - 1] ?? 0) + washes.length;
     layers.push({ value: stage, pigment: amounts.indexOf(Math.max(...amounts)), mixId, shapes: washes, mix: amounts.map(v => v / strength), amount: strength, area: total, _order: { phase: stage === 1 ? 'ground' : 'mid', region: 0, shoot: true }, _valuePhase: stage === 1 ? 'light' : 'mid' });
   };
-  const cuts = [], paperL = filmLab(new Array(k).fill(0), pigments, paperCol)[0];
+  const cuts = [], paperL = filmLab(new Array(k).fill(0), pigments, paperCol)[0]; let things = null;
   // A shape's lights: the mean colour of its lighter half, as the last stage's squint sees it. One colour for the shape.
   const fine = squint(light, pw, ph, planMm, STAGES[STAGES.length - 1].squintMm), fineL = Float32Array.from({ length: pn }, (_, i) => labOf(fine, i, paperCol)[0]);
   const lightsOf = cells => {
@@ -137,7 +186,19 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
     return sum.map(v => 255 * (v / count) ** (1 / 2.2));
   };
   STAGES.forEach((S, s) => {
-    const stage = s + 1, cut = washShapes({ rgb: squint(light, pw, ph, planMm, S.squintMm), w: pw, h: ph, paperRGB: paperCol, cellMm: planMm, brushMm: S.shapeBrushMm, contrast: S.contrast, barrier: stage === 1 ? planReserved : null }); cuts.push(cut.shapes.length);
+    const stage = s + 1, seen = squint(light, pw, ph, planMm, S.squintMm), shared = { rgb: seen, w: pw, h: ph, paperRGB: paperCol, cellMm: planMm, brushMm: S.shapeBrushMm };
+    let cut;
+    if (stage === 1) {
+      // the things: the run's segments, or the shapes of the squint; each cut into its parts, and each part's touching cells one shape
+      const thing = segments ? Int32Array.from({ length: pn }, (_, q) => segments[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]) : washShapes({ ...shared, contrast: S.contrast, barrier: planReserved }).labels;
+      const lab = new Float32Array(pn * 3), byThing = new Map(), part = new Int32Array(pn).fill(-1); let next = 0;
+      for (let i = 0; i < pn; i++) { const q = labOf(seen, i, paperCol); lab[i * 3] = q[0]; lab[i * 3 + 1] = q[1]; lab[i * 3 + 2] = q[2]; if (!planReserved[i]) { const l = byThing.get(thing[i]); if (l) l.push(i); else byThing.set(thing[i], [i]); } }
+      for (const cells of byThing.values()) for (const list of partsOf(cells, lab)) { for (const i of list) part[i] = next; next++; }
+      const start = new Int32Array(pn).fill(-1), stack = new Int32Array(pn); let pieces = 0;
+      for (let s0 = 0; s0 < pn; s0++) { if (part[s0] < 0 || start[s0] >= 0) continue; let sp = 0; stack[sp++] = s0; start[s0] = pieces; while (sp) { const i = stack[--sp], x = i % pw; for (const j of [x ? i - 1 : -1, x < pw - 1 ? i + 1 : -1, i - pw, i + pw]) if (j >= 0 && j < pn && start[j] < 0 && part[j] === part[i]) { start[j] = pieces; stack[sp++] = j; } } pieces++; }
+      cut = washShapes({ ...shared, contrast: SAME_THING, start }); things = cut.labels;
+    } else cut = washShapes({ ...shared, contrast: S.contrast, zone: things });
+    cuts.push(cut.shapes.length);
     // the largest shape first; each shape's mix is judged from its colour and from what the plan has laid under it
     const order = cut.shapes.map((_, a) => a).sort((a, b) => cut.shapes[b].area - cut.shapes[a].area || a - b);
     const cellsOf = cut.shapes.map(() => []); for (let i = 0; i < pn; i++) if (cut.labels[i]) cellsOf[cut.labels[i] - 1].push(i);
