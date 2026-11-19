@@ -186,6 +186,34 @@ export function puddleLabels(A, k, w, h, { K = 8, floor = 0.04, radius = 2, stri
   return { labels, centres };
 }
 
+/** Two puddles whose colours differ by less than this CIEDE2000 (hue and chroma, at one lightness) are one wash: under 2.3 the
+ *  eye does not tell them apart (src/eval/colour.mjs: 1 is a just-noticeable difference). */
+const PUDDLE_VISIBLE_DE = 2.3;
+
+/**
+ * Puddles the eye cannot tell apart are one: a puddle joins the larger puddle whose paint, rendered at this puddle's own mean
+ * amount, differs from its own by less than `de` in hue and chroma. The cut then keeps only the colour differences a
+ * flat wash would show. `pigments` carry K and S; `A` is the fitted paint per cell (n * k).
+ * @returns { labels (Uint8Array, n, the surviving puddle ids), merged (how many puddles joined another) }
+ */
+export function mergeCloseColours({ labels, centres }, A, k, pigments, paperRGB, { de = PUDDLE_VISIBLE_DE } = {}) {
+  const K = centres.length, n = labels.length, total = new Float64Array(K), count = new Float64Array(K);
+  for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < k; j++) t += A[i * k + j]; total[labels[i]] += t; count[labels[i]]++; }
+  const mean = Array.from({ length: K }, (_, c) => (count[c] ? total[c] / count[c] : 0));
+  const paper = Uint8ClampedArray.from(paperRGB), optics = pigments.map(q => ({ K: q.K, S: q.S ?? [0, 0, 0] }));
+  // the colour of puddle c's paint laid at `amount`, as Lab against the paper
+  const colour = (c, amount) => { const out = renderLayers([pigments.map((_, j) => Float32Array.of(centres[c][j] * amount))], optics, paper, 1, 1); return labPlanes(out, 1, paperRGB); };
+  const order = Array.from({ length: K }, (_, c) => c).filter(c => count[c] > 0).sort((a, b) => count[b] - count[a]);
+  const into = Int32Array.from({ length: K }, (_, c) => c), kept = [];
+  for (const c of order) {
+    const own = colour(c, mean[c]);
+    const host = kept.find(d => hueChroma(own.L[0], own.a[0], own.b[0], colour(d, mean[c]).a[0], colour(d, mean[c]).b[0]) < de);
+    if (host === undefined) kept.push(c); else into[c] = host;
+  }
+  const out = new Uint8Array(n); for (let i = 0; i < n; i++) out[i] = into[labels[i]];
+  return { labels: out, merged: order.length - kept.length };
+}
+
 /**
  * A pass's components cut again by puddle: connected pieces that share a component and a puddle label, with any piece
  * under `small` cells folded into the largest neighbouring piece of its own component (so a colour's fringe is laid

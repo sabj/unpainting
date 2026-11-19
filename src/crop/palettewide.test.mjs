@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { paperOf, pickPalette } from './palettepick.mjs';
 import { paletteOf } from './palette.mjs';
-import { widePalette, localColours, kmeans, splitByPuddle, puddleLabels, coverKeyHues, keyHueCoverage } from './palettewide.mjs';
+import { widePalette, localColours, kmeans, splitByPuddle, puddleLabels, mergeCloseColours, coverKeyHues, keyHueCoverage } from './palettewide.mjs';
 import { sampleSource } from './boxpick.mjs';
 import { BOX } from './box.mjs';
 
@@ -95,6 +95,18 @@ test('splitByPuddle never leaves a piece a wash would drop: a sliver too thin to
   assert.ok(keep(merged, 4));
   let covered = 0; for (let i = 0; i < w * h; i++) if (merged.labels[i]) covered++;
   assert.equal(covered, w * h, 'every cell of the uncut wash is covered by exactly one cut wash');
+});
+
+test('puddles the eye cannot tell apart are one wash, and a different colour stays its own', () => {
+  const pigments = [{ K: [0.05, 0.6, 0.5], S: [0.02, 0.02, 0.02] }, { K: [0.5, 0.2, 0.05], S: [0.02, 0.02, 0.02] }], paper = [252, 251, 248];
+  // three puddles over 6 cells: a rose, the same rose with a hair of the other pan, and a blue
+  const centres = [[0.97, 0.03], [0.96, 0.04], [0.05, 0.95]], labels = Uint8Array.of(0, 0, 0, 1, 1, 2), A = new Float32Array(12);
+  labels.forEach((c, i) => { A[i * 2] = centres[c][0] * 0.8; A[i * 2 + 1] = centres[c][1] * 0.8; });
+  const r = mergeCloseColours({ labels, centres }, A, 2, pigments, paper);
+  assert.equal(r.merged, 1);
+  assert.equal(r.labels[3], r.labels[0], 'the near rose joins the larger puddle');
+  assert.notEqual(r.labels[5], r.labels[0], 'the blue is its own wash');
+  assert.equal(mergeCloseColours({ labels, centres }, A, 2, pigments, paper, { de: 0 }).merged, 0);
 });
 
 test('puddle labels follow the amounts', () => {

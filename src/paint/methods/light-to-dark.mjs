@@ -20,7 +20,7 @@ import {layerFractions,regionCuts} from './layer-cuts.mjs';
 import { components, closeLocal, removeSmall, erode, dilate } from '../../raster.js';
 import { targetRegions } from './target-regions.mjs';
 import { passage } from '../../crop/blockin.mjs';
-import { puddleLabels, splitByPuddle } from '../../crop/palettewide.mjs';
+import { puddleLabels, splitByPuddle, mergeCloseColours } from '../../crop/palettewide.mjs';
 import { labOf } from '../../eval/colour.mjs';
 
 const VALUE_CAPS = Object.freeze([.16, .32, .50, .75, 1]);
@@ -239,8 +239,8 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
   const inkWashCell=i=>cellStyle(i)?.name==='ink-and-wash';
   const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rFloor):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?weights[3][i]+weights[4][i]>0:deep?weights[4][i]>0:weights[3][i]>0&&!(weights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1&&'fine'))}):null;
   const layers=[],instructions=[];let omittedDemand=0;
-  // local colour (palettewide.mjs puddles): a wash that keeps families apart is cut again by the mix of the cells it covers, so a shirt and a face of one family are never one mean wash
-  let PUDDLE_LABELS=null;const puddles=()=>PUDDLE_LABELS??=puddleLabels(demand,k,w,h).labels;
+  // local colour (palettewide.mjs puddles): a wash that keeps families apart is cut again by the mix of the cells it covers, so a shirt and a face of one family are never one mean wash; mixes the eye cannot tell apart stay one wash
+  let PUDDLE_LABELS=null;const puddles=()=>PUDDLE_LABELS??=mergeCloseColours(puddleLabels(demand,k,w,h),demand,k,pigments,paperRGB??[252,251,248]).labels;
   for(let i=0;i<n;i++)if(protectedCells[i]||(!rgb&&value.values[i]===0))for(let j=0;j<k;j++)omittedDemand+=demand[i*k+j];
   // layers>0: the middle values are built as several wide connected wash layers, each dried
   // before the next. Layer 0 covers the whole middle form; each later layer covers only the
