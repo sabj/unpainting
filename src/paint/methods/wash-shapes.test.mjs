@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { washShapes, leastAreas, isPaper, LEAST_WASH_TOUCHES } from './wash-shapes.mjs';
+import { washShapes, reservedLights, leastAreas, isPaper, LEAST_WASH_TOUCHES, LEAST_CONTRAST } from './wash-shapes.mjs';
+import { labOf } from '../../eval/colour.mjs';
 
 const PAPER = [252, 251, 248];
 // a picture of flat rectangles: [x0, y0, x1, y1, [r, g, b]] painted in order over a ground
@@ -38,24 +39,66 @@ test('a large enough patch is its own shape, at any cell size', () => {
   }
 });
 
-test('paper a wash can go round is kept as a shape of its own, and a speck of paper is washed over', () => {
-  // a 6 x 6 mm and a 2 x 2 mm patch of bare paper in a mid-tone field; the least wash is 28.3 mm2, the least reserve 7.1
-  const w = 60, h = 40, rgb = picture(w, h, [150, 140, 120], [[10, 10, 16, 16, PAPER], [40, 20, 42, 22, PAPER]]);
-  const { labels, shapes, least } = washShapes({ rgb, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 });
-  assert.equal(shapes.length, 2);
-  const light = shapes.find(s => s.paper);
-  assert.ok(light.areaMm2 >= least.reserveMm2 && light.areaMm2 <= 36, `${light.areaMm2} mm2 of paper`);
-  assert.equal(labels[13 * w + 13], light.id);
-  assert.notEqual(labels[21 * w + 41], light.id, 'paper under one touch is washed over');
-  assert.ok(isPaper(light.mean, PAPER) && !isPaper([150, 140, 120], PAPER));
+test('two fields are two shapes only when their colours differ by the least contrast', () => {
+  const w = 60, h = 40, apart = c => { const a = labOf([200, 90, 80], 0, PAPER), b = labOf(c, 0, PAPER); return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); };
+  const near = [188, 84, 76], far = [150, 62, 55];
+  assert.ok(apart(near) < LEAST_CONTRAST - 2 && apart(far) > LEAST_CONTRAST + 2, `${apart(near)}, ${apart(far)}`);
+  assert.equal(washShapes({ rgb: picture(w, h, [200, 90, 80], [[30, 0, 60, 40, near]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 }).shapes.length, 1);
+  assert.equal(washShapes({ rgb: picture(w, h, [200, 90, 80], [[30, 0, 60, 40, far]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 }).shapes.length, 2);
 });
 
-test('a reserve may be smaller than a wash', () => {
-  // 4 x 5 mm (20 mm2): kept as paper, joined to its neighbour as paint
-  for (const [colour, count] of [[PAPER, 2], [[120, 110, 95], 1]]) {
-    const w = 60, h = 40, rgb = picture(w, h, [150, 140, 120], [[10, 10, 14, 15, colour]]);
-    assert.equal(washShapes({ rgb, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 }).shapes.length, count);
-  }
+test('a blurred edge between two fields leaves no shape of its own, and a stripe narrower than the brush is no wash', () => {
+  // a ramp 8 mm wide from red to blue: its cells go to the field nearer them in colour
+  const w = 60, h = 40, rgb = picture(w, h, [200, 90, 80], [[34, 0, 60, 40, [70, 100, 190]]]);
+  for (let y = 0; y < h; y++) for (let x = 26; x < 34; x++) { const t = (x - 25.5) / 8; rgb.set([200 + t * (70 - 200), 90 + t * 10, 80 + t * 110], (y * w + x) * 3); }
+  const ramp = washShapes({ rgb, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 });
+  assert.equal(ramp.shapes.length, 2);
+  assert.notEqual(ramp.labels[20 * w + 27], ramp.labels[20 * w + 32], 'the ramp is shared between the two fields');
+  // a 2 mm dark stripe 40 mm long (80 mm2, over the least wash) on a 7 mm brush's sheet: a stroke, not a wash
+  const stripe = washShapes({ rgb: picture(w, h, [200, 190, 160], [[10, 19, 50, 21, [60, 50, 45]]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 });
+  assert.equal(stripe.shapes.length, 1);
+  const band = washShapes({ rgb: picture(w, h, [200, 190, 160], [[10, 16, 50, 24, [60, 50, 45]]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 });
+  assert.equal(band.shapes.length, 2, 'an 8 mm band is a wash');
+});
+
+test('a chain of small steps does not run two different colours into one shape', () => {
+  // six bands, each within the least contrast of the next, from a cream to a violet
+  const w = 60, h = 40, rgb = new Uint8ClampedArray(w * h * 3), a = [230, 215, 180], b = [120, 120, 190];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const t = Math.floor(x / 10) / 5; rgb.set(a.map((v, c) => v + t * (b[c] - v)), (y * w + x) * 3); }
+  const { shapes, labels } = washShapes({ rgb, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3, contrast: 16 });
+  assert.ok(shapes.length >= 2 && shapes.length <= 6, `${shapes.length} shapes`);
+  assert.notEqual(labels[20 * w + 2], labels[20 * w + 57]);
+});
+
+test('cells behind the barrier belong to no shape', () => {
+  const w = 60, h = 40, barrier = new Uint8Array(w * h); for (let y = 10; y < 20; y++) for (let x = 10; x < 20; x++) barrier[y * w + x] = 1;
+  const { labels, shapes } = washShapes({ rgb: picture(w, h, [200, 90, 80], [[10, 10, 20, 20, PAPER]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3, barrier });
+  assert.equal(shapes.length, 1); assert.equal(labels[15 * w + 15], 0); assert.equal(shapes[0].area, w * h - 100);
+});
+
+test('a light is reserved when it is near the picture\'s lightest tone and clearly lighter than what is round it', () => {
+  // a grey scan: nothing is paper white. A cream hull (the lightest thing) on a violet sky, beside a pale blue field.
+  const w = 80, h = 50, rgb = picture(w, h, [150, 150, 195], [[10, 10, 34, 34, [226, 220, 200]], [44, 0, 80, 50, [196, 208, 226]], [50, 20, 53, 23, [226, 220, 200]]]);
+  const r = reservedLights({ rgb, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 7, thinMm: 3 });
+  assert.equal(r.lights, 1);
+  assert.equal(r.mask[20 * w + 20], 1, 'the hull stays paper');
+  assert.equal(r.mask[25 * w + 60], 0, 'a pale blue field is a wash, not a light');
+  assert.equal(r.mask[5 * w + 5], 0);
+  assert.equal(r.mask[21 * w + 51], 0, 'a fleck under one touch of the brush is not reserved');
+  assert.ok(Math.abs(r.lightest - labOf([226, 220, 200], 0, PAPER)[0]) < 2);
+  // the same cream as the whole of a sheet with one dark mark is not lighter than its surroundings, but paper is paper
+  assert.equal(reservedLights({ rgb: picture(w, h, [226, 220, 200], [[30, 20, 50, 30, [60, 50, 45]]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 7, thinMm: 3 }).lights, 1);
+  const bare = reservedLights({ rgb: picture(w, h, [150, 140, 120], [[10, 10, 30, 30, PAPER]]), w, h, paperRGB: PAPER, cellMm: 1, brushMm: 7, thinMm: 3 });
+  assert.equal(bare.mask[20 * w + 20], 1); assert.ok(isPaper(PAPER, PAPER) && !isPaper([150, 140, 120], PAPER));
+});
+
+test('a faint pattern over the picture (3 L* rms) moves no shape and no light', () => {
+  const w = 80, h = 50, base = picture(w, h, [150, 150, 195], [[10, 10, 34, 34, [226, 220, 200]], [44, 0, 80, 50, [205, 170, 125]], [50, 14, 70, 40, [150, 124, 92]]]);
+  const planted = Uint8ClampedArray.from(base, (v, q) => { const i = (q / 3) | 0, x = i % w, y = (i / w) | 0; return v + 16 * Math.sin(x * 1.9 + 1) * Math.sin(y * 1.7 + 2); });
+  const a = washShapes({ rgb: base, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 }), b = washShapes({ rgb: planted, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 3 });
+  assert.equal(a.shapes.length, 4); assert.deepEqual(b.labels, a.labels);
+  b.shapes.forEach((s, q) => assert.ok(Math.hypot(...s.lab.map((v, c) => v - a.shapes[q].lab[c])) < 1.5));
+  assert.deepEqual(reservedLights({ rgb: planted, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 7, thinMm: 3 }).mask, reservedLights({ rgb: base, w, h, paperRGB: PAPER, cellMm: 1, brushMm: 7, thinMm: 3 }).mask);
 });
 
 test('faint grain inside a field (5 of 255 either way) does not cut it into shapes', () => {

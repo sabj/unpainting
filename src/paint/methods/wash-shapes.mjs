@@ -1,28 +1,42 @@
 // Wash shapes: the areas of a picture a painter would wash in one go.
 //
-// The subject's colours are sorted into a few families, each cell takes the family most common under the smallest wash
-// brush around it (the squint), and each connected run of one family is a shape. A shape under the least area joins the neighbour nearest it in colour,
-// smallest first, until every shape is one the brush can lay; touching shapes the eye cannot tell apart are then joined. The least areas are stated in mm2 and come from the brush:
+// The squinted subject is cut by contrast, with a margin. Every cell starts as its own shape. The two touching shapes
+// nearest in colour join, again and again, until no two touching shapes are within LEAST_CONTRAST of each other. A
+// shape is one colour: two shapes do not join when the cells of the joined shape would stray from its mean (so a chain
+// of small steps cannot run a sky into a sail). Then
+// the smallest shape under the least area joins the neighbour nearest it in colour, and a shape nowhere as wide as its
+// brush is not a wash (it is a stroke, or the blurred edge between two shapes): its cells go to the neighbours nearest
+// them in colour. So a shape exists only where the picture has a clear step, and a faint pattern laid over the picture
+// moves no shape: it changes a shape's mean colour by a hair and is far under the margin.
 //
-//   least wash    LEAST_WASH_TOUCHES touches of the brush (a shape smaller than that is a stroke, not a wash)
-//   least reserve one touch of the brush (the least paper a wash can go round)
+//   least wash      LEAST_WASH_TOUCHES touches of the brush (a shape smaller than that is a stroke, not a wash)
+//   least reserve   one touch of the brush (the least paper a wash can go round)
+//   least contrast  LEAST_CONTRAST between the mean colours of two touching shapes
 //
-// The shapes partition the sheet. Everything the plan decides after this is decided once a shape, from the shape's mean
-// colour. Plan time only.
-import { kmeans } from '../../crop/palettewide.mjs';
+// Reserved lights are decided here too, before any wash: the shapes that stay paper. A light is a shape near the
+// picture's own lightest tone that is clearly lighter than what surrounds it.
+// Everything the plan decides after this is decided once a shape, from the shape's mean colour. Plan time only.
 import { labOf } from '../../eval/colour.mjs';
 import { footprintMm2 } from './brush-footprint.mjs';
 
 /** A wash is at least this many touches of the brush that lays it. */
 export const LEAST_WASH_TOUCHES = 4;
-/** Colour families the squinted subject is sorted into before its connected runs are taken (as the touch-up shapes are). */
-const FAMILIES = 24;
+/** Two touching shapes are kept apart only when their mean colours differ by at least this (Lab distance). */
+export const LEAST_CONTRAST = 10;
+/** A shape is one colour: two shapes join only if the cells of the joined shape stay within this share of the least contrast of its mean (rms). */
+const ONE_COLOUR = 0.5;
+/** A wash is somewhere at least this share of its brush wide. */
+const LEAST_DEPTH = 0.8;
 /** A shape whose mean colour is within this of the paper, per channel, is paper: the tolerance the paper rule uses. */
 const PAPER_TOLERANCE = [9, 9, 12];
-/** Two colour families are kept apart only when their centres are at least this far apart (Lab distance). */
-const FAMILY_APART = 5;
-/** Touching shapes whose mean colours are within this (Lab distance; about what the eye can tell apart) are one shape. */
-const SAME_COLOUR = 2.3;
+/** A light is within this of the picture's lightest tone (Lab distance) ... */
+const LIGHT_WITHIN = 10;
+/** ... and at least this many L* lighter than the shapes around it. */
+const LIGHT_CLEAR = 6;
+/** The lights are cut from the picture at this contrast: a light is told from a pale wash beside it. */
+const LIGHT_CONTRAST = 6;
+/** The picture's lightest tone is this quantile of its squinted lightness. */
+const LIGHTEST_QUANTILE = 0.98;
 
 const LIN = Float32Array.from({ length: 256 }, (_, v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
 const encode = v => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
@@ -38,98 +52,144 @@ export function isPaper(mean, paperRGB) {
   return mean[0] >= paperRGB[0] - PAPER_TOLERANCE[0] && mean[1] >= paperRGB[1] - PAPER_TOLERANCE[1] && mean[2] >= paperRGB[2] - PAPER_TOLERANCE[2];
 }
 
-function boxMean(src, w, h, r) {
-  const n = w * h, row = new Float32Array(n), out = new Float32Array(n);
-  for (let y = 0; y < h; y++) { let s = 0, c = 0; for (let x = -r; x < w + r; x++) { const a = x + r, b = x - r - 1; if (a >= 0 && a < w) { s += src[y * w + a]; c++; } if (b >= 0 && b < w) { s -= src[y * w + b]; c--; } if (x >= 0 && x < w) row[y * w + x] = s / c; } }
-  for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let y = -r; y < h + r; y++) { const a = y + r, b = y - r - 1; if (a >= 0 && a < h) { s += row[a * w + x]; c++; } if (b >= 0 && b < h) { s -= row[b * w + x]; c--; } if (y >= 0 && y < h) out[y * w + x] = s / c; } }
-  return out;
+/** A binary heap of arrays ordered by their first entries. */
+function heapOf(order) {
+  const heap = [], less = (p, q) => { for (let c = 0; c < order; c++) if (p[c] !== q[c]) return p[c] < q[c]; return false; };
+  return {
+    get size() { return heap.length; },
+    push(e) { heap.push(e); let i = heap.length - 1; while (i) { const p = (i - 1) >> 1; if (!less(heap[i], heap[p])) break; [heap[i], heap[p]] = [heap[p], heap[i]]; i = p; } },
+    pop() { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let s = i; if (l < heap.length && less(heap[l], heap[s])) s = l; if (r < heap.length && less(heap[r], heap[s])) s = r; if (s === i) break; [heap[i], heap[s]] = [heap[s], heap[i]]; i = s; } } return top; },
+  };
 }
 
 /**
  * The sheet cut into wash shapes.
- * @param rgb the subject, sRGB bytes (n * 3). @param cellMm one cell in mm. @param brushMm the smallest wash brush's belly.
+ * @param rgb the squinted subject, sRGB bytes (n * 3). @param cellMm one cell in mm. @param brushMm the brush the shapes are laid with.
+ * @param leastMm2 the least area of a shape (default: the brush's least wash). @param barrier cells (1) that belong to no shape.
+ * @param start shapes to begin from, one number a cell (negative: no shape), in place of single cells: the things of the
+ *   picture. They are joined only where two that touch are within `contrast`, and are not cut.
  * @returns {{labels: Int32Array, shapes: Array<{id:number, area:number, areaMm2:number, mean:number[], lab:number[], paper:boolean}>,
- *   least: {washMm2:number, reserveMm2:number}}} labels are 1..shapes.length; `mean` is the shape's mean colour, averaged
- *   as light and given as sRGB 0..255.
+ *   least: {washMm2:number, reserveMm2:number}}} labels are 1..shapes.length (0 on the barrier); `mean` is the shape's
+ *   mean colour, averaged as light and given as sRGB 0..255.
  */
-export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, families = FAMILIES }) {
+export function washShapes({ rgb, w, h, paperRGB, cellMm, brushMm, contrast = LEAST_CONTRAST, leastMm2 = null, barrier = null, start = null }) {
   const n = w * h;
   if (!rgb || rgb.length !== n * 3) throw new Error('wash shapes need the subject colours');
   if (!(cellMm > 0) || !(brushMm > 0)) throw new Error('wash shapes need a positive cell size and brush width');
-  const least = leastAreas(brushMm), cell2 = cellMm * cellMm;
-  // the subject as light
+  const least = leastAreas(brushMm), leastCells = (leastMm2 ?? least.washMm2) / (cellMm * cellMm);
   const lin = [0, 1, 2].map(c => { const f = new Float32Array(n); for (let i = 0; i < n; i++) f[i] = LIN[rgb[i * 3 + c]]; return f; });
   const lab = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { const q = labOf(rgb, i, paperRGB); lab[i * 3] = q[0]; lab[i * 3 + 1] = q[1]; lab[i * 3 + 2] = q[2]; }
-  // colour families: k-means on a sample spread over the sheet, then every cell to its nearest family
-  const stride = Math.max(1, Math.ceil(n / 40000)), m = Math.ceil(n / stride), P = new Float32Array(m * 3);
-  for (let q = 0; q < m; q++) { const i = Math.min(n - 1, q * stride); P[q * 3] = lab[i * 3]; P[q * 3 + 1] = lab[i * 3 + 1]; P[q * 3 + 2] = lab[i * 3 + 2]; }
-  const km = kmeans(P, m, 3, families), share = new Float64Array(km.centres.length), centres = [];
-  for (const c of km.labels) share[c]++;
-  // families too close to tell apart are one family, the commoner first: a flat field with grain is not sorted by its grain
-  for (const c of km.centres.map((_, q) => q).sort((a, b) => share[b] - share[a] || a - b)) { const C = km.centres[c]; if (share[c] && !centres.some(K => Math.hypot(C[0] - K[0], C[1] - K[1], C[2] - K[2]) < FAMILY_APART)) centres.push(C); }
-  const own = new Uint8Array(n);
-  for (let i = 0; i < n; i++) { let best = 0, bd = Infinity; for (let c = 0; c < centres.length; c++) { const d = (lab[i * 3] - centres[c][0]) ** 2 + (lab[i * 3 + 1] - centres[c][1]) ** 2 + (lab[i * 3 + 2] - centres[c][2]) ** 2; if (d < bd) { bd = d; best = c; } } own[i] = best; }
-  // the squint: a cell takes the family most of the cells under the brush around it belong to. A vote keeps an edge
-  // where it is and makes no in-between colour along it, as a blur would.
-  const r = Math.max(1, Math.round(brushMm / 2 / cellMm)), fam = new Uint8Array(n), top = new Float32Array(n), ind = new Float32Array(n);
-  for (let c = 0; c < centres.length; c++) {
-    let any = 0; for (let i = 0; i < n; i++) { ind[i] = own[i] === c ? 1 : 0; any |= ind[i]; }
-    if (!any) continue;
-    const share = boxMean(ind, w, h, r);
-    for (let i = 0; i < n; i++) if (share[i] > top[i]) { top[i] = share[i]; fam[i] = c; }
+  const open = i => !barrier?.[i] && !(start && start[i] < 0), spread = (ONE_COLOUR * contrast) ** 2;
+
+  const parent = Int32Array.from({ length: n }, (_, i) => i), find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  if (!start) {
+    // 1. cells into regions: the closest touching pair joins first, while any pair is within the least contrast
+    const size = new Float64Array(n).fill(1), sum = [0, 1, 2].map(c => Float64Array.from({ length: n }, (_, i) => lab[i * 3 + c])), square = Float64Array.from({ length: n }, (_, i) => lab[i * 3] ** 2 + lab[i * 3 + 1] ** 2 + lab[i * 3 + 2] ** 2);
+    // the mean square distance of a joined shape's cells from its mean colour
+    const loose = (a, b) => { const m = size[a] + size[b]; return (square[a] + square[b]) / m - ((sum[0][a] + sum[0][b]) ** 2 + (sum[1][a] + sum[1][b]) ** 2 + (sum[2][a] + sum[2][b]) ** 2) / (m * m); };
+    const apart = (a, b) => Math.hypot(sum[0][a] / size[a] - sum[0][b] / size[b], sum[1][a] / size[a] - sum[1][b] / size[b], sum[2][a] / size[a] - sum[2][b] / size[b]);
+    for (let round = 0, joined = 1; joined && round < 8; round++) {
+      joined = 0; const heap = heapOf(3), seen = new Set();
+      for (let i = 0; i < n; i++) { if (!open(i)) continue; const x = i % w, a = find(i); for (const j of [x < w - 1 ? i + 1 : -1, i + w < n ? i + w : -1]) { if (j < 0 || !open(j)) continue; const b = find(j); if (a === b) continue; const key = a < b ? a * n + b : b * n + a; if (seen.has(key)) continue; seen.add(key); const d = apart(a, b); if (d < contrast) heap.push([d, Math.min(a, b), Math.max(a, b)]); } }
+      while (heap.size) {
+        const [was, p, q] = heap.pop(), a = find(p), b = find(q); if (a === b) continue;
+        // a pair whose shapes have changed since it was filed is filed again at what it is now
+        const d = apart(a, b); if (d > was + 1e-9) { if (d < contrast) heap.push([d, Math.min(a, b), Math.max(a, b)]); continue; }
+        if (loose(a, b) > spread) continue;
+        const into = size[a] > size[b] || (size[a] === size[b] && a < b) ? a : b, from = into === a ? b : a;
+        parent[from] = into; size[into] += size[from]; square[into] += square[from]; for (let c = 0; c < 3; c++) sum[c][into] += sum[c][from]; joined++;
+      }
+    }
   }
-  // connected runs of one family (edge neighbours)
-  const run = new Int32Array(n).fill(-1), stack = new Int32Array(n); let count = 0;
-  for (let s = 0; s < n; s++) {
-    if (run[s] >= 0) continue;
-    let sp = 0; stack[sp++] = s; run[s] = count;
-    while (sp) { const i = stack[--sp], x = i % w; for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (j >= 0 && j < n && run[j] < 0 && fam[j] === fam[i]) { run[j] = count; stack[sp++] = j; } }
-    count++;
-  }
-  // each run's area and sums (the subject's own light, not the squint), and the runs it touches
-  const area = new Float64Array(count), sum = Array.from({ length: 6 }, () => new Float64Array(count)), touch = Array.from({ length: count }, () => new Set());
-  for (let i = 0; i < n; i++) {
-    const a = run[i]; area[a]++;
-    for (let c = 0; c < 3; c++) { sum[c][a] += lin[c][i]; sum[3 + c][a] += lab[i * 3 + c]; }
-    const x = i % w; for (const j of [x < w - 1 ? i + 1 : -1, i + w < n ? i + w : -1]) if (j >= 0 && run[j] !== a) { touch[a].add(run[j]); touch[run[j]].add(a); }
-  }
-  const meanOf = a => [0, 1, 2].map(c => encode(sum[c][a] / area[a])), labMean = a => [sum[3][a] / area[a], sum[4][a] / area[a], sum[5][a] / area[a]];
-  const floorOf = a => (isPaper(meanOf(a), paperRGB) ? least.reserveMm2 : least.washMm2) / cell2;
-  // smallest first, a run under its least area joins the touching run nearest it in colour
-  const parent = Int32Array.from({ length: count }, (_, a) => a), find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
-  const heap = []; // [area, run], a binary heap on area then run id; stale entries are skipped when popped
-  const less = (p, q) => p[0] < q[0] || (p[0] === q[0] && p[1] < q[1]);
-  const push = e => { heap.push(e); let i = heap.length - 1; while (i) { const p = (i - 1) >> 1; if (!less(heap[i], heap[p])) break; [heap[i], heap[p]] = [heap[p], heap[i]]; i = p; } };
-  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r2 = l + 1; let s = i; if (l < heap.length && less(heap[l], heap[s])) s = l; if (r2 < heap.length && less(heap[r2], heap[s])) s = r2; if (s === i) break; [heap[i], heap[s]] = [heap[s], heap[i]]; i = s; } } return top; };
-  const join = (a, into) => {
-    parent[a] = into; area[into] += area[a]; for (let c = 0; c < 6; c++) sum[c][into] += sum[c][a];
-    for (const b of touch[a]) { touch[b].delete(a); if (b !== into) { touch[b].add(into); touch[into].add(b); } }
-    touch[a] = null; push([area[into], into]);
+  let labels = new Int32Array(n).fill(-1), count = 0;
+  { const idOf = new Map(); for (let i = 0; i < n; i++) if (open(i)) { const a = start ? start[i] : find(i); let id = idOf.get(a); if (id === undefined) { id = count++; idOf.set(a, id); } labels[i] = id; } }
+
+  // 2. regions into shapes: contrast first, then the smallest shape under the least area into its nearest neighbour
+  const settle = () => {
+    const area = new Float64Array(count), sums = Array.from({ length: 7 }, () => new Float64Array(count)), touch = Array.from({ length: count }, () => new Set());
+    for (let i = 0; i < n; i++) {
+      const a = labels[i]; if (a < 0) continue; area[a]++;
+      for (let c = 0; c < 3; c++) { sums[c][a] += lin[c][i]; sums[3 + c][a] += lab[i * 3 + c]; sums[6][a] += lab[i * 3 + c] ** 2; }
+      const x = i % w; for (const j of [x < w - 1 ? i + 1 : -1, i + w < n ? i + w : -1]) if (j >= 0 && labels[j] >= 0 && labels[j] !== a) { touch[a].add(labels[j]); touch[labels[j]].add(a); }
+    }
+    const alive = new Uint8Array(count).fill(1), into = Int32Array.from({ length: count }, (_, a) => a);
+    const far = (a, b) => Math.hypot(sums[3][a] / area[a] - sums[3][b] / area[b], sums[4][a] / area[a] - sums[4][b] / area[b], sums[5][a] / area[a] - sums[5][b] / area[b]);
+    const slack = (a, b) => { const m = area[a] + area[b]; return (sums[6][a] + sums[6][b]) / m - ((sums[3][a] + sums[3][b]) ** 2 + (sums[4][a] + sums[4][b]) ** 2 + (sums[5][a] + sums[5][b]) ** 2) / (m * m); };
+    const join = (a, b) => { // a into b
+      alive[a] = 0; into[a] = b; area[b] += area[a]; for (let c = 0; c < 7; c++) sums[c][b] += sums[c][a];
+      for (const t of touch[a]) { touch[t].delete(a); if (t !== b) { touch[t].add(b); touch[b].add(t); } }
+      touch[a] = null;
+    };
+    for (;;) {
+      let pa = -1, pb = -1, bd = contrast;
+      for (let a = 0; a < count; a++) if (alive[a]) for (const b of touch[a]) if (b > a) { const d = far(a, b); if (d < bd && slack(a, b) <= spread) { bd = d; pa = a; pb = b; } }
+      if (pa < 0) {
+        let small = -1; for (let a = 0; a < count; a++) if (alive[a] && area[a] < leastCells && touch[a].size && (small < 0 || area[a] < area[small])) small = a;
+        if (small < 0) break;
+        pa = small; bd = Infinity; for (const b of touch[small]) { const d = far(small, b); if (d < bd || (d === bd && b < pb)) { bd = d; pb = b; } }
+      }
+      if (area[pa] > area[pb]) join(pb, pa); else join(pa, pb);
+    }
+    const root = a => { while (into[a] !== a) a = into[a]; return a; }, idOf = new Int32Array(count).fill(-1); let next = 0;
+    for (let i = 0; i < n; i++) { if (labels[i] < 0) continue; const a = root(labels[i]); if (idOf[a] < 0) idOf[a] = next++; labels[i] = idOf[a]; }
+    const stats = Array.from({ length: next }, () => null); for (let a = 0; a < count; a++) if (alive[a] && idOf[a] >= 0) stats[idOf[a]] = { area: area[a], mean: [0, 1, 2].map(c => encode(sums[c][a] / area[a])), lab: [sums[3][a] / area[a], sums[4][a] / area[a], sums[5][a] / area[a]] };
+    count = next; return stats;
   };
-  for (let a = 0; a < count; a++) push([area[a], a]);
-  while (heap.length) {
-    const [was, a] = pop();
-    if (parent[a] !== a || area[a] !== was || area[a] >= floorOf(a) || !touch[a].size) continue;
-    const own = labMean(a); let into = -1, bd = Infinity;
-    for (const b of touch[a]) { const q = labMean(b), d = (own[0] - q[0]) ** 2 + (own[1] - q[1]) ** 2 + (own[2] - q[2]) ** 2; if (d < bd || (d === bd && b < into)) { bd = d; into = b; } }
-    join(a, into);
+  let stats = settle();
+
+  // 3. a shape nowhere as wide as its brush is no wash: its cells go to the touching shapes nearest them in colour
+  for (let pass = 0; pass < 2 && count > 1; pass++) {
+    const D = new Float32Array(n), differs = (i, j) => labels[j] !== labels[i];
+    for (let i = 0; i < n; i++) { const x = i % w; D[i] = labels[i] < 0 || (x && differs(i, i - 1)) || (x < w - 1 && differs(i, i + 1)) || (i >= w && differs(i, i - w)) || (i + w < n && differs(i, i + w)) ? 0 : 1e9; }
+    for (let i = 0; i < n; i++) { if (!D[i]) continue; const x = i % w; let d = D[i]; if (x) d = Math.min(d, D[i - 1] + 1); if (i >= w) { d = Math.min(d, D[i - w] + 1); if (x) d = Math.min(d, D[i - w - 1] + Math.SQRT2); if (x < w - 1) d = Math.min(d, D[i - w + 1] + Math.SQRT2); } D[i] = d; }
+    for (let i = n - 1; i >= 0; i--) { if (!D[i]) continue; const x = i % w; let d = D[i]; if (x < w - 1) d = Math.min(d, D[i + 1] + 1); if (i + w < n) { d = Math.min(d, D[i + w] + 1); if (x < w - 1) d = Math.min(d, D[i + w + 1] + Math.SQRT2); if (x) d = Math.min(d, D[i + w - 1] + Math.SQRT2); } D[i] = d; }
+    const deep = new Float32Array(count); for (let i = 0; i < n; i++) if (labels[i] >= 0 && D[i] < 1e8 && D[i] + .5 > deep[labels[i]]) deep[labels[i]] = D[i] + .5;
+    for (let a = 0; a < count; a++) if (!deep[a]) deep[a] = .5;
+    const thin = Uint8Array.from(deep, d => (d * cellMm < LEAST_DEPTH * brushMm / 2 ? 1 : 0));
+    if (!thin.some(Boolean) || thin.every(Boolean)) break;
+    for (let moved = 1; moved;) {
+      moved = 0; const next = [];
+      for (let i = 0; i < n; i++) {
+        if (labels[i] < 0 || !thin[labels[i]]) continue; const x = i % w; let best = -1, bd = Infinity;
+        for (const j of [x ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) { if (j < 0 || j >= n || labels[j] < 0 || thin[labels[j]]) continue; const q = stats[labels[j]].lab, d = (lab[i * 3] - q[0]) ** 2 + (lab[i * 3 + 1] - q[1]) ** 2 + (lab[i * 3 + 2] - q[2]) ** 2; if (d < bd || (d === bd && labels[j] < best)) { bd = d; best = labels[j]; } }
+        if (best >= 0) next.push(i, best);
+      }
+      for (let q = 0; q < next.length; q += 2) { labels[next[q]] = next[q + 1]; moved++; }
+    }
+    // the shapes are numbered again and settled: a shape that took the cells of a thin one has a new mean
+    { const idOf = new Map(); let next = 0; for (let i = 0; i < n; i++) if (labels[i] >= 0) { let id = idOf.get(labels[i]); if (id === undefined) { id = next++; idOf.set(labels[i], id); } labels[i] = id; } count = next; }
+    stats = settle();
   }
-  // touching shapes the eye cannot tell apart are one shape: grain inside a field must not cut it up
-  for (let a = 0; a < count; a++) if (parent[a] === a) push([area[a], a]);
-  while (heap.length) {
-    const [was, a] = pop();
-    if (parent[a] !== a || area[a] !== was || !touch[a].size) continue;
-    const own = labMean(a); let into = -1, bd = SAME_COLOUR * SAME_COLOUR;
-    for (const b of touch[a]) { const q = labMean(b), d = (own[0] - q[0]) ** 2 + (own[1] - q[1]) ** 2 + (own[2] - q[2]) ** 2; if (d < bd || (d === bd && into >= 0 && b < into)) { bd = d; into = b; } }
-    if (into < 0) continue;
-    join(a, into);
-  }
-  const idOf = new Int32Array(count), shapes = [], labels = new Int32Array(n);
-  for (let i = 0; i < n; i++) {
-    const a = find(run[i]);
-    if (!idOf[a]) { const mean = meanOf(a); shapes.push({ id: shapes.length + 1, area: area[a], areaMm2: area[a] * cell2, mean, lab: labOf(mean, 0, paperRGB), paper: isPaper(mean, paperRGB) }); idOf[a] = shapes.length; }
-    labels[i] = idOf[a];
-  }
+  const shapes = stats.map((s, a) => ({ id: a + 1, area: s.area, areaMm2: s.area * cellMm * cellMm, mean: s.mean, lab: labOf(s.mean, 0, paperRGB), paper: isPaper(s.mean, paperRGB) }));
+  for (let i = 0; i < n; i++) labels[i]++;
   return { labels, shapes, least };
+}
+
+/**
+ * The lights that stay paper, decided before any wash.
+ * A shape of the squinted picture is a light when it is the paper's colour, or when it is within LIGHT_WITHIN of the
+ * picture's own lightest tone (the mean colour of its lightest fiftieth) and, taken with the lights it touches, at least LIGHT_CLEAR L* lighter than the shapes
+ * around it. A light is at least the least reserve of `brushMm` in area and somewhere as wide as `thinMm`.
+ * @returns {{mask: Uint8Array (1 on a reserved cell), lightest: number (L*), lights: number}}
+ */
+export function reservedLights({ rgb, w, h, paperRGB, cellMm, brushMm, thinMm = brushMm }) {
+  const n = w * h, cut = washShapes({ rgb, w, h, paperRGB, cellMm, brushMm: thinMm, leastMm2: leastAreas(brushMm).reserveMm2, contrast: LIGHT_CONTRAST });
+  const labs = Array.from({ length: n }, (_, i) => labOf(rgb, i, paperRGB)), level = labs.map(q => q[0]).sort((a, b) => a - b)[Math.min(n - 1, Math.floor(LIGHTEST_QUANTILE * n))];
+  const tone = [0, 0, 0]; let top = 0; for (const q of labs) if (q[0] >= level) { top++; for (let c = 0; c < 3; c++) tone[c] += q[c]; }
+  for (let c = 0; c < 3; c++) tone[c] /= top;
+  const lightest = tone[0], candidate = cut.shapes.map(s => s.paper || Math.hypot(s.lab[0] - tone[0], s.lab[1] - tone[1], s.lab[2] - tone[2]) <= LIGHT_WITHIN), mask = new Uint8Array(n);
+  // touching candidates are judged together against the shapes around them
+  const group = new Int32Array(n).fill(-1), stack = new Int32Array(n); let lights = 0;
+  for (let s0 = 0; s0 < n; s0++) {
+    if (group[s0] >= 0 || !candidate[cut.labels[s0] - 1]) continue;
+    let sp = 0, area = 0, L = 0, around = 0, rim = 0, paper = true; const cells = []; stack[sp++] = s0; group[s0] = s0;
+    while (sp) {
+      const i = stack[--sp], x = i % w, own = cut.shapes[cut.labels[i] - 1]; cells.push(i); area++; L += own.lab[0]; paper &&= own.paper;
+      for (const j of [x ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) { if (j < 0 || j >= n) continue; if (candidate[cut.labels[j] - 1]) { if (group[j] < 0) { group[j] = s0; stack[sp++] = j; } } else { around += cut.shapes[cut.labels[j] - 1].lab[0]; rim++; } }
+    }
+    if (!paper && !(rim && L / area - around / rim >= LIGHT_CLEAR)) continue;
+    for (const i of cells) mask[i] = 1; lights++;
+  }
+  return { mask, lightest, lights };
 }

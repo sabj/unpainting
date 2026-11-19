@@ -34,13 +34,36 @@ test('soft and hard are decided once a boundary and come out as lines along the 
 
 const lengthOf = s => s.points.reduce((a, p, q) => a + (q ? Math.hypot(p[0] - s.points[q - 1][0], p[1] - s.points[q - 1][1]) : 0), 0);
 
-test('a wash is laid from its edge inward by one brush chosen from its size, in a few rounds', () => {
-  // 100 x 70 mm: the one-inch flat (its radius is under half the 35 mm depth); 60 x 40 mm: the 7 mm round; 8 x 8 mm: the 3 mm round
-  for (const [a, b, brush, most] of [[100, 70, 25.4, 3], [60, 40, 7, 5], [8, 8, 3, 3]]) {
-    const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes([{ points: [[10, 10], [10 + a, 10], [10 + a, 10 + b], [10, 10 + b]], soft: [] }], { kitMm: KIT, pointMm: 1.2 });
+const box = (a, b) => [{ points: [[10, 10], [10 + a, 10], [10 + a, 10 + b], [10, 10 + b]], soft: [] }];
+
+test('a large wash is swept in straight lanes with the widest flat or mop that fits it, and its edge is closed by the rounds', () => {
+  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 46 mm: the mop in one; 50 x 34 mm: the one-inch flat in one
+  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 46, 38, 1], [50, 34, 25.4, 1]]) {
+    const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes(box(a, b), { kitMm: KIT, pointMm: 1.2 });
     assert.equal(brushMm, brush, `${a} x ${b} mm`);
     assert.ok(Math.abs(areaMm2 - a * b) < .03 * a * b);
     assert.ok(uncovered < .02, `${uncovered} of a ${a} x ${b} mm wash left bare`);
+    const swept = strokes.filter(s => s.kind === 'lane'); assert.equal(swept.length, lanes);
+    for (const s of swept) {
+      assert.equal(s.radiusMm, brush / 2);
+      assert.equal(new Set(s.points.map(p => p[1])).size, 1, 'a lane is straight');
+      assert.ok(Math.abs(lengthOf(s) - (a - 7)) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash`);
+      // the band is as wide as the brush and square at its ends: all of it is inside the outline, by the 7 mm round's radius
+      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x) >= 3.5 - .8 && Math.min(y - 10, 10 + b - y) >= brush / 2 + 3.5 - .8, `${x}, ${y}`);
+    }
+    // the edge of the wash is laid by a round steered along the outline, over the band's ends
+    assert.ok(strokes.some(s => s.kind === 'edge' && s.radiusMm === 3.5 && lengthOf(s) > a + b), 'a round goes round the outline');
+    assert.ok(strokes.length <= 16, `${strokes.length} strokes`);
+  }
+});
+
+test('a wash too small for a flat is laid from its edge inward by the widest round that fits it, in a few rounds', () => {
+  // 30 x 22 mm: the 7 mm round; 8 x 8 mm: the 5 mm round; 5 x 5 mm: the 3 mm round
+  for (const [a, b, brush, most] of [[30, 22, 7, 3], [8, 8, 5, 3], [5, 5, 3, 3]]) {
+    const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes(box(a, b), { kitMm: KIT, pointMm: 1.2 });
+    assert.equal(brushMm, brush, `${a} x ${b} mm`);
+    assert.ok(Math.abs(areaMm2 - a * b) < .03 * a * b);
+    assert.ok(uncovered < .06, `${uncovered} of a ${a} x ${b} mm wash left bare`);
     const rounds = strokes.filter(s => s.kind === 'contour'); assert.ok(rounds.length >= 1 && rounds.length <= most, `${rounds.length} rounds`);
     assert.ok(rounds.every(s => s.radiusMm === brush / 2));
     // the first round follows the outline, the brush's radius inside it: no point of it is nearer the outline than that
@@ -51,11 +74,21 @@ test('a wash is laid from its edge inward by one brush chosen from its size, in 
   }
 });
 
+test('a wash is laid past its outline to meet its neighbours, but not onto a reserved light', () => {
+  const wash = box(40, 30), light = [{ points: [[50, 0], [70, 0], [70, 50], [50, 50]], soft: [] }];   // paper kept along the wash's right side
+  // how far right a stroke's footprint goes: a lane ends square where the brush stops, a round reaches its radius further
+  const reach = r => Math.max(...r.strokes.flatMap(s => s.points.map(p => p[0] + (s.kind === 'lane' ? 0 : s.radiusMm))));
+  const open = planWashStrokes(wash, { kitMm: KIT, growMm: 2.25 }), kept = planWashStrokes(wash, { kitMm: KIT, growMm: 2.25, keepOut: light });
+  assert.ok(reach(open) > 51.5, `the wash reaches ${reach(open)} mm`);
+  assert.ok(reach(kept) < 50.8, `beside the light it stops at ${reach(kept)} mm`);
+  assert.ok(Math.min(...kept.strokes.flatMap(s => s.points.map(p => p[0] - (s.kind === 'lane' ? 0 : s.radiusMm)))) < 8.5, 'and still grows on its other sides');
+});
+
 test('strokes follow a slanted edge as a line, not as steps, and a thin tail takes the detail brush or a closing stroke', () => {
   const tri = planWashStrokes([{ points: [[10, 10], [70, 10], [10, 50]], soft: [] }], { kitMm: KIT, pointMm: 1.2 });
   assert.ok(tri.uncovered < .03, `${tri.uncovered} of a triangle left bare`);
   // along the slanted side the first round stays one radius from it, within the planning grid's pitch
-  const first = tri.strokes[0], r = first.radiusMm, off = first.points.map(([x, y]) => (40 * (70 - x) - 60 * (y - 10)) / Math.hypot(40, 60)).filter((d, q) => { const [x, y] = first.points[q]; return x - 10 > 3 * r && y - 10 > 3 * r; });
+  const first = tri.strokes.find(s => s.kind !== 'lane'), r = first.radiusMm, off = first.points.map(([x, y]) => (40 * (70 - x) - 60 * (y - 10)) / Math.hypot(40, 60)).filter((d, q) => { const [x, y] = first.points[q]; return x - 10 > 3 * r && y - 10 > 3 * r; });
   assert.ok(off.length >= 5); for (const d of off) assert.ok(Math.abs(d - r) < 1, `${d} mm from the slanted side`);
   const loops = [{ points: [[10, 10], [40, 10], [40, 30], [26, 30], [26, 32], [60, 32], [60, 34], [10, 34]], soft: [] }];   // a block with a 2 mm tail
   const without = planWashStrokes(loops, { kitMm: KIT }), withPoint = planWashStrokes(loops, { kitMm: KIT, pointMm: 1.2 });
