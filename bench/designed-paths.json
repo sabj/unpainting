@@ -126,6 +126,9 @@
       "ran_if": [
         {
           "log": "^small marks: \\d+ small lights reserved, \\d+ small darks laid once, last"
+        },
+        {
+          "log": "^washes: \\d+ over \\d+ stages; least wash [\\d.]+ mm2"
         }
       ],
       "signal": "seen (rembrandt only)",

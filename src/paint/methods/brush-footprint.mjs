@@ -23,3 +23,9 @@ export function roleBrushPointMm(root, role, { brushes = 'src/paint/brushes.json
   if (!(b?.point_width_mm > 0)) throw new Error(`no ${role} brush point width (${k}) in ${brushes}`);
   return b.point_width_mm;
 }
+
+/** The belly widths in mm of the brushes a wash is laid with: every water brush of the kit at least as wide as the shape brush, widest first. */
+export function washKitMm(root, { brushes = 'src/paint/brushes.json' } = {}) {
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, brushes), 'utf8')), least = roleBrushMm(root, 'shape', { brushes });
+  return Object.values(cfg.brushes).filter(b => b.water_ml > 0 && !b.pigment && b.width_mm >= least).map(b => b.width_mm).sort((a, b) => b - a);
+}

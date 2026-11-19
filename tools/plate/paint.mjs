@@ -415,7 +415,14 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   const attachPlaneRamp = raw => attachRampToPaths(raw, PB && sh._plane ? null : (sh._rampVec ?? sh._valuePlan?.rampVec), SC, PATH_RAMP);
   const makeShapedPlanePaths = () => shapedPlanePaths(MASK,w,h,{scale:SC,texture:sh._valuePlan.texture,shortMm:num('texshort',0)>0?sh._valuePlan.resolution.mmPerCell:0,shortPress:num('texpress',.3),lanesR:skyLaneRadius(sh),laneStep:num('skylanestep',1.5),flowDark,box:MB,mmPerCell:num('sheetmm',DEFAULT_SHEET_MM)/w,maxBrushMm:38,protect:ctx.VALUE_PLAN?.protectedCells,edgeHalf:(r,p)=>edgeHalfWidth(r,{pressure:p,splay:WASH_FLAT_SPLAY})});
   const rawShapedPaths = () => (sh._valuePlan.brush?.paths ? passageBrushPaths(sh._valuePlan.brush, SC) : makeShapedPlanePaths());
-  const shapedPaths = BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
+  // A wash of the wash plan arrives as strokes in millimetres inside its outline (wash-strokes.mjs). They are laid as
+  // written and nothing clips them: the wash's edge is where the brush's footprint ends.
+  const CELLS_PER_MM = W2 / num('sheetmm', DEFAULT_SHEET_MM);
+  // The plan gives each stroke the half-width it is to lay. The brush that lays that half-width on this sheet is a little
+  // wider (the engine's own edgeHalfWidth, which the lanes of every wash are spaced by), so it is sized through that.
+  const brushFor = half => { let r = half + 1; for (let it = 0; it < 6; it++) r += half - edgeHalfWidth(r, { pressure: 1, splay: WASH_FLAT_SPLAY }); return Math.max(SC, r); };
+  const vectorPaths = !BUDGET && sh._valuePlan?.strokes ? sh._valuePlan.strokes.map(st => { const r = brushFor(st.radiusMm * CELLS_PER_MM); return st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1 })); }) : null;
+  const shapedPaths = vectorPaths ? vectorPaths : BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
   // an area plan's graded or variegated wash (pass.wash) runs its lanes across its direction (area-washes.mjs)
@@ -500,6 +507,10 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     if (!paths.length) { used['touch-up too small, left'] = (used['touch-up too small, left'] || 0) + 1; continue; }
     touchSmall = true; used['touch-up small brush'] = (used['touch-up small brush'] || 0) + 1;
   }
+  // A wash of the wash plan (fair-wash.mjs) is a whole shape laid in sweeps. One no sweep fits is left and counted: it gets
+  // no touch placed at its centroid.
+  if (vectorPaths) { used['unclipped wash strokes'] = (used['unclipped wash strokes'] || 0) + paths.length; }
+  if (!paths.length && sh._valuePlan?.puddle != null) { used['wash no sweep fits, left'] = (used['wash no sweep fits, left'] || 0) + 1; ctx.dropped++; ctx.droppedMass += sh.amount * sh.area; continue; }
   if (!paths.length) {
     const FLOORMASK = FLOOR ? getFloorMask() : null;
     // --rescue sweep: a round brush as wide as the passage, drawn down its middle, instead of small marks (default marks).
@@ -525,7 +536,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   }
   // under --crisp the bead stops at the passage's own edge, for the clean water and the paint alike
   if (process.env.FW_DUMP && L < num('dumppasses', 3)) { const g = Buffer.alloc(N2); for (const pts of paths) for (let k = 0; k < pts.length; k++) { const a = pts[k], b = pts[Math.min(pts.length - 1, k + 1)], m = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y))); for (let t = 0; t <= m; t++) { const x = Math.round(a.x + (b.x - a.x) * t / m), y = Math.round(a.y + (b.y - a.y) * t / m); if (x >= 0 && y >= 0 && x < W2 && y < H2) g[y * W2 + x] = Math.hypot(b.x - a.x, b.y - a.y) > 6 * SC ? 128 : 255; } } await sharp(g, { raw: { width: W2, height: H2, channels: 1 } }).png().toFile(path.join(process.env.FW_DUMP, `P${L + 1}-s${layer.shapes.indexOf(sh)}.png`)); }
-  const crispHere = !!BUDGET || !!shapedPaths || semanticUsesNumericClip(sh._semantic) && CRISP.on && CRISP.wants(T, detail);
+  const crispHere = vectorPaths ? false : !!BUDGET || !!shapedPaths || semanticUsesNumericClip(sh._semantic) && CRISP.on && CRISP.wants(T, detail);
   // --washreach: a planned stroke may end past the outline, so the clip is the passage grown by the reach, still off
   // the plan's reserved lights; the edge is where the strokes end, not the mask
   const P = ctx.VALUE_PLAN?.protectedCells;
@@ -596,7 +607,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
     const wetLane = pts => {
       if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
-      const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
+      const r = vectorPaths ? pts[0].r : !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
       const wet = createBrush({ flat: sh._semantic?sh._semantic.pass.brush.kind==='flat':true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED, ...(sh._semantic?semanticBrushOptions(sh._semantic.pass,num('sheetmm', DEFAULT_SHEET_MM)/W2):{}) });
       productionDip(wet, { water: num('prewetwater', shapeCells ? .55 : 1), conc: PIGS.map(() => 0) });
       stroke(wet, ctx.sheet, pts, { upright: UPRIGHT });
@@ -621,7 +632,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     ctx.WET_TRACE?.lane();
     if (wetEachLane) wetEachLane(pts);
     if(sh._semantic&&!authoredPaths)pts=pts.map(p=>({...p,r:sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2))}));
-    const r = !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
+    const r = vectorPaths ? pts[0].r : !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):sh._semantic?sh._semantic.pass.brush.widthMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
     let CHARGE_CAL=SEMANTIC_CAL_MODE==='actual'&&sh._semantic?semanticCalibrationGain(SEMANTIC_CAL[sh._semantic.key],pts,PB.mmPerCell):ICAL.cal;
     const numericTuftHere=numericTuftEligible({shapeId:ctx.MAJOR_TECHNIQUE?.shapeId,selected:NUMERIC_TUFT_SHAPES,detail,dry:T.name.startsWith('dry brush'),semantic:Boolean(sh._semantic),radiusMm:r*num('sheetmm', DEFAULT_SHEET_MM)/W2});
     const brush = detail
@@ -821,6 +832,17 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // round of the kit that fits inside the shape and is no wider than the passage's own brush (--softmm caps its width), so a
   // shape narrower than the finest round keeps its dry edge. A soft cell within one brush of a hard cell of the passage or
   // of a reserved light is left as cut. --softsplit 0 and a plan's soften:false turn it off.
+  // A wash plan's soft boundary (fair-wash.mjs: decided once for the boundary between two shapes) is made with the brush: a
+  // clean damp round, the smallest wash brush, run along that part of the outline while the wash is wet.
+  if (vectorPaths && paths.length && sh._valuePlan.softEdges?.length) {
+    const rS = Math.max(SC, sh._valuePlan.strokes.reduce((a, st) => Math.min(a, st.radiusMm), Infinity) * CELLS_PER_MM);
+    for (const line of sh._valuePlan.softEdges) {
+      const b = createBrush({ flat: false, radius: rS, bristles: Math.max(12, Math.ceil(rS * 2)), capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, stiffness: 8, seed: SEED + ctx.laid });
+      dip(b, { water: 1, conc: SHEET_PIGS.map(() => 0) }); thirsty(b, { water: SOFTEN_WATER });
+      stroke(b, ctx.sheet, line.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: rS, p: 1 })), { upright: UPRIGHT });
+    }
+    used['soft edge, damp brush'] = (used['soft edge, damp brush'] || 0) + sh._valuePlan.softEdges.length;
+  }
   if(num('softsplit',1)>0&&PB&&!BUDGET&&!detail&&!sh._valuePlan?.texture&&sh._valuePlan?.edges?.softCells?.length&&paths.length){
     const mmc=num('sheetmm', DEFAULT_SHEET_MM)/W2,halves=(ctx._softRounds??=['rigger','round4','round8','round12'].filter(k=>PB.cfg.brushes[k]).map(k=>PB.half(k)));
     const washR=sh._valuePlan.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*mmc):Math.max(SC,...paths.map(pts=>Math.max(...pts.map(q=>q.r))));
