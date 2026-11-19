@@ -24,8 +24,8 @@ export function compareMeasured(lite, full) {
   const fields = ['models', 'targets', 'targetFingerprints', 'painterVersion', 'simVersion', 'sourceCommit', 'machine', 'backend',
     'round', 'judgeVersion', 'judgeRoute', 'scoreProtocol', 'progressionProtocol', 'progressionJudges', 'rubric', 'strictVerdict'];
   const differences = fields.filter(k => lite[k] == null || full[k] == null || JSON.stringify(lite[k]) !== JSON.stringify(full[k]));
-  for (const [side, value, expected] of [['lite', lite, { benchmarkProfile: 'lite-v1', tries: 1, judgeProfile: 'J2-lite' }],
-    ['full', full, { benchmarkProfile: 'full-v1', tries: 3, judgeProfile: 'J2-full' }]]) {
+  for (const [side, value, expected] of [['lite', lite, { benchmarkProfile: benchmarkProfile('lite').id, tries: 1, judgeProfile: 'J2-lite' }],
+    ['full', full, { benchmarkProfile: benchmarkProfile('full').id, tries: 3, judgeProfile: 'J2-full' }]]) {
     for (const [k, v] of Object.entries(expected)) if (value[k] !== v) differences.push(`${side}.${k}`);
   }
   if (lite.round !== 'V4' || full.round !== 'V4') differences.push('round must be V4');

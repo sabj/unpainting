@@ -1,13 +1,19 @@
 # Benchmark profiles and measurement
 
-The default V4 run is `lite-v1`. V5 and the V1 to V3 toolkit rounds run in full. Lite cannot run as V5,
+The default V4 run is `lite-v2`. V5 and the V1 to V3 toolkit rounds run in full (`full-v2`). Lite cannot run as V5,
 because it has no feedback or repair loop. Both profiles preserve all requested targets, paper dimensions in mm,
-brush widths in mm, the painter recipe, target guards and essential stage evidence. Native density changes.
+brush widths in mm, the painter recipe, target guards and essential stage evidence, and both paint at the same
+native density: the subject's own width, one sheet cell for each target pixel (0.259 mm a cell).
+
+The painter does not paint from an enlarged source, so no profile paints a subject wider than its target. Until 0.3.3
+the subjects were 1200 to 1224 cells wide, four times their 300 px targets, and `lite-v1` capped that at 540 cells.
+That cap is over every target now, so `lite-v2` has none. The ids became `-v2` with the subject sizes: a `-v1` record
+was painted from an enlarged target and is never grouped with a `-v2` record.
 
 | Setting | Lite | Full |
 |---|---|---|
 | Tries per model and target | 1 | 3 |
-| Native width | at most 540 | subject specification (1200–1224) |
+| Native width | subject specification (300–306, the target's own width) | same |
 | Model time per target | 5 minutes | 85 minutes of active work |
 | Wall safety cap per model turn | 5 minutes | 300 minutes |
 | Model task | write plan, then exit | paint, inspect and revise |
@@ -19,7 +25,7 @@ brush widths in mm, the painter recipe, target guards and essential stage eviden
 | Progression judging | 2 calls | 2 calls |
 
 Compact stroke statistics, the audit ledger, final PNG and required stages remain available with mark exports off.
-Lite is a development screen; its native density can lose fine detail, so it is not interchangeable with full quality evidence.
+Lite is a development screen: one unrevised plan and lighter judging, so it is not interchangeable with full quality evidence.
 
 ```sh
 npm run bench:lite -- --plan
@@ -46,8 +52,8 @@ partial counts are retained separately. These controls do not constitute a unive
 ## What the 80 percent objective means
 
 Compare the same model IDs/efforts and the same targets, on the same machine/backend and code, one lite try versus
-three full tries. The offline plan currently estimates 90.2% fewer initial final+progression calls and about 93% fewer
-grid-cell/try operations. Retries can add calls. These are work estimates, not measured speed, money or quality gains.
+three full tries. The offline plan currently estimates 90.2% fewer initial final+progression calls and 66.7% fewer
+grid-cell/try operations (one try in place of three, at the same width). Retries can add calls. These are work estimates, not measured speed, money or quality gains.
 Dropping models is not counted as an optimization.
 
 `suite.json` records actual whole-suite wall time, renderer time, provider-reported model tokens, completeness and

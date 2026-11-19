@@ -47,6 +47,8 @@
         "bench/v2/targets/sargent.png",
         "--width",
         "1200",
+        "--sourcescale",
+        "4",
         "--scale",
         "1",
         "--sheetmm",

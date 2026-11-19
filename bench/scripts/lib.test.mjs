@@ -218,15 +218,22 @@ test('judge versions validate and never share a result group', () => {
 
 test('explicit benchmark budgets, density, route and judge profiles never share a result group', () => {
   const source = runs.find(e => e.run.round === 'V4').run;
-  const base = { ...source, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', settings: { ...source.settings, benchmarkProfile: 'lite-v1', modelMinutesCap: 5, paintWidth: { hills: 540 } } };
+  const base = { ...source, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', settings: { ...source.settings, benchmarkProfile: 'lite-v2', modelMinutesCap: 5, paintWidth: { hills: 306 } } };
   const variants = [base,
     { ...base, judgeProfile: 'J2-full' },
     { ...base, judgeRoute: 'openrouter' },
-    { ...base, settings: { ...base.settings, paintWidth: { hills: 1200 } } },
-    { ...base, settings: { ...base.settings, benchmarkProfile: 'full-v1', modelMinutesCap: 85 } }];
+    // painted enlarged, as the subjects were until 0.3.3: the width alone separates it, and so does the profile id
+    { ...base, settings: { ...base.settings, paintWidth: { hills: 1224 } } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'lite-v1', paintWidth: { hills: 540 } } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'lite-v1' } },
+    { ...base, settings: { ...base.settings, benchmarkProfile: 'full-v2', modelMinutesCap: 85 } }];
   const groups = groupByPainter(variants.map(run => ({ run })));
-  assert.equal(groups.length, 5);
+  assert.equal(groups.length, 7);
   assert.ok(groups.every(g => g.entries.length === 1 && g.evaluation));
+  // a published V096 record carries no profile and keeps its own group, apart from every new run
+  assert.equal(source.settings.benchmarkProfile, undefined);
+  const withPublished = groupByPainter([{ run: source }, { run: { ...base, painterVersion: source.painterVersion, simVersion: source.simVersion, judgeVersion: source.judgeVersion } }]);
+  assert.equal(withPublished.length, 2, 'same painter, sim and judge versions, yet the published record stands alone');
 });
 
 test('Mittens is public with the native self-score, and the CPU Ships rerender is scored', () => {

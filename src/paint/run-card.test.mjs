@@ -68,3 +68,14 @@ test("writeRunCard records the medium decision with its evidence under the drawi
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("writeRunCard records the source size, the sheet against it and the enlargement the run accepted", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-card-scale-"));
+  try {
+    const dims = { sourceWidth: 300, sourceHeight: 263, paintWidth: 300, paintHeight: 263, enlargement: 1, sheetWidth: 300, sourceScale: 1, sourceScaleAllowed: 1 };
+    assert.deepEqual(writeRunCard({ root: tmp, out: tmp, dimensions: dims }).dimensions, dims);
+    // a card from before the setting keeps its sizes and says nothing about the scale
+    assert.deepEqual(writeRunCard({ root: tmp, out: tmp, dimensions: { sourceWidth: 300, paintWidth: 1200, enlargement: 4 } }).dimensions,
+      { sourceWidth: 300, sourceHeight: null, paintWidth: 1200, paintHeight: null, enlargement: 4, sheetWidth: null, sourceScale: null, sourceScaleAllowed: null });
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});

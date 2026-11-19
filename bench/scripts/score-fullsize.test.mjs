@@ -7,14 +7,15 @@ import { spawnSync } from "node:child_process";
 import sharp from "sharp";
 import { BENCH, readJson, writeJson, loadRuns } from "./lib.mjs";
 import { benchmarkProfile } from "./profiles.mjs";
+import { scorePython } from "./preflight.mjs";
 
-async function makeTryFolder(root) {
+async function makeTryFolder(root, cropPatch = {}) {
   const source = structuredClone(loadRuns().find(e => e.run.round === "V4" && e.run.crops.hills).run);
   const crop = source.crops.hills;
   Object.assign(source, {
     judgeVersion: "J2", judgeProfile: "J2-lite", judgeRoute: "together", complete: true,
-    crops: { hills: { ...crop, score: null, progression: null, fullsize: null } }, unpainted: {},
-    settings: { ...source.settings, crops: ["hills"], benchmarkProfile: "lite-v1", budget: benchmarkProfile("lite"), judgeProfile: "J2-lite", judgeRoute: "together" }
+    crops: { hills: { ...crop, score: null, progression: null, fullsize: null, ...cropPatch } }, unpainted: {},
+    settings: { ...source.settings, crops: ["hills"], benchmarkProfile: "lite-v2", budget: benchmarkProfile("lite"), judgeProfile: "J2-lite", judgeRoute: "together" }
   });
   const dir = path.join(root, "try"), raw = path.join(root, "raw"), frames = path.join(raw, "out", "hills", "frames");
   fs.mkdirSync(frames, { recursive: true });
@@ -93,11 +94,26 @@ test("score.mjs attaches crop.fullsize non-blockingly", async () => {
     assert.ok(saved.crops.hills.fullsize, "crop.fullsize must be attached");
     assert.equal(saved.crops.hills.fullsize.version, "fullsize-v1");
     assert.equal(saved.crops.hills.fullsize.measures.edges.hard_share, 0.72);
-    // Hills sheetmm in subjects.json is ~158.05 mm
-    assert.ok(Math.abs(saved.crops.hills.fullsize.plateMm - 158.05) < 0.1, "should read plate-mm from subjects.json");
+    // the published try was painted 1224 px wide at 0.1291 mm a cell: its own sheet, not today's Hills subject (79.254 mm)
+    assert.equal(saved.crops.hills.fullsize.plateMm, 158.02, "plate-mm is the sheet the try records");
 
     const calls = fs.readFileSync(log, "utf8");
     assert.ok(calls.includes("fullsize.py"), "fullsize.py must be called");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("score.mjs reads the sheet from subjects.json for a try that records none", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "score-fullsize-subject-"));
+  try {
+    const { dir, raw } = await makeTryFolder(root, { sheet: null });
+    const r = spawnSync(process.execPath, [
+      path.join(BENCH, "scripts", "score.mjs"), dir, "--raw", raw, "--python", makeMockPython(root), "--no-fullsize-vision"
+    ], { encoding: "utf8", env: { ...process.env, TOGETHER_API_KEY: "mock-key" } });
+    assert.equal(r.status, 0, r.stderr);
+    const subject = readJson(path.join(BENCH, "v4v5", "subjects.json")).subjects.hills;
+    assert.equal(readJson(path.join(dir, "run.json")).crops.hills.fullsize.plateMm, subject.sheetmm);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -147,7 +163,12 @@ test("score.mjs --no-fullsize flag skips fullsize evaluation", async () => {
   }
 });
 
-test("score.mjs invokes real fullsize.py and attaches genuine craft measures", async () => {
+test("score.mjs invokes real fullsize.py and attaches genuine craft measures", async t => {
+  // The scorer's own interpreter: --python, else BENCH_SCORE_PYTHON, else python3 (preflight.mjs). Without the scorer's
+  // packages the real measures cannot run here, and the test is reported as skipped, not passed.
+  const realPy = scorePython(null);
+  const probe = spawnSync(realPy, ["-c", "import numpy, scipy, skimage, PIL"], { encoding: "utf8" });
+  if (probe.error || probe.status !== 0) return t.skip(`${realPy} lacks the packages in bench/scorer/requirements.txt; set BENCH_SCORE_PYTHON to an interpreter that has them`);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "score-fullsize-real-"));
   try {
     const { dir, raw } = await makeTryFolder(root);
@@ -156,7 +177,7 @@ test("score.mjs invokes real fullsize.py and attaches genuine craft measures", a
     fs.writeFileSync(python, `#!${process.execPath}
 const { execFileSync } = require("child_process"), path = require("path");
 const a = process.argv.slice(2), s = path.basename(a[0]);
-const realPy = "/Users/factbot/painter-lines/bin/python3";
+const realPy = ${JSON.stringify(realPy)};
 if (s === "-c") {
   execFileSync(realPy, ["-c", a[1]], { stdio: "inherit" });
   process.exit(0);

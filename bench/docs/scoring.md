@@ -40,7 +40,7 @@ Results record `judgeProfile`, the requested and required counts and panel in `s
 
 With one valid call per judge, repeatability is unmeasured: `pm` is null and `repeatabilityMeasured` is false. `judgeSpread` is the range of the judges' overall scores and measures panel disagreement, not repeatability. Repeated profiles retain the existing `pm` dispersion calculation; it is not a calibrated confidence interval. Escalate both sides of an ambiguous comparison to the same profile. Changes to the artistic rubric or image protocol require a new judge version, rather than a cheaper J2 profile.
 
-Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the 1224 px V4 and V5 renders are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. Some V4 and V5 records keep an older 720 px upscaled score as `scoreOld`; results do not use it.
+Every painting is scored at its target's native size (for example 306 x 242 for Hills): V1 to V3 paintings are already that size, and the published V4 and V5 renders, painted 1200 to 1224 px wide, are Lanczos-downscaled to it, so all five rounds share one scale and nothing is upscaled. From 0.3.3 V4 and V5 paint at the target's own size and need no resampling. Some V4 and V5 records keep an older 720 px upscaled score as `scoreOld`; results do not use it.
 
 Score from the toolkit's own `final.png`, not from a compressed thumbnail. The marks metric is sensitive to compression: a 600 px WebP of a published painting gave a marks score 2.4 points lower than the PNG it was made from.
 

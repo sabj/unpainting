@@ -43,6 +43,21 @@ test('ink on a pencil subject fails the medium contract', t => {
   assert.equal(checkDesignedPaths(dir).rows.find(r => r.row === 3).status, 'DID NOT RUN');
 });
 
+test('a graphite drawing the painter decided itself satisfies the medium contract without the caller typing the option', t => {
+  const { dir, write } = fixture(t);
+  // as tools/paint-plate.mjs records a plain graphite run: the caller typed no --subjectmedium, the painter added it
+  const card = { args: ['--outlinemedium', 'graphite'], expandedArgs: ['--outlinemedium', 'graphite', '--subjectmedium', 'pencil', '--washjoin', '1', '--huechroma', '30', '--lightfamilies', '1'], drawing: { medium: 'graphite', subjectMedium: { medium: 'pencil', override: null } } };
+  write('run-card.json', card);
+  const row = checkDesignedPaths(dir).rows.find(r => r.row === 3);
+  assert.deepEqual([row.applicable, row.status], [true, 'RAN']);
+  assert.equal(checkDesignedPaths(dir).ok, true);
+  // the same run drawn in ink still fails, and so does a known subject painted in another medium than its own
+  write('run-card.json', { ...card, drawing: { ...card.drawing, medium: 'ink' } });
+  assert.equal(checkDesignedPaths(dir).rows.find(r => r.row === 3).status, 'DID NOT RUN');
+  write('run-card.json', { ...card, subject: 'trumbull' });
+  assert.equal(checkDesignedPaths(dir).rows.find(r => r.row === 3).status, 'DID NOT RUN', 'Trumbull is none, not pencil');
+});
+
 test('an aborted run still writes all 23 results and fails its contract', t => {
   const { dir } = fixture(t);
   const aborted = path.join(dir, 'aborted');

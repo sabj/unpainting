@@ -10,6 +10,8 @@ checks ordinary continuation and strict abort. CPU and GPU have separate PNG
 SHA-256 baselines. Same backend, mode, adapter and input hashes are mandatory.
 The Ships plan is copied without changes from V5 self-study Astra attempt 1.
 The 1200px census uses its actual harness-generated flags and width.
+That width enlarges the 300 px Ships crop four times, as the benchmark then did. The painter now stops on an
+enlarged source unless the run states it, so the fixture states `--sourcescale 4`; the setting changes no pixel.
 
 Run from the repository root after sourcing `work/env-030.sh` and exporting
 `PAINTER_LINES_PYTHON="$PAINTER_LINE_PYTHON"`:

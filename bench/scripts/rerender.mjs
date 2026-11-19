@@ -18,9 +18,9 @@ import { codeState } from '../../src/paint/code-state.mjs';
 import { versionStamp } from '../../src/painter-version.mjs';
 
 const list = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : null;
-// Published targets start at 300 px, so a fixed floor admits them all and still refuses thumbnails.
-const MIN_SOURCE_WIDTH = 300;
-export const rerenderGate = spec => ({ minWidth: spec.width, minSourceWidth: MIN_SOURCE_WIDTH });
+// A rerender is painted exactly as wide as its subject specifies, and never wider than its source (preflight.mjs).
+// No least width: the subjects are their 300 px targets at one cell a pixel.
+export const rerenderGate = spec => ({ width: spec.width, maxSourceScale: 1 });
 
 export function parseRerenderArgs(argv = process.argv.slice(2)) {
   const o = {

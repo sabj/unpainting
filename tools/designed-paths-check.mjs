@@ -17,8 +17,12 @@ export function checkDesignedPaths(folder, { registry = read(registryFile), logF
   const opts = options(card?.expandedArgs ?? card?.args);
   const expectedMedium = registry.subjectMedia?.[String(card?.subject ?? '').trim().toLowerCase()];
   const jsonEvidence = (file, test, show = d => d) => { const d = read(path.join(folder, file)); return d && test(d) ? `${file}: ${JSON.stringify(show(d)).slice(0, 640)}` : null; };
+  // The subject medium the run painted with: the option as the painter ran it. The painter adds --subjectmedium pencil
+  // itself when its medium decision is graphite (src/paint/medium-run.mjs), so the caller's own arguments need not
+  // carry it; the expanded arguments are also what makes the row applicable below.
+  const ranMedium = opts.get('subjectmedium');
   const checks = {
-    'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(options(c.args).get('subjectmedium')) && (!expectedMedium || options(c.args).get('subjectmedium') === expectedMedium) && c.drawing?.medium !== 'ink', c => ({ expectedMedium, subjectMedium: options(c.args).get('subjectmedium'), drawingMedium: c.drawing?.medium })),
+    'subject-medium': () => jsonEvidence('run-card.json', c => ['none', 'pencil'].includes(ranMedium) && (!expectedMedium || ranMedium === expectedMedium) && c.drawing?.medium !== 'ink', c => ({ expectedMedium, subjectMedium: ranMedium, drawingMedium: c.drawing?.medium })),
     'small-marks': () => opts.get('washjoin') === '1' && line(/^small marks: \d+ small lights reserved, \d+ small darks laid once, last/),
     'wash-rules': () => jsonEvidence('pipeline-plan.json', d => d.plan?.washes?.colour && opts.get('huechroma') === '30' && opts.get('lightfamilies') === '1', d => ({ washes: d.plan.washes, huechroma: opts.get('huechroma'), lightfamilies: opts.get('lightfamilies') })),
     'brush-lanes': () => jsonEvidence('designed-execution.json', d => d.laneStrokes > 0 || d.brushChoiceStrokes > 0),

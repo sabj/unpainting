@@ -126,7 +126,11 @@ try {
 
       if (!has('no-fullsize')) {
         try {
-          const plateMm = subjectsDoc[c]?.sheetmm ?? specs[c]?.sheetmm ?? 280;
+          // the sheet this painting was painted on: the try's own record first, since subjects.json describes new runs
+          // (published V4 and V5 tries were painted 1200 px wide on 158 and 280 mm sheets, the subjects are now ~78 mm)
+          const ownSheet = crop.sheet?.W > 0 && crop.sheet?.mmPerCell > 0 ? +(crop.sheet.W * crop.sheet.mmPerCell).toFixed(2) : null;
+          const plateMm = ownSheet ?? subjectsDoc[c]?.sheetmm;
+          if (!(plateMm > 0)) throw new Error(`${c}: no sheet width in the try's record or bench/v4v5/subjects.json`);
           const fullsizeArgs = ['--image', final, '--style', style, '--plate-mm', String(plateMm)];
           if (has('no-fullsize-vision') || has('no-vision') || !process.env.TOGETHER_API_KEY) fullsizeArgs.push('--no-vision');
           if (opt('fullsize-calls')) fullsizeArgs.push('--calls', opt('fullsize-calls'));

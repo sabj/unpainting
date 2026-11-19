@@ -20,7 +20,7 @@ test('offline lite completes one plan/check/render with no self-view or repair, 
     const r = readJson(path.join(root, 'v4-pipeline', 'dry-run', '1', 'run.json'));
     raw = path.join(BENCH, r.raw);
     assert.equal(pngSize(path.join(raw, 'hills', 'target.png'))[0], r.settings.paintWidth.hills, 'offline planner and renderer share the native fixture');
-    assert.equal(r.settings.benchmarkProfile, 'lite-v1'); assert.equal(r.complete, true);
+    assert.equal(r.settings.benchmarkProfile, 'lite-v2'); assert.equal(r.complete, true);
     assert.equal(r.session.tokens, null); assert.equal(r.session.usageComplete, false);
     const c = r.crops.hills, p = c.pipeline;
     assert.equal(p.paintedBy.startsWith('harness'), true); assert.equal(p.looks, 0); assert.equal(p.revisions, 0);
@@ -59,7 +59,7 @@ await runPipeline({round:ROUNDS.find(r=>r.id==='V4'),model:{key:'fixture',name:'
 test('the routine suite fixes seven targets and six models; all remains opt-in', () => {
   const plan = suitePlan();
   assert.equal(plan.targets.length, 7); assert.equal(plan.models.length, 6);
-  assert.equal(plan.profile.id, 'lite-v1');
+  assert.equal(plan.profile.id, 'lite-v2');
   assert.ok(suitePlan({ selection: 'all' }).models.length > 6);
 });
 
@@ -84,7 +84,7 @@ test('scoring caches exact inputs, but missing progression stages and failed jud
     const crop = source.crops.hills;
     Object.assign(source, { judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', complete: true,
       crops: { hills: { ...crop, score: null, progression: null } }, unpainted: {},
-      settings: { ...source.settings, crops: ['hills'], benchmarkProfile: 'lite-v1', budget: benchmarkProfile('lite'), judgeProfile: 'J2-lite', judgeRoute: 'together' } });
+      settings: { ...source.settings, crops: ['hills'], benchmarkProfile: 'lite-v2', budget: benchmarkProfile('lite'), judgeProfile: 'J2-lite', judgeRoute: 'together' } });
     const dir = path.join(root, 'try'), raw = path.join(root, 'raw'), frames = path.join(raw, 'out', 'hills', 'frames');
     fs.mkdirSync(frames, { recursive: true });
     fs.copyFileSync(path.join(BENCH, 'v2', 'targets', 'hills.png'), path.join(raw, 'out', 'hills', 'final.png'));
@@ -131,7 +131,7 @@ test('lite results retain the planned denominator and do not rank a partial succ
     const targets = suitePlan().targets;
     Object.assign(r, { try: 1, judgeVersion: 'J2', judgeProfile: 'J2-lite', judgeRoute: 'together', complete: false,
       crops: { hills: r.crops.hills }, unpainted: Object.fromEntries(targets.filter(c => c !== 'hills').map(c => [c, { pipeline: { outcome: 'no-plan' } }])),
-      settings: { ...r.settings, crops: targets, benchmarkProfile: 'lite-v1', budget: benchmarkProfile('lite') }, score: { ...r.score, complete: false } });
+      settings: { ...r.settings, crops: targets, benchmarkProfile: 'lite-v2', budget: benchmarkProfile('lite') }, score: { ...r.score, complete: false } });
     writeJson(path.join(root, 'runs', 'run.json'), r);
     const out = path.join(root, 'results.json');
     execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'build-results.mjs'), '--runs', path.join(root, 'runs'), '--out', out], { stdio: 'pipe' });
