@@ -432,9 +432,9 @@ test('--paperdelta sets the light tolerance a plan asks for', () => {
   assert.equal(loose.protectedCells[5 * w + 15], 1, '20 below the paper is bare paper at a tolerance of 30');
 });
 
-test('a cropped target with no paper border reserves highlights from its lightest material if light and neutral, but not on dark/saturated crops', () => {
+test('a cropped target with no paper border reserves only what is at the white sheet\'s own lightness: pale clouds and dark haze are painted', () => {
   const w = 40, h = 40, n = w * h;
-  // Case A: a crop with bright neutral clouds. 10% clouds [236, 237, 233] along the top, rest dark/midtone building [120, 100, 80].
+  // Case A: a crop with pale neutral clouds, a few L* under the white sheet. 10% clouds [236, 237, 233] along the top, rest dark/midtone building [120, 100, 80].
   const rgbCloud = new Uint8Array(n * 3), density = new Float32Array(n).fill(0.2);
   for (let i = 0; i < n; i++) {
     const y = (i / w) | 0;
@@ -443,7 +443,7 @@ test('a cropped target with no paper border reserves highlights from its lightes
     density[i] = isCloud ? 0.03 : 0.4;
   }
   const planCloud = planLightToDark({ w, h, k: 1, rgb: rgbCloud, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], minShapeCells: 4 });
-  assert.equal(planCloud.protectedCells[2 * w + 10], 1, 'cloud highlight is reserved as bare paper');
+  assert.equal(planCloud.protectedCells[2 * w + 10], 0, 'a cloud 5 L* under the sheet is a pale wash, not bare paper');
   assert.equal(planCloud.protectedCells[20 * w + 20], 0, 'building is not reserved');
 
   // Case B: Low-key photo crop. Lightest 10% is mid-grey haze [180, 160, 140] (L* ~66 < 90).
@@ -454,6 +454,11 @@ test('a cropped target with no paper border reserves highlights from its lightes
   }
   const planDark = planLightToDark({ w, h, k: 1, rgb: rgbDark, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], minShapeCells: 4 });
   assert.equal(planDark.protectedCells[2 * w + 10], 0, 'dark haze is not reserved as bare white paper');
+  // Case C: highlights that do reach the sheet's own lightness stay bare paper.
+  const rgbWhite = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) rgbWhite.set(((i / w) | 0) < 4 ? [251, 250, 247] : [120, 100, 80], 3 * i);
+  const planWhite = planLightToDark({ w, h, k: 1, rgb: rgbWhite, density, demand: density.slice(), shaped: true, paperRule: true, paperRel: true, paperRGB: [252, 251, 248], minShapeCells: 4 });
+  assert.equal(planWhite.protectedCells[2 * w + 10], 1, 'a highlight at the sheet\'s own lightness is reserved');
 });
 
 
