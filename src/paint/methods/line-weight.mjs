@@ -3,7 +3,8 @@
 // how many L* darker the subject is along it than on both of its sides. The pencil then presses so that its own line, on
 // bare paper, is that many L* darker than the paper, by a table drawn on a scrap of the painting's paper
 // (pencil-scrap.mjs). A dark whisker is drawn dark; a line the subject does not show keeps the light pressure of a
-// preparatory drawing. Under a wash a pencil line shows a little less than on bare paper, so this never overstates a line.
+// preparatory drawing. The match is made on bare paper: a wash over the line hides some of it, a dark wash most of it,
+// so under paint the pencil's line is lighter than the subject's, never darker.
 //
 // The reading is made at line scale: one darkness for a whole line, the median along it, so at least half of the line is
 // that dark, as a line is kept or left off whole. Across the path the darkest value within `reachMm` is the line (the
