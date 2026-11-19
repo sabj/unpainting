@@ -8,7 +8,7 @@
 // strand mark where the laid line would be more than SCALE_LIMIT times the strand it stands for, and it counts strokes
 // from the paint area measured here. Nothing is fitted to a picture; it is the engine's brush on its paper. DOM free.
 import { makePaper } from '../../media/paper.mjs';
-import { createSheet, deposit, dry, layersOf, thickness, DEFAULTS } from '../../media/sheet.mjs';
+import { createSheet, deposit, dry, layersOf, DEFAULTS } from '../../media/sheet.mjs';
 import { createBrush, dip, stroke } from '../../media/brush.mjs';
 import { renderLayers } from '../../media/km.mjs';
 import { GOUACHE_PIGMENT, GOUACHE_FILM } from '../../media/gouache.mjs';
@@ -72,54 +72,4 @@ export function measureDryBrush({ mmPerCell, seed = 1, radii = RADII }) {
 /** The swatch row for the radius nearest `radiusCells` among those measured. */
 export function swatchAt(swatch, radiusCells) {
   return swatch.radii.reduce((best, o) => (!best || Math.abs(o.radiusCells - radiusCells) < Math.abs(best.radiusCells - radiusCells) ? o : best), null);
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// The rigger's point: a wet line of dark paint on a light ground. A thin dark the washes could not lay is drawn with it, so
-// its line is measured the same way: strokes of dark paint at a set of loads on a scrap sheet of the same paper and cell
-// size, dried, and read for the width of the line (extent at a fifth of its height, core at half), how much of it holds
-// along its length (continuity), the thickness it leaves at its centre per unit of load, and the step in L* a load makes.
-// A line that breaks is not the line: the lightest load whose line holds along CONTINUITY of its length is the stable
-// load, and a dark the subject draws with less paint than that cannot be laid as a line by this point.
-const POINT = { radius: 1, rowsPer: 4, length: 200, x0: 30, water: 1.0, concs: [3, 6, 12, 24] };
-const POINT_BRUSH = { bristles: 6, capacity: 6, belly: 1, feed: 0.12, give: 0.5, free: 0.3, film: 0.2, splay: 0.02, stiffness: 6, wetMix: 0.1, bridge: 0.2, bridgeSoft: 1.0, streak: 0.2 };
-const POINT_SETTINGS = Object.freeze({ ...POINT_BRUSH, water: POINT.water, radiusCells: POINT.radius });
-export const POINT_INK_K = Object.freeze([1.2, 1.1, 0.9]);   // the swatch's dark paint
-
-/**
- * @returns {{ widthMm, coreMm, rows: [{ conc, continuity, depositPerLoad, stepLstar }], stable: row|null, mmPerCell, settings }}
- */
-export function measurePoint({ mmPerCell, seed = 1, water = POINT.water, concs = POINT.concs }) {
-  const r = POINT.radius, rowStep = 4 * r + 10, strokes = concs.length * POINT.rowsPer, W = SWATCH.w, H = rowStep * (strokes + 1);
-  const pigs = [{ name: 'ink', K: POINT_INK_K, S: [0.02, 0.02, 0.02], rho: 0.05, omega: 1.4, gamma: 0.1 }];
-  const paper = makePaper(W, H, { seed, coldPress: { mmPerCell }, mmPerCell }), sheet = createSheet(paper, pigs);
-  const base = Buffer.alloc(W * H * 3, 252), before = renderLayers(layersOf(sheet), pigs, base, W * H, 1), th0 = thickness(sheet).map(a => Float32Array.from(a));
-  const placed = []; let row = 0;
-  for (const conc of concs) for (let k = 0; k < POINT.rowsPer; k++, row++) {
-    const y = rowStep * (row + 1), brush = createBrush({ radius: r, ...POINT_BRUSH, seed: 300 + row });
-    dip(brush, { water, conc: [conc] });
-    stroke(brush, sheet, [{ x: POINT.x0, y, p: 1, r }, { x: POINT.x0 + POINT.length, y, p: 1, r }], { upright: true });
-    placed.push({ conc, y });
-  }
-  dry(sheet, 20000, DEFAULTS, { levelMax: 900 });
-  const after = renderLayers(layersOf(sheet), pigs, base, W * H, 1), th1 = thickness(sheet);
-  const dL = (x, y) => { const i = y * W + x; return lstar(after[i * 3], after[i * 3 + 1], after[i * 3 + 2]) - lstar(before[i * 3], before[i * 3 + 1], before[i * 3 + 2]); };
-  const med = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
-  const span = Math.ceil(2 * r + 4), xs = []; for (let x = POINT.x0 + 15; x <= POINT.x0 + POINT.length - 15; x++) xs.push(x);
-  const rows = concs.map(conc => {
-    const mine = placed.filter(p => p.conc === conc), centre = [], step = []; let held = 0, cols = 0;
-    for (const { y } of mine) for (const x of xs) {
-      let best = 0, bi = 0; cols++;
-      for (let d = -span; d <= span; d++) { const v = -dL(x, y + d); if (v > best) { best = v; bi = d; } }
-      if (best > SWATCH.hit) held++;
-      centre.push(th1[0][(y + bi) * W + x] - th0[0][(y + bi) * W + x]); step.push(-best);
-    }
-    return { conc, continuity: +(held / cols).toFixed(3), depositPerLoad: +(med(centre) / conc).toFixed(4), stepLstar: +med(step).toFixed(1) };
-  });
-  // the width of the line at the stable load (or the heaviest tried): mean cross-section over its strokes
-  const stable = rows.find(o => o.continuity >= CONTINUITY) ?? null, at = (stable ?? rows.at(-1)).conc;
-  const profile = new Array(2 * span + 1).fill(0), mine = placed.filter(p => p.conc === at);
-  for (const { y } of mine) for (const x of xs) for (let d = -span; d <= span; d++) profile[d + span] += Math.max(0, -dL(x, y + d)) / (mine.length * xs.length);
-  const peak = Math.max(...profile), widthAt = f => { const level = peak * f, lo = profile.findIndex(v => v >= level), hi = profile.length - 1 - [...profile].reverse().findIndex(v => v >= level); if (!(peak > 0) || lo < 0) return 0; const cross = (a, b) => (profile[b] === profile[a] ? a : a + (level - profile[a]) / (profile[b] - profile[a]) * (b - a)); return Math.max(1, (hi < profile.length - 1 ? cross(hi + 1, hi) : hi) - (lo > 0 ? cross(lo - 1, lo) : lo)); };
-  return { widthMm: +(widthAt(0.2) * mmPerCell).toFixed(3), coreMm: +(widthAt(0.5) * mmPerCell).toFixed(3), rows, stable, mmPerCell, settings: { ...POINT_BRUSH, water, radiusCells: r } };
 }
