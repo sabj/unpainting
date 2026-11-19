@@ -1,7 +1,7 @@
 // The graphite drawing carries the structure of the subject: the line model's pool, pruned by meaning, drawn whole and light.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { graphitePoolWanted, mergeAuthored, edgeStep } from './graphite-pool.mjs';
+import { graphitePoolWanted, mergeAuthored, edgeStep, graphiteDrawingArgs } from './graphite-pool.mjs';
 import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 test('a graphite drawing from the pool is wanted unless a line source, stages, no drawing or the models are asked off', () => {
@@ -68,4 +68,9 @@ test('with an edge score the budget keeps the strongest edges, not the longest l
   const score = g => (g.points[0][1] === 100 ? 10 : 1) * (g.points.at(-1)[0] - g.points[0][0]);   // the middle line is on a strong edge
   const r = mergeAuthored(pool, null, { sheetMm: 1000, amount: 0.3, score });
   assert.deepEqual(r.lines.map(g => g.points[0][1]), [100]);
+});
+
+test('the drawing flags: the pool file, no stage planner, light pressure, and no planned-passage filter unless the run says otherwise', () => {
+  assert.deepEqual(graphiteDrawingArgs(['--image', 'x.png'], 'out/graphite-lines'), ['--drawingfile', 'out/graphite-lines', '--drawingstages', 'off', '--openingpressure', '0.35', '--lineedges', '0']);
+  assert.deepEqual(graphiteDrawingArgs(['--openingpressure', '0.6', '--lineedges', '1'], 'g'), ['--drawingfile', 'g', '--drawingstages', 'off']);
 });
