@@ -1,7 +1,11 @@
-// The brush's load for a coat stroke: paste and tint for a light, the strand's own paint over the ground for a dark.
+// The brush's load for a coat stroke: paste and tint for a light; for a dark, the strand's own paint at the load a swatch of
+// the dry brush says adds the step the subject's strands show, over the sheet as it stands.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { lightLoad, darkLoad, LOAD, DEPOSIT } from './coat-lay.mjs';
+import { lightLoad, strandLoad, measureDryDark, LOAD, SWATCH_PRESSURE } from './coat-lay.mjs';
+import { FIRST_PASS, tolerance, secondPass } from './thin-darks-lay.mjs';
+import { measurePoint } from '../../src/paint/methods/point-swatch.mjs';
+import { BRUSH_SETTINGS } from '../../src/paint/methods/brush-swatch.mjs';
 import { GOUACHE_FILM, tintedGouache } from '../../src/media/gouache.mjs';
 
 const palette = [{ K: [1.6, 1.5, 1.2] }, { K: [0.4, 0.8, 2.2] }, { K: [0.2, 0.7, 1.9] }];
@@ -19,12 +23,59 @@ test('a light stroke is loaded with white paste and the pot of tint in the share
   assert.equal(lightLoad({ rgb: null }, PAPER, pot, 3, 4, 5).conc[4], 0);
 });
 
-test('a dark stroke adds what the strand needs over the ground, and nothing where the ground is already as dark', () => {
-  const strand = [1.2, 1.3, 1.4], ground = [0.3, 0.3, 0.4];
-  const load = darkLoad(strand, ground, palette, 4);
-  assert.ok(load && load.conc.slice(0, 3).some(v => v > 0) && load.conc[3] === 0);
-  const added = load.mix.reduce((s, m) => s + m.amount * palette[m.pigment].K[0], 0);
-  assert.ok(added > 0.3, `the paint adds density: ${added}`);
-  assert.equal(darkLoad([0.5, 0.5, 0.5], [0.6, 0.6, 0.6], palette, 4), null, 'a ground that is darker needs no stroke');
-  assert.ok(DEPOSIT > 0 && DEPOSIT < 1);
+const MM = 0.2333, RADIUS = 2, WHITE = [252, 252, 252];
+// the swatch's own paint as the whole palette, so a load can be laid again on a scrap and read
+const dark = [{ name: 'dark', K: [1.2, 1.1, 0.9], S: [0.02, 0.02, 0.02], rho: 0.05, omega: 1.4, gamma: 0.1 }];
+const swatch = measureDryDark({ mmPerCell: MM, radiusCells: RADIUS });
+const strand = { step: 14, L: 55, rgb: [120, 110, 100] };
+
+test('the dry brush is tried with dark paint on a scrap: it breaks on the tooth and every load that leaves paint counts', () => {
+  assert.ok(swatch.rows.every(r => r.holds && r.drop > 0), JSON.stringify(swatch.rows));
+  assert.ok(swatch.rows.some(r => r.held < 0.9), 'a dry brush does not hold an unbroken line');
+  for (let k = 1; k < swatch.rows.length; k++) assert.ok(swatch.rows[k].thickness >= swatch.rows[k - 1].thickness);
+  assert.equal(swatch.settings.radiusCells, RADIUS); assert.equal(swatch.settings.pressure, SWATCH_PRESSURE);
+});
+
+test('a dark stroke is laid for the step the strands show, less what the sheet shows, and never past the strand itself', () => {
+  const on = { swatch, palette: dark, paperRGB: WHITE }, ground = [225, 222, 215];
+  const full = strandLoad(strand, { drop: 0, on: 88, groundRGB: ground }, on);
+  assert.ok(full.lay && full.need === 14 && full.conc > 0, JSON.stringify(full));
+  assert.ok(Math.abs(full.predicted - FIRST_PASS * 14) < 0.2, `the first pass is laid for ${FIRST_PASS} of the step: ${full.predicted}`);
+  assert.deepEqual(full.shares, [1]);
+  const part = strandLoad(strand, { drop: 6, on: 88, groundRGB: ground }, on);
+  assert.ok(part.lay && part.need === 8 && part.conc < full.conc, 'a sheet that shows part of the step takes the rest');
+  const stated = strandLoad(strand, { drop: 12, on: 88, groundRGB: ground }, on);
+  assert.ok(!stated.lay && /already shows/.test(stated.why), JSON.stringify(stated));
+  const near = strandLoad(strand, { drop: 0, on: 63, groundRGB: [150, 148, 140] }, on);
+  assert.ok(near.lay && near.need === 8, 'a ground 8 L* lighter than the strand takes 8, not the strands\' 14');
+  const darkGround = strandLoad(strand, { drop: 0, on: 57, groundRGB: [135, 133, 126] }, on);
+  assert.ok(!darkGround.lay && /as dark as the strand/.test(darkGround.why), JSON.stringify(darkGround));
+  assert.ok(tolerance(14) >= 3);
+  assert.equal(strandLoad({ ...strand, step: undefined }, { drop: 0, on: 88, groundRGB: ground }, on).lay, false, 'no step planned, no stroke');
+});
+
+test('a step beyond the heaviest load tried is laid with that load and reads short: the brush has no more', () => {
+  // a near-black strand on a dark coat, in a paint a sixth as strong as the swatch's: the film for the step is thicker than
+  // any load tried leaves
+  const weak = [{ ...dark[0], K: dark[0].K.map(k => k / 6) }];
+  const on = { swatch, palette: weak, paperRGB: WHITE }, coat = [60, 58, 55], black = { step: 20, L: 3, rgb: [12, 11, 10] };
+  const r = strandLoad(black, { drop: 0, on: 25, groundRGB: coat }, on);
+  assert.ok(r.lay && r.short && r.conc === swatch.heaviest.conc && /heaviest load/.test(r.why), JSON.stringify(r));
+  assert.ok(r.predicted > 0 && r.predicted < FIRST_PASS * 20, `the heaviest load is predicted to add ${r.predicted} L*, short of ${FIRST_PASS * 20}`);
+  const env = { swatch, palette: weak }, first = { predicted: r.predicted, added: r.predicted };
+  assert.equal(secondPass(20 - r.predicted, first, coat, r.shares, env), null, 'a point with a pencil behind it lays no such second pass');
+  const again = secondPass(20 - r.predicted, first, coat, r.shares, { ...env, fullest: true });
+  assert.ok(again && again.short && again.conc === swatch.heaviest.conc && again.predicted < 20 - r.predicted, JSON.stringify(again));
+  const within = secondPass(3, { predicted: 5, added: 5 }, [225, 222, 215], [1], { swatch, palette: dark, fullest: true });
+  assert.ok(within && !within.short && within.predicted === 3, 'a step the loads tried can make is laid as before');
+});
+
+test('the load asked for a step leaves that step when the brush lays it: twice the film is not laid, nor a third of it', () => {
+  // the step over white paper, both passes at once, laid again by the same brush on a fresh scrap and read as the sheet is
+  for (const step of [6, 12, 24]) {
+    const r = strandLoad({ step: step / FIRST_PASS, L: 20, rgb: strand.rgb }, { drop: 0, on: 96, groundRGB: WHITE }, { swatch, palette: dark, paperRGB: WHITE });
+    assert.ok(r.lay, JSON.stringify(r));
+    const { water, ...brush } = BRUSH_SETTINGS, again = measurePoint({ mmPerCell: MM, seed: 5, loads: [r.conc], point: { radiusMm: RADIUS * MM, water, pressure: SWATCH_PRESSURE, brush }, hold: 0 });
+    assert.ok(Math.abs(again.rows[0].drop - step) <= tolerance(step), `planned ${step} L*, the brush laid ${again.rows[0].drop} on another scrap`);
+  }
 });
