@@ -36,6 +36,7 @@ function buildRunCard({
   gouache = null,
   surface = null,
   coat = null,
+  thinDarks = null,
   caption = null,
   seconds = 0,
   exitCode = 0,
@@ -110,6 +111,8 @@ function buildRunCard({
     surface,
     // a coat's dry-brush texture: strokes planned and laid, and what they did to the sheet (tools/plate/coat-lay.mjs)
     coat,
+    // thin dark lines laid with the rigger's point: the rule's inputs, what was skipped and why, and planned against painted step
+    thinDarks,
     // what this output is, so its image can be labelled on the image: subject, code, mode, sizes, sheet and date
     caption,
     continuedChecks: continuedSummary(),

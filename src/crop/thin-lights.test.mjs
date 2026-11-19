@@ -110,3 +110,16 @@ test('a light on a mid-tone ground is not over dark, and a step too small to see
   const E = field(3.0); line(E, 30, 100, 110, 104, 3, 2.8, 3);
   assert.equal(thinLights(E, W, H, { pixelMm: PX }).strokes.length, 0, 'under 10 L* lighter than the ring');
 });
+
+test('a thin dark is a thin light turned over: a dark line over a lighter ground, never over a dark one', () => {
+  const D = field(0.5);                 // a light ground
+  for (let y = 98; y < 101; y++) for (let x = 40; x < 130; x++) D[y * W + x] = 2.5;   // a dark line, 0.6 mm
+  const dark = thinLights(D, W, H, { pixelMm: PX, polarity: 'dark' }).strokes;
+  assert.equal(dark.length, 1); assert.ok(dark[0].lengthMm > 14 && dark[0].lightOd > 2, `its own density: ${dark[0].lightOd}`);
+  assert.equal(thinLights(D, W, H, { pixelMm: PX }).strokes.length, 0, 'the same field has no thin light over dark');
+  const E = field(3.0); for (let y = 98; y < 101; y++) for (let x = 40; x < 130; x++) E[y * W + x] = 3.6;
+  assert.equal(thinLights(E, W, H, { pixelMm: PX, polarity: 'dark' }).strokes.length, 0, 'a dark line over a dark ground is not a thin dark');
+  const rgb = new Uint8Array(W * H * 3).fill(200); for (let y = 98; y < 101; y++) for (let x = 40; x < 130; x++) rgb.fill(30, (y * W + x) * 3, (y * W + x) * 3 + 3);
+  assert.ok(thinLights(D, W, H, { pixelMm: PX, polarity: 'dark', rgb }).strokes[0].rgb[0] < 60, 'the colour is the line\'s, not the ground\'s');
+  assert.equal(thinLights(D, W, H, { pixelMm: PX, polarity: 'dark' }).strokes.filter(s => s.kind === 'glint').length, 0, 'a dark has no glints');
+});
