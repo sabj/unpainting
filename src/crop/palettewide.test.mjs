@@ -78,6 +78,25 @@ test('splitByPuddle cuts a component by colour and folds slivers into a neighbou
   assert.notEqual(r.labels[0], r.labels[9]);
 });
 
+test('splitByPuddle never leaves a piece a wash would drop: a sliver too thin to hold a wash joins its neighbour', () => {
+  // a 24 x 12 component of three colours; the middle colour is a strip two cells wide, long but thin
+  const w = 24, h = 12, labels = new Int32Array(w * h).fill(1), puddles = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) puddles[y * w + x] = x < 11 ? 0 : x < 13 ? 1 : 2;
+  const keep = (r, thin) => { // every piece: area at least `small` and twice its area over its boundary cells at least `thin`
+    const area = new Map(), edge = new Map();
+    for (let i = 0; i < w * h; i++) { const p = r.labels[i]; if (!p) continue; area.set(p, (area.get(p) ?? 0) + 1); const x = i % w; if ([x ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i + w < w * h ? i + w : -1].some(j => j < 0 || r.labels[j] !== p)) edge.set(p, (edge.get(p) ?? 0) + 1); }
+    return [...area].every(([p, a]) => a >= 6 && 2 * a / edge.get(p) >= thin);
+  };
+  const plain = splitByPuddle(labels, puddles, w, h, 6);
+  assert.equal(plain.count, 3, 'without the thin rule the strip is a piece of its own');
+  assert.equal(keep(plain, 4), false);
+  const merged = splitByPuddle(labels, puddles, w, h, 6, { thin: 4 });
+  assert.equal(merged.count, 2);
+  assert.ok(keep(merged, 4));
+  let covered = 0; for (let i = 0; i < w * h; i++) if (merged.labels[i]) covered++;
+  assert.equal(covered, w * h, 'every cell of the uncut wash is covered by exactly one cut wash');
+});
+
 test('puddle labels follow the amounts', () => {
   const w = 12, h = 6, k = 2, A = new Float32Array(w * h * k);
   for (let i = 0; i < w * h; i++) A[i * k + ((i % w) < 6 ? 0 : 1)] = 0.5;

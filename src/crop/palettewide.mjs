@@ -191,7 +191,7 @@ export function puddleLabels(A, k, w, h, { K = 8, floor = 0.04, radius = 2, stri
  * under `small` cells folded into the largest neighbouring piece of its own component (so a colour's fringe is laid
  * with its neighbour rather than dropped). Same shape as raster.js components' result.
  */
-export function splitByPuddle(labels, puddles, w, h, small) {
+export function splitByPuddle(labels, puddles, w, h, small, { thin = 0 } = {}) {
   const n = w * h, out = new Int32Array(n), stack = new Int32Array(n), areas = [0];
   let next = 1;
   for (let s = 0; s < n; s++) {
@@ -221,6 +221,36 @@ export function splitByPuddle(labels, puddles, w, h, small) {
     let moved = 0;
     for (let i = 0; i < n; i++) { const p = out[i]; if (p && into[p]) { out[i] = into[p]; moved++; } }
     if (!moved) break;
+    areas.fill(0); for (let i = 0; i < n; i++) if (out[i]) areas[out[i]]++;
+  }
+  // A piece a wash would drop (under `small` cells, or with `thin` > 0 and twice its area over its boundary cells under
+  // `thin`: a sliver along a cut) joins the neighbour it shares most boundary with, so the cut partitions the component and
+  // no cell the uncut wash covered is left bare. A piece with no neighbour is the whole component and stays as it is.
+  for (let round = 0; round < 12; round++) {
+    const edge = new Int32Array(next), share = new Map();
+    for (let i = 0; i < n; i++) {
+      const p = out[i]; if (!p) continue;
+      const x = i % w, y = (i - x) / w;
+      let boundary = false;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+        const q = j < 0 ? 0 : out[j];
+        if (q === p) continue;
+        boundary = true;
+        if (q && labels[j] === labels[i]) { const key = p * next + q; share.set(key, (share.get(key) ?? 0) + 1); }
+      }
+      if (boundary) edge[p]++;
+    }
+    const into = new Int32Array(next);
+    const failing = []; for (let p = 1; p < next; p++) if (areas[p] > 0 && (areas[p] < small || (thin > 0 && edge[p] > 0 && 2 * areas[p] / edge[p] < thin))) failing.push(p);
+    failing.sort((a, b) => areas[a] - areas[b]);
+    const gone = new Set();
+    for (const p of failing) {
+      let best = 0, bestShare = 0;
+      for (let q = 1; q < next; q++) { if (q === p || gone.has(q) || !areas[q]) continue; const sh = share.get(p * next + q) ?? 0; if (sh > bestShare) { bestShare = sh; best = q; } }
+      if (best) { into[p] = best; gone.add(p); }
+    }
+    if (!gone.size) break;
+    for (let i = 0; i < n; i++) { const p = out[i]; if (p && into[p]) out[i] = into[p]; }
     areas.fill(0); for (let i = 0; i < n; i++) if (out[i]) areas[out[i]]++;
   }
   const map = new Int32Array(next), dense = [0];

@@ -333,7 +333,7 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
       for(const domain of domains){
         const M0=joined?Uint8Array.from(mask,(v,i)=>v&&joined[i]===keyOfDomain(domain)?1:0):groupMode?Uint8Array.from(mask,(v,i)=>v&&cellGroup(i)===keyOfDomain(domain)?1:0):typeof domain==='string'?Uint8Array.from(mask,(v,i)=>v&&cellStyle(i).name===domain?1:0):domain?Uint8Array.from(mask,(v,i)=>v&&region.labels[i]===domain?1:0):mask;
         const M=edgeWobbleMm>0&&M0.reduce((a,v)=>a+v,0)>n*.004?wobbleMask(M0,w,h,edgeWobbleMm/(sheetWidthMm/w),protectedCells,sheetWidthMm/w):M0;
-        const c=groupMode&&cutByMix&&k>1?splitByPuddle(components(M,w,h).labels,puddles(),w,h,step.floor):components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
+        const c=groupMode&&cutByMix&&k>1?splitByPuddle(components(M,w,h).labels,puddles(),w,h,step.floor,{thin:shaped&&phase==='mid'?(DETAIL?1.1:4):0}):components(M,w,h),cells=Array.from({length:c.count+1},()=>[]);
         for(let i=0;i<n;i++)if(c.labels[i])cells[c.labels[i]].push(i);
         const shapes=[];
         for(let id=1;id<=c.count;id++){
