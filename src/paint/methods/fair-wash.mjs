@@ -36,12 +36,12 @@ const PLAN_CELLS_PER_BRUSH = 3;
 /** An outline is simplified to half the smallest wash brush's radius, and never to less than this many plan cells. */
 const OUTLINE_PLAN_CELLS = 1.25;
 /** A later wash is laid only where the shape must be this much darker (L*) than what is under it. */
-export const VISIBLE_DARKER = 8;
+const VISIBLE_DARKER = 8;
 /**
  * The stages: how hard the subject is squinted (mm), the brush whose least wash the stage's shapes keep (mm), and the
  * most puddles the stage may mix. Twenty-five puddles at most over the sheet.
  */
-export const STAGES = Object.freeze([{ squintMm: 4, shapeBrushMm: 7, puddles: 6 }, { squintMm: 2, shapeBrushMm: 7, puddles: 9 }, { squintMm: 1, shapeBrushMm: 3, puddles: 10 }]);
+const STAGES = Object.freeze([{ squintMm: 4, shapeBrushMm: 7, puddles: 6 }, { squintMm: 2, shapeBrushMm: 7, puddles: 9 }, { squintMm: 1, shapeBrushMm: 3, puddles: 10 }]);
 
 /** The subject on the plan's grid, as light (three planes, 0..1). */
 function lightOnPlanGrid(rgb, w, h, pw, ph) {

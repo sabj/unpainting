@@ -28,7 +28,7 @@ export const PUDDLE_TOLERANCE = 5;
 const VISIBLE_STEP = 2;
 export const DILUTIONS = Object.freeze([{ name: 'pale' }, { name: 'middle' }, { name: 'full' }]);
 /** The dilution (index into DILUTIONS) each stage lays, light to dark. */
-export const STAGE_DILUTION = Object.freeze([0, 1, 2]);
+const STAGE_DILUTION = Object.freeze([0, 1, 2]);
 export const MAX_STAGES = STAGE_DILUTION.length;
 
 const sumOf = a => { let s = 0; for (const v of a) s += v; return s; };
