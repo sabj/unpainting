@@ -10,6 +10,8 @@ import { potShare, mixFor, GOUACHE_FILM } from '../../src/media/gouache.mjs';
 import { DEFAULT_SHEET_MM } from '../../src/media/sheet-size.mjs';
 import { BRUSH_SETTINGS, LOAD_FILMS } from '../../src/paint/methods/brush-swatch.mjs';
 import { lstar } from '../../src/crop/thin-lights.mjs';
+import { lineDarkness } from '../../src/paint/methods/line-weight.mjs';
+import { lPlane } from '../../src/paint/methods/ink-match.mjs';
 
 export const LOAD = LOAD_FILMS;  // gouache paste on the brush, in hiding films, as the swatch loads it: a dry brush leaves about a tenth of it on the tooth's hills
 export const DEPOSIT = 0.16;     // thickness the dry brush leaves on the hills, as a share of its load: the 90th percentile of the pixels that take paint, 0.157, 0.155, 0.158, 0.162 at loads of 3, 6, 12, 30 (measured on the engine's brush, water 0.5). The plan's step is laid at the hills, not at the median pixel, so the painted step is capped at the subject's
@@ -53,6 +55,7 @@ export async function layCoats(ctx) {
       const g = [0, 1, 2].map(c => median(s.points.map(p => before[(Math.min(H2 - 1, Math.round(p.y * SC)) * W2 + Math.min(W2 - 1, Math.round(p.x * SC))) * 3 + c])));
       load = s.rgb ? darkLoad(odOf(s.rgb, paperRGB).map((v, ch) => Math.min(v, capOd[ch])), odOf(g, paperRGB), palette, K) : null;
       if (!load) { laid.skippedNoNeed++; continue; }
+      s.cappedRGB = odOf(s.rgb, paperRGB).map((v, ch) => paperRGB[ch] * Math.exp(-Math.min(v, capOd[ch])));
     } else {
       if (along - s.od < MARGIN_OD) { laid.skippedWashKeptLight++; continue; }
       load = lightLoad(s, paperRGB, SHEET_PIGS[POT_AT], GOUACHE_AT, POT_AT, K);
@@ -77,12 +80,22 @@ export async function layCoats(ctx) {
     });
     return rows.length ? { strokes: rows.length, plannedLstar: +median(rows.map(r => r.planned)).toFixed(1), groundLstar: +median(rows.map(r => r.ground)).toFixed(1), plannedStep: +median(rows.map(r => r.planned - r.ground)).toFixed(1), paintedStep: +median(rows.map(r => r.step)).toFixed(1) } : null;
   };
-  laid.plannedAgainstPainted = { light: gap('light'), dark: gap('dark') };
+  // the dark strokes read as lines, as the thin darks are (line-weight.mjs lineDarkness): the step the subject's strands show,
+  // the step the load was chosen for, and the step the paint added along the stroke. What the paint added is read on the
+  // change in the sheet's lightness: a coat's strokes lie among each other and along the edges of washes, and the change is
+  // the stroke's own.
+  const LB = lPlane(before, N2), LA = lPlane(after, N2), change = Float32Array.from(LA, (v, i) => v - LB[i]), r2 = v => +(+v).toFixed(2);
+  const rows = mine.filter(s => s.polarity === 'dark').map(s => {
+    const pts = s.points.map(p => [(p.x + 0.5) * SC, (p.y + 0.5) * SC]), b = lineDarkness(pts, LB, W2, H2, mmPerCell), a = lineDarkness(pts, LA, W2, H2, mmPerCell), strandL = lPlane(Uint8ClampedArray.from(s.cappedRGB), 1)[0];
+    return { region: s.region, kind: s.kind, lengthMm: s.lengthMm, widthMm: s.widthMm, step: s.step ?? null, strandL: r2(strandL), groundL: r2(b.on), present: r2(b.drop), planned: r2(b.on - strandL), added: r2(Math.max(0, -lineDarkness(pts, change, W2, H2, mmPerCell).on)), shown: r2(a.drop), from: [s.points[0].x, s.points[0].y].map(Math.round), to: [s.points.at(-1).x, s.points.at(-1).y].map(Math.round) };
+  });
+  const med = f => (rows.length ? r2(median(rows.map(f))) : null);
+  laid.plannedAgainstPainted = { light: gap('light'), dark: gap('dark'), darkAsLines: rows.length ? { strokes: rows.length, subjectStep: med(r => r.step ?? 0), plannedStep: med(r => r.planned), before: med(r => r.present), addedStep: med(r => r.added), shownStep: med(r => r.shown), meanOver: r2(rows.reduce((t, r) => t + Math.max(0, r.added - r.planned), 0) / rows.length), overSubject: rows.filter(r => r.step != null && r.shown > r.step + Math.max(3, 0.25 * r.step)).length } : null };
   laid.lengthMm = +laid.lengthMm.toFixed(1); laid.changedShareOfSheet = +(changed / N2).toFixed(5);
   laid.lighterPixels = up.length; laid.lighterMedianLstar = q(up, 0.5); laid.lighterP90Lstar = q(up, 0.9); laid.darkerPixels = down.length; laid.darkerMedianLstar = q(down, 0.5); laid.darkerP10Lstar = q(down, 0.1);
   laid.brush = { ...BRUSH, water: WATER, loadFilms: LOAD, depositShare: DEPOSIT, mmPerCell: +mmPerCell.toFixed(4), capOd: capOd.map(v => +v.toFixed(2)) };
   ctx.COAT_RECORD = { ...plan.record, laid };
-  fs.writeFileSync(path.join(out, 'coat-texture.json'), JSON.stringify(ctx.COAT_RECORD, null, 1));
+  fs.writeFileSync(path.join(out, 'coat-texture.json'), JSON.stringify({ ...ctx.COAT_RECORD, darkStrokes: rows }, null, 1));
   console.log(`coat texture: ${laid.light} light and ${laid.dark} dark dry-brush strokes, ${laid.lengthMm} mm, ${(100 * laid.changedShareOfSheet).toFixed(2)}% of the sheet changed by more than 2 L* (lighter median ${laid.lighterMedianLstar}, darker median ${laid.darkerMedianLstar}); skipped ${laid.skippedWashKeptLight} where the wash kept the light, ${laid.skippedNoNeed} where the ground was dark enough and ${laid.skippedReserved} on reserved light`);
   ctx.STAGE = { stage: 'coat-texture' }; ctx.NATIVE_CAPTURE?.('coat-texture');
   if (laid.light + laid.dark && !FILM_BY_PAINT) await shoot();

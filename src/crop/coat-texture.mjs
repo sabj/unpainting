@@ -33,18 +33,19 @@ const gauss01 = rnd => { let u = 0; for (let i = 0; i < 6; i++) u += rnd(); retu
 /**
  * Thin lights and thin darks of a density field, as 0/1 planes: lighter, or darker, than the ring by a step the eye sees.
  * The ring must be the ground of the region, within GROUND_TOL of its mean lightness over GROUND_MM: the gaps between dense
- * light hairs are not dark hairs, and the gaps between dense dark hairs are not light ones.
+ * light hairs are not dark hairs, and the gaps between dense dark hairs are not light ones. `step` is that step in L* at
+ * each pixel of either plane: how much lighter, or darker, the strand is than its own ring.
  */
 export function thinPlanes(D, w, h, mmPerCell) {
   const r = Math.max(1, Math.round(THIN_MM / 2 / mmPerCell)), L = Float32Array.from(D, lstar);
   const E = Float32Array.from(L, v => -v), cE = minFilter(maxFilter(E, w, h, r), w, h, r), cL = minFilter(maxFilter(L, w, h, r), w, h, r);
-  const light = new Uint8Array(w * h), dark = new Uint8Array(w * h), Lm = gaussian(L, w, h, GROUND_MM / mmPerCell), m = r + 1; // the filters see the sheet's edge as a wall
+  const light = new Uint8Array(w * h), dark = new Uint8Array(w * h), step = new Float32Array(w * h), Lm = gaussian(L, w, h, GROUND_MM / mmPerCell), m = r + 1; // the filters see the sheet's edge as a wall
   for (let y = m; y < h - m; y++) for (let x = m; x < w - m; x++) {
     const i = y * w + x;
-    if (-cE[i] <= DARK_L && cE[i] - E[i] >= STEP_L && Math.abs(-cE[i] - Lm[i]) <= GROUND_TOL) light[i] = 1;
-    else if (cL[i] >= GROUND_L && cL[i] - L[i] >= STEP_L && Math.abs(cL[i] - Lm[i]) <= GROUND_TOL) dark[i] = 1;
+    if (-cE[i] <= DARK_L && cE[i] - E[i] >= STEP_L && Math.abs(-cE[i] - Lm[i]) <= GROUND_TOL) { light[i] = 1; step[i] = cE[i] - E[i]; }
+    else if (cL[i] >= GROUND_L && cL[i] - L[i] >= STEP_L && Math.abs(cL[i] - Lm[i]) <= GROUND_TOL) { dark[i] = 1; step[i] = cL[i] - L[i]; }
   }
-  return { light, dark, L };
+  return { light, dark, L, step };
 }
 
 /** Each plane pixel's strand width in mm: twice the distance to the ridge's edge, taken at the ridge's centre line nearby. */
@@ -67,7 +68,8 @@ export function structureMask(L, w, h, mmPerCell) {
  * @param plan     { w, h, mmPerCell }: the sheet's plan grid, which the strokes are returned on
  * @param kinds    { regionId: 'short-coat'|'curly-coat'|'long-hair' }
  * @param brush    the swatch (src/paint/methods/brush-swatch.mjs measureDryBrush) at the plan's density
- * @returns {{ strokes, regions }} strokes [{ polarity, region, kind, points: [{x, y, r, p}] (plan cells), widthMm, strandMm, lengthMm, rgb, od }]
+ * @returns {{ strokes, regions }} strokes [{ polarity, region, kind, points: [{x, y, r, p}] (plan cells), widthMm, strandMm, lengthMm, rgb, od, step }]
+ *   `rgb` and `od` are the colour and density of the strands near the stroke, `step` how many L* they stand off their own ground
  */
 export function coatTexture({ fine, plan, kinds, brush, ceiling = Infinity, seed = 1 }) {
   const { D, rgb, labelMap, w, h, mmPerCell: mm } = fine, scale = plan.w / w, rnd = rng(seed);
@@ -91,7 +93,7 @@ export function coatTexture({ fine, plan, kinds, brush, ceiling = Infinity, seed
       if (!px) { record[`${polarity}Strokes`] = 0; continue; }
       const widthsLaid = []; for (let i = 0; i < w * h; i++) if (T[i]) widthsLaid.push(widths[i]);
       const O = orientationField(T, w, h, gaussian, { sigma }), density = gaussian(T, w, h, sigma * 1.3);
-      const cs = gaussian(T, w, h, COLOUR_MM / mm), wmap = gaussian(Float32Array.from(T, (v, i) => v * widths[i]), w, h, COLOUR_MM / mm), col = [0, 1, 2].map(c => gaussian(Float32Array.from(T, (v, i) => v * rgb[i * 3 + c]), w, h, COLOUR_MM / mm)), od = gaussian(Float32Array.from(T, (v, i) => v * D[i]), w, h, COLOUR_MM / mm);
+      const cs = gaussian(T, w, h, COLOUR_MM / mm), wmap = gaussian(Float32Array.from(T, (v, i) => v * widths[i]), w, h, COLOUR_MM / mm), col = [0, 1, 2].map(c => gaussian(Float32Array.from(T, (v, i) => v * rgb[i * 3 + c]), w, h, COLOUR_MM / mm)), od = gaussian(Float32Array.from(T, (v, i) => v * D[i]), w, h, COLOUR_MM / mm), st = gaussian(Float32Array.from(T, (v, i) => v * planes.step[i]), w, h, COLOUR_MM / mm);
       // strokes until the paint they leave, as measured on the swatch, covers as much of the region as the strands do
       const areaPerMm = narrow.areaPerCell * plan.mmPerCell, strandArea = px * mm * mm, perStroke = lengthMm * areaPerMm, widthMm = Math.max(laidMm, median(widthsLaid));
       const want = Math.min(Math.round(strandArea / perStroke), Math.max(0, ceiling - strokes.length));
@@ -120,7 +122,7 @@ export function coatTexture({ fine, plan, kinds, brush, ceiling = Infinity, seed
         const k = Math.round(sy) * w + Math.round(sx), c = cs[k] > 1e-6 ? col.map(F => Math.round(F[k] / cs[k])) : null;
         if (!c) continue; // no strand near enough to give a colour
         const p0 = 0.7 + 0.3 * rnd(), n1 = line.length - 1;
-        strokes.push({ polarity, region: Number(id), kind, widthMm: +widthMm.toFixed(3), strandMm: +(wmap[k] / cs[k]).toFixed(3), lengthMm: +len.toFixed(2), rgb: c, od: od[k] / cs[k],
+        strokes.push({ polarity, region: Number(id), kind, widthMm: +widthMm.toFixed(3), strandMm: +(wmap[k] / cs[k]).toFixed(3), lengthMm: +len.toFixed(2), rgb: c, od: od[k] / cs[k], step: +(st[k] / cs[k]).toFixed(2),
           // pressed at the root, lifting to a fine tip: the width and the pressure fall along the stroke
           points: line.map(([x, y], q) => { const t = n1 ? q / n1 : 0; return { x: x * scale, y: y * scale, r: rCells * (1 - 0.45 * t ** 1.5), p: p0 * (1 - 0.55 * t ** 1.2) }; }) });
         made++; lengthSum += len;
