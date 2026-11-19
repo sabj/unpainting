@@ -55,6 +55,7 @@ import {strokeBudgetDefaults} from '../../src/paint/methods/stroke-budget.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
 import {linePython, resolveLinePython} from '../../src/paint/methods/line-python.mjs';
 import {detectSheetTone} from '../../src/paint/methods/sheet-tone.mjs';
+import {checkSourceScale, sourceReadable} from './source-scale.mjs';
 
 export async function setup(ctx) {
 const { ENTRY_FILE } = ctx;
@@ -175,6 +176,15 @@ if (SPEED_RENDER_THREADS > 1) {
 }
 const root = path.dirname(path.dirname(ENTRY_FILE));
 const out = path.resolve(root, opt('out', 'work/plate'));
+// The source is not enlarged: the sheet's cells across (--width x --scale) against the source's pixels across, checked
+// before the output folder is touched or anything is prepared. --sourcescale s (default 1): the most sheet cells for
+// each source pixel the run accepts (source-scale.mjs). A source that is not there is the image load's error, below.
+const SOURCE_FILE = opt('image', '') ? path.resolve(root, opt('image', '')) : null;
+const SOURCE_SCALE = SOURCE_FILE && sourceReadable(SOURCE_FILE) ? await (async () => {
+  const meta = await sharp(SOURCE_FILE).metadata();
+  return checkSourceScale({ image: opt('image', ''), sourceWidth: meta.width, sourceHeight: meta.height, width: num('width', 700), widthGiven: optIdx('width') >= 0, scale: num('scale', 1), allowed: num('sourcescale', 1) });
+})() : null;
+if (SOURCE_SCALE) console.log(`source: ${SOURCE_SCALE.sourceWidth} x ${SOURCE_SCALE.sourceHeight} px, sheet ${SOURCE_SCALE.sheetWidth} cells wide, ${+SOURCE_SCALE.sourceScale.toFixed(3)} cells for each source pixel (--sourcescale ${SOURCE_SCALE.allowed})`);
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
 // the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
@@ -409,5 +419,5 @@ Object.assign(ctx, { GRAPHITE_POOL, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv
   SOFT_WET_MM, WASH_SESSION, MAJOR_INTENT, NUMERIC_TUFT_SHAPES, NUMERIC_TUFT_CAL, WALL_PHASES, 
   phaseMark, srcMeta, PX_SOURCE, PX_RAW, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, SEGMENTS_RECORD, createBrush, 
   physicalStroke, candidateContact, ANCHORS, lum, TONE_MODE, SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, 
-  WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted });
+  WASH_SPLAT_SETTINGS, planContentHashes, CODE_HASH, PALETTE_FROM_FILE, paletteFitStarted, SOURCE_SCALE });
 }

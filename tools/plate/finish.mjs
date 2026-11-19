@@ -5,6 +5,7 @@ import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
 import {compactLowerLayers, layerStorageStats} from '../../src/media/layer-storage.mjs';
 import {writeCensus} from '../speed/census-write.mjs';
 import {writeRunCard} from '../../src/paint/run-card.mjs';
+import {sourceScaleRecord} from './source-scale.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {validateProductionDetails} from '../painter/semantic-production-details.mjs';
@@ -378,7 +379,7 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
   }
 }
 
-writeRunCard({ provenanceHistory:ctx.PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, expandedArgs: argv, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), mediumDecision: ctx.MEDIUM_DECISION ?? null, graphitePool: ctx.GRAPHITE_POOL ?? null, subjectMedium: opt('subjectmedium', 'pen') !== 'pen' ? { medium: opt('subjectmedium', 'pen'), override: ctx.SUBJECT_MEDIUM ? { asked: ctx.SUBJECT_MEDIUM.asked, drawn: 'graphite', dropped: ctx.SUBJECT_MEDIUM.dropped } : null } : null, code: CODE_STATE, segments: SEGMENTS_RECORD, linework: ctx.LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
+writeRunCard({ provenanceHistory:ctx.PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, expandedArgs: argv, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), mediumDecision: ctx.MEDIUM_DECISION ?? null, graphitePool: ctx.GRAPHITE_POOL ?? null, subjectMedium: opt('subjectmedium', 'pen') !== 'pen' ? { medium: opt('subjectmedium', 'pen'), override: ctx.SUBJECT_MEDIUM ? { asked: ctx.SUBJECT_MEDIUM.asked, drawn: 'graphite', dropped: ctx.SUBJECT_MEDIUM.dropped } : null } : null, code: CODE_STATE, segments: SEGMENTS_RECORD, linework: ctx.LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null, ...(ctx.SOURCE_SCALE ? sourceScaleRecord(ctx.SOURCE_SCALE) : {}) }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
 

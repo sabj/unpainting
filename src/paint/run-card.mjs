@@ -101,6 +101,11 @@ function buildRunCard({
           paintWidth: dimensions.paintWidth ?? null,
           paintHeight: dimensions.paintHeight ?? null,
           enlargement: dimensions.enlargement ?? null,
+          // the sheet's cells across, the cells for each source pixel, and the most the run accepted (--sourcescale,
+          // tools/plate/source-scale.mjs). paintWidth is the output's pixels, wider than the sheet with --inkres.
+          sheetWidth: dimensions.sheetWidth ?? null,
+          sourceScale: dimensions.sourceScale ?? null,
+          sourceScaleAllowed: dimensions.sourceScaleAllowed ?? null,
         }
       : null,
     // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)

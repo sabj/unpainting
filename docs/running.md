@@ -20,7 +20,7 @@ The default recipe, a preset of painter settings, opens with a light pencil draw
 
 Line models extract candidate lines. The trained line models in `tools/seg/` are optional: without them the painter finds lines with its own ink separator and line tracer ([ink.md](ink.md#where-the-lines-come-from)). The plan chooses whether and how to draw them. A value plan, which describes regions and painting styles, has a `drawing` section that sets the medium, ink colour, amount, line set, weight and closing lines ([plan-format.md](plan-format.md#value-plans-the-drawing-section)), and a flag on the command line still overrides it.
 
-The default physical sheet fits the target inside a 6 x 4 in postcard turned to its orientation. Width and height follow the target's proportions within that box. `--sheetmm 152.4` explicitly fixes the width at 152.4 mm instead. `--width` sets the planning grid width in cells, the simulation grid squares. A larger export does not change the physical paper size. The paper is cold-press, with a textured surface and physical fibers by default; `--paper flat` and `--paperphysical 0` turn them off.
+The default physical sheet fits the target inside a 6 x 4 in postcard turned to its orientation. Width and height follow the target's proportions within that box. `--sheetmm 152.4` explicitly fixes the width at 152.4 mm instead. `--width` sets the planning grid width in cells, the simulation grid squares. The painter does not paint from an enlarged source: a `--width` above the source's width in pixels stops the run, and so does the default 700 on a narrower source. Paint at the source's width or less, or state the enlargement the run accepts with `--sourcescale` (the most cells for each source pixel, default 1). The run card records the source size, the sheet's cells and the scale. A larger export does not change the physical paper size. The paper is cold-press, with a textured surface and physical fibers by default; `--paper flat` and `--paperphysical 0` turn them off.
 
 The image examples write to ignored `work/<name>/` folders:
 
@@ -68,7 +68,8 @@ Flags use `--name value`. The last repeated flag wins. Recipe flags come first, 
 |---|---|---|---|
 | `--image` | target image path | required | required |
 | `--out` | output directory | `work/plate` | same |
-| `--width` | planning width in cells | 700 | same |
+| `--width` | planning width in cells, at most the source's width in pixels | 700 | same |
+| `--sourcescale` | the most sheet cells across for each source pixel across; above 1 states the enlargement a run accepts | 1 | same |
 | `--mode` | `fast`, `full` | `fast` | same |
 | `--recipe` | `default`, `penwash`, `person`, `none` | omitted selects `default` | `default` |
 | `--order` | `painter` (light-to-dark shapes), `ladder` (successive value layers), `legacy-painter` (region-by-region order) | `painter` (value planner) | same |
