@@ -90,13 +90,16 @@ export function routeLine(line, sheet, { swatch, palette, paperRGB, canPaint = t
  * yield (the step it added over the step the swatch said it would, where that is more than one). Null when nothing more is laid: the step is there,
  * or what is missing is lighter than the lightest line the point holds. Pure.
  * @param first  { predicted, added }: the first pass's predicted step and the step the sheet shows it added
- * @returns {{ conc, predicted, yield }|null}
+ * @param fullest  a brush with no pencil behind it (a coat's dry brush, coat-lay.mjs): where what is missing asks for a
+ *   thicker film than the heaviest load tried leaves, that load is laid, for the step it is predicted to add (`short`)
+ * @returns {{ conc, predicted, yield, short? }|null}
  */
-export function secondPass(remaining, first, groundRGB, shares, { swatch, palette }) {
+export function secondPass(remaining, first, groundRGB, shares, { swatch, palette, fullest = false }) {
   if (!(remaining > 0)) return null;
   const yieldOf = first.predicted > 0 ? Math.min(YIELD[1], Math.max(YIELD[0], first.added / first.predicted)) : 1;
-  const film = filmFor(remaining / yieldOf, groundRGB, palette, shares), load = film == null ? null : loadFor(film, swatch);
-  return load ? { conc: load.conc, predicted: remaining, yield: yieldOf } : null;
+  const asked = filmFor(remaining / yieldOf, groundRGB, palette, shares), most = fullest ? swatch.heaviest?.thickness : undefined, short = most != null && (asked == null || asked > most);
+  const film = short ? most : asked, load = film == null ? null : loadFor(film, swatch);
+  return load ? { conc: load.conc, predicted: short ? yieldOf * stepOf(film, groundRGB, palette, shares) : remaining, yield: yieldOf, ...(short ? { short: true } : {}) } : null;
 }
 
 /**

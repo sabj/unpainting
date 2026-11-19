@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lightLoad, strandLoad, measureDryDark, LOAD, SWATCH_PRESSURE } from './coat-lay.mjs';
-import { FIRST_PASS, tolerance } from './thin-darks-lay.mjs';
+import { FIRST_PASS, tolerance, secondPass } from './thin-darks-lay.mjs';
 import { measurePoint } from '../../src/paint/methods/point-swatch.mjs';
 import { BRUSH_SETTINGS } from '../../src/paint/methods/brush-swatch.mjs';
 import { GOUACHE_FILM, tintedGouache } from '../../src/media/gouache.mjs';
@@ -52,6 +52,22 @@ test('a dark stroke is laid for the step the strands show, less what the sheet s
   assert.ok(!darkGround.lay && /as dark as the strand/.test(darkGround.why), JSON.stringify(darkGround));
   assert.ok(tolerance(14) >= 3);
   assert.equal(strandLoad({ ...strand, step: undefined }, { drop: 0, on: 88, groundRGB: ground }, on).lay, false, 'no step planned, no stroke');
+});
+
+test('a step beyond the heaviest load tried is laid with that load and reads short: the brush has no more', () => {
+  // a near-black strand on a dark coat, in a paint a sixth as strong as the swatch's: the film for the step is thicker than
+  // any load tried leaves
+  const weak = [{ ...dark[0], K: dark[0].K.map(k => k / 6) }];
+  const on = { swatch, palette: weak, paperRGB: WHITE }, coat = [60, 58, 55], black = { step: 20, L: 3, rgb: [12, 11, 10] };
+  const r = strandLoad(black, { drop: 0, on: 25, groundRGB: coat }, on);
+  assert.ok(r.lay && r.short && r.conc === swatch.heaviest.conc && /heaviest load/.test(r.why), JSON.stringify(r));
+  assert.ok(r.predicted > 0 && r.predicted < FIRST_PASS * 20, `the heaviest load is predicted to add ${r.predicted} L*, short of ${FIRST_PASS * 20}`);
+  const env = { swatch, palette: weak }, first = { predicted: r.predicted, added: r.predicted };
+  assert.equal(secondPass(20 - r.predicted, first, coat, r.shares, env), null, 'a point with a pencil behind it lays no such second pass');
+  const again = secondPass(20 - r.predicted, first, coat, r.shares, { ...env, fullest: true });
+  assert.ok(again && again.short && again.conc === swatch.heaviest.conc && again.predicted < 20 - r.predicted, JSON.stringify(again));
+  const within = secondPass(3, { predicted: 5, added: 5 }, [225, 222, 215], [1], { swatch, palette: dark, fullest: true });
+  assert.ok(within && !within.short && within.predicted === 3, 'a step the loads tried can make is laid as before');
 });
 
 test('the load asked for a step leaves that step when the brush lays it: twice the film is not laid, nor a third of it', () => {

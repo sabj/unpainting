@@ -9,7 +9,9 @@
 //      and never to take the sheet darker than the strand itself. Where that is within the tolerance, nothing is laid.
 //   2. The load is read from a swatch of this same dry brush, laid by the run's own brush on its paper and read as the
 //      sheet is (src/paint/methods/point-swatch.mjs): the film of the strand's own paints that makes the step over this
-//      ground, by the render that draws every glaze, and the load that leaves that film.
+//      ground, by the render that draws every glaze, and the load that leaves that film. Where the step asks for a
+//      thicker film than the heaviest load tried leaves (a near-black strand on a dark coat), that load is laid and
+//      the stroke may read short of its step: the brush has no more, and there is no pencil behind it.
 //   3. A dark is built up, not struck at once: a first pass for FIRST_PASS of the step; the sheet is dried and read; a
 //      second pass for what is still missing, at the yield the first one showed. Paint cannot be taken back.
 //      What a pass added is read on the change in the sheet's lightness, as a line along the stroke: a coat's strokes
@@ -52,17 +54,18 @@ export function measureDryDark({ mmPerCell, radiusCells, paperOpts = null, tools
  * @param strand  { step, L, rgb }: how many L* the subject's strands stand off their own ground, and the strand's own lightness and colour
  * @param sheet   { drop, on, groundRGB }: the step the sheet already shows along the stroke, its lightness there, and the colour under it
  * @param swatch  measureDryDark at the stroke's brush
- * @returns {{ lay: boolean, need, why, conc?, shares?, predicted? }} `need` the step still to add, in L*; `conc` the
- *   first pass's load in all, shared among the paints by `shares`; `predicted` the step the swatch says it adds
+ * @returns {{ lay: boolean, need, why, conc?, shares?, predicted?, short? }} `need` the step still to add, in L*; `conc` the
+ *   first pass's load in all, shared among the paints by `shares`; `predicted` the step the swatch says it adds; `short`
+ *   when that is the heaviest load tried and less than the first pass asks
  */
 export function strandLoad(strand, sheet, { swatch, palette, paperRGB }) {
   const missing = strand.step - sheet.drop, room = sheet.on - strand.L, need = Math.min(missing, room), tol = tolerance(strand.step);
   if (!(need > tol)) return { lay: false, need, why: room <= missing ? 'the sheet is as dark as the strand there' : 'the sheet already shows the step' };
-  const shares = lineShares(strand.rgb, paperRGB, palette), first = filmFor(FIRST_PASS * need, sheet.groundRGB, palette, shares);
-  if (first == null) return { lay: false, need, why: 'the strand\'s paints cannot make the step over this ground' };
-  const load = loadFor(first, swatch);
-  if (!load) return { lay: false, need, why: first < (swatch.lightest?.thickness ?? Infinity) ? 'lighter than the lightest load the brush was tried at' : 'darker than the heaviest load the brush was tried at' };
-  return { lay: true, need, why: 'the brush can lay it', conc: load.conc, shares, predicted: stepOf(first, sheet.groundRGB, palette, shares) };
+  const shares = lineShares(strand.rgb, paperRGB, palette), asked = filmFor(FIRST_PASS * need, sheet.groundRGB, palette, shares);
+  if (asked == null) return { lay: false, need, why: 'the strand\'s paints cannot make the step over this ground' };
+  const most = swatch.heaviest?.thickness, short = most != null && asked > most, first = short ? most : asked, load = loadFor(first, swatch);
+  if (!load) return { lay: false, need, why: 'lighter than the lightest load the brush was tried at' };
+  return { lay: true, need, why: short ? 'the heaviest load the brush was tried at' : 'the brush can lay it', conc: load.conc, shares, predicted: stepOf(first, sheet.groundRGB, palette, shares), ...(short ? { short: true } : {}) };
 }
 
 export async function layCoats(ctx) {
@@ -105,7 +108,7 @@ export async function layCoats(ctx) {
       Object.assign(row, { present: now.drop, groundL: now.on, groundRGB, need: r.need, why: r.why, laid: r.lay, shares: r.shares ?? null });
       rows.push(row);
       if (!r.lay) { laid.skippedNoNeed++; left[r.why] = (left[r.why] ?? 0) + 1; continue; }
-      row.passes = [{ conc: r.conc, predicted: r.predicted }];
+      row.passes = [{ conc: r.conc, predicted: r.predicted, ...(r.short ? { short: true } : {}) }];
       lay(s, shared(r.shares, r.conc), seed);
     } else {
       if (under - s.od < MARGIN_OD) { laid.skippedWashKeptLight++; continue; }
@@ -122,7 +125,7 @@ export async function layCoats(ctx) {
     const first = row.passes[0];
     first.added = addedOn(row, change);
     // the same seed for both passes of a stroke, so the second follows the first's hand
-    const second = secondPass(row.need - first.added, first, groundOf(row.stroke, now), row.shares, { swatch: swatchFor(row.stroke.points[0].r * SC), palette: PIGS });
+    const second = secondPass(row.need - first.added, first, groundOf(row.stroke, now), row.shares, { swatch: swatchFor(row.stroke.points[0].r * SC), palette: PIGS, fullest: true });
     if (second) { row.passes.push(second); lay(row.stroke, shared(row.shares, second.conc), row.seed); again++; }
   }
   if (again) { dry(sheet, 20000, O, { levelMax: 200 }); now = read(); change = changeFrom(now); }
@@ -144,7 +147,7 @@ export async function layCoats(ctx) {
     return list.length ? { strokes: list.length, plannedLstar: +median(list.map(r => r.planned)).toFixed(1), groundLstar: +median(list.map(r => r.ground)).toFixed(1), plannedStep: +median(list.map(r => r.plannedStep)).toFixed(1), paintedStep: +median(list.map(r => r.step)).toFixed(1) } : null;
   };
   const r2 = v => (v == null ? null : +(+v).toFixed(2)), count = f => darks.filter(f).length;
-  const asLines = darks.length ? { strokes: darks.length, twoPasses: count(r => r.passes.length > 1), within: count(r => r.verdict === 'within'), under: count(r => r.verdict === 'under'), over: count(r => r.verdict === 'over'),
+  const asLines = darks.length ? { strokes: darks.length, twoPasses: count(r => r.passes.length > 1), heaviestLoad: count(r => r.passes.some(p => p.short)), within: count(r => r.verdict === 'within'), under: count(r => r.verdict === 'under'), over: count(r => r.verdict === 'over'),
     subjectStep: r2(median(darks.map(r => r.stroke.step))), before: r2(median(darks.map(r => r.present))), plannedStep: r2(median(darks.map(r => r.need))), paintedStep: r2(median(darks.map(r => r.added))), meanMiss: r2(darks.reduce((a, r) => a + Math.abs(r.added - r.need), 0) / darks.length) } : null;
   laid.plannedAgainstPainted = { light: gap('light'), dark: gap('dark'), darkAsLines: asLines };
   laid.darkLeft = left; laid.tolerance = 'thin-darks-lay.mjs STEP_TOLERANCE'; laid.firstPass = FIRST_PASS;
@@ -153,9 +156,9 @@ export async function layCoats(ctx) {
   laid.brush = { ...BRUSH, water: WATER, loadFilms: LOAD, mmPerCell: +mmPerCell.toFixed(4), capOd: capOd.map(v => +v.toFixed(2)), darkSwatches: [...swatches].map(([radiusCells, s]) => ({ radiusCells, pressure: SWATCH_PRESSURE, lineMm: s.widthMm, rows: s.rows })) };
   ctx.COAT_RECORD = { ...plan.record, laid };
   const strokesOut = rows.map(r => ({ region: r.stroke.region, kind: r.stroke.kind, laid: r.laid, why: r.why, lengthMm: r.stroke.lengthMm, widthMm: r.stroke.widthMm, step: r2(r.stroke.step), strandL: r2(r.strandL), groundL: r2(r.groundL), present: r2(r.present), need: r2(r.need), ground: r.groundRGB.map(Math.round),
-    passes: r.passes ? r.passes.map(p => ({ conc: r2(p.conc), predicted: r2(p.predicted), added: r2(p.added), yield: r2(p.yield) })) : null, added: r2(r.added), verdict: r.verdict ?? null, from: [r.stroke.points[0].x, r.stroke.points[0].y].map(Math.round), to: [r.stroke.points.at(-1).x, r.stroke.points.at(-1).y].map(Math.round) }));
+    passes: r.passes ? r.passes.map(p => ({ conc: r2(p.conc), predicted: r2(p.predicted), added: r2(p.added), yield: r2(p.yield), ...(p.short ? { short: true } : {}) })) : null, added: r2(r.added), verdict: r.verdict ?? null, from: [r.stroke.points[0].x, r.stroke.points[0].y].map(Math.round), to: [r.stroke.points.at(-1).x, r.stroke.points.at(-1).y].map(Math.round) }));
   fs.writeFileSync(path.join(out, 'coat-texture.json'), JSON.stringify({ ...ctx.COAT_RECORD, darkStrokes: strokesOut }, null, 1));
-  console.log(`coat texture: ${laid.light} light and ${laid.dark} dark dry-brush strokes, ${laid.lengthMm} mm, ${(100 * laid.changedShareOfSheet).toFixed(2)}% of the sheet changed by more than 2 L* (lighter median ${laid.lighterMedianLstar}, darker median ${laid.darkerMedianLstar}); skipped ${laid.skippedWashKeptLight} where the wash kept the light, ${laid.skippedNoNeed} darks the sheet already states or the brush cannot lay and ${laid.skippedReserved} on reserved light${asLines ? `; darks read as lines: planned ${asLines.plannedStep} L*, painted ${asLines.paintedStep} at the median (${asLines.within} within tolerance, ${asLines.under} under, ${asLines.over} over; ${asLines.twoPasses} in two passes)` : ''}`);
+  console.log(`coat texture: ${laid.light} light and ${laid.dark} dark dry-brush strokes, ${laid.lengthMm} mm, ${(100 * laid.changedShareOfSheet).toFixed(2)}% of the sheet changed by more than 2 L* (lighter median ${laid.lighterMedianLstar}, darker median ${laid.darkerMedianLstar}); skipped ${laid.skippedWashKeptLight} where the wash kept the light, ${laid.skippedNoNeed} darks the sheet already states or the brush cannot lay and ${laid.skippedReserved} on reserved light${asLines ? `; darks read as lines: planned ${asLines.plannedStep} L*, painted ${asLines.paintedStep} at the median (${asLines.within} within tolerance, ${asLines.under} under, ${asLines.over} over; ${asLines.twoPasses} in two passes, ${asLines.heaviestLoad} at the heaviest load tried)` : ''}`);
   ctx.STAGE = { stage: 'coat-texture' }; ctx.NATIVE_CAPTURE?.('coat-texture');
   if (laid.light + laid.dark && !FILM_BY_PAINT) await shoot();
   return laid;
