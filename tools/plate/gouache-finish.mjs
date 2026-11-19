@@ -25,14 +25,14 @@ export function strokesToLay(strokes, painted, w, h) {
   return { lay, kept };
 }
 
-/** A strand's root end first: the hair grows from the body of the cluster and the stroke lifts to its tip. */
+/** A strand's root end first: the hair grows from the body of its group (one coat, or the single lights together) and the
+ *  stroke lifts to its tip. */
 export function rootFirst(strokes) {
-  const strands = strokes.filter(s => s.kind === 'strand');
-  if (!strands.length) return strokes;
-  const cx = strands.reduce((a, s) => a + s.curve[s.curve.length >> 1][0], 0) / strands.length, cy = strands.reduce((a, s) => a + s.curve[s.curve.length >> 1][1], 0) / strands.length;
+  const groups = new Map();
+  for (const s of strokes) if (s.kind === 'strand') { const k = s.field ?? 'single', g = groups.get(k) ?? { x: 0, y: 0, n: 0 }, m = s.curve[s.curve.length >> 1]; g.x += m[0]; g.y += m[1]; g.n++; groups.set(k, g); }
   return strokes.map(s => {
     if (s.kind !== 'strand') return s;
-    const d = p => Math.hypot(p[0] - cx, p[1] - cy);
+    const g = groups.get(s.field ?? 'single'), cx = g.x / g.n, cy = g.y / g.n, d = p => Math.hypot(p[0] - cx, p[1] - cy);
     return d(s.curve[0]) <= d(s.curve.at(-1)) ? s : { ...s, curve: [...s.curve].reverse() };
   });
 }
@@ -55,13 +55,13 @@ export async function layGouache(ctx) {
   const film = sheet.D[at]; let touched = 0;
   if (items.length) for (let i = 0; i < N2; i++) if (film[i] > 0.05 * GOUACHE_FILM) touched++;
   const laid = {
-    strokes: items.length, strands: items.filter(s => s.kind === 'strand').length, glints: items.filter(s => s.kind === 'glint').length,
+    strokes: items.length, singles: items.filter(s => s.kind === 'strand' && s.field == null).length, fieldStrokes: items.filter(s => s.field != null).length, glints: items.filter(s => s.kind === 'glint').length,
     lengthMm: +items.reduce((a, s) => a + s.lengthMm, 0).toFixed(1), cellsTouched: touched, shareOfSheet: +(touched / N2).toFixed(5), tinted: items.filter(s => s.tint.mix.length).length,
     skippedWashKeptLight: kept.length, marginOd: MARGIN_OD, drawn,
   };
   ctx.GOUACHE_RECORD = { ...plan.record, laid };
   fs.writeFileSync(path.join(out, 'gouache.json'), JSON.stringify({ ...ctx.GOUACHE_RECORD, strokes: items.map(({ points, curve, ...s }) => ({ ...s, points: curve.length })) }, null, 1));
-  console.log(`gouache: ${laid.strokes} rigger strokes (${laid.strands} strands, ${laid.glints} glints, ${laid.tinted} tinted), ${laid.lengthMm} mm, ${(100 * laid.shareOfSheet).toFixed(3)}% of the sheet; ${kept.length} lights the washes kept`);
+  console.log(`gouache: ${laid.strokes} rigger strokes (${laid.singles} single lights, ${laid.fieldStrokes} in coats, ${laid.glints} glints, ${laid.tinted} tinted), ${laid.lengthMm} mm, ${(100 * laid.shareOfSheet).toFixed(3)}% of the sheet; ${kept.length} lights the washes kept`);
   ctx.STAGE = { stage: 'gouache' }; ctx.NATIVE_CAPTURE?.('gouache-strokes');
   if (items.length && !FILM_BY_PAINT) await shoot();
   return laid;
