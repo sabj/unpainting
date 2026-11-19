@@ -61,19 +61,27 @@ test('a thin film hides less: the stroke thins with pressure and at its tip', ()
 });
 
 test('a light near paper white takes pure white; a warm light takes a little of the warm paint that gives its colour', () => {
-  assert.deepEqual(gouacheTint([250, 249, 246], PAPER, [COAT, OCHRE]), { pigment: null, amount: 0, residual: 0 });
+  assert.deepEqual(gouacheTint([250, 249, 246], PAPER, [COAT, OCHRE]), { mix: [], residual: 0 });
   const t = gouacheTint([236, 214, 160], PAPER, [COAT, OCHRE]);
-  assert.equal(t.pigment, 1, 'ochre, not the dark coat paint');
-  assert.ok(t.amount > 0 && t.amount < 1, `a little: ${t.amount}`);
+  assert.deepEqual(t.mix.map(m => m.pigment), [1], 'ochre, not the dark coat paint');
+  assert.ok(t.mix[0].amount > 0 && t.mix[0].amount < 1, `a little: ${t.mix[0].amount}`);
   // laid as the film and the tint in one layer, it reads that colour
-  const rgb = renderLayers([[new Float32Array([1.5]), new Float32Array(1), new Float32Array(1)], [new Float32Array(1), new Float32Array([t.amount]), new Float32Array([GOUACHE_FILM])]], [COAT, OCHRE, GOUACHE_PIGMENT], paperOf(1), 1, 1);
+  const rgb = renderLayers([[new Float32Array([1.5]), new Float32Array(1), new Float32Array(1)], [new Float32Array(1), new Float32Array([t.mix[0].amount]), new Float32Array([GOUACHE_FILM])]], [COAT, OCHRE, GOUACHE_PIGMENT], paperOf(1), 1, 1);
   assert.ok(Math.abs(rgb[0] - 236) < 30 && Math.abs(rgb[1] - 214) < 25 && Math.abs(rgb[2] - 160) < 20 && rgb[2] < rgb[0] - 30, `tinted white reads ${rgb[0]}/${rgb[1]}/${rgb[2]}`);
 });
 
+test('a neutral grey light takes a mix of paints, not one paint with its cast', () => {
+  const BLUE = { K: [2.0, 1.2, 0.3] }, ORANGE = { K: [0.2, 0.7, 1.9] }, GREEN = { K: [1.5, 0.4, 1.4] };
+  const grey = gouacheTint([150, 150, 150], PAPER, [BLUE, ORANGE, GREEN]);
+  assert.ok(grey.mix.length >= 2, `a mix: ${JSON.stringify(grey.mix)}`);
+  const one = gouacheTint([150, 150, 150], PAPER, [GREEN]);
+  assert.ok(grey.residual < one.residual, `the mix misses less (${grey.residual.toFixed(3)} against ${one.residual.toFixed(3)})`);
+  assert.ok(grey.mix.every(m => m.amount > 0), 'no negative paint');
+});
+
 test('a light is never taken darker than the floor, so a stroke stays lighter than the coat it lies on', () => {
-  const t = gouacheTint([60, 50, 40], PAPER, [COAT, OCHRE], { floor: 0.6 });
-  const R = gouacheTint([60, 50, 40], PAPER, [COAT, OCHRE], { floor: 0.9 });
-  assert.ok(R.amount < t.amount + 1e-9, 'a higher floor asks for less tint');
+  const need = t => t.mix.reduce((a, m) => a + m.amount, 0);
+  assert.ok(need(gouacheTint([60, 50, 40], PAPER, [COAT, OCHRE], { floor: 0.9 })) < need(gouacheTint([60, 50, 40], PAPER, [COAT, OCHRE], { floor: 0.6 })) + 1e-9, 'a higher floor asks for less tint');
 });
 
 test('a rigger stroke is pressed at the root and lifts to the tip', () => {

@@ -75,32 +75,52 @@ function filmAbsorption(r) {
 }
 
 /**
- * White tinted toward a colour: gouache mixed with a little of one palette paint, as a painter does for a light that is
- * not paper white. A film that scatters S x = HIDING and absorbs K x over a dark ground reflects
+ * White tinted toward a colour: gouache mixed with a little of the palette's paints, as a painter does for a light that
+ * is not paper white. A film that scatters S x = HIDING and absorbs K x over a dark ground reflects
  * R = sinh(b t) / (a sinh(b t) + b cosh(b t)), a = 1 + k, b = sqrt(a^2 - 1), k = K / S, t = HIDING (Kubelka-Munk, the
  * ground's own share is under 1% at this thickness). A reflectance R in a channel asks for the k that gives it, by
- * bisection. The paint that gives that absorption best, in least squares over the three channels, is the tint, in the
- * amount that gives it. A colour within 8% of the paper in every channel is a true glint: pure white.
+ * bisection. The paints that give that absorption best, in least squares over the three channels, are the tint: every
+ * mix of one, two or three palette paints is solved for non-negative amounts, and the one that misses least wins, a
+ * mix of two paints only when it misses at least 15% less than one. A colour within 8% of the paper in every channel
+ * is a true glint: pure white.
  * @param rgb       the light's colour, 0..255
  * @param paperRGB  the sheet's paper colour
  * @param pigments  the palette's pigments (K per channel)
- * @param floor     the darkest reflectance a light may take (a light stays lighter than the coat it lies on)
- * @returns {{ pigment: number|null, amount: number, residual: number }} pigment is an index into `pigments`
+ * @param floor     the darkest reflectance a light may take
+ * @returns {{ mix: [{ pigment: number, amount: number }], residual: number }} pigment is an index into `pigments`
  */
-export function gouacheTint(rgb, paperRGB, pigments, { floor = 0.6 } = {}) {
+export function gouacheTint(rgb, paperRGB, pigments, { floor = 0.35 } = {}) {
   const R = [0, 1, 2].map(c => Math.min(0.98, Math.max(floor, rgb[c] / Math.max(1, paperRGB[c]))));
-  if (R.every(v => v >= 0.92)) return { pigment: null, amount: 0, residual: 0 };
+  if (R.every(v => v >= 0.92)) return { mix: [], residual: 0 };
   const need = R.map((r, c) => Math.max(0, filmAbsorption(r) * HIDING - GOUACHE_PIGMENT.K[c] * GOUACHE_FILM));
-  let best = null;
-  pigments.forEach((p, j) => {
-    let num = 0, den = 0;
-    for (let c = 0; c < 3; c++) { num += p.K[c] * need[c]; den += p.K[c] * p.K[c]; }
-    if (den <= 0) return;
-    const a = Math.max(0, num / den);
-    let res = 0; for (let c = 0; c < 3; c++) res += (need[c] - a * p.K[c]) ** 2;
-    if (!best || res < best.residual) best = { pigment: j, amount: a, residual: res };
-  });
-  return best ?? { pigment: null, amount: 0, residual: 0 };
+  const subsets = [];
+  for (let i = 0; i < pigments.length; i++) {
+    subsets.push([i]);
+    for (let j = i + 1; j < pigments.length; j++) { subsets.push([i, j]); for (let k = j + 1; k < pigments.length; k++) subsets.push([i, j, k]); }
+  }
+  let best = { mix: [], residual: need.reduce((a, v) => a + v * v, 0) };
+  for (const sub of subsets) {
+    const amounts = solveNonNegative(sub.map(i => pigments[i].K), need);
+    if (!amounts) continue;
+    let res = 0; for (let c = 0; c < 3; c++) res += (need[c] - sub.reduce((a, i, q) => a + amounts[q] * pigments[i].K[c], 0)) ** 2;
+    const score = res * (1 + 0.15 * (sub.length - 1));
+    if (score < best.residual * (best.mix.length > 1 ? 1 + 0.15 * (best.mix.length - 1) : 1) - 1e-12) best = { mix: sub.map((i, q) => ({ pigment: i, amount: amounts[q] })).filter(m => m.amount > 1e-9), residual: res };
+  }
+  return best;
+}
+
+// least squares for non-negative amounts a_q of the rows K_q (3 channels) against `need`; null when any amount is negative
+function solveNonNegative(rows, need) {
+  const m = rows.length, A = Array.from({ length: m }, () => new Array(m + 1).fill(0));
+  for (let p = 0; p < m; p++) { for (let q = 0; q < m; q++) for (let c = 0; c < 3; c++) A[p][q] += rows[p][c] * rows[q][c]; for (let c = 0; c < 3; c++) A[p][m] += rows[p][c] * need[c]; }
+  for (let i = 0; i < m; i++) {
+    let piv = i; for (let r = i + 1; r < m; r++) if (Math.abs(A[r][i]) > Math.abs(A[piv][i])) piv = r;
+    if (Math.abs(A[piv][i]) < 1e-12) return null;
+    [A[i], A[piv]] = [A[piv], A[i]];
+    for (let r = 0; r < m; r++) if (r !== i) { const f = A[r][i] / A[i][i]; for (let c = i; c <= m; c++) A[r][c] -= f * A[i][c]; }
+  }
+  const a = A.map((row, i) => row[m] / row[i]);
+  return a.every(v => v >= 0) ? a : null;
 }
 
 /**

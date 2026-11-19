@@ -23,7 +23,7 @@ test('light hairs over a dark coat decide for gouache, with the tint and the rec
   const { strokes, record } = await planGouache({ image: file, w: 600, h: 400, sheetMm: 150, paperRGB: PAPER, pigments: PIGS });
   assert.equal(record.decision, 'gouache');
   assert.ok(strokes.length >= 4 && strokes.length <= Math.ceil(STROKES_PER_100_CM2 * 150 * 100 / 100 / 100) + 1, `a handful: ${strokes.length}`);
-  for (const s of strokes) { assert.ok(s.widthMm >= 0.25 && s.widthMm <= 1.0); assert.ok(s.tint.pigment === 0, 'a warm light takes the warm paint'); assert.ok(s.fit.maxMm <= 0.3); }
+  for (const s of strokes) { assert.ok(s.widthMm >= 0.25 && s.widthMm <= 1.0); assert.ok(s.tint.mix.length >= 1 && s.tint.mix[0].pigment === 0, 'a warm light takes the warm paint'); assert.ok(s.fit.maxMm <= 0.3); }
   assert.equal(record.read.stage, 'planning, before the first wash');
   assert.ok(record.rule.includes('thinner'));
 });

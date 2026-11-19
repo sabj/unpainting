@@ -49,14 +49,14 @@ export async function layGouache(ctx) {
     // ordinal, so the same pressure and the same cells)
     const r = pencilDraw(sheet, items.map(s => ({ points: s.points })), at, { amount: GOUACHE_FILM, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, usePointWidths: true });
     drawn = r.drawn;
-    items.forEach((s, gi) => { if (s.tint.pigment != null && s.tint.amount > 0) pencilDraw(sheet, [{ points: s.points }], s.tint.pigment, { amount: s.tint.amount, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, ordinal: gi, usePointWidths: true }); });
+    items.forEach((s, gi) => { for (const m of s.tint.mix) pencilDraw(sheet, [{ points: s.points }], m.pigment, { amount: m.amount, width: 1, vary: PRESSURE_WANDER, tooth: TOOTH, seed, ordinal: gi, usePointWidths: true }); });
     layersChanged(sheet);
   }
   const film = sheet.D[at]; let touched = 0;
   if (items.length) for (let i = 0; i < N2; i++) if (film[i] > 0.05 * GOUACHE_FILM) touched++;
   const laid = {
     strokes: items.length, strands: items.filter(s => s.kind === 'strand').length, glints: items.filter(s => s.kind === 'glint').length,
-    lengthMm: +items.reduce((a, s) => a + s.lengthMm, 0).toFixed(1), cellsTouched: touched, shareOfSheet: +(touched / N2).toFixed(5), tinted: items.filter(s => s.tint.pigment != null).length,
+    lengthMm: +items.reduce((a, s) => a + s.lengthMm, 0).toFixed(1), cellsTouched: touched, shareOfSheet: +(touched / N2).toFixed(5), tinted: items.filter(s => s.tint.mix.length).length,
     skippedWashKeptLight: kept.length, marginOd: MARGIN_OD, drawn,
   };
   ctx.GOUACHE_RECORD = { ...plan.record, laid };

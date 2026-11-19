@@ -33,7 +33,7 @@ export async function planGouache({ image, w, h, sheetMm, paperRGB, pigments, cr
   const found = thinLights(D, info.width, info.height, { pixelMm, rgb: data, strokesMax, glintsMax });
   const sx = w / info.width, sy = h / info.height;
   const strokes = found.strokes.map(s => {
-    const tint = s.kind === 'glint' ? { pigment: null, amount: 0, residual: 0 } : gouacheTint(s.rgb ?? [255, 255, 255], paperRGB, pigments);
+    const tint = s.kind === 'glint' ? { mix: [], residual: 0 } : gouacheTint(s.rgb ?? [255, 255, 255], paperRGB, pigments);
     return { kind: s.kind, curve: s.points.map(([x, y]) => [x * sx, y * sy]), widthMm: +s.widthMm.toFixed(3), lengthMm: +s.lengthMm.toFixed(2), lightOd: +s.lightOd.toFixed(3), surroundOd: +s.surroundOd.toFixed(3), rgb: s.rgb, tint, fit: s.fit };
   });
   const lengthMm = strokes.reduce((a, s) => a + s.lengthMm, 0);

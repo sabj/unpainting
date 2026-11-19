@@ -16,6 +16,7 @@ export const TOUCH_MM = 1.2;            // the narrowest light the wash planner 
 export const RIGGER_MM = Object.freeze({ min: 0.25, max: 1.0 });   // a rigger's line, point to belly
 const STEP_OD = 0.25;                   // lighter than its surround by at least this much density (about 22% in luminance)
 const DARK_OD = 0.45;                   // the surround, closed over the light, is at least this dense
+const LIGHT_MAX_OD = 1.0;               // a hair is a light itself: it reflects at least about 37% of the paper
 const MIN_LENGTH_MM = 4;                // a stroke shorter than this is a fragment, not a hair
 const ASPECT = 8;                       // length over width
 const FIT_MM = 0.3;                     // the most a stroke may leave its ridge
@@ -238,7 +239,7 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
       if (lengthMm < MIN_LENGTH_MM || lengthMm / Math.max(widthMm, 0.05) < ASPECT || perCm > MAX_TURNS_PER_CM) continue;
       const lightOd = densityAlong(s.curve, D), surroundOd = densityAlong(s.curve, closed);
       const sides = sideDensity(s.curve, D, w, h, Math.ceil(widthMm / 2 / pixelMm) + 2);
-      if (sides < DARK_OD || sides - lightOd < STEP_OD) continue;
+      if (sides < DARK_OD || sides - lightOd < STEP_OD || lightOd > LIGHT_MAX_OD) continue;
       strokes.push({ kind: 'strand', points: s.curve, widthMm: Math.min(RIGGER_MM.max, Math.max(RIGGER_MM.min, widthMm)), lengthMm, lightOd, surroundOd, rgb: colourOf(s.curve),
         fit: { maxMm: +(s.max * pixelMm).toFixed(3), meanMm: +(s.dev * pixelMm).toFixed(3), turnsPerCm: +perCm.toFixed(3) }, score: (surroundOd - lightOd) * lengthMm });
     }
