@@ -42,10 +42,10 @@ test('the second pass is laid for what is missing, by the yield the first one sh
   const even = second(11), strong = second(14), weak = second(7);
   assert.ok(Math.abs(even.yield - 1) < 0.06 && Math.abs(stepOf(even.conc / 10, ground, palette, r.shares) - 9) < 0.6, 'a first pass that came out as predicted: the rest as the swatch says');
   assert.ok(strong.yield > 1.2 && strong.conc < even.conc, `a first pass that came out strong: a lighter load for the rest (${strong.conc} against ${even.conc})`);
-  assert.ok(weak.yield < 0.7 && weak.conc > even.conc, 'a weak one: a heavier load');
+  assert.ok(weak.yield === 1 && Math.abs(stepOf(weak.conc / 10, ground, palette, r.shares) - 13) < 0.6, 'a weak reading never makes the second pass heavier than the swatch says for what is missing');
   assert.equal(second(20.5), null, 'nothing more once the step is there');
   assert.equal(second(19.9), null, 'nor for a rest lighter than the lightest line the point holds');
-  assert.ok(secondPass(18, { predicted: 2, added: 20 }, ground, r.shares, env).yield === 2, 'the yield is held to between a half and two');
+  assert.ok(secondPass(18, { predicted: 2, added: 20 }, ground, r.shares, env).yield === 2, 'the yield is held to between one and two');
 });
 
 test('a line the point cannot lay goes to the pencil, with the reason', () => {
@@ -63,10 +63,11 @@ test('a line the point cannot lay goes to the pencil, with the reason', () => {
   assert.equal(black.route, 'pencil'); assert.match(black.why, /cannot make the step/);
 });
 
-test('the line\'s paints are those of its colour over its ground: a blue line over a neutral ground takes the blue', () => {
-  const s = lineShares([70, 110, 200], [200, 200, 200], PAPER, palette);
+test('the line\'s paints are those of its own colour: a blue line takes the blue', () => {
+  const s = lineShares([70, 110, 200], PAPER, palette);
   assert.ok(s[1] > 0.6, `${s}`);
-  assert.deepEqual(lineShares(PAPER, PAPER, PAPER, palette), [1, 0], 'a line of no colour takes the darkest paint');
+  assert.ok(lineShares([60, 55, 50], PAPER, palette)[0] > 0.8, 'a dark neutral line takes the dark paint, whatever is under it');
+  assert.deepEqual(lineShares(PAPER, PAPER, palette), [1, 0], 'a line of no colour takes the darkest paint');
 });
 
 test('the pencil presses by the table read over the ground, and a line beyond its firmest is drawn at the firmest and marked short', () => {

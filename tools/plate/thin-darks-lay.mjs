@@ -13,8 +13,9 @@
 //      Paint cannot be taken back, and on the sheet a load has given from two thirds to nearly twice the swatch's step.
 //      A missing step too faint for two such passes is the pencil's.
 //   3. Every other line goes to a pencil, as a painter restates a line over a dry wash: a 2B, pressed by a table read over
-//      paint of the ground's colour (pencil-scrap.mjs pencilScrapOver), not over bare paper. A line darker than the
-//      pencil's firmest takes the firmest and is recorded as short of the subject's.
+//      paint of the ground's colour (pencil-scrap.mjs pencilScrapOver), not over bare paper. The sheet is read, and a
+//      line still short of its step by more than the tolerance is gone over once more for the rest. A line that is still
+//      short after a second pass at the pencil's firmest is recorded as short of the subject's: the pencil has no more.
 //   4. The sheet is read again along every laid line, and planned is set against painted. A painted line that is still
 //      short of its step by more than the tolerance is restated in pencil for the rest. One that came out darker cannot
 //      be taken back and is recorded as over.
@@ -38,17 +39,19 @@ export const tolerance = step => Math.max(STEP_TOLERANCE.lstar, STEP_TOLERANCE.s
 export const RESTATING_PENCIL = 'graphite-2B';
 /** The share of a missing step the first pass of paint is laid for; the second is laid by what the first one did. */
 export const FIRST_PASS = 0.55;
-const YIELD = Object.freeze([0.5, 2]);   // the yield a second pass may be corrected by: what the sheet showed over what the swatch said
+const YIELD = Object.freeze([1, 2]);   // the yield a second pass is corrected by: a first pass that came out strong lightens the second (to half); a weak reading never makes it heavier than the swatch says
 
 const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
 const mean3 = v => (v[0] + v[1] + v[2]) / 3;
 const odOf = (c, paper) => [0, 1, 2].map(k => -Math.log(Math.max(0.02, Math.min(1, c[k] / Math.max(1, paper[k])))));
 
-/** The proportions of the palette's paints that make a line's colour over its ground: one share per paint, summing to 1. */
-export function lineShares(lineRGB, groundRGB, paperRGB, palette) {
-  const line = odOf(lineRGB, paperRGB), ground = odOf(groundRGB, paperRGB), over = line.map((v, c) => Math.max(0, v - ground[c]));
-  let mix = mixFor(over, palette).mix;
-  if (!mix.length) mix = mixFor(line, palette).mix;
+/**
+ * The proportions of the palette's paints that mix a line's own colour: one share per paint, summing to 1. The line is
+ * painted in its colour and the ground shows through it, as a glaze. (Mixing for the difference between line and ground
+ * asks for whatever the washes happened to leave out there, a yellow or a blue alone, which darkens nothing.)
+ */
+export function lineShares(lineRGB, paperRGB, palette) {
+  let mix = mixFor(odOf(lineRGB, paperRGB), palette).mix;
   // a line no darker than paper in any channel: the darkest paint in the box
   if (!mix.length) mix = [{ pigment: palette.map((p, j) => [mean3(p.K), j]).sort((a, b) => b[0] - a[0])[0][1], amount: 1 }];
   const total = mix.reduce((a, m) => a + m.amount, 0), shares = new Array(palette.length).fill(0);
@@ -71,7 +74,7 @@ export function routeLine(line, sheet, { swatch, palette, paperRGB, canPaint = t
   if (!canPaint) return pencil('the sheet has its painted lines');
   if (!swatch?.lightest) return pencil('the point holds no line on this paper');
   if (swatch.widthMm > SCALE_LIMIT * line.halfMm) return pencil('the point\'s line is too wide for it');
-  const shares = lineShares(line.rgb, sheet.groundRGB, paperRGB, palette), film = filmFor(need, sheet.groundRGB, palette, shares);
+  const shares = lineShares(line.rgb, paperRGB, palette), film = filmFor(need, sheet.groundRGB, palette, shares);
   if (film == null) return pencil('the line\'s paints cannot make the step over this ground');
   const load = loadFor(film, swatch);
   if (!load) return pencil(film < swatch.lightest.thickness ? 'lighter than the lightest line the point holds' : 'darker than the heaviest load tried');
@@ -84,7 +87,7 @@ export function routeLine(line, sheet, { swatch, palette, paperRGB, canPaint = t
 
 /**
  * The second pass of a painted line: the load for what the sheet still lacks after the first, corrected by the first's
- * yield (the step it added over the step the swatch said it would). Null when nothing more is laid: the step is there,
+ * yield (the step it added over the step the swatch said it would, where that is more than one). Null when nothing more is laid: the step is there,
  * or what is missing is lighter than the lightest line the point holds. Pure.
  * @param first  { predicted, added }: the first pass's predicted step and the step the sheet shows it added
  * @returns {{ conc, predicted, yield }|null}
@@ -99,7 +102,7 @@ export function secondPass(remaining, first, groundRGB, shares, { swatch, palett
 /**
  * The pencil's pressure for a missing step over a ground, by the table read over that ground. Pure.
  * @returns {{ pressure, reach, short }} `reach` the firmest line's step over this ground; `short` when the missing step is
- *   beyond it by more than the tolerance of the whole step, and the line is drawn at the firmest and stays lighter
+ *   beyond it by more than the tolerance of the whole step, so one pass at the firmest leaves the line lighter
  */
 export function pencilFor(need, step, table) {
   const reach = table.at(-1).drop;
@@ -127,7 +130,7 @@ export async function layThinDarks(ctx) {
   let painted = 0;
   for (const s of lines) {
     const now = along(s, before), groundRGB = groundOf(s, before);
-    const r = routeLine(s, { drop: now.drop, groundRGB }, { swatch, palette: PIGS, paperRGB, canPaint: painted < plan.record.paintedMax });
+    const r = routeLine(s, { drop: now.drop, groundRGB }, { swatch, palette: PIGS, paperRGB, canPaint: painted < (plan.record.paintedMax ?? 0) });
     if (r.route === 'paint') painted++;
     rows.push({ line: s, route: r.route, why: r.why, step: s.step, present: now.drop, need: r.need, groundRGB, conc: r.conc ?? null, shares: r.shares ?? null, predicted: r.predicted ?? null, widthMm: r.widthMm ?? null });
   }
@@ -159,26 +162,32 @@ export async function layThinDarks(ctx) {
   }
   // the pencil: the lines the point could not lay, and what a painted line still lacks
   const forPencil = rows.filter(r => r.route === 'pencil' || (r.route === 'paint' && r.verdict === 'under'));
-  let drawn = 0;
+  let drawn = 0, last = after;
   if (scrap) {
     const tables = new Map(), tableOver = rgb => { const key = rgb.map(v => 8 * Math.round(v / 8)).join(','); if (!tables.has(key)) tables.set(key, scrap(key.split(',').map(Number))); return tables.get(key); };
-    const amount = pencil.concentration * mean3(pencil.pigment.K) / mean3(SHEET_PIGS[GRAPHITE_AT].K), gestures = [];
-    for (const row of forPencil) {
-      const shown = row.route === 'paint' ? row.painted : row.present, ground = row.route === 'paint' ? groundOf(row.line, after) : row.groundRGB;
-      const p = pencilFor(row.step - shown, row.step, tableOver(ground));
-      row.pencil = { pressure: +p.pressure.toFixed(3), reach: +p.reach.toFixed(2), short: p.short, need: +(row.step - shown).toFixed(2) };
-      // the pencil's own coordinates name a cell by its corner
-      gestures.push({ points: row.line.points.map(([x, y]) => ({ x: x - 0.5, y: y - 0.5, s: p.pressure })) });
-    }
-    if (gestures.length) {
-      const r = drawMaterial(sheet, gestures, null, W2, H2, { medium: RESTATING_PENCIL, stage: 'closing', mmPerCell, edgeCut: false, state: { used: 0 }, caps: { lines: gestures.length, pressure: 1, minLengthMm: 0, edgeMin: 0 }, audit: [], O, pigmentAt: GRAPHITE_AT, graphiteOptions: { amount, seed: 1700 + SEED } });
-      drawn = r.drawn; layersChanged(sheet);
-    }
+    const amount = pencil.concentration * mean3(pencil.pigment.K) / mean3(SHEET_PIGS[GRAPHITE_AT].K);
+    // one pass of the pencil over `list`: each line pressed for what the sheet, read at `at`, still lacks of its step
+    const pass = (list, at, seed) => {
+      if (!list.length) return;
+      const gestures = list.map(row => {
+        const shown = row.drawn ?? row.painted ?? row.present, p = pencilFor(row.step - shown, row.step, tableOver(groundOf(row.line, at)));
+        (row.pencilPasses ??= []).push({ pressure: +p.pressure.toFixed(3), need: +(row.step - shown).toFixed(2), reach: +p.reach.toFixed(2) });
+        // the pencil's own coordinates name a cell by its corner
+        return { points: row.line.points.map(([x, y]) => ({ x: x - 0.5, y: y - 0.5, s: p.pressure })) };
+      });
+      const r = drawMaterial(sheet, gestures, null, W2, H2, { medium: RESTATING_PENCIL, stage: 'closing', mmPerCell, edgeCut: false, state: { used: 0 }, caps: { lines: gestures.length, pressure: 1, minLengthMm: 0, edgeMin: 0 }, audit: [], O, pigmentAt: GRAPHITE_AT, graphiteOptions: { amount, seed } });
+      drawn += r.drawn; layersChanged(sheet); last = read();
+      for (const row of list) { row.drawn = along(row.line, last).drop; row.pencilPasses.at(-1).drawn = +row.drawn.toFixed(2); }
+    };
+    pass(forPencil, after, 1700 + SEED);
+    // a line still short of its step is gone over once more, as a draughtsman darkens a line; twice is all
+    pass(forPencil.filter(row => verdict(row.step, row.drawn) === 'under'), last, 1900 + SEED);
   }
-  const last = drawn ? read() : after;
   for (const row of forPencil) {
-    if (!row.pencil) { row.refused = 'no pencil on this sheet'; continue; }
-    row.drawn = along(row.line, last).drop; row.final = verdict(row.step, row.drawn);
+    if (!row.pencilPasses) { row.refused = 'no pencil on this sheet'; continue; }
+    row.final = verdict(row.step, row.drawn);
+    // short: the pencil went over the line twice, the second time at its firmest, and the line is still lighter than the subject's
+    row.pencil = { passes: row.pencilPasses, short: row.final === 'under' && row.pencilPasses.length > 1 && row.pencilPasses.at(-1).pressure >= 1 };
   }
   const r2 = v => (v == null ? null : +(+v).toFixed(2)), count = (list, f) => list.filter(f).length;
   const pencilRows = rows.filter(r => r.route === 'pencil'), shown = r => r.drawn ?? r.painted ?? r.present;
@@ -186,8 +195,8 @@ export async function layThinDarks(ctx) {
   const why = {}; for (const r of pencilRows) why[r.why] = (why[r.why] ?? 0) + 1;
   const laid = {
     found: rows.length, stated: count(rows, r => r.route === 'stated'),
-    paint: { lines: paintRows.length, twoPasses: count(paintRows, r => r.passes.length > 1), within: count(paintRows, r => r.verdict === 'within'), under: count(paintRows, r => r.verdict === 'under'), over: count(paintRows, r => r.verdict === 'over'), restatedInPencil: count(paintRows, r => r.pencil), lengthMm: r2(paintRows.reduce((a, r) => a + r.line.lengthMm, 0)), plannedAgainstPainted: against(paintRows.map(r => ({ ...r, drawn: undefined }))) },
-    pencil: { lines: count(pencilRows, r => r.pencil), within: count(pencilRows, r => r.final === 'within'), under: count(pencilRows, r => r.final === 'under'), over: count(pencilRows, r => r.final === 'over'), short: count(pencilRows, r => r.pencil?.short), lengthMm: r2(pencilRows.filter(r => r.pencil).reduce((a, r) => a + r.line.lengthMm, 0)), why, plannedAgainstPainted: against(pencilRows.filter(r => r.pencil)) },
+    paint: { lines: paintRows.length, twoPasses: count(paintRows, r => r.passes.length > 1), within: count(paintRows, r => r.verdict === 'within'), under: count(paintRows, r => r.verdict === 'under'), over: count(paintRows, r => r.verdict === 'over'), restatedInPencil: count(paintRows, r => r.pencil), withinAfterPencil: count(paintRows, r => r.pencil && r.final === 'within'), lengthMm: r2(paintRows.reduce((a, r) => a + r.line.lengthMm, 0)), plannedAgainstPainted: against(paintRows.map(r => ({ ...r, drawn: undefined }))) },
+    pencil: { lines: count(pencilRows, r => r.pencil), twoPasses: count(pencilRows, r => r.pencil?.passes.length > 1), within: count(pencilRows, r => r.final === 'within'), under: count(pencilRows, r => r.final === 'under'), over: count(pencilRows, r => r.final === 'over'), short: count(pencilRows, r => r.pencil?.short), lengthMm: r2(pencilRows.filter(r => r.pencil).reduce((a, r) => a + r.line.lengthMm, 0)), why, plannedAgainstPainted: against(pencilRows.filter(r => r.pencil)) },
     refused: { lines: count(rows, r => r.refused), why: count(rows, r => r.refused) ? { 'no pencil on this sheet': count(rows, r => r.refused) } : {} },
     plannedAgainstPainted: against(rows.filter(r => r.route !== 'stated' && !r.refused)),
     tolerance: STEP_TOLERANCE, scaleLimit: SCALE_LIMIT, mmPerCell: +mmPerCell.toFixed(4),
@@ -198,7 +207,7 @@ export async function layThinDarks(ctx) {
   ctx.THIN_DARKS_RECORD = { ...plan.record, laid };
   fs.writeFileSync(path.join(out, 'thin-darks.json'), JSON.stringify({ ...ctx.THIN_DARKS_RECORD, lines: linesOut }, null, 1));
   const pa = laid.plannedAgainstPainted;
-  console.log(`thin darks: ${laid.found} lines planned; ${laid.stated} the sheet already states; ${laid.paint.lines} painted with the point, ${laid.paint.twoPasses} in two passes (${laid.paint.within} within tolerance of their step, ${laid.paint.under} under and restated in pencil, ${laid.paint.over} over); ${laid.pencil.lines} drawn in pencil over the washes (${laid.pencil.within} within, ${laid.pencil.short} short of a line darker than the ${RESTATING_PENCIL} pencil's firmest); ${laid.refused.lines} refused${pa ? `; planned ${pa.plannedStep} L*, before ${pa.before}, on the sheet ${pa.paintedStep} at the median` : ''}`);
+  console.log(`thin darks: ${laid.found} lines planned; ${laid.stated} the sheet already states; ${laid.paint.lines} painted with the point, ${laid.paint.twoPasses} in two passes (${laid.paint.within} within tolerance of their step, ${laid.paint.under} under and restated in pencil, ${laid.paint.over} over); ${laid.pencil.lines} drawn in pencil over the washes, ${laid.pencil.twoPasses} gone over twice (${laid.pencil.within} within, ${laid.pencil.under} under, ${laid.pencil.short} of them beyond two passes of the ${RESTATING_PENCIL} pencil at its firmest); ${laid.refused.lines} refused${pa ? `; planned ${pa.plannedStep} L*, before ${pa.before}, on the sheet ${pa.paintedStep} at the median` : ''}`);
   ctx.STAGE = { stage: 'thin-darks' }; ctx.NATIVE_CAPTURE?.('thin-darks');
   if ((paintRows.length || drawn) && !FILM_BY_PAINT) await shoot();
   return laid;
