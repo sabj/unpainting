@@ -9,7 +9,8 @@
 // with one nib (the mark's own width) and one weight (its mean darkness), the same along the whole stroke; the painter's
 // hand gives the pressure curve along it. Nothing is read point by point.
 // The tracer's distances are millimetres on the sheet (pen-trace.mjs TRACE_MM), so it needs the sheet's width:
-// --sheetmm, else the planning workspace's frozen.json (bench/frozen.json, its sheetmm), else the bench sheet, 280 mm.
+// --sheetmm, else the planning workspace's frozen.json (bench/frozen.json, its sheetmm, the subject's own sheet), else
+// 280 mm, the sheet the tracer's limits were set on.
 // Nothing else is settable: whether a subject has pen lines is the declared medium's choice, not a contrast turned
 // down until lines appear.
 // node bench/tools/trace-ink.mjs target.png out.json [--sheetmm N] [--medium pen|pencil|none]

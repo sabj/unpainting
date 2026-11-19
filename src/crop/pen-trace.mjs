@@ -12,8 +12,11 @@
 // Between lifts the path is rounded (corner cutting, at most half the reach from the trace): a hand makes no corners
 // inside one stroke. Each line is drawn with one nib, its mark's mean equivalent width, and one weight from its mean
 // darkness; the painter's hand gives the curve along it. Points are [x, y] in the target's pixels.
-// Nothing is settable. The millimetres are the tracer's pixel limits on a bench subject (300 px on its 280 mm sheet,
-// BENCH_PIXEL_MM a pixel) restated on the sheet, so a bench subject traces exactly as before.
+// Nothing is settable. The millimetres are the tracer's pixel limits as they were set on the bench subjects while
+// those were painted enlarged (300 px on a 280 mm sheet, BENCH_PIXEL_MM a pixel), restated on the sheet. A bench
+// subject is now painted at source scale (0.259 mm a pixel, bench/v4v5/subjects.json), where the same millimetres are
+// 3.6 times as many pixels: the shortest line is 50 px of a 300 px crop, not 14. The limits have not been set again
+// for that scale.
 
 const BENCH_PIXEL_MM = 280 / 300;
 const mm = px => px * BENCH_PIXEL_MM;

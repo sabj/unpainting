@@ -9,15 +9,25 @@ import { PaintSession } from './pipeline/session.mjs';
 import { runTurn } from './pipeline/harness.mjs';
 
 test('routine V4 is lite; other rounds keep full; lite cannot masquerade as a V5 learning run', () => {
-  assert.equal(profileForRound('V4').id, 'lite-v1');
-  assert.equal(profileForRound('V5').id, 'full-v1');
+  assert.equal(profileForRound('V4').id, 'lite-v2');
+  assert.equal(profileForRound('V5').id, 'full-v2');
   assert.throws(() => profileForRound('V5', 'lite'), /V4 planning screen/);
   assert.throws(() => benchmarkProfile('cheap'), /unknown/);
 });
-test('lite changes native density and recording, preserving physical size and subject parameters', () => {
-  const source = { width: 1200, sheetmm: 280, taskStyle: 'ink and wash' };
-  assert.deepEqual(profileSubject(source, benchmarkProfile('lite')), { ...source, width: 540, benchmarkProfile: 'lite-v1', recordingMarks: 0, planOnly: true, renderTimeoutMs: 600000, checkTimeoutMs: 120000 });
-  assert.equal(source.width, 1200);
+test('both profiles paint a subject at its own width; lite changes recording and budgets, never the density', () => {
+  const source = { width: 300, sheetmm: 77.7, taskStyle: 'ink and wash' };
+  assert.deepEqual(profileSubject(source, benchmarkProfile('lite')), { ...source, benchmarkProfile: 'lite-v2', recordingMarks: 0, planOnly: true, renderTimeoutMs: 600000, checkTimeoutMs: 120000 });
+  assert.equal(profileSubject(source, benchmarkProfile('full')).width, 300);
+  assert.equal(benchmarkProfile('lite').width, null, 'lite-v1 capped at 540, over every crop: lite-v2 has no cap');
+  assert.equal(source.width, 300);
+});
+test('a profile cap or a dry width lowers a subject width and never raises it', () => {
+  const source = { width: 300, sheetmm: 77.7 }, lite = benchmarkProfile('lite');
+  assert.equal(profileSubject(source, { ...lite, width: 160 }).width, 160);
+  assert.equal(profileSubject(source, { ...lite, width: 540 }).width, 300);
+  assert.equal(profileSubject(source, lite, 96).width, 96);
+  assert.equal(profileSubject(source, lite, 1200).width, 300);
+  assert.equal(profileSubject(source, { ...lite, width: 160 }, 96).width, 96);
 });
 test('core default retains the complete registry and optional Muse selection', () => {
   const models = loadModels(), before = models.length;

@@ -14,7 +14,7 @@ async function makeTryFolder(root, cropPatch = {}) {
   Object.assign(source, {
     judgeVersion: "J2", judgeProfile: "J2-lite", judgeRoute: "together", complete: true,
     crops: { hills: { ...crop, score: null, progression: null, fullsize: null, ...cropPatch } }, unpainted: {},
-    settings: { ...source.settings, crops: ["hills"], benchmarkProfile: "lite-v1", budget: benchmarkProfile("lite"), judgeProfile: "J2-lite", judgeRoute: "together" }
+    settings: { ...source.settings, crops: ["hills"], benchmarkProfile: "lite-v2", budget: benchmarkProfile("lite"), judgeProfile: "J2-lite", judgeRoute: "together" }
   });
   const dir = path.join(root, "try"), raw = path.join(root, "raw"), frames = path.join(raw, "out", "hills", "frames");
   fs.mkdirSync(frames, { recursive: true });

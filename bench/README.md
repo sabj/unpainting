@@ -49,7 +49,7 @@ All five rounds were painted with painter V096, sim 100 and judges J1, in releas
 
 ## Reproduce
 
-You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 use the checked-out painter: V102, sim 103 in release 0.3.0. Scores can differ from the published V096 runs. The plan's drawing section and explicit arguments control the drawing medium and order; explicit command-line arguments take precedence. Keep new runs under their actual painter, simulator and judge versions rather than rewriting historical results. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
+You can rerun every round on your own machine, with the published briefs and rules. V4 and V5 use the checked-out painter: V102, sim 103 in release 0.3.0. Scores can differ from the published V096 runs. From 0.3.3 V4 and V5 paint each target at its own size (about 300 cells wide on a 78 mm sheet, [subjects.json](v4v5/subjects.json)); the published runs painted it enlarged four times, 1200 to 1224 cells wide on 158 and 280 mm sheets. The two sizes never share a result group. The plan's drawing section and explicit arguments control the drawing medium and order; explicit command-line arguments take precedence. Keep new runs under their actual painter, simulator and judge versions rather than rewriting historical results. A V3 session offers `--tries` attempts (default 3). The published sessions offered up to five.
 
 ```sh
 npm run bench:test                                   # check every run record, that results/ regenerates unchanged, and dry runs of V3 to V5
@@ -69,6 +69,7 @@ V5 try 1 reuses V4 try 1 (the same session).
 Use `--models all` or explicit keys such as `--models core,wonderfull,spark` to include other registered models.
 
 Lite is a separate planning screen: one five-minute plan per target, one harness check and render after the model exits,
-no automatic repairs, at most 540 native cells across, and J2-lite judging. Full mode keeps three tries and model
-self-view. Both preserve physical paper sizes, guards and all required stages. Their results are grouped separately;
-a cheap screen does not establish full-resolution painting quality. See [profiles and measurements](docs/profiles.md).
+no automatic repairs, and J2-lite judging. Full mode keeps three tries and model self-view. Both paint each target at
+source scale, one sheet cell for each target pixel on a sheet about 78 mm wide, and keep the guards and all required
+stages. The painter does not paint from an enlarged source. Their results are grouped separately; a cheap screen does
+not establish the quality of a full run. See [profiles and measurements](docs/profiles.md).
