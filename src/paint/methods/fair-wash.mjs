@@ -79,7 +79,7 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
           const intent = { id: key, phase, valueBand: stage, stage, puddle: q, dilution: DILUTIONS[d].name, shapes: [...members], regions: touched.map(r => r.id), crossesRegions: touched.length > 1,
             referenceCue: 'Whole wash shapes charged from one puddle at one dilution.', intendedResult: stage === 1 ? 'First wash of local colour over whole shapes.' : 'A further wash over the shapes that are darker.', cool,
             shaped, subject, move: 'wet on dry', paperBefore: 'fully dry; own same-passage wet overlap allowed', baseBefore: 'fully dry',
-            brush: { kind: 'round wash brushes of the kit, widest that fits first', shape: 'round', contact: 'belly', width: 'each stroke names its brush' },
+            brush: { kind: 'flat wash brushes of the kit, widest that fits first', contact: 'side/belly', width: 'each stroke names its brush' },
             resolution: { question: 'wash', minimumWashBodyCells: 4, estimatedSupportWidthCells: 2 * list.length / Math.max(1, rim / cellMm), estimateMethod: 'twice area over outline length', mmPerCell: cellMm },
             layer: stage, break: null, load: { water: phase === 'shadow' ? .45 : .62, pigment: 'the puddle at a named dilution; calibrated delivery', reload: 'existing finite instrument route' },
             edges: { hardCells: [], softCells: [], policy: 'hard or soft by the boundary between two shapes; a damp brush run along the soft ones' },

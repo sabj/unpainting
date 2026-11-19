@@ -4,7 +4,7 @@
 // the radius of the smallest wash brush), with each segment marked soft or hard from the two shapes it lies between.
 // planWashStrokes: the strokes that fill the outline. The smallest brush is steered round the inside of the outline, its
 // radius from it, to state the edge. Then the widest brush of the kit that fits is laid in lanes along the wash's
-// longer side, each lane's centre at least the brush's radius inside the outline, then the smaller brushes where the
+// longer side, the brush's whole width inside the outline all along each lane, then the smaller brushes where the
 // wider ones could not go. The edge of the wash is where the brush's own footprint ends. A part of a wash narrower than the smallest
 // wash brush is laid with the detail brush run round inside it. What no stroke's footprint reaches is counted (uncovered).
 // The lanes are worked out on a planning grid a sixth of the smallest brush's width, cut from the outline: the grid is
@@ -104,7 +104,7 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
   for (let i = 0; i < gn; i++) D[i] = inside[i] ? 1e9 : 0;
   for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; if (!D[i]) continue; let d = D[i]; if (x) d = Math.min(d, D[i - 1] + 1); if (y) { d = Math.min(d, D[i - gw] + 1); if (x) d = Math.min(d, D[i - gw - 1] + R2); if (x < gw - 1) d = Math.min(d, D[i - gw + 1] + R2); } D[i] = d; }
   for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; if (!D[i]) continue; let d = D[i]; if (x < gw - 1) d = Math.min(d, D[i + 1] + 1); if (y < gh - 1) { d = Math.min(d, D[i + gw] + 1); if (x < gw - 1) d = Math.min(d, D[i + gw + 1] + R2); if (x) d = Math.min(d, D[i + gw - 1] + R2); } D[i] = d; }
-  let deepest = 0; for (let i = 0; i < gn; i++) if (D[i]) { D[i] = (D[i] - .5) * pitch; if (D[i] > deepest) deepest = D[i]; }
+  for (let i = 0; i < gn; i++) if (D[i]) D[i] = (D[i] - .5) * pitch;
   const covered = new Uint8Array(gn), seen = new Int32Array(gn); let stampId = 0, coveredCount = 0;
   // the inside cells a stroke's footprint touches: [not yet covered, all]; commit marks them covered
   const stamp = (pts, radius, commit) => {
@@ -123,14 +123,24 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
   };
   const strokes = [], toMm = ([gx, gy]) => { const u = ou + (gx + .5) * pitch, v = ov + (gy + .5) * pitch; return tall ? [+v.toFixed(3), +u.toFixed(3)] : [+u.toFixed(3), +v.toFixed(3)]; };
   const lay = (kind, radius, pts, least) => { const [fresh, all] = stamp(pts, radius, false); if (!all || fresh < least * all) return; stamp(pts, radius, true); strokes.push({ kind, radiusMm: radius, points: pts.map(toMm) }); };
+  // A lane is a flat brush drawn straight: its hairs lie across the stroke, so the whole line of them, one radius to
+  // either side, must be inside the outline at every point of the lane, and the lane covers a band, square at its ends.
+  const clear = new Float32Array(gn);   // how far the outline is, straight across a lane (in grid cells), the nearer side
+  for (let x = 0; x < gw; x++) { let run = 0; for (let y = 0; y < gh; y++) { const i = y * gw + x; run = inside[i] ? run + 1 : 0; clear[i] = run; } run = 0; for (let y = gh - 1; y >= 0; y--) { const i = y * gw + x; run = inside[i] ? run + 1 : 0; clear[i] = Math.min(clear[i], run); } }
+  const band = (gy, a, b, rc, commit) => { let fresh = 0, all = 0; for (let y = Math.max(0, Math.ceil(gy - rc)); y <= Math.min(gh - 1, Math.floor(gy + rc)); y++) for (let x = a; x <= b; x++) { const i = y * gw + x; if (!inside[i]) continue; all++; if (!covered[i]) { fresh++; if (commit) { covered[i] = 1; coveredCount++; } } } return [fresh, all]; };
   const lanes = (radius, least) => {
-    const rc = radius / pitch, step = Math.max(1, Math.round(2 * rc * (1 - LANE_OVERLAP))), ok = i => D[i] >= radius - pitch / 2;
+    const rc = radius / pitch, step = Math.max(1, Math.round(2 * rc * (1 - LANE_OVERLAP))), ok = i => clear[i] >= rc;
     let first = -1; for (let i = 0; i < gn && first < 0; i++) if (ok(i)) first = (i / gw) | 0;
     if (first < 0) return;
     for (let gy = first, turn = 0; gy < gh; gy += step, turn++) for (let gx = 0; gx < gw; gx++) {
       if (!ok(gy * gw + gx)) continue;
       let end = gx; while (end + 1 < gw && ok(gy * gw + end + 1)) end++;
-      if (end - gx >= rc) { const count = Math.max(2, Math.ceil((end - gx) / rc) + 1), pts = Array.from({ length: count }, (_, q) => [gx + (end - gx) * q / (count - 1), gy]); lay('lane', radius, turn % 2 ? pts.reverse() : pts, least); }
+      const [fresh, all] = band(gy, gx, end, rc, false);
+      if (end - gx >= rc && all && fresh >= least * all) {
+        band(gy, gx, end, rc, true);
+        const count = Math.max(2, Math.ceil((end - gx) / rc) + 1), pts = Array.from({ length: count }, (_, q) => [gx + (end - gx) * q / (count - 1), gy]);
+        strokes.push({ kind: 'lane', radiusMm: radius, points: (turn % 2 ? pts.reverse() : pts).map(toMm) });
+      }
       gx = end;
     }
   };
@@ -141,7 +151,7 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
     if (Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) <= 4) pts.push(pts[0]);
     lay('edge', r, pts, LEAST_NEW);
   }
-  for (const width of kit) if (width / 2 <= deepest) lanes(width / 2, width === small ? LEAST_NEW / 2 : LEAST_NEW);
+  for (const width of kit) lanes(width / 2, width === small ? LEAST_NEW / 2 : LEAST_NEW);
   // parts narrower than the smallest wash brush: the detail brush run round inside them, only along the stretches no
   // stroke has reached
   if (pointMm > 0 && pointMm < small) {
