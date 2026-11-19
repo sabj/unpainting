@@ -32,7 +32,7 @@ test('a source-ink line source in ink takes the line model for its pool; auto ma
     const f = flags(inkHoldArgs(['--outlinemedium', 'ink', '--linesource', source]));
     for (const [k, v] of Object.entries(INK_POOL_FLAGS)) assert.equal(f.get('--' + k), v, k);
   }
-  assert.deepEqual(INK_POOL_FLAGS, { linemodel: 'strict', copylinesmin: '0' });
+  assert.deepEqual(INK_POOL_FLAGS, { linemodel: 'strict', linestroke: '1', copylinesmin: '0' });
   assert.ok(!flags(inkHoldArgs(['--outlinemedium', 'ink', '--linesource', 'photo-sketch'])).has('--linemodel'));
 });
 
