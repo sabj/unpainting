@@ -184,7 +184,7 @@ const SOURCE_SCALE = SOURCE_FILE && sourceReadable(SOURCE_FILE) ? await (async (
   const meta = await sharp(SOURCE_FILE).metadata();
   return checkSourceScale({ image: opt('image', ''), sourceWidth: meta.width, sourceHeight: meta.height, width: num('width', 700), widthGiven: optIdx('width') >= 0, scale: num('scale', 1), allowed: num('sourcescale', 1) });
 })() : null;
-if (SOURCE_SCALE) console.log(`source: ${SOURCE_SCALE.sourceWidth} x ${SOURCE_SCALE.sourceHeight} px, sheet ${SOURCE_SCALE.sheetWidth} cells wide, ${+SOURCE_SCALE.sourceScale.toFixed(3)} cells for each source pixel (--sourcescale ${SOURCE_SCALE.allowed})`);
+if (SOURCE_SCALE) console.log(`source: ${SOURCE_SCALE.sourceWidth} x ${SOURCE_SCALE.sourceHeight} px; sheet ${SOURCE_SCALE.sheetWidth} cells wide; source scale ${+SOURCE_SCALE.sourceScale.toFixed(3)} cells a pixel, at most ${SOURCE_SCALE.allowed} (--sourcescale)`);
 // a fresh process taking over a saved painting (--resumestate) continues in the painting's own folder
 if (opt('resumestate', '')) { if (!fs.existsSync(path.join(out, 'f0000.jpg'))) throw new Error('--resumestate: ' + out + ' holds no painting to continue'); } else prepareOutputDirectory(out);
 // the commit painted from, refused when tracked files or new source files differ from it (src/paint/code-state.mjs)
