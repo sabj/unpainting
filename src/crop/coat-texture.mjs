@@ -14,7 +14,7 @@ import { lstar } from './thin-lights.mjs';
 
 export const STREAK = 0.22;                 // the share of a dry-brush stroke's footprint that holds paint: measured on the engine's dry brush
 export const LENGTH_MM = Object.freeze({ 'short-coat': 4, 'curly-coat': 5, 'long-hair': 10 });
-const WIDTH_MM = Object.freeze({ 'short-coat': 1.6, 'curly-coat': 1.6, 'long-hair': 2.2 });  // a small round's dry belly
+const WIDTH_MM = Object.freeze({ 'short-coat': 1.0, 'curly-coat': 1.0, 'long-hair': 1.4 });  // a small round's dry belly
 const STEP_L = 10, DARK_L = 55, GROUND_L = 25, GROUND_TOL = 12, GROUND_MM = 3, THIN_MM = 1.2, SIGMA_MM = 1.5, COLOUR_MM = 2;
 
 function rng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -79,6 +79,7 @@ export function coatTexture({ D, rgb, labelMap, kinds, w, h, mmPerCell, ceiling 
         const line = [...walk(-1).reverse(), [sx, sy], ...walk(1)];
         if (line.length * 0.5 < lenCells * 0.4) continue;
         const k = Math.round(sy) * w + Math.round(sx), c = cs[k] > 1e-6 ? col.map(F => Math.round(F[k] / cs[k])) : null;
+        if (!c) continue; // no strand near enough to give a colour
         strokes.push({ polarity, region: Number(id), kind, widthMm, lengthMm: +((line.length - 1) * 0.5 * mmPerCell).toFixed(2), rgb: c, od: cs[k] > 1e-6 ? od[k] / cs[k] : 0,
           points: line.map(([x, y], q) => ({ x, y, r: halfW, p: 1 - 0.4 * (q / Math.max(1, line.length - 1)) })) });
         made++; lengthSum += (line.length - 1) * 0.5 * mmPerCell;

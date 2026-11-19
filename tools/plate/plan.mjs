@@ -38,7 +38,7 @@ import {labPlanes} from '../../src/eval/colour.mjs';
 import {smallLights, paperDensity, cellShare, keepLargestLights} from '../../src/crop/lights.mjs';
 import {planGouache} from './gouache-plan.mjs';
 import {planSurface} from './surface-plan.mjs';
-import {GOUACHE_PIGMENT} from '../../src/media/gouache.mjs';
+import {GOUACHE_PIGMENT, tintedGouache} from '../../src/media/gouache.mjs';
 import {planCurls} from '../../src/crop/curls.mjs';
 import {pigmentPhysics} from '../../src/paint/methods/pigment-physics.mjs';
 import {planLinework} from '../../src/paint/methods/linework-plan.mjs';
@@ -812,11 +812,13 @@ const GOUACHE_PLAN = opt('areaplan', '')
   ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lights (pass.lights)' } }
   : await planGouache({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, pigments: PIGS, coat: { mask: SURFACE_PLAN.coatMask } });
 const COAT_PLAN = { strokes: SURFACE_PLAN.coat.strokes, record: { status: SURFACE_PLAN.record.status, regions: SURFACE_PLAN.coat.regions, strokes: SURFACE_PLAN.coat.strokes.length } };
+// the coat's tinted gouache: one pot, made for the darker quarter of its light strands; lighter strands take more white (src/media/gouache.mjs)
+const COAT_POT = (() => { const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], rgbs = COAT_PLAN.strokes.filter(c => c.polarity === 'light' && c.rgb).map(c => c.rgb).sort((a, b) => lum(a) - lum(b)); return rgbs.length ? tintedGouache(rgbs[Math.floor(rgbs.length * 0.25)], paperRGB) : null; })();
 console.log(GOUACHE_PLAN.strokes.length ? `final lights: ${GOUACHE_PLAN.record.planned.singles} single lights and ${GOUACHE_PLAN.record.planned.glints} glints for rigger gouache, ${GOUACHE_PLAN.record.planned.lengthMm} mm of line (${(100 * GOUACHE_PLAN.record.planned.shareOfCeiling).toFixed(2)}% of the stroke ceiling; read at ${GOUACHE_PLAN.record.read.fineWidth} px wide)` : `final lights: no single thin light over dark that a wash cannot reserve (${GOUACHE_PLAN.record.reason ?? `${GOUACHE_PLAN.record.found.ridges} ridges, none kept`})`);
 fs.writeFileSync(path.join(out, 'gouache-plan.json'), JSON.stringify({ ...GOUACHE_PLAN.record, strokes: GOUACHE_PLAN.strokes }, null, 1));
-const SHEET_PIGS = [...(WICK_FLOOR > 0 ? PIGS.map((p, j) => (wickFloorOf(j) > 0 ? { ...p, wick: Math.max(wickFloorOf(j), p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))) } : p)) : PIGS), ...(INK ? [INK] : []), ...(GRAPHITE ? [GRAPHITE] : []), ...(GOUACHE_PLAN.strokes.length || COAT_PLAN.strokes.some(c => c.polarity === 'light') ? [GOUACHE_PIGMENT] : [])]; ctx.SHEET_PIGS = SHEET_PIGS;
+const SHEET_PIGS = [...(WICK_FLOOR > 0 ? PIGS.map((p, j) => (wickFloorOf(j) > 0 ? { ...p, wick: Math.max(wickFloorOf(j), p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))) } : p)) : PIGS), ...(INK ? [INK] : []), ...(GRAPHITE ? [GRAPHITE] : []), ...(GOUACHE_PLAN.strokes.length || COAT_POT ? [GOUACHE_PIGMENT] : []), ...(COAT_POT ? [COAT_POT] : [])]; ctx.SHEET_PIGS = SHEET_PIGS;
 const GRAPHITE_AT = PIGS.length + (INK ? 1 : 0);
-const GOUACHE_AT = SHEET_PIGS.includes(GOUACHE_PIGMENT) ? SHEET_PIGS.length - 1 : -1;
+const GOUACHE_AT = SHEET_PIGS.indexOf(GOUACHE_PIGMENT), POT_AT = COAT_POT ? SHEET_PIGS.indexOf(COAT_POT) : -1;
 // every brush is dipped for the wash palette; with a separate ink or accent paints on the sheet it carries none of them
 const FINISH_FILE=opt('finishareaplan','');
 if(FINISH_FILE&&opt('semanticcalibration','legacy')!=='actual')throw Error('finishareaplan requires actual authored instrument calibration');
@@ -850,6 +852,6 @@ Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT
   FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
   FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 
-  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, SURFACE_PLAN, COAT_PLAN, GOUACHE_PLAN, GOUACHE_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
+  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, SURFACE_PLAN, COAT_PLAN, GOUACHE_PLAN, GOUACHE_AT, POT_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
   EARLY_DRY_VALUE });
 }

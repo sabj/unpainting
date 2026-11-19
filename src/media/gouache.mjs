@@ -133,6 +133,26 @@ function solveNonNegative(rows, need) {
 }
 
 /**
+ * A pot of tinted gouache: white mixed with its tint beforehand, one paint that behaves on the brush as gouache does. A
+ * watercolour tint loaded beside the paste does not: a pigment that granulates settles in the paper's hollows while the paste
+ * stays on the hills, and the tint drifts away from the colour asked for. The pot's absorption per unit thickness is the
+ * tint for `rgb` at the hiding film (HIDING), so a film of GOUACHE_FILM of it reads as `rgb`; scatter is the white's.
+ */
+export function tintedGouache(rgb, paperRGB, { floor = 0.35 } = {}) {
+  const R = [0, 1, 2].map(c => Math.min(0.98, Math.max(floor, rgb[c] / Math.max(1, paperRGB[c]))));
+  const need = R.map((r, c) => Math.max(0, filmAbsorption(r) * HIDING - GOUACHE_PIGMENT.K[c] * GOUACHE_FILM));
+  return Object.freeze({ name: 'tinted gouache', K: need.map(v => GOUACHE_PIGMENT.K[0] + v / GOUACHE_FILM), S: GOUACHE_PIGMENT.S, rho: GOUACHE_PIGMENT.rho, omega: GOUACHE_PIGMENT.omega, gamma: 0 });
+}
+
+/** How much of the pot's tint a light of colour `rgb` asks for, 0 (white) to 1 (the pot as it is), by least squares over the channels. */
+export function potShare(rgb, paperRGB, pot, { floor = 0.35 } = {}) {
+  const R = [0, 1, 2].map(c => Math.min(0.98, Math.max(floor, rgb[c] / Math.max(1, paperRGB[c]))));
+  let num = 0, den = 0;
+  for (let c = 0; c < 3; c++) { const want = Math.max(0, filmAbsorption(R[c]) * HIDING - GOUACHE_PIGMENT.K[c] * GOUACHE_FILM), have = (pot.K[c] - GOUACHE_PIGMENT.K[c]) * GOUACHE_FILM; num += want * have; den += have * have; }
+  return den > 1e-12 ? Math.max(0, Math.min(1, num / den)) : 0;
+}
+
+/**
  * A stroke as the points the dry deposit takes: sheet cells, a width in cells at each point (the rigger's, pressed at
  * the root and lifting to the tip), and the pressure along it. `curve` is [[x, y]] in plan cells, scaled by `scale`.
  */

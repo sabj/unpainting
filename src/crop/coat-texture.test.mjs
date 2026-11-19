@@ -38,7 +38,7 @@ test('strokes follow the strands: light ones in the dark coat along 30 degrees i
 test('strokes are laid until the paint they leave cover as much as the strands, and none where there are none', () => {
   const { D, rgb, labelMap } = scene();
   const out = coatTexture({ D, rgb, labelMap, kinds: { 1: 'short-coat' }, w, h, mmPerCell: MM }), rec = out.regions[0];
-  const per = (LENGTH_MM['short-coat'] / MM) * (1.6 / MM) * STREAK, covered = out.strokes.filter(s => s.polarity === 'light').length * per / rec.cells;
+  const per = (LENGTH_MM['short-coat'] / MM) * (1.0 / MM) * STREAK, covered = out.strokes.filter(s => s.polarity === 'light').length * per / rec.cells;
   assert.ok(covered > 0.6 * rec.lightShare && covered < 1.4 * rec.lightShare, `paint covers ${covered.toFixed(3)} against strand share ${rec.lightShare}`);
   const bare = coatTexture({ D: new Float32Array(w * h).fill(2.6), rgb, labelMap, kinds: { 1: 'short-coat' }, w, h, mmPerCell: MM });
   assert.equal(bare.strokes.length, 0, 'a flat dark coat gets nothing');

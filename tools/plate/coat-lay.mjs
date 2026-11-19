@@ -6,7 +6,7 @@
 // its light. Nothing is read from the target here: colours and strands were planned before the first wash.
 import fs from 'node:fs';
 import path from 'node:path';
-import { gouacheTint, mixFor, GOUACHE_FILM } from '../../src/media/gouache.mjs';
+import { potShare, mixFor, GOUACHE_FILM } from '../../src/media/gouache.mjs';
 import { DEFAULT_SHEET_MM } from '../../src/media/sheet-size.mjs';
 
 export const LOAD = 12;          // gouache paste on the brush, in hiding films: a dry brush leaves about a tenth of it on the tooth's hills
@@ -17,12 +17,11 @@ const BRUSH = { bristles: 10, capacity: 20, belly: 2, feed: 0.06, give: 0.6, fre
 const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
 const odOf = (c, paper) => [0, 1, 2].map(k => -Math.log(Math.max(0.02, Math.min(1, c[k] / Math.max(1, paper[k])))));
 
-/** The brush's load for a light stroke: gouache paste and the tint paints, as concentrations on a sheet of `k` pigments. */
-export function lightLoad(stroke, paperRGB, pigments, gouacheAt, k) {
-  const conc = new Array(k).fill(0), tint = gouacheTint(stroke.rgb ?? [255, 255, 255], paperRGB, pigments);
-  conc[gouacheAt] = GOUACHE_FILM * LOAD;
-  for (const m of tint.mix) conc[m.pigment] = m.amount * LOAD;
-  return { conc, tint };
+/** The brush's load for a light stroke: white paste and the pot of tinted paste, in the share its colour asks for, as concentrations on a sheet of `k` pigments. */
+export function lightLoad(stroke, paperRGB, pot, gouacheAt, potAt, k) {
+  const conc = new Array(k).fill(0), share = stroke.rgb ? potShare(stroke.rgb, paperRGB, pot) : 0;
+  conc[gouacheAt] = (1 - share) * GOUACHE_FILM * LOAD; conc[potAt] = share * GOUACHE_FILM * LOAD;
+  return { conc, share };
 }
 
 /** The brush's load for a dark stroke: the paints that add what the strand needs over the ground, as concentrations. */
@@ -35,7 +34,7 @@ export function darkLoad(strandOd, groundOd, pigments, k) {
 }
 
 export async function layCoats(ctx) {
-  const { COAT_PLAN: plan, PIGS, GOUACHE_AT, SHEET_PIGS, SC, W2, H2, N2, w, h, out, num, render, sheetDensity, shoot, FILM_BY_PAINT, SEED, paperRGB, createBrush, dip, stroke, dry, O, UPRIGHT } = ctx;
+  const { COAT_PLAN: plan, PIGS, GOUACHE_AT, POT_AT, SHEET_PIGS, SC, W2, H2, N2, w, h, out, num, render, sheetDensity, shoot, FILM_BY_PAINT, SEED, paperRGB, createBrush, dip, stroke, dry, O, UPRIGHT } = ctx;
   const sheet = ctx.sheet, mmPerCell = num('sheetmm', DEFAULT_SHEET_MM) / W2, K = SHEET_PIGS.length, palette = PIGS.map(p => ({ K: Array.from(p.K) }));
   const before = render(), painted = sheetDensity(before);
   const cell = p => Math.min(h - 1, Math.max(0, Math.round(p.y))) * w + Math.min(w - 1, Math.max(0, Math.round(p.x)));
@@ -50,7 +49,7 @@ export async function layCoats(ctx) {
       if (!load) { laid.skippedNoNeed++; continue; }
     } else {
       if (along - s.od < MARGIN_OD) { laid.skippedWashKeptLight++; continue; }
-      load = lightLoad(s, paperRGB, palette, GOUACHE_AT, K);
+      load = lightLoad(s, paperRGB, SHEET_PIGS[POT_AT], GOUACHE_AT, POT_AT, K);
     }
     const brush = createBrush({ radius: s.points[0].r * SC, ...BRUSH, seed: 700 + SEED + n++ });
     dip(brush, { water: WATER, conc: load.conc });

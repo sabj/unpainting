@@ -2,17 +2,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lightLoad, darkLoad, LOAD, DEPOSIT } from './coat-lay.mjs';
-import { GOUACHE_FILM } from '../../src/media/gouache.mjs';
+import { GOUACHE_FILM, tintedGouache } from '../../src/media/gouache.mjs';
 
 const palette = [{ K: [1.6, 1.5, 1.2] }, { K: [0.4, 0.8, 2.2] }, { K: [0.2, 0.7, 1.9] }];
 const PAPER = [252, 251, 248];
 
-test('a light stroke is loaded with gouache paste and a little of the paints that tint it', () => {
-  const { conc } = lightLoad({ rgb: [236, 214, 170] }, PAPER, palette, 3, 4);
-  assert.equal(conc.length, 4); assert.ok(Math.abs(conc[3] - GOUACHE_FILM * LOAD) < 1e-9, 'paste');
-  assert.ok(conc[1] > 0 || conc[2] > 0, 'a warm tint'); assert.equal(conc[0], 0, 'not the dark paint');
-  const white = lightLoad({ rgb: [250, 250, 247] }, PAPER, palette, 3, 4).conc;
-  assert.deepEqual(white.slice(0, 3), [0, 0, 0], 'a true white takes no tint');
+test('a light stroke is loaded with white paste and the pot of tint in the share its colour asks for', () => {
+  const pot = tintedGouache([170, 175, 190], PAPER);
+  const mid = lightLoad({ rgb: [170, 175, 190] }, PAPER, pot, 3, 4, 5).conc;
+  assert.equal(mid.length, 5); assert.ok(Math.abs(mid[3] + mid[4] - GOUACHE_FILM * LOAD) < 1e-6, 'one paste in all');
+  assert.ok(mid[4] > 0.9 * GOUACHE_FILM * LOAD, 'the pot as it is for the colour it was made for');
+  const lighter = lightLoad({ rgb: [235, 235, 238] }, PAPER, pot, 3, 4, 5).conc;
+  assert.ok(lighter[3] > lighter[4], 'a lighter strand takes more white');
+  const white = lightLoad({ rgb: [250, 250, 247] }, PAPER, pot, 3, 4, 5).conc;
+  assert.ok(white[4] < 0.05 * GOUACHE_FILM * LOAD, 'a true white takes none of the tint');
+  assert.equal(lightLoad({ rgb: null }, PAPER, pot, 3, 4, 5).conc[4], 0);
 });
 
 test('a dark stroke adds what the strand needs over the ground, and nothing where the ground is already as dark', () => {
