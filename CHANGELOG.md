@@ -2,113 +2,93 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## 0.3.3-rc.1 (release candidate, not released)
+## 0.3.3-rc.1 (not released)
 
-Painter **V106-dev**, simulator **105**, judges **J1**. The changes run from the 0.3.2 release. The release will set V106 and 0.3.3.
+Painter **V106-dev**, simulator **105**, judges **J1**. Measured on 2026-11-19 at `bac75526`, in the default mode, on the GPU.
 
-Everything in this section was measured on 2026-11-19 at commit `bac75526`, in the default mode (the painter may look at its subject while it paints), on the GPU. Pictures and numbers will be made again on the release commit.
+The painter used to plan its darks and its smallest washes at the size of a 3 mm brush. It now plans them at the size of the brushes that lay them, so small shapes survive.
 
-### What changed, in pictures
+### Against the published plates
 
-0.3.3 keeps the small shapes of its subject. Until now the painter planned its darks, and its smallest washes, at the size of a 3 mm brush, so anything finer was averaged away before any paint was laid. It now plans them at the size of the brushes that lay them.
+The crop is on the left. On the right, the 0.3.3 plate slides over the earlier plate of the same crop.
 
-Each picture below shows a benchmark crop on the left. On the right, the 0.3.3 plate slides in over an earlier published plate of the same crop and back out. All three are shown at the same size. Nothing is blended: every pixel is one plate or the other.
+![Trumbull: the crop, and the 0.3.3 plate sliding over the 0.1.1 winner](docs/img/0.3.3/wipe-trumbull.webp)
 
-![Trumbull: the benchmark crop beside the 0.1.1 winning plate, with the 0.3.3 plate sliding in over it](docs/img/0.3.3/wipe-trumbull.webp)
+![Mittens: the crop, and the 0.3.3 plate sliding over the 0.1.1 winner](docs/img/0.3.3/wipe-mittens.webp)
 
-![Mittens: the benchmark crop beside the 0.1.1 winning plate, with the 0.3.3 plate sliding in over it](docs/img/0.3.3/wipe-mittens.webp)
+![Mittens: the crop, and the 0.3.3 plate sliding over the 0.2.1 pencil plate](docs/img/0.3.3/wipe-mittens-021.webp)
 
-![Mittens: the benchmark crop beside the 0.2.1 pencil plate, with the 0.3.3 plate sliding in over it](docs/img/0.3.3/wipe-mittens-021.webp)
+![Yale h36: the crop, and the 0.3.3 plate sliding over the 0.2.1 ink plate](docs/img/0.3.3/wipe-h36.webp)
 
-![Yale h36: the benchmark crop beside the 0.2.1 ink plate, with the 0.3.3 plate sliding in over it](docs/img/0.3.3/wipe-h36.webp)
+All plates were painted from the 300 px crop at 1200 cells on a 280 mm sheet. The 0.1.1 plates came from a model's plan; the 0.3.3 plates are the painter's own run.
 
-How these were made, so the comparison can be judged fairly:
+Two 0.3.3 plates from blank paper, in the painter's saved frames:
 
-- All plates were painted from the same 300 px crop on a 280 mm sheet, 1200 cells wide. That is how the earlier plates were published, and it is four cells for each crop pixel. 0.3.3 otherwise refuses to enlarge a source; these runs state the enlargement with `--sourcescale 4`.
-- The 0.1.1 plates are the benchmark round winners, painted from a plan written by a model session (Sonnet try 2 for Trumbull, Astra try 3 for Mittens). The 0.2.1 plates are that release's plates of the same crops. The 0.3.3 plates are the painter's own run, with no plan and no model session.
-- The 0.1.1 winners are compared from their 300 px previews, so every plate is reduced to the crop's 300 px before it is shown or measured.
-
-The same two 0.3.3 plates being painted, from blank paper. These are the painter's own saved frames in order, with no blending, then a quick rewind.
-
-![Trumbull painted by 0.3.3 from blank paper: drawing, five washes from light to dark, then the finish](docs/img/0.3.3/build-trumbull.webp)
+![Trumbull painted by 0.3.3 from blank paper](docs/img/0.3.3/build-trumbull.webp)
 
 ![Mittens painted by 0.3.3 from blank paper](docs/img/0.3.3/build-mittens.webp)
 
-### Quality at different detail levels
+### Detail by size
 
-A painting can match its subject from across the room and still fall apart close up, so one score hides what matters. These measurements split each picture's light and dark into bands by the size of the feature, and ask two questions of each band:
+Agreement is the correlation between the plate's light and dark and the subject's at one feature size. 1 is identical, 0 is unrelated.
 
-- **Agreement**: is the detail of that size in the right place? This is the correlation between the plate's band and the subject's, from 0 (no relation) to 1 (the same).
-- **Amount**, in brackets: how much detail of that size is there at all, as a share of the subject's. A plate can have plenty of fine texture that agrees with nothing; brush edges and paper grain count here.
+![Agreement by feature size for the 0.1.1, 0.2.1 and 0.3.3 plates of three benchmark crops](docs/img/0.3.3/published-by-size.svg)
 
-**Against the published plates.** On the benchmark crops, as published (one crop pixel is 0.93 mm of paper):
+| Crop | Plate | Under 2 px | 2–4 px | Colour error |
+|---|---|---|---|---|
+| Trumbull | 0.1.1 winner | 0.54 | 0.81 | 9.64 |
+| Trumbull | 0.3.3 | 0.84 | 0.97 | 3.90 |
+| Mittens | 0.1.1 winner | 0.70 | 0.90 | 5.32 |
+| Mittens | 0.2.1 | 0.69 | 0.94 | 5.76 |
+| Mittens | 0.3.3 | 0.84 | 0.98 | 3.48 |
+| Yale h36 | 0.2.1 | 0.58 | 0.82 | 4.33 |
+| Yale h36 | 0.3.3 | 0.83 | 0.98 | 3.17 |
 
-![Agreement with the subject by feature size, for the 0.1.1, 0.2.1 and 0.3.3 plates of the Trumbull, Mittens and Yale h36 crops](docs/img/0.3.3/published-by-size.svg)
+On those sheets a crop pixel is 0.93 mm of paper, which a small brush can follow. A whole subject at its own size is harder: a source pixel is 0.26 mm, and the smallest brush lays a line 0.5 to 0.8 mm wide.
 
-| Crop | Plate | Under 2 px | 2–4 px | 4–8 px | 8–16 px | Colour error |
-|---|---|---|---|---|---|---|
-| Trumbull | 0.1.1 winner | 0.54 (73%) | 0.81 (88%) | 0.91 (96%) | 0.92 (103%) | 9.64 |
-| Trumbull | 0.3.3 | 0.84 (75%) | 0.97 (96%) | 0.99 (101%) | 0.99 (103%) | 3.90 |
-| Mittens | 0.1.1 winner | 0.70 (76%) | 0.90 (87%) | 0.93 (92%) | 0.96 (102%) | 5.32 |
-| Mittens | 0.2.1 | 0.69 (74%) | 0.94 (91%) | 0.97 (96%) | 0.99 (100%) | 5.76 |
-| Mittens | 0.3.3 | 0.84 (86%) | 0.98 (99%) | 0.99 (99%) | 1.00 (101%) | 3.48 |
-| Yale h36 | 0.2.1 | 0.58 (79%) | 0.82 (85%) | 0.92 (97%) | 0.98 (101%) | 4.33 |
-| Yale h36 | 0.3.3 | 0.83 (75%) | 0.98 (98%) | 0.99 (102%) | 1.00 (105%) | 3.17 |
+![Agreement by feature size on the sheet for four subjects, at 0.26 mm and 0.13 mm cells](docs/img/0.3.3/detail-by-size.svg)
 
-The earlier plates had about the right amount of fine detail but not in the right places: agreement under 2 px was 0.54 to 0.70. In 0.3.3 it is 0.83 to 0.84, and from 2 px up the plates agree with the crop at 0.97 or better. Colour error, the mean colour difference after a 3 px blur, falls from between 4.3 and 9.6 to between 3.2 and 3.9.
+| Subject | Cell | Under 0.5 mm | 0.5–1 mm | 1–2 mm | 2–4 mm | Strokes | Small marks | Minutes |
+|---|---|---|---|---|---|---|---|---|
+| Overlook | 0.26 mm | 0.25 | 0.72 | 0.87 | 0.95 | 13,756 | 31% | 7 |
+| Overlook | 0.13 mm | 0.41 | 0.77 | 0.89 | 0.95 | 34,129 | 52% | 30 |
+| Mittens | 0.26 mm | 0.52 | 0.92 | 0.97 | 0.99 | 8,009 | 36% | 2 |
+| Mittens | 0.13 mm | 0.68 | 0.93 | 0.97 | 0.99 | 14,268 | 49% | 8 |
+| White Ships | 0.26 mm | 0.39 | 0.87 | 0.95 | 0.98 | 13,486 | 22% | 2 |
+| White Ships | 0.13 mm | 0.52 | 0.88 | 0.95 | 0.98 | 24,779 | 38% | 8 |
+| Trumbull, painted | 0.26 mm | 0.46 | 0.88 | 0.95 | 0.98 | 28,684 | 27% | 9 |
 
-**At each subject's own size.** A 300 px crop spread over 280 mm is an easy case: each pixel is nearly a millimetre wide and a small brush can follow it. The harder and more honest test is a whole subject at one cell for each source pixel, where a pixel is 0.26 mm of paper and the smallest brush lays a line 0.5 to 0.8 mm wide.
+- Features of 1 mm and larger agree at 0.87 to 0.99.
+- From 0.5 to 1 mm, the size of a rim, a seam or a lock of hair, agreement is 0.72 to 0.92.
+- Under 0.5 mm it is 0.25 to 0.52. That is finer than the brush's line, so the painter cannot place it.
+- Halving the cell to 0.13 mm lifts agreement under 0.5 mm by 0.13 to 0.16. It takes 1.8 to 2.5 times the strokes and 3.3 to 4.2 times the time.
 
-![Agreement with the subject by feature size on the sheet, for four subjects at 0.26 mm and 0.13 mm cells](docs/img/0.3.3/detail-by-size.svg)
+Strokes count paint only. A small mark is under 1.5 mm wide and shorter than three times its width. The stroke limit is one cover of the sheet in marks of 1.5 by 4.5 mm: Overlook is at 0.89 of it at 0.26 mm cells and 2.2 times over at 0.13 mm.
 
-| Subject | Cells | Under 0.5 mm | 0.5–1 mm | 1–2 mm | 2–4 mm | Colour error |
-|---|---|---|---|---|---|---|
-| Overlook | 0.26 mm | 0.25 (60%) | 0.72 (86%) | 0.87 (91%) | 0.95 (92%) | 4.68 |
-| Overlook | 0.13 mm | 0.41 (65%) | 0.77 (87%) | 0.89 (90%) | 0.95 (92%) | 4.78 |
-| Mittens | 0.26 mm | 0.52 (74%) | 0.92 (90%) | 0.97 (97%) | 0.99 (98%) | 3.52 |
-| Mittens | 0.13 mm | 0.68 (73%) | 0.93 (93%) | 0.97 (98%) | 0.99 (98%) | 3.84 |
-| White Ships | 0.26 mm | 0.39 (72%) | 0.87 (91%) | 0.95 (99%) | 0.98 (100%) | 3.83 |
-| White Ships | 0.13 mm | 0.52 (81%) | 0.88 (98%) | 0.95 (100%) | 0.98 (101%) | 3.75 |
-| Trumbull, painted | 0.26 mm | 0.46 (68%) | 0.88 (84%) | 0.95 (94%) | 0.98 (99%) | 5.71 |
-| Dog, front view, watercolour | 0.26 mm | 0.42 (73%) | 0.82 (89%) | 0.90 (94%) | 0.95 (98%) | 3.57 |
-| Dog, front view, walnut ink | 0.26 mm | 0.48 (72%) | 0.87 (92%) | 0.94 (96%) | 0.97 (98%) | 2.80 |
-| Dog, front view, ink | 0.26 mm | 0.58 (82%) | 0.94 (93%) | 0.98 (99%) | 0.99 (101%) | 2.53 |
+White Ships at three distances:
 
-How to read it:
+![White Ships as the whole sheet, a third of it and a ninth of it: the subject and two 0.3.3 plates](docs/img/0.3.3/distances-white-ships.jpg)
 
-- **2 mm and larger: right.** Shapes the size of a small wash agree with the subject at 0.95 to 0.99. This is what a viewer sees at arm's length.
-- **1 to 2 mm: nearly right.** 0.87 to 0.98. The edges of small shapes and most small darks are in place.
-- **0.5 to 1 mm: mostly right, and uneven.** 0.72 to 0.94. This is the size of a rim, a seam or a lock of hair. Line subjects (ink, Mittens) do best; a face with glasses and a dog's coat (Overlook) do worst.
-- **Under 0.5 mm: mostly not the subject's detail.** 0.25 to 0.58. The plates carry 60 to 82% as much variation at this size as their subjects do, but most of it is the painter's own brush edges and paper grain. It is finer than the smallest brush's line, so the painter cannot place it and does not try.
-- **Finer cells help where the brush can use them.** At 0.13 mm cells, agreement under 0.5 mm rises by 0.13 to 0.16 on all three subjects and the 0.5 to 1 mm band by 0.01 to 0.05, for about four times the render time. Colour error moves by 0.1 to 0.3 either way.
+Numbers: [`detail-by-size.json`](docs/img/0.3.3/detail-by-size.json).
 
-The same thing seen by eye, on White Ships (199 mm across): the subject, 0.3.3 at 0.26 mm cells, and 0.3.3 at 0.13 mm cells, at three distances. Only cropping and resizing are applied.
+### Changes
 
-![White Ships at three distances: the whole sheet, a third of it, and a ninth of it, for the subject and two 0.3.3 plates](docs/img/0.3.3/distances-white-ships.jpg)
+- Darks and shadow glazes are planned at the detail brush's size.
+- The smallest wash brush is the 1.2 mm rigger, down from the 3 mm round.
+- Thin dark lines are laid last, at the subject's own darkness, in paint or pencil.
+- Pencil lines press as dark as the subject's lines.
+- The painter stops on an enlarged source unless the run allows it.
+- Each paint granulates as its pigment does. No setting is fitted to one subject.
 
-The whole sheets are hard to tell apart. A third of the sheet shows the washes as flatter, harder-edged patches than the subject's. At a ninth, the washes read as stepped bands where the subject has soft gradations.
+### Known problems
 
-The numbers behind both charts are in [`docs/img/0.3.3/detail-by-size.json`](docs/img/0.3.3/detail-by-size.json). Bands are differences of Gaussian blurs of L* at sigma 0, 2, 4, 8 and 16 source pixels, measured at the subject's own size.
-
-### What changed in the painter
-
-- **Darks are planned at the size of the detail brush.** Both dark washes and the shadow glazes were cut from the picture averaged over a 3 mm brush. They now use the picture as the detail brush sees it.
-- **The smallest wash brush is the rigger (1.2 mm), not the 3 mm round.** A pale wash can now hold any shape the kit's smallest brush can lay.
-- **Thin dark lines are laid last, at the subject's own darkness.** The painter reads the sheet along each line first, leaves a line that is already there, and otherwise paints it in two passes with a reading between, or draws it in pencil where the brush's line would be too wide.
-- **Pencil lines press as dark as the subject's own lines.**
-- **Washes get soft edges where the plan asks for them.**
-- **The painter refuses to paint from an enlarged source** unless the run says so, and the benchmark subjects are now painted at their crops' own size.
-- **Each paint granulates as its pigment does**, white gouache is a real pigment on the sheet, and no setting is fitted to any one subject.
-
-### What is still wrong
-
-- **Detail inside a mass of one tone is flattened.** The stone blocks of the painted Trumbull's wall and the strands in a black dog's coat are lost in the plan, before any paint: the wall becomes one smooth wash and the coat a few dark blocks with no eyes.
-- **Most rims and seams are still missing** at 0.26 mm cells. The thin-line finder covers 6 of 25 sunglasses rims and 4 of 16 cap seams on Overlook.
-- **Coat strokes are too heavy on Mittens**: dark dashes on the cat that the subject does not have.
-- **White gouache streaks at 0.13 mm cells**: wide white marks across Overlook's cap.
-- **Ink lines come out soft and grey** on the ink subjects.
-- **The paint step loses colour against the plan**: colour error rises by 1.1 to 1.6 between the plan preview and the painted sheet, about 2 L* of it from the paper.
-- **Copy limits.** By the limits listed below, the three plates in the pictures above do not pass. Their fine-detail correlation with the crop is 0.83 to 0.84 against a ceiling of 0.645, and their strokes are 11,534 to 25,854 against ceilings of 7,743 to 10,182. The target guard recorded no violation. Whether a plate this close to its subject is copying, or simply painting well on a sheet where each pixel is nearly a millimetre wide, is not settled; a test that plants noise finer than the brush in the subject and checks that none of it reaches the plate is being built to decide it.
+- Detail inside one tone is flattened in the plan: the stone blocks of Trumbull's wall, the strands and eyes in a black dog's coat.
+- Most rims and seams are missing at 0.26 mm cells. On Overlook the line finder covers 6 of 25 sunglasses rims.
+- Coat strokes on Mittens are heavier than the subject's.
+- White gouache streaks appear on Overlook's cap at 0.13 mm cells.
+- Ink lines come out soft and grey.
+- Colour error rises by 1.1 to 1.6 between the plan and the painted sheet.
+- The plates shown above fail the copy limits listed below: correlation 0.83 to 0.84 against 0.645, and 11,534 to 25,854 strokes against 7,743 to 10,182. The target guard recorded no violation. Whether they copy is being tested.
 
 ### The full list
 
