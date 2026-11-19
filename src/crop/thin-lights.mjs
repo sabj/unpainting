@@ -88,13 +88,17 @@ function findGlints(D, w, h, pixelMm) {
  * @param pixelMm  millimetres of the sheet one pixel spans
  * @param rgb      optional RGB bytes, 3 * w * h: the light's own colour is read from it along each stroke
  * @param strokesMax  the most single strokes; glintsMax the most glints; skip (x, y) true where a coat is (its strands are not single lights)
+ * @param polarity    'light' (the default) finds thin lights over a dark ring; 'dark' finds thin darks over a ring that is not dark,
+ *                    the same rules turned over (a dark has no glints); lightOd is then the line's own density
  * @returns {{ strokes, stats }} strokes: [{ kind: 'strand'|'glint', points: [[x, y]] (pixels), widthMm, lengthMm, lightOd,
  *   surroundOd, rgb|null, fit: { maxMm, meanMm, turnsPerCm } }], best singles first
  */
-export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity, glintsMax = Infinity, skip = null } = {}) {
+export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity, glintsMax = Infinity, skip = null, polarity = 'light' } = {}) {
+  const dark = polarity === 'dark';
   if (!(pixelMm > 0)) throw new Error('thin lights: the millimetres of one pixel');
   const n = w * h, r = Math.max(1, Math.round(TOUCH_MM / 2 / pixelMm));
-  const L = Float32Array.from(D, lstar);
+  // a thin dark is a thin light of the lightness turned over: a ridge darker than its ring, over a ring that is not dark
+  const L = Float32Array.from(D, d => (dark ? 100 - lstar(d) : lstar(d)));
   // closing of darkness = opening of lightness: what a thin light is lighter than, and what its ring is
   const E = Float32Array.from(L, v => -v), closedE = minFilter(maxFilter(E, w, h, r), w, h, r);
   const margin = r + 1, mask = new Uint8Array(n);
@@ -106,7 +110,7 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
   const colourOf = pts => {
     if (!rgb) return null;
     const px = pts.map(([x, y]) => { const i = Math.min(h - 1, Math.max(0, Math.floor(y))) * w + Math.min(w - 1, Math.max(0, Math.floor(x))); return [rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2], 0.2126 * rgb[i * 3] + 0.7152 * rgb[i * 3 + 1] + 0.0722 * rgb[i * 3 + 2]]; });
-    px.sort((a, b) => b[3] - a[3]);
+    px.sort((a, b) => (dark ? a[3] - b[3] : b[3] - a[3]));
     const top = px.slice(0, Math.max(1, Math.ceil(px.length / 2)));
     return [0, 1, 2].map(c => Math.round(top.reduce((s, p) => s + p[c], 0) / top.length));
   };
@@ -149,12 +153,12 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
       if (lengthMm < MIN_LENGTH_MM || lengthMm / Math.max(widthMm, 0.05) < ASPECT || perCm > MAX_TURNS_PER_CM) continue;
       const lightL = along(s.curve, L), side = sideLight(s.curve, L, w, h, Math.ceil(widthMm / 2 / pixelMm) + 2), sideL = side.dark;
       if (sideL > DARK_L || lightL - sideL < STEP_L || lightL - side.light < STEP_L / 2) continue;
-      singles.push({ kind: 'strand', points: s.curve, measuredMm: widthMm, widthMm: Math.min(RIGGER_MM.max, Math.max(RIGGER_MM.min, widthMm)), lengthMm, lightOd: along(s.curve, D), surroundOd: -Math.log(Math.max(1e-3, (sideL + 16) ** 3 / 116 ** 3)), rgb: colourOf(s.curve),
+      singles.push({ kind: 'strand', points: s.curve, measuredMm: widthMm, widthMm: Math.min(RIGGER_MM.max, Math.max(RIGGER_MM.min, widthMm)), lengthMm, lightOd: along(s.curve, D), surroundOd: dark ? null : -Math.log(Math.max(1e-3, (sideL + 16) ** 3 / 116 ** 3)), rgb: colourOf(s.curve),
         fit: { maxMm: +(s.max * pixelMm).toFixed(3), meanMm: +(s.dev * pixelMm).toFixed(3), turnsPerCm: +perCm.toFixed(3) }, score: (lightL - sideL) * lengthMm });
     }
   }
   const byScore = (a, b) => b.score - a.score;
-  const keptSingles = singles.sort(byScore).slice(0, strokesMax), keptGlints = findGlints(D, w, h, pixelMm).sort(byScore).slice(0, glintsMax);
+  const keptSingles = singles.sort(byScore).slice(0, strokesMax), keptGlints = dark ? [] : findGlints(D, w, h, pixelMm).sort(byScore).slice(0, glintsMax);
   return {
     strokes: [...keptSingles, ...keptGlints],
     stats: { maskPx, skelPx, dropped: drop, ridges: chains.length, singles: keptSingles.length, glints: keptGlints.length, closingRadiusPx: r },
