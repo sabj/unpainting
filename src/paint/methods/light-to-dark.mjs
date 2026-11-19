@@ -29,7 +29,7 @@ const REPO=fileURLToPath(new URL('../../..',import.meta.url));
 // The q quantile of G over a passage's cells.
 function quantileOf(list,G,q){const v=Float32Array.from(list,i=>G[i]).sort();return v[Math.min(v.length-1,Math.max(0,Math.floor(q*(v.length-1))))];}
 const neighbors = (i,w,n) => [i%w?i-1:-1,i%w<w-1?i+1:-1,i>=w?i-w:-1,i+w<n?i+w:-1].filter(j=>j>=0);
-function targetValueMap(density) {
+export function targetValueMap(density) {
   if (!density.length || density.some(v=>!Number.isFinite(v)||v<0)) throw Error('finite nonnegative target density required');
   const a=Array.from(density).filter(v=>v>0).sort((a,b)=>a-b);
   const peak=a[Math.min(a.length-1,Math.floor(a.length*.97))]||1;

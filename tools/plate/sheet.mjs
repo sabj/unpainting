@@ -11,8 +11,9 @@ import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/m
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
+import {planFairWashes} from '../../src/paint/methods/fair-wash.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
-import {roleBrushMm,roleBrushPointMm} from '../../src/paint/methods/brush-footprint.mjs';
+import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {unsupportedAxisEdges} from '../../src/paint/methods/target-regions.mjs';
 import {writeValuePreview} from '../painter/value-plan-preview.mjs';
 import {writePlanValueCheck} from '../painter/plan-value-check.mjs';
@@ -264,13 +265,17 @@ if(VALUE_ENABLED){
  const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
   const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,ownSwatch:true,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),edgeWobbleMm:num('edgewobble',0),shadowThresh:num('shadowthresh',.38),shadowWater:num('shadowwater',0),skyOneLayer:num('skyonelayer',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',0),floorBrushMm:roleBrushMm(root,'floor',{brushes:opt('brushes','src/paint/brushes.json'),name:opt('floorbrush','')}),detailPointMm:roleBrushPointMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')}),styleGain:num('stylegain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,hold:ctx.FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
 
+ // The wash plan (fair-wash.mjs): puddles and whole shapes. A plan that names a style (ink and wash, the wet styles) still
+ // takes the older value plan, whose style profiles the wash plan does not read yet; that path goes when they are ported.
+ valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
+ const planValues=valueOptions.styleSelection?planLightToDark:planFairWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
-  const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planLightToDark(valueOptions),demand:valueOptions.demand}));
+  const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions),demand:valueOptions.demand}));
   ctx.VALUE_PLAN=saved.value.plan;
   // The cached demand is restored on a hit, so a plan step that rewrites it stays reproducible.
   if(saved.cached)valueOptions.demand.set(saved.value.demand);
- }else ctx.VALUE_PLAN=planLightToDark(valueOptions);
+ }else ctx.VALUE_PLAN=planValues(valueOptions);
  SPEED_PROFILE?.add('setup:value-plan',performance.now()-valueStarted);
  ctx.layers=ctx.VALUE_PLAN.layers;ctx.steps=5;
  // --washsession 2: within each band step, a region's pigment passes follow one another, so its wash is charged with
@@ -297,13 +302,13 @@ if(VALUE_ENABLED){
    {const pal=[[230,159,0],[86,180,233],[0,158,115],[240,228,66],[0,114,178],[213,94,0],[204,121,167],[120,120,120]],img=Buffer.alloc(n*3);for(let i=0;i<n;i++){const c=pal[field.rank[i]%pal.length];img[3*i]=c[0];img[3*i+1]=c[1];img[3*i+2]=c[2];}await sharp(img,{raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,'subject-order.png'));}
    console.log(`subject order ${so}: ${ctx.layers.length} passes; ${r.summary.map(q=>`${q.subject} ${(100*q.share).toFixed(0)}% passes ${q.first}-${q.last}`).join(', ')}`);}}
  ctx.HOLD=ctx.VALUE_PLAN.protectedCells;
- fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
+ fs.writeFileSync(path.join(out,'value-plan.json'),JSON.stringify({stage:'executable target-value plan before physical instruments',style:ctx.VALUE_PLAN.style,target:opt('image'),caps:[.16,.32,.50,.75,1],peakDensity:ctx.VALUE_PLAN.value.peak,geometry:ctx.VALUE_PLAN.geometry,omittedReservedOrSpeckDemand:ctx.VALUE_PLAN.omittedDemand,lights:ctx.VALUE_PLAN.lightShapes,explicitLights:VALUE_CONFIG?.reserves??[],puddles:ctx.VALUE_PLAN.puddles,washShapes:ctx.VALUE_PLAN.shapeMeans,summary:ctx.VALUE_PLAN.summary,passes:ctx.VALUE_PLAN.instructions,drawing:'sparse structure first; lighter selective closing ink after dry gate'},null,2));
  // --valuemaps 1: the value plan as maps for diagnosis (value band per cell, colour region, reserved lights) and every
  // passage's cells in paint order, to value-maps.json.gz. Read by nothing in the painter.
  if(num('valuemaps',0)>0){const caps=[.16,.32,.50,.75,1],vv=ctx.VALUE_PLAN.value.values,band=Array.from(vv,v=>v<=0?0:caps.findIndex(t=>v<=t)+1||5);
   const passes=ctx.layers.flatMap((l,L)=>l.shapes.map(sh=>{const m=sh.mask,cells=[];if(m)for(let i=0;i<n;i++)if(m[i])cells.push(i);return {L,id:sh._valuePlan?.id??null,phase:l._valuePhase??null,value:l.value,pigment:l.pigment,amount:sh.amount,area:sh.area,cells};}));
   fs.writeFileSync(path.join(out,'value-maps.json.gz'),zlib.gzipSync(JSON.stringify({w,h,caps,band,value:Array.from(vv,v=>+v.toFixed(3)),labels:Array.from(ctx.VALUE_PLAN.regions.labels),protected:Array.from(ctx.VALUE_PLAN.protectedCells),passes})));}
- console.log(`target values: ${ctx.layers.length} pigment/region passes, ${ctx.VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
+ console.log(ctx.VALUE_PLAN.puddles?`wash plan: ${ctx.layers.length} puddle passes, ${ctx.VALUE_PLAN.instructions.length} washes in ${ctx.VALUE_PLAN.summary.stages} stages`:`target values: ${ctx.layers.length} pigment/region passes, ${ctx.VALUE_PLAN.instructions.length} connected shapes; five light-to-dark bands; shadows never split by region`);
  if(num('valuepreviewonly',0)){
   const preview=await writeValuePreview({plan:ctx.VALUE_PLAN,out,w,h,pigments:PIGS,paperRGB,target:path.resolve(root,opt('image')),photo:VALUE_CONFIG?.photo,subject:VALUE_CONFIG?.subject??'subject',name:VALUE_CONFIG?.name,root,opening:opt('drawingfile',''),closing:opt('drawinglast',''),variant:opt('valuevariant','lighttodark'),version:opt('valueversion','W4'),sheetMm:num('sheetmm', DEFAULT_SHEET_MM)});
   fs.writeFileSync(path.join(out,'compile-result.json'),JSON.stringify(preview,null,2));console.log('CPU preview',preview.board,preview.seconds);
