@@ -8,12 +8,12 @@ import sharp from "sharp";
 import { BENCH, readJson, writeJson, loadRuns } from "./lib.mjs";
 import { benchmarkProfile } from "./profiles.mjs";
 
-async function makeTryFolder(root) {
+async function makeTryFolder(root, cropPatch = {}) {
   const source = structuredClone(loadRuns().find(e => e.run.round === "V4" && e.run.crops.hills).run);
   const crop = source.crops.hills;
   Object.assign(source, {
     judgeVersion: "J2", judgeProfile: "J2-lite", judgeRoute: "together", complete: true,
-    crops: { hills: { ...crop, score: null, progression: null, fullsize: null } }, unpainted: {},
+    crops: { hills: { ...crop, score: null, progression: null, fullsize: null, ...cropPatch } }, unpainted: {},
     settings: { ...source.settings, crops: ["hills"], benchmarkProfile: "lite-v1", budget: benchmarkProfile("lite"), judgeProfile: "J2-lite", judgeRoute: "together" }
   });
   const dir = path.join(root, "try"), raw = path.join(root, "raw"), frames = path.join(raw, "out", "hills", "frames");
@@ -93,11 +93,26 @@ test("score.mjs attaches crop.fullsize non-blockingly", async () => {
     assert.ok(saved.crops.hills.fullsize, "crop.fullsize must be attached");
     assert.equal(saved.crops.hills.fullsize.version, "fullsize-v1");
     assert.equal(saved.crops.hills.fullsize.measures.edges.hard_share, 0.72);
-    // Hills sheetmm in subjects.json is ~158.05 mm
-    assert.ok(Math.abs(saved.crops.hills.fullsize.plateMm - 158.05) < 0.1, "should read plate-mm from subjects.json");
+    // the published try was painted 1224 px wide at 0.1291 mm a cell: its own sheet, not today's Hills subject (79.254 mm)
+    assert.equal(saved.crops.hills.fullsize.plateMm, 158.02, "plate-mm is the sheet the try records");
 
     const calls = fs.readFileSync(log, "utf8");
     assert.ok(calls.includes("fullsize.py"), "fullsize.py must be called");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("score.mjs reads the sheet from subjects.json for a try that records none", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "score-fullsize-subject-"));
+  try {
+    const { dir, raw } = await makeTryFolder(root, { sheet: null });
+    const r = spawnSync(process.execPath, [
+      path.join(BENCH, "scripts", "score.mjs"), dir, "--raw", raw, "--python", makeMockPython(root), "--no-fullsize-vision"
+    ], { encoding: "utf8", env: { ...process.env, TOGETHER_API_KEY: "mock-key" } });
+    assert.equal(r.status, 0, r.stderr);
+    const subject = readJson(path.join(BENCH, "v4v5", "subjects.json")).subjects.hills;
+    assert.equal(readJson(path.join(dir, "run.json")).crops.hills.fullsize.plateMm, subject.sheetmm);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
