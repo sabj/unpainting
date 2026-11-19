@@ -219,7 +219,7 @@ Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen a
 | `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |
 | `skyOneLayer` | true or false | lays the sky in one clean wash (`--skyonelayer 1`) instead of splitting it across layers |
 | `lanes` | true or false | plans explicit brush lanes and chooses the largest fitting brush per passage (`--strokeplan 1 --laneadapt 1`) |
-| `soften` | true, false or `{enabled, maxArcMm}` | splits soft boundary arcs for wet softening (`--softsplit`, `--softmm`) |
+| `soften` | true, false or `{enabled, maxArcMm}` | wet softening of the boundaries the planner classes soft: a damp round, the largest of the kit that fits the shape and the passage's own brush (and is no wider than `maxArcMm`), runs along them while the wash is wet; `false` turns it off (`--softsplit`, `--softmm`) |
 | `edgeFadeMm`, `edgeWobbleMm` | millimetres | fades (`--edgefade`) or wobbles (`--edgewobble`) wash edges at physical scale |
 | `smallMarks`, `joinSmall` | true or false | lays small darks once last (`--smallmarks`) and joins sub-minimum pieces into neighbouring washes (`--washjoin`) |
 | `furReserves` | `{bounds, reach, drop, dark, maxDensity, minCells}` | keeps sheen and glints open inside a dark coat before the washes |
