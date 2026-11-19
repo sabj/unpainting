@@ -2,13 +2,13 @@
 
 Releases use semver. Each release records its painter and simulator versions ([version guide](docs/versions.md)).
 
-## 0.3.3-rc.2 (not released)
+## 0.4.0-rc.1 (not released)
 
-Painter **V106-dev**, simulator **105**, judges **J1**. Changes are against 0.2.1, the last release. Assembled on 2026-11-19.
+Painter **V107-dev**, simulator **105**, judges **J1**. Changes are against 0.2.1, the last release. There was no 0.3.3 release. Assembled on 2026-11-19.
 
 The painter now lays washes as a painter does: whole shapes, light to dark, each loaded with a mix judged for the shape. It no longer computes paint from the cells a stroke will cover.
 
-| One 100 x 75 mm piece | The plan it replaces | 0.3.3 |
+| One 100 x 75 mm piece | The plan it replaces | 0.4.0 |
 |---|---|---|
 | Faint planted pattern copied, 1.8 mm blobs | 0.73 | -0.04 |
 | Faint planted pattern copied, 3.4 mm blobs | 0.81 | 0.03 |

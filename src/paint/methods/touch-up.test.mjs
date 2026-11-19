@@ -50,5 +50,6 @@ test('the painter takes the touch-up lack from the darken-only rule, once a roun
   assert.match(paint, /_touch: layer\._touch \+ 1/);
   assert.match(paint, /layer\._touch < TP_ROUNDS/);
   const recipe = fs.readFileSync(new URL('../recipe.mjs', import.meta.url), 'utf8');
-  assert.match(recipe, /--touchpoints 2/);
+  // the default recipe lays no touch-up round: correcting toward the subject's colour after a look is off since 0.4
+  assert.match(recipe, /--touchpoints 0/);
 });

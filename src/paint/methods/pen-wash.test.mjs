@@ -266,7 +266,7 @@ test('--style penwash names the pen-and-wash recipe; the default recipe is uncha
   assert.ok(!pen.includes('--style'));
   const def = expandRecipe({ argv: ['--image', 'a.jpg'] }).argv;
   assert.ok(!def.includes('--penwash'));
-  assert.equal(def[def.lastIndexOf('--touchpoints') + 1], '2');
+  assert.equal(def[def.lastIndexOf('--touchpoints') + 1], '0');
 });
 
 test('collinear pieces of the same drawing part are joined before speck pruning', () => {
