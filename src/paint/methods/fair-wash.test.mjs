@@ -6,14 +6,14 @@ import { BOX, boxPigment } from '../../crop/box.mjs';
 import { unmix, channelDensity } from '../../crop/pigments.mjs';
 
 const PAPER = [252, 251, 248], pigments = ['hansa', 'ultramarine', 'cadred'].map(key => boxPigment(BOX.find(p => p.key === key)));
-function plan(w, h, ground, rects, { noise = 0 } = {}) {
+function plan(w, h, ground, rects, { noise = 0, sheetMm = w } = {}) {
   const n = w * h, rgb = new Uint8ClampedArray(n * 3);
   for (let i = 0; i < n; i++) rgb.set(ground, i * 3);
   for (const [x0, y0, x1, y1, c] of rects) for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) rgb.set(c, (y * w + x) * 3);
   if (noise) { let s = 7; const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 - 0.5; }; for (let i = 0; i < rgb.length; i++) rgb[i] = Math.max(0, Math.min(255, rgb[i] + noise * rnd())); }
   const D = channelDensity(rgb, n, PAPER), demand = unmix(D, n, pigments.map(p => p.K.map(v => v / .55))), density = Float32Array.from({ length: n }, (_, i) => Math.max(0, (D[i * 3] + D[i * 3 + 1] + D[i * 3 + 2]) / 3));
   const log = console.log; console.log = () => {};
-  try { return planFairWashes({ demand, k: pigments.length, density, w, h, rgb, paperRGB: PAPER, pigments, sheetWidthMm: w, washBrushMm: 3, washKitMm: [38, 25.4, 7, 5, 3], pointBrushMm: 1.2 }); } finally { console.log = log; }
+  try { return planFairWashes({ demand, k: pigments.length, density, w, h, rgb, paperRGB: PAPER, pigments, sheetWidthMm: sheetMm, washBrushMm: 3, washKitMm: [38, 25.4, 7, 5, 3], pointBrushMm: 1.2 }); } finally { console.log = log; }
 }
 // a wall in three values of one colour, a sky, a sheet of bare paper and a small dark window
 const SCENE = [[0, 0, 80, 20, [150, 175, 215]], [0, 20, 30, 60, [205, 170, 125]], [30, 20, 55, 60, [164, 136, 100]], [55, 20, 80, 60, [113, 94, 69]], [5, 30, 15, 40, PAPER], [60, 35, 70, 45, [50, 45, 50]]];
@@ -28,7 +28,7 @@ test('every wash is a whole shape charged from a puddle at a named dilution', ()
     assert.ok(dilution, 'the dilution is one of the puddle\'s');
     sh.mix.forEach((v, j) => assert.ok(Math.abs(v - puddle.mix[j] * dilution.strength) < 1e-9, 'the charge is the puddle\'s'));
     assert.ok(Math.abs(sh.amount - dilution.strength) < 1e-9);
-    assert.ok(sh.area >= least.washMm2, `a wash of ${sh.area} mm2`);
+    assert.ok(q.areaMm2 >= least.washMm2, `a wash of ${q.areaMm2} mm2`);
     assert.equal(sh._rampVec, undefined); assert.equal(sh.graded, null);
     charges.add(q.puddle + '/' + q.dilution);
   }
@@ -60,6 +60,21 @@ test('reserves are whole shapes', () => {
   assert.equal(p.protectedCells[35 * w + 10], 1, 'the sheet of bare paper is reserved');
   assert.ok(held >= 80 && held <= 100, `${held} cells reserved`);
   for (const sh of washesOf(p)) assert.equal(sh.mask[35 * w + 10], 0);
+});
+
+test('the plan is set in millimetres: the same picture on finer cells gets the same puddles, washes and strokes', () => {
+  const fine = SCENE.map(([x0, y0, x1, y1, c]) => [x0 * 4, y0 * 4, x1 * 4, y1 * 4, c]);
+  const a = plan(80, 60, [205, 170, 125], SCENE), b = plan(320, 240, [205, 170, 125], fine, { sheetMm: 80 });
+  assert.equal(b.summary.planCellMm, 1); assert.equal(a.summary.planCellMm, 1);
+  assert.deepEqual(b.puddles, a.puddles);
+  assert.deepEqual(washesOf(b).map(sh => [sh._valuePlan.id, sh._valuePlan.outline, sh._valuePlan.strokes]), washesOf(a).map(sh => [sh._valuePlan.id, sh._valuePlan.outline, sh._valuePlan.strokes]));
+  assert.equal(washesOf(b)[0].area, 16 * washesOf(a)[0].area, 'only the record of covered cells is finer');
+});
+
+test('touching shapes that take one puddle to one value step are one shape', () => {
+  const p = plan(80, 60, [205, 170, 125], [[40, 0, 80, 60, [197, 164, 121]]]);
+  assert.ok(p.summary.shapes <= p.summary.shapesCut);
+  assert.equal(washesOf(p).filter(sh => sh._valuePlan.stage === 1).length, 1, 'two fields a hair apart are one first wash');
 });
 
 test('a wash reaches the brush as an outline and strokes in millimetres, with no edge cells', () => {

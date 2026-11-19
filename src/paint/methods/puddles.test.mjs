@@ -49,16 +49,15 @@ test('paper shapes take no puddle', () => {
   assert.equal(puddles.length, 1); assert.deepEqual([...assign], [-1, 0]);
 });
 
-test('the ladder: three dilutions, one a stage, the darkest shape in all five stages, earliest stages first', () => {
-  const mix = [.3, .4, .3], most = 1.2, needs = [most, most / 12, most / 6, most / 4, most * 5 / 12, 0];
+test('the ladder: three dilutions, one a stage; a shape takes the first so many stages, the darkest all five', () => {
+  const mix = [.3, .4, .3], most = 1.2, needs = [most, most / 12, most / 6, most / 4, most * 5 / 12, most * 7 / 12, 0];
   const L = dilutionLadder(mix, needs, pigments, PAPER);
   assert.ok(Math.abs(L.unit - most / 12) < 1e-9);
   assert.deepEqual(L.strengths.map(v => Math.round(v / L.unit)), [1, 1, 2, 4, 4]);
   assert.deepEqual(L.dilutions.map(d => d.name), ['pale', 'middle', 'full']);
-  assert.deepEqual(L.steps, [[0, 1, 2, 3, 4], [0], [0, 1], [0, 2], [0, 3], []]);
+  // value steps of 1, 2, 4, 8 and 12 parts: 3 parts sits on 2 (the lighter of two equally near), 5 on 4, 7 on 8
+  assert.deepEqual(L.steps, [[0, 1, 2, 3, 4], [0], [0, 1], [0, 1], [0, 1, 2], [0, 1, 2, 3], []]);
   assert.equal(L.steps[0].length, MAX_STAGES);
-  // what a shape is given is within half a pale wash of what it needs
-  needs.forEach((t, q) => assert.ok(Math.abs(L.steps[q].reduce((a, j) => a + L.strengths[j], 0) - t) <= L.unit / 2 + 1e-9));
 });
 
 test('a pale wash is never weaker than one that shows, so a pale shape beside a strong one may be left as paper', () => {

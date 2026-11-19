@@ -11,10 +11,10 @@
 //
 // A puddle is used at up to three named dilutions, on one ladder for the whole puddle. The stages run light to dark and
 // each stage has one dilution: pale, pale, middle, full, full (1, 1, 2, 4 and 4 parts of the pale wash). A shape takes
-// some of the stages, so its value is one of thirteen steps, none to twelve parts, and of the ways to make a step the
-// one that uses the earliest stages is taken: the first wash of a puddle covers every shape the puddle paints, and each
-// later wash covers fewer. The puddle's darkest shape takes all five. A pale wash is never weaker than one that shows
-// on the paper (VISIBLE_STEP L*).
+// the first so many stages and no others, so it sits on one of five value steps (1, 2, 4, 8 or 12 parts), the one
+// nearest what it needs, or is left as paper. The first wash of a puddle covers every shape the puddle paints and each
+// later wash lies inside the one before, as a painter builds a value. The puddle's darkest shape takes all five. A
+// pale wash is never weaker than one that shows on the paper (VISIBLE_STEP L*).
 // Plan time only.
 import { unmix, channelDensity } from '../../crop/pigments.mjs';
 import { renderLayers } from '../../media/km.mjs';
@@ -31,16 +31,10 @@ export const DILUTIONS = Object.freeze([{ name: 'pale', parts: 1 }, { name: 'mid
 export const STAGE_DILUTION = Object.freeze([0, 0, 1, 2, 2]);
 export const MAX_STAGES = STAGE_DILUTION.length;
 const STAGE_PARTS = STAGE_DILUTION.map(d => DILUTIONS[d].parts), LADDER_PARTS = STAGE_PARTS.reduce((a, v) => a + v, 0);
-// for each number of parts, the stages that make it, earliest stages first
-const STAGES_FOR = (() => {
-  const best = new Array(LADDER_PARTS + 1).fill(null);
-  for (let set = 0; set < 1 << MAX_STAGES; set++) {
-    const stages = []; let parts = 0; for (let j = 0; j < MAX_STAGES; j++) if (set & (1 << j)) { stages.push(j); parts += STAGE_PARTS[j]; }
-    const have = best[parts], earlier = !have || (() => { for (let q = 0; q < Math.min(have.length, stages.length); q++) if (stages[q] !== have[q]) return stages[q] < have[q]; return stages.length > have.length; })();
-    if (earlier) best[parts] = stages;
-  }
-  return best;
-})();
+/** Parts of the pale wash a shape holds after its first 0..5 stages. */
+const LEVEL_PARTS = STAGE_PARTS.reduce((a, v) => [...a, a[a.length - 1] + v], [0]);
+/** How many stages a shape that needs `parts` takes: the level nearest it (the lighter of two equally near). */
+const levelFor = parts => { let best = 0; for (let l = 1; l < LEVEL_PARTS.length; l++) if (Math.abs(LEVEL_PARTS[l] - parts) < Math.abs(LEVEL_PARTS[best] - parts)) best = l; return best; };
 
 const sumOf = a => { let s = 0; for (const v of a) s += v; return s; };
 
@@ -108,7 +102,8 @@ export function choosePuddles(shapes, { pigments, paperRGB, tolerance = PUDDLE_T
  * A puddle's dilutions and the stages each of its shapes takes.
  * @param needs the strength each of the puddle's shapes needs of this puddle (strengthFor)
  * @returns {{ unit: number, dilutions: Array<{name:string, strength:number}> (those in use), strengths: number[] (one per
- *   stage), steps: number[][] }} steps[q] lists the stages (0 first) shape q is washed in; empty for a shape left as paper.
+ *   stage), steps: number[][] }} steps[q] lists the stages (0 first) shape q is washed in, always the first so many;
+ *   empty for a shape left as paper.
  */
 export function dilutionLadder(mix, needs, pigments, paperRGB) {
   const most = Math.max(0, ...needs);
@@ -117,7 +112,7 @@ export function dilutionLadder(mix, needs, pigments, paperRGB) {
   let visible = most;
   if (step(most) > VISIBLE_STEP) { let lo = 0, hi = most; for (let it = 0; it < 24; it++) { const mid = (lo + hi) / 2; if (step(mid) < VISIBLE_STEP) lo = mid; else hi = mid; } visible = hi; }
   const unit = Math.max(most / LADDER_PARTS, visible);
-  const steps = needs.map(t => STAGES_FOR[Math.min(LADDER_PARTS, Math.round(t / unit))]);
+  const steps = needs.map(t => Array.from({ length: levelFor(t / unit) }, (_, j) => j));
   const usedD = new Set(steps.flat().map(j => STAGE_DILUTION[j]));
   return { unit, dilutions: DILUTIONS.map(d => ({ name: d.name, strength: d.parts * unit })).filter((_, q) => usedD.has(q)), strengths: STAGE_PARTS.map(v => v * unit), steps };
 }

@@ -2,18 +2,19 @@
 //
 // outlineLoops: the boundary of a wash's shapes as closed loops in mm, simplified to a tolerance set by the brush (half
 // the radius of the smallest wash brush), with each segment marked soft or hard from the two shapes it lies between.
-// planWashStrokes: the strokes that fill the outline. The smallest brush is steered round the inside of the outline, its
-// radius from it, to state the edge. Then the widest brush of the kit that fits is laid in lanes along the wash's
-// longer side, the brush's whole width inside the outline all along each lane, then the smaller brushes where the
-// wider ones could not go. The edge of the wash is where the brush's own footprint ends. A part of a wash narrower than the smallest
-// wash brush is laid with the detail brush run round inside it. What no stroke's footprint reaches is counted (uncovered).
+// planWashStrokes: the strokes that lay the wash as one wet film. One brush is chosen from the wash's size (the widest
+// of the kit that gives the wash at least three lanes) and laid in lanes along the wash's longer side, each lane over
+// the wet edge of the last by a third of the brush, the brush's whole width inside the outline all along each lane.
+// The smallest wash brush is then steered round the inside of the outline where the lanes fell short of it, and laid in
+// lanes over what is still bare; the detail brush goes round inside parts narrower than that. The edge of the wash is
+// where the brush's own footprint ends. What no stroke's footprint reaches is counted (uncovered).
 // The lanes are worked out on a planning grid a sixth of the smallest brush's width, cut from the outline: the grid is
 // set in millimetres, so a sheet with finer cells gets the same strokes.
 // Plan time only.
 import { traceOutlines } from '../../crop/outline.mjs';
 
-/** Lanes of one brush overlap by this share of the brush's width. */
-const LANE_OVERLAP = 0.15;
+/** A lane goes over the wet edge of the one before by this share of the brush's width. */
+const LANE_OVERLAP = 1 / 3;
 /** A stroke is laid only when at least this share of what it touches is not yet covered. */
 const LEAST_NEW = 0.25;
 
@@ -79,7 +80,7 @@ export function softLines(loops) {
 /**
  * The strokes that lay a wash inside its outline.
  * @param loops outlineLoops' result. @param kitMm the wash brushes' belly widths in mm. @param pointMm the detail brush's belly width.
- * @returns {{strokes: Array<{kind:'lane'|'edge'|'point', radiusMm:number, points:number[][]}>, areaMm2:number, uncovered:number}}
+ * @returns {{strokes: Array<{kind:'lane'|'edge'|'point', radiusMm:number, points:number[][]}>, brushMm:number, areaMm2:number, uncovered:number}}
  *   uncovered is the share of the outline's area no stroke's footprint reaches.
  */
 export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
@@ -122,50 +123,51 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
     return [fresh, all];
   };
   const strokes = [], toMm = ([gx, gy]) => { const u = ou + (gx + .5) * pitch, v = ov + (gy + .5) * pitch; return tall ? [+v.toFixed(3), +u.toFixed(3)] : [+u.toFixed(3), +v.toFixed(3)]; };
-  const lay = (kind, radius, pts, least) => { const [fresh, all] = stamp(pts, radius, false); if (!all || fresh < least * all) return; stamp(pts, radius, true); strokes.push({ kind, radiusMm: radius, points: pts.map(toMm) }); };
   // A lane is a flat brush drawn straight: its hairs lie across the stroke, so the whole line of them, one radius to
   // either side, must be inside the outline at every point of the lane, and the lane covers a band, square at its ends.
-  // A wider brush's lanes also keep off what is already laid, so no band is charged twice; the smallest brush goes over
-  // the strips that leaves.
-  const clear = new Float32Array(gn);   // how far a lane's brush may reach straight across it (in grid cells), the nearer side
-  const clearance = open => { for (let x = 0; x < gw; x++) { let run = 0; for (let y = 0; y < gh; y++) { const i = y * gw + x; run = open(i) ? run + 1 : 0; clear[i] = run; } run = 0; for (let y = gh - 1; y >= 0; y--) { const i = y * gw + x; run = open(i) ? run + 1 : 0; clear[i] = Math.min(clear[i], run); } } };
+  const clear = new Float32Array(gn);   // how far the outline is straight across a lane (in grid cells), the nearer side
+  for (let x = 0; x < gw; x++) { let run = 0; for (let y = 0; y < gh; y++) { const i = y * gw + x; run = inside[i] ? run + 1 : 0; clear[i] = run; } run = 0; for (let y = gh - 1; y >= 0; y--) { const i = y * gw + x; run = inside[i] ? run + 1 : 0; clear[i] = Math.min(clear[i], run); } }
   const band = (gy, a, b, rc, commit) => { let fresh = 0, all = 0; for (let y = Math.max(0, Math.ceil(gy - rc)); y <= Math.min(gh - 1, Math.floor(gy + rc)); y++) for (let x = a; x <= b; x++) { const i = y * gw + x; if (!inside[i]) continue; all++; if (!covered[i]) { fresh++; if (commit) { covered[i] = 1; coveredCount++; } } } return [fresh, all]; };
-  const lanes = (radius, least, overLaid) => {
-    clearance(overLaid ? i => inside[i] : i => inside[i] && !covered[i]);
-    const rc = radius / pitch, step = Math.max(1, Math.round(2 * rc * (1 - LANE_OVERLAP))), ok = i => clear[i] >= rc;
-    let first = -1; for (let i = 0; i < gn && first < 0; i++) if (ok(i)) first = (i / gw) | 0;
+  // Lanes of one brush, spread evenly from the first row the brush fits to the last, each over the wet edge of the one
+  // before by at least LANE_OVERLAP of the brush. A lane that would lay almost nothing new is not laid.
+  const lanes = (radius, least) => {
+    const rc = radius / pitch, ok = i => clear[i] >= rc;
+    let first = -1, last = -1; for (let i = 0; i < gn; i++) if (ok(i)) { if (first < 0) first = (i / gw) | 0; last = (i / gw) | 0; }
     if (first < 0) return;
-    for (let gy = first, turn = 0; gy < gh; gy += step, turn++) for (let gx = 0; gx < gw; gx++) {
+    const count = Math.ceil((last - first) / (2 * rc * (1 - LANE_OVERLAP))) + 1;
+    for (let q = 0; q < count; q++) { const gy = count > 1 ? Math.round(first + (last - first) * q / (count - 1)) : first; for (let gx = 0; gx < gw; gx++) {
       if (!ok(gy * gw + gx)) continue;
       let end = gx; while (end + 1 < gw && ok(gy * gw + end + 1)) end++;
       const [fresh, all] = band(gy, gx, end, rc, false);
       if (end - gx >= rc && all && fresh >= least * all) {
         band(gy, gx, end, rc, true);
-        const count = Math.max(2, Math.ceil((end - gx) / rc) + 1), pts = Array.from({ length: count }, (_, q) => [gx + (end - gx) * q / (count - 1), gy]);
-        strokes.push({ kind: 'lane', radiusMm: radius, points: (turn % 2 ? pts.reverse() : pts).map(toMm) });
+        const m = Math.max(2, Math.ceil((end - gx) / rc) + 1), pts = Array.from({ length: m }, (_, t) => [gx + (end - gx) * t / (m - 1), gy]);
+        strokes.push({ kind: 'lane', radiusMm: radius, points: (q % 2 ? pts.reverse() : pts).map(toMm) });
       }
       gx = end;
-    }
+    } }
   };
-  // the smallest brush steered round the inside of the outline first, to state the edge; then lanes, widest brush first
-  const r = small / 2, ring = Uint8Array.from(D, v => (v >= r - pitch / 2 ? 1 : 0));
-  for (const c of traceOutlines(ring, gw, gh, { minLength: Math.round(2 * r / pitch), step: 2 })) {
-    const pts = c.points.map(p => [p.x, p.y]); if (pts.length < 2) continue;
-    if (Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) <= 4) pts.push(pts[0]);
-    lay('edge', r, pts, LEAST_NEW);
-  }
-  for (const width of kit) lanes(width / 2, LEAST_NEW, false);
-  lanes(small / 2, LEAST_NEW, true);
-  // parts narrower than the smallest wash brush: the detail brush run round inside them, only along the stretches no
-  // stroke has reached
-  if (pointMm > 0 && pointMm < small) {
-    const rp = pointMm / 2, thin = Uint8Array.from(D, v => (v >= rp - pitch / 2 ? 1 : 0));
-    for (const c of traceOutlines(thin, gw, gh, { minLength: Math.round(2 * rp / pitch), step: 2 })) {
+  // A brush steered round the inside of the outline, its radius from it, along the stretches no stroke has reached.
+  const follow = (kind, radius) => {
+    const ring = Uint8Array.from(D, v => (v >= radius - pitch / 2 ? 1 : 0));
+    for (const c of traceOutlines(ring, gw, gh, { minLength: Math.max(2, Math.round(2 * radius / pitch)), step: 2 })) {
+      const pts = c.points.map(p => [p.x, p.y]); if (pts.length < 2) continue;
+      if (Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) <= 4) pts.push(pts[0]);
       let run = [];
-      const flush = () => { if (run.length >= 2) { stamp(run, rp, true); strokes.push({ kind: 'point', radiusMm: rp, points: run.map(toMm) }); } run = []; };
-      for (const q of c.points) { const [fresh, all] = stamp([[q.x, q.y]], rp, false); if (all && fresh >= LEAST_NEW * all) run.push([q.x, q.y]); else flush(); }
+      const flush = () => { if (run.length >= 2) { stamp(run, radius, true); strokes.push({ kind, radiusMm: radius, points: run.map(toMm) }); } run = []; };
+      for (const q of pts) { const [fresh, all] = stamp([q], radius, false); if (all && fresh >= LEAST_NEW * all) run.push(q); else flush(); }
       flush();
     }
-  }
-  return { strokes, areaMm2: area * pitch * pitch, uncovered: 1 - coveredCount / area };
+  };
+  // One brush for the wash, from its size: the widest of the kit no wider than half the wash's mean breadth across its
+  // lanes, so the wash takes at least three lanes of it; the smallest brush for a wash narrower than that.
+  let longest = 0; for (let y = 0; y < gh; y++) { let a = -1, b = -1; for (let x = 0; x < gw; x++) if (inside[y * gw + x]) { if (a < 0) a = x; b = x; } if (b - a + 1 > longest && a >= 0) longest = b - a + 1; }
+  const breadth = area / Math.max(1, longest) * pitch, brush = kit.find(width => width <= breadth / 2) ?? small;
+  lanes(brush / 2, LEAST_NEW / 2);
+  // then the smallest brush: round the edge where the lanes fell short of it, and in lanes over what is still bare
+  follow('edge', small / 2);
+  if (brush > small) lanes(small / 2, LEAST_NEW);
+  // parts narrower than the smallest wash brush: the detail brush run round inside them
+  if (pointMm > 0 && pointMm < small) follow('point', pointMm / 2);
+  return { strokes, brushMm: brush, areaMm2: area * pitch * pitch, uncovered: 1 - coveredCount / area };
 }
