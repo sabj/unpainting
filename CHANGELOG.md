@@ -4,29 +4,28 @@ Releases use semver. Each release records its painter and simulator versions ([v
 
 ## 0.3.3-rc.2 (not released)
 
-Painter **V106-dev**, simulator **105**, judges **J1**. Assembled on 2026-11-19.
+Painter **V106-dev**, simulator **105**, judges **J1**. Changes are against 0.2.1, the last release. Assembled on 2026-11-19.
 
-rc.1 copied its subject. Its wash plan unmixed the subject cell by cell into three pigments, cut thousands of small washes and charged each from its own cells. 0.3.2 worked the same way with larger washes. rc.2 replaces that plan.
+The painter now lays washes as a painter does: whole shapes, light to dark, each loaded with a mix judged for the shape. It no longer computes paint from the cells a stroke will cover.
 
-| On one 100 x 75 mm piece | rc.1 | rc.2 |
+| One 100 x 75 mm piece | The plan it replaces | 0.3.3 |
 |---|---|---|
 | Faint planted pattern copied, 1.8 mm blobs | 0.73 | -0.04 |
 | Faint planted pattern copied, 3.4 mm blobs | 0.81 | 0.03 |
 | Washes | 2,131 | 29 |
 | Paint strokes | 2,196 | 74 |
-| Paint mixes | one pigment at a time | 12 mixes on the palette |
 | Strokes clipped to a cell mask | all | none |
 
-### Changed in rc.2
+### Changed
 
-- The wash plan is a few paint mixes (each a batch a painter would mix on the palette) and whole shapes, laid light to dark in three stages (`src/paint/methods/puddles.mjs`, `wash-shapes.mjs`, `fair-wash.mjs`, `wash-strokes.mjs`).
+- Washes are whole shapes laid light to dark in three stages, each loaded with one paint mix (`src/paint/methods/puddles.mjs`, `wash-shapes.mjs`, `fair-wash.mjs`, `wash-strokes.mjs`).
 - A wash has a smooth outline in millimetres and strokes that follow it. No stroke is clipped to cells.
 - Gone for washes: charges taken from the cells under a wash, dabs at a wash's centre, the pressure ramp along demand, per-cell edge classes, the per-cell sky test.
 - The touch-up rounds are off in the default recipe. They glazed any area that read lighter than the subject, which is a correction loop toward the subject's colour.
 - Coat strokes are loaded from a swatch and laid in two passes. They were 2.6 to 3 times darker than planned.
 - A recorded run sees every thin-dark pencil stroke, so recorded benchmark runs finish.
 
-### Known problems in rc.2
+### Known problems
 
 - Plates are plain sketches. Windows, stone and other detail are gone until stroke techniques are wired into the new plan.
 - White Ships comes out grey: no lights are reserved, and one colour laid over another goes to mud.
