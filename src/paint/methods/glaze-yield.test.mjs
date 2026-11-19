@@ -5,13 +5,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from '../../media/paper.mjs';
-import { createSheet, step, dry, thickness, setClip, DEFAULTS } from '../../media/sheet.mjs';
+import { createSheet, step, dry, thickness, setClip, coherent, applyResist, liftResist, DEFAULTS } from '../../media/sheet.mjs';
 import { createBrush, dip, stroke } from '../../media/brush.mjs';
 import { washPaths, openEdgeShare } from '../../media/wash.mjs';
 import { scaleBrushForDensity } from '../../media/brush-density.mjs';
 import { shapedPlanePaths } from '../techniques/shaped-marks.mjs';
 import { passageMaterial } from '../techniques/passage-plan.mjs';
-import { valueTechnique } from './light-to-dark.mjs';
+import { valueTechnique, planLightToDark } from './light-to-dark.mjs';
+import { narrowestMarkMm } from './brush-marks.mjs';
+import { roleBrushPointMm } from './brush-footprint.mjs';
+import { attachGpu, gpuStats } from '../../media/gpu/link.mjs';
+import { fileURLToPath } from 'node:url';
 import { SWATCH, swatchMask, scrapDelivery, chargeFactor } from './scrap-swatch.mjs';
 import { createInstrumentCal } from './instrument-cal.mjs';
 
@@ -94,84 +98,130 @@ test('stacked plan glazes land what the ledger books for them, as the base wash 
   }
 });
 
-test('fitted thin mid paint deposits continuously on the physical sheet and keeps a reserved gap', {timeout:120000}, async t => {
- const {planLightToDark}=await import('./light-to-dark.mjs');
- const {attachGpu,gpuStats}=await import('../../media/gpu/link.mjs');
- const {coherent}=await import('../../media/sheet.mjs');
- for(const backend of ['cpu','gpu']){
-  for(const form of ['straight','diagonal','curved']){
-   const w=180,h=240,n=w*h,density=new Float32Array(n),hold=new Uint8Array(n);
-   const center=y=>110+(form==='diagonal'?Math.round((y-120)/5):form==='curved'?Math.round(14*Math.sin((y-20)/200*Math.PI)):0);
-   for(let y=20;y<220;y++)for(let x=20;x<70;x++)density[y*w+x]=.8;
-   for(let y=20;y<220;y++){for(let x=center(y);x<center(y)+3;x++)density[y*w+x]=.4;if(y>=110&&y<120)for(let x=center(y)-3;x<center(y)+6;x++)hold[y*w+x]=1;}
-   const plan=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,shadowThresh:.9,sheetWidthMm:w*MM});
-   const shapes=plan.layers.filter(l=>l.value===2).flatMap(l=>l.shapes);
-   const sheet=createSheet(makePaper(w,h,{mmPerCell:MM,seed:9,scale:1,toothScale:.2,fibres:.5,tooth:.5,proudBlur:1,coldPress:{mmPerCell:MM,bumpMm:[.5,2],cover:2.2,swell:.3}}),[PIGMENT]);
-   if(backend==='gpu'){
-    const info=attachGpu(sheet,PHYSICS,{mode:'auto',log:()=>{}});
-    if(info.backend!=='gpu'){t.skip('no GPU for physical thin-plane coupon');return;}
-    assert.equal(info.fallback,false);t.diagnostic('physical coupon backend GPU, '+form);
-   }
-   try{
-    for(const sh of shapes){
-     const T=valueTechnique(sh._valuePlan),paths=shapedPlanePaths(sh.mask,w,h,{mmPerCell:MM,protect:hold});
-     setClip(sheet,sh.mask);
-     for(const pts of paths){const b=washBrush(Math.max(1,...pts.map(p=>p.r)),T);dip(b,{water:T.water,conc:[sh.amount]});stroke(b,sheet,pts,{upright:'sweep',spacing:1.4,lift:true});}
-    }
-    setClip(sheet,null);dry(sheet,30000,PHYSICS,{levelMax:140,dt:2});coherent(sheet);
-    const pigment=thickness(sheet)[0];let rows=0,minRow=Infinity;
-    for(let y=30;y<210;y++){if(y>=106&&y<124)continue;let total=0;for(let x=center(y);x<center(y)+3;x++)total+=pigment[y*w+x];assert.ok(total>0,backend+' '+form+' has deposited paint at row '+y);minRow=Math.min(minRow,total);rows++;}
-    for(let y=113;y<117;y++)for(let x=center(y);x<center(y)+3;x++)assert.equal(pigment[y*w+x],0,'reserved gap remains bare');
-    t.diagnostic(JSON.stringify({backend,form,rows,minDepositedRow:minRow,gpu:backend==='gpu'?gpuStats(sheet):null}));
-   }finally{sheet._gpu?.close();}
+// The two coupons below hold the planner's brush floor on the physical sheet. The narrowest mark the detail brush lays is the
+// larger of its point's laid width and four cells (brush-marks.mjs), so the forms here are that wide in whole cells: the
+// planner asks for paint at that width, the fitted gesture lays it, and a light of that width is left.
+const POINT_MM = roleBrushPointMm(fileURLToPath(new URL('../../..', import.meta.url)), 'detail');
+const markCells = cellMm => Math.ceil(narrowestMarkMm(POINT_MM, cellMm) / cellMm - 1e-9);
+const coldPress = (w, h, mm) => makePaper(w, h, { mmPerCell: mm, seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
+const quiet = run => { const log = console.log; console.log = () => {}; try { return run(); } finally { console.log = log; } };
+/** Lays one planned shape as paint-plate does: clipped to its mask, one fitted gesture per path, the brush as wide as the path. */
+function layShape(sheet, sh, w, h, mm, hold, renderWidth) {
+  const T = valueTechnique(sh._valuePlan), paths = shapedPlanePaths(sh.mask, w, h, { mmPerCell: mm, protect: hold });
+  setClip(sheet, sh.mask);
+  for (const pts of paths) {
+    const b = washBrush(Math.max(1, ...pts.map(p => p.r)), T, 31, renderWidth);
+    dip(b, { water: T.water, conc: [sh.amount] });
+    stroke(b, sheet, pts, { upright: 'sweep', spacing: 1.4, lift: true });
   }
- }
+  return paths.length;
+}
+
+// A mid-value line `cells` wide on bare paper beside a dark block that sets the value scale, with a reserved gap across it,
+// planned band by band. Its middle paint belongs to band 3, the detail brush's; band 2 is the floor brush's.
+function thinLine(form, cells) {
+  const w = 180, h = 240, n = w * h, density = new Float32Array(n), hold = new Uint8Array(n);
+  const center = y => 110 + (form === 'diagonal' ? Math.round((y - 120) / 5) : form === 'curved' ? Math.round(14 * Math.sin((y - 20) / 200 * Math.PI)) : 0);
+  for (let y = 20; y < 220; y++) for (let x = 20; x < 70; x++) density[y * w + x] = 0.8;
+  for (let y = 20; y < 220; y++) {
+    for (let x = center(y); x < center(y) + cells; x++) density[y * w + x] = 0.4;
+    if (y >= 110 && y < 120) for (let x = center(y) - 3; x < center(y) + cells + 3; x++) hold[y * w + x] = 1;
+  }
+  const plan = quiet(() => planLightToDark({ w, h, k: 1, density, demand: density.slice(), hold, shaped: true, shadowThresh: 0.9, sheetWidthMm: w * MM }));
+  const mid = plan.layers.filter(l => l._valuePhase === 'mid').flatMap(l => l.shapes);
+  const onLine = sh => { for (let y = 20; y < 220; y++) for (let x = center(y); x < center(y) + cells; x++) if (sh.mask[y * w + x]) return true; return false; };
+  return { w, h, hold, center, mid, onLine };
+}
+
+test('mid paint as wide as the narrowest mark deposits continuously on the physical sheet and keeps a reserved gap', { timeout: 120000 }, t => {
+  const cells = markCells(MM);
+  assert.equal(cells, 4, 'four cells govern at 0.233 mm a cell');
+  // One cell under the narrowest mark the line is the pen's or the pencil's, and the planner holds no middle passage on it.
+  // Stated for the straight line: the planner reads a shape's width from its second moments (minorWidth), which is the
+  // width of a straight piece and more than the width of a bent one.
+  const under = thinLine('straight', cells - 1);
+  assert.equal(under.mid.filter(under.onLine).length, 0, 'a line one cell under the narrowest mark gets no middle passage');
+  for (const backend of ['cpu', 'gpu']) {
+    for (const form of ['straight', 'diagonal', 'curved']) {
+      const { w, h, hold, center, mid, onLine } = thinLine(form, cells);
+      const own = mid.filter(onLine);
+      assert.ok(own.length > 0, `${form}: the plan holds a middle passage on the line`);
+      assert.ok(own.every(sh => /^mid\/b3\//.test(sh._valuePlan.id)), `${form}: in the detail brush's band`);
+      const sheet = createSheet(coldPress(w, h, MM), [PIGMENT]);
+      if (backend === 'gpu') {
+        const info = attachGpu(sheet, PHYSICS, { mode: 'auto', log: () => {} });
+        if (info.backend !== 'gpu') { t.skip('no GPU for physical thin-plane coupon'); return; }
+        assert.equal(info.fallback, false);
+        t.diagnostic('physical coupon backend GPU, ' + form);
+      }
+      try {
+        for (const sh of mid) assert.ok(layShape(sheet, sh, w, h, MM, hold, WIDTH) > 0, `${form}: a fitted gesture for ${sh._valuePlan.id}`);
+        setClip(sheet, null);
+        dry(sheet, 30000, PHYSICS, { levelMax: 140, dt: 2 });
+        coherent(sheet);
+        const pigment = thickness(sheet)[0];
+        let rows = 0, minRow = Infinity;
+        for (let y = 30; y < 210; y++) {
+          if (y >= 106 && y < 124) continue;
+          let total = 0;
+          for (let x = center(y); x < center(y) + cells; x++) total += pigment[y * w + x];
+          assert.ok(total > 0, `${backend} ${form} has deposited paint at row ${y}`);
+          minRow = Math.min(minRow, total);
+          rows++;
+        }
+        for (let y = 113; y < 117; y++) for (let x = center(y); x < center(y) + cells; x++) assert.equal(pigment[y * w + x], 0, 'reserved gap remains bare');
+        t.diagnostic(JSON.stringify({ backend, form, cells, rows, minDepositedRow: minRow, gpu: backend === 'gpu' ? gpuStats(sheet) : null }));
+      } finally { sheet._gpu?.close(); }
+    }
+  }
 });
 
-
-test('multiscale original layers physically retain dark form and light channel at two densities', {timeout:240000}, async t => {
- const {planLightToDark}=await import('./light-to-dark.mjs');
- const {attachGpu,gpuStats}=await import('../../media/gpu/link.mjs');
- const {coherent,applyResist,liftResist}=await import('../../media/sheet.mjs');
- for(const nativeWidth of [1200,2448]){
-  const w=Math.round(70*nativeWidth/280),h=Math.round(42*nativeWidth/280),mm=70/w,n=w*h;
-  const density=new Float32Array(n).fill(.4),hold=new Uint8Array(n);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-   const i=y*w+x,X=(x+.5)*mm,Y=(y+.5)*mm;
-   if(X<14)density[i]=.8;
-   if(Y>5&&Y<37&&X>33&&X<34){density[i]=.65;if(Y>20&&Y<22)hold[i]=1;}
-   if(Y>5&&Y<37&&X>50&&X<51)density[i]=.15;
-  }
-  const plan=planLightToDark({w,h,k:1,density,demand:density.slice(),hold,shaped:true,sheetWidthMm:70,
-   calibratedPlan:true,cellLight:false,massTone:false,layers:4,layerSmoothMm:2});
-  const sheet=createSheet(makePaper(w,h,{mmPerCell:mm,seed:9,scale:1,toothScale:.2,fibres:.5,tooth:.5,proudBlur:1,coldPress:{mmPerCell:mm,bumpMm:[.5,2],cover:2.2,swell:.3}}),[PIGMENT]);
-  const info=attachGpu(sheet,PHYSICS,{mode:'auto',log:()=>{}});
-  if(info.backend!=='gpu'){t.skip('no GPU for physical multiscale coupon');return;}
-  assert.equal(info.fallback,false);
-  try{
-   applyResist(sheet,hold); // Explicit essential reserve, as in the production film lifecycle.
-   for(const layer of plan.layers){
-    for(const sh of layer.shapes){
-     const T=valueTechnique(sh._valuePlan),paths=shapedPlanePaths(sh.mask,w,h,{mmPerCell:mm,protect:hold});
-     setClip(sheet,sh.mask);
-     for(const pts of paths){
-      const b=washBrush(Math.max(1,...pts.map(p=>p.r)),T,31,nativeWidth);
-      dip(b,{water:T.water,conc:[sh.amount]});
-      stroke(b,sheet,pts,{upright:'sweep',spacing:1.4,lift:true});
-     }
+// The darks are the detail brush's work. On a mid-tone ground beside a dark block: a dark line as wide as the narrowest mark,
+// with a reserved gap across it, and a light channel as wide as the narrowest mark inside the dark block. Every layer of the
+// plan is laid and dried in order, as the painter does. The dark bands develop the line over the ground, both dark glazes go
+// round the channel, and the pale layers under them still carry it. At 1200 cells across 280 mm the mark is four cells
+// (0.93 mm); at 2448 the point governs and it is five (0.57 mm), so the finer sheet holds the finer form.
+test('the dark bands physically develop a dark form and leave a light channel as wide as the narrowest mark, at two densities', { timeout: 240000 }, t => {
+  for (const nativeWidth of [1200, 2448]) {
+    const w = Math.round(70 * nativeWidth / 280), h = Math.round(42 * nativeWidth / 280), mm = 70 / w, n = w * h, cells = markCells(mm);
+    const col = x => Math.round(x / mm), darkX = col(33), lightX = col(7);
+    const density = new Float32Array(n).fill(0.4), hold = new Uint8Array(n);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x, X = (x + 0.5) * mm, Y = (y + 0.5) * mm, tall = Y > 5 && Y < 37;
+      if (X < 14) density[i] = 0.8;
+      if (tall && x >= darkX && x < darkX + cells) { density[i] = 0.65; if (Y > 20 && Y < 22) hold[i] = 1; }
+      if (tall && x >= lightX && x < lightX + cells) density[i] = 0.15;
     }
-    setClip(sheet,null);dry(sheet,30000,PHYSICS,{levelMax:140,dt:2});
-   }
-   liftResist(sheet);coherent(sheet);const pigment=thickness(sheet)[0];
-   const mean=(x0,x1,y0,y1)=>{let sum=0,count=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const X=(x+.5)*mm,Y=(y+.5)*mm;if(X>x0&&X<x1&&Y>y0&&Y<y1){sum+=pigment[y*w+x];count++;}
-   }return sum/count;};
-   const dark=mean(33,34,8,17),besideDark=mean(31,32,8,17),light=mean(50,51,8,17),besideLight=mean(48,49,8,17);
-   assert.ok(dark>besideDark,'original later layers physically develop the dark form');
-   assert.ok(light<besideLight,'channel remains lighter after all original layers');
-   assert.ok(light>0,'light channel retains its pale foundation');
-   assert.equal(mean(33,34,20.8,21.2),0,'held gap stays bare');
-   t.diagnostic(JSON.stringify({nativeWidth,backend:info.backend,dark,besideDark,light,besideLight,gpu:gpuStats(sheet)}));
-  }finally{sheet._gpu?.close();}
- }
+    const plan = quiet(() => planLightToDark({ w, h, k: 1, density, demand: density.slice(), hold, shaped: true, sheetWidthMm: 70,
+      calibratedPlan: true, cellLight: false, massTone: false, layers: 4 }));
+    const sheet = createSheet(coldPress(w, h, mm), [PIGMENT]);
+    const info = attachGpu(sheet, PHYSICS, { mode: 'auto', log: () => {} });
+    if (info.backend !== 'gpu') { t.skip('no GPU for physical multiscale coupon'); return; }
+    assert.equal(info.fallback, false);
+    try {
+      applyResist(sheet, hold); // Explicit essential reserve, as in the production film lifecycle.
+      for (const layer of plan.layers) {
+        for (const sh of layer.shapes) layShape(sheet, sh, w, h, mm, hold, nativeWidth);
+        setClip(sheet, null);
+        dry(sheet, 30000, PHYSICS, { levelMax: 140, dt: 2 });
+      }
+      liftResist(sheet);
+      coherent(sheet);
+      const pigment = thickness(sheet)[0];
+      // mean pigment over columns [x0, x1) and the rows whose centres lie between y0 and y1 mm
+      const mean = (x0, x1, y0, y1) => {
+        let sum = 0, count = 0;
+        for (let y = 0; y < h; y++) { const Y = (y + 0.5) * mm; if (Y > y0 && Y < y1) for (let x = x0; x < x1; x++) { sum += pigment[y * w + x]; count++; } }
+        return sum / count;
+      };
+      const dark = mean(darkX, darkX + cells, 8, 17), besideDark = mean(col(31), col(32), 8, 17);
+      const light = mean(lightX, lightX + cells, 8, 17), besideLight = mean(col(5), col(6), 8, 17);
+      const label = JSON.stringify({ nativeWidth, cells, dark, besideDark, light, besideLight });
+      assert.ok(dark > besideDark, `the dark bands develop the dark form, ${label}`);
+      assert.ok(light < besideLight, `the dark glazes leave the channel lighter, ${label}`);
+      assert.ok(light > 0, `the channel keeps its pale foundation, ${label}`);
+      assert.equal(mean(darkX, darkX + cells, 20.8, 21.2), 0, 'held gap stays bare');
+      t.diagnostic(JSON.stringify({ nativeWidth, backend: info.backend, cells, dark, besideDark, light, besideLight, gpu: gpuStats(sheet) }));
+    } finally { sheet._gpu?.close(); }
+  }
 });
