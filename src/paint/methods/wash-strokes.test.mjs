@@ -37,8 +37,8 @@ const lengthOf = s => s.points.reduce((a, p, q) => a + (q ? Math.hypot(p[0] - s.
 const box = (a, b) => [{ points: [[10, 10], [10 + a, 10], [10 + a, 10 + b], [10, 10 + b]], soft: [] }];
 
 test('a large wash is swept in straight lanes with the widest flat or mop that fits it, and its edge is closed by the rounds', () => {
-  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 40 mm: the one-inch flat in one
-  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 40, 25.4, 1]]) {
+  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 40 mm: the one-inch flat in two
+  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 40, 25.4, 2]]) {
     const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes(box(a, b), { kitMm: KIT, pointMm: 1.2 });
     assert.equal(brushMm, brush, `${a} x ${b} mm`);
     assert.ok(Math.abs(areaMm2 - a * b) < .03 * a * b);

@@ -5,7 +5,7 @@
 // planWashStrokes: the strokes that lay the wash as one wet film, with the widest brush of the kit that fits it. A flat
 // or a mop (a brush of LANE_FROM_MM or wider) fits a wash it can be swept across in a straight lane at least LANE_LEAST
 // of its width long, its whole footprint inside the outline; it is swept in such lanes side by side, each over the wet edge of
-// the last by a third of the brush. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
+// the last by half the brush. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
 // outline, its radius inside it, then round again further in until the middle is closed. Each smaller brush of the kit
 // then goes round where the wash is too narrow for the one before, and the detail brush inside parts narrower than
 // that. So a wall or a sky is laid with a flat or a mop and only its edge and corners with a round. The edge of the wash is where the brush's own footprint ends: a curve, never a cut. What no
@@ -17,7 +17,7 @@
 import { traceOutlines } from '../../crop/outline.mjs';
 
 /** A round of the brush goes over the wet edge of the one before by this share of the brush's width. */
-const LANE_OVERLAP = 1 / 3;
+const LANE_OVERLAP = 1 / 2;
 /** A stroke is laid only when at least this share of what it touches is not yet covered. */
 const LEAST_NEW = 0.25;
 /** A brush fits a wash that is at least this many brush widths across at its widest. */
@@ -199,12 +199,14 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut
     return rows;
   };
   const longest = rows => { let l = 0; for (const runs of rows) if (runs) for (const [a, b] of runs) l = Math.max(l, (b - a) * pitch); return l; };
-  // Straight lanes side by side across the wash, evenly spaced and no further apart than a round of the brush.
+  // Straight lanes side by side across the wash, no further apart than a round of the brush: the wash is cut into that
+  // many bands and each band's lane is swept where the brush can travel furthest.
   const sweep = (radius, rows) => {
     let top = -1, bottom = -1; rows.forEach((runs, gy) => { if (runs) { if (top < 0) top = gy; bottom = gy; } });
     const count = Math.max(1, Math.ceil((bottom - top) * pitch / (2 * radius * (1 - LANE_OVERLAP))));
     for (let q = 0; q < count; q++) {
-      const gy = Math.round(top + (q + .5) * (bottom - top) / count);
+      let gy = -1, reach = -1;
+      for (let y = Math.ceil(top + q * (bottom - top) / count); y <= top + (q + 1) * (bottom - top) / count; y++) for (const [a, b] of rows[y] ?? []) if (b - a > reach) { reach = b - a; gy = y; }
       for (const [a, b] of rows[gy] ?? []) {
         if ((b - a) * pitch < LANE_LEAST * 2 * radius) continue;   // a stroke, not a dab
         const pts = [[a, gy], [(a + b) / 2, gy], [b, gy]], [fresh, all] = stamp(pts, radius, false);
