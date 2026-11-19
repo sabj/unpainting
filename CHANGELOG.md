@@ -22,7 +22,7 @@ Judging painting changes. Checked with unit tests and a run without judge calls 
 ### Final lights and surface marks
 
 - **White gouache is a pigment on the sheet.** The finish lays thin lights over dark with the rigger, tinted by a mix of palette paints, in the top layer. The render is Kubelka-Munk with no overlay. The older per-cell overlay (`--smalllights gouache`) stays off.
-- **A thin light qualifies by its step over its dark ring in L*, not by its whiteness.** Isolated lights keep single, smoothly fitted strokes. Strands in a coat are laid with the dry brush. The run card records the decision as `gouache`.
+- **A thin light qualifies by its step over its dark ring in L*, not by its whiteness.** Isolated lights keep single, smoothly fitted strokes. Strands in a coat are laid with the dry brush, and only where the brush's measured line is within one and a half times the strand. The run card records the decision as `gouache`.
 - **Surface marks on an unplanned run follow the region's label.** A vision judge labels the SAM regions on a contact sheet of cut-outs. Coats and dressed stone choose their mark kinds. Anything else, or any doubt, takes none. A judge that cannot run is reported and lays nothing. The run card records it as `surface`.
 
 ### Granulation from the pigment

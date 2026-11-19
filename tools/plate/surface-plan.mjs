@@ -12,7 +12,10 @@ import { labelSurfaces, SURFACE_KIND } from '../../src/paint/methods/surface-lab
 import { surfaceMarkPaths } from '../../src/paint/techniques/surface-marks.mjs';
 import { orientationField } from '../../src/crop/fur.mjs';
 import { gaussian } from '../../src/keyframes/density.mjs';
+import sharp from 'sharp';
 import { coatTexture } from '../../src/crop/coat-texture.mjs';
+import { paperDensity } from '../../src/crop/lights.mjs';
+import { measureDryBrush } from '../../src/paint/methods/brush-swatch.mjs';
 import { strokeCeiling } from '../guard/cheat-risk.mjs';
 
 // The brush a kind is laid with, in mm: a small round for a coat, a flat for a block of stone.
@@ -20,7 +23,7 @@ export const BRUSH_MM = Object.freeze({ 'short-coat': 1.0, 'curly-coat': 1.0, 'l
 // The share of the candidate places in a region a kind visits: a painter hints a coat or a wall, she does not draw it.
 export const COVER = Object.freeze({ 'short-coat': 0.35, 'curly-coat': 0.3, 'long-hair': 0.25, masonry: 0.2 });
 export const SURFACE_CEILING_SHARE = 0.1;
-export const COAT_CEILING_SHARE = 0.1;
+export const COAT_CEILING_SHARE = 0.2;
 const LIGHT_OD = 0.35, FULL_OD = 1.25; // no mark in a light; the most marks where the source is this dense or more
 
 /** The marks for labelled regions, from a label map, the kinds the labels ask for, and the source's density. Pure. */
@@ -46,7 +49,7 @@ export function surfaceMarksFor({ labelMap, kinds, labels, SRC, w, h, sheetMm, c
 }
 
 /** Labels the run's regions with the judge and plans the marks and the coats' texture; the record is for the run card and the log. */
-export async function planSurface({ image, root, w, h, sheetMm, segments, SRC, rgb, judge = 'codex', cacheDir, env = process.env, run, log = () => {} }) {
+export async function planSurface({ image, root, w, h, sheetMm, segments, SRC, paperRGB, judge = 'codex', cacheDir, env = process.env, run, log = () => {} }) {
   const unavailable = reason => { log(`! surface marks: ${reason}; no surface marks, no coat texture and no coat strokes are laid`); return { groups: [], coat: { strokes: [], regions: [] }, coatMask: new Uint8Array(w * h), record: { status: 'unavailable', reason, judge, marks: 0 } }; };
   if (!segments?.stem) return unavailable('no SAM regions (--segments off), so no region can be labelled');
   const base = path.basename(image, path.extname(image));
@@ -58,7 +61,12 @@ export async function planSurface({ image, root, w, h, sheetMm, segments, SRC, r
   const sheetHeightMm = sheetMm * h / w, strokeMax = strokeCeiling(sheetMm, sheetHeightMm), ceiling = Math.floor(SURFACE_CEILING_SHARE * strokeMax);
   const stone = Object.fromEntries(Object.entries(lab.kinds).filter(([, k]) => k === 'masonry')), coats = Object.fromEntries(Object.entries(lab.kinds).filter(([, k]) => k !== 'masonry'));
   const { groups } = surfaceMarksFor({ labelMap: seg.labels, kinds: stone, labels: lab.labels, SRC, w, h, sheetMm, ceiling });
-  const coat = coatTexture({ D: SRC, rgb, labelMap: seg.labels, kinds: coats, w, h, mmPerCell: sheetMm / w, ceiling: Math.floor(COAT_CEILING_SHARE * strokeMax) });
+  // the planning data on its own grid (the source's pixels, no finer than the sheet's cells doubled), and what the brush can lay here
+  const { data, info } = await sharp(image).flatten({ background: '#ffffff' }).resize({ width: Math.min(2 * w, 2400), withoutEnlargement: true }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const fw = info.width, fh = info.height, fineLabels = new Uint8Array(fw * fh);
+  for (let y = 0; y < fh; y++) for (let x = 0; x < fw; x++) fineLabels[y * fw + x] = seg.labels[Math.min(h - 1, Math.floor(y * h / fh)) * w + Math.min(w - 1, Math.floor(x * w / fw))];
+  const brush = Object.keys(coats).length ? measureDryBrush({ mmPerCell: sheetMm / w }) : null;
+  const coat = coatTexture({ fine: { D: paperDensity(data, fw * fh, paperRGB), rgb: data, labelMap: fineLabels, w: fw, h: fh, mmPerCell: sheetMm / fw }, plan: { w, h, mmPerCell: sheetMm / w }, kinds: coats, brush, ceiling: Math.floor(COAT_CEILING_SHARE * strokeMax) });
   const coatMask = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) if (coats[seg.labels[i]]) coatMask[i] = 1;
   const byKind = {}; for (const g of groups) byKind[g.kind] = (byKind[g.kind] ?? 0) + g.paths.length;
   const count = groups.reduce((a, g) => a + g.paths.length, 0);
@@ -67,8 +75,8 @@ export async function planSurface({ image, root, w, h, sheetMm, segments, SRC, r
     labels: Object.fromEntries(Object.entries(lab.labels).map(([id, l]) => [id, { label: l, kind: SURFACE_KIND[l] ?? null }])),
     regions: groups.map(g => ({ id: g.id, label: g.label, kind: g.kind, areaShare: g.areaShare, brushMm: g.brushMm, courseAngleDeg: g.courseAngleDeg, marks: g.paths.length })),
     marks: count, byKind, ceiling, cover: COVER, lightOd: LIGHT_OD,
-    coats: coat.regions, coatStrokes: coat.strokes.length, coatCeiling: Math.floor(COAT_CEILING_SHARE * strokeMax),
+    coats: coat.regions, coatStrokes: coat.strokes.length, brushSwatch: brush, coatCeiling: Math.floor(COAT_CEILING_SHARE * strokeMax),
   };
-  log(`surface labels (${lab.judge} ${lab.model ?? ''}${lab.cached ? ', cached' : ''}): ${Object.keys(lab.labels).length} regions; ${Object.keys(coats).length} coats (${coat.strokes.length} dry-brush strokes planned: ${coat.regions.map(r => `region ${r.id} ${r.kind} ${r.lightStrokes ?? 0} light ${r.darkStrokes ?? 0} dark`).join('; ') || 'none'}); ${Object.keys(stone).length} dressed stone (${count} marks)`);
+  log(`surface labels (${lab.judge} ${lab.model ?? ''}${lab.cached ? ', cached' : ''}): ${Object.keys(lab.labels).length} regions; ${Object.keys(coats).length} coats (${coat.strokes.length} dry-brush strokes planned: ${coat.regions.map(r => `region ${r.id} ${r.kind} ${r.lightStrokes ?? 0} light ${r.darkStrokes ?? 0} dark, strands ${r.lightStrandMm ?? '-'} mm against a laid line of ${r.laidLineMm ?? '-'} mm`).join('; ') || 'none'}); ${Object.keys(stone).length} dressed stone (${count} marks)`);
   return { groups, coat, coatMask, record };
 }

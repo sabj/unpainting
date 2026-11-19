@@ -15,6 +15,10 @@ import { strokeCeiling } from '../guard/cheat-risk.mjs';
 export const STROKES_PER_100_CM2 = 3;
 export const GLINTS_PER_100_CM2 = 1;
 const FINE_MAX = 2400;
+const SCALE_LIMIT = 1.5;   // the same rule as the coat texture: a mark laid wider than this many strands is not laid
+
+/** The rigger's laid line is its stroke width, and never thinner than one cell. A stroke the strand would not fill is not laid. */
+export function scaleOk(measuredMm, widthMm, cellMm) { return Math.max(widthMm, cellMm) <= SCALE_LIMIT * measuredMm; }
 
 /**
  * @param image     path of the source image
@@ -36,7 +40,9 @@ export async function planGouache({ image, w, h, sheetMm, paperRGB, pigments, cr
   const ceiling = strokeCeiling(sheetMm, sheetMm * info.height / info.width);
   const inCoat = coat?.mask ? (x, y) => coat.mask[Math.min(h - 1, Math.floor(y * h / info.height)) * w + Math.min(w - 1, Math.floor(x * w / info.width))] === 1 : null;
   const found = thinLights(D, info.width, info.height, { pixelMm, rgb: data, strokesMax, glintsMax, skip: inCoat });
-  const sx = w / info.width, sy = h / info.height;
+  const sx = w / info.width, sy = h / info.height, cellMm = sheetMm / w;
+  const tooFine = found.strokes.filter(s => s.kind === 'strand' && !scaleOk(s.measuredMm, s.widthMm, cellMm)).length;
+  found.strokes = found.strokes.filter(s => s.kind !== 'strand' || scaleOk(s.measuredMm, s.widthMm, cellMm));
   const strokes = found.strokes.map(s => {
     const tint = s.kind === 'glint' ? { mix: [], residual: 0 } : gouacheTint(s.rgb ?? [255, 255, 255], paperRGB, pigments);
     return { kind: s.kind, curve: s.points.map(([x, y]) => [x * sx, y * sy]), widthMm: +s.widthMm.toFixed(3), lengthMm: +s.lengthMm.toFixed(2), lightOd: +s.lightOd.toFixed(3), surroundOd: s.surroundOd == null ? null : +s.surroundOd.toFixed(3), rgb: s.rgb, tint, fit: s.fit };
@@ -48,7 +54,7 @@ export async function planGouache({ image, w, h, sheetMm, paperRGB, pigments, cr
     read: { fineWidth: info.width, pixelMm: +pixelMm.toFixed(4), stage: 'planning, before the first wash' },
     rigger: { minMm: RIGGER_MM.min, maxMm: RIGGER_MM.max, pigment: GOUACHE_PIGMENT.name },
     caps: { singlesMax: strokesMax, glintsMax, strokeCeiling: ceiling, per100Cm2: { singles: STROKES_PER_100_CM2, glints: GLINTS_PER_100_CM2 } },
-    found: found.stats,
+    found: found.stats, scaleRule: { limit: SCALE_LIMIT, riggerLineMm: +cellMm.toFixed(3), droppedTooFine: tooFine },
     planned: { strokes: strokes.length, singles: strokes.filter(s => s.kind === 'strand').length, glints: strokes.filter(s => s.kind === 'glint').length, lengthMm: +lengthMm.toFixed(1), shareOfCeiling: +(strokes.length / ceiling).toFixed(4) },
   };
   return { strokes, record };

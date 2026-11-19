@@ -806,7 +806,7 @@ const WICK_FLOOR = Math.max(...WICK_FLOORS);
 // coat marks and dressed stone for masonry, anything else or any doubt for none. An area plan has its own marks (pass.marks).
 const SURFACE_PLAN = opt('areaplan', '')
   ? { groups: [], coat: { strokes: [], regions: [] }, coatMask: new Uint8Array(w * h), record: { status: 'none', reason: 'an area plan owns its marks (pass.marks)' } }
-  : await planSurface({ image: path.resolve(root, opt('image')), root, w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), segments: ctx.SEGMENTS_RECORD, SRC: ctx.SRC, rgb: ctx.px, judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')), log: console.log });
+  : await planSurface({ image: path.resolve(root, opt('image')), root, w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), segments: ctx.SEGMENTS_RECORD, SRC: ctx.SRC, paperRGB, judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')), log: console.log });
 fs.writeFileSync(path.join(out, 'surface-plan.json'), JSON.stringify(SURFACE_PLAN.record, null, 1));
 const GOUACHE_PLAN = opt('areaplan', '')
   ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lights (pass.lights)' } }

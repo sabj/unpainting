@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { planGouache, STROKES_PER_100_CM2 } from './gouache-plan.mjs';
+import { planGouache, STROKES_PER_100_CM2, scaleOk } from './gouache-plan.mjs';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gouache-plan-'));
 async function image(name, draw) {
@@ -40,6 +40,13 @@ test('strands inside a region labelled a coat are the coat\'s texture, not singl
   const run = mask => planGouache({ image: file, w: 600, h: 400, sheetMm: 150, paperRGB: PAPER, pigments: PIGS, coat: { mask } });
   assert.ok((await run(new Uint8Array(600 * 400))).strokes.length >= 3, 'a wall or no label: the lights stay single strokes');
   assert.equal((await run(new Uint8Array(600 * 400).fill(1))).strokes.length, 0, 'in a coat they are left to the dry brush');
+});
+
+test('the scale rule: a stroke wider than one and a half strands is not laid, and the line is never thinner than a cell', () => {
+  assert.equal(scaleOk(0.4, 0.4, 0.258), true, 'a hair the rigger fills');
+  assert.equal(scaleOk(0.15, 0.25, 0.258), false, 'a hair under a cell: the cell is 1.7 times it');
+  assert.equal(scaleOk(0.2, 0.25, 0.129), true, 'a hair of 0.2 mm, the rigger line at its finest 0.25 mm');
+  assert.equal(scaleOk(0.2, 0.25, 0.258), true, 'and at the coarser cell, 0.258 mm is under 1.5 times 0.2');
 });
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));

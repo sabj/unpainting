@@ -149,7 +149,7 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
       if (lengthMm < MIN_LENGTH_MM || lengthMm / Math.max(widthMm, 0.05) < ASPECT || perCm > MAX_TURNS_PER_CM) continue;
       const lightL = along(s.curve, L), side = sideLight(s.curve, L, w, h, Math.ceil(widthMm / 2 / pixelMm) + 2), sideL = side.dark;
       if (sideL > DARK_L || lightL - sideL < STEP_L || lightL - side.light < STEP_L / 2) continue;
-      singles.push({ kind: 'strand', points: s.curve, widthMm: Math.min(RIGGER_MM.max, Math.max(RIGGER_MM.min, widthMm)), lengthMm, lightOd: along(s.curve, D), surroundOd: -Math.log(Math.max(1e-3, (sideL + 16) ** 3 / 116 ** 3)), rgb: colourOf(s.curve),
+      singles.push({ kind: 'strand', points: s.curve, measuredMm: widthMm, widthMm: Math.min(RIGGER_MM.max, Math.max(RIGGER_MM.min, widthMm)), lengthMm, lightOd: along(s.curve, D), surroundOd: -Math.log(Math.max(1e-3, (sideL + 16) ** 3 / 116 ** 3)), rgb: colourOf(s.curve),
         fit: { maxMm: +(s.max * pixelMm).toFixed(3), meanMm: +(s.dev * pixelMm).toFixed(3), turnsPerCm: +perCm.toFixed(3) }, score: (lightL - sideL) * lengthMm });
     }
   }
