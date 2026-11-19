@@ -153,7 +153,8 @@ test('a thing that spans two hues is cut by hue before it gets a mix, a thing wi
   assert.ok(mixAt(10)[1] > 3 * mixAt(10)[0], 'the lavender strip is a blue mix'); assert.ok(mixAt(30)[0] > 1.5 * mixAt(30)[1], 'the warm strip holds more yellow than blue');
   assert.ok(chromaOf([188, 169, 174]) < .5 * chromaOf([170, 168, 222]), 'their mean would have been mud');
   // a lit and a shadowed side of one hue
-  const sides = plan(80, 60, [205, 170, 125], [[40, 0, 80, 60, [150, 124, 92]]], { things: () => 1 });
+  // (with a patch of paper, so that the lit side is not the picture's lightest tone and is not reserved)
+  const sides = plan(80, 60, [205, 170, 125], [[40, 0, 80, 60, [150, 124, 92]], [4, 4, 16, 16, PAPER]], { things: () => 1 });
   assert.equal(washesOf(sides).filter(sh => sh._valuePlan.stage === 1).length, 2);
   // six bands of one thing: three parts at most
   const bands = []; for (let q = 0; q < 6; q++) bands.push([0, q * 10, 80, q * 10 + 10, [205 - 22 * q, 170 - 18 * q, 125 - 13 * q]]);

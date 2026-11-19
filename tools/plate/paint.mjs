@@ -421,7 +421,8 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // The plan gives each stroke the half-width it is to lay. The brush that lays that half-width on this sheet is a little
   // wider (the engine's own edgeHalfWidth, which the lanes of every wash are spaced by), so it is sized through that.
   const brushFor = half => { let r = half + 1; for (let it = 0; it < 6; it++) r += half - edgeHalfWidth(r, { pressure: 1, splay: WASH_FLAT_SPLAY }); return Math.max(SC, r); };
-  const vectorPaths = !BUDGET && sh._valuePlan?.strokes ? sh._valuePlan.strokes.map(st => { const r = brushFor(st.radiusMm * CELLS_PER_MM); return st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1 })); }) : null;
+  // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
+  const vectorPaths = !BUDGET && sh._valuePlan?.strokes ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); return st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1, round })); }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
@@ -640,7 +641,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
           give: 0.7, free: 0.4, film: 0.22, splay: 0.06, stiffness: 5, wetMix: T.intoWet ? 0.6 : 0.15 * num('drymix', 1),
           bridge: washBridge(T, Math.min(T.bridge, 0.55)), bridgeSoft: 1.2, streak: 0.5, seed: 31 + ctx.laid + SEED })
       : createBrush({ grainShift: num('grainshift', 0),
-          flat: sh._valuePlan?.brush?.shape?sh._valuePlan.brush.shape==='flat':numericTuftHere?false:(sh._semantic?sh._semantic.pass.brush.kind==='flat':true), ...(numericTuftHere?{model:'tuft'}:{}), radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4,
+          flat: pts[0]?.round!=null?!pts[0].round:sh._valuePlan?.brush?.shape?sh._valuePlan.brush.shape==='flat':numericTuftHere?false:(sh._semantic?sh._semantic.pass.brush.kind==='flat':true), ...(numericTuftHere?{model:'tuft'}:{}), radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4,
           // --washfree f: the wash brush's free-liquid threshold, also on the scrap; lower lets a light load still give water. Default 0.4.
           give: 0.9, free: num('washfree', 0.4), film: 0.25, splay: WASH_FLAT_SPLAY, stiffness: 8, wetMix: MIX(T),
           // --washbridgesoft k: the wash's liquid stops over a wider band of tooth (bridgeSoft x k), grading deep pits in. Default 1.
