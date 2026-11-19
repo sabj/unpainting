@@ -24,6 +24,12 @@ test('strand widths are measured per pixel from the ridge, in mm', () => {
   assert.ok(med > 0.4 && med < 1.0, `a 0.6 mm hair measures ${med} mm`);
 });
 
+test('a strand\'s step is how far it stands off its own ring, in L*, and is read only on a strand', () => {
+  const { D } = scene(2.4), p = thinPlanes(D, w, h, MM); let on = 0, off = 0;
+  for (let i = 0; i < w * h; i++) { if (p.light[i] || p.dark[i]) { on++; assert.ok(p.step[i] >= 10, `a strand is at least a step the eye sees off its ring: ${p.step[i]}`); } else off += p.step[i]; }
+  assert.ok(on > 500 && off === 0, `${on} strand pixels, ${off} L* read off them`);
+});
+
 test('the scale rule: strands about as wide as the brush line are laid, strands far thinner are not', () => {
   const wide = run(scene(2.4)), thin = run(scene(1.0));
   assert.ok(wide.strokes.length > 15, `hairs of 0.6 mm under a 0.7 mm line: ${wide.strokes.length}`);
@@ -43,6 +49,8 @@ test('strokes follow the strands in their colour, light in the dark coat and dar
   const ang = s => { const a = s.points[0], b = s.points.at(-1); return ((Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI) % 180 + 180) % 180; };
   assert.ok(light.filter(s => Math.abs(ang(s) - 30) < 25 || Math.abs(ang(s) - 30) > 155).length / light.length > 0.7, 'along the hairs');
   for (const s of dark) { assert.ok(s.rgb[0] < 100); assert.ok(s.strandMm >= 0.4 && s.strandMm < 1.2); }
+  // each stroke carries the step its strands stand off their own ground: about 34 L* in this scene, either way
+  for (const s of strokes) assert.ok(s.step > 25 && s.step < 40, `a ${s.polarity} strand's step: ${s.step} L*`);
   assert.ok(regions[0].lightStrokes === light.length && regions[0].laidLineMm === 0.7);
 });
 

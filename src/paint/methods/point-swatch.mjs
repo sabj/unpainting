@@ -61,14 +61,14 @@ export function stepOf(thickness, groundRGB, pigments, shares) {
   return lOf(Uint8ClampedArray.from(groundRGB)) - filmL(shares.map(s => s * thickness), pigments, groundRGB);
 }
 
-function layLine({ mmPerCell, seed, conc, direction: [dx, dy], point, paperOpts, tools, paints }) {
+function layLine({ mmPerCell, seed, conc, direction: [dx, dy], point, paperOpts, tools, paints, upright }) {
   // the swatch's paint is the first of as many paints as the run's sheet carries, so the run's own dip fits its brush
   const pigs = Array.from({ length: paints }, () => SWATCH_PAINT), load = pigs.map((_, k) => (k ? 0 : conc));
   const W = LENGTH + 2 * MARGIN, n = W * W, paper = makePaper(W, W, paperOpts ?? { seed, coldPress: { mmPerCell }, mmPerCell }), sheet = createSheet(paper, pigs);
   const c = W / 2, a = { x: c - dx * LENGTH / 2, y: c - dy * LENGTH / 2 }, b = { x: c + dx * LENGTH / 2, y: c + dy * LENGTH / 2 };
   const r = pointRadius(mmPerCell, point), brush = tools.createBrush({ radius: r, ...point.brush, seed: 300 + seed });
   tools.dip(brush, { water: point.water, conc: load });
-  tools.stroke(brush, sheet, [{ ...a, p: point.pressure, r }, { ...b, p: point.pressure, r }], { upright: false });
+  tools.stroke(brush, sheet, [{ ...a, p: point.pressure, r }, { ...b, p: point.pressure, r }], { upright });
   tools.dry(sheet, 20000, tools.physics, { levelMax: 900 });
   const L = lPlane(renderLayers(layersOf(sheet), pigs, new Uint8ClampedArray(n * 3).fill(WHITE[0]), n, 1), n);
   const path = Array.from({ length: 13 }, (_, k) => [a.x + (b.x - a.x) * k / 12, a.y + (b.y - a.y) * k / 12]).slice(2, -2);
@@ -96,20 +96,24 @@ export function lineHold(path, L, w, h, pxMm, paperL) {
  * @param paperOpts  the run's paper (makePaper options); a cold-press sheet of this density when not given
  * @param tools      the run's own { createBrush, dip, stroke, dry, physics }; the engine's when not given
  * @param paints     how many paints the run's sheet carries (its brushes are dipped for that many)
+ * @param point      the brush tried: the rigger's point, or another brush read the same way (a coat's dry brush,
+ *   tools/plate/coat-lay.mjs), as { radiusMm, water, pressure, brush }
+ * @param hold       the share of its length a line must hold; 0 for a brush that is meant to break on the paper's tooth
+ * @param upright    how the brush is held along its path, as the stroke that will use the swatch holds it
  * @returns {{ rows: [{ conc, drop, widthMm, held, gapMm, spread, thickness, holds }], lightest: row|null, heaviest: row|null,
  *   widthMm, mmPerCell, settings }} `drop` the L* the dried line reads darker than its paper, the mean of the three
  *   directions and `spread` their range; `widthMm` its width at half depth; `held` the least share of its length that
  *   holds, of the three; `thickness` the film of the swatch's paint that reads `drop` (filmFor). `lightest` and
  *   `heaviest` are the ends of the loads that hold a line; the top-level `widthMm` is the lightest's.
  */
-export function measurePoint({ mmPerCell, seed = 1, loads = POINT_LOADS, point = POINT, paperOpts = null, tools = ENGINE, paints = 1 }) {
+export function measurePoint({ mmPerCell, seed = 1, loads = POINT_LOADS, point = POINT, paperOpts = null, tools = ENGINE, paints = 1, hold = HOLDS, upright = false }) {
   if (!(mmPerCell > 0)) throw new Error('point swatch: mmPerCell must be positive');
   const paperL = lOf(Uint8ClampedArray.from(WHITE));
   const rows = loads.map(conc => {
-    const read = DIRECTIONS.map(direction => { const { L, W, path } = layLine({ mmPerCell, seed, conc, direction, point, paperOpts, tools: { ...ENGINE, ...tools }, paints }); return { ...lineDarkness(path, L, W, W, mmPerCell), ...lineHold(path, L, W, W, mmPerCell, paperL) }; });
+    const read = DIRECTIONS.map(direction => { const { L, W, path } = layLine({ mmPerCell, seed, conc, direction, point, paperOpts, tools: { ...ENGINE, ...tools }, paints, upright }); return { ...lineDarkness(path, L, W, W, mmPerCell), ...lineHold(path, L, W, W, mmPerCell, paperL) }; });
     const drops = read.map(r => r.drop), drop = drops.reduce((a, v) => a + v, 0) / drops.length, widths = read.map(r => r.widthMm).filter(Number.isFinite), held = Math.min(...read.map(r => r.held));
     return { conc, drop: +drop.toFixed(2), widthMm: +(widths.length ? Math.max(...widths) : 0).toFixed(3), held: +held.toFixed(3), gapMm: +Math.max(...read.map(r => r.gapMm)).toFixed(2), spread: +(Math.max(...drops) - Math.min(...drops)).toFixed(2),
-      thickness: +(filmFor(drop, WHITE, [SWATCH_PAINT], [1]) ?? 0).toFixed(5), holds: held >= HOLDS && drop > 0 };
+      thickness: +(filmFor(drop, WHITE, [SWATCH_PAINT], [1]) ?? 0).toFixed(5), holds: held >= hold && drop > 0 };
   });
   // a heavier load never reads lighter or leaves less: the paper's grain may make one rung dip a hair below the last
   for (let k = 1; k < rows.length; k++) { rows[k].drop = Math.max(rows[k].drop, rows[k - 1].drop); rows[k].thickness = Math.max(rows[k].thickness, rows[k - 1].thickness); }

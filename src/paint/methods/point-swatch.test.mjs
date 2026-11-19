@@ -31,6 +31,16 @@ test('a starved point does not hold a line, and the swatch says so', () => {
   assert.ok(s.rows.every(r => !r.holds) && s.lightest === null && s.widthMm === null, JSON.stringify(s.rows));
 });
 
+test('another brush is read the same way, and one that is meant to break counts every load that leaves paint', () => {
+  // the starved point again, as a brush that is not asked to hold a line: its loads are read, lightest to heaviest
+  const point = { ...POINT, pressure: 0.85, brush: { ...POINT.brush, capacity: 6, belly: 1, bridge: 0.2 } }, s = measurePoint({ mmPerCell: MM, loads: [1, 3], point, hold: 0, upright: 'sweep' });
+  assert.ok(s.rows.every(r => r.holds && r.drop > 0 && r.thickness > 0) && s.lightest.conc === 1 && s.heaviest.conc === 3, JSON.stringify(s.rows));
+  assert.ok(s.rows.some(r => r.held < HOLDS), 'it breaks, and the swatch still says how much');
+  assert.equal(s.settings.pressure, 0.85);
+  const load = loadFor((s.rows[0].thickness + s.rows[1].thickness) / 2, s);
+  assert.ok(load && load.conc > 1 && load.conc < 3, JSON.stringify(load));
+});
+
 test('the film for a step makes that step over its ground, and a darker ground needs a thicker film', () => {
   const shares = [0.7, 0.3];
   for (const ground of [[250, 248, 244], [150, 120, 100], [110, 95, 90]]) for (const drop of [6, 15, 30]) {
