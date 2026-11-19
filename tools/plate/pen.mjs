@@ -4,6 +4,7 @@ import {fastPaintFrame} from '../speed/frame-policy.mjs';
 import {scaleDrawingGestures} from '../../src/paint/methods/drawing-hand.mjs';
 import {cutInDarkWash} from '../../src/paint/methods/ink-dark-skip.mjs';
 import {prepareDrawing} from '../../src/paint/methods/material-profiles.mjs';
+import {weighGraphiteDrawing} from '../../src/paint/methods/graphite-pool.mjs';
 import {plannedEdges, supportedLines} from '../../src/paint/methods/line-support.mjs';
 import {selectValueInk, drawsWholeFile, valueInkVerdict} from '../../src/paint/methods/light-to-dark.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
@@ -512,6 +513,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
   let scaled = scaleDrawingGestures(kept, SC).map((g,i)=>({...g,ml:!!g.ml,draw:!inkVerdict||inkVerdict[i].kept}));
+  // the graphite pool drawing: each line presses as dark as the subject's own line there, by a scrap of this paper (graphite-pool.mjs)
+  if(graphiteFirst){const r=weighGraphiteDrawing(scaled,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,paperOpts:ctx.PAPER_OPTS,out,log:console.log});scaled=r.strokes;if(r.stats&&ctx.GRAPHITE_POOL)ctx.GRAPHITE_POOL.lineWeight=r.stats;}
   scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.

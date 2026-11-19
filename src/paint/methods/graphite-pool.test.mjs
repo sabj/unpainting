@@ -1,7 +1,10 @@
 // The graphite drawing carries the structure of the subject: the line model's pool, pruned by meaning, drawn whole and light.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { graphitePoolWanted, mergeAuthored, edgeStep, graphiteDrawingArgs } from './graphite-pool.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { graphitePoolWanted, mergeAuthored, edgeStep, graphiteDrawingArgs, strengthScore, weighGraphiteDrawing } from './graphite-pool.mjs';
 import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 test('a graphite drawing from the pool is wanted unless a line source, stages, no drawing or the models are asked off', () => {
@@ -70,7 +73,44 @@ test('with an edge score the budget keeps the strongest edges, not the longest l
   assert.deepEqual(r.lines.map(g => g.points[0][1]), [100]);
 });
 
-test('the drawing flags: the pool file, no stage planner, light pressure, and no planned-passage filter unless the run says otherwise', () => {
-  assert.deepEqual(graphiteDrawingArgs(['--image', 'x.png'], 'out/graphite-lines'), ['--drawingfile', 'out/graphite-lines', '--drawingstages', 'off', '--openingpressure', '0.35', '--lineedges', '0']);
+test('a line of the subject\'s own claims the budget as an edge does: a whisker on bare paper is not dropped before a faint edge', () => {
+  const whisker = { points: [[0, 0], [40, 0]], subjectLine: { drop: 25 } }, faintEdge = { points: [[0, 50], [40, 50]], subjectLine: { drop: 0 } };
+  // across the whisker the paper is the same on both sides (step 0); the faint edge steps 6 L*
+  assert.equal(strengthScore(whisker, 0, 0.5), 20 * 25);
+  assert.equal(strengthScore(faintEdge, 6, 0.5), 20 * 6);
+  assert.equal(strengthScore({ points: whisker.points }, 6, 0.5), 20 * 6, 'a line nobody read has its edge only');
+  const pool = { image: { w: 100, h: 100 }, lines: [faintEdge, whisker] }, step = new Map([[whisker, 0], [faintEdge, 6]]);
+  const byBoth = mergeAuthored(pool, null, { sheetMm: 50, amount: 0.5, score: g => strengthScore(g, step.get(g), 0.5) });
+  assert.deepEqual(byBoth.lines, [whisker]);
+  const byStep = mergeAuthored(pool, null, { sheetMm: 50, amount: 0.5, score: g => 20 * step.get(g) });
+  assert.deepEqual(byStep.lines, [faintEdge], 'by the step alone the whisker was the one left out');
+});
+
+test('the drawing flags: the pool file, no stage planner, the full pencil as the most a line may press, and no planned-passage filter unless the run says otherwise', () => {
+  assert.deepEqual(graphiteDrawingArgs(['--image', 'x.png'], 'out/graphite-lines'), ['--drawingfile', 'out/graphite-lines', '--drawingstages', 'off', '--openingpressure', '1', '--lineedges', '0']);
   assert.deepEqual(graphiteDrawingArgs(['--openingpressure', '0.6', '--lineedges', '1'], 'g'), ['--drawingfile', 'g', '--drawingstages', 'off']);
+});
+
+test('the pool drawing\'s strokes are weighed on a scrap and the table is written; another drawing\'s strokes are left alone', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'graphite-weight-'));
+  try {
+    const pts = y => [{ x: 0, y }, { x: 30, y }], plain = [{ points: pts(1), weight: 0.9 }];
+    const untouched = weighGraphiteDrawing(plain, { medium: 'graphite-HB', mmPerCell: 0.26, out: dir });
+    assert.equal(untouched.strokes, plain);
+    assert.equal(untouched.stats, null);
+    assert.ok(!fs.existsSync(path.join(dir, 'graphite-line-weight.json')));
+    const log = [];
+    const r = weighGraphiteDrawing([{ points: pts(1), subjectLine: { drop: 0.5 } }, { points: pts(5), subjectLine: { drop: 9 } }, { points: pts(9), subjectLine: { drop: 60 } }], { medium: 'graphite-HB', mmPerCell: 0.26, out: dir, log: m => log.push(m) });
+    const [faint, mid, black] = r.strokes.map(g => g.weight);
+    assert.equal(faint, 0.35);
+    assert.ok(mid > 0.45 && mid < 0.95, `a 9 L* line at ${mid}`);
+    assert.equal(black, 1);
+    assert.equal(r.stats.weighed, 2);
+    assert.equal(r.stats.beyond, 1);
+    const file = JSON.parse(fs.readFileSync(path.join(dir, 'graphite-line-weight.json'), 'utf8'));
+    assert.equal(file.table.length, 10);
+    assert.equal(file.firmestDrop, file.table.at(-1).drop);
+    assert.match(log[0], /2 of 3 strokes press as dark as the subject's own line there/);
+    assert.match(log[0], /1 strokes follow a line darker than the pencil's firmest/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
