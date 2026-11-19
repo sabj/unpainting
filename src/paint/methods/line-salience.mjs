@@ -1,11 +1,11 @@
 // Pipeline: inking, stage 2 (hold and measure the lines): salience.
 // What makes a subject read first is closed and connected geometry: a gate's frame, bars and arch, a figure's outline.
-// Lines are grouped into connected sets (ends within a short gap). A set is kept when it is long enough to be a form, or
+// Lines are grouped into connected sets (ends within the join distance, 2.5 mm, so a broken arch is one set). A set is kept when it is long enough to be a form, or
 // closed, or a face or hand feature; an isolated short piece is texture that belongs to no form and is left to the wash.
-// Each line is also held to the shortest piece its ground allows (ink-labels.mjs). Sets that are long or closed are drawn first.
+// Each line is also held to the shortest piece its ground allows (ink-labels.mjs), and to 3 mm: a shorter piece is a tick. Sets that are long or closed are drawn first.
 // Pure: arrays in, arrays out. Coordinates are the line file's image pixels.
 
-const SALIENCE_DEFAULTS = Object.freeze({ gapMm: 0.6, componentMm: 6, firstMm: 20 });
+const SALIENCE_DEFAULTS = Object.freeze({ gapMm: 2.5, componentMm: 6, firstMm: 20, pieceMm: 3 });
 
 const pathMm = (pts, pxMm) => { let s = 0; for (let k = 1; k < pts.length; k++) s += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return s * pxMm; };
 
@@ -36,7 +36,8 @@ export function salience(lines, { pxMm, isFeature = () => false }, o = SALIENCE_
     if (isClosed) closed++;
     for (const i of s.ids) {
       const g = lines[i], mm = pathMm(g.points, pxMm), need = Math.max(o.componentMm, g.inkMinMm ?? 0);
-      const keep = s.feature || isClosed || s.mm >= need;
+      // a piece under pieceMm is a tick: it stays only as part of a closed set or a face or hand feature
+      const keep = s.feature || isClosed || (s.mm >= need && mm >= o.pieceMm);
       if (!keep) { droppedMm += mm; continue; }
       out.push({ ...g, tier: isClosed || s.mm >= o.firstMm ? 1 : 2 }); kept++;
     }

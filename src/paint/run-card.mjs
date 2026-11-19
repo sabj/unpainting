@@ -26,6 +26,8 @@ function buildRunCard({
   drawingOrder = "first",
   drawingMedium = "graphite",
   subjectMedium = null,
+  mediumDecision = null,
+  graphitePool = null,
   code = null,
   segments = null,
   linework = null,
@@ -66,6 +68,10 @@ function buildRunCard({
       medium: drawingMedium,
       // --subjectmedium and, when it turned an ink drawing into graphite, what was asked for
       ...(subjectMedium ? { subjectMedium } : {}),
+      // what decided ink on or off, with its evidence (src/paint/methods/medium-decision.mjs)
+      ...(mediumDecision ? { mediumDecision } : {}),
+      // the graphite drawing's lines, from the line model's pool (src/paint/methods/graphite-pool.mjs)
+      ...(graphitePool ? { graphitePool } : {}),
       file: drawingFile || null,
       stage: linework ?? null,
     },

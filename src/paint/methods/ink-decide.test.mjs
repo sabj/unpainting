@@ -27,8 +27,9 @@ test('the label of the ground decides: foliage is wash only, architecture keeps 
   const arch = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' });
   assert.ok(arch.stats.keptPx > 60);
   const leaves = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }, { ...DECIDE_DEFAULTS, strongContrast: Infinity });
-  // a strong ink stroke is not a leaf: it stays
-  assert.ok(decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx > 20);
+  // leaves are wash even for a strong stroke; a long smooth line through them is a branch and stays
+  assert.equal(decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx, 0);
+  assert.ok(decideLines([line(21, 5, 90)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'foliage' }).stats.keptPx > 80);
   assert.equal(leaves.lines.length, 0);
   assert.ok(leaves.stats.droppedMm.short > 4, "a piece too short to be a branch is wash");
   const edge = decideLines([line(21, 5, 80)], { L, w: W, h: H, pxMm: PX, cellLabel: (x, y) => (y < 21 ? 'sky' : 'architecture') });
@@ -174,7 +175,7 @@ test('agy pins the existing default model and cannot substitute simple on failur
   await assert.rejects(labelRegions({ ...opts, judge: 'agy', run: () => ({ status: 1 }) }), /ink labels \(agy\): label process failed/);
 });
 
-test('bridging does not cross intentional semantic label cuts', () => {
+test('a line that runs mostly into a wash-only ground is left off whole, not trimmed to its architecture end', () => {
   const L = plane();
   // Line crossing from architecture into sky:
   // x=10..14 is architecture (draws line); x=15..16 is within reach=2; x >= 17 is pure sky (r.ink === 'none')
@@ -182,18 +183,14 @@ test('bridging does not cross intentional semantic label cuts', () => {
   const r = decideLines([crossing], {
     L, w: W, h: H, pxMm: PX,
     cellLabel: (x) => (x < 15 ? 'architecture' : 'sky'),
-  }, { bridgeMm: 5.0 });
-  // Points at x >= 19 are outside reach=4 of architecture and in pure sky; they must be dropped and NOT bridged
-  for (const line of r.lines) {
-    for (const p of line.points) {
-      assert.ok(p.x < 19, `point at x=${p.x} should not be bridged into pure sky`);
-    }
-  }
+  }, { strongContrast: Infinity, structureMm: Infinity });
+  // 5 of 20 points lie on architecture: under half of the line is drawable, so none of it is drawn and none is trimmed
+  assert.equal(r.lines.length, 0);
 });
 
 test('partial options object merges with defaults without dropping unmentioned options', () => {
   const L = plane();
-  const r = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' }, { bridgeMm: 0.5 });
+  const r = decideLines([line(21, 5, 40)], { L, w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' }, { keepLineShare: 0.4 });
   assert.ok(r.stats != null);
   assert.ok(r.stats.lines === 1);
 });
@@ -218,11 +215,13 @@ test('structural exception is source-provenance bounded and rejects short, unsup
   }
   assert.equal(decideLines([line(60)], structuralCtx({ foliage: new Uint8Array(W * H).fill(1) })).lines.length, 0);
 });
-test('structural contours do not bridge explicit semantic gaps', () => {
+test('a structural contour is drawn whole across a short wash-only stretch and left off whole across a long one', () => {
   for (const label of ['sky', 'foliage', 'shadow_mass']) {
-    const r = decideLines([line(60)], structuralCtx({ cellLabel: x => x > 55 && x < 105 ? label : 'architecture' }), { bridgeMm: 100 });
-    assert.equal(r.lines.length, 2, label);
-    assert.ok(r.lines.every(g => g.points.every(p => p.x < 65 || p.x > 95)), label);
+    const third = decideLines([line(60)], structuralCtx({ cellLabel: x => x > 55 && x < 105 ? label : 'architecture' }));
+    assert.equal(third.lines.length, 1, label);
+    assert.equal(third.stats.pieces, 1, label);
+    const most = decideLines([line(60)], structuralCtx({ cellLabel: x => x > 15 && x < 145 ? label : 'architecture' }));
+    assert.equal(most.lines.length, 0, label);
   }
 });
 function rasterContour(pxMm, kind) {
@@ -259,14 +258,14 @@ test('decideFile forwards source-model provenance into the structural decision',
   } finally { fs.rmSync(out, { recursive: true, force: true }); }
 });
 
-test('unsupported faint semantic gaps cannot reconnect structural mass contours', () => {
+test('a model mass contour with an unsupported wash-only gap is whole when the gap is short', () => {
   const L = plane();
   for (let y = 0; y < H; y++) for (let x = 55; x <= 105; x++) L[y * W + x] = 90;
   assert.equal(classifyPathDetail(Array.from({ length: 151 }, (_, k) => ({ x: k + 5, y: 60 })), L, W, H, PX).cls[75], CLASS.faint);
   for (const label of ['foliage', 'sky', 'water', 'shadow_mass']) {
-    const r = decideLines([line(60)], structuralCtx({ L, cellLabel: x => x >= 55 && x <= 105 ? label : 'architecture' }), { bridgeMm: 100 });
-    assert.equal(r.lines.length, 2, label);
-    assert.ok(r.lines.every(g => g.points.every(p => p.x < 65 || p.x > 95)), label);
+    const short = decideLines([line(60)], structuralCtx({ L, cellLabel: x => x >= 55 && x <= 105 ? label : 'architecture' }));
+    assert.equal(short.lines.length, 1, label);
+    assert.equal(short.stats.pieces, 1, label);
   }
 });
 
@@ -399,14 +398,21 @@ test('a tone-mass shadow never takes wash-only or trunk ground, only ground that
   assert.ok(arch.stats.droppedMm.label.shadow_mass > 5);
 });
 
-test('observed source ink is pen by construction: short, turning pen strokes in foliage and under a shadow stay, wash edges and faint marks still go', async () => {
+test('observed source ink is pen by construction, except on leaves: foliage takes only a long smooth branch, a trunk keeps its turning strokes, wash edges and faint marks go', async () => {
   const ctx = (inputKind, extra = {}) => ({ L: inWash(), w: W, h: H, pxMm: PX, inputKind, cellLabel: () => 'foliage', shadow: dark(), ...extra });
-  // a 3 mm stroke is under the foliage minimum (8 mm): wash for a learned line map, a drawn stroke in observed ink
-  for (const kind of [undefined, 'line-map']) assert.equal(decideLines([seg(3)], ctx(kind)).lines.length, 0, String(kind));
-  const stroke = decideLines([seg(3)], ctx('stroke'));
-  assert.equal(stroke.lines.length, 1);
-  assert.equal(stroke.lines[0].inkMinMm, 0, 'the salience step does not undo it');
-  assert.ok(Math.abs(stroke.stats.keptPx * PX - 3) < 0.3);
+  // a 3 mm stroke is under the foliage minimum (8 mm): leaves are wash, whatever made the line (Sam: ink goes on branches, not on leaves)
+  for (const kind of [undefined, 'line-map', 'stroke']) assert.equal(decideLines([seg(3)], ctx(kind)).lines.length, 0, String(kind));
+  // a long smooth stroke through the leaves is a branch and stays, drawn in observed ink
+  const branch = decideLines([seg(12)], ctx('stroke'));
+  assert.equal(branch.lines.length, 1);
+  // the same 3 mm stroke on a trunk is drawn in observed ink
+  const trunk = decideLines([seg(3)], ctx('stroke', { cellLabel: () => 'tree_trunk' }));
+  assert.equal(trunk.lines.length, 1);
+  assert.equal(trunk.lines[0].inkMinMm, 0, 'the salience step does not undo it');
+  assert.ok(Math.abs(trunk.stats.keptPx * PX - 3) < 0.3);
+  // a strong dark stroke in foliage is still a leaf
+  const strongL = inWash(); for (let x = 5; x < 25; x++) { strongL[20 * W + x] = 10; strongL[21 * W + x] = 10; }
+  assert.equal(decideLines([seg(3)], { ...ctx('stroke'), L: strongL }).lines.length, 0);
   // a scallop (two loops of 1.2 mm radius, 15 mm of pen) turns faster than a branch may: drawn only in observed ink
   const loopL = inWash(), loop = { points: [] };
   for (let k = 0; k <= 80; k++) { const a = k / 80 * 4 * Math.PI, x = 60 + 8 * Math.cos(a), y = 50 + 8 * Math.sin(a); loop.points.push({ x, y }); for (const [dx, dy] of [[0, 0], [1, 0], [0, 1]]) loopL[Math.round(y + dy) * W + Math.round(x + dx)] = 35; }
@@ -424,4 +430,54 @@ test('observed source ink is pen by construction: short, turning pen strokes in 
   assert.equal(none.lines.length, 0);
   // sky stays wash only, observed ink or not
   assert.equal(decideLines([seg(3)], { ...ctx('stroke'), cellLabel: () => 'sky' }).lines.length, 0);
+});
+
+// ---- whole lines: a line is kept whole or dropped whole, never sliced at a mass or faint stretch ----
+const arcMm = (pts, px) => { let s = 0; for (let k = 1; k < pts.length; k++) s += Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y); return s * px; };
+const poly = (...runs) => ({ points: runs.flatMap(([y, x0, x1]) => { const n = Math.max(2, Math.round(Math.abs(x1 - x0) / 5) + 1); return Array.from({ length: n }, (_, k) => ({ x: x0 + (x1 - x0) * k / (n - 1), y })); }) });
+const ARCH = { L: plane(), w: W, h: H, pxMm: PX, cellLabel: () => 'architecture' };
+
+test('a contour with a short mass stretch in it is kept whole, not sliced into pieces', () => {
+  // pen along row 21, over to the wash block's bare top edge at row 60, and back to the pen line
+  const g = poly([21, 5, 75], [60, 75, 95], [21, 95, 155]);
+  const r = decideLines([g], ARCH);
+  assert.equal(r.lines.length, 1, 'one line out for one line in');
+  const ends = l => [l.points[0], l.points.at(-1)];
+  assert.deepEqual(ends(r.lines[0]), ends(g), 'it runs from the pool line\'s first point to its last');
+  assert.ok(Math.abs(arcMm(r.lines[0].points, PX) - arcMm(g.points, PX)) < 0.01, 'none of its length is cut');
+  assert.equal(r.stats.pieces, 1);
+  assert.ok(r.stats.keptPx > 0);
+});
+
+test('a contour that is mostly mass edge is dropped whole, with no short pen piece left behind', () => {
+  const g = poly([21, 5, 30], [60, 30, 140]);
+  const r = decideLines([g], ARCH);
+  assert.equal(r.lines.length, 0);
+  assert.ok(r.stats.droppedMm.whole > 0, 'the live part is counted as dropped with its line');
+});
+
+test('lines out never exceed lines in, and kept plus dropped length is the input length', () => {
+  const gs = [poly([21, 5, 155]), poly([21, 5, 75], [60, 75, 95], [21, 95, 155]), poly([60, 5, 140]), poly([21, 5, 30], [60, 30, 140])];
+  const r = decideLines(gs, ARCH);
+  assert.ok(r.lines.length <= gs.length);
+  const s = r.stats, dropped = s.droppedMm.mass + s.droppedMm.faint + s.droppedMm.short + s.droppedMm.whole + Object.values(s.droppedMm.label).reduce((a, v) => a + v, 0);
+  assert.ok(Math.abs(s.keptPx * PX + dropped - s.lengthPx * PX) < 0.05 * s.lengthPx * PX, JSON.stringify(s));
+});
+
+test('a line with a wash-only label under most of it is dropped whole; with the label under a minority it stays whole', () => {
+  const g = poly([21, 5, 150]);
+  const mostlySky = decideLines([g], { ...ARCH, cellLabel: x => (x < 100 ? 'sky' : 'architecture') }, { ...DECIDE_DEFAULTS, strongContrast: Infinity, structureMm: Infinity });
+  assert.equal(mostlySky.lines.length, 0);
+  const littleSky = decideLines([g], { ...ARCH, cellLabel: x => (x < 40 ? 'sky' : 'architecture') }, { ...DECIDE_DEFAULTS, strongContrast: Infinity, structureMm: Infinity });
+  assert.equal(littleSky.lines.length, 1);
+  assert.ok(Math.abs(arcMm(littleSky.lines[0].points, PX) - arcMm(g.points, PX)) < 0.01);
+});
+
+test('the lines dropped are returned with the reason that mostly cut them, so a joint between kept lines can be restored', () => {
+  const mass = decideLines([poly([21, 5, 30], [60, 30, 140])], ARCH);
+  assert.equal(mass.dropped.length, 1);
+  assert.equal(mass.dropped[0].dropWhy, 'mass');
+  const sky = decideLines([poly([21, 5, 150])], { ...ARCH, cellLabel: () => 'sky' }, { ...DECIDE_DEFAULTS, strongContrast: Infinity, structureMm: Infinity });
+  assert.equal(sky.dropped[0].dropWhy, 'label');
+  assert.equal(decideLines([poly([21, 5, 150])], ARCH).dropped.length, 0, 'a kept line is not in it');
 });

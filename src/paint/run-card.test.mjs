@@ -55,3 +55,16 @@ test("writeRunCard records input hashes, segments, drawing stages, GPU backend a
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("writeRunCard records the medium decision with its evidence under the drawing", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "run-card-medium-"));
+  try {
+    const decision = { medium: "pencil", basis: "source", vetoed: true, evidence: { penSharePct: 0.31, penFirstPct: 0.5, inkRequestedBy: ["--inkrecipe wash"], planDeclared: null, planStyles: [] }, note: "medium pencil: ink is removed" };
+    const card = writeRunCard({ root: tmp, out: tmp, mediumDecision: decision, code: { commit: "abc12345", git: true, dirty: false, tracked: [], untracked: [] } });
+    assert.deepEqual(card.drawing.mediumDecision, decision);
+    assert.equal(writeRunCard({ root: tmp, out: tmp, code: null }).drawing.mediumDecision, undefined);
+  } finally {
+    resetChecks();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -21,3 +21,18 @@ test('a feature in a face stays, and a piece shorter than its ground allows goes
   assert.equal(salience([short], { pxMm: PX }).lines.length, 0);
   assert.equal(salience(long, { pxMm: PX }).lines.length, 2);
 });
+
+test('a short stub on a long line is left to the wash; a closed set and a face feature keep their short pieces', () => {
+  const long = line([[0, 0], [300, 0]]), stub = line([[300, 0], [310, 15]]);
+  assert.equal(salience([long, stub], { pxMm: PX }).lines.length, 1, 'a piece under 3 mm is a tick, not a stroke');
+  const tri = [line([[0, 0], [16, 0]]), line([[16, 0], [8, 13]]), line([[8, 13], [0, 0]])];
+  assert.equal(salience(tri, { pxMm: PX }).lines.length, 3);
+  assert.equal(salience([line([[0, 0], [10, 0]])], { pxMm: PX, isFeature: () => true }).lines.length, 1);
+});
+
+test('pieces of one contour 2 mm apart are one set: a broken arch is not a row of ticks', () => {
+  const a = line([[0, 0], [30, 0]]), b = line([[43, 0], [73, 0]]);          // 4.5 mm pieces, 2 mm gap at 0.15 mm a pixel
+  assert.equal(salience([a, b], { pxMm: PX }).lines.length, 2);
+  const far = line([[0, 0], [30, 0]]), far2 = line([[80, 0], [110, 0]]);   // 7.5 mm apart: still separate, still ticks
+  assert.equal(salience([far, far2], { pxMm: PX }).lines.length, 0);
+});
