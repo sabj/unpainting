@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import {createNativeOperationRecorder,verifyNativeMarkCoverage,diskFloor} from './native-operation-recorder.mjs';
+import {createNativeOperationRecorder,verifyNativeMarkCoverage} from './native-operation-recorder.mjs';
 import {applyNativeOperation,playFilm} from '../../demos/lab/targets/film.js';
 import {makePaper} from '../../src/media/paper.mjs';
 import {createSheet,layersOf,dry,DEFAULTS} from '../../src/media/sheet.mjs';
@@ -201,12 +201,3 @@ test('native player awaits each exact native surface and rejects invalid seeks b
  const before=requests;for(const seek of [NaN,Infinity,-Infinity,-.1,1.1])await assert.rejects(()=>playFilm(film,null,40,30,{...options,seek}),/seek must be finite/);assert.equal(requests,before);
  let rejected=0;await assert.rejects(()=>playFilm(film,new Canvas(40,30),40,30,{...options,onFrame:async()=>{rejected++;throw Error('consumer failed');}}),/consumer failed/);assert.equal(rejected,1);
 });
-
-test('the recording keeps 10 GiB free unless the environment asks for a lower floor, and refuses a nonsense one',()=>{
-  assert.equal(diskFloor({}),10*1024**3);
-  assert.equal(diskFloor({PAINTER_DISK_FLOOR_GIB:''}),10*1024**3);
-  assert.equal(diskFloor({PAINTER_DISK_FLOOR_GIB:'3'}),3*1024**3);
-  assert.throws(()=>diskFloor({PAINTER_DISK_FLOOR_GIB:'0'}),/at least 1/);
-  assert.throws(()=>diskFloor({PAINTER_DISK_FLOOR_GIB:'lots'}),/at least 1/);
-});
-

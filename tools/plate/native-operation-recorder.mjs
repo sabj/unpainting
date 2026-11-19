@@ -5,15 +5,7 @@ import crypto from 'node:crypto';
 import {Worker, isMainThread, parentPort, workerData} from 'node:worker_threads';
 import sharp from 'sharp';
 const hash = b => crypto.createHash('sha256').update(b).digest('hex');
-/** The free space a recording keeps: 10 GiB, or PAINTER_DISK_FLOOR_GIB when a tight disk needs a lower floor and says so. */
-export function diskFloor(env = process.env) {
-  const given = env.PAINTER_DISK_FLOOR_GIB;
-  if (given === undefined || given === '') return 10 * 1024 ** 3;
-  const gib = Number(given);
-  if (!(gib >= 1)) throw new Error(`PAINTER_DISK_FLOOR_GIB must be at least 1, not ${given}`);
-  return gib * 1024 ** 3;
-}
-const FLOOR = diskFloor(), CAP = 512 * 1024 ** 2;
+const FLOOR = 10 * 1024 ** 3, CAP = 512 * 1024 ** 2;
 
 /** The synchronous painter cannot queue unbounded raw frames. One shared slot, one acknowledgement. */
 export function createNativeOperationRecorder({directory,width,height,provenance={},resumeFrom=null,byteCap=CAP,diskFloor=FLOOR,timeoutMs=120000}) {
