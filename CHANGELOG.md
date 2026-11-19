@@ -19,6 +19,12 @@ Judging painting changes. Checked with unit tests and a run without judge calls 
 - **The copy limits are absolute ceilings.** A plate passes or fails on its own records: guard clean, no paint-time look at the target, `hfCorr` at or under the ceiling for its width, and paint strokes at or under the sheet's stroke ceiling, which is the number of 1.5 mm by 4.5 mm marks that cover the sheet once (`strokeCeiling` in `tools/guard/cheat-risk.mjs`, written to `cheat-risk.json` with the sheet size). The earlier limits against the previous build (hfCorr up by at most 0.02, strokes up by at most 10%) are not used. Strokes and render seconds are reported as a cost beside the verdict.
 - Measured on 11 stored 1,200 px plates from 0.3.1 and 0.3.2 development commits, all painted with no target looks: 5 pass these ceilings. Five are over the `hfCorr` ceiling of 0.645 (three Mittens plates at 0.654 to 0.700 and two h36a plates at 0.734 and 0.755). One Trumbull plate lays 16,823 paint strokes against its ceiling of 10,182.
 
+### Final lights and surface marks
+
+- **White gouache is a pigment on the sheet.** The finish lays thin lights over dark with the rigger, tinted by a mix of palette paints, in the top layer. The render is Kubelka-Munk with no overlay. The older per-cell overlay (`--smalllights gouache`) stays off.
+- **A thin light qualifies by its step over its dark ring in L*, not by its whiteness.** Many strands running one way in a coat are laid from a direction field. Isolated lights keep single, smoothly fitted strokes. The run card records the decision as `gouache`.
+- **Surface marks on an unplanned run follow the region's label.** A vision judge labels the SAM regions on a contact sheet of cut-outs. Coats and dressed stone choose their mark kinds. Anything else, or any doubt, takes none. A judge that cannot run is reported and lays nothing. The run card records it as `surface`.
+
 ### Granulation from the pigment
 
 - **Each box paint settles as its pigment does, always.** The sheet takes each paint's published granulation, flocculation, staining and density (`demos/lab/media/pigment-physical.js`); colour and scattering stay as picked, and picking is unchanged. Before, every paint settled at granulation 0.25 under a sheet-wide scale of 0.25, so an ultramarine wash dried smooth with its pigment slightly on the paper's peaks. `--boxphys` and `--gran` are removed.

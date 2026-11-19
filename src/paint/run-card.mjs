@@ -34,6 +34,7 @@ function buildRunCard({
   palette = null,
   phases = [],
   gouache = null,
+  surface = null,
   seconds = 0,
   exitCode = 0,
 } = {}) {
@@ -103,6 +104,8 @@ function buildRunCard({
     phases,
     // the final lights: the rule, what the planning data gave, and what was laid (tools/plate/gouache-plan.mjs)
     gouache,
+    // surface marks: the judge, every region's label and what was laid (tools/plate/surface-plan.mjs)
+    surface,
     continuedChecks: continuedSummary(),
   };
 }

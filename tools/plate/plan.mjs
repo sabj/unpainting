@@ -37,6 +37,7 @@ import {finishField} from '../../src/crop/finish.mjs';
 import {labPlanes} from '../../src/eval/colour.mjs';
 import {smallLights, paperDensity, cellShare, keepLargestLights} from '../../src/crop/lights.mjs';
 import {planGouache} from './gouache-plan.mjs';
+import {planSurface} from './surface-plan.mjs';
 import {GOUACHE_PIGMENT} from '../../src/media/gouache.mjs';
 import {planCurls} from '../../src/crop/curls.mjs';
 import {pigmentPhysics} from '../../src/paint/methods/pigment-physics.mjs';
@@ -801,9 +802,15 @@ const WICK_FLOOR = Math.max(...WICK_FLOORS);
 // Final lights (tools/plate/gouache-plan.mjs): thin light over dark that no wash can reserve, laid last in white gouache.
 // Decided here from the planning data, the same rule for every picture and in both looking modes; an area plan owns its
 // own lights (pass.lights), so it takes none. The white is one more pigment channel on the sheet only when a stroke is planned.
+// Surface marks on an unplanned run (tools/plate/surface-plan.mjs): a vision judge labels the SAM regions, a coat asks for
+// coat marks and dressed stone for masonry, anything else or any doubt for none. An area plan has its own marks (pass.marks).
+const SURFACE_PLAN = opt('areaplan', '')
+  ? { groups: [], coatMask: new Uint8Array(w * h), record: { status: 'none', reason: 'an area plan owns its marks (pass.marks)' } }
+  : await planSurface({ image: path.resolve(root, opt('image')), root, w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), segments: ctx.SEGMENTS_RECORD, SRC: ctx.SRC, judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')), log: console.log });
+fs.writeFileSync(path.join(out, 'surface-plan.json'), JSON.stringify(SURFACE_PLAN.record, null, 1));
 const GOUACHE_PLAN = opt('areaplan', '')
   ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lights (pass.lights)' } }
-  : await planGouache({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, pigments: PIGS });
+  : await planGouache({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, pigments: PIGS, coat: { status: SURFACE_PLAN.record.status, mask: SURFACE_PLAN.coatMask } });
 console.log(GOUACHE_PLAN.strokes.length ? `final lights: ${GOUACHE_PLAN.record.planned.singles} single lights, ${GOUACHE_PLAN.record.planned.fieldStrokes} strokes in ${GOUACHE_PLAN.record.fields.length} coats, ${GOUACHE_PLAN.record.planned.glints} glints for white gouache, ${GOUACHE_PLAN.record.planned.lengthMm} mm of rigger line (${(100 * GOUACHE_PLAN.record.planned.shareOfCeiling).toFixed(2)}% of the stroke ceiling; read at ${GOUACHE_PLAN.record.read.fineWidth} px wide)` : `final lights: no thin light over dark that a wash cannot reserve (${GOUACHE_PLAN.record.reason ?? `${GOUACHE_PLAN.record.found.ridges} ridges, no coat, none kept`})`);
 fs.writeFileSync(path.join(out, 'gouache-plan.json'), JSON.stringify({ ...GOUACHE_PLAN.record, strokes: GOUACHE_PLAN.strokes }, null, 1));
 const SHEET_PIGS = [...(WICK_FLOOR > 0 ? PIGS.map((p, j) => (wickFloorOf(j) > 0 ? { ...p, wick: Math.max(wickFloorOf(j), p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))) } : p)) : PIGS), ...(INK ? [INK] : []), ...(GRAPHITE ? [GRAPHITE] : []), ...(GOUACHE_PLAN.strokes.length ? [GOUACHE_PIGMENT] : [])]; ctx.SHEET_PIGS = SHEET_PIGS;
@@ -842,6 +849,6 @@ Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT
   FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
   FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 
-  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, GOUACHE_PLAN, GOUACHE_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
+  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, SURFACE_PLAN, GOUACHE_PLAN, GOUACHE_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
   EARLY_DRY_VALUE });
 }

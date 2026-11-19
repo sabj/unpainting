@@ -34,13 +34,13 @@ const finite = x => typeof x === 'number' && Number.isFinite(x);
 const point = p => Array.isArray(p) && p.length === 2 && p.every(v => finite(v) && v >= 0 && v <= 1);
 
 /** Checks a plan's marks entry; throws with the reason. */
-export function validateSurfaceMarks(marks, key = 'pass') {
+export function validateSurfaceMarks(marks, key = 'pass', { flowGiven = false } = {}) {
   if (!marks || typeof marks !== 'object' || Array.isArray(marks)) fail(`${key}.marks must be an object`);
   if (!SURFACE_MARKS.includes(marks.kind)) fail(`${key}.marks.kind must be one of ${SURFACE_MARKS.join(', ')}`);
   if (typeof marks.reason !== 'string' || !marks.reason.trim()) fail(`${key}.marks.reason required: what the subject shows there`);
   if (!finite(marks.cover) || marks.cover <= 0 || marks.cover > 1) fail(`${key}.marks.cover must be a share in (0, 1]`);
   if (!['edge', 'whole'].includes(marks.placement)) fail(`${key}.marks.placement must be edge or whole`);
-  if (NEEDS_FLOW.has(marks.kind) && (!Array.isArray(marks.flow) || marks.flow.length < 2 || !marks.flow.every(point)))
+  if (NEEDS_FLOW.has(marks.kind) && !flowGiven && (!Array.isArray(marks.flow) || marks.flow.length < 2 || !marks.flow.every(point)))
     fail(`${key}.marks.flow required for ${marks.kind}: two or more normalized points along the coat`);
   if (marks.kind === 'masonry' && (!finite(marks.courseAngleDeg) || Math.abs(marks.courseAngleDeg) > 45))
     fail(`${key}.marks.courseAngleDeg required for masonry: the courses' angle in degrees, -45 to 45`);
@@ -55,7 +55,7 @@ function rng(seed) {
 const hash = text => { let h = 2166136261; for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619); return h >>> 0; };
 
 // The flow's direction at a point: that of the nearest flow segment.
-function flowAt(flow, x, y) {
+function flowAt_(flow, x, y) {
   let best = Infinity, dir = [1, 0];
   for (let k = 1; k < flow.length; k++) {
     const [ax, ay] = flow[k - 1], [bx, by] = flow[k], vx = bx - ax, vy = by - ay, n = vx * vx + vy * vy;
@@ -74,13 +74,17 @@ function flowAt(flow, x, y) {
  * @param toCell   ([nx, ny]) => [x, y] on the plan grid, for the plan's normalized flow points
  * @param scale    sheet cells per plan cell
  * @param seedKey  text that seeds the marks (the pass key)
+ * @param flowAt   optional ([x, y]) => [dx, dy], the coat's growth direction at a plan cell, in place of the plan's flow line
+ * @param weight   optional Float32Array w * h in 0..1: how much a mark is wanted at each cell (the cover is scaled by it)
  * @returns [[{x, y, r, p}]] in sheet cells
  */
-export function surfaceMarkPaths(marks, { mask, w, h, mmPerCell, brushMm, toCell, scale = 1, seedKey = '' }) {
-  validateSurfaceMarks(marks);
+export function surfaceMarkPaths(marks, { mask, w, h, mmPerCell, brushMm, toCell, scale = 1, seedKey = '', flowAt = null, weight = null }) {
+  validateSurfaceMarks(marks, 'pass', { flowGiven: typeof flowAt === 'function' });
   if (!finite(brushMm) || brushMm <= 0 || !finite(mmPerCell) || mmPerCell <= 0) fail('brush width and cell size required');
   const W = brushMm / mmPerCell, f = FORM[marks.kind], rnd = rng(hash(`${marks.kind}:${seedKey}`)), r = W / 2;
-  const flow = marks.flow ? marks.flow.map(toCell) : null;
+  const flow = marks.flow && !flowAt ? marks.flow.map(toCell) : null;
+  const direction = (x, y) => (flowAt ? flowAt(x, y) : flowAt === null && flow ? flowAt_(flow, x, y) : [1, 0]);
+  const wanted = (x, y) => { if (!weight) return 1; const X = Math.round(x), Y = Math.round(y); return X >= 0 && Y >= 0 && X < w && Y < h ? weight[Y * w + X] : 0; };
   const inside = (x, y) => { const X = Math.round(x), Y = Math.round(y); return X >= 0 && Y >= 0 && X < w && Y < h && mask[Y * w + X] === 1; };
   // a candidate centre is at the edge when some point two brush widths away lies outside the shape
   const nearEdge = (x, y) => { for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; if (!inside(x + 2 * W * Math.cos(a), y + 2 * W * Math.sin(a))) return true; } return false; };
@@ -105,8 +109,8 @@ export function surfaceMarkPaths(marks, { mask, w, h, mmPerCell, brushMm, toCell
     for (let y = y0; y <= y1; y += across) for (let x = x0 + (rnd() * along); x <= x1; x += along) {
       if (rnd() >= marks.cover) continue;
       const cx = x + (rnd() - 0.5) * across, cy = y + (rnd() - 0.5) * across;
-      if (!placed(cx, cy)) continue;
-      const [dx0, dy0] = flowAt(flow, cx, cy), a = (rnd() - 0.5) * 2 * f.spread * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+      if (!placed(cx, cy) || (weight && rnd() >= wanted(cx, cy))) continue;
+      const [dx0, dy0] = direction(cx, cy), a = (rnd() - 0.5) * 2 * f.spread * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
       keep(stroke(cx, cy, dx0 * ca - dy0 * sa, dx0 * sa + dy0 * ca, f.length * W, (f.wave ?? 0) * W, (f.waveLength ?? 1) * W));
     }
   } else if (marks.kind === 'curly-coat') {
@@ -114,7 +118,7 @@ export function surfaceMarkPaths(marks, { mask, w, h, mmPerCell, brushMm, toCell
     for (let row = 0, y = y0; y <= y1; y += pitch * 0.866, row++) for (let x = x0 + (row % 2 ? pitch / 2 : 0); x <= x1; x += pitch) {
       if (rnd() >= marks.cover) continue;
       const cx = x + (rnd() - 0.5) * pitch * 0.5, cy = y + (rnd() - 0.5) * pitch * 0.5, start = rnd() * Math.PI * 2;
-      if (!placed(cx, cy)) continue;
+      if (!placed(cx, cy) || (weight && rnd() >= wanted(cx, cy))) continue;
       const steps = Math.max(4, Math.ceil(turn * R / Math.max(0.5, r))), pts = [];
       for (let k = 0; k <= steps; k++) { const t = k / steps, a = start + turn * t; pts.push({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), p: 1 - 0.6 * t }); }
       keep(pts);
@@ -128,7 +132,7 @@ export function surfaceMarkPaths(marks, { mask, w, h, mmPerCell, brushMm, toCell
       for (let u = u0 - (k % 2 ? f.blockMax * course / 2 : 0); u <= u1;) {
         const len = (f.blockMin + rnd() * (f.blockMax - f.blockMin)) * course, mid = u + len / 2;
         const cx = mid * dx + v * nx, cy = mid * dy + v * ny;
-        if (rnd() < marks.cover && placed(cx, cy)) {
+        if (rnd() < marks.cover && placed(cx, cy) && (!weight || rnd() < wanted(cx, cy))) {
           const run = Math.max(W, len - f.gap * W), pts = [];
           for (let s = 0, steps = Math.max(2, Math.ceil(run / Math.max(0.5, r))); s <= steps; s++) { const t = s / steps - 0.5; pts.push({ x: cx + dx * run * t, y: cy + dy * run * t, p: 1 }); }
           keep(pts);
