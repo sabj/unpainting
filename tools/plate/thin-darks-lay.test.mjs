@@ -92,7 +92,7 @@ import { renderLayers } from '../../src/media/km.mjs';
 import { materialProfile } from '../../src/paint/methods/material-profiles.mjs';
 import { layThinDarks } from './thin-darks-lay.mjs';
 
-async function sheetWith(strokes, { graphite = true, wash = 0.25 } = {}) {
+async function sheetWith(strokes, { graphite = true, wash = 0.25, capture = null } = {}) {
   const W = 200, H = 120, MM = 0.26, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'thin-darks-lay-'));
   const PIGS = [{ name: 'umber', K: [0.9, 1.2, 1.7], S: [0.03, 0.03, 0.03], rho: 0.05, omega: 1.4, gamma: 0.1 }, { name: 'dark', K: [1.6, 1.5, 1.4], S: [0.02, 0.02, 0.02], rho: 0.05, omega: 1.4, gamma: 0.1 }];
   const SHEET_PIGS = [...PIGS, ...(graphite ? [materialProfile('graphite-HB').pigment] : [])], paperOpts = { seed: 9, coldPress: { mmPerCell: MM }, mmPerCell: MM };
@@ -101,7 +101,7 @@ async function sheetWith(strokes, { graphite = true, wash = 0.25 } = {}) {
   dry(sheet, 20000, DEFAULTS, { levelMax: 900 });
   const ctx = { sheet, THIN_DARKS_PLAN: { strokes, record: { paintedMax: 2 } }, PIGS, SHEET_PIGS, GRAPHITE: graphite ? SHEET_PIGS[2] : null, GRAPHITE_AT: 2, SC: 1, W2: W, H2: H, N2: W * H, out: dir,
     num: (name, d) => (name === 'sheetmm' ? W * MM : d), render: () => renderLayers(layersOf(sheet), SHEET_PIGS, base, W * H, 1), shoot: async () => {}, FILM_BY_PAINT: true, SEED: 0, paperRGB: [250, 250, 250],
-    createBrush, dip, stroke, dry, O: DEFAULTS, PAPER_OPTS: paperOpts };
+    createBrush, dip, stroke, dry, O: DEFAULTS, PAPER_OPTS: paperOpts, ...(capture ? { NATIVE_CAPTURE: operation => capture.push(operation) } : {}) };
   const laid = await layThinDarks(ctx), record = JSON.parse(fs.readFileSync(path.join(dir, 'thin-darks.json'), 'utf8'));
   fs.rmSync(dir, { recursive: true, force: true });
   return { laid, lines: record.lines };
@@ -121,6 +121,14 @@ test('on a dried wash a wide line is painted and a hairline pencilled, each with
     assert.equal(l.final, 'within');
   }
   assert.equal(laid.paint.within + laid.pencil.within, 3); assert.equal(laid.paint.over, 0);
+});
+
+test('a recorded run keeps one frame for every pencil stroke laid over the washes', async () => {
+  // The recorder fails a run whose tape holds a graphite stroke it never saw (stored-plan repaints at 74c316dd: tape 174, captured 165).
+  const capture = [], { laid, lines } = await sheetWith([planned(60, { step: 12, halfMm: 0.3 })], { capture });
+  const passes = lines.reduce((sum, l) => sum + (l.pencil?.passes.length ?? 0), 0);
+  assert.equal(laid.pencil.lines, 1); assert.ok(passes >= 1);
+  assert.equal(capture.filter(op => op === 'graphite').length, passes, `captured ${JSON.stringify(capture)}`);
 });
 
 test('the sheet takes its painted lines and no more, and without a pencil on it the rest are refused', async () => {

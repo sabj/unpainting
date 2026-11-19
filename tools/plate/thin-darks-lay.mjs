@@ -175,7 +175,9 @@ export async function layThinDarks(ctx) {
         // the pencil's own coordinates name a cell by its corner
         return { points: row.line.points.map(([x, y]) => ({ x: x - 0.5, y: y - 0.5, s: p.pressure })) };
       });
-      const r = drawMaterial(sheet, gestures, null, W2, H2, { medium: RESTATING_PENCIL, stage: 'closing', mmPerCell, edgeCut: false, state: { used: 0 }, caps: { lines: gestures.length, pressure: 1, minLengthMm: 0, edgeMin: 0 }, audit: [], O, pigmentAt: GRAPHITE_AT, graphiteOptions: { amount, seed } });
+      const r = drawMaterial(sheet, gestures, null, W2, H2, { medium: RESTATING_PENCIL, stage: 'closing', mmPerCell, edgeCut: false, state: { used: 0 }, caps: { lines: gestures.length, pressure: 1, minLengthMm: 0, edgeMin: 0 }, audit: [], O, pigmentAt: GRAPHITE_AT, graphiteOptions: { amount, seed },
+        // a recorded run (--marks 1) keeps one frame for every graphite stroke on the tape, these included
+        ...(ctx.NATIVE_CAPTURE ? { afterStroke: e => ctx.NATIVE_CAPTURE(e.skipped ? 'graphite-skipped' : 'graphite') } : {}) });
       drawn += r.drawn; layersChanged(sheet); last = read();
       for (const row of list) { row.drawn = along(row.line, last).drop; row.pencilPasses.at(-1).drawn = +row.drawn.toFixed(2); }
     };
