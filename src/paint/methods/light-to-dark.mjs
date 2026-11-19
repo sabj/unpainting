@@ -217,7 +217,9 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
   // layers' own cuts are. A wash holds no shape finer than that; cut cell by cell, each step is a tracing of the target.
   // Each cell still asks for its own paint, so a wash's charge is the mass tone of the cells it covers.
   // The first wash and the first middle layer take the steps squinted over the floor brush; later layers and the darks
-  // take them squinted over the detail brush (fineWeights).
+  // take them squinted over the detail brush (fineWeights), and so do the shadow glazes. The darks carry a picture's
+  // accents (an eyelid, a nostril, a rim, a rope), so they are the detail brush's work: their shapes may be as small as
+  // one touch of its narrowest mark, not the floor brush's footprint.
   const SQUINT=nestedBands&&stepSquint?boxMeanValue(value.values,w,h,rFloor):null,SQUINT_FINE=nestedBands&&stepSquint?boxMeanValue(value.values,w,h,rDetail):null;
   const fineWeights=weights.map(a=>Float32Array.from(a));
   const cutSteps=(set,field)=>{for(let i=0;i<n;i++){
@@ -243,7 +245,7 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
   const TONE=massTone?createMassTone({n,pigments,paperRGB:paperRGB??[252,251,248]}):null;let toneSum=0,toneArea=0;
   // shadow glazes (shadow-glaze.mjs): the shadow bands are charged against the paint the earlier passes have laid, a value step at a time
   const inkWashCell=i=>cellStyle(i)?.name==='ink-and-wash';
-  const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rFloor):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?weights[3][i]+weights[4][i]>0:deep?weights[4][i]>0:weights[3][i]>0&&!(weights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1&&'fine'))}):null;
+  const GLAZE=TONE?createShadowGlazes({n,k,pigments,paperRGB:paperRGB??[252,251,248],demand,squint:SQUINT?f=>boxMeanValue(f,w,h,rDetail):undefined,eligible:(i,{last,deep})=>!protectedCells[i]&&!inkWashCell(i)&&(deep===undefined?fineWeights[3][i]+fineWeights[4][i]>0:deep?fineWeights[4][i]>0:fineWeights[3][i]>0&&!(fineWeights[4][i]>0))&&(shadowMask[i]||(last&&accentCells[i]===1&&'fine'))}):null;
   const layers=[],instructions=[];let omittedDemand=0;
   // local colour (palettewide.mjs puddles): a wash that keeps families apart is cut again by the mix of the cells it covers, so a shirt and a face of one family are never one mean wash; mixes the eye cannot tell apart stay one wash
   let PUDDLE_LABELS=null;const puddles=()=>PUDDLE_LABELS??=mergeCloseColours(puddleLabels(demand,k,w,h),demand,k,pigments,paperRGB??[252,251,248]).labels;
@@ -254,7 +256,7 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
   // The darks keep the floor brush's scale for their passages and weights; only their holes follow the detail brush.
   // holeFloor: the least paper a step goes round. A dark glaze goes round a light the detail brush can leave (a mullion in a window),
   // though its own passages keep the floor brush's size.
-  const steps=[1,2,3,4,5].map(band=>({band,wt:(band===3?fineWeights:weights)[band-1],tag:'',floor:band===3?smallShape:minShape,holeFloor:band===3||band>=4?smallShape:minShape,holeWidth:band===3||band>=4?markCells:0}));
+  const steps=[1,2,3,4,5].map(band=>({band,wt:(band>=3?fineWeights:weights)[band-1],tag:'',floor:band>=3?smallShape:minShape,holeFloor:band>=3?smallShape:minShape,holeWidth:band>=3?markCells:0}));
   if(shaped&&washLayers>0&&profile?.name!=='ink-and-wash'){
     const sm=boxMeanValue(value.values,w,h,rDetail),smBroad=sm;
     const live=[];for(let i=0;i<n;i++)if(!protectedCells[i]&&weights[1][i]>0)live.push(smBroad[i]);live.sort((a,b)=>a-b);
@@ -287,7 +289,7 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
     // layerTexture: band 3 stays a sparse dry-brush texture pass over the dried layers (rough stone).
     steps.splice(1,layerTexture?1:2,...layerSteps);
   }
-  if(GLAZE){const at=steps.findIndex(s=>s.band===4),G=(g,band,tag,deep)=>({band,tag,glaze:g,deep,last:g===MAX_GLAZES-1&&deep!==false,floor:minShape,holeFloor:smallShape,holeWidth:markCells,wt:null});steps.splice(at,2,G(0,4,''),...Array.from({length:MAX_GLAZES-1},(_,q)=>[G(q+1,4,'G'+(q+1),false),G(q+1,5,q?'D'+(q+1):'',true)]).flat());}
+  if(GLAZE){const at=steps.findIndex(s=>s.band===4),G=(g,band,tag,deep)=>({band,tag,glaze:g,deep,last:g===MAX_GLAZES-1&&deep!==false,floor:smallShape,holeFloor:smallShape,holeWidth:markCells,wt:null});steps.splice(at,2,G(0,4,''),...Array.from({length:MAX_GLAZES-1},(_,q)=>[G(q+1,4,'G'+(q+1),false),G(q+1,5,q?'D'+(q+1):'',true)]).flat());}
   // passCap q: each passage is charged at the q quantile of its cells' demand, not the mean, so one charge does not
   // overshoot its paler cells; what a cell still needs (or got too much of) is carried into that pigment's next band.
   // massTone: a wash charged at its mass tone leaves nothing to carry. What some of its cells lack, others have over,

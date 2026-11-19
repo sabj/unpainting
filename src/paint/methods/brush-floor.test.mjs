@@ -24,7 +24,7 @@ function plan(density, extra = {}) {
   try { return planLightToDark({ w: W, h: H, k: 1, density, demand: density.slice(), shaped: true, nestedBands: true, layers: 4, sheetWidthMm: W * CELL_MM, ...extra }); }
   finally { console.log = log; }
 }
-// Passes of the middle layers after the first: where the form is built up. The darks are not cut from the small brushes.
+// Passes of the middle layers after the first: where the form is built up.
 const builtUp = p => p.layers.flatMap(l => l.shapes).filter(sh => /^mid\/b2L[1-9]\//.test(sh._valuePlan.id));
 const painted = (shapes, cell) => shapes.some(sh => sh.mask[cell]);
 
@@ -149,4 +149,21 @@ test('a mid-tone shape of the narrowest mark becomes a passage at twice the dens
     const { w, mm, p } = sheetAt(cell, draw);
     assert.equal(later(p, mm(19.5) * w + mm(14.25)).length > 0, laid, `at ${cell.toFixed(3)} mm a cell`);
   }
+});
+
+test('a small dark the detail brush can lay gets its own deepest-dark passage, though it is under the floor brush\'s footprint', () => {
+  // 0.3.2 cut both dark bands and the shadow glazes from the picture squinted over the 3 mm floor brush and held their shapes
+  // to that brush's footprint, so an accent of 64 cells (2 x 2 mm) inside a mid-tone form never got its dark.
+  const floorFootprint = brushFootprintCells(3, CELL_MM);
+  for (const side of [8, 6]) {
+    assert.ok(side * side < floorFootprint, `${side * side} cells is under the floor brush's ${floorFootprint}`);
+    const p = plan(field(d => rect(d, 126, 126, side, 0.92)));
+    const centre = (126 + (side >> 1)) * W + 126 + (side >> 1);
+    const deepest = p.layers.flatMap(l => l.shapes).filter(sh => /^shadow\/b5\//.test(sh._valuePlan.id) && sh.mask[centre]);
+    assert.equal(deepest.length, 1, `a ${side}x${side} dark has one deepest-dark passage over it`);
+    assert.ok(deepest[0].area <= side * side + 8, `the passage is the accent's own size (${deepest[0].area} cells), not a floor-brush shape`);
+  }
+  // a speck under one touch of the narrowest mark is still not a passage
+  const speck = plan(field(d => rect(d, 126, 126, 2, 0.92)));
+  assert.ok(!speck.layers.flatMap(l => l.shapes).some(sh => /^shadow\/b5\//.test(sh._valuePlan.id) && sh.mask[127 * W + 127]));
 });
