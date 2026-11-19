@@ -167,3 +167,18 @@ test('a small dark the detail brush can lay gets its own deepest-dark passage, t
   const speck = plan(field(d => rect(d, 126, 126, 2, 0.92)));
   assert.ok(!speck.layers.flatMap(l => l.shapes).some(sh => /^shadow\/b5\//.test(sh._valuePlan.id) && sh.mask[127 * W + 127]));
 });
+
+test('a pale shape the kit\'s smallest brush can lay is a passage of the first middle wash, with the kit\'s own floor role', () => {
+  // The floor role was the 3 mm round: a pale 2 x 2 mm shape on a light ground got a 16-cell fragment of a later layer, and a
+  // 1.5 x 1.5 mm one got nothing. The floor is now the rigger's belly: a wash may hold any shape the kit's smallest brush lays.
+  for (const [side, value] of [[8, 0.28], [6, 0.28], [8, 0.45], [6, 0.45]]) {
+    const density = new Float32Array(N).fill(0.1);
+    rect(density, 10, 10, 40, 0.9);
+    rect(density, 126, 126, side, value);
+    const p = plan(density), centre = (126 + (side >> 1)) * W + 126 + (side >> 1);
+    const first = p.layers.flatMap(l => l.shapes).filter(sh => /^mid\/b2L0\//.test(sh._valuePlan.id) && sh.mask[centre]);
+    assert.equal(first.length, 1, `a ${side}x${side} shape of value ${value} is one passage of the first middle wash`);
+    // measured: 88 and 52 cells at value 0.28, 124 and 80 at 0.45 (the shape plus the rigger squint's halo)
+    assert.ok(first[0].area >= side * side && first[0].area <= 2.5 * side * side, `it is the shape's own size with its halo (${first[0].area} cells for ${side * side})`);
+  }
+});

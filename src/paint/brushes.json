@@ -61,9 +61,9 @@
   },
   "roles": {
     "wash": "mop",
-    "floor": "round4",
+    "floor": "rigger",
     "detail": "rigger",
     "drag": "dry",
-    "note": "Which brush does which job: the widest sweeps use the mop, no wash stroke before the detail passes is narrower than the floor brush, the detail passes may go down to the rigger, and the drags use the dry brush."
+    "note": "Which brush does which job: the widest sweeps use the mop, no wash stroke is narrower than the floor brush (the rigger's belly, 1.2 mm; a wash may hold any shape the kit's smallest brush can lay), the detail passes go down to the rigger's point, and the drags use the dry brush."
   }
 }

@@ -20,7 +20,7 @@ export function loadPhysical({ root, opt, num, W2, H2 = W2 }) {
   const loadCells = (name, tech) => loadCm(name, tech) * 10 / mmPerCell;
   // --washbrush name: the biggest brush a wash passage may use, instead of the kit's wash role. Foliage is dabbed with
   // a round about the size of a clump, not swept with a mop.
-  // --floorbrush name: the smallest brush a wash passage may use, instead of the kit's floor role (round4, 3 mm).
+  // --floorbrush name: the smallest brush a wash passage may use, instead of the kit's floor role (the rigger, 1.2 mm).
   // Strips narrower than the floor brush need a smaller one, or every darker pass paints across them.
   const R = { ...cfg.roles, ...(opt('washbrush', '') ? { wash: opt('washbrush', '') } : {}), ...(opt('floorbrush', '') ? { floor: opt('floorbrush', '') } : {}) };
   if (!B(R.wash)) throw new Error(`--washbrush: no brush ${R.wash} in ${opt('brushes', 'src/paint/brushes.json')}`);
