@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import sharp from "sharp";
 import { BENCH, readJson, writeJson, loadRuns } from "./lib.mjs";
 import { benchmarkProfile } from "./profiles.mjs";
+import { scorePython } from "./preflight.mjs";
 
 async function makeTryFolder(root, cropPatch = {}) {
   const source = structuredClone(loadRuns().find(e => e.run.round === "V4" && e.run.crops.hills).run);
@@ -162,7 +163,12 @@ test("score.mjs --no-fullsize flag skips fullsize evaluation", async () => {
   }
 });
 
-test("score.mjs invokes real fullsize.py and attaches genuine craft measures", async () => {
+test("score.mjs invokes real fullsize.py and attaches genuine craft measures", async t => {
+  // The scorer's own interpreter: --python, else BENCH_SCORE_PYTHON, else python3 (preflight.mjs). Without the scorer's
+  // packages the real measures cannot run here, and the test is reported as skipped, not passed.
+  const realPy = scorePython(null);
+  const probe = spawnSync(realPy, ["-c", "import numpy, scipy, skimage, PIL"], { encoding: "utf8" });
+  if (probe.error || probe.status !== 0) return t.skip(`${realPy} lacks the packages in bench/scorer/requirements.txt; set BENCH_SCORE_PYTHON to an interpreter that has them`);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "score-fullsize-real-"));
   try {
     const { dir, raw } = await makeTryFolder(root);
@@ -171,7 +177,7 @@ test("score.mjs invokes real fullsize.py and attaches genuine craft measures", a
     fs.writeFileSync(python, `#!${process.execPath}
 const { execFileSync } = require("child_process"), path = require("path");
 const a = process.argv.slice(2), s = path.basename(a[0]);
-const realPy = "/Users/factbot/painter-lines/bin/python3";
+const realPy = ${JSON.stringify(realPy)};
 if (s === "-c") {
   execFileSync(realPy, ["-c", a[1]], { stdio: "inherit" });
   process.exit(0);
