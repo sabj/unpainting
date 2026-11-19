@@ -122,7 +122,7 @@ if (GOUACHE_LIGHTS) {
 // the final lights planned before the first wash (tools/plate/gouache-plan.mjs): rigger strokes of white gouache, in the sheet's physics
 // a coat's texture planned before the first wash (src/crop/coat-texture.mjs): dry-brush strokes along the strands the subject shows
 if (ctx.COAT_PLAN?.strokes.length) await layCoats(ctx); else ctx.COAT_RECORD = ctx.COAT_PLAN?.record ?? null;
-// thin darks planned before the first wash (tools/plate/thin-darks-plan.mjs): lines the washes could not lay, drawn with the rigger's point as paint
+// thin darks planned before the first wash (tools/plate/thin-darks-plan.mjs): lines the washes could not lay, each laid at its own step with the rigger's point or restated in pencil
 if (ctx.THIN_DARKS_PLAN?.strokes.length) await layThinDarks(ctx); else ctx.THIN_DARKS_RECORD = ctx.THIN_DARKS_PLAN?.record ?? null;
 // surface marks planned before the first wash (tools/plate/surface-plan.mjs): dry flicks of each coat's or wall's own paint
 if (ctx.SURFACE_PLAN?.groups.length) await layMarks(ctx); else ctx.SURFACE_RECORD = ctx.SURFACE_PLAN?.record ?? null;

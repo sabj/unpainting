@@ -51,9 +51,11 @@ export function prepareDrawing(gestures,{medium,stage='opening',mmPerCell,edgeSt
  }
  return out;
 }
-export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,edgeCut=true,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,dropSize=.1,drySheet,...opts}){
- const profile=materialProfile(medium),k=sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
- if(k<0)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
+// `pigmentAt`: the sheet pigment a pencil's graphite is laid as, when the sheet carries another grade's graphite (the
+// same material at another strength; the caller scales `graphiteOptions.amount` by the two absorptions).
+export function drawMaterial(sheet,gestures,want,w,h,{medium,stage='opening',mmPerCell=280/w,edgeStrength=want,edgeCut=true,state,caps,sourceInk=false,O,audit=[],dryInk=true,graphiteOptions={},widthFloorMm=0,dropSize=.1,drySheet,pigmentAt=null,...opts}){
+ const profile=materialProfile(medium),k=pigmentAt!=null&&profile.kind==='graphite'?pigmentAt:sheet.pigments.findIndex(p=>p.name===profile.pigment.name);
+ if(k<0||k>=sheet.pigments.length)throw Error(`Sheet missing declared pigment ${profile.pigment.name}`);
  const selected=prepareDrawing(gestures,{medium,stage,mmPerCell,edgeStrength,edgeCut,w,h,state,caps,sourceInk,widthFloorMm});
  const dryGate=dryPenGate({O,audit,...(drySheet?{drySheet}:{})});
  const gate=event=>{
