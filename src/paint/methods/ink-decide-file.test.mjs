@@ -21,11 +21,13 @@ async function setup() {
   const line = (y, x0, x1) => ({ points: Array.from({ length: 36 }, (_, k) => [x0 + (x1 - x0) * k / 35, y + 0.5]), inputKind: 'line-map' });
   return { dir, image, stem, L, doc: { image: { w: W, h: H }, lines: [line(30, 5, 75), line(70, 85, 155)] } };
 }
+// The label cache is keyed by the model, so a vision judge must be named; the reply itself is stubbed.
+const LABEL_ENV = { ...process.env, INK_LABEL_MODEL: 'test-model' };
 const replying = json => () => ({ status: 0, stdout: JSON.stringify(json), stderr: '' });
 
 test('a vision model labels the regions, the sky line is wash and the architecture line is drawn, and the record says so', async () => {
   const s = await setup(), logs = [];
-  const r = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: m => logs.push(m), run: replying({ 1: 'architecture', 2: 'sky' }) });
+  const r = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', env: LABEL_ENV, cacheDir: path.join(s.dir, 'cache'), log: m => logs.push(m), run: replying({ 1: 'architecture', 2: 'sky' }) });
   assert.equal(r.lines.length, 1);
   assert.ok(r.lines[0].points.every(([x]) => x < W / 2 + 1));
   const rec = JSON.parse(fs.readFileSync(path.join(s.dir, 'ink-labels.json'), 'utf8'));
@@ -33,27 +35,24 @@ test('a vision model labels the regions, the sky line is wash and the architectu
   assert.equal(rec.judge, 'codex');
   assert.ok(rec.stats.droppedMm.label.sky > 5);
   // the labels are cached by the target's hash: a second call asks nobody
-  const again = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: () => {}, run: () => { throw new Error('asked again'); } });
+  const again = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', env: LABEL_ENV, cacheDir: path.join(s.dir, 'cache'), log: () => {}, run: () => { throw new Error('asked again'); } });
   assert.equal(again.record.cached, true);
   assert.equal(again.lines.length, 1);
 });
 
-test('when the model cannot run the regions take the simple classifier, loudly, and the record says so', async () => {
-  const s = await setup(), logs = [];
-  const r = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: m => logs.push(m), run: () => ({ status: 1, stdout: '', stderr: 'not signed in' }) });
-  assert.ok(logs.some(m => m.startsWith('!!! ink labels:')));
-  const rec = JSON.parse(fs.readFileSync(path.join(s.dir, 'ink-labels.json'), 'utf8'));
-  assert.equal(rec.judge, 'simple');
-  assert.match(rec.note, /not signed in/);
-  assert.ok(rec.regions.every(g => g.from === 'simple'));
-  assert.equal(r.lines.length, 2, 'both are architecture to the simple classifier, and both are pen lines');
+test('a requested vision judge that cannot run stops the decision; it does not fall back to the simple classifier', async () => {
+  const s = await setup();
+  const failing = () => ({ status: 1, stdout: '', stderr: 'not signed in' });
+  await assert.rejects(decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', env: LABEL_ENV, cacheDir: path.join(s.dir, 'cache'), run: failing }),
+    /ink labels \(codex\): label process failed/);
+  assert.ok(!fs.existsSync(path.join(s.dir, 'ink-labels.json')), 'no label record is written for a failed judge');
 });
 
 test('face and hands are never taken for shadow: a pen line in a dark face region stays', async () => {
   const s = await setup();
   for (let y = 0; y < H; y++) for (let x = 0; x < W / 2; x++) if (!(y === 30 || y === 31)) s.L[y * W + x] = 40; // the left half is a dark mass, the line only 12 L* darker
   for (let x = 5; x < 75; x++) for (const y of [30, 31]) s.L[y * W + x] = 28;
-  const r = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: () => {}, run: replying({ 1: 'face', 2: 'sky' }) });
+  const r = await decideFile({ doc: s.doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', env: LABEL_ENV, cacheDir: path.join(s.dir, 'cache'), log: () => {}, run: replying({ 1: 'face', 2: 'sky' }) });
   assert.ok(r.lines.some(g => g.points[0][0] < W / 2));
 });
 
@@ -76,7 +75,7 @@ test('authored plan lines are pruned by the target, not by region labels: a sky 
   const doc = { image: { w: W, h: H }, lines: [mk(30, 5, 75), mk(50, 25, 150), mk(80, 25, 150)] };
   const run = replying({ 1: 'sky', 2: 'architecture' });
   const ys = r => r.lines.map(g => Math.round(g.points[0][1])).sort((a, b) => a - b);
-  const common = { doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', cacheDir: path.join(s.dir, 'cache'), log: () => {}, run, shadowMask: false };
+  const common = { doc, L: s.L, image: s.image, out: s.dir, stage: 'opening', pxMm: PX, segments: { stem: s.stem }, judge: 'codex', env: LABEL_ENV, cacheDir: path.join(s.dir, 'cache'), log: () => {}, run, shadowMask: false };
   const authored = await decideFile({ ...common, authored: true });
   assert.deepEqual(ys(authored), [31, 51], 'the line under a sky label and the mass edge stay; the line across the mass goes');
   const rec = JSON.parse(fs.readFileSync(path.join(s.dir, 'ink-labels.json'), 'utf8'));

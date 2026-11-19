@@ -32,7 +32,7 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, authored = false, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false }) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, authored = false, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false , env = undefined}) {
   let o = o0;
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   let seg = null, regions = [], lab = { judge: 'none', cached: true, labels: {}, source: {}, note: 'segments off' };
@@ -44,7 +44,7 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
     seg = await loadSegments(base, w, h);
     const segDoc = JSON.parse(fs.readFileSync(`${segments.stem}.json`, 'utf8'));
     regions = segDoc.regions.map(r => ({ ...r, id: Number(r.id) }));
-    lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}) });
+    lab = await labelRegions({ image, regions, labelMap: seg.labels, w, h, judge, cacheDir, segKey: path.basename(segments.stem), log, ...(run ? { run } : {}), ...(env ? { env } : {}) });
   }
   const shadow = shadowMask ? shadowMassMask(L, w, h, pxMm) : new Uint8Array(w * h);
   // --inkfoliage 1: green, busy cells are leaves, wash only (line-foliage.mjs), whatever the regions' labels say
