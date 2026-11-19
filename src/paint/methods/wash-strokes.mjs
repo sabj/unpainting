@@ -125,10 +125,13 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
   const lay = (kind, radius, pts, least) => { const [fresh, all] = stamp(pts, radius, false); if (!all || fresh < least * all) return; stamp(pts, radius, true); strokes.push({ kind, radiusMm: radius, points: pts.map(toMm) }); };
   // A lane is a flat brush drawn straight: its hairs lie across the stroke, so the whole line of them, one radius to
   // either side, must be inside the outline at every point of the lane, and the lane covers a band, square at its ends.
-  const clear = new Float32Array(gn);   // how far the outline is, straight across a lane (in grid cells), the nearer side
-  for (let x = 0; x < gw; x++) { let run = 0; for (let y = 0; y < gh; y++) { const i = y * gw + x; run = inside[i] ? run + 1 : 0; clear[i] = run; } run = 0; for (let y = gh - 1; y >= 0; y--) { const i = y * gw + x; run = inside[i] ? run + 1 : 0; clear[i] = Math.min(clear[i], run); } }
+  // A wider brush's lanes also keep off what is already laid, so no band is charged twice; the smallest brush goes over
+  // the strips that leaves.
+  const clear = new Float32Array(gn);   // how far a lane's brush may reach straight across it (in grid cells), the nearer side
+  const clearance = open => { for (let x = 0; x < gw; x++) { let run = 0; for (let y = 0; y < gh; y++) { const i = y * gw + x; run = open(i) ? run + 1 : 0; clear[i] = run; } run = 0; for (let y = gh - 1; y >= 0; y--) { const i = y * gw + x; run = open(i) ? run + 1 : 0; clear[i] = Math.min(clear[i], run); } } };
   const band = (gy, a, b, rc, commit) => { let fresh = 0, all = 0; for (let y = Math.max(0, Math.ceil(gy - rc)); y <= Math.min(gh - 1, Math.floor(gy + rc)); y++) for (let x = a; x <= b; x++) { const i = y * gw + x; if (!inside[i]) continue; all++; if (!covered[i]) { fresh++; if (commit) { covered[i] = 1; coveredCount++; } } } return [fresh, all]; };
-  const lanes = (radius, least) => {
+  const lanes = (radius, least, overLaid) => {
+    clearance(overLaid ? i => inside[i] : i => inside[i] && !covered[i]);
     const rc = radius / pitch, step = Math.max(1, Math.round(2 * rc * (1 - LANE_OVERLAP))), ok = i => clear[i] >= rc;
     let first = -1; for (let i = 0; i < gn && first < 0; i++) if (ok(i)) first = (i / gw) | 0;
     if (first < 0) return;
@@ -151,7 +154,8 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0 }) {
     if (Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) <= 4) pts.push(pts[0]);
     lay('edge', r, pts, LEAST_NEW);
   }
-  for (const width of kit) lanes(width / 2, width === small ? LEAST_NEW / 2 : LEAST_NEW);
+  for (const width of kit) lanes(width / 2, LEAST_NEW, false);
+  lanes(small / 2, LEAST_NEW, true);
   // parts narrower than the smallest wash brush: the detail brush run round inside them, only along the stretches no
   // stroke has reached
   if (pointMm > 0 && pointMm < small) {

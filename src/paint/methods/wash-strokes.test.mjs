@@ -33,15 +33,17 @@ test('soft and hard are decided once a boundary and come out as lines along the 
 });
 
 test('strokes stay inside the outline by their own width, widest brush that fits, and cover it', () => {
-  const loops = [{ points: [[10, 10], [70, 10], [70, 40], [10, 40]], soft: [] }], { strokes, areaMm2, uncovered } = planWashStrokes(loops, { kitMm: KIT, pointMm: 1.2 });
-  assert.ok(Math.abs(areaMm2 - 1800) < 40);
+  const loops = [{ points: [[10, 10], [70, 10], [70, 50], [10, 50]], soft: [] }], { strokes, areaMm2, uncovered } = planWashStrokes(loops, { kitMm: KIT, pointMm: 1.2 });
+  assert.ok(Math.abs(areaMm2 - 2400) < 50);
   assert.ok(uncovered < .02, `${uncovered} uncovered`);
   assert.equal(strokes[0].kind, 'edge'); assert.equal(strokes[0].radiusMm, 1.5);
-  assert.ok(strokes.some(s => s.kind === 'lane' && s.radiusMm === 12.7), 'the one-inch flat fits a 30 mm band');
+  assert.ok(strokes.some(s => s.kind === 'lane' && s.radiusMm === 12.7), 'the one-inch flat fits inside the edge stroke of a 40 mm band');
   assert.ok(!strokes.some(s => s.radiusMm === 19), 'the mop does not');
   // a lane is a flat brush drawn straight: its width stays inside the outline, and it runs to the outline at both ends
-  for (const s of strokes) for (const [x, y] of s.points) { const along = s.kind === 'lane' ? 0 : s.radiusMm; assert.ok(x - along >= 10 - .5 && x + along <= 70 + .5 && y - s.radiusMm >= 10 - .5 && y + s.radiusMm <= 40 + .5, `${s.kind} r ${s.radiusMm} at ${x}, ${y}`); }
-  assert.ok(strokes.length <= 12, `${strokes.length} strokes for a 60 x 30 mm wash`);
+  for (const s of strokes) for (const [x, y] of s.points) { const along = s.kind === 'lane' ? 0 : s.radiusMm; assert.ok(x - along >= 10 - .5 && x + along <= 70 + .5 && y - s.radiusMm >= 10 - .5 && y + s.radiusMm <= 50 + .5, `${s.kind} r ${s.radiusMm} at ${x}, ${y}`); }
+  assert.ok(strokes.length <= 12, `${strokes.length} strokes for a 60 x 40 mm wash`);
+  // no wide lane goes over the edge stroke's band or another lane's: the wash is not charged twice along its edge
+  for (const s of strokes.filter(q => q.kind === 'lane' && q.radiusMm > 1.5)) for (const [, y] of s.points) assert.ok(y - s.radiusMm >= 13 - .5 && y + s.radiusMm <= 47 + .5);
 });
 
 test('the strokes are the same on any grid, and lanes run along the longer side', () => {
