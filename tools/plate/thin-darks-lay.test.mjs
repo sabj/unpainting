@@ -1,7 +1,7 @@
 // The instrument for a thin dark: nothing where the sheet already shows the line, the point where it can lay the missing step, a pencil where it cannot.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { routeLine, lineShares, pencilFor, verdict, tolerance, STEP_TOLERANCE, RESTATING_PENCIL } from './thin-darks-lay.mjs';
+import { routeLine, secondPass, lineShares, pencilFor, verdict, tolerance, STEP_TOLERANCE, RESTATING_PENCIL, FIRST_PASS } from './thin-darks-lay.mjs';
 import { stepOf, filmFor } from '../../src/paint/methods/point-swatch.mjs';
 import { pencilScrapOver } from '../../src/paint/methods/pencil-scrap.mjs';
 
@@ -24,17 +24,28 @@ test('a line the sheet already shows is left alone', () => {
   assert.equal(r.route, 'stated'); assert.ok(Math.abs(r.need - 5) < 1e-9);
 });
 
-test('a line the point can lay takes the load whose film makes the missing step over this ground, in the line\'s own paints', () => {
+test('a line the point can lay is built in two passes: the first for 55% of the missing step over this ground, in the line\'s own paints', () => {
   const r = routeLine(line(), { drop: 4, groundRGB: ground }, env);
-  assert.equal(r.route, 'paint'); assert.equal(r.need, 20);
-  assert.ok(Math.abs(r.predicted - 20) < 0.6, `the film is predicted to read ${r.predicted} L* over the ground`);
+  assert.equal(r.route, 'paint'); assert.equal(r.need, 20); assert.equal(FIRST_PASS, 0.55);
+  assert.ok(Math.abs(r.predicted - 11) < 0.6, `the first pass is predicted to read ${r.predicted} L* over the ground`);
   assert.ok(Math.abs(r.shares.reduce((a, v) => a + v, 0) - 1) < 1e-9 && r.shares[0] > 0.5, `mostly the dark paint: ${r.shares}`);
-  const film = filmFor(20, ground, palette, r.shares);
+  const film = filmFor(11, ground, palette, r.shares);
   assert.ok(Math.abs(r.conc - 10 * film) < 1e-6, `load ${r.conc} for a film of ${film}`);
   // over a darker ground the same step takes more paint
   const dark = routeLine(line({ step: 20 }), { drop: 0, groundRGB: [120, 100, 85] }, env);
   assert.ok(dark.route === 'paint' && dark.conc > r.conc, `${dark.conc} over the dark ground, ${r.conc} over the light`);
-  assert.ok(Math.abs(stepOf(dark.conc / 10, [120, 100, 85], palette, dark.shares) - 20) < 0.6);
+  assert.ok(Math.abs(stepOf(dark.conc / 10, [120, 100, 85], palette, dark.shares) - 11) < 0.6);
+});
+
+test('the second pass is laid for what is missing, by the yield the first one showed', () => {
+  const r = routeLine(line(), { drop: 4, groundRGB: ground }, env), second = added => secondPass(20 - added, { predicted: r.predicted, added }, ground, r.shares, env);
+  const even = second(11), strong = second(14), weak = second(7);
+  assert.ok(Math.abs(even.yield - 1) < 0.06 && Math.abs(stepOf(even.conc / 10, ground, palette, r.shares) - 9) < 0.6, 'a first pass that came out as predicted: the rest as the swatch says');
+  assert.ok(strong.yield > 1.2 && strong.conc < even.conc, `a first pass that came out strong: a lighter load for the rest (${strong.conc} against ${even.conc})`);
+  assert.ok(weak.yield < 0.7 && weak.conc > even.conc, 'a weak one: a heavier load');
+  assert.equal(second(20.5), null, 'nothing more once the step is there');
+  assert.equal(second(19.9), null, 'nor for a rest lighter than the lightest line the point holds');
+  assert.ok(secondPass(18, { predicted: 2, added: 20 }, ground, r.shares, env).yield === 2, 'the yield is held to between a half and two');
 });
 
 test('a line the point cannot lay goes to the pencil, with the reason', () => {
@@ -44,6 +55,8 @@ test('a line the point cannot lay goes to the pencil, with the reason', () => {
   assert.equal(faint.route, 'pencil'); assert.match(faint.why, /lighter than the lightest line/);
   const full = routeLine(line(), { drop: 0, groundRGB: ground }, { ...env, canPaint: false });
   assert.equal(full.route, 'pencil'); assert.match(full.why, /has its painted lines/);
+  const small = routeLine(line({ step: 7 }), { drop: 0, groundRGB: PAPER }, env);
+  assert.equal(small.route, 'pencil'); assert.match(small.why, /too faint to build up in two passes/);
   const none = routeLine(line(), { drop: 0, groundRGB: ground }, { ...env, swatch: { rows: [], lightest: null, widthMm: null } });
   assert.equal(none.route, 'pencil'); assert.match(none.why, /holds no line/);
   const black = routeLine(line({ step: 40 }), { drop: 0, groundRGB: [40, 38, 36] }, env);
@@ -95,9 +108,10 @@ async function sheetWith(strokes, { graphite = true, wash = 0.25 } = {}) {
 const planned = (y, over = {}) => ({ kind: 'dark-line', curve: Array.from({ length: 31 }, (_, k) => [25 + 5 * k, y + 0.04 * 5 * k]), measuredMm: 0.6, halfMm: 0.6, step: 20, sideL: 70, lengthMm: 39, od: 1, rgb: [70, 60, 55], fit: {}, ...over });
 
 test('on a dried wash a wide line is painted and a hairline pencilled, each within the tolerance of its planned step', async () => {
-  const { laid, lines } = await sheetWith([planned(30), planned(60, { step: 12, halfMm: 0.3 }), planned(90, { step: 9 })]);
+  const { laid, lines } = await sheetWith([planned(30), planned(60, { step: 12, halfMm: 0.3 }), planned(90, { step: 14 })]);
   assert.equal(laid.found, 3); assert.equal(laid.stated, 0); assert.equal(laid.refused.lines, 0);
-  assert.equal(laid.paint.lines, 2); assert.equal(laid.pencil.lines, 1);
+  assert.equal(laid.paint.lines, 2); assert.equal(laid.paint.twoPasses, 2); assert.equal(laid.pencil.lines, 1);
+  for (const l of lines.filter(q => q.route === 'paint')) assert.ok(l.passes[0].painted < l.step && l.passes[1].painted > l.passes[0].painted, `the first pass stops short of the step: ${JSON.stringify(l.passes)}`);
   assert.equal(lines[1].route, 'pencil'); assert.match(lines[1].why, /too wide/);
   for (const l of lines) {
     const shown = l.drawn ?? l.painted;
