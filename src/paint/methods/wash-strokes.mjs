@@ -2,12 +2,13 @@
 //
 // outlineLoops: the boundary of a wash's shapes as closed loops in mm, simplified to a tolerance set by the brush (half
 // the radius of the smallest wash brush), with each segment marked soft or hard from the two shapes it lies between.
-// planWashStrokes: the strokes that lay the wash as one wet film. The widest brush of the kit that fits the wash (the
-// wash is at least BRUSH_FIT brush widths across at its widest) is steered along the outline, its radius inside it,
-// then round again further in, each round over the wet edge of the last by a third of the brush, until the middle is
-// closed. Each smaller brush of the kit then does the same where the wash is too narrow for the one before, and the
-// detail brush goes round inside parts narrower than that. So a wall or a sky is laid with a flat or a mop and only its
-// corners with a round. The edge of the wash is where the brush's own footprint ends: a curve, never a cut. What no
+// planWashStrokes: the strokes that lay the wash as one wet film, with the widest brush of the kit that fits it. A flat
+// or a mop (a brush of LANE_FROM_MM or wider) fits a wash it can be swept across in a straight lane at least LANE_LEAST
+// of its width long, its whole footprint inside the outline; it is swept in such lanes side by side, each over the wet edge of
+// the last by a third of the brush. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
+// outline, its radius inside it, then round again further in until the middle is closed. Each smaller brush of the kit
+// then goes round where the wash is too narrow for the one before, and the detail brush inside parts narrower than
+// that. So a wall or a sky is laid with a flat or a mop and only its edge and corners with a round. The edge of the wash is where the brush's own footprint ends: a curve, never a cut. What no
 // stroke's footprint reaches is counted (uncovered). A wash is laid a little past its outline to meet its neighbours,
 // but never onto a reserved light (keepOut).
 // The strokes are worked out on a planning grid a sixth of the smallest brush's width, cut from the outline: the grid is
@@ -21,6 +22,10 @@ const LANE_OVERLAP = 1 / 3;
 const LEAST_NEW = 0.25;
 /** A brush fits a wash that is at least this many brush widths across at its widest. */
 const BRUSH_FIT = 1.25;
+/** A brush this wide or wider is a flat or a mop: it is swept in straight lanes, not steered round an outline. */
+const LANE_FROM_MM = 12;
+/** The shortest lane a flat or a mop is swept in, in brush widths. */
+const LANE_LEAST = 0.6;
 
 function simplify(pts, tol) {
   // Douglas-Peucker on a closed loop: split at vertex 0 and the vertex furthest from it
@@ -106,7 +111,7 @@ export function softLines(loops) {
  * The strokes that lay a wash inside its outline.
  * @param loops outlineLoops' result. @param kitMm the wash brushes' belly widths in mm. @param pointMm the detail brush's belly width.
  * @param growMm the wash is laid this far past its outline. @param keepOut outlines (as loops) the wash never grows onto.
- * @returns {{strokes: Array<{kind:'contour'|'edge'|'point'|'close', radiusMm:number, points:number[][]}>, brushMm:number, depthMm:number, areaMm2:number, uncovered:number}}
+ * @returns {{strokes: Array<{kind:'lane'|'contour'|'edge'|'point'|'close', radiusMm:number, points:number[][]}>, brushMm:number, depthMm:number, areaMm2:number, uncovered:number}}
  *   brushMm is the widest brush used, depthMm how far the middle of the wash is from its edge, uncovered the share of
  *   the outline's area no stroke's footprint reaches.
  */
@@ -186,10 +191,30 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut
     for (; level <= deepest; level += step) follow(kind, radius, level, least);
     if (deepest > level - step + radius) follow(kind, radius, Math.max(level - step + radius / 2, deepest - pitch), least);
   };
-  // The first brush, from the wash's size: the widest of the kit that fits it (twice the depth of the wash, how far its
-  // middle is from its edge, is BRUSH_FIT brush widths or more); the smallest brush for a small wash.
-  const brush = kit.find(width => BRUSH_FIT * width <= 2 * deepest) ?? small;
-  inward('contour', brush / 2, LEAST_NEW / 2);
+  // Where a flat or a mop of this radius can be put down with its whole footprint inside the outline: by row, the runs
+  // of the grid it can be swept along.
+  const runsFor = radius => {
+    const rows = [];
+    for (let gy = 0; gy < gh; gy++) { let from = -1; for (let gx = 0; gx <= gw; gx++) { const ok = gx < gw && D[gy * gw + gx] >= radius - pitch / 2; if (ok && from < 0) from = gx; else if (!ok && from >= 0) { (rows[gy] ??= []).push([from, gx - 1]); from = -1; } } }
+    return rows;
+  };
+  const longest = rows => { let l = 0; for (const runs of rows) if (runs) for (const [a, b] of runs) l = Math.max(l, (b - a) * pitch); return l; };
+  // Straight lanes side by side across the wash, evenly spaced and no further apart than a round of the brush.
+  const sweep = (radius, rows) => {
+    let top = -1, bottom = -1; rows.forEach((runs, gy) => { if (runs) { if (top < 0) top = gy; bottom = gy; } });
+    const count = Math.max(1, Math.ceil((bottom - top) * pitch / (2 * radius * (1 - LANE_OVERLAP))));
+    for (let q = 0; q < count; q++) {
+      const gy = Math.round(top + (q + .5) * (bottom - top) / count);
+      for (const [a, b] of rows[gy] ?? []) {
+        if ((b - a) * pitch < LANE_LEAST * 2 * radius) continue;   // a stroke, not a dab
+        const pts = [[a, gy], [(a + b) / 2, gy], [b, gy]], [fresh, all] = stamp(pts, radius, false);
+        if (all && fresh >= LEAST_NEW / 2 * all) { stamp(pts, radius, true); strokes.push({ kind: 'lane', radiusMm: radius, points: pts.map(toMm) }); }
+      }
+    }
+  };
+  // The first brush, from the wash's size: the widest of the kit that fits it; the smallest brush for a small wash.
+  const brush = kit.find(width => (width >= LANE_FROM_MM ? longest(runsFor(width / 2)) >= LANE_LEAST * width : BRUSH_FIT * width <= 2 * deepest)) ?? small;
+  if (brush >= LANE_FROM_MM) sweep(brush / 2, runsFor(brush / 2)); else inward('contour', brush / 2, LEAST_NEW / 2);
   // then each smaller brush where the wash is too narrow for the one before, and the detail brush where it is narrower still
   for (const width of kit) if (width < brush) inward('edge', width / 2, LEAST_NEW);
   if (pointMm > 0 && pointMm < small) follow('point', pointMm / 2, pointMm / 2, LEAST_NEW);
