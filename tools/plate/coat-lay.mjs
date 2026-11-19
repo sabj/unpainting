@@ -12,7 +12,7 @@ import { BRUSH_SETTINGS, LOAD_FILMS } from '../../src/paint/methods/brush-swatch
 import { lstar } from '../../src/crop/thin-lights.mjs';
 
 export const LOAD = LOAD_FILMS;  // gouache paste on the brush, in hiding films, as the swatch loads it: a dry brush leaves about a tenth of it on the tooth's hills
-export const DEPOSIT = 0.09;     // thickness a dry brush leaves, as a share of its load, at the pixels that take paint: 0.11, 0.09, 0.07 at loads of 3, 6, 12 (measured on the engine's brush, water 0.5)
+export const DEPOSIT = 0.16;     // thickness the dry brush leaves on the hills, as a share of its load: the 90th percentile of the pixels that take paint, 0.157, 0.155, 0.158, 0.162 at loads of 3, 6, 12, 30 (measured on the engine's brush, water 0.5). The plan's step is laid at the hills, not at the median pixel, so the painted step is capped at the subject's
 const { water: WATER, ...BRUSH } = BRUSH_SETTINGS, MARGIN_OD = 0.15, MIN_NEED = 0.1;
 
 const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
