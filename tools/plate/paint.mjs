@@ -510,7 +510,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // A wash of the wash plan (fair-wash.mjs) is a whole shape laid in sweeps. One no sweep fits is left and counted: it gets
   // no touch placed at its centroid.
   if (vectorPaths) { used['unclipped wash strokes'] = (used['unclipped wash strokes'] || 0) + paths.length; }
-  if (!paths.length && sh._valuePlan?.puddle != null) { used['wash no sweep fits, left'] = (used['wash no sweep fits, left'] || 0) + 1; ctx.dropped++; ctx.droppedMass += sh.amount * sh.area; continue; }
+  if (!paths.length && sh._valuePlan?.mixId != null) { used['wash no sweep fits, left'] = (used['wash no sweep fits, left'] || 0) + 1; ctx.dropped++; ctx.droppedMass += sh.amount * sh.area; continue; }
   if (!paths.length) {
     const FLOORMASK = FLOOR ? getFloorMask() : null;
     // --rescue sweep: a round brush as wide as the passage, drawn down its middle, instead of small marks (default marks).

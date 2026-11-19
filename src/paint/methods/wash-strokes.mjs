@@ -2,11 +2,14 @@
 //
 // outlineLoops: the boundary of a wash's shapes as closed loops in mm, simplified to a tolerance set by the brush (half
 // the radius of the smallest wash brush), with each segment marked soft or hard from the two shapes it lies between.
-// planWashStrokes: the strokes that lay the wash as one wet film. One brush is chosen from the wash's size and steered
-// along the outline, its radius inside it, then round again further in, each round over the wet edge of the last by a
-// third of the brush, until the middle is closed. The smallest wash brush does the same where the wash is too narrow
-// for the first, and the detail brush goes round inside parts narrower than that. The edge of the wash is where the
-// brush's own footprint ends: a curve, never a cut. What no stroke's footprint reaches is counted (uncovered).
+// planWashStrokes: the strokes that lay the wash as one wet film. The widest brush of the kit that fits the wash (the
+// wash is at least BRUSH_FIT brush widths across at its widest) is steered along the outline, its radius inside it,
+// then round again further in, each round over the wet edge of the last by a third of the brush, until the middle is
+// closed. Each smaller brush of the kit then does the same where the wash is too narrow for the one before, and the
+// detail brush goes round inside parts narrower than that. So a wall or a sky is laid with a flat or a mop and only its
+// corners with a round. The edge of the wash is where the brush's own footprint ends: a curve, never a cut. What no
+// stroke's footprint reaches is counted (uncovered). A wash is laid a little past its outline to meet its neighbours,
+// but never onto a reserved light (keepOut).
 // The strokes are worked out on a planning grid a sixth of the smallest brush's width, cut from the outline: the grid is
 // set in millimetres, so a sheet with finer cells gets the same strokes.
 // Plan time only.
@@ -16,6 +19,8 @@ import { traceOutlines } from '../../crop/outline.mjs';
 const LANE_OVERLAP = 1 / 3;
 /** A stroke is laid only when at least this share of what it touches is not yet covered. */
 const LEAST_NEW = 0.25;
+/** A brush fits a wash that is at least this many brush widths across at its widest. */
+const BRUSH_FIT = 1.25;
 
 function simplify(pts, tol) {
   // Douglas-Peucker on a closed loop: split at vertex 0 and the vertex furthest from it
@@ -100,10 +105,12 @@ export function softLines(loops) {
 /**
  * The strokes that lay a wash inside its outline.
  * @param loops outlineLoops' result. @param kitMm the wash brushes' belly widths in mm. @param pointMm the detail brush's belly width.
- * @returns {{strokes: Array<{kind:'contour'|'edge'|'point'|'close', radiusMm:number, points:number[][]}>, brushMm:number, areaMm2:number, uncovered:number}}
- *   uncovered is the share of the outline's area no stroke's footprint reaches.
+ * @param growMm the wash is laid this far past its outline. @param keepOut outlines (as loops) the wash never grows onto.
+ * @returns {{strokes: Array<{kind:'contour'|'edge'|'point'|'close', radiusMm:number, points:number[][]}>, brushMm:number, depthMm:number, areaMm2:number, uncovered:number}}
+ *   brushMm is the widest brush used, depthMm how far the middle of the wash is from its edge, uncovered the share of
+ *   the outline's area no stroke's footprint reaches.
  */
-export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0 }) {
+export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut = null }) {
   const kit = [...kitMm].sort((a, b) => b - a), small = kit[kit.length - 1], pitch = small / 6;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const l of loops) for (const [x, y] of l.points) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -111,14 +118,19 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0 }) {
   // lanes run along the longer side: work in a frame whose u axis is that side
   const tall = y1 - y0 > x1 - x0, U = p => (tall ? [p[1], p[0]] : p);
   const pad = pitch * (1 + Math.ceil(growMm / pitch)), ou = (tall ? y0 : x0) - pad, ov = (tall ? x0 : y0) - pad, gw = Math.ceil(((tall ? y1 - y0 : x1 - x0) + 2 * pad) / pitch), gh = Math.ceil(((tall ? x1 - x0 : y1 - y0) + 2 * pad) / pitch), gn = gw * gh;
-  const inside = new Uint8Array(gn), rows = Array.from({ length: gh }, () => []);
-  for (const l of loops) for (let q = 0; q < l.points.length; q++) {
-    const P = U(l.points[q]), Q = U(l.points[(q + 1) % l.points.length]); if (P[1] === Q[1]) continue;
-    const lo = Math.min(P[1], Q[1]), hi = Math.max(P[1], Q[1]);
-    for (let gy = Math.max(0, Math.ceil((lo - ov) / pitch - .5)); gy < gh; gy++) { const v = ov + (gy + .5) * pitch; if (v >= hi) break; if (v < lo) continue; rows[gy].push(P[0] + (v - P[1]) / (Q[1] - P[1]) * (Q[0] - P[0])); }
-  }
-  let area = 0;
-  for (let gy = 0; gy < gh; gy++) { const xs = rows[gy].sort((a, b) => a - b); for (let q = 0; q + 1 < xs.length; q += 2) for (let gx = Math.max(0, Math.ceil((xs[q] - ou) / pitch - .5)); gx < gw && ou + (gx + .5) * pitch < xs[q + 1]; gx++) { inside[gy * gw + gx] = 1; area++; } }
+  // the grid cells whose centres lie inside a set of loops (even-odd)
+  const fill = ls => {
+    const m = new Uint8Array(gn), rows = Array.from({ length: gh }, () => []);
+    for (const l of ls) for (let q = 0; q < l.points.length; q++) {
+      const P = U(l.points[q]), Q = U(l.points[(q + 1) % l.points.length]); if (P[1] === Q[1]) continue;
+      const lo = Math.min(P[1], Q[1]), hi = Math.max(P[1], Q[1]);
+      for (let gy = Math.max(0, Math.ceil((lo - ov) / pitch - .5)); gy < gh; gy++) { const v = ov + (gy + .5) * pitch; if (v >= hi) break; if (v < lo) continue; rows[gy].push(P[0] + (v - P[1]) / (Q[1] - P[1]) * (Q[0] - P[0])); }
+    }
+    for (let gy = 0; gy < gh; gy++) { const xs = rows[gy].sort((a, b) => a - b); for (let q = 0; q + 1 < xs.length; q += 2) for (let gx = Math.max(0, Math.ceil((xs[q] - ou) / pitch - .5)); gx < gw && ou + (gx + .5) * pitch < xs[q + 1]; gx++) m[gy * gw + gx] = 1; }
+    return m;
+  };
+  const inside = fill(loops), barred = growMm > 0 && keepOut?.length ? fill(keepOut) : null;
+  let area = 0; for (let i = 0; i < gn; i++) area += inside[i];
   if (!area) return { strokes: [], areaMm2: 0, uncovered: 0 };
   // growMm: the wash is laid this far past its outline, so that it meets its neighbours; rounding an outline must not
   // leave paper between two washes
@@ -127,7 +139,7 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0 }) {
     for (let i = 0; i < gn; i++) far[i] = inside[i] ? 0 : 1e9;
     for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = y * gw + x; let d = far[i]; if (!d) continue; if (x) d = Math.min(d, far[i - 1] + 1); if (y) { d = Math.min(d, far[i - gw] + 1); if (x) d = Math.min(d, far[i - gw - 1] + R2g); if (x < gw - 1) d = Math.min(d, far[i - gw + 1] + R2g); } far[i] = d; }
     for (let y = gh - 1; y >= 0; y--) for (let x = gw - 1; x >= 0; x--) { const i = y * gw + x; let d = far[i]; if (!d) continue; if (x < gw - 1) d = Math.min(d, far[i + 1] + 1); if (y < gh - 1) { d = Math.min(d, far[i + gw] + 1); if (x < gw - 1) d = Math.min(d, far[i + gw + 1] + R2g); if (x) d = Math.min(d, far[i + gw - 1] + R2g); } far[i] = d; }
-    for (let y = 1; y < gh - 1; y++) for (let x = 1; x < gw - 1; x++) { const i = y * gw + x; if (!inside[i] && far[i] * pitch <= growMm) { inside[i] = 1; area++; } }
+    for (let y = 1; y < gh - 1; y++) for (let x = 1; x < gw - 1; x++) { const i = y * gw + x; if (!inside[i] && far[i] * pitch <= growMm && !barred?.[i]) { inside[i] = 1; area++; } }
   }
   // distance in mm from each inside cell to the outline
   const D = new Float32Array(gn), R2 = Math.SQRT2;
@@ -174,12 +186,12 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0 }) {
     for (; level <= deepest; level += step) follow(kind, radius, level, least);
     if (deepest > level - step + radius) follow(kind, radius, Math.max(level - step + radius / 2, deepest - pitch), least);
   };
-  // One brush for the wash, from its size: the widest of the kit whose radius is no more than half the depth of the wash
-  // (how far its middle is from its edge), so the wash is closed in a few rounds; the smallest brush for a small wash.
-  const brush = kit.find(width => width / 2 <= deepest / 2) ?? small;
+  // The first brush, from the wash's size: the widest of the kit that fits it (twice the depth of the wash, how far its
+  // middle is from its edge, is BRUSH_FIT brush widths or more); the smallest brush for a small wash.
+  const brush = kit.find(width => BRUSH_FIT * width <= 2 * deepest) ?? small;
   inward('contour', brush / 2, LEAST_NEW / 2);
-  // then the smallest brush where the wash is too narrow for that one, and the detail brush where it is narrower still
-  if (brush > small) inward('edge', small / 2, LEAST_NEW);
+  // then each smaller brush where the wash is too narrow for the one before, and the detail brush where it is narrower still
+  for (const width of kit) if (width < brush) inward('edge', width / 2, LEAST_NEW);
   if (pointMm > 0 && pointMm < small) follow('point', pointMm / 2, pointMm / 2, LEAST_NEW);
   // A wash covers its whole outline: where a patch as large as a touch of the smallest brush is still bare (the middle of
   // a round too small to trace), one more stroke of that brush is drawn through it, end to end.
@@ -194,5 +206,5 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0 }) {
       stamp(pts, r, true); strokes.push({ kind: 'close', radiusMm: r, points: pts.map(toMm) });
     }
   }
-  return { strokes, brushMm: brush, areaMm2: area * pitch * pitch, uncovered: 1 - coveredCount / area };
+  return { strokes, brushMm: brush, depthMm: deepest, areaMm2: area * pitch * pitch, uncovered: 1 - coveredCount / area };
 }
