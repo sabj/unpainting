@@ -601,3 +601,17 @@ test('a wash that keeps a colour family apart is cut again by the mix of the cel
   }
 });
 
+test('paperRel measures the lights against the sheet, not the target\'s lightest tenth: a pale cream sail is a pale wash, a white is paper', () => {
+  const w = 40, h = 40, n = w * h, sheet = [252, 251, 248];
+  const run = lightest => {
+    // a picture with no visible sheet: its lightest tenth is `lightest`, along the top
+    const rgb = new Uint8Array(n * 3), density = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const y = (i / w) | 0, top = y < 6; rgb.set(top ? lightest : [90, 100, 120], 3 * i); density[i] = top ? 0.05 : 1.0; }
+    const log = console.log; console.log = () => {};
+    try { return planLightToDark({ w, h, k: 1, rgb, density, demand: density.slice(), shaped: true, paperRel: true, paperRGB: sheet, minShapeCells: 8 }); } finally { console.log = log; }
+  };
+  assert.equal(run([236, 232, 215]).protectedCells[2 * w + 10], 0, 'a pale cream sail is not bare paper');
+  assert.equal(run([251, 250, 247]).protectedCells[2 * w + 10], 1, 'a cell at the sheet\'s own lightness is');
+  assert.equal(run([236, 232, 215]).protectedCells[20 * w + 10], 0, 'the dark is not');
+});
+

@@ -65,12 +65,15 @@ export function planLightToDark({puddles:cutByMix=true,paperRule=false,calibrate
   // --paperrel: the paper colour is the mean of the lightest 10% of cells, and every
   // cell within 9/9/12 (or 14/14/18 on warm cream paper) below it per channel is a light. With --paperbase source the sheet takes that colour too.
   let PAP = null;
-  if (!lightRef && paperRel && rgb) {
+  // The lights are measured against the sheet the plate is painted on (paperRGB: its own paper, or white when the target shows no
+  // sheet), never against the target's lightest tenth: a pale cream sail or stone facade is a pale wash, not bare paper. Only
+  // without a sheet colour does the lightest tenth stand in.
+  if (!lightRef && paperRel && paperRGB) {
+    PAP = [...paperRGB];
+  } else if (!lightRef && paperRel && rgb) {
     const L = Float32Array.from({ length: n }, (_, i) => rgb[3 * i] + rgb[3 * i + 1] + rgb[3 * i + 2]);
     const idx = Array.from(L.keys()).sort((a, b) => L[b] - L[a]).slice(0, Math.max(1, Math.floor(n * .1)));
     PAP = [0, 1, 2].map(c => idx.reduce((a, i) => a + rgb[3 * i + c], 0) / idx.length);
-  } else if (!lightRef && paperRel && paperRGB) {
-    PAP = [...paperRGB];
   }
   const tonedPap = Boolean(PAP && PAP[0] - PAP[2] >= 18 && 252 - PAP[2] >= 20);
   const papTol = tonedPap ? [14, 14, 18] : [9, 9, 12];

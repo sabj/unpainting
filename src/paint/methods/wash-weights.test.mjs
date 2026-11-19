@@ -12,12 +12,12 @@ test('band shares over the whole are scaled back to the whole; shares under it a
  assert.ok(Math.abs(weights.reduce((s,a)=>s+a[1],0)-.5)<1e-6);
 });
 
-test('the paper rule reads cream as a wash on a white sheet; without it the relative-light rule holds it as paper',()=>{
+test('cream on a white sheet is a wash under the paper rule and under the relative-light rule alike',()=>{
  const w=30,h=30,n=w*h,rgb=new Uint8Array(n*3),density=new Float32Array(n).fill(.2);
  for(let i=0;i<n;i++)rgb.set([248,245,216],3*i);
  const common={w,h,k:1,rgb,density,demand:density.slice(),shaped:true,paperRel:true,paperRGB:[252,251,248],minShapeCells:4};
  assert.equal(planLightToDark({...common,paperRule:true}).protectedCells[5*w+5],0);
- assert.equal(planLightToDark(common).protectedCells[5*w+5],1);
+ assert.equal(planLightToDark(common).protectedCells[5*w+5],0);
 });
 
 test('feedback follows the passage mixture when the first pan is already complete',()=>{
