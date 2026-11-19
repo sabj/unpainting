@@ -14,12 +14,12 @@ rc.1 copied its subject. Its wash plan unmixed the subject cell by cell into thr
 | Faint planted pattern copied, 3.4 mm blobs | 0.81 | 0.03 |
 | Washes | 2,131 | 29 |
 | Paint strokes | 2,196 | 74 |
-| Mixes | one pigment at a time | 12 mixed puddles |
+| Paint mixes | one pigment at a time | 12 mixes on the palette |
 | Strokes clipped to a cell mask | all | none |
 
 ### Changed in rc.2
 
-- The wash plan is a few mixed puddles and whole shapes, laid light to dark in three stages (`src/paint/methods/puddles.mjs`, `wash-shapes.mjs`, `fair-wash.mjs`, `wash-strokes.mjs`).
+- The wash plan is a few paint mixes (each a batch a painter would mix on the palette) and whole shapes, laid light to dark in three stages (`src/paint/methods/puddles.mjs`, `wash-shapes.mjs`, `fair-wash.mjs`, `wash-strokes.mjs`).
 - A wash has a smooth outline in millimetres and strokes that follow it. No stroke is clipped to cells.
 - Gone for washes: charges taken from the cells under a wash, dabs at a wash's centre, the pressure ramp along demand, per-cell edge classes, the per-cell sky test.
 - The touch-up rounds are off in the default recipe. They glazed any area that read lighter than the subject, which is a correction loop toward the subject's colour.
@@ -44,7 +44,7 @@ rc.1 copied its subject. Its wash plan unmixed the subject cell by cell into thr
 - One plan in millimetres for every cell size.
 - Removing the old planner from styled and benchmark plans.
 - Stroke techniques for detail: lines, blades, locks, stones.
-- The copy limits: the planted-pattern test and counts of puddles and washes are to replace the correlation and stroke ceilings.
+- The copy limits: the planted-pattern test and counts of mixes and washes are to replace the correlation and stroke ceilings.
 - Thin dark lines, gouache lights and coat strands still read the subject at fine scale and have not been reviewed against these rules.
 
 ## 0.3.3-rc.1 (withdrawn: its plates were painted by the separation plan)
