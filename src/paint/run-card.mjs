@@ -35,6 +35,7 @@ function buildRunCard({
   phases = [],
   gouache = null,
   surface = null,
+  coat = null,
   seconds = 0,
   exitCode = 0,
 } = {}) {
@@ -106,6 +107,8 @@ function buildRunCard({
     gouache,
     // surface marks: the judge, every region's label and what was laid (tools/plate/surface-plan.mjs)
     surface,
+    // a coat's dry-brush texture: strokes planned and laid, and what they did to the sheet (tools/plate/coat-lay.mjs)
+    coat,
     continuedChecks: continuedSummary(),
   };
 }

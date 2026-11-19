@@ -35,23 +35,11 @@ test('a plain dark picture, or a pale one, decides against gouache and adds noth
   assert.equal((await planGouache({ image: pale, w: 600, h: 400, sheetMm: 150, paperRGB: PAPER, pigments: PIGS })).strokes.length, 0, 'no light over dark, no gouache');
 });
 
-test('a coat of strands is laid only where the surface labels say coat: no labels, or a wall, no coat strokes', async () => {
-  const W = 700, H = 500;
-  let seed = 7; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  const file = path.join(dir, 'coat.png'), px = Buffer.alloc(W * H * 3, 20);
-  for (let y = 150; y < 350; y += 6) for (let x = 200; x < 500; x += 9) {
-    const x0 = x + rnd() * 5, y0 = y + rnd() * 3, a = Math.PI / 6 + (rnd() - 0.5) * 0.25, len = 15 + rnd() * 15;
-    for (let t = 0; t <= len; t += 0.5) for (const o of [0, 0.6]) { const xx = Math.round(x0 + Math.cos(a) * t - Math.sin(a) * o), yy = Math.round(y0 + Math.sin(a) * t + Math.cos(a) * o), i = (yy * W + xx) * 3; px[i] = 140; px[i + 1] = 135; px[i + 2] = 130; }
-  }
-  await sharp(px, { raw: { width: W, height: H, channels: 3 } }).png().toFile(file);
-  const run = coat => planGouache({ image: file, w: W, h: H, sheetMm: 140, paperRGB: PAPER, pigments: PIGS, coat });
-  const none = await run(null), wall = await run({ status: 'ok', mask: new Uint8Array(W * H) }), unavailable = await run({ status: 'unavailable', mask: new Uint8Array(W * H).fill(1) });
-  for (const r of [none, wall, unavailable]) assert.equal(r.strokes.filter(s => s.field != null).length, 0);
-  assert.match(unavailable.record.coat.reason, /judge could not run/);
-  assert.match(wall.record.coat.reason, /not in a region labelled a coat/);
-  const fur = await run({ status: 'ok', mask: new Uint8Array(W * H).fill(1) });
-  assert.ok(fur.strokes.filter(s => s.field != null).length >= 10, 'a labelled coat is laid from its field');
-  assert.ok(fur.record.planned.shareOfCeiling > 0 && fur.record.fields.length >= 1);
+test('strands inside a region labelled a coat are the coat\'s texture, not single lights', async () => {
+  const file = await image('coat-hairs.png', (px, W) => { for (let k = 0; k < 3; k++) hair(px, W, 100, 260, 60 + k * 120, [235, 215, 170]); });
+  const run = mask => planGouache({ image: file, w: 600, h: 400, sheetMm: 150, paperRGB: PAPER, pigments: PIGS, coat: { mask } });
+  assert.ok((await run(new Uint8Array(600 * 400))).strokes.length >= 3, 'a wall or no label: the lights stay single strokes');
+  assert.equal((await run(new Uint8Array(600 * 400).fill(1))).strokes.length, 0, 'in a coat they are left to the dry brush');
 });
 
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));

@@ -93,6 +93,15 @@ export function gouacheTint(rgb, paperRGB, pigments, { floor = 0.35 } = {}) {
   const R = [0, 1, 2].map(c => Math.min(0.98, Math.max(floor, rgb[c] / Math.max(1, paperRGB[c]))));
   if (R.every(v => v >= 0.92)) return { mix: [], residual: 0 };
   const need = R.map((r, c) => Math.max(0, filmAbsorption(r) * HIDING - GOUACHE_PIGMENT.K[c] * GOUACHE_FILM));
+  return mixFor(need, pigments);
+}
+
+/**
+ * The palette paints, one, two or three, whose absorption (K x, amounts x non-negative) best matches `need` in the three
+ * channels, in least squares. A mix of more paints is taken only when it misses at least 15% less than the one before.
+ * @returns {{ mix: [{ pigment, amount }], residual }}
+ */
+export function mixFor(need, pigments) {
   const subsets = [];
   for (let i = 0; i < pigments.length; i++) {
     subsets.push([i]);

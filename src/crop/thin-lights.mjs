@@ -7,20 +7,18 @@
 // own ring in L* (STEP_L, a visible step), over a dark surround (DARK_L), and long for its width. A grey hair on a
 // near-black coat is as good a light as a white one; the paint is tinted to the strand's own colour. Where many such
 // ridges run the same way inside one dark region they are a coat, and src/crop/strand-field.mjs lays that passage
-// from a direction field; the ridges outside a passage are single lights (whiskers, rigging, lane lines) and each is
-// fitted with one cubic. A dot qualifies only as a true glint: a few tenths of a millimetre across, near paper white,
+// as dry-brush texture (src/crop/coat-texture.mjs); the ridges outside a coat are single lights (whiskers, rigging, lane
+// lines) and each is fitted with one cubic. A dot qualifies only as a true glint: a few tenths of a millimetre across, near paper white,
 // ringed by a smooth dark. Constants are painter's limits in millimetres and L*, the same for every subject. DOM free.
 import { components, thin, minFilter, maxFilter, distanceToOne } from '../raster.js';
 import { walkChains, simplify, splitAtTurns, joinPieces } from './pen-trace.mjs';
 import { densify, plen, smoothStrokes, turnSigns } from './curve-fit.mjs';
-import { strandFields } from './strand-field.mjs';
 
 export const TOUCH_MM = 1.2;            // the narrowest light the wash planner can go round (a rigger touch)
 export const RIGGER_MM = Object.freeze({ min: 0.25, max: 1.0 });   // a rigger's line, point to belly
 const STEP_L = 10;                      // lighter than its ring by at least this much L*: a step the eye sees
 const DARK_L = 55;                      // the ring is at most this light (L*): over dark, never in a light area
 const MIN_LENGTH_MM = 4;                // a single stroke shorter than this is a fragment, not a hair
-const RIDGE_MM = 1.5;                   // ridges shorter than this are not read into a direction field
 const ASPECT = 8;                       // length over width
 const FIT_MM = 0.3;                     // the most a single stroke may leave its ridge
 const MAX_TURNS_PER_CM = 0.75;          // curvature sign changes per cm of a laid stroke
@@ -89,12 +87,11 @@ function findGlints(D, w, h, pixelMm) {
  * @param D        optical density per pixel (0 at paper), w * h
  * @param pixelMm  millimetres of the sheet one pixel spans
  * @param rgb      optional RGB bytes, 3 * w * h: the light's own colour is read from it along each stroke
- * @param strokesMax  the most single strokes; glintsMax the most glints; fieldCeiling the most field strokes
- * @returns {{ strokes, fields, stats }} strokes: [{ kind: 'strand'|'glint', field?, points: [[x, y]] (pixels), widthMm,
- *   lengthMm, lightOd, surroundOd, rgb|null, fit: { maxMm, meanMm, turnsPerCm } }], best singles first; fields: the
- *   passages laid from a direction field, for the run card
+ * @param strokesMax  the most single strokes; glintsMax the most glints; skip (x, y) true where a coat is (its strands are not single lights)
+ * @returns {{ strokes, stats }} strokes: [{ kind: 'strand'|'glint', points: [[x, y]] (pixels), widthMm, lengthMm, lightOd,
+ *   surroundOd, rgb|null, fit: { maxMm, meanMm, turnsPerCm } }], best singles first
  */
-export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity, glintsMax = Infinity, fieldCeiling = Infinity } = {}) {
+export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity, glintsMax = Infinity, skip = null } = {}) {
   if (!(pixelMm > 0)) throw new Error('thin lights: the millimetres of one pixel');
   const n = w * h, r = Math.max(1, Math.round(TOUCH_MM / 2 / pixelMm));
   const L = Float32Array.from(D, lstar);
@@ -133,9 +130,8 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
   }
   chains.sort((a, b) => b.score - a.score); chains.length = Math.min(chains.length, CHAINS_MAX);
 
-  // a coat: many ridges one way inside one dark region, laid from the field (src/crop/strand-field.mjs)
-  const field = strandFields(chains.filter(c => c.pts.length * pixelMm >= RIDGE_MM), { w, h, pixelMm, ceiling: fieldCeiling });
-  const outside = chains.filter(c => !field.inside(...c.pts[c.pts.length >> 1])).slice(0, SINGLES_MAX_CHAINS);
+  // lights inside a coat are the coat's texture (src/crop/coat-texture.mjs); `skip(x, y)` says where a coat is. The rest are single lights
+  const outside = chains.filter(c => !(skip && skip(...c.pts[c.pts.length >> 1]))).slice(0, SINGLES_MAX_CHAINS);
 
   // single lights: the chains outside any coat, joined where one carries on another, each fitted with one cubic
   const singles = [], tolPx = FIT_MM / pixelMm, minLen = MIN_LENGTH_MM / pixelMm;
@@ -160,7 +156,7 @@ export function thinLights(D, w, h, { pixelMm, rgb = null, strokesMax = Infinity
   const byScore = (a, b) => b.score - a.score;
   const keptSingles = singles.sort(byScore).slice(0, strokesMax), keptGlints = findGlints(D, w, h, pixelMm).sort(byScore).slice(0, glintsMax);
   return {
-    strokes: [...keptSingles, ...field.strokes, ...keptGlints], fields: field.passages, fieldStats: field.stats,
-    stats: { maskPx, skelPx, dropped: drop, ridges: chains.length, singles: keptSingles.length, fieldStrokes: field.strokes.length, passages: field.passages.length, glints: keptGlints.length, closingRadiusPx: r },
+    strokes: [...keptSingles, ...keptGlints],
+    stats: { maskPx, skelPx, dropped: drop, ridges: chains.length, singles: keptSingles.length, glints: keptGlints.length, closingRadiusPx: r },
   };
 }
