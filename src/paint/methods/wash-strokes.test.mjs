@@ -37,8 +37,8 @@ const lengthOf = s => s.points.reduce((a, p, q) => a + (q ? Math.hypot(p[0] - s.
 const box = (a, b) => [{ points: [[10, 10], [10 + a, 10], [10 + a, 10 + b], [10, 10 + b]], soft: [] }];
 
 test('a large wash is swept in straight lanes with the widest flat or mop that fits it, and its edge is closed by the rounds', () => {
-  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 40 mm: the one-inch flat in two
-  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 40, 25.4, 2]]) {
+  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 40 mm: the mop in one; 50 x 30 mm: the one-inch flat in one; each from edge to edge
+  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 40, 38, 1], [50, 30, 25.4, 1]]) {
     const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes(box(a, b), { kitMm: KIT, pointMm: 1.2 });
     assert.equal(brushMm, brush, `${a} x ${b} mm`);
     assert.ok(Math.abs(areaMm2 - a * b) < .03 * a * b);
@@ -47,11 +47,10 @@ test('a large wash is swept in straight lanes with the widest flat or mop that f
     for (const s of swept) {
       assert.equal(s.radiusMm, brush / 2);
       assert.equal(new Set(s.points.map(p => p[1])).size, 1, 'a lane is straight');
-      assert.ok(Math.abs(lengthOf(s) - (a - brush)) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash`);
-      // the whole footprint is inside the outline
-      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x, y - 10, 10 + b - y) >= brush / 2 - .8, `${x}, ${y}`);
+      assert.ok(Math.abs(lengthOf(s) - a) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash, edge to edge`);
+      // the band is as wide as the brush and square at its ends: all of it is inside the outline
+      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x) >= -.5 && Math.min(y - 10, 10 + b - y) >= brush / 2 - .8, `${x}, ${y}`);
     }
-    assert.ok(strokes.some(s => s.kind === 'edge' && s.radiusMm < brush / 2), 'the corners are left to a smaller brush');
     assert.ok(strokes.length <= 16, `${strokes.length} strokes`);
   }
 });
@@ -75,18 +74,19 @@ test('a wash too small for a flat is laid from its edge inward by the widest rou
 
 test('a wash is laid past its outline to meet its neighbours, but not onto a reserved light', () => {
   const wash = box(40, 30), light = [{ points: [[50, 0], [70, 0], [70, 50], [50, 50]], soft: [] }];   // paper kept along the wash's right side
-  const reach = r => Math.max(...r.strokes.flatMap(s => s.points.map(p => p[0] + s.radiusMm)));
+  // how far right a stroke's footprint goes: a lane ends square where the brush stops, a round reaches its radius further
+  const reach = r => Math.max(...r.strokes.flatMap(s => s.points.map(p => p[0] + (s.kind === 'lane' ? 0 : s.radiusMm))));
   const open = planWashStrokes(wash, { kitMm: KIT, growMm: 2.25 }), kept = planWashStrokes(wash, { kitMm: KIT, growMm: 2.25, keepOut: light });
   assert.ok(reach(open) > 51.5, `the wash reaches ${reach(open)} mm`);
   assert.ok(reach(kept) < 50.8, `beside the light it stops at ${reach(kept)} mm`);
-  assert.ok(Math.min(...kept.strokes.flatMap(s => s.points.map(p => p[0] - s.radiusMm))) < 8.5, 'and still grows on its other sides');
+  assert.ok(Math.min(...kept.strokes.flatMap(s => s.points.map(p => p[0] - (s.kind === 'lane' ? 0 : s.radiusMm)))) < 8.5, 'and still grows on its other sides');
 });
 
 test('strokes follow a slanted edge as a line, not as steps, and a thin tail takes the detail brush or a closing stroke', () => {
   const tri = planWashStrokes([{ points: [[10, 10], [70, 10], [10, 50]], soft: [] }], { kitMm: KIT, pointMm: 1.2 });
   assert.ok(tri.uncovered < .03, `${tri.uncovered} of a triangle left bare`);
   // along the slanted side the first round stays one radius from it, within the planning grid's pitch
-  const first = tri.strokes[0], r = first.radiusMm, off = first.points.map(([x, y]) => (40 * (70 - x) - 60 * (y - 10)) / Math.hypot(40, 60)).filter((d, q) => { const [x, y] = first.points[q]; return x - 10 > 3 * r && y - 10 > 3 * r; });
+  const first = tri.strokes.find(s => s.kind !== 'lane'), r = first.radiusMm, off = first.points.map(([x, y]) => (40 * (70 - x) - 60 * (y - 10)) / Math.hypot(40, 60)).filter((d, q) => { const [x, y] = first.points[q]; return x - 10 > 3 * r && y - 10 > 3 * r; });
   assert.ok(off.length >= 5); for (const d of off) assert.ok(Math.abs(d - r) < 1, `${d} mm from the slanted side`);
   const loops = [{ points: [[10, 10], [40, 10], [40, 30], [26, 30], [26, 32], [60, 32], [60, 34], [10, 34]], soft: [] }];   // a block with a 2 mm tail
   const without = planWashStrokes(loops, { kitMm: KIT }), withPoint = planWashStrokes(loops, { kitMm: KIT, pointMm: 1.2 });

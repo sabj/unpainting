@@ -3,9 +3,9 @@
 // outlineLoops: the boundary of a wash's shapes as closed loops in mm, simplified to a tolerance set by the brush (half
 // the radius of the smallest wash brush), with each segment marked soft or hard from the two shapes it lies between.
 // planWashStrokes: the strokes that lay the wash as one wet film, with the widest brush of the kit that fits it. A flat
-// or a mop (a brush of LANE_FROM_MM or wider) fits a wash it can be swept across in a straight lane at least LANE_LEAST
-// of its width long, its whole footprint inside the outline; it is swept in such lanes side by side, each over the wet edge of
-// the last by half the brush. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
+// or a mop (a brush of LANE_FROM_MM or wider) lays a band as wide as itself with square ends. It fits a wash it can be
+// swept across in a straight lane at least LANE_LEAST of its width long with its whole width inside the outline, and it
+// is swept in such lanes from edge to edge, side by side. A round fits a wash at least BRUSH_FIT of its widths across; it is steered along the
 // outline, its radius inside it, then round again further in until the middle is closed. Each smaller brush of the kit
 // then goes round where the wash is too narrow for the one before, and the detail brush inside parts narrower than
 // that. So a wall or a sky is laid with a flat or a mop and only its edge and corners with a round. The edge of the wash is where the brush's own footprint ends: a curve, never a cut. What no
@@ -17,13 +17,15 @@
 import { traceOutlines } from '../../crop/outline.mjs';
 
 /** A round of the brush goes over the wet edge of the one before by this share of the brush's width. */
-const LANE_OVERLAP = 1 / 2;
+const LANE_OVERLAP = 1 / 3;
 /** A stroke is laid only when at least this share of what it touches is not yet covered. */
 const LEAST_NEW = 0.25;
 /** A brush fits a wash that is at least this many brush widths across at its widest. */
 const BRUSH_FIT = 1.25;
 /** A brush this wide or wider is a flat or a mop: it is swept in straight lanes, not steered round an outline. */
 const LANE_FROM_MM = 12;
+/** A lane of a flat or a mop goes over the one beside it by this share of the brush's width. */
+const FLAT_OVERLAP = 0.15;
 /** The shortest lane a flat or a mop is swept in, in brush widths. */
 const LANE_LEAST = 0.6;
 
@@ -191,26 +193,30 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut
     for (; level <= deepest; level += step) follow(kind, radius, level, least);
     if (deepest > level - step + radius) follow(kind, radius, Math.max(level - step + radius / 2, deepest - pitch), least);
   };
-  // Where a flat or a mop of this radius can be put down with its whole footprint inside the outline: by row, the runs
-  // of the grid it can be swept along.
+  // A flat or a mop lays a band as wide as itself and as long as it travels, with square ends. Where one of this radius
+  // can be put down with its whole width inside the wash: by row, the runs of the grid it can be swept along.
+  const column = new Int32Array((gh + 1) * gw); for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) column[(gy + 1) * gw + gx] = column[gy * gw + gx] + inside[gy * gw + gx];
   const runsFor = radius => {
-    const rows = [];
-    for (let gy = 0; gy < gh; gy++) { let from = -1; for (let gx = 0; gx <= gw; gx++) { const ok = gx < gw && D[gy * gw + gx] >= radius - pitch / 2; if (ok && from < 0) from = gx; else if (!ok && from >= 0) { (rows[gy] ??= []).push([from, gx - 1]); from = -1; } } }
+    const rc = Math.floor(radius / pitch), rows = [];
+    for (let gy = rc; gy < gh - rc; gy++) { let from = -1; for (let gx = 0; gx <= gw; gx++) { const ok = gx < gw && column[(gy + rc + 1) * gw + gx] - column[(gy - rc) * gw + gx] === 2 * rc + 1; if (ok && from < 0) from = gx; else if (!ok && from >= 0) { (rows[gy] ??= []).push([from, gx - 1]); from = -1; } } }
     return rows;
   };
   const longest = rows => { let l = 0; for (const runs of rows) if (runs) for (const [a, b] of runs) l = Math.max(l, (b - a) * pitch); return l; };
-  // Straight lanes side by side across the wash, no further apart than a round of the brush: the wash is cut into that
-  // many bands and each band's lane is swept where the brush can travel furthest.
+  // the cells a lane's band touches: [not yet covered, all]; commit marks them covered
+  const band = (a, b, gy, rc, commit) => { let fresh = 0, all = 0; for (let y = gy - rc; y <= gy + rc; y++) for (let x = a; x <= b; x++) { const i = y * gw + x; all++; if (!covered[i]) { fresh++; if (commit) { covered[i] = 1; coveredCount++; } } } return [fresh, all]; };
+  // Straight lanes side by side across the wash, no further apart than the brush less its overlap: the wash is cut into
+  // that many bands and each band's lane is swept where the brush can travel furthest, from edge to edge.
   const sweep = (radius, rows) => {
-    let top = -1, bottom = -1; rows.forEach((runs, gy) => { if (runs) { if (top < 0) top = gy; bottom = gy; } });
-    const count = Math.max(1, Math.ceil((bottom - top) * pitch / (2 * radius * (1 - LANE_OVERLAP))));
+    const rc = Math.floor(radius / pitch); let top = -1, bottom = -1; rows.forEach((runs, gy) => { if (runs) { if (top < 0) top = gy; bottom = gy; } });
+    // as many lanes as cover the wash from its top to its bottom; the outer two hug its edges where the brush travels as far there
+    const count = Math.max(1, Math.ceil(((bottom - top) * pitch + 2 * radius * (1 - FLAT_OVERLAP)) / (2 * radius * (1 - FLAT_OVERLAP)) - 1e-9));
     for (let q = 0; q < count; q++) {
-      let gy = -1, reach = -1;
-      for (let y = Math.ceil(top + q * (bottom - top) / count); y <= top + (q + 1) * (bottom - top) / count; y++) for (const [a, b] of rows[y] ?? []) if (b - a > reach) { reach = b - a; gy = y; }
+      const ideal = count > 1 ? top + q * (bottom - top) / (count - 1) : (top + bottom) / 2; let gy = -1, reach = -1;
+      for (let y = Math.ceil(top + q * (bottom - top) / count); y <= top + (q + 1) * (bottom - top) / count; y++) for (const [a, b] of rows[y] ?? []) if (b - a > reach || (b - a === reach && Math.abs(y - ideal) < Math.abs(gy - ideal))) { reach = b - a; gy = y; }
       for (const [a, b] of rows[gy] ?? []) {
         if ((b - a) * pitch < LANE_LEAST * 2 * radius) continue;   // a stroke, not a dab
-        const pts = [[a, gy], [(a + b) / 2, gy], [b, gy]], [fresh, all] = stamp(pts, radius, false);
-        if (all && fresh >= LEAST_NEW / 2 * all) { stamp(pts, radius, true); strokes.push({ kind: 'lane', radiusMm: radius, points: pts.map(toMm) }); }
+        const [fresh, all] = band(a, b, gy, rc, false);
+        if (fresh >= LEAST_NEW * all) { band(a, b, gy, rc, true); strokes.push({ kind: 'lane', radiusMm: radius, points: [[a, gy], [(a + b) / 2, gy], [b, gy]].map(toMm) }); }
       }
     }
   };

@@ -63,7 +63,12 @@ test('a light is reserved before the first wash: a cream hull on a grey scan sta
   for (const sh of washesOf(p)) {
     assert.equal(sh.mask[30 * w + 35], 0, 'no wash is laid on the hull');
     // no stroke's footprint reaches more than the outline tolerance into it
-    for (const st of sh._valuePlan.strokes) for (const [x, y] of st.points) assert.ok(Math.hypot(Math.max(hull[0] - x, 0, x - hull[2]), Math.max(hull[1] - y, 0, y - hull[3])) > st.radiusMm - 1.6, `a ${2 * st.radiusMm} mm brush at ${x}, ${y}`);
+    // (a lane's band ends square where the brush stops; a round reaches its radius all round)
+    for (const st of sh._valuePlan.strokes) for (const [x, y] of st.points) {
+      const dx = Math.max(hull[0] - x, 0, x - hull[2]), dy = Math.max(hull[1] - y, 0, y - hull[3]), level = st.kind === 'lane' && st.points[0][1] === st.points[1][1];
+      const clear = st.kind !== 'lane' ? Math.hypot(dx, dy) - st.radiusMm : level ? Math.max(dx, dy - st.radiusMm) : Math.max(dy, dx - st.radiusMm);
+      assert.ok(clear > -1.6, `a ${2 * st.radiusMm} mm brush at ${x}, ${y}`);
+    }
   }
   assert.ok(p.lightShapes.length >= 1);
 });
