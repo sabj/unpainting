@@ -1,7 +1,8 @@
 // The graphite drawing carries the structure of the subject, whatever its medium. Its lines are the line model's pool
 // (line-model.mjs) held to the target and pruned by meaning (ink-lines-file.mjs: region labels, mass edges, foliage, whole
-// lines kept or left off, ticks under 3 mm gone), then drawn light in graphite. A plan's own opening lines stay; a pool line
-// the plan already drew is not drawn twice. Texture, shadow and wash edges and the sheet border go to the washes.
+// lines kept or left off, ticks under 3 mm gone), then drawn in graphite, each line as dark as the subject's own line there
+// (line-weight.mjs) and light where the subject shows none. A plan's own opening lines stay; a pool line the plan already
+// drew is not drawn twice. Texture, shadow and wash edges and the sheet border go to the washes.
 import fs from 'node:fs';
 import path from 'node:path';
 import { traceLineModel } from './line-model.mjs';
@@ -11,10 +12,12 @@ import { INK_HOLD_FLAGS } from './ink-hold-defaults.mjs';
 import { linePaths, readLineText } from '../../crop/lines.mjs';
 import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 import { labPlanes } from './line-evidence.mjs';
+import { lineDarkness, weighStrokes, LIGHT_PRESSURE } from './line-weight.mjs';
+import { pencilScrap } from './pencil-scrap.mjs';
 import sharp from 'sharp';
 
-/** The graphite opening pressure of the pool drawing: a drawing, not a finish. */
-const GRAPHITE_POOL_PRESSURE = '0.35';
+/** The most a line of the pool drawing may press: the pencil's full pressure. Each line's own comes from the subject (line-weight.mjs). */
+const GRAPHITE_POOL_PRESSURE = '1';
 
 const last = (argv, name) => { const at = argv.lastIndexOf(name); return at >= 0 ? argv[at + 1] : undefined; };
 const isGraphite = v => v === undefined || v === 'graphite' || /^graphite-/.test(String(v));
@@ -47,6 +50,13 @@ export function edgeStep(line, L, w, h, pxMm, offMm = 1.2) {
   return steps.length ? steps[steps.length >> 1] : 0;
 }
 
+/**
+ * A pool line's claim on the drawing's length: its length times how strongly the subject marks it, as the tone step
+ * across it (an edge) plus how much darker it is than both its sides (a line of the subject's own), both in L*. A
+ * whisker on bare paper has no step across it, and by the step alone would be dropped before a faint edge.
+ */
+export const strengthScore = (g, step, pxMm) => pathMm(g.points, pxMm) * (step + (g.subjectLine?.drop ?? 0));
+
 const pathMm = (pts, pxMm) => { let s = 0; for (let k = 1; k < pts.length; k++) s += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); return s * pxMm; };
 
 /**
@@ -72,9 +82,9 @@ export function mergeAuthored(pool, authored, { sheetMm, nearMm = 1, share = 0.6
 }
 
 /**
- * The flags that point the drawing at the pool file: no stage planner, a light opening pressure, and no planned-passage filter
- * (--lineedges 0: that filter leaves off a line inside one planned wash passage, and a pencil line under a wash is still drawing).
- * A flag the run already sets stays.
+ * The flags that point the drawing at the pool file: no stage planner, the pencil's full pressure as the most a line may
+ * take, and no planned-passage filter (--lineedges 0: that filter leaves off a line inside one planned wash passage, and a
+ * pencil line under a wash is still drawing). A flag the run already sets stays.
  */
 export function graphiteDrawingArgs(argv, target) {
   const has = name => argv.includes(name);
@@ -100,14 +110,34 @@ export async function prepareGraphitePool({ opt, num, argv, out, root, image, sh
   const rec = await holdInkLines({ opt: gopt, num: gnum, argv: held, image, root, out, sheetMm, log });
   const pool = JSON.parse(fs.readFileSync(rec?.opening?.out ? linePaths(rec.opening.out).lines : `${stem}-lines.json`, 'utf8'));
   const own = opt('drawingfile', '') ? JSON.parse(readLineText(linePaths(path.resolve(root, opt('drawingfile', ''))).lines)) : null;
-  // lines are ranked by length times the tone step across them: the budget goes to window and roof edges, not mortar joints
+  // each pool line is read against the target: the tone step across it and the subject's own line along it. Lines are ranked
+  // by length times both, so the budget goes to window and roof edges and to the subject's drawn lines, not to mortar joints
   const { w, h } = pool.image, { data, info } = await sharp(image).removeAlpha().resize(w, h, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer({ resolveWithObject: true });
-  const L = labPlanes(data, info.width, info.height).L.map(v => 100 * v), pxMm = sheetMm / w;
-  const merged = mergeAuthored(pool, own, { sheetMm, amount: num('prepamount', STAGE_DEFAULTS.prep.amount), score: g => pathMm(g.points, pxMm) * edgeStep(g, L, w, h, pxMm) });
+  const L = labPlanes(data, info.width, info.height).L.map(v => 100 * v), pxMm = sheetMm / w, r2 = v => (Number.isFinite(v) ? Math.round(v * 100) / 100 : null);
+  const read = { ...pool, lines: pool.lines.map(g => { const d = lineDarkness(g.points, L, w, h, pxMm); return { ...g, subjectLine: { drop: r2(d.drop), widthMm: r2(d.widthMm) } }; }) };
+  const step = new Map(read.lines.map(g => [g, edgeStep(g, L, w, h, pxMm)]));
+  const merged = mergeAuthored(read, own, { sheetMm, amount: num('prepamount', STAGE_DEFAULTS.prep.amount), score: g => strengthScore(g, step.get(g), pxMm) });
+  const drops = merged.lines.flatMap(g => (g.subjectLine ? [g.subjectLine.drop] : [])).sort((a, b) => a - b), at = f => (drops.length ? drops[Math.min(drops.length - 1, Math.floor(f * drops.length))] : null);
+  const stats = { ...merged.stats, subjectLineDrop: { p50: at(0.5), p90: at(0.9), max: at(1) } };
   const target = path.join(out, 'graphite-lines');
-  fs.writeFileSync(`${target}-lines.json`, JSON.stringify({ ...merged, medium: 'graphite' }) + '\n');
-  fs.writeFileSync(path.join(out, 'graphite-pool.json'), JSON.stringify({ stem, pool: pool.lines.length, ...merged.stats }, null, 1) + '\n');
+  fs.writeFileSync(`${target}-lines.json`, JSON.stringify({ ...merged, stats, medium: 'graphite' }) + '\n');
+  fs.writeFileSync(path.join(out, 'graphite-pool.json'), JSON.stringify({ stem, pool: pool.lines.length, ...stats }, null, 1) + '\n');
   argv.push(...graphiteDrawingArgs(argv, target));
-  log(`graphite drawing: ${merged.lines.length} lines, ${merged.stats.lengthMm} mm, ${Math.round(100 * merged.stats.amount)}% of the length, strongest edges first, of ${pool.lines.length} pool lines held and decided by meaning${own ? `, ${merged.stats.authored} authored lines kept` : ''}`);
-  return { ...merged.stats, file: `${target}-lines.json` };
+  log(`graphite drawing: ${merged.lines.length} lines, ${stats.lengthMm} mm, ${Math.round(100 * stats.amount)}% of the length, strongest edges and the subject's darkest lines first, of ${pool.lines.length} pool lines held and decided by meaning${own ? `, ${stats.authored} authored lines kept` : ''}; the subject's line along them is ${at(0.5)} L* darker than its sides at the median, ${at(0.9)} at the 90th percentile`);
+  return { ...stats, file: `${target}-lines.json` };
+}
+
+/**
+ * The pool drawing's strokes at the pressure their subject line asks for (line-weight.mjs), by a table drawn with this
+ * pencil on a scrap of this paper (pencil-scrap.mjs). Strokes of any other drawing (none carries `subjectLine`) come back
+ * as they are. Writes <out>/graphite-line-weight.json.
+ * @returns {{ strokes, stats }} stats null when nothing was weighed
+ */
+export function weighGraphiteDrawing(strokes, { medium, mmPerCell, paperOpts, out, log = () => {} }) {
+  if (!strokes.some(g => g.subjectLine)) return { strokes, stats: null };
+  const table = pencilScrap({ medium, mmPerCell, paperOpts }), r = weighStrokes(strokes, table), s = r.stats, top = table.at(-1);
+  const stats = { ...s, medium, mmPerCell: +mmPerCell.toFixed(4), lightPressure: LIGHT_PRESSURE, firmestDrop: top.drop };
+  fs.writeFileSync(path.join(out, 'graphite-line-weight.json'), JSON.stringify({ ...stats, table }, null, 1) + '\n');
+  log(`graphite line weight: ${s.weighed} of ${s.strokes} strokes press as dark as the subject's own line there (pressure ${s.pressures.join(', ')} at the 10th, 50th and 90th percentile); ${s.light} stay at the light ${LIGHT_PRESSURE}. A ${medium} scrap line reads ${table.map(t => `${t.drop} L* at ${t.pressure}`).filter((_, k) => [2, 5, 9].includes(k)).join(', ')}${s.beyond ? `; ${s.beyond} strokes follow a line darker than the pencil's firmest ${top.drop} L* and are drawn at that` : ''}`);
+  return { strokes: r.strokes, stats };
 }

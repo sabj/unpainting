@@ -83,3 +83,10 @@ test('a line with one width is drawn with that nib along its length; per-point w
   assert.deepEqual(b.points.map(q => q.width), [2, 6]);
   assert.equal(c.points[0].width, undefined);
 });
+
+test('the subject\'s own line measured along a line is carried, in millimetres and L*, whatever the plan\'s size', () => {
+  const doc = { image: { w: 100, h: 50 }, lines: [{ points: [[0, 40], [40, 40]], subjectLine: { drop: 12.5, widthMm: 0.4 } }, { points: [[10, 10], [10, 30]] }] };
+  const [long, short] = scaleLines(doc, 300, 100);
+  assert.deepEqual(long.subjectLine, { drop: 12.5, widthMm: 0.4 });
+  assert.equal('subjectLine' in short, false);
+});

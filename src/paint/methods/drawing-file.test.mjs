@@ -140,3 +140,17 @@ test('an inkDecided line file is not clipped again by coarse value-plan family d
     assert.ok(!logs.some(m => /left out by the plan's drawing roles/.test(m)), 'no linesByRole drop logged on inkDecided file');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a stroke keeps the measure of the subject line its line was read against', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drawing-file-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'pool-lines.json'), JSON.stringify({ image: { w: 100, h: 100 }, inkDecided: true, lines: [
+      { points: [[5, 10], [50, 10], [95, 10]], subjectLine: { drop: 14, widthMm: 0.5 } }, { points: [[5, 60], [95, 60]] }] }));
+    const f = flagsOf(['--drawingfile', path.join(dir, 'pool'), '--drawstroke', '0.3']);
+    const strokes = selectedDrawing({ first: true, w: 100, h: 100, ...f, log: () => {}, walked: 0 });
+    const top = strokes.filter(g => g.points[0].y === 10), bottom = strokes.filter(g => g.points[0].y === 60);
+    assert.ok(top.length >= 2, 'the long line is split into strokes');
+    for (const g of top) assert.deepEqual(g.subjectLine, { drop: 14, widthMm: 0.5 });
+    for (const g of bottom) assert.equal('subjectLine' in g, false);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
