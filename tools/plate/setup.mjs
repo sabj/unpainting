@@ -323,6 +323,9 @@ const WASH_SHEET=PAPER_RULE?sheetColour(ctx.px,w,h):null;
 const PAPER_EST = opt('paperrgb', '') === 'auto' ? estimatePaper(ctx.px, w, h, new Float32Array(w * h)) : null;
 const PAPER_AUTO = opt('paperrgb', '') === 'auto' ? (WASH_SHEET?WASH_SHEET.rgb:SHEET_TONE.toned ? SHEET_TONE.paperRGB : PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10 ? PAPER_EST.rgb.map(v => Math.round(v)) : [252, 251, 248]) : null;
 const PAPER_DECLARED = opt('paperrgb', '') === 'source' ? PAPER_PICK.paperRGB : PAPER_AUTO ?? (opt('paperrgb', '') ? opt('paperrgb', '').split(',').map(Number) : null);
+// a toned sheet was asked for (--tonestage) and auto found no paper tone: stop, never fall back to white silently
+if (PAPER_AUTO && !WASH_SHEET && !SHEET_TONE.toned && !(PAPER_EST && PAPER_EST.touchesBorder && PAPER_EST.rgb[0] - PAPER_EST.rgb[2] >= 10) && !['', '0', 'off'].includes(opt('tonestage', '')))
+  throw Error(`--paperrgb auto with --tonestage ${opt('tonestage', '')}: no paper tone found in the subject (largest bright region ${PAPER_EST ? `${(100 * PAPER_EST.cells / (w * h)).toFixed(1)}% of the sheet, ${PAPER_EST.touchesBorder ? 'touching' : 'not touching'} the border` : 'under 1%'}), so the sheet would be white; give the paper as --paperrgb R,G,B`);
 if (PAPER_AUTO) console.log(`paper: auto sheet ${PAPER_AUTO.join('/')} from the largest bright region ${PAPER_EST ? PAPER_EST.rgb.map(v => v.toFixed(0)).join('/') + ' (' + (100 * PAPER_EST.cells / (w * h)).toFixed(1) + '% of the sheet)' : 'none (under 1%)'}`);
 if (PAPER_DECLARED && (PAPER_DECLARED.length !== 3 || PAPER_DECLARED.some(v => !(v > 0 && v <= 255)))) throw Error('--paperrgb needs three values in 1..255');
 const { lightest, white: whitePaper } = PAPER_PICK, paperRGB = PAPER_DECLARED ?? PAPER_PICK.paperRGB;

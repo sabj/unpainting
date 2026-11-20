@@ -115,6 +115,3 @@ export function stageVectors(vec, stageLines) {
   return { ...vec, strokes: vec.strokes.filter(s => keep.has(Math.floor(s.line))) };
 }
 
-
-/** The vectors file beside a line file (`<stem>-lines.json` -> `<stem>-vectors.json`). */
-export const vectorsBeside = linesFile => linesFile.replace(/-lines\.json(\.gz)?$/, '-vectors.json');

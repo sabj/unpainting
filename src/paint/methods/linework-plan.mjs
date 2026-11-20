@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { linePaths, readLineText } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
+import { stageVectors } from './ink-vectors.mjs';
 
 const STAGE_KEYS = Object.freeze({ prep: 'prep', prepink: 'prepInk', finishink: 'finishInk' });
 
@@ -44,14 +45,12 @@ export async function planLinework({ opt, num, argv, out, grid, density, log, pl
   const info = { source: opt('drawingfile', '') ? 'file' : 'none', stages: null, files: {} };
   if (opt('drawing', 'first') === 'none') return info;
   if (!stages) return info;
-  // a drawing fitted as vector strokes is laid whole and exactly, first (tools/plate/drawing.mjs layExactVectors): it is
-  // not cut into stage files, which have no vectors beside them
-  { const f = opt('drawingfile', ''), stem = f.endsWith('-lines.json') ? f.slice(0, -'-lines.json'.length) : f; if (f && fs.existsSync(`${stem}-vectors.json`)) { log(`linked stages: none, the drawing ${path.basename(stem)} is laid as vector strokes`); return info; } }
   // the one line set the stages share, in its own source pixels: the drawing file (src/paint/line-source.mjs). The target's
   // own lines are never traced here (removed in 0.4, last at commit 49447027).
   const file = opt('drawingfile', '');
   if (!file) throw new Error('drawing stages need a drawing file (--drawingfile): the painter no longer traces the subject\'s lines');
   const doc = JSON.parse(readLineText(linePaths(file).lines)), setName = linePaths(file).lines;
+  const vecFile = setName.replace(/-lines\.json$/, '-vectors.json'), vec = fs.existsSync(vecFile) ? JSON.parse(fs.readFileSync(vecFile, 'utf8')) : null;
   const imageSize = doc.image ?? { w: grid.w, h: grid.h };
   // the plan's line choice (amount, lines, maxLines) applies to the set once, before the stages are cut from it
   const lines = planLines ? planLines(doc.lines.filter(g => g.points?.length >= 2), imageSize) : doc.lines;
@@ -63,6 +62,8 @@ export async function planLinework({ opt, num, argv, out, grid, density, log, pl
     // (drawing-file.mjs), while every other reader of the opening file sees no lines, as before
     const empty = r[key] ? null : 'the plan has a prep pencil and no prepInk stage; the pencil is the opening drawing';
     fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ ...stageDoc(r[key] ?? [], { image: imageSize, stage: key, source: setName }), ...(empty ? { empty } : {}), ...(doc.inputKind ? { inputKind: doc.inputKind } : {}), ...(doc.inkDecided ? { inkDecided: true } : {}) }) + '\n');
+    // the pen lays a drawing only as its vector strokes: the stage carries the same strokes for the lines it holds
+    if (vec && key !== 'prep') { const v = stageVectors(vec, r[key] ?? []); fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify({ ...v, stage: key, source: `${v.source ?? ''}; stage ${key} of ${path.basename(vecFile)}` })); info.vectors = { ...(info.vectors ?? {}), [key]: v.strokes.length }; }
     info.files[key] = stem;
   }
   if (info.files.prepInk) argv.push('--drawingfile', info.files.prepInk);
