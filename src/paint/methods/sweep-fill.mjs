@@ -271,6 +271,8 @@ const SPINE_LONG = 1.6;
 const SPINE_SIMPLE = 0.9;
 /** The spine's brush is at most this many times as wide as the shape. */
 const SPINE_FATTEST = 1.6;
+/** A shape at least this share of the smallest brush's width, and narrower than it, is pulled with it held light. */
+const SPINE_THINNEST = 0.3;
 /** The least pressure down the spine and at its ends. */
 const SPINE_TIP = 0.3;
 
@@ -305,7 +307,9 @@ function spineFill(loops, kit) {
   // (but not one more than SPINE_FATTEST times as wide: pressed that lightly it hardly lays paint; the widest narrower one instead,
   const asc = [...kit].sort((p, q) => p - q), over = asc.find(w => w >= 0.9 * widest);
   // (or not one less than two thirds as wide; else the shape is no spine stroke)
-  const under = [...asc].reverse().find(w => w < 0.9 * widest), brush = over != null && over <= SPINE_FATTEST * widest ? over : under != null && under >= 0.66 * widest ? under : null;
+  // (and a shape narrower than any brush, a mast or a rope, is pulled with the smallest held light, if it is at least
+  // SPINE_THINNEST of that brush's width: in lanes it would come out as a row of dots)
+  const under = [...asc].reverse().find(w => w < 0.9 * widest), brush = over != null && over <= SPINE_FATTEST * widest ? over : under != null && under >= 0.66 * widest ? under : over === asc[0] && widest >= SPINE_THINNEST * asc[0] ? asc[0] : null;
   if (brush == null) return null;
   const r = brush / 2;
   // a point every half radius down the spine, its pressure from the width there (a round lays r (0.25 + 0.75 p) each side)

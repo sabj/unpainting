@@ -235,11 +235,12 @@ function shifted(rgb, pw, ph, [dx, dy]) {
 }
 
 /** A broken mass (laid in dabs): a green between these hues (degrees, Lab), or a shape that loses this share of itself when rounded; between these shares of the sheet. */
-const BROKEN_HUE = [95, 170], BROKEN_LOST = 0.15, BROKEN_LEAST = 0.002, BROKEN_MOST = 0.08;
+const BROKEN_HUE = [95, 170], BROKEN_LOST = 0.15, BROKEN_THIN = 0.6, BROKEN_LONG = 3, BROKEN_LEAST = 0.002, BROKEN_MOST = 0.08;
 /** Foliage dabs: a round about this share of the sheet's width; dabs this many brush widths apart; the darker value's share of the dabs and its strength. */
-const DAB_SHARE = 0.025, DAB_PITCH = 0.8, DAB_DARK_SHARE = 0.35, DAB_DARK = 1.6;
-/** Dabs vary in size between these shares of the brush; they come in clusters this many cells across, this share of the clusters left out as paper. */
-const DAB_SIZE = [0.55, 1.25], DAB_CLUSTER = 3, DAB_GAPS = 0.2;
+const DAB_SHARE = 0.025, DAB_PITCH = 0.6, DAB_DARK_SHARE = 0.35, DAB_DARK = 1.6;
+/** Dabs vary in size between these shares of the brush and in length between these shares of their width; they come in clusters
+ * this many cells across, the dabs of a cluster turned alike (within DAB_TURN radians), this share of the clusters left out as paper. */
+const DAB_SIZE = [0.55, 1.25], DAB_LONG = [0.6, 1.8], DAB_CLUSTER = 3, DAB_TURN = 0.45, DAB_GAPS = 0.12;
 /** A darker value is dropped into a dabbed mass of at least this area (mm2). */
 const DARK_DABS_FROM = 100;
 /** Close values: a wash is laid against a neighbour still damp (one session, a soft edge) when their L* differ by no more than this. */
@@ -297,8 +298,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     return loops;
   };
   // the same, one list of loops for each connected part (a part is laid on its own, along its own long axis)
+  // (rounding closes gaps and notches but never takes away the shape's own cells: opened, a 2 mm mast falls into beads)
   const partLoops = (m, roundMm, avoid = null) => {
-    const r = roundMask(m, pw, ph, rC(roundMm / 2)); if (avoid) for (let q = 0; q < pn; q++) if (avoid[q] && !m[q]) r[q] = 0;
+    const r = roundMask(m, pw, ph, rC(roundMm / 2)); for (let q = 0; q < pn; q++) { if (m[q]) r[q] = 1; else if (avoid?.[q]) r[q] = 0; }
     const c = components(r, pw, ph, 4), out = []; for (let id = 1; id <= c.count; id++) { const l = loopsFor(c.labels, id); if (l.length) out.push(l); }
     return out;
   };
@@ -381,24 +383,31 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const c = shape.cells.length; if (flat || c < BROKEN_LEAST * pn || c > BROKEN_MOST * pn) return false;
     const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360;
     if (shape.chroma >= 8 && hue >= BROKEN_HUE[0] && hue <= BROKEN_HUE[1]) return true;
+    // (nor is a long shape, a mast or a spar: it is laid in a pull along its length)
+    let mx = 0, my = 0; for (const q of shape.cells) { mx += q % pw; my += (q / pw) | 0; } mx /= c; my /= c;
+    let sa = 0, sb = 0, sc = 0; for (const q of shape.cells) { const dx = q % pw - mx, dy = ((q / pw) | 0) - my; sa += dx * dx; sb += dx * dy; sc += dy * dy; }
+    const mean = (sa + sc) / 2, dd = Math.sqrt(((sa - sc) / 2) ** 2 + sb * sb); if (Math.sqrt((mean + dd) / Math.max(1e-9, mean - dd)) >= BROKEN_LONG) return false;
     const m = new Uint8Array(pn); for (const q of shape.cells) m[q] = 1; const o = roundMask(m, pw, ph, rC(2)); let kept = 0; for (const q of shape.cells) kept += o[q];
-    return 1 - kept / c >= BROKEN_LOST;
+    // (a shape that loses most of itself is not broken but thin: a mast, a rope, a frame, laid in a pull along its length)
+    return 1 - kept / c >= BROKEN_LOST && 1 - kept / c < BROKEN_THIN;
   };
   // a hash of a grid point, 0..1, fixed to the sheet (no picture is read)
   const hash = (a, b, c = 0) => { let x = Math.imul(a * 73856093 ^ b * 19349663 ^ c * 83492791, 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return (x >>> 0) / 4294967296; };
   const dabBrush = [...washKitMm].sort((a, b) => Math.abs(a - DAB_SHARE * sheetWidthMm) - Math.abs(b - DAB_SHARE * sheetWidthMm))[0], dr = dabBrush / 2;
-  // loose dabs of a round over a mask, fixed to the sheet (a hash, no picture read): in clusters, some clusters left out
-  // as gaps of paper; each dab its own size (DAB_SIZE times the brush), angle, length and place within its cell
+  // loose dabs of a round over a mask, fixed to the sheet (a hash, no picture read): overlapping, in clusters whose dabs
+  // lie alike, some clusters left out as gaps of paper; each dab its own size (DAB_SIZE times the brush), length and place
+  // within its cell, landing and lifting on the tip. With keep < 1, whole clusters are kept (the darker dabs come in clumps).
   const dabsOver = (m, salt, keep = 1) => {
     const pitch = DAB_PITCH * dabBrush, strokes = [], cl = DAB_CLUSTER;
     for (let gy = 0; gy * pitch < ph * mmX; gy++) for (let gx = 0; gx * pitch < pw * mmX; gx++) {
-      if (hash(Math.floor(gx / cl), Math.floor(gy / cl), salt + 5) < DAB_GAPS || hash(gx, gy, salt + 7) > keep) continue;
+      const kx = Math.floor(gx / cl), ky = Math.floor(gy / cl);
+      if (hash(kx, ky, salt + 5) < DAB_GAPS || (keep < 1 && (hash(kx, ky, salt + 7) > 1.4 * keep || hash(gx, gy, salt + 8) > 0.75))) continue;
       const cx = (gx + 0.5 + 0.9 * (hash(gx, gy, salt) - 0.5)) * pitch, cy = (gy + 0.5 + 0.9 * (hash(gx, gy, salt + 1) - 0.5)) * pitch;
       if (cx < dr || cy < dr || cx > pw * mmX - dr || cy > ph * mmX - dr) continue;
       const q = Math.min(ph - 1, Math.floor(cy / mmX)) * pw + Math.min(pw - 1, Math.floor(cx / mmX)); if (!m[q]) continue;
       const r = dr * (DAB_SIZE[0] + (DAB_SIZE[1] - DAB_SIZE[0]) * hash(gx, gy, salt + 4));
-      const a = Math.PI * hash(gx, gy, salt + 2), len = r * (0.2 + 1.2 * hash(gx, gy, salt + 3)), ux = Math.cos(a) * len / 2, uy = Math.sin(a) * len / 2;
-      strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: [[cx - ux, cy - uy, .5], [cx, cy, 1], [cx + ux, cy + uy, .5]].map(p => p.map(v => +v.toFixed(3))) });
+      const a = Math.PI * hash(kx, ky, salt + 2) + DAB_TURN * (2 * hash(gx, gy, salt + 2) - 1), len = r * (DAB_LONG[0] + (DAB_LONG[1] - DAB_LONG[0]) * hash(gx, gy, salt + 3)), ux = Math.cos(a) * len / 2, uy = Math.sin(a) * len / 2;
+      strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: [[cx - ux, cy - uy, .35], [cx, cy, 1], [cx + ux, cy + uy, .35]].map(p => p.map(v => +v.toFixed(3))) });
     }
     return strokes;
   };
@@ -479,7 +488,14 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     });
   }
   // a shape's outline: it and the darker shapes nested on it (its wash carried under them), rounded, off the true lights
-  const outlineOf = (list, roundMm = roundFirst) => { const m = new Uint8Array(pn); for (const i of list) for (const s of under(i)) for (const q of shapes[s].cells) m[q] = 1; return { m, parts: partLoops(m, roundMm, paperMask) }; };
+  // With `runUnder` (the wash's L*), it runs UNDER_MM on under the darker shapes beside it that are laid later, so a lighter
+  // wash and a darker one overlap instead of meeting at a hairline.
+  const outlineOf = (list, roundMm = roundFirst, runUnder = null) => {
+    const m = new Uint8Array(pn); for (const i of list) for (const s of under(i)) for (const q of shapes[s].cells) m[q] = 1;
+    const own = Uint8Array.from(m);
+    if (runUnder != null && !flat) { const g = dilate(own, pw, ph, rC(UNDER_MM)); for (let q = 0; q < pn; q++) if (g[q] && !own[q] && !paperMask[q] && !shapes[label[q]].paper && !done.has(label[q]) && shapes[label[q]].lab[0] < runUnder - NEST_LIGHTER) m[q] = 1; }
+    return { m: own, parts: partLoops(m, roundMm, paperMask) };
+  };
   const phaseOf = i => { const s = shapes[i]; if (s.lab[0] < DARK_L && share(i) < DARK_SMALL) return 3; return parent[i] < 0 && fam[i] < 0 && s.lab[0] >= FIRST_L ? 1 : 2; };
   // the session open now: its stage, its shapes, the study shapes in it (a close-valued neighbour may join it while damp)
   let session = null;
@@ -523,7 +539,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const group = (groupOf.get(i) ?? [i]).filter(j => !done.has(j)); for (const j of group) done.add(j);
     const s = shapes[i], own = group.flatMap(j => shapes[j].cells), phase = phaseOf(i);
     const over = parent[i] >= 0 || fam[i] >= 0, stage = phase === 1 ? 1 : phase === 3 ? 4 : over ? 3 : 1;
-    const { m, parts } = outlineOf(group, group.length > 1 ? Math.max(roundFirst, 1.5 * JOIN_MM) : roundFirst); if (!parts.length) continue;
+    const { m, parts } = outlineOf(group, group.length > 1 ? Math.max(roundFirst, 1.5 * JOIN_MM) : roundFirst, s.lab[0]); if (!parts.length) continue;
     const loops = parts.flat();
     const what = `study shape ${group.join(' ')}${parent[i] >= 0 ? ` over ${parent[i]}` : fam[i] >= 0 ? ` over the under-wash of ${fam[i]}` : ''}${kids[i].length ? `, carried under ${kids[i].join(' ')}` : ''}`;
     // laid against a neighbour still damp, in the same session, when their values are close and it is not laid over it:

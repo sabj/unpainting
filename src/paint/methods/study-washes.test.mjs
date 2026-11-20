@@ -107,3 +107,16 @@ test('cast-shadow pieces of one colour a millimetre apart are one wash, laid alo
   const long = shadows[0].strokes.filter(s => s.points.length >= 2).map(s => { const a = s.points[0], b = s.points.at(-1); return Math.abs(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI); });
   assert.ok(long.every(d => d > 40 && d < 80), long.join(' '));
 });
+
+test('a mast narrower than the smallest brush is one pull down its length, not a row of dots', () => {
+  const mast = { points: [[50, 10], [52, 10], [53, 70], [51, 70]] }, f = laneFill([mast], { kitMm: [38, 25.4, 7, 5] });
+  assert.equal(f.strokes.length, 1, JSON.stringify(f.strokes.map(s => s.points.length)));
+  assert.ok(f.spine);
+});
+
+test('a long thin brown shape of the study (a spar) is laid in a pull, not in dabs', () => {
+  const w = 320, h = 200, rgb = new Uint8ClampedArray(w * h * 3).fill(255);
+  for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; if (Math.abs(x - 40 - (y - 20) * 0.5) < 1.6 + (y % 7 < 2 ? 0.8 : 0) && y > 20 && y < 90) rgb.set([140, 90, 50], i * 3); }
+  const p = plan({ w, h, rgb }), q = p.instructions.filter(r => r.stage !== 2);
+  assert.ok(q.length >= 1 && q.every(r => !/dabs/.test(r.thing)), q.map(r => r.thing).join(' | '));
+});
