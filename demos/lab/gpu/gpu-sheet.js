@@ -8,6 +8,7 @@ import { WGSL } from './gpu-wgsl.js';
 import { flowTime, poreTime } from '../media/flow-time.js';
 import { EF_RMAX, EF_BMAX } from '../media/gpu/edge-feed-wgsl.js';
 import { wetBoxes, edgeGeometry } from '../media/gpu/edge-geometry.js';
+import { levelOn, levelBudget, levelBuffers, levelUniforms, encodeLevel, adaptLevel } from '../media/gpu/film-level-host.js';
 import { channelList, observeSheetChannels, observePackedChannels } from './gpu-active-channels.js';
 
 const TILE = 16;
@@ -31,7 +32,9 @@ export async function openDevice(gpu = globalThis.navigator?.gpu) {
 const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntiles', 'u'], ['K', 'u'], ['hasTop', 'u'], ['holdOn', 'u'], ['cap', 'u'], ['p2', 'u'], ['p3', 'u'],
   ...['dt', 'evap', 'edgeEvap', 'edgeWidth', 'capE', 'absorb', 'film', 'flow', 'ff', 'flowDepth', 'diffuse', 'cd', 'settle', 'liftDepth', 'rewetLift', 'granFill', 'holdCap', 'slide', 'slideFill', 'capStep', 'capEps', 'capDelta', 'sizing', 'wickFilter', 'wetEps', 'paperDry', 'capSigma', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre',
   'enclose', 'slideCap', 'holeFill', 'padB', 'filmDiff', 'filmDepth', 'holeSpan', 'mar', 'slope', 'padC', 'mmPerCell', 'edgeFlowDepth',
-  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'padTime3'].map(k => [k, 'f'])];
+  'toothLo', 'toothSpan', 'hollowUnit', 'groundPhys', 'poreHalo', 'poreReach', 'padTime2', 'padTime3',
+  // the painter's film sheet (media/gpu/film-level-host.js levelUniforms)
+  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes'].map(k => [k, 'f'])];
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UBYTES = UF.length * 4 + 512 + 64 + 256;
 const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  act: array<vec4<u32>, 4>,\n  pc: array<vec4<f32>, 16>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\nfn pigC(k: u32) -> vec4<f32> { return u.pc[k]; }\nfn physicalChannel(a: u32) -> u32 { return u.act[a / 4u][a % 4u]; }\n`;
@@ -121,6 +124,9 @@ export class GpuSheet {
     this.paperHollow = { toothLo: paper.toothLo, toothSpan: paper.toothSpan, hollowUnit: paper.hollowUnit, physical: !!paper.zUm };
     this.cap = this.ntiles; this.hold = 0; this.epoch = 0; this.knownDry = false; this.hasTop = false;
     this.efAlloc(B);
+    // the CPU step's boxes and the film's levelling (media/gpu/film-level-wgsl.js)
+    const lvSize = levelBuffers(w, h, n, this.ntiles, true); for (const k of Object.keys(lvSize)) B[k] = mk(lvSize[k]);
+    this.lv = levelBudget(); this.tilt = sheet.tilt ?? null;
     this.setOptions({});
     this.bg = {};
     this.bindAll();
@@ -192,6 +198,13 @@ export class GpuSheet {
     q.writeBuffer(this.b.EFL, 0, L); q.writeBuffer(this.b.EFG, 0, G); q.writeBuffer(this.b.EFB, 0, new Uint32Array([b, ef.rounds]));
     ef.count = L[0];
   }
+  /** Before queuing steps: the levelling's budgets brought up to what the last steps needed (film-level-host.js adaptLevel). */
+  async levelReady() {
+    if (!levelOn(this.o)) return;
+    const v = new Uint32Array(await this.readWords('LVS', 48));
+    this.device.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(9));
+    if (adaptLevel(this.lv, v)) this.setOptions({});
+  }
   bufFor(name) { return name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : this.b[name]; }
 
   /** Uniform values for the options and pigments. dt changes between dry()'s phases: call again with { dt }. */
@@ -220,6 +233,7 @@ export class GpuSheet {
       padC: 0, mmPerCell: o.mmPerCell ?? 0.3, edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
       poreHalo: Math.max(1, Math.ceil(this.poreTime.iters / TILE)), poreReach: Math.max(2, this.poreTime.iters),
       toothLo: this.paperHollow?.toothLo ?? 0, toothSpan: this.paperHollow?.toothSpan ?? 0, hollowUnit: this.paperHollow?.hollowUnit ?? 1, groundPhys: this.paperHollow?.physical ? 1 : 0,
+      ...levelUniforms({ ...o, tiltX: this.tilt?.x ?? 0, tiltY: this.tilt?.y ?? 0 }, dt, o.mmPerCell ?? 0.3, this.lv ?? levelBudget()),
     }).forEach(([k, v]) => set(k, v));
     const base = UF.length, gran = o.gran ?? 1, scour = o.scour ?? 0;
     this.pigments.forEach((p, k) => {
@@ -248,6 +262,7 @@ export class GpuSheet {
     this.hasTop = sheet.layers.length > 0;
     if (this.hasTop) { const top = sheet.layers[sheet.layers.length - 1]; for (let k = 0; k < K; k++) put(B.TOP, top[k], k * n * 4); }
     this.channelMask = observeSheetChannels(this.channelMask ?? 0, sheet, K);
+    this.tilt = sheet.tilt ?? null;   // the board's tilt (sheet.js setTilt), for the levelling
     this.setOptions({ mmPerCell: sheet.paper?.mmPerCell ?? 0.3 });
     const fl = new Uint32Array(this.ntiles), cap = sheet.paper.capacity;
     // The active-tile reduction covers every nonzero W only if loaded surface
@@ -292,6 +307,16 @@ export class GpuSheet {
       }
       go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); go('tiles_args', 0, [1]);
       if (o.optimized !== false) { go('pigment_scan', 12); go('pigment_masks', 0, [nT]); }
+      // the boxes and the levelling, after the feed as the CPU step's (sheet.js levelFilm); their kernels loop over their
+      // work, so any number of workgroups covers it
+      if (!zeroWater) encodeLevel((name, groups, constants = null) => {
+        if (!constants) return go(name, 0, [groups]);
+        const p = timer ? timer.pass(enc, name) : pass, key = `${name}#${JSON.stringify(constants)}`;
+        p.setPipeline(this.p[key] ??= this.device.createComputePipeline({ layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[name]] }), compute: { module: this.module, entryPoint: name, constants } }));
+        p.setBindGroup(0, this.bg[name]);
+        if (stopSurface) p.dispatchWorkgroupsIndirect(this.b.ARGS, 24); else p.dispatchWorkgroups(groups);
+        if (timer) p.end();
+      }, o, o.mmPerCell ?? 0.3, this.lv, Math.max(1, nD));
       // Proven W==0 is invariant until upload/writeRect. The retained p3a,
       // capillary and wet-front passes still run at the original dt.
       if (!zeroWater) {
@@ -342,7 +367,7 @@ export class GpuSheet {
    */
   async advance(steps) {
     if (this.knownDry) { this.surfaceWet = false; return false; }
-    await this.efReady();
+    await this.efReady(); await this.levelReady();
     const epoch = this.epoch;
     this.step(steps);
     const c = await this.counters();
@@ -360,7 +385,7 @@ export class GpuSheet {
   async advanceSurface(steps, quantum) {
     if (!Number.isInteger(quantum) || quantum < 1 || !Number.isInteger(steps) || steps < quantum || steps % quantum) throw new Error('surface batch needs whole observation quanta');
     if (this.knownDry) { this.surfaceWet = false; return { wet: false, steps: 0 }; }
-    await this.efReady();
+    await this.efReady(); await this.levelReady();
     const epoch = this.epoch, d = this.device;
     // CTR[8..11]: enabled, executed steps, original quantum, terminal latch.
     // ARGS[6..8]: global tile-list/mask work; ordinary kernels use ARGS[0..5].
