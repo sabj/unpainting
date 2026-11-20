@@ -202,7 +202,10 @@ function layExactVectors(file) {
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
   const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
-  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf));
+  // --inkfill (0..1, default 0.25; from claude/033-replay): when paint follows the pen, a FILL stroke (a leaf mass, a dark
+  // pane) is laid as its edge at line weight and its inside at this share of its darkness, so the paint supplies the dark
+  const fill = num('drawingonly', 0) > 0 ? 1 : Math.max(0, Math.min(1, num('inkfill', 0.25)));
+  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;
