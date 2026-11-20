@@ -36,7 +36,6 @@ import {versionStamp, versionLine} from '../../src/painter-version.mjs';
 import {registerDrawingFile, lineTargetOf} from '../../src/paint/methods/drawing-registration.mjs';
 import {holdInkLines} from '../../src/paint/methods/ink-lines-file.mjs';
 import {inkRecipeArgs} from '../../src/paint/methods/ink-recipe.mjs';
-import {inkHoldArgs} from '../../src/paint/methods/ink-hold-defaults.mjs';
 import {mediumForRun} from '../../src/paint/medium-run.mjs';
 import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {subjectMediumNote} from '../../src/paint/subject-medium.mjs';
@@ -197,8 +196,6 @@ const INK_RECIPE = { recipe: INK_RECIPE_NAME };
 // the pen-and-wash recipe turns ink on, so a subject with no pen does not take it
 if (NO_PEN_SUBJECT && INK_RECIPE.recipe === 'wash') console.log(`ink recipe: wash not applied, the subject medium is ${opt('subjectmedium', 'pen')}`);
 else argv.push(...inkRecipeArgs(INK_RECIPE.recipe, argv0));
-// an ink drawing is held to the target and decided by meaning whatever made its lines (src/paint/methods/ink-hold-defaults.mjs)
-argv.push(...inkHoldArgs(argv));
 // The line comes only from a drawing file (src/paint/line-source.mjs): with none, the run draws no line and says so.
 const LINE_SOURCE = lineSource({ drawing: opt('drawing', 'first'), drawingFile: opt('drawingfile', ''), drawingLast: opt('drawinglast', ''), stages: opt('stages', ''), resolve: f => path.resolve(root, f) });
 if (LINE_SOURCE.warning) { console.log(LINE_SOURCE.warning); argv.push('--drawing', LINE_SOURCE.drawing); }
@@ -212,14 +209,11 @@ if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('i
 const DRAWING_REGISTRATION = opt('drawingfile','') && opt('drawing','first') !== 'none' ? await registerDrawingFile({ base: opt('drawingfile'), image: path.resolve(root, opt('image','')), root, out, width: num('width', 700), argv, log: console.log }) : null;
 const SWEEP_CACHE = path.dirname(root) === '/root/sweepwork' ? '/root/sweepwork/cache' : null;
 const RUN_CACHE = {dir:process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root,'work','cache'),enabled:opt('runcache','1')!=='0'};
-// Ink lines held to the target (src/paint/methods/ink-lines-file.mjs), after every route that sets the line files.
-// --linesupport t (L*, default 0 off): keep an opening or closing line whole when at least half of it runs along a line
-// in the target at least t L* darker than beside it, and leave it off whole otherwise (never cut point by point). --linesmooth mm (default 0 off): smooth stepped traces at mm,
-// keeping corners sharper than --linesmoothcorner degrees (default 50). Either writes <out>/ink-<stage>-lines.json and
-// points the pen at it. --inkdarkcap and --inkwidthfloor also need the target's measures, so they run it too. It runs
-// again in a process that takes over a saved painting (--resumestate), on the line files as they now stand.
+// The target's own line darkness and pixel size, read for --inkdarkmatch, --inkdarkcap and --inkwidthfloor
+// (src/paint/methods/ink-lines-file.mjs); the drawing files are drawn as they are. It runs again in a process that takes
+// over a saved painting (--resumestate).
 const holdInk = () => opt('drawing','first') !== 'none' && opt('image','')
-  ? holdInkLines({ opt, num, argv, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
+  ? holdInkLines({ opt, num, image: path.resolve(root, opt('image','')), root, out, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
 ctx.INK_LINES = await holdInk();
 process.env.GPU_DEMAND_READBACK ??= NATIVE_PAINT_MODE.mode==='fast'?'fast':'0';
 process.env.GPU_SIGNED_ZERO ??= NATIVE_PAINT_MODE.mode==='fast'?'ignore':'exact';

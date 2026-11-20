@@ -84,11 +84,6 @@ if (DRAW_LAST && DRAWING !== 'none') {
   await sharp(view(), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'wash.jpg'));
   if (opt('draw', '1') !== '0') await drawPass(null);
 }
-// the finishing lines, after whatever ink the sheet's own order calls for and before the lights
-if (opt('finish', '0') !== '0' && opt('draw', '1') !== '0') {
-  ctx.STAGE = { stage: 'ink', step: 'fine' };
-  await drawPass(null, { fine: true });
-}
 // --smalllights gouache|both: white gouache last where the source has a small light and the painting reads over --gouachemargin denser.
 // --gouachefull: light share that covers a cell (default 0.5); --gouacheopacity 0.9, --gouachedry 0.5: hiding and dry-brush misses.
 if (GOUACHE_LIGHTS) {

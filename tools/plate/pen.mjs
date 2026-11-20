@@ -18,14 +18,9 @@ import {tapeSheet} from '../../src/media/sheet.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {dilate, erode, closeLocal} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
-import {planGestures} from '../../src/crop/gestures.mjs';
-import {joinLines} from '../../src/crop/joinlines.mjs';
 import {lineField, lineBudget} from '../../src/media/draw.mjs';
 import {classifyInkPaths, inkFilterCounts, inkFilterOverlay} from '../../src/crop/inkfilter.mjs';
-import {pathLength, straightness, meanContrast, insideShare, onShare, inkTierOverlay} from '../../src/crop/inktiers.mjs';
-import {silhouette, traceOutlines} from '../../src/crop/outline.mjs';
-import {edgeChains} from '../../src/crop/contours.mjs';
-import {drawAs} from '../../src/crop/simplify.mjs';
+import {silhouette} from '../../src/crop/outline.mjs';
 import {selectedDrawing, drawingWant} from '../../src/paint/methods/drawing-file.mjs';
 import {fillSheetBase} from '../../src/paint/methods/sheet-tone.mjs';
 
@@ -154,32 +149,6 @@ const writeInkFilter = async (D) => {
   const rgb = inkFilterOverlay(D, w, h, INK_FILTER_LOG, { width: num('inkfilterwidth', 2) });
   await sharp(Buffer.from(rgb.buffer, rgb.byteOffset, rgb.length), { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'ink-filter.png'));
 };
-// --inktiers 1: spend the ink budget in tiers before the greedy walk takes the rest (src/crop/inktiers.mjs).
-//   tier 1: the subject boundary and long near-straight step edges, --tier1 of the budget (default 0.3).
-//   tier 2: short paths inside the subject, ranked by contrast with their own ground, --tier2 (default 0.3).
-//   tier 3: the greedy walk with the rest; its faint second pass is guaranteed --tier3faint of the budget (default 0.1).
-// Selection and order only: pressure normalisation and batch boundaries are frozen as under --inkfilter.
-const INKTIERS = opt('inktiers', '0') !== '0';
-const INK_TIER_LOG = [];
-// Where the subject is, for the tiers alone: without --mask, the source's mask is read as a ranking priority, never a veto.
-const TIER_MASK = await (async () => {
-  if (!INKTIERS) return null;
-  if (ctx.SUBJECT) { console.log('ink tiers: the subject comes from --mask'); return ctx.SUBJECT; }
-  const image = opt('image', '');
-  const base = image ? path.basename(image, path.extname(image)) : '';
-  const file = base ? path.resolve(root, `work/masks/${base}.png`) : '';
-  if (!file || !fs.existsSync(file)) { console.log(`ink tiers: no subject mask for ${base || 'this source'}; tier 1 is edges only and tier 2 is the whole sheet`); return null; }
-  const { data } = await sharp(file).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer({ resolveWithObject: true });
-  const soft = Math.max(1, Math.round(num('masksoft', 0.01) * Math.min(w, h)));
-  const m = gaussian(Float32Array.from({ length: n }, (_, i) => data[i] / 255), w, h, soft);
-  let subj = 0; for (let i = 0; i < n; i++) if (m[i] > 0.5) subj++;
-  console.log(`ink tiers: subject from work/masks/${base}.png, ${(100 * subj / n).toFixed(1)}% of the sheet, for ranking only`);
-  return m;
-})();
-const writeInkTiers = async (D) => {
-  const rgb = inkTierOverlay(D, w, h, INK_TIER_LOG, { width: num('inktierswidth', 2) });
-  await sharp(Buffer.from(rgb.buffer, rgb.byteOffset, rgb.length), { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'ink-tiers.png'));
-};
 // The pen's drawing is planned whole before the first mark: where every line goes and how
 // hard, from the reference and the plan, never from the sheet. drawPass, after TARGET_GUARD.beginPaint(), only draws it.
 async function planPen(planD0, opts = {}) {
@@ -196,7 +165,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --penwant src|glaze|residual: src follows the source's darks; residual what the washes leave. Default src first, residual after.
   // glaze: lines where src puts them, laying only the density the glazes over them will not supply.
   const penWant = opt('penwant', first ? 'src' : 'residual'), planShare = penWant === 'residual' ? 1 : 0;
-  if (fine) console.log(`finish: a fine pass for the lines the washes cannot carry`);
   for (let i = 0; i < n; i++) inkWant[i] = Math.max(0, DRAW_SOURCE[i] - planShare * planD[i] - num('forgive', 0.10));
   // A pen follows thin dark ridges (lineField); the walk turns hard and crosses at most a few cells of paper.
   // --cellscale 1: scale the pen's cell sizes by sheet width over 420, so they are sizes on the paper. Default 0.
@@ -216,29 +184,8 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     const near = dilate(SEP.ink, w, h, Math.round(num('inkgate', 7) * K));
     for (let i = 0; i < n; i++) if (!near[i]) field[i] = 0;
   }
-  const nz = Array.from(field).filter(v => v > 0).sort((a, b) => a - b);
-  // --carry: cells without ink a walk may cross (default 8); --floorq: ink quantile that may seed a line (default 0.5).
-  // --inkconc, --outlineconc: ink concentrations (defaults 10 and 6.5).
-  const floor = nz.length ? nz[Math.floor(nz.length * num('floorq', preparing ? 0.25 : 0.5))] : 0.05;
-  // --penfrom walk|chains: chains draws form edges as chains (src/crop/contours.mjs), lines by construction, not a ridge walk.
-  const chainPen = () => edgeChains(DRAW_SOURCE, w, h, gaussian, {
-    sigma: num('edgesigma', 1.5) * K * PENBLUR, minLength: Math.round(num('penchainmin', 14) * K),
-    margin: num('silmargin', 0.04), step: Math.max(1, Math.round(2 * K)), high: num('penchainhigh', 0.7),
-  }).map(g => ({ points: g.points }));
-  const walkPen = () => (fine
-    ? planGestures(field, w, h, { seed: 31 + ctx.SEED, floor: floor * num('finefloor', 0.45), keep: num('finekeep', 260),
-        claimRadius: Math.max(1, num('fineclaim', 1.2) * K), reachShare: num('finereach', 0.05),
-        turn: num('fineturn', 0.92), carry: num('finecarry', 14) * K, scales: [num('finescale', 0.6), 0], tries: 4000 }).gestures
-    : planGestures(field, w, h, { seed: 7 + ctx.SEED, floor, keep: num('keep', 400), claimRadius: 3 * K, reachShare: num('penreach', 0.12), turn: num('turn', 0.8), carry: num('carry', 8) * K, scales: [1.5, 0], tries: 3000 }).gestures);
-  // --pensimplify c: reduce each pen path to the points it needs within c cells, then resample evenly. Default 0, off.
-  const SIMPLIFY = num('pensimplify', 0) * K;
-  const simplifyAll = gs => (SIMPLIFY > 0 ? gs.map(g => ({ ...g, points: drawAs(g.points, { tolerance: SIMPLIFY, step: Math.max(1, 2 * K) }) })).filter(g => g.points.length >= 2) : gs);
-  // Hybrid logic consumes the walker even with an authored drawing.
-  // Diagnostic gesture dumps also promise the original walked paths.
-  const fileReplacesWalk = !!(first ? opt('drawingfile','') : !fine && opt('drawinglast',''))
-    && num(first ? 'drawinglogic' : 'drawinglastlogic', num('drawinglogic',0)) === 0
-    && !opt('dumpgestures');
-  const gestures = fileReplacesWalk ? [] : simplifyAll(ctx.clock('paths', () => (opt('penfrom', 'walk') === 'chains' ? chainPen() : walkPen())));
+  // the pen draws only a drawing file's lines (drawing-file.mjs); the walker that traced the subject was removed in 0.4
+  const gestures = [];
   // the ink is the darkest fluid on the palette, as walnut ink is darker than any wash made from it
   // --firstpen graphite: the first pen's drawing as a light pencil lay-in, ink kept for the closing pen. Needs a graphite
   // outline medium; --prep does the same.
@@ -252,97 +199,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // (default 0.3), so the drawing as a whole carries as much line as the source shows, not twice that.
   const passShare = ctx.PEN_FIRST && ctx.DRAW_LAST && !fine && num('closingshare', 0) > 0 ? (first ? 1 - num('closingshare', 0) : num('closingshare', 0)) : 1;
   const CELLS = share * n * num('inkbudget', 6) * passShare, NIB = 1.5 * K;
-  const cellsOf = gs => gs.reduce((a, g) => a + (g.length ?? pathLength(g.points)) * NIB, 0);
-  const TIERED = INKTIERS && num('inkbudget', preparing ? 0 : 6) > 0;
-  const FAINT_CELLS = CELLS * num('tier3faint', 0.1);
-  // --inktiers: the same CELLS, reserved before the greedy walk may use them.
-  const tiered = TIERED && !fileReplacesWalk ? (() => {
-    const t1Cells = CELLS * num('tier1', 0.3), t2Cells = CELLS * num('tier2', 0.3);
-    const stride = Math.max(1, Math.round(2 * K));
-    // Tier 1a: the subject's own boundary; traceOutlines returns ordered, smoothed, longest-first chains.
-    const maskC = (TIER_MASK
-      ? traceOutlines(Uint8Array.from(TIER_MASK, v => (v >= num('pendrawat', 0.5) ? 1 : 0)), w, h, { minLength: Math.round(num('silmin', 12) * K), step: stride })
-      : []).map(g => ({ points: g.points, length: pathLength(g.points), tier: 1 }));
-    // Tier 1b: long near-straight runs through the ground, away from gated pen line (a horizon), let past --inkgate here only.
-    const gated = dilate(SEP.ink, w, h, Math.round(num('inkgate', 7) * K));
-    const longMin = num('tier1long', 0.10) * Math.min(w, h);
-    const stepC = [...edgeChains(DRAW_SOURCE, w, h, gaussian, { sigma: num('edgesigma', 1.5) * K, minLength: Math.round(num('edgemin', 20) * K), margin: num('silmargin', 0.04), step: stride, high: num('edgehigh', 0.85) })
-      .filter(g => pathLength(g.points) >= longMin
-        && straightness(g.points) >= num('tier1straight', 0.85)
-        && onShare(g.points, gated, w, h) < num('tier1gated', 0.5)
-        // the subject's own long edges are tier 1a's business; this half is for the lines through the ground
-        && (!TIER_MASK || insideShare(g.points, TIER_MASK, w, h, num('pendrawat', 0.5)) < 0.5))
-      .map(g => ({ points: g.points, length: pathLength(g.points), tier: 1 }))];
-    // the boundary first, then the horizon, then whatever of the boundary is still affordable
-    const a = lineBudget(maskC, t1Cells * num('tier1mask', 0.6), { width: NIB });
-    const b = lineBudget(stepC, t1Cells - cellsOf(a), { width: NIB });
-    const done = new Set(a);
-    const c = lineBudget(maskC.filter(g => !done.has(g)), t1Cells - cellsOf(a) - cellsOf(b), { width: NIB });
-    const t1 = [...a, ...b, ...c];
-    // Tier 2: short paths inside the subject, ranked by how far they stand above their lighter flank, not by darkness.
-    // A faint-scale walk restricted to the subject adds short candidates, since the main walk's gestures are mostly long.
-    const featLen = num('featlen', 0.08) * Math.min(w, h);
-    const featField = Float32Array.from(field, (v, i) => (TIER_MASK && TIER_MASK[i] < num('pendrawat', 0.5) ? 0 : v));
-    const fnz = Array.from(featField).filter(v => v > 0).sort((p, q) => p - q);
-    const featWalk = fnz.length
-      ? planGestures(featField, w, h, { seed: 17 + ctx.SEED, floor: fnz[Math.floor(fnz.length * num('featfloorq', 0.35))], keep: num('keep', 400),
-          claimRadius: 2 * K, reachShare: num('featrun', 0.05), turn: 1, carry: num('outlinecarry', 6) * K, scales: [0], tries: 3000 }).gestures
-      : [];
-    const t2cand = [...gestures, ...featWalk]
-        .filter(g => g.points.length >= 2 && (g.length ?? pathLength(g.points)) <= featLen
-          && (!TIER_MASK || insideShare(g.points, TIER_MASK, w, h, num('pendrawat', 0.5)) >= num('featinside', 0.6)))
-        .map(g => ({ from: g, contrast: meanContrast(DRAW_SOURCE, w, h, g.points, { reach: num('featreach', 4) * K }) }))
-        .sort((p, q) => q.contrast - p.contrast)
-        .map(e => ({ ...e.from, tier: 2, from: e.from }));
-    const t2 = lineBudget(t2cand, t2Cells, { width: NIB });
-    // Tier 3: the existing greedy darkest-first walk, with what is left once the faint pass's share is held back.
-    const spentOn2 = new Set(t2.map(g => g.from));
-    // --tier3: cap on the greedy walk's share of the budget. Default 1.
-    const t3Cells = Math.min(CELLS * num('tier3', 1), Math.max(0, CELLS - cellsOf(t1) - cellsOf(t2) - FAINT_CELLS));
-    const t3cand = gestures.filter(g => !spentOn2.has(g)).map(g => ({ ...g, tier: 3 }));
-    const t3 = lineBudget(t3cand, t3Cells, { width: NIB });
-    console.log(`ink tier 1 outline:  ${t1.length}/${maskC.length + stepC.length} paths, ${Math.round(cellsOf(t1))} of ${Math.round(t1Cells)} cells (mask boundary ${a.length + c.length} of ${maskC.length}, step edges ${b.length} of ${stepC.length})`);
-    console.log(`ink tier 2 features: ${t2.length}/${t2cand.length} paths, ${Math.round(cellsOf(t2))} of ${Math.round(t2Cells)} cells, at ${featLen.toFixed(0)} cells or shorter`);
-    console.log(`ink tier 3 rest:     ${t3.length}/${t3cand.length} paths, ${Math.round(cellsOf(t3))} of ${Math.round(t3Cells)} cells`);
-    // Short marks cost few cells, so the tiers may not draw more marks than the plain budget would keep.
-    // The excess comes off the tail of the greedy walk, the least structural part of the set.
-    return { paths: [...t1, ...t2, ...t3], cap: lineBudget(gestures, CELLS, { width: NIB }).length, t1n: t1.length, t2n: t2.length, t3n: t3.length };
-  })() : null;
-  const budgeted = (tiered ? tiered.paths : (num('inkbudget', preparing ? 0 : 6) > 0 ? lineBudget(gestures, CELLS, { width: 1.5 * K }) : gestures)).slice();
-  console.log(`line budget: source ink ${(100 * share).toFixed(1)}% of cells, ${budgeted.length} of ${gestures.length} gestures`);
-  // --outline 0|1: a lighter second pass on fainter ridges away from what is drawn, within the line budget. Default 1.
-  // --outlinemin p: run it only when the source shows at least p per cent of its cells as line. Default 0.
-  if (!fileReplacesWalk && opt('outline', '1') !== '0' && share >= num('outlinemin', 0) / 100) {
-    const drawn = new Uint8Array(n);
-    for (const g of budgeted) for (const q of g.points) { const x = Math.round(q.x), y = Math.round(q.y); if (x >= 0 && y >= 0 && x < w && y < h) drawn[y * w + x] = 1; }
-    const away = dilate(drawn, w, h, Math.round(2 * K)), faint = Float32Array.from(field, (v, i) => (away[i] ? 0 : v));
-    const nzf = Array.from(faint).filter(v => v > 0).sort((a, b) => a - b);
-    const floorF = nzf.length ? nzf[Math.floor(nzf.length * num('outlinefloorq', 0.35))] : 0.05;
-    // --outlinecarry: cells without ink the faint pass may cross (default 6); it draws a face's defining lines.
-    const more = planGestures(faint, w, h, { floor: floorF, keep: num('keep', 400), claimRadius: 2 * K, reachShare: num('outlinereach', 0.05), turn: 1, carry: num('outlinecarry', 6) * K, scales: [0], tries: 3000 }).gestures;
-    const used0 = budgeted.reduce((a, g) => a + (g.length ?? g.points.length) * 1.5 * K, 0);
-    // --tier3faint: under --inktiers the faint pass gets a floor of its own, not only the leftovers.
-    const left = TIERED ? Math.max(FAINT_CELLS, CELLS - used0) : Math.max(0, CELLS - used0);
-    const extra = lineBudget(more, left, { width: 1.5 * K });
-    console.log(TIERED
-      ? `ink tier 3 faint:    ${extra.length}/${more.length} paths, ${Math.round(cellsOf(extra))} of ${Math.round(left)} cells`
-      : `outline: ${extra.length} of ${more.length} fainter gestures`);
-    budgeted.push(...extra.map(g => (TIERED ? { ...g, outline: true, tier: 3 } : { ...g, outline: true })));
-  }
-  // the mark cap, applied once the faint pass has been counted: see the tier block
-  if (tiered && budgeted.length > tiered.cap) {
-    const cut = Math.min(budgeted.length - tiered.cap, tiered.t3n);
-    budgeted.splice(tiered.t1n + tiered.t2n + tiered.t3n - cut, cut);
-    console.log(`ink tiers: ${cut} of the greedy walk's marks let go to hold the plain budget's ${tiered.cap}, ${budgeted.length} paths drawn`);
-  }
-  // --joingap g: join fragments whose ends face, tangents agree and gap runs along both (src/crop/joinlines.mjs). Default 0, off.
-  // --dumpgestures path: the pen's gestures before joining, as JSON in sheet cells, one file per pass (-first, -last, -fine).
-  if (opt('dumpgestures')) fs.writeFileSync(path.resolve(root, opt('dumpgestures').replace(/\.json$/, '') + `-${first ? 'first' : fine ? 'fine' : 'last'}.json`),
-    JSON.stringify({ w, h, K, gestures: budgeted.map(g => ({ outline: !!g.outline, pass: g.pass, length: g.length, points: g.points.map(q => ({ x: +q.x.toFixed(2), y: +q.y.toFixed(2) })) })) }));
-  const drawn = num('joingap', 0) > 0
-    ? (() => { const r = joinLines(budgeted, { gap: num('joingap', 0) * K, cos: num('joincos', 0.94), aim: num('joinaim', 0.9) });
-        console.log(`joined ${r.joined} line fragments: ${budgeted.length} gestures into ${r.gestures.length}`); return r.gestures; })()
-    : budgeted;
+  const drawn = [];
   // The pen follows the subject, else the finish field, as the washes do. Ground texture is a cross hatch,
   // never a traced contour.
   const PEN_FIELD = ctx.SUBJECT ?? FINISH;
@@ -357,7 +214,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --inkskinerode: interior erosion in cells (default 3); --inkskinshare: share of points inside that drops a gesture (default 0.6).
   if (!first && opt('inkskin', '') !== '') {
     const [bx0, by0, bx1, by1] = String(opt('inkskin', '0,0,1,1')).split(',').map(Number);
-    const fig = ctx.SUBJECT || TIER_MASK, S0 = new Uint8Array(n);
+    const fig = ctx.SUBJECT, S0 = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const x = i % w, y = (i / w) | 0;
       if (x < bx0 * w || x > bx1 * w || y < by0 * h || y > by1 * h) continue;
@@ -449,12 +306,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     console.log(`pen face: ${before - kept.length} of ${before} ${first ? 'opening' : fine ? 'fine' : 'closing'} gestures are off the reference's lines and are left off`);
   }
   if (penKeep && kept.length !== drawn.length) console.log(`pen: ${kept.length} of ${drawn.length} gestures lie on ${ctx.SUBJECT ? 'the subject' : 'the part of the sheet that is carried'}`);
-  // Which tier paid for each path that reaches the nib, as a picture: the source in light grey, the outline tier blue,
-  // the features green, the greedy walk red. Rewritten after each drawing pass, so a run stopped early leaves it.
-  if (TIERED) {
-    INK_TIER_LOG.push(...kept.filter(g => g.tier).map(g => ({ tier: g.tier, points: g.points })));
-    await writeInkTiers(DRAW_SOURCE);
-  }
   // --inkfilter: classify each path on the density the walker followed, once the budget and subject clip are applied.
   // The paths stay in the array either way: the schedule below is built from all of them.
   // --inkdarkskip v: no closing pen line inside the plan's darkest washes (planned value above v); the opening drawing
@@ -489,63 +340,22 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
   const press = penWant !== 'glaze' ? field : Float32Array.from(field, (v, i) => v * Math.max(num('penfloor', 0.2), Math.min(1, (DRAW_SOURCE[i] - planD[i]) / Math.max(1e-3, DRAW_SOURCE[i]))));
-  const peakOf = (() => { const v = []; for (const g of budgeted) for (const q of g.points) { const x = Math.round(q.x), y = Math.round(q.y); if (x >= 0 && y >= 0 && x < w && y < h) v.push(field[y * w + x]); } v.sort((a, b) => a - b); return v.length ? Math.max(1e-4, v[Math.floor(v.length * 0.95)]) : null; })();
+  const peakOf = (() => { const v = []; for (const g of kept) for (const q of g.points) { const x = Math.round(q.x), y = Math.round(q.y); if (x >= 0 && y >= 0 && x < w && y < h) v.push(field[y * w + x]); } v.sort((a, b) => a - b); return v.length ? Math.max(1e-4, v[Math.floor(v.length * 0.95)]) : null; })();
   const peak = penWant === 'glaze' ? peakOf : null;
   const big = SC === 1 ? press : Float32Array.from({ length: N2 }, (_, i) => press[(((i / W2) | 0) / SC | 0) * w + ((i % W2) / SC | 0)]);
   let outlines = null;
-  if (first && !SELECTED && opt('penoutline', '0') !== '0') {
-    const sil = silhouette(DRAW_SOURCE, w, h, gaussian, { scale: num('silscale', 4) * K });
-    // --outlineskip 1: cut the outline where the source has a line within --outlineskipr cells (default 3), so it is not doubled.
-    const skipNear = opt('outlineskip', '0') !== '0' ? dilate(SEP.ink, w, h, Math.round(num('outlineskipr', 3) * K)) : null;
-    const minPts = Math.max(3, Math.round(num('silmin', 12) * K / 2));
-    // --outlinesource edges: the pencil follows form edges (src/crop/contours.mjs), else the outline of tone masses. Default edges.
-    const traced = opt('outlinesource', 'edges') === 'edges'
-      ? edgeChains(DRAW_SOURCE, w, h, gaussian, { sigma: num('edgesigma', 1.5) * K, minLength: Math.round(num('edgemin', 20) * K), margin: num('silmargin', 0.04), step: Math.max(1, Math.round(2 * K)), high: num('edgehigh', 0.85) })
-      : traceOutlines(sil, w, h, { minLength: Math.round(num('silmin', 12) * K), step: Math.max(1, Math.round(2 * K)) });
-    const outlineCells = traced
-      // --silmargin: cut chains within this share of the sheet's side of its edge, so a scan's border is not drawn. Default 0.04.
-      .flatMap(g => {
-        const mg = num('silmargin', 0.04), mx = mg * w, my = mg * h, inside = q => q.x >= mx && q.y >= my && q.x < w - mx && q.y < h - my;
-        if (mg <= 0) return [g];
-        const runs = []; let cur = [];
-        for (const q of g.points) { if (inside(q)) cur.push(q); else { if (cur.length >= minPts) runs.push({ points: cur }); cur = []; } }
-        if (cur.length >= minPts) runs.push({ points: cur });
-        return runs;
-      })
-      .flatMap(g => {
-        if (!skipNear) return [g];
-        const runs = []; let cur = [];
-        for (const q of g.points) { const i = Math.round(q.y) * w + Math.round(q.x); if (skipNear[i]) { if (cur.length >= minPts) runs.push({ points: cur }); cur = []; } else cur.push(q); }
-        if (cur.length >= minPts) runs.push({ points: cur });
-        return runs;
-      })
-      // The outline pass is clipped too, here, in sheet coordinates, before the scale up.
-      .filter(g => !penKeep || penKeep(g))
-      .filter(g => !faceNear || faceOnLine(g))
-      .filter(g => !INKOFF || !INKOFF.outlinesToo || !INKOFF.off(g))
-      .filter((g, i, all) => { if (!(WIGGLE > 0)) return true; if (i === 0) console.log(`ink wiggle, ${wiggleLog(all, 'outlines')}`); return wiggleOf(g) <= WIGGLE; });
-    // The silhouette pass is filtered on the same evidence: a chain traced round a patch of texture is as unwanted as
-    // a walked one. Its want is a constant and its peak is already fixed at 1, so only the batch boundaries are frozen.
-    const outlineVerdict = INKFILTER ? classifyInkPaths(outlineCells, DRAW_SOURCE, w, h, { scale: num('inkfilterscale', K), accent: num('inkfilteraccent', 10) * K }) : null;
-    if (outlineVerdict) {
-      INK_FILTER_LOG.push(...outlineVerdict.map((e, i) => ({ ...e, pass: `${passName}-silhouette`, points: outlineCells[i].points })));
-      const c = inkFilterCounts(outlineVerdict);
-      console.log(`ink filter: kept ${c.kept} of ${c.total} (contour ${c.contour}, accent ${c.accent}; dropped wash ${c.wash}, dry ${c.dry}, texture ${c.texture})`);
-      await writeInkFilter(DRAW_SOURCE);
-    }
-    outlines = outlineCells.map((g, i) => ({ draw: !outlineVerdict || outlineVerdict[i].kept, points: g.points.map(q => ({ x: q.x * SC, y: q.y * SC })) }));
-  }
+
   // Batches and pressure come from the whole planned set, not the survivors: drawGestures normalises pressure to the
   // 95th percentile of the want under its paths. So the peak and batch boundaries come from the unfiltered batch.
   const frozenPeak = gs => { const v = []; for (const g of gs) for (const q of g.points) v.push(big[Math.max(0, Math.min(H2 - 1, Math.round(q.y))) * W2 + Math.max(0, Math.min(W2 - 1, Math.round(q.x)))]); v.sort((a, b) => a - b); return v.length ? Math.max(1e-4, v[Math.floor(v.length * 0.95)]) : 1; };
   // The outline tier lies where the ridge field is gated to zero, so it takes a constant want at a fixed peak,
   // as the silhouette pass does; other paths in the batch cannot change its pressure.
   // a selected drawing brings its own pressure, stroke by stroke (--drawwant times each line's weight)
-  const wantT1 = SELECTED ? drawingWant(SELECTED, W2, H2, SC, { base: num('drawwant', num('tier1want', 0.6)), floor: num('drawfloorwant', 0.15) }) : TIERED ? new Float32Array(N2).fill(num('tier1want', 0.6)) : null;
+  const wantT1 = SELECTED ? drawingWant(SELECTED, W2, H2, SC, { base: num('drawwant', num('tier1want', 0.6)), floor: num('drawfloorwant', 0.15) }) : null;
   const per = Math.max(1, Math.ceil(scaled.length / 8));
   return { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures };
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
   PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, LOOK_AL, 
-  LOOK_PLAN, SOURCE_INK, TIER_MASK });
+  LOOK_PLAN, SOURCE_INK });
 }

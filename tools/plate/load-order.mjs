@@ -90,8 +90,6 @@ import '../../src/crop/inkfilter.mjs';
 import '../../src/crop/inktiers.mjs';
 import '../../src/crop/inkwash.mjs';
 import '../../src/crop/outline.mjs';
-import '../../src/crop/contours.mjs';
-import '../../src/crop/simplify.mjs';
 import '../../src/crop/finish.mjs';
 import '../../src/eval/colour.mjs';
 import '../../src/crop/lights.mjs';

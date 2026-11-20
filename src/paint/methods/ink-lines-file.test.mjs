@@ -20,36 +20,29 @@ async function setup() {
   return dir;
 }
 
-test('the files are cut to the target lines, written beside the painting and handed to the pens', async () => {
-  const dir = await setup(), f = flags(['--drawingfile', path.join(dir, 'open'), '--drawinglast', path.join(dir, 'close'), '--linesupport', '6', '--linesmooth', '0.5']);
-  const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
-  assert.equal(f.opt('drawingfile'), path.join(dir, 'ink-opening'));
-  assert.equal(f.opt('drawinglast'), path.join(dir, 'ink-closing'));
-  const open = JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8'));
-  assert.equal(open.lines.length, 1);
-  assert.ok(open.lines[0].points.every(([, y]) => Math.abs(y - 10.5) < 0.6));
-  const close = JSON.parse(fs.readFileSync(path.join(dir, 'ink-closing-lines.json'), 'utf8'));
-  assert.equal(close.lines.length, 0);
-  assert.match(close.empty, /no line of close-lines.json follows a line in the target/);
-  assert.equal(r.pixelMm, 2);
-  assert.ok(r.opening.stats.absorbance > 0.8);
-  assert.ok(fs.existsSync(path.join(dir, 'ink-lines.json')));
-});
-
 test('measuring alone leaves the files and the pens as they were', async () => {
   const dir = await setup(), f = flags(['--drawingfile', path.join(dir, 'open'), '--inkdarkcap', '1']);
   const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
   assert.equal(f.argv.length, 4);
   assert.equal(r.opening.out, null);
   assert.equal(r.closing, null);
-  assert.ok(r.opening.stats.supportedShare > 0.4 && r.opening.stats.supportedShare < 0.6);
   assert.equal(await holdInkLines({ ...flags([]), image: path.join(dir, 'target.png'), out: dir, sheetMm: 120 }), null, 'no flag, no work');
 });
 
 test('the ink flags refuse negative values', () => {
-  assert.throws(() => inkLineFlags(flags(['--linesupport', '-1']).num), /support/);
-  assert.throws(() => inkLineFlags(flags(['--linesmoothcorner', '200']).num), /linesmoothcorner/);
+  assert.throws(() => inkLineFlags(flags(['--inkdarkcap', '-1']).num), /darkCap/);
   assert.equal(inkLineFlags(flags([]).num).measure, false);
+});
+
+test('a drawing file is drawn as it is: its darkness is read, its lines are never cut or rewritten', async () => {
+  const dir = await setup(), f = flags(['--drawingfile', path.join(dir, 'open'), '--drawinglast', path.join(dir, 'close'), '--inkdarkmatch', '1']);
+  const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
+  assert.equal(f.argv.length, 6, 'the pens keep the files they were given');
+  assert.equal(r.opening.out, null); assert.equal(r.closing.out, null);
+  assert.ok(!fs.existsSync(path.join(dir, 'ink-opening-lines.json')));
+  assert.ok(r.opening.stats.peakAbsorbance > 0 && r.opening.stats.inkAbsorbance > 0);
+  assert.equal(r.pixelMm, 2);
+  assert.ok(fs.existsSync(path.join(dir, 'ink-lines.json')));
 });
 
 test('--inkrecipe v2 adds only the flags the command line leaves unset', () => {
@@ -58,21 +51,6 @@ test('--inkrecipe v2 adds only the flags the command line leaves unset', () => {
   assert.deepEqual(add.filter((_, i) => i % 2 === 0).sort(), Object.keys(INK_RECIPES.v2).filter(k => k !== 'inkdamp').map(k => '--' + k).sort());
   assert.deepEqual(inkRecipeArgs('none', []), []);
   assert.throws(() => inkRecipeArgs('v3', []), /--inkrecipe/);
-});
-
-test('--linemeasure reads a finer file on the painting grid and writes per-point widths, weights and line cores', async () => {
-  const dir = await setup(), w = 60, h = 40, k = 3;
-  const fine = y => ({ points: Array.from({ length: 11 }, (_, i) => [k * (5 + 5 * i), k * y]) });
-  fs.writeFileSync(path.join(dir, 'fine-lines.json'), JSON.stringify({ image: { w: w * k, h: h * k }, lines: [fine(10.5), fine(30.5)] }));
-  const f = flags(['--drawingfile', path.join(dir, 'fine'), '--linesupport', '6', '--linemeasure', '1', '--inkdarkmatch', '1', '--width', String(w)]);
-  const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
-  const open = JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8'));
-  assert.deepEqual(open.image, { w, h });
-  assert.equal(open.lines.length, 1);
-  const g = open.lines[0];
-  assert.equal(g.widths.length, g.points.length);
-  assert.ok(g.weights.every(v => v >= 0.45 && v <= 1));
-  assert.ok(r.opening.stats.peakAbsorbance > 0);
 });
 
 test('--inkrecipe wash turns ink on, traces no source line, and the command line still wins', () => {
@@ -84,16 +62,7 @@ test('--inkrecipe wash turns ink on, traces no source line, and the command line
   assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');
 });
 
-test('--inkres keeps a finer file on its own grid, up to the fine sheet', async () => {
-  const dir = await setup(), w = 60, h = 40, k = 3;
-  const fine = y => ({ points: Array.from({ length: 11 }, (_, i) => [k * (5 + 5 * i), k * y]) });
-  fs.writeFileSync(path.join(dir, 'fine-lines.json'), JSON.stringify({ image: { w: w * k, h: h * k }, lines: [fine(10.5), fine(30.5)] }));
-  const f = flags(['--drawingfile', path.join(dir, 'fine'), '--linesupport', '6', '--linemeasure', '1', '--width', String(w), '--inkres', String(k)]);
-  await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8')).image, { w: w * k, h: h * k });
-});
-
-test('the wash recipe draws on a fine sheet by width, by a hand that chains strokes', () => {
+test('the wash recipe draws on a fine sheet by width, by a hand that chains strokes, and holds no line to the target', () => {
   const opt = (argv, n) => { const a = inkRecipeArgs('wash', argv); return a[a.indexOf('--' + n) + 1]; };
   assert.equal(opt(['--width', '540'], 'inkres'), '4');
   assert.equal(opt(['--width', '1200'], 'inkres'), '2');
@@ -102,47 +71,10 @@ test('the wash recipe draws on a fine sheet by width, by a hand that chains stro
   assert.ok(!inkRecipeArgs('wash', ['--width', '540', '--inkres', '2']).includes('--inkres'), 'a flag on the command line wins');
   assert.equal(INK_RECIPES.wash.drawinghand, '1');
   assert.equal(INK_RECIPES.wash.drawstroke, '0');
-  assert.equal(INK_RECIPES.wash.inkdecide, '1');
-  assert.equal(INK_RECIPES.wash.inklabeljudge, 'simple', 'no region image leaves the machine by default');
-  assert.equal(INK_RECIPES.wash.inkshadowmask, '0');
-  assert.equal(INK_RECIPES.wash.inkdropfaint, '0');
-  assert.equal(INK_RECIPES.wash.inkdarkrule, '1');
-  assert.equal(INK_RECIPES.wash.inkjoin, '2.5');
-  assert.equal(INK_RECIPES.wash.inkfoliage, '1');
   const fl = (argv) => { const a = inkRecipeArgs('wash', argv); return a[a.indexOf('--inkwidthfloor') + 1]; };
   assert.equal(fl(['--width', '540']), '0', 'on a fine sheet no floor');
   assert.equal(fl(['--width', '2400']), '1');
-  assert.equal(INK_RECIPES.wash.inksalience, '1');
-  for (const k of ['inkgeom', 'inkhatch']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} is opt-in`);
-});
-
-test('lineart map lines are measured and never cut or marked soft, whatever --linesupport says', async () => {
-  const dir = await setup();
-  for (const name of ['open', 'close']) {
-    const doc = JSON.parse(fs.readFileSync(path.join(dir, `${name}-lines.json`), 'utf8'));
-    fs.writeFileSync(path.join(dir, `${name}-lines.json`), JSON.stringify({ ...doc, inputKind: 'line-map' }));
-  }
-  const f = flags(['--drawingfile', path.join(dir, 'open'), '--linesupport', '6', '--linemeasure', '1', '--linesmooth', '0.5', '--lineminmm', '3', '--linegapmm', '1']);
-  const r = await holdInkLines({ ...f, image: path.join(dir, 'target.png'), root: dir, out: dir, sheetMm: 120 });
-  const open = JSON.parse(fs.readFileSync(path.join(dir, 'ink-opening-lines.json'), 'utf8'));
-  assert.equal(open.lines.length, 2, 'the line over bare paper stays');
-  assert.equal(open.inputKind, 'line-map');
-  assert.ok(open.lines.every(g => g.soft === undefined));
-  assert.ok(r.opening.model);
-  assert.ok(Math.abs(r.opening.stats.keptPx / r.opening.stats.lengthPx - 1) < 1e-9, 'every pixel of the length is kept');
-  assert.equal(open.inkLines.support, 0);
-});
-
-test('unchanged stage measurements reuse their record; edited files and flags invalidate it', async()=>{
- const dir=await setup(),f=flags(['--drawingfile',path.join(dir,'open'),'--inkdarkcap','1']),logs=[];
- try {
-  const args={...f,image:path.join(dir,'target.png'),root:dir,out:dir,sheetMm:120,log:s=>logs.push(s)};
-  const a=await holdInkLines(args),b=await holdInkLines(args);
-  assert.strictEqual(a.opening,b.opening);assert(logs.some(s=>s.includes('reused measurements')));
-  const file=path.join(dir,'open-lines.json'),doc=JSON.parse(fs.readFileSync(file));doc.lines.pop();fs.writeFileSync(file,JSON.stringify(doc));
-  const c=await holdInkLines(args);assert.notStrictEqual(c.opening,b.opening);
-  f.argv.push('--inkdarkmatch','1');const d=await holdInkLines(args);assert.notStrictEqual(d.opening,c.opening);
- }finally{fs.rmSync(dir,{recursive:true,force:true});}
+  for (const k of ['inkdecide', 'linesupport', 'linesmooth', 'linemeasure']) assert.equal(INK_RECIPES.wash[k], undefined, `${k} was removed in 0.4: a drawing file is drawn as it is`);
 });
 
 test('wash with --drawingonly 1: black ink, firm ends, a load match past 4x, one opening pen; flags still win', () => {

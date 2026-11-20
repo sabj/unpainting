@@ -43,27 +43,7 @@ export function meanContrast(D, w, h, points, { reach = 3 } = {}) {
   return count ? sum / count : 0;
 }
 
-/** The share of a path's points where a float field stands at or above `at`. */
-export function insideShare(points, F, w, h, at = 0.5) {
-  if (!F || !points.length) return 0;
-  let inside = 0;
-  for (const p of points) {
-    const x = Math.min(w - 1, Math.max(0, Math.round(p.x))), y = Math.min(h - 1, Math.max(0, Math.round(p.y)));
-    if (F[y * w + x] >= at) inside++;
-  }
-  return inside / points.length;
-}
 
-/** The share of a path's points standing on a byte mask. */
-export function onShare(points, M, w, h) {
-  if (!M || !points.length) return 0;
-  let on = 0;
-  for (const p of points) {
-    const x = Math.min(w - 1, Math.max(0, Math.round(p.x))), y = Math.min(h - 1, Math.max(0, Math.round(p.y)));
-    if (M[y * w + x]) on++;
-  }
-  return on / points.length;
-}
 
 const stamp = (rgb, w, h, x, y, colour, radius) => {
   const r = Math.max(1, Math.ceil(radius));
@@ -84,20 +64,3 @@ const polyline = (rgb, w, h, points, colour, width) => {
   if (points.length === 1) stamp(rgb, w, h, points[0].x, points[0].y, colour, radius);
 };
 
-/**
- * Which tier paid for each path, as a picture rather than a count: the source in light grey, the outline tier blue,
- * the feature tier green and what the greedy walk took with the rest red. Raw RGB; the caller writes the file.
- *
- * @param marks [{ points, tier }] in the cells D is on
- */
-export function inkTierOverlay(D, w, h, marks, { width = 2, colours = [[40, 90, 220], [40, 160, 60], [214, 40, 40]] } = {}) {
-  const n = w * h, rgb = new Uint8Array(n * 3);
-  const sorted = Array.from(D).sort((a, b) => a - b), top = sorted[Math.floor(0.98 * (n - 1))] || 1;
-  for (let i = 0; i < n; i++) {
-    const v = Math.round(255 - 120 * Math.min(1, Math.max(0, D[i] / top)));
-    rgb[3 * i] = v; rgb[3 * i + 1] = v; rgb[3 * i + 2] = v;
-  }
-  // last tier first, so where two tiers run together the earlier and more structural one is the colour on top
-  for (let t = colours.length; t >= 1; t--) for (const m of marks) if (m.tier === t) polyline(rgb, w, h, m.points, colours[t - 1], width);
-  return rgb;
-}

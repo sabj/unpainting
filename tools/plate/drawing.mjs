@@ -34,7 +34,7 @@ const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out,
   GRAPHITE_AT, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
   PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, render, view, BRUSH, UPRIGHT, 
   highlights, expected, sheetDensity, drainFrames, mark, WET, CAL, snap, shoot, FILM_BY_PAINT, PEN_FRAMES, 
-  SOURCE_INK, TIER_MASK, planPen } = ctx;
+  SOURCE_INK, planPen } = ctx;
 Object.assign(ctx, { drawPass });
 // The plan's density before anything is laid: every passage booked at its full amount, the way the loop books one it
 // lays whole. The pen-first order needs it to know what the washes will not carry.
@@ -118,7 +118,6 @@ if (opt('draw', '1') !== '0') {
   const PLAN_D = planDensityOfLayers();
   if (PEN_FIRST && DRAWING !== 'none') PEN_PLANS.first = await planPen(PLAN_D, { first: true });
   if (DRAW_LAST && DRAWING !== 'none') PEN_PLANS.last = await planPen(PLAN_D);
-  if (opt('finish', '0') !== '0') PEN_PLANS.fine = await planPen(PLAN_D, { fine: true });
 }
 // --texflow d: short texture marks follow the reference's value smoothed over about 2 mm (direction only); d scales density.
 if (num('texflow', 0) > 0) {
@@ -190,7 +189,6 @@ async function drawPass(_unused, { first = false, fine = false } = {}) {
   ctx.DRAW_STAGE=first?'opening':'closing';
   if (first && STAGE_PLAN?.files.prep && GRAPHITE) await drawPrepStage(PEN);
   const stageBefore = STAGE_PLAN && !fine ? thickness(ctx.sheet).map(a => Float32Array.from(a)) : null;
-  // --penoutline (pen first only, default on): the main shapes' outlines first, so the drawing alone states the subject.
   if (first && PREP && GRAPHITE && ANCHORS) {
     const points=Object.fromEntries(ANCHORS.landmarks.map(a=>[a.id,{x:a.painting[0]*W2/ANCHORS.canvas[0],y:a.painting[1]*H2/ANCHORS.canvas[1]}]));
     const skeleton=Object.entries(ANCHORS.curves).filter(([name])=>/eye_axis|face_axis|jaw_planes|ear_near|ear_far/.test(name)).map(([,ids])=>({points:ids.map(id=>points[id])}));
