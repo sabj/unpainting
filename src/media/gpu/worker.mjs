@@ -196,6 +196,8 @@ async function handleOp(m) {
       brushPigments(m); strokeMask(m);
       // not awaited: the next message is handled while the GPU lays this one; its brush state lands in the ring when it is done
       (m.op === 'stroke' ? gpu.runStroke(m.data, {...m.info,slot:m.slot,seq:m.seq}) : gpu.runSplat(m.data, m.info)).then(out => { if(out===null) return; ring.set(out, m.slot * RING_FLOATS); Atomics.store(done, m.slot, m.seq); Atomics.notify(done, m.slot); }).catch(e => { console.error('gpu worker error', e); fail(e.stack ?? e.message); });
+      // a stroke laid in parts (its flows wait for the edge feed's geometry, stepfull.mjs strokeEncoding) holds the next message
+      if (gpu.encoding) await gpu.encoding;
       return;
     }
     case 'idle': await gpu.idle(); break;

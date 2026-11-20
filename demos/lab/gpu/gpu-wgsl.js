@@ -1,6 +1,7 @@
 // Sheet physics kernels adapted from src/media/gpu/stepfull.wgsl.
 // Buffers are the sheet's fields, resident on the GPU; see gpu-sheet.js for the bindings and dispatch.
 import { edgeFeedWgsl } from '../media/gpu/edge-feed-wgsl.js';
+import { filmLevelWgsl } from '../media/gpu/film-level-wgsl.js';
 export const WGSL = String.raw`// A whole stepBox (sheet.mjs) as gathers on 16x16 tiles: the pinned-edge feed, drying and absorption, flow with pigment
 // transport, pigment exchange, slide, capillary spread, wet fronts. The JS driver prepends 'struct U' and the
 // uniform binding (see gpu-sheet.js). Tiles that hold or border water are listed each step (tiles_*), the other kernels
@@ -299,6 +300,13 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
   let turnover = select(0.0, min(1.0, WENT[i] / Wi * (u.mmPerCell / 0.25)), Wi > 1e-6);   // scour per mm the water travels
   var settled = 0.0;
   if (u.granFill > 0.0) { for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } settled += D[k * u.n + i]; } }
+  // the suspension's mean Stokes speed by mass (sheet.js coSettle: a mix's fine particles ride down on the coarse ones)
+  var vMix = 0.0;
+  if (u.coSettle > 0.0) {
+    var gm = 0.0;
+    for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } let g = G[k * u.n + i]; vMix += g * pigB(k).x; gm += g; }
+    vMix = select(0.0, vMix / gm, gm > 0.0);
+  }
   for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; }
     let q = k * u.n + i;
     var Gk = G[q]; var Dk = D[q]; var top = 0.0;
@@ -306,7 +314,7 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
     if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
     let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: Stokes speed (mm/s, times settle), omega, floc, mobility
     let gg = pa.x;
-    let down = Gk * settleShareG(pb.x, pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
+    let down = Gk * settleShareG(select(pb.x, (1.0 - u.coSettle) * pb.x + u.coSettle * vMix, u.coSettle > 0.0), pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
     let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover);
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));
@@ -317,7 +325,7 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
   var gs = 0.0;
   for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } gs += G[k * u.n + i]; }
   let hold = u.holdCap * Wi;
-  if (u.holdOn != 0u && gs > hold) {
+  if (u.holdOn != 0u && Wi < u.holdDepth && gs > hold) {   // only a film thinner than holdDepth strands its paint
     let f = 1.0 - hold / gs;
     for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } let q = k * u.n + i; let q2 = G[q] * f; G[q] -= q2; D[q] += q2; }
   }
@@ -326,9 +334,9 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
 fn dep_k(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   var d = 0.0; for (var k = 0u; k < u.K; k++) { if (!hasPigment(c, k)) { continue; } d += D[k * u.n + c.i]; }
-  DEP[c.i] = u.slideFill * d;
+  DEP[c.i] = d;   // the deposit's height, unscaled: the slide scales it by its box's fill (fillAt)
 }
-fn surf(j: u32, fl: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + DEP[j]; }
+fn surf(j: u32, fl: f32, fill: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + fill * DEP[j]; }
 @compute @workgroup_size(16, 16)
 fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || !hasPigment(c, c.z) || M[c.i] != 1u) { return; }
@@ -338,12 +346,12 @@ fn slide_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id
   let gg = pa.x;
   if (Wi <= 0.0 || gg <= 0.0 || Dk <= 0.0) { return; }
   let film = min(3.0, 0.12 / max(0.04, Wi)) * select(Wi / u.film, 1.0, Wi > u.film);
-  let here = surf(i, pb.z); let rep = pa.w;
+  let fill = fillAt(i); let here = surf(i, pb.z, fill); let rep = pa.w;
   var ex = vec4<f32>(0.0);
-  if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z) - rep); }
-  if (c.x > 0u && M[i - 1u] == 1u) { ex.y = max(0.0, here - surf(i - 1u, pb.z) - rep); }
-  if (c.y < u.h - 1u && M[i + u.w] == 1u) { ex.z = max(0.0, here - surf(i + u.w, pb.z) - rep); }
-  if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z) - rep); }
+  if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z, fill) - rep); }
+  if (c.x > 0u && M[i - 1u] == 1u) { ex.y = max(0.0, here - surf(i - 1u, pb.z, fill) - rep); }
+  if (c.y < u.h - 1u && M[i + u.w] == 1u) { ex.z = max(0.0, here - surf(i + u.w, pb.z, fill) - rep); }
+  if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z, fill) - rep); }
   let sum = ex.x + ex.y + ex.z + ex.w;
   if (sum <= 0.0) { return; }
   let moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
@@ -582,4 +590,8 @@ fn cap_commit(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_i
 }
 // a latched surface batch (surface_boundary) leaves the rest of its queued steps alone, the edge feed's too
 fn efHalted() -> bool { return atomicLoad(&CTR[8]) != 0u && atomicLoad(&CTR[11]) != 0u; }
-` + edgeFeedWgsl({ channel: 'physicalChannel', count: 'u.p3' });
+// what the boxes and levelling (media/gpu/film-level-wgsl.js) ask of the sheet: the lab keeps OUT4 whole and no fixed bed
+fn o4get(q: u32) -> vec4<f32> { return OUT4[q]; }
+fn o4set(q: u32, v: vec4<f32>) { OUT4[q] = v; }
+const FIXED_BED: bool = false;
+` + edgeFeedWgsl({ channel: 'physicalChannel', count: 'u.p3' }) + filmLevelWgsl({ channel: 'physicalChannel', count: 'u.p3' });

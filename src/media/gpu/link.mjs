@@ -46,7 +46,7 @@ const TIMEOUT_MS = 30 * 60 * 1000;
 const DEFERRED_ARCHIVE_BUDGET_BYTES = 128 * 1024 * 1024;
 // the worker ops that only read the sheet: every other op counts as a change (GpuLink.version)
 const READ_OPS = new Set(['down', 'paperDown', 'paperGate', 'sums', 'topDown', 'topSums', 'topDownRect', 'counters', 'idle', 'prof', 'dryStats', 'snap', 'framePort', 'brushState', 'lowerDown', 'lowerBatch', 'opticalInit', 'opticalFrame', 'drainDrys','demandCheckState']);
-const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth', 'edgeMm', 'reachMm'];
+const OPT_KEYS = ['flow', 'flowIters', 'diffuse', 'evap', 'edgeEvap', 'edgeWidth', 'absorb', 'film', 'capRate', 'capEps', 'capDelta', 'settle', 'lift', 'looseLift', 'scour', 'liftDepth', 'rewetLift', 'wetEps', 'spill', 'spillHeight', 'dampEase', 'pinning', 'pinFibre', 'encloseEase', 'slideCap', 'holeFill', 'holeSpan', 'fibreFlow', 'carryDepth', 'flowDepth', 'gran', 'granFill', 'slide', 'slideFill', 'repose', 'hold', 'sizing', 'wickFilter', 'dt', 'capSigma', 'paperDry', 'marangoni', 'slope', 'filmDiffuse', 'filmDepth', 'mmPerCell', 'edgeFlowDepth', 'edgeMm', 'reachMm', 'holdDepth', 'coSettle', 'fillRef', 'level', 'meniscus', 'meniscusMm', 'tiltX', 'tiltY'];
 
 export class GpuLink {
   constructor(worker, shared, sheet) {
@@ -92,9 +92,12 @@ export class GpuLink {
   errText() { let e = 0; while (e < this.err.length && this.err[e]) e++; return new TextDecoder().decode(this.err.slice(0, e)); }
   post(msg, transfer) { assertHealthy(this.health); if(msg.op==='framePort')this.frameWorkerActive=true; if (!READ_OPS.has(msg.op)) this.version++; this.worker.postMessage(msg, transfer); }
 
+  // the board's tilt is the sheet's (sheet.mjs setTilt), not an option: it goes to the GPU sheet with the options
+  withTilt(o) { const t = this.sheet?.tilt; return { ...o, tiltX: t?.x ?? 0, tiltY: t?.y ?? 0 }; }
   applyOptions(o) {
-    if (o === this.lastO) return;
-    const pick = {}; let key = ''; for (const k of OPT_KEYS) if (o[k] !== undefined) { pick[k] = o[k]; key += `${k}=${o[k]};`; }
+    if (o === this.lastO && this.sheet?.tilt === this.lastTilt) return;
+    this.lastTilt = this.sheet?.tilt; const ot = this.withTilt(o);
+    const pick = {}; let key = ''; for (const k of OPT_KEYS) if (ot[k] !== undefined) { pick[k] = ot[k]; key += `${k}=${ot[k]};`; }
     this.lastO = o; if (key === this.lastKey) return;
     const prevVer = this.version;
     this.lastKey = key; this.post({ op: 'opts', o: pick });
@@ -729,7 +732,7 @@ export class GpuLink {
     this.syncLower(sheet);
     this.stats.deferredArchiveDrains = (this.stats.deferredArchiveDrains ?? 0) + 1;
   }
-  optPick(o) { const p = {}; for (const k of OPT_KEYS) if (o[k] !== undefined) p[k] = o[k]; return p; }
+  optPick(o) { const p = {}, ot = this.withTilt(o); for (const k of OPT_KEYS) if (ot[k] !== undefined) p[k] = ot[k]; return p; }
 
   /** Make the CPU copy current everywhere (a render, thickness, a direct read). */
   syncAll(sheet) {
