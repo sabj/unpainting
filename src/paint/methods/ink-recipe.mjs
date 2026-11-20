@@ -5,8 +5,8 @@
 //   wash  pen-and-wash: ink on, the lines of the lineart models' fused map traced whole (line-model.mjs; copy-lines on
 //         the target's own ink only when the models cannot run), mass edges (shadow and wash steps) cut out by the
 //         line-or-mass test (ink-decide.mjs) and drawn first with no pencil,
-//         held to the target, with the width and darkness of the source's line along each stroke, the ink load
-//         matched to the source's line darkness on a scrap, the ink's hue taken from the source, and pale spread lines
+//         held to the target, each stroke with one width and darkness read from the source's line along it (stroke-weight.mjs), the ink load
+//         matched to the source's firm lines on a scrap, the ink's hue taken from the source, and pale spread lines
 //         drawn on damp paper; the pens draw on a fine sheet (--inkres, 4 at 540 px wide, less as the painting is wider; washInkRes), thin, tapered and light. For pen drawings and pen-and-wash sources; not for photographs.
 export const INK_RECIPES = Object.freeze({
   v2: Object.freeze({ linesupport: '5', linesmooth: '1', linesmoothcorner: '50', inkdarkmatch: '1', inkdamp: '0.3' }),
