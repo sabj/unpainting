@@ -34,19 +34,21 @@ test('objects: a window face inside a wall face is its child', () => {
   assert.equal(sheet.parent, null); assert.equal(wall.parent, sheet.id); assert.equal(win.parent, wall.id);
 });
 
-test('order: the largest form first, its outline before its inside, a container before its contents, texture then small things last', () => {
+test('order: the whole structure first from the main mass, then object by object, then fine detail, texture and small things last', () => {
   // a wall with two windows (one with a bar), a scribble against the wall's edge, a far small mark
   const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), ...box(60, 20, 75, 40), zig(10.5, 50, 12), seg(96, 66, 97, 66.5)];
   const r = orderStrokes(S, 100, 70), st = orderStats(r, 100, 70);
   assert.equal(r.reduce((n, x) => n + x.parts.length, 0), S.length, 'every stroke once');
   const at = i => r.findIndex(x => x.parts.includes(i));
-  // the wall's outline (0..3) before both windows' strokes, each window's outline before its bar
-  for (const w of [0, 1, 2, 3]) for (const k of [4, 5, 6, 7, 8, 9, 10, 11, 12]) assert.ok(at(w) < at(k));
-  for (const k of [4, 5, 6, 7]) assert.ok(at(k) < at(8));
+  // pass 1 sketches the whole composition (every long line: the wall's and the windows' outlines), from the wall's
+  // longest line; the bar (a division) and the rest come after; passes never go back
+  assert.ok([0, 2].includes(r[0].parts[0]), 'the main mass\'s longest line first');
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8]) assert.equal(r[at(k)].pass, 1);
+  assert.ok(r.every((x, k) => !k || x.pass >= r[k - 1].pass));
   assert.deepEqual([r.at(-1).parts[0], r.at(-1).role], [14, 'small'], 'the small isolated mark last');
-  assert.deepEqual([r.at(-2).parts[0], r.at(-2).role, r.at(-2).pass], [13, 'texture', 2], 'texture in the second pass');
+  assert.deepEqual([r.at(-2).parts[0], r.at(-2).role, r.at(-2).pass], [13, 'texture', 3], 'texture in the last pass');
   assert.ok(r.find(x => x.parts.includes(8)).role === 'inner', 'the bar divides the window: one object, the bar inside it');
-  assert.equal(st.innerBeforeOutline, 0);
+  assert.ok(st.innerBeforeOutline <= 1, 'only a long division (pass 1) may come before its frame is closed');
   for (const x of r) { const a = x.points[0], b = x.points.at(-1); assert.ok(Math.abs(b[1] - a[1]) > Math.abs(b[0] - a[0]) ? b[1] >= a[1] : b[0] >= a[0]); }
 });
 

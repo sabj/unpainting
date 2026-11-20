@@ -21,12 +21,14 @@ export const ORDER_DEFAULTS = Object.freeze({
   smallShare: 0.005,    // ... and smaller than this share of the sheet ...
   smallDiag: 0.06,      // ... and than this share of its diagonal across is a small isolated thing, drawn last
   reachMm: 5,           // the next stroke is the nearest, a long one counted nearer: distance / sqrt(1 + length / reachMm)
-  hatchMm: [1, 12],     // a hatching stroke: straight, this long ...
+  hatchMm: [1, 30],     // a hatching stroke (or a repeated mullion or bar): straight, this long ...
   hatchDeg: 20,         // ... with neighbours within this angle ...
   hatchGapMm: 3,        // ... and this far apart (at least two of them), side by side
   ink: 'full',          // the ink amount inside painted masses (`masses`, a test (x, y) mm -> boolean): none | forms | full
   formMm: 6,            // at 'forms', a stroke inside a mass is kept when at least this long and along the mass's edge
   edgeMm: 1.5,          // ... within this of the edge
+  structureMm: 12,      // pass 1: the big structure, smooth lines at least this long (of every mass, main mass first)
+  fineMm: 4,            // pass 3: lines shorter than this are fine detail, laid after every object's outline and divisions
   partShare: 0.02,      // faces under this share of the sheet split by a line between them are parts of one object (panes of a window)
 });
 
@@ -319,6 +321,15 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   if (main.id != null) {
     const lines = (byObj.get(main.id) ?? []).filter(s => s.role === 'outline');
     if (lines.length) pen = lines.reduce((a, b) => (a.len >= b.len ? a : b)).points[0];
+  }
+  // pass 1: the big structure of the whole picture, the long smooth lines of every mass, from the main mass's longest
+  // line, the nearest next (a person sketches the whole composition in before any object is worked)
+  { const big = joined.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner') && s.len >= c.structureMm && turningPerMm(s.points) <= 6);
+    nearestFirst(big); for (const r of out) r.pass = 1; }
+  // fine detail waits for pass 3: short lines are set aside from the object-by-object pass
+  for (const s of joined) if (!s.taken && (s.role === 'outline' || s.role === 'inner') && s.len < c.fineMm) s.role = 'fine';
+  const pass2 = out.length;
+  if (main.id != null) {
     // its containers first (outline before inside), so start at the outermost one that holds it
     let top = main.id; while (objects[top].parent != null) top = objects[top].parent;
     visit(top);
@@ -341,6 +352,9 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const across = s => { const m = s.points[0]; return -m[0] * dy + m[1] * dx; };
     mem.sort((a, b) => across(a) - across(b));
   }
+  for (let k = pass2; k < out.length; k++) out[k].pass = 2;
+  // pass 3: fine detail, then texture and hatching (the finest repeated detail latest of all), then small isolated things
+  { const at = out.length; nearestFirst(joined.filter(s => s.role === 'fine' && !s.taken)); for (let k = at; k < out.length; k++) out[k].pass = 3; }
   for (const id of [...visited, -1]) {
     const at = out.length, T = own(id, 'texture'), R = [...new Set(own(id, 'hatch').map(s => s.run))].map(r => runOf.get(r));
     const items = [...T.map(s => ({ s })), ...R.map(m => ({ m }))];
@@ -351,7 +365,7 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
       if (x.s) take(x.s, 2);
       else { const m = dist(pen, x.m[0].points[0]) <= dist(pen, x.m[x.m.length - 1].points[0]) ? x.m : [...x.m].reverse(); for (const s of m) if (!s.taken) take(s, 2); }
     }
-    for (let k = at; k < out.length; k++) out[k].pass = 2;
+    for (let k = at; k < out.length; k++) out[k].pass = 3;
   }
   // small isolated things last
   const at = out.length; nearestFirst(joined.filter(s => s.role === 'small' && !s.taken)); for (let k = at; k < out.length; k++) out[k].pass = 3;
