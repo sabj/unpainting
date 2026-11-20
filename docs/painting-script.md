@@ -52,10 +52,14 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 | `count`, `character` | for groups: how many, and `size` (even, varied), `spread` (scattered, clustered, along a line), `denser` (top, bottom, left, right, edges, middle) |
 | `paint` | pigment parts; `swatch` (or `dilution`: very pale, pale, medium, strong, rich, dark) is the mix as one wash on white paper, and sets its strength |
 | `paper` | `dry`; `wet` (clean water first, or with `into` into the wet passage just before); `damp` with `into` (laid beside the passage just before as it loses its shine) |
-| `handling` | `hold` (upright, side: the belly, the width steadier), `start` (point, belly), `pressure` (a list from start to end; the width follows it), `path` (straight, curved, s-curve, zigzag, flick, wobble), `direction` (degrees, 0 right, 90 down), `speed` (slow: more points and a waver; fast), `load` (flooded, loaded, damp, dry: the brush's water; dry is dry brush), `lengthMm`, `look` (for people) |
-| `into` | the passage just before; this one is laid in the same wet session. Any other passage starts on a dry sheet |
+| `handling` | `mark` (one of the 26 kinds of the shared mark library, `src/paint/marks`: the executor places each stroke and the library gives it its pressure, speed, blade and water; strokes written point by point are laid as written), `hold` (upright, side: the belly, the width steadier), `start` (point, belly), `pressure` (a list from start to end; the width follows it), `path` (straight, curved, s-curve, zigzag, flick, wobble), `direction` (degrees, 0 right, 90 down), `speed` (slow: more points and a waver; fast), `load` (flooded, loaded, damp, dry: the brush's water; dry is dry brush), `lengthMm`, `look` (for people) |
+| `into` | the passage just before; this one is laid in the same wet session |
+| `wait` | how far the sheet dries before this passage: `dry` (the default: everything dried first, a new sitting), `damp` (laid straight after the passage before, beside it as it loses its shine) or `none` (straight on). The plan records it per passage |
+| `glaze` | `[i, n]`: one of a series of glazes over the same area (recorded; each is laid on a dry layer unless `wait` says otherwise) |
+| `shapes`, `reserve`, `{along: id}` | a block-in study's shapes by number (`tools/painter/script-resolve.mjs` turns them into regions, a passage's own reserves and a stroke down a shape's axis; the shapes come from the authoring tools' numbered list) |
 | `charges` | dabs of their own mix dropped into the passage while wet, one at each `at` |
-| `what`, `edges`, `dryFirst`, `why` | for people and judges; a stage-3 passage on dry paper is laid as a glaze |
+| `edges` | `lost` on dry paper: laid into a damp bed of clean water under its own footprint, so its edges run soft; `found` or `mixed`: on the paper as it is |
+| `what`, `dryFirst`, `why` | for people and judges; a stage-3 passage on dry paper is laid as a glaze |
 
 Touches are set down like a hand: scattered (no two nearer than half the even spacing, never on a grid), in clumps,
 or along the region's long axis, weighted toward the side `denser` names, and visited nearest-next from the top left.
