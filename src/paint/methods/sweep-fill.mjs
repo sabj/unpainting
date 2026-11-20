@@ -171,14 +171,19 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
   const across = (hi - lo + 1) * pitch;
   // and whose sweeps lay most of it: a broad brush in a shape it cannot sweep leaves its whole edge to a small brush,
   // which then runs round it as a ring
-  let brush = small;
+  // (a shape full of holes, which no broad brush sweeps cleanly, takes the broad brush that leaves least, if it leaves
+  // under twice that share)
+  let brush = small, best = null;
   for (const width of kit.filter(w => w > small && BRUSH_FIT * w <= 2 * deepest && w * (1 + (LEAST_SWEEPS - 1) * (1 - overlap)) <= across)) {
-    const mark = strokes.length; zigzag(width / 2, inside);
+    zigzag(width / 2, inside);
     let left = 0; for (let i = 0; i < gn; i++) if (inside[i] && !covered[i]) left++;
-    if (left <= SWEPT_SHARE * area) { brush = width; break; }
-    strokes.length = mark; covered.fill(0);
+    const share = left / area;
+    if (!best || share < best.share - 0.02) best = { width, share };
+    strokes.length = 0; covered.fill(0);
+    if (share <= SWEPT_SHARE) break;
   }
-  if (brush === small) zigzag(small / 2, inside);
+  if (best && best.share <= 2 * SWEPT_SHARE) brush = best.width;
+  zigzag(brush / 2, inside);
   // Where the lanes' square ends leave the outline bare (a slanting or curved side, a corner), a smaller brush runs along
   // the outline, its edge on it, over the stretches that are bare: an edge laid once, not a ring inside a ring. A bare
   // part far from the outline (rare) is swept in lanes of that brush.

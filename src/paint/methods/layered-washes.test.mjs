@@ -29,7 +29,7 @@ function plan(sc) {
 }
 
 test('three layers in order: a first wash, shadow glazes, darks; the paper round the wall is left bare', () => {
-  const p = plan(scene()), stages = p.instructions.map(q => q.stage);
+  const p = plan(scene()), stages = p.instructions.map(q => (q.stage === 2 ? 1 : q.stage));   // a charge goes into its wash
   assert.deepEqual(stages, [...stages].sort((a, b) => a - b), 'first wash, then shadows, then darks');
   assert.ok(p.summary.washesByStage[0] >= 1 && p.summary.washesByStage[2] >= 1 && p.summary.washesByStage[3] >= 1, JSON.stringify(p.summary.washesByStage));
   assert.ok(p.summary.reservedShare > 0.3, 'the paper round the wall');

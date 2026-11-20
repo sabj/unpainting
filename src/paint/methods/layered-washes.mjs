@@ -25,15 +25,15 @@ import { targetValueMap, estimatePaper } from './light-to-dark.mjs';
 /** The plan's grid cell (mm): fine enough for a smooth outline, never finer than the sheet's cells. */
 const PLAN_MM = 0.5;
 /** Squint (Gaussian sigma, mm) for the reserved lights, the shadow shapes, the darks and the first wash's areas. */
-export const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 8;
+export const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 5;
 /** Bare paper: squinted within this L* of the lighter of the paper and the picture's lightest tone, and no more chromatic than this. */
 const RESERVE_WITHIN = 7, RESERVE_CHROMA = 12;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
 const RESERVE_LEAST_MM2 = 25, RESERVE_ROUND_MM = 4;
 /** First wash: at most this many colour families; families nearer than this (Lab) are one; an area is at least this big (mm2) or this share of the sheet. */
-const ZONE_FAMILIES = 6, ZONE_JOIN = 12, ZONE_LEAST_MM2 = 150, ZONE_LEAST_SHARE = 0.012;
+const ZONE_FAMILIES = 6, ZONE_JOIN = 6, ZONE_LEAST_MM2 = 150, ZONE_LEAST_SHARE = 0.012;
 /** Areas are told apart by hue and chroma first: light weighs this much, so a lit face and its shadowed side are one area. */
-const ZONE_L_WEIGHT = 0.25;
+const ZONE_L_WEIGHT = 0.15;
 /** An area whose light side is this near the paper (CIEDE2000) is left as paper: a lot of the sheet stays bare. */
 const ZONE_PAPER = 6;
 /** Under a pen drawing (ink and wash) the drawing carries the structure and more is left bare: lights within this L*. */
@@ -51,7 +51,7 @@ const SHADOW_STEP = 12, DEEP_STEP = 26;
 /** The least shadow shape (mm2); the brush (mm) that rounds its outline (its smallest feature); the most shapes a step. */
 const SHADOW_LEAST_MM2 = 40, SHADOW_ROUND_MM = 7, SHADOW_MOST = 30;
 /** Darks: no lighter than the picture's 3rd percentile plus this, this much darker than what is laid there, at least this big (mm2), at most this many. */
-const DARK_REACH = 10, DARK_UNDER = 14, DARK_LEAST_MM2 = 8, DARK_MOST = 14;
+const DARK_REACH = 10, DARK_UNDER = 14, DARK_LEAST_MM2 = 15, DARK_MOST = 14;
 /** A wash is graded: its charge runs this share (at least, at most) either side of its mix; L* of the subject's own change per share. */
 const GRADE_LEAST = 0.12, GRADE_MOST = 0.35, GRADE_PER_L = 40;
 /** A wash is laid only when it darkens what is under it by this much L*. */
@@ -235,15 +235,18 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   // --- 2. the first wash: areas of one local colour, light side, charged while wet ---
   // the light side is read off the subject squinted at the shadow's scale, so no fine mark of the subject sets it
   const S3 = squint(SHADOW_SIGMA_MM), sqAt = q => toRGB(S3.planes, q), sqL = q => S3.L[q];
+  // an area is one local colour in light and in shadow: its chromaticity, (a*, b*) over L* (a shadow is darker and less
+  // chromatic in proportion), and a little of its light
+  const zoneFeature = q => { const l = Math.max(20, S6.L[q]); return [60 * S6.A[q] / l, 60 * S6.B[q] / l, ZONE_L_WEIGHT * S6.L[q]]; };
   const open = [];
   for (let q = 0; q < pn; q++) if (!lightMask[q]) open.push(q);
   const step = Math.max(1, Math.floor(open.length / 6000)), rows = [];
-  for (let t = 0; t < open.length; t += step) { const q = open[t]; rows.push(S6.A[q], S6.B[q], ZONE_L_WEIGHT * S6.L[q]); }
+  for (let t = 0; t < open.length; t += step) { const q = open[t]; rows.push(...zoneFeature(q)); }
   let centres = kmeans(Float32Array.from(rows), 3, ZONE_FAMILIES, 30);
   // families too close are one
   for (let merged = true; merged;) { merged = false; for (let a = 0; a < centres.length && !merged; a++) for (let b = a + 1; b < centres.length && !merged; b++) if (Math.hypot(centres[a][0] - centres[b][0], centres[a][1] - centres[b][1], centres[a][2] - centres[b][2]) < ZONE_JOIN) { centres[a] = centres[a].map((v, j) => (v + centres[b][j]) / 2); centres.splice(b, 1); merged = true; } }
   const fam = new Int32Array(pn).fill(-1);
-  for (const q of open) { let best = 0, bd = Infinity; centres.forEach((c, f) => { const d = (S6.A[q] - c[0]) ** 2 + (S6.B[q] - c[1]) ** 2 + (ZONE_L_WEIGHT * S6.L[q] - c[2]) ** 2; if (d < bd) { bd = d; best = f; } }); fam[q] = best; }
+  for (const q of open) { let best = 0, bd = Infinity; centres.forEach((c, f) => { const [fa, fb, fl] = zoneFeature(q), d = (fa - c[0]) ** 2 + (fb - c[1]) ** 2 + (fl - c[2]) ** 2; if (d < bd) { bd = d; best = f; } }); fam[q] = best; }
   // areas: each family's parts, rounded by a big brush; a part under the least area joins the family it borders most
   const leastZone = cellsFor(Math.max(ZONE_LEAST_MM2, ZONE_LEAST_SHARE * sheetWidthMm * sheetWidthMm * ph / pw));
   for (let pass = 0; pass < 3; pass++) {
@@ -343,7 +346,8 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   const SD = squint(DARK_SIGMA_MM), sortedD = Float32Array.from(SD.L).sort(), darkFloor = sortedD[Math.floor(.03 * (pn - 1))];
   const tone = new Float32Array(pn); for (let q = 0; q < pn; q++) { const u = new Array(k); for (let j = 0; j < k; j++) u[j] = laid[j][q]; tone[q] = u.some(v => v > 0) ? filmLab(u, pigments, paperCol)[0] : 100; }
   const dm = Uint8Array.from(SD.L, (v, q) => (v <= darkFloor + DARK_REACH && tone[q] - v >= DARK_UNDER ? 1 : 0));
-  const dc = keepParts(dm, pw, ph, cellsFor(DARK_LEAST_MM2)), darks = [];
+  // a dark is a decided touch: its pieces within a brush's width of each other are one
+  const dc = keepParts(roundMask(dm, pw, ph, rC(1.5)), pw, ph, cellsFor(DARK_LEAST_MM2)), darks = [];
   for (let id = 1; id <= dc.count; id++) { const cells = []; for (let q = 0; q < pn; q++) if (dc.labels[q] === id) cells.push(q); if (cells.length) darks.push({ id, cells, L: cells.reduce((a, q) => a + SD.L[q], 0) / cells.length }); }
   darks.sort((a, b) => a.L - b.L);
   const small = Math.min(...washKitMm), darkShapes = [];
