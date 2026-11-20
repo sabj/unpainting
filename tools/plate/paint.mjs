@@ -939,7 +939,10 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   else if(skyBoundary)JSONL.append(path.join(out,'major-sky-schedule.jsonl'),JSON.stringify(skyBoundary)+'\n');
   // Fast: when an ordinary dry follows at once, its own slow (dt 1) level phase does the settling, held until the measured
   // surface is level; the idle steps before it only repeated that (--fastsettle sets how many remain, default 0)
-  else{const dryFollows=NATIVE_PAINT_MODE.mode==='fast'&&!ctx.AREA_PLAN&&(wetInto||endOfValue||nextOther);const settle=dryFollows?Math.min(num('settle',60),num('fastsettle',0)):num('settle',60);clock('flow',()=>{for(let q=0;q<settle;q++)step(ctx.sheet,O);});}
+  // A wash of the wash plan (layered-washes.mjs) is many sweeps laid into one wet film. It is left to level before it
+  // dries, in fast mode too: dried at once, each sweep's own wet edge dried where it lay and the sweeps showed as stripes
+  // with dark rims, never merging into one wash.
+  else{const oneWetWash=layer.shapes.some(sh=>Array.isArray(sh._valuePlan?.strokes));const dryFollows=NATIVE_PAINT_MODE.mode==='fast'&&!ctx.AREA_PLAN&&!oneWetWash&&(wetInto||endOfValue||nextOther);const settle=dryFollows?Math.min(num('settle',60),num('fastsettle',0)):num('settle',60);clock('flow',()=>{for(let q=0;q<settle;q++)step(ctx.sheet,O);});}
   colourMass('after-flow',{pass:L+1});
   // softening, the plan's soft edges and lifting, while the pass is wet (tools/painter/soften-lift-run.mjs, area-edges.mjs)
   if(ctx.AREA_PLAN&&layer._semantic){const sp=layer._semantic.pass,mmc=num('sheetmm',DEFAULT_SHEET_MM)/W2,softNear=sp.source!=='authored'&&['wet on wet','wet on dry'].includes(sp.move)?passSoftCells(ctx.AREA_PLAN,layer._semantic.area.id,sp,sp.brush.widthMm/2/(num('sheetmm',DEFAULT_SHEET_MM)/w)+1):null;if(sp.soften||sp.lights?.mode==='lift'||softNear||sp.charge){if(ctx.SOFTEN_LIFT?.key!==layer._semantic.key)ctx.SOFTEN_LIFT={key:layer._semantic.key,m:new Uint8Array(w*h),amount:0,cells:0};const m=ctx.SOFTEN_LIFT.m;for(const sh of layer.shapes){let c=0;for(let i=0;i<m.length;i++)if(sh.mask[i]){m[i]=1;c++;}ctx.SOFTEN_LIFT.amount+=(sh.amount??0)*c;ctx.SOFTEN_LIFT.cells+=c;}ctx.SOFTEN_LIFT_AMOUNT=ctx.SOFTEN_LIFT.cells?ctx.SOFTEN_LIFT.amount/ctx.SOFTEN_LIFT.cells:0;if(ctx.layers[L+1]?._semantic?.key!==layer._semantic.key){ctx.SOFTEN_LIFT=null;
@@ -983,7 +986,9 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // round, whatever the frame policy, so lights before darks can be seen band by band.
   const forceStageFrame = (endOfValue || endOfTouch) && !AWARE_DIR && !RESUME_DIR;
   ctx.STAGE = { stage: 'paint', step: `value ${layer.value} of ${ctx.steps}`, pass: L + 1, of: ctx.layers.length, value: layer.value, of_values: ctx.steps, pigment: layer.mixIndex ?? layer.pigment, ...(forceStageFrame ? { force: true, boundary: endOfValue ? 'value' : 'touch' } : {}), ...(layer._order ? { order: layer._order.phase } : {}), techniques: Object.fromEntries(Object.entries(used).filter(([k]) => ['wet on dry', 'wet on wet', 'glazed', 'dry brush', 'detail marks', 'small brush'].includes(k))) };
-  const boundaryShot = !FRAME_POLICY.all || forceStageFrame;
+  // keeping every frame relies on the wet snaps between boundaries, and fast mode takes none (pen.mjs snap), so a pass's
+  // own frame is shot there too, or keeping every frame kept fewer than the default policy
+  const boundaryShot = !FRAME_POLICY.all || forceStageFrame || NATIVE_PAINT_MODE.mode === 'fast';
   ctx.NATIVE_CAPTURE?.('layer');
   if (boundaryShot) await shoot();
   if (CANARY_STOP === L + 1) await stopAtCanary({ out, pass: L + 1, passes: ctx.layers.length, value: layer.value, brushMarks: ctx.laid, backend: GPU_INFO,
