@@ -31,17 +31,22 @@ test('the study\'s flat shapes: three painted, the white left as paper, each one
   const p = plan(study({ rim: true }));
   assert.equal(p.summary.shapes - p.summary.paperShapes, 3, JSON.stringify(p.summary));
   assert.ok(p.summary.reservedShare > 0.35, 'the paper round the wall');
+  // the wall one wash; the shadow and the door each built by two or more glazes
   const washes = p.instructions.filter(q => q.stage !== 2);
-  assert.equal(washes.length, 3);
+  assert.equal(washes.filter(q => !/glaze/.test(q.thing)).length, 1);
+  assert.ok(washes.filter(q => /shadow, glaze/.test(q.thing)).length >= 2 && washes.filter(q => /glaze/.test(q.thing) && !/shadow/.test(q.thing)).length >= 2, washes.map(q => q.thing).join(' | '));
   assert.ok(p.mixes.every(m => m.mix.length === pigments.length));
 });
 
 test('wash within wash: the wall is laid first and carried under its shadow; the shadow goes over it dry; the door is last', () => {
   const p = plan(study()), washes = p.instructions.filter(q => q.stage !== 2);
   const L = washes.map(q => labOf(q.colour, 0, PAPER)[0]);
-  // (the darkest small shape, the door, is the block-in's last wash; the later studies' touches are the last value step)
-  assert.deepEqual(washes.map(q => q.stage), [1, 3, 3]);
-  assert.ok(L[0] > L[1] && L[1] > L[2], L.join(' '));
+  // (the shadow and the door are glazed, each glaze darker than the last, every first glaze before any second; the later
+  // studies' touches are the last value step)
+  assert.deepEqual(washes.map(q => q.stage), [1, ...washes.slice(1).map(() => 3)]);
+  const step = q => Number(/glaze (\d) of/.exec(q.thing)?.[1] ?? 0);
+  for (let i = 2; i < washes.length; i++) assert.ok(step(washes[i]) >= step(washes[i - 1]), washes.map(q => q.thing).join(' | '));
+  assert.ok(L.slice(1).every(v => v < L[0]), L.join(' '));
   // the wall's wash covers the shadow too: nearly the whole wall less the door
   assert.ok(washes[0].areaMm2 > 0.85 * (120 * 75 - 15 * 35), `${washes[0].areaMm2}`);
   assert.ok(p.layers.every(l => l.shapes.every(s => s._valuePlan.strokes.every(st => st.points.every(q => Number.isFinite(q[0]) && Number.isFinite(q[1]))))));
@@ -106,11 +111,12 @@ test('the under-wash: one connected wash over the wall, under its window and its
 });
 
 test('cast-shadow pieces of one colour a millimetre apart are one wash, laid along the bands', () => {
-  const p = plan(wallStudy()), shadows = p.instructions.filter(q => q.stage === 3 && /shadow glaze/.test(q.thing));
+  const p = plan(wallStudy()), shadows = p.instructions.filter(q => q.stage === 3 && /shadow, glaze 1 of/.test(q.thing));
   assert.equal(shadows.length, 1, shadows.map(q => q.thing).join(' | '));
   // its strokes run down the bands (a slant of about 59 degrees from level), not across them
   const long = shadows[0].strokes.filter(s => s.points.length >= 2).map(s => { const a = s.points[0], b = s.points.at(-1); return Math.abs(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI); });
-  assert.ok(long.every(d => d > 40 && d < 80), long.join(' '));
+  // (most of them: the outline is cut first with a small round that follows it)
+  assert.ok(long.filter(d => d > 40 && d < 80).length >= 0.6 * long.length, long.join(' '));
 });
 
 test('a mast narrower than the smallest brush is one pull down its length, not a row of dots', () => {
