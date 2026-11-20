@@ -11,6 +11,7 @@ import sharp from 'sharp';
 import { BENCH, REPO, V2, readJson, writeJson } from './lib.mjs';
 import { reportDesignedPaths } from '../../tools/designed-paths-check.mjs';
 import { resolvePlan, renderVerdict } from './pipeline/plan-args.mjs';
+import { painterFailure } from './pipeline/painting.mjs';
 import { STAGES, thumb, stageStrip } from './images.mjs';
 import { verifyComparisonRun } from './preflight.mjs';
 import { runDoctor } from '../../src/paint/doctor.mjs';
@@ -175,6 +176,9 @@ async function renderJob(opts, job, { run, verify }) {
   }
   const painted = verdict.exit === 0 && finished;
   const problems = [...verdict.failures.map(f => f.reason)];
+  // A stored plan that names an option removed since it was written (src/paint/removed-options.mjs) is not migrated: the
+  // painter refuses it before painting, and the record carries that refusal (each option and why it went), not only an exit code.
+  if (child.status !== 0 && child.status != null) problems.push(painterFailure(logText, child.status));
   if (opts.strictPlan && plan.problems?.length) problems.push(...plan.problems);
   let stagesFile = null;
   if (!opts.compileOnly && painted) {
