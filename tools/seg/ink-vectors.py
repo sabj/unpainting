@@ -136,9 +136,9 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
     orphan = inkm & (dist * px > orphan_mm)
     extra = []
     if orphan.any():
-        n, cl = cv2.connectedComponents(orphan.astype(np.uint8), connectivity=8)
+        n, cl, st_, _ = cv2.connectedComponentsWithStats(orphan.astype(np.uint8), connectivity=8)
         for c in range(1, n):
-            ys, xs = np.nonzero(cl == c)
+            bx, by, bw, bh = st_[c, :4]; ys, xs = np.nonzero(cl[by:by + bh, bx:bx + bw] == c); ys += by; xs += bx
             if len(xs) < 2: owner[ys, xs] = 0; continue
             Q = np.c_[xs, ys].astype(float); m = Q.mean(0); _, _, vt = np.linalg.svd(Q - m, full_matrices=False); d = vt[0]
             if abs(d[1]) > abs(d[0]) and d[1] < 0 or abs(d[0]) >= abs(d[1]) and d[0] < 0: d = -d
