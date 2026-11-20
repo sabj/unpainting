@@ -21,17 +21,14 @@ async function paint(dir, extra) {
   return { guard: JSON.parse(fs.readFileSync(path.join(out, 'target-guard.json'), 'utf8')), steps: JSON.parse(fs.readFileSync(path.join(out, 'step-backs.json'), 'utf8')), png: fs.readFileSync(path.join(out, 'painting.png')) };
 }
 
-test('default mode looks at shape scale, in its planned step-backs and once a passage; strict takes none', { timeout: 600000 }, async () => {
+test('default mode looks at shape scale only in its planned step-backs (a passage takes no look: its mix is one colour for the shape, from the study); strict takes none', { timeout: 600000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'step-backs-'));
   try {
     const d = await paint(dir, []);
     assert.deepEqual(d.steps.planned, [], 'no step-back is planned');
     assert.deepEqual(d.steps.taken, [], 'none is taken');
-    assert.ok(d.steps.passageLooks > 0, 'default mode looks once at each passage');
-    assert.equal(d.guard.looks.count, d.steps.shapeLooks + d.steps.passageLooks, 'every look the guard saw was a passage or inside a step-back');
-    const labels = d.guard.looks.entries.map(e => e.label);
-    assert.equal(new Set(labels).size, labels.length, 'each shape is read once');
-    assert.ok(labels.every(l => /^L\d+\/s\d+$/.test(l)), `only passage and step-back reads: ${labels.join(' ')}`);
+    assert.equal(d.steps.passageLooks, 0, 'a passage takes no look at the subject');
+    assert.equal(d.guard.looks.count, d.steps.shapeLooks, 'every look the guard saw was inside a step-back');
     const s = await paint(dir, ['--notargetlooks', '1']);
     assert.equal(s.guard.looks.count, 0);
     assert.equal(s.steps.shapeLooks + s.steps.passageLooks, 0);
