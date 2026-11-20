@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from '../paper.mjs';
-import { createSheet, step, DEFAULTS, setClip, tapeSheet } from '../sheet.mjs';
+import { createSheet, step, DEFAULTS as SHEET_DEFAULTS, setClip, tapeSheet } from '../sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import { createBrush, dip, stroke, recordMarks, TAPE } from '../brush.mjs';
 import { createPen, dipPen, penStroke } from '../pen.mjs';
 import { drawGestures } from '../draw.mjs';

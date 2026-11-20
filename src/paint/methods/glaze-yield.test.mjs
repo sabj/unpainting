@@ -21,7 +21,8 @@ import { createInstrumentCal } from './instrument-cal.mjs';
 
 const WIDTH = 1200, MM = 280 / WIDTH, STRENGTH = 2.2, CHUNK = Math.round(Math.max(6, 24 * WIDTH / 1086));
 const PIGMENT = { K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 };
-const PHYSICS = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, gran: 0.25, granFill: 0 };
+// edgeEvap 0: the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one
+const PHYSICS = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0, gran: 0.25, granFill: 0 };
 // the wash brush of paint-plate's lay loop and of its swatch, under --loadedcontact 1 (a loaded brush reaches every pit)
 const washBrush = (r, T, seed = 31, renderWidth = WIDTH) => createBrush(scaleBrushForDensity({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: T.wetMix, bridge: 0, bridgeSoft: T.bridgeSoft, seed }, { renderWidth }));
 const waterBrush = r => createBrush(scaleBrushForDensity({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }, { renderWidth: WIDTH }));

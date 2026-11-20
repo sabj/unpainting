@@ -10,7 +10,7 @@ import { setStrict, resetChecks } from './checks.mjs';
 import { BOX, boxPigment } from '../crop/box.mjs';
 const pigment = { rho: .05, omega: 1.4, gamma: .15, K: [.35,.49,.66], S: [.06,.025,.014] };
 const sheet = (w = 24, h = w, seed = 1) => createSheet(makePaper(w,h,{seed}), [pigment]);
-const still = { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0, absorb: 0, paperDry: 0, capRate: 0, slide: 0, settle: 0, lift: 0, rewetLift: 0 };
+const still = { ...DEFAULTS, slope: 0, flowIters: 0, evap: 0, edgeEvap: 0, absorb: 0, paperDry: 0, capRate: 0, slide: 0, settle: 0, lift: 0, rewetLift: 0 };
 const near = (a,b,eps=2e-6) => assert.ok(Math.abs(a-b) <= eps*Math.max(1,Math.abs(b)), `${a} != ${b}`);
 const finite = s => { for(const a of [s.W,s.s,...s.G,...s.P,...s.D,...s.layers.flat()]) for(const v of a) assert.ok(Number.isFinite(v) && v >= 0, `invalid mass ${v}`); };
 const brushMass = b => ({water:b.resW+b.hairs.reduce((v,h)=>v+h.water,0),pig:b.resP[0]+b.hairs.reduce((v,h)=>v+h.pig[0],0)});
@@ -43,10 +43,24 @@ test('dry accepts partial options just like step', () => {
   near(totals(s).water,0); near(totals(s).pig[0],.1);
 });
 
-test('pinned edges evaporate faster than the interior', () => {
-  const s = sheet(7); s.W.fill(1); s.M.fill(1); s.ever.fill(1);
-  step(s,{...still,edgeEvap:.1,edgeWidth:2,dt:1});
-  assert.ok(s.W[0] < s.W[24]); near(s.W[24],1);
+test('a pinned edge dries faster, and the flow that feeds it carries pigment out to it', () => {
+  // a 9 x 9 wash in the middle of dry paper: its edge is pinned (beside paper it never wet)
+  const s = sheet(31);
+  for (let y = 5; y < 26; y++) for (let x = 5; x < 26; x++) deposit(s, y * 31 + x, .2, [.1]);
+  const a = totals(s), mid = 15 * 31 + 15, edge = 15 * 31 + 5;
+  s.edgeEvaporated = 0; step(s, { ...still, edgeEvap: .01, dt: 1 });
+  assert.ok(s.edgeEvaporated > 0, 'the edge dried');
+  near(totals(s).water + s.edgeEvaporated, a.water); near(totals(s).pig[0], a.pig[0]);
+  assert.ok(s.G[0][edge] > .102 && s.G[0][mid] < .1, `pigment moved out: edge ${s.G[0][edge]}, middle ${s.G[0][mid]}`);
+  assert.ok(Math.abs(s.W[edge] - s.W[mid]) < .02, 'the film keeps its depth: the edge is fed, not drained');
+  // the same wash with no paper it never wet (the whole sheet wet): nothing is pinned, nothing dries faster
+  const t = sheet(7); t.W.fill(1); t.M.fill(1); t.ever.fill(1); t.edgeEvaporated = 0;
+  step(t, { ...still, edgeEvap: .1, dt: 1 }); assert.equal(t.edgeEvaporated, 0);
+});
+test('the pinned edge evaporates the same water and carries the same pigment in one long step as in many short ones', () => {
+  const run = (dt, n) => { const s = sheet(15); for (let y = 3; y < 12; y++) for (let x = 3; x < 12; x++) deposit(s, y * 15 + x, .2, [.1]); s.edgeEvaporated = 0; for (let k = 0; k < n; k++) step(s, { ...still, edgeEvap: .002, dt }); return s; };
+  const a = run(.5, 40), b = run(20, 1);
+  near(b.edgeEvaporated, a.edgeEvaporated, .05); near(b.G[0][7 * 15 + 3], a.G[0][7 * 15 + 3], .05);
 });
 
 test('granulation settles into hollows and lifts from peaks', () => {
@@ -288,17 +302,7 @@ test('boxPigment returns immutable or defensively copied scatter arrays protecti
   }
 });
 
-test('stepBox decouples flowDepth for bulk face conductance from edgeFlowDepth for edge evaporation', () => {
-  const s1 = sheet(16);
-  const s2 = sheet(16);
-  s1.W.fill(0.03); s1.M.fill(1); s1.ever.fill(1);
-  s2.W.fill(0.03); s2.M.fill(1); s2.ever.fill(1);
-
-  step(s1, { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0.01, edgeWidth: 2, flowDepth: 0.12, edgeFlowDepth: 0.06, dt: 1 });
-  step(s2, { ...DEFAULTS, flowIters: 0, evap: 0, edgeEvap: 0.01, edgeWidth: 2, flowDepth: 0.12, edgeFlowDepth: 0.01, dt: 1 });
-
-  assert.ok(s2.W[0] < s1.W[0], `s2 edge cell (${s2.W[0]}) should have evaporated more than s1 (${s1.W[0]})`);
-
+test('flowDepth sets the bulk face conductance', () => {
   const sf1 = sheet(16);
   const sf2 = sheet(16);
   const i1 = 7 * 16 + 8, i2 = 7 * 16 + 9;
@@ -317,3 +321,9 @@ test('stepBox decouples flowDepth for bulk face conductance from edgeFlowDepth f
 });
 
 
+
+test('a dry pit the wash holds round dries without a rim; a wider hole rims unless holeSpan reaches across it', () => {
+  const run = (half, holeSpan) => { const s = sheet(31); for (let y = 5; y < 26; y++) for (let x = 5; x < 26; x++) if (Math.max(Math.abs(x - 15), Math.abs(y - 15)) > half) deposit(s, y * 31 + x, .2, [.1]); s.edgeEvaporated = 0; step(s, { ...still, edgeEvap: .01, dt: 1, holeSpan }); return s.G[0][15 * 31 + 15 - half - 1]; };
+  assert.ok(Math.abs(run(0, 0) - .1) < .002, `a one-cell pit: ${run(0, 0)}`);
+  assert.ok(run(2, 0) > .102 && Math.abs(run(2, 6) - .1) < .002, `a five-cell hole: ${run(2, 0)}, with holeSpan ${run(2, 6)}`);
+});

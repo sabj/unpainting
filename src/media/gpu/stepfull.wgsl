@@ -1067,8 +1067,10 @@ fn level_k_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid);
   if (c.ok && M[c.i] == 1u) {
     var m = 0.0;
-    if (c.x < u.w - 1u && M[c.i + 1u] == 1u) { m = max(m, abs(W[c.i] - W[c.i + 1u])); }
-    if (c.y < u.h - 1u && M[c.i + u.w] == 1u) { m = max(m, abs(W[c.i] - W[c.i + u.w])); }
+    // the water's surface, depth plus slope times the paper's height, as sheet.mjs surfaceLevel
+    let si = W[c.i] + u.slope * PAPER3[c.i].z;
+    if (c.x < u.w - 1u && M[c.i + 1u] == 1u) { m = max(m, abs(si - W[c.i + 1u] - u.slope * PAPER3[c.i + 1u].z)); }
+    if (c.y < u.h - 1u && M[c.i + u.w] == 1u) { m = max(m, abs(si - W[c.i + u.w] - u.slope * PAPER3[c.i + u.w].z)); }
     if (m > 0.0) { atomicMax(&tileMaxLevel, bitcast<u32>(m)); }
   }
   workgroupBarrier();

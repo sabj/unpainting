@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { deviceHealth, markBroken, brokenReason, assertDeviceHealthy, watchDevice } from './device-health.mjs';
 import { GpuLink, attachGpu } from './link.mjs';
 import { openGpu } from './stepfull.mjs';
-import { createSheet, DEFAULTS } from '../sheet.mjs';
+import { createSheet, DEFAULTS as SHEET_DEFAULTS } from '../sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import { makePaper } from '../paper.mjs';
 
 // a stand-in for Dawn's device: an event target with a lost promise

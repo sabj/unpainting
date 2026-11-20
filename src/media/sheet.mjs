@@ -1,6 +1,7 @@
 import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, recordWetCell, recordWetCells, recordWetStep, syncWetReachVersion } from './paper-certificate.mjs';
 import { censusDry } from './census.mjs';
 import { SIZING } from './sizing.mjs';
+import { edgeFeed } from './edge-feed.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
 // A sheet of paper with water and pigment on it and in it. The model's structure is based on Computer-Generated Watercolor,
 // "Computer-Generated Watercolor" (SIGGRAPH 97): water with suspended pigment above the paper, pigment adsorbed
@@ -25,14 +26,19 @@ import { SIZING } from './sizing.mjs';
 import { check } from './checks.mjs';
 
 export const DEFAULTS = {
-  flow: 0.2, flowIters: 2, slope: 0,             // surface water levelling; each face's conductance is capped at 1/4
+  // surface water levelling; each face's conductance is capped at 1/4. slope: the paper's relief in depth units (its
+  // height runs 0..1): the water levels its surface, not its depth, so it stands deeper over the hollows of the grain,
+  // holds more pigment there and dries there last, which is most of granulation. At 0 the paper was flat to the water.
+  flow: 0.2, flowIters: 2, slope: 0.1,
   diffuse: 0.02,                                  // pigment particles barely diffuse; water carries them (< 0.25)
   // Paint charged into a standing film mixes out into it (convection and the binder's pull, here as an effective
   // diffusion, cells^2 per flow iteration), with a mobility that grows with the film: full at a glossy film of
   // filmDepth, a fraction on a sheen, almost none on damp paper, none on dry (no wet face). With carryDepth alone a
   // glossy film (0.03 deep) let paint travel 0.5 mm (glaze-timing findings).
   filmDiffuse: 0.2, filmDepth: 0.03,
-  evap: 0.0003, edgeEvap: 0.0025, edgeWidth: 2,    // drying: faster within edgeWidth cells of the pinned boundary
+  // drying: evenly at evap, and faster by edgeEvap (mean over a band edgeMm deep) at a pinned edge, fed by a flow
+  // from up to feedMm behind it that carries pigment there (edge-feed.mjs); edgeWidth is left only for the GPU step
+  evap: 0.0003, edgeEvap: 0.001, edgeMm: 1, feedMm: 50, edgeWidth: 2,
   absorb: 0.002, film: 0.03, paperDry: 0.0006,    // pores fill from the film without tearing it; damp pores dry slowly
   capRate: 0.05, capEps: 0.35, capDelta: 0.1, capSigma: 0.6, // capillary layer (fractions of capacity), Computer-Generated Watercolor, section 4.6
   settle: 0.25, lift: 0.25, looseLift: 6,         // adsorption and desorption scale; loose (unfixed) pigment lifts more
@@ -45,7 +51,10 @@ export const DEFAULTS = {
   pinning: 1.5, pinFibre: 2,                      // on damp paper fronts are pinned at gaps between fibres (spread of gap sizes) and run along fibres
   marangoni: 0,                                   // paint's binder lowers surface tension: paint runs out over clean water (wet-in-wet blooms)
   fibreFlow: 0.6,                                 // how much the fibres steer surface water (permeability varies along and across them)
-  carryDepth: 0.2,                                // water shallower than this leaves its pigment behind as it moves (the pigment lags the water)
+  // a film thinner than this carries less of its pigment as it moves: the grains are as deep as the film (about 20 um),
+  // so the outward flow of a drying wash still carries them to its pinned edge (until 2026-11 it was 0.2, and no wash
+  // dried with a darker rim)
+  carryDepth: 0.02,
   flowDepth: 0.06,                                // a film thinner than this barely flows (lubrication: flux grows with depth cubed)
   gran: 1,                                        // scales every pigment's granulation
   slide: 0.4, slideFill: 2, repose: 0.04,         // settled grains roll into the paper's hollows (by granulation), filling them, down slopes steeper than repose / granulation;
@@ -547,6 +556,8 @@ export const collectFlows = (a, at) => { STROKEFLOWS = a; STROKESTEP = at; };
 
 // A sheet clock a read-only trace may hang on a sheet (tools/plate/wet-trace.mjs): step adds its dt, nothing reads it here.
 export const SHEET_CLOCK = Symbol('sheetClock');
+// millimetres a cell: the step's own, else the paper's (a sheet made without one is taken at 0.3)
+const sheetMm = (sheet, o) => (o.mmPerCell > 0 ? o.mmPerCell : sheet.paper.mmPerCell > 0 ? sheet.paper.mmPerCell : 0.3);
 export function step(sheet, o = DEFAULTS, reduction = null) {
   const wetValid = recordWetStep(sheet, 1);
   // a flow inside a stroke is recorded at its position in that stroke; a flow between strokes is its own entry
@@ -562,14 +573,18 @@ export function step(sheet, o = DEFAULTS, reduction = null) {
   const boxes = wetBoxes(sheet); if (!boxes.length) return false;
   if (o.dt === 0) return true;
   if (reduction) { reduction.maxW = 0; reduction.surfaceLevel = 0; }
+  // the pinned edges dry faster, fed by the flow from behind them (edge-feed.mjs); the box steps then dry evenly
+  const mm = sheetMm(sheet, o);
+  for (const box of boxes) sheet.edgeEvaporated = (sheet.edgeEvaporated ?? 0) + edgeFeed(sheet, o, box, mm);
+  const oBox = o.edgeEvap ? { ...o, edgeEvap: 0 } : o;
   const merge = value => { if (reduction) { reduction.maxW = Math.max(reduction.maxW, value.maxW); reduction.surfaceLevel = Math.max(reduction.surfaceLevel, value.surfaceLevel); } };
   if (PAR) {
     const H = { scratch: scratch(sheet), perm: permeability(sheet.paper), throats: throatTable(sheet.n) };
     for (const box of boxes) {
-      if (PAR.stepBox(sheet, o, box, H)) { if (reduction) merge(boxDryStats(sheet, box)); }
-      else { const value = stepBox(sheet, o, box, !!reduction); if (reduction) merge(value); }
+      if (PAR.stepBox(sheet, oBox, box, H)) { if (reduction) merge(boxDryStats(sheet, box, oBox.slope ?? 0)); }
+      else { const value = stepBox(sheet, oBox, box, !!reduction); if (reduction) merge(value); }
     }
-  } else for (const box of boxes) { const value = stepBox(sheet, o, box, !!reduction); if (reduction) merge(value); }
+  } else for (const box of boxes) { const value = stepBox(sheet, oBox, box, !!reduction); if (reduction) merge(value); }
   sheet.steps++;
   return true;
 }
@@ -661,40 +676,11 @@ function stepBox(sheet, o, box, reduce = false) {
   for (let k = 0; k < K; k++) { const Gk = G[k]; for (let q = 0; q < nw; q++) if (Gk[wl[q]] !== 0) { act[nA++] = k; break; } }
 
   // 1. drying, faster at the pinned boundary; absorption into the pores without tearing the film
-  const evap = o.evap, edgeEvap = o.edgeEvap, absorb = o.absorb, oFilm = o.film;
-  const edgeFlowDepth = o.edgeFlowDepth ?? 0.06;
-  const mmPerCell = o.mmPerCell > 0 ? o.mmPerCell : (paper.mmPerCell > 0 ? paper.mmPerCell : 0.3);
-  const dryR = Math.max(2, Math.min(8, Math.round(2.0 / mmPerCell)));
-  const dryR2 = dryR * dryR;
+  const evap = o.evap, absorb = o.absorb, oFilm = o.film;
 
   for (let q = 0; q < nw; q++) {
     const i = wl[q];
-    let near = 0;
-    if (edge[i] <= edgeWidth) {
-      const geomNear = 1 - (edge[i] - 1) / edgeWidth;
-      const cx = i % w, cy = (i / w) | 0;
-      let dryCells = 0, totalCells = 0;
-      for (let dy = -dryR; dy <= dryR; dy++) {
-        const dy2 = dy * dy, py = cy + dy;
-        const inY = py >= 0 && py < h;
-        const prow = inY ? py * w : 0;
-        for (let dx = -dryR; dx <= dryR; dx++) {
-          if (dx * dx + dy2 <= dryR2) {
-            totalCells++;
-            const px = cx + dx;
-            if (!inY || px < 0 || px >= w || !M[prow + px]) dryCells++;
-          }
-        }
-      }
-      const dryFrac = totalCells > 0 ? dryCells / totalCells : 0;
-      const fMin = dryR <= 2 ? 0.10 : 0.18;
-      const fMax = dryR <= 2 ? 0.28 : 0.42;
-      const u = Math.min(1, Math.max(0, (dryFrac - fMin) / (fMax - fMin)));
-      const dryFactor = u * u * (3 - 2 * u);
-      const depthFactor = edgeFlowDepth > 0 ? Math.min(1, Math.max(0, W[i] / edgeFlowDepth)) : 1;
-      near = geomNear * dryFactor * depthFactor;
-    }
-    W[i] = Math.max(0, W[i] - dt * (evap + edgeEvap * near));
+    W[i] = Math.max(0, W[i] - dt * evap);
     const a = Math.min(dt * absorb, Math.max(0, capacity[i] - s[i]), Math.max(0, W[i] - oFilm));
     if (a > 0) { const aw = a / W[i]; for (let n = 0; n < nA; n++) { const k = act[n], Gk = G[k], g = Gk[i] * aw * mobility[k]; Gk[i] -= g; P[k][i] += g; } }
     s[i] += a; W[i] -= a;
@@ -1029,8 +1015,8 @@ function stepBox(sheet, o, box, reduce = false) {
     let surfaceLevel = 0;
     const face = i => {
       if (!M[i]) return;
-      if (i % w < w - 1 && M[i + 1]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + 1]));
-      if (i + w < sheet.n && M[i + w]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + w]));
+      if (i % w < w - 1 && M[i + 1]) surfaceLevel = Math.max(surfaceLevel, Math.abs((W[i] + slope * height[i]) - (W[i + 1] + slope * height[i + 1])));
+      if (i + w < sheet.n && M[i + w]) surfaceLevel = Math.max(surfaceLevel, Math.abs((W[i] + slope * height[i]) - (W[i + w] + slope * height[i + w])));
     };
     for (let q = 0; q < nw; q++) face(wl[q]);
     for (const i of newly) face(i);
@@ -1039,13 +1025,13 @@ function stepBox(sheet, o, box, reduce = false) {
 }
 // Parallel steps do not expose their wet lists; reduce their disjoint active
 // rectangles once, rather than scanning the entire water plane twice.
-function boxDryStats(sheet, [x0, y0, x1, y1]) {
-  const {w, h, W, M} = sheet; let maxW = 0, surfaceLevel = 0;
+function boxDryStats(sheet, [x0, y0, x1, y1], slope = 0) {
+  const {w, h, W, M} = sheet, height = sheet.paper.valley || sheet.paper.height; let maxW = 0, surfaceLevel = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
     const i = y * w + x; maxW = Math.max(maxW, W[i]);
     if (!M[i]) continue;
-    if (x < w - 1 && M[i + 1]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + 1]));
-    if (y < h - 1 && M[i + w]) surfaceLevel = Math.max(surfaceLevel, Math.abs(W[i] - W[i + w]));
+    if (x < w - 1 && M[i + 1]) surfaceLevel = Math.max(surfaceLevel, Math.abs((W[i] + slope * height[i]) - (W[i + 1] + slope * height[i + 1])));
+    if (y < h - 1 && M[i + w]) surfaceLevel = Math.max(surfaceLevel, Math.abs((W[i] + slope * height[i]) - (W[i + w] + slope * height[i + w])));
   }
   return {maxW, surfaceLevel};
 }
@@ -1105,13 +1091,13 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
   const oLevel = { ...o, dt: o.dt }, oFast = { ...o, dt };
   let summary = null;
   if (analyticTail && !onStep && o.dt > 0 && dt > 0) {
-    summary = boxDryStats(sheet, [0, 0, sheet.w - 1, sheet.h - 1]);
+    summary = boxDryStats(sheet, [0, 0, sheet.w - 1, sheet.h - 1], o.slope ?? 0);
     // Direct array clients can supply surface water outside the wet mask. Keep
     // the original full-plane checks for that nonstandard state.
     for (let i = 0; i < sheet.n; i++) if (sheet.W[i] !== 0 && !sheet.M[i]) { summary = null; break; }
   }
   for (; t < max; t++) {
-    if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && (summary ? summary.surfaceLevel : surfaceLevel(sheet)) < levelTol))) fast = true;
+    if (!fast && t >= level && (t >= levelMax || (t % 25 === 0 && (summary ? summary.surfaceLevel : surfaceLevel(sheet, o.slope ?? 0)) < levelTol))) fast = true;
     if (analyticTail && !onStep) {
       if (summary ? summary.maxW <= o.wetEps : quietDryTail(sheet, o)) {
         if (summary) evaporateInPlace(sheet);
@@ -1130,13 +1116,14 @@ function dryCpu(sheet, max, o, { level, levelMax, levelTol, dt, onStep, analytic
   return t;
 }
 
-/** The largest difference in depth across any face between two wet cells. */
-function surfaceLevel(sheet) {
-  const { w, h, W, M } = sheet; let most = 0;
+/** The largest difference in water level (depth plus `slope` times the paper's height) across any face between two
+ *  wet cells: the water is level when its surface is, not its depth. */
+function surfaceLevel(sheet, slope = 0) {
+  const { w, h, W, M } = sheet, height = sheet.paper.valley || sheet.paper.height; let most = 0;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x; if (!M[i]) continue;
-    if (x < w - 1 && M[i + 1]) most = Math.max(most, Math.abs(W[i] - W[i + 1]));
-    if (y < h - 1 && M[i + w]) most = Math.max(most, Math.abs(W[i] - W[i + w]));
+    if (x < w - 1 && M[i + 1]) most = Math.max(most, Math.abs((W[i] + slope * height[i]) - (W[i + 1] + slope * height[i + 1])));
+    if (y < h - 1 && M[i + w]) most = Math.max(most, Math.abs((W[i] + slope * height[i]) - (W[i + w] + slope * height[i + w])));
   }
   return most;
 }

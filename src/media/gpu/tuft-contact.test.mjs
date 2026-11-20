@@ -10,7 +10,9 @@ const sheet=()=>createSheet(makePaper(160,128,{mmPerCell:.125,seed:17,fibres:.32
 const total=s=>[s.W,...s.G,...s.P,...s.D].map(a=>a.reduce((v,x)=>v+x,0));
 const water=b=>b.resW+b.hairs.reduce((s,h)=>s+h.water,0);
 const pigment=b=>b.resP[0]+b.hairs.reduce((s,h)=>s+h.pig[0],0);
-const expected={0.75:[707.2748467942656,707.2748467942656,0,636.2298216719282],0.18:[0.22791281051468104,0.22791281051468104,0,156.92482019311637]};
+// measured on the paper with its fine grain (paper.mjs fineGrain, 2026-11): a nearly dry tuft now touches only the grain's
+// peaks and lays about half what it laid on the old, smooth tooth
+const expected={0.75:[715.6131260248039,715.6131260248039,0,615.0368325506934],0.18:[0.13093791902065277,0.13093791902065277,0,73.17720111328127]};
 for(const load of [.75,.18]) test('native tuft matches measured contact contract with load '+load,()=>{
  const a=sheet(),ba=createBrush(options);dip(ba,{water:load,conc:[1]});
  const beforeW=water(ba),beforeP=pigment(ba);

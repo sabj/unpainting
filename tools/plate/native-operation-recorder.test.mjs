@@ -8,7 +8,9 @@ import sharp from 'sharp';
 import {createNativeOperationRecorder,verifyNativeMarkCoverage} from './native-operation-recorder.mjs';
 import {applyNativeOperation,playFilm} from '../../demos/lab/targets/film.js';
 import {makePaper} from '../../src/media/paper.mjs';
-import {createSheet,layersOf,dry,DEFAULTS} from '../../src/media/sheet.mjs';
+import {createSheet,layersOf,dry,DEFAULTS as SHEET_DEFAULTS} from '../../src/media/sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS={...SHEET_DEFAULTS,edgeEvap:0};
 import {createBrush,dip,stroke,recordMarks} from '../../src/media/brush.mjs';
 import {renderLayers} from '../../src/media/km.mjs';
 import {materialProfile,drawMaterial} from '../../src/paint/methods/material-profiles.mjs';

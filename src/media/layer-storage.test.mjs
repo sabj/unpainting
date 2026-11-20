@@ -78,7 +78,9 @@ test('plane aliases to retained layers or live reservoirs are never detached',()
 
 import { fixedBedLower } from './fixed-bed.mjs';
 import { attachGpu } from './gpu/link.mjs';
-import { step, dry, DEFAULTS } from './sheet.mjs';
+import { step, dry, DEFAULTS as SHEET_DEFAULTS } from './sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 test('fixed-bed rebuild reads cropped planes without losing support',()=>{
  const sheet=setup(),before=fixedBedLower(sheet);
  compactLowerLayers(sheet);

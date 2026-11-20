@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { backendLine, assertSameBackend } from './backend-record.mjs';
 import { attachGpu } from './link.mjs';
-import { createSheet, DEFAULTS } from '../sheet.mjs';
+import { createSheet, DEFAULTS as SHEET_DEFAULTS } from '../sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import { makePaper } from '../paper.mjs';
 
 const GPU = { mode: 'auto', backend: 'gpu', fallback: false, adapter: 'webgpu (Dawn)', adapterEvidence: { adapterInfo: { vendor: 'apple', architecture: 'metal-3', device: '', description: 'Apple M4' } } };

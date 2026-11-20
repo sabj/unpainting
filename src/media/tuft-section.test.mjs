@@ -7,7 +7,7 @@ import { headOf, moveChain, contactShare, tuftShape, kappaOf, exchangeCell, toot
 import { pigmentPerMm, runOut, meanBetween, diagonalEdge, spectralPeak } from '../../tools/lab/brush-measure.mjs';
 
 const pigments = [{ K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 }, { K: [0.2, 0.5, 0.9], S: [0.05, 0.03, 0.02], rho: 0.05, omega: 1.4, gamma: 0.15 }];
-const paperAt = (wmm, hmm, mm) => makePaper(Math.round(wmm / mm), Math.round(hmm / mm), { seed: 9, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
+const paperAt = (wmm, hmm, mm, extra = {}) => makePaper(Math.round(wmm / mm), Math.round(hmm / mm), { seed: 9, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 }, ...extra });
 // the painter's detail round (tools/plate/paint.mjs) as a section brush, rmm its belly half-width in mm
 const round = (mm, rmm = 2.5, extra = {}) => { const r = rmm / mm; return createBrush({ model: 'section', radius: r, bristles: Math.max(8, Math.ceil(r * 3)), capacity: 26, belly: 2, feed: 0.08, give: 0.7, free: 0.4, film: 0.22, splay: 0.06, stiffness: 5, bridge: 0.55, bridgeSoft: 1.2, streak: 0.5, seed: 31, ...extra }); };
 const flat = (mm, rmm = 6, extra = {}) => { const r = rmm / mm; return createBrush({ model: 'section', flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, seed: 41, ...extra }); };
@@ -145,7 +145,8 @@ test('the towed tuft trails the hand and swings round a turn late', () => {
 });
 
 test('a 45 degree line has no roughness at the cell pitch', () => {
-  const mm = 0.25, sheet = createSheet(paperAt(40, 40, mm), pigments), b = round(mm, 1.5);
+  // the brush's own geometry: paper without its fine grain, whose pores differ cell by cell and step every edge at the pitch
+  const mm = 0.25, sheet = createSheet(paperAt(40, 40, mm, { grainAmp: 0 }), pigments), b = round(mm, 1.5);
   dip(b, { water: 1, conc: [0.5, 0] });
   stroke(b, sheet, [{ x: 20, y: 20, p: 0.8 }, { x: 140, y: 140, p: 0.8 }]);
   const f = Float64Array.from(sheet.W, (v, i) => v + sheet.s[i]);
@@ -207,7 +208,8 @@ test('on a GPU sheet the section brush lays exactly what it lays on a CPU sheet 
   const { attachGpu } = await import('./gpu/link.mjs');
   const make = () => createSheet(paperAt(40, 20, 0.25), pigments);
   const gpu = make(); let info;
-  try { info = attachGpu(gpu, DEFAULTS, { mode: 'on', log: () => {} }); } catch (e) { if (process.env.GPU_REQUIRED === '1') throw e; t.skip(`no WebGPU adapter: ${e.message}`); return; }
+  // edgeEvap 0: the GPU sheet has no pinned-edge feed (edge-feed.mjs) and refuses one
+  try { info = attachGpu(gpu, { ...DEFAULTS, edgeEvap: 0 }, { mode: 'on', log: () => {} }); } catch (e) { if (process.env.GPU_REQUIRED === '1') throw e; t.skip(`no WebGPU adapter: ${e.message}`); return; }
   if (info.backend !== 'gpu') { if (process.env.GPU_REQUIRED === '1') assert.fail('no GPU'); t.skip('no WebGPU adapter'); return; }
   const cpu = make();
   for (const sheet of [cpu, gpu]) { const b = round(0.25, 2); dip(b, { water: 1, conc: [0.5, 0] }); stroke(b, sheet, inMm([{ x: 5, y: 10, p: 1 }, { x: 20, y: 6, p: 0.8 }, { x: 35, y: 12, p: 1 }], 0.25)); }

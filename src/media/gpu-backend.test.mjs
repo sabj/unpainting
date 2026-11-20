@@ -3,7 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
-import { createSheet, step, dry, thickness, totals, DEFAULTS, layersChanged } from './sheet.mjs';
+import { createSheet, step, dry, thickness, totals, DEFAULTS as SHEET_DEFAULTS, layersChanged } from './sheet.mjs';
+// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import { createBrush, dip, stroke } from './brush.mjs';
 import { attachGpu, gpuStats } from './gpu/link.mjs';
 
@@ -194,4 +196,11 @@ test('a dry brush over cold-press tooth lays the same paint on the GPU as on the
     const gpu = lay(g); assert.ok(gpuStats(g).strokes >= 1, 'the stroke was laid on the GPU');
     assert.ok(cpu > 0 && Math.abs(gpu - cpu) <= 1e-4 * cpu, `GPU ${gpu} against CPU ${cpu}`);
   } finally { g._gpu.close(); }
+});
+
+test('a GPU sheet refuses the pinned-edge feed it does not have, loudly with --gpu on and by falling back with auto', () => {
+  const make = () => createSheet(makePaper(16, 16, { seed: 3 }), [{ K: [1, 1, 1], S: [.02, .02, .02], rho: .05, omega: 1, gamma: 0 }]);
+  assert.throws(() => attachGpu(make(), SHEET_DEFAULTS, { mode: 'on', log: () => {} }), /pinned-edge feed/);
+  const info = attachGpu(make(), SHEET_DEFAULTS, { mode: 'auto', log: () => {} });
+  assert.equal(info.backend, 'cpu'); assert.match(info.reason, /pinned-edge feed/);
 });
