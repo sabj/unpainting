@@ -524,11 +524,17 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start
   // its structure (detailLagMm counted onto their cost), so the drawing is worked outward from the main form instead of
   // being staked out over the whole sheet first; texture and hatching wait for the end
   const isStruct = new Set(structural);
-  const detail = live.filter(s => !s.taken && !isStruct.has(s) && (s.role === 'outline' || s.role === 'inner' || s.role === 'fine'));
+  // short marks (under tickMm) are not part of the sweep: they come once the whole structure is down, before the texture
+  const detailAll = live.filter(s => !s.taken && !isStruct.has(s) && (s.role === 'outline' || s.role === 'inner' || s.role === 'fine'));
+  const detail = detailAll.filter(s => s.len >= c.tickMm), short = detailAll.filter(s => s.len < c.tickMm);
+  // a detail line waits until the structure has grown past it: it lies wholly within the frontier (the farthest reach of the
+  // structure drawn so far)
+  let frontier = 0;
   walk([...structural, ...detail], s => (isStruct.has(s) ? 'growth' : 'detail'),
-    s => (s.role === 'outline' && isStruct.has(s) ? !parentOpen(s) : !(outlineLeft.get(s.object) > 0) && !parentOpen(s)),
-    s => { if (s.role === 'outline' && isStruct.has(s)) outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); },
+    s => (s.role === 'outline' && isStruct.has(s) ? !parentOpen(s) : !(outlineLeft.get(s.object) > 0) && !parentOpen(s) && (isStruct.has(s) || s.rad <= frontier)),
+    s => { if (isStruct.has(s)) frontier = Math.max(frontier, s.rad); if (s.role === 'outline' && isStruct.has(s)) outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); },
     s => (isStruct.has(s) ? 0 : c.detailLagMm));
+  walk(short, 'detail');
   const runs = new Map(); for (const s of live) if (!s.taken && s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
   const items = [...live.filter(s => !s.taken && s.role === 'texture').map(s => ({ s })), ...[...runs.values()].map(m => ({ m }))];
   while (items.length) {
