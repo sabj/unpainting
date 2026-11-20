@@ -9,7 +9,7 @@ export const levelOn = o => (o.level ?? 1) > 0;
 const fillOn = o => (o.slide ?? 0) > 0 && (o.fillRef ?? 0.4) > 0;
 
 /** The budgets a sheet starts with: CG iterations and substep rounds encoded a step, workgroups for the per-box kernels. */
-export const levelBudget = () => ({ iters: 128, subs: 64, boxes: 16, total: null });
+export const levelBudget = () => ({ iters: 128, subs: 64, boxes: 16, total: null, recent: [] });
 
 /** Bytes of each buffer for a w x h sheet of n cells and `ntiles` 16x16 tiles; the per-cell fields only with `on`. */
 export function levelBuffers(w, h, n, ntiles, on) {
@@ -53,7 +53,7 @@ export function encodeLevel(run, o, mm, lv, tiles) {
  * What the last steps needed, from the first 12 words of LVS (the most CG iterations and substeps, the solves that ran
  * short, the most boxes): counted into lv.total, and the budgets grown while a step uses most of them. A short solve keeps
  * the iterate it reached, as the CPU's does at 2000; one counted here grows the budget for the next steps. Returns
- * whether a budget grew (the uniforms must be written again). The caller clears LVS words 3 to 11.
+ * whether a budget changed (the uniforms must be written again). The caller clears LVS words 3 to 11.
  */
 export function adaptLevel(lv, v) {
   const st = { iterations: v[3], short: v[4], subs: v[5], fewer: v[6], solves: v[7], boxes: v[11] };
@@ -64,5 +64,14 @@ export function adaptLevel(lv, v) {
   if ((st.short || st.iterations > 0.75 * lv.iters) && lv.iters < LV_ITMAX) { lv.iters = Math.min(LV_ITMAX, 2 * lv.iters); grew = true; }
   if ((st.fewer || st.subs > 0.75 * lv.subs) && lv.subs < 64) { lv.subs = Math.min(64, 2 * lv.subs); grew = true; }
   if (st.boxes > lv.boxes && lv.boxes < LV_BMAX) { lv.boxes = Math.min(LV_BMAX, 2 * st.boxes); grew = true; }
+  // Every iteration and round encoded is a dispatch a step, needed or not (most of the step's time on a small sheet), so
+  // the budgets come down again to twice the most the last 16 reads with solves needed (no lower than 64 iterations and
+  // 8 rounds). A solve or a box that then runs short is counted and grows them at once.
+  if (st.solves) { (lv.recent ??= []).push([st.iterations, st.subs]); if (lv.recent.length > 16) lv.recent.shift(); }
+  if (!grew && lv.recent?.length >= 4) {
+    const pow2 = v => 2 ** Math.ceil(Math.log2(Math.max(1, v)));
+    const it = Math.max(64, 2 * pow2(Math.max(...lv.recent.map(r => r[0])))), sb = Math.max(8, 2 * pow2(Math.max(...lv.recent.map(r => r[1]))));
+    if (it < lv.iters || sb < lv.subs) { lv.iters = Math.min(lv.iters, it); lv.subs = Math.min(lv.subs, sb); grew = true; }
+  }
   return grew;
 }
