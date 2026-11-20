@@ -1,0 +1,29 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { byImportance, lineImportance } from './line-importance.mjs';
+
+const line = (x0, y, len, extra = {}) => ({ points: [{ x: x0, y }, { x: x0 + len, y }], ...extra });
+
+test('within the budget nothing is dropped, and the order is kept', () => {
+  const lines = [line(0, 0, 10), line(0, 5, 40), line(0, 9, 5)];
+  const r = byImportance(lines, { pxMm: 1, budgetMm: 100 });
+  assert.equal(r.lines, lines);
+  assert.equal(r.stats.dropped, 0);
+});
+
+test('over the budget the long, sure and structural lines stay, in their own order, with no count cap', () => {
+  const lines = [line(0, 0, 4, { weight: 1 }), line(0, 5, 60, { weight: 0.8, tier: 1 }), line(0, 9, 30, { weight: 0.9 }), line(0, 12, 30, { weight: 0.2 }), line(0, 15, 6, { weight: 1 })];
+  const r = byImportance(lines, { pxMm: 1, budgetMm: 90 });
+  assert.deepEqual(r.lines.map(g => g.points[1].x), [60, 30]);
+  assert.equal(r.stats.keptMm, 90);
+  assert.equal(r.stats.dropped, 3);
+  // many short lines are all kept when the budget allows: the budget is a length, not a count
+  const many = Array.from({ length: 200 }, (_, k) => line(0, k, 2));
+  assert.equal(byImportance(many, { pxMm: 1, budgetMm: 400 }).lines.length, 200);
+});
+
+test('a line of a form outranks loose detail of the same length, and confidence breaks the tie', () => {
+  assert.ok(lineImportance(line(0, 0, 10, { tier: 1, weight: 0.5 }), 1) > lineImportance(line(0, 0, 10, { tier: 2, weight: 0.5 }), 1));
+  assert.ok(lineImportance(line(0, 0, 10, { weight: 0.9 }), 1) > lineImportance(line(0, 0, 10, { weight: 0.3 }), 1));
+  assert.equal(lineImportance(line(0, 0, 10, { weight: 0.5 }), 0.5), 5);
+});

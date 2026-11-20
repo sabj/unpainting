@@ -84,7 +84,7 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // from decided lines is not decided again.
   let decided = doc.inkDecided === true;
   if (decide && !decided) {
-    const r = await decideFile({ doc, L, image, out, stage, pxMm, authored: !MODEL_KINDS.includes(doc0.inputKind), ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
+    const r = await decideFile({ doc, L, image, out, stage, pxMm, authored: !MODEL_KINDS.includes(doc0.inputKind), ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, budgetMm: (doc0.stats?.sourceInkLength ?? 0) * sheetMm / doc0.image.w, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
     doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
   }
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this

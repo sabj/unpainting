@@ -11,6 +11,7 @@ import { geometrise, GEOM_DEFAULTS } from './line-geometry.mjs';
 import { foliageMask } from './line-foliage.mjs';
 import { hatchShadows, HATCH_DEFAULTS } from './line-hatch.mjs';
 import { salience } from './line-salience.mjs';
+import { byImportance } from './line-importance.mjs';
 import { joinCollinear } from './line-geometry.mjs';
 import { fairLines, dropWandering } from './line-fair.mjs';
 import { restoreBridges } from './line-bridge.mjs';
@@ -32,7 +33,7 @@ function fromPoints(g, pts) {
  * Decide the lines of `doc` (a line file, on grid `doc.image`). `segments` is prepareSegments' record ({ stem }).
  * @returns { lines, record } the lines kept (line-file form) and the record written to ink-labels.json
  */
-export async function decideFile({ doc, L, image, out, stage, pxMm, segments, authored = false, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false , env = undefined}) {
+export async function decideFile({ doc, L, image, out, stage, pxMm, segments, authored = false, judge = 'codex', cacheDir, log = () => {}, o: o0 = DECIDE_DEFAULTS, run, geom = false, geomOptions = GEOM_DEFAULTS, shadowMask = true, foliage = false, hatch = null, salient = false, inkDarkRule = false, joinMm = 0, economy = false , env = undefined, budgetMm = 0}) {
   let o = o0;
   const { w, h } = doc.image, base = path.basename(image, path.extname(image));
   let seg = null, regions = [], lab = { judge: 'none', cached: true, labels: {}, source: {}, note: 'segments off' };
@@ -100,6 +101,9 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
     const isF = (x, y) => ['face', 'hands'].includes(cellLabel(Math.max(0, Math.min(w - 1, Math.round(x))), Math.max(0, Math.min(h - 1, Math.round(y)))));
     const sres = salience(kept, { pxMm, isFeature: isF }); kept = sres.lines; sal = sres.stats;
   }
+  // the subject's own line length is the drawing's length: the most important lines first, until it is reached (line-importance.mjs)
+  let imp = null;
+  if (budgetMm > 0 && !authored) { const ires = byImportance(kept, { pxMm, budgetMm }); kept = ires.lines; imp = ires.stats; }
   // --inkhatch 1 (pure ink only, off by default): shadow masses as cross-hatching, by tone, at a hand angle or along the form
   let hatched = 0;
   if (hatch) { const hs = hatchShadows(shadow, L, w, h, pxMm, { ...HATCH_DEFAULTS, angleDeg: hatch.angle, fromForm: hatch.form }); kept = [...kept, ...hs]; hatched = hs.length; }
@@ -117,11 +121,13 @@ export async function decideFile({ doc, L, image, out, stage, pxMm, segments, au
     fair: fairing.stats,
     ...(economyStats ? { economy: economyStats } : {}),
     ...(sal ? { salience: sal } : {}),
+    ...(imp ? { importance: imp } : {}),
   };
   fs.writeFileSync(path.join(out, `ink-labels${stage === 'opening' ? '' : '-' + stage}.json`), JSON.stringify(record, null, 1) + '\n');
   const pct = v => `${(100 * v).toFixed(0)}%`, s = r.stats;
   log(`ink decide, ${stage}: regions labelled by ${lab.judge}${lab.cached ? ' (cached)' : ''}; ${pct(s.keptPx / Math.max(1e-9, s.lengthPx))} of the line length kept; mass-edge share of the length ${pct(s.massBefore)} before, ${pct(s.massAfter)} after; cut ${s.droppedMm.mass.toFixed(0)} mm mass edge, ${s.droppedMm.faint.toFixed(0)} mm faint, ${Object.entries(s.droppedMm.label).map(([k, v]) => `${v.toFixed(0)} mm ${k}`).join(', ')}`);
   if (sal) log(`ink salience, ${stage}: ${sal.sets} connected sets (${sal.closedSets} closed); ${sal.linesDropped} isolated pieces, ${sal.droppedMm.toFixed(0)} mm, left to the wash`);
+  if (imp) log(`ink importance, ${stage}: ${imp.beforeMm.toFixed(0)} mm of candidate line against the subject's ${imp.budgetMm.toFixed(0)} mm; ${imp.dropped} lesser lines left out, ${imp.keptMm.toFixed(0)} mm kept, the shortest ${imp.shortestKeptMm.toFixed(1)} mm`);
   if (geometry) log(`ink geometry, ${stage}: ${geometry.fragmentsBefore} fragments to ${geometry.fragmentsAfter}; mean curvature energy per stroke ${geometry.energyBefore.toFixed(4)} to ${geometry.energyAfter.toFixed(4)} rad2/mm2; ${geometry.geometry} traces replaced by straight runs and arcs, ${geometry.kept} form or feature contours kept, ${geometry.droppedSquiggle} squiggles left to the wash (${geometry.offSource} off the source, ${geometry.tooManyPieces} too many pieces)`);
   return { lines, record, labelsOf: LABELS };
 }

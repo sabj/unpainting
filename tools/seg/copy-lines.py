@@ -198,6 +198,7 @@ def main():
     ap.add_argument('--stroke-close', type=int, default=0, help='--kind stroke: close breaks of up to this many pixels before tracing')
     ap.add_argument('--stroke-colour', type=float, default=0, help='--kind stroke: keep strokes within this a*b* distance of the ink colour (0 off)')
     ap.add_argument('--gate', help="a lineart map (dark on white): a --kind stroke stroke is kept only where it also sees a line")
+    ap.add_argument('--source', help="--kind line-map: the picture the map was made from; the length of its own pen strokes where the map sees a line is reported as sourceInkLength")
     ap.add_argument('--fine', help="the fine model's own map (dark on white): its marks above .28 in busy detail regions join a line map")
     args = ap.parse_args()
     bgr = cv2.imread(args.image)
@@ -224,6 +225,16 @@ def main():
             ap.error('cannot read '+args.gate)
         gate = 1-cv2.resize(grey, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32)/255
     lines, mask, skeleton, stats = plan(bgr, args.kind, tolerance, fine, gate, {'lo_frac': args.stroke_lo, 'close': args.stroke_close, 'ink_colour': args.stroke_colour})
+    if args.source:
+        if args.kind != 'line-map':
+            ap.error('--source goes with --kind line-map')
+        src = cv2.imread(args.source)
+        if src is None:
+            ap.error('cannot read '+args.source)
+        # how much line the subject itself carries: its own narrow dark strokes where the map also sees a line, thinned.
+        # One number for the whole picture; the drawing is cut to this length by importance (line-importance.mjs).
+        own, _ = stroke_mask(cv2.resize(src, (w, h), interpolation=cv2.INTER_AREA), 152.4/w, gate=1-cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255, ink_colour=10)
+        stats['sourceInkLength'] = int(prune_spurs(thin(own)[0], 3)[0].sum())
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
     doc = {'source': 'copy-lines: '+('prepared learned line map' if args.kind == 'line-map' else 'observed source ink')+', pre-paint only',
            'inputKind': args.kind,
