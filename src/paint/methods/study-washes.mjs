@@ -32,7 +32,7 @@ const PLAN_MM = 0.5;
 const CLUSTERS = 8, CLUSTER_JOIN = 18;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
-const COPY_TEST = 'copy test of this reading, 20 Nov 2026: mini 1 (RunPod studies) d1 copied +0.00/-0.04 at 1.8/3.4 mm (null 0.04/0.05), stable 0.92/0.92; d2 +0.02/-0.03, 0.91/0.92; mini 2 (local studies) d1 +0.01/+0.06 (null 0.14/0.18), stable 0.63/0.57 against a seed floor of 0.66; all within their nulls; the absolute limit 0.05 is passed on mini 1 and missed by 0.01 on mini 2 at 3.4 mm, where the null is 0.18 wide (measured before the rule that keeps regions over 2% apart; not re-run)';
+const COPY_TEST = 'copy test of this reading, laid as at 02db12b0 (under-washes, joined shadows, cut darks), 20 Nov 2026: mini 1 (RunPod studies) flat copied -0.00/-0.06 at 1.8/3.4 mm (null max 0.08/0.08), d1 +0.02/-0.05 (0.10/0.08), d2 +0.03/-0.04 (0.05/0.08), stable 0.85 to 0.90 against a seed floor of 0.47 to 0.52; mini 2 (local studies) flat -0.05/-0.02 (0.07/0.16), d1 -0.04/+0.02 (0.13/0.14), d2 -0.04/+0.02 (0.13/0.14), stable 0.61 to 0.73 against a seed floor of 0.65 to 0.74; every copy within its null; no copy above +0.03';
 /** Two regions each over this share of the sheet are never merged into one (a roof and its wall stay two shapes). */
 const BIG = 0.02;
 /** A part smaller than this share of the sheet is a sliver and joins a neighbour. */
