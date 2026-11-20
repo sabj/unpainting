@@ -31,8 +31,11 @@ test('within one stroke the pressure rises and falls and the path turns: constan
   // the ends: a taper lands and lifts on the point, a belly-first stroke lands pressed and lifts on the point
   const t = makeMark('taper', at)[0].points, r = makeMark('reverse', at)[0].points;
   assert.ok(t[0][2] < 0.15 && t.at(-1)[2] < 0.1 && r[0][2] > 0.5 && r.at(-1)[2] < 0.1);
-  // a slow landing and a fast lift: a grass blade is flicked off
-  const g = makeMark('grass', at)[0].points; assert.ok(g.at(-1)[3] > 3 * g[0][3]);
+  // a grass blade: a slow landing, fast through its body, and eased off over its last fifth so the tail is laid
+  // (BRUSH-GAPS 5); a dry drag stays fast to its end
+  const g = makeMark('grass', at)[0].points, mid = Math.max(...g.map(q => q[3]));
+  assert.ok(mid > 2.5 * g[0][3] && g.at(-1)[3] <= 25 && mid > 2 * g.at(-1)[3]);
+  assert.ok(makeMark('drag', at)[0].points.at(-1)[3] > 150);
 });
 test('a flat held at a fixed angle names it; a line is the point barely pressed; dry marks carry little water', () => {
   const rb = makeMark('ribbon', at)[0]; assert.equal(rb.flat, true); assert.equal(rb.held, 'fixed');
