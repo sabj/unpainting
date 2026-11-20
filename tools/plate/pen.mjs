@@ -8,6 +8,7 @@ import {weighGraphiteDrawing} from '../../src/paint/methods/graphite-pool.mjs';
 import {plannedEdges, supportedLines} from '../../src/paint/methods/line-support.mjs';
 import {selectValueInk, drawsWholeFile, valueInkVerdict} from '../../src/paint/methods/light-to-dark.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
+import {linePaths, readLineText} from '../../src/crop/lines.mjs';
 import {cachedStep, codeHash} from '../../src/paint/run-cache.mjs';
 import {startStrokeLedger} from '../../src/paint/stroke-ledger.mjs';
 import fs from 'node:fs';
@@ -496,7 +497,9 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     // --lineedges 0 turns it off. A line from the plan's drawing file is drawn only when at least half of it lies on an
     // edge of a planned passage (src/paint/methods/line-support.mjs); a line inside one planned mass is left off whole.
     // The slack is one source pixel. A source's own pen lines are drawn as they are.
-    if(num('lineedges',1)>0&&!sourceInkDrawing()&&drawsWholeFile({first,fine,graphiteFirst,drawingFile:opt('drawingfile',''),closingFile:opt('drawinglast','')})){
+    // A prepared drawing (trace-drawing.py, inputKind drawing) is the whole drawing, kept as drawn in either medium: no plan edge cuts it.
+    ctx.PREPARED_DRAWING??=(()=>{try{return !!opt('drawingfile','')&&JSON.parse(readLineText(linePaths(path.resolve(root,opt('drawingfile',''))).lines)).inputKind==='drawing';}catch{return false;}})();
+    if(num('lineedges',1)>0&&!sourceInkDrawing()&&!(first&&ctx.PREPARED_DRAWING)&&drawsWholeFile({first,fine,graphiteFirst,drawingFile:opt('drawingfile',''),closingFile:opt('drawinglast','')})){
       ctx.LINE_EDGES??=plannedEdges(ctx.VALUE_PLAN.instructions,n);
       const r=supportedLines(kept,{edges:ctx.LINE_EDGES,w,h,tol:Math.max(1,Math.round(w/srcMeta.width))});kept=r.kept;
       console.log(`line support, ${first?'opening':fine?'fine':'closing'}: ${r.kept.length} of ${r.kept.length+r.dropped.length} lines lie mostly on planned passage edges and are drawn; ${r.dropped.length} inside planned masses are left off`);

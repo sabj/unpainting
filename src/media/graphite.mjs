@@ -2,6 +2,27 @@ import {TAPE} from './brush.mjs';
 // a slow wander in 0..1 along the arc length, seeded per stroke: the pressure a hand gives a line
 const wander = (s, seed) => 0.5 + 0.25 * Math.sin(s * 0.045 + seed) + 0.25 * Math.sin(s * 0.11 + 2.3 * seed);
 
+/** How proud each fibre stands, 0 (deepest hollow) to 1 (highest crest), from the paper's `proud` (5th to 95th percentile), kept on the paper. */
+function proudness(paper) {
+  if (paper._proudRank) return paper._proudRank;
+  const src = paper.proud ?? paper.height, s = Float32Array.from(src).sort(), lo = s[Math.floor(0.05 * s.length)], hi = s[Math.floor(0.95 * s.length)], r = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) r[i] = Math.max(0, Math.min(1, (src[i] - lo) / (hi - lo || 1)));
+  return (paper._proudRank = r);
+}
+
+/**
+ * The share of a stroke's graphite a cell takes. The lead touches the fibres that stand proud and skips the hollows
+ * between them; pressed lighter it touches fewer, so a light line breaks on the tooth and a firm one fills in.
+ * `v` is the stroke's pressure there (0..1), `tooth` how much the paper's relief decides (0 none, 1 all).
+ * Before: the paper's absolute height times 1.4, capped at 1, which every cell above 0.71 reached (half the sheet), so the
+ * line hardly broke.
+ */
+export function toothTake(paper, i, v, tooth) {
+  if (!(tooth > 0) || !(paper?.proud || paper?.height)) return 1;
+  const gate = tooth * 0.8 * (1 - Math.min(1, v)), pr = proudness(paper)[i];
+  return (1 - tooth) + tooth * Math.max(0, Math.min(1, (pr - gate) / (1 - gate)));
+}
+
 /**
  * Lay strokes [{points: [{x, y, s?}]}] (sheet cells) dry into sheet.D[k]. `amount` is the core's deposit (the
  * measured mean density), `width` the line's width in cells, `vary` how far pressure wanders (0..1).
@@ -44,7 +65,7 @@ export function pencilDraw(sheet, strokes, k, { amount, width = 1.2, vary = 0.35
     if(best.size&&!synced){sheet._gpu?.syncAll(sheet);synced=true;}
     beforeStroke?.({ gesture:g, ordinal:gi, cells:[...best.keys()] });
     if(TAPE && sheet._tape) TAPE.push({k:'g',pigment:k,points:P,options:{amount,width,vary,tooth,spacing,seed,pressureReference,arcScale,usePointWidths,ordinal:gi+ordinal}});
-    for (const [i, v] of best) { const t = paper.height ? (1 - tooth) + tooth * Math.min(1, Math.max(0, paper.height[i] * 1.4)) : 1; D[i] += amount * v * t; cellsLaid++; }
+    for (const [i, v] of best) { D[i] += amount * v * toothTake(paper, i, v, tooth); cellsLaid++; }
     drawn++;
     if(afterStroke){if(best.size)sheet._gpu?.cpuWroteAll();afterStroke({gesture:g,ordinal:gi,offSheet:!best.size});}
   });
