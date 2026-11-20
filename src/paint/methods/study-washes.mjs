@@ -22,6 +22,7 @@ import { outlineLoops, loopsMask } from './wash-strokes.mjs';
 import { laneFill } from './sweep-fill.mjs';
 import { mixFor, mixOver, filmLab } from './puddles.mjs';
 import { kmeans, roundMask, dilate } from './study-shapes.mjs';
+import { monoAt } from './mono-mix.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.5;
@@ -267,6 +268,12 @@ const LIGHT_LEAST_MM2 = 40;
 const UNDER_MM = 2;
 /** Shapes of one cluster this near (mm) are one wash. */
 const JOIN_MM = 2;
+/** Near-monochrome value steps: a wash whose study lightness spans at least this (L*, 10th to 90th percentile) is laid in
+ * steps: first at the lightness of this quantile, then the cells at or under these quantiles over it, each part at least
+ * MONO_STEP_LEAST mm2. */
+/** A sheet darker than this (L* against white) is toned. */
+const TONED_L = 95;
+const MONO_STEP_L = 8, MONO_FIRST = 0.7, MONO_CUTS = [0.4, 0.12], MONO_STEP_LEAST = 25;
 /** The block-in (the first layer) has at most this many shapes. */
 const FIRST_MOST = 16;
 
@@ -275,7 +282,7 @@ const FIRST_MOST = 16;
 // `studies`: the stack, coarse to fine: [{rgb (w x h x 3), file, minMm2, mode}] (mode 'glaze': a few connected glazes
 // from that study instead of every shape it adds). `flat`: every shape one flat fill of its own,
 // butted, no nesting, charging, load, soft edges or dabs (for comparison only).
-export function planStudyWashes({ k, w, h, studies, flat = false, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null }) {
+export function planStudyWashes({ k, w, h, studies, flat = false, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null, mono = null }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
   if (!studies?.length || studies.some(st => !st?.rgb || st.rgb.length !== n * 3)) throw Error('the study wash plan needs its studies registered to the sheet (w x h x 3)');
   if (pigments.length !== k || k < 1) throw Error('the wash plan needs the pigments');
@@ -322,11 +329,20 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // A study's shapes and values are trusted more than its hues (an image model drifts a brown drawing to pink): the mix
   // is the palette's nearest to the study's colour (mixFor / mixOver: the painter's own pigments), its strength then set
   // so the film over what is laid reaches the study's VALUE (L*). The hue follows only as far as the palette allows.
+  // A near-monochrome subject (mono-mix.mjs) is mixed from its own one or two paints in the proportion it has at that
+  // value, whatever hue the study drifted to; only the strength comes from the study.
+  const MONO = mono?.mono ? mono : null;
+  // On a toned sheet the study (an image on white) is a picture of the subject's values from white down, and its white is
+  // the sheet (the paper rule: bare paper is the toned sheet). So a wash's value is read against the study's own white and
+  // laid as that much darker than the sheet. Read against the sheet instead, every value of the study lighter than the
+  // buff is lost and the rest come out a few L* deep.
+  const valueRef = labOf(paperCol, 0, [255, 255, 255])[0] < TONED_L ? [255, 255, 255] : paperCol;
   const valueMix = (colour, u) => {
-    const fresh = u.every(v => v <= 1e-9), base = fresh ? mixFor(colour, pigments, paperCol) : mixOver(colour, u, pigments, paperCol);
+    const fresh = u.every(v => v <= 1e-9), want = labOf(colour, 0, valueRef)[0];
+    const base = MONO ? monoAt(MONO, want) : fresh ? mixFor(colour, pigments, paperCol) : mixOver(colour, u, pigments, paperCol);
     if (!(base.reduce((a, v) => a + v, 0) > 1e-9)) return base;
-    const want = labOf(colour, 0, paperCol)[0], Lat = t => filmLab(u.map((v, j) => v + t * base[j]), pigments, paperCol)[0];
-    let lo = 0.05, hi = 8; if (Lat(hi) > want) return base.map(v => v * hi); if (Lat(lo) < want) return base.map(v => v * lo);
+    const Lat = t => filmLab(u.map((v, j) => v + t * base[j]), pigments, paperCol)[0];
+    let lo = MONO ? 0.01 : 0.05, hi = MONO ? 32 : 8; if (Lat(hi) > want) return base.map(v => v * hi); if (Lat(lo) < want) return base.map(v => v * lo);
     for (let it = 0; it < 11; it++) { const mid = Math.sqrt(lo * hi); if (Lat(mid) > want) lo = mid; else hi = mid; }
     return base.map(v => v * Math.sqrt(lo * hi));
   };
@@ -426,7 +442,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   };
   // in a larger wash, a warmer and a cooler neighbour's mix dropped in while it is wet
   const lifeFor = (sh, cells, shapesOf, idx, exclude, what) => {
-    if (flat || cells.length < CHARGE_FROM * pn) return [];
+    if (flat || MONO || cells.length < CHARGE_FROM * pn) return [];
     const mine = new Uint8Array(pn); for (const q of cells) mine[q] = 1;
     const r = rC(cb + 1), inside = [];
     for (const q of cells) { const x = q % pw, y = (q / pw) | 0; let ok = true; for (let d = -r; d <= r && ok; d += Math.max(1, r >> 1)) for (const [xx, yy] of [[x + d, y - r], [x + d, y + r], [x - r, y + d], [x + r, y + d]]) if (xx < 0 || yy < 0 || xx >= pw || yy >= ph || !mine[yy * pw + xx]) { ok = false; break; } if (ok) inside.push(q); }
@@ -458,6 +474,25 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     dabbed++;
     return out;
   };
+
+  // Value steps of a near-monochrome subject (books/RULES.md A1, A2): the coarse clusters hold a brown drawing in two or
+  // three colours, so within a wash the study's own lightness sets two or three strengths, laid as nested washes: the
+  // first at the lighter tone, then the darker parts over it once it is dry, then the darkest. {firstL, steps: [{cells, L}]}
+  const studyL = Float32Array.from({ length: pn }, (_, q) => labOf(grids[0], q, valueRef)[0]);
+  const monoSteps = (own, minMm2) => {
+    if (!MONO || flat || !own.length) return null;
+    const Ls = own.map(q => studyL[q]).sort((a, b) => a - b), at = f => Ls[Math.min(Ls.length - 1, Math.floor(f * Ls.length))];
+    if (at(0.9) - at(0.1) < MONO_STEP_L) return null;
+    const steps = [];
+    for (const f of MONO_CUTS) {
+      const cut = at(f), cells = own.filter(q => studyL[q] <= cut); if (cells.length * cellMm2 < minMm2) continue;
+      const v = cells.map(q => studyL[q]).sort((a, b) => a - b); steps.push({ cells, L: v[v.length >> 1] });
+    }
+    return steps.length ? { firstL: at(MONO_FIRST), steps } : null;
+  };
+  const withL = (colour, L) => { const [, a, b] = labOf(colour, 0, valueRef); return labToRgb([L, a, b], valueRef); };
+  const deferredSteps = [];
+  const stepsAfter = (what, own, colour, studyLayer = 1) => { const st = monoSteps(own, MONO_STEP_LEAST); if (!st) return colour; st.steps.forEach((x, k) => deferredSteps.push({ k, what: `${what}: value step ${k + 2}`, cells: x.cells, colour: withL(colour, x.L), studyLayer })); return withL(colour, st.firstL); };
 
   // --- layer 1: the block-in ---
   const L1 = studies[0], R1 = L1.read ?? {}, first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(SLIVER_SHARE * pn, (L1.minMm2 ?? 0) / cellMm2), most: FIRST_MOST, ...R1 });
@@ -512,7 +547,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const members = shapes.map((_, i) => i).filter(i => fam[i] === r);
     const what = `under-wash of study shape ${r}, the family ${members.join(' ')}`;
     close();
-    const made = wash(1, what, parts.flat(), s.colour, { own: s.cells, parts });
+    const made = wash(1, what, parts.flat(), stepsAfter(what, members.flatMap(i => shapes[i].paper ? [] : shapes[i].cells), s.colour), { own: s.cells, parts });
     if (!made) continue;
     laidL.set(r, s.lab[0]);
     session = { stage: 1, list: [made], ids: new Set([r]) };
@@ -549,7 +584,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const isBroken = broken(s);
     // a darker shape laid over a lighter one of its hue is a shadow: a transparent cool glaze, even in strength (no load
     // variation), at the study's value
-    const shadow = !flat && parent[i] >= 0 && stage === 3, target = shadow ? cooled(s.colour) : s.colour;
+    const shadow = !flat && !MONO && parent[i] >= 0 && stage === 3, target = isBroken ? s.colour : stepsAfter(what, own, shadow ? cooled(s.colour) : s.colour);
     const made = isBroken ? dabMass(stage, what, m, loops, s.colour, own) : [wash(stage, shadow ? `${what}: a cool shadow glaze` : what, loops, target, { own, parts, move: soft ? 'beside damp' : 'wet on dry', grade: !flat && !shadow })].filter(Boolean);
     if (!made.length) continue;
     if (soft) softJoins++;
@@ -560,6 +595,16 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     if (!isBroken && group.length === 1) { const ex = new Set(under(i)); for (let a = parent[i]; a >= 0; a = parent[a]) ex.add(a); if (fam[i] >= 0) ex.add(fam[i]); session.list.push(...lifeFor(made[0], s.cells, shapes, i, ex, what)); }
   }
   close();
+  // the value steps, over the dry first washes: every second strength, then every third, lightest first
+  for (const k of [0, 1]) {
+    const list = deferredSteps.filter(x => x.k === k).sort((a, b) => labOf(b.colour, 0, paperCol)[0] - labOf(a.colour, 0, paperCol)[0]), sess = [];
+    for (const x of list) {
+      const m = new Uint8Array(pn); for (const q of x.cells) m[q] = 1;
+      const parts = partLoops(m, 2 * ROUND_MM, paperMask).filter(l => cellsIn(l).length * cellMm2 >= MONO_STEP_LEAST); if (!parts.length) continue;
+      const sh = wash(3, x.what, parts.flat(), x.colour, { own: x.cells, parts, grade: true, studyLayer: x.studyLayer }); if (sh) sess.push(sh);
+    }
+    if (sess.length) layer(3, sess);
+  }
   perLayer.push({ study: L1.file ?? null, minMm2: L1.minMm2 ?? null, shapes: shapes.length, washes: instructions.filter(q => q.stage !== 2).length, strokes: strokeCount, shift: shifts[0] });
 
   // what the plan has laid so far, as the study it follows reads: each cell the colour of the shape laid there last

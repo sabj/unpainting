@@ -120,3 +120,19 @@ test('a long thin brown shape of the study (a spar) is laid in a pull, not in da
   const p = plan({ w, h, rgb }), q = p.instructions.filter(r => r.stage !== 2);
   assert.ok(q.length >= 1 && q.every(r => !/dabs/.test(r.thing)), q.map(r => r.thing).join(' | '));
 });
+
+test('a near-monochrome subject: every mix is its own paint, and one cluster of the study is laid in nested value steps', () => {
+  // one shape of one colour cluster whose lightness runs from pale to mid across it (the coarse clusters hold it as one)
+  const w = 320, h = 200, rgb = new Uint8ClampedArray(w * h * 3).fill(255);
+  for (let i = 0; i < w * h; i++) { const x = (i % w) / 2, y = ((i / w) | 0) / 2; if (x >= 20 && x < 140 && y >= 15 && y < 90) { const t = (x - 20) / 120; rgb.set([215 - 40 * t, 195 - 40 * t, 170 - 40 * t].map(Math.round), i * 3); } }
+  const mono = { mono: true, pigments: [3], k: pigments.length, fits: [], note: 'test' };
+  const log = console.log; console.log = () => {};
+  try {
+    const p = planStudyWashes({ k: pigments.length, w, h, studies: [{ rgb, file: 'mono' }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5], mono });
+    const washes = p.instructions.filter(q => q.stage !== 2);
+    assert.ok(washes.filter(q => /value step/.test(q.thing)).length >= 1, washes.map(q => q.thing).join(' | '));
+    assert.ok(p.mixes.every(m => m.mix.every((v, j) => j === 3 || v === 0)), 'umber only');
+    // the steps are smaller than the wash they go over (wash within wash)
+    assert.ok(washes.slice(1).every(q => q.areaMm2 < washes[0].areaMm2));
+  } finally { console.log = log; }
+});
