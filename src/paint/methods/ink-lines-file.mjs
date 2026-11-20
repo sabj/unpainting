@@ -85,6 +85,10 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // --inkdecide 1: a candidate line, from the lineart map or authored by the plan, is drawn whole only where the ink rule of the
   // ground under it allows it and the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made
   // from decided lines is not decided again.
+  // A prepared drawing (trace-drawing.py: a clean line drawing made for this target) is already the selection, faired and
+  // with its own widths: it is not decided, cut by the target's support, smoothed or re-measured. Only its darkness is read.
+  const prepared = doc0.inputKind === 'drawing';
+  if (prepared) doc = { ...doc, inkDecided: true };
   let decided = doc.inkDecided === true, decidedHere = false;
   if (decide && !decided) {
     const r = await decideFile({ doc, L, image, out, stage, pxMm, authored: !MODEL_KINDS.includes(doc0.inputKind), ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
@@ -94,8 +98,8 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // (defaults 2 and 3 of the file's pixels)
   // A lineart map's contours (copy-lines --kind line-map) are measured, never cut: the map says where the line is, and the
   // target's pixels only set its width and darkness. Their pieces are never drawn on damp paper (--inkbleed).
-  const model = MODEL_KINDS.includes(doc0.inputKind), support = model ? 0 : flags.support;
-  const opts = { sigma: flags.smoothMm / pxMm, cornerDeg: flags.cornerDeg, threshold: support,
+  const model = MODEL_KINDS.includes(doc0.inputKind), support = model || prepared ? 0 : flags.support;
+  const opts = { sigma: prepared ? 0 : flags.smoothMm / pxMm, cornerDeg: flags.cornerDeg, threshold: support,
     ...(flags.gapMm > 0 ? { gapPx: flags.gapMm / pxMm } : {}), ...(flags.minMm > 0 ? { minRunPx: flags.minMm / pxMm } : {}) };
   const inkMask = flags.inkOnly > 0 && support > 0 ? await inkCells(image, im.w, im.h) : null;
   // a map's contours: widths held to the pen's range (--linewidthmin, --linewidthmax, --linedetailmm for short or curved
@@ -103,7 +107,7 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // a traced pen stroke carries its own width: up to --linestrokemax mm, no detail ratio, no darkness shrink
   const stroke = doc0.inputKind === 'stroke';
   const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: (stroke ? flags.strokeMaxMm : flags.widthMaxMm) / pxMm, detail: stroke ? 1 : flags.detailRatio, darkWidth: !stroke, paperWeight: stroke, paperL: stroke ? quantileOf(L, 0.9) : null, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
-  const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
+  const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: !prepared && flags.lineMeasure > 0, inkMask, contour: model, ...contour });
   // the subject's own line length is the drawing's length (copy-lines.py reports it with a traced map): the most important
   // of the decided, measured lines are drawn, until that length is reached (line-importance.mjs). Once, with the decision.
   const budgetMm = model && decidedHere ? (doc0.stats?.sourceInkLength ?? 0) * sheetMm / doc0.image.w : 0;
@@ -127,7 +131,8 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
     record.out = stem;
   }
   const s = r.stats, pct = v => `${(100 * v).toFixed(0)}%`;
-  log(`ink lines, ${stage}: ${path.basename(file)}${flags.smoothMm > 0 ? `, smoothed at ${flags.smoothMm} mm (turning ${(s.turnBefore / pxMm).toFixed(1)} to ${(s.turnAfter / pxMm).toFixed(1)} degrees per mm)` : ''}`
+  if (prepared) log(`ink lines, ${stage}: ${path.basename(file)} is a prepared drawing, ${r.lines.length} of ${doc0.lines.length} lines kept as drawn`);
+  log(`ink lines, ${stage}: ${path.basename(file)}${flags.smoothMm > 0 && !prepared ? `, smoothed at ${flags.smoothMm} mm (turning ${(s.turnBefore / pxMm).toFixed(1)} to ${(s.turnAfter / pxMm).toFixed(1)} degrees per mm)` : ''}`
     + `${support > 0 ? `, ${s.kept} of ${s.lines} lines kept whole, each with at least half its length on a target line of ${support} L* or more (${pct(s.keptPx / Math.max(1e-9, s.lengthPx))} of the length)` : `, ${model ? 'lineart map lines, measured and not cut, ' : ''}${pct(s.supportedShare)} of the length on a target line`}`
     + `; target line L* ${s.lineL?.toFixed(1) ?? '-'} against ${s.sideL?.toFixed(1) ?? '-'} beside it`);
   return record;
