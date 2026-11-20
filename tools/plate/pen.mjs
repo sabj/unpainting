@@ -107,7 +107,6 @@ phaseMark('sheet');
 // Wrap the target and its per-cell maps (--targetguard): planning may read them until TARGET_GUARD.beginPaint()
 // closes them before the first mark. The look gets shape-level means only.
 TARGET_GUARD.provide('px', PX_RAW, { stride: 3 }); TARGET_GUARD.provide('A', ctx.A, { stride: PIGS.length }); if (ctx.AL !== ctx.A) TARGET_GUARD.provide('AL', ctx.AL, { stride: PIGS.length });
-const LOOK_AL = ctx.AL !== ctx.A ? 'AL' : 'A', LOOK_PLAN = COLOUR_BUDGET ? LOOK_AL : 'A';
 if (TARGET_GUARD.mode !== 'off') {
   TARGET_GUARD.register('A', ctx.A); ctx.px = TARGET_GUARD.seal('px', ctx.px); ctx.D_SOURCE = TARGET_GUARD.seal('D_SOURCE', ctx.D_SOURCE); ctx.A = TARGET_GUARD.seal('A', ctx.A); ctx.AL = TARGET_GUARD.seal('AL', ctx.AL); ctx.SRC = TARGET_GUARD.seal('SRC', ctx.SRC);
   // the value plan's per-cell amounts (sh.graded): one amount per shape while painting, so they are closed too
@@ -356,6 +355,5 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   return { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures };
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
-  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, LOOK_AL, 
-  LOOK_PLAN, SOURCE_INK });
+  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, SOURCE_INK });
 }

@@ -28,7 +28,6 @@ import {step, thickness, thicknessInto, thicknessTotals, blot, coherent} from '.
 import {thirsty, edgeHalfWidth} from '../../src/media/brush.mjs';
 import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
-import {shapeDeficit, shapeCharge, shapeOwedColour} from '../../src/paint/methods/shape-deficit.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
 import {distanceToZero} from '../../src/raster.js';
@@ -59,8 +58,7 @@ const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, optTrack, NATIVE_PAIN
   GPU_INFO, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
   expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, 
   WET, MIX, washBridge, CAL, instrumentOf, FRAMES, snap, MARKTAPE, 
-  AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, PASSFRAMES, WET_STEPS, FILM_BY_PAINT, LOOK_AL, 
-  LOOK_PLAN, up, SEED, clock, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, 
+  AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, PASSFRAMES, WET_STEPS, FILM_BY_PAINT, up, SEED, clock, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, 
   FILM_FRAMES, used, TECHS, LAST, DRAWING, DRAW_LAST, SKY_WARM_RB, 
   PROVENANCE_TARGET_SHA, PREPF, fadePrep, mopLanes, setStage } = ctx;
 const removeFilm=()=>{const value=liftResist(ctx.sheet);ctx.NATIVE_CAPTURE?.('film-remove');return value;};
@@ -246,16 +244,11 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
   const ICAL = instrumentOf(T, sh);
   sh.dryAfter = T.dryAfter;
-  // A passage asks for a shape-level look (plan and sheet means; the charge would come from their difference). A passage
-  // is never a step-back (src/paint/step-backs.mjs), so the look is null in both modes and the passage keeps the charge
-  // frozen at planning; the same holds for the kept-colour recharge and the texture look below.
+  // A passage is charged its planned amount: its mix was chosen for the shape as a whole from ONE colour (the study's flat
+  // colour for the shape, through the mix chooser, study-washes.mjs). No look at the subject's per-cell pigment fit
+  // corrects it (that look was always null for a passage, which is never a step-back; it is removed, not kept unused).
   // SHAPE_LOAD spreads that one number over the shape for path planners that take a field; it steers nothing.
-  const colourMix = sh.mix.filter(v=>v>1e-9).length>1 ? shapeMix(sh) : layer.mixv;
-
-  const LEDGER = ONSHEET ?? expected;
-  const LOOK_REF = colourMix ? LOOK_PLAN : LOOK_AL;
-  const LOOK = paintingLook('passage', `L${L + 1}/s${layer.shapes.indexOf(sh)}`, MASK, { box: { ...MB, w }, ref: [LOOK_REF], sheet: { ledger: { arr: LEDGER, stride: PIGS.length }, booked: { arr: expected, stride: PIGS.length } } });
-  const SHAPE_LACK = LOOK ? shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.ledger, { mix: colourMix, pigment: layer.pigment }) : sh.amount;
+  const SHAPE_LACK = sh.amount;
   let shapeLoad=null;
   const getShapeLoad=()=>{
     if(shapeLoad)return shapeLoad;
@@ -263,11 +256,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     for(let y=MB.y0;y<=MB.y1;y++)for(let i=y*w+MB.x0,e=y*w+MB.x1;i<=e;i++)if(MASK[i])shapeLoad[i]=SHAPE_LACK;
     return shapeLoad;
   };
-  // under --feedback the passage is charged for what the shape still lacks, against what the plan asked of this pass,
-  // both as shape means: from none when the sheet already holds the shape's amount, up to twice when it holds far less.
-  // A shape too small to squint at, or any passage outside a step-back (the look returns null), is charged its planned
-  // amount: since passages are not step-backs, --feedback reads the sheet but no longer changes a passage's charge.
-  if (ONSHEET && sh._fb == null) sh._fb = LOOK ? shapeCharge(SHAPE_LACK, shapeDeficit(LOOK.ref[LOOK_REF], LOOK.sheet.booked, { mix: colourMix, pigment: layer.pigment })) : 1;
+  if (ONSHEET && sh._fb == null) sh._fb = 1;
   // --skipheld f: skip a broad passage the sheet already holds (feedback charge under f). Default 0.
   // --skipheldmin: least share of the sheet for a passage to be skipped (default 0.02); small features are always laid.
   if (ONSHEET && num('skipheld', 0) > 0 && (sh._fb ?? 1) < num('skipheld', 0) && sh.area >= num('skipheldmin', 0.02) * n) { used['held, skipped'] = (used['held, skipped'] || 0) + 1; continue; }
