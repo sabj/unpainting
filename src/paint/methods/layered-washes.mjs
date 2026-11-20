@@ -126,12 +126,18 @@ export function sideColour(cells, rgbAt, LAt, [lo, hi]) {
   return [0, 1, 2].map(c => { const v = mid.map(i => rgbAt(i)[c]).sort((p, q) => p - q); return v[v.length >> 1]; });
 }
 
-/** k-means on rows of features (Float32Array n x d), farthest-point start; returns centres. */
+/** k-means on rows of features (Float32Array n x d), started from slices along the main axis; returns centres. */
 export function kmeans(rows, d, k, iterations = 12) {
   const n = rows.length / d; if (!n) return [];
-  const centres = [Array.from(rows.subarray(0, d))], dist = new Float32Array(n).fill(Infinity);
+  // a start that a small change to the rows cannot flip: the means of k equal slices along the rows' main axis
+  const mean = new Float64Array(d); for (let i = 0; i < n; i++) for (let j = 0; j < d; j++) mean[j] += rows[i * d + j] / n;
+  let axis = Array.from({ length: d }, (_, j) => (j === 0 ? 1 : 0.5));
+  for (let it = 0; it < 20; it++) { const next = new Float64Array(d); for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < d; j++) t += (rows[i * d + j] - mean[j]) * axis[j]; for (let j = 0; j < d; j++) next[j] += t * (rows[i * d + j] - mean[j]); } const len = Math.hypot(...next) || 1; axis = Array.from(next, v => v / len); }
+  const order = Array.from({ length: n }, (_, i) => i), proj = i => { let t = 0; for (let j = 0; j < d; j++) t += (rows[i * d + j] - mean[j]) * axis[j]; return t; }, pr = Float64Array.from(order, proj);
+  order.sort((a, b) => pr[a] - pr[b]);
+  const centres = [];
+  for (let q = 0; q < k; q++) { const part = order.slice(Math.floor(q * n / k), Math.floor((q + 1) * n / k)); if (!part.length) continue; const c = new Array(d).fill(0); for (const i of part) for (let j = 0; j < d; j++) c[j] += rows[i * d + j] / part.length; centres.push(c); }
   const d2 = (i, c) => { let s = 0; for (let j = 0; j < d; j++) s += (rows[i * d + j] - c[j]) ** 2; return s; };
-  while (centres.length < k) { let far = -1, fd = 0; for (let i = 0; i < n; i++) { dist[i] = Math.min(dist[i], d2(i, centres[centres.length - 1])); if (dist[i] > fd) { fd = dist[i]; far = i; } } if (far < 0 || fd < 1e-6) break; centres.push(Array.from(rows.subarray(far * d, far * d + d))); }
   for (let it = 0; it < iterations; it++) {
     const sum = centres.map(() => new Float64Array(d)), cnt = new Int32Array(centres.length);
     for (let i = 0; i < n; i++) { let best = 0, bd = Infinity; centres.forEach((c, q) => { const v = d2(i, c); if (v < bd) { bd = v; best = q; } }); cnt[best]++; for (let j = 0; j < d; j++) sum[best][j] += rows[i * d + j]; }
@@ -242,8 +248,9 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   const zoneFeature = q => { const l = Math.max(20, S6.L[q]); return [60 * S6.A[q] / l, 60 * S6.B[q] / l, ZONE_L_WEIGHT * S6.L[q]]; };
   const open = [];
   for (let q = 0; q < pn; q++) if (!lightMask[q]) open.push(q);
-  const step = Math.max(1, Math.floor(open.length / 6000)), rows = [];
-  for (let t = 0; t < open.length; t += step) { const q = open[t]; rows.push(...zoneFeature(q)); }
+  // the families are read off a fixed grid of the sheet (not off the cells left after the lights, which move a little)
+  const grid = Math.max(1, Math.round(Math.sqrt(pn / 6000))), rows = [];
+  for (let y = 0; y < ph; y += grid) for (let x = 0; x < pw; x += grid) if (!lightMask[y * pw + x]) rows.push(...zoneFeature(y * pw + x));
   let centres = kmeans(Float32Array.from(rows), 3, ZONE_FAMILIES, 30);
   // families too close are one
   for (let merged = true; merged;) { merged = false; for (let a = 0; a < centres.length && !merged; a++) for (let b = a + 1; b < centres.length && !merged; b++) if (Math.hypot(centres[a][0] - centres[b][0], centres[a][1] - centres[b][1], centres[a][2] - centres[b][2]) < ZONE_JOIN) { centres[a] = centres[a].map((v, j) => (v + centres[b][j]) / 2); centres.splice(b, 1); merged = true; } }
