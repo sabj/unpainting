@@ -349,11 +349,18 @@ fn apply_g(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) 
 }
 
 // ---- 3. pigment exchange ---------------------------------------------------------------------------------------
+// settling (src/media/settling.mjs): 1 - exp(-(v B / h + D / l^2) dt), B = 1 + gamma hollow, l = min(h, 0.02 mm)
+fn hollowAt(i: u32) -> f32 { let p = PAPER3[i]; return max(0.0, (u.toothLo + u.toothSpan * p.x - p.w) / u.hollowUnit); }
+fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
+  let h = max(0.001, Wi); let l = min(h, 0.02);
+  let x = (v * (1.0 + gg * hol) / h + df / (l * l)) * u.dt;
+  if (x < 0.01) { return x * (1.0 - x * (0.5 - x / 6.0)); }
+  return 1.0 - exp(-x);
+}
 @compute @workgroup_size(16, 16)
 fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || RESIST[c.i] != 0u) { return; }
-  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z;
-  let thin = min(3.0, 0.12 / max(0.04, Wi));
+  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
   let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
   let rewet = u.hasTop != 0u && Wi > u.film;
   let turnover = select(0.0, min(1.0, WENT[i] / Wi), Wi > 1e-6);
@@ -364,10 +371,9 @@ fn p3a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_id) lid:
     var Gk = G[q]; var Dk = D[q]; var top = 0.0;
     if (rewet) { top = TOP[q]; }
     if (Gk == 0.0 && Dk == 0.0 && !(rewet && top != 0.0)) { continue; }
-    let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: rho, omega, floc, mobility
-    let filled = select(hh, min(1.0, hh + settled * u.granFill), u.granFill > 0.0);
+    let pa = pigA(k); let pb = pigB(k);   // pa: gg, liftOf, scourOf, rep;  pb: Stokes speed (mm/s, times settle), omega, floc, mobility
     let gg = pa.x;
-    let down = Gk * max(0.0, 1.0 - filled * gg) * pb.x * u.settle * thin * u.dt;
+    let down = Gk * settleShareG(pb.x, pigC(k).x, gg, select(hol, hol * max(0.0, 1.0 - settled * u.granFill), u.granFill > 0.0), Wi);
     let shape = max(0.0, 1.0 + (hh - 1.0) * gg);
     let up = Dk * shape * (pa.y * wetting * u.dt + pa.z * turnover * wetting);
     let dn = min(Gk, max(0.0, down)); let uu = min(Dk, max(0.0, up));

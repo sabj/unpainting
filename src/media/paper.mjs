@@ -1,4 +1,4 @@
-import { paperRelief, hollowOf } from './paper-relief.mjs';
+import { paperRelief, HEIGHT_SPAN_UM } from './paper-relief.mjs';
 // Paper: a surface height made of fibres and tooth, and the capacity of its pores. Rough watercolour paper is a
 // felt of cotton fibres pressed together, lightly sized (Computer-Generated Watercolor, section 2.1); the height steers water
 // and granulating pigment, the capacity (c = h (cmax - cmin) + cmin) sets how much water it can absorb.
@@ -68,7 +68,22 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
   const sorted = Float32Array.from(rel).sort();
   const reliefSpread = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
   // zUm, hollow (physical sheets): the relief in micrometres and each cell's depth below its millimetre mean in RMS units
-  return { w, h, n, height, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, mmPerCell: physMm, hollow: RF ? RF.hollow : hollowOf(height, w, h, blur(2)), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm } : {}) };
+  return { w, h, n, height, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, mmPerCell: physMm, ...toothHollow(height, toothH, toothLo, toothSpan, RF ? RF.hollowRmsUm / HEIGHT_SPAN_UM : 0), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm } : {}) };
+}
+
+/**
+ * How deep each cell lies below the tooth level under it (the height's mean over about a millimetre), in units of
+ * `unit` (height units; the relief's own RMS about that mean): the bias settling pigment has towards a hollow (B = 1 +
+ * gamma hollow, settling.mjs). A physical sheet passes its relief's unit, fixed in micrometres, so a coarser grid sees
+ * shallower hollows of the same paper; a paper without units (unit 0) is measured against its own RMS. The GPU works
+ * the same expression out from the tooth, height and the three numbers (gpu/stepfull.wgsl settleShareG).
+ */
+export function toothHollow(height, tooth, toothLo, toothSpan, unit = 0) {
+  const n = height.length, d = new Float64Array(n);
+  for (let i = 0; i < n; i++) d[i] = toothLo + toothSpan * tooth[i] - height[i];
+  if (!(unit > 0)) { let v = 0; for (let i = 0; i < n; i++) v += d[i] * d[i]; unit = Math.sqrt(v / n) || 1; }
+  const hollow = new Float32Array(n); for (let i = 0; i < n; i++) hollow[i] = Math.max(0, d[i] / unit);
+  return { hollow, hollowUnit: unit };
 }
 
 /** The blurred tooth's own range, [lo, span]: the tooth level under cell i in the height's own units is

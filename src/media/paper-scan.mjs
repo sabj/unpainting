@@ -1,8 +1,7 @@
 // A sheet of paper from a scanned height map instead of noise. Everything else is derived from the height as in
 // makePaper; fibre direction still comes from makePaper, since a height scan has none. The scan tiles mirrored at
 // each seam, one scan pixel to `scanScale` cells. DOM free apart from the loader.
-import { makePaper } from './paper.mjs';
-import { hollowOf } from './paper-relief.mjs';
+import { makePaper, toothHollow } from './paper.mjs';
 
 function box(src, w, h, r) {
   const tmp = new Float32Array(w * h), out = new Float32Array(w * h);
@@ -42,5 +41,5 @@ export function scanPaper(w, h, scan, { scanScale = 1, scanMix = 1, cmin = 0.2, 
   const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - (toothLo + toothSpan * tooth[i]);
   const sorted = Float32Array.from(rel).sort();
   const relief = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
-  return { w, h, n, height, capacity, valley, proud, tooth, toothLo, toothSpan, fdx: base.fdx, fdy: base.fdy, grain: base.grain, relief, hollow: hollowOf(height, w, h, blur(2)) };
+  return { w, h, n, height, capacity, valley, proud, tooth, toothLo, toothSpan, fdx: base.fdx, fdy: base.fdy, grain: base.grain, relief, ...toothHollow(height, tooth, toothLo, toothSpan) };
 }

@@ -15,7 +15,7 @@ const FIXED_BED: bool = false;
 @group(0) @binding(4) var<storage, read_write> W: array<f32>;
 @group(0) @binding(5) var<storage, read_write> S: array<f32>;   // [0, n): S; [n, 2*n): S2; [2*n, 3*n): NEWF
 @group(0) @binding(8) var<storage, read> PAPER: array<vec4<f32>>;   // capacity, grain, fdx, fdy
-@group(0) @binding(9) var<storage, read> PAPER2: array<vec4<f32>>;  // perm +x, perm +y, hollow (settling), unused
+@group(0) @binding(9) var<storage, read> PAPER2: array<vec4<f32>>;  // perm +x, perm +y, unused, unused
 @group(0) @binding(10) var<storage, read> PAPER3: array<vec4<f32>>; // tooth, throat, valley-or-height, height
 @group(0) @binding(11) var<storage, read_write> EA: array<f32>;
 @group(0) @binding(12) var<storage, read_write> EB: array<f32>;
@@ -436,6 +436,8 @@ fn apply_g_tile(wid: vec3<u32>, lid: vec3<u32>) {
 // settling (settling.mjs): the share of the suspension that falls through a film Wi mm deep in one step at speed v mm/s,
 // and Brownian diffusion D mm^2/s to the fibres, 1 - exp(-(v B / h + D / l^2) dt) with B = 1 + gamma hollow and
 // l = min(h, 0.02 mm) (FIBRE_GAP_MM); a series where the exponent is small keeps f32's digits
+// how deep a cell lies below the tooth level under it, in the paper's hollow unit (paper.mjs toothHollow)
+fn hollowAt(i: u32) -> f32 { let p = PAPER3[i]; return max(0.0, (u.toothLo + u.toothSpan * p.x - p.w) / u.hollowUnit); }
 fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
   let h = max(0.001, Wi); let l = min(h, 0.02);
   let x = (v * (1.0 + gg * hol) / h + df / (l * l)) * u.dt;
@@ -444,7 +446,7 @@ fn settleShareG(v: f32, df: f32, gg: f32, hol: f32, Wi: f32) -> f32 {
 }
 fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u || (RESIST[c.i] & 1u) != 0u) { return; }
-  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = PAPER2[i].z;
+  let i = c.i; let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
   let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
   let rewet = u.hasTop != 0u && Wi > u.film;
   let turnover = select(0.0, min(1.0, WENT[i] / Wi), Wi > 1e-6);
@@ -925,7 +927,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   let i = c.i;
   if ((RESIST[i] & 1u) == 0u) {
-    let Wi = W[i]; let hh = PAPER3[i].z; let hol = PAPER2[i].z;
+    let Wi = W[i]; let hh = PAPER3[i].z; let hol = hollowAt(i);
     let ld = Wi / u.liftDepth; let wetting = select(ld * ld, 1.0, ld >= 1.0);
     let rewet = u.hasTop != 0u && Wi > u.film;
     let turnover = select(0.0, min(1.0, WENT[i] / Wi), Wi > 1e-6);

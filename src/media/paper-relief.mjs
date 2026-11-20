@@ -31,7 +31,7 @@ export const RELIEF_PRESETS = Object.freeze({
 // own relief in millimetres.
 export const HEIGHT_SPAN_UM = 100;
 // The neighbourhood a hollow is measured against: the mean height over about a millimetre.
-export const HOLLOW_MM = 1;
+const HOLLOW_MM = 1;
 
 const TILES = [{ n: 1024, dx: 0.025 }, { n: 1024, dx: 0.02 }];
 
@@ -125,41 +125,23 @@ function boxPeriodic(f, n, r) {
   for (let x = 0; x < n; x++) { let s = 0; for (let d = -r; d <= r; d++) s += tmp[(((d % n) + n) % n) * n + x]; for (let y = 0; y < n; y++) { out[y * n + x] = s / k; s += tmp[((y + r + 1) % n) * n + x] - tmp[(((y - r) % n + n) % n) * n + x]; } }
   return out;
 }
-function boxClamped(f, w, h, r) {
-  const tmp = new Float64Array(w * h), out = new Float64Array(w * h);
-  for (let y = 0; y < h; y++) { let s = 0, c = 0; for (let x = 0; x <= Math.min(w - 1, r); x++) { s += f[y * w + x]; c++; } for (let x = 0; x < w; x++) { tmp[y * w + x] = s / c; const a = x + r + 1, b = x - r; if (a < w) { s += f[y * w + a]; c++; } if (b >= 0) { s -= f[y * w + b]; c--; } } }
-  for (let x = 0; x < w; x++) { let s = 0, c = 0; for (let y = 0; y <= Math.min(h - 1, r); y++) { s += tmp[y * w + x]; c++; } for (let y = 0; y < h; y++) { out[y * w + x] = s / c; const a = y + r + 1, b = y - r; if (a < h) { s += tmp[a * w + x]; c++; } if (b >= 0) { s -= tmp[b * w + x]; c--; } } }
-  return out;
-}
 
 /**
  * The relief on a grid of w x h cells of `mmPerCell`: each cell's mean height in micrometres (zUm), the height a sheet
- * reads (0.5 + z / HEIGHT_SPAN_UM, clamped to 0..1), and how deep each cell lies below its millimetre mean in units of
- * the paper's own RMS there (hollow, >= 0; the settling's bias, sheet.mjs). `relief` a preset name or object.
+ * reads (0.5 + z / HEIGHT_SPAN_UM, clamped to 0..1), and hollowRmsUm, the RMS of the relief about its millimetre mean
+ * at full resolution (the unit makePaper measures a hollow in). `relief` a preset name or object.
  */
 export function paperRelief(w, h, mmPerCell, { seed = 1, relief = 'cold' } = {}) {
   if (!(mmPerCell > 0)) throw new Error('paper-relief: mmPerCell must be positive');
   const F = fieldOf(relief, seed), rms = F.p.rmsUm, n = w * h;
   // samples a cell: sub-cells no wider than 0.04 mm, a third of the finest wavelength the relief carries (up to 8 a side)
   const k = Math.max(1, Math.min(8, Math.ceil(mmPerCell / 0.04))), zUm = new Float32Array(n), height = new Float32Array(n);
-  const z = new Float64Array(n);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     let s = 0;
     for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) s += sampleAt(F, (x + (b + 0.5) / k) * mmPerCell, (y + (a + 0.5) / k) * mmPerCell);
-    const i = y * w + x; z[i] = (rms * s) / (k * k); zUm[i] = z[i];
-    height[i] = Math.min(1, Math.max(0, 0.5 + z[i] / HEIGHT_SPAN_UM));
+    const i = y * w + x; zUm[i] = (rms * s) / (k * k);
+    height[i] = Math.min(1, Math.max(0, 0.5 + zUm[i] / HEIGHT_SPAN_UM));
   }
-  const mean = boxClamped(z, w, h, Math.max(1, Math.round(HOLLOW_MM / 2 / mmPerCell))), hollow = new Float32Array(n), unit = F.hollowRms * rms;
-  for (let i = 0; i < n; i++) hollow[i] = Math.max(0, (mean[i] - z[i]) / unit);
-  return { zUm, height, hollow, rmsUm: rms, hollowRmsUm: unit, preset: F.p };
+  return { zUm, height, rmsUm: rms, hollowRmsUm: F.hollowRms * rms, preset: F.p };
 }
 
-/** The hollow field of a height that has no physical units (a value-noise or scanned paper): depth below the mean over
- *  r cells either way, in units of this field's own RMS about that mean. A physical sheet's comes from paperRelief. */
-export function hollowOf(height, w, h, r) {
-  const n = w * h, z = Float64Array.from(height), mean = boxClamped(z, w, h, Math.max(1, r)), out = new Float32Array(n);
-  let v = 0; for (let i = 0; i < n; i++) v += (z[i] - mean[i]) ** 2;
-  const unit = Math.sqrt(v / n) || 1;
-  for (let i = 0; i < n; i++) out[i] = Math.max(0, (mean[i] - z[i]) / unit);
-  return out;
-}
