@@ -201,7 +201,7 @@ function layExactVectors(file) {
   const sheet = fineSheet ? INKRES.fine : ctx.sheet, w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? 0 : pencil ? GRAPHITE_AT : PIGS.length;
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
-  const darkOf = t => { const px = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (px[0] + px[1] + px[2]) / 765; };
+  const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
   const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf));
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, 'ink-vectors.json'));

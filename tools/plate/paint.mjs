@@ -293,6 +293,8 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
   // a wash plan's strokes are a list of laid strokes (layered-washes.mjs), each charged at its own share of the mix (a
   // graded wash: water added at each recharge); a light-to-dark plan's are a count and lane widths for its stroke plan
+  // a wash plan's first washes are divided by at most this much for the paper their lanes reach past the outline
+  const FIRST_SPREAD_MOST = 1.5;
   const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane' && !st.flat, r = round || st.flat ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r: q[4] != null ? Math.max(0.5, r * q[4]) : r, p: q[2] ?? 1, round, ...(q[3] > 0 ? { v: q[3] } : {}), ...(st.angle != null ? { blade: st.held === 'fixed' ? st.angle - 90 : st.angle } : {}) })); if (st.charge) PATH_FACTOR.set(path, st.charge); if (st.held === 'fixed' || st.water != null) PATH_HAND.set(path, { fixed: st.held === 'fixed', water: st.water ?? 1 }); return path; }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && through > num('detailfrom', 2);
@@ -515,7 +517,9 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     // the film the plan asks for over every place the brush goes, and a glaze run a little past its outline is a little
     // larger, not thinner. Spread over the paper past the study's cells, marks dried 30 to 45 L* pale and four glazes
     // planned to L* 31 left a window at L* 63 to 79.
-    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' || vectorPaths ? 1 : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
+    // (a first wash's lanes, run a little past the outline to meet its neighbours, keep a share of the divisor: at full
+    // strength over a wide overrun they laid more than the plan's forms on a coarse sheet; glazes and marks keep none)
+    if (sh._spread == null) sh._spread = detail || brush.model !== 'section' ? 1 : vectorPaths ? (sh._valuePlan?.stage <= 2 ? Math.min(FIRST_SPREAD_MOST, Math.max(1, footprintSpread(paths, up(MASK), W2, H2))) : 1) : Math.max(1, footprintSpread(paths, up(MASK), W2, H2));
     sh.laidShare = opening;
     // see GRADED_CAL: the whole scrap's delivery, less what runs past this passage's own open edge (in sheet cells)
     if (useGradedCal && sh._gcal == null) {
