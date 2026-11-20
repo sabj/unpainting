@@ -27,14 +27,16 @@ Paintings made from these targets are © 2026 Sam Jackson under [CC BY 4.0](http
 
 ## Full-size A/B
 
+This protocol was run on 0.2.x and 0.3.x; tag v0.3.2 replays it. On 0.4 each painting also needs a drawing file and a block-in study ([Running the painter](../../docs/running.md#your-own-image)), so the commands below do not run on the trunk as written.
+
 Paint each target at up to 1200 px wide. The camel stays at its own 880, so it is not upsampled. Use three seeds and these configurations:
 
 - `d020`: the default painter at tag `v0.2.0`.
 - `pencil`: the default painter from this release, pencil only (`--inkrecipe none`).
-- `auto`: `--inkrecipe auto`, which chooses the pen-and-wash recipe or pencil from the pen line in the target.
+- `auto`: `--inkrecipe auto`, which chose ink or pencil from the pen line in the target (0.3.x).
 - `wash`: `--inkrecipe wash`, to force the recipe.
 
-Run `npm run doctor` first. The wash recipe traces lines with `copy-lines.py`. That needs the line python (`PAINTER_LINES_PYTHON` or `.venv-lines`) with NumPy and OpenCV; without it, the run logs a `!!!` fallback line and traces less.
+Run `npm run doctor` first.
 
 ```sh
 set -e

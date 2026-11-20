@@ -81,7 +81,7 @@ The painter is built for watercolor, where light comes from the paper and each l
 
 ### Ink too heavy, paint too pale
 
-On images the painter was not tuned on, closing ink can end up darker than the darkest wash, and the washes come out light. The brush delivers about 0.6 to 0.75 of the pigment the plan asks for, and touch-ups do not make up the rest. 0.2.0 draws in pencil by default while ink is reworked.
+On images the painter was not tuned on, closing ink can end up darker than the darkest wash, and the washes come out light. The brush delivers about 0.6 to 0.75 of the pigment the plan asks for. 0.2.0 draws in pencil by default while ink is reworked.
 - Fix: charge the brush for what reaches the paper. Cap ink at the source's own share of line, and keep closing ink lighter than the darkest wash.
 
 ### The progression judge does not check prep

@@ -1,7 +1,6 @@
 // The drawing medium for one run (methods/medium-decision.mjs), applied to the command line before the recipe expands it.
 // Reads the plan the command line names and, only when an ink request has no plan behind it, the source's pen share.
-// The plan is the value plan (--valueplan), or the drawing section of an area plan (--areaplan): an area plan states
-// its drawing medium too, and the harness's --outlinemedium only repeats it.
+// The plan is the value plan (--valueplan).
 import fs from 'node:fs';
 import path from 'node:path';
 import { readPlan, styleAlias } from './recipe.mjs';
@@ -10,19 +9,6 @@ import { decideMedium, planDeclaration, inkRequestedBy, argvWithoutInk } from '.
 
 const PEN_FIRST_PCT = 0.5;
 const last = (argv, name) => { const at = argv.lastIndexOf(name); return at >= 0 ? argv[at + 1] : undefined; };
-
-/**
- * The drawing section of the area plan the command line names, as a plan that declares only that, or null. An area
- * plan that cannot be read declares nothing here: the painter's own area-plan loader reports it (semantic-areas.mjs).
- */
-function areaPlanDeclaration(argv, root) {
-  const file = last(argv, '--areaplan');
-  if (!file) return null;
-  let doc;
-  try { doc = JSON.parse(fs.readFileSync(path.resolve(root, file), 'utf8')); } catch { return null; }
-  const d = doc?.drawing;
-  return d && typeof d === 'object' && !Array.isArray(d) && typeof d.medium === 'string' ? { drawing: { medium: d.medium } } : null;
-}
 
 /**
  * @param {{ argv: string[], root: string, penShareOf: (image: string) => Promise<number>, log?: (line: string) => void }} input
@@ -49,11 +35,11 @@ function preparedDrawing(argv, root) {
 export async function mediumForRun({ argv, root, penShareOf, log = () => {} }) {
   const drawing = preparedDrawing(argv, root);
   if (drawing) {
-    const decision = decideMedium({ argv, plan: readPlan(styleAlias(argv), root) ?? areaPlanDeclaration(argv, root), penFirstPct: PEN_FIRST_PCT, drawing });
+    const decision = decideMedium({ argv, plan: readPlan(styleAlias(argv), root), penFirstPct: PEN_FIRST_PCT, drawing });
     log(decision.note);
     return { argv: decision.subjectMedium ? [...argv, '--subjectmedium', decision.subjectMedium] : [...argv, ...(decision.medium === 'pen' && !argv.includes('--outlinemedium') ? ['--outlinemedium', 'ink'] : [])], decision };
   }
-  const plan = readPlan(styleAlias(argv), root) ?? areaPlanDeclaration(argv, root);
+  const plan = readPlan(styleAlias(argv), root);
   const penFirstPct = Number(last(argv, '--penfirst') ?? PEN_FIRST_PCT);
   if (!(penFirstPct >= 0)) throw new Error(`--penfirst: a share in per cent, not ${last(argv, '--penfirst')}`);
   const needShare = inkRequestedBy(argv).length > 0 && planDeclaration(plan).medium === null && last(argv, '--subjectmedium') === undefined;

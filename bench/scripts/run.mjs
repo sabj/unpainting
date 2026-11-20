@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Run one model through a round under protocol v2, gentle mode, and write its try folders.
-//   npm run bench:run -- --model opus --round V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict] [--planform token|area] [--skills <dir>]
+//   npm run bench:run -- --model opus --round V4|V5 [--tries 3] [--crops <crop,crop>] [--out bench/runs] [--strict-verdict] [--skills <dir>]
 //   npm run bench:run -- --dry-run [--round V4|V5]   (no model, no keys: a scripted stand-in exercises the whole path)
 // V4 and V5 write tries 1 to --tries (pipeline/round45.mjs). Rounds V1 to V3 are published history and can no longer be run.
 // A try folder (<out>/<round dir>/<model>/<try>/) gets run.json, <crop>.webp and <crop>-stages.webp. Raw outputs
@@ -21,7 +21,7 @@ const has = n => argv.includes('--' + n);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i + 1] : d; };
 const fail = msg => { console.error(`bench:run: ${msg}`); process.exit(2); };
 const FLAGS = new Set(['--dry-run', '--link-v4-try1', '--force', '--strict-verdict']);
-const OPTS = new Set(['--round', '--profile', '--judge', '--notargetlooks', '--mode', '--dry-key', '--model', '--crops', '--python', '--out', '--tries', '--from-try', '--gpu', '--dry-width', '--planform', '--skills']);
+const OPTS = new Set(['--round', '--profile', '--judge', '--notargetlooks', '--mode', '--dry-key', '--model', '--crops', '--python', '--out', '--tries', '--from-try', '--gpu', '--dry-width', '--skills']);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (FLAGS.has(a)) continue;
@@ -93,13 +93,10 @@ const outRoot = path.resolve(opt('out', path.join(BENCH, 'work', DRY ? 'dry-run'
     console.error(`bench:run: V5 try 1 is ${model.name}'s V4 try 1 (--link-v4-try1)`);
     fromTry = 2;
   }
-  // --planform: token (config.json + recipe tokens over BASE, the stored baselines' route; the default) or area (an area
-  // plan and its drawing section). --skills: a skills folder to seed instead of the repository's .agents/skills.
-  const planForm = opt('planform', 'token');
-  if (!['token', 'area'].includes(planForm)) fail('--planform must be token or area');
+  // --skills: a skills folder to seed instead of the repository's .agents/skills.
   const skills = opt('skills') ? path.resolve(opt('skills')) : null;
   if (skills && !['painting-planner', 'watercolor-technique'].every(k => fs.existsSync(path.join(skills, k, 'SKILL.md')))) fail('--skills must hold painting-planner/SKILL.md and watercolor-technique/SKILL.md');
-  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), noTargetLooks: opt('notargetlooks') === '1', profile, python, planForm, skills };
+  const runOpts = { round, model, tries, crops, dry: DRY, outRoot, force: has('force') || DRY, gpu: opt('gpu', DRY ? 'off' : 'on'), dryWidth: Number(opt('dry-width', 96)), fromTry, strictVerdict: has('strict-verdict'), noTargetLooks: opt('notargetlooks') === '1', profile, python, skills };
   try {
     await (await import('./pipeline/round45.mjs')).runPipeline(runOpts);
   } catch (e) { fail(e.stack || e.message); }

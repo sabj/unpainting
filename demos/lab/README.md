@@ -11,10 +11,10 @@ Paint by hand on simulated paper. **[Open it](https://sabj.github.io/unpainting/
 - `worker.js`: the simulation, run off the page's thread.
 - `media/`: paper, sheet, brush, pen, pencil, pigments and mixing. `paper.js`, `sheet.js`, `brush.js`, `pen.js`, `pencil.js`, `km.js`, `stroke-bench.js` and the helpers they import are the painter's own `src/media/`, copied by `node tools/lab/sync-site-media.mjs`; edit the source and run it again (`npm test` fails while the copy is stale). `lab-media.js` adds what only the lab needs: a pigment joining a sheet mid-painting.
 - `gpu/`: the WebGPU sheet, its GPU programs and WebGL2 colour rendering. The brush, pen and pencil always run on the CPU copy of the paper state; the WebGPU simulation advances the water and pigment between strokes with its own WGSL shaders (GPU programs). It lacks the thin surface-water diffusion, hole and slide options of `sheet.mjs`. `?physics=cpu` or `?nowebgpu=1` steps the painter's own `sheet.js` instead.
-- `targets/`: one picker for recorded paintings and technique demonstrations. `worker/live-tape.js` re-runs the original recorded material events, including dips, in the simulator. Live is the default; 250 and 2,500 are early-stroke studies, not shortened recreations of a finished picture. Timeline seeks rebuild the physical state, and Carry on painting keeps it. Replay explicitly shows a recording, stepping saved frames without blending. No image upload is offered.
+- `targets/`: one picker for recorded paintings and technique demonstrations. `worker/live-tape.js` re-runs the recorded material events, including dips, in the simulator. Live replays one tape made by the current pipeline, the Tiepolo camel. Timeline seeks rebuild the physical state, and Carry on painting keeps it. Replay explicitly shows a recording, stepping saved frames without blending. No image upload is offered.
 - `ui/`: pointer contact, the cursor and the move queue on the page side.
 - `worker/`: the worker's helpers: demonstrations, pacing, undo history, autosave, sheet state and self-checks.
-- `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. The full live tapes retain pigment recipes, tools, dip events and early strokes. Rebuild them with `node tools/lab/build-live-examples.mjs H36_250 H36_2500 SHIPS_250 SHIPS_2500`, four run directories; the older compact path logs are used only by recording mode.
+- `examples/`, `thumbnails/` and `fonts/`: example animations, demo thumbnails and the typeface. The live tape retains pigment recipes, tools, dip events and every stroke. Build it from a run painted with `--drawingfile`, `--washplan`, `--marks 1` and `--inkres 1` (Live has no fine pen sheet): `node tools/lab/build-live-examples.mjs <id> <run dir> <target image>`, then `node tools/lab/build-live-checkpoints.mjs` for the seek points.
 
 | Dry brush | Flat wash | Glazing | Wet in wet |
 | --- | --- | --- | --- |
@@ -41,16 +41,10 @@ surface water and suspended pigment; **Water** rewets; **Dryer** dries locally.
 These changes participate in undo/autosave. Masks are restored when seeking.
 Masking should precede the washes it protects.
 
-The first-wash gaps have two explicit causes in both shipped tapes: resist and
-passage clips. h36's 1086 × 724 tape masks 92,398 cells; White Ships' 720 × 514
-tape masks 23,485. Their 2,500-stroke excerpts contain `r`, `c`, and `y` operations
-but no `R` removal, so the fluid stays on until a later recorded removal or the
-user removes it. Dry contact and depleted load can also leave broken marks;
-they are not substitutes for the explicit recorded masks.
+Dry contact and depleted load can leave broken marks; recorded masks and passage clips leave gaps on purpose.
 
 Replay uses each point's recorded radius for the WebGPU read and write bounds.
-The first washes record radii up to 358.8 source cells in h36 and 257.3 in White
-Ships. The live indicator outlines only cells whose water or pigment changed in
+The live indicator outlines only cells whose water or pigment changed in
 that application. It appears with the finished paint frame and clears between
 strokes and operations. It does not animate travel across untouched paper.
 Overlays do not enter image exports.

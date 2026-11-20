@@ -25,10 +25,8 @@ test('actual production stroke records selected spacing and keeps positive pigme
 test('disabled default, semantic instructions and Full keep the original route',()=>{
  for(const change of [{enabled:false},{instructionBound:true},{mode:'full'}])assert.equal(nativeBodyCadence({...ordinary,...change}).approximated,false);
 });
-test('actual major route sees selected spacing before physical stroke',()=>{
+test('the paint loop sees selected spacing before the physical stroke',()=>{
  const source=painterSource();
- assert.match(source,/instructionBound:!!sh\._semantic,technique:T.name/);
- assert.match(source,/candidateContact\(b,\{\.\.\.target,clip:null\},points,\{\.\.\.options,neighborRadius:3(?:,sparseRow:SPARSE_CONTACT_RECORD.enabled)?\}\)/);
  assert.match(source,/stroke\(b,target,points,\{\.\.\.options,spacing:cadence.spacing\}\)/);
  assert.equal((source.match(/numericalStroke\(brush, ctx.sheet,/g)||[]).length,3);
  assert.match(source,/stroke\(wet, ctx.sheet, pts, \{ upright: UPRIGHT \}\)/);

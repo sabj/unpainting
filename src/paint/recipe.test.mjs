@@ -24,8 +24,10 @@ test('v096 and presets are gone: naming either fails the run', () => {
   assert.ok(!y1.argv.includes('--stoneblocks') && !y1.argv.includes('--recesses'));
 });
 
-test('a stored plan that selects a style (the light-to-dark plan) fails loudly and says how to replay it', () => {
-  assert.throws(() => expandRecipe({ argv: ['--valueplan', 'examples/plans/trumbull-values.json'] }), /styleSelection was removed in 0.4.*tag v0.3.2/);
+test('a stored plan that selects a style (the light-to-dark plan) fails loudly and says how to replay it', async () => {
+  const styled = (await import('node:path')).join(PLAN_DIR, 'styled.json');
+  (await import('node:fs')).writeFileSync(styled, JSON.stringify({ subject: 'x', styleSelection: { style: 'ink-and-wash', reason: 'a stored 0.3 plan' } }));
+  assert.throws(() => expandRecipe({ argv: ['--valueplan', styled] }), /styleSelection was removed in 0.4.*tag v0.3.2/);
 });
 
 test("a plan's washes.paints sets the box unless --paints is given", () => {
@@ -36,9 +38,8 @@ test("a plan's washes.paints sets the box unless --paints is given", () => {
   assert.equal(own[own.lastIndexOf('--paints') + 1], 'ochre');
 });
 
-test('none and areaplan runs add no flags', () => {
+test('a none recipe adds no flags', () => {
   assert.deepEqual(expandRecipe({ argv: ['--recipe', 'none'] }).argv, ['--recipe', 'none']);
-  assert.deepEqual(expandRecipe({ argv: ['--areaplan', 'x.json'] }).argv, ['--areaplan', 'x.json']);
 });
 
 test('a plan drawing section comes after the recipe and before the command line, so typed flags win', () => {

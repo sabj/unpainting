@@ -2,7 +2,7 @@
 
 `--speedprofile 1` records main-thread image encoding/writing, planning/setup and drawing spans in `speed-profile.json`, frame-worker work in `speed-frame-profile.json`, and sampled GPU kernels, dispatch counts and readback waits in `backend.json`. GPU timestamps do not serialize strokes. Sampled times are estimates, can be quantized by the adapter, and are nested inside operation wall times. Do not add those columns together.
 
-Still jobs (`--video 0`) keep passage checkpoints at 10/25/50/75/100 percent, first wash, paper, drawing and material stages. `--keepallframes 1` keeps every frame, as video output does. Progress means completed passages in the current plan. The finished frame stays the final state when touch-up passes extend the plan. Snapshots used by feedback are kept separately.
+Still jobs (`--video 0`) keep passage checkpoints at 10/25/50/75/100 percent, first wash, paper, drawing and material stages. `--keepallframes 1` keeps every frame, as video output does. Progress means completed passages in the current plan. Snapshots used by feedback are kept separately.
 
 The GPU switches default to 1. Pass 0 to turn each one off.
 
@@ -14,7 +14,6 @@ The GPU switches default to 1. Pass 0 to turn each one off.
 These switches are also on by default. Each keeps the painting byte-identical. Pass 0 to turn one off. With the CPU switches on, native Mittens painted in 148.6 s instead of 162.6 s, with the same PNG.
 
 - `--speedcontact 1`: reuse value-contact scratch masks and build the neighbour halo by row.
-- `--speedvalueonly 1`: skip the block plan that value planning replaces.
 - `--speedcoverage 1`: rasterize sweep coverage as exact row unions and reuse graded overlap counts.
 - `--speedflowrect 1`: compute slow flow fields only over their nonzero support rectangle.
 - `--speedfilm 1`: remove masking film by plane.

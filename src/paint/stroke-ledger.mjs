@@ -1,6 +1,6 @@
 // The stroke ledger: the marks the stroke gate measures, recorded in every run and every mode.
 //
-// --marks 1 (or --strokebudget) keeps the full mark tape, which marks.json ships for playback. Without it the painter
+// --marks 1 keeps the full mark tape, which marks.json ships for playback. Without it the painter
 // still records a compact tape that holds only what stroke sizes and wash areas need: brush strokes ('s', without
 // their copied point objects or flow steps), pen lines ('P'), dips ('d', 'D'), clips ('c'), resists ('r', 'R', the
 // masks as bytes) and frame marks ('m'). Flow and dry steps, ink-resolution notes and blot masks are dropped, and

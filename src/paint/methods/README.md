@@ -1,16 +1,15 @@
 # src/paint/methods
 
-Generic watercolor methods. A wash is a layer of diluted paint; a glaze is a transparent wash over dried paint. This folder covers paper, palette, paint order, washes, glazes, layers and the drawing. `tools/paint-plate.mjs` imports them.
+Generic watercolor methods. A wash is a layer of diluted paint; a glaze is a transparent wash over dried paint. This folder covers the study wash plan, brushes, paper wetness, the drawing and the pen. `tools/paint-plate.mjs` imports them.
 
-- `light-to-dark.mjs`: value planning from light to dark, with the style preset's technique per value band (a light-to-dark range).
-- `outline-medium.mjs`, `drawing-file.mjs`, `drawing-logic.mjs` and `material-profiles.mjs`: the ink or pencil drawing made before the first wash, and stroke-count limits on each drawing stage.
-- `first-wash.mjs` and `mop-lanes.mjs`: the opening wash and the pen-and-wash mop lanes.
-- `wetdry.mjs`: wet blend or dry layer, and readiness checks that hold a stroke until its paper is ready.
-- `painter-order.mjs`: `--order legacy-painter`, region-by-region painting order.
-
+- `study-washes.mjs`, `study-shapes.mjs`, `sweep-fill.mjs`, `puddles.mjs`: the washes read from block-in studies, their shapes, lanes and mixes.
+- `drawing-file.mjs`, `drawing-hand.mjs`, `stroke-order.mjs`, `pencil-hand.mjs`: the drawing file's lines, laid as a hand draws them.
+- `ink-lines-file.mjs`, `ink-match.mjs`, `ink-recipe.mjs`: the pen's load from the target's line darkness, and the `--inkrecipe` flags.
+- `outline-medium.mjs`, `medium-decision.mjs`, `material-profiles.mjs`: ink or pencil, and the drawing materials.
+- `wetdry.mjs`: readiness checks that hold a stroke until its paper is ready.
 
 ```sh
 node --test src/paint/methods/*.test.mjs
 ```
 
-[techniques.md](../../../docs/techniques.md) lists every module here and the preset flags that turn them on.
+[techniques.md](../../../docs/techniques.md) indexes the modules here.

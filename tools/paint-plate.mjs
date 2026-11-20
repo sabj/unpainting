@@ -18,7 +18,7 @@ import './plate/load-order.mjs';
 import {fileURLToPath} from 'node:url';
 import {createJSONLWriter} from './painter/jsonl-writer.mjs';
 import {onCheckFailure} from '../src/media/checks.mjs';
-import {AUTHORING_CONTRACT} from './painter/semantic-areas.mjs';
+
 import {setup} from './plate/setup.mjs';
 import {plan} from './plate/plan.mjs';
 import {sheetAndBrushes} from './plate/sheet.mjs';
@@ -29,7 +29,6 @@ import {finish} from './plate/finish.mjs';
 
 // PAINT_MEMLOG=s: print process.memoryUsage (MB) every s seconds, to find what grows on big sheets.
 if(Number(process.env.PAINT_MEMLOG)>0){const t0=Date.now();setInterval(()=>{const m=process.memoryUsage();console.log(`memlog ${((Date.now()-t0)/1000).toFixed(0)}s rss ${(m.rss/1048576)|0} heapUsed ${(m.heapUsed/1048576)|0} heapTotal ${(m.heapTotal/1048576)|0} external ${(m.external/1048576)|0} arrayBuffers ${(m.arrayBuffers/1048576)|0}`);},Number(process.env.PAINT_MEMLOG)*1000).unref();}
-if(process.argv.includes('--areahelp')){console.log(JSON.stringify(AUTHORING_CONTRACT,null,2));process.exit(0);}
 
 // The splay of the wash flat (the brush that lays shaped value planes, and its scrap calibration). Shaped-plane lanes
 // are spaced by this brush's edge reach (edgeHalfWidth).

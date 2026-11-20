@@ -47,7 +47,7 @@ test('fix 4b: trace-ink limits come from the subject\'s own value range, not fro
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('fix 5: closing-ink and --linesupport keep or drop each line whole, never cut point by point', async () => {
+test('fix 5: closing-ink and the support threshold keep or drop each line whole, never cut point by point', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'looks-closing-'));
   try {
     // a target with one dark line along row 20; one planned line runs three quarters along it, one a quarter
@@ -64,6 +64,6 @@ test('fix 5: closing-ink and --linesupport keep or drop each line whole, never c
     const w = 80, h = 40, L = new Float32Array(w * h).fill(90); for (let x = 0; x < w; x++) L[20 * w + x] = 30;
     const r = holdLinesToTarget([{ points: pts(30).map(([x, y]) => [x, y + 0.5]) }], L, w, h, { threshold: 6 });
     assert.equal(r.lines.length, 1);
-    assert.equal(r.lines[0].points.length, 40, '--linesupport keeps the line whole');
+    assert.equal(r.lines[0].points.length, 40, 'the support threshold keeps the line whole');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

@@ -8,7 +8,6 @@ import {writeRunCard} from '../../src/paint/run-card.mjs';
 import {sourceScaleRecord} from './source-scale.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
-import {validateProductionDetails} from '../painter/semantic-production-details.mjs';
 import {measurePaperDry} from '../../src/paint/methods/wetdry.mjs';
 import {tapeStats, panelSVG} from '../stroke-stats.mjs';
 import {evaluateGate, printGate} from '../stroke-gate.mjs';
@@ -31,22 +30,21 @@ import {intermediates} from '../../src/eval/composite.mjs';
 import {planDensityOver} from '../../src/eval/plan-optics.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {gouacheCover, dryCover} from '../../src/media/gouache.mjs';
-import {layCurls} from '../../src/crop/curlpaint.mjs';
 import {writeGuardReport} from '../guard/no-target.mjs';
 import {cheatRisk} from '../guard/cheat-risk.mjs';
 
 export async function finish(ctx) {
-const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, STROKE_BUDGET, 
+const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   NATIVE_PAINT_MODE, SPEED_TRANSFERS, measurePaper, liftResist, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, 
   CPU_PROFILE, PAINTER, root, out, CODE_STATE, VALUE_CONFIG, WALL_PHASES, phaseMark, srcMeta, PX_RAW, 
   TARGET_GUARD, w, h, n, SEGMENTS_RECORD, createBrush, paperRGB, PALETTE, PIGS, STYLE, D_AIM, GOUACHE_LIGHTS, 
-  LIGHT_SHARE, MOD, COLOUR_TRACE, reportTechniques, CURLS, SEP, FACE_INK, INK, PENCIL, 
-  PENCIL_STAGE, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, AREA_COMPLETED, AREA_EXEC, dry, dip, stroke, SC, W2, H2, N2, PB, 
+  LIGHT_SHARE, COLOUR_TRACE, SEP, FACE_INK, INK, PENCIL, 
+  PENCIL_STAGE, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, dry, dip, stroke, SC, W2, H2, N2, PB, 
   CP_MM, PAPER_OPTS, paper, ABLATE, INKRES, PEN_STATE_GATE, PEN_STATE_AUDIT, penDraw, OUT_W, OUT_H, O, GPU_INFO, 
   base, SHADE, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
   expected, sheetDensity, marks, drainFrames, mark, CAL, FRAMES, FULL_TAPE, MARKTAPE, RESUME_AT, shoot, 
-  FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, FW_SUBJ, used, TECHS, LAST, DRAWING, 
-  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, BUDGET, awareProvenance, awareBoundary } = ctx;
+  FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, used, TECHS, LAST, DRAWING, 
+  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, awareProvenance, awareBoundary } = ctx;
 // a painting taken over at the closing boundary has had everything up to the closing drawing (AWARE_SKIP_POST)
 const removeFilm=()=>{const value=liftResist(ctx.sheet);ctx.NATIVE_CAPTURE?.('film-remove');return value;};
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
@@ -54,28 +52,16 @@ if (!AWARE_SKIP_POST) dry(ctx.sheet, 20000, O, { levelMax: 900 });
 colourMass('dried');
 
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-after-dry.png'));
-if(ctx.AREA_PLAN&&MOD&&validateProductionDetails(ctx.AREA_PLAN.doc))fs.writeFileSync(path.join(out,'semantic-production-details-before.json'),JSON.stringify({declaration:ctx.AREA_PLAN.doc.productionDetails,sampler:'existing production orientationField/furMarks/dryMarkPath/dryMarkBrush',calibration:CAL['wet on dry'],calibrationRole:'historical wet-on-dry gain retained; not matched dry-brush proof',demand:'existing MOD.Ad only; unplaced residual remains debt'},null,2));
-// The modulation lays no target-seeded dry-brush marks (anti-cheat rules); its wash and detail split (planning) stays.
-if (MOD && !ABLATE.has('dry')) console.log('dry brush: target-seeded dry-brush marks removed');
-if(ctx.AREA_PLAN)AREA_EXEC.set(null);
 colourMass('detailed');
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-after-detail.png'));
 if (!FILM_BY_PAINT) await shoot();
-// --curls: what the clipped glazes owed, laid as crescents round the lights and locks across the outline, then booked
-if (CURLS?.area) {
-  const r = await layCurls(ctx.sheet, CURLS, { w, h, SC, k: PIGS.length, pigments: PIGS, blur: gaussian, dip, O, D: ctx.SRC, strength: num('strength', 2.2), cal: CAL['dry brush'] ?? 1, seed: 1300 + SEED, shoot, stage: st => { ctx.STAGE = st; } },
-    { charge: num('curlcharge', 1), water: num('curlwater', 0.3), edge: num('curledge', 1), lean: num('curllean', 0.25), brushShare: num('curlbrush', 0.9), rounds: opt('curlrounds', '0.8,0.4').split(',').map(Number) });
-  for (let i = 0; i < n * PIGS.length; i++) expected[i] += CURLS.owed[i];
-  // read again, so covered and the forms are measured with the curls on the sheet, against the plan that owes them
-  mark(ctx.layers.length);
-  console.log(`curls: ${r.rounds.join(' + ')} crescents, ${r.edge} locks across the outline`);
-} else if (!AWARE_SKIP_POST && marks.length && marks.at(-1)?.pass !== ctx.layers.length) {
+if (!AWARE_SKIP_POST && marks.length && marks.at(-1)?.pass !== ctx.layers.length) {
   // read the finished washes when the cadence did not land on the last pass, so covered and forms see every pass
   mark(ctx.layers.length);
 }
 // the mask comes off last, and the paper under it is untouched
 if(!AWARE_SKIP_POST&&ctx.VALUE_PLAN&&ctx.RESIST){dry(ctx.sheet,30000,O,{levelMax:140,dt:2});const paper=measurePaperDry(ctx.sheet);check('value-plan film removal requires dry base',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'physical-film-remove',paper,operation:'existing real liftResist after final shadow; no white overlay'})+'\n');}
-if (!AWARE_SKIP_POST && ctx.RESIST && !ctx.AREA_FILM_REMOVED) { if(ctx.AREA_PLAN){const cells=Array.from(up(ctx.AREA_PLAN.film),(v,i)=>v?i:-1).filter(i=>i>=0);if(cells.length){for(const a of ctx.AREA_PLAN.doc.areas)for(const p of a.passes)if(p.lights.mode==='film')for(const dep of p.lights.actions.afterPasses)check('film removal prerequisite unexecuted',AREA_COMPLETED.has(dep),{pass:dep});dry(ctx.sheet,30000,O,{levelMax:140,dt:2});const paper=measurePaper(ctx.sheet,cells);check('semantic film requires dry paint before removal',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});AREA_EXEC.set(null);AREA_EXEC.command('physical film remove',{cells,paper,areaPassIds:ctx.AREA_PLAN.schedule.filter(s=>s.pass.lights.mode==='film').map(s=>s.key),semanticPlanned:true,revealedEdges:'inspection pending; no automatic softening'},()=>removeFilm());}else removeFilm();}else removeFilm(); dry(ctx.sheet, 20000, O, { levelMax: 200 }); ctx.STAGE = { stage: 'lift', step: 'frisket off' }; if (!FILM_BY_PAINT) await shoot(); }
+if (!AWARE_SKIP_POST && ctx.RESIST) { removeFilm(); dry(ctx.sheet, 20000, O, { levelMax: 200 }); ctx.STAGE = { stage: 'lift', step: 'frisket off' }; if (!FILM_BY_PAINT) await shoot(); }
 
 if (PREPF) { const f = fadePrep();ctx.NATIVE_CAPTURE?.('preparation-fade'); let a = 0; for (const v of PREPF.applied) a += v; console.log(`prep fade: the drawing held at ${(100 * a / N2).toFixed(1)}% on average before the closing pen (${f} cells faded in the last step)`); }
 // --pencilerase 1: the pencil the finish does not keep, lifted with a kneaded eraser once the washes are dry and before
@@ -97,11 +83,6 @@ if (DRAW_LAST && DRAWING !== 'none') {
   ctx.WASH_THK = thickness(ctx.sheet).map(a => Float32Array.from(a));
   await sharp(view(), { raw: { width: W2, height: H2, channels: 3 } }).jpeg({ quality: 92 }).toFile(path.join(out, 'wash.jpg'));
   if (opt('draw', '1') !== '0') await drawPass(null);
-}
-// the finishing lines, after whatever ink the sheet's own order calls for and before the lights
-if (opt('finish', '0') !== '0' && opt('draw', '1') !== '0') {
-  ctx.STAGE = { stage: 'ink', step: 'fine' };
-  await drawPass(null, { fine: true });
 }
 // --smalllights gouache|both: white gouache last where the source has a small light and the painting reads over --gouachemargin denser.
 // --gouachefull: light share that covers a cell (default 0.5); --gouacheopacity 0.9, --gouachedry 0.5: hiding and dry-brush misses.
@@ -151,7 +132,6 @@ console.log(`time: ${Object.entries(spent).map(([k, v]) => `${k} ${(v / 1000).to
 console.log(`profile: ${Object.entries(PROF).map(([k, v]) => `${k} ${(v / 1000).toFixed(1)}s`).join(', ')}`);
 console.log(`${ctx.laid} brush sweeps, ${ctx.frame} frames, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
 
-reportTechniques();
 if(COLOUR_TRACE) await sharp(INKRES ? INKRES.compose(render()) : render(), {raw:{width:OUT_W,height:OUT_H,channels:3}}).png().toFile(path.join(out,'colour-final.png'));
 // --subgrid N: spread settled pigment over N x N sub-cells by the cold-press relief, each cell keeping its pigment. Default 0.
 // Water stays at the sheet's grid. Written as painting-fine.jpg and averaged back as reflectance. Cold-press paper only.
@@ -224,11 +204,6 @@ if(ctx.NATIVE_RECORDER){
  }
 }
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
-if (STROKE_BUDGET) {
- const count=MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length;
- fs.writeFileSync(path.join(out,'stroke-budget.json'),JSON.stringify({budget:STROKE_BUDGET,strokes:count,complete:count<=STROKE_BUDGET,counts:Object.fromEntries(['s','P','g'].map(k=>[k,MARKTAPE.filter(m=>m.k===k).length]))},null,2));
- check('Whole painting exceeded stroke budget',count<=STROKE_BUDGET,{strokes:count,budget:STROKE_BUDGET});
-}
 let exportedMarkTape = null;
 if (MARKTAPE) {
   const file = path.join(out, 'marks.json');
@@ -239,7 +214,7 @@ if (MARKTAPE) {
   const { markTapeJSON } = await import('../../src/media/mark-tape-json.mjs');
   exportedMarkTape = {
     w: W2, h: H2, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM),
-    version:2, methods:ctx.RUN_METHODS, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
+    version:2, methods:ctx.RUN_METHODS, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
     base: Array.from(base.subarray(0, 3)),
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
@@ -379,7 +354,7 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
   }
 }
 
-writeRunCard({ provenanceHistory:ctx.PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, expandedArgs: argv, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), mediumDecision: ctx.MEDIUM_DECISION ?? null, subjectMedium: opt('subjectmedium', 'pen') !== 'pen' ? { medium: opt('subjectmedium', 'pen'), override: ctx.SUBJECT_MEDIUM ? { asked: ctx.SUBJECT_MEDIUM.asked, drawn: 'graphite', dropped: ctx.SUBJECT_MEDIUM.dropped } : null } : null, code: CODE_STATE, segments: SEGMENTS_RECORD, linework: { source: ctx.LINE_SOURCE?.source ?? null, file: ctx.LINE_SOURCE?.file ?? null }, methods: ctx.RUN_METHODS, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null, ...(ctx.SOURCE_SCALE ? sourceScaleRecord(ctx.SOURCE_SCALE) : {}) }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, caption: { subject: path.basename(opt('image', ''), path.extname(opt('image', ''))), role: null, codeSHA: (CODE_STATE?.commit ?? '').slice(0, 8) || null, looking: opt('notargetlooks', '0') === '1' ? 'strict' : 'looking', speed: opt('mode', 'full'), sourcePx: srcMeta?.width ? `${srcMeta.width}x${srcMeta.height}` : null, renderWidth: OUT_W, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), date: new Date().toISOString() }, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
+writeRunCard({ provenanceHistory:ctx.PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, expandedArgs: argv, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), mediumDecision: ctx.MEDIUM_DECISION ?? null, subjectMedium: opt('subjectmedium', 'pen') !== 'pen' ? { medium: opt('subjectmedium', 'pen'), override: ctx.SUBJECT_MEDIUM ? { asked: ctx.SUBJECT_MEDIUM.asked, drawn: 'graphite', dropped: ctx.SUBJECT_MEDIUM.dropped } : null } : null, code: CODE_STATE, segments: SEGMENTS_RECORD, linework: { source: ctx.LINE_SOURCE?.source ?? null, file: ctx.LINE_SOURCE?.file ?? null }, methods: ctx.RUN_METHODS, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null, ...(ctx.SOURCE_SCALE ? sourceScaleRecord(ctx.SOURCE_SCALE) : {}) }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, caption: { subject: path.basename(opt('image', ''), path.extname(opt('image', ''))), role: null, codeSHA: (CODE_STATE?.commit ?? '').slice(0, 8) || null, looking: opt('notargetlooks', '0') === '1' ? 'strict' : 'looking', speed: opt('mode', 'full'), sourcePx: srcMeta?.width ? `${srcMeta.width}x${srcMeta.height}` : null, renderWidth: OUT_W, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), date: new Date().toISOString() }, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
 

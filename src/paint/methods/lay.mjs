@@ -35,7 +35,7 @@ function shapeSweep(pts, want, w, h, amount, { land = 0.06, lift = 0.1, followMi
 /** The sweeps a passage takes with a mop no wider than `maxRadius`, held inside it, and the widest brush among them.
  *  A passage too narrow for the mop gets a small brush drawn down its middle, not skipped. Callers charge by `radius`:
  *  a mop held in a narrow passage is the small brush, and charging it at the mop's yield lays about twice the paint. */
-export function passagePaths(mask, w, h, { maxRadius, want = null, seed = 1, pad = 1.5 } = {}) {
+function passagePaths(mask, w, h, { maxRadius, want = null, seed = 1, pad = 1.5 } = {}) {
   const dist = distanceToZero(mask, w, h);
   let paths = containPaths(brushedWashPaths(mask, w, h, { pad, minRadius: 1, minLength: 3, maxRadius, field: want, seed, overlap: 0.15, walk: true, outerDrift: 1.5 }), dist, w, h, { minRadius: 0.8, minLength: 2, slack: 0.5 });
   if (!paths.length) paths = washPaths(mask, w, h, { pad: 0.2, minRadius: 0.5, minLength: 2 });

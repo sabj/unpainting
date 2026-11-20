@@ -10,11 +10,9 @@ import {tapeSheet,tapePixels,tapeFlow} from '../../demos/lab/worker/tape-sheet.j
 // fixed-layer settling used by these tapes, so it is not an equivalent backend.
 const root=new URL('../../demos/lab/',import.meta.url),manifestURL=new URL('examples/recorded.json',root);
 const manifest=JSON.parse(await fs.readFile(manifestURL));
-const ri=process.argv.indexOf('--runs'),runs=ri<0?null:process.argv.slice(ri+1,ri+5);
-if(runs&&runs.length!==4)throw Error('--runs requires four painter output directories');
-for(const ex of manifest.examples){ex.checkpoints={};for(const limit of [250,2500]){
+for(const ex of manifest.examples){if(!ex.live)continue;ex.checkpoints={};for(const limit of Object.keys(ex.live)){
  const tape=JSON.parse(gunzipSync(await fs.readFile(new URL(ex.live[limit],root))));
- if(tape.version<2||!tape.complete)throw Error('Checkpoints require a complete budgeted run');
+ if(tape.version<2||!tape.complete)throw Error('Checkpoints require a complete recorded run');
  const sheet=tapeSheet(tape),{w,h}=sheet;
  const stops=new Map([.1,.25,.5,.75,.9,1].map(f=>[Math.floor(tape.strokeCount*f),f])),list=[];
  const save=async(done,state,final=false)=>{
@@ -29,20 +27,6 @@ for(const ex of manifest.examples){ex.checkpoints={};for(const limit of [250,250
  };
  await runTape(tape,{sheet:()=>sheet,ready:async()=>true,begin:()=>{},end:()=>{},touch:async(p,r,fn)=>fn(),present:async()=>{},progress:async()=>{},mutate:async fn=>fn(),flow:async(dry,m)=>tapeFlow(tape,sheet,dry,m),checkpoint:save,finished:(done,state)=>save(done,state,true)});
  ex.checkpoints[limit]=list;
- if(runs){
-  const run=runs[manifest.examples.indexOf(ex)*2+(limit===2500?1:0)],prefix=`examples/${ex.id}/studies/${limit}`;
-  await fs.mkdir(new URL(prefix+'/',root),{recursive:true});
-  const expected=await sharp(run+'/painting.png').removeAlpha().raw().toBuffer(),pixels=tapePixels(tape,sheet);
-  if(expected.length!==pixels.length)throw Error('Native comparison dimensions differ');
-  let sum=0,max=0;for(let i=0;i<pixels.length;i++){const d=Math.abs(pixels[i]-expected[i]);sum+=d;max=Math.max(max,d);}
-  const native=await sharp(expected,{raw:{width:w,height:h,channels:3}}).png().toBuffer(),live=await sharp(pixels,{raw:{width:w,height:h,channels:3}}).png().toBuffer();
-  await fs.writeFile(new URL(prefix+'/painting.png',root),native);
-  await fs.writeFile(new URL(prefix+'/live.png',root),live);
-  await sharp({create:{width:w*2,height:h,channels:3,background:'white'}}).composite([{input:native,left:0,top:0},{input:live,left:w,top:0}]).png().toFile(new URL(prefix+'/after-side-by-side.png',root).pathname);
-  const metrics={meanAbsoluteDifference:sum/pixels.length,maxDifference:max,range:'0–255 RGB',width:w,height:h,columns:['painter','Live executor']};
-  await fs.writeFile(new URL(prefix+'/after.json',root),JSON.stringify(metrics,null,2)+'\n');
-  Object.assign(ex.studies[limit],{painting:prefix+'/painting.png',comparison:prefix+'/after-side-by-side.png',metrics:prefix+'/after.json'});
-  console.log(ex.id,limit,metrics);
- }
+
 }}
 await fs.writeFile(manifestURL,JSON.stringify(manifest,null,2)+'\n');

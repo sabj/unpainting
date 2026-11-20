@@ -1,16 +1,132 @@
 {
   "examples": [
     {
+      "id": "tiepolo-camel",
+      "title": "Punchinello Riding a Camel · Tiepolo",
+      "kind": "Pen and wash",
+      "target": "examples/tiepolo-camel/target.jpg",
+      "thumb": "examples/tiepolo-camel/thumb.webp",
+      "credit": "Domenico Tiepolo, Punchinello Riding a Camel, late 1790s, Getty Center, public domain. Drawing and block-in study made with an image model. Painter output: CC BY 4.0.",
+      "live": {
+        "study": "examples/tiepolo-camel/live.json.gz"
+      },
+      "studies": {
+        "study": {
+          "label": "Drawing and block-in study",
+          "strokes": 2553,
+          "width": 360,
+          "height": 259,
+          "methods": {
+            "lineSource": "prepared drawing",
+            "lineFile": "tiepolo-punchinello-camel-lines.json",
+            "washPlan": "block-in study",
+            "studies": [
+              "tiepolo-punchinello-camel-study.png"
+            ],
+            "legacy": []
+          }
+        }
+      },
+      "film": {
+        "frames": [
+          "examples/tiepolo-camel/f0000.webp",
+          "examples/tiepolo-camel/f0001.webp",
+          "examples/tiepolo-camel/f0002.webp",
+          "examples/tiepolo-camel/f0003.webp",
+          "examples/tiepolo-camel/f0004.webp",
+          "examples/tiepolo-camel/f0005.webp",
+          "examples/tiepolo-camel/f0006.webp",
+          "examples/tiepolo-camel/f0007.webp",
+          "examples/tiepolo-camel/f0008.webp",
+          "examples/tiepolo-camel/f0009.webp",
+          "examples/tiepolo-camel/f0010.webp",
+          "examples/tiepolo-camel/f0011.webp",
+          "examples/tiepolo-camel/f0012.webp",
+          "examples/tiepolo-camel/f0013.webp",
+          "examples/tiepolo-camel/f0014.webp",
+          "examples/tiepolo-camel/f0015.webp",
+          "examples/tiepolo-camel/f0016.webp",
+          "examples/tiepolo-camel/f0017.webp",
+          "examples/tiepolo-camel/f0018.webp",
+          "examples/tiepolo-camel/f0019.webp",
+          "examples/tiepolo-camel/f0020.webp"
+        ],
+        "frameNumbers": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20
+        ],
+        "final": "examples/tiepolo-camel/final.webp",
+        "aspect": 1.38996138996139,
+        "seconds": 42,
+        "strokes": 2553
+      },
+      "checkpoints": {
+        "study": [
+          {
+            "fraction": 0.1,
+            "done": 255,
+            "state": "examples/tiepolo-camel/checkpoints/study-10.bin.gz",
+            "image": "examples/tiepolo-camel/checkpoints/study-10.webp"
+          },
+          {
+            "fraction": 0.25,
+            "done": 638,
+            "state": "examples/tiepolo-camel/checkpoints/study-25.bin.gz",
+            "image": "examples/tiepolo-camel/checkpoints/study-25.webp"
+          },
+          {
+            "fraction": 0.5,
+            "done": 1276,
+            "state": "examples/tiepolo-camel/checkpoints/study-50.bin.gz",
+            "image": "examples/tiepolo-camel/checkpoints/study-50.webp"
+          },
+          {
+            "fraction": 0.75,
+            "done": 1914,
+            "state": "examples/tiepolo-camel/checkpoints/study-75.bin.gz",
+            "image": "examples/tiepolo-camel/checkpoints/study-75.webp"
+          },
+          {
+            "fraction": 0.9,
+            "done": 2297,
+            "state": "examples/tiepolo-camel/checkpoints/study-90.bin.gz",
+            "image": "examples/tiepolo-camel/checkpoints/study-90.webp"
+          },
+          {
+            "fraction": 1,
+            "done": 2553,
+            "state": "examples/tiepolo-camel/checkpoints/study-100.bin.gz",
+            "image": "examples/tiepolo-camel/checkpoints/study-100.webp"
+          }
+        ]
+      }
+    },
+    {
       "id": "h36-a",
-      "title": "Yale gateway \u00b7 h36-a",
+      "title": "Yale gateway · h36-a",
       "kind": "Ink and watercolor",
       "target": "examples/h36-a/h36-a.png",
       "thumb": "examples/h36-a/thumb.webp",
       "credit": "Carol M. Highsmith / Library of Congress, public domain photograph. Stylised target made with an image model. Painter output: CC BY 4.0.",
-      "live": {
-        "250": "examples/h36-a/live-250.json.gz",
-        "2500": "examples/h36-a/live-2500.json.gz"
-      },
       "film": {
         "paths": "examples/h36-a/paths.json",
         "frames": [
@@ -97,115 +213,7 @@
         "strokes": 3257
       },
       "source": "fin1086-1010-050155.tip.finish.h36a",
-      "honesty": "fair, gentle anti-cheat mode",
-      "checkpoints": {
-        "250": [
-          {
-            "fraction": 0.1,
-            "done": 25,
-            "state": "examples/h36-a/checkpoints/250-10.bin.gz",
-            "image": "examples/h36-a/checkpoints/250-10.webp"
-          },
-          {
-            "fraction": 0.25,
-            "done": 62,
-            "state": "examples/h36-a/checkpoints/250-25.bin.gz",
-            "image": "examples/h36-a/checkpoints/250-25.webp"
-          },
-          {
-            "fraction": 0.5,
-            "done": 125,
-            "state": "examples/h36-a/checkpoints/250-50.bin.gz",
-            "image": "examples/h36-a/checkpoints/250-50.webp"
-          },
-          {
-            "fraction": 0.75,
-            "done": 187,
-            "state": "examples/h36-a/checkpoints/250-75.bin.gz",
-            "image": "examples/h36-a/checkpoints/250-75.webp"
-          },
-          {
-            "fraction": 0.9,
-            "done": 225,
-            "state": "examples/h36-a/checkpoints/250-90.bin.gz",
-            "image": "examples/h36-a/checkpoints/250-90.webp"
-          },
-          {
-            "fraction": 1,
-            "done": 250,
-            "state": "examples/h36-a/checkpoints/250-100.bin.gz",
-            "image": "examples/h36-a/checkpoints/250-100.webp"
-          }
-        ],
-        "2500": [
-          {
-            "fraction": 0.1,
-            "done": 250,
-            "state": "examples/h36-a/checkpoints/2500-10.bin.gz",
-            "image": "examples/h36-a/checkpoints/2500-10.webp"
-          },
-          {
-            "fraction": 0.25,
-            "done": 625,
-            "state": "examples/h36-a/checkpoints/2500-25.bin.gz",
-            "image": "examples/h36-a/checkpoints/2500-25.webp"
-          },
-          {
-            "fraction": 0.5,
-            "done": 1250,
-            "state": "examples/h36-a/checkpoints/2500-50.bin.gz",
-            "image": "examples/h36-a/checkpoints/2500-50.webp"
-          },
-          {
-            "fraction": 0.75,
-            "done": 1875,
-            "state": "examples/h36-a/checkpoints/2500-75.bin.gz",
-            "image": "examples/h36-a/checkpoints/2500-75.webp"
-          },
-          {
-            "fraction": 0.9,
-            "done": 2250,
-            "state": "examples/h36-a/checkpoints/2500-90.bin.gz",
-            "image": "examples/h36-a/checkpoints/2500-90.webp"
-          },
-          {
-            "fraction": 1,
-            "done": 2500,
-            "state": "examples/h36-a/checkpoints/2500-100.bin.gz",
-            "image": "examples/h36-a/checkpoints/2500-100.webp"
-          }
-        ]
-      },
-      "studies": {
-        "250": {
-          "label": "250-stroke painting",
-          "strokes": 250,
-          "width": 360,
-          "height": 240,
-          "painting": "examples/h36-a/studies/250/painting.png",
-          "comparison": "examples/h36-a/studies/250/after-side-by-side.png",
-          "metrics": "examples/h36-a/studies/250/after.json",
-          "beforeComparison": "examples/h36-a/studies/250/before-side-by-side.png",
-          "beforeMetrics": "examples/h36-a/studies/250/before.json",
-          "run": "examples/h36-a/studies/250/run.json",
-          "budgetAudit": "examples/h36-a/studies/250/stroke-budget.json",
-          "guard": "examples/h36-a/studies/250/target-guard.json"
-        },
-        "2500": {
-          "label": "2,500-stroke painting",
-          "strokes": 2500,
-          "width": 360,
-          "height": 240,
-          "painting": "examples/h36-a/studies/2500/painting.png",
-          "comparison": "examples/h36-a/studies/2500/after-side-by-side.png",
-          "metrics": "examples/h36-a/studies/2500/after.json",
-          "beforeComparison": "examples/h36-a/studies/2500/before-side-by-side.png",
-          "beforeMetrics": "examples/h36-a/studies/2500/before.json",
-          "run": "examples/h36-a/studies/2500/run.json",
-          "budgetAudit": "examples/h36-a/studies/2500/stroke-budget.json",
-          "guard": "examples/h36-a/studies/2500/target-guard.json"
-        }
-      }
+      "honesty": "fair, gentle anti-cheat mode"
     },
     {
       "id": "white-ships",
@@ -240,118 +248,6 @@
         "seconds": 8,
         "strokes": 19,
         "paths": "examples/white-ships-first-marks-strokes.json"
-      },
-      "live": {
-        "250": "examples/white-ships/live-250.json.gz",
-        "2500": "examples/white-ships/live-2500.json.gz"
-      },
-      "checkpoints": {
-        "250": [
-          {
-            "fraction": 0.1,
-            "done": 25,
-            "state": "examples/white-ships/checkpoints/250-10.bin.gz",
-            "image": "examples/white-ships/checkpoints/250-10.webp"
-          },
-          {
-            "fraction": 0.25,
-            "done": 62,
-            "state": "examples/white-ships/checkpoints/250-25.bin.gz",
-            "image": "examples/white-ships/checkpoints/250-25.webp"
-          },
-          {
-            "fraction": 0.5,
-            "done": 125,
-            "state": "examples/white-ships/checkpoints/250-50.bin.gz",
-            "image": "examples/white-ships/checkpoints/250-50.webp"
-          },
-          {
-            "fraction": 0.75,
-            "done": 187,
-            "state": "examples/white-ships/checkpoints/250-75.bin.gz",
-            "image": "examples/white-ships/checkpoints/250-75.webp"
-          },
-          {
-            "fraction": 0.9,
-            "done": 225,
-            "state": "examples/white-ships/checkpoints/250-90.bin.gz",
-            "image": "examples/white-ships/checkpoints/250-90.webp"
-          },
-          {
-            "fraction": 1,
-            "done": 250,
-            "state": "examples/white-ships/checkpoints/250-100.bin.gz",
-            "image": "examples/white-ships/checkpoints/250-100.webp"
-          }
-        ],
-        "2500": [
-          {
-            "fraction": 0.1,
-            "done": 250,
-            "state": "examples/white-ships/checkpoints/2500-10.bin.gz",
-            "image": "examples/white-ships/checkpoints/2500-10.webp"
-          },
-          {
-            "fraction": 0.25,
-            "done": 625,
-            "state": "examples/white-ships/checkpoints/2500-25.bin.gz",
-            "image": "examples/white-ships/checkpoints/2500-25.webp"
-          },
-          {
-            "fraction": 0.5,
-            "done": 1250,
-            "state": "examples/white-ships/checkpoints/2500-50.bin.gz",
-            "image": "examples/white-ships/checkpoints/2500-50.webp"
-          },
-          {
-            "fraction": 0.75,
-            "done": 1875,
-            "state": "examples/white-ships/checkpoints/2500-75.bin.gz",
-            "image": "examples/white-ships/checkpoints/2500-75.webp"
-          },
-          {
-            "fraction": 0.9,
-            "done": 2250,
-            "state": "examples/white-ships/checkpoints/2500-90.bin.gz",
-            "image": "examples/white-ships/checkpoints/2500-90.webp"
-          },
-          {
-            "fraction": 1,
-            "done": 2500,
-            "state": "examples/white-ships/checkpoints/2500-100.bin.gz",
-            "image": "examples/white-ships/checkpoints/2500-100.webp"
-          }
-        ]
-      },
-      "studies": {
-        "250": {
-          "label": "250-stroke painting",
-          "strokes": 250,
-          "width": 360,
-          "height": 257,
-          "painting": "examples/white-ships/studies/250/painting.png",
-          "comparison": "examples/white-ships/studies/250/after-side-by-side.png",
-          "metrics": "examples/white-ships/studies/250/after.json",
-          "beforeComparison": "examples/white-ships/studies/250/before-side-by-side.png",
-          "beforeMetrics": "examples/white-ships/studies/250/before.json",
-          "run": "examples/white-ships/studies/250/run.json",
-          "budgetAudit": "examples/white-ships/studies/250/stroke-budget.json",
-          "guard": "examples/white-ships/studies/250/target-guard.json"
-        },
-        "2500": {
-          "label": "2,500-stroke painting",
-          "strokes": 2500,
-          "width": 360,
-          "height": 257,
-          "painting": "examples/white-ships/studies/2500/painting.png",
-          "comparison": "examples/white-ships/studies/2500/after-side-by-side.png",
-          "metrics": "examples/white-ships/studies/2500/after.json",
-          "beforeComparison": "examples/white-ships/studies/2500/before-side-by-side.png",
-          "beforeMetrics": "examples/white-ships/studies/2500/before.json",
-          "run": "examples/white-ships/studies/2500/run.json",
-          "budgetAudit": "examples/white-ships/studies/2500/stroke-budget.json",
-          "guard": "examples/white-ships/studies/2500/target-guard.json"
-        }
       }
     }
   ]

@@ -48,13 +48,13 @@ unpainting/
 ├── src/
 │   ├── media/      paper, water, pigment, brush, pen and pencil physics (CPU + WebGPU)
 │   ├── paint/
-│   │   ├── methods/     generic watercolor methods: washes, glazes, layers, drawing order
-│   │   └── techniques/  techniques for a kind of problem: faces, dark fur, coats and hair, masonry, foliage, skies, sea
-│   └── crop/       target analysis: regions, value masses, palette fitting
+│   │   ├── methods/     generic watercolor methods: study washes, glazes, the drawing
+│   │   └── techniques/  named techniques: passage moves, shaped marks, softening
+│   └── crop/       target analysis: regions, line files, palette fitting
 ├── tools/
 │   ├── paint-plate.mjs   paint an image with target-pixel reads blocked
 │   ├── run-plan.mjs      execute a JSON stroke plan
-│   └── seg/              line and contour proposals (Python)
+│   └── seg/              tracing and ordering a drawing, SAM regions (Python)
 ├── .agents/skills/ watercolor technique and painting planner, for agents
 └── .claude/skills  symlink to ../.agents/skills for Claude Code
 ```
@@ -63,7 +63,7 @@ unpainting/
 
 The pipeline has seven steps: instructions, planning tools, plan execution, tool preparation, tool use, judgment and practice between attempts. It takes a painting-style image and prepares paper, colors and brushes. It plans the painting, executes the plan, then judges the result and improves on it.
 
-A drawing goes down first and dries before any wash, a layer of diluted paint. Washes then build from light to dark. The drawing medium defaults to pencil. A plan, `--outlinemedium ink` or the [automatic stage choice](docs/ink.md#automatic-drawing-stages) can add ink.
+A painting takes the target, a drawing file and one or more block-in studies. An image model draws a clean line drawing of the subject, which is traced and ordered as a hand draws it. Another makes the studies: the subject simplified to flat shapes. The drawing goes down first and dries. The washes, layers of diluted paint, then build from light to dark, read from the studies.
 
 <p align="center"><a href="docs/how-it-paints.md"><img src="docs/img/pipeline-map.png" alt="The painting pipeline: plan, prepare the sheet, paint, review. Cards 1, 3 and 4 show the Part 1 beach study; card 2 shows a White Ships run with a pencil drawing"></a></p>
 
@@ -97,20 +97,22 @@ Open `work/plan-graded-wash/result.png` to see a blue wash fade from dark to lig
 To paint one of the bundled public-domain targets, or your own:
 
 ```sh
-npm run example:portrait    # Sargent, A Tramp
-node tools/paint-plate.mjs --image path/to/painting.jpg --width 540 --mode fast --out work/mine
+npm run example:animal      # Tiepolo, Punchinello Riding a Camel: drawing and study
+npm run example:portrait    # Sargent, A Tramp: study only
 ```
+
+Your own image needs a drawing file and a study; [Running the painter](docs/running.md#your-own-image) shows how.
 
 <p align="center"><img src="docs/img/build-white-ships.webp" width="560" alt="Sargent's White Ships beside a benchmark painting by Sol, built from blank paper with the brush outline following each recorded stroke, then rewound"></p>
 
 Sargent's White Ships, left, and Sol's benchmark painting, right, made with painter V096 and sim 100 (release 0.1.0). The outline is the brush; paint shows up at the next saved frame.
 
-Unless told otherwise, the painter runs its default recipe, a preset of painter settings (`src/paint/recipe.mjs`). [Methods, techniques and tuned settings](docs/techniques.md) lists every part of the painter, which settings were fitted to benchmark images, and how to turn each one off.
+Unless told otherwise, the painter runs its default recipe, a preset of painter settings (`src/paint/recipe.mjs`). [Methods, techniques and tuned settings](docs/techniques.md) lists the parts of the painter.
 
-[Running the painter](docs/running.md) covers the recipe, sheet size, saved stages, animations and Paint Lab. Supporting tools need more:
+[Running the painter](docs/running.md) covers the inputs, sheet size, saved stages, animations and Paint Lab. Supporting tools need more:
 
 - `ffmpeg` on your `PATH` for animations of the painting. Pass `--video 0` to skip them.
-- Python 3 for the optional scoring and segmentation tools. The scorer lists its packages in [bench/scorer/requirements.txt](bench/scorer/requirements.txt).
+- Python 3 for tracing a drawing, segmentation and scoring. The scorer lists its packages in [bench/scorer/requirements.txt](bench/scorer/requirements.txt).
 
 Everything runs on a basic machine. A GPU, including a local one through WebGPU, runs faster and in parallel. That helps when you steer towards an outcome.
 
@@ -119,7 +121,7 @@ Everything runs on a basic machine. A GPU, including a local one through WebGPU,
 [unpaint-bench](bench/README.md) tests how well AI models paint, in five rounds, V1 to V5, with more help each time.
 
 - V1 to V3: the model writes scripts that lay every stroke, within about 15 minutes and 2,500 strokes. V2 adds technique guides, V3 the model's earlier attempts.
-- V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try.
+- V4 and V5: the model writes a plan and the painter turns it into strokes. V5 adds feedback from the previous try. Both are retired in 0.4; tag v0.3.2 replays them. A V6 task is drafted in [bench/v6/TASK.md](bench/v6/TASK.md).
 
 The leaderboard uses painter V096, sim 100 and judges J1, from releases 0.1.0 and 0.1.1 ([changelog](CHANGELOG.md), [versions](docs/versions.md)). It has not been rerun for 0.3.0. The 0.2.0 and 0.2.1 releases replayed only the Opus 5.5 V5 plans ([0.2.0 comparison](docs/release-performance-0.2.0.md)).
 
@@ -158,4 +160,4 @@ Code: MIT ([LICENSE](LICENSE)). Painter output from public-domain inputs: CC BY 
 
 [Image sources](NOTICE)
 
-[^nn]: Pretrained models are used only to guide painting: optional prep tools use them to find lines and regions in the target. See the [reading list](docs/reading-list.md).
+[^nn]: Pretrained models are used only to prepare a painting: image models make the line drawing and the block-in studies, and SAM finds regions in the target. See the [reading list](docs/reading-list.md).

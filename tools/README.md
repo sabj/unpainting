@@ -5,14 +5,14 @@ Command-line tools. Run each from the repository root with `node tools/<path>`. 
 | folder | what it holds | start with |
 |---|---|---|
 | `tools/` | the painter and the stroke-plan runner | `paint-plate.mjs --image FILE --out DIR`, `run-plan.mjs PLAN.json` |
-| `painter/` | the modules `paint-plate.mjs` imports: area plans, brush paths supplied by a plan, calibration, production checks | `semantic-areas.mjs` (`paint-plate.mjs --areahelp` prints its contract) |
-| `aware/` | stops at passage boundaries (`--pausedir`) and the take-over of a saved painting by a fresh process (`--resumestate`), used by rounds V4 and V5 | `pause.mjs` (the pause folder's files), `aware.test.mjs` |
+| `painter/` | the modules `paint-plate.mjs` imports: loading studies, wet beds, softening, calibration, production checks | `study-load.mjs` |
+| `aware/` | stops at passage boundaries (`--pausedir`) and the take-over of a saved painting by a fresh process (`--resumestate`), written for rounds V4 and V5 (retired in 0.4) | `pause.mjs` (the pause folder's files), `aware.test.mjs` |
 | `guard/` | the target guard (a check that blocks target-pixel reads), the cheat-risk score, the deliberate-cheat test and the source lint | `cheat-test.mjs`, `promote-check.mjs RUNDIR` |
 | `judge/` | classic measures against a target, stage checks, the wash scorer, and blind evaluations of saved stages with model judges in `rounds/` | `judge-plate.mjs`, `stage-check.mjs`, `wash-score.mjs --dir DUMP` |
 | `lab/` | builds Paint Lab's recorded examples in `demos/lab/examples/`, copies `src/media/` into the lab, builds the site, and records the lab's demo animation | `build-live-examples.mjs`; `sync-site-media.mjs`; `build-site.mjs`; `record-demo.mjs` |
 | `readme/` | builds the README figures and the demo animations in `demos/thumbs/` | `build-readme-media.mjs`; `demo-animations.mjs` |
 | `cloud/` | render batches on rented machines (optional; needs a paid account) | `render-batch.py`; see [docs/CLOUD.md](../docs/CLOUD.md) |
-| `seg/` | figure masks and line extraction in Python (u2net, SAM and line models) | [seg/README.md](seg/README.md) |
+| `seg/` | tracing and ordering a prepared drawing, SAM regions and masks | [seg/README.md](seg/README.md) |
 
 `npm test` runs the `.test.mjs` files under `src/` and `tools/`. `npm run bench:test` runs the tests in `bench/scripts/`.
 

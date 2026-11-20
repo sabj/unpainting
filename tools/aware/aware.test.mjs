@@ -33,7 +33,7 @@ test('saved state round-trips typed arrays, shared references, Sets, Maps and sp
 });
 
 const ARGS = ['tools/paint-plate.mjs', '--recipe', 'none', '--image', 'bench/v2/targets/hills.png', '--washplan', 'bench/v2/targets/hills.png', '--width', '64', '--scale', '1', '--sheetmm', '80', '--palettewide', '1',
-  '--physical', '1', '--order', 'painter', '--shapedmarks', '1', '--drawing', 'both', '--outlinemedium', 'ink',
+  '--physical', '1', '--shapedmarks', '1', '--drawing', 'both', '--outlinemedium', 'ink',
   '--mode', 'fast', '--marks', '1', '--video', '0', '--targetguard', 'gentle', '--seed', '0', '--gpu', 'off', '--allowdirty', '1',
   // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
   '--segments', 'off'];
