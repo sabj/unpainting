@@ -373,6 +373,17 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   return out;
 }
 
+/**
+ * Line weight for ink under washes, from the order rather than the drawing (a thin grey drawing gives no weight to copy):
+ * the big structure firm and wide, outlines firm, inner lines lighter, fine detail and texture lightest; nearer (lower on
+ * the sheet) heavier, farther lighter. Returns { weight (0..1 pressure share), widthScale }.
+ */
+export function structureWeight(r, heightMm) {
+  const [w, s] = r.pass === 1 ? [1, 1.6] : r.pass === 2 && r.role === 'outline' ? [0.9, 1.3] : r.pass === 2 ? [0.75, 1] : [0.6, 0.8];
+  const y = r.points.reduce((a, p) => a + p[1], 0) / r.points.length, near = 0.85 + 0.3 * Math.min(1, Math.max(0, y / heightMm));
+  return { weight: Math.min(1, w * near), widthScale: s * near };
+}
+
 /** Hand travel between consecutive strokes (end of one to start of the next). */
 export function handTravel(ordered) {
   return ordered.slice(1).map((r, k) => dist(ordered[k].points[ordered[k].points.length - 1], r.points[0]));

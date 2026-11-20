@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orderStrokes, orderStats, pullDirection, turningPerMm, joinContinuations, findObjects } from './stroke-order.mjs';
+import { orderStrokes, orderStats, pullDirection, turningPerMm, joinContinuations, findObjects, structureWeight } from './stroke-order.mjs';
 
 const seg = (x0, y0, x1, y1, n = 10) => Array.from({ length: n + 1 }, (_, k) => [x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n]);
 const box = (x0, y0, x1, y1) => [seg(x0, y0, x1, y0), seg(x1, y0, x1, y1), seg(x1, y1, x0, y1), seg(x0, y1, x0, y0)];
@@ -72,4 +72,11 @@ test('ink amount: inside a painted mass none lays nothing, forms only the long s
   assert.deepEqual(n('full'), [0, 1, 2, 3]);
   assert.deepEqual(n('forms'), [0, 3]);
   assert.deepEqual(n('none'), [3]);
+});
+
+test('structure weight: the big structure firm and wide, fine detail light, the foreground heavier', () => {
+  const at = (pass, role, y) => structureWeight({ pass, role, points: [[0, y], [10, y]] }, 100);
+  assert.ok(at(1, 'inner', 50).weight > at(2, 'outline', 50).weight && at(2, 'outline', 50).weight > at(2, 'inner', 50).weight && at(2, 'inner', 50).weight > at(3, 'texture', 50).weight);
+  assert.ok(at(1, 'inner', 50).widthScale > at(3, 'fine', 50).widthScale);
+  assert.ok(at(2, 'inner', 90).weight > at(2, 'inner', 10).weight);
 });
