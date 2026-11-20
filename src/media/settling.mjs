@@ -23,16 +23,16 @@
 
 const G = 9.81, RHO_W = 1000, MU = 1.0e-3, KT = 4.05e-21;   // m s^-2, kg m^-3, Pa s, J (water near 20 C)
 // the shallowest film settling divides by: a film thinner than a particle has nothing left to fall through
-export const MIN_FILM_MM = 0.001;
+const MIN_FILM_MM = 0.001;
 // how far a particle diffuses to reach a fibre: the surface fibres (cotton, 15 to 20 um thick, as far apart) stand in
 // the film, so a fine particle finds one within about this distance however deep the film is
-export const FIBRE_GAP_MM = 0.02;
+const FIBRE_GAP_MM = 0.02;
 
 /** Stokes settling speed in mm/s of particles `dUm` micrometres across with density `rhoP` kg/m^3. */
 export const stokesMmPerS = (dUm, rhoP) => (Math.max(0, rhoP - RHO_W) * G * (dUm * 1e-6) ** 2) / (18 * MU) * 1000;
 
 /** Brownian diffusion coefficient in mm^2/s of particles `dUm` micrometres across. */
-export const diffusionMm2PerS = dUm => (KT / (3 * Math.PI * MU * dUm * 1e-6)) * 1e6;
+const diffusionMm2PerS = dUm => (KT / (3 * Math.PI * MU * dUm * 1e-6)) * 1e6;
 
 /**
  * A pigment's effective particle diameter (um) and density (kg/m^3). A paint from the table (pigment-physical.mjs) or

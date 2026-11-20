@@ -65,7 +65,7 @@ function rng(seed) {
   return () => (u() + u() + u() + u() - 2) * 1.7320508075688772;
 }
 /** Power of the relief at spatial frequency (fx, fy) cycles a millimetre. */
-export function reliefPower(fx, fy, p) {
+function reliefPower(fx, fy, p) {
   const f = Math.hypot(fx * p.aniso, fy / p.aniso);
   if (f === 0) return 0;
   const band = (lo, hi) => f ** -2 * Math.exp(-((f * lo) ** 2)) * (1 - Math.exp(-((f * hi) ** 2)));
