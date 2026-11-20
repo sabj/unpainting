@@ -311,3 +311,140 @@ export function spineFill(loops, kit) {
   pts[0][2] = Math.min(pts[0][2], 0.15); pts[pts.length - 1][2] = Math.min(pts[pts.length - 1][2], 0.15);
   return { strokes: [{ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }], brushMm: brush, angle: th, depthMm: widest / 2, areaMm2: 0, uncovered: 0, spine: true };
 }
+
+// --- lanes ---------------------------------------------------------------------------------------------------------
+// Why the zigzag above leaves a stepped edge: each lane is a band 2r tall that has to stop at ONE place, read on the
+// lane's centre row (where the brush's whole width fits, plus a little overshoot). Where the outline slants, the lane's
+// upper and lower edges meet the outline at different places, so every lane ends in a step one lane tall. The steps were
+// then covered by a smaller brush steered along the outline, which laid the outline twice (a dark rim) and, round a
+// whole shape, a ring.
+// laneFill instead lays each lane as its own stroke along the shape's long axis, from outline to outline on its own
+// centre line, landing and lifting on the brush's tip: the end of a lane is a taper the width of the tip, so the ends of
+// neighbouring lanes follow the slant instead of stepping. Nothing runs along the outline. What the lanes leave bare (a
+// corner, an arm) is laid the same way with a smaller brush along that part's own long axis.
+
+/** The pressure a lane lands and lifts at (a round lays r (0.25 + 0.75 p) to each side). */
+const TIP = 0.15;
+/** Lanes overlap by this share of the brush's width. */
+const LANE_OVERLAP = 0.25;
+/** A shape is laid along its long axis when it is at least this many times as long as it is wide; else level. */
+const LONG = 2.2;
+/** The brush is the smallest of the kit that lays the shape in at most this many lanes... */
+const MOST_LANES = 4;
+/** ... and is never wider than this many times the shape's widest inscribed width. */
+const FATTEST = 1.3;
+/** A bare part is laid again when it is at least this big (mm2) and wider than this (mm). */
+const BARE_LEAST_MM2 = 10, BARE_WIDE_MM = 2;
+
+const halfAt = (r, p) => r * (0.25 + 0.75 * p);
+
+/**
+ * The strokes that fill `loops` (closed outlines in mm, even-odd) as one wash, in lanes along its long axis.
+ * @returns {{strokes: Array<{kind:'sweep', radiusMm:number, points:number[][]}>, brushMm:number, angle:number, depthMm:number, areaMm2:number, uncovered:number}}
+ */
+export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = true }) {
+  const kit = [...kitMm].sort((a, b) => a - b), small = kit[0];
+  const all = loops.flatMap(l => l.points);
+  if (all.length < 3) return { strokes: [], brushMm: 0, angle: 0, depthMm: 0, areaMm2: 0, uncovered: 0 };
+  if (spine) { const s = spineFill(loops, [...kit].reverse()); if (s) return s; }
+  const pitch = Math.max(0.2, Math.min(0.5, small / 10));
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of all) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const pad = 2 + Math.ceil(growMm / pitch), ox = x0 - pad * pitch, oy = y0 - pad * pitch;
+  const gw = Math.ceil((x1 - x0) / pitch) + 2 * pad + 1, gh = Math.ceil((y1 - y0) / pitch) + 2 * pad + 1, gn = gw * gh;
+  const fill = ls => {
+    const m = new Uint8Array(gn);
+    for (let gy = 0; gy < gh; gy++) {
+      const v = oy + (gy + .5) * pitch, xs = [];
+      for (const l of ls) for (let q = 0; q < l.points.length; q++) { const P = l.points[q], Q = l.points[(q + 1) % l.points.length]; if ((P[1] <= v) !== (Q[1] <= v)) xs.push(P[0] + (v - P[1]) / (Q[1] - P[1]) * (Q[0] - P[0])); }
+      xs.sort((a, b) => a - b);
+      for (let q = 0; q + 1 < xs.length; q += 2) for (let gx = Math.max(0, Math.ceil((xs[q] - ox) / pitch - .5)); gx < gw && ox + (gx + .5) * pitch < xs[q + 1]; gx++) m[gy * gw + gx] = 1;
+    }
+    return m;
+  };
+  const inside = fill(loops);
+  if (growMm > 0) {
+    const out = distance(Uint8Array.from(inside, v => 1 - v), gw, gh), barred = keepOut?.length ? fill(keepOut) : null;
+    for (let i = 0; i < gn; i++) if (!inside[i] && out[i] * pitch <= growMm && !barred?.[i]) inside[i] = 1;
+  }
+  let area = 0; for (let i = 0; i < gn; i++) area += inside[i];
+  if (!area) return { strokes: [], brushMm: 0, angle: 0, depthMm: 0, areaMm2: 0, uncovered: 0 };
+  const covered = new Uint8Array(gn), strokes = [];
+  const at = (x, y) => { const gx = Math.floor((x - ox) / pitch), gy = Math.floor((y - oy) / pitch); return gx >= 0 && gy >= 0 && gx < gw && gy < gh ? gy * gw + gx : -1; };
+  // a round's footprint: a disc of the half-width its pressure gives, every half cell along the path
+  const stamp = (pts, r) => {
+    for (let q = 0; q + 1 < pts.length; q++) {
+      const A = pts[q], B = pts[q + 1], len = Math.hypot(B[0] - A[0], B[1] - A[1]), steps = Math.max(1, Math.ceil(len / (pitch / 2)));
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps, cx = A[0] + (B[0] - A[0]) * t, cy = A[1] + (B[1] - A[1]) * t, hr = halfAt(r, (A[2] ?? 1) + ((B[2] ?? 1) - (A[2] ?? 1)) * t), rc = hr / pitch;
+        const gx = (cx - ox) / pitch, gy = (cy - oy) / pitch;
+        for (let y = Math.max(0, Math.floor(gy - rc)); y <= Math.min(gh - 1, Math.ceil(gy + rc)); y++) for (let x = Math.max(0, Math.floor(gx - rc)); x <= Math.min(gw - 1, Math.ceil(gx + rc)); x++) if ((x + .5 - gx) ** 2 + (y + .5 - gy) ** 2 <= rc * rc) covered[y * gw + x] = 1;
+      }
+    }
+  };
+  let first = null;
+  // one part (a 0/1 grid) laid in lanes by the brushes of `kit` that are no wider than `widest`
+  const layPart = (part, widest, depth) => {
+    const cells = []; for (let i = 0; i < gn; i++) if (part[i]) cells.push(i);
+    if (!cells.length) return;
+    const P = cells.map(i => [ox + (i % gw + .5) * pitch, oy + (((i / gw) | 0) + .5) * pitch]);
+    let mx = 0, my = 0; for (const [x, y] of P) { mx += x; my += y; } mx /= P.length; my /= P.length;
+    let a = 0, b = 0, c = 0; for (const [x, y] of P) { const dx = x - mx, dy = y - my; a += dx * dx; b += dx * dy; c += dy * dy; }
+    const mean = (a + c) / 2, d = Math.sqrt(((a - c) / 2) ** 2 + b * b), long = Math.sqrt((mean + d) / Math.max(1e-9, mean - d));
+    let th = long >= LONG ? 0.5 * Math.atan2(2 * b, a - c) : 0;
+    const tx = Math.cos(th), ty = Math.sin(th);
+    // the lanes' normal points down the sheet (or right, for an upright shape), so the lanes go top down
+    let nx = -ty, ny = tx; if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)) { nx = -nx; ny = -ny; }
+    let v0 = Infinity, v1 = -Infinity, u0 = Infinity, u1 = -Infinity;
+    for (const [x, y] of P) { const v = x * nx + y * ny, u = x * tx + y * ty; if (v < v0) v0 = v; if (v > v1) v1 = v; if (u < u0) u0 = u; if (u > u1) u1 = u; }
+    v0 -= pitch / 2; v1 += pitch / 2; u0 -= pitch; u1 += pitch;
+    const D = distance(part, gw, gh); let deep = 0; for (const i of cells) if (D[i] > deep) deep = D[i];
+    const across = v1 - v0, fat = 2 * deep * pitch * FATTEST;
+    // the brush: the smallest that lays the part in MOST_LANES lanes, never much fatter than the part
+    const fits = kit.filter(wd => wd <= widest && (wd <= fat || wd === kit[0]));
+    if (!fits.length) return;
+    let brush = fits.find(wd => Math.ceil(Math.max(0, across - wd) / (wd * (1 - LANE_OVERLAP))) + 1 <= MOST_LANES) ?? fits[fits.length - 1];
+    const r = brush / 2;
+    if (!first) first = { brush, th, deep: deep * pitch };
+    // lane centres: the outer ones nine tenths of the brush's radius in, so its edge lays the part's edge
+    const inset = Math.min(across / 2, 0.9 * r), lanes = Math.max(1, Math.ceil(Math.max(0, across - 2 * inset) / (2 * r * (1 - LANE_OVERLAP))) + 1);
+    const vs = lanes === 1 ? [(v0 + v1) / 2] : Array.from({ length: lanes }, (_, q) => v0 + inset + q * (across - 2 * inset) / (lanes - 1));
+    let k = 0;
+    for (const v of vs) {
+      // the runs of the part along this lane's centre line
+      const runs = []; let from = null, last = null;
+      for (let u = u0; u <= u1 + 1e-9; u += pitch / 2) {
+        const x = u * tx + v * nx, y = u * ty + v * ny, i = at(x, y), ok = i >= 0 && part[i];
+        if (ok && from == null) from = u; if (ok) last = u;
+        if (!ok && from != null) { runs.push([from, last]); from = null; }
+      }
+      if (from != null) runs.push([from, last]);
+      for (const [ra, rb] of runs) {
+        const len = rb - ra; if (len < 0.6 * r) continue;
+        // the tip lands on the outline (its centre a third of the radius in) and the hand presses over the first radius
+        const e = Math.min(len / 3, 0.3 * r), fw = k % 2 === 0, s = fw ? ra + e : rb - e, f = fw ? rb - e : ra + e, dir = fw ? 1 : -1, run = Math.abs(f - s);
+        const us = run > 2.5 * r ? [[s, TIP], [s + dir * r, 1], [f - dir * r, 1], [f, TIP]] : [[s, TIP], [(s + f) / 2, 1], [f, TIP]];
+        const pts = us.map(([u, p]) => [+(u * tx + v * nx).toFixed(3), +(u * ty + v * ny).toFixed(3), p]);
+        stamp(pts, r); strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }); k++;
+      }
+    }
+    if (depth >= 2) return;
+    // what the lanes left bare, less the slivers the wet wash closes by itself, laid with a smaller brush
+    const raw = Uint8Array.from(part, (vv, i) => (vv && !covered[i] ? 1 : 0)), o = BARE_WIDE_MM / 2 / pitch;
+    const shrunk = Uint8Array.from(distance(raw, gw, gh), dd => (dd > o ? 1 : 0)), back = distance(Uint8Array.from(shrunk, vv => 1 - vv), gw, gh);
+    const bare = Uint8Array.from(raw, (vv, i) => (vv && back[i] <= o + 1 ? 1 : 0));
+    dropSmall(bare, gw, gh, BARE_LEAST_MM2 / (pitch * pitch));
+    // each bare part on its own, a little grown into what is laid so its lanes meet the wash
+    const seen = new Uint8Array(gn);
+    for (let s0 = 0; s0 < gn; s0++) {
+      if (!bare[s0] || seen[s0]) continue;
+      const comp = new Uint8Array(gn), stack = [s0]; seen[s0] = 1;
+      while (stack.length) { const i = stack.pop(), x = i % gw; comp[i] = 1; for (const j of [x ? i - 1 : -1, x < gw - 1 ? i + 1 : -1, i - gw, i + gw]) if (j >= 0 && j < gn && bare[j] && !seen[j]) { seen[j] = 1; stack.push(j); } }
+      const near = distance(Uint8Array.from(comp, vv => 1 - vv), gw, gh), grown = Uint8Array.from(near, (dd, i) => (part[i] && dd * pitch <= 1 ? 1 : 0));
+      layPart(grown, brush - 1e-6, depth + 1);
+    }
+  };
+  layPart(inside, Infinity, 0);
+  let cov = 0; for (let i = 0; i < gn; i++) if (inside[i] && covered[i]) cov++;
+  return { strokes, brushMm: first?.brush ?? 0, angle: first?.th ?? 0, depthMm: first?.deep ?? 0, areaMm2: area * pitch * pitch, uncovered: 1 - cov / area };
+}

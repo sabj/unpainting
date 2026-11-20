@@ -805,11 +805,18 @@ const WICK_FLOOR = Math.max(...WICK_FLOORS);
 // own lights (pass.lights), so it takes none. The white is one more pigment channel on the sheet only when a stroke is planned.
 // Surface marks on an unplanned run (tools/plate/surface-plan.mjs): a vision judge labels the SAM regions, a coat asks for
 // coat marks and dressed stone for masonry, anything else or any doubt for none. An area plan has its own marks (pass.marks).
-const SURFACE_PLAN = opt('areaplan', '')
+// A study wash plan (--washplan FILE, study-washes.mjs) lays the washes of a block-in study and nothing read off the
+// subject's fine detail: no surface marks, no final lights, no thin darks (they failed the planted-pattern copy test).
+const STUDY_WASHES = opt('washplan', 'squint') !== 'squint';
+const SURFACE_PLAN = STUDY_WASHES
+  ? { groups: [], coat: { strokes: [], regions: [] }, coatMask: new Uint8Array(w * h), record: { status: 'none', reason: 'the study wash plan lays no surface marks' } }
+  : opt('areaplan', '')
   ? { groups: [], coat: { strokes: [], regions: [] }, coatMask: new Uint8Array(w * h), record: { status: 'none', reason: 'an area plan owns its marks (pass.marks)' } }
   : await planSurface({ image: path.resolve(root, opt('image')), root, w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), segments: ctx.SEGMENTS_RECORD, SRC: ctx.SRC, paperRGB, judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')), log: console.log });
 fs.writeFileSync(path.join(out, 'surface-plan.json'), JSON.stringify(SURFACE_PLAN.record, null, 1));
-const GOUACHE_PLAN = opt('areaplan', '')
+const GOUACHE_PLAN = STUDY_WASHES
+  ? { strokes: [], record: { decision: 'none', reason: 'the study wash plan leaves its lights as paper' } }
+  : opt('areaplan', '')
   ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lights (pass.lights)' } }
   : await planGouache({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, pigments: PIGS, coat: { mask: SURFACE_PLAN.coatMask } });
 const COAT_PLAN = { strokes: SURFACE_PLAN.coat.strokes, record: { status: SURFACE_PLAN.record.status, regions: SURFACE_PLAN.coat.regions, strokes: SURFACE_PLAN.coat.strokes.length, brushSwatch: SURFACE_PLAN.record.brushSwatch ?? null } };
@@ -818,7 +825,9 @@ const COAT_PLAN = { strokes: SURFACE_PLAN.coat.strokes, record: { status: SURFAC
 // with its own step over its sides, never where the drawing layer already draws the line in ink or visible graphite, never
 // in a coat. They are laid last over the dry washes, in paint with the rigger's point or in pencil (thin-darks-lay.mjs).
 const THIN_DARKS_DRAWN = drawnLines(STAGE_PLAN?.files, { root, out, graphiteAmount: num('prepamount', 0.3) });
-const THIN_DARKS_PLAN = opt('areaplan', '')
+const THIN_DARKS_PLAN = STUDY_WASHES
+  ? { strokes: [], record: { decision: 'none', reason: 'the study wash plan lays no thin darks' } }
+  : opt('areaplan', '')
   ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lines' } }
   : await planThinDarks({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, coat: { mask: SURFACE_PLAN.coatMask }, drawn: THIN_DARKS_DRAWN.lines });
 THIN_DARKS_PLAN.record.drawingLayer = THIN_DARKS_DRAWN.found;

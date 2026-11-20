@@ -10,8 +10,10 @@ import {prepareWetBed} from '../painter/wet-bed-prep.mjs';
 import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/methods/fine-material.mjs';
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
-import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
+import {planLightToDark, valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/light-to-dark.mjs';
 import {planLayeredWashes} from '../../src/paint/methods/layered-washes.mjs';
+import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
+import {loadStudy} from '../painter/study-load.mjs';
 import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
@@ -272,7 +274,11 @@ if(VALUE_ENABLED){
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
  // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
  valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
- const planValues=valueOptions.styleSelection?planLightToDark:planLayeredWashes;
+ // --washplan FILE: the washes are read from a painter's block-in study (an image of the subject simplified to flat
+ // shapes), registered to the sheet; the subject is not read for them (study-washes.mjs). squint: from the subject squinted.
+ const WASH_PLAN=opt('washplan','squint');
+ if(WASH_PLAN!=='squint'){valueOptions.study=await loadStudy(path.resolve(root,WASH_PLAN),w,h);const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ const planValues=WASH_PLAN!=='squint'?planStudyWashes:valueOptions.styleSelection?planLightToDark:planLayeredWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions),demand:valueOptions.demand}));
@@ -290,7 +296,7 @@ if(VALUE_ENABLED){
  if(num('darkfirst',0)>0){const ph=l=>l._valuePhase==='light'?0:l._valuePhase==='shadow'?1:2;ctx.layers=ctx.layers.map((l,i)=>({l,i})).sort((a,b)=>ph(a.l)-ph(b.l)||a.i-b.i).map(q=>q.l);console.log('darkfirst: '+ctx.layers.map(l=>l._valuePhase[0]).join(''));}
  // a crop rectangle would show as a straight mask edge the subject does not have; the layered plan's shapes are outlines
  // of the squinted subject, which sit a squint's width off a straight subject edge, so the test is the older plan's
- const seams=planValues===planLayeredWashes?[]:ctx.layers.filter(l=>l.value===1).flatMap(l=>l.shapes.flatMap(sh=>unsupportedAxisEdges(sh.mask,w,h,ctx.px).map(edge=>({pass:sh._valuePlan.id,...edge}))));
+ const seams=planValues!==planLightToDark?[]:ctx.layers.filter(l=>l.value===1).flatMap(l=>l.shapes.flatMap(sh=>unsupportedAxisEdges(sh.mask,w,h,ctx.px).map(edge=>({pass:sh._valuePlan.id,...edge}))));
  const baseMass=new Float32Array(n);for(const l of ctx.layers.filter(l=>l.value===1))for(const sh of l.shapes)for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){const i=y*w+x;if(sh.ids[i]===sh.id)baseMass[i]+=(sh.graded?sh.graded[i]:sh.amount);}
  let warm=0,warmPainted=0;for(let i=0;i<n;i++)if(ctx.px[3*i]-ctx.px[3*i+2]>18&&ctx.px[3*i+1]-ctx.px[3*i+2]>8){warm++;if(baseMass[i]>0)warmPainted++;}
  fs.writeFileSync(path.join(out,'value-region-check.json'),JSON.stringify({source:ctx.VALUE_PLAN.regions.source,band1UnsupportedAxisEdges:seams,regionCount:ctx.VALUE_PLAN.regions.regions.length,regions:ctx.VALUE_PLAN.regions.regions,warmTargetCells:warm,warmCellsWithPositiveBand1Pigment:warmPainted,physicalReserve:'same target-white mask as compiled plan'},null,2));
