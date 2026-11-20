@@ -53,6 +53,10 @@ const CASES = {
     flowFor(sheet, Number(arg('bloomwait', 60)));
     disc(sheet, mm, 25, 25, 6, 0.25, [0.05, 0]);
   },
+  // a nearly dry flat dragged once, light and fast, over dry paper (dry brush: paint caught on the grain's peaks)
+  drag: (sheet, mm) => {
+    for (const [y, p] of [[15, 0.35], [32, 0.6]]) { const b = flat(mm, 70 + y); B.dip(b, { water: 0.18, conc: [1.5, 0] }); lay(sheet, mm, b, [{ x: 5, y, p }, { x: 45, y: y + 1, p }], { upright: 'sweep', speed: 250 }); }
+  },
 };
 const cells = arg('cells', '0.25,0.1').split(',').map(Number), modes = arg('modes', 'full,fast').split(','), only = arg('cases', Object.keys(CASES).join(',')).split(',');
 const info = { root: path.resolve(root), O, size: SIZE, runs: [] };
