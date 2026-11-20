@@ -18,7 +18,7 @@ test('a two-stage pen run lays the drawing\'s vector strokes in both stages; no 
     const lines = Array.from({ length: 6 }, (_, i) => ({ seq: i, points: [[6, 6 + 4 * i], [40, 6 + 4 * i]], width: 1, weight: 1, role: 'pen stroke', length: 34 }));
     fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ image: { w: 48, h: 36 }, inputKind: 'drawing', medium: 'ink', lines }));
     const strokes = lines.map(l => ({ seq: l.seq, line: l.seq, dark: 1, path: [[6.5, 6.5 + 4 * l.seq], [40.5, 6.5 + 4 * l.seq]], widths: [0.6, 0.6], outline: [[[6, 6.2 + 4 * l.seq], [41, 6.2 + 4 * l.seq], [41, 6.8 + 4 * l.seq], [6, 6.8 + 4 * l.seq]]] }));
-    fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify({ sheetMm: 48, heightMm: 36, medium: 'ink', strokes }));
+    fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify({ sheetMm: 48, heightMm: 36, medium: 'ink', fills: 'marked', strokes }));
     const log = run(['--image', target, '--washplan', target, '--drawingfile', stem, '--inkrecipe', 'wash', '--stages', 'prepink,finishink', '--prepinkkeep', '1', '--prepinkadd', '0', '--prepinkdeviate', '0', '--out', out], cwd);
     const laid = log.split('\n').filter(l => l.startsWith('ink vectors:'));
     assert.equal(laid.length, 2, `both pens lay vectors:\n${log.split('\n').slice(-30).join('\n')}`);

@@ -202,15 +202,15 @@ function layExactVectors(file, { closing = false } = {}) {
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
   const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
-  // --inkfill (0..1, default 0.25): when paint follows the pen, a FILL stroke (a leaf mass, a dark pane) is laid as its edge
-  // at line weight and its inside at this share of its darkness, so the paint supplies the dark and the ink does not
-  // overcome it; nothing is dropped. A drawing laid alone (--drawingonly) is laid exactly.
+  // --inkfill (0..1, default 0.25): when paint follows the pen, a FILL stroke (a mass of ink the fitter marked: a leaf mass, a
+  // dark pane) is laid as one pale soft shape at this share of its darkness, so the paint supplies the dark and the ink does
+  // not overcome it; lines are laid whole and nothing is dropped. A drawing laid alone (--drawingonly) is laid exactly.
   const fill = num('drawingonly', 0) > 0 ? 1 : Math.max(0, Math.min(1, num('inkfill', 0.25)));
   const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;
-  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}; no tracer, no pen gestures`);
+  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}${r.widened ? `, ${r.widened} lines finer than a cell laid a cell wide` : ''}; no tracer, no pen gestures`);
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const speedDrawStart = performance.now();

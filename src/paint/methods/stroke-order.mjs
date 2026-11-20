@@ -9,6 +9,7 @@
 
 import { bridgeGaps } from './stroke-bridge.mjs';
 import { strokeContributions } from './stroke-contribution.mjs';
+import { byArea } from './area-order.mjs';
 
 const ORDER_DEFAULTS = Object.freeze({
   cellMm: 0.5,          // the grid the faces are found on
@@ -594,8 +595,10 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start
   const key = s => Math.min(s.len, c.accentMm) * ((s.heft ?? 1) / heftMid) ** 2 * (s.object === main.id ? 1.5 : 1) * (0.6 + s.points[0][1] / heightMm);
   const pool = emph.size ? [...emph] : structural.filter(s => s.role === 'outline').sort((a, b) => key(b) - key(a)).slice(0, Math.round(c.emphasisShare * out.length));
   nearest(pool, 'emphasis');
-  out.dropped = joined.filter(s => s.dropped).length;
-  return out;
+  // worked area by area: each thing finished with its own detail and texture before the hand moves outward (area-order.mjs)
+  const worked = byArea(out, { centre, mainUnit: sizeable ? main.id : null });
+  worked.dropped = joined.filter(s => s.dropped).length;
+  return worked;
 }
 
 /**
