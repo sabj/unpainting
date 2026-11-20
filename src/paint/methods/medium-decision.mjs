@@ -6,6 +6,9 @@
 //      ink or auto, --inkrecipe wash, an ink stage) is honoured only when the source shows pen line at
 //      --penfirst per cent or more; below that it is removed, and the washes are not touched by ink flags (subject-medium.mjs).
 // The pen share is evidence for that veto. It never switches ink on.
+//   0. A prepared drawing file (--drawingfile of inputKind drawing) declares its own medium (the file's `medium`, else
+//      --outlinemedium): that is the medium, and the pen share is not consulted. A plan or --subjectmedium naming another
+//      medium stops the run.
 import { subjectMediumOf } from './../subject-medium.mjs';
 
 /** The plan styles that declare a pen drawing. */
@@ -57,13 +60,22 @@ export function inkRequestedBy(argv) {
  *   graphite subject, so no ink option or closing file survives and no ink flag can reach the washes; addArgs are the flags
  *   a declared style adds.
  */
-export function decideMedium({ argv, plan, penSharePct = null, penFirstPct }) {
+export function decideMedium({ argv, plan, penSharePct = null, penFirstPct, drawing = null }) {
   const declared = planDeclaration(plan), requested = inkRequestedBy(argv), flag = subjectMediumOf(argv);
   const evidence = {
     planDeclared: declared.medium ? `${declared.medium} (${declared.by})` : null, planStyles: declared.styles,
     inkRequestedBy: requested, penSharePct: Number.isFinite(penSharePct) ? penSharePct : null, penFirstPct,
+    preparedDrawing: drawing ? `${drawing.medium} (${drawing.from})` : null,
   };
   const out = (medium, basis, { vetoed = false, addArgs = [], note }) => ({ medium, basis, vetoed, addArgs, subjectMedium: medium === 'pencil' && basis !== 'flag' ? 'pencil' : null, evidence, note: `medium ${medium}: ${note}` });
+  if (drawing) {
+    const medium = drawing.medium === 'ink' ? 'pen' : drawing.medium === 'pencil' || isGraphite(drawing.medium) ? 'pencil' : null;
+    if (!medium) throw new Error(`medium decision: the prepared drawing ${drawing.file} declares no medium (ink or pencil): give it a "medium" or pass --outlinemedium`);
+    const planMedium = declared.medium === 'ink' ? 'pen' : declared.medium === 'graphite' ? 'pencil' : null;
+    if (planMedium && planMedium !== medium) throw new Error(`medium decision: the prepared drawing ${drawing.file} is ${drawing.medium} (${drawing.from}) but the plan declares ${declared.medium} (${declared.by})`);
+    if (flag && (flag === 'pen' ? 'pen' : 'pencil') !== medium) throw new Error(`medium decision: the prepared drawing ${drawing.file} is ${drawing.medium} (${drawing.from}) but --subjectmedium is ${flag}`);
+    return { ...out(medium, 'drawing', { note: `the prepared drawing ${drawing.file} is ${drawing.medium} (${drawing.from}); the source's pen share is not consulted` }), subjectMedium: medium === 'pencil' ? 'pencil' : null };
+  }
   if (flag) return out(flag === 'pen' ? 'pen' : 'pencil', 'flag', { note: `--subjectmedium ${flag} given on the command line` });
   if (declared.medium === 'ink') {
     const addArgs = declared.by === 'style' && !argv.includes('--outlinemedium') ? ['--outlinemedium', 'ink'] : [];
