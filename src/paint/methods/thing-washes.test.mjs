@@ -93,3 +93,10 @@ test('a named shadow is one glaze in the colour of its shade, laid after the thi
   assert.ok(q.indexOf(s[0]) > Math.max(...q.filter(v => v.stage === 2).map(v => q.indexOf(v))));
   assert.ok(s[0].outline.length === 1 && s[0].outline[0].points.length < 200, 'a loose shape, not the dapple');
 });
+
+test('a named thing\'s own SAM mask is its shape, whatever regions the automatic map cut', () => {
+  const pw = 10, ph = 10, region = new Int32Array(100).fill(1), own = Uint8Array.from({ length: 100 }, (_, i) => (i % 10 >= 6 && (i / 10 | 0) >= 6 ? 2 : 0));
+  const named = cleanThings([{ name: 'wall', kind: 'wall', box: [0, 0, 1, 1] }, { name: 'door', kind: 'door', box: [.5, .5, 1, 1] }]);
+  const { things } = assignThings(region, pw, ph, named, 1, own);
+  assert.equal(things.find(t => t.name === 'door').cells.length, 16); assert.equal(things.find(t => t.name === 'wall').cells.length, 84);
+});

@@ -1,7 +1,8 @@
 // The wash plan by things: the washes a person would choose, one a thing, with no tracing of the subject's values.
 //
-// Inputs: the subject, its SAM regions (the run's segment map) and the things a local vision model named with rough
-// boxes (thing-labels.mjs). A SAM region belongs to the most specific named thing whose box holds most of it.
+// Inputs: the subject, its SAM regions (the run's segment map), the things a local vision model named with rough
+// boxes and each thing's SAM mask from its box (thing-labels.mjs). What no thing's mask holds goes by SAM region to the
+// most specific named thing whose box holds most of the region.
 // 1. Reserved lights: the few brightest regions of named things, kept as bare paper. Each is a smooth outline no narrower than
 //    the wash brush; every wash goes round them.
 // 2. Big bands first: the sky, the ground, the water, the path and the main mass (a thing over a quarter of the
@@ -129,14 +130,15 @@ function clipLoop(loop, s) {
 }
 
 /**
- * The things of the picture: each SAM region given to the named thing with the smallest box that holds IN_BOX of it.
+ * The things of the picture. A cell in a named thing's own mask (`own`: SAM prompted with its box) is that thing's.
+ * Every other SAM region is given to the named thing with the smallest box that holds IN_BOX of it.
  * A region no box holds is a thing of its own (kind 'other') when it is large enough for a wash, else it joins the
  * thing it borders most. Shadows take no regions: they glaze across things.
  * @returns {{things: Array<{name, kind, box, cells:number[]}>, regionOf: Int32Array, regions: Map}}
  */
-export function assignThings(region, pw, ph, named, leastCells) {
+export function assignThings(region, pw, ph, named, leastCells, own = null) {
   const pn = pw * ph, regions = new Map();
-  for (let i = 0; i < pn; i++) { let r = regions.get(region[i]); if (!r) regions.set(region[i], (r = { id: region[i], cells: [] })); r.cells.push(i); }
+  for (let i = 0; i < pn; i++) { if (own?.[i]) continue; let r = regions.get(region[i]); if (!r) regions.set(region[i], (r = { id: region[i], cells: [] })); r.cells.push(i); }
   const things = named.filter(t => t.kind !== 'shadow').map(t => ({ ...t, cells: [] }));
   const boxCells = t => [Math.floor(t.box[0] * pw), Math.floor(t.box[1] * ph), Math.ceil(t.box[2] * pw), Math.ceil(t.box[3] * ph)];
   const inside = (t, i) => { const [x0, y0, x1, y1] = boxCells(t), x = i % pw, y = (i / pw) | 0; return x >= x0 && x < x1 && y >= y0 && y < y1; };
@@ -157,6 +159,8 @@ export function assignThings(region, pw, ph, named, leastCells) {
     if (best >= 0) owner.set(r.id, best);
   }
   const thingOf = new Int32Array(pn).fill(-1);
+  // a cell in a named thing's own mask is that thing's
+  if (own) { const at = new Map(); things.forEach((t, q) => { if (t.index !== undefined) at.set(t.index + 1, q); }); for (let i = 0; i < pn; i++) { const q = own[i] ? at.get(own[i]) : undefined; if (q !== undefined) { things[q].cells.push(i); thingOf[i] = q; } } }
   for (const r of regions.values()) { const o = owner.get(r.id); if (o >= 0) for (const i of r.cells) { things[o].cells.push(i); thingOf[i] = o; } }
   const kept = things.filter(t => t.cells.length), index = things.map(t => kept.indexOf(t));
   for (let i = 0; i < pn; i++) if (thingOf[i] >= 0) thingOf[i] = index[thingOf[i]];
@@ -196,7 +200,7 @@ export function thingOrder(things) {
   return out;
 }
 
-export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], pointBrushMm = 0, hold = null, families = [], subject = null, shaped = true, segments = null, things: named = [], drawn = false }) {
+export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], pointBrushMm = 0, hold = null, families = [], subject = null, shaped = true, segments = null, things: named = [], thingMap = null, drawn = false }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
   if (demand.length !== n * k || density.length !== n || k < 1) throw Error('target/demand grid mismatch');
   if (!rgb || pigments.length !== k) throw Error('the wash plan needs the subject colours and the pigments');
@@ -213,7 +217,8 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   if (!segments || segments.length !== n) throw Error('the thing-wash plan needs the run\'s segment map (--segments sam)');
   const regionMap = Int32Array.from({ length: pn }, (_, q) => segments[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]);
   const least = leastAreas(washBrushMm), leastCells = least.washMm2 / (planMm * planMm);
-  const { things, thingOf } = assignThings(regionMap, pw, ph, named, leastCells);
+  const own = thingMap ? Uint8Array.from({ length: pn }, (_, q) => thingMap[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]) : null;
+  const { things, thingOf } = assignThings(regionMap, pw, ph, named, leastCells, own);
   const sortedL = Float32Array.from(pL).sort(), lightest = sortedL[Math.floor(.98 * (pn - 1))], medianL = sortedL[pn >> 1], darkFloor = sortedL[Math.floor(.04 * (pn - 1))];
   const maskOf = cells => { const m = new Uint8Array(pn); for (const i of cells) m[i] = 1; return m; };
   const cellsOf = m => { const out = []; for (let i = 0; i < pn; i++) if (m[i]) out.push(i); return out; };
@@ -223,7 +228,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   const tolThing = drawn ? DRAWN_TOL_MM : THING_TOL_MM;
   // the regions of named things that are the picture's lights; a thing all of whose cells are lights is left as paper
   const regionCells = new Map(); for (let i = 0; i < pn; i++) { const r = regionMap[i]; if (!regionCells.has(r)) regionCells.set(r, []); regionCells.get(r).push(i); }
-  const lightRegions = [...regionCells.values()].map(cells => ({ cells, L: labOf(trimmedMedian(cells, rgbAt, LAt), 0, paperCol)[0], owner: thingOf[cells[0]] }))
+  const lightRegions = [...regionCells.values()].map(cells => ({ cells, L: labOf(trimmedMedian(cells, rgbAt, LAt), 0, paperCol)[0], owner: (() => { const v = new Map(); for (const i of cells) v.set(thingOf[i], (v.get(thingOf[i]) ?? 0) + 1); return [...v].sort((a, b) => b[1] - a[1])[0][0]; })() }))
     .filter(r => r.owner >= 0 && !BAND_KINDS.has(things[r.owner].kind) && r.cells.length < MASS_SHARE * pn && r.L >= lightest - LIGHT_WITHIN && r.L >= medianL + LIGHT_CLEAR).sort((a, b) => b.L - a.L).slice(0, MOST_LIGHTS);
   const lightLoops = [], lightNames = [];
   for (const r of lightRegions) { const loops = polygonsOf(maskOf(r.cells), pw, ph, { planMm, brushMm: washBrushMm, tolMm: tolThing, leastMm2: least.reserveMm2 }); if (loops.length) { lightLoops.push(...loops); lightNames.push(things[r.owner].name); r.kept = true; } }

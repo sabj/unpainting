@@ -276,7 +276,7 @@ if(VALUE_ENABLED){
  // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
  valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
  // the things a local vision model named in the subject, with rough boxes (thing-labels.mjs)
- {const t=loadThings(opt('image',''));valueOptions.things=t.things;console.log(t.file?`named things: ${t.things.length} from ${path.basename(t.file)} (${t.model})`:'named things: none for this subject; each SAM region is a thing');}
+ {const t=await loadThings(opt('image',''),w,h);valueOptions.things=t.things;valueOptions.thingMap=t.map;console.log(t.file?`named things: ${t.things.length} from ${path.basename(t.file)} (${t.model})${t.map?', with their SAM masks':''}`:'named things: none for this subject; each SAM region is a thing');}
  const planValues=valueOptions.styleSelection?planLightToDark:planThingWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
