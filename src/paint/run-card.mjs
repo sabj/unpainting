@@ -35,10 +35,6 @@ function buildRunCard({
   dimensions = null,
   palette = null,
   phases = [],
-  gouache = null,
-  surface = null,
-  coat = null,
-  thinDarks = null,
   caption = null,
   seconds = 0,
   exitCode = 0,
@@ -116,14 +112,6 @@ function buildRunCard({
     // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)
     palette,
     phases,
-    // the final lights: the rule, what the planning data gave, and what was laid (tools/plate/gouache-plan.mjs)
-    gouache,
-    // surface marks: the judge, every region's label and what was laid (tools/plate/surface-plan.mjs)
-    surface,
-    // a coat's dry-brush texture: strokes planned and laid, and what they did to the sheet (tools/plate/coat-lay.mjs)
-    coat,
-    // thin dark lines laid over the dry washes, in paint with the rigger's point or in pencil: how many of each, why, and planned against painted step
-    thinDarks,
     // what this output is, so its image can be labelled on the image: subject, code, mode, sizes, sheet and date
     caption,
     continuedChecks: continuedSummary(),

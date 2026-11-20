@@ -101,7 +101,7 @@ export function gouacheTint(rgb, paperRGB, pigments, { floor = 0.35 } = {}) {
  * channels, in least squares. A mix of more paints is taken only when it misses at least 15% less than the one before.
  * @returns {{ mix: [{ pigment, amount }], residual }}
  */
-export function mixFor(need, pigments) {
+function mixFor(need, pigments) {
   const subsets = [];
   for (let i = 0; i < pigments.length; i++) {
     subsets.push([i]);

@@ -25,7 +25,7 @@ export const REMOVED_OPTIONS = Object.freeze({
 // (git show 49447027:<file>); the history is the archive.
 const LAST = 'last at commit 49447027';
 const in04 = (names, why, where) => Object.fromEntries(names.map(k => [k, `removed in 0.4: ${why} (${LAST}, ${where})`]));
-export const REMOVED_IN_04 = Object.freeze({
+const REMOVED_IN_04 = Object.freeze({
   ...in04(['touchpoints', 'touchbroad', 'touchthrough', 'touchdmin', 'touchfamilies', 'touchmincells', 'touchsmoothmm', 'touchlinepad', 'finishsnaps'],
     'the touch-up rounds glazed each planning family toward the subject\'s colour after a look, a correction loop', 'src/paint/methods/touch-up.mjs, tools/plate/paint.mjs'),
   ...in04(['finaldarks', 'fdquantile', 'fdmin', 'fdcontrast', 'fdsurroundmm', 'fdminmm2', 'fdtilemm', 'fddmin', 'fdgain'],

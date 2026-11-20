@@ -58,21 +58,3 @@ export function shapeRefit(A, aim, K, shapes, { render, unmix1, rounds = 3, log 
   return A;
 }
 
-/** The planned pen drawing as a cell mask (line files are planning assets, not the reference): the cells a line will
- * cover, grown by pad cells, so a step-back compares paint with paint and not with the ink still to come. */
-export function lineMask(files, w, h, { pad = 1, fs } = {}) {
-  const m = new Uint8Array(w * h);
-  for (const f of files) {
-    if (!f || !fs.existsSync(f)) continue;
-    const d = JSON.parse(fs.readFileSync(f, 'utf8')), iw = d.image?.w ?? w, ih = d.image?.h ?? h, sx = w / iw, sy = h / ih;
-    for (const l of d.lines ?? []) {
-      const r = Math.max(1, Math.ceil(((l.width ?? 1) * sx) / 2)) + pad, P = l.points ?? [];
-      for (let k = 0; k < P.length; k++) {
-        const [x1, y1] = P[k], [x0, y0] = P[Math.max(0, k - 1)], steps = Math.max(1, Math.ceil(Math.hypot((x1 - x0) * sx, (y1 - y0) * sy)));
-        for (let s = 0; s <= steps; s++) { const cx = Math.round((x0 + (x1 - x0) * s / steps) * sx), cy = Math.round((y0 + (y1 - y0) * s / steps) * sy);
-          for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const x = cx + dx, y = cy + dy; if (x >= 0 && y >= 0 && x < w && y < h && dx * dx + dy * dy <= r * r) m[y * w + x] = 1; } }
-      }
-    }
-  }
-  return m;
-}
