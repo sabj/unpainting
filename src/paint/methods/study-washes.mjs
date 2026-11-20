@@ -218,6 +218,8 @@ const BROKEN_HUE = [95, 170], BROKEN_LOST = 0.15, BROKEN_LEAST = 0.002, BROKEN_M
 const DAB_SHARE = 0.025, DAB_PITCH = 0.8, DAB_DARK_SHARE = 0.35, DAB_DARK = 1.6;
 /** Dabs vary in size between these shares of the brush; they come in clusters this many cells across, this share of the clusters left out as paper. */
 const DAB_SIZE = [0.55, 1.25], DAB_CLUSTER = 3, DAB_GAPS = 0.2;
+/** A darker value is dropped into a dabbed mass of at least this area (mm2). */
+const DARK_DABS_FROM = 100;
 /** Close values: a wash is laid against a neighbour still damp (one session, a soft edge) when their L* differ by no more than this. */
 const CLOSE_L = 8;
 /** Load along a wash: the brush starts loaded at this share over the mix and is thinned to this share under it before each recharge, every this many strokes. */
@@ -345,6 +347,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     for (let gy = 0; gy * pitch < ph * mmX; gy++) for (let gx = 0; gx * pitch < pw * mmX; gx++) {
       if (hash(Math.floor(gx / cl), Math.floor(gy / cl), salt + 5) < DAB_GAPS || hash(gx, gy, salt + 7) > keep) continue;
       const cx = (gx + 0.5 + 0.9 * (hash(gx, gy, salt) - 0.5)) * pitch, cy = (gy + 0.5 + 0.9 * (hash(gx, gy, salt + 1) - 0.5)) * pitch;
+      if (cx < dr || cy < dr || cx > pw * mmX - dr || cy > ph * mmX - dr) continue;
       const q = Math.min(ph - 1, Math.floor(cy / mmX)) * pw + Math.min(pw - 1, Math.floor(cx / mmX)); if (!m[q]) continue;
       const r = dr * (DAB_SIZE[0] + (DAB_SIZE[1] - DAB_SIZE[0]) * hash(gx, gy, salt + 4));
       const a = Math.PI * hash(gx, gy, salt + 2), len = r * (0.2 + 1.2 * hash(gx, gy, salt + 3)), ux = Math.cos(a) * len / 2, uy = Math.sin(a) * len / 2;
@@ -394,7 +397,8 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const light = dabsOver(m, 11), sh = light.length ? wash(stage, `${what}, in loose dabs`, loops, colour, { strokes: light, own }) : null;
     if (!sh) return [];
     const dark = dabsOver(m, 29, DAB_DARK_SHARE), out = [sh];
-    if (dark.length) { const d = wash(2, `${what}: darker dabs dropped in`, loops, colour, { strokes: dark, amounts: sh.mix.map(v => v * (DAB_DARK - 1)), move: 'wet on wet' }); if (d) out.push(d); }
+    // (a darker value only in a mass big enough to hold a few dabs of it, away from the sheet's edge)
+    if (dark.length >= 3 && own.length * cellMm2 >= DARK_DABS_FROM) { const d = wash(2, `${what}: darker dabs dropped in`, loops, colour, { strokes: dark, amounts: sh.mix.map(v => v * (DAB_DARK - 1)), move: 'wet on wet' }); if (d) out.push(d); }
     dabbed++;
     return out;
   };
@@ -438,7 +442,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     if (!session) session = { stage, list: [], ids: new Set() };
     session.list.push(...made); session.ids.add(i);
     // a broken mass's broken darker kids are dropped into it while it is wet
-    if (isBroken) for (const c of kids[i]) if (broken(shapes[c])) { const cm = new Uint8Array(pn); for (const q of shapes[c].cells) cm[q] = 1; const cl = maskLoops(cm, ROUND_MM, paperMask); const clm = loopsMask(cl, pw, ph, mmX); for (let q = 0; q < pn; q++) cm[q] &= clm[q]; const kd = dabsOver(cm, 47 + c); const d = kd.length ? wash(2, `study shape ${c} dropped into ${i} in dabs`, cl, shapes[c].colour, { strokes: kd, own: shapes[c].cells, move: 'wet on wet' }) : null; if (d) { session.list.push(d); done.add(c); } }
+    if (isBroken) for (const c of kids[i]) if (broken(shapes[c])) { const cm = new Uint8Array(pn); for (const q of shapes[c].cells) cm[q] = 1; const cl = maskLoops(cm, ROUND_MM, paperMask); const clm = loopsMask(cl, pw, ph, mmX); for (let q = 0; q < pn; q++) cm[q] &= clm[q]; const kd = dabsOver(cm, 47 + c); const d = kd.length >= 3 && shapes[c].cells.length * cellMm2 >= DARK_DABS_FROM ? wash(2, `study shape ${c} dropped into ${i} in dabs`, cl, shapes[c].colour, { strokes: kd, own: shapes[c].cells, move: 'wet on wet' }) : null; if (d) { session.list.push(d); done.add(c); } }
     if (!isBroken) { const ex = new Set(under(i)); for (let a = parent[i]; a >= 0; a = parent[a]) ex.add(a); session.list.push(...lifeFor(made[0], s.cells, shapes, i, ex, what)); }
   }
   close();
