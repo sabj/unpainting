@@ -123,3 +123,24 @@ test('a named mark sets the handling the script leaves out', () => {
   assert.equal(plan(script([{ ...wall, handling: { mark: 'drag' } }])).layers[0].shapes[0]._valuePlan.move, 'dry on dry');
 });
 
+
+test('a stroke off the sheet is reported with its passage; a wet stroke too small for a bed is laid on dry paper, never dropped', () => {
+  const lines = [], log = console.log; console.log = (...a) => lines.push(a.join(' '));
+  let p;
+  try {
+    p = planScriptWashes({ script: script([
+      { id: 'off', what: 'off the sheet', stage: 2, kind: 'strokes', brush: 'r8', paper: 'dry', paint: { pigments: { umber: 1 }, dilution: 'medium' }, strokes: [{ points: [[200, 200, 0.8], [210, 200, 0.8]] }, { points: [[20, 20, 0.8], [30, 20, 0.8]] }] },
+      { id: 'wet', what: 'wet touches', stage: 2, kind: 'strokes', brush: 'rig', paper: 'wet', paint: { pigments: { umber: 1 }, dilution: 'medium' }, strokes: [{ brush: 'r8', points: [[20, 40, 0.2], [20.5, 40, 0.2]] }, { points: [[30, 40, 1], [70, 40, 1], [70, 42, 1], [30, 42, 1]] }] },
+      { id: 'gone', what: 'wholly off', stage: 2, kind: 'strokes', brush: 'r8', paper: 'dry', paint: { pigments: { umber: 1 }, dilution: 'medium' }, strokes: [{ points: [[300, 200, 0.8], [310, 200, 0.8]] }] },
+    ]), k: pigments.length, w: 160, h: 120, pigments, sheetWidthMm: 80 });
+  } finally { console.log = log; }
+  assert.ok(lines.some(l => /STROKE NOT LAID: passage off/.test(l)), 'the off-sheet stroke is reported');
+  assert.ok(lines.some(l => /NOTHING LAID: passage gone/.test(l)), 'a passage with nothing to touch is reported');
+  assert.ok(lines.some(l => /passage wet .*laid on the paper as it is/.test(l)), 'the small wet stroke is reported');
+  assert.equal(p.summary.strokesNotLaid.length, 2);
+  assert.deepEqual(p.summary.smallStrokesLaidDry, [{ passage: 'wet', kind: 'strokes', strokes: 1 }]);
+  const small = p.instructions.find(q => q.script.passage === 'wet-small'), main = p.instructions.find(q => q.script.passage === 'wet');
+  assert.equal(small.move, 'wet on dry'); assert.equal(small.strokes.length, 1);
+  assert.equal(main.move, 'wet on wet'); assert.equal(main.strokes.length, 1);
+  assert.ok(!p.instructions.some(q => q.script.passage === 'gone'));
+});

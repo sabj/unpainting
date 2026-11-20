@@ -226,6 +226,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   const laid = Array.from({ length: k }, () => new Float32Array(n)), labels = new Int32Array(n);
   const layers = [], instructions = [], mixes = [], polygons = [], checks = [];
   let session = null, strokeCount = 0, charges = 0, label = 0;
+  const dropped = [], laidDry = [], after = [];
   const close = () => {
     if (!session) return;
     const list = session.list, area = list.reduce((a, s) => a + s.area, 0), mix = new Array(k).fill(0);
@@ -237,13 +238,23 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   // one wash of the plan: its strokes, its mix, its move; the cells its strokes touch are its passage (for the ledger and
   // the wet and dry checks, never a clip)
   const wash = (p, stage, strokes0, mix, how, { kind, what, charge = false }) => {
-    // a stroke that lands on no cell of the sheet (a lane run past the edge) is not laid, and a stroke laid into its own
-    // wet bed needs enough cells for the bed to be judged (WET_LEAST_CELLS, as the study plan)
-    const least = how.move === 'wet on wet' ? WET_LEAST_CELLS : 1;
-    const strokes = strokes0.filter(st => { const m = footprint([st], w, h, cellMm); let c = 0; for (let i = 0; i < n && c < least; i++) c += m[i]; return c >= least; });
+    // a stroke that lands on no cell of the sheet (a lane run past the edge) cannot be laid: it is reported, with its
+    // passage, never dropped quietly. A stroke too small for its own wet bed to be judged (under WET_LEAST_CELLS, as the
+    // study plan) is still laid: on the paper as it is, after the passage's other strokes, and reported
+    const cellsOf = st => { const m = footprint([st], w, h, cellMm); let c = 0; for (let i = 0; i < n && c < WET_LEAST_CELLS; i++) c += m[i]; return c; };
+    const counts = strokes0.map(cellsOf), offSheet = strokes0.filter((_, q) => counts[q] === 0);
+    const small = how.move === 'wet on wet' ? strokes0.filter((_, q) => counts[q] > 0 && counts[q] < WET_LEAST_CELLS) : [];
+    const strokes = strokes0.filter((_, q) => counts[q] >= (how.move === 'wet on wet' ? WET_LEAST_CELLS : 1));
+    const where = st => `(${st.points[0][0].toFixed(1)}, ${st.points[0][1].toFixed(1)}) mm`;
+    for (const st of offSheet) { dropped.push({ passage: p.id, kind, reason: 'lands on no cell of the sheet', at: st.points[0].slice(0, 2) }); console.log(`PAINTING SCRIPT, STROKE NOT LAID: passage ${p.id} (${kind}), a stroke from ${where(st)}: it lands on no cell of the sheet`); }
+    if (small.length) {
+      console.log(`painting script: passage ${p.id} (${kind}), ${small.length} stroke${small.length > 1 ? 's' : ''} under ${WET_LEAST_CELLS} cells (from ${small.slice(0, 4).map(where).join('; ')}${small.length > 4 ? '; ...' : ''}): too small for a wet bed, laid on the paper as it is`);
+      laidDry.push({ passage: p.id, kind, strokes: small.length });
+      after.push(() => wash({ ...p, id: `${p.id}-small` }, stage, small, mix, { move: 'wet on dry', water: how.water, phase: how.phase }, { kind, what: `${what} (its small strokes)`, charge }));
+    }
+    if (!strokes.length) { if (!small.length) console.log(`PAINTING SCRIPT, NOTHING LAID: passage ${p.id} (${kind}) has no stroke that touches the sheet (${strokes0.length} placed); skipped`); return null; }
     const ids = footprint(strokes, w, h, cellMm), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
     for (let i = 0; i < n; i++) if (ids[i]) { area++; const x = i % w, y = (i / w) | 0; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; }
-    if (!area || !strokes.length) return null;
     const strength = mix.reduce((a, v) => a + v, 0), mixId = mixes.length; mixes.push({ mix: mix.map(v => v / strength), strength, stage });
     label++; for (let i = 0; i < n; i++) if (ids[i]) { labels[i] = label; for (let j = 0; j < k; j++) laid[j][i] += mix[j]; }
     const sh = passage(ids, 1, box, strength, area, w); sh.mix = [...mix]; sh.graded = null; sh._follow = true; sh.firstWash = stage <= 2; sh._opening = 1; sh.dryAfter = true;
@@ -275,9 +286,11 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     const strokes = passageStrokes(p, brushes, seed, lights), mix = mixOf(p.paint);
     const sh = wash(p, stage, strokes, mix, own, { kind: p.kind, what: `${p.id}: ${p.what ?? ''}` });
     prev = p;
-    if (!sh) continue;
+    const smalls = after.splice(0).map(f => f()).filter(Boolean);
+    if (!sh && !smalls.length) continue;
     if (!session) session = { stage, list: [], ids: [] };
-    session.list.push(sh); session.ids.push(p.id);
+    if (sh) session.list.push(sh); session.ids.push(p.id);
+    if (!sh) { session.list.push(...smalls); continue; }
     // charges: each `at` a dab of the charge's own mix, dropped into this passage while it is wet
     const rng = handOf(`${seed}/${p.id}/charges`);
     for (const [ci, c] of (p.charges ?? []).entries()) {
@@ -287,6 +300,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       const ch = wash({ ...p, id: `${p.id}-c${ci + 1}` }, stage, cs, mixOf({ pigments: c.pigments, dilution: c.dilution ?? 'medium', swatch: c.swatch }), { move: 'wet on wet', water: 0.88, phase: PHASE[stage] }, { kind: 'charge', what: `${p.id}: charge ${ci + 1} dropped in while wet`, charge: true });
       if (ch) { session.list.push(ch); charges++; }
     }
+    session.list.push(...smalls, ...after.splice(0).map(f => f()).filter(Boolean));
     washed.push([p.id, sh]);
     // the plan's own colour over the passage's cells once it and its charges are laid: the film of everything planned
     // there so far, on this paper, as sRGB and then Lab against white (what the plate is measured against)
@@ -303,7 +317,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   }
   const covered = laid[0].map((_, i) => (laid.some(L => L[i] > 0) ? 1 : 0)).reduce((a, v) => a + v, 0);
   const summary = { source: 'painting script', author: script.author ?? null, passages: passages.length, sessions: layers.length, washes: instructions.filter(q => q.kind !== 'charge').length, charges, stages: new Set(layers.map(l => l.value)).size, plannedStrokes: strokeCount, paintedShare: covered / n,
-    kinds: passages.reduce((a, p) => ({ ...a, [p.kind]: (a[p.kind] ?? 0) + 1 }), {}), papers: passages.reduce((a, p) => ({ ...a, [p.paper ?? 'dry']: (a[p.paper ?? 'dry'] ?? 0) + 1 }), {}), lights: lights.length, colourCheck: checks,
+    kinds: passages.reduce((a, p) => ({ ...a, [p.kind]: (a[p.kind] ?? 0) + 1 }), {}), papers: passages.reduce((a, p) => ({ ...a, [p.paper ?? 'dry']: (a[p.paper ?? 'dry'] ?? 0) + 1 }), {}), lights: lights.length, strokesNotLaid: dropped, smallStrokesLaidDry: laidDry, colourCheck: checks,
     colourCheckMedianDE: checks.length ? [...checks].sort((a, b) => a.dE - b.dE)[checks.length >> 1].dE : null };
   console.log(`script washes: ${passages.length} passages by ${script.author ?? 'an unnamed author'} in ${layers.length} wet sessions; ${strokeCount} strokes, ${charges} charges; kinds ${JSON.stringify(summary.kinds)}; paper ${JSON.stringify(summary.papers)}; ${lights.length} lights kept; painted ${(100 * summary.paintedShare).toFixed(0)}% of the sheet; colour against the subject's mean over each passage, median dE ${summary.colourCheckMedianDE}`);
   const regions = { source: 'painting script', labels, regions: Array.from({ length: label }, (_, i) => ({ id: i + 1, colour: null, paper: false, parent: null, share: 0 })) };

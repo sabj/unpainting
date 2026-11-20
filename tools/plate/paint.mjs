@@ -4,6 +4,7 @@ import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs'
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {check} from '../../src/media/checks.mjs';
 import {createScriptColourCheck} from '../painter/script-colour-check.mjs';
+import {inkMoved, INK_MOVED_MOST} from '../../src/paint/methods/ink-held.mjs';
 import {splitLoadsFeathered} from '../../src/paint/methods/brushes.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../../src/paint/methods/passage-brush.mjs';
 import {shapeMix} from '../../src/paint/methods/wash-weights.mjs';
@@ -200,19 +201,22 @@ if (TECH_CAL && L_START === 0) {
 }
 // a painting script's passages: planned colour against what the plate lays, measured on the next dry sheet (script-colour-check.mjs)
 const SCRIPT_CHECK = ctx.VALUE_PLAN?.summary?.source === 'painting script' ? createScriptColourCheck({ out, w, SC, W2 }) : null;
-// the pen is set before any wash: the ink laid on the sheet (its deposited field) is held as it was before the first
-// wash, and once the sheet is next dry the first wash must have moved none of it (a wash that lifts and carries the
-// pen's ink leaves black clouds round every line); more than INK_MOVED_MOST of it moved stops the run
-const INK_MOVED_MOST = 0.02;
+// the pen is set before any wash: the ink's whole thickness (every dried layer and what is wet, never the top layer
+// alone, which empties at each dry) is held as it was before the first wash, and once the sheet is next dry the first
+// wash must have moved none of it out of its cells (ink-held.mjs); more than INK_MOVED_MOST stops the run
 let INK_HOLD = null;
-if (ctx.VALUE_PLAN && ctx.sheet.D?.[PIGS.length] && L_START === 0) { coherent(ctx.sheet); const d = ctx.sheet.D[PIGS.length]; let t = 0; for (let i = 0; i < d.length; i++) t += d[i]; if (t > 0) INK_HOLD = { before: Float32Array.from(d), total: t, checked: false }; }
+if (ctx.VALUE_PLAN && L_START === 0) {
+  const before = Float32Array.from(thickness(ctx.sheet)[PIGS.length] ?? []); let t = 0; for (let i = 0; i < before.length; i++) t += before[i];
+  if (t > 0) INK_HOLD = { before, checked: false };
+  else if (INKRES) console.log(`INK HELD NOT CHECKED: the pen is on its own fine sheet (--inkres ${INKRES.N}), which no wash touches; nothing on the painting sheet to hold`);
+  else console.log('ink held: no pen on the sheet before the first wash; nothing to check');
+}
 const checkInkHeld = when => {
   if (!INK_HOLD || INK_HOLD.checked) return;
-  coherent(ctx.sheet); const d = ctx.sheet.D[PIGS.length]; let moved = 0; for (let i = 0; i < d.length; i++) moved += Math.abs(d[i] - INK_HOLD.before[i]);
-  const share = moved / INK_HOLD.total; INK_HOLD.checked = true;
-  console.log(`ink held: the first wash moved ${(100 * share).toFixed(2)}% of the pen's ink (${when})`);
-  fs.writeFileSync(path.join(out, 'ink-held.json'), JSON.stringify({ moved: share, most: INK_MOVED_MOST, when }));
-  if (share > INK_MOVED_MOST) throw Error(`the first wash moved ${(100 * share).toFixed(1)}% of the pen's ink (most ${100 * INK_MOVED_MOST}%): the pen was not set before the washes (--inkfast) or was still wet`);
+  const r = inkMoved(INK_HOLD.before, thickness(ctx.sheet)[PIGS.length]); INK_HOLD.checked = true;
+  console.log(`ink held: the first wash moved ${(100 * r.moved).toFixed(2)}% of the pen's ink out of its cells, ${(100 * r.lost).toFixed(2)}% off the sheet (${when})`);
+  fs.writeFileSync(path.join(out, 'ink-held.json'), JSON.stringify({ moved: r.moved, lost: r.lost, most: INK_MOVED_MOST, when }));
+  if (r.moved > INK_MOVED_MOST) throw Error(`the first wash moved ${(100 * r.moved).toFixed(1)}% of the pen's ink (most ${100 * INK_MOVED_MOST}%): the pen was not set before the washes (--inkfast) or was still wet`);
 };
 for (let L = L_START; L < ctx.layers.length; L++) {
   const layer = ctx.layers[L];
