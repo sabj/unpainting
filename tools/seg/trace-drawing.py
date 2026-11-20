@@ -135,19 +135,24 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
 
 
-def paper_dark(bgr, blur=.7):
-    """A pencil drawing's darkness against its own local paper, 0 (paper) to 1 (black), with the grain blurred out."""
+def paper_dark(bgr, blur=.7, line_px=3, full=False):
+    """A pencil drawing's lines: darkness against its own local paper, 0 (paper) to 1 (black), grain blurred out and broad
+    tone taken off. `full` also returns the whole darkness (tone included), which sets how firmly a line is pressed."""
     grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
     h, w = grey.shape; r = max(5, int(round(.012*max(h, w))))
     # the paper: the light envelope over about a centimetre of a drawing (a closing removes every line under that width)
     paper = cv2.dilate(grey, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
     paper = cv2.GaussianBlur(paper, (0, 0), r)
     dark = 1-np.clip(grey/np.maximum(.05, paper), 0, 1)
-    return cv2.GaussianBlur(dark, (0, 0), blur) if blur > 0 else dark
+    dark = cv2.GaussianBlur(dark, (0, 0), blur) if blur > 0 else dark
+    # the lines only: shading is graphite too, but broad. An opening wider than a stroke (and a doubled stroke) holds the
+    # tone under the lines, and what stands above it is line; a hatched area keeps its hatching, not its blur
+    tone = cv2.morphologyEx(dark, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*line_px+1, 2*line_px+1)))
+    return (np.clip(dark-tone, 0, 1), dark) if full else np.clip(dark-tone, 0, 1)
 
 
 def pencil_plan(bgr, zoom=4, smooth_px=1.2, min_px=4.0):
-    dark0 = paper_dark(bgr)
+    dark0, whole = paper_dark(bgr, full=True)
     # the paper's own noise: the spread of the darkness where nothing is drawn (the lower half of the pixels)
     lo = dark0[dark0 <= np.percentile(dark0, 50)]
     noise = float(np.median(np.abs(lo-np.median(lo))))*1.4826+1e-4
@@ -182,10 +187,12 @@ def pencil_plan(bgr, zoom=4, smooth_px=1.2, min_px=4.0):
         q = resample((resample(p.astype(float), 1)+.5)/zoom-.5, 1.0)
         q = resample(smooth(q, smooth_px), 1.5)
         lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'role': 'pencil stroke', 'length': arc_length(q)})
-    weigh(lines, dark0, firm)
+    # a stroke is pressed as dark as the drawing is there, its tone included: hatching in a dark mass is firm, not light
+    firm_whole = float(np.percentile(whole[cv2.resize(mask, whole.shape[::-1], interpolation=cv2.INTER_AREA) > 0], 97)) if mask.any() else 1.0
+    weigh(lines, whole, firm_whole)
     lines.sort(key=lambda l: -l['length'])
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom,
-                                   'medium': 'pencil', 'paperNoise': round(noise, 4), 'low': round(low, 4), 'high': round(high, 4), 'firm': round(firm, 4)}
+                                   'medium': 'pencil', 'paperNoise': round(noise, 4), 'low': round(low, 4), 'high': round(high, 4), 'firm': round(firm, 4), 'firmWhole': round(firm_whole, 4)}
 
 
 def weigh(lines, dark, firm, reach=1.5):
@@ -204,9 +211,9 @@ def weigh(lines, dark, firm, reach=1.5):
 
 
 def reweigh(file, image, out):
-    doc = json.load(open(file)); bgr = cv2.imread(image); dark = paper_dark(bgr)
+    doc = json.load(open(file)); bgr = cv2.imread(image); dark = paper_dark(bgr, full=True)[1]
     sx, sy = bgr.shape[1]/doc['image']['w'], bgr.shape[0]/doc['image']['h']
-    firm = doc.get('stats', {}).get('firm') or float(np.percentile(dark[dark > .05], 95))
+    firm = doc.get('stats', {}).get('firmWhole') or float(np.percentile(dark[dark > .05], 95))
     pts = [l['points'] for l in doc['lines']]
     for l in doc['lines']:
         l['points'] = [[x*sx, y*sy] for x, y in l['points']]
