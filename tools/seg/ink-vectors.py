@@ -155,10 +155,25 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=.6,
             'sheetMm': sheet_mm, 'heightMm': sheet_mm * h0 / w0, 'drawing': {'w': w0, 'h': h0}, 'level': 'half the stroke\'s darkness', 'firm': round(firm, 3),
             'targetSHA256': lines_doc.get('targetSHA256'), 'strokes': strokes}
 
-def render_vectors(doc, width, upto=None, ss=4):
+def ring_area(r):
+    r = np.asarray(r, float); return .5 * float(np.dot(r[:, 0], np.roll(r[:, 1], 1)) - np.dot(r[:, 1], np.roll(r[:, 0], 1)))
+
+
+def is_fill(stroke, width_mm=.5, area_mm2=1.5):
+    """A FILL (a leaf mass, a dark pane, a blot), not a LINE: its ink (outer rings less holes) is wider than `width_mm` (twice
+    area over perimeter, the width of a strip) and hardly longer than four widths, or covers over `area_mm2` and is over
+    0.8 of that wide. Contours, bars, branches and hatching are lines. Same rule as src/paint/methods/ink-vectors.mjs."""
+    rings = stroke['outline']; a = abs(sum(ring_area(r) for r in rings))
+    per = sum(float(np.hypot(*np.diff(np.vstack([r, r[:1]]), axis=0).T).sum()) for r in map(np.asarray, rings))
+    w = 2 * a / max(per, 1e-9); L = per / 2
+    return (w > width_mm and L < 4 * w) or (a > area_mm2 and w > .8 * width_mm)
+
+
+def render_vectors(doc, width, upto=None, ss=4, fill=1.0, band_mm=.25):
     """The vectors drawn at `width` pixels across: each stroke's outline filled with its darkness (darkest wins where two
     abut), antialiased by supersampling. Returns the darkness field (0 paper .. 1 black). `upto` (seq, fraction) stops after
-    that much of a stroke: its outline revealed only where the nib has passed along its path."""
+    that much of a stroke: its outline revealed only where the nib has passed along its path. `fill` (0..1) lays a FILL
+    stroke (is_fill) as its edge, a band of `band_mm`, at full darkness and its inside at `fill` of it (1: exact)."""
     s = width / doc['sheetMm']; H = int(round(doc['heightMm'] * s)); S = ss
     out = np.zeros((H, width), np.float32)
     for st in doc['strokes']:
@@ -176,7 +191,12 @@ def render_vectors(doc, width, upto=None, ss=4):
             r = max(2, int(max(st['widths'] + [0.3]) * s * S * .7 + 2)); nib = np.zeros_like(m)
             cv2.polylines(nib, [np.int32(Q)], False, 255, 2 * r); [cv2.circle(nib, tuple(np.int32(q)), r, 255, -1) for q in Q[-1:]]
             m &= nib
-        cov = cv2.resize(m.astype(np.float32) / 255, (y0[0] - x0[0], y0[1] - x0[1]), interpolation=cv2.INTER_AREA) * st['dark']
+        mf = m.astype(np.float32) / 255
+        if fill < 1 and is_fill(st):
+            # the inside of a fill, farther than the band from its edge, at `fill` of the stroke's darkness
+            inner = cv2.distanceTransform(m, cv2.DIST_L2, 5) > band_mm * s * S
+            mf = np.where(inner, mf * fill, mf)
+        cov = cv2.resize(mf, (y0[0] - x0[0], y0[1] - x0[1]), interpolation=cv2.INTER_AREA) * st['dark']
         sub = out[x0[1]:y0[1], x0[0]:y0[0]]; np.maximum(sub, cov, out=sub)
     return out
 

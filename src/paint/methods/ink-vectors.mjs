@@ -47,25 +47,54 @@ export function inkForDarkness(darkOf, tMax = 64, n = 400) {
   };
 }
 
+const ringArea = r => { let a = 0; for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
+const ringLength = r => { let L = 0; for (let k = 0, n = r.length; k < n; k++) { const p = r[k], q = r[(k + 1) % n]; L += Math.hypot(q[0] - p[0], q[1] - p[1]); } return L; };
+
+/**
+ * A FILL (a leaf mass, a dark pane, a blot), not a LINE: its ink (outer rings less holes) is wider than `widthMm` (twice its
+ * area over its perimeter, the width of a strip) and hardly longer than four widths, or covers over `areaMm2` and is over
+ * 0.8 of that wide. Contours, bars, branches and hatching are lines. Same rule as tools/seg/ink-vectors.py is_fill.
+ */
+export function isFill(stroke, widthMm = 0.5, areaMm2 = 1.5) {
+  const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0);
+  const w = 2 * a / Math.max(per, 1e-9), L = per / 2;
+  return (w > widthMm && L < 4 * w) || (a > areaMm2 && w > 0.8 * widthMm);
+}
+
+/** Distance from (x, y) to the nearest edge of the rings (same unit). */
+function edgeDistance(R, x, y) {
+  let best = Infinity;
+  for (const r of R) for (let k = 0, n = r.length; k < n; k++) {
+    const a = r[k], b = r[(k + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    const t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)) : 0, ex = a[0] + t * dx - x, ey = a[1] + t * dy - y, d = ex * ex + ey * ey;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
+}
+
 /**
  * Lays the strokes on `field` (an ink amount per cell, w x h cells of `mm` mm) in seq order; the darker holds where two meet.
  * `inkOf` maps darkness to ink amount (inkForDarkness). `each(stroke, cells)` is told each stroke's area as it is laid.
- * Returns { strokes, cells }.
+ * `fill` (0..1): a FILL stroke (isFill) is laid as its edge, a band of `bandMm` at the stroke's darkness, and its inside at
+ * `fill` of that darkness, so a mass the paint will darken stays drawn without its ink overcoming the paint (1: exact).
+ * Returns { strokes, cells, fills }.
  */
-export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null } = {}) {
+export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, bandMm = 0.25 } = {}) {
   const S = [...doc.strokes].sort((a, b) => a.seq - b.seq), dark = new Float32Array(w * h);
-  let cells = 0;
+  let cells = 0, fills = 0;
   for (const s of S) {
     const r = rasterizeRings(s.outline, w, h, mm, ss); let n = 0;
+    const thin = fill < 1 && isFill(s); if (thin) fills++;
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
       const c = r.cov[j * r.w + i]; if (!(c > 0)) continue;
-      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark);
+      const inside = thin && edgeDistance(s.outline, (r.x0 + i + 0.5) * mm, (r.y0 + j + 0.5) * mm) > bandMm;
+      const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark * (inside ? fill : 1));
       // the darker holds, against ink already on the sheet too (a closing pen over the opening's ink adds none twice)
       if (d > dark[k]) { dark[k] = d; const t = inkOf(d); if (t > field[k]) field[k] = t; n++; }
     }
     cells += n; each?.(s, n);
   }
-  return { strokes: S.length, cells };
+  return { strokes: S.length, cells, fills };
 }
 
 /**

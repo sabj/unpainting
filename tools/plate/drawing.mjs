@@ -268,11 +268,15 @@ function layExactVectors(file, { closing = false } = {}) {
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
   const darkOf = t => { const px = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (px[0] + px[1] + px[2]) / 765; };
-  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf));
+  // --inkfill (0..1, default 0.25): when paint follows the pen, a FILL stroke (a leaf mass, a dark pane) is laid as its edge
+  // at line weight and its inside at this share of its darkness, so the paint supplies the dark and the ink does not
+  // overcome it; nothing is dropped. A drawing laid alone (--drawingonly) is laid exactly.
+  const fill = num('drawingonly', 0) > 0 ? 1 : Math.max(0, Math.min(1, num('inkfill', 0.25)));
+  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;
-  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked; no tracer, no pen gestures`);
+  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}; no tracer, no pen gestures`);
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const speedDrawStart = performance.now();
