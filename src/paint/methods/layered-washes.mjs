@@ -282,9 +282,11 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   // An area's wash runs on behind the darker things inside it (a sky behind a tree, a wall behind its windows): its
   // holes are filled, but for the lights and the areas lighter than it, which the wash goes round.
   const areaOf = new Int32Array(pn).fill(-1); zones.forEach((z, zi) => { for (const q of z.cells) areaOf[q] = zi; });
+  // (only the first, largest area: the sky behind the trees; a shirt is not painted on behind the dog in front of it)
+  const largest = zones.reduce((b, z) => (!z.paper && (!b || z.cells.length > b.cells.length) ? z : b), null);
   for (const z of zones) {
     const m = new Uint8Array(pn); for (const q of z.cells) m[q] = 1;
-    const rounded = roundMask(m, pw, ph, rC(3)), round = fillHoles(rounded, pw, ph);
+    const rounded = roundMask(m, pw, ph, rC(3)), round = z === largest ? fillHoles(rounded, pw, ph) : rounded;
     // only holes smaller than the area itself: a wash runs behind a tree, not behind a whole building
     { const hole = Uint8Array.from(round, (v, q) => (v && !rounded[q] ? 1 : 0)), hc = components(hole, pw, ph, 4), size = new Int32Array(hc.count + 1); for (const id of hc.labels) if (id) size[id]++; for (let q = 0; q < pn; q++) if (hc.labels[q] && size[hc.labels[q]] > HOLE_MOST * z.cells.length) round[q] = 0; }
     for (let q = 0; q < pn; q++) if (lightMask[q] || (areaOf[q] >= 0 && zones[areaOf[q]] !== z && zones[areaOf[q]].L > z.L - AROUND_LIGHTER)) round[q] = round[q] && m[q];
@@ -296,7 +298,7 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   // each area's charges follow it while it is wet
   // the largest area first (the sky or the main band), then the rest from the top of the sheet down: far to near, weakly
   for (const z of zones) { let y = 0; for (const q of z.cells) y += (q / pw) | 0; z.cy = y / z.cells.length; }
-  const biggest = zones.reduce((b, z) => (!z.paper && (!b || z.cells.length > b.cells.length) ? z : b), null);
+  const biggest = largest;
   zones.sort((a, b) => (a === biggest ? -1 : b === biggest ? 1 : a.cy - b.cy));
   const zoneOf = new Int32Array(pn).fill(-1), zoneL = new Float32Array(pn).fill(100);
   zones.forEach((z, zi) => { for (const q of z.cells) { zoneOf[q] = zi; zoneL[q] = z.L; } });
