@@ -491,7 +491,34 @@ export class GpuSheet {
   }
   async runStroke(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore }) {
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
-    if (this.batch && slot !== undefined) return this.queueStroke(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore });
+    const done = this.strokeEncoding(data, nSteps, sp, s0);
+    try {
+      if (this.batch && slot !== undefined) return await this.queueStroke(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore });
+      return await this.runStrokeNow(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0 }, done);
+    } finally { done?.(); }
+  }
+  /**
+   * With the edge feed on, a stroke whose plan runs the sheet's flow between its steps is laid in parts: before each flow
+   * the brush's deposit and the flows so far are submitted, and the feed's geometry made again where the wet outline moved
+   * (efMidStroke), as the CPU sheet's edgeFeed finds its footprint at the start of every step. `this.encoding` holds the
+   * next message (the worker waits for it) until the stroke's last part is submitted. Returns the release, or null when
+   * the stroke is laid in one go.
+   */
+  strokeEncoding(data, nSteps, sp, s0) {
+    if (!this.efOn) return null;
+    const U = new Uint32Array(data.buffer, data.byteOffset, data.length);
+    let flows = false; for (let s = 0; s < nSteps && !flows; s++) flows = U[s0 + s * sp + 6] > 0;
+    if (!flows) return null;
+    let release; this.encoding = new Promise(r => { release = r; });
+    return () => { this.encoding = null; release(); };
+  }
+  /** Before a flow inside a stroke: has the wet outline moved since the feed's geometry was made? Then make it again. */
+  async efMidStroke() {
+    const st = new Uint32Array(await this.readWords('EFB', 20));
+    if (st[4]) this.ef.stale = true;
+    if (this.ef.stale) await this.efRefresh();
+  }
+  async runStrokeNow(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0 }, split) {
     const d = this.device, U32 = new Uint32Array(data.buffer, data.byteOffset, data.length);
     if (data.length > this.SB) throw new Error('GpuSheet: the stroke plan is too long');
     // A stroke that carries straight on from the last one leaves the generator's two words (22, 23) as that one left them,
@@ -502,13 +529,17 @@ export class GpuSheet {
     else wr(0, data.length);
     this.bumpFor(rect); this.gpuAhead = true;
     if (globalThis.GPU_PROF) return this.runStrokeProf(data, { planFloats, nSteps, sp, s0, lift });
-    const enc = d.createCommandEncoder(), pass = this.timestamps.begin(enc, 'runStroke');
+    let enc = d.createCommandEncoder(), pass = this.timestamps.begin(enc, 'runStroke');
     const run = () => { pass.setPipeline(this.p[data[35]>0?'stroke_run_full':'stroke_run']); pass.setBindGroup(0, this.bg.stroke_run); pass.dispatchWorkgroups(1); };
-    let done = 0;
     for (let s = 0; s < nSteps; s++) {
       const flows = U32[s0 + s * sp + 6];
       if (!flows && s < nSteps - 1) continue;
-      run(); done = s + 1;
+      run();
+      if (flows && split) {
+        this.efWatch(pass); pass.end(); d.queue.submit([enc.finish()]);
+        await this.efMidStroke();
+        enc = d.createCommandEncoder(); pass = this.timestamps.begin(enc, 'runStroke');
+      }
       for (let q = 0; q < flows; q++) this.stepsInPass(pass, 1);
     }
     if (lift) { pass.setPipeline(this.p.stroke_end); pass.setBindGroup(0, this.bg.stroke_end); pass.dispatchWorkgroups(1); }
@@ -525,9 +556,9 @@ export class GpuSheet {
 
   // Uploads live in the command stream, so a later plan cannot overwrite BSTR before
   // an earlier dispatch reads it. Brush results stay in a GPU ring until requested.
-  queueStroke(data, info) {
+  async queueStroke(data, info) {
     if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
-    const { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore } = info;
+    const { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore } = info, split = !!this.encoding;
     if (data.length > this.SB || planFloats > 6144) throw new Error('stroke exceeds GPU slot');
     const d = this.device, U = new Uint32Array(data.buffer, data.byteOffset, data.length);
     const bytes = data.byteLength, align = Math.ceil(bytes / 4) * 4, cap = 8 * 1024 * 1024;
@@ -540,7 +571,7 @@ export class GpuSheet {
       src = d.createBuffer({ size: bytes, usage: GPUBufferUsage.COPY_SRC, mappedAtCreation: true });
       new Float32Array(src.getMappedRange()).set(data); src.unmap(); this.batchItems.push(src);
     }
-    const enc = this.batchEncoder ??= d.createCommandEncoder();
+    let enc = this.batchEncoder ??= d.createCommandEncoder();
     if(restore!==undefined) {
       const prev=this.brushSlots.get(restore); if(!prev) throw new Error('missing resident brush');
       enc.copyBufferToBuffer(prev.buffer,22*4,this.b.BSTR,22*4,8);
@@ -552,10 +583,12 @@ export class GpuSheet {
     else cp(0,data.length);
     const serial=data[34]>0 && process.env.GPU_METERED_SERIAL!=='0';
     const kernel=(serial?'stroke_metered':'stroke_run')+(data[35]>0?'_full':'');
-    const pass = this.timestamps.begin(enc, serial?'meteredStroke':'queueStroke');
+    let pass = this.timestamps.begin(enc, serial?'meteredStroke':'queueStroke');
     for (let s=0;s<nSteps;s++) {
       const flows=U[s0+s*sp+6]; if (!flows && s<nSteps-1) continue;
       pass.setPipeline(this.p[kernel]); pass.setBindGroup(0,this.bg[kernel]); pass.dispatchWorkgroups(1);
+      // with the edge feed on, the batch is submitted before each flow and the feed's geometry brought up to date (runStroke)
+      if (flows && split) { this.efWatch(pass); pass.end(); await this.efMidStroke(); enc = this.batchEncoder ??= d.createCommandEncoder(); pass = this.timestamps.begin(enc, serial?'meteredStroke':'queueStroke'); }
       if (flows) this.stepsInPass(pass,flows);
     }
     if(lift) { pass.setPipeline(this.p.stroke_end); pass.setBindGroup(0,this.bg.stroke_end); pass.dispatchWorkgroups(1); }
