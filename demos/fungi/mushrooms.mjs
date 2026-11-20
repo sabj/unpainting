@@ -7,7 +7,8 @@
 // Every tested form and held-out seed must score >=90/100 for plausibly being
 // a real hand-drawn, hand-colored botanical plate. Failed plates remain failed;
 // an average, cherry-picked seed or functional test cannot satisfy that gate.
-import { makePaper, coldPressField } from '../lab/media/paper.js';
+import { makePaper } from '../lab/media/paper.js';
+import { coldPressField } from './cold-press-field.mjs';
 import { createSheet, step, fix, setClip, totals, layersOf, clipRuns } from '../lab/media/sheet.js';
 import { createBrush, dip, stroke } from '../lab/media/brush.js';
 import { layerRT, renderLayers, renderLayersCached } from '../lab/media/km.js';

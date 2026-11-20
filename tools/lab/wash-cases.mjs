@@ -38,7 +38,13 @@ const disc = (sheet, mm, cxMm, cyMm, rMm, water, conc) => {
 const flowFor = (sheet, time) => { const n = Math.round(time / O.dt); for (let i = 0; i < n; i++) S.step(sheet, O); };
 // a 12 mm flat as the painter's wash flat (tools/plate/paint.mjs), sized in mm
 const flat = (mm, seed) => { const r = 6 / mm; return B.createBrush({ model: arg('brush', 'section'), flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, seed }); };
-const lay = (sheet, mm, brush, pts, opts) => { let n = 0; B.stroke(brush, sheet, pts.map(q => ({ ...q, x: q.x / mm, y: q.y / mm })), { ...opts, between: () => { if (++n % 8 === 0) S.step(sheet, O); } }); };
+// The sheet runs on the hand's clock: a brush step is 0.7 cells of travel at the stroke's speed, and the sheet steps once
+// for each O.dt of that time. Stepping once every eight brush steps ran the sheet 4 times faster than the hand at 0.25 mm
+// cells and 11 times at 0.1 mm, so a finer sheet pinned and dried each sweep's edge longer before the next one came.
+const lay = (sheet, mm, brush, pts, opts) => {
+  const perStep = 0.7 * mm / (opts?.speed ?? brush.speed ?? 60); let t = 0;
+  B.stroke(brush, sheet, pts.map(q => ({ ...q, x: q.x / mm, y: q.y / mm })), { ...opts, between: () => { for (t += perStep; t >= O.dt; t -= O.dt) S.step(sheet, O); } });
+};
 
 // Every case is on a 50 x 50 mm sheet.
 const SIZE = 50;

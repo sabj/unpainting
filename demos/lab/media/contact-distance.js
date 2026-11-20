@@ -54,7 +54,10 @@ export function cellEdgeFlux(field, x, y, mm, E) {
     const b = Math.max(first, d[base + 2], d[base + 2 * w], d[base + 2 * w + 2]) * mm;
     return edgeProfile(a, b, E);
   }
-  const count = Math.max(2, Math.ceil(mm / (.005 * E))), tail = 1 / Math.sqrt(1.02), norm = 2 * (Math.sqrt(1.02) - Math.sqrt(.02)) - tail;
+  // Samples 0.005 E apart, but at most 64 a side: a cell several millimetres wide (a coarse sheet, or the scrap a coarse
+  // sheet calibrates on) asked for 635 a side, 400,000 samples an edge cell and a step, and a 48-cell painting took
+  // minutes in its swatches. At 64 a 3 mm cell is still sampled every 0.05 mm, twenty samples across a 1 mm band.
+  const count = Math.min(64, Math.max(2, Math.ceil(mm / (.005 * E)))), tail = 1 / Math.sqrt(1.02), norm = 2 * (Math.sqrt(1.02) - Math.sqrt(.02)) - tail;
   let sum = 0;
   for (let iy = 0; iy < count; iy++) for (let ix = 0; ix < count; ix++) {
     const xq = 2 * (ix + .5) / count, yq = 2 * (iy + .5) / count, ax = Math.floor(xq), ay = Math.floor(yq), fx = xq - ax, fy = yq - ay;
