@@ -313,6 +313,8 @@ const ERR_LIGHT = 0;
 const GLASS_LIFT = 8;
 /** A pane is laid as one stroke when at least this big (mm2); smaller darks in a window are left to the pen. */
 const PANE_LEAST_MM2 = 2.5;
+/** A touch from a later study is kept only when it is at most this big (mm2) and at least this dark (L*). */
+const ACCENT_MOST_MM2 = 15, ACCENT_L = 40;
 /** Glazes: one for each GLAZE_STEP_L (L*) a shadow or dark is below what is laid, at most four; glaze k covers the cells
  * at or under this quantile of the finest study's lightness in the shape; parts under GLAZE_LEAST_MM2 are left. */
 const GLAZE_STEP_L = 10, GLAZE_STEPS = [1, 0.65, 0.4, 0.22], GLAZE_LEAST_MM2 = 6;
@@ -716,7 +718,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // a dark shape (a window, a doorway) is a wash of dark paint cut to its silhouette; when a finer study follows it is
     // laid a little lighter than the study's dark (the value of a window's bars), and the finest study's darks go over it
     // as touches (the panes), leaving the bars at the wash's value
-    const glass = isDark(i) && studies.length > 1 && !MONO; if (glass) for (const j of group) leftDark.add(j);
+    // (the finest study's panes laid as touches over a lighter glass wash added nothing the pen's bars do not give: the
+    // owner preferred the plate before them, 20 Nov 2026; a window is glazed to the study's dark)
+    const glass = false;
     const dark = isDark(i), { m, parts } = outlineOf(group, dark ? Math.min(roundFirst, DARK_ROUND_MM) : roundFirst, dark ? null : s.lab[0]); if (!parts.length) continue;
     const loops = parts.flat();
     const what = `study shape ${group.join(' ')}${parent[i] >= 0 ? ` over ${parent[i]}` : fam[i] >= 0 ? ` over the under-wash of ${fam[i]}` : ''}${kids[i].length ? `, carried under ${kids[i].join(' ')}` : ''}`;
@@ -844,6 +848,10 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const keepFor = leftDark.size ? Uint8Array.from(paperMask, (v, q) => (v || leftDark.has(label[q]) ? 1 : 0)) : paperMask;
     const coarseL = Float32Array.from({ length: pn }, (_, q) => { let v = 0; for (let k = 0; k < li; k++) v = Math.max(v, labOf(grids[k], q, valueRef)[0]); return v; });
     const groups = touchesFrom({ grid: grids[li], ref: { L: refL, A: refA, B: refB }, paper: keepFor, pw, ph, mmX, paperRGB: paperCol, minMm2, kit: TOUCH_KIT, salt: li, coarseL });
+    // touches must earn their place (the owner, 20 Nov 2026: the plate after the glazes was better than after its touches,
+    // which added grey blobs and darkened the tree): only small decisive darks the washes have not laid are kept, never
+    // a glaze-sized change, never foliage dabs
+    for (const gr of groups) gr.touches = gr.touches.filter(t => !t.wash && t.what !== 'foliage' && t.areaMm2 <= ACCENT_MOST_MM2 && t.meanL <= ACCENT_L);
     for (const gr of groups) for (const t of gr.touches) touchLog.push({ layer: li + 1, name: t.name, wash: t.wash, areaMm2: t.areaMm2, length: t.length, width: t.width, L: t.glazeL ?? gr.lab[0], strokes: t.strokes.length, cx: t.cells.length ? +(((t.cells[0] % pw) + 0.5) * mmX).toFixed(1) : 0, cy: t.cells.length ? +((Math.floor(t.cells[0] / pw) + 0.5) * mmX).toFixed(1) : 0 });
     const stage = 4; let sess = [], sessMask = new Uint8Array(pn), touches = 0;
     const flush = () => { if (sess.length) layer(stage, sess); sess = []; sessMask = new Uint8Array(pn); };
