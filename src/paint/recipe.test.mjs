@@ -36,9 +36,8 @@ test("a plan's washes.paints sets the box unless --paints is given", () => {
   assert.equal(own[own.lastIndexOf('--paints') + 1], 'ochre');
 });
 
-test('none and areaplan runs add no flags', () => {
+test('a none recipe adds no flags', () => {
   assert.deepEqual(expandRecipe({ argv: ['--recipe', 'none'] }).argv, ['--recipe', 'none']);
-  assert.deepEqual(expandRecipe({ argv: ['--areaplan', 'x.json'] }).argv, ['--areaplan', 'x.json']);
 });
 
 test('a plan drawing section comes after the recipe and before the command line, so typed flags win', () => {

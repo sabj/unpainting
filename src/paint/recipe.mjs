@@ -13,7 +13,7 @@ import { subjectMediumOf, drawingForSubject, argvForSubject } from './subject-me
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --paperrgb auto --paper coldpress --paperphysical 1 --drawing both --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --undercover 0';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --paperrgb auto --paper coldpress --paperphysical 1 --drawing both --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --undercover 0';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
@@ -88,7 +88,7 @@ function planSheet(plan, argv) {
 }
 
 // The command line with the recipe's flags and the plan's drawing flags in front of it, and the line to log about the
-// choice. No --recipe means the default recipe, except on an --areaplan run. An unknown recipe name or any preset
+// choice. No --recipe means the default recipe. An unknown recipe name or any preset
 // throws. With recipe none, the plan overrides the harness template.
 // --subjectmedium none|pencil: an ink drawing, from the plan or the command line, becomes a graphite preparatory drawing
 // (subject-medium.mjs). `subjectMedium` in the result says what was asked for when that happened.
@@ -106,7 +106,7 @@ function expandFor({ argv: given0, plan }) {
   const argv = styleAlias(given0);
   let drawing = drawingFlags(plan?.drawing ?? null);
   const at = argv.lastIndexOf('--recipe');
-  const [given, ...typed] = at < 0 ? [argv.includes('--areaplan') ? 'none' : DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
+  const [given, ...typed] = at < 0 ? [DEFAULT_RECIPE] : String(argv[at + 1]).split('+');
   const name = given === 'none' && at < 0 ? null : given;
   const combined = ['default', 'combined', 'general'].includes(name);
   const hasWashPlan = Boolean(plan && (plan.washes || (plan.order && typeof plan.order === 'object' && !Array.isArray(plan.order)) || plan.subjectOrder));

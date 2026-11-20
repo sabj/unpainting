@@ -15,8 +15,7 @@
 // every run's frame at a stage is the one nearest that stage's position (its percent) in work/references/manifest.json.
 // The twin should be the control's recipe rendered under another seed (--twin), so the pair is equal in kind but not
 // pixel-identical and a judge cannot spot it by matching; without --twin the control's own frames are shown twice.
-// The negative should be a real bad render (--negative, for example --drawing none --maxvalues 1: no pen, one flat
-// wash per region); without it the control is shown with its pen taken out by a median and blurred at half size. Stages come
+// The negative should be a real bad render (--negative, for example --drawing none: no pen); without it the control is shown with its pen taken out by a median and blurred at half size. Stages come
 // from measure.mjs selectByPosition, one rule for every run, printed before any image is made. Each judge gets its own letters, its own order and its own pairs (present.mjs), in a folder with a neutral
 // name, the rubric copied in and no path from this repo. The key stays beside --out, outside every packet.
 import fs from 'node:fs';

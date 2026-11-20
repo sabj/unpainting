@@ -31,7 +31,7 @@ import {fillSheetBase} from '../../src/paint/methods/sheet-tone.mjs';
 
 export async function penPlan(ctx) {
 const { opt, num, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACHE, VALUE_CONFIG, 
-  VALUE_ENABLED, phaseMark, srcMeta, PX_RAW, TARGET_GUARD, w, h, n, paperRGB, PIGS, COLOUR_BUDGET, MASS_BUDGET, 
+  phaseMark, srcMeta, PX_RAW, TARGET_GUARD, w, h, n, paperRGB, PIGS, COLOUR_BUDGET, MASS_BUDGET, 
   DRAW_STYLE, EDGE, FINISH, SEP, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, STYLE_INK_DEFAULT, 
   GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, PENCIL, GRAPHITE, GRAPHITE_AT, SC, W2, H2, N2, PB, paper, INKRES, 
   TARGET_DRAW_EDGE, sourceInkDrawing, drawingCapsFor, OUT_W, OUT_H, base, SHADE, TONE_STAGE, view, framer, 
@@ -183,12 +183,12 @@ const writeInkTiers = async (D) => {
 // The pen's drawing is planned whole before the first mark: where every line goes and how
 // hard, from the reference and the plan, never from the sheet. drawPass, after TARGET_GUARD.beginPaint(), only draws it.
 async function planPen(planD0, opts = {}) {
-  const prev = [ctx.VALUE_ACTIVE, ctx.AREA_DRAW_STAGE];
-  try { return await planPenInner(planD0, opts); } finally { [ctx.VALUE_ACTIVE, ctx.AREA_DRAW_STAGE] = prev; }
+  const prev = [ctx.VALUE_ACTIVE, ctx.DRAW_STAGE];
+  try { return await planPenInner(planD0, opts); } finally { [ctx.VALUE_ACTIVE, ctx.DRAW_STAGE] = prev; }
 }
 async function planPenInner(planD0, { first = false, fine = false } = {}) {
   ctx.VALUE_ACTIVE=null;
-  ctx.AREA_DRAW_STAGE=first?'opening':'closing';
+  ctx.DRAW_STAGE=first?'opening':'closing';
   const preparing = first && ctx.PREP;
   const DRAW_SOURCE = first && DRAW_GUIDE ? DRAW_GUIDE : ctx.SRC;
   const planD = planD0;
@@ -357,7 +357,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // --inkskinerode: interior erosion in cells (default 3); --inkskinshare: share of points inside that drops a gesture (default 0.6).
   if (!first && opt('inkskin', '') !== '') {
     const [bx0, by0, bx1, by1] = String(opt('inkskin', '0,0,1,1')).split(',').map(Number);
-    const fig = ctx.FW_SUBJ || ctx.SUBJECT || TIER_MASK, S0 = new Uint8Array(n);
+    const fig = ctx.SUBJECT || TIER_MASK, S0 = new Uint8Array(n);
     for (let i = 0; i < n; i++) {
       const x = i % w, y = (i / w) | 0;
       if (x < bx0 * w || x > bx1 * w || y < by0 * h || y > by1 * h) continue;
@@ -385,7 +385,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
     const base = path.basename(opt('image', ''), path.extname(opt('image', '')));
     const seg = hasSegments(base) ? await loadSegments(base, w, h) : null;
     const sky = seg?.regions.find(r => r.name === 'sky')?.mask;
-    const fig = ctx.FW_SUBJ || ctx.SUBJECT;
+    const fig = ctx.SUBJECT;
     const m = Uint8Array.from({ length: n }, (_, i) => {
       if ((fig && fig[i] > 0.5) || (sky && sky[i])) return 0;
       const r = ctx.px[i * 3], g = ctx.px[i * 3 + 1], b = ctx.px[i * 3 + 2];
@@ -396,7 +396,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   })() : null;
   const INKOFF = opt('inkoffbox', '') !== '' || num('inkofffoliage', 0) > 0 || SAND_OFF ? (() => {
     const box = opt('inkoffbox', '') !== '' ? String(opt('inkoffbox', '0,0,1,1')).split(',').map(Number) : null;
-    const fig = ctx.FW_SUBJ || ctx.SUBJECT, share = num('inkoffshare', 0.5);
+    const fig = ctx.SUBJECT, share = num('inkoffshare', 0.5);
     const at = (x, y) => Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)));
     const fd = num('inkofffoliage', 0);
     const fol = fd > 0 ? (() => {
@@ -493,7 +493,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   const peak = penWant === 'glaze' ? peakOf : null;
   const big = SC === 1 ? press : Float32Array.from({ length: N2 }, (_, i) => press[(((i / W2) | 0) / SC | 0) * w + ((i % W2) / SC | 0)]);
   let outlines = null;
-  if (first && !SELECTED && opt('penoutline', VALUE_ENABLED ? '0' : '1') !== '0') {
+  if (first && !SELECTED && opt('penoutline', '0') !== '0') {
     const sil = silhouette(DRAW_SOURCE, w, h, gaussian, { scale: num('silscale', 4) * K });
     // --outlineskip 1: cut the outline where the source has a line within --outlineskipr cells (default 3), so it is not doubled.
     const skipNear = opt('outlineskip', '0') !== '0' ? dilate(SEP.ink, w, h, Math.round(num('outlineskipr', 3) * K)) : null;

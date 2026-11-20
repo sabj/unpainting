@@ -12,7 +12,7 @@ export async function runSpeedSequence(argv, script) {
   if (at < 0) return false;
   const runs = JSON.parse(argv[at + 1]);
   if (!Array.isArray(runs) || !runs.length || runs.length > 8 || runs.some(r => !Array.isArray(r) || r.some(v => typeof v !== 'string'))) throw Error('--speedsequence requires 1 to 8 arrays of CLI strings');
-  if (runs.some(r => r.some(v => ['--out', '--image', '--valueplan', '--areaplan', '--drawingfile', '--targetguard', '--speedsequence'].includes(v)))) throw Error('sequence variants cannot override inputs, guard or output');
+  if (runs.some(r => r.some(v => ['--out', '--image', '--valueplan', '--drawingfile', '--targetguard', '--speedsequence'].includes(v)))) throw Error('sequence variants cannot override inputs, guard or output');
   const args = argv.slice(); args.splice(at, 2);
   const oi = args.lastIndexOf('--out');
   if (oi < 0 || !args[oi + 1]) throw Error('--speedsequence requires --out');

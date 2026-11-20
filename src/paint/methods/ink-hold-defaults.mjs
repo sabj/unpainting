@@ -17,7 +17,6 @@ export function inkHoldArgs(argv) {
   const outline = last(argv, '--outlinemedium');
   const ink = outline !== undefined && outline !== 'none' && outline !== 'auto' && !isGraphite(outline);
   const noPen = ['none', 'pencil'].includes(subjectMediumOf(argv));
-  // an area plan decides its own lines by drawingRole and refuses the region-label decision (area-owned-options.mjs)
-  if (!ink || last(argv, '--drawing') === 'none' || noPen || argv.includes('--areaplan')) return [];
+  if (!ink || last(argv, '--drawing') === 'none' || noPen) return [];
   return Object.entries(INK_HOLD_FLAGS).flatMap(([k, v]) => (argv.includes('--' + k) ? [] : ['--' + k, v]));
 }

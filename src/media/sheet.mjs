@@ -1241,7 +1241,7 @@ export function wetSums(sheet) {
 /** The newest dried layer's CPU copy made current (a rewet on the GPU may have lifted some of it). */
 export const syncTopLayer = sheet => { if (sheet._gpu) sheet._gpu.syncTop(sheet, true); };
 /** The CPU copy made current over a rectangle [x, y, w, h] of cells, for code that reads the sheet's arrays directly. */
-export const needCells = (sheet, x, y, bw, bh) => { if (sheet._gpu && !sheet._gpu.paused && !ENV.NEEDCELLS_OFF) sheet._gpu.ensureFresh(sheet, [x, y, bw, bh]); };
+const needCells = (sheet, x, y, bw, bh) => { if (sheet._gpu && !sheet._gpu.paused && !ENV.NEEDCELLS_OFF) sheet._gpu.ensureFresh(sheet, [x, y, bw, bh]); };
 function thicknessParts(sheet, materializeWet = true) {
   syncTopLayer(sheet);
   const sums = materializeWet ? wetSums(sheet) : sheet._gpu?.wetSums(sheet) ?? null;

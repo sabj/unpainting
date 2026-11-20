@@ -3,7 +3,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { painterSource } from '../plate/source.mjs';
 import { REMOVED_OPTIONS } from '../../src/paint/removed-options.mjs';
-import { semanticTechnique } from './semantic-areas.mjs';
 
 const SRC = painterSource();
 
@@ -14,18 +13,10 @@ test('no forcing switch is left in the painter: each is a removed option with it
   }
 });
 
-test('the technique is chosen once: an area pass by its move, a value plan by its own, the source only with no plan', () => {
+test('the technique is chosen once: every passage takes its wash plan\'s move', () => {
   // the only assignment that makes a passage wet on wet from the paint loop's own numbers is gone
   assert.doesNotMatch(SRC, /T = \{ \.\.\.T, name: 'wet on wet', water: 0\.88/);
-  assert.match(SRC, /let T = sh\._semantic \? \{\} : sh\._valuePlan \? valueTechnique\(sh\._valuePlan\) : techniqueOf\(sh\);/);
-  // a value plan's technique never overwrites an area pass's move
-  assert.match(SRC, /if\(sh\._valuePlan\)\{if\(!sh\._semantic\)T=valueTechnique\(sh\._valuePlan\);/);
-});
-
-test('an area pass takes its own move whatever the starting technique', () => {
-  const pass = { move: 'wet on dry', source: 'numeric', load: { water: 0.5 } };
-  for (const start of [{}, { name: 'wet on wet', intoWet: true, passes: 2 }]) {
-    const T = semanticTechnique({ pass }, start);
-    assert.deepEqual([T.name, T.intoWet, T.dryAfter, T.water, T.passes], ['wet on dry', false, true, 0.5, 1]);
-  }
+  assert.match(SRC, /let T = valueTechnique\(sh\._valuePlan\);/);
+  // the source is no longer read for a technique (the ladder's chooseTechnique was removed in 0.4)
+  assert.doesNotMatch(SRC, /techniqueOf\(/);
 });

@@ -23,7 +23,7 @@ test('an ink drawing gets the hold and decision flags it does not set', () => {
 
 test('graphite, no medium, no drawing, a graphite subject and the ink-free options get nothing', () => {
   for (const argv of [['--outlinemedium', 'graphite'], [], ['--outlinemedium', 'none'], ['--outlinemedium', 'ink', '--drawing', 'none'],
-    ['--outlinemedium', 'ink', '--subjectmedium', 'pencil'], ['--outlinemedium', 'auto'], ['--outlinemedium', 'ink', '--areaplan', 'plan.json']]) assert.deepEqual(inkHoldArgs(argv), [], JSON.stringify(argv));
+    ['--outlinemedium', 'ink', '--subjectmedium', 'pencil'], ['--outlinemedium', 'auto']]) assert.deepEqual(inkHoldArgs(argv), [], JSON.stringify(argv));
 });
 
 test('the defaults are the pruning half of the wash recipe, with the same values', () => {
