@@ -81,10 +81,11 @@ test('noise in the subject does not change the shapes: polygons are things, not 
   assert.deepEqual(a.layers.map(l => l.shapes[0]._valuePlan.thing), b.layers.map(l => l.shapes[0]._valuePlan.thing));
 });
 
-test('without named things each SAM region is a thing, and the plan still needs the segment map', () => {
+test('without named things each SAM region is a thing; without a segment map the sheet is one region', () => {
   const sc = scene(), p = plan(sc, []);
   assert.ok(p.summary.washes >= 3 && p.summary.washes < 15);
-  assert.throws(() => plan({ ...sc, seg: null }), /segment map/);
+  const one = plan({ ...sc, seg: null }, []);
+  assert.ok(one.summary.washes >= 1 && one.summary.washes <= 3, `one band and perhaps an accent (${one.summary.washes})`);
 });
 
 test('a named shadow is one glaze in the colour of its shade, laid after the things', () => {

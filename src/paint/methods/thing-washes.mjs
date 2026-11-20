@@ -195,8 +195,10 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   const prgb = new Uint8ClampedArray(pn * 3); for (let q = 0; q < pn; q++) for (let c = 0; c < 3; c++) prgb[q * 3 + c] = 255 * (lin[c][q] / Math.max(1, cnt[q])) ** (1 / 2.2);
   const pL = Float32Array.from({ length: pn }, (_, q) => labOf(prgb, q, paperCol)[0]);
   const rgbAt = q => [prgb[q * 3], prgb[q * 3 + 1], prgb[q * 3 + 2]], LAt = q => pL[q];
-  if (!segments || segments.length !== n) throw Error('the thing-wash plan needs the run\'s segment map (--segments sam)');
-  const regionMap = Int32Array.from({ length: pn }, (_, q) => segments[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]);
+  if (segments && segments.length !== n) throw Error('the segment map is not on the sheet\'s grid');
+  // a run without a segment map (--segments off) has one region: the named things' own masks, if any, and one band
+  if (!segments) console.log('thing washes: no segment map; the sheet is one region');
+  const regionMap = !segments ? new Int32Array(pn) : Int32Array.from({ length: pn }, (_, q) => segments[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]);
   const least = leastAreas(washBrushMm), leastCells = least.washMm2 / (planMm * planMm);
   const own = thingMap ? Uint8Array.from({ length: pn }, (_, q) => thingMap[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]) : null;
   const { things, thingOf } = assignThings(regionMap, pw, ph, named, leastCells, own);
