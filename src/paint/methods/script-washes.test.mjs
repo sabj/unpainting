@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { planScriptWashes, checkScript, passageStrokes, footprint, hexRgb, upgradeScript } from './script-washes.mjs';
 import { handOf, inside, placesIn, sweeps, scattered, chordAt, lines, pressureAt, handled } from './script-marks.mjs';
 import { cropScript, clipPolygon } from '../../../tools/painter/script-crop.mjs';
+import { resolveScript } from '../../../tools/painter/script-resolve.mjs';
 import { BOX, boxPigment } from '../../crop/box.mjs';
 
 const keys = ['ochre', 'ultramarine', 'sapgreen', 'umber'];
@@ -96,4 +97,15 @@ test('helpers: a swatch colour, and the footprint of a stroke', () => {
   assert.equal(passageStrokes({ ...wall, id: 'y', brush: undefined }, brushes)[0].radiusMm, 6);
   const old = upgradeScript({ format: 'painting-script 1', passages: [{ id: 'a', mark: 'dab', move: 'wet into wet', strokes: 4, pressure: 'firm' }] });
   assert.equal(old.passages[0].kind, 'touches'); assert.equal(old.passages[0].paper, 'wet'); assert.equal(old.passages[0].count, 4);
+});
+
+test('shapes of a study named by number become the passage\'s regions, its reserves and a stroke along a shape', () => {
+  const shapes = { study: 's', shapes: [{ id: 1, outline: square, centre: [35, 30], axisDeg: 90, lengthMm: 40 }, { id: 2, outline: [[30, 25], [40, 25], [40, 35], [30, 35]], centre: [35, 30], axisDeg: 0, lengthMm: 10 }] };
+  const r = resolveScript(script([{ ...wall, region: undefined, shapes: [1], reserve: [2] }, { id: 's', stage: 3, kind: 'strokes', brush: 'r8', paint: { pigments: { umber: 1 } }, strokes: [{ along: 1, pressure: [0.2, 1, 0.1] }] }], { lights: [{ what: 'w', shapes: [2] }] }), shapes);
+  assert.deepEqual(r.passages[0].regions, [square]); assert.equal(r.passages[0].reserveRegions.length, 1); assert.equal(r.lights[0].region.length, 4);
+  assert.deepEqual(r.passages[1].strokes[0].from, [35, 10]); assert.equal(r.passages[1].strokes[0].direction, 90);
+  assert.throws(() => resolveScript(script([{ ...wall, shapes: [9] }]), shapes), /shape 9/);
+  // a passage's own reserve is worked round by its lanes
+  const st = passageStrokes({ ...r.passages[0], brush: 'r8' }, brushes).flatMap(q => q.points);
+  assert.ok(!st.some(([x, y]) => x > 32 && x < 38 && y > 27 && y < 33));
 });

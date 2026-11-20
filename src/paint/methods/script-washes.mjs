@@ -88,7 +88,9 @@ function washBrush(p, brushes) {
 }
 
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
-export function passageStrokes(p, brushes, seed = 0, lights = []) {
+export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
+  // the paper this passage keeps: the sheet's lights and its own reserves (shapes it is laid round, painted later)
+  const lights = [...sheetLights, ...(p.reserveRegions ?? []).filter(P => P?.length >= 3)];
   const rng = handOf(`${seed}/${p.id}`), h = p.handling ?? {}, ch = p.character ?? {}, polys = regionsOf(p);
   const deg = Number(h.direction ?? 0) || 0, pressure = Array.isArray(h.pressure) ? h.pressure.map(Number) : PRESSURES[h.pressure] ?? PRESSURES.medium;
   const widthMm = p.kind === 'wash' ? washBrush(p, brushes) : brushes[p.brush].widthMm;
