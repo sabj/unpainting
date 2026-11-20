@@ -10,15 +10,17 @@ import { localRowPlanBound } from './gpu/local-row-plan.js';
 import { checkedStroke } from './gpu/stroke-check.js';
 import { markCpuStrokeCell } from './cpu-stroke-dirty.js';
 import { brushContactLookahead,lookaheadCount } from './cpu-contact-lookahead.js';
+import { TUFT, REF_MM, tuftShape, contactShare, roundProfile, kappaOf, headOf, feedRate, moveChain, footprint, exchangeCell, toothReach } from './tuft-section.js';
 
 export function createBrush(opts = {}) {
   const b = makeBrush(opts);
   if (BRUSHES) b._tapeId = brushId(opts);
   return b;
 }
-function makeBrush({ loadWater = 0, depositDepth = 0, bristles = 22, radius = 6, capacity = 20, give = 0.8, feed = 0.04, wetness = 0.9, flat = false, belly = 1.6, free = 0.4, film = 0.25, breakup = 1.5, bridge = 0, bridgeSoft = 0.25, bridgeStreak = 1, fine = 0.1, streak = 0.35, streakLength = 14, coarse = 0.3, splay = 0.03, stiffness, wetMix = 0, grainShift = 0, model = 'row', lag = 0.6, seed = 3, variety = null, merge = null } = {}) {
-  if (!['row','tuft'].includes(model)) throw new RangeError('Invalid brush model');
+function makeBrush({ loadWater = 0, depositDepth = 0, bristles = 22, radius = 6, capacity = 20, give = 0.8, feed = 0.04, wetness = 0.9, flat = false, belly = 1.6, free = 0.4, film = 0.25, breakup = 1.5, bridge = 0, bridgeSoft = 0.25, bridgeStreak = 1, fine = 0.1, streak = 0.35, streakLength = 14, coarse = 0.3, splay = 0.03, stiffness, wetMix = 0, grainShift = 0, model = 'row', lag = 0.6, seed = 3, variety = null, merge = null, speed = TUFT.speed, bladeAngle = 90 } = {}) {
+  if (!['row','tuft','section'].includes(model)) throw new RangeError('Invalid brush model');
   if (!Number.isFinite(lag) || lag < 0) throw new RangeError('Invalid tuft lag');
+  if (!(speed > 0) || !Number.isFinite(bladeAngle)) throw new RangeError('Invalid brush speed or blade angle');
   const rs = { s: seed * 7919 + 13 }; const rnd = () => (rs.s = (rs.s * 16807) % 2147483647) / 2147483647; // rs: the generator's state, kept where a snapshot can reach it
   const hairs = [], clumps = []; let left = 0, c = -1;
   for (let j = 0; j < bristles; j++) {
@@ -32,7 +34,7 @@ function makeBrush({ loadWater = 0, depositDepth = 0, bristles = 22, radius = 6,
   // travels, so overlapping sweeps break up differently instead of compounding on the same cells.
   const gs = grainShift > 0 ? grainShift : 0;
   const grainTable = gs ? Array.from({ length: 8 }, () => [Math.round((rnd() * 2 - 1) * gs), Math.round((rnd() * 2 - 1) * gs)]) : null;
-  return { loadWater, depositDepth, hairs, clumps, radius, capacity, give, feed, wetness, flat, belly, free, film, breakup, bridge, bridgeSoft, bridgeStreak, fine, streak, streakLength, coarse, splay, travel: 0, wetMix, grainTable, grainPeriod: 9, stiffness: stiffness ?? Math.max(4, Math.round(radius * 0.5)), rnd, rs, resW: 0, resP: null, K: 0, carry: 0, model, lag, tip: null, bend: 0, seed, dips: 0, sinceDip: 0, variety, merge };
+  return { loadWater, depositDepth, hairs, clumps, radius, capacity, give, feed, wetness, flat, belly, free, film, breakup, bridge, bridgeSoft, bridgeStreak, fine, streak, streakLength, coarse, splay, travel: 0, wetMix, grainTable, grainPeriod: 9, stiffness: stiffness ?? Math.max(4, Math.round(radius * 0.5)), rnd, rs, resW: 0, resP: null, K: 0, carry: 0, model, lag, tip: null, bend: 0, seed, dips: 0, sinceDip: 0, variety, merge, speed, bladeAngle };
 }
 
 /** Dip: water at a pigment concentration (per unit of water, per pigment), into the belly and every bristle. */
@@ -53,6 +55,8 @@ export function dip(brush, { water = 1, conc }) {
     for (const hr of brush.hairs) { hr.water = tip * hr.len * brush.capacity / tipCap; hr.pig = conc.map(v => v * hr.water); }
     brush.resW = total - tip; brush.resP = conc.map(v => v * brush.resW);
   }
+  // the belly's capacity, for the section brush's capillary feed: what a dip at 1 puts there, or what this metered load did
+  brush._capB = Math.max(brush.capacity * brush.hairs.length * brush.belly, brush.resW);
 }
 
 /** A thirsty brush: a dip at a little water and no pigment, damp with no free liquid, for lifting out of a wet wash.
@@ -201,7 +205,7 @@ export function varyPath(brush, path, paper, lift = true) {
   const lw = Math.max(6, 4 * R0), lp = Math.max(8, 5 * R0), lo = Math.max(8, 3 * R0);
   let pmin = Infinity, pmax = -Infinity; for (const q of path) { const p = q.p ?? 1; pmin = Math.min(pmin, p); pmax = Math.max(pmax, p); }
   // the hand lands where the brush was off the paper, and lifts where this call lifts it
-  const flatP = pmax - pmin < 0.03, landOn = !brush._onPaper, liftOn = lift !== false, land = Math.min(0.15 * L, 0.8 * R0), liftL = Math.min(0.25 * L, 1.5 * R0), capOff = 0.5 / mmc;
+  const sect = brush.model === 'section', flatP = pmax - pmin < 0.03, landOn = !brush._onPaper, liftOn = lift !== false, land = Math.min(0.15 * L, (sect ? 1.5 : 0.8) * R0), liftL = Math.min(sect ? 0.3 * L : 0.25 * L, (sect ? 2 : 1.5) * R0), capOff = 0.5 / mmc;
   const out = new Array(n);
   for (let k = 0; k < n; k++) {
     const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)], tl = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / tl, ny = (b.x - a.x) / tl;
@@ -210,8 +214,14 @@ export function varyPath(brush, path, paper, lift = true) {
     off = Math.max(-capOff, Math.min(capOff, off));
     const o = { ...q, x: q.x + nx * off, y: q.y + ny * off };
     let p = (q.p ?? 1) * (1 + 0.07 * v * (2 * field2(4005, q.x / lp, q.y / lp) - 1));
-    if (flatP && landOn) p *= 1 - v + v * (0.6 + 0.4 * smooth(s / land));
-    if (flatP && liftOn) p *= 1 - v + v * (0.45 + 0.55 * smooth((L - s) / liftL));
+    if (sect) {
+      // the section brush lands on its tip and lifts off it: the hand's pressure comes from nothing and goes back to it
+      if (landOn) p *= 1 - v + v * (0.1 + 0.9 * smooth(s / land));
+      if (liftOn) p *= 1 - v + v * (brush.flat ? 0.25 + 0.75 * smooth((L - s) / liftL) : smooth((L - s) / liftL)); // a flat tilts off its edge
+    } else {
+      if (flatP && landOn) p *= 1 - v + v * (0.6 + 0.4 * smooth(s / land));
+      if (flatP && liftOn) p *= 1 - v + v * (0.45 + 0.55 * smooth((L - s) / liftL));
+    }
     o.p = Math.max(0, Math.min(1.2, p));
     o.r = Math.max(0, rad * (1 + 0.05 * v * (2 * field2(4007, q.x / lw, q.y / lw) - 1)));
     out[k] = o;
@@ -301,6 +311,7 @@ export const restoreTapeState = s => {
 // How far past its path a stroke of radius r can touch the paper, in cells.
 export function strokeReach(brush, paper, r = brush.radius) {
   const vm = varietyOf(brush) ? 0.25 * r + 2 * edgeTooth(brush, paper) + 0.5 / (paper?.mmPerCell || 280 / 1086) : 0; // varyPath's wander and edgeShift
+  if (brush.model === 'section') { const sh = tuftShape(brush.flat); return Math.ceil(r * Math.max(1.2, sh.cMax * 1.2 ** 0.85 * sh.length + sh.thick) * (1 + 0.1 * varietyOf(brush)) + 3 + vm); }
   return Math.ceil(r * (brush.model === 'tuft' ? 2.2 : 1) * (1 + (brush.splay ?? 0)) + 3 + vm);
 }
 function strokeRect(brush, sheet, path) {
@@ -318,7 +329,7 @@ function strokeRect(brush, sheet, path) {
 let WASH_SPLAT = false, SPLAT_WATER = 1;
 export const setWashSplat = (on, { water = 1 } = {}) => { WASH_SPLAT = !!on; SPLAT_WATER = water; };
 export const splatWater = () => SPLAT_WATER;
-const splats = brush => WASH_SPLAT && brush.capacity >= 50 && (brush.load ?? 0) >= 0.3;
+const splats = brush => brush.model !== 'section' && WASH_SPLAT && brush.capacity >= 50 && (brush.load ?? 0) >= 0.3;
 const sstep = (e0, e1, x) => { const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
 // the brush as one reservoir: water, the paint's concentration, and the water it would hold dipped at 1
 function reservoir(brush, K) {
@@ -435,12 +446,13 @@ export function stroke(brush, sheet, path, options = {}) {
   // The GPU contact kernel is row-only: tufts use CPU contact; metered tips require GPU_RESIDENT=1.
   const planLimit=link?.strokePlanCapacity??3900000;
   let fits=planFits(brush,varyPath(brush,path,sheet.paper,options.lift),options.spacing??.7,planLimit);
-  if(!fits&&link&&!link.paused&&link.brushGpu&&betweenOk&&brush.model!=='tuft'&&(!brush.depositDepth||ENV.GPU_RESIDENT==='1')&&ENV.GPU_LOCAL_ROW_PLAN==='1'&&onGpu(brush,sheet)){
+  if(!fits&&link&&!link.paused&&link.brushGpu&&betweenOk&&brush.model!=='tuft'&&brush.model!=='section'&&(!brush.depositDepth||ENV.GPU_RESIDENT==='1')&&ENV.GPU_LOCAL_ROW_PLAN==='1'&&onGpu(brush,sheet)){
     const bound=localRowPlanBound(brush,sheet,path,options,planLimit);fits=bound.eligible;
     const stats=link.stats??(link.stats={});stats.localRowPlanChecks=(stats.localRowPlanChecks??0)+1;
     if(fits){stats.localRowPlanAdmitted=(stats.localRowPlanAdmitted??0)+1;stats.localRowPlanWords=(stats.localRowPlanWords??0)+bound.words;stats.localRowPlanEmptySteps=(stats.localRowPlanEmptySteps??0)+bound.emptySteps;}
   }
-  const gpuOk = brush.model !== 'tuft' && (!brush.depositDepth || ENV.GPU_RESIDENT === '1') && !!link && !link.paused && path.length > 0 && link.brushGpu && betweenOk && onGpu(brush, sheet) && fits;
+  // The section brush has no GPU contact kernel yet (BRUSH-PHYSICS.md S4): its contact runs on the CPU against the GPU sheet.
+  const gpuOk = brush.model !== 'tuft' && brush.model !== 'section' && (!brush.depositDepth || ENV.GPU_RESIDENT === '1') && !!link && !link.paused && path.length > 0 && link.brushGpu && betweenOk && onGpu(brush, sheet) && fits;
   const p = brush._pend;
   if (p) {
     // A pending GPU stroke: continue on the GPU when possible (_cont 2 when hairs and belly are still there, 1 for the
@@ -461,7 +473,7 @@ export function stroke(brush, sheet, path, options = {}) {
 }
 
 // The stroke's entry on the mark tape (nothing when no tape is recording); returns the list its flows are collected into.
-function tapeStroke(brush, sheet, path, { spacing, lift, upright, splat = false }) {
+function tapeStroke(brush, sheet, path, { spacing, lift, upright, splat = false, speed }) {
   let rec = TAPE && brush._tapeId !== undefined && sheet._tape ? [] : null;
   // Only the painting's own sheet records; scrap test sheets do not.
   if (TAPE && brush._tapeId !== undefined && sheet._tape) TAPE.push({
@@ -473,6 +485,8 @@ function tapeStroke(brush, sheet, path, { spacing, lift, upright, splat = false 
     ...(lift ? {} : { lf: 0 }),
     ...(spacing === 0.7 ? {} : { sp: spacing }),
     ...(splat ? { splat: 1 } : {}),
+    // the hand's speed in mm/s, when the stroke gives one (the section brush reads it)
+    ...(speed !== undefined ? { vs: speed } : {}),
     // step indices where this stroke flowed the sheet
     fl: rec,
     // points as integers: x and y in tenths of a cell, pressure in hundredths, and the point's own radius in tenths
@@ -500,7 +514,105 @@ function strokeContacts(sheet) {
 function beadRoom(brush, p, freeL, W) {
   return W.map(Wi => brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * p) - Wi) : brush.give * p * Math.max(0, brush.wetness * freeL * (0.6 + 0.4 * p) - Wi));
 }
+// The section brush's stroke (tuft-section.mjs): a towed tuft on the CPU, one film law between it and the paper.
+// `speed` (mm/s) sets how long each cell is in contact; a point's own `v` overrides it.
+function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, candidateMask = null } = {}) {
+  const countContact = candidateMask ? null : strokeContacts(sheet);
+  const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright, speed });
+  land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
+  const { w, h, paper } = sheet, K = sheet.K, mmc = paper.mmPerCell > 0 ? paper.mmPerCell : REF_MM, S = TUFT.sections;
+  const shape = tuftShape(brush.flat), lanes = brush.hairs.length, hairs = brush.hairs, v0 = speed ?? brush.speed ?? TUFT.speed;
+  const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || brush.wetness;
+  const [tlo, tspan] = paper.toothSpan > 0 ? [paper.toothLo, paper.toothSpan] : [0, 0], relief = paper.relief ?? 0.2, soft = Math.max(0.05, brush.bridgeSoft) * relief;
+  const ET = edgeTooth(brush, paper), vr = varietyOf(brush), clip = sheet.clip ?? null;
+  const capB = brush._capB ?? brush.capacity * lanes * brush.belly, buf = new Float64Array(K);
+  const sat = new Float64Array(lanes), hb = new Float64Array(lanes), reach = new Float64Array(lanes), capL = new Float64Array(lanes);
+  for (let j = 0; j < lanes; j++) capL[j] = brush.capacity * hairs[j].len;
+  let hx = 0, hy = 1;
+  if (upright === 'sweep' && path.length > 1) {
+    const ex = path[path.length - 1].x - path[0].x, ey = path[path.length - 1].y - path[0].y, em = Math.hypot(ex, ey);
+    if (em > 1e-6) { hx = ex / em; hy = ey / em; }
+  }
+  if (!brush._onPaper) { brush._chain = null; brush._blade = null; brush._seg = 0; }
+  let t = brush.carry, k = 1, steps = 0;
+  if (rec) collectFlows(rec, () => steps);
+  sheet.clock = sheet.clock ?? 0;
+  sheet._contactBrush = brush;
+  const rad = new Float64Array(S), geom = { pts: null, S, rad, flat: brush.flat, bx: 1, by: 0, thick: 0, onBox: null };
+  if (sheet._cpuDemandWindow) geom.onBox = (x0, y0, x1, y1) => { const r = [x0, y0, x1 - x0 + 1, y1 - y0 + 1]; if (!sheet._cpuDemandWindow.covers(r)) sheet._cpuDemandWindow.require(r); };
+  while (k < path.length) {
+    const a = path[k - 1], b = path[k], seg = Math.hypot(b.x - a.x, b.y - a.y) || 1e-6;
+    if (t > seg) { t -= seg; k++; continue; }
+    const u = t / seg, p = (a.p ?? 1) + ((b.p ?? 1) - (a.p ?? 1)) * u, qx = a.x + (b.x - a.x) * u, qy = a.y + (b.y - a.y) * u;
+    const tx = (b.x - a.x) / seg, ty = (b.y - a.y) / seg, R = a.r === undefined ? brush.radius : a.r + ((b.r ?? a.r) - a.r) * u;
+    const vel = (a.v ?? v0) + ((b.v ?? a.v ?? v0) - (a.v ?? v0)) * u, dt = spacing * mmc / Math.max(1e-3, vel);
+    if (p < 0.02 || !(R > 0)) { brush._chain = null; brush._seg = 0; }
+    else {
+      // the tuft: how much of it lies down, the towed chain, and its section widths
+      const c = contactShare(shape, p), segLen = c * shape.length * R / (S - 1);
+      brush._chain = moveChain(brush._chain, S, qx, qy, segLen, brush._seg ?? 0, -tx, -ty); brush._seg = segLen;
+      geom.pts = brush._chain;
+      if (brush.flat) {
+        const a0 = R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.15)); // the corners leave the paper only at the last
+        rad.fill(a0); geom.thick = Math.max(0.5, shape.thick * R);
+        // the blade, held at bladeAngle to the heading (the path's, or the fixed one upright), turns after the path
+        const [fx, fy] = upright ? [hx, hy] : [tx, ty], ang = brush.bladeAngle * Math.PI / 180;
+        let gx = fx * Math.cos(ang) - fy * Math.sin(ang), gy = fx * Math.sin(ang) + fy * Math.cos(ang);
+        const bl = brush._blade;
+        if (bl && gx * bl[0] + gy * bl[1] < 0) { gx = -gx; gy = -gy; }
+        if (!bl || upright) brush._blade = [gx, gy];
+        else { const e = 1 - Math.exp(-spacing / Math.max(spacing, R)); let nx = bl[0] + (gx - bl[0]) * e, ny = bl[1] + (gy - bl[1]) * e; const m = Math.hypot(nx, ny) || 1; brush._blade = [nx / m, ny / m]; }
+        [geom.bx, geom.by] = brush._blade;
+      } else for (let j = 0; j < S; j++) rad[j] = R * roundProfile(1 - c + c * j / (S - 1), shape.belly) * (1 + 0.15 * Math.max(0, p - 1));
+      if (!candidateMask) {
+        // the belly feeds the lanes by capillary flow, both ways, towards one saturation
+        const ef = 1 - Math.exp(-kF * dt);
+        for (let j = 0; j < lanes; j++) {
+          const hr = hairs[j], sB = capB > 0 ? brush.resW / capB : 0, sL = hr.water / (capL[j] || 1);
+          const q = ef * (sB - sL) * capL[j] * capB / (capL[j] + capB || 1);
+          if (q > 0) feedHair(brush, brush.resP, hr, Math.min(q, brush.resW));
+          else if (q < 0 && hr.water > 0) { const f = Math.min(1, -q / hr.water); for (let kk = 0; kk < K; kk++) { const m = hr.pig[kk] * f; hr.pig[kk] -= m; brush.resP[kk] += m; } brush.resW += hr.water * f; hr.water -= hr.water * f; }
+          sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], brush.free, Hb);
+          const cl = brush.clumps[hr.clump], wander = cl && brush.streak ? 1 + brush.streak * (2 * along1(hr.clump + cl.lift * 7, brush.travel * mmc / (brush.streakLength * REF_MM)) - 1) : 1;
+          reach[j] = toothReach(hb[j], Hb, p, brush.bridge, wander) * relief;
+        }
+      }
+      const ka = TUFT.rate * brush.give / 0.9, half = brush.flat ? rad[0] : R, band = vr ? 0.1 * half + 2 * ET + 1 : 2 * ET + 1;
+      const l1 = Math.max(3, 0.8 * half), l2 = Math.max(8, 3 * half);
+      footprint(geom, w, h, band, (i, d, across, x, y) => {
+        if (d > band + 0.5) return;
+        // the wet edge breathes at two scales, as fields over the paper, and follows the tooth
+        if (d > -band - 0.5) {
+          if (vr) d -= half * vr * (0.05 * (2 * field2(1046, x / l1, y / l1) - 1) + 0.05 * (2 * field2(1058, x / l2, y / l2) - 1));
+          if (ET) d -= ET * Math.max(-2, Math.min(2, (paper.height[i] - 0.54) / 0.16));
+        }
+        const cov = Math.min(1, 0.5 - d); if (cov <= 0) return;
+        if (clip && !clip[i]) return;
+        if (candidateMask) { candidateMask[i] = 1; return; }
+        const j = Math.max(0, Math.min(lanes - 1, Math.round((across + 1) / 2 * (lanes - 1)))), hr = hairs[j];
+        const rel = tspan ? paper.height[i] - (tlo + tspan * paper.tooth[i]) : 0, tooth = smooth((rel + reach[j]) / soft + 0.5);
+        const contact = cov * tooth; if (contact <= 0) return;
+        // a round presses hardest along its spine, a flat evenly along its blade
+        const pl = brush.flat ? p : p * (0.6 + 0.4 * (1 - across * across)), aa = 1 - Math.exp(-ka * (0.35 + 0.65 * Math.min(1, pl)) * dt);
+        countContact(i); markCpuStrokeCell(sheet, i);
+        exchangeCell(sheet, i, hr, capL[j], brush.free * capL[j], aa, contact, hb[j], g, buf);
+        // the lane's head follows what it gave or took
+        sat[j] = hr.water / (capL[j] || 1); hb[j] = headOf(sat[j], brush.free, Hb);
+      });
+    }
+    steps++; if (between) between(steps);
+    t += spacing; brush.travel += spacing; sheet.clock++;
+  }
+  brush.carry = t;
+  if (rec) collectFlows(null, null);
+  if (candidateMask) return;
+  if (!lift) { brush._onPaper = true; return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW; }
+  brush.carry = 0; nextStroke(brush); brush._chain = null; brush._blade = null; brush._seg = 0;
+  sheet._contactBrush = null; sheet._lastPoint = path[path.length - 1];
+  return brush.hairs.reduce((s2, hr) => s2 + hr.water, 0) + brush.resW;
+}
 function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, flowEvery = 0, candidateMask = null } = {}) {
+  if (brush.model === 'section') return sectionStroke(brush, sheet, path, arguments[3] ?? {});
   const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
@@ -749,6 +861,7 @@ function strokeImpl(brush, sheet, path, { spacing = 0.7, between, lift = true, u
 // The strokeImpl stroke with cell work on the GPU (gpu/stepfull.wgsl, stroke_run). Geometry and cell selection are
 // planned here in the same double arithmetic as strokeImpl, so edge cells go the same way as on the CPU.
 function strokeGpu(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false } = {}, observational = false) {
+  if (brush.model === 'section') throw new Error('strokeGpu: the section brush has no GPU contact kernel until BRUSH-PHYSICS.md stage 4; its contact runs on the CPU');
   const countContact = observational ? null : strokeContacts(sheet);
   const link = sheet._gpu, rec = observational ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
@@ -922,9 +1035,9 @@ export function candidateContact(brush, sheet, path, { spacing = 0.7, lift = tru
   for (const q of path) if (!q || !Number.isFinite(q.x) || !Number.isFinite(q.y) || (q.p !== undefined && (!Number.isFinite(q.p) || q.p < 0)) || (q.r !== undefined && (!Number.isFinite(q.r) || q.r < 0))) throw new Error('candidate contact path coordinates, pressure and radius must be finite and valid');
   if (![brush.radius, brush.splay, brush.carry, brush.travel].every(Number.isFinite) || brush.radius < 0 || brush.carry < 0) throw new Error('candidate contact instrument geometry must be finite and valid');
   for (let k = 1; k < path.length; k++) if (!Number.isFinite(Math.hypot(path[k].x - path[k - 1].x, path[k].y - path[k - 1].y))) throw new Error('candidate contact path segment must be finite');
-  const tuft = brush.model === 'tuft', sw = sheet.w, sh = sheet.h;
+  const tuft = brush.model === 'tuft' || brush.model === 'section', sw = sheet.w, sh = sheet.h;
   const n = sw * sh, work = !tuft && workspace instanceof ContactWorkspace ? workspace.prepare(n, sw, sh) : null;
-  const mask = work?.mask ?? new Uint8Array(n), copy = tuft ? { ...brush, tip:brush.tip?{...brush.tip}:null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() } : { ...brush, tip:null };
+  const mask = work?.mask ?? new Uint8Array(n), copy = tuft ? { ...brush, tip:brush.tip?{...brush.tip}:null, _chain:brush._chain?.slice()??null, _blade:brush._blade?.slice()??null, hairs:brush.hairs.map(hr=>({...hr,pig:hr.pig?.slice()})), resP:brush.resP?.slice() } : { ...brush, tip:null };
   const sparse = sparseRow === true && !tuft, emitted = sparse ? [] : null;
   const rLo = work?.rowLo ?? null, rHi = work?.rowHi ?? null, nrLo = work?.nrowLo ?? null, nrHi = work?.nrowHi ?? null;
   // row-major index range of the set cells, so dense passes scan only that range
