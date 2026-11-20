@@ -2,6 +2,7 @@
 // a serial step. Cross-band face sums are added by the receiving band in raster order; writes another band reads wait
 // for the next phase; the wet front's in-place scan uses recomputed or snapshotted neighbour rows. The chamfer edge
 // distance is capped at edgeWidth + 1 so each band recomputes nearby rows privately. DOM free, no Node imports.
+import { settleShare } from './settling.mjs';
 
 // ctrl (Int32) layout
 export const GEN = 0, PHASE = 1, SHEET = 2, DONE = 3, ERR = 4, NT = 5, READY = 6, NCH = 8;
@@ -19,7 +20,7 @@ export const P = {
   pinFibre: 37, hasTop: 38, hasResist: 39, enclose: 40, slideCap: 41, holeSpan: 42, holeFill: 43, filmDiff: 44, filmDepth: 45,
   mmPerCell: 46, edgeFlowDepth: 47,
 };
-export const PK = 64, PKS = 10; // per pigment: mobility, rho, omega, gamma, gg, lift, scour, rep, floc
+export const PK = 64, PKS = 11; // per pigment: mobility, rho, omega, gamma, gg, lift, scour, rep, floc, Stokes speed (mm/s), diffusion (mm^2/s)
 export const PRM_LEN = PK + PKS * MAXK;
 export const PH = { A: 1, B: 2, F0: 3, F1: 4, F2: 5, F3: 6, S3: 7, SL: 8, AP: 9, P5: 10, PM: 11, JOB: 12, QUIT: 99 };
 
@@ -326,7 +327,7 @@ function phaseF3(C, ya, yb) {
 }
 
 function phaseS3(C, ya, yb) {
-  const { ctrl, prm, W, G, D, K, height, went, dep, wl, wrow, resist, top, fibreH, tooth, surf } = C;
+  const { ctrl, prm, W, G, D, K, height, went, dep, wl, wrow, resist, top, fibreH, tooth, surf, hollow } = C;
   applyG(C, ya, yb);
   const n3 = ctrl[N3], dt = prm[P.dt], oFilm = prm[P.film];
   const liftDepth = prm[P.liftDepth], holdCap = prm[P.holdCap], settle = prm[P.settle], rewetLift = prm[P.rewetLift], granFill = prm[P.granFill];
@@ -336,14 +337,14 @@ function phaseS3(C, ya, yb) {
     const i = wl[q];
     if (granFill > 0) { let d = 0; for (let k = 0; k < K; k++) d += D[k][i]; dep[i] = d; }
     if (!(resistOn !== null && resistOn[i])) {
-      const Wi = W[i], hh = height[i], thin = Math.min(3, 0.12 / Math.max(0.04, Wi)), ld = Wi / liftDepth, wetting = ld >= 1 ? 1 : ld * ld;
+      const Wi = W[i], hh = height[i], ld = Wi / liftDepth, wetting = ld >= 1 ? 1 : ld * ld;
       const rewet = topLayer !== null && Wi > oFilm, turnover = Wi > 1e-6 ? Math.min(1, went[i] / Wi) : 0;
       for (let n = 0; n < n3; n++) {
         const k = ctrl[ACT3 + n], Gk = G[k], Dk = D[k];
         if (Gk[i] === 0 && Dk[i] === 0 && !(rewet && topLayer[k][i] !== 0)) continue;
-        const pk = PK + k * PKS, rho = prm[pk + 1], omega = prm[pk + 2];
-        const filled = granFill > 0 ? Math.min(1, hh + dep[i] * granFill) : hh;
-        const gg = prm[pk + 4], down = Gk[i] * Math.max(0, 1 - filled * gg) * rho * settle * thin * dt;
+        const pk = PK + k * PKS, omega = prm[pk + 2];
+        const hol = granFill > 0 ? hollow[i] * Math.max(0, 1 - dep[i] * granFill) : hollow[i];
+        const gg = prm[pk + 4], down = Gk[i] * settleShare(prm[pk + 9] * settle, prm[pk + 10] * settle, gg, hol, dt, Wi);
         const shape = Math.max(0, 1 + (hh - 1) * gg);
         const up = Dk[i] * shape * (prm[pk + 5] * wetting * dt + prm[pk + 6] * turnover * wetting);
         const dn = Math.min(Gk[i], Math.max(0, down)), u = Math.min(Dk[i], Math.max(0, up));

@@ -25,16 +25,21 @@ const withPhysics = (p, num) => {
   const [r, g, b] = Array.from(p.K), top = Math.max(r, g, b), spread = top - Math.min(r, g, b);
   let kind = spread < num('pigneutral', 0.3) * top ? 'grey' : top === r ? 'blue' : top === b ? 'earth' : 'violet';
   if (kind === 'earth' && (num('gammayellow', -1) >= 0 || num('flocyellow', -1) >= 0) && g < num('pigyellow', 0.35) * b) kind = 'yellow';
-  const phys = { blue: { rho: 0.08, gamma: num('gammablue', 0.8) }, earth: { rho: 0.06, gamma: num('gammaearth', 0.5) }, grey: { rho: 0.06, gamma: num('gammagrey', 0.6) }, violet: { rho: 0.05, gamma: num('gammaviolet', 0.4) }, yellow: { rho: 0.05, gamma: num('gammayellow', 0.1) } }[kind];
+  // dUm, rhoP: each class's typical particle diameter (um) and density (kg/m^3) for the Stokes settling (src/media/settling.mjs),
+  // as src/media/pigment-physical.mjs gives the paints that stand for it: blue as ultramarine (PB29, 2 um, 2350; Handprint,
+  // Pigment Compendium), earth as the natural iron oxides (1 to 5 um, about 3500; Pigment Compendium), grey as a carbon and
+  // ultramarine mix (Payne's grey, about 0.9 um, 1870), violet as a quinacridone (0.1 um, 1500; Herbst and Hunger) and
+  // yellow as an arylide (0.2 um, 1500; Herbst and Hunger)
+  const phys = { blue: { rho: 0.08, gamma: num('gammablue', 0.8), dUm: 2, rhoP: 2350 }, earth: { rho: 0.06, gamma: num('gammaearth', 0.5), dUm: 2, rhoP: 3500 }, grey: { rho: 0.06, gamma: num('gammagrey', 0.6), dUm: 0.9, rhoP: 1870 }, violet: { rho: 0.05, gamma: num('gammaviolet', 0.4), dUm: 0.1, rhoP: 1500 }, yellow: { rho: 0.05, gamma: num('gammayellow', 0.1), dUm: 0.2, rhoP: 1500 } }[kind];
   const flag = 'floc' + kind, configured = num(flag, NaN);
   const floc = Number.isNaN(configured) ? p.floc : flocOf(num, flag);
-  return { ...p, rho: p.rho ?? phys.rho, gamma: num('gamma' + kind, p.gamma ?? phys.gamma), ...(floc != null ? { floc } : {}), kind };
+  return { ...p, rho: p.rho ?? phys.rho, gamma: num('gamma' + kind, p.gamma ?? phys.gamma), dUm: p.dUm ?? phys.dUm, rhoP: p.rhoP ?? phys.rhoP, ...(floc != null ? { floc } : {}), kind };
 };
 
 /** Box pigments given their published settling physics; colour and scattering kept. */
 function boxPhysics({ pigments, log }) {
   const out = pigments.map(p => { const paint = BOX.find(b => b.name === p.name && (p.key == null || b.key === p.key)); return paint ? { ...p, ...physicsFields(paint.physics), key: paint.key } : p; });
-  if (out.some((p, j) => p !== pigments[j])) log(`pigments settle as published: ${out.map((p, j) => (p === pigments[j] ? `${j} unchanged` : `${j} ${p.name} gamma ${p.gamma} omega ${p.omega} rho ${p.rho}${p.floc ? ` floc ${p.floc}` : ''}`)).join(', ')}`);
+  if (out.some((p, j) => p !== pigments[j])) log(`pigments settle as published: ${out.map((p, j) => (p === pigments[j] ? `${j} unchanged` : `${j} ${p.name} gamma ${p.gamma} omega ${p.omega} rho ${p.rho} d ${p.dUm} um${p.floc ? ` floc ${p.floc}` : ''}`)).join(', ')}`);
   return out;
 }
 
