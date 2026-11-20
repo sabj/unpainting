@@ -280,7 +280,7 @@ const SPINE_TIP = 0.3;
  * the tip where it narrows and in its ends. Null when the shape is wider than the widest brush, not long enough, or
  * branches (its cross-sections are not one piece each).
  */
-export function spineFill(loops, kit) {
+function spineFill(loops, kit) {
   const all = loops.flatMap(l => l.points);
   let sx = 0, sy = 0; for (const [x, y] of all) { sx += x; sy += y; }
   const n = all.length, mx = sx / n, my = sy / n; let a = 0, b = 0, cc = 0;

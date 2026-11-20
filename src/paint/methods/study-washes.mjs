@@ -81,9 +81,9 @@ function parts(lab, w, h) {
 
 /**
  * The study's flat shapes on a pw x ph grid: {label (0-based shape per cell), shapes: [{cells, colour (sRGB), lab, paper, border: Map(shape -> shared edges), rim}]}.
- * `rgb` is the study on that grid. Exported for its test.
+ * `rgb` is the study on that grid.
  */
-export function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0 }) {
+function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0 }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
   for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(rgb, q, paperRGB); L[q] = l; A[q] = a; B[q] = b; }
   // the colours, read off a fixed grid of about 8000 cells
@@ -151,7 +151,7 @@ const tint = ([L, a, b]) => { const l = Math.max(20, L); return [60 * a / l, 60 
 
 /**
  * For each shape, the lighter shape of like hue it is laid over (its wash carried on under this one), or -1.
- * Exported for its test.
+ *
  */
 export function nestParents(shapes) {
   return shapes.map((s, i) => {
@@ -171,9 +171,9 @@ const lightOf = (rgb, pn, paperRGB) => Float32Array.from({ length: pn }, (_, q) 
 
 /**
  * The shift (cells) that best lays study `b` on study `a` (both pw x ph sRGB grids): the smallest mean L* difference
- * over shifts up to `most` cells each way, read on a grid four times coarser and refined at full size. Exported for its test.
+ * over shifts up to `most` cells each way, read on a grid four times coarser and refined at full size.
  */
-export function registerShift(a, b, pw, ph, paperRGB, most) {
+function registerShift(a, b, pw, ph, paperRGB, most) {
   const pn = pw * ph, La = lightOf(a, pn, paperRGB), Lb = lightOf(b, pn, paperRGB);
   const cost = (dx, dy, step) => { let s = 0, c = 0; for (let y = Math.max(0, dy); y < Math.min(ph, ph + dy); y += step) for (let x = Math.max(0, dx); x < Math.min(pw, pw + dx); x += step) { s += Math.abs(La[y * pw + x] - Lb[(y - dy) * pw + x - dx]); c++; } return c ? s / c : Infinity; };
   let best = [0, 0], bc = cost(0, 0, 4);
