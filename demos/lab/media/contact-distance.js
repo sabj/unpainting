@@ -15,10 +15,14 @@ function edt(f, n, out, v, z) {
   k = 0;
   for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; out[q] = (q - v[k]) ** 2 + f[v[k]]; }
 }
-export function contactDistance(mask, w, h, pinned) {
-  const width = 2 * w + 1, height = 2 * h + 1, distance = new Float64Array(width * height).fill(BIG);
-  const point = (x, y) => { distance[y * width + x] = 0; };
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mask[y * w + x]) {
+// box [x0, y0, x1, y1] (optional): the footprint lies inside it, so its faces and every cell asked about do too, and the
+// transform runs over that part of the half-cell lattice only. The distances are the same numbers (the same feature
+// points, squared distances exact in lattice units); the first version transformed the whole sheet for a mark.
+export function contactDistance(mask, w, h, pinned, box = null) {
+  const [bx0, by0, bx1, by1] = box ?? [0, 0, w - 1, h - 1], ox = 2 * bx0, oy = 2 * by0;
+  const width = 2 * (bx1 - bx0 + 1) + 1, height = 2 * (by1 - by0 + 1) + 1, distance = new Float64Array(width * height).fill(BIG);
+  const point = (x, y) => { distance[(y - oy) * width + x - ox] = 0; };
+  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) if (mask[y * w + x]) {
     const xx = 2 * x, yy = 2 * y;
     if (pinned(x - 1, y)) for (let k = 0; k < 3; k++) point(xx, yy + k);
     if (pinned(x + 1, y)) for (let k = 0; k < 3; k++) point(xx + 2, yy + k);
@@ -36,7 +40,7 @@ export function contactDistance(mask, w, h, pinned) {
     f.set(distance.subarray(r, r + width)); edt(f, width, out, v, z);
     for (let x = 0; x < width; x++) distance[r + x] = .5 * Math.sqrt(out[x]);
   }
-  return { distance, width };
+  return { distance, width, ox, oy };
 }
 
 // Average over the entire square cell, including the zero-flux portion beyond
@@ -44,7 +48,7 @@ export function contactDistance(mask, w, h, pinned) {
 // never a fixed count of grid cells. Distances are bilinear between exact
 // half-cell samples, so straight contact lines are represented exactly.
 export function cellEdgeFlux(field, x, y, mm, E) {
-  const { distance: d, width: w } = field, x0 = 2 * x, y0 = 2 * y;
+  const { distance: d, width: w } = field, x0 = 2 * x - (field.ox ?? 0), y0 = 2 * y - (field.oy ?? 0);
   if (d[(y0 + 1) * w + x0 + 1] * mm > E + Math.SQRT2 * mm) return 0;
   const base = y0 * w + x0, first = d[base], gx = .5 * (d[base + 2] - first), gy = .5 * (d[base + 2 * w] - first);
   let straight = Math.abs(Math.abs(2 * gx) - 1) < 1e-12 && Math.abs(gy) < 1e-12 || Math.abs(Math.abs(2 * gy) - 1) < 1e-12 && Math.abs(gx) < 1e-12;

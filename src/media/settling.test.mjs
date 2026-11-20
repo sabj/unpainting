@@ -83,3 +83,13 @@ test('a 40 mm wash of phthalo stays smooth at 0.25 and 0.1 mm cells and on halvi
   // a staining pigment gets no sub-cell grain
   assert.ok(subcellGrain(P25, PHTHALO) < 0.02);
 });
+
+test('a dark wash of ultramarine keeps its grain: lighter peaks under four times the paint', () => {
+  // A heavily loaded wash used to strand half its pigment evenly the moment it was laid (the hold cap at any depth), and
+  // the rest filled every hollow (a fixed hollow fill): poured at 5 it dried at grain 0.02 (0.5-1.5 mm, 0.25 mm cells)
+  // where the pale one has 0.10 and the dark real skies 0.08 to 0.12 (etudes/granul-gulfstream-sky).
+  const pale = wash(ULTRAMARINE, 0.25), dark = wash(ULTRAMARINE, 0.25, { conc: 5 });
+  console.log(`poured ultramarine grain, 0.5-1.5 mm at 0.25 mm cells: at 1.2 ${pale.mid.toFixed(4)}, at 5 ${dark.mid.toFixed(4)}`);
+  assert.ok(dark.mid >= 0.06 && dark.mid >= 0.6 * pale.mid, `dark ${dark.mid} pale ${pale.mid}`);
+  assert.ok(Math.abs(dark.after - dark.before) / dark.before < 1e-5);
+});

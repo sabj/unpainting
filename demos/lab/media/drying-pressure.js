@@ -4,21 +4,31 @@
 // Pin one pressure gauge per component; this does not pin or remove liquid.
 // IC(0)-preconditioned conjugate gradients handles long, narrow brush marks
 // without the thousands of iterations a diagonal preconditioner requires.
+//
+// Speed: the work arrays are kept between calls (sized to the sheet) and only the entries of the cells solved are
+// set back afterwards, and every loop walks the sorted cells by index. The arithmetic and its order are those of the
+// first version, so the result is the same to the bit (drying-pressure.test.mjs keeps that version and compares).
+let POOL = null;
+function pool(n) {
+  if (POOL && POOL.n === n) return POOL;
+  POOL = { n, r: new Float64Array(n), z: new Float64Array(n), p: new Float64Array(n), ap: new Float64Array(n), degree: new Uint8Array(n), edges: new Int32Array(4 * n).fill(-1), component: new Int32Array(n), anchor: new Uint8Array(n), diagonal: new Float64Array(n), west: new Float64Array(n), north: new Float64Array(n), temporary: new Float64Array(n), queue: new Int32Array(n), means: [0], gauges: [0] };
+  return POOL;
+}
 export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, pressure) {
-  const n = pressure.length, r = new Float64Array(n), z = new Float64Array(n), p = new Float64Array(n), ap = new Float64Array(n);
-  const degree = new Uint8Array(n), edges = new Int32Array(4 * n).fill(-1);
+  const n = pressure.length, B = pool(n), { r, z, p, ap, degree, edges, component, anchor, diagonal, west, north, temporary, queue } = B;
   const sorted = order.slice(0, count).sort();
-  for (const i of sorted) {
-    const e = 4 * i;
+  for (let q = 0; q < count; q++) {
+    const i = sorted[q], e = 4 * i;
     if (i % width && index[i - 1]) edges[e] = i - 1;
     if ((i + 1) % width && index[i + 1]) edges[e + 1] = i + 1;
     if (i >= width && index[i - width]) edges[e + 2] = i - width;
     if (i + width < n && index[i + width]) edges[e + 3] = i + width;
     for (let a = e; a < e + 4; a++) if (edges[a] >= 0) degree[i]++;
   }
-  const component = new Int32Array(n), queue = new Int32Array(count), means = [0], gauges = [0], anchor = new Uint8Array(n);
+  const means = B.means, gauges = B.gauges; means.length = 1; gauges.length = 1;
   let components = 0;
-  for (const seed of sorted) {
+  for (let s = 0; s < count; s++) {
+    const seed = sorted[s];
     if (component[seed]) continue;
     const label = ++components; let head = 0, tail = 1, total = 0;
     queue[0] = seed; component[seed] = label; let centreX = 0, centreY = 0;
@@ -36,12 +46,12 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     // thin fringe at the first raster cell. Only pressure differences matter.
     anchor[gauge] = 1; gauges[label] = pressure[gauge];
   }
-  for (const i of sorted) pressure[i] -= gauges[component[i]];
+  for (let q = 0; q < count; q++) { const i = sorted[q]; pressure[i] -= gauges[component[i]]; }
   // Incomplete Cholesky on the symmetric five-point stencil. Natural grid
   // order has only west/north entries below the diagonal, and no fill terms
   // between these neighbours. Anchor columns are excluded from the solve.
-  const diagonal = new Float64Array(n), west = new Float64Array(n), north = new Float64Array(n), temporary = new Float64Array(n);
-  for (const i of sorted) {
+  for (let q = 0; q < count; q++) {
+    const i = sorted[q];
     if (anchor[i]) { diagonal[i] = 1; continue; }
     const l = edges[4 * i], u = edges[4 * i + 2];
     if (l >= 0 && !anchor[l]) west[i] = -1 / diagonal[l];
@@ -49,7 +59,8 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     diagonal[i] = Math.sqrt(Math.max(1e-14, degree[i] - west[i] ** 2 - north[i] ** 2));
   }
   const precondition = () => {
-    for (const i of sorted) {
+    for (let q = 0; q < count; q++) {
+      const i = sorted[q];
       if (anchor[i]) { temporary[i] = 0; continue; }
       const l = edges[4 * i], u = edges[4 * i + 2];
       temporary[i] = (r[i] - (l >= 0 ? west[i] * temporary[l] : 0) - (u >= 0 ? north[i] * temporary[u] : 0)) / diagonal[i];
@@ -61,7 +72,8 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     }
   };
   let norm = 0, residual = 0;
-  for (const i of sorted) {
+  for (let q = 0; q < count; q++) {
+    const i = sorted[q];
     const rhs = means[component[i]] - sink[i]; norm += sink[i] * sink[i];
     if (anchor[i]) continue;
     let lap = degree[i] * pressure[i];
@@ -70,11 +82,12 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
   }
   const tolerance = Math.max(Math.max(norm, residual) * 1e-22, 1e-30);
   precondition(); let rz = 0;
-  for (const i of sorted) { p[i] = z[i]; rz += r[i] * z[i]; }
+  for (let q = 0; q < count; q++) { const i = sorted[q]; p[i] = z[i]; rz += r[i] * z[i]; }
   let iterations = 0;
   for (; residual > tolerance && iterations < 16 * Math.sqrt(count) + 500; iterations++) {
     let pap = 0;
-    for (const i of sorted) {
+    for (let q = 0; q < count; q++) {
+      const i = sorted[q];
       if (anchor[i]) continue;
       let v = degree[i] * p[i];
       for (let a = 4 * i; a < 4 * i + 4; a++) if (edges[a] >= 0) v -= p[edges[a]];
@@ -82,20 +95,27 @@ export function dryingPressure(order, count, index, width, sink, fluxX, fluxY, p
     }
     if (!(pap > 0)) break;
     const alpha = rz / pap; residual = 0;
-    for (const i of sorted) { pressure[i] += alpha * p[i]; r[i] -= alpha * ap[i]; residual += r[i] * r[i]; }
+    for (let q = 0; q < count; q++) { const i = sorted[q]; pressure[i] += alpha * p[i]; r[i] -= alpha * ap[i]; residual += r[i] * r[i]; }
     precondition(); let next = 0;
-    for (const i of sorted) next += r[i] * z[i];
+    for (let q = 0; q < count; q++) { const i = sorted[q]; next += r[i] * z[i]; }
     const beta = next / rz; rz = next;
-    for (const i of sorted) p[i] = z[i] + beta * p[i];
+    for (let q = 0; q < count; q++) { const i = sorted[q]; p[i] = z[i] + beta * p[i]; }
   }
   // Verify the original Neumann equations, including the excluded gauge row.
   residual = 0;
-  for (const i of sorted) {
+  for (let q = 0; q < count; q++) {
+    const i = sorted[q];
     let lap = degree[i] * pressure[i];
     for (let a = 4 * i; a < 4 * i + 4; a++) if (edges[a] >= 0) lap -= pressure[edges[a]];
     residual += (lap - means[component[i]] + sink[i]) ** 2;
     fluxX[i] = (i + 1) % width && index[i + 1] ? pressure[i] - pressure[i + 1] : 0;
     fluxY[i] = i + width < n && index[i + width] ? pressure[i] - pressure[i + width] : 0;
+  }
+  // set back what this call wrote, so the next starts from the zeros (and -1 edges) a fresh array has
+  for (let q = 0; q < count; q++) {
+    const i = sorted[q], e = 4 * i;
+    r[i] = 0; z[i] = 0; p[i] = 0; ap[i] = 0; degree[i] = 0; component[i] = 0; anchor[i] = 0; diagonal[i] = 0; west[i] = 0; north[i] = 0; temporary[i] = 0;
+    edges[e] = -1; edges[e + 1] = -1; edges[e + 2] = -1; edges[e + 3] = -1;
   }
   return { components, iterations, relativeResidual: norm ? Math.sqrt(residual / norm) : Math.sqrt(residual) };
 }

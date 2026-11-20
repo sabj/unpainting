@@ -59,6 +59,14 @@ const CASES = {
   sweeps: (sheet, mm) => {
     for (let k = 0; k < 5; k++) { const y = 9 + k * 8, b = flat(mm, 60 + k); B.dip(b, { water: 1, conc: [0.6, 0] }); const [a, z] = k % 2 ? [45, 5] : [5, 45]; lay(sheet, mm, b, [{ x: a, y, p: 0.9 }, { x: z, y, p: 0.9 }], { upright: 'sweep' }); }
   },
+  // the five sweeps on a board tilted 3 degrees towards the bottom (sheet.mjs setTilt): the film runs down and stands at
+  // the lower edge
+  sweepsTilt: (sheet, mm) => {
+    if (!S.setTilt) throw new Error('wash-cases: sweepsTilt needs sheet.mjs setTilt');
+    S.setTilt(sheet, 3, 'bottom'); CASES.sweeps(sheet, mm);
+  },
+  // a 30 mm puddle of ultramarine and phthalo mixed: a heavy and a fine pigment settling together (DEFAULTS coSettle)
+  mixed: (sheet, mm) => disc(sheet, mm, 25, 25, 15, 0.3, [1.0, 0.6]),
   // a graded wash: a 40 mm square poured with ultramarine falling evenly from strong at the top to nearly clear at the bottom
   graded: (sheet, mm) => {
     const { w } = sheet;

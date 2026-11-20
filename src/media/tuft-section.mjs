@@ -17,6 +17,7 @@
 // paint only where the pores pull it, on the tooth it reaches. Films in contact also trade equal volumes, so colours
 // merge even where the two heads are level.
 import { soak, deposit, depositDry } from './sheet.mjs';
+import { SIZING } from './sizing.mjs';
 
 export const REF_MM = 280 / 1086;          // the cell the legacy per-cell brush numbers were tuned at, mm
 export const TUFT = Object.freeze({
@@ -25,6 +26,7 @@ export const TUFT = Object.freeze({
   rate: 30,           // 1/s: how fast the tuft's film and the paper's level at full pressure
   suck: 0.6,          // head (depth) of a bone-dry tuft
   pore: 0.15,         // head of a dry sheet's pores, through the sizing
+  poreFilm: 0.03,     // mm: a standing film this deep keeps the tuft off the pores (1/e), the sheet's own film depth
   refSpeed: 60,       // the hand speed the legacy per-step feed was tuned at, mm/s
   wick: 60,           // 1/s: the slowest the belly refills the tips by capillary flow
   keep: 0.5,          // a tuft's retention share, of the legacy free threshold
@@ -213,10 +215,16 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
     }
   }
   // 3. a dry sheet's pores pull from the tuft through the sizing where they touch it; a film standing between them
-  //    feeds them instead (the sheet's own absorption), and the tuft keeps that film up
+  //    feeds them instead (the sheet's own absorption), and the tuft keeps that film up. The sizing holds a loaded
+  //    tuft's free liquid out of the pores as soak does (only 1 - SIZING of its head pushes in), and the pores drink
+  //    through a standing film only once it is thinner than the sheet's film (poreFilm). Both pulled at full head, a
+  //    loaded flat's first touch filled the pores (0.32 of 0.375 mm) and fixed the paint they drank on the fibres where
+  //    each lane and each sweep laid it, so a wash laid in sweeps dried in lanes and bands the film could not level.
+  //    A nearly dry tuft (no free head) still leaves its paint where the pores pull it: dry brush is unchanged.
   const cap = sheet.paper.capacity[i], dryness = cap > 0 ? Math.max(0, 1 - sheet.s[i] / cap) : 0;
   if (dryness > 0 && lane.water > 1e-12) {
-    const Jp = Math.min(a * share * Math.max(0, hb + TUFT.pore * dryness) * Math.exp(-sheet.W[i] / TUFT.pore), lane.water / g, share * cap - sheet.s[i]); // only the pores it touches
+    const free = hb > 0 ? hb : 0, push = free * (1 - SIZING * free / (free + TUFT.poreFilm)) + (hb < 0 ? hb : 0);
+    const Jp = Math.min(a * share * Math.max(0, push + TUFT.pore * dryness) * Math.exp(-sheet.W[i] / TUFT.poreFilm), lane.water / g, share * cap - sheet.s[i]); // only the pores it touches
     if (Jp > 1e-12) {
       const f = Jp * g / lane.water;
       for (let k = 0; k < K; k++) { buf[k] = lane.pig[k] * f / g; lane.pig[k] -= buf[k] * g; }

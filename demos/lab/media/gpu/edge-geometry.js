@@ -6,7 +6,7 @@
 // that changes; the GPU then runs the subcycled upwind transport every step (stepfull edge-feed kernels).
 //
 // The functions below repeat sheet.mjs wetBoxes and the geometry half of edge-feed.mjs edgeFeed line for line (both are
-// private there); the shared parts (dryingPressure, contactDistance, cellEdgeFlux) are imported, not copied. The GPU
+// private there), as of edge-feed.mjs clearing its footprint by box and contactDistance working on the box's lattice; the shared parts (dryingPressure, contactDistance, cellEdgeFlux) are imported, not copied. The GPU
 // edge parity tests (gpu-edge-feed.test.mjs) fail if the copies drift.
 import { dryingPressure } from '../drying-pressure.js';
 import { contactDistance, cellEdgeFlux } from '../contact-distance.js';
@@ -66,13 +66,17 @@ export function wetBoxes({ w, h, M, s, capacity }, margin = 2) {
 export function edgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
   const edgeEvap = o.edgeEvap ?? 0, E = o.edgeMm ?? 1;
   const n0 = w * h;
-  if (!S.lev || S.lev.length !== n0) Object.assign(S, { lev: new Int32Array(n0), order: new Int32Array(n0), ex: new Float64Array(n0), geo: new Float32Array(n0), mask: new Uint8Array(n0), fx: new Float64Array(n0), fy: new Float64Array(n0), pressure: new Float64Array(n0), buckets: [] });
+  if (!S.lev || S.lev.length !== n0) Object.assign(S, { maskBox: null, lev: new Int32Array(n0), order: new Int32Array(n0), ex: new Float64Array(n0), geo: new Float32Array(n0), mask: new Uint8Array(n0), fx: new Float64Array(n0), fy: new Float64Array(n0), pressure: new Float64Array(n0), buckets: [] });
   const [x0, y0, x1, y1] = box, L = Math.min(32000, Math.max(1, Math.ceil(Math.hypot(w, h))));
   const { lev, order, ex, geo, mask, fx, fy, pressure, buckets } = S;
   const reach = Math.max(1, Math.round((o.reachMm ?? 1.5) / mm));
-  mask.fill(0);
+  // the footprint is only ever set inside a box, so clearing the last box clears it (edge-feed.mjs)
+  if (S.maskBox) { const [a0, b0, a1, b1] = S.maskBox; for (let y = b0; y <= b1; y++) mask.fill(0, y * w + a0, y * w + a1 + 1); }
+  S.maskBox = box;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; mask[i] = M[i] || ever[i]; }
-  ex.fill(0); lev.fill(0);
+  // the last call's cells, cleared (the whole sheet was cleared every call)
+  for (let q = 0; q < (S.used ?? 0); q++) { lev[order[q]] = 0; ex[order[q]] = 0; }
+  S.used = 0;
   const dryAt = (x, y) => x < 0 || y < 0 || x >= w || y >= h || !mask[y * w + x];
   const hs = o.holeSpan ?? 0;
   const heldHole = (x, y) => {
@@ -109,6 +113,7 @@ export function edgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
       }
     }
   }
+  S.used = n;
   const NX = [1, -1, 0, 0, 1, 1, -1, -1], NY = [0, 0, 1, -1, 1, -1, 1, -1];
   const nb = (i, d) => { const xx = (i % w) + NX[d], yy = ((i / w) | 0) + NY[d]; return xx < x0 || yy < y0 || xx > x1 || yy > y1 ? -1 : yy * w + xx; };
   const ax0 = x0 - reach, ay0 = y0 - reach, aw = x1 - x0 + 2 * reach + 2, ah = y1 - y0 + 2 * reach + 2;
@@ -119,7 +124,7 @@ export function edgeGeometry({ w, h, M, ever, resist }, o, box, mm, S) {
     sat[k] = (dryAt(ax0 + xx - 1, ay0 + yy - 1) ? 1 : 0) + sat[k - 1] + sat[k - aw] - sat[k - aw - 1];
   }
   const dryShare = (x, y) => { const xa = x - reach - ax0, ya = y - reach - ay0, xb = xa + 2 * reach + 1, yb = ya + 2 * reach + 1; return (sat[yb * aw + xb] - sat[ya * aw + xb] - sat[yb * aw + xa] + sat[ya * aw + xa]) / ((2 * reach + 1) ** 2); };
-  const distance = contactDistance(mask, w, h, pinnedAt);
+  const distance = contactDistance(mask, w, h, pinnedAt, box);
   let Etot = 0;
   for (let q = 0; q < n; q++) {
     const i = order[q], l = lev[i];
