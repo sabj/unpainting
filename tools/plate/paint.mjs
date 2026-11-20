@@ -30,6 +30,7 @@ import {unmix} from '../../src/crop/pigments.mjs';
 import {dropMask} from '../../src/crop/blockin.mjs';
 import {washPaths, brushedWashPaths, invalidateFlowField, sweepCover, footprintSpread, sweepCount, containPaths, openEdgeShare, softArcs, soften} from '../../src/media/wash.mjs';
 import {wetsLaneByLane} from '../../src/paint/methods/prewet-order.mjs';
+import {lanesOfPath} from '../../src/paint/methods/zigzag-lanes.mjs';
 import {distanceToZero} from '../../src/raster.js';
 import {components, removeSmall, dilate, erode, closeLocal} from '../../src/raster.js';
 import {detailMarks} from '../../src/crop/technique.mjs';
@@ -464,13 +465,15 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   }
   // how many of this graded wash's sweeps lie over each cell, so each is charged for its share (sweepCount)
   const useGradedCal = Boolean(sh.graded || sh._valuePlan);
-  const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = useGradedCal && !detail && SHARE > 0 ? sweepCount(paths, W2, H2) : null;
+  // a wash plan's zigzag (laneFill) counts as the lanes it lays, each a pass over the cells it covers (zigzag-lanes.mjs)
+  const coverPaths = vectorPaths ? paths.flatMap(lanesOfPath) : paths;
+  const coverStarted = performance.now(), SHARE = num('gradedshare', 0.6), UNDER = useGradedCal && !detail && SHARE > 0 ? sweepCount(coverPaths, W2, H2) : null;
   SPEED_PROFILE?.add('painting:sweep-count', performance.now() - coverStarted);
   let cachedCover;
   const passageCover = () => {
     if(cachedCover!==undefined)return cachedCover;
     const started = performance.now();
-    const result = sweepCover(paths, up(MASK), W2, H2, SPEED_COVERAGE ? { counts: UNDER, cells: sh.area * SC * SC, box: {x0:MB.x0*SC,y0:MB.y0*SC,x1:Math.min(W2-1,(MB.x1+1)*SC-1),y1:Math.min(H2-1,(MB.y1+1)*SC-1)} } : undefined);
+    const result = sweepCover(coverPaths, up(MASK), W2, H2, SPEED_COVERAGE ? { counts: UNDER, cells: sh.area * SC * SC, box: {x0:MB.x0*SC,y0:MB.y0*SC,x1:Math.min(W2-1,(MB.x1+1)*SC-1),y1:Math.min(H2-1,(MB.y1+1)*SC-1)} } : undefined);
     SPEED_PROFILE?.add('painting:sweep-cover', performance.now() - started);
     return cachedCover=result;
   };
