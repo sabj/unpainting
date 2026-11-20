@@ -355,7 +355,7 @@ export class GpuSheet {
     lv.stats = st; return st;
   }
   /** The levelling's counts since the sheet was made: the most iterations and substeps a step used, solves that ran short. */
-  levelStats() { return { ...(this.lv?.total ?? {}), iters: this.lv?.iters, subs: this.lv?.subs }; }
+  levelStats() { return { ...(this.lv?.total ?? {}), budget: { iterations: this.lv?.iters, subs: this.lv?.subs, boxes: this.lv?.boxes } }; }
 
   bufFor(name) { return name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : name === 'PACK' ? this.pack() : this.b[name]; }
   pack() { return this.b.PACK ?? (this.b.PACK = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE })); }

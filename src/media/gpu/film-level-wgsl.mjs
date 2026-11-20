@@ -15,8 +15,9 @@
 // a step, and a box that runs out is counted (LVS[4]) and the host gives the next steps more. The water each face
 // carries over the step then moves with its pigment in the box's substeps (no donor gives more than half its water, at
 // most 64), each under the 95% donor budgets. The host encodes u.lvSubs rounds; a box needing more takes u.lvSubs
-// (counted in LVS[6]). The surface's tilt enters only as differences between neighbours (a cell's H holds W + slope
-// height and the meniscus), so a board's fall over a large sheet does not swamp a film's depth in float32.
+// (counted in LVS[6]). The surface enters only as differences between neighbours, taken part by part (depth, relief,
+// the meniscus's lowering, which LVA holds, and the tilt), so a board's fall over a large sheet or a film's depth near
+// its relief does not lose the digits its slope has in float32.
 export const LV_BMAX = 1024;
 /** Words of the LVX buffer for a w x h sheet with `ntiles` 16x16 tiles. */
 export function lvxWords(w, h, ntiles) {
@@ -217,27 +218,30 @@ fn lvCellOf(t: u32, lid: vec3<u32>) -> vec3<u32> {
   let x = (t % u.tw) * 16u + lid.x; let y = (t / u.tw) * 16u + lid.y;
   return vec3<u32>(x, y, select(0u, 1u, x < u.w && y < u.h));
 }
-fn lvH(i: u32) -> f32 { return W[i] + u.slope * PAPER3[i].z; }
+// H at cell i less H at cell j, without the meniscus or the tilt, as the differences of its parts: the CPU's surfaces
+// are doubles, and two float32 surfaces near each other lose the digits their difference has (the box's explicit
+// face flux, compared with 1e-7 to skip a level box, is a few ulps of a surface)
+fn lvDh(i: u32, j: u32) -> f32 { return (W[i] - W[j]) + u.slope * (PAPER3[i].z - PAPER3[j].z); }
 @compute @workgroup_size(16, 16)
 fn lv_init(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
   let count = LVX[1];
   for (var j = wid.x; j < count; j += nw.x) {
     let c = lvCellOf(LVX[lvLT() + j], lid); if (c.z == 0u) { continue; }
     let i = c.y * u.w + c.x; if (!lvLevel(i)) { continue; }
-    let b = lvBoxOf(i); let Hi = lvH(i);
+    let b = lvBoxOf(i);
     var cw = 0.0; var cn = 0.0; var most = 0.0;
     if (c.x > 0u && lvLevel(i - 1u)) {
       let h = 0.5 * (W[i] + W[i - 1u]); let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[i - 1u].x);
-      cw = u.lvK0 * p * h * h * h; most = max(most, cw * abs(Hi - lvH(i - 1u) - u.lvTx));
+      cw = u.lvK0 * p * h * h * h; most = max(most, cw * abs(lvDh(i, i - 1u) - u.lvTx));
     }
     if (c.y > 0u && lvLevel(i - u.w)) {
       let h = 0.5 * (W[i] + W[i - u.w]); let p = 1.0 - u.ff + u.ff * (0.25 + 1.75 * PAPER2[i - u.w].y);
-      cn = u.lvK0 * p * h * h * h; most = max(most, cn * abs(Hi - lvH(i - u.w) - u.lvTy));
+      cn = u.lvK0 * p * h * h * h; most = max(most, cn * abs(lvDh(i, i - u.w) - u.lvTy));
     }
     atomicMax(&LVS[16u + 2u * b], bitcast<u32>(most));
     // the line's cells: a side not on a wet cell of the box
     let edge = !(c.x > 0u && lvLevel(i - 1u)) || !(c.y > 0u && lvLevel(i - u.w)) || !(c.x + 1u < u.w && lvLevel(i + 1u)) || !(c.y + 1u < u.h && lvLevel(i + u.w));
-    LVA[i] = vec4<f32>(Hi, cw, cn, 0.0);
+    LVA[i] = vec4<f32>(0.0, cw, cn, 0.0);   // x: the meniscus's lowering of H (lv_dist)
     LVF[i] = vec4<f32>(0.0, 0.0, 1.0, select(1e9, 0.0, edge)); LVB[i] = vec4<f32>(0.0);
   }
 }
@@ -274,10 +278,10 @@ fn lvFaces(i: u32, x: u32, y: u32) -> array<vec2<f32>, 4> {
 // H at the cell minus H at each neighbour (tilt as the difference it makes)
 fn lvDiffs(i: u32, f: array<vec2<f32>, 4>) -> vec4<f32> {
   let h = LVA[i].x; var d = vec4<f32>(0.0);
-  if (f[0].y != 0.0) { d.x = h - LVA[i - 1u].x - u.lvTx; }
-  if (f[1].y != 0.0) { d.y = h - LVA[i - u.w].x - u.lvTy; }
-  if (f[2].y != 0.0) { d.z = h - LVA[i + 1u].x + u.lvTx; }
-  if (f[3].y != 0.0) { d.w = h - LVA[i + u.w].x + u.lvTy; }
+  if (f[0].y != 0.0) { d.x = lvDh(i, i - 1u) + (h - LVA[i - 1u].x) - u.lvTx; }
+  if (f[1].y != 0.0) { d.y = lvDh(i, i - u.w) + (h - LVA[i - u.w].x) - u.lvTy; }
+  if (f[2].y != 0.0) { d.z = lvDh(i, i + 1u) + (h - LVA[i + 1u].x) + u.lvTx; }
+  if (f[3].y != 0.0) { d.w = lvDh(i, i + u.w) + (h - LVA[i + u.w].x) + u.lvTy; }
   return d;
 }
 // The preconditioner: symmetric Gauss-Seidel within the 16x16 tile in red-black order (red, black, red, ... red: the
@@ -456,8 +460,8 @@ fn lv_flux(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     let i = c.y * u.w + c.x; if (!lvLevel(i) || lvState(lvBoxOf(i)) == 0u) { continue; }
     let a = LVA[i]; let di = LVB[i].x;
     var fw = 0.0; var fn_ = 0.0;
-    if (a.y != 0.0) { fw = a.y * (LVA[i - 1u].x - a.x + u.lvTx + LVB[i - 1u].x - di); }
-    if (a.z != 0.0) { fn_ = a.z * (LVA[i - u.w].x - a.x + u.lvTy + LVB[i - u.w].x - di); }
+    if (a.y != 0.0) { fw = a.y * (lvDh(i - 1u, i) + (LVA[i - 1u].x - a.x) + u.lvTx + (LVB[i - 1u].x - di)); }
+    if (a.z != 0.0) { fn_ = a.z * (lvDh(i - u.w, i) + (LVA[i - u.w].x - a.x) + u.lvTy + (LVB[i - u.w].x - di)); }
     LVF[i] = vec4<f32>(fw, fn_, 1.0, 0.0);
   }
 }
