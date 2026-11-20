@@ -27,3 +27,9 @@ test('lay: strokes in order, the darker holds where two meet, nothing outside th
   assert.deepEqual(order, [0, 1]);
   assert.ok(Math.abs(f[0] - 0.4) < 1e-6 && Math.abs(f[3] - 0.9) < 1e-6 && f[7] === 0 && f[50] === 0);
 });
+
+test('lay over ink already there: the darker holds, nothing is taken away', () => {
+  const f = new Float32Array(100).fill(0.5), doc = { strokes: [{ seq: 0, dark: 0.3, outline: [square(0, 0, 2)] }, { seq: 1, dark: 0.9, outline: [square(2, 0, 2)] }] };
+  layVectors(doc, f, 10, 10, 0.5, d => d);
+  assert.ok(Math.abs(f[0] - 0.5) < 1e-6 && Math.abs(f[5] - 0.9) < 1e-6 && f[50] === 0.5);
+});

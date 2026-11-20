@@ -60,9 +60,26 @@ export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null } 
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
       const c = r.cov[j * r.w + i]; if (!(c > 0)) continue;
       const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark);
-      if (d > dark[k]) { dark[k] = d; field[k] = inkOf(d); n++; }
+      // the darker holds, against ink already on the sheet too (a closing pen over the opening's ink adds none twice)
+      if (d > dark[k]) { dark[k] = d; const t = inkOf(d); if (t > field[k]) field[k] = t; n++; }
     }
     cells += n; each?.(s, n);
   }
   return { strokes: S.length, cells };
 }
+
+/**
+ * A derived line file's vector strokes (a stage, or the lines the ink hold kept): the drawing's own vectors (ink-vectors.py) of the lines the stage holds, matched by the line each
+ * stroke came from (`line` = the line's seq). Never re-traced. A stage of lines without seq, or vectors without `line`,
+ * takes the whole set (the stage is then the whole drawing). Returns the vectors document.
+ */
+export function stageVectors(vec, stageLines) {
+  const seqs = stageLines.map(g => g.seq);
+  if (seqs.some(q => q == null) || vec.strokes.some(s => s.line == null)) return vec;
+  const keep = new Set(seqs.map(Math.floor));
+  return { ...vec, strokes: vec.strokes.filter(s => keep.has(Math.floor(s.line))) };
+}
+
+
+/** The vectors file beside a line file (`<stem>-lines.json` -> `<stem>-vectors.json`). */
+export const vectorsBeside = linesFile => linesFile.replace(/-lines\.json(\.gz)?$/, '-vectors.json');

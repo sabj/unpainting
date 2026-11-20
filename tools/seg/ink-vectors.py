@@ -3,6 +3,8 @@
 """Divide a clean pen drawing's ink into strokes, each a VECTOR shape in sheet millimetres fitted to the drawing: a smooth
 closed outline (rings, the ink's edge at half the stroke's own darkness), the path the pen takes along it (the ordered
 line file's centre line, for the direction and the nib's advance), the width along that path, and the stroke's darkness.
+Each stroke names the ordered line it came from (`line`, that line's seq), so a stage cut from the line file takes the same
+vector strokes (src/paint/methods/linework-plan.mjs).
 The drawing's pixels are only what the vectors are fitted to; the plate's ink is rendered from the vectors at any
 resolution (render_vectors), so a zoom re-renders crisp.
 
@@ -105,9 +107,9 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
         pieces = [(own, dk)] if not (black.sum() >= 12 and greyc.sum() >= max(12, .3 * own.sum())) else [(own & ~black | greyc, float(np.percentile(A[greyc], 90))), (black, float(np.percentile(A[black], 90)))]
         parts = []
         for m, top in pieces:
-            # a faint line is one stroke: its field softened a little and its edge at 0.4 of its darkness, so its dips do not
-            # break it into dashes
-            faint = top < .5; F = cv2.GaussianBlur(A, (0, 0), .8) if faint else A; lvl = (.4 if faint else .5) * top
+            # a faint line is one stroke: its field softened very slightly and its edge at 0.45 of its darkness, so its dips do
+            # not break it into dashes (more would fuse close faint hatching into a grey blot)
+            faint = top < .5; F = cv2.GaussianBlur(A, (0, 0), .4) if faint else A; lvl = (.45 if faint else .5) * top
             vals = A[m]; vals = vals[vals >= lvl]
             if not len(vals): continue
             # its darkness: the median of its ink inside its edge (a drawing's black varies a little from mark to mark: over
@@ -128,9 +130,10 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
         if not parts: continue
         if k <= len(L):
             l = L[k - 1]; path = (np.asarray(l['points'], float) + .5) * (sheet_mm / w0)
-            rec = {'seq': l['seq'], 'part': l.get('part'), 'phase': l.get('phase'), 'object': l.get('object'), 'unit': l.get('unit')}
+            rec = {'seq': l['seq'], 'line': l['seq'], 'part': l.get('part'), 'phase': l.get('phase'), 'object': l.get('object'), 'unit': l.get('unit')}
         else:
-            e = extra[k - len(L) - 1]; path = (e['path'] + .5) * px; rec = {'seq': (L[e['after']]['seq'] if e['after'] >= 0 else len(L)) + .5, 'part': 'small', 'phase': 'texture'}
+            e = extra[k - len(L) - 1]; path = (e['path'] + .5) * px; ln = L[e['after']]['seq'] if e['after'] >= 0 else len(L)
+            rec = {'seq': ln + .5, 'line': ln, 'part': 'small', 'phase': 'texture'}
         # the width along the path: twice the distance to the outline's ink, read on the grid
         for n_, (rings, tone, f, lvl) in enumerate(parts):
             inside = (f[1:-1, 1:-1] >= lvl).astype(np.uint8); dt = cv2.distanceTransform(np.pad(inside, 1), cv2.DIST_L2, 5)[1:-1, 1:-1]

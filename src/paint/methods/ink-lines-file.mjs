@@ -7,6 +7,7 @@
 // <out>/ink-lines.json.
 // Planning only: it reads the target once, before the target guard seals it.
 import fs from 'node:fs';
+import { stageVectors, vectorsBeside } from './ink-vectors.mjs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -128,6 +129,9 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
     const stem = path.join(out, `ink-${stage}`), next = { ...doc, lines: r.lines, ...(decided ? { inkDecided: true } : {}), inkLines: { source: file, support, smoothMm: flags.smoothMm, cornerDeg: flags.cornerDeg, measured: flags.lineMeasure > 0 } };
     if (!r.lines.length) next.empty = `no line of ${path.basename(file)} follows a line in the target (--linesupport ${support})`;
     fs.writeFileSync(`${stem}-lines.json`, JSON.stringify(next) + '\n');
+    // the pen lays a drawing only as its vector strokes: the held file carries the strokes of the lines it kept
+    const vf = vectorsBeside(path.resolve(file));
+    if (fs.existsSync(vf)) fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify(stageVectors(JSON.parse(fs.readFileSync(vf, 'utf8')), r.lines)));
     record.out = stem;
   }
   const s = r.stats, pct = v => `${(100 * v).toFixed(0)}%`;
