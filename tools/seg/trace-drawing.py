@@ -106,21 +106,28 @@ def fair(p, tol, spacing):
     return s[[0, -1]] if out is None else out
 
 
-def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_deg=25):
+def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_deg=35, min_width=.4, spread=1.6):
     """Strokes along the drawing's own direction inside a dense region: streamlines of the structure tensor's line
     direction, seeded on dark cells and kept `spacing` source pixels apart, each a single pull that stops where the ink
-    ends, where it leaves the region, or where it would turn by more than `turn_deg` (a junction is a break, not a turn)."""
+    ends, where it leaves the region, or where it would turn by more than `turn_deg` (a junction is a break, not a turn).
+    Each stream is as wide as the drawing's tone around it allows (tone x spacing over `spread`, the pen's spread of a drawn
+    width on the sheet, from `min_width` up to `width`):
+    a solid dark lays strokes that touch, a hatched or strand-lit coat lays separate strands with paper between, and a
+    stream's weight is the drawing's darkness along it, so a light strand is a light stroke."""
     dark = 1-np.clip(grey, 0, 1); H, W = grey.shape
+    # the drawing's tone around each point, over about one spacing: 1 in a solid dark, near .5 in strands with paper between
+    cover = cv2.GaussianBlur(dark, (0, 0), max(.7, spacing/2))
     gx = cv2.Sobel(grey, cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(grey, cv2.CV_32F, 0, 1, ksize=3)
     sg = max(1., spacing)
     jxx = cv2.GaussianBlur(gx*gx, (0, 0), sg); jyy = cv2.GaussianBlur(gy*gy, (0, 0), sg); jxy = cv2.GaussianBlur(gx*gy, (0, 0), sg)
     theta = .5*np.arctan2(2*jxy, jxx-jyy)+np.pi/2          # along the lines, across the gradient
     tx, ty = np.cos(theta), np.sin(theta)
     max_len = max_len or 40*spacing
-    occ = np.zeros((H, W), bool); r = max(1, int(round(spacing/2)))
+    # no stream comes nearer another than `spacing`: a stream's samples claim the pixels within r of them
+    occ = np.zeros((H, W), bool); r = max(1, int(np.ceil(spacing/2)))
     def free(x, y):
         i, j = int(round(x)), int(round(y))
-        return 0 <= i < W and 0 <= j < H and region[j, i] and not occ[max(0, j-r+1):j+r, max(0, i-r+1):i+r].any()
+        return 0 <= i < W and 0 <= j < H and region[j, i] and not occ[j, i]
     out = []; cos_turn = np.cos(np.radians(turn_deg))
     ys, xs = np.nonzero(region & (dark > .45))
     order = np.argsort(-dark[ys, xs])
@@ -137,16 +144,47 @@ def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_d
                     if d @ d0 < 0: d = -d
                     if d @ d0 < cos_turn: break
                 nx, ny = x+.75*d[0], y+.75*d[1]
-                if not (0 <= nx < W-1 and 0 <= ny < H-1) or dark[int(round(ny)), int(round(nx))] < .3 or not free(nx, ny): break
+                if not (0 <= nx < W-1 and 0 <= ny < H-1) or dark[int(round(ny)), int(round(nx))] < .2 or not free(nx, ny): break
                 pts.append((nx, ny)); x, y, d0 = nx, ny, d; L += .75
             halves.append(pts)
         p = np.array(halves[1][::-1]+[(x0, y0)]+halves[0])
         if len(p) < 2 or arc_length(p) < min_px: continue
-        for (x, y) in p: occ[int(round(y)), int(round(x))] = True
+        for (x, y) in p:
+            i, j = int(round(x)), int(round(y)); occ[max(0, j-r+1):j+r, max(0, i-r+1):i+r] = True
         q = resample(p, 1)
-        wt = float(np.clip(np.median(dark[np.clip(q[:, 1].round().astype(int), 0, H-1), np.clip(q[:, 0].round().astype(int), 0, W-1)])/.85, .25, 1))
-        out.append({'points': np.round(q[::max(1, len(q)//12)] if len(q) > 24 else q, 3).tolist(), 'width': round(width, 3), 'weight': round(wt, 3), 'role': 'pen stroke', 'length': arc_length(q), 'dense': True})
+        jj, ii = np.clip(q[:, 1].round().astype(int), 0, H-1), np.clip(q[:, 0].round().astype(int), 0, W-1)
+        wt = float(np.clip(np.median(dark[jj, ii])/.85, .25, 1))
+        wd = float(np.clip(np.median(cover[jj, ii])*spacing/spread, min_width, width))
+        out.append({'points': np.round(q[::max(1, len(q)//12)] if len(q) > 24 else q, 3).tolist(), 'width': round(wd, 3), 'weight': round(wt, 3), 'role': 'pen stroke', 'length': arc_length(q), 'dense': True})
     return out
+
+
+def territory_widths(streams, dark, region, reach, max_width, spread=1.9, min_width=.4):
+    """Each stream's width from the ink it stands for: the pixels of the dense region nearer to it than to any other stream
+    (within `reach`) are its territory, and it is drawn as wide as the territory's tone times its breadth (area over length),
+    over the pen's `spread` of a drawn width on the sheet. A solid dark gets strands that close up into solid; strands lit
+    by paper between them stay apart, as thin as the drawing's light strands."""
+    if not streams:
+        return
+    H, W = dark.shape; ids = np.zeros((H, W), np.float32)
+    for k, l in enumerate(streams):
+        cv2.polylines(ids, [np.int32(np.round(l['points']))], False, float(k+1), 1)
+    src = (ids == 0).astype(np.uint8)
+    dist, lab = cv2.distanceTransformWithLabels(src, cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
+    zy, zx = np.nonzero(src == 0); owner_of = np.zeros(lab.max()+1, np.int64); owner_of[lab[zy, zx]] = ids[zy, zx].astype(np.int64)
+    own = owner_of[lab]; own[(dist > reach) | ~region] = 0
+    # a light strand inside a dark coat stays paper: no stream is drawn wide enough to reach the nearest light pixel
+    to_light = cv2.distanceTransform((dark >= .55).astype(np.uint8), cv2.DIST_L2, 5)
+    n = len(streams)+1
+    area = np.bincount(own.ravel(), minlength=n).astype(float); tone = np.bincount(own.ravel(), weights=dark.ravel(), minlength=n)
+    for k, l in enumerate(streams):
+        a = area[k+1]
+        if a <= 0: continue
+        breadth = a/max(1.0, l['length']); t = tone[k+1]/a
+        # a solid dark (tone .94 and over) closes up: its strands are drawn wide enough to overlap their neighbours
+        s = float(np.clip((t-.82)/.12, 0, 1)); w = (1-s)*t*breadth/spread + s*.75*breadth
+        q = np.asarray(l['points']); d = float(np.median(to_light[np.clip(q[:, 1].round().astype(int), 0, H-1), np.clip(q[:, 0].round().astype(int), 0, W-1)]))
+        l['width'] = round(float(np.clip(min(w, 2*d/1.3), min_width, max_width)), 3)
 
 
 def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
@@ -188,7 +226,14 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
     if dense is not None and dense.any():
         small = cv2.resize(dense.astype(np.uint8), (grey.shape[1], grey.shape[0]), interpolation=cv2.INTER_AREA) > 0
         wid = float(np.median([l['width'] for l in lines])) if lines else 1.0
-        streams = dense_strokes(grey, small, spacing=dense_px/2.5, width=wid, min_px=min_px)
+        # strands about two nib widths apart: paper shows between them unless the drawing is solid there
+        sp = dense_px/2.5
+        streams = dense_strokes(grey, small, spacing=sp, width=wid, min_px=min_px)
+        territory_widths(streams, 1-np.clip(grey, 0, 1), small, reach=1.5*sp, max_width=2*sp)
+        # a strand is a pulled line, not a dab: one shorter than three times its width is left, and its neighbours take its
+        # tone (the widths are worked out again without it)
+        streams = [l for l in streams if l['length'] >= 3*l['width']]
+        territory_widths(streams, 1-np.clip(grey, 0, 1), small, reach=1.5*sp, max_width=2*sp)
         lines += streams; lines.sort(key=lambda l: -l['length'])
     return lines, mask, skeleton, {'denseShare': round(float(dense.mean()), 4) if dense is not None else 0, 'denseStrokes': len(streams) if dense is not None and dense.any() else 0,'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
 
