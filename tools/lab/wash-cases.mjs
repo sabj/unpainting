@@ -31,10 +31,13 @@ const O = { ...S.DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, granFill: 0, slideCap:
 // The painter's ordinary dry (tools/plate/paint.mjs) in each mode (tools/painter/native-paint-mode.mjs).
 const DRY = { full: { levelMax: 200 }, fast: { levelMax: 200, dt: 14, analyticTail: true } };
 const paperOf = (w, h, mm) => makePaper(w, h, { seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
-const disc = (sheet, mm, cxMm, cyMm, rMm, water, conc) => {
+// S.deposit writes the CPU copy only: on a GPU sheet bring the GPU's copy down first and send the whole sheet up after,
+// or the GPU never sees the paint (the --backend gpu runs came out empty).
+const raw = (sheet, write) => { S.coherent?.(sheet); write(); sheet._gpu?.cpuWroteAll(); };
+const disc = (sheet, mm, cxMm, cyMm, rMm, water, conc) => raw(sheet, () => {
   const { w, h } = sheet;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (Math.hypot((x + 0.5) * mm - cxMm, (y + 0.5) * mm - cyMm) < rMm) S.deposit(sheet, y * w + x, water, conc.map(c => c * water));
-};
+});
 const flowFor = (sheet, time) => { const n = Math.round(time / O.dt); for (let i = 0; i < n; i++) S.step(sheet, O); };
 // a 12 mm flat as the painter's wash flat (tools/plate/paint.mjs), sized in mm
 const flat = (mm, seed) => { const r = 6 / mm; return B.createBrush({ model: arg('brush', 'section'), flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.3, seed }); };
@@ -59,16 +62,18 @@ const CASES = {
   // a graded wash: a 40 mm square poured with ultramarine falling evenly from strong at the top to nearly clear at the bottom
   graded: (sheet, mm) => {
     const { w } = sheet;
-    for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) { const c = 1.5 * (1 - ((y + 0.5) * mm - 5) / 40) + 0.05; for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.3, [0.3 * c, 0]); }
+    raw(sheet, () => { for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) { const c = 1.5 * (1 - ((y + 0.5) * mm - 5) / 40) + 0.05; for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.3, [0.3 * c, 0]); } });
   },
   // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a 12 mm drop of nearly clean water into it
   bloom: (sheet, mm) => {
     const { w } = sheet;
-    for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.2, [0.25, 0]);
+    raw(sheet, () => { for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.2, [0.25, 0]); });
     let preparation = null;
     if (arg('bloomwait', 'auto') === 'auto') {
       const indices = []; for (let y = 0; y < sheet.h; y++) for (let x = 0; x < sheet.w; x++) if (Math.hypot((x + .5) * mm - 25, (y + .5) * mm - 25) < 6) indices.push(y * w + x);
-      preparation = waitForDamp(sheet, indices, O, S.step);
+      // on a GPU sheet bring down the drop's footprint after each step, so the wait reads the GPU's water
+      const r0 = Math.floor(19 / mm), r1 = Math.ceil(31 / mm), box = [r0, r0, r1 - r0, r1 - r0];
+      preparation = waitForDamp(sheet, indices, O, (sh, o) => { S.step(sh, o); sh._gpu?.ensureFresh(sh, box); });
     } else flowFor(sheet, Number(arg('bloomwait', 60)));
     disc(sheet, mm, 25, 25, 6, 0.25, [0.05, 0]);
     return preparation;
