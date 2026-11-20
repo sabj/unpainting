@@ -12,7 +12,12 @@ import { createSheet, step, dry, thickness, coherent, DEFAULTS as SHEET_DEFAULTS
 // calls (stepfull.mjs efSteps); the flows inside a GPU stroke's plan keep the geometry from before the stroke, which
 // parts from the CPU by more than float noise. The feed's own parity: gpu/gpu-edge-feed.test.mjs and
 // tools/lab/gpu-wash-cases.test.mjs.
-const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
+// The film's levelling is off here too. As these washes dry, a cell's last film can stand at 1e-37 mm, or at a float32
+// denormal (1e-45), which the GPU holds as 0: film-level.mjs counts it as wet (M and W > 0) and the GPU does not, so the
+// meniscus's line moves by a cell and lowers the film beside it by up to 0.0175 mm. That parts the dried paint by 1e-5
+// on average and 3e-3 at worst (slope 0.3), a hundred times this file's float-noise bound, with every option off as
+// much as on. The levelling's own parity: gpu/gpu-film-level.test.mjs and tools/lab/gpu-wash-cases.test.mjs.
+const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0, level: 0 };
 import { attachGpu, gpuStats } from './gpu/link.mjs';
 
 const pigments = [
@@ -59,15 +64,17 @@ const midOf = r => [r.mid.W, ...r.mid.G];
 const CASES = [
   // holeSpan (--holerim) acts on the pinned-edge feed (edge-feed.mjs), which the GPU sheet refuses; edge-feed's own test covers it
   ['holeFill (--holefill)', { holeFill: 3 }, true],
-  ['marangoni', { marangoni: 0.1 }, false],
+  // (marangoni levels its film, without the meniscus: with levelling off the CPU's float noise here, 7e-5 in one cell,
+  // was a quarter of the option's own effect; the meniscus is where the last-film difference above shows)
+  ['marangoni', { marangoni: 0.1 }, false, { level: 1, meniscus: 0 }],
   ['a steeper slope', { slope: 0.25 }, false],
   ['a steeper slope, no edge drying', { slope: 0.3, edgeEvap: 0 }, false],
 ];
 
-for (const [name, extra, pits] of CASES) {
+for (const [name, extra, pits, sheet = {}] of CASES) {
   const wash = () => washOf(pits);
   test(`${name} on the GPU sheet paints within the CPU sheet's own float noise`, { timeout: 180000 }, t => {
-    const base = { ...DEFAULTS, gran: 0.25 }, O = { ...base, ...extra };
+    const base = { ...DEFAULTS, gran: 0.25, ...sheet }, O = { ...base, ...extra };
     const ref = paint(wash(), O), scale = peak(ref.thick);
     const O2 = { ...O }; for (const k of ['flow', 'diffuse', 'evap']) O2[k] = Math.fround(O[k] * (1 + 1e-6));
     const floor = stats(paint(wash(), O2).thick, ref.thick), midFloor = stats(midOf(paint(wash(), O2)), midOf(ref));
