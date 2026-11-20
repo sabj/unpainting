@@ -122,18 +122,23 @@ export function footprint(g, w, h, pad, visit) {
   if (X1 < X0 || Y1 < Y0) return null;
   g.onBox?.(X0, Y0, X1, Y1);
   if (flat) return flatFootprint(g, w, X0, Y0, X1, Y1, visit);
-  // per segment: origin, axis, normal, length
-  const seg = [];
-  for (let j = 0; j + 1 < S; j++) {
-    const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, L = Math.hypot(ex, ey);
-    seg.push([ax, ay, L > 1e-9 ? ex / L : 1, L > 1e-9 ? ey / L : 0, L, rad[j], rad[j + 1]]);
+  // per segment: origin, axis, length and the radii at its two ends, flat (7 numbers a segment)
+  const ns = S - 1, seg = g._seg && g._seg.length === 7 * ns ? g._seg : (g._seg = new Float64Array(7 * ns));
+  for (let j = 0; j < ns; j++) {
+    const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, L = Math.hypot(ex, ey), o = 7 * j;
+    seg[o] = ax; seg[o + 1] = ay; seg[o + 2] = L > 1e-9 ? ex / L : 1; seg[o + 3] = L > 1e-9 ? ey / L : 0; seg[o + 4] = L; seg[o + 5] = rad[j]; seg[o + 6] = rad[j + 1];
   }
-  // the across direction of the shape as a whole: the normal of the chain from hand to tip (or of the first segment)
   for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) {
     const px = x + 0.5, py = y + 0.5;
     let best = Infinity, across = 0;
-    for (const [ax, ay, ex, ey, L, r1, r2] of seg) {
-      const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex, d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
+    for (let o = 0; o < 7 * ns; o += 7) {
+      const ax = seg[o], ay = seg[o + 1], ex = seg[o + 2], ey = seg[o + 3], L = seg[o + 4], r1 = seg[o + 5], r2 = seg[o + 6];
+      const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex;
+      // the cone lies inside the capsule of its wider radius round its axis: a segment that cannot come nearer than the
+      // nearest so far is passed over (the result is the same)
+      const Yc = Y < 0 ? Y : Y > L ? Y - L : 0;
+      if (Math.sqrt(Xs * Xs + Yc * Yc) - (r1 > r2 ? r1 : r2) >= best) continue;
+      const d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
       if (d < best) { best = d; const t = L > 1e-6 ? Math.max(0, Math.min(1, Y / L)) : 0, r = r1 + (r2 - r1) * t; across = r > 1e-6 ? Math.max(-1, Math.min(1, Xs / r)) : 0; }
     }
     visit(y * w + x, best, across, x, y);
