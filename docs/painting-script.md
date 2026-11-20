@@ -13,23 +13,27 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 `tools/painter/script-crop.mjs` (a script cut to a window of its sheet, for trying a piece fast) and
 `tools/painter/script-overlay.mjs` (the passages and their strokes drawn over the subject).
 
-## Format
+## Format (painting-script 2)
 
 ```json
 {
-  "format": "painting-script 1",
+  "format": "painting-script 2",
   "subject": "h36", "author": "who wrote it",
   "sheet": { "widthMm": 280, "heightMm": 186.7 },
   "palette": ["ochre", "rawsienna", "ultramarine"],
   "brushes": { "mop": { "shape": "round", "widthMm": 22 }, "r8": { "shape": "round", "widthMm": 6 } },
   "approach": "how it will be painted, for people",
+  "lights": [ { "what": "lit sill", "region": [[40, 34], [70, 34], [70, 37.5], [40, 37.5]] } ],
   "passages": [
-    { "id": "p01", "what": "first wash: the stone facade", "stage": 1,
+    { "id": "p01", "what": "first wash: the stone front", "stage": 1, "kind": "wash",
       "region": [[6, 3], [272, 3], [272, 118], [8, 114]],
       "paint": { "pigments": { "ochre": 3, "rawsienna": 1 }, "dilution": "very pale", "swatch": "#efe0bf" },
-      "brush": "mop", "move": "wet into wet", "mark": "sweep", "direction": 0, "strokes": 9, "pressure": "firm",
-      "charges": [ { "pigments": { "sienna": 1 }, "dilution": "pale", "at": [[195, 88]], "brush": "r8" } ],
-      "leave": "the far courtyard", "edges": "lost", "why": "one warm ground" }
+      "paper": "wet", "edges": "lost",
+      "handling": { "hold": "side", "start": "belly", "pressure": [0.7, 0.8, 0.6], "direction": 0, "speed": "fast", "load": "flooded" },
+      "charges": [ { "pigments": { "sienna": 1 }, "dilution": "pale", "at": [[195, 88]], "brush": "r8" } ] },
+    { "id": "p11", "what": "tree shadows", "stage": 3, "kind": "strokes", "brush": "mop", "paper": "dry",
+      "paint": { "pigments": { "ultramarine": 3, "rose": 1 }, "dilution": "pale" },
+      "strokes": [ { "points": [[50, 38, 0.2], [58, 47, 0.7], [66, 58, 0.9], [76, 78, 0.15]] } ] }
   ]
 }
 ```
@@ -39,22 +43,30 @@ Code: `src/paint/methods/script-washes.mjs` (the plan), `src/paint/methods/scrip
 | `sheet.widthMm` | must be the painter's `--sheetmm`; positions are sheet millimetres, x right, y down |
 | `palette` | box keys (`src/crop/box.mjs`); give them to the painter with `--paints` |
 | `brushes` | the kit by name; `widthMm` is the loaded belly's width at full pressure. Every brush is laid as a round today |
+| `lights` | paper kept: no wash lane runs through a light and no touch is set down in one (they are worked round, not masked) |
 | `stage` | 1 first pale washes, 2 local colours and masses, 3 shadows and glazes, 4 touches, 5 darks and accents; the replay's value step |
+| `kind` | `wash` (overlapping strokes of a brush sized to it, about a third of its width, unless `brush` is named), `strokes` (a few separate strokes), `touches` (short marks scattered like a hand), `lines` (the point along each of `paths`) |
 | `region` / `regions` | loose polygons (mm) that place the strokes; a guide to the hand, never a clip |
-| `paths` | polylines the point follows, for `line` |
+| `paths` | polylines the point follows, for `lines` |
+| `strokes` | strokes written one by one: `{points: [[x, y, pressure], ...]}`, or `{from|at: [x, y], direction, lengthMm, pressure: [...], path}`; a stroke may name its own `brush` |
+| `count`, `character` | for groups: how many, and `size` (even, varied), `spread` (scattered, clustered, along a line), `denser` (top, bottom, left, right, edges, middle) |
 | `paint` | pigment parts; `swatch` (or `dilution`: very pale, pale, medium, strong, rich, dark) is the mix as one wash on white paper, and sets its strength |
-| `move` | `wet on dry`, `wet into wet` (clean water first, or with `into` into the wet passage just before), `beside damp` (with `into`), `glaze` (over dry, little trade with wet paint), `dry brush` |
+| `paper` | `dry`; `wet` (clean water first, or with `into` into the wet passage just before); `damp` with `into` (laid beside the passage just before as it loses its shine) |
+| `handling` | `hold` (upright, side: the belly, the width steadier), `start` (point, belly), `pressure` (a list from start to end; the width follows it), `path` (straight, curved, s-curve, zigzag, flick, wobble), `direction` (degrees, 0 right, 90 down), `speed` (slow: more points and a waver; fast), `load` (flooded, loaded, damp, dry: the brush's water; dry is dry brush), `lengthMm`, `look` (for people) |
 | `into` | the passage just before; this one is laid in the same wet session. Any other passage starts on a dry sheet |
-| `mark` | `sweep` (lanes across the region along `direction`, laid back and forth in loads of up to three), `tapered` (pressed on and lifted off), `dab` (a leaf or stone touch), `wedge` (from the point to a square pressed end), `line` (the point along each path), `scumble` (short broken strokes turned every way) |
-| `direction` | degrees: 0 left to right, 90 down |
-| `strokes`, `lengthMm`, `pressure` | about how many strokes (lanes of a sweep), their length, light, medium or firm |
 | `charges` | dabs of their own mix dropped into the passage while wet, one at each `at` |
-| `what`, `leave`, `edges`, `dryFirst`, `why` | for people and judges |
+| `what`, `edges`, `dryFirst`, `why` | for people and judges; a stage-3 passage on dry paper is laid as a glaze |
 
-Touches are placed loosely over the region (a jittered spread found for the count, in bands from the top, each band
-crossed the other way from the last) and each is held to the region's chord along its direction, so a streak or a dab
-keeps inside the shape it is laying without being cut. Every stroke has its own small irregularity of place, angle,
-length and pressure from a hand seeded by the passage's id.
+Touches are set down like a hand: scattered (no two nearer than half the even spacing, never on a grid), in clumps,
+or along the region's long axis, weighted toward the side `denser` names, and visited nearest-next from the top left.
+Each is held to the region's chord along its direction (and stops at a light), so it keeps inside the shape it is
+laying without being cut. Every stroke has its own small irregularity of place, angle, length and pressure from a hand
+seeded by the passage's id. Format 1 scripts (`mark`, `move`, `strokes` as a count) are upgraded on reading.
+
+`tools/painter/script-overlay.mjs` draws a script as the painting it describes, before it is painted: each stroke a
+ribbon as wide as its pressure, in its paint, each passage multiplied over the last, the lights blank, a dot at each
+stroke's start and an arrow at its end; with `--stages` and `--order`, the same after each stage and after 5 to 100% of
+the passages.
 
 ## What it adds to the plan format
 
@@ -65,7 +77,7 @@ records each passage as an instruction with its strokes, so a script and the str
 
 ## Not yet
 
-- Flat brushes are laid as rounds.
+- Flat brushes are laid as rounds; `hold: side` only steadies the width.
 - `swatch` is the mix on white paper; glazes over earlier passages compound. The plan writes, for each passage, the
-  film it predicts over its cells against the subject's mean there (`summary.colourCheck`), as a check only.
+  finished film it predicts over its cells against the subject's mean there (`summary.colourCheck`), as a check only.
 - Lifting, scraping and masking fluid are not marks.
