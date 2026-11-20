@@ -36,7 +36,8 @@ function majority(lab, pw, ph) {
   for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) {
     const i = y * pw + x; if (lab[i] < 0) continue; votes.clear(); let best = lab[i], bv = 0;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; if (yy < 0 || xx < 0 || yy >= ph || xx >= pw) continue; const v = lab[yy * pw + xx]; if (v < 0) continue; const c = (votes.get(v) ?? 0) + 1; votes.set(v, c); if (c > bv) { bv = c; best = v; } }
-    if (bv >= 4) out[i] = best;
+    // (only a speck changes: a cell with two or more like neighbours keeps its label, so a window's bars stay bars)
+    if (bv >= 4 && (votes.get(lab[i]) ?? 0) <= 2) out[i] = best;
   }
   return out;
 }
