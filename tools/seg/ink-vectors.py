@@ -149,7 +149,8 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
     # FILLS: a mass of ink (a leaf mass, a blot, a pane) is one stroke of its own, whole, whatever lines the tracer ran
     # through it; a window's grey glass is one grey fill laid under its black bars, which stay lines
     under = np.zeros((H, W), np.int32)
-    for fl in find_fills(a, px):
+    # (ink only: a light drawing, pencil, has no masses that could overcome the paint; its shading stays as drawn)
+    for fl in (find_fills(a, px) if gain == 1.0 else []):
         kid = len(L) + len(extra) + 1; x0, y0, m = fl['x0'], fl['y0'], fl['mask']; sl = (slice(y0, y0 + m.shape[0]), slice(x0, x0 + m.shape[1]))
         ids = owner[sl][m]; ids = ids[(ids > 0) & (ids <= len(L))]
         ys, xs = np.nonzero(m); c = np.array([xs.mean() + x0, ys.mean() + y0])
@@ -279,6 +280,16 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
                         rings = []
                         for a_, b_ in runs:
                             ring = sausage(C[a_:b_], np.maximum(.35 * Z, wid[a_:b_] / 2)); rings.append(np.round(edge_ring(np.c_[ring[:, 1] + y0 - 1, ring[:, 0] + x0 - 1]), 3).tolist())
+                        # the line's own ink the path does not cover (a second line close beside it that the tracer took with
+                        # it, a piece the joined path runs wide of) is kept as outlined shapes with the stroke: nothing is lost
+                        rest_m = I & (f >= lvl) & ~(cv2.dilate(S, np.ones((int(2 * Z) + 1,) * 2, np.uint8)) > 0); rest = []
+                        if rest_m.sum() >= 4 * Z * Z:
+                            for c in find_contours(np.where(cv2.dilate(rest_m.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0, f, 0), lvl):
+                                if len(c) < 4 or not np.allclose(c[0], c[-1]): continue
+                                c = simplify_ring(smooth_ring(c[:-1] - 1 + [y0, x0], .6 * Z), .1 * Z)
+                                if len(c) >= 3 and abs(ring_area(c)) >= Z * Z: rest.append(np.round(edge_ring(c), 3).tolist())
+                        rings += rest
+                        if rest: rec = {**rec, 'rest': rest}
                         wid = np.where(on, wid, 0)
                         path = np.round((C + [x0 - 1, y0 - 1] + .5) * px, 3); widths = np.round(wid * px, 3).tolist(); drawn = 'path'
             if drawn: rec = {**rec, 'drawn': drawn}

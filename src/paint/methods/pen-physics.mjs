@@ -3,7 +3,7 @@
 // path (`drawn: 'path'`: a path with a width at every point) is redrawn as a nib would lay it: the width breathes a little
 // with pressure and thins with speed, the path wobbles by a fraction of a millimetre, a long fast stroke starves towards its
 // end, and the pen runs a touch past the end. Bounded: no point of a path moves more than MAX_SHIFT_MM, no stroke is added
-// or dropped, the order is kept. Fills and outlined shapes are not touched. Seeded: the same dial and seed give the same lines.
+// or dropped, the order is kept. Ink a line carries beside its path (`rest`) stays as it is. Fills and outlined shapes are not touched. Seeded: the same dial and seed give the same lines.
 
 /** No point of a path moves farther than this at any dial setting (mm). */
 export const MAX_SHIFT_MM = 0.3;
@@ -47,7 +47,7 @@ export function nibStroke(stroke, amount, seed = 1) {
     if (e > 0.02) { path.push([b[0] + (b[0] - a[0]) / tl * e, b[1] + (b[1] - a[1]) / tl * e]); widths.push(widths[n - 1] * 0.5); }
   }
   const round = v => Math.round(v * 1000) / 1000;
-  return { ...stroke, dark: round(stroke.dark * (1 - amount * STARVE_PALE * starve)), path: path.map(p => [round(p[0]), round(p[1])]), widths: widths.map(round), outline: [lineOutline(path, widths)] };
+  return { ...stroke, dark: round(stroke.dark * (1 - amount * STARVE_PALE * starve)), path: path.map(p => [round(p[0]), round(p[1])]), widths: widths.map(round), outline: [lineOutline(path, widths), ...(stroke.rest ?? [])] };
 }
 
 /** The vectors document at the pen-physics dial `amount` (0 exact .. 1). Same strokes, same order. 0 returns the document itself. */
