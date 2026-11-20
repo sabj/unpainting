@@ -12,6 +12,7 @@
 import { passage } from '../../crop/blockin.mjs';
 import { labOf } from '../../eval/colour.mjs';
 import { filmLab } from './puddles.mjs';
+import { renderLayers } from '../../media/km.mjs';
 import { handOf, PRESSURES, sweeps, scattered, lines, written, handled, chargeDab } from './script-marks.mjs';
 import { makeMark, MARK_KINDS } from '../marks/index.mjs';
 
@@ -250,6 +251,11 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       if (ch) { session.list.push(ch); charges++; }
     }
     washed.push([p.id, sh]);
+    // the plan's own colour over the passage's cells once it and its charges are laid: the film of everything planned
+    // there so far, on this paper, as sRGB and then Lab against white (what the plate is measured against)
+    { const u = new Array(k).fill(0); let c = 0; for (let i = 0; i < n; i++) if (sh.ids?.[i]) { c++; for (let j = 0; j < k; j++) u[j] += laid[j][i]; }
+      if (c) { const px = renderLayers([pigments.map((_, j) => Float32Array.of(u[j] / c))], pigments.map(q => ({ K: q.K, S: q.S ?? [0, 0, 0] })), Uint8ClampedArray.from(paperCol), 1, 1);
+        sh._valuePlan.script.planned = labOf(px, 0, [255, 255, 255]).map(v => +v.toFixed(2)); sh._valuePlan.script.plannedRGB = Array.from(px.slice(0, 3)); } }
   }
   close();
   // the check (never fed back): the plan's finished film over each passage's cells against the subject's mean colour there

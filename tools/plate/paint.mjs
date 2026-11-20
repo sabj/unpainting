@@ -3,6 +3,7 @@
 import {invalidatePaperCertificate} from '../../src/media/paper-certificate.mjs';
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {check} from '../../src/media/checks.mjs';
+import {createScriptColourCheck} from '../painter/script-colour-check.mjs';
 import {splitLoadsFeathered} from '../../src/paint/methods/brushes.mjs';
 import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplies} from '../../src/paint/methods/passage-brush.mjs';
 import {shapeMix} from '../../src/paint/methods/wash-weights.mjs';
@@ -197,6 +198,8 @@ if (TECH_CAL && L_START === 0) {
   if (ONSHEET) for (let k = 0; k < ONSHEET.length; k++) initialHeld += ONSHEET[k];
   TECH_CAL.observe(initialHeld);
 }
+// a painting script's passages: planned colour against what the plate lays, measured on the next dry sheet (script-colour-check.mjs)
+const SCRIPT_CHECK = ctx.VALUE_PLAN?.summary?.source === 'painting script' ? createScriptColourCheck({ out, w, SC, W2 }) : null;
 for (let L = L_START; L < ctx.layers.length; L++) {
   const layer = ctx.layers[L];
   colourMass('before-pass', {pass:L+1,value:layer.value,pigment:layer.pigment});
@@ -239,7 +242,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   const TRACE_MASS = opt('trace', '0') !== '0' ? thicknessTotals(ctx.sheet) : null;
   // The plan's move is final: every passage comes from the wash plan (valueTechnique). No switch replaces a planned move.
   let T = valueTechnique(sh._valuePlan);
-  if(sh._valuePlan){ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
+  if(sh._valuePlan){ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);if(SCRIPT_CHECK?.pending&&base.dry)SCRIPT_CHECK.measure(render(),'next dry sheet');JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
   // one passage for the dry-paper gate: its reach is looked over once, before its first lane (passage-dry-gate.mjs)
   ctx.VALUE_PASSAGE = sh._valuePlan ? {} : null;
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
@@ -741,6 +744,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   }
   if(ctx.VALUE_PLAN){const next=ctx.layers[L+1];if(!next||next.value!==layer.value){ctx.VALUE_ACTIVE=null;fs.writeFileSync(path.join(out,'value-executed-counts.json'),JSON.stringify({scope:'all actual value-pass stroke calls and summed observed footprint contact cells; includes clean water and finite reloads',bands:VALUE_COUNTS,total:VALUE_COUNTS.reduce((a,b)=>({strokes:a.strokes+b.strokes,contacts:a.contacts+b.contacts}),{strokes:0,contacts:0})},null,2));const bandRgb=Buffer.from(render());PENDING_IO.push(sharp(bandRgb,{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'value-band-'+layer.value+'-dried.png')));}}
   // Nothing after a pass reads its passages again (the ledger holds what it laid), so its sheet-sized fields are freed.
+  SCRIPT_CHECK?.queue(layer);
   for (const sh of layer.shapes) { sh.mask = null; sh.graded = null; sh._prewet = null; sh._brushMask = null; sh.ids = null; }
   layer.mask = null; layer.ids = null;
   // Playback gets a frame at every value-band boundary (the band complete and dried) and at the end of each touch-up
@@ -774,6 +778,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
 if (TECH_CAL) { console.log(`technique calibration: ${TECH_CAL.history().length} reads; charge factors ${JSON.stringify(Object.fromEntries(Object.entries(TECH_CAL.factors()).map(([k, v]) => [k, +v.toFixed(2)])))}`); fs.writeFileSync(path.join(out, 'technique-cal.json'), JSON.stringify({ kind: 'sheet gain against ledger charge, per technique; no target reads', history: TECH_CAL.history() }, null, 1)); }
 if (DELIVERY) { const hst = DELIVERY.history(); console.log(`delivery calibration: ${hst.length} reads; kept of charge ${JSON.stringify(hst.at(-1)?.kept ?? [])}; charge factors ${DELIVERY.factors().map(v => v.toFixed(2)).join(', ')}`); fs.writeFileSync(path.join(out, 'delivery-cal.json'), JSON.stringify({ kind: 'sheet against ledger, per pigment; no target reads', history: hst }, null, 1)); }
 if (FEEDBACK_LAG) console.log(`feedback: ${feedbackStats.read} passes read the sheet, ${feedbackStats.predicted} predicted it from the last read and the ledger`);
+if (SCRIPT_CHECK) { if (SCRIPT_CHECK.pending) { clock('dry', () => dry(ctx.sheet, 30000, O, { levelMax: 140, dt: 2 })); SCRIPT_CHECK.measure(render(), 'end, dried'); } SCRIPT_CHECK.finish(); }
 colourMass('ladder-finished');
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-before-dry.png'));
 Object.assign(ctx, { awareProvenance, awareBoundary });
