@@ -150,25 +150,6 @@ test('the token route uses the default recipe without area settings', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('dry run on the area route: plans, checks, paints with stops, looks, cannot revise, and finishes', () => {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dry-area-'));
-  execFileSync(process.execPath, [path.join(BENCH, 'scripts', 'run.mjs'), '--dry-run', '--round', 'V4', '--profile', 'full', '--crops', 'hills', '--tries', '1', '--planform', 'area', '--out', out], { stdio: ['ignore', 'ignore', 'pipe'] });
-  const r = readJson(path.join(out, 'v4-pipeline', 'dry-run', '1', 'run.json')), p = r.crops.hills.pipeline;
-  assert.deepEqual(validateRun(r), []);
-  assert.equal(r.settings.planForm, 'area');
-  assert.equal(p.outcome, 'painted');
-  assert.equal(p.paintedBy, 'the model');
-  assert.equal(p.tokens, 'area-plan');
-  assert.ok(p.looks >= 1, JSON.stringify(p));
-  assert.equal(p.revisions, 0);
-  assert.equal(p.segments, 1);
-  const dir = path.join(out, 'v4-pipeline', 'dry-run', '1', 'hills-plan');
-  assert.ok(fs.existsSync(path.join(dir, 'area-plan.json')));
-  assert.ok(!fs.existsSync(path.join(dir, 'config.json')));
-  assert.match(fs.readFileSync(path.join(dir, 'CHECKPOINTS.jsonl'), 'utf8'), /"kind":"look"/);
-  fs.rmSync(out, { recursive: true, force: true });
-});
-
 test('the area route removes example plans of benchmark subjects from the model\'s tree', async () => {
   const { removeSubjectPlans } = await import('./pipeline/round45.mjs');
   const ws = tmp(), dir = path.join(ws, 'examples', 'plans');

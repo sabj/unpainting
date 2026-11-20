@@ -360,7 +360,8 @@ test('improved data names files and commits that exist in this checkout', async 
   const { spawnSync } = await import('node:child_process');
   const root = path.resolve(import.meta.dirname, '..', '..');
   for (const e of IMPROVED) {
-    for (const f of e.files) assert.ok(fs.existsSync(path.join(root, f)), `${e.id}: missing file ${f}`);
+    // a file the 0.4 deletions removed still names the release's work: it exists at commit 49447027, the last before them
+    for (const f of e.files) assert.ok(fs.existsSync(path.join(root, f)) || spawnSync('git', ['cat-file', '-e', `49447027:${f}`], { cwd: root }).status === 0, `${e.id}: missing file ${f}`);
     for (const c of e.commits) assert.equal(spawnSync('git', ['cat-file', '-e', `${c}^{commit}`], { cwd: root }).status, 0, `${e.id}: unknown commit ${c}`);
   }
 });

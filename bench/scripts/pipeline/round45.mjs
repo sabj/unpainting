@@ -377,7 +377,11 @@ export async function tryEntry({ tryDir, r }) {
 }
 
 /** Run V4 or V5 for one model: tries 1..tries over the targets, in order (V5 tries learn from the one before). */
+export const RETIRED_V45 = 'the V4 and V5 tasks ran on painter 0.2.x and 0.3.x and cannot run on 0.4 (their plans use the light-to-dark value plan and options removed in 0.4): check out tag v0.3.2 to replay them. The next task is bench/v6 (a draft, not yet run).';
 export async function runPipeline({ round, model, tries, crops, dry, outRoot, force, gpu = 'auto', dryWidth = 96, fromTry = 1, strictVerdict = false, noTargetLooks = false, profile = benchmarkProfile('full'), python = process.env.BENCH_SCORE_PYTHON || 'python3', planForm = 'token', skills = null }) {
+  // V4 and V5 ran on painter 0.2.x and 0.3.x: their plans select a style (the light-to-dark value plan) and recipe tokens
+  // that 0.4 removed. They replay from that code, not this one.
+  if (['V4', 'V5'].includes(round.id)) throw new Error(RETIRED_V45);
   planFormOf(planForm);
   const subjects = loadSubjects();
   if (profile.planOnly && (round.id !== 'V4' || tries !== 1 || fromTry !== 1)) throw new Error('lite requires V4 try 1 only; use full for repeated trials');
