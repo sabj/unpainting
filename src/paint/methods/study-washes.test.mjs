@@ -55,12 +55,16 @@ test('nesting: a darker shape of like hue nests on the lighter one it borders; a
   assert.deepEqual(nestParents(shapes), [-1, 0, -1]);
 });
 
-test('lanes: a wide band is laid in a few lanes along its length, landing and lifting on the tip, nothing round its outline', () => {
+test('lanes: a wide band is laid in a few lanes along its length, back and forth without lifting, landing and lifting on the tip, nothing round its outline', () => {
   const band = { points: [[0, 0], [120, 10], [120, 40], [0, 30]] }, f = laneFill([band], { kitMm: [38, 25.4, 7, 5], spine: false });
   const big = f.strokes.filter(s => 2 * s.radiusMm === f.brushMm);
-  assert.ok(big.length >= 2 && big.length <= 4, `${big.length} lanes of the ${f.brushMm} mm brush`);
+  // a lane is a long segment; the lanes of one stroke are joined by short turns at the outline
+  const lanes = s => s.points.slice(1).map((q, j) => [q[0] - s.points[j][0], q[1] - s.points[j][1]]).filter(([dx, dy]) => Math.hypot(dx, dy) > 30);
+  const n = big.reduce((a, s) => a + lanes(s).length, 0);
+  assert.ok(n >= 2 && n <= 4, `${n} lanes of the ${f.brushMm} mm brush`);
+  assert.equal(big.length, 1, 'one stroke: the brush turns at the outline instead of lifting');
   assert.ok(f.uncovered < 0.03, `${f.uncovered}`);
-  for (const s of big) { assert.ok(s.points[0][2] < 0.5 && s.points[s.points.length - 1][2] < 0.5, 'tapered ends'); const dx = s.points.at(-1)[0] - s.points[0][0], dy = s.points.at(-1)[1] - s.points[0][1]; assert.ok(Math.abs(dy / dx) < 0.25, 'along the band'); }
+  for (const s of big) { assert.ok(s.points[0][2] < 0.5 && s.points[s.points.length - 1][2] < 0.5, 'tapered ends'); for (const [dx, dy] of lanes(s)) assert.ok(Math.abs(dy / dx) < 0.25, 'along the band'); }
 });
 
 test('a toned sheet: the study\'s buff paper and its white are both bare paper, measured against the sheet\'s colour', () => {

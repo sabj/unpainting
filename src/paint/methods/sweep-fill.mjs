@@ -397,6 +397,14 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
   if (!area) return { strokes: [], brushMm: 0, angle: 0, depthMm: 0, areaMm2: 0, uncovered: 0 };
   const covered = new Uint8Array(gn), strokes = [];
   const at = (x, y) => { const gx = Math.floor((x - ox) / pitch), gy = Math.floor((y - oy) / pitch); return gx >= 0 && gy >= 0 && gx < gw && gy < gh ? gy * gw + gx : -1; };
+  // a turn from one lane's end to the next lane's start stays on the part (no more than a brush's tip off it): it is
+  // short (no longer than three lane steps) and its points every half cell lie on the part or its grown margin
+  // (`off`: each cell's distance to the part, in grid cells; `reach`: mm a lane's end may overrun the outline)
+  const turnOnPart = (A, B, off, reach) => {
+    const len = Math.hypot(B[0] - A[0], B[1] - A[1]), steps = Math.ceil(len / (pitch / 2));
+    for (let s = 1; s < steps; s++) { const i = at(A[0] + (B[0] - A[0]) * s / steps, A[1] + (B[1] - A[1]) * s / steps); if (i < 0 || off[i] * pitch > reach + pitch) return false; }
+    return true;
+  };
   // a round's footprint: a disc of the half-width its pressure gives, every half cell along the path
   const stamp = (pts, r) => {
     for (let q = 0; q + 1 < pts.length; q++) {
@@ -449,8 +457,10 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     const step = 2 * r * (1 - LANE_OVERLAP), a0 = v0 + inset, a1 = v1 - inset, vs = [];
     if (lanes === 1 || a1 - a0 < step) vs.push(...(a1 - a0 < 0.2 * step ? [(v0 + v1) / 2] : [a0, a1]));
     else { for (let g = Math.ceil(a0 / step) * step; g <= a1 + 1e-9; g += step) vs.push(g); if (vs[0] - a0 > 0.5 * step) vs.unshift(a0); if (a1 - vs[vs.length - 1] > 0.5 * step) vs.push(a1); }
-    let k = 0;
-    for (const v of vs) {
+    // `open`: the strokes that ended in the lane before, each of which the next lane may carry on
+    let k = 0, open = [], off = null;
+    vs.forEach(v => {
+      const next = [];
       // along the lane's centre line the hand presses as wide as the part allows there (half-width no more than the
       // distance to the outline), so where the outline slants or narrows the lane narrows and ends on its tip: the lane
       // never runs past the outline and its end follows the slant. Where not even the tip fits, the lane lifts.
@@ -468,19 +478,42 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
         // ends are carried on to the outline, at the tip, where the outline
         // is met; a lane's end that stops a cap's width short leaves a white seam against its neighbour
         const ext = END_REACH * halfAt(r, TIP), a0 = run0[0], a1 = run0[run0.length - 1];
-        const run = [...(samples[0].u < a0.u ? [{ u: a0.u - ext, dmm: a0.dmm, in: true }] : []), ...run0, ...(a1.u < samples[samples.length - 1].u ? [{ u: a1.u + ext, dmm: a1.dmm, in: true }] : [])];
-        const seq = k % 2 === 0 ? run : [...run].reverse(), every = Math.max(1, Math.round(r / 3 / (pitch / 2))), pts = [];
-        seq.forEach((sm, q) => {
-          if (q % every && q !== seq.length - 1) return;
+        const run = [...(samples[0].u < a0.u ? [{ u: a0.u - ext, dmm: a0.dmm, in: true, ext: true }] : []), ...run0, ...(a1.u < samples[samples.length - 1].u ? [{ u: a1.u + ext, dmm: a1.dmm, in: true, ext: true }] : [])];
+        const every = Math.max(1, Math.round(r / 3 / (pitch / 2))), fwd = [];
+        run.forEach((sm, q) => {
+          if (q % every && q !== run.length - 1) return;
           const p = Math.max(TIP, Math.min(1, (sm.dmm / r - 0.25) / 0.75));
           // drop a point between two of the same pressure on a straight run
-          if (pts.length >= 2 && Math.abs(pts[pts.length - 1][2] - p) < 0.04 && Math.abs(pts[pts.length - 2][2] - p) < 0.04 && q !== seq.length - 1) pts.pop();
-          pts.push([+(sm.u * tx + v * nx).toFixed(3), +(sm.u * ty + v * ny).toFixed(3), +p.toFixed(3)]);
+          if (fwd.length >= 2 && Math.abs(fwd[fwd.length - 1][2] - p) < 0.04 && Math.abs(fwd[fwd.length - 2][2] - p) < 0.04 && q !== run.length - 1) fwd.pop();
+          fwd.push([+(sm.u * tx + v * nx).toFixed(3), +(sm.u * ty + v * ny).toFixed(3), +p.toFixed(3)]);
         });
-        if (pts.length < 2) continue;
-        stamp(pts, r); strokes.push({ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }); k++;
+        if (fwd.length < 2) continue;
+        // The next lane goes on without lifting, turning at the outline where a stroke of the lane before ended (a
+        // zigzag; round a hole, one on each side), when the turn is short and stays on the part: the brush lands on its
+        // tip and opens to its width only over the length of tuft it lays down (about 2.5 radii), and lifts off over two
+        // radii, so a lane laid as its own stroke left a wedge of paper at each start and a point at each end (white gaps
+        // where washes meet; src/media/tuft-section.mjs). A turn is laid by the brush's side at the tip's pressure, so
+        // the lane ends that meet in a turn are not carried past the outline as an end that lifts is (the brush going
+        // round would push the wash out past it).
+        off ??= distance(Uint8Array.from(part, vv => 1 - vv), gw, gh);
+        let join = null;
+        for (const st of open) for (const rev of [false, true]) {
+          const end = st.points[st.points.length - 1], first = rev ? fwd[fwd.length - 1] : fwd[0], d = Math.hypot(first[0] - end[0], first[1] - end[1]);
+          if (d <= 3 * step && (!join || d < join.d) && turnOnPart(end, first, off, END_REACH * halfAt(r, TIP))) join = { st, rev, d };
+        }
+        const rev = join ? join.rev : k % 2 === 1, pts = rev ? [...fwd].reverse() : fwd;
+        const startExt = (rev ? run[run.length - 1] : run[0]).ext && pts.length > 2, endExt = (rev ? run[0] : run[run.length - 1]).ext;
+        if (join) {
+          const st = join.st;
+          if (st._endExt && st.points.length > 2) st.points.pop();
+          if (startExt) pts.shift();
+          stamp([st.points[st.points.length - 1], pts[0]], r); stamp(pts, r); st.points.push(...pts); st._endExt = endExt;
+          open.splice(open.indexOf(st), 1); next.push(st);
+        } else { stamp(pts, r); const st = { kind: 'sweep', radiusMm: +r.toFixed(3), points: pts, _endExt: endExt }; strokes.push(st); next.push(st); }
+        k++;
       }
-    }
+      open = next;
+    });
     if (depth >= 3) return;
     // what the lanes left bare, less the slivers the wet wash closes by itself, laid with a smaller brush
     const raw = Uint8Array.from(part, (vv, i) => (vv && !covered[i] ? 1 : 0)), o = BARE_WIDE_MM / 2 / pitch;
@@ -498,6 +531,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     }
   };
   layPart(inside, Infinity, 0);
+  for (const st of strokes) delete st._endExt;
   let cov = 0; for (let i = 0; i < gn; i++) if (inside[i] && covered[i]) cov++;
   return { strokes, brushMm: first?.brush ?? 0, angle: first?.th ?? 0, depthMm: first?.deep ?? 0, areaMm2: area * pitch * pitch, uncovered: 1 - cov / area };
 }
