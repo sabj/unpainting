@@ -44,6 +44,9 @@ export async function planLinework({ opt, num, argv, out, grid, density, log, pl
   const info = { source: opt('drawingfile', '') ? 'file' : 'none', stages: null, files: {} };
   if (opt('drawing', 'first') === 'none') return info;
   if (!stages) return info;
+  // a drawing fitted as vector strokes is laid whole and exactly, first (tools/plate/drawing.mjs layExactVectors): it is
+  // not cut into stage files, which have no vectors beside them
+  { const f = opt('drawingfile', ''), stem = f.endsWith('-lines.json') ? f.slice(0, -'-lines.json'.length) : f; if (f && fs.existsSync(`${stem}-vectors.json`)) { log(`linked stages: none, the drawing ${path.basename(stem)} is laid as vector strokes`); return info; } }
   // the one line set the stages share, in its own source pixels: the drawing file (src/paint/line-source.mjs). The target's
   // own lines are never traced here (removed in 0.4, last at commit 49447027).
   const file = opt('drawingfile', '');

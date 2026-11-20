@@ -39,6 +39,9 @@ export async function lineTargetOf(image) {
 export async function registerDrawingFile({ base, image, root = '.', out, stem = path.join(out, 'lines-registered'), width, argv = [], force = false, log = () => {} }) {
   const file = path.resolve(root, linePaths(base).lines);
   if (!hasLineFile(file)) return null;
+  // a drawing fitted as vector strokes is in sheet millimetres already, cut to its window (tools/seg/vectors-crop.py):
+  // it is laid as it is, never refitted (a refit copy has no vectors beside it)
+  if (fs.existsSync(file.replace(/-lines\.json$/, '-vectors.json'))) return null;
   const doc = JSON.parse(readLineText(file));
   if (!doc.image?.w || !doc.image?.h || (!force && doc.registration?.targetGrid)) return null;
   const t = await lineTargetOf(image), gap = aspectGap(doc.image, t.w, t.h);
