@@ -202,10 +202,11 @@ function layExactVectors(file, { closing = false } = {}) {
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
   const darkOf = t => { const ink = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (ink[0] + ink[1] + ink[2]) / 765; };
-  // --inkfill (0..1, default 0.25): when paint follows the pen, a FILL stroke (a mass of ink the fitter marked: a leaf mass, a
-  // dark pane) is laid as one pale soft shape at this share of its darkness, so the paint supplies the dark and the ink does
-  // not overcome it; lines are laid whole and nothing is dropped. A drawing laid alone (--drawingonly) is laid exactly.
-  const fill = num('drawingonly', 0) > 0 ? 1 : Math.max(0, Math.min(1, num('inkfill', 0.25)));
+  // --inkfill (0..1, default 1: the drawing is laid exactly as drawn, under paint too). Below 1 a FILL stroke (a mass of ink
+  // the fitter marked: a leaf mass, a dark pane) is laid as one pale soft shape at that share of its darkness; lines are laid
+  // whole and nothing is dropped. Tried at 0.25 as the default under paint and rejected (flat grey patches, mud under
+  // colour): the code stays, unused unless asked for.
+  const fill = Math.max(0, Math.min(1, num('inkfill', 1)));
   const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
   fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));

@@ -159,7 +159,9 @@ def build(drawing, lines_doc, sheet_mm, zoom=4, ink=.06, orphan_mm=.6, sigma=.6,
         ys, xs = np.nonzero(m); c = np.array([xs.mean() + x0, ys.mean() + y0])
         first = int(ids.min()) if len(ids) else int(lab.ravel()[of[near[int(c[1]), int(c[0])]]])
         if fl['grey']: under[sl][m] = kid; owner[sl][m & (a[sl] < .85)] = 0
-        else: owner[sl][m] = kid
+        else:
+            # (the fill's soft edge goes with it: left to the stroke that ran through the blob it would be laid as a grey rim)
+            owner[sl][m] = kid; rim = (cv2.dilate(m.astype(np.uint8), np.ones((int(4 * Z) + 1,) * 2, np.uint8)) > 0) & ~m & (a[sl] < (fl['level'] or .5)); owner[sl][rim] = 0
         Q = np.c_[xs, ys][::max(1, len(xs) // 4000)].astype(float); mq = Q.mean(0); _, _, vt = np.linalg.svd(Q - mq, full_matrices=False); d = vt[0]
         if abs(d[1]) > abs(d[0]) and d[1] < 0 or abs(d[0]) >= abs(d[1]) and d[0] < 0: d = -d
         with np.errstate(all='ignore'): u = (Q - mq) @ d
@@ -335,11 +337,11 @@ def find_fills(a, px, width_mm=.8):
     is left of the ink when half that is taken off all round, grown back: bars, twigs and the knots of a lattice are
     thinner and stay lines), unless it is a strip (is_strip: long and of even width: a thick branch, a post, a frame),
     which is a line at any width and stays with the pen's strokes. Two kinds: a black fill (ink over 0.85: a leaf mass, a
-    blot, dark glass), and a grey fill (ink over 0.3 of which a quarter or more is grey: glass, a shaded pane), which lies
+    blot, dark glass), and a grey fill (ink over 0.2 of which a quarter or more is grey: glass, a shaded pane), which lies
     under whatever black is drawn across it. Returns [{x0, y0, mask, grey, tone, level}], the black ones first."""
     out = []; black_taken = np.zeros(a.shape, bool); r = .5 * width_mm / px; g = 2; kg = np.ones((2 * g + 1,) * 2, np.uint8)
     for grey in (False, True):
-        ink = (a >= (.3 if grey else .85)).astype(np.uint8); dt = cv2.distanceTransform(ink, cv2.DIST_L2, 5)
+        ink = (a >= (.2 if grey else .85)).astype(np.uint8); dt = cv2.distanceTransform(ink, cv2.DIST_L2, 5)
         core = dt > r
         if not core.any(): continue
         wide = ((cv2.distanceTransform((~core).astype(np.uint8), cv2.DIST_L2, 5) <= r + 1) & (ink > 0)).astype(np.uint8)
