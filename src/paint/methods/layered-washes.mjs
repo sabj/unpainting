@@ -170,10 +170,11 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   // --- 1. the reserved lights ---
   const S2 = squint(RESERVE_SIGMA_MM), sortedL = Float32Array.from(S2.L).sort(), lightest = sortedL[Math.floor(.995 * (pn - 1))];
   // Light things are not painted: they are paper, their shapes cut by what is painted round them. The sheet keeps as
-  // much bare paper as the subject has near-paper light (read at a 1 mm squint, a share of the sheet, no place): the
+  // much bare paper as the subject has near-paper light (a share of the sheet, no place): the
   // lightest that share of the squinted subject is reserved, never darker than PAPER_DARKEST.
   // (near the subject's own paper: its lightest tone, a photographed sheet being no whiter than it is)
-  const S1 = squint(1), own = Float32Array.from(S1.L).sort()[Math.floor(.995 * (pn - 1))]; let near = 0;
+  // (read at the lights' own squint: at a fine one a faint pattern on the subject moves cells across the line)
+  const S1 = S2, own = lightest; let near = 0;
   for (let q = 0; q < pn; q++) if (S1.L[q] >= Math.min(100, own) - PAPER_NEAR && Math.hypot(S1.A[q], S1.B[q]) <= RESERVE_CHROMA * 1.5) near++;
   const subjectPaper = near / pn;
   const reserveFrom = Math.max(PAPER_DARKEST, sortedL[Math.max(0, Math.floor((1 - subjectPaper) * (pn - 1)))]);
