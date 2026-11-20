@@ -16,6 +16,8 @@ export const SWEEP_OVERLAP = 0.3;
 const BRUSH_FIT = 1.1;
 /** A part left bare is filled when it is at least this share of a touch of the brush that fills it. */
 const LEAST_BARE = 0.5;
+/** The pressure a lane's end lifts to (a round brush at this pressure is a little over half as wide). */
+const LIFT = 0.4;
 /** The brush is recharged (a new stroke, from where the last one ended) every this many lanes. */
 const LANES_PER_LOAD = 2;
 /** A lane's square end may reach this far (mm, or this share of the brush's radius) past where the brush fits, at a slanting outline. */
@@ -178,7 +180,8 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
       open = next;
     }
     let made = 0;
-    const emit = line => { stamp(line, radius); strokes.push({ kind: 'sweep', radiusMm: +radius.toFixed(3), points: line.map(([gx2, gy2]) => toXY([ou + gx2 * pitch, ov + gy2 * pitch])) }); made++; };
+    // a point may carry the hand's pressure as a third number (a lane's end lifts, so its end is round, not square)
+    const emit = line => { stamp(line, radius); strokes.push({ kind: 'sweep', radiusMm: +radius.toFixed(3), points: line.map(([gx2, gy2, p]) => (p == null ? toXY([ou + gx2 * pitch, ov + gy2 * pitch]) : [...toXY([ou + gx2 * pitch, ov + gy2 * pitch]), p])) }); made++; };
     const insideLine = (A, B) => { for (let t = 0; t <= 8; t++) { const x = Math.round(A[0] + (B[0] - A[0]) * t / 8 - .5), y = Math.round(A[1] + (B[1] - A[1]) * t / 8 - .5); if (!(D[y * gw + x] >= .8 * rc)) return false; } return true; };
     for (const ch of chains) {
       let line = [];
@@ -192,7 +195,9 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
           if (insideLine(inA, inB)) line.push(inA, inB);
           else { if (line.length >= 2) emit(line); line = []; }
         }
-        line.push([start + .5, y], [(a + b) / 2 + .5, y], [end + .5, y]);
+        // the hand eases off over the last radius of a lane, so its end is rounded by the brush, not cut square
+        const dir = end > start ? 1 : -1, ease = Math.min(rc, Math.abs(end - start) / 3);
+        line.push([start + .5, y, k ? 1 : LIFT], [start + .5 + dir * ease, y, 1], [end + .5 - dir * ease, y, 1], [end + .5, y, LIFT]);
         // the brush is recharged every LANES_PER_LOAD lanes: the next load starts where this one ended, on the bead
         if ((k + 1) % LANES_PER_LOAD === 0 && k + 1 < ch.runs.length) { const at = line[line.length - 1]; emit(line); line = [at]; }
       });

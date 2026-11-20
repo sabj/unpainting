@@ -424,7 +424,7 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
   // a wash plan's strokes are a list of laid strokes (layered-washes.mjs), each charged at its own share of the mix (a
   // graded wash: water added at each recharge); a light-to-dark plan's are a count and lane widths for its stroke plan
-  const vectorPaths = !BUDGET && Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1, round })); if (st.charge) PATH_FACTOR.set(path, st.charge); return path; }) : null;
+  const vectorPaths = !BUDGET && Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: q[2] ?? 1, round })); if (st.charge) PATH_FACTOR.set(path, st.charge); return path; }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
