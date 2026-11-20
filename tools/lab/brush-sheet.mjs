@@ -19,7 +19,7 @@ const STAGE = arg('stage', 's1'), OUT = path.resolve(arg('out', `brush-${STAGE}.
 const MODELS = arg('models', STAGE === 's2' ? 'row,tuft,section' : 'row,section').split(',');
 // --real <file>: a grid of real watercolour crops (5 across, 2 down, each labelled underneath, about 0.14 mm a pixel)
 // shown in a last column at the same 40 px a mm, for comparison
-const REAL = arg('real', null), REAL_MM = Number(arg('realmm', '0.14'));
+const REAL = arg('real', null), REAL_MM = Number(arg('realmm', '0.14')), REAL_PICK = arg('realpick', '3,7,10').split(',').map(Number); // crops by number, 1 to 10
 const PX = 40; // pixels a millimetre
 
 const paperOptions = mm => ({ seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
@@ -155,8 +155,8 @@ for (const [pi, p] of panels.entries()) {
 }
 { let ry = 80; const rx = GAP + MODELS.length * (colW + GAP); svg.push(label('real watercolour, same scale', rx, 50, 30)); for (const t of realTiles) { comps.push({ input: t.img, left: rx, top: ry }); ry += t.h + GAP; } }
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
-await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
-  .composite([...comps, { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${svg.join('')}</svg>`), left: 0, top: 0 }])
+await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } }, limitInputPixels: false })
+  .composite([...comps, { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${svg.join('')}</svg>`), left: 0, top: 0, limitInputPixels: false }])
   .jpeg({ quality: 85 }).toFile(OUT);
 console.log(`${OUT}: ${W}x${H}`);
 if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(results, null, 2));
@@ -176,7 +176,8 @@ function measurePanel(stage, pi, r) {
 // The crops of a 5 x 2 grid image, each scaled from mmPx millimetres a pixel to PX a millimetre (a label strip under each cut off).
 async function realCrops(file, mmPx) {
   const meta = await sharp(file).metadata(), cw = Math.floor(meta.width / 5), ch = Math.floor(meta.height / 2), strip = Math.round(ch * 0.06), out = [];
-  for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) {
+  for (const k of REAL_PICK) {
+    const r = Math.floor((k - 1) / 5), c = (k - 1) % 5;
     const w = Math.round((cw - 6) * mmPx * PX), h = Math.round((ch - strip - 6) * mmPx * PX);
     out.push({ w, h, img: await sharp(file).extract({ left: c * cw + 3, top: r * ch + 3, width: cw - 6, height: ch - strip - 6 }).resize(w, h, { kernel: 'lanczos3' }).png().toBuffer() });
   }

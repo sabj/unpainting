@@ -17,7 +17,6 @@
 // paint only where the pores pull it, on the tooth it reaches. Films in contact also trade equal volumes, so colours
 // merge even where the two heads are level.
 import { soak, deposit, depositDry } from './sheet.mjs';
-import { SIZING } from './sizing.mjs';
 
 export const REF_MM = 280 / 1086;          // the cell the legacy per-cell brush numbers were tuned at, mm
 export const TUFT = Object.freeze({
@@ -65,12 +64,16 @@ export const feedRate = feed => Math.max(TUFT.wick, -Math.log(1 - Math.min(0.99,
 /** Move the towed chain `pts` (x0, y0, x1, y1 ... in cells, the hand first, then each segment's length) for the hand
  *  at (hx, hy), segment length seg (cells), the previous step's seg0, and the direction (dx, dy) a chain lies in when
  *  it has none. A point further than seg from the one before it is pulled in along the line between them (towed); a
- *  segment shorter than seg grows by TUFT.creep of the growth of seg, as pressure bends the tuft over and its tip slides.
+ *  segment shorter than seg grows by TUFT.creep of the growth of seg that the hand's travel does not take up, as pressure
+ *  bends the tuft over and its tip slides.
  *  Returns pts (made, gathered at the hand, when null). */
 export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy) {
+  const moved = pts ? Math.hypot(hx - pts[0], hy - pts[1]) : 0;
   if (!pts) { pts = new Float64Array(3 * S); for (let j = 0; j < S; j++) { pts[2 * j] = hx; pts[2 * j + 1] = hy; } }
   pts[0] = hx; pts[1] = hy;
-  const grow = Math.max(0, seg - seg0);
+  // what the press grows the tuft by that the hand's own travel does not take up slides the tip out: all of it in a tap,
+  // little of it when the brush lands on the move (its tip holds where it touched and the hand draws the belly down)
+  const grow = Math.max(0, seg - seg0 - moved / (S - 1));
   for (let j = 1; j < S; j++) {
     const ax = pts[2 * j - 2], ay = pts[2 * j - 1];
     let ex = pts[2 * j] - ax, ey = pts[2 * j + 1] - ay, L = Math.hypot(ex, ey);
@@ -200,7 +203,7 @@ export function exchangeCell(sheet, i, lane, capL, freeAt, a, share, hb, g, buf)
   //    feeds them instead (the sheet's own absorption), and the tuft keeps that film up
   const cap = sheet.paper.capacity[i], dryness = cap > 0 ? Math.max(0, 1 - sheet.s[i] / cap) : 0;
   if (dryness > 0 && lane.water > 1e-12) {
-    const Jp = Math.min((1 - SIZING) * a * share * Math.max(0, hb + TUFT.pore * dryness) * Math.exp(-sheet.W[i] / TUFT.pore), lane.water / g, cap - sheet.s[i]);
+    const Jp = Math.min(a * share * Math.max(0, hb + TUFT.pore * dryness) * Math.exp(-sheet.W[i] / TUFT.pore), lane.water / g, share * cap - sheet.s[i]); // only the pores it touches
     if (Jp > 1e-12) {
       const f = Jp * g / lane.water;
       for (let k = 0; k < K; k++) { buf[k] = lane.pig[k] * f / g; lane.pig[k] -= buf[k] * g; }

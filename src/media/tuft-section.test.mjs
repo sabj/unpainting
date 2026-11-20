@@ -150,7 +150,7 @@ test('a 45 degree line has no roughness at the cell pitch', () => {
   stroke(b, sheet, [{ x: 20, y: 20, p: 0.8 }, { x: 140, y: 140, p: 0.8 }]);
   const f = Float64Array.from(sheet.W, (v, i) => v + sheet.s[i]);
   const { spectrum } = diagonalEdge(f, sheet.w, sheet.h, 0, 0.3, 40, 120);
-  assert.ok(spectralPeak(spectrum, 0.25) < 3, `power at the cell pitch ${spectralPeak(spectrum, 0.25)} times its neighbours`);
+  assert.ok(spectralPeak(spectrum, 0.25) < 2, `power at the cell pitch ${spectralPeak(spectrum, 0.25)} times its neighbours`);
 });
 
 test('a flat on edge lays a line as thin as the blade, square to it as wide as the blade', t => {
