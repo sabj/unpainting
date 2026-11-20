@@ -287,7 +287,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   };
   // --texflow: texture density over a shape is one number from a 'texture' look; direction comes from the planned flow field
   const flowDark=sh._valuePlan?.texture&&num('texflow',0)>0?(()=>{const lk=paintingLook('texture',`L${L + 1}/s${shIdx}`,MASK,{box:{...MB,w},ref:['px']});if(!lk)return .5;const [r,g,b]=lk.ref.px;return Math.max(0,Math.min(1,1-(.2126*r+.7152*g+.0722*b)/250));})():1;
-  // --strokeplan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
+  // a stroke plan: the passage's strokes and their charge factors were planned before painting (stroke-plan.mjs)
   const PATH_FACTOR=new WeakMap(),PATH_RAMP=new WeakMap(),strokePlanPaths=s=>s._strokePlan.paths.map((ps,k)=>{const q=ps.map(p=>({...p,x:p.x*SC,y:p.y*SC,r:p.r*SC}));PATH_FACTOR.set(q,s._strokePlan.factors[k]);if(s._strokePlan.ramps?.[k])PATH_RAMP.set(q,s._strokePlan.ramps[k]);return q;});
   // the plan's graded plane (graded-demand.mjs) carries the grade through the physical loads below; the single-sweep
   // pressure ramp stands in for it only where there are no physical loads
@@ -397,7 +397,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // under --crisp the bead stops at the passage's own edge, for the clean water and the paint alike
   if (process.env.FW_DUMP && L < num('dumppasses', 3)) { const g = Buffer.alloc(N2); for (const pts of paths) for (let k = 0; k < pts.length; k++) { const a = pts[k], b = pts[Math.min(pts.length - 1, k + 1)], m = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y))); for (let t = 0; t <= m; t++) { const x = Math.round(a.x + (b.x - a.x) * t / m), y = Math.round(a.y + (b.y - a.y) * t / m); if (x >= 0 && y >= 0 && x < W2 && y < H2) g[y * W2 + x] = Math.hypot(b.x - a.x, b.y - a.y) > 6 * SC ? 128 : 255; } } await sharp(g, { raw: { width: W2, height: H2, channels: 1 } }).png().toFile(path.join(process.env.FW_DUMP, `P${L + 1}-s${layer.shapes.indexOf(sh)}.png`)); }
   const crispHere = vectorPaths ? false : !!shapedPaths || CRISP.on && CRISP.wants(T, detail);
-  // --washreach: a planned stroke may end past the outline, so the clip is the passage grown by the reach, still off
+  // the wash reach: a planned stroke may end past the outline, so the clip is the passage grown by the reach, still off
   // the plan's reserved lights; the edge is where the strokes end, not the mask
   const P = ctx.VALUE_PLAN?.protectedCells;
   if (crispHere) {
@@ -507,7 +507,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
         });
     // The first value goes on light (--opening, default 0.55) and is booked so. A graded wash carries all its values and is not lightened.
     const opening = (layer.value <= 1 && !(sh.graded && !sh._follow) ? (sh._opening ?? num('opening', 0.55)) : 1) * (sh._tint ?? 1);
-    const PF = PATH_FACTOR.get(pts) ?? 1; // --strokeplan: this stroke's planned charge factor
+    const PF = PATH_FACTOR.get(pts) ?? 1; // the stroke plan: this stroke's planned charge factor
     // A passage laid in overlapping lanes is charged for the overlap, once per passage: see sweepCover. Detail marks
     // leave paper between them on purpose and are not divided. --cover 0|1, default 0, except for a wash plan's strokes
     // (fair-wash.mjs): its rounds ring the outline and its lanes overlap by a third, so about 1.7 sweeps lie over a cell

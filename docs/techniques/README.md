@@ -1,6 +1,6 @@
 # Techniques
 
-These are the brush, wash, pen and pencil techniques the simulator has, with the code that does each one. The default image painter uses `src/paint/methods/light-to-dark.mjs` to choose settings per value passage (a wash or group of marks in one light-to-dark range). Per-subject presets in `src/paint/styles/` supply water, mixing and edge settings. Separate passage modules use `chooseTechnique` in `src/crop/technique.mjs`. The wash table below cites `TECHNIQUES` in `src/paint/methods/lay.mjs`, which is used by the standalone painter; its settings do not cover every passage chosen by a value plan. A stroke plan for `tools/run-plan.mjs` can call the same brush and drying steps by hand (see [plan-format.md](../plan-format.md)).
+These are the brush, wash, pen and pencil techniques the simulator has, with the code that does each one. The image painter's washes come from block-in studies (`src/paint/methods/study-washes.mjs`), which choose the move for each shape. The wash table below cites `TECHNIQUES` in `src/media/brush-kit.mjs`, re-exported by `src/paint/methods/lay.mjs`. A stroke plan for `tools/run-plan.mjs` can call the same brush and drying steps by hand (see [plan-format.md](../plan-format.md)).
 
 ## Washes
 

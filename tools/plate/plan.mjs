@@ -319,7 +319,7 @@ const EDGE = (() => { const e = num('edgeclear', 0), ex = Math.round(e * w), ey 
 // the wash plan's passes (sheet.mjs) replace this before painting
 ctx.layers = []; ctx.steps = 5;
 
-// The way the source's hair and grain lie, for --fur: read once, when a fur pass first asks for it.
+
 // --finish f: how far each part of the sheet is carried (src/crop/finish.mjs); f is the background's finish. Default 0, off.
 // --mask: the subject from u2net (tools/seg/segment.py, work/masks), used as the finish field directly.
 // --vignette inset: a ragged wash edge; ground is carried inside it and paper left outside. The subject is never faded.
@@ -429,8 +429,8 @@ const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || PIPELINE?.d
 const PEN_SHARE = PEN_ASKED && fs.existsSync(path.resolve(root, opt('image', ''))) ? await sourcePenShare({ image: path.resolve(root, opt('image', '')), sharp }) : SEP.stats.ink / n;
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
-// The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): --linesource picks where the lines
-// come from, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
+// The plan's line set and its linked stages (src/paint/methods/linework-plan.mjs): the lines
+// come from the drawing file, --stages cuts prep (pencil), prep ink and finish ink from that one set. Planning only, before the seal.
 // --outlinemedium auto|ink|graphite|<profile>: preparatory drawing medium. graphite (default): the drawing is pencil
 // unless ink is asked for (--outlinemedium ink or a plan's medium); ink is being reworked. auto is ink when the source
 // shows --penfirst per cent of line or more, else graphite.

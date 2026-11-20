@@ -109,128 +109,79 @@ The criteria ask for one connected wash that gets lighter from top to bottom, wi
 - [examples/plans/glazes.json](../examples/plans/glazes.json): three bands, each dried before the next. See [pigments-and-paper.md](pigments-and-paper.md).
 - [examples/plans/drying-dry-between.json](../examples/plans/drying-dry-between.json) and [drying-too-wet.json](../examples/plans/drying-too-wet.json): the same two strokes with and without drying between them.
 
-## Other plan formats in this repository
+## Line files
 
-- Area plans (`tools/paint-plate.mjs --areaplan <file>`, validated by `tools/painter/semantic-areas.mjs`) describe a whole painting as named areas, as many as the subject needs (the count is an outcome, not a limit; a plan with no areas stops the run). Each area has ordered passes (move, value range (light to dark), brush, load, lights, dependencies). A pass that is not authored is laid as one wash: every cell of its area whose value (on the automatic value ladder) falls in its value range, with the gaps narrower than the pass's brush filled and the parts narrower than it opened away (closed, then opened, at the brush's radius, inside the area and off its reserved lights), so its outline is the brush's and not the ladder's pixels. A part narrower than the brush is left as paper on purpose with its own paint (never moved onto the rest of the pass), logged and listed under `narrowerThanBrush` in `semantic-coverage.json`; a smaller brush in a later pass can take it, as one shape holding all the paint the ladder puts there, mixed as one puddle (`compileAreaLayers` in `tools/painter/semantic-areas.mjs`). A lighter pass covers more of the area and a darker one less, as a painter lays a first wash and then darker shapes inside it. A pass whose whole value range lies above the ladder's darkest value stops the run with the ladder's range (it could never be laid). Two hooks let the area route's other parts reshape what a pass lays without editing the compiler: `forms(pass, gathered, {plan, mmPerCell, earlier})` may give a pass its own cells and paint (the area's earlier passes are passed in), and `split(pass, shape, {plan, palette})` may lay one pass as several washes inside its shape, holding exactly its paint; a hook that breaks either rule stops the run. The move is `wet on wet`, `wet on dry` or `dry brush`; each takes the brush contact the technique library gives it (`src/paint/methods/lay.mjs`). A `dry brush` pass is laid on dry paper with the low load the plan writes, and its paint does not bridge the tooth's hollows, so paper shows through: the plan chooses it where the subject shows broken texture against light. A wet on wet or wet on dry pass (not authored) can join a wet session, `"session": {"id": ..., "reason": ...}`: passes with the same id are laid back to back, with no drying between them or between their shapes, so neighbouring washes meet wet and merge; the session dries once after its last pass. A session has at least two passes and they are consecutive in the schedule (`order`). The plan decides every edge two areas share, `"edges": [{"areas": [id, id], "kind": "hard" | "soft" | "lost", "reason": ...}]`. A plan whose areas touch must name each pair of areas whose cells touch in the raster (a parent and a child included) once, and only those; the run stops and lists any boundary left out (in a cropped `view` a named pair may meet outside the crop). There is no default edge: a silent plan used to get a hard edge almost everywhere. One edge can change along its length (a shadow hard on the lit side, lost on the other): an entry may carry `"stretch": [[x, y], ...]` and then applies only to the part of the boundary inside that polygon; each pair keeps exactly one entry without a stretch for the rest. A shared wet session makes every entry of that pair lost. The rules behind the field are painting-rules 13 to 16 (Ruskin, Zbukvic, MacEvoy); softening here is the first of MacEvoy's four ways, a clean moist brush along the wet edge. Touching is read on the run's own grid, so two areas that come within a cell of each other at one width may touch at a coarser one: give areas that meet a shared boundary (the same vertices), and leave a clear gap where they do not. `hard`: wet on dry; before a pass of one area is laid, the sheet is dried if the other area is still wet. `soft`: right after each wet on wet or wet on dry pass of either area, while it is wet, a clean damp brush the size of the pass brush runs along the part of the pass's edge that lies on that boundary, so the wash creeps out and fades (`tools/painter/area-edges.mjs`). `lost`: the two areas must have passes in one wet session. A single pass (not authored) can also ask for `"soften": {"reason": ..., "polygon"?: [[x, y], ...]}`: right after the pass, the same damp brush runs along the edge of the pass's shapes, or only the part inside `polygon`. The damp brush holds a little free liquid (dip water 0.48, the value route's softening load); the code is in `src/paint/techniques/soften-lift.mjs` and `tools/painter/soften-lift-run.mjs`, A wet on wet or wet on dry pass (not authored) can lift a light from damp paint, `"lights": {"mode": "lift", "reason": ..., "polygon": [...]}`: the pass paints over the light, the painter waits for the shine to go off the light (the wait a charge into a wet bed takes, `tools/painter/wet-bed-wait.mjs`), then a thirsty clean brush the size of the pass brush (rinsed and squeezed before every stroke, `thirsty` in `src/media/brush.mjs`) lifts it in lanes one brush width apart. Lifted while still glossy, the wash flows back in and the light keeps its paint. Each run appends what it did, including the steps waited, to `semantic-soften-lift.jsonl`. Colour and value can change inside the wet wash (`tools/painter/area-washes.mjs`). `"wash": {"kind": "graded", "direction": [dx, dy], "strength": [start, end], "reason": ...}` lays the pass in lanes across `direction` (normalized target coordinates) and dips each load stronger or weaker along it, start to end; the mean over each shape is unchanged. `"wash": {"kind": "variegated", "direction": [dx, dy], "paint": {"rose": 1}, "reason": ...}` turns from the pass's own colour at the start to `paint` at the end, with the same amount of pigment; each load is dipped at the mix where it lies (both need the physical brush's loads, `--physical 1`; a shape laid in one load stays flat). `"charge": {"paint": {...}, "strength": s, "water": w, "reason": ..., "polygon"?: [...]}` drops a second colour into the pass right after it, while it is wet, in lanes one brush width apart (inside `polygon`, if given), at s times the pass's mean amount. `water` may not exceed the pass's own load water (a wetter brush makes a backrun), and a lane whose bed has dried past the wet stage is not charged and is counted (`tools/painter/area-charge-run.mjs`). Pigment names must be on the run's palette. All three are for wet on wet or wet on dry passes that are not authored. The paper is not a shape (`tools/painter/area-paper.mjs`). A pass can tone its area first, `"tone": {"paint": {"rawsienna": 1}, "amount": a, "reason": ...}`: one wash of that paint over the whole area (off reserved lights) at `a` (0 to 1) of pigment per cell in the value ladder's units, whatever the ladder holds there; it takes no ladder paint and has no `valueRange`. On the area that holds the whole sheet this tones the page before anything else. The plan can list the page's own blemishes, `"ignore": [{"polygon": [...], "reason": ...}]` (foxing, stains, a sheet border, ruled guide lines): the ladder's paint inside them is dropped and counted (`ignoredDemandCells` in `semantic-coverage.json`), never laid. Passes can carry brush paths supplied by the plan like the strokes above. A wet on dry or dry brush pass can instead name surface marks from the technique library, `"marks": {"kind": "short-coat" | "curly-coat" | "long-hair" | "masonry", "reason": ..., "cover": share of the area the marks visit, "placement": "edge" (within two brush widths of the shape's edge, a few marks at a mass's silhouette) or "whole", "flow": [[x, y], ...] (normalized, for the coats that follow a direction), "courseAngleDeg": ... (masonry)}`: the planner picks the kind from what the subject shows, and `src/paint/techniques/surface-marks.mjs` lays it with the pass's brush, every mark size a multiple of the brush width. No field has a default. `node tools/paint-plate.mjs --areahelp` prints the contract. Example: [examples/plans/mittens-area.json](../examples/plans/mittens-area.json), six areas for the Mittens target (`bench/v2/targets/mittens.png`) that use each field above.
-- Value plans (`--valueplan`) describe a subject with region families (groups of related image regions), style choices and reserved lights. Target colors determine the actual regions; family boxes supply descriptions. Example: [examples/plans/trumbull-values.json](../examples/plans/trumbull-values.json), run with `npm run example:architecture`.
-- Without a plan file, the automatic planner inside `tools/paint-plate.mjs` produces passes from the target image.
+A drawing file is a line file, `STEM-lines.json` or `STEM-lines.json.gz`, given to the painter as `--drawingfile STEM`. `tools/seg/trace-drawing.py` writes it from a clean line drawing and `tools/seg/order-strokes.mjs` orders it; [examples/drawings/](../examples/drawings/) holds one.
 
-## Value plan input
+| field | meaning |
+|---|---|
+| `inputKind` | `drawing` for a traced drawing |
+| `medium` | `ink` or `pencil` |
+| `image` | `{w, h}`: the pixel size the lines were traced on |
+| `targetSHA256` | the target the drawing belongs to; a file made for another image is refused |
+| `lines` | the strokes in drawing order, each with `points` (target pixels), `width`, `weight`, `role` and its place in the order (`seq`, `object`, `part`, `pass`) |
 
-`--valueplan FILE` reads a JSON object. It supplies descriptions and style choices to the value planner when `--order painter` is active and no area plan is present. It does not supply brush strokes or replace the target image. There is no version field. The consumers validate drawing choices, style choices and explicit reserves separately, and `src/paint/plan-keys.mjs` reports keys that nothing reads.
+The painter maps the image box onto the target (`src/paint/methods/drawing-registration.mjs`) and draws each line as it is.
 
-| Field | Type and meaning | Default if omitted |
-|---|---|---|
-| `subject` | string naming the subject; it selects no style and turns on no fitted rule. The style comes from `styleSelection` | none |
-| `name` | string for the preview title | preview fallback title |
-| `photo` | source photo label in the preview; only its basename is used, and no photo is read | `unknown` |
-| `sheet` | optional `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match `--sheetmm` when both are given; `seed` and `targetGuard` set defaults | command-line or painter defaults |
-| `families` | array of descriptive region families, described below | empty array |
-| `reserves` | array of explicit bare-paper highlights, described below | empty array |
-| `styleSelection` | object with `style`, `reason` and optional `regions` | no style profile |
-| `view` | optional metadata object; a truthy `wholeOf` enables per-cell family style selection unless `--cellfamilies` overrides it | region-level style selection |
-| `drawing` | drawing choices, [below](#value-plans-the-drawing-section) | no drawing flags added |
-| `washes` | wash colour, sessions and flow, [below](#the-washes-section) | family colour in passage sessions |
-| `order` | subject order, [below](#the-order-section) | whole-sheet bands |
+## The V6 draft plan
 
-Each family can have `id`, `bounds`, `referenceCue` and `baseMove`. `bounds` is `[x0, y0, x1, y1]` in normalized target coordinates. It helps describe target-derived color regions; it does not clip a wash to a box. `referenceCue` is a note about the target, and `baseMove` is the family's move. `wet in wet` (also `wet on wet`) lays a light family's pale foundation into a prepared moist bed. The code is `src/paint/techniques/passage-plan.mjs`; later layers and other moves such as `wet on dry` or `glaze` paint on dry paper. Missing cues and moves use generated descriptions and `wet on dry`. `drawingRole` says which lines the family gets, in the words an area plan uses: `none` (no line; the wash states it), `scaffold` (opening drawing only), `structural` (opening and closing) or `focal` (closing only). Each line is kept or left out whole by the role of the family under most of it; where families overlap, the smallest box decides. A family with no role changes nothing (`src/paint/methods/family-roles.mjs`). Family fields have no other schema validation. Use ordered bounds between 0 and 1 and distinct string ids.
-
-Each reserve needs a nonempty `reason` and four finite `bounds` values between 0 and 1, with `x0 < x1` and `y0 < y1`. Invalid reserves stop planning. They protect the bounded cells as bare-paper highlights.
-
-A style selection needs a `style` and nonempty `reason`. The supported styles are `ink-and-wash`, `precise-watercolor`, `urban-sketch` and `atmospheric-wet`. `regions` maps family ids to `{ "style": "...", "reason": "..." }` overrides; each override needs a reason. Unknown styles stop planning. Style selection is resolved only when `subject` is present. Without a subject mapping or explicit selection, the planner keeps its own settings. `--regionstyle family=style[,family=style]` overrides family styles and requires a plan with a style mapping.
-
-Code: `src/paint/methods/light-to-dark.mjs`, `target-regions.mjs`, `src/paint/styles/loader.mjs` and `tools/painter/value-plan-preview.mjs`. A key no consumer reads is reported, not ignored. The painter logs `UNUSED PLAN KEYS` and writes `unused-plan-keys.txt`. It exits 3 after writing its outputs, as it does for unused command-line options. `--allowunusedplan 1` keeps exit 0. `washes` and `order` are read only by the default recipe. `rationale`, `drawingNote`, `run` and a subject's `reason` are notes for people and are not reported. `src/paint/plan-keys.mjs` lists every key the painter reads.
-
-## Value plans: the drawing section
-
-Line models (`tools/seg/lines.py`) only extract candidate lines. They are optional; `tools/seg/ink-lines.mjs` makes a line file from the painter's own ink separator. A value plan (`--valueplan`) chooses whether to draw, in what medium, how much and which lines, in an optional `drawing` object:
+`bench/v6/TASK.md` drafts a whole-painting plan for a planning model. It is not yet run. A plan is a folder with `plan.json`, an optional drawing line file and the studies:
 
 ```json
-"drawing": { "medium": "ink", "inkColor": "sepia", "amount": 1, "lines": "all", "weight": 1, "closingLines": 1 }
+{
+  "subject": "camel",
+  "sheet": { "widthMm": 280, "seed": 0 },
+  "drawing": { "medium": "ink", "file": "drawing-lines.json" },
+  "washes": {
+    "layers": [ { "study": "studies/s1.png", "leastMm2": 150 }, { "study": "studies/s2.png", "leastMm2": 120, "glaze": true } ],
+    "paints": ["ochre", "ultramarine", "sienna"]
+  }
+}
 ```
 
-| field | values | painter flags |
+| field | meaning | painter option |
 |---|---|---|
-| `medium` | `none`, `graphite`, `ink`, `auto` | `none` sets `--drawing none` and the other fields are ignored; `graphite` and `ink` set `--outlinemedium` |
-| `reason` | a sentence | why this medium for this target; logged as `the plan's medium: ...`. The subject's medium can still override it (`--subjectmedium`) |
-| `inkColor` | `sepia`, `black` | `--inkprofile sepia-ink` or `black-ink` |
-| `amount` | 0 to 1 | the share of candidate lines drawn, strongest first (`--drawshare`). A line's strength is the model's mean response along it times its length. The opening and closing count caps become 100000 (`--openinglines` and `--closinglines`). Minimum lengths and other drawing filters still apply |
-| `lines` | `all`, `contours`, `subject`, `regions` | which candidates from a `--drawingfile`: `contours` leaves out dark fill (`--drawingskip "dark fill"`), `subject` leaves out setting lines (`--drawingskip setting`). `regions` ranks the lines by the region each lies in (`--drawregions 1`): head, face, hands and book first, then clothing, then the setting (chair, background and unknown regions), and lines in a dark wash last; strongest first inside a tier. It needs a line file whose lines carry a `region`, such as `tools/seg/ink-lines.mjs --regions` writes |
-| `maxLines` | whole number | the most candidate lines drawn, taken in the order above (`--drawmax`); without `regions`, the strongest. Lifts the opening and closing count caps like `amount` |
-| `weight` | 0 to 1 | how heavy the line is. 0 selects the light end of the explicit range; 1 is the heaviest. Omit the field to use the medium's default. It scales `--inkkscale` 1 to 8, `--drawwidthgain` 1.39 to 2, `--drawwant` 0.6 to 1 and `--closingpressure` 0.4 to 1 |
-| `closingLines` | 0 to 1 | how much the closing pen draws. 0 sets `--drawing first`, with no closing pen. Above 0 it sets `--closingedgemin` to 0.44 x (1 - closingLines), so 0.5 sets 0.22 and 1 removes that extra edge gate |
-| `linework` | `auto`, `off` | `auto` runs the universal linework stage (`--linework auto`, docs/linework.md): it picks the source, cleans the lines and gates whether to draw, the medium and how much. It replaces `source` and a `--drawingfile`. `medium` still fixes the medium |
-| `source` | `none`, `auto`, `source-ink`, `photo-sketch`, `line-map` | where the line set comes from (`--linesource`). `source-ink` copies the target's own pen lines. `photo-sketch` runs `tools/seg/sketch-lines.py` on a photograph. `structure-lines` fits perspective lines; `structure-combine` adds detail to them. `line-map` reads a prepared model line map from `drawing.map`, simplified by `drawing.mapSmoothing` planning cells. `auto` picks `source-ink` when the target shows 0.5% pen line or more, else `photo-sketch` when numpy and OpenCV are available, else the pen's own walk. `none` is the bounded walker. An explicit choice fails when its Python tools are missing, except `source-ink`, which falls back to the narrow-ridge tracer. A `--drawingfile` on the command line wins |
-| `ink` | `{ "color": "sepia" or "black", "waterproof": true or false }` | the ink (`--inkprofile`) and whether it sets before the washes (`--inkfast`). `waterproof` defaults to true for black and false for sepia |
-| `stages` | `{ "prep", "prepInk", "finishInk" }` | the linked drawing stages, any subset; see below. Not with `closingLines`, and not with `medium: "graphite"` (use `prep`) |
+| `sheet.widthMm`, `sheet.seed` | sheet width in mm, and the seed | `--sheetmm`, `--seed` |
+| `drawing.medium` | `ink`, `pencil` or `none` | `--inkrecipe wash`, `--outlinemedium graphite` or `--drawing none` |
+| `drawing.file` | the traced, ordered line file | `--drawingfile` |
+| `washes.layers` | studies coarse to fine; `leastMm2` is the least shape a layer lays, `glaze` makes it a glaze | `--washplan STUDY:MIN[:glaze],...` |
+| `washes.paints` | box keys from `src/crop/box.mjs` | `--paints` |
 
-### Stages
+The painter does not read this file yet. `bench/v6/plan-args.mjs` turns it into painter options. The model chooses the medium, the ink level it asks the drawing model for, the studies for each layer with their least size and glaze, the paints, and when to stop.
 
-```json
-"drawing": { "source": "auto", "ink": { "color": "sepia" },
-  "stages": { "prep": { "amount": 0.5 },
-              "prepInk": { "from": "prep", "keep": 0.8, "add": 0.15, "method": "contour" },
-              "finishInk": { "from": "prepInk", "select": "both", "restate": 0.3, "method": "accent" } } }
-```
+## Value plan file
 
-Without `stages`, the ordinary bounded drawing runs. A stage left out is not drawn; `true` takes its defaults. Prep uses amount 0.5. Prep ink straight from lines keeps amount 1 without deviation. Over pencil it keeps 0.8 and adds 0.15, with small bounded deviation. Finish restates 0.3. Zero shares produce zero marks. `from` defaults to the stage before it that is present.
+`--valueplan FILE` reads a JSON object. It does not supply washes; the washes come from the studies. `src/paint/plan-keys.mjs` lists every key the painter reads, and a key nothing reads makes the run log `UNUSED PLAN KEYS`, write `unused-plan-keys.txt` and exit 3 after its outputs (`--allowunusedplan 1` keeps exit 0).
 
-| stage | field | values | meaning |
-|---|---|---|---|
-| `prep` | `amount` | 0 to 1 | the share of the line set's length the pencil places, structure first |
-| `prepInk` | `from` | `prep`, `lines` | ink over the pencil, or straight from the line set |
-| | `keep`, `add` | 0 to 1 | the share of pencil lines inked (the rest stay pencil), and how many more lines to add, as a share of those kept |
-| | `amount` | 0 to 1 | with `from: "lines"`, the share of the line set's length inked |
-| | `method` | `contour`, `scribble` | as planned; fewer longer strokes with the lit edges open and the dark masses scribbled (`--drawinglogic 3`) |
-| | `deviate` | 0 to 1 | bounded variation; default 0 directly from lines, 0.25 over pencil |
-| `finishInk` | `from` | `prepInk`, `prep`, `lines` | which earlier lines it restates |
-| | `select` | `edges`, `darks`, `both` | where it restates: the target's strongest edges, its darks, or both |
-| | `restate` | 0 to 1 | the share of those lines restated |
-| | `method` | `accent`, `architecture` | each chosen line restated whole, or whole lines at full pressure with widths from the target's darkness, and strong sepia |
-| | `masses` | `none`, `scribble` | `scribble` adds loose scribble over the dark masses (`--finishmasses 1`); default none |
+| field | meaning |
+|---|---|
+| `sheet` | `{ widthMm, seed, targetGuard }`; `widthMm` sets `--sheetmm` and must match it when both are given |
+| `drawing` | the drawing choices below |
+| `washes` | `paints` (box keys), `sessions` (`dry`, `passage`, `connected`), `inkAware`, `soften` and `physics` (`holeRimMm`, `marangoni`, `slope`) |
+| `order` | `subjects` (`{id, bounds}` or `{id, families}`) and `strength` 0 to 1 |
+| `families` | `{id, bounds, drawingRole}`: regions for `order.subjects`; `drawingRole` (`none`, `scaffold`, `structural`, `focal`) keeps or leaves out each line whole |
 
-The finish runs after every wash passage and the final dry gate, so it follows each subject's last wash. Graphite then finish ink is `prep` plus `finishInk: {"from": "prep"}` with no `prepInk`. `--drawing first|last|none` overrides stage timing. [ink.md](ink.md#linework-stages) says which stage and method fits which job. Code: `src/paint/methods/drawing-stages.mjs` and `linework-plan.mjs`.
+`rationale`, `drawingNote`, `run` and a subject's `reason` are notes for people.
 
-A field left out, or set to `auto`, adds no flag. The painter's own default applies: the drawing is graphite, with sparse construction-sketch limits. Ink needs `medium: "ink"`, `--outlinemedium ink` or an ink stage; source ink keeps the source line budget and short marks. Without `stages` or a `--drawingfile`, the [automatic stage choice](ink.md#automatic-drawing-stages) runs. It adds ink stages only when ink is asked for. A plan with no `drawing` section uses these defaults. A recipe is a preset of painter settings. The plan's flags go after the recipe's and before the command line's, so a flag on the command line still wins. Code: `src/paint/drawing-plan.mjs`.
-
-For a pen-and-wash target, `tools/seg/ink-lines.mjs` takes the candidates from the target's own pen lines. The separator in `src/crop/inkwash.mjs` estimates the ink, which is traced to center lines and joined where pieces continue. With `--regions` it tags each line with its region, from the label map that `tools/seg/subject-regions.py` writes (Mask R-CNN for the person, Segment Anything for named parts). A plan uses them with `lines: "regions"` and `maxLines`.
-
-[examples/plans/trumbull-values.json](../examples/plans/trumbull-values.json) asks for every candidate line in heavy sepia ink, opening and closing.
-
-For the stroke gate, annotate intended broad wash interiors with `broadAreas` polygons and optional `detailPolygons`; see [stroke statistics](stroke-stats.md). Count share is diagnostic. Only area and visible contribution from tiny paint inside these planned interiors can trigger the gate.
-
-Frozen replay: `--notargetlooks 1` paints every passage with the charge frozen at planning. It skips every optional shape-average reference look during painting (charge correction, kept-colour recharge, touch-ups, final darks, sky lane selection and texture darkness). With `--feedback 0 --touchpoints 0 --finaldarks 0` it paints with no target look at all. Check `target-guard.json` for zero looks, zero element reads and zero violations. Use the same flags on both arms of a comparison. The default, 0, looks only at the step-backs planned before painting (touch-ups after the washes, final darks); every passage keeps its frozen charge in both modes.
-
-## The washes section
+### Value plans: the drawing section
 
 ```json
-"washes": { "colour": "family", "sessions": "connected", "inkAware": false, "charge": 0.5, "carryMm": 0,
-            "paleLimit": 0.16, "physics": { "holeRimMm": 0, "marangoni": 0, "slope": 0 } }
+"drawing": { "medium": "ink", "ink": { "color": "sepia" }, "stages": { "prepInk": { "from": "lines" }, "finishInk": { "from": "prepInk", "restate": 0.3 } } }
 ```
 
 | field | values | meaning |
 |---|---|---|
-| `colour` | `family` (default), `layered` | `family` keeps saturated and muted colour families in separate mixes and carries demand across layers. `layered` mixes by layer, which can suit connected dark foliage |
-| `sessions` | `dry`, `passage` (default), `connected` | `connected` lets pigments mingle in one wet session with one drying edge. Sessions join only within one subject, region, phase and glaze step, so shadows and later glazes dry apart |
-| `inkAware` | true or false | removes planned narrow lines from the wash target before value planning. Default true for `source-ink` and `line-map`, which need a prepared drawing. Keep it false for rough construction drawings |
-| `charge` | 0 to 1, default 0.5 | each passage is charged at this quantile of its demand; what a cell still needs carries into the next band. A delivery calibration: benchmark plans may not set it (the harness refuses it) |
-| `carryMm` | 0 to 10 mm, default 2 | in `family` mode, the carried mask is averaged over this brush-sized area. Prefer 0 in new plans: 2 mm dilutes saturated colour and paints over lit areas |
-| `paleLimit` | 0 to 1, default 0.16 | pale planes up to this value get one clean first wash that no later layer crosses |
-| `paints` | pan keys, such as `["sienna","hansa","paynes"]` | the box's pans, instead of letting the palette fit choose them. Under `--paintguard`, a box that fits the target clearly worse than the painter's own pick is extended or replaced, and `run-card.json` records it |
-| `skyOneLayer` | true or false | lays the sky in one clean wash (`--skyonelayer 1`) instead of splitting it across layers |
-| `lanes` | true or false | plans explicit brush lanes and chooses the largest fitting brush per passage (`--strokeplan 1 --laneadapt 1`) |
-| `soften` | true, false or `{enabled, maxArcMm}` | wet softening of the boundaries the planner classes soft: a damp round, the largest of the kit that fits the shape and the passage's own brush (and is no wider than `maxArcMm`), runs along them while the wash is wet; `false` turns it off (`--softsplit`, `--softmm`) |
-| `edgeFadeMm`, `edgeWobbleMm` | millimetres | fades (`--edgefade`) or wobbles (`--edgewobble`) wash edges at physical scale |
-| `smallMarks`, `joinSmall` | true or false | lays small darks once last (`--smallmarks`) and joins sub-minimum pieces into neighbouring washes (`--washjoin`) |
-| `furReserves` | `{bounds, reach, drop, dark, maxDensity, minCells}` | keeps sheen and glints open inside a dark coat before the washes |
-| `physics` | `holeRimMm` 0 to 3, `marangoni` 0 to 1, `slope` -1 to 1 | material choices for hole rims, surface-tension flow and downhill flow. `--physics key=value` overrides one coefficient and keeps the others |
+| `medium` | `none`, `graphite`, `ink`, `auto` | `none` sets `--drawing none`; the others set `--outlinemedium` |
+| `reason` | a sentence | why this medium, logged |
+| `ink` | `{ "color": "sepia" or "black", "waterproof": true or false }` | the ink and whether it sets before the washes; waterproof defaults to true for black |
+| `amount`, `maxLines` | 0 to 1; a whole number | the share or count of the file's lines drawn, strongest first |
+| `lines` | `all`, `contours`, `subject`, `regions` | which lines of the file: `contours` leaves out dark fill, `subject` leaves out the setting, `regions` orders by the region a line lies in |
+| `weight` | 0 to 1 | how heavy the line is |
+| `closingLines` | 0 to 1 | how much the closing pen draws; 0 means none |
+| `stages` | `prep`, `prepInk`, `finishInk` | the linked stages, cut from the drawing file |
 
-## The order section
+Stage fields: `prep.amount`, `prep.weight`, `prep.fade`, `prep.frames`; `prepInk.from` (`prep` or `lines`), `keep`, `add`, `amount`, `deviate`, `method` (`contour` or `scribble`); `finishInk.from`, `select` (`edges`, `darks`, `both`), `restate`, `deviate`, `method` (`accent` or `architecture`), `masses` (`none` or `scribble`). The finish runs after every wash. Code: `src/paint/drawing-plan.mjs`, `src/paint/methods/drawing-stages.mjs`.
 
-```json
-"order": { "strength": 0.5, "subjects": [{ "id": "sky", "bounds": [[0, 0, 1, 0.3]] }, { "id": "rest" }] }
-```
+[examples/plans/white-ships.json](../examples/plans/white-ships.json) is a value plan.
 
-`subjects` is a list of `{id, families: [family ids]}` or `{id, bounds: [[x0, y0, x1, y1]]}`, with an optional `{"id": "rest"}`. `strength` from 0 to 1 holds later subjects back while each stays light to dark. It defaults to 0.5 with subjects. Without `order`, every band goes across the whole sheet. A top-level `subjectOrder` list is read the same way when `order.subjects` is absent. [How it paints](how-it-paints.md) describes the subject-order outputs.
-
-The painter compiles every target-derived path and mask before the strict target guard seals the target. It records the resolved plan and any command-line overrides in `pipeline-plan.json`.
+The painter records the resolved plan and any command-line overrides in `pipeline-plan.json`.
