@@ -26,9 +26,9 @@ const paperOptions = mm => ({ seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, t
 
 // each kind's size 1 (length and width in mm: what the real marks of FINDINGS.md measure), and the sizes and loads shown
 const BASE = {
-  sweep: [60, 12], taper: [24, 4], reverse: [18, 4], leaf: [12, 4.5], comma: [10, 4], teardrop: [9, 4], dot: [2.5, 2.5], touch: [6, 2.5],
+  sweep: [40, 8], taper: [24, 4], reverse: [20, 3.5], leaf: [16, 3], comma: [12, 3.2], teardrop: [14, 3], dot: [2.5, 2.5], touch: [8, 2.2],
   line: [40, 0.4], edge: [30, 0.6], wedge: [5, 8], swell: [40, 4], ribbon: [30, 8], contour: [30, 4], hook: [20, 3.5], bar: [24, 4],
-  hatch: [10, 2.5], scumble: [14, 5], drag: [40, 10], 'flying-white': [40, 5], grass: [20, 2.5], 'leaf-stem': [20, 4], branch: [36, 4], 's-stroke': [24, 4], ring: [30, 4], 'leaf-group': [16, 3.5],
+  hatch: [10, 2.5], scumble: [14, 5], drag: [30, 8], 'flying-white': [40, 5], grass: [20, 2.5], 'leaf-stem': [20, 4], branch: [36, 4], 's-stroke': [16, 4.5], ring: [30, 4], 'leaf-group': [16, 3.5],
 };
 const SIZES = [0.5, 1, 2], LOADS = [1, 0.55];
 
@@ -49,10 +49,10 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const kind of KINDS) {
   const t0 = Date.now(), [L, W] = BASE[kind], variants = [];
   // each size on its own sheet, the two loads one above the other; the cell --mm, coarser for a large mark so its
-  // sheet stays near 3 million cells (0.05 mm steps)
+  // sheet stays under 2 million cells and a wide brush is no more than 50 cells across (0.05 mm steps)
   for (const s of SIZES) {
     const span = Math.max(L, W) * s * 1.25 + 5, cw = span, ch = 2 * span;
-    const MM = Math.max(MM0, Math.ceil(Math.sqrt(cw * ch / 3e6) / 0.05) * 0.05);
+    const MM = Math.max(MM0, Math.ceil(Math.max(Math.sqrt(cw * ch / 2e6), W * s / 50) / 0.05) * 0.05);
     const w = Math.round(cw / MM), h = Math.round(ch / MM), paper = makePaper(w, h, paperOptions(MM)), sheet = createSheet(paper, pigments);
     if (BACKEND === 'gpu') { const g = attachGpu(sheet, O, { mode: 'on', log: () => {} }); if (g.backend !== 'gpu') throw new Error('marks-sheet: no GPU'); }
     const file = `${kind}-${s}.png`;

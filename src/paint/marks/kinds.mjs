@@ -22,13 +22,22 @@ const EDGE = 0.24;
 const sideOf = o => (o.bend ? Math.sign(o.bend) : hash(o.seed ?? 0, 99) < 0.5 ? -1 : 1);
 const bendOf = (o, own) => (o.bend ? Math.abs(o.bend) : own);
 const loadOf = o => (o.load ?? 1);
-/** The common work: moves to a path of `length`, turned to `angle` and placed, then driven by the hand. */
+/** The common work: moves to a path of `length`, turned to `angle` and placed, then driven by the hand. With `hide` (a
+ *  share of the length) the tip is hidden as calligraphers hide it: the brush lands moving back against the stroke for
+ *  that share, then turns and comes forward over its own landing, so the belly is already down where the stroke begins
+ *  and its head is round and blunt (a brush that lands moving forward opens from its point). */
 function one(o, name, moves, width, opts, step) {
-  const L = o.length, path = place(movesPath(moves, L, Math.max(0.1, Math.min(0.5, L / 60)), o.seed ?? 0), o.x, o.y, o.angle ?? 0, o.place !== 'start');
-  return hand(name, path, width, { seed: o.seed ?? 0, step, ...(o.load != null && opts.water == null ? { water: o.load } : {}), ...opts });
+  let { hide = o.hide ?? 0, ...rest } = opts;
+  if (hide > 0) {
+    const h = Math.min(0.2, hide), h2 = 2 * h / (1 + 2 * h), map = ks => ks.map(([u, v]) => [h2 + u * (1 - h2), v]);
+    moves = [{ len: h, turn: 0, fixed: true }, { len: 0.0005, turn: Math.PI, fixed: true }, { len: h, turn: 0, fixed: true }, ...moves];
+    rest = { ...rest, pressure: [[0, 0.5 * rest.pressure[0][1] + 0.3], ...map(rest.pressure)], speed: [[0, 6], ...map(rest.speed)] };
+  }
+  const L = o.length * (1 + 2 * Math.min(0.2, hide)), path = place(movesPath(moves, L, Math.max(0.1, Math.min(0.5, L / 60)), o.seed ?? 0), o.x, o.y, (o.angle ?? 0) + (hide > 0 ? Math.PI : 0), o.place !== 'start');
+  return hand(name, path, width, { seed: o.seed ?? 0, step, ...(o.load != null && rest.water == null ? { water: o.load } : {}), ...rest });
 }
 
-export const KINDS = {
+const KINDS = {
   sweep: {
     label: 'wash sweep: a loaded flat held square, even pressure, slow, carrying a bead along its lower edge',
     make: o => [one(o, 'sweep', [{ len: 1, turn: 0.06 * sideOf(o) * bendOf(o, 1) }], o.width,
@@ -42,22 +51,22 @@ export const KINDS = {
   reverse: {
     label: 'belly-first stroke (bamboo leaf): pressed down where it lands, drawn out and lifted to a fine point',
     make: o => { const s = sideOf(o), b = bendOf(o, 0.3); return [one(o, 'reverse', [{ len: 0.15, turn: s * 0.05 }, { len: 0.85, turn: s * b }], o.width,
-      { pressure: [[0, 0.65], [0.07, 1], [0.4, 0.85], [0.75, 0.35], [1, 0.02]], speed: [[0, 12], [0.12, 45], [0.6, 100], [1, 180]] })]; },
+      { pressure: [[0, 0.8], [0.05, 1], [0.3, 0.75], [0.65, 0.3], [1, 0.02]], speed: [[0, 12], [0.12, 45], [0.6, 100], [1, 180]] })]; },
   },
   leaf: {
     label: 'leaf or petal: lands on the point, presses to the belly through the middle, lifts back to the point',
     make: o => { const s = sideOf(o), b = bendOf(o, 0.45); return [one(o, 'leaf', [{ len: 0.5, turn: s * b * 0.6 }, { len: 0.5, turn: s * b }], o.width,
-      { pressure: [[0, 0.04], [0.42, 1], [0.58, 0.95], [1, 0.02]], speed: [[0, 35], [0.45, 40], [1, 90]] })]; },
+      { pressure: [[0, 0.04], [0.3, 1], [0.45, 0.95], [1, 0.02]], speed: [[0, 35], [0.35, 40], [1, 90]] })]; },
   },
   comma: {
     label: 'comma: pressed round head, then the tail pulled off round a curve, thinning as it speeds up',
     make: o => { const s = sideOf(o), b = bendOf(o, 1.3); return [one(o, 'comma', [{ len: 0.22, turn: s * 0.35 }, { len: 0.78, turn: s * b }], o.width,
-      { pressure: [[0, 0.35], [0.08, 1], [0.25, 0.95], [0.55, 0.45], [1, 0.02]], speed: [[0, 8], [0.18, 25], [1, 160]] })]; },
+      { pressure: [[0, 0.9], [0.08, 1], [0.2, 0.9], [0.5, 0.4], [1, 0.02]], speed: [[0, 8], [0.18, 25], [1, 160]] })]; },
   },
   teardrop: {
     label: 'teardrop: the belly pressed and held a moment, then pulled straight back to a point',
     make: o => [one(o, 'teardrop', [{ len: 1, turn: 0.08 * sideOf(o) * bendOf(o, 1) }], o.width,
-      { pressure: [[0, 0.45], [0.1, 1], [0.3, 0.85], [1, 0.02]], speed: [[0, 6], [0.2, 35], [1, 130]] })],
+      { pressure: [[0, 0.9], [0.08, 1], [0.25, 0.8], [1, 0.02]], speed: [[0, 6], [0.2, 35], [1, 130]] })],
   },
   dot: {
     label: 'dot: the point set down and pressed while the hand turns a little, then lifted (a press without moving does not open the tuft)',
@@ -67,7 +76,7 @@ export const KINDS = {
   touch: {
     label: 'touch: a short stroke laid on the belly, a little drag, lifted blunt (Homer\'s and Sargent\'s leaf and twig touches)',
     make: o => { const s = sideOf(o); return [one(o, 'touch', [{ len: 1, turn: s * bendOf(o, 0.25) }], o.width,
-      { pressure: [[0, 0.5], [0.15, 1], [0.7, 0.85], [1, 0.3]], speed: [[0, 8], [0.2, 30], [1, 60]] })]; },
+      { pressure: [[0, 0.9], [0.15, 1], [0.7, 0.85], [1, 0.35]], speed: [[0, 8], [0.2, 30], [0.85, 40], [1, 15]] })]; },
   },
   line: {
     label: 'long fine line with the point: the brush upright and light, the pressure breathing a little, drawn steadily (slow enough for the point to lay its paint)',
@@ -108,12 +117,9 @@ export const KINDS = {
       { pressure: [[0, 0.5], [0.06, 0.85], [0.45, 0.6], [0.72, 0.75], [0.79, 1], [0.84, 0.7], [1, 0.02]], speed: [[0, 15], [0.1, 70], [0.7, 55], [0.79, 8], [0.85, 40], [1, 200]] })]; },
   },
   bar: {
-    label: 'bar (bamboo stalk, the horizontal of Yong, a roof line): the tip hidden by a small reverse at the landing, pressed at both ends, lighter between',
-    make: o => {
-      const back = Math.min(0.08, 0.5 * o.width / o.length);
-      return [one(o, 'bar', [{ len: back, turn: 0 }, { len: 0.001, turn: Math.PI }, { len: back + 0.02, turn: 0 }, { len: 0.86, turn: 0.04 * sideOf(o) * bendOf(o, 1) }, { len: 0.03, turn: 0.6 * sideOf(o) }], o.width,
-        { pressure: [[0, 0.5], [0.1, 1], [0.2, 0.7], [0.8, 0.7], [0.92, 1], [1, 0.35]], speed: [[0, 10], [0.12, 15], [0.22, 70], [0.82, 70], [0.92, 10], [1, 15]] })];
-    },
+    label: 'bar (bamboo stalk, the horizontal of Yong, a roof line): pressed into a head where it lands, lighter along, pressed and turned down at the end',
+    make: o => [one(o, 'bar', [{ len: 0.96, turn: 0.04 * sideOf(o) * bendOf(o, 1) }, { len: 0.04, turn: 0.6 * sideOf(o) }], o.width,
+      { pressure: [[0, 0.55], [0.07, 1], [0.18, 0.7], [0.82, 0.7], [0.93, 1], [1, 0.35]], speed: [[0, 6], [0.1, 15], [0.18, 70], [0.82, 70], [0.93, 10], [1, 15]] })],
   },
   hatch: {
     label: 'hatch touches: a few short strokes side by side in one direction, each landed with a press and lifted quick',
