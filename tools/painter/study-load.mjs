@@ -17,7 +17,8 @@ export async function loadStudy(file, w, h) {
 }
 
 /**
- * The --washplan stack: "FILE[:MIN],FILE[:MIN],..." coarse to fine (MIN: the least shape in mm2 a layer lays), or with
+ * The --washplan stack: "FILE[:MIN[:glaze]],..." coarse to fine (MIN: the least shape in mm2 a layer lays; glaze: the layer
+ * is a few connected dark-and-cool glazes, not every shape the study adds), or with
  * "flat:" before it the same laid as plain flat fills (for comparison). Each study is registered to the sheet here and
  * to the first study in the plan. {studies: [{rgb, file, registered, minMm2}], flat}
  */
@@ -26,8 +27,8 @@ export async function loadStudies(spec, root, w, h) {
   if (!list.length) throw Error('--washplan: no study named');
   const studies = [];
   for (const item of list) {
-    const m = /^(.*?)(?::(\d+(?:\.\d+)?))?$/.exec(item), st = await loadStudy(path.resolve(root, m[1]), w, h);
-    studies.push({ ...st, minMm2: m[2] != null ? Number(m[2]) : null });
+    const m = /^(.*?)(?::(\d+(?:\.\d+)?))?(?::(glaze))?$/.exec(item), st = await loadStudy(path.resolve(root, m[1]), w, h);
+    studies.push({ ...st, minMm2: m[2] != null ? Number(m[2]) : null, mode: m[3] ?? 'add' });
   }
   return { studies, flat };
 }

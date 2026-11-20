@@ -205,12 +205,15 @@ const ADD_DARKER = 6, ADD_CHROMA = 8;
 const ACCENT_DARKER = 14, ACCENT_MOST = 24;
 /** Glazes of one layer that do not touch are laid in one session (the sheet dried after it), at most this many. */
 const SESSION_MOST = 10;
+/** A glaze layer (FILE:MIN:glaze): a cell joins a glaze when the study is a little darker and this much cooler (b*) than what is laid; parts within this (mm) are one; at most this many glazes. */
+const GLAZE_COOLER = 6, GLAZE_JOIN_MM = 4, GLAZE_MOST = 6;
 /** The block-in (the first layer) has at most this many shapes. */
 const FIRST_MOST = 16;
 
 // `inkValue`: the subject's value map the pen's line choice reads, as with the other plan (the drawing is the painter's
 // own as before); the washes never read it.
-// `studies`: the stack, coarse to fine: [{rgb (w x h x 3), file, minMm2}]. `flat`: every shape one flat fill of its own,
+// `studies`: the stack, coarse to fine: [{rgb (w x h x 3), file, minMm2, mode}] (mode 'glaze': a few connected glazes
+// from that study instead of every shape it adds). `flat`: every shape one flat fill of its own,
 // butted, no nesting, charging, load, soft edges or dabs (for comparison only).
 export function planStudyWashes({ k, w, h, studies, flat = false, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
@@ -390,12 +393,36 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   perLayer.push({ study: L1.file ?? null, minMm2: L1.minMm2 ?? null, shapes: shapes.length, washes: instructions.filter(q => q.stage !== 2).length, strokes: strokeCount, shift: shifts[0] });
 
   // what the plan has laid so far, as the study it follows reads: each cell the colour of the shape laid there last
-  const refL = new Float32Array(pn), refC = new Float32Array(pn);
-  for (let q = 0; q < pn; q++) { const s = shapes[label[q]]; refL[q] = s.paper ? 100 : s.lab[0]; refC[q] = s.paper ? 0 : s.chroma; }
+  const refL = new Float32Array(pn), refC = new Float32Array(pn), refB = new Float32Array(pn);
+  for (let q = 0; q < pn; q++) { const s = shapes[label[q]]; refL[q] = s.paper ? 100 : s.lab[0]; refC[q] = s.paper ? 0 : s.chroma; refB[q] = s.paper ? 0 : s.lab[2]; }
 
   // --- later layers: what each richer study adds over the one before ---
   for (let li = 1; li < studies.length; li++) {
     const st = studies[li], minMm2 = st.minMm2 ?? 25, accent = li >= 2, before = { washes: instructions.filter(q => q.stage !== 2).length, strokes: strokeCount };
+    if (st.mode === 'glaze') {
+      // one glaze per connected dark-and-cool region of the richer study: where it is darker than what is laid, or a
+      // little darker and cooler; parts within GLAZE_JOIN_MM joined, smaller than the least size dropped, the largest
+      // GLAZE_MOST kept, each one mix (the study's median colour over it), its outline smoothed; the rest of the study ignored
+      const g = grids[li], m = new Uint8Array(pn);
+      for (let q = 0; q < pn; q++) { if (paperMask[q]) continue; const [l, , b] = labOf(g, q, paperCol), dl = refL[q] - l; if (dl >= ADD_DARKER || (dl >= 2 && refB[q] - b >= GLAZE_COOLER)) m[q] = 1; }
+      const joined = roundMask(m, pw, ph, rC(GLAZE_JOIN_MM / 2)); for (let q = 0; q < pn; q++) if (paperMask[q]) joined[q] = 0;
+      const pc = components(joined, pw, ph, 4), parts = [];
+      for (let id = 1; id <= pc.count; id++) { const cells = []; for (let q = 0; q < pn; q++) if (pc.labels[q] === id) cells.push(q); if (cells.length * cellMm2 >= minMm2) parts.push(cells); }
+      parts.sort((a, b) => b.length - a.length); parts.length = Math.min(parts.length, GLAZE_MOST);
+      const sess = [];
+      parts.forEach((cells, j) => {
+        const pm = new Uint8Array(pn); for (const q of cells) pm[q] = 1;
+        const loops = maskLoops(pm, 2 * ROUND_MM, paperMask); if (!loops.length) return;
+        // its colour: the study's median over the cells that are darker or cooler (not over the gaps the joining closed)
+        const dark = cells.filter(q => m[q]), colour = [0, 1, 2].map(c => { const v = dark.map(q => g[q * 3 + c]).sort((a, b) => a - b); return v[v.length >> 1]; }), lab = labOf(colour, 0, paperCol);
+        const sh = wash(3, `glaze ${j + 1}: a connected dark-and-cool region of ${st.file ?? `study ${li + 1}`}`, loops, colour, { own: dark, studyLayer: li + 1 });
+        if (!sh) return; sess.push(sh);
+        for (const q of cells) { refL[q] = Math.min(refL[q], lab[0]); refB[q] = Math.min(refB[q], lab[2]); }
+      });
+      if (sess.length) layer(3, sess);
+      perLayer.push({ study: st.file ?? null, minMm2, mode: 'glaze', shapes: parts.length, washes: instructions.filter(q => q.stage !== 2).length - before.washes, strokes: strokeCount - before.strokes, shift: shifts[li], accent: false });
+      continue;
+    }
     const roundMm = Math.min(ROUND_MM, Math.sqrt(minMm2) / 2);
     const got = studyShapes(grids[li], pw, ph, paperCol, { sliverCells: Math.max(4, minMm2 / cellMm2) });
     const adds = [];
@@ -436,7 +463,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const summary = { source: 'study', flat, files: studies.map(st => st.file ?? null), layersOfStudy: perLayer, clusters, shapes: shapes.length, paperShapes: shapes.filter(s => s.paper).length, nested, softJoins, dabbed, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes, charges, planCellMm: mmX, reservedShare,
     paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
-  perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
+  perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
   console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${dabbed} in dabs, ${charges} charges; ${strokeCount} strokes`);
   return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
     geometry: 'Washes from a stack of block-in studies, coarse to fine: the block-in\'s flat shapes, each one mix, lightest and largest first, a darker shape of like hue laid over its lighter one (wash within wash), close values laid against each other damp, broken masses in dabs, the darkest small shapes last; each richer study adds only where it is darker or stronger than what is laid. Whites left as paper.' };
