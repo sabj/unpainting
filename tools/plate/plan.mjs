@@ -10,20 +10,17 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
-import {renderLayers} from '../../src/media/km.mjs';
 import {pickPalette, paletteOptions} from '../../src/crop/palettepick.mjs';
 import {widePalette} from '../../src/crop/palettewide.mjs';
 import {paintGuardOptions} from '../../src/crop/paint-guard.mjs';
-import {channelDensity, unmix} from '../../src/crop/pigments.mjs';
+import {channelDensity} from '../../src/crop/pigments.mjs';
 import {measureLine} from '../../src/paint/methods/pencil-line.mjs';
-import {heldWhites} from '../../src/paint/methods/paper-colour.mjs';
 import {components, minFilter, maxFilter} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {setClip as physicalSetClip, stableClipMask} from '../../src/media/sheet.mjs';
-import {styleTarget, massesOf} from '../../src/crop/styletarget.mjs';
+import {styleTarget} from '../../src/crop/styletarget.mjs';
 import {separate} from '../../src/crop/inkwash.mjs';
 import {finishField} from '../../src/crop/finish.mjs';
-import {labPlanes} from '../../src/eval/colour.mjs';
 import {smallLights, paperDensity, cellShare, keepLargestLights} from '../../src/crop/lights.mjs';
 import {pigmentPhysics} from '../../src/paint/methods/pigment-physics.mjs';
 import {planLinework} from '../../src/paint/methods/linework-plan.mjs';
@@ -33,7 +30,6 @@ import {sourcePenShare} from '../../src/paint/methods/pen-share.mjs';
 import {chooseDrawingStages} from '../../src/paint/methods/drawing-stages-auto.mjs';
 import {eraseWeights, eraserDabs, ERASER_MM} from '../../src/paint/methods/pencil-erase.mjs';
 import {planLines as planLineChoice} from '../../src/paint/drawing-plan.mjs';
-import {massBudget} from '../../src/paint/methods/mass-budget.mjs';
 import {measureStyle} from '../../src/paint/methods/practice-style.mjs';
 
 export async function plan(ctx) {
@@ -137,62 +133,8 @@ if (STYLE > 0) {
   for (let i = 0; i < n; i++) { const m = (D_AIM[i * 3] + D_AIM[i * 3 + 1] + D_AIM[i * 3 + 2]) / 3; if (m > deep) deep = m; if (m <= 0) paper++; }
   console.log(`style target: aiming at a watercolour, not the photograph; darkest ${deep.toFixed(2)}, ${(100 * paper / n).toFixed(1)}% left as paper`);
 }
-// --planmasses r: plan from big shapes, an edge-preserving mean over r cells at 540 px, scaled with width (massesOf). Plan only.
-// --planmassrange: how far apart two values may be and still count as one mass. Not --masses (the mop washes).
-const PLAN_MASSES = num('planmasses', 0), PM_R = Math.max(1, Math.round(PLAN_MASSES * w / 540));
-// --figurelayers 1: paint the figure mask (--fwmask, required) in a few layers.
-// On the mask: plan massed over --figuremassr cells (default 2).
-const FIG_LAYERS = num('figurelayers', 0) > 0;
-const FIG_MASK = FIG_LAYERS && opt('fwmask', '') ? Uint8Array.from(await sharp(path.resolve(root, opt('fwmask', ''))).resize(w, h, { fit: 'fill' }).greyscale().raw().toBuffer(), v => (v >= 128 ? 1 : 0)) : null;
-if (FIG_LAYERS && !FIG_MASK) console.log('figure layers: no --fwmask, the flag does nothing');
-let D_PLAN = PLAN_MASSES > 0 ? massesOf(D_AIM, w, h, { radius: PM_R, range: num('planmassrange', 0.12) }) : D_AIM;
-if (PLAN_MASSES > 0) console.log(`plan masses: an edge-preserving mean over ${PM_R} cells, range ${num('planmassrange', 0.12)}`);
-if (FIG_MASK && PLAN_MASSES <= 0) {
-  const r = Math.max(1, Math.round(num('figuremassr', 2) * (280 / 540) / (num('sheetmm', DEFAULT_SHEET_MM) / w)));
-  const massed = massesOf(D_AIM, w, h, { radius: r, range: num('figuremassrange', 0.12) });
-  D_PLAN = Float32Array.from(D_AIM);
-  for (let c = 0; c < n; c++) if (FIG_MASK[c]) { D_PLAN[c * 3] = massed[c * 3]; D_PLAN[c * 3 + 1] = massed[c * 3 + 1]; D_PLAN[c * 3 + 2] = massed[c * 3 + 2]; }
-  console.log(`figure layers: the figure's plan is an edge-preserving mean over ${r} cells; its hard-edged passages are dried before they are laid`);
-}
-// each pixel as amounts of those pigments: this is what a painter mixes, not a grey level
-const pigmentFitStarted = performance.now();
-ctx.A = (await cachedStep({ ...RUN_CACHE, name:'pigment-fit', code:CODE_HASH, track:optTrack, inputs:{D_PLAN,D_AIM,px: ctx.px,n,PIGS,paperRGB,PLAN_MASSES,COLOUR_BUDGET,SHAPE_REFIT:[num("shaperefit",0),num("refitfamilies",24),num("refitmin",0.0005)]} }, async()=>{
-let A = unmix(D_PLAN, n, PIGS.map(p => p.K.map(v => v / 0.55)));
-// Under --planmasses the shape refit aims at the simplified plan, not the source, so the speckle stays out.
-{
-  const Ks = PIGS.map(p => p.K.map(v => v / 0.55)), D0 = (PLAN_MASSES > 0 || D_PLAN !== D_AIM) ? D_PLAN : channelDensity(ctx.px, n, paperRGB);
-  const flat = new Uint8ClampedArray(n * 3); for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) flat[i * 3 + c] = paperRGB[c];
-  // The plan is the straight unmix; it only sets each shape's amount and mix.
-  if (num('refit', 0) > 0) throw new Error('--refit was removed by the anti-cheat rules (render-compare-correct against the target)');
-  void D0; void Ks; void flat;
-  // --shaperefit R: R rounds of Kubelka-Munk correction per planning shape, not per cell (src/paint/methods/shape-refit.mjs). Planning only.
-  if (num('shaperefit', 0) > 0) {
-    const { planningShapes, shapeRefit } = await import('../../src/paint/methods/shape-refit.mjs');
-    const shapes = planningShapes(D0, w, h, { families: num('refitfamilies', 24), minCells: Math.max(16, Math.round(num('refitmin', 0.0005) * n)) });
-    const K = PIGS.length, one = new Uint8ClampedArray(3); for (let c = 0; c < 3; c++) one[c] = paperRGB[c];
-    const render = mean => { const R = renderLayers([PIGS.map((_, j) => Float32Array.of(mean[j]))], PIGS, one, 1, 1); return channelDensity(R, 1, paperRGB); };
-    const unmix1 = d => unmix(Float32Array.from(d), 1, Ks);
-    shapeRefit(A, D0, K, shapes, { render, unmix1, rounds: num('shaperefit', 3), log: console.log });
-  }
-
-}
-return A;
-})).value;
-SPEED_PROFILE?.add('setup:pigment-fit', performance.now() - pigmentFitStarted);
-// --paperkeep L: book no pigment where the source is within L of the paper's lightness and under --paperchroma (default 8).
-// Unmixing does not know paper white is a colour and would lay a weak pan there. Default 0, off.
-if (num('paperkeep', 0) > 0) {
-  const keep = num('paperkeep', 0), maxC = num('paperchroma', 8), k = PIGS.length;
-  const lab = labPlanes(ctx.px, n, paperRGB), pl = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
-  let left = 0;
-  for (let i = 0; i < n; i++) {
-    const lum = 0.2126 * ctx.px[i * 3] + 0.7152 * ctx.px[i * 3 + 1] + 0.0722 * ctx.px[i * 3 + 2];
-    if (lum < pl - keep || Math.hypot(lab.a[i], lab.b[i]) > maxC) continue;
-    for (let j = 0; j < k; j++) ctx.A[i * k + j] = 0;
-    left++;
-  }
-  console.log(`paper kept: ${left} cells (${(100 * left / n).toFixed(1)}% of the sheet) booked as paper, not paint`);
-}
+// The subject is not fitted cell by cell into pigment amounts (the per-cell pigment fit ctx.A was removed in 0.4): every
+// wash's mix is chosen for its shape as a whole from one colour (src/paint/methods/study-washes.mjs).
 
 if (opt('accents', '0') !== '0') throw new Error('--accents was removed by the anti-cheat rules (keep-if-closer against the target)');
 // --white frisket|gouache|both|none: how small lights are kept. frisket masks them before the washes; gouache touches them in last.
@@ -226,35 +168,7 @@ const SMALL = (() => {
   return mask;
 })();
 if (SMALL) { let c = 0; for (let i = 0; i < n; i++) c += SMALL[i]; console.log(`frisket: ${c} cells (${(100 * c / n).toFixed(2)}% of the sheet) reserved`); }
-// --shorten r: carry the plan's deepest note down by ratio r (0..1), the rest along --shortencurve (default 0.75), keeping dark order.
-// A painting has a shorter value range than its photograph. Off unless 0 < r < 1.
-(() => {
-  const keep = num('shorten', 0);
-  if (keep <= 0 || keep >= 1) return;
-  const k = PIGS.length, tot = new Float32Array(n);
-  for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < k; j++) t += ctx.A[i * k + j]; tot[i] = t; }
-  const sorted = Float32Array.from(tot).sort();
-  const deepest = sorted[Math.floor(n * 0.995)], want = deepest * keep;
-  // a curve, not a clip: a clip flattens every dark to one tone and loses the edges inside the darks
-  for (let i = 0; i < n; i++) {
-    if (tot[i] <= 0) continue;
-    const f = (want * Math.pow(tot[i] / deepest, num('shortencurve', 0.75))) / tot[i];
-    for (let j = 0; j < k; j++) ctx.A[i * k + j] *= f;
-  }
-  console.log(`range: plan's darkest note ${deepest.toFixed(2)} shortened to ${want.toFixed(2)} (x${keep}), curve ${num('shortencurve', 0.75)}`);
-})();
-// --whitefloor f: cells whose whole planned depth is under f of one glaze, and that are bare paper by the paper rule, join no mask,
-// so no sweep aims at them. A pale tint under the floor that the paper rule does not call paper takes its pale wash. Default 0.5.
-const WHITE_HOLD = (() => {
-  const f = num('whitefloor', 0.5);
-  if (f <= 0) return null;
-  const floor = f * num('glaze', 0.12), { held, count: c } = heldWhites({ demand: ctx.A, k: PIGS.length, rgb: ctx.px, paperRGB, floor });
-  console.log(`whites: ${c} cells (${(100 * c / n).toFixed(1)}% of the sheet) under ${floor.toFixed(3)} of paint and within the paper's tolerance held out of every pass`);
-  return c ? held : null;
-})();
-// Plan reserves (VALUE_CONFIG.reserves) are not boxes on the hold: the value planner reserves the target's own light
-// inside each box (src/paint/methods/light-reserves.mjs) and HOLD takes its protectedCells after the plan.
-ctx.HOLD = WHITE_HOLD; ctx.FUR_HOLD = null;
+ctx.HOLD = null; ctx.FUR_HOLD = null;
 const ART_DENSITY = () => { const pl0 = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2]; return Float32Array.from({ length: n }, (_, i) => Math.max(0, -Math.log(Math.max(0.02, Math.min(1, lum(i) / pl0))))); };
 const combinedClipCache=new WeakMap();
 let clipBaseSource=null, clipBaseWidth=0, clipBaseHeight=0, clipBase=null;
@@ -287,20 +201,9 @@ const setClip=(target,mask,box=null)=>{
   if(box)combinedClipCache.set(mask,{base:clipBase,mask:combined});
   physicalSetClip(target,stableClipMask(combined));
 };
-const MASS_BUDGET = massBudget({ A: ctx.A, MOD: null, K: PIGS.length, SRC: ART_DENSITY(), rgb: ctx.px, w, h, gaussian, components, num, log: console.log });
 // --drawinglogic 3 draws its scribble only on an ink-led piece
 const DRAW_STYLE = num('drawinglogic', 0) === 3 ? (await measureStyle({ SRC: ART_DENSITY(), w, h, n, px: ctx.px, gaussian, minFilter, maxFilter, log: console.log })) : null;
-// a passage's charge feedback reads the shape's mean of this fit (paint.mjs, the passage look)
-ctx.AL = ctx.A;
 const COLOUR_TRACE = num('colourtrace', 0) > 0;
-async function colourPlan(name, amounts) {
-  if (!COLOUR_TRACE) return;
-  const flat = new Uint8ClampedArray(n * 3);
-  for (let i=0;i<n;i++) for(let c=0;c<3;c++) flat[3*i+c]=paperRGB[c];
-  const rgb=renderLayers([PIGS.map((_,j)=>Float32Array.from({length:n},(_,i)=>amounts[i*PIGS.length+j]))],PIGS,flat,n,1);
-  await sharp(Buffer.from(rgb), {raw:{width:w,height:h,channels:3}}).png().toFile(path.join(out,`colour-${name}.png`));
-}
-await colourPlan('unmixed', ctx.A);
 // Whites are kept by masking, not by painting round them: a wash flows over the mask and leaves it clean.
 const pl = 0.2126 * paperRGB[0] + 0.7152 * paperRGB[1] + 0.0722 * paperRGB[2];
 ctx.SRC = TARGET_GUARD.register('SRC', new Float32Array(n));
@@ -373,15 +276,7 @@ const MASK_FINISH = await (async () => {
     let seed = 20260919;
     const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
     const noise = gaussian(Float32Array.from({ length: n }, () => rnd()), w, h, scale);
-    // --groundpapertone t: weights the noise so a ground cell is likelier left as paper the lighter its plan. Default 0.
-    const tone = num('groundpapertone', 0);
-    const field = new Float32Array(n);
-    if (tone > 0) {
-      const k = PIGS.length, dep = new Float32Array(n);
-      for (let i = 0; i < n; i++) { let t = 0; for (let j = 0; j < k; j++) t += ctx.A[i * k + j]; dep[i] = t; }
-      const ds = Float32Array.from(dep).sort(), top = Math.max(1e-6, ds[Math.floor(n * 0.95)]);
-      for (let i = 0; i < n; i++) field[i] = noise[i] + tone * Math.min(1, dep[i] / top);
-    } else field.set(noise);
+    const field = Float32Array.from(noise);
     // threshold among GROUND cells only, so the share is of the ground and not of the sheet
     const vals = [];
     for (let i = 0; i < n; i++) if (m[i] <= 0.5) vals.push(field[i]);
@@ -545,8 +440,8 @@ const GRAPHITE_AT = PIGS.length + (INK ? 1 : 0);
 ctx.DRAW_STAGE='opening';
 const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DRY_VALUE,value:0,fullBoundary:false});
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));ctx.EARLY_DRY_CAPTURED=false;
-Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
-  SMALL, WHITE_HOLD, setClip, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, 
+Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
+  SMALL, setClip, DRAW_STYLE, COLOUR_TRACE, 
   EDGE, maskBox, FULLBOX, 
   FINISH, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 

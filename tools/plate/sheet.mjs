@@ -77,7 +77,7 @@ const { WASH_FLAT_SPLAY, ENTRY_FILE, JSONL, opt, num, optTrack, NATIVE_PAINT_MOD
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_UNIFORM_PAPER, measurePaper, VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, 
   SPEED_PROFILE, root, out, RUN_CACHE, VALUE_CONFIG, VALUE_COUNTS, 
   WASH_SESSION, phaseMark, w, h, n, createBrush, physicalStroke: untracedStroke, candidateContact, TONE_MODE, 
-  SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, WHITE_HOLD, 
+  SHEET_TONE, CALIBRATED_PLAN, PAPER_RULE, paperRGB, WASH_SPLAT_SETTINGS, CODE_HASH, PIGS, SMALL, 
   setClip, COLOUR_TRACE, OUTLINE, STAGE_PLAN, REQUESTED_DRAW_MEDIUM, INK_WIDTH_FLOOR_MM, INK_DAMP, 
   STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, INK, GRAPHITE, SHEET_PIGS, GRAPHITE_AT } = ctx;
 Object.assign(ctx, { colourMass });
@@ -165,7 +165,7 @@ const pencilDraw=(target,gs,pigment,options)=>{
 
 {
  const shaped=num('shapedmarks',0)>0;
-  const valueOptions={shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
+  const valueOptions={shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
 
  // The wash plan is read from block-in studies (study-washes.mjs), never from the subject. The squinted-subject plan
  // (layered-washes.mjs) and the light-to-dark value plan were removed in 0.4 (last at commit 49447027).
@@ -185,10 +185,8 @@ const pencilDraw=(target,gs,pigment,options)=>{
  const planValues=planStudyWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
-  const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions),demand:valueOptions.demand}));
+  const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions)}));
   ctx.VALUE_PLAN=saved.value.plan;
-  // The cached demand is restored on a hit, so a plan step that rewrites it stays reproducible.
-  if(saved.cached)valueOptions.demand.set(saved.value.demand);
  }else ctx.VALUE_PLAN=planValues(valueOptions);
  SPEED_PROFILE?.add('setup:value-plan',performance.now()-valueStarted);
  ctx.layers=ctx.VALUE_PLAN.layers;ctx.steps=5;
@@ -512,7 +510,7 @@ function colourMass(stage, extra={}) {
  for(let j=0;j<PIGS.length;j++){held[j]+=mass(j,q)/(SC*SC);}
  }}
  const sum=a=>Array.from({length:PIGS.length},(_,j)=>traceCells.reduce((v,i)=>v+a[i*PIGS.length+j],0));
- colourTrace.push({stage,held,plan:sum(ctx.A),wash:sum(ctx.AL),booked:sum(expected),...extra});
+ colourTrace.push({stage,held,booked:sum(expected),...extra});
 }
 
 // --brushshare s: widest brush as a share of the sheet's short side, so it keeps its size against the picture. Default 0.076.

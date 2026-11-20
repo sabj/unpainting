@@ -24,31 +24,6 @@ export function seeAsMasses(L, w, h, { radius = 3, range = 0.12 } = {}) {
 }
 
 /**
- * The edge-preserving mean over all three channels: a cell takes the average colour of the neighbours whose density
- * is within `range` of its own in every channel, over `radius` cells. No paper threshold and no value steps, so a pale
- * form keeps its value and loses only its speckle. Used by paint-plate's --masses to plan from big shapes.
- */
-export function massesOf(D3, w, h, { radius = 5, range = 0.12 } = {}) {
-  const n = w * h, out = new Float32Array(n * 3);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x;
-    let r = 0, g = 0, b = 0, cnt = 0;
-    for (let dy = -radius; dy <= radius; dy++) {
-      const yy = y + dy; if (yy < 0 || yy >= h) continue;
-      for (let dx = -radius; dx <= radius; dx++) {
-        const xx = x + dx; if (xx < 0 || xx >= w) continue;
-        const j = yy * w + xx;
-        // every channel within range, not only the mean: two colours of equal value (a red shirt against a green hill)
-        // are two masses, and a mean-only test smeared one into the other
-        if (Math.abs(D3[j * 3] - D3[i * 3]) <= range && Math.abs(D3[j * 3 + 1] - D3[i * 3 + 1]) <= range && Math.abs(D3[j * 3 + 2] - D3[i * 3 + 2]) <= range) { r += D3[j * 3]; g += D3[j * 3 + 1]; b += D3[j * 3 + 2]; cnt++; }
-      }
-    }
-    out[i * 3] = r / cnt; out[i * 3 + 1] = g / cnt; out[i * 3 + 2] = b / cnt;
-  }
-  return out;
-}
-
-/**
  * Compress a density field into what paper and pigment hold: nothing below `paperAt` of the range is painted at all,
  * and the darkest note stops at `deepest` of what the photograph reaches.
  */

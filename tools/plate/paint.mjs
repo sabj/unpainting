@@ -51,7 +51,7 @@ export async function paint(ctx) {
 const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_COVERAGE, measurePaper, liftResist, FRAME_POLICY, SPEED_PROFILE, root, out, RUN_CACHE, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_COUNTS, SOFT_WET_MM, WASH_SESSION, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, createBrush, candidateContact, paperRGB, 
-  planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, GOUACHE_LIGHTS, setClip, MASS_BUDGET, 
+  planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, GOUACHE_LIGHTS, setClip, 
   COLOUR_TRACE, maskBox, FULLBOX, 
   FINISH, SHEET_PIGS, EARLY_DRY_VALUE, 
   dry, dip, dipLoad, productionDip, stroke, SC, W2, H2, N2, PB, GFLOOR, GCHUNK, PAPER_OPTS, PROBE, INKRES, OUT_W, OUT_H, O,
@@ -333,7 +333,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     paths.length = 0; paths.push(...held);
   }
   // --cutin 0|1: run a small brush along the inside of the passage's edge before filling it, as a painter cuts in. Default 1.
-  if (!shapedPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
+  if (!shapedPaths && !FLOOR && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutband n (default 2): the cut-in band.
     const cellMmHigh = num('sheetmm', DEFAULT_SHEET_MM) / W2;
