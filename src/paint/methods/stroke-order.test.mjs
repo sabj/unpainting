@@ -65,13 +65,16 @@ test('hatching: parallel strokes side by side are one run, laid together, pulled
   assert.ok(xs.every((x, k) => !k || x > xs[k - 1]) || xs.every((x, k) => !k || x < xs[k - 1]), 'swept across');
 });
 
-test('ink amount: inside a painted mass none lays nothing, forms only the long strokes along its edge, full everything', () => {
+test('ink amount: inside a painted mass none lays nothing, forms keeps its form (edge, long lines, the strongest short marks), full everything', () => {
   const mass = (x, y) => x >= 50 && x <= 90 && y >= 10 && y <= 60;
-  const S = [seg(50.2, 15, 50.2, 55), seg(60, 20, 62, 22), seg(65, 30, 80, 30), seg(10, 30, 40, 30)];
-  const n = ink => orderStrokes(S, 100, 70, { ink, masses: mass }).flatMap(x => x.parts).sort();
-  assert.deepEqual(n('full'), [0, 1, 2, 3]);
-  assert.deepEqual(n('forms'), [0, 3]);
-  assert.deepEqual(n('none'), [3]);
+  const S = [seg(50.2, 15, 50.2, 55), seg(65, 30, 80, 30), seg(10, 30, 40, 30), ...[0, 1, 2, 3, 4].map(k => seg(60 + 4 * k, 45, 61 + 4 * k, 47 - (k === 0 ? 0 : 1.5)))];
+  const n = ink => orderStrokes(S, 100, 70, { ink, masses: mass }).flatMap(x => x.parts).sort((a, b) => a - b);
+  assert.deepEqual(n('full'), [0, 1, 2, 3, 4, 5, 6, 7]);
+  const f = n('forms');
+  assert.ok([0, 1, 2].every(k => f.includes(k)), 'edge, long line and the outside kept');
+  assert.equal(f.filter(k => k >= 3).length, 2, 'the strongest 30% of the short marks');
+  assert.ok(f.includes(3), 'the longest short mark is among them');
+  assert.deepEqual(n('none'), [2]);
 });
 
 test('structure weight: the big structure firm and wide, fine detail light, the foreground heavier', () => {
@@ -101,7 +104,7 @@ test('growth order: a few light lay-in lines, outlines before their divisions, d
   assert.ok(ph.every((p, k) => !k || order.indexOf(p) >= order.indexOf(ph[k - 1])), 'phases in order');
   assert.equal(ph.filter(p => p === 'layin').length, 3);
   assert.ok(ph.at(-1) === 'emphasis');
-  assert.ok(growthWeight({ phase: 'layin' }).weight < growthWeight({ phase: 'growth' }).weight && growthWeight({ phase: 'growth' }).weight < growthWeight({ phase: 'emphasis' }).weight);
+  assert.ok(growthWeight({ phase: 'layin' }).weight < growthWeight({ phase: 'growth' }).weight && growthWeight({ phase: 'growth' }).weight <= growthWeight({ phase: 'emphasis' }).weight);
   const g = r.filter(x => x.phase === 'growth'), bar = g.findIndex(x => x.parts.includes(8));
   for (const k of [4, 5, 6, 7]) { const i = g.findIndex(x => x.parts.includes(k)); if (i >= 0 && g[i].role === 'outline') assert.ok(i < bar); }
 });
@@ -113,20 +116,41 @@ test('hatching: none drops runs, sparse keeps every second line of a run by a fo
   assert.deepEqual([n('none'), n('sparse'), n('drawn')], [0, 3, 6]);
 });
 
-test('stroke budget: only the most important strokes, containers and outlines first', () => {
-  const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), zig(40, 50, 12), seg(60, 30, 62, 30)];
-  const r = orderStrokes(S, 100, 70, { mode: 'growth', budget: 4, layIn: 0, emphasisShare: 0 });
-  assert.deepEqual(r.flatMap(x => x.parts).sort((a, b) => a - b), [0, 1, 2, 3]);
+test('contribution threshold: a crumb under the threshold is left, every object keeps its form', () => {
+  const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), seg(60, 30, 60.3, 30), seg(60.2, 30, 60.4, 30.1)];
+  const all = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, contributions: true });
+  assert.ok(all.every(x => x.contribution != null), 'every stroke carries its contribution');
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, threshold: 0.5, objectFloor: 1 });
+  const laid = r.flatMap(x => x.parts);
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7]) assert.ok(laid.includes(k), `outline ${k} kept`);
+  assert.ok(!laid.includes(10), 'the overlapping crumb is left');
+  assert.ok(r.belowThreshold >= 1);
 });
 
-test('growth weight builds: lay-in faint, structure at an ordinary visible weight when drawn (main lines firmer), accents heavy', () => {
-  const at = (phase, width, major = false) => width * growthWeight({ phase, major }, 1, { width, mid: 1 }).widthScale;
-  assert.ok(Math.abs(at('growth', 2.5) - at('growth', 0.3)) < 1e-9, 'structure at one ordinary width whatever the drawing');
-  assert.ok(at('growth', 1, true) > at('growth', 1) && at('growth', 1) >= 1, 'main lines a little firmer, none hairline');
-  assert.ok(at('layin', 1) < at('detail', 1) && at('detail', 2) <= 1 && at('texture', 0.5) === 0.5);
-  assert.ok(at('emphasis', 2.5) > 2.5 && at('emphasis', 1) > at('growth', 1, true));
-  const w = (phase, major) => growthWeight({ phase, major }, 0.5, { width: 1, mid: 1 }).weight;
-  assert.ok(w('layin') < w('growth') && w('growth') < w('growth', true) && w('growth', true) <= w('emphasis'));
+test('growth weight from the drawing: lay-in faint, every line at its drawn width and weight, heavy lines restated at full width', () => {
+  const at = (phase, width, heavy = false) => width * growthWeight({ phase, heavy }, 1, { width, mid: 1 }).widthScale;
+  assert.equal(at('growth', 2.5), 2.5); assert.equal(at('growth', 0.3), 0.3); assert.equal(at('texture', 0.5), 0.5); assert.equal(at('detail', 1.4), 1.4);
+  assert.ok(at('growth', 2.5, true) < 2.5 && at('growth', 2.5, true) >= 1, 'a heavy line is laid at the ordinary width first');
+  assert.equal(at('emphasis', 2.5, true), 2.5, '... and restated at its own width');
+  assert.ok(at('layin', 1) < at('growth', 1));
+  const w = phase => growthWeight({ phase }, 0.8, { width: 1, mid: 1 }).weight;
+  assert.ok(w('layin') < w('growth') && w('growth') === 0.8 && w('emphasis') === 0.8);
+});
+
+test('growth: the strokes filling a solid dark wait for the texture phase', () => {
+  const fill = [0, 1, 2, 3].map(k => seg(40, 30 + 0.4 * k, 44, 30 + 0.4 * k));
+  const S = [...box(10, 10, 90, 60), ...box(38, 28, 46, 33), ...fill];
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, fills: S.map((_, k) => k >= 8) });
+  for (const k of [8, 9, 10, 11]) { const x = r.find(x => x.parts.includes(k)); assert.equal(x.role, 'fill'); assert.equal(x.phase, 'texture'); }
+});
+
+test('growth: object by object, one object finished before its neighbour', () => {
+  // two windows side by side in a wall; with a stickiness the hand finishes one window's lines before the other's
+  const S = [...box(5, 5, 95, 65), ...box(20, 20, 40, 50), seg(25, 44, 35, 44), seg(25, 26, 35, 26), ...box(60, 20, 80, 50), seg(65, 44, 75, 44), seg(65, 26, 75, 26)];
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0 });
+  // (the loose inner marks are texture, laid later: only the outlines are compared)
+  const seqOf = k => r.findIndex(x => x.parts.includes(k)), A = [4, 5, 6, 7].map(seqOf), B = [10, 11, 12, 13].map(seqOf);
+  assert.ok(Math.max(...A) < Math.min(...B) || Math.max(...B) < Math.min(...A), `windows interleaved: ${A} / ${B}`);
 });
 
 test('growth: loose ticks wait for the texture phase; a dashed line is one stroke', () => {

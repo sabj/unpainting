@@ -17,6 +17,8 @@ import {dropMask} from '../../src/crop/blockin.mjs';
 import {brushedWashPaths, sweepCover, containPaths, gradientSweepAngle, prewetArea} from '../../src/media/wash.mjs';
 import {pencilBatches, prepFade} from '../../src/paint/methods/pencil-stage.mjs';
 import {renderInkProof} from '../../src/paint/methods/ink-res.mjs';
+import {layVectors, inkForDarkness} from '../../src/paint/methods/ink-vectors.mjs';
+import {coherent} from '../../src/media/sheet.mjs';
 import {components, removeSmall, dilate, erode} from '../../src/raster.js';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {applyResist} from '../../src/media/sheet.mjs';
@@ -179,8 +181,39 @@ async function drawPrepStage(PEN) {
   console.log(`prep stage: ${strokes.length} pencil lines in ${batches.length} frames (${[0, 1, 2].map(p => `${['big shapes', 'features', 'detail'][p]} ${strokes.filter(g => (g.rank === 1 ? 0 : g.rank === 2 ? 1 : 2) === p).length}`).join(', ')}), ${drawn} strokes laid`);
   await stageShot('prep', before);
 }
+// A prepared drawing fitted as vector strokes (tools/seg/ink-vectors.py, <drawingfile>-vectors.json beside the line file)
+// is laid exactly: each stroke's outline rasterised on the pen's sheet and inked to the drawing's own darkness, stroke by
+// stroke in the drawing's order. The vectors are the recording (copied to ink-vectors.json): the replay advances each
+// stroke along its path.
+function vectorFile() {
+  const base = opt('drawingfile', '');
+  if (!base) return null;
+  const f = (base.endsWith('-lines.json') ? base.slice(0, -'-lines.json'.length) : base) + '-vectors.json';
+  return fs.existsSync(f) ? f : null;
+}
+function layExactVectors(file) {
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
+  if (Math.abs(doc.sheetMm - sheetMm) > 0.01 * sheetMm) throw new Error(`ink vectors: ${path.basename(file)} is for a ${doc.sheetMm} mm sheet, this sheet is ${sheetMm} mm`);
+  // a pencil drawing is laid in graphite on the painting's sheet; ink on the pen's fine sheet when there is one
+  const pencil = doc.medium === 'pencil';
+  if (pencil && GRAPHITE_AT == null) throw new Error(`ink vectors: ${path.basename(file)} is a pencil drawing but this run has no graphite (--outlinemedium graphite)`);
+  const fineSheet = INKRES && !pencil;
+  const sheet = fineSheet ? INKRES.fine : ctx.sheet, w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? 0 : pencil ? GRAPHITE_AT : PIGS.length;
+  if (!fineSheet) coherent(sheet);
+  const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
+  const darkOf = t => { const px = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (px[0] + px[1] + px[2]) / 765; };
+  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf));
+  if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
+  fs.copyFileSync(file, path.join(out, 'ink-vectors.json'));
+  ctx.drawnCount += r.strokes;
+  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked; no tracer, no pen gestures`);
+}
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const speedDrawStart = performance.now();
+  const VECTORS = first ? vectorFile() : null;
+  // a prepared drawing is laid only as its vector strokes: there is no traced-line pen route to fall back on
+  if (first && opt('drawingfile', '') && !VECTORS) throw new Error(`--drawingfile ${opt('drawingfile', '')}: no vector strokes beside it (${opt('drawingfile', '').replace(/-lines\.json$/, '')}-vectors.json). Make them with tools/seg/ink-vectors.py; the pen no longer lays traced lines (removed in 0.4, replay/VECTOR-PEN.md)`);
+  if (VECTORS) { layExactVectors(VECTORS); if (INKRES) INKRES.settle(); return; }
   try {
   const PLAN = PEN_PLANS[first ? 'first' : fine ? 'fine' : 'last'];
   if (!PLAN) throw new Error('drawing: this pen pass was not planned before painting');
