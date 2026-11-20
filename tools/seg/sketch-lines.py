@@ -84,6 +84,101 @@ def trace(skel, min_points=4, window=5):
     return paths
 
 
+def through_junctions(paths, skel, reach=2.5, tangent=7, straight=.8, stub=4):
+    """Carry each line through its junctions along the straightest continuation.
+
+    The walker gives a junction to whichever path reaches it first, often a side branch turning onto the main line, so a
+    wall edge or an arch comes out in pieces. Here every path is cut where it passes a fork of the skeleton, and at each
+    fork the piece ends are paired again, straightest pair first (their tangents over `tangent` pixels must agree to a
+    cosine of `straight`); an end left over stops there. A piece shorter than `stub` pixels that found no partner at
+    either end is a thinning stub and is dropped. Returns (paths, joins).
+    """
+    h, w = skel.shape
+    k = np.ones((3, 3), np.float32)
+    fork = ((cv2.filter2D(skel.astype(np.float32), -1, k, borderType=cv2.BORDER_CONSTANT) - 1 >= 3) & (skel > 0)).astype(np.uint8)
+    pieces = []
+    for p in paths:
+        closed = len(p) > 2 and np.array_equal(p[0], p[-1])
+        on = at(fork, p) > 0
+        cuts = []; i = 1
+        while i < len(p)-1:
+            if on[i]:
+                j = i
+                while j+1 < len(p)-1 and on[j+1]:
+                    j += 1
+                cuts.append((i+j)//2); i = j+1
+            else:
+                i += 1
+        if closed and not cuts:
+            pieces.append(p); continue
+        last = 0
+        for c in cuts + [len(p)-1]:
+            if c > last:
+                pieces.append(p[last:c+1])
+            last = c
+    ends = []
+    for i, p in enumerate(pieces):
+        if len(p) > 2 and np.array_equal(p[0], p[-1]):
+            continue
+        for end, q in enumerate((p, p[::-1])):
+            v = q[0]-q[min(tangent, len(q)-1)]
+            ends.append((i, end, q[0], v/max(1e-9, np.linalg.norm(v))))
+    bins = {}
+    for b, B in enumerate(ends):
+        bins.setdefault(tuple(np.floor(B[2]/4).astype(int)), []).append(b)
+    pairs = []
+    for a, A in enumerate(ends):
+        tx, ty = np.floor(A[2]/4).astype(int)
+        for b in (b for dx in (-1, 0, 1) for dy in (-1, 0, 1) for b in bins.get((tx+dx, ty+dy), []) if b > a):
+            B = ends[b]
+            if A[0] == B[0] or np.linalg.norm(B[2]-A[2]) > reach:
+                continue
+            c = float(np.dot(A[3], -B[3]))
+            if c >= straight:
+                pairs.append((-c, a, b))
+    links = {}; parents = list(range(len(pieces)))
+    def root(i):
+        while parents[i] != i:
+            i = parents[i]
+        return i
+    index = {(e[0], e[1]): n for n, e in enumerate(ends)}
+    for _, a, b in sorted(pairs):
+        ra, rb = root(ends[a][0]), root(ends[b][0])
+        if a in links or b in links or ra == rb:
+            continue
+        links[a] = b; links[b] = a; parents[ra] = rb
+    seen = set(); result = []
+    for i, p in enumerate(pieces):
+        if i in seen:
+            continue
+        e0, e1 = index.get((i, 0)), index.get((i, 1))
+        if e0 is None:
+            seen.add(i); result.append(p); continue
+        if e0 in links and e1 in links:
+            continue
+        if e0 not in links and e1 not in links:
+            seen.add(i)
+            touching = at(fork, p[[0, -1]]).any()
+            if not (touching and arc_length(p) < stub):
+                result.append(p)
+            continue
+        entry = e0 if e0 not in links else e1
+        parts = []
+        while True:
+            k = ends[entry][0]
+            if k in seen:
+                break
+            seen.add(k)
+            q = pieces[k] if ends[entry][1] == 0 else pieces[k][::-1]
+            parts.append(q if not parts or not np.array_equal(parts[-1][-1], q[0]) else q[1:])
+            other = index[(k, 1-ends[entry][1])]
+            if other not in links:
+                break
+            entry = links[other]
+        result.append(np.concatenate(parts))
+    return result, len(links)//2
+
+
 def join(paths, support, gap=9):
     """Tangent-aligned, source-supported bridges. Never connect parallel neighbours."""
     ends = []

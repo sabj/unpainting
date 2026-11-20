@@ -72,6 +72,8 @@ def line_map_mask(bgr, fine=None, min_area=2):
 
 # a contour this long (cells of a 1080 px wide map, about 8 mm on a 152 mm sheet) is structure, not detail
 LONG_CELLS = 57
+# the widest break in a line that is bridged when both ends point along it and the evidence carries on between them
+JOIN_GAP = 7
 
 
 def stroke_mask(bgr, pxmm=152.4/1080, rmm=.5, gate=None, lo_frac=.5, close=0, ink_colour=0):
@@ -137,6 +139,14 @@ def plan(bgr, kind='ink', map_tolerance=.25, fine=None, gate=None, stroke_opts=N
         # a stub off a fork cuts a line in two; a standalone short mark is not a stub and stays
         skeleton, _ = prune_spurs(skeleton, 2)
     paths = sketch.trace(skeleton, min_points=2, window=3 if kind == 'line-map' else 5)
+    joins = 0
+    if kind in ('line-map', 'stroke'):
+        # one line through each junction along its straightest continuation, then across the short breaks the map or a
+        # dry pen leaves where the evidence carries on (a wall edge, an eave or an arch is one long stroke)
+        paths, joins = sketch.through_junctions(paths, skeleton)
+        before = len(paths)
+        paths = sketch.join(paths, contrast, gap=JOIN_GAP)
+        joins += before - len(paths)
     q_scale = bgr.shape[1]/1080
     distance = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
     lines = []
@@ -173,7 +183,7 @@ def plan(bgr, kind='ink', map_tolerance=.25, fine=None, gate=None, stroke_opts=N
                       **({'tier': 1 if arc_length(q) >= LONG_CELLS * q_scale else 2} if kind in ('line-map', 'stroke') else {})})
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()),
         'skeletonPixels': int(skeleton.sum()), 'tracedPaths': len(paths),
-        'selectedPaths': len(lines), 'joins': 0, 'budgetDrops': 0,
+        'selectedPaths': len(lines), 'joins': joins, 'budgetDrops': 0,
         'simplificationTolerance': map_tolerance if kind in ('line-map', 'stroke') else .25}
 
 
