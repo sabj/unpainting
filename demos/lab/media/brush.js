@@ -518,12 +518,26 @@ function strokeContacts(sheet) {
 function beadRoom(brush, p, freeL, W) {
   return W.map(Wi => brush.depositDepth ? Math.max(0, brush.depositDepth * (0.7 + 0.3 * p) - Wi) : brush.give * p * Math.max(0, brush.wetness * freeL * (0.6 + 0.4 * p) - Wi));
 }
+// The line across a path at its first point (or its last, `atEnd`): the point and the unit direction into the path, from
+// the first point at least half a cell away. Null for a path that never leaves its point (a dab).
+function endLine(path, atEnd) {
+  const n = path.length, a = path[atEnd ? n - 1 : 0];
+  for (let k = 1; k < n; k++) {
+    const b = path[atEnd ? n - 1 - k : k], dx = b.x - a.x, dy = b.y - a.y, m = Math.hypot(dx, dy);
+    if (m >= 0.5) return { x: a.x, y: a.y, tx: dx / m, ty: dy / m };
+  }
+  return null;
+}
 // The section brush's stroke (tuft-section.mjs): a towed tuft on the CPU, one film law between it and the paper.
 // `speed` (mm/s) sets how long each cell is in contact; a point's own `v` overrides it.
 function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true, upright = false, speed, candidateMask = null } = {}) {
   const countContact = candidateMask ? null : strokeContacts(sheet);
   const rec = candidateMask ? null : tapeStroke(brush, sheet, path, { spacing, lift, upright, speed });
   land(brush, path); path = varyPath(brush, path, sheet.paper, lift);
+  // The stroke lays inside its planned ends: nothing behind the line across it where the brush lands, nothing past the
+  // one where it lifts. Only near those ends, so a ring that comes back round past its start is not cut.
+  const ends = [!brush._onPaper ? endLine(path, false) : null, lift !== false ? endLine(path, true) : null].filter(Boolean);
+  if (ends.length) { const near = 1.2 * path.reduce((m, q) => Math.max(m, q.r ?? brush.radius), 0) + 2 * edgeTooth(brush, sheet.paper) + 3; for (const e of ends) e.r2 = near * near; }
   const { w, h, paper } = sheet, K = sheet.K, mmc = paper.mmPerCell > 0 ? paper.mmPerCell : REF_MM, S = TUFT.sections;
   const shape = tuftShape(brush.flat), lanes = brush.hairs.length, hairs = brush.hairs, v0 = speed ?? brush.speed ?? TUFT.speed;
   const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || brush.wetness;
@@ -542,7 +556,8 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
     const ex = path[path.length - 1].x - path[0].x, ey = path[path.length - 1].y - path[0].y, em = Math.hypot(ex, ey);
     if (em > 1e-6) { hx = ex / em; hy = ey / em; }
   }
-  if (!brush._onPaper) { brush._chain = null; brush._blade = null; brush._seg = 0; }
+  // a brush that lands holds its tip where it touched until the hand has drawn the tuft out behind it (moveChain)
+  if (!brush._onPaper) { brush._chain = null; brush._blade = null; brush._seg = 0; brush._hold = true; }
   let t = brush.carry, k = 1, steps = 0;
   if (rec) collectFlows(rec, () => steps);
   sheet.clock = sheet.clock ?? 0;
@@ -555,11 +570,14 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
     const u = t / seg, p = (a.p ?? 1) + ((b.p ?? 1) - (a.p ?? 1)) * u, qx = a.x + (b.x - a.x) * u, qy = a.y + (b.y - a.y) * u;
     const tx = (b.x - a.x) / seg, ty = (b.y - a.y) / seg, R = a.r === undefined ? brush.radius : a.r + ((b.r ?? a.r) - a.r) * u;
     const vel = (a.v ?? v0) + ((b.v ?? a.v ?? v0) - (a.v ?? v0)) * u, dt = spacing * mmc / Math.max(1e-3, vel);
-    if (p < 0.02 || !(R > 0)) { brush._chain = null; brush._seg = 0; }
+    if (p < 0.02 || !(R > 0)) { brush._chain = null; brush._seg = 0; brush._hold = true; }
     else {
       // the tuft: how much of it lies down, the towed chain, and its section widths
       const c = contactShare(shape, p), segLen = c * shape.length * R / (S - 1);
-      brush._chain = moveChain(brush._chain, S, qx, qy, segLen, brush._seg ?? 0, -tx, -ty); brush._seg = segLen;
+      const tipX = brush._chain?.[2 * S - 2], tipY = brush._chain?.[2 * S - 1];
+      brush._chain = moveChain(brush._chain, S, qx, qy, segLen, brush._seg ?? 0, -tx, -ty, brush._hold); brush._seg = segLen;
+      // the tip is held until the tow first pulls it off the point where it landed
+      if (brush._hold && tipX !== undefined && (brush._chain[2 * S - 2] !== tipX || brush._chain[2 * S - 1] !== tipY)) brush._hold = false;
       geom.pts = brush._chain;
       if (brush.flat) {
         const a0 = R * (0.9 + 0.1 * p) * Math.sqrt(Math.min(1, p / 0.05)); // a flat lands and lifts on its whole edge; the corners leave only at the last
@@ -572,7 +590,13 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
         if (!bl || upright) brush._blade = [gx, gy];
         else { const e = 1 - Math.exp(-spacing / Math.max(spacing, R)); let nx = bl[0] + (gx - bl[0]) * e, ny = bl[1] + (gy - bl[1]) * e; const m = Math.hypot(nx, ny) || 1; brush._blade = [nx / m, ny / m]; }
         [geom.bx, geom.by] = brush._blade;
-      } else for (let j = 0; j < S; j++) rad[j] = R * roundProfile(1 - c + c * j / (S - 1), shape.belly) * (1 + 0.15 * Math.max(0, p - 1));
+      } else {
+        // a round that has just landed lies on the paper only as far as the hand has drawn it out from its tip: the part of
+        // its profile in contact is that length, so it lands on its point and opens to its belly as the hand moves off
+        let cr = c;
+        if (brush._hold) { let lying = 0; for (let j = 1; j < S; j++) lying += brush._chain[2 * S + j - 1]; cr = Math.min(c, lying / Math.max(1e-9, shape.length * R)); }
+        for (let j = 0; j < S; j++) rad[j] = R * roundProfile(1 - cr + cr * j / (S - 1), shape.belly) * (1 + 0.15 * Math.max(0, p - 1));
+      }
       if (!candidateMask) {
         // the belly feeds the lanes by capillary flow, both ways, towards one saturation
         const ef = 1 - Math.exp(-kF * dt);
@@ -595,7 +619,9 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
           if (vr) d -= half * vr * (0.05 * (2 * field2(1046, x / l1, y / l1) - 1) + 0.05 * (2 * field2(1058, x / l2, y / l2) - 1));
           if (ET) d -= ET * Math.max(-2, Math.min(2, (paper.height[i] - 0.54) / 0.16));
         }
-        const cov = Math.min(1, 0.5 - d); if (cov <= 0) return;
+        let cov = Math.min(1, 0.5 - d);
+        for (const e of ends) { const ex = x + 0.5 - e.x, ey = y + 0.5 - e.y; if (ex * ex + ey * ey <= e.r2) cov = Math.min(cov, 0.5 + ex * e.tx + ey * e.ty); }
+        if (cov <= 0) return;
         if (clip && !clip[i]) return;
         if (candidateMask) { candidateMask[i] = 1; return; }
         const j = Math.max(0, Math.min(lanes - 1, Math.round((across + 1) / 2 * (lanes - 1)))), hr = hairs[j];

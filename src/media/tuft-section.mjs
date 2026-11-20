@@ -65,15 +65,16 @@ export const feedRate = feed => Math.max(TUFT.wick, -Math.log(1 - Math.min(0.99,
  *  at (hx, hy), segment length seg (cells), the previous step's seg0, and the direction (dx, dy) a chain lies in when
  *  it has none. A point further than seg from the one before it is pulled in along the line between them (towed); a
  *  segment shorter than seg grows by TUFT.creep of the growth of seg that the hand's travel does not take up, as pressure
- *  bends the tuft over and its tip slides.
+ *  bends the tuft over and its tip slides. With `hold` the tip is held where it landed: nothing slides, and the tuft
+ *  only unrolls between the landing point and the hand as the hand moves away from it.
  *  Returns pts (made, gathered at the hand, when null). */
-export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy) {
+export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy, hold = false) {
   const moved = pts ? Math.hypot(hx - pts[0], hy - pts[1]) : 0;
   if (!pts) { pts = new Float64Array(3 * S); for (let j = 0; j < S; j++) { pts[2 * j] = hx; pts[2 * j + 1] = hy; } }
   pts[0] = hx; pts[1] = hy;
   // what the press grows the tuft by that the hand's own travel does not take up slides the tip out: all of it in a tap,
   // little of it when the brush lands on the move (its tip holds where it touched and the hand draws the belly down)
-  const grow = Math.max(0, seg - seg0 - moved / (S - 1));
+  const grow = hold ? 0 : Math.max(0, seg - seg0 - moved / (S - 1));
   for (let j = 1; j < S; j++) {
     const ax = pts[2 * j - 2], ay = pts[2 * j - 1];
     let ex = pts[2 * j] - ax, ey = pts[2 * j + 1] - ay, L = Math.hypot(ex, ey);
@@ -82,7 +83,7 @@ export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy) {
     let px = dx, py = dy;
     if (j > 1) { const qx = ax - pts[2 * j - 4], qy = ay - pts[2 * j - 3], q = Math.hypot(qx, qy); if (q > 1e-9) { px = qx / q; py = qy / q; } }
     const own = pts[2 * S + j - 1];
-    if (L <= 1e-9 || own <= 0) { ex = px; ey = py; L = 0; } // gathered at the one before: it lies on in the chain's line
+    if (L <= 1e-9 || (own <= 0 && !hold)) { ex = px; ey = py; L = 0; } // gathered at the one before: it lies on in the chain's line
     const to = L > seg ? seg : Math.min(seg, Math.max(L, own + TUFT.creep * grow));
     if (L < to && ex * px + ey * py < 0) { ex = px; ey = py; } // a segment growing under a press lies on in the chain's line
     pts[2 * j] = ax + ex * to; pts[2 * j + 1] = ay + ey * to; pts[2 * S + j - 1] = to;
@@ -121,18 +122,23 @@ export function footprint(g, w, h, pad, visit) {
   if (X1 < X0 || Y1 < Y0) return null;
   g.onBox?.(X0, Y0, X1, Y1);
   if (flat) return flatFootprint(g, w, X0, Y0, X1, Y1, visit);
-  // per segment: origin, axis, normal, length
-  const seg = [];
-  for (let j = 0; j + 1 < S; j++) {
-    const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, L = Math.hypot(ex, ey);
-    seg.push([ax, ay, L > 1e-9 ? ex / L : 1, L > 1e-9 ? ey / L : 0, L, rad[j], rad[j + 1]]);
+  // per segment: origin, axis, length and the radii at its two ends, flat (7 numbers a segment)
+  const ns = S - 1, seg = g._seg && g._seg.length === 7 * ns ? g._seg : (g._seg = new Float64Array(7 * ns));
+  for (let j = 0; j < ns; j++) {
+    const ax = pts[2 * j], ay = pts[2 * j + 1], ex = pts[2 * j + 2] - ax, ey = pts[2 * j + 3] - ay, L = Math.hypot(ex, ey), o = 7 * j;
+    seg[o] = ax; seg[o + 1] = ay; seg[o + 2] = L > 1e-9 ? ex / L : 1; seg[o + 3] = L > 1e-9 ? ey / L : 0; seg[o + 4] = L; seg[o + 5] = rad[j]; seg[o + 6] = rad[j + 1];
   }
-  // the across direction of the shape as a whole: the normal of the chain from hand to tip (or of the first segment)
   for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) {
     const px = x + 0.5, py = y + 0.5;
     let best = Infinity, across = 0;
-    for (const [ax, ay, ex, ey, L, r1, r2] of seg) {
-      const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex, d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
+    for (let o = 0; o < 7 * ns; o += 7) {
+      const ax = seg[o], ay = seg[o + 1], ex = seg[o + 2], ey = seg[o + 3], L = seg[o + 4], r1 = seg[o + 5], r2 = seg[o + 6];
+      const dx = px - ax, dy = py - ay, Y = dx * ex + dy * ey, Xs = -dx * ey + dy * ex;
+      // the cone lies inside the capsule of its wider radius round its axis: a segment that cannot come nearer than the
+      // nearest so far is passed over (the result is the same)
+      const Yc = Y < 0 ? Y : Y > L ? Y - L : 0;
+      if (Math.sqrt(Xs * Xs + Yc * Yc) - (r1 > r2 ? r1 : r2) >= best) continue;
+      const d = L > 1e-6 ? coneDist(Math.abs(Xs), Y, L, r1, r2) : Math.hypot(dx, dy) - Math.max(r1, r2);
       if (d < best) { best = d; const t = L > 1e-6 ? Math.max(0, Math.min(1, Y / L)) : 0, r = r1 + (r2 - r1) * t; across = r > 1e-6 ? Math.max(-1, Math.min(1, Xs / r)) : 0; }
     }
     visit(y * w + x, best, across, x, y);

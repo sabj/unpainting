@@ -16,12 +16,15 @@ export function smoothProfile(a, win) {
   for (let i = 0; i < a.length; i++) { let s = 0, n = 0; for (let k = i - r; k <= i + r; k++) if (k >= 0 && k < a.length) { s += a[k]; n++; } out[i] = s / n; }
   return out;
 }
-/** Run-out of a stroke from x0 (mm), along x: the first distance past the stroke's start plateau (its mean from 5 to 15
- *  mm) where the pigment per mm, smoothed over 2 mm, falls below half of it. Infinity when it never does. */
+/** Run-out of a stroke from x0 (mm), along x: the first distance past the stroke's plateau (its mean from 10 to 20 mm)
+ *  where the pigment per mm, smoothed over 4 mm, falls below half of it. Infinity when it never does. A round lands on
+ *  its tip and opens to its belly over its contact length (about 7 mm for a 5 mm round), so the plateau is read past
+ *  that; and smoothed over 2 mm, as wide as one cold-press bump, a fading stroke crossed half its plateau where a single
+ *  bump fell (the base brush on another seed of the same paper ran out 9% further at 0.25 mm cells than at 0.1 mm). */
 export function runOut(perMm, mm, x0) {
-  const s = smoothProfile(perMm, Math.round(2 / mm)), at = d => Math.min(s.length - 1, Math.max(0, Math.round((x0 + d) / mm)));
-  let plateau = 0, n = 0; for (let k = at(5); k <= at(15); k++) { plateau += s[k]; n++; } plateau /= n;
-  for (let k = at(15); k < s.length; k++) if (s[k] < 0.5 * plateau) return k * mm - x0;
+  const s = smoothProfile(perMm, Math.round(4 / mm)), at = d => Math.min(s.length - 1, Math.max(0, Math.round((x0 + d) / mm)));
+  let plateau = 0, n = 0; for (let k = at(10); k <= at(20); k++) { plateau += s[k]; n++; } plateau /= n;
+  for (let k = at(20); k < s.length; k++) if (s[k] < 0.5 * plateau) return k * mm - x0;
   return Infinity;
 }
 /** Mean of a profile between two distances (mm) from x0. */

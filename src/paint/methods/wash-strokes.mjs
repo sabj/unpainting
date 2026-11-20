@@ -18,7 +18,7 @@
 import { traceOutlines } from '../../crop/outline.mjs';
 
 /** A round of the brush goes over the wet edge of the one before by this share of the brush's width. */
-const LANE_OVERLAP = 1 / 3;
+export const LANE_OVERLAP = 1 / 3;
 /** A stroke is laid only when at least this share of what it touches is not yet covered. */
 const LEAST_NEW = 0.25;
 /** A brush fits a wash that is at least this many brush widths across at its widest. */
@@ -26,7 +26,7 @@ const BRUSH_FIT = 1.25;
 /** A brush this wide or wider is a flat or a mop: it is swept in straight lanes, not steered round an outline. */
 const LANE_FROM_MM = 12;
 /** A lane of a flat or a mop goes over the one beside it by this share of the brush's width. */
-const FLAT_OVERLAP = 0.15;
+export const FLAT_OVERLAP = 0.15;
 /** The shortest lane a flat or a mop is swept in, in brush widths. */
 const LANE_LEAST = 0.6;
 

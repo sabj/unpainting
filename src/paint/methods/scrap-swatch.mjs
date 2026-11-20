@@ -15,12 +15,34 @@ export function swatchMask() {
   return mask;
 }
 
+/** The hand's pressure along a sweep, as the painter lays one (tools/plate/paint.mjs): it lands over the first `land` of
+ *  the sweep, bears down through its middle and lifts over the last `lift`. u is the share of the sweep travelled. */
+export const sweepPressure = (u, land = 0.06, lift = 0.1) => Math.max(0.18, Math.min(1.2, (0.72 + 0.28 * Math.sin(Math.PI * u)) * Math.min(Math.min(1, u / land), Math.min(1, (1 - u) / lift))));
+
+/**
+ * The swatch laid as the sheet lays a wash: straight lanes of a brush of `radius` cells from one side of the square to
+ * the other, as many as cover it with neighbours overlapping by `overlap` of the brush, the outer two inside its edges,
+ * each pressed as the painter presses a sweep. A point every cell, so a graded swatch can recharge along a lane.
+ * @returns {Array<Array<{x:number,y:number,r:number,p:number}>>}
+ */
+export function swatchLanes(radius, { overlap = 1 / 3 } = {}) {
+  const { x0, x1, y0, y1 } = SWATCH, r = Math.max(0.5, Math.min(radius, (y1 - y0) / 2));
+  const top = y0 + r, span = Math.max(0, y1 - r - top), count = span > 0 ? Math.ceil(span / (2 * r * (1 - overlap)) - 1e-9) + 1 : 1;
+  const n = Math.max(2, Math.ceil(x1 - x0) + 1), lanes = [];
+  for (let q = 0; q < count; q++) {
+    const y = count > 1 ? top + q * span / (count - 1) : (y0 + y1) / 2;
+    lanes.push(Array.from({ length: n }, (_, k) => ({ x: x0 + (x1 - x0) * k / (n - 1), y, r, p: sweepPressure(k / (n - 1)) })));
+  }
+  return lanes;
+}
+
 /**
  * Lay one technique on scrap and read what it delivers.
  * @param {{ water: number, passes: number, intoWet?: boolean, chunk?: number }} T the technique: its brush load, how many
  *   times the swatch is brushed while wet, whether clean water goes down first, and (chunk > 0) a recharge every
  *   `chunk` path points, as a graded wash is laid.
- * @param {object} env mask and paths of the swatch; pigment, physics and paperOptions of the scrap; charge, the
+ * @param {object} env mask and paths of the swatch (bedPaths, when given, wet the whole bed before a passage laid into
+ *   wet is charged along paths); pigment, physics and paperOptions of the scrap; charge, the
  *   concentration that should lay SWATCH.want; upright, the stroke heading; water(T), the dip's water;
  *   paintBrush(r, T) and waterBrush(r), the brushes; dip, stroke, step and dry, the caller's instruments;
  *   prepareBed(scrap, pts, r, T, cells), the sheet's own wetting of a wet-into-wet bed (its brushes, pickup and wait), or
@@ -31,13 +53,24 @@ export function swatchMask() {
  *   over want; all: the whole scrap's pigment over the swatch's cells, over want; escape: the share that ran past the
  *   swatch; edge: the swatch's open-edge share.
  */
-export function scrapDelivery(T, { mask, paths, pigment, physics, paperOptions, charge, upright, water, paintBrush, waterBrush, dip, stroke, step, dry, settle = null, prepareBed = null }) {
+export function scrapDelivery(T, { mask, paths, bedPaths = null, pigment, physics, paperOptions, charge, upright, water, paintBrush, waterBrush, dip, stroke, step, dry, settle = null, prepareBed = null }) {
   if (!Number.isInteger(T.passes) || T.passes < 1) throw new RangeError(`scrap swatch: ${T.name} needs a whole number of passes, got ${T.passes}`);
   const { width: SW, height: SH, want } = SWATCH, SN = SW * SH;
   const scrap = createSheet(makePaper(SW, SH, paperOptions), [pigment]);
+  // bedPaths: a passage laid in lanes into wet has its whole bed wetted first and is charged lane by lane after the wait
+  if (T.intoWet && bedPaths) {
+    const before = settle ? Float32Array.from(scrap.W) : null, cells = new Set();
+    for (const pts of bedPaths) {
+      const r = Math.max(1, ...pts.map(p => p.r)), lane = laneCells(pts, r, SW, SH);
+      for (const i of lane) cells.add(i);
+      if (prepareBed) prepareBed(scrap, pts, r, T, lane);
+      else { const wetB = waterBrush(r); dip(wetB, { water: 1, conc: [0] }); stroke(wetB, scrap, pts, { upright }); }
+    }
+    if (settle) settle(scrap, wettedCells(scrap, before, [...cells]));
+  }
   for (const pts of paths) {
     const r = Math.max(1, ...pts.map(p => p.r));
-    if (T.intoWet) {
+    if (T.intoWet && !bedPaths) {
       const before = settle ? Float32Array.from(scrap.W) : null;
       if (prepareBed) prepareBed(scrap, pts, r, T, laneCells(pts, r, SW, SH));
       else { const wetB = waterBrush(r); dip(wetB, { water: 1, conc: [0] }); stroke(wetB, scrap, pts, { upright }); }
