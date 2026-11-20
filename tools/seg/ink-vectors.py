@@ -48,6 +48,11 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
     if (lines_doc['image']['w'], lines_doc['image']['h']) != (w0, h0): raise SystemExit('ink-vectors: the line file is not on the drawing\'s grid')
     W, H = w0 * zoom, h0 * zoom; px = sheet_mm / W   # mm per grid pixel
     a = cv2.resize(darkness(bgr), (W, H), interpolation=cv2.INTER_CUBIC).clip(0, 1)
+    # a light drawing (pencil, whose firmest line is grey) is fitted on its own scale: the shapes are found as if its
+    # firmest line were black, and each stroke keeps its real darkness
+    firm = float(np.percentile(a[a > .02], 99)) if (a > .02).any() else 1.0
+    gain = 1 / firm if firm < .6 else 1.0
+    a = np.clip(a * gain, 0, 1)
     inkm = a > ink
     L = sorted(lines_doc['lines'], key=lambda l: l['seq'])
     g = lambda P: (np.asarray(P, float) + .5) * zoom - .5   # source pixel -> grid pixel
@@ -108,7 +113,7 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
             # its darkness: the median of its ink inside its edge (a drawing's black varies a little from mark to mark: over
             # 0.85 is black, so a dark mass made of several strokes is one black, not a patchwork of near-blacks; a grey
             # stays its own grey)
-            tone = float(np.median(vals)); tone = 1.0 if tone >= .85 else tone
+            tone = float(np.median(vals)) / gain; tone = 1.0 if tone >= .85 else tone
             # the field the outline is fitted to: this piece's own ink, reaching a pixel past a cut so neighbours abut
             f = np.pad(np.where(grow(m), F, 0), 1)
             rings = []
@@ -135,7 +140,7 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
     strokes.sort(key=lambda s: s['seq'])
     for i, s in enumerate(strokes): s['seq'] = i
     return {'source': 'ink-vectors: strokes as vector shapes fitted to a prepared drawing\'s ink', 'medium': lines_doc.get('medium', 'ink'),
-            'sheetMm': sheet_mm, 'heightMm': sheet_mm * h0 / w0, 'drawing': {'w': w0, 'h': h0}, 'level': 'half the stroke\'s darkness',
+            'sheetMm': sheet_mm, 'heightMm': sheet_mm * h0 / w0, 'drawing': {'w': w0, 'h': h0}, 'level': 'half the stroke\'s darkness', 'firm': round(firm, 3),
             'targetSHA256': lines_doc.get('targetSHA256'), 'strokes': strokes}
 
 def render_vectors(doc, width, upto=None, ss=4):
