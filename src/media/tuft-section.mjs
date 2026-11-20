@@ -65,15 +65,16 @@ export const feedRate = feed => Math.max(TUFT.wick, -Math.log(1 - Math.min(0.99,
  *  at (hx, hy), segment length seg (cells), the previous step's seg0, and the direction (dx, dy) a chain lies in when
  *  it has none. A point further than seg from the one before it is pulled in along the line between them (towed); a
  *  segment shorter than seg grows by TUFT.creep of the growth of seg that the hand's travel does not take up, as pressure
- *  bends the tuft over and its tip slides.
+ *  bends the tuft over and its tip slides. With `hold` the tip is held where it landed: nothing slides, and the tuft
+ *  only unrolls between the landing point and the hand as the hand moves away from it.
  *  Returns pts (made, gathered at the hand, when null). */
-export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy) {
+export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy, hold = false) {
   const moved = pts ? Math.hypot(hx - pts[0], hy - pts[1]) : 0;
   if (!pts) { pts = new Float64Array(3 * S); for (let j = 0; j < S; j++) { pts[2 * j] = hx; pts[2 * j + 1] = hy; } }
   pts[0] = hx; pts[1] = hy;
   // what the press grows the tuft by that the hand's own travel does not take up slides the tip out: all of it in a tap,
   // little of it when the brush lands on the move (its tip holds where it touched and the hand draws the belly down)
-  const grow = Math.max(0, seg - seg0 - moved / (S - 1));
+  const grow = hold ? 0 : Math.max(0, seg - seg0 - moved / (S - 1));
   for (let j = 1; j < S; j++) {
     const ax = pts[2 * j - 2], ay = pts[2 * j - 1];
     let ex = pts[2 * j] - ax, ey = pts[2 * j + 1] - ay, L = Math.hypot(ex, ey);
@@ -82,7 +83,7 @@ export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy) {
     let px = dx, py = dy;
     if (j > 1) { const qx = ax - pts[2 * j - 4], qy = ay - pts[2 * j - 3], q = Math.hypot(qx, qy); if (q > 1e-9) { px = qx / q; py = qy / q; } }
     const own = pts[2 * S + j - 1];
-    if (L <= 1e-9 || own <= 0) { ex = px; ey = py; L = 0; } // gathered at the one before: it lies on in the chain's line
+    if (L <= 1e-9 || (own <= 0 && !hold)) { ex = px; ey = py; L = 0; } // gathered at the one before: it lies on in the chain's line
     const to = L > seg ? seg : Math.min(seg, Math.max(L, own + TUFT.creep * grow));
     if (L < to && ex * px + ey * py < 0) { ex = px; ey = py; } // a segment growing under a press lies on in the chain's line
     pts[2 * j] = ax + ex * to; pts[2 * j + 1] = ay + ey * to; pts[2 * S + j - 1] = to;

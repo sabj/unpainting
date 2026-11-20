@@ -228,3 +228,17 @@ test('the mark tape records the section brush and the hand speed of its strokes'
     assert.equal(marks.BRUSHOPTS[0].model, 'section');
   } finally { marks.recordMarks(false); }
 });
+
+test('a stroke lays inside its planned ends: a round lands on its point there, a flat on its edge', () => {
+  const mm = 0.1;
+  for (const [name, make] of [['round', () => round(mm, 2.5)], ['flat', () => flat(mm, 4)]]) {
+    const sheet = createSheet(paperAt(40, 14, mm), pigments), b = make();
+    dip(b, { water: 1, conc: [0.5, 0] });
+    stroke(b, sheet, inMm([{ x: 5, y: 7, p: 1 }, { x: 35, y: 7, p: 1 }], mm), { upright: 'sweep' });
+    const wet = x => widthAt(sheet, Math.round(x / mm));
+    let outside = 0, inside = 0;
+    for (let y = 0; y < sheet.h; y++) for (let x = 0; x < sheet.w; x++) { const i = y * sheet.w + x, v = sheet.W[i] + sheet.s[i], at = (x + 0.5) * mm; if (at < 5 - mm || at > 35 + mm) outside += v; else inside += v; }
+    assert.ok(outside < 0.005 * inside, `${name}: ${(100 * outside / inside).toFixed(2)}% of the water past the ends`);
+    if (name === 'round') assert.ok(wet(5.5) < 0.4 * wet(15), `the round lands on its point: ${wet(5.5)} cells wide 0.5 mm in, ${wet(15)} at 10 mm`);
+  }
+});
