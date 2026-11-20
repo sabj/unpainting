@@ -22,7 +22,7 @@ export const INK_RECIPES = Object.freeze({
 // start and a short lift, pressed fully (the stroke's own weight sets how hard), loaded to twice the subject's line
 // absorbance (a drawing's line is near black where a painting's is grey), its contact widened to the drawn width: black ink (not the source's sepia) in the flexible drawing nib (0.03 to 1.2 mm, so each stroke
 // keeps its drawn width), a load match that may go past 4x, no damp, one opening pen.
-export const PEN_ONLY = Object.freeze({ inkprofile: 'drawing-ink', inkhue: 'profile', inkloadmax: '16', drawing: 'first', stages: 'prepink', drawwant: '1', inkdarkmatch: '2', drawwidthgain: '1.4',
+const PEN_ONLY = Object.freeze({ inkprofile: 'drawing-ink', inkhue: 'profile', inkloadmax: '16', drawing: 'first', stages: 'prepink', drawwant: '1', inkdarkmatch: '2', drawwidthgain: '1.4',
   drawtaperin: '1', drawtaperstart: '1', drawtaperout: '3', drawtaperend: '0.85', inkbleed: '0' });
 
 /**
