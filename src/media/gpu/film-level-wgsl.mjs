@@ -29,8 +29,7 @@ export function lvxWords(w, h, ntiles) {
 // words (x0, y0, x1, y1, deposit sum, wet count, fill, LT offset, LT tiles, alpha, beta, rz, tol, iterations, state,
 // substeps), the cluster-to-box map, then LT: the tiles holding level cells, grouped by box.
 // LVS (atomic u32): [3] most CG iterations a solve took, [4] solves stopped at u.lvIt, [5] most substeps a box asked
-// for, [6] boxes that got fewer than they asked for, [7] solves, [10] steps with more boxes than u.lvBoxes, [11] the most
-// boxes; per box at 16 + 2 b, the largest explicit face flux
+// for, [6] boxes that got fewer than they asked for, [7] solves, [11] the most boxes; per box at 16 + 2 b, the largest explicit face flux
 // (most) and the largest outflow over water (worst), as f32 bits.
 // State bits: 1 the box levels, 2 its CG is done.
 export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
@@ -204,9 +203,6 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
       }
     }
     LVX[0] = nb; LVX[1] = off;
-    // the per-box kernels run on u.lvBoxes workgroups (the host's count, from the boxes it has seen); a box past them
-    // does not level this step, and is counted
-    if (f32(nb) > u.lvBoxes) { atomicAdd(&LVS[10], 1u); }
     atomicMax(&LVS[11], nb);
   }
   storageBarrier(); workgroupBarrier();
@@ -352,17 +348,24 @@ fn lvBoxSums(b: u32, li: u32) {
   workgroupBarrier();
   lvReduce2(li);
 }
+// The per-box kernels: each workgroup takes boxes wid.x, wid.x + workgroups, ... (any number of workgroups covers them)
+var<workgroup> lvBoxN: u32;
+fn lvBoxCount(li: u32) -> u32 { if (li == 0u) { lvBoxN = LVX[0]; } return workgroupUniformLoad(&lvBoxN); }
 @compute @workgroup_size(256)
-fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  let b = wid.x; let B = lvBX(b);
-  if (li == 0u) { lvBox = select(0u, 1u, lvActive(b) && LVX[B + 8u] > 0u); }
-  if (workgroupUniformLoad(&lvBox) == 0u) { if (li == 0u) { LVX[B + 14u] = 0u; } return; }
-  lvBoxSums(b, li);
-  if (li == 0u) {
-    let bb = lvSum[0]; let tol = max(1e-24, 1e-12 * bb);
-    LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(lvSum2[0]); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
-    LVX[B + 14u] = select(1u, 3u, bb <= tol);
-    atomicAdd(&LVS[7], 1u);
+fn lv_cg0(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  let nb = lvBoxCount(li);
+  for (var b = wid.x; b < nb; b += nw.x) {
+    let B = lvBX(b);
+    if (li == 0u) { lvBox = select(0u, 1u, lvActive(b) && LVX[B + 8u] > 0u); }
+    if (workgroupUniformLoad(&lvBox) == 0u) { if (li == 0u) { LVX[B + 14u] = 0u; } continue; }
+    lvBoxSums(b, li);
+    if (li == 0u) {
+      let bb = lvSum[0]; let tol = max(1e-24, 1e-12 * bb);
+      LVX[B + 9u] = 0u; LVX[B + 10u] = 0u; LVX[B + 11u] = bitcast<u32>(lvSum2[0]); LVX[B + 12u] = bitcast<u32>(tol); LVX[B + 13u] = 0u;
+      LVX[B + 14u] = select(1u, 3u, bb <= tol);
+      atomicAdd(&LVS[7], 1u);
+    }
+    workgroupBarrier();
   }
 }
 fn lvRunning(b: u32) -> bool { return lvState(b) == 1u; }
@@ -397,14 +400,17 @@ fn lv_cg_a(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
   }
 }
 @compute @workgroup_size(256)
-fn lv_cg_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  let b = wid.x;
-  if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
-  if (workgroupUniformLoad(&lvBox) == 0u) { return; }
-  lvBoxSums(b, li);
-  if (li == 0u) {
-    let B = lvBX(b); let pq = lvSum[0];
-    if (!(pq > 0.0)) { LVX[B + 14u] = 3u; } else { LVX[B + 9u] = bitcast<u32>(bitcast<f32>(LVX[B + 11u]) / pq); }
+fn lv_cg_b(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  let nb = lvBoxCount(li);
+  for (var b = wid.x; b < nb; b += nw.x) {
+    if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
+    if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
+    lvBoxSums(b, li);
+    if (li == 0u) {
+      let B = lvBX(b); let pq = lvSum[0];
+      if (!(pq > 0.0)) { LVX[B + 14u] = 3u; } else { LVX[B + 9u] = bitcast<u32>(bitcast<f32>(LVX[B + 11u]) / pq); }
+    }
+    workgroupBarrier();
   }
 }
 @compute @workgroup_size(16, 16)
@@ -437,18 +443,21 @@ fn lv_cg_c(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
   }
 }
 @compute @workgroup_size(256)
-fn lv_cg_d(@builtin(workgroup_id) wid: vec3<u32>, @builtin(local_invocation_index) li: u32) {
-  let b = wid.x;
-  if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
-  if (workgroupUniformLoad(&lvBox) == 0u) { return; }
-  lvBoxSums(b, li);
-  if (li == 0u) {
-    let B = lvBX(b); let rr = lvSum[0]; let next = lvSum2[0];
-    LVX[B + 10u] = bitcast<u32>(next / bitcast<f32>(LVX[B + 11u])); LVX[B + 11u] = bitcast<u32>(next);
-    let it = LVX[B + 13u] + 1u; LVX[B + 13u] = it;
-    atomicMax(&LVS[3], it);
-    if (rr <= bitcast<f32>(LVX[B + 12u])) { LVX[B + 14u] = 3u; }
-    else if (f32(it) >= u.lvIt) { LVX[B + 14u] = 3u; atomicAdd(&LVS[4], 1u); }
+fn lv_cg_d(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>, @builtin(local_invocation_index) li: u32) {
+  let nb = lvBoxCount(li);
+  for (var b = wid.x; b < nb; b += nw.x) {
+    if (li == 0u) { lvBox = select(0u, 1u, lvRunning(b)); }
+    if (workgroupUniformLoad(&lvBox) == 0u) { continue; }
+    lvBoxSums(b, li);
+    if (li == 0u) {
+      let B = lvBX(b); let rr = lvSum[0]; let next = lvSum2[0];
+      LVX[B + 10u] = bitcast<u32>(next / bitcast<f32>(LVX[B + 11u])); LVX[B + 11u] = bitcast<u32>(next);
+      let it = LVX[B + 13u] + 1u; LVX[B + 13u] = it;
+      atomicMax(&LVS[3], it);
+      if (rr <= bitcast<f32>(LVX[B + 12u])) { LVX[B + 14u] = 3u; }
+      else if (f32(it) >= u.lvIt) { LVX[B + 14u] = 3u; atomicAdd(&LVS[4], 1u); }
+    }
+    workgroupBarrier();
   }
 }
 // the water each face carries over the step, from the new surface: stored at the face's +x / +y cell, towards +x / +y
@@ -486,14 +495,16 @@ fn lv_out(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     if (out > 0.0 && wk > u.wetEps) { atomicMax(&LVS[17u + 2u * b], bitcast<u32>(out / wk)); }
   }
 }
-@compute @workgroup_size(1)
-fn lv_subs(@builtin(workgroup_id) wid: vec3<u32>) {
-  let b = wid.x; let B = lvBX(b); if (LVX[B + 14u] == 0u) { return; }
-  let worst = bitcast<f32>(atomicLoad(&LVS[17u + 2u * b]));
-  let want = u32(min(64.0, max(1.0, ceil(worst / 0.5))));
-  atomicMax(&LVS[5], want);
-  if (f32(want) > u.lvSubs) { atomicAdd(&LVS[6], 1u); }
-  LVX[B + 15u] = min(want, u32(u.lvSubs));
+@compute @workgroup_size(64)
+fn lv_subs(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>) {
+  for (var b = gid.x; b < LVX[0]; b += 64u * nw.x) {
+    let B = lvBX(b); if (LVX[B + 14u] == 0u) { continue; }
+    let worst = bitcast<f32>(atomicLoad(&LVS[17u + 2u * b]));
+    let want = u32(min(64.0, max(1.0, ceil(worst / 0.5))));
+    atomicMax(&LVS[5], want);
+    if (f32(want) > u.lvSubs) { atomicAdd(&LVS[6], 1u); }
+    LVX[B + 15u] = min(want, u32(u.lvSubs));
+  }
 }
 // one substep (round LVROUND of the box's): the donors' water scale, each pigment's concentration and pigment scale
 @compute @workgroup_size(16, 16)
