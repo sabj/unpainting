@@ -156,7 +156,8 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=.6,
             # a line's darkness is its core's (the darker tenth): its edge at half of that is its drawn width (the width at half
             # the darkness of a soft-edged line), so a thin black line stays thin and black; a grey area under black bars
             # takes its median, an even wash of grey
-            tone = (float(np.median(vals)) if split and n_ == 0 else top) / gain; tone = 1.0 if tone >= .85 else tone
+            # (a pale line, under half black, keeps the median of its ink: its darkness spread over its half-level width)
+            tone = (float(np.median(vals)) if (split and n_ == 0) or faint else top) / gain; tone = 1.0 if tone >= .85 else tone
             # the field the outline is fitted to: this piece's own ink, reaching a pixel past a cut so neighbours abut
             f = np.pad(np.where(grow(m), F, 0), 1)
             rings = []
@@ -200,7 +201,7 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=.6,
                     T = np.gradient(Q, axis=0); T /= np.maximum(1e-9, np.hypot(*T.T))[:, None]; C = Q + np.c_[-T[:, 1], T[:, 0]] * off[:, None]
                     # a thin line's core (under three grid pixels) reads lighter than it was drawn (a pixel-wide black line sampled between pixels):
                     # darkness up to black over 0.75, the width narrowed to keep the same ink, so it is thin and black
-                    if .45 <= tone < 1 and np.median(wid) < 3: t2 = min(1.0, tone / .75); wid = wid * tone / t2; tone = t2
+                    if .6 <= tone < 1 and np.median(wid) < 3: t2 = min(1.0, tone / .75); wid = wid * tone / t2; tone = t2
                     ring = sausage(C, np.maximum(.35, wid / 2))
                     a_ring, a_s = abs(ring_area(np.asarray(rings[0]) / px)), abs(ring_area(ring))
                     if a_ring > 0 and abs(a_s / a_ring - 1) < .33:
