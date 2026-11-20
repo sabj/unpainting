@@ -58,7 +58,7 @@ import {gaussian} from '../../src/keyframes/density.mjs';
 import {overlay} from '../../src/media/gouache.mjs';
 // Optional stages, one module each, off unless their flag is given.
 import {furLightReserves} from '../../src/paint/methods/finish-texture.mjs';
-import {sampledInkAbsorbance, matchInkLoad, sampleGestures} from '../../src/paint/methods/ink-match.mjs';
+import {sampledInkAbsorbance, matchInkLoad, sampleGestures, INK_STRENGTH_QUANTILE} from '../../src/paint/methods/ink-match.mjs';
 import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
 import {loadPhysical} from '../../src/paint/methods/brushes.mjs';
 import {fillSheetBase, WHITE_PAPER_RGB} from '../../src/paint/methods/sheet-tone.mjs';
@@ -400,14 +400,14 @@ const drawingCapsFor = (stage, graphite = false) => {
 const INK_MATCH={};
 function inkDarkMatch(stage,gs,optionsAt,want,w,h){
  if(INK_MATCH[stage])return INK_MATCH[stage].factor;
- const A=ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance;
+ const ST=ctx.INK_LINES?.[stage]?.stats, firm=ST?.inkAbsorbance>0, A=firm?ST.inkAbsorbance:ST?.peakAbsorbance;
  if(!(A>0)){INK_MATCH[stage]={factor:1,why:'no measured target lines for this stage'};console.log(`ink dark match, ${stage}: no measured target lines, load unchanged`);return 1;}
  const sample=sampleGestures(gs,60), N=INKRES?.N??1, fw=w*N, fh=h*N;
  const baseOpts=(()=>{const {edgeStrength,state,audit,O:o,...rest}=optionsAt(1);return rest;})();
- const r=cachedStepSync({...RUN_CACHE,name:`ink-dark-match-${stage}`,code:codeHash(root,[],{dependencies:['src/paint/methods/ink-match.mjs','src/paint/methods/fine-material.mjs','src/paint/methods/material-profiles.mjs','src/media/draw.mjs','src/media/pen.mjs']}),track:optTrack,inputs:{stage,A,sample,N,w,h,PAPER_OPTS,INK,baseOpts,...(INKRES?{}:{want})}},()=>{
+ const r=cachedStepSync({...RUN_CACHE,name:`ink-dark-match-${stage}`,code:codeHash(root,[],{dependencies:['src/paint/methods/ink-match.mjs','src/paint/methods/fine-material.mjs','src/paint/methods/material-profiles.mjs','src/media/draw.mjs','src/media/pen.mjs']}),track:optTrack,inputs:{stage,A,firm,sample,N,w,h,PAPER_OPTS,INK,baseOpts,...(INKRES?{}:{want})}},()=>{
   const paper=INKRES?INKRES.fine.paper:makePaper(w,h,PAPER_OPTS);
   if(paper.w!==fw||paper.h!==fh)throw Error('Ink calibration paper dimensions differ');
-  const absorbance=sampledInkAbsorbance(fw,fh,N>1?fineGestures(sample,N):sample);
+  const absorbance=sampledInkAbsorbance(fw,fh,N>1?fineGestures(sample,N):sample,firm?{quantile:INK_STRENGTH_QUANTILE,paperL:100}:{});
   const scrap=createSheet(paper,[INK]);
   scrap._tapePigmentMap={count:SHEET_PIGS.length,indices:[PIGS.length]};
   const measure=f=>{
@@ -419,7 +419,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
    return absorbance(scrap);
   };
   const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0),measure});
-  console.log(`ink dark match, ${stage}: target lines ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${res.before.toFixed(2)}, so the load is scaled by ${res.factor.toFixed(3)} (now ${res.after.toFixed(2)})`);
+  console.log(`ink dark match, ${stage}: target ${firm?'firm lines against paper':'lines'} ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${res.before.toFixed(2)}, so the load is scaled by ${res.factor.toFixed(3)} (now ${res.after.toFixed(2)})`);
   return res;
  }).value;
  INK_MATCH[stage]={...r,target:A,sample:sample.length};

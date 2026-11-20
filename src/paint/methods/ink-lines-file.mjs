@@ -13,7 +13,7 @@ import sharp from 'sharp';
 import { linePaths, hasLineFile, readLineText } from '../../crop/lines.mjs';
 import { labPlanes } from './line-evidence.mjs';
 import { holdLinesToTarget } from './ink-lines.mjs';
-import { strokesPeakAbsorbance } from './ink-match.mjs';
+import { strokesPeakAbsorbance, INK_STRENGTH_QUANTILE } from './ink-match.mjs';
 import { separate } from '../../crop/inkwash.mjs';
 import { decideFile } from './ink-decide-file.mjs';
 import { DECIDE_DEFAULTS } from './ink-decide.mjs';
@@ -103,7 +103,9 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
   // the target's line cores, as --inkdarkmatch reads the pen's strokes on its scrap
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));
-  const stats = flags.darkMatch > 0 ? { ...r.stats, peakAbsorbance: strokesPeakAbsorbance(L, im.w, im.h, gestures) } : r.stats;
+  // peakAbsorbance: the lines' median step against their sides (a record). inkAbsorbance: the ink's own strength, read on
+  // the firm lines against bare paper; this is what the pen's load is matched to.
+  const stats = flags.darkMatch > 0 ? { ...r.stats, peakAbsorbance: strokesPeakAbsorbance(L, im.w, im.h, gestures), inkAbsorbance: strokesPeakAbsorbance(L, im.w, im.h, gestures, { quantile: INK_STRENGTH_QUANTILE, paperL: quantileOf(L, 0.9) }) } : r.stats;
   const record = { file, out: null, stats, pixelMm: sheetMm / targetW, filePixelMm: pxMm, ...(model ? { model: true } : {}) };
   const changed = support > 0 || flags.smoothMm > 0 || flags.lineMeasure > 0 || decided;
   if (changed) {

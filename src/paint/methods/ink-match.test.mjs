@@ -62,3 +62,14 @@ test('gathered bilinear neighbours preserve full-sheet RGB rounding and absorban
  sheet.D[0].fill(0.13);
  assert.equal(measure(sheet),strokesPeakAbsorbance(lPlane(renderLayers(layersOf(sheet),[pig],new Uint8ClampedArray(w*h*3).fill(255),w*h),w*h),w,h,gestures));
 });
+
+test('the ink strength is read on the firm lines against bare paper, not on the median step against a wash', async () => {
+  const { strokesPeakAbsorbance, INK_STRENGTH_QUANTILE } = await import('./ink-match.mjs');
+  // a black line (L* 10) on a mid-tone wash (L* 50), and a thin grey one (L* 40) beside it; the paper is L* 95
+  const w = 40, h = 20, L = new Float32Array(w * h).fill(50);
+  for (let x = 0; x < w; x++) { L[5 * w + x] = 10; L[14 * w + x] = 40; }
+  const lines = [{ points: [{ x: 2, y: 5 }, { x: 37, y: 5 }] }, { points: [{ x: 2, y: 14 }, { x: 37, y: 14 }] }];
+  const step = strokesPeakAbsorbance(L, w, h, lines), ink = strokesPeakAbsorbance(L, w, h, lines, { quantile: INK_STRENGTH_QUANTILE, paperL: 95 });
+  assert.ok(ink > step + 1, `ink ${ink} against step ${step}`);
+  assert.ok(ink > 3, 'the black line is read as black ink');
+});
