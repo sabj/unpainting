@@ -320,6 +320,10 @@ const ACCENT_MOST_MM2 = 15, ACCENT_L = 40;
 const GLAZE_STEP_L = 7, GLAZE_STEPS = [1, 0.8, 0.62, 0.45, 0.3, 0.2], GLAZE_LEAST_MM2 = 6;
 /** A dark (a window's glass) is glazed whole more times before its glazes shrink. */
 const GLAZE_STEPS_DARK = [1, 1, 0.9, 0.8, 0.7, 0.6];
+/** A cast shadow's later glazes may reach this far (mm) past its block-in shape where the finest study is as dark. */
+const SHADOW_REACH_MM = 8;
+/** Skin: a shape of this hue (Lab degrees), chroma and at least this light takes at most SKIN_GLAZES glazes and no touches. */
+const SKIN_HUE = [30, 80], SKIN_C = [8, 45], SKIN_L = 45, SKIN_GLAZES = 2;
 /** Foliage glazes: each covers the canopy cells at or under this quantile of the finest study's lightness, its colour read
  * from this study of the stack (0 the block-in), its leaf strokes kept in this share of their clusters; no glaze moves a
  * place by more than FOLIAGE_STEP_L (L*). */
@@ -510,6 +514,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // (a shape that loses most of itself is not broken but thin: a mast, a rope, a frame, laid in a pull along its length)
     return 1 - kept / c >= BROKEN_LOST && 1 - kept / c < BROKEN_THIN;
   };
+  const isSkin = shape => { const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360; return shape.chroma >= SKIN_C[0] && shape.chroma <= SKIN_C[1] && hue >= SKIN_HUE[0] && hue <= SKIN_HUE[1] && shape.lab[0] >= SKIN_L; };
   const isGreen = shape => { const hue = (Math.atan2(shape.lab[2], shape.lab[1]) * 180 / Math.PI + 360) % 360; return shape.chroma >= 8 && hue >= BROKEN_HUE[0] && hue <= BROKEN_HUE[1]; };
   // a hash of a grid point, 0..1, fixed to the sheet (no picture is read)
   const hash = (a, b, c = 0) => { let x = Math.imul(a * 73856093 ^ b * 19349663 ^ c * 83492791, 2654435761) >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return (x >>> 0) / 4294967296; };
@@ -749,10 +754,17 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // is dry, each a little smaller (the parts of the shape that the finest study shows darker), laid after every
     // first wash so the painter works elsewhere while each dries
     if (!flat && !MONO && !isBroken && (shadow || dark)) {
-      const u0 = underMix(own), Lu = filmLab(u0, pigments, paperCol)[0], Lt = labOf(target, 0, valueRef)[0], K = Math.max(1, Math.min(GLAZE_STEPS.length, Math.ceil((Lu - Lt) / GLAZE_STEP_L)));
+      // (skin takes at most two glazes: a face is a few pale soft washes, never built dark)
+      const u0 = underMix(own), Lu = filmLab(u0, pigments, paperCol)[0], Lt = labOf(target, 0, valueRef)[0], K = Math.max(1, Math.min(isSkin(s) ? SKIN_GLAZES : GLAZE_STEPS.length, Math.ceil((Lu - Lt) / GLAZE_STEP_L)));
+      // a cast shadow's later glazes follow the finest study's dapple: they may run past the block-in shape, within
+      // SHADOW_REACH_MM of it, onto any painted cell the finest study shows as dark (the shadow covers the wall, the
+      // sunlit patches cut into it)
+      const ownSet = new Uint8Array(pn); for (const q of own) ownSet[q] = 1;
+      const reach = shadow ? dilate(ownSet, pw, ph, rC(SHADOW_REACH_MM)) : ownSet;
+      const reachCells = []; if (shadow) for (let q = 0; q < pn; q++) if (reach[q] && !paperMask[q] && !isDark(label[q]) && !broken(shapes[label[q]])) reachCells.push(q);
       const fl = own.map(q => fineL[q]).sort((a, b) => a - b), at = f => fl[Math.min(fl.length - 1, Math.floor(f * fl.length))];
       for (let k = 0; k < K; k++) {
-        const cut = k ? at((dark ? GLAZE_STEPS_DARK : GLAZE_STEPS)[k]) : Infinity, cells = own.filter(q => fineL[q] <= cut); if (cells.length * cellMm2 < GLAZE_LEAST_MM2) break;
+        const cut = k ? at((dark ? GLAZE_STEPS_DARK : GLAZE_STEPS)[k]) : Infinity, cells = (k && shadow ? reachCells : own).filter(q => fineL[q] <= cut); if (cells.length * cellMm2 < GLAZE_LEAST_MM2) break;
         const gm = new Uint8Array(pn); for (const q of cells) gm[q] = 1;
         const gp = k ? partLoops(gm, roundFirst, paperMask).filter(l => cellsIn(l).length * cellMm2 >= GLAZE_LEAST_MM2) : parts; if (!gp.length) break;
         const gl = gp.flat(), colour = withL(target, Lu - (Lu - Lt) * (k + 1) / K);
@@ -877,7 +889,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // touches of one colour are one mix, mixed for what they add over what is laid there; groups that do not touch
     // share a session
     // (the darks of the block-in were laid from the finest study already)
-    const keepFor = leftDark.size ? Uint8Array.from(paperMask, (v, q) => (v || leftDark.has(label[q]) ? 1 : 0)) : paperMask;
+    const keepFor = Uint8Array.from(paperMask, (v, q) => (v || leftDark.has(label[q]) || isSkin(shapes[label[q]]) ? 1 : 0));
     const coarseL = Float32Array.from({ length: pn }, (_, q) => { let v = 0; for (let k = 0; k < li; k++) v = Math.max(v, labOf(grids[k], q, valueRef)[0]); return v; });
     const groups = touchesFrom({ grid: grids[li], ref: { L: refL, A: refA, B: refB }, paper: keepFor, pw, ph, mmX, paperRGB: paperCol, minMm2, kit: TOUCH_KIT, salt: li, coarseL });
     // touches must earn their place (the owner, 20 Nov 2026: the plate after the glazes was better than after its touches,
