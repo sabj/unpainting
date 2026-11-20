@@ -90,32 +90,48 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
         x0, y0, x1, y1 = max(0, b[1].start - 3), max(0, b[0].start - 3), min(W, b[1].stop + 3), min(H, b[0].stop + 3)
         own = owner[y0:y1, x0:x1] == k
         # the stroke's darkness: its core (the darker tenth of its ink); its edge at half of that
-        av = a[y0:y1, x0:x1][own]; dk = float(np.percentile(av, 90)); lvl = .5 * dk
+        av = a[y0:y1, x0:x1][own]; dk = float(np.percentile(av, 90))
         if dk < 2 * ink: continue
-        # its darkness: the median of its ink inside the half level (a grey line is a lighter stroke, a black one black)
-        # (a drawing's black varies a little from mark to mark: over 0.9 is black, so a dark mass made of several strokes
-        # is one black, not a patchwork of near-blacks)
-        tone = float(min(1, np.median(av[av >= lvl]) / .9))
-        # the field the outline is fitted to: this stroke's own ink, reaching half a pixel past a cut so neighbours abut
-        f = np.where(cv2.dilate(own.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0, a[y0:y1, x0:x1], 0)
-        f = np.pad(f, 1)
-        rings = []
-        for c in find_contours(f, lvl):
-            if len(c) < 4 or not np.allclose(c[0], c[-1]): continue
-            c = c - 1 + [y0, x0]
-            c = simplify_ring(smooth_ring(c[:-1], sigma), eps)
-            if len(c) >= 3: rings.append(np.round(edge_ring(c), 3).tolist())
-        if not rings: continue
+        A = a[y0:y1, x0:x1]; grow = lambda m: cv2.dilate(m.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+        # a stroke whose ink is part black and part grey (black bars round a grey pane) is two pieces on one path, the grey
+        # laid first and the black over it, each at its own darkness: grey stays grey
+        # (grey that is a black line's soft edge does not count: only grey two pixels and more from the black)
+        black = own & (A >= .7); greyc = own & (A >= .2) & (A < .6) & ~(cv2.dilate(black.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
+        pieces = [(own, dk)] if not (black.sum() >= 12 and greyc.sum() >= max(12, .3 * own.sum())) else [(own & ~black | greyc, float(np.percentile(A[greyc], 90))), (black, float(np.percentile(A[black], 90)))]
+        parts = []
+        for m, top in pieces:
+            # a faint line is one stroke: its field softened a little and its edge at 0.4 of its darkness, so its dips do not
+            # break it into dashes
+            faint = top < .5; F = cv2.GaussianBlur(A, (0, 0), .8) if faint else A; lvl = (.4 if faint else .5) * top
+            vals = A[m]; vals = vals[vals >= lvl]
+            if not len(vals): continue
+            # its darkness: the median of its ink inside its edge (a drawing's black varies a little from mark to mark: over
+            # 0.85 is black, so a dark mass made of several strokes is one black, not a patchwork of near-blacks; a grey
+            # stays its own grey)
+            tone = float(np.median(vals)); tone = 1.0 if tone >= .85 else tone
+            # the field the outline is fitted to: this piece's own ink, reaching a pixel past a cut so neighbours abut
+            f = np.pad(np.where(grow(m), F, 0), 1)
+            rings = []
+            for c in find_contours(f, lvl):
+                if len(c) < 4 or not np.allclose(c[0], c[-1]): continue
+                c = c[:-1] - 1 + [y0, x0]
+                # smoothing no more than a quarter of the ring's own radius, so a small white gap keeps its size
+                rad = len(c) / (2 * np.pi)
+                c = simplify_ring(smooth_ring(c, min(sigma, .25 * rad)), min(eps, .1 * rad))
+                if len(c) >= 3: rings.append(np.round(edge_ring(c), 3).tolist())
+            if rings: parts.append((rings, tone, f, lvl))
+        if not parts: continue
         if k <= len(L):
             l = L[k - 1]; path = (np.asarray(l['points'], float) + .5) * (sheet_mm / w0)
             rec = {'seq': l['seq'], 'part': l.get('part'), 'phase': l.get('phase'), 'object': l.get('object'), 'unit': l.get('unit')}
         else:
             e = extra[k - len(L) - 1]; path = (e['path'] + .5) * px; rec = {'seq': (L[e['after']]['seq'] if e['after'] >= 0 else len(L)) + .5, 'part': 'small', 'phase': 'texture'}
         # the width along the path: twice the distance to the outline's ink, read on the grid
-        inside = (f[1:-1, 1:-1] >= lvl).astype(np.uint8); dt = cv2.distanceTransform(np.pad(inside, 1), cv2.DIST_L2, 5)[1:-1, 1:-1]
-        gp = path / px - .5; ii = np.clip(np.round(gp[:, 0]).astype(int) - x0, 0, x1 - x0 - 1); jj = np.clip(np.round(gp[:, 1]).astype(int) - y0, 0, y1 - y0 - 1)
-        widths = np.round(2 * dt[jj, ii] * px, 3).tolist()
-        strokes.append({**rec, 'dark': round(tone, 3), 'path': np.round(path, 3).tolist(), 'widths': widths, 'outline': rings})
+        for n_, (rings, tone, f, lvl) in enumerate(parts):
+            inside = (f[1:-1, 1:-1] >= lvl).astype(np.uint8); dt = cv2.distanceTransform(np.pad(inside, 1), cv2.DIST_L2, 5)[1:-1, 1:-1]
+            gp = path / px - .5; ii = np.clip(np.round(gp[:, 0]).astype(int) - x0, 0, x1 - x0 - 1); jj = np.clip(np.round(gp[:, 1]).astype(int) - y0, 0, y1 - y0 - 1)
+            widths = np.round(2 * dt[jj, ii] * px, 3).tolist()
+            strokes.append({**rec, 'seq': rec['seq'] + .01 * n_, 'dark': round(tone, 3), 'path': np.round(path, 3).tolist(), 'widths': widths, 'outline': rings, **({'piece': ['grey', 'black'][n_]} if len(parts) > 1 else {})})
     strokes.sort(key=lambda s: s['seq'])
     for i, s in enumerate(strokes): s['seq'] = i
     return {'source': 'ink-vectors: strokes as vector shapes fitted to a prepared drawing\'s ink', 'medium': lines_doc.get('medium', 'ink'),
