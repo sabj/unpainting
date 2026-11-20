@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { expandRecipe } from './recipe.mjs';
 
 const flagNames = argv => argv.filter((_, i) => i % 2 === 0);
+// the bundled Trumbull plan's drawing and paints, without its styleSelection (removed in 0.4)
+const PLAN_DIR = (await import('node:fs')).mkdtempSync((await import('node:path')).join((await import('node:os')).tmpdir(), 'recipe-plan-'));
+const TRUMBULL = (await import('node:path')).join(PLAN_DIR, 'trumbull.json');
+(await import('node:fs')).writeFileSync(TRUMBULL, JSON.stringify({ subject: 'trumbull', drawing: { medium: 'ink', inkColor: 'sepia', amount: 1, lines: 'all', weight: 1, closingLines: 1 }, washes: { paints: ['ochre', 'rawsienna', 'hansa', 'ultramarine', 'cerulean', 'sepia', 'sapgreen'] } }));
 
 test('the default recipe names each flag once, as flag and value pairs', () => {
   const { argv, note } = expandRecipe({ argv: [] });
@@ -16,12 +20,16 @@ test('the default recipe names each flag once, as flag and value pairs', () => {
 test('v096 and presets are gone: naming either fails the run', () => {
   assert.throws(() => expandRecipe({ argv: ['--recipe', 'v096'] }), /v096/);
   assert.throws(() => expandRecipe({ argv: ['--recipe', 'default+architecture'] }), /presets were removed/);
-  const y1 = expandRecipe({ argv: ['--valueplan', 'examples/plans/trumbull-values.json'] });
+  const y1 = expandRecipe({ argv: ['--valueplan', TRUMBULL] });
   assert.ok(!y1.argv.includes('--stoneblocks') && !y1.argv.includes('--recesses'));
 });
 
+test('a stored plan that selects a style (the light-to-dark plan) fails loudly and says how to replay it', () => {
+  assert.throws(() => expandRecipe({ argv: ['--valueplan', 'examples/plans/trumbull-values.json'] }), /styleSelection was removed in 0.4.*tag v0.3.2/);
+});
+
 test("a plan's washes.paints sets the box unless --paints is given", () => {
-  const plan = ['--valueplan', 'examples/plans/trumbull-values.json'];
+  const plan = ['--valueplan', TRUMBULL];
   const box = expandRecipe({ argv: plan }).argv;
   assert.equal(box[box.lastIndexOf('--paints') + 1], 'ochre,rawsienna,hansa,ultramarine,cerulean,sepia,sapgreen');
   const own = expandRecipe({ argv: [...plan, '--paints', 'ochre'] }).argv;
@@ -34,13 +42,13 @@ test('none and areaplan runs add no flags', () => {
 });
 
 test('a plan drawing section comes after the recipe and before the command line, so typed flags win', () => {
-  const plan = ['--valueplan', 'examples/plans/trumbull-values.json'];
+  const plan = ['--valueplan', TRUMBULL];
   const { argv, note } = expandRecipe({ argv: [...plan, '--inkkscale', '2'] });
   assert.match(note, /drawing from the plan/);
   const value = name => argv[argv.lastIndexOf(name) + 1];
   assert.equal(value('--inkkscale'), '2');
   assert.equal(value('--outlinemedium'), 'ink');
-  assert.ok(argv.indexOf('--outlinemedium') > argv.indexOf('--skylanes'));
+  assert.ok(argv.indexOf('--outlinemedium') > argv.indexOf('--palettewide'));
 });
 
 test('the default recipe forces no drawing medium or ink weight', () => {
@@ -48,35 +56,14 @@ test('the default recipe forces no drawing medium or ink weight', () => {
   for (const flag of ['--outlinemedium', '--inkkscale', '--inkk', '--openinglines', '--closinglines', '--closingedgemin', '--drawwidthgain']) assert.ok(!argv.includes(flag), flag);
 });
 
-test('an unseen ink-and-wash plan uses source paper and a lean palette, with explicit overrides last', async () => {
-  const fs = await import('node:fs');
-  const os = await import('node:os');
-  const path = await import('node:path');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ink-recipe-'));
-  try {
-    const file = path.join(dir, 'plan.json');
-    fs.writeFileSync(file, JSON.stringify({ subject:'unseen-ink-study', styleSelection:{style:'ink-and-wash',reason:'Visible brown ink and pale washes'} }));
-    const read = args => {const {argv}=expandRecipe({argv:['--recipe','general','--valueplan',file,...args]});const get=name=>argv[argv.lastIndexOf('--'+name)+1];get.has=name=>argv.includes('--'+name);return get;};
-    const base=read([]);
-    assert.equal(base('paperrgb'),'source');assert.equal(base('palettewide'),'0');assert.equal(base('boxpick'),'0');assert.ok(!base.has('stoneblocks'));
-    const own=read(['--palettewide','1','--paperrgb','250,250,250']);
-    assert.equal(own('palettewide'),'1');assert.equal(own('paperrgb'),'250,250,250');
-  } finally {fs.rmSync(dir,{recursive:true,force:true});}
-});
-
 test('no recipe names a line extraction option; one typed fails loudly as removed', async () => {
   const { refuseRemoved } = await import('./removed-options.mjs');
-  for (const name of ['default', 'general', 'combined', 'penwash']) {
+  for (const name of ['default', 'general', 'combined']) {
     const { argv } = expandRecipe({ argv: ['--recipe', name] });
     assert.ok(!argv.some(a => ['--linesource', '--sourcelines', '--copylines', '--linemodel', '--linework'].includes(a)), name);
   }
   assert.throws(() => refuseRemoved(['--linesource', 'source-ink']), /--linesource was removed in 0.4.*49447027/);
-});
-
-// The general recipe lost connected dark masses on Hills in the release comparison.
-test('combined defaults use general washes', () => {
-  const general = expandRecipe({argv: []}).argv;
-  for (const flag of ['--huechroma','--passcap','--maskmm','--lightfamilies','--palelights']) assert.ok(general.includes(flag), flag);
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'penwash'] }), /penwash recipe .* was removed in 0.4/);
 });
 
 test('a plan sheet section sets --sheetmm, --seed and --targetguard defaults and checks --sheetmm', async () => {
@@ -103,13 +90,10 @@ test('a plan sheet section sets --sheetmm, --seed and --targetguard defaults and
   }
 });
 
-test('the default recipe carries the technique rules: seams on colour edges, small marks, joined washes, no blot charge', () => {
+test('the default recipe carries the technique rules: seams on colour edges, no blot charge', () => {
   const { argv } = expandRecipe({ argv: [] });
   const value = name => argv[argv.lastIndexOf(name) + 1];
   assert.equal(value('--subjectseam'), '0.5');
-  assert.equal(value('--smallmarks'), '1');
-  assert.equal(value('--smallmarklights'), '0', 'no small reserved lights: they read as speckle in dark coats');
-  assert.equal(value('--washjoin'), '1');
   assert.equal(value('--undercover'), '0');
 });
 
@@ -122,31 +106,21 @@ test('experimental pigment properties and sheet-tone stages require an explicit 
 });
 
 test('recipe none gives plan drawing precedence over template defaults', () => {
-  const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', 'examples/plans/trumbull-values.json', '--outlinemedium', 'graphite'] });
+  const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', TRUMBULL, '--outlinemedium', 'graphite'] });
   assert.equal(argv[argv.lastIndexOf('--outlinemedium') + 1], 'ink');
 });
 
-test('recipe none: authored plan wash settings take precedence over inherited defaults', async () => {
+test('recipe none: a plan naming a removed wash field fails loudly', async () => {
   const fs = await import('node:fs');
-  const os = await import('node:os');
   const path = await import('node:path');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recipe-wash-'));
-  try {
-    const file = path.join(dir, 'plan.json');
-    fs.writeFileSync(file, JSON.stringify({ subject: 'test', washes: { colour: 'layered' } }));
-    const { argv } = expandRecipe({ argv: ['--recipe', 'none', '--valueplan', file, '--huechroma', '45', '--passcap', '0.7'] });
-    const get = name => argv[argv.lastIndexOf('--' + name) + 1];
-    assert.equal(get('huechroma'), '30');
-    // Unauthored wash keys (e.g. passcap) are NOT emitted by pipelineFlags, so inherited argv is preserved
-    assert.equal(get('passcap'), '0.7');
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  const file = path.join(PLAN_DIR, 'wash.json');
+  fs.writeFileSync(file, JSON.stringify({ subject: 'test', washes: { colour: 'layered' } }));
+  assert.throws(() => expandRecipe({ argv: ['--recipe', 'none', '--valueplan', file] }), /washes.colour was removed in 0.4/);
 });
 test('standalone flags do not shift scalar collapse, including negative values', () => {
-  const { argv } = expandRecipe({ argv: ['--verbose', '--midlayers', '2', '--probe', '--offset', '-2', '--midlayers', '3', '--end'] });
-  assert.equal(argv[argv.indexOf('--midlayers') + 1], '3');
-  assert.equal(argv.filter(v => v === '--midlayers').length, 1);
+  const { argv } = expandRecipe({ argv: ['--verbose', '--frames', '2', '--probe', '--offset', '-2', '--frames', '3', '--end'] });
+  assert.equal(argv[argv.indexOf('--frames') + 1], '3');
+  assert.equal(argv.filter(v => v === '--frames').length, 1);
   assert.deepEqual(argv.slice(-5), ['--verbose', '--probe', '--offset', '-2', '--end'].slice(-6));
 });
 test('unknown recipe names throw, including inherited object names', () => {

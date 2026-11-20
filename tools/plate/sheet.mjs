@@ -10,14 +10,12 @@ import {prepareWetBed} from '../painter/wet-bed-prep.mjs';
 import {drawFineMaterial, drawOnFineSheet, fineGestures} from '../../src/paint/methods/fine-material.mjs';
 import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
-import {planLightToDark, valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/light-to-dark.mjs';
-import {planLayeredWashes} from '../../src/paint/methods/layered-washes.mjs';
+import {valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/value-shared.mjs';
 import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
 import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
-import {unsupportedAxisEdges} from '../../src/paint/methods/target-regions.mjs';
 import {writeValuePreview} from '../painter/value-plan-preview.mjs';
 import {writePlanValueCheck} from '../painter/plan-value-check.mjs';
 import {subjectField, orderBySubject, OVERLAP} from '../../src/paint/methods/subject-order.mjs';
@@ -60,7 +58,6 @@ import {planDensityOver} from '../../src/eval/plan-optics.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {overlay} from '../../src/media/gouache.mjs';
 // Optional stages, one module each, off unless their flag is given.
-import {furLightReserves} from '../../src/paint/methods/finish-texture.mjs';
 import {sampledInkAbsorbance, matchInkLoad, sampleGestures, INK_STRENGTH_QUANTILE} from '../../src/paint/methods/ink-match.mjs';
 import {makeInkRes} from '../../src/paint/methods/ink-res.mjs';
 import {loadPhysical} from '../../src/paint/methods/brushes.mjs';
@@ -261,25 +258,24 @@ const pencilDraw=(target,gs,pigment,options)=>{
 if(VALUE_ENABLED){
  if(MOD||MIXES||FINISH_FILE||opt('curls','0')!=='0'||num('bgfirst',0)>0)throw Error('value planner cannot combine with independent modulation/mixes/finish/curls/bgfirst adapters; use --order legacy-painter for legacy replay');
  const shaped=num('shapedmarks',0)>0;
- if (opt('furreserves','')) {
-  const reserves=furLightReserves({D:ctx.SRC,w,h},JSON.parse(opt('furreserves')));
-  ctx.HOLD=Uint8Array.from(reserves,(v,i)=>v||(ctx.HOLD?.[i]??0)?1:0);ctx.FUR_HOLD=reserves;
-  fs.writeFileSync(path.join(out,'fur-reserves.json'),JSON.stringify({cells:reserves.reduce((a,v)=>a+v,0),settings:JSON.parse(opt('furreserves')),stage:'planned before paint'}));
- }
- const DETAIL_SEG = num('detailseg',0)>0 && opt('image','') ? await (async () => { const { hasSegments, loadSegments } = await import('../../src/crop/segments.mjs'); const b = path.basename(opt('image',''), path.extname(opt('image',''))); return hasSegments(b) ? loadSegments(b, w, h) : null; })() : null;
-  const valueOptions={paperRule:PAPER_RULE,calibratedPlan:CALIBRATED_PLAN,ownSwatch:true,smallLightMax:num('smallmarklights',120),detailScale:num('detailscale',0),detailSegments:DETAIL_SEG,layerLocal:num('layerlocal',0)>0,smallMarks:num('smallmarks',0)>0,smallIsolationMm:num('smallisolation',0),washJoin:num('washjoin',0)>0,bandRound:num('bandround',0)>0,valueFloor:opt('valuefloor','')||null,strokePlan:num('strokeplan',0)>0,laneMm:opt('lanemm','')==='auto'?0:num('lanemm',6),laneAdapt:num('laneadapt',0)>0,strokeMm:num('strokemm',30),washReachMm:num('washreach',0),edgeWobbleMm:num('edgewobble',0),shadowThresh:num('shadowthresh',.38),shadowWater:num('shadowwater',0),skyOneLayer:num('skyonelayer',0)>0,minShapeCells:num('minshapecells',0),cellFamilies:num('cellfamilies',VALUE_CONFIG?.view?.wholeOf?1:0)>0,paperRel:num('paperrel',0)>0,paperLights:num('paperlights',0)>0,paperDelta:opt('paperdelta','')?num('paperdelta',10):null,accentShare:num('accentshare',0),accentMin:num('accentmin',.55),layerSmoothMm:num('layersmooth',0),floorBrushMm:roleBrushMm(root,'floor',{brushes:opt('brushes','src/paint/brushes.json'),name:opt('floorbrush','')}),detailPointMm:roleBrushPointMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')}),styleGain:num('stylegain',1),skySplit:num('skysplit',0)>0,layerTexture:num('layertexture',0)>0,edgeFadeMm:num('edgefade',0),layerHue:num('layerhue',0)>0,layers:num('midlayers',0),layerIncrement:num('layerincrement',0)>0,pigShare:num('pigshare',0),hueChroma:num('huechroma',0),hueChromaLab:num('huechromalab',0)>0,shadowFamilies:num('shadowfamilies',0)>0,passCap:num('passcap',0),carryMm:num('carrymm',0),holeFill:num('holefill',0),keepMask:num('carrykeep',0)>0,maskMm:num('maskmm',0),paleLights:num('palelights',0),lightFamilies:num('lightfamilies',0)>0,laneMax:num('lanemax',0),nestedBands:num('nestedbands',CALIBRATED_PLAN?1:0)>0,cellLight:num('celllight',CALIBRATED_PLAN?1:0)>0,massTone:num('masstone',CALIBRATED_PLAN?1:0)>0,nested:num('nestedmid',0)>0,midDomains:num('middomain',1)>0,brushChoice:num('brushchoice',0)>0,shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,hold:ctx.FUR_HOLD,paleHold:WHITE_HOLD,families:VALUE_CONFIG?.families??MAJOR_INTENT?.families??[],reserves:VALUE_CONFIG?.reserves??[],smallestBrushMm:smallestBrushMm(JSON.parse(fs.readFileSync(path.join(root,opt('brushes','src/paint/brushes.json')),'utf8'))),sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
+  const valueOptions={shaped,pigments:PIGS,subject:VALUE_CONFIG?.subject,demand:ctx.AL,k:PIGS.length,density:ctx.SRC,w,h,rgb:ctx.px,paperRGB,sheetWidthMm:num('sheetmm', DEFAULT_SHEET_MM)};
 
- // The wash plan (layered-washes.mjs): a first wash, shadow shapes and darks, from the squinted subject. A plan that names a style (ink and wash, the wet styles) still
- // takes the older value plan, whose style profiles the wash plan does not read yet; that path goes when they are ported.
+ // The wash plan is read from block-in studies (study-washes.mjs), never from the subject. The squinted-subject plan
+ // (layered-washes.mjs) and the light-to-dark value plan were removed in 0.4 (last at commit 49447027).
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
  // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
  valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
  // --washplan FILE[:MIN],FILE[:MIN],...: the washes are read from a stack of painter's block-in studies, coarse to fine
  // (images of the subject simplified to flat shapes), registered to the sheet; the subject is not read for them
- // (study-washes.mjs; tools/painter/study-load.mjs). squint: from the subject squinted.
- const WASH_PLAN=opt('washplan','squint');
- if(WASH_PLAN!=='squint'){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
- const planValues=WASH_PLAN!=='squint'?planStudyWashes:valueOptions.styleSelection?planLightToDark:planLayeredWashes;
+ // (study-washes.mjs; tools/painter/study-load.mjs). Without one a painting stops; a drawing-only run gets no washes.
+ // the default is 'required': a painting stops without a study (a drawing-only run lays no wash)
+ const WASH_PLAN_GIVEN=opt('washplan','required'),WASH_PLAN=WASH_PLAN_GIVEN==='required'?'':WASH_PLAN_GIVEN;
+ if(WASH_PLAN==='squint')throw Error('--washplan squint was removed in 0.4: the washes are not read from the subject squinted (last at commit 49447027); give --washplan STUDY.png[:MIN],...');
+ if(!WASH_PLAN&&num('drawingonly',0)===0)throw Error('no wash plan: give --washplan STUDY.png[:MIN],... (a block-in study registered to the sheet, made by the image model). The washes are never read from the subject: the squinted-subject plan and the light-to-dark value plan were removed in 0.4 (last at commit 49447027)');
+ console.log(`wash plan: ${WASH_PLAN?`study (${WASH_PLAN.split(',').map(f=>path.basename(f)).join(', ')})`:'none (drawing only)'}`);
+ if(!WASH_PLAN){valueOptions.studies=[{rgb:new Uint8ClampedArray(n*3).fill(255),file:'(none: drawing only)',registered:'blank',minMm2:null}];valueOptions.flat=false;}
+ if(WASH_PLAN){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ const planValues=planStudyWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions),demand:valueOptions.demand}));
@@ -297,14 +293,10 @@ if(VALUE_ENABLED){
  if(num('darkfirst',0)>0){const ph=l=>l._valuePhase==='light'?0:l._valuePhase==='shadow'?1:2;ctx.layers=ctx.layers.map((l,i)=>({l,i})).sort((a,b)=>ph(a.l)-ph(b.l)||a.i-b.i).map(q=>q.l);console.log('darkfirst: '+ctx.layers.map(l=>l._valuePhase[0]).join(''));}
  // a crop rectangle would show as a straight mask edge the subject does not have; the layered plan's shapes are outlines
  // of the squinted subject, which sit a squint's width off a straight subject edge, so the test is the older plan's
- const seams=planValues!==planLightToDark?[]:ctx.layers.filter(l=>l.value===1).flatMap(l=>l.shapes.flatMap(sh=>unsupportedAxisEdges(sh.mask,w,h,ctx.px).map(edge=>({pass:sh._valuePlan.id,...edge}))));
+ const seams=[];
  const baseMass=new Float32Array(n);for(const l of ctx.layers.filter(l=>l.value===1))for(const sh of l.shapes)for(let y=sh.box.y0;y<=sh.box.y1;y++)for(let x=sh.box.x0;x<=sh.box.x1;x++){const i=y*w+x;if(sh.ids[i]===sh.id)baseMass[i]+=(sh.graded?sh.graded[i]:sh.amount);}
  let warm=0,warmPainted=0;for(let i=0;i<n;i++)if(ctx.px[3*i]-ctx.px[3*i+2]>18&&ctx.px[3*i+1]-ctx.px[3*i+2]>8){warm++;if(baseMass[i]>0)warmPainted++;}
  fs.writeFileSync(path.join(out,'value-region-check.json'),JSON.stringify({source:ctx.VALUE_PLAN.regions.source,band1UnsupportedAxisEdges:seams,regionCount:ctx.VALUE_PLAN.regions.regions.length,regions:ctx.VALUE_PLAN.regions.regions,warmTargetCells:warm,warmCellsWithPositiveBand1Pigment:warmPainted,physicalReserve:'same target-white mask as compiled plan'},null,2));
- // A line-only checkpoint never executes these wash masks. Keep their diagnostic
- // in value-region-check.json, but do not reject a valid drawing because an
- // unused wash plan failed its seam check. Full paintings still fail closed.
- if(seams.length && num('drawingonly',0)===0)throw Error('compiled band-1 mask contains unsupported axis-aligned seams');
  // --subjectorder s (0..1): the plan's subjectOrder brought on subject by subject, light to dark within each, held back
  // by s (src/paint/methods/subject-order.mjs). 0, the default, keeps the whole-sheet bands.
  {const so=num('subjectorder',0);if(!(so>=0&&so<=1))throw Error('--subjectorder: a number from 0 to 1');

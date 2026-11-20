@@ -1,7 +1,6 @@
 // The palette, pigment demand, masks and the order of the layers.
 // Stage 2 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
 import {materialProfile} from '../../src/paint/methods/material-profiles.mjs';
-import {resolveStyle} from '../../src/paint/styles/loader.mjs';
 import {boundsOf} from '../../src/mask-bounds.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {resolveOutlineMedium, describeOutlineMedium} from '../../src/paint/methods/outline-medium.mjs';
@@ -676,7 +675,7 @@ if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * S
 // The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source): one
 // reading at 1200 px wide (pen-share.mjs), so --width does not change what is pen. SEP is at the run's grid.
 // A run with a graphite outline, no line source and no ink plan never asks, so it skips the extra reading.
-const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
+const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || PIPELINE?.drawing?.medium === 'ink';
 const PEN_SHARE = PEN_ASKED && fs.existsSync(path.resolve(root, opt('image', ''))) ? await sourcePenShare({ image: path.resolve(root, opt('image', '')), sharp }) : SEP.stats.ink / n;
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
@@ -723,7 +722,6 @@ const FACE_INK = () => FACE_INK_CACHE ??= (num('penfacelong', 0) > 0 ? (() => {
 // --inkfast auto|1|0: 1 sets the ink before washes (waterproof); 0 keeps the material's rewetting. auto (default) is
 // waterproof for black ink and soluble for sepia, as a plan's drawing.ink.waterproof defaults. --inkcolour is unused.
 const REQUESTED_DRAW_MEDIUM=OUTLINE_REQUESTED==='auto'?OUTLINE.medium:OUTLINE_REQUESTED;
-const SUBJECT_STYLE=VALUE_CONFIG?.styleSelection?resolveStyle(VALUE_CONFIG.subject,null,VALUE_CONFIG.styleSelection):null;
 // precise-watercolor is the identity profile for the shaped planner; other styles scale ink and graphite by their weights
 const STYLE_ON=()=>!!ctx.VALUE_PLAN?.style&&ctx.VALUE_PLAN.style.name!=='precise-watercolor';
 // The pen's ink load. --closingconc f dilutes the closing pen's ink (default 1): a closing accent restates an edge over
@@ -754,7 +752,7 @@ function inkDarkCap(stage){
  fs.writeFileSync(path.join(out,'ink-dark-cap.json'),JSON.stringify(INK_DARK_CAPS,null,1)+'\n');
  return r.factor;
 }
-const STYLE_INK_DEFAULT=SUBJECT_STYLE?.pigment==='black'?'black-ink':'sepia-ink';
+const STYLE_INK_DEFAULT='sepia-ink';
 const INK_PROFILE=materialProfile(opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT));
 const GRAPHITE_PROFILE=materialProfile(opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'));
 if(INK_PROFILE.kind!=='ink'||GRAPHITE_PROFILE.kind!=='graphite')throw Error('inkprofile/graphiteprofile must use the corresponding material family');

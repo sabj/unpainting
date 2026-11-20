@@ -59,7 +59,7 @@ export async function chooseDrawingStages({ opt, argv, image, root, out, rgb, w,
   }
   const hasAuthoredFile = (intent.authoredOpening ?? false) || (intent.authoredClosing ?? false);
   if (!intent.explicitAuto && hasAuthoredFile) return null;
-  const style = Number(opt('penwash', 0)) > 0 ? 'penwash' : null;
+  const style = null;
   const ev = edgeEvidence(rgb, w, h, { margin: Math.max(2, Math.round(0.04 * Math.min(w, h))) });
   let edges = 0; for (const v of ev.edge) edges += v;
   const python = resolveLinePython({ flag: opt('sketchpython', '') }).path;

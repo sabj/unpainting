@@ -9,7 +9,7 @@ import {execFileSync} from 'node:child_process';
 
 import {brushedWashPaths} from '../../src/media/wash.mjs';
 import {loadLines,hasLines} from '../../src/crop/lines.mjs';
-import {selectValueInk} from '../../src/paint/methods/light-to-dark.mjs';
+import {selectValueInk} from '../../src/paint/methods/value-shared.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
 export async function writeValuePreview({plan,out,w,h,pigments,paperRGB,target,photo,subject='subject',name=subject,root,opening='',closing='',version='W4',variant='lighttodark',date,compilePaths=true,sheetMm=DEFAULT_SHEET_MM}){

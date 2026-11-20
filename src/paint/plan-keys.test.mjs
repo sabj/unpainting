@@ -56,7 +56,7 @@ test('the painter exits 3 on a plan key it never reads, unless --allowunusedplan
   try {
     const plan = path.join(dir, 'plan.json');
     fs.writeFileSync(plan, JSON.stringify({ subject: 'x', families: [{ id: 'a', bounds: [0, 0, 1, 1], looseness: 1 }] }));
-    const run = (out, extra = []) => spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--width', '48',
+    const run = (out, extra = []) => spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--washplan', 'examples/targets/trumbull.jpg', '--width', '48',
       // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
       '--mode', 'fast', '--video', '0', '--gpu', 'off', '--segments', 'off', '--valueplan', plan, '--valuepreviewonly', '1', '--allowdirty', '1', '--out', path.join(dir, out), ...extra],
     { cwd: root, encoding: 'utf8', timeout: 120000 });

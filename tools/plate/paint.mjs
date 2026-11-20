@@ -8,7 +8,7 @@ import {passageBrushPaths, attachPlaneRamp as attachRampToPaths, planeRampApplie
 import {shapeMix} from '../../src/paint/methods/wash-weights.mjs';
 import {planeAtCell, gradeLoadPressure, softClipMask} from '../../src/paint/methods/graded-demand.mjs';
 import {shapedPlanePaths} from '../../src/paint/techniques/shaped-marks.mjs';
-import {valueTechnique, softBoundaryPaths} from '../../src/paint/methods/light-to-dark.mjs';
+import {valueTechnique, softBoundaryPaths} from '../../src/paint/methods/value-shared.mjs';
 import {softRing} from '../../src/paint/methods/soft-edges.mjs';
 import {softenWhere, growReserve, softenBrushCells} from '../../src/paint/methods/value-soften.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
@@ -75,7 +75,7 @@ const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTra
   GPU_INFO, render, view, colourTrace, traceCells, colourMass, BRUSH, UPRIGHT, highlights, 
   expected, DELIVERY, DCAL, TECH_CAL, TCAL, marks, PENDING_IO, drainFrames, mark, 
   WET, MIX, washBridge, CAL, instrumentOf, SEMANTIC_CAL_MODE, SEMANTIC_CAL, FRAMES, snap, MARKTAPE, 
-  AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PENWASH, LOOK_AL, 
+  AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, PASSFRAMES, WET_STEPS, FILM_BY_PAINT, LOOK_AL, 
   LOOK_PLAN, TIER_MASK, up, SEED, clock, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, FW, 
   FW_SUBJ, isFirst, FILM_FRAMES, used, TECHS, LAST, DRAWING, DRAW_LAST, SKY_WARM_RB, 
   PROVENANCE_TARGET_SHA, PREPF, fadePrep, mopLanes, setStage } = ctx;
@@ -224,13 +224,13 @@ const awareBoundary = async at => {
 let L_START = 0;
 if (ctx.RESUMING) { const at = awareRestore(); L_START = at.kind === 'start' ? 0 : at.kind === 'pass' ? at.L + 1 : ctx.layers.length; }
 else await awareBoundary({ kind: 'start' });
-if (!ctx.WASH_BASE && !PENWASH && L_START < ctx.layers.length) ctx.WASH_BASE = cellRGB(render(), { w, h, SC, W2 });
+if (!ctx.WASH_BASE && L_START < ctx.layers.length) ctx.WASH_BASE = cellRGB(render(), { w, h, SC, W2 });
 if (TECH_CAL && L_START === 0) {
   let initialHeld = 0;
   if (ONSHEET) for (let k = 0; k < ONSHEET.length; k++) initialHeld += ONSHEET[k];
   TECH_CAL.observe(initialHeld);
 }
-for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
+for (let L = L_START; L < ctx.layers.length; L++) {
   if(L===ctx.FINISH_START){ctx.AREA_PLAN=ctx.FINISH_PLAN;ctx.AREA_COMPILED=ctx.FINISH_COMPILED;AREA_EXEC.set(null);if(ctx.FINISH_PLAN.doc.finishingBase){const b=ctx.FINISH_PLAN.doc.finishingBase;dry(ctx.sheet,b.maxSteps,O,{levelMax:140,dt:b.dt});const paper=measurePaperDry(ctx.sheet);fs.writeFileSync(path.join(out,'finishing-dry-base.json'),JSON.stringify({kind:'actual declared whole base ordinarydry before connected finishing contacts',declared:b,paper},null,2));check('finishing connected pass requires measured dry base',paper.dry,{waterMax:paper.waterMax,saturationMax:paper.saturationMax});}await sharp(render(),{raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'finishing-base-before.png'));coherent(ctx.sheet);ctx.FINISH_MASS_BEFORE=thicknessTotals(ctx.sheet);}
   const layer = ctx.layers[L];
   if(ctx.AREA_PLAN)AREA_EXEC.set(layer._semantic);

@@ -50,7 +50,7 @@ test('the painter reports the plan carried in the sheet\'s units, not hundreds o
   const root = fileURLToPath(new URL('../..', import.meta.url));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-optics-'));
   try {
-    const r = spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--width', '64', '--mode', 'fast', '--video', '0',
+    const r = spawnSync(process.execPath, ['tools/paint-plate.mjs', '--image', 'examples/targets/trumbull.jpg', '--washplan', 'examples/targets/trumbull.jpg', '--width', '64', '--mode', 'fast', '--video', '0',
       // segmentation is not under test: off keeps the run free of the SAM python and checkpoint (src/crop/segment-prep.mjs)
       '--gpu', 'off', '--segments', 'off', '--allowdirty', '1', '--out', path.join(dir, 'p')], { cwd: root, encoding: 'utf8', timeout: 240000 });
     assert.equal(r.status, 0, r.stderr);

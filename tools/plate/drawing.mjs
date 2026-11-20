@@ -31,7 +31,6 @@ import {longShare} from '../../src/crop/gestures.mjs';
 import {fillReserved} from '../../src/crop/lights.mjs';
 import {erasePrep} from '../../src/paint/methods/pencil-erase.mjs';
 import {makeMopLanes} from '../../src/paint/methods/mop-lanes.mjs';
-import {paintPenWash} from '../../src/paint/methods/pen-wash.mjs';
 import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
@@ -43,7 +42,7 @@ const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out,
   GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_EXEC, dry, dip, stroke, pencilDraw, SC, W2, H2, N2, PB, paper, INKRES, 
   PEN_STATE_AUDIT, drawingCapsFor, penDraw, OUT_W, OUT_H, O, GPU_INFO, base, render, view, BRUSH, UPRIGHT, 
   highlights, expected, sheetDensity, drainFrames, mark, WET, CAL, snap, shoot, FILM_BY_PAINT, PEN_FRAMES, 
-  PENWASH_PLAN, penWashFlat, SOURCE_INK, TIER_MASK, planPen } = ctx;
+  SOURCE_INK, TIER_MASK, planPen } = ctx;
 Object.assign(ctx, { drawPass });
 // The plan's density before anything is laid: every passage booked at its full amount, the way the loop books one it
 // lays whole. The pen-first order needs it to know what the washes will not carry.
@@ -326,13 +325,6 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
   if (PREP_ERASE && STAGE_PLAN?.files.prep && GRAPHITE) erasePrep({ sheet: ctx.sheet, k: GRAPHITE_AT, dabs: PREP_ERASE, strength: num('preperase', 0.85), SC, w, W2, layersChanged, log: console.log });
   ctx.INK_THK = thickness(ctx.sheet).map((a, j) => Float32Array.from(a, (v, i) => Math.max(0, v - before[j][i])));
   await sharp(INKRES ? INKRES.compose(view()) : render(), { raw: { width: OUT_W, height: OUT_H, channels: 3 } }).png().toFile(path.join(out, 'drawing-opening.png'));
-  if (PENWASH_PLAN) {
-    // the flat plan over the actual dry ink, multiplied as a transparent wash would sit on it
-    const ink = render(), flat = penWashFlat(), mix = Buffer.alloc(N2 * 3);
-    for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = y * W2 + x, j = ((y / SC) | 0) * w + ((x / SC) | 0); for (let c = 0; c < 3; c++) mix[i * 3 + c] = Math.round(ink[i * 3 + c] * flat[j * 3 + c] / Math.max(1, paperRGB[c])); }
-    await sharp(mix, { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'penwash-preview.png'));
-    if (ctx.PENWASH_LINES) fs.writeFileSync(path.join(out, 'penwash-lines.json'), JSON.stringify(ctx.PENWASH_LINES, null, 2));
-  }
 }
 // An actual dry-pen checkpoint, using the same planned strokes and physics as
 // the full painting. The process exit hook still writes the strict guard report.
@@ -351,7 +343,7 @@ if (num('drawingonly', 0) > 0) {
     const { markTapeJSON } = await import('../../src/media/mark-tape-json.mjs'), { PENS, PENOPTS } = await import('../../src/media/brush.mjs');
     const asTape = p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, ArrayBuffer.isView(v) ? Array.from(v) : v]));
     const fineN = INKRES?.N ?? 1;   // the pens draw on the fine sheet: the marks are in its cells
-    const tape = { w: W2 * fineN, h: H2 * fineN, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), version: 2, drawingOnly: true, paperRGB,
+    const tape = { w: W2 * fineN, h: H2 * fineN, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), version: 2, methods: ctx.RUN_METHODS, drawingOnly: true, paperRGB,
       base: Array.from(base.subarray(0, 3)), pigments: SHEET_PIGS.map(asTape), penOpts: PENOPTS, pens: PENS, marks: ctx.MARKTAPE,
       strokeCount: ctx.MARKTAPE.filter(m => ['s', 'P', 'g'].includes(m.k)).length };
     const fd = fs.openSync(path.join(out, 'marks.json'), 'w');
@@ -416,15 +408,6 @@ const fadePrep = () => {
 };
 const mopLanes = makeMopLanes({ num });
 const setStage = s => { ctx.STAGE = s; };
-if (PENWASH_PLAN) {
-  const r = await paintPenWash({
-    createBrush, stroke, step, dry, thickness, sheet: ctx.sheet, w, h, n, W2, H2, PIGS, O, SEED, UPRIGHT, CAL, WET, mopLanes, handAngle, flowEvery, dip, up, clock, shoot, setStage, num, log: console.log, expected, used,
-    mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / W2,
-    checkpoint: async (k, id) => sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, `penwash-${String(k).padStart(2, '0')}-${id}.png`)),
-  }, PENWASH_PLAN);
-  ctx.laid += r.laid;
-  fs.writeFileSync(path.join(out, 'penwash-run.json'), JSON.stringify({ passages: r.records, lines: ctx.PENWASH_LINES }, null, 2));
-}
 Object.assign(ctx, { up, t0, spent, PROF, prof, handAngle, flowEvery, SHAPE_LOAD_BUFFER, brushMask, FILM_MASS, FW, 
   isFirst, FILM_FRAMES, used, TECHS, LAST, DRAWING, SKY_WARM_RB, PROVENANCE_TARGET_SHA, PREPF, 
   fadePrep, mopLanes, setStage });

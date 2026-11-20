@@ -244,7 +244,7 @@ function thin(M, W, H) {
  *  is finer, since the one-pixel staircase and the reading itself are set at that scale (a 1600 px pen drawing read at
  *  its own pixels traces wash grain and jagged lines), else as it is. { w, h, pixelMm, back } with back its width
  *  over w. */
-export function readSize(W, H, sheetMm) {
+function readSize(W, H, sheetMm) {
   if (!(sheetMm > 0)) throw new Error(`pen trace: the sheet width in mm, not ${sheetMm}`);
   const w = Math.max(1, Math.min(W, Math.round(sheetMm / TRACE_MM.pixel))), h = w === W ? H : Math.max(1, Math.round(H * w / W));
   return { w, h, pixelMm: sheetMm / w, back: W / w };

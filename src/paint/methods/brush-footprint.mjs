@@ -2,11 +2,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Area in mm2 of one touch of a round brush whose belly is widthMm wide. */
-export function footprintMm2(widthMm) {
-  if (!(widthMm > 0)) throw new Error(`brush footprint: width must be positive, got ${widthMm}`);
-  return Math.PI * (widthMm / 2) ** 2;
-}
 
 /** A brush role's belly width in mm from the brush file (or the brush named instead). Throws when it is missing. */
 export function roleBrushMm(root, role, { brushes = 'src/paint/brushes.json', name = '' } = {}) {

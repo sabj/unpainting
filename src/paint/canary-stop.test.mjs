@@ -11,7 +11,7 @@ test('a native CPU canary stops after one real paint pass', () => {
   const out = path.join(tmp, 'plate');
   try {
     const run = spawnSync(process.execPath, [
-      'tools/paint-plate.mjs', '--allowdirty', '1', '--image', 'examples/targets/white-ships.jpg',
+      'tools/paint-plate.mjs', '--allowdirty', '1', '--image', 'examples/targets/white-ships.jpg', '--washplan', 'examples/targets/white-ships.jpg',
       '--out', out, '--width', '96', '--scale', '1', '--sheetmm', '152.4',
       '--recipe', 'none', '--mode', 'fast', '--gpu', 'off',
       '--drawing', 'none', '--draw', '0', '--video', '0', '--frames', '1',

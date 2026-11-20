@@ -6,7 +6,7 @@ import {scaleBrushForDensity} from '../../src/media/brush-density.mjs';
 import {framePolicy} from '../speed/frame-policy.mjs';
 import {startSpeedProfile} from '../speed/profile.mjs';
 import {runSpeedSequence} from '../speed/sequence.mjs';
-import {estimatePaper} from '../../src/paint/methods/light-to-dark.mjs';
+import {estimatePaper} from '../../src/paint/methods/value-shared.mjs';
 import {sheetColour} from '../../src/paint/methods/paper-colour.mjs';
 import {setTextureVariety} from '../../src/paint/techniques/shaped-marks.mjs';
 import {removePlannedInk} from '../../src/crop/ink-free.mjs';
@@ -48,6 +48,7 @@ import {prepareSegments} from '../../src/crop/segment-prep.mjs';
 import {outputRelative, planFileDigest} from '../../src/paint/early-lines-cache.mjs';
 import {refuseRemoved} from '../../src/paint/removed-options.mjs';
 import {lineSource} from '../../src/paint/line-source.mjs';
+import {runMethods, describeMethods} from '../../src/paint/run-methods.mjs';
 import {refuseAreaOwned} from '../../src/paint/area-owned-options.mjs';
 import {strokeBudgetDefaults} from '../../src/paint/methods/stroke-budget.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
@@ -210,6 +211,9 @@ argv.push(...inkHoldArgs(argv));
 const LINE_SOURCE = lineSource({ drawing: opt('drawing', 'first'), drawingFile: opt('drawingfile', ''), drawingLast: opt('drawinglast', ''), stages: opt('stages', ''), resolve: f => path.resolve(root, f) });
 if (LINE_SOURCE.warning) { console.log(LINE_SOURCE.warning); argv.push('--drawing', LINE_SOURCE.drawing); }
 console.log(`line source: ${LINE_SOURCE.source}${LINE_SOURCE.file ? ` (${path.basename(LINE_SOURCE.file)})` : ''}`);
+// what makes this plate, recorded in the log, the run card and the stroke tape (src/paint/run-methods.mjs)
+const RUN_METHODS = runMethods({ lineSource: LINE_SOURCE, washPlan: opt('washplan', 'required') === 'required' ? '' : opt('washplan', 'required'), areaPlan: opt('areaplan', ''), drawingOnly: num('drawingonly', 0) > 0 });
+console.log(describeMethods(RUN_METHODS));
 // every line file is checked against the target (lines.mjs); a --drawingfile made for another image or aspect is
 // registered to the target first (drawing-registration.mjs)
 if (opt('image','')) bindLineTarget(await lineTargetOf(path.resolve(root, opt('image',''))).catch(() => null));
@@ -251,10 +255,7 @@ console.log(`native tracked CPU upload: ${NATIVE_UPLOAD_POLICY.value}; ${NATIVE_
 if (PIPELINE) fs.writeFileSync(path.join(out, 'pipeline-plan.json'), JSON.stringify({plan:PIPELINE, overrides:argv0},null,2));
 const VALUE_CONFIG=(()=>{let c=opt('valueplan','')?JSON.parse(fs.readFileSync(path.resolve(root,opt('valueplan','')))):null;
   if (c && PIPELINE) c = {...c, subjectOrder: PIPELINE.order.subjects};
-  // --regionstyle family=style[,family=style]: per-run region style override on top of the plan's styleSelection.
-  if(!c||!opt('regionstyle',''))return c;const base=c.styleSelection;if(!base)throw Error('--regionstyle needs a value plan with a styleSelection');
-  const regions={...(base.regions??{})};for(const kv of opt('regionstyle','').split(',')){const [family,style]=kv.split('=');if(!family||!style)throw Error('--regionstyle family=style');regions[family]={style,reason:'run override --regionstyle for an A/B test'};}
-  return {...c,styleSelection:{...base,regions}};})();
+  return c;})();
 // value plan keys nothing reads are logged and exit 3 like unused options (src/paint/plan-keys.mjs); --allowunusedplan 1 allows them
 if(opt('valueplan',''))reportUnusedPlanKeys({file:path.resolve(root,opt('valueplan','')),pipeline:Boolean(PIPELINE),out,allow:opt('allowunusedplan','0')!=='0'});
 if(VALUE_CONFIG?.sheet?.widthMm!=null&&Math.abs(num('sheetmm',VALUE_CONFIG.sheet.widthMm)-VALUE_CONFIG.sheet.widthMm)>1e-6)throw Error(`value plan sheet.widthMm ${VALUE_CONFIG.sheet.widthMm} does not match --sheetmm ${num('sheetmm',VALUE_CONFIG.sheet.widthMm)}`);
@@ -367,7 +368,7 @@ const CODE_HASH = RUN_CACHE.enabled ? codeHash(root, [ENTRY_FILE]) : '';
 const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(root, opt('palettefrom', ''))) ? crypto.createHash('sha256').update(fs.readFileSync(path.resolve(root, opt('palettefrom', '')))).digest('hex') : '';
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
-Object.assign(ctx, { LINE_SOURCE, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
+Object.assign(ctx, { LINE_SOURCE, RUN_METHODS, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_VALUE_ONLY, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 

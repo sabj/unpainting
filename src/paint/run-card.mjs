@@ -27,10 +27,10 @@ function buildRunCard({
   drawingMedium = "graphite",
   subjectMedium = null,
   mediumDecision = null,
-  graphitePool = null,
   code = null,
   segments = null,
   linework = null,
+  methods = null,
   gpu = null,
   dimensions = null,
   palette = null,
@@ -71,8 +71,6 @@ function buildRunCard({
       ...(subjectMedium ? { subjectMedium } : {}),
       // what decided ink on or off, with its evidence (src/paint/methods/medium-decision.mjs)
       ...(mediumDecision ? { mediumDecision } : {}),
-      // the graphite drawing's lines, from the line model's pool (src/paint/methods/graphite-pool.mjs)
-      ...(graphitePool ? { graphitePool } : {}),
       file: drawingFile || null,
       stage: linework ?? null,
     },
@@ -112,6 +110,8 @@ function buildRunCard({
     // the box paints painted with, and the paint guard's decision on a forced box (null when it did not run)
     palette,
     phases,
+    // what made this plate: line source, wash plan, legacy routes (src/paint/run-methods.mjs)
+    methods,
     // what this output is, so its image can be labelled on the image: subject, code, mode, sizes, sheet and date
     caption,
     continuedChecks: continuedSummary(),
