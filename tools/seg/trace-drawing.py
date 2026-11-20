@@ -162,7 +162,7 @@ def main():
     ap.add_argument('--sheetmm', type=float, help='sheet width in mm: adds widthMm to each line')
     ap.add_argument('--zoom', type=int, default=4, help='enlargement before thinning')
     ap.add_argument('--mergemm', type=float, default=.45, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 keeps them')
-    ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
+    ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks under four widths long are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
     ap.add_argument('--fit', type=float, default=.6, help='how far a straight run or arc may lie from the traced line, source pixels')
     args = ap.parse_args()
     bgr = cv2.imread(args.image)
@@ -175,8 +175,8 @@ def main():
         if args.mergemm > 0:
             lines, stats['foldedParallels'] = merge_parallels(lines, args.mergemm*px)
         if args.maxwidthmm > 0:
-            # a filled dark (traced as a fat scribble) is left to the paint
-            n = len(lines); lines = [l for l in lines if l['width'] <= args.maxwidthmm*px]; stats['filledDarksLeft'] = n-len(lines)
+            # a filled dark (a fat mark hardly longer than it is wide) is left to the paint
+            n = len(lines); lines = [l for l in lines if l['width'] <= args.maxwidthmm*px or l['length'] >= 4*l['width']]; stats['filledDarksLeft'] = n-len(lines)
         stats['selectedPaths'] = len(lines)
     if args.sheetmm:
         for l in lines:
