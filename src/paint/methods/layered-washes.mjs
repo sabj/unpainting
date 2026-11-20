@@ -25,7 +25,7 @@ import { targetValueMap, estimatePaper } from './light-to-dark.mjs';
 /** The plan's grid cell (mm): fine enough for a smooth outline, never finer than the sheet's cells. */
 const PLAN_MM = 0.5;
 /** Squint (Gaussian sigma, mm) for the reserved lights, the shadow shapes, the darks and the first wash's areas. */
-export const RESERVE_SIGMA_MM = 3.5, SHADOW_SIGMA_MM = 3.5, DARK_SIGMA_MM = 3, ZONE_SIGMA_MM = 6;
+export const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 8;
 /** Bare paper: squinted within this L* of the lighter of the paper and the picture's lightest tone, and no more chromatic than this. */
 const RESERVE_WITHIN = 7, RESERVE_CHROMA = 12;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
@@ -38,6 +38,10 @@ const ZONE_L_WEIGHT = 0.25;
 const ZONE_PAPER = 6;
 /** Under a pen drawing (ink and wash) the drawing carries the structure and more is left bare: lights within this L*. */
 const RESERVE_WITHIN_DRAWN = 12;
+/** An area's wash goes round an area inside it that is lighter than it, or less than this much darker (L*). */
+const AROUND_LIGHTER = 4;
+/** ... and runs behind a hole in it no bigger than this share of it. */
+const HOLE_MOST = 0.3;
 /** The light side of an area: the cells between these quantiles of its L*. */
 const LIGHT_SIDE = [0.6, 0.92];
 /** Charges: tiles this wide (mm) read for the local light side; a charge where it is this far (CIEDE2000) from the wash; at most this many a wash, one per this much area (mm2). */
@@ -47,7 +51,9 @@ const SHADOW_STEP = 12, DEEP_STEP = 26;
 /** The least shadow shape (mm2); the brush (mm) that rounds its outline (its smallest feature); the most shapes a step. */
 const SHADOW_LEAST_MM2 = 40, SHADOW_ROUND_MM = 7, SHADOW_MOST = 30;
 /** Darks: no lighter than the picture's 3rd percentile plus this, this much darker than what is laid there, at least this big (mm2), at most this many. */
-const DARK_REACH = 10, DARK_UNDER = 14, DARK_LEAST_MM2 = 3, DARK_MOST = 14;
+const DARK_REACH = 10, DARK_UNDER = 14, DARK_LEAST_MM2 = 8, DARK_MOST = 14;
+/** A wash is graded: its charge runs this share (at least, at most) either side of its mix; L* of the subject's own change per share. */
+const GRADE_LEAST = 0.12, GRADE_MOST = 0.35, GRADE_PER_L = 40;
 /** A wash is laid only when it darkens what is under it by this much L*. */
 const VISIBLE_STEP = 2;
 /** Outline tolerance (mm) for lights, areas, shadows. */
@@ -83,6 +89,15 @@ function keepParts(m, w, h, least) {
   for (const id of c.labels) if (id) size[id]++;
   for (let i = 0; i < m.length; i++) if (m[i] && size[c.labels[i]] < least) m[i] = 0;
   return components(m, w, h, 4);
+}
+/** The mask with its holes filled (the cells not reached from the sheet's edge through cells outside it). */
+function fillHoles(m, w, h) {
+  const out = Uint8Array.from(m, () => 1), stack = [];
+  const push = i => { if (!m[i] && out[i]) { out[i] = 0; stack.push(i); } };
+  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+  while (stack.length) { const i = stack.pop(), x = i % w; if (x) push(i - 1); if (x < w - 1) push(i + 1); if (i >= w) push(i - w); if (i + w < w * h) push(i + w); }
+  return out;
 }
 /** The outline loops (mm) of the component `id` of `labels`, with its holes. */
 function loopsOf(labels, id, w, h, planMm, tolMm) {
@@ -141,6 +156,7 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   const squint = sigmaMm => { const planes = lin.map(p => blur(p, pw, ph, sigmaMm / mmX)); return { planes, ...lab(planes) }; };
   const mm2 = cells => cells * mmX * mmX, cellsFor = a => a / (mmX * mmX), rC = mm => Math.max(1, Math.round(mm / mmX));
 
+  const S6 = squint(ZONE_SIGMA_MM);
   // --- 1. the reserved lights ---
   const S2 = squint(RESERVE_SIGMA_MM), sortedL = Float32Array.from(S2.L).sort(), lightest = sortedL[Math.floor(.995 * (pn - 1))];
   const reserveFrom = Math.min(100, lightest) - (drawn ? RESERVE_WITHIN_DRAWN : RESERVE_WITHIN);
@@ -169,6 +185,7 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
     const before = filmLab(u, pigments, paperCol)[0], after = filmLab(u.map((v, j) => v + mix[j]), pigments, paperCol)[0];
     if (stage !== 2 && before - after < VISIBLE_STEP) return null;
     const fill = strokes ? { strokes, brushMm: Math.max(...strokes.map(s => 2 * s.radiusMm)), depthMm: 0, uncovered: 0 } : sweepFill(loops, { kitMm: washKitMm, growMm, keepOut });
+    if (!strokes) gradeStrokes(fill, cells);
     if (!fill.strokes.length) return null;
     for (const q of cells) if (!lightMask[q] || stage > 1) for (let j = 0; j < k; j++) laid[j][q] += mix[j];
     // the shape on the sheet's cells, for the painter's records (its edge is where the strokes end)
@@ -196,13 +213,29 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
     byStage[stage - 1]++;
     return sh;
   };
+  // Every wash is graded (a little paler at one part than another): the sweeps go down the shape and each is charged
+  // at its share of the mix, the share falling (water added at each recharge) or rising the way the subject squinted
+  // at the first wash's scale grows lighter or darker down the sweeps; dark to pale when it is flat. The shares
+  // average one, so the wash holds its mix.
+  const gradeStrokes = (fill, cells) => {
+    const c = Math.cos(fill.angle ?? 0), s = Math.sin(fill.angle ?? 0), down = (x, y) => -x * s + y * c;
+    let n0 = 0, sv = 0, sl = 0, svv = 0, svl = 0;
+    for (const q of cells) { const v = down((q % pw + .5) * mmX, (((q / pw) | 0) + .5) * mmX), l = S6.L[q]; n0++; sv += v; sl += l; svv += v * v; svl += v * l; }
+    const slope = n0 > 2 ? (svl - sv * sl / n0) / Math.max(1e-9, svv - sv * sv / n0) : 0;
+    const at = fill.strokes.map(st => { let v = 0; for (const [x, y] of st.points) v += down(x, y); return v / st.points.length; });
+    const lo = Math.min(...at), hi = Math.max(...at), span = hi - lo; if (!(span > 1)) return;
+    // lighter further down: pale at the end; darker further down: strong at the end
+    const delta = slope * span, amp = Math.max(GRADE_LEAST, Math.min(GRADE_MOST, Math.abs(delta) / GRADE_PER_L)), sign = delta > 1 ? -1 : 1;
+    const raw = at.map(v => 1 + sign * amp * (1 - 2 * (v - lo) / span)), mean = raw.reduce((a, v) => a + v, 0) / raw.length;
+    fill.strokes.forEach((st, k) => { st.charge = +(raw[k] / mean).toFixed(3); });
+  };
   // one layer: the shapes painted in one session (no drying between them); the painter dries at the end of a value
   const layer = (stage, shapes) => { if (!shapes.length) return; const area = shapes.reduce((a, s) => a + s.area, 0), mix = new Array(k).fill(0); for (const s of shapes) s.mix.forEach((v, j) => { mix[j] += v * s.area / area; }); const t = mix.reduce((a, v) => a + v, 0) || 1; layers.push({ value: stage, pigment: mix.indexOf(Math.max(...mix)), mixId: shapes[0]._valuePlan.mixId, shapes, mix: mix.map(v => v / t), amount: shapes.reduce((a, s) => a + s.amount * s.area, 0) / area, area, _order: { phase: stage <= 2 ? 'ground' : stage <= 4 ? 'mid' : 'dark', region: 0, shoot: true }, _valuePhase: shapes[0]._valuePlan.phase }); };
 
   // --- 2. the first wash: areas of one local colour, light side, charged while wet ---
   // the light side is read off the subject squinted at the shadow's scale, so no fine mark of the subject sets it
   const S3 = squint(SHADOW_SIGMA_MM), sqAt = q => toRGB(S3.planes, q), sqL = q => S3.L[q];
-  const S6 = squint(ZONE_SIGMA_MM), open = [];
+  const open = [];
   for (let q = 0; q < pn; q++) if (!lightMask[q]) open.push(q);
   const step = Math.max(1, Math.floor(open.length / 6000)), rows = [];
   for (let t = 0; t < open.length; t += step) { const q = open[t]; rows.push(S6.A[q], S6.B[q], ZONE_L_WEIGHT * S6.L[q]); }
@@ -230,18 +263,29 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   for (let id = 1; id <= zoneLabels.count; id++) {
     const cells = []; for (let q = 0; q < pn; q++) if (zoneLabels.labels[q] === id) cells.push(q);
     if (cells.length < leastZone / 2) continue;
-    const m = new Uint8Array(pn); for (const q of cells) m[q] = 1;
-    const round = roundMask(m, pw, ph, rC(3));
-    for (let q = 0; q < pn; q++) if (lightMask[q]) round[q] = 0;
-    const lc = keepParts(round, pw, ph, leastZone / 2), loops = [];
-    for (let j = 1; j <= lc.count; j++) loops.push(...loopsOf(lc.labels, j, pw, ph, mmX, ZONE_TOL_MM));
-    if (!loops.length) continue;
     const colour = sideColour(cells, sqAt, sqL, LIGHT_SIDE);
     // an area near the paper's own colour is left bare; its shadows are still painted
-    zones.push({ id, cells, loops, colour, L: labOf(colour, 0, paperCol)[0], paper: deltaE2000(labOf(colour, 0, paperCol), [100, 0, 0]) < ZONE_PAPER });
+    zones.push({ id, cells, colour, L: labOf(colour, 0, paperCol)[0], paper: deltaE2000(labOf(colour, 0, paperCol), [100, 0, 0]) < ZONE_PAPER });
   }
-  // light to dark; each area's charges follow it while it is wet
-  zones.sort((a, b) => b.L - a.L);
+  // An area's wash runs on behind the darker things inside it (a sky behind a tree, a wall behind its windows): its
+  // holes are filled, but for the lights and the areas lighter than it, which the wash goes round.
+  const areaOf = new Int32Array(pn).fill(-1); zones.forEach((z, zi) => { for (const q of z.cells) areaOf[q] = zi; });
+  for (const z of zones) {
+    const m = new Uint8Array(pn); for (const q of z.cells) m[q] = 1;
+    const rounded = roundMask(m, pw, ph, rC(3)), round = fillHoles(rounded, pw, ph);
+    // only holes smaller than the area itself: a wash runs behind a tree, not behind a whole building
+    { const hole = Uint8Array.from(round, (v, q) => (v && !rounded[q] ? 1 : 0)), hc = components(hole, pw, ph, 4), size = new Int32Array(hc.count + 1); for (const id of hc.labels) if (id) size[id]++; for (let q = 0; q < pn; q++) if (hc.labels[q] && size[hc.labels[q]] > HOLE_MOST * z.cells.length) round[q] = 0; }
+    for (let q = 0; q < pn; q++) if (lightMask[q] || (areaOf[q] >= 0 && zones[areaOf[q]] !== z && zones[areaOf[q]].L > z.L - AROUND_LIGHTER)) round[q] = round[q] && m[q];
+    const lc = keepParts(round, pw, ph, leastZone / 2), loops = [];
+    for (let j = 1; j <= lc.count; j++) loops.push(...loopsOf(lc.labels, j, pw, ph, mmX, ZONE_TOL_MM));
+    z.loops = loops;
+  }
+  for (let i = zones.length - 1; i >= 0; i--) if (!zones[i].loops.length) zones.splice(i, 1);
+  // each area's charges follow it while it is wet
+  // the largest area first (the sky or the main band), then the rest from the top of the sheet down: far to near, weakly
+  for (const z of zones) { let y = 0; for (const q of z.cells) y += (q / pw) | 0; z.cy = y / z.cells.length; }
+  const biggest = zones.reduce((b, z) => (!z.paper && (!b || z.cells.length > b.cells.length) ? z : b), null);
+  zones.sort((a, b) => (a === biggest ? -1 : b === biggest ? 1 : a.cy - b.cy));
   const zoneOf = new Int32Array(pn).fill(-1), zoneL = new Float32Array(pn).fill(100);
   zones.forEach((z, zi) => { for (const q of z.cells) { zoneOf[q] = zi; zoneL[q] = z.L; } });
   const tile = rC(CHARGE_TILE_MM), sheetBrush = Math.max(...washKitMm.filter(b => b <= 14), washBrushMm);

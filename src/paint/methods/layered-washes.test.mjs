@@ -45,9 +45,11 @@ test('the wall\'s first wash is its light side, not the mean of its lit and shad
 });
 
 test('a fine pattern on the wall changes no shape: the plan reads the subject squinted', () => {
-  const a = plan(scene()), b = plan(scene({ speckle: 12 }));
-  assert.equal(a.instructions.length, b.instructions.length);
-  a.instructions.forEach((q, i) => assert.ok(Math.abs(q.areaMm2 - b.instructions[i].areaMm2) <= 0.08 * q.areaMm2 + 20, `${q.id}: ${q.areaMm2} vs ${b.instructions[i].areaMm2}`));
+  // the shapes (first washes, shadows, darks; a charge is a touch dropped at a place and has no shape of its own)
+  const shapes = p => p.instructions.filter(q => q.stage !== 2);
+  const a = shapes(plan(scene())), b = shapes(plan(scene({ speckle: 12 })));
+  assert.equal(a.length, b.length);
+  a.forEach((q, i) => assert.ok(Math.abs(q.areaMm2 - b[i].areaMm2) <= 0.08 * q.areaMm2 + 20, `${q.id}: ${q.areaMm2} vs ${b[i].areaMm2}`));
 });
 
 test('helpers: blur keeps the mean, a brush-rounded mask loses its speck, the light side is the lighter part, k-means finds two groups', () => {
