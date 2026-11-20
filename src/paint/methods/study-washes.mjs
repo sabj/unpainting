@@ -55,9 +55,9 @@ const NEST_BORDER = 0.05;
 /** Phases: a first wash at least this light; a dark under this L*; a dark is last only when smaller than this share of the sheet. */
 const FIRST_L = 55, DARK_L = 40, DARK_SMALL = 0.04;
 /** Charges: in a wash of at least this share of the sheet, at most this many, each a dab of a round this wide (mm) at this share of the wash's strength. */
-const CHARGE_FROM = 0.03, CHARGE_MOST = 2, CHARGE_BRUSH_MM = 7, CHARGE_STRENGTH = 0.7;
+const CHARGE_FROM = 0.01, CHARGE_MOST = 2, CHARGE_BRUSH_MM = 7, CHARGE_STRENGTH = 0.7, CHARGE_SHIFT = 10;
 /** A wash is graded top to bottom by this share either side of its mix (A9: every patch a little paler at one end). */
-const GRADE = 0.22;
+const GRADE = 0.3;
 /** A wash is laid this far past its outline to meet its neighbours, never onto bare paper. */
 const GROW_MM = 0.4;
 /** A touch dropped into a wet wash covers at least this many sheet cells (a stroke's own footprint). */
@@ -240,10 +240,10 @@ function shifted(rgb, pw, ph, [dx, dy]) {
 /** A broken mass (laid in dabs): a green between these hues (degrees, Lab), or a shape that loses this share of itself when rounded; between these shares of the sheet. */
 const BROKEN_HUE = [95, 170], BROKEN_LOST = 0.15, BROKEN_THIN = 0.6, BROKEN_LONG = 3, BROKEN_LEAST = 0.002, BROKEN_MOST = 0.3;
 /** Foliage dabs: a round about this share of the sheet's width; dabs this many brush widths apart; the darker value's share of the dabs and its strength. */
-const DAB_SHARE = 0.025, DAB_PITCH = 0.6, DAB_DARK_SHARE = 0.35, DAB_DARK = 1.6;
+const DAB_SHARE = 0.025, DAB_PITCH = 0.85, DAB_DARK_SHARE = 0.35, DAB_DARK = 1.6;
 /** Dabs vary in size between these shares of the brush and in length between these shares of their width; they come in clusters
  * this many cells across, the dabs of a cluster turned alike (within DAB_TURN radians), this share of the clusters left out as paper. */
-const DAB_SIZE = [0.55, 1.25], DAB_LONG = [2.6, 3.8], DAB_CLUSTER = 3, DAB_TURN = 0.45, DAB_GAPS = 0.12;
+const DAB_SIZE = [0.7, 1.4], DAB_LONG = [2.6, 3.8], DAB_CLUSTER = 3, DAB_TURN = 0.45, DAB_GAPS = 0.25;
 /** A dab is a leaf stroke, pressed and lifted: this many points along it, pressed as sin(pi u) to this power. The round
  * lands on its point and opens to its belly only over the tuft it draws down (about 2.8 radii at full pressure,
  * src/media/tuft-section.mjs), so a dab travels DAB_LONG radii: a three-point touch no longer than the brush was wide
@@ -311,6 +311,8 @@ const FIRST_MOST = 48;
 const ERR_LIGHT = 0;
 /** A window's glass wash is laid this much lighter (L*) than the study's dark, when the finest study's panes go over it. */
 const GLASS_LIFT = 8;
+/** A pane is laid as one stroke when at least this big (mm2); smaller darks in a window are left to the pen. */
+const PANE_LEAST_MM2 = 2.5;
 /** Glazes: one for each GLAZE_STEP_L (L*) a shadow or dark is below what is laid, at most four; glaze k covers the cells
  * at or under this quantile of the finest study's lightness in the shape; parts under GLAZE_LEAST_MM2 are left. */
 const GLAZE_STEP_L = 10, GLAZE_STEPS = [1, 0.65, 0.4, 0.22], GLAZE_LEAST_MM2 = 6;
@@ -554,7 +556,10 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     let lo = Infinity, hi = -Infinity; for (const q of cells) { const t = (q % pw + .5 - mx) * ux + (((q / pw) | 0) + .5 - my) * uy; if (t < lo) lo = t; if (t > hi) hi = t; }
     const end = t => [(mx + ux * t) * mmX, (my + uy * t) * mmX], places = [end(lo + (hi - lo) / 3), end(hi - (hi - lo) / 3)];
     const out = [];
-    [warm, cool].forEach((o, j) => { if (o == null || out.length >= CHARGE_MOST) return; const ch = chargeAt(inside, places[j], shapesOf[o].colour, sh, `${what}: a ${o === warm ? 'warmer' : 'cooler'} neighbour's mix dropped in`); if (ch) out.push(ch); });
+    // with no warmer or cooler neighbour, the wash's own colour warmed or cooled (a painter varies every wash: warm into
+    // cool, A8, A9)
+    const shifted = (dA, dB) => labToRgb([s.lab[0], s.lab[1] + dA, s.lab[2] + dB], paperCol);
+    [warm, cool].forEach((o, j) => { if (out.length >= CHARGE_MOST) return; const colour = o != null ? shapesOf[o].colour : j ? shifted(-2, -CHARGE_SHIFT) : shifted(CHARGE_SHIFT / 2, CHARGE_SHIFT); const ch = chargeAt(inside, places[j], colour, sh, `${what}: ${o != null ? `a ${j ? 'cooler' : 'warmer'} neighbour's mix` : `its own colour ${j ? 'cooled' : 'warmed'}`} dropped in`); if (ch) out.push(ch); });
     return out;
   };
   // a broken mass laid as dabs: its own value first, then a darker value dropped into it while wet
@@ -667,7 +672,8 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     if (!made) continue;
     laidL.set(r, s.lab[0]);
     session = { stage: 1, list: [made], ids: new Set([r]) };
-    session.list.push(...lifeFor(made, s.cells, shapes, r, new Set(under(r)), what));
+    // (charged where the whole family's wash lies, not only its root shape: the root is often a small light piece of it)
+    session.list.push(...lifeFor(made, members.filter(i => !shapes[i].paper).flatMap(i => shapes[i].cells), shapes, r, new Set(under(r)), what));
     // the family's shapes of another hue but a close value are dropped into the wet under-wash where they sit, each as
     // marks of the brush shaped to it (src/paint/marks): they mingle with it, their edges lost; darker ones are glazed later on
     // the dry wash, their edges found
@@ -777,7 +783,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const near = dilate(inDark, pw, ph, rC(0.6)), keep = Uint8Array.from(near, (v, q) => (v && !paperMask[q] ? 0 : 1));
     const base = { L: new Float32Array(pn), A: new Float32Array(pn), B: new Float32Array(pn) };
     for (let q = 0; q < pn; q++) { const i = label[q], t = leftDark.has(i) ? (parent[i] >= 0 ? shapes[parent[i]] : fam[i] >= 0 ? shapes[fam[i]] : null) : shapes[i]; const lab = glassLab.get(i) ?? (t && !t.paper ? t.lab : [100, 0, 0]); base.L[q] = lab[0]; base.A[q] = lab[1]; base.B[q] = lab[2]; }
-    const groups = touchesFrom({ grid: g, ref: base, paper: keep, pw, ph, mmX, paperRGB: paperCol, minMm2: 0.8, kit: TOUCH_KIT, salt: 97 }).filter(gr => gr.lab[0] < base.L[gr.cells[0]] - 2);
+    const groups = touchesFrom({ grid: g, ref: base, paper: keep, pw, ph, mmX, paperRGB: paperCol, minMm2: PANE_LEAST_MM2, kit: TOUCH_KIT, salt: 97 }).filter(gr => gr.lab[0] < base.L[gr.cells[0]] - 2);
     const sess = [];
     for (const [j, gr] of groups.entries()) {
       const strokesOf = gr.touches.flatMap(t => t.strokes), loops = maskLoops(footprint(strokesOf), 0.5); if (!loops.length) continue;
