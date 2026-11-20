@@ -59,9 +59,10 @@ function fiveSweeps(mm, dryOpts) {
   const od = densityOf(luminance(renderLayers(layersOf(s), pigments, base, n), n), luminance([246, 245, 239], 1)[0]);
   return { ...sweptSquare(od, w, w, mm, { centres: [9, 17, 25, 33, 41], half: 6 }), before };
 }
+const squares = {};
 for (const mm of [0.25, 0.1]) for (const [mode, dryOpts] of [['exact', { levelMax: 200 }], ['fast', { levelMax: 200, dt: 14, analyticTail: true }]]) {
   test(`a 40 mm square laid in five sweeps dries as one film at ${mm} mm cells (${mode}): no bands, no seams, a rim all round`, { timeout: 900000 }, () => {
-    const r = fiveSweeps(mm, dryOpts);
+    const r = fiveSweeps(mm, dryOpts); squares[`${mm} ${mode}`] = r;
     console.log(`five sweeps ${mm} mm ${mode}: bands ${r.bands.toFixed(4)}, seam ${r.seam.toFixed(4)} OD, rims ${r.rims.map(v => v.toFixed(3)).join(' ')}`);
     // the row-mean density, outside the rim and over 2 mm of rows, within 3% of its mean (a poured square reads 2.3%)
     assert.ok(r.bands < 0.03, `bands ${r.bands}`);
@@ -69,3 +70,13 @@ for (const mm of [0.25, 0.1]) for (const [mode, dryOpts] of [['exact', { levelMa
     for (const v of r.rims) assert.ok(v >= 1.05 && v <= 1.4, `rims ${r.rims}`);
   });
 }
+
+test('the five-sweep square dries the same rim at 0.25 and 0.1 mm cells, each side within 6%', () => {
+  // (wash-measure rimContrast reads 1.21 at 0.25 mm and 1.05 at 0.1 mm on the same squares: it measures the outer 1 mm
+  // from every unpainted cell, and the few tooth pits a sweep skips at 0.1 mm (0.4% of the square) each make a
+  // millimetre of interior around them count as rim. Along the square's own sides the rims agree.)
+  for (const mode of ['exact', 'fast']) {
+    const a = squares[`0.25 ${mode}`], b = squares[`0.1 ${mode}`]; if (!a || !b) continue;
+    a.rims.forEach((v, i) => assert.ok(Math.abs(b.rims[i] / v - 1) < 0.06, `${mode} side ${i}: ${v} at 0.25 mm, ${b.rims[i]} at 0.1 mm`));
+  }
+});

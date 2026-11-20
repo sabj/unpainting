@@ -76,7 +76,8 @@ export function levelFilm(sheet, o, box, mm) {
     const R = Math.ceil(dm / mm), dist = b.dist ?? (b.dist = new Int32Array(sheet.n)), queue = b.queue ?? (b.queue = new Int32Array(sheet.n));
     let head = 0, tail = 0;
     for (let k = 0; k < n; k++) { dist[k] = -1; if (west[k] < 0 || north[k] < 0 || east[k] < 0 || south[k] < 0) { dist[k] = 0; queue[tail++] = k; } }
-    while (head < tail) { const k = queue[head++], d = dist[k] + 1; if (d >= R) continue; for (const j of [west[k], north[k], east[k], south[k]]) if (j >= 0 && dist[j] < 0) { dist[j] = d; queue[tail++] = j; } }
+    const visit = (j, d) => { if (j >= 0 && dist[j] < 0) { dist[j] = d; queue[tail++] = j; } };
+    while (head < tail) { const k = queue[head++], d = dist[k] + 1; if (d >= R) continue; visit(west[k], d); visit(north[k], d); visit(east[k], d); visit(south[k], d); }
     for (let k = 0; k < n; k++) if (dist[k] >= 0) { const dmm = (dist[k] + 0.5) * mm; if (dmm < dm) H[k] += tanA * (dm - dmm); }
   }
   const done = () => { for (let k = 0; k < n; k++) at[cells[k]] = -1; };
@@ -129,7 +130,7 @@ export function levelFilm(sheet, o, box, mm) {
     for (let k = 0; k < n; k++) p[k] = z[k] + beta * p[k];
   }
   // the water each face carries over the step, towards +x (fe) and +y (fs), from the new surface
-  const { fe, fs, out, dW, dG, pout } = b;
+  const { fe, fs, out, dW, dG, pout } = b, thin = o.wetEps ?? 0.004;
   let worst = 0;
   for (let k = 0; k < n; k++) { out[k] = 0; }
   for (let k = 0; k < n; k++) {
@@ -138,8 +139,9 @@ export function levelFilm(sheet, o, box, mm) {
     if (fe[k] > 0) out[k] += fe[k]; else if (fe[k] < 0) out[e] -= fe[k];
     if (fs[k] > 0) out[k] += fs[k]; else if (fs[k] < 0) out[s] -= fs[k];
   }
-  for (let k = 0; k < n; k++) { const wk = W[cells[k]]; if (out[k] > 0) worst = Math.max(worst, wk > 1e-12 ? out[k] / wk : Infinity); }
-  // substeps: no donor gives more than half its water in one, so the pigment it passes on is the pigment it holds
+  for (let k = 0; k < n; k++) { const wk = W[cells[k]]; if (out[k] > 0 && wk > thin) worst = Math.max(worst, out[k] / wk); }
+  // substeps: no donor gives more than half its water in one, so the pigment it passes on is the pigment it holds. A
+  // film thinner than wetEps is left to the 95% budget: counted, its last micrometre asked for 64 substeps of the box.
   const subs = Math.min(64, Math.max(1, Math.ceil(worst / 0.5)));
   const act = []; for (let g = 0; g < K; g++) { const Gg = G[g]; for (let k = 0; k < n; k++) if (Gg[cells[k]] !== 0) { act.push(g); break; } }
   // the CG's work arrays are free now: ae, as the water each face carries in a substep after its donor's budget, c the
