@@ -8,7 +8,6 @@ import { createSheet, step, dry, thickness, totals, DEFAULTS as SHEET_DEFAULTS, 
 const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import { createBrush, dip, stroke } from './brush.mjs';
 import { attachGpu, gpuStats } from './gpu/link.mjs';
-import { GPU_PORT_TODO } from './gpu/port-todo.mjs';
 
 const pigments = [
   { K: [0.35, 0.49, 0.66], S: [0.06, 0.025, 0.014], rho: 0.05, omega: 1.4, gamma: 0.15 },
@@ -37,7 +36,7 @@ const fresh = () => createSheet(makePaper(N, N, { seed: 5 }), pigments);
 const stats = (a, b) => { let max = 0, sum = 0; for (let k = 0; k < a.length; k++) for (let i = 0; i < a[k].length; i++) { const d = Math.abs(a[k][i] - b[k][i]); if (d > max) max = d; sum += d; } return { max, mean: sum / (a.length * a[0].length) }; };
 const peak = t => Math.max(...t.map(a => a.reduce((m, v) => Math.max(m, v), 0)));
 
-test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 120000 , todo: GPU_PORT_TODO }, t => {
+test('the GPU sheet paints within the CPU sheet\'s own float noise', { timeout: 120000 }, t => {
   const O = { ...DEFAULTS, gran: 0.25 };
   const cpuSheet = fresh(), ref = paint(cpuSheet, O);
   assert.equal(cpuSheet._gpu, undefined, 'the CPU run must not touch the GPU path');
@@ -74,7 +73,7 @@ test('--gpu off leaves the sheet on the untouched CPU path', () => {
   assert.equal(info.backend, 'cpu'); assert.equal(off._gpu, undefined);
 });
 
-test('accumulated support follows GPU fixation and CPU edits to lower layers', { timeout: 120000 , todo: GPU_PORT_TODO }, t => {
+test('accumulated support follows GPU fixation and CPU edits to lower layers', { timeout: 120000 }, t => {
   const O = { ...DEFAULTS, gran: 0.25, fixedBed: 1 };
   const cpu = fresh(), gpu = fresh();
   const info = attachGpu(gpu, O, {mode:'auto', log:()=>{}});
@@ -166,7 +165,7 @@ test('dry-fraction evaporation parity across CPU and GPU with dynamic mmPerCell'
 
 // brush-review item 8: a damp round carrying paint, drawn through a wet wash, gives its paint into it as it drinks; the
 // GPU contact trades both ways as the CPU one does.
-test('a damp round carrying paint through a wet wash lays the same paint on the GPU as on the CPU', { timeout: 120000 , todo: GPU_PORT_TODO }, t => {
+test('a damp round carrying paint through a wet wash lays the same paint on the GPU as on the CPU', { timeout: 120000 }, t => {
   const lay = sheet => {
     const flat = createBrush({ flat: true, radius: 10, capacity: 100, belly: 12, give: 0.9, free: 0.4, wetMix: 0.55, seed: 5 });
     dip(flat, { water: 0.62, conc: [0.3, 0] }); stroke(flat, sheet, [{ x: 8, y: 48, p: 0.9, r: 10 }, { x: 88, y: 48, p: 0.9, r: 10 }], { upright: 'sweep' });

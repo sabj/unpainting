@@ -196,7 +196,7 @@ export class GpuSheet {
       capStep: this.poreTime.fraction, capEps: o.capEps, capDelta: o.capDelta, sizing: o.sizing ?? SIZING, wickFilter: o.wickFilter ?? 0.2,
       wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill, spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
       enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0, holeFill: o.holeFill ?? 0, padB: this.workers, filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03,
-      padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 || this.poreTime.iters > 2 ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: (o.marangoni ?? 0) * fraction, slope: o.slope ?? 0,
+      padC: process.env.GPU_SPARSE_TIGHT === '0' || process.env.GPU_STEP === 'old' || o.edgeWidth + 1 > 7 || this.poreTime.iters > TILE ? 0 : 1, holeSpan: o.holeSpan ?? 0, mar: (o.marangoni ?? 0) * fraction, slope: o.slope ?? 0,
       mmPerCell: o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : (this.paper?.mmPerCell > 0 ? this.paper.mmPerCell : 0.3)),
       edgeFlowDepth: o.edgeFlowDepth ?? 0.06,
       poreHalo: Math.max(1, Math.ceil(this.poreTime.iters / TILE)), poreReach: Math.max(2, this.poreTime.iters),
