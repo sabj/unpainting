@@ -149,7 +149,7 @@ test('wash with --drawingonly 1: black ink, firm ends, a load match past 4x, one
   const f = argv => { const a = inkRecipeArgs('wash', argv), m = new Map(); for (let k = 0; k < a.length; k += 2) m.set(a[k], a[k + 1]); return m; };
   const only = f(['--drawingonly', '1', '--width', '1224']), plain = f(['--width', '1224']);
   assert.equal(only.get('--inkprofile'), 'drawing-ink'); assert.equal(only.get('--inkhue'), 'profile'); assert.equal(only.get('--drawtaperstart'), '1');
-  assert.equal(only.get('--drawing'), 'first'); assert.equal(only.get('--inkloadmax'), '16');
+  assert.equal(only.get('--drawing'), 'first'); assert.equal(only.get('--inkloadmax'), '16'); assert.equal(only.get('--drawwant'), '1');
   assert.equal(plain.get('--inkhue'), 'source'); assert.equal(plain.get('--inkprofile'), undefined); assert.equal(plain.get('--drawtaperstart'), '0.7');
   assert.equal(f(['--drawingonly', '1', '--inkhue', 'source']).get('--inkhue'), undefined);
 });
