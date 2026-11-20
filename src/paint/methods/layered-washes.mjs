@@ -27,7 +27,7 @@ const PLAN_MM = 0.5;
 /** Squint (Gaussian sigma, mm) for the reserved lights, the shadow shapes, the darks and the first wash's areas. */
 const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 5;
 /** Bare paper: squinted within this L* of the lighter of the paper and the picture's lightest tone, and no more chromatic than this. */
-const RESERVE_WITHIN = 7, RESERVE_CHROMA = 12;
+const RESERVE_CHROMA = 12;
 /** Near-paper light in the subject: within this L* of the paper. A reserve is never darker than PAPER_DARKEST L*. */
 const PAPER_NEAR = 10, PAPER_DARKEST = 72;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
@@ -172,9 +172,11 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   // Light things are not painted: they are paper, their shapes cut by what is painted round them. The sheet keeps as
   // much bare paper as the subject has near-paper light (read at a 1 mm squint, a share of the sheet, no place): the
   // lightest that share of the squinted subject is reserved, never darker than PAPER_DARKEST.
-  const S1 = squint(1); let near = 0; for (let q = 0; q < pn; q++) if (S1.L[q] >= 100 - PAPER_NEAR && Math.hypot(S1.A[q], S1.B[q]) <= RESERVE_CHROMA * 1.5) near++;
+  // (near the subject's own paper: its lightest tone, a photographed sheet being no whiter than it is)
+  const S1 = squint(1), own = Float32Array.from(S1.L).sort()[Math.floor(.995 * (pn - 1))]; let near = 0;
+  for (let q = 0; q < pn; q++) if (S1.L[q] >= Math.min(100, own) - PAPER_NEAR && Math.hypot(S1.A[q], S1.B[q]) <= RESERVE_CHROMA * 1.5) near++;
   const subjectPaper = near / pn;
-  const reserveFrom = Math.max(PAPER_DARKEST, Math.min(Math.min(100, lightest) - RESERVE_WITHIN, sortedL[Math.max(0, Math.floor((1 - subjectPaper) * (pn - 1)))]));
+  const reserveFrom = Math.max(PAPER_DARKEST, sortedL[Math.max(0, Math.floor((1 - subjectPaper) * (pn - 1)))]);
   let reserve = Uint8Array.from(S2.L, (v, q) => (v >= reserveFrom && Math.hypot(S2.A[q], S2.B[q]) <= RESERVE_CHROMA * 1.5 ? 1 : 0));
   reserve = roundMask(reserve, pw, ph, rC(RESERVE_ROUND_MM / 2));
   const rc = keepParts(reserve, pw, ph, cellsFor(RESERVE_LEAST_MM2)), lightLoops = [];
