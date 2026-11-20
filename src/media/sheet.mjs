@@ -2,6 +2,8 @@ import { certifyDryFixed, validDryFixedCertificate, invalidatePaperCertificate, 
 import { censusDry } from './census.mjs';
 import { SIZING } from './sizing.mjs';
 import { edgeFeed, resetEdgeFeed } from './edge-feed.mjs';
+import { levelFilm } from './film-level.mjs';
+export { setTilt } from './film-level.mjs';
 import { flowTime, poreTime } from './flow-time.mjs';
 import { settleSpeed, settleDiffusion, settleShare } from './settling.mjs';
 // Pipeline: painting, stage 4 (the sheet physics).
@@ -32,6 +34,10 @@ export const DEFAULTS = {
   // height runs 0..1): the water levels its surface, not its depth, so it stands deeper over the hollows of the grain,
   // holds more pigment there and dries there last, which is most of granulation. At 0 the paper was flat to the water.
   flow: 0.2, flowIters: 2, slope: 0.1,
+  // the glossy film levels by thin-film flow (film-level.mjs): this share of the free film's lubrication mobility,
+  // (rho g / 3 mu) h^3; the board's tilt (setTilt) runs it downhill. At 0.1 a five-sweep 40 mm square still dried 3%
+  // darker in its middle than its first and last sweeps (40 mm took a minute to level); at 1 it is flat to its grain.
+  level: 1, meniscus: 0.05, meniscusMm: 0.5,
   diffuse: 0.02,                                  // pigment particles barely diffuse; water carries them (< 0.25)
   // Paint charged into a standing film mixes out into it (convection and the binder's pull, here as an effective
   // diffusion, cells^2 per flow iteration), with a mobility that grows with the film: full at a glossy film of
@@ -604,6 +610,8 @@ function stepCpu(sheet, o, reduction) {
     sheet.edgeEvaporated = (sheet.edgeEvaporated ?? 0) + e;
     sheet.evaporated = (sheet.evaporated ?? 0) + e;
   }
+  // the glossy film levels as one film, carrying its pigment (film-level.mjs)
+  for (const box of boxes) levelFilm(sheet, o, box, mm);
   const oBox = o.edgeEvap ? { ...o, edgeEvap: 0 } : o;
   const merge = value => { if (reduction) { reduction.maxW = Math.max(reduction.maxW, value.maxW); reduction.surfaceLevel = Math.max(reduction.surfaceLevel, value.surfaceLevel); } };
   if (PAR) {
