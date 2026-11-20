@@ -19,6 +19,11 @@ export const INK_RECIPES = Object.freeze({
   }),
 });
 
+// wash with --drawingonly 1: a prepared pen drawing laid alone on dry paper. A pen line there is near black with a firm
+// start and a short lift: black ink (not the source's sepia), a load match that may go past 4x, no damp, one opening pen.
+export const PEN_ONLY = Object.freeze({ inkprofile: 'black-ink', inkhue: 'profile', inkloadmax: '16', drawing: 'first', stages: 'prepink',
+  drawtaperin: '1', drawtaperstart: '1', drawtaperout: '3', drawtaperend: '0.85', inkbleed: '0' });
+
 /**
  * The wash recipe's --inkres for a painting `width` pixels wide: the pens draw on a sheet near 2160 px wide, so N is 2160 over
  * the width, from 1 to 4. At 540 px that is 4, a fine cell of 0.07 mm; at 1200 px it is 2; from 1080 px up it is 2 or 1, so the
@@ -34,7 +39,8 @@ export function inkRecipeArgs(name, argv) {
   if (!name || name === 'none') return [];
   const r = INK_RECIPES[name];
   if (!r) throw new Error(`--inkrecipe: ${Object.keys(INK_RECIPES).join(' or ')} or none, not ${name}`);
-  const flags = Object.entries(r).flatMap(([k, v]) => (argv.includes('--' + k) ? [] : ['--' + k, v]));
+  const i0 = argv.lastIndexOf('--drawingonly'), penOnly = name === 'wash' && i0 >= 0 && Number(argv[i0 + 1]) > 0;
+  const flags = Object.entries(penOnly ? { ...r, ...PEN_ONLY } : r).flatMap(([k, v]) => (argv.includes('--' + k) ? [] : ['--' + k, v]));
   if (name === 'wash') {
     const i = argv.lastIndexOf('--width'), n = argv.includes('--inkres') ? Number(argv[argv.lastIndexOf('--inkres') + 1]) : washInkRes(i >= 0 ? argv[i + 1] : 700);
     if (!argv.includes('--inkres')) flags.push('--inkres', String(n));
