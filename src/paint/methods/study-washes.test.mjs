@@ -39,7 +39,8 @@ test('the study\'s flat shapes: three painted, the white left as paper, each one
 test('wash within wash: the wall is laid first and carried under its shadow; the shadow goes over it dry; the door is last', () => {
   const p = plan(study()), washes = p.instructions.filter(q => q.stage !== 2);
   const L = washes.map(q => labOf(q.colour, 0, PAPER)[0]);
-  assert.deepEqual(washes.map(q => q.stage), [1, 3, 4]);
+  // (the darkest small shape, the door, is the block-in's last wash; the later studies' touches are the last value step)
+  assert.deepEqual(washes.map(q => q.stage), [1, 3, 3]);
   assert.ok(L[0] > L[1] && L[1] > L[2], L.join(' '));
   // the wall's wash covers the shadow too: nearly the whole wall less the door
   assert.ok(washes[0].areaMm2 > 0.85 * (120 * 75 - 15 * 35), `${washes[0].areaMm2}`);
@@ -105,7 +106,7 @@ test('the under-wash: one connected wash over the wall, under its window and its
 });
 
 test('cast-shadow pieces of one colour a millimetre apart are one wash, laid along the bands', () => {
-  const p = plan(wallStudy()), shadows = p.instructions.filter(q => q.stage === 3);
+  const p = plan(wallStudy()), shadows = p.instructions.filter(q => q.stage === 3 && /shadow glaze/.test(q.thing));
   assert.equal(shadows.length, 1, shadows.map(q => q.thing).join(' | '));
   // its strokes run down the bands (a slant of about 59 degrees from level), not across them
   const long = shadows[0].strokes.filter(s => s.points.length >= 2).map(s => { const a = s.points[0], b = s.points.at(-1); return Math.abs(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI); });

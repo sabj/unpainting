@@ -682,7 +682,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     if (done.has(i)) continue;
     const group = (groupOf.get(i) ?? [i]).filter(j => !done.has(j)); for (const j of group) done.add(j);
     const s = shapes[i], own = group.flatMap(j => shapes[j].cells), phase = phaseOf(i);
-    const over = parent[i] >= 0 || fam[i] >= 0, stage = phase === 1 ? 1 : phase === 3 ? 4 : over ? 3 : 1;
+    const over = parent[i] >= 0 || fam[i] >= 0, stage = phase === 1 ? 1 : phase === 3 ? 3 : over ? 3 : 1;
     const dark = isDark(i), { m, parts } = outlineOf(group, dark ? Math.min(roundFirst, DARK_ROUND_MM) : roundFirst, dark ? null : s.lab[0]); if (!parts.length) continue;
     const loops = parts.flat();
     const what = `study shape ${group.join(' ')}${parent[i] >= 0 ? ` over ${parent[i]}` : fam[i] >= 0 ? ` over the under-wash of ${fam[i]}` : ''}${kids[i].length ? `, carried under ${kids[i].join(' ')}` : ''}`;
@@ -756,7 +756,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     // touches of one colour are one mix, mixed for what they add over what is laid there; groups that do not touch
     // share a session
     const groups = touchesFrom({ grid: grids[li], ref: { L: refL, A: refA, B: refB }, paper: paperMask, pw, ph, mmX, paperRGB: paperCol, minMm2, kit: TOUCH_KIT, salt: li });
-    const stage = accent ? 4 : 3; let sess = [], sessMask = new Uint8Array(pn), touches = 0;
+    const stage = 4; let sess = [], sessMask = new Uint8Array(pn), touches = 0;
     const flush = () => { if (sess.length) layer(stage, sess); sess = []; sessMask = new Uint8Array(pn); };
     for (const [j, gr] of groups.entries()) {
       const m = new Uint8Array(pn); for (const q of gr.cells) m[q] = 1;
