@@ -166,7 +166,7 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
 /** Muted warm local colours: hue (Lab degrees) and chroma between these; their share of the sample that brings in the earths. */
 const EARTH_HUE = [45, 90], EARTH_C = [4, 32], EARTH_SHARE = 0.2;
 /** The earth pans for a picture whose local colours are mostly muted warm (raw sienna, burnt sienna, ultramarine), or none. */
-export function earthPans(colours) {
+function earthPans(colours) {
   const share = colours.filter(r => r.h >= EARTH_HUE[0] && r.h <= EARTH_HUE[1] && r.C >= EARTH_C[0] && r.C <= EARTH_C[1]).reduce((a, r) => a + r.share, 0);
   return share >= EARTH_SHARE ? ['rawsienna', 'sienna', 'ultramarine'].map(k => BOX.find(p => p.key === k)) : [];
 }
