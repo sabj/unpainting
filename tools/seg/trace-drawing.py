@@ -6,6 +6,14 @@ The drawing is enlarged before thinning, so two lines a pixel apart stay two lin
 pixel to pixel. Each traced line is carried through its junctions (sketch-lines.py), cut at its corners, and each piece
 is replaced by a straight run or a circular arc where one fits within --fit source pixels, else by a smoothed curve.
 Emits the ordinary drawingfile JSON (points and one width per line, in source pixels; widthMm with --sheetmm).
+
+--medium pencil reads a pencil drawing instead: grey lines of every weight on a paper that may not be white. The paper is
+found locally (a light construction line is measured against the paper around it, not against white), graphite grain is
+blurred out, the threshold comes from the paper's own noise, and a faint run is kept only where it joins a firmer one
+(hysteresis). Lines closer than a stroke width fuse into one stroke (a doubled line is drawn twice where it splits). The
+traced line keeps the hand's wobble: it is smoothed, not replaced by straight runs and arcs. Each point carries the drawing's
+own darkness there as `weights` (0..1, the firmest lines near 1), so the pencil presses as the drawing was pressed.
+--reweigh FILE puts those weights on another line file's points (one re-ordered or joined after tracing).
 """
 import argparse
 import hashlib
@@ -127,6 +135,87 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
 
 
+def paper_dark(bgr, blur=.7):
+    """A pencil drawing's darkness against its own local paper, 0 (paper) to 1 (black), with the grain blurred out."""
+    grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
+    h, w = grey.shape; r = max(5, int(round(.012*max(h, w))))
+    # the paper: the light envelope over about a centimetre of a drawing (a closing removes every line under that width)
+    paper = cv2.dilate(grey, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
+    paper = cv2.GaussianBlur(paper, (0, 0), r)
+    dark = 1-np.clip(grey/np.maximum(.05, paper), 0, 1)
+    return cv2.GaussianBlur(dark, (0, 0), blur) if blur > 0 else dark
+
+
+def pencil_plan(bgr, zoom=4, smooth_px=1.2, min_px=4.0):
+    dark0 = paper_dark(bgr)
+    # the paper's own noise: the spread of the darkness where nothing is drawn (the lower half of the pixels)
+    lo = dark0[dark0 <= np.percentile(dark0, 50)]
+    noise = float(np.median(np.abs(lo-np.median(lo))))*1.4826+1e-4
+    low = max(.03, float(np.median(lo))+5*noise)
+    line = dark0[dark0 > low]
+    firm = float(np.percentile(line, 95)) if line.size else 1.0
+    high = max(2*low, .35*firm)
+    big = cv2.resize(dark0, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_CUBIC)
+    # a line is pencil down to 45% of its own darkness, as for ink, but against the local paper and the noise-set floor
+    r = int(round(1.5*zoom))
+    peak = cv2.dilate(big, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
+    mask = ((big > low) & (big > .45*peak)).astype('uint8')
+    # hysteresis: a pale run stays only when it is part of a mark that somewhere reaches the firm level
+    n, lab = cv2.connectedComponents(mask, connectivity=8)
+    top = np.zeros(n, np.float32); np.maximum.at(top, lab.ravel(), big.ravel())
+    keep = top > high; keep[0] = False
+    mask = keep[lab].astype('uint8')
+    skeleton, _ = thin(mask)
+    skeleton, _ = prune_spurs(skeleton, 2*zoom)
+    paths = sketch.trace(skeleton, min_points=2, window=2*zoom)
+    paths, joins = sketch.through_junctions(paths, skeleton, reach=2.5, tangent=3*zoom, stub=2*zoom)
+    before = len(paths)
+    paths = sketch.join(paths, big, gap=3*zoom)
+    joins += before-len(paths)
+    distance = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+    lines = []
+    for p in paths:
+        p = np.asarray(p, np.float32)
+        if arc_length(p) < min_px*zoom:
+            continue
+        width = max(.6, float(np.median(2*sketch.at(distance, p)))/zoom)
+        q = resample((resample(p.astype(float), 1)+.5)/zoom-.5, 1.0)
+        q = resample(smooth(q, smooth_px), 1.5)
+        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'role': 'pencil stroke', 'length': arc_length(q)})
+    weigh(lines, dark0, firm)
+    lines.sort(key=lambda l: -l['length'])
+    return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom,
+                                   'medium': 'pencil', 'paperNoise': round(noise, 4), 'low': round(low, 4), 'high': round(high, 4), 'firm': round(firm, 4)}
+
+
+def weigh(lines, dark, firm, reach=1.5):
+    """Each point's darkness in the drawing (the darkest within `reach` pixels, smoothed along the line) over `firm`, as
+    `weights`; the line's median as `weight`. A light construction line comes out light, a pressed contour near 1."""
+    h, w = dark.shape; r = int(np.ceil(reach))
+    peak = cv2.dilate(dark, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*r+1, 2*r+1)))
+    for l in lines:
+        p = np.asarray(l['points'], float)
+        v = cv2.remap(peak, p[:, 0].astype(np.float32), p[:, 1].astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)[:, 0] if len(p) else np.zeros(0)
+        if len(v) >= 5:
+            k = np.exp(-.5*(np.arange(-4, 5)/2)**2); k /= k.sum()
+            v = np.convolve(np.pad(v, 4, mode='edge'), k, 'valid')
+        wt = np.clip(v/max(1e-3, firm), .12, 1)
+        l['weights'] = np.round(wt, 3).tolist(); l['weight'] = round(float(np.median(wt)), 3)
+
+
+def reweigh(file, image, out):
+    doc = json.load(open(file)); bgr = cv2.imread(image); dark = paper_dark(bgr)
+    sx, sy = bgr.shape[1]/doc['image']['w'], bgr.shape[0]/doc['image']['h']
+    firm = doc.get('stats', {}).get('firm') or float(np.percentile(dark[dark > .05], 95))
+    pts = [l['points'] for l in doc['lines']]
+    for l in doc['lines']:
+        l['points'] = [[x*sx, y*sy] for x, y in l['points']]
+    weigh(doc['lines'], dark, firm)
+    for l, p in zip(doc['lines'], pts):
+        l['points'] = p
+    Path(out).write_text(json.dumps(doc)+'\n'); print(len(doc['lines']), 'lines weighed ->', out)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('image'); ap.add_argument('--out', required=True)
@@ -134,17 +223,21 @@ def main():
     ap.add_argument('--sheetmm', type=float, help='sheet width in mm: adds widthMm to each line')
     ap.add_argument('--zoom', type=int, default=4, help='enlargement before thinning')
     ap.add_argument('--fit', type=float, default=.6, help='how far a straight run or arc may lie from the traced line, source pixels')
+    ap.add_argument('--medium', choices=['ink', 'pencil'], default='ink', help='pencil: grey lines of every weight, kept with their wobble and darkness')
+    ap.add_argument('--reweigh', help='put the drawing\'s darkness on this line file\'s points (pencil) and write it to --out')
     args = ap.parse_args()
+    if args.reweigh:
+        return reweigh(args.reweigh, args.image, args.out)
     bgr = cv2.imread(args.image)
     if bgr is None:
         ap.error('cannot read '+args.image)
     h, w = bgr.shape[:2]
-    lines, mask, skeleton, stats = plan(bgr, args.zoom, fit=args.fit)
+    lines, mask, skeleton, stats = pencil_plan(bgr, args.zoom) if args.medium == 'pencil' else plan(bgr, args.zoom, fit=args.fit)
     if args.sheetmm:
         for l in lines:
             l['widthMm'] = round(l['width']*args.sheetmm/w, 3)
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
-    doc = {'source': 'trace-drawing: a clean line drawing, pre-paint only', 'inputKind': 'drawing', 'widthPolicy': 'one observed width per line',
+    doc = {'source': f'trace-drawing: a clean {"pencil" if args.medium == "pencil" else "line"} drawing, pre-paint only', 'inputKind': 'drawing', 'widthPolicy': 'one observed width per line',
            'image': {'w': w, 'h': h}, 'targetSHA256': hashlib.sha256(Path(args.target or args.image).read_bytes()).hexdigest(), 'stats': stats, 'lines': lines}
     Path(str(stem)+'-lines.json').write_text(json.dumps(doc)+'\n')
     cv2.imwrite(str(stem)+'-ink.png', (1-mask)*255)
