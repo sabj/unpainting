@@ -70,6 +70,8 @@ test('the plan: bands first, then things, a light kept as paper, one mix a polyg
   assert.equal(new Set(L.map(l => l.mixId)).size, p.mixes.length, 'one mix a polygon');
   for (const v of q) { assert.ok(v.strokes.length > 0); assert.ok(v.outline.every(l => l.points.length < 400)); }
   assert.ok(p.protectedCells.every(v => v === 0), 'no clip: the strokes go round the light');
+  // no stroke of any wash lies on the white boat (x 40..100, y 30..60 mm), away from its edge
+  for (const v of q) for (const st of v.strokes) for (const [x, y] of st.points) assert.ok(!(x > 46 + st.radiusMm && x < 94 - st.radiusMm && y > 34 + st.radiusMm && y < 56 - st.radiusMm), `${v.thing} strokes over the light at ${x},${y}`);
   // the buoy is red: its mix is mostly the red paint, though it is laid over the sea band
   const buoy = L.find(l => l.shapes[0]._valuePlan.thing === 'buoy'); assert.equal(pigments[buoy.pigment].key ?? buoy.pigment, pigments[2].key ?? 2);
 });

@@ -77,6 +77,7 @@ export function fillHoles(m, w, h) {
   return out;
 }
 const areaOf = m => m.reduce((a, v) => a + v, 0);
+const shoelace = P => P.reduce((a, p, q) => { const b = P[(q + 1) % P.length]; return a + (p[0] * b[1] - b[0] * p[1]) / 2; }, 0);
 
 /**
  * A mask as the polygons a painter would lay: closed and opened by the brush (so nothing in it is narrower than the
@@ -241,10 +242,19 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   const mixes = [], layers = [], instructions = [], byStage = [], polygons = []; let strokeCount = 0;
   const STAGE_NAME = ['', 'band', 'thing', 'shadow', 'accent'];
   // One polygon's wash (or its two graded halves): the mix judged for the polygon as a whole over what is under it.
-  const lay = (stage, what, loops, { keepOut: ko = null, growMm = 0, grade = true, shade = false } = {}) => {
-    if (!loops.length) return 0;
-    const koMask = ko ? loopsMask(ko, pw, ph, planMm) : null, m = loopsMask(loops, pw, ph, planMm), cells = cellsOf(m).filter(i => !(koMask && koMask[i]));
+  const lay = (stage, what, outline, { keepOut: ko = null, growMm = 0, grade = true, shade = false } = {}) => {
+    let loops = outline; if (!loops.length) return 0;
+    const koMask = ko ? loopsMask(ko, pw, ph, planMm) : null, m = loopsMask(loops, pw, ph, planMm); let cells = cellsOf(m).filter(i => !(koMask && koMask[i]));
     if (!cells.length) return 0;
+    // a light inside the polygon is a hole in it: the outline goes round the light, opened by the brush so no sliver is left
+    if (koMask && cells.length < areaOf(m)) {
+      const r = Math.max(1, Math.round(washBrushMm / 2 / planMm)), cut = dilate(erode(Uint8Array.from(m, (v, i) => (v && !koMask[i] ? 1 : 0)), pw, ph, r), pw, ph, r);
+      for (let i = 0; i < pn; i++) if (koMask[i]) cut[i] = 0;
+      loops = outlineLoops(cut, 1, { x0: 0, y0: 0, x1: pw - 1, y1: ph - 1 }, pw, ph, { cellMm: planMm, tolMm: THING_TOL_MM / 2 }).filter(l => Math.abs(shoelace(l.points)) >= least.reserveMm2);
+      if (!loops.length) return 0;
+      const inside = loopsMask(loops, pw, ph, planMm); cells = cells.filter(i => inside[i]);
+      if (!cells.length) return 0;
+    }
     let parts = [{ loops, cells }];
     const ax = longAxis(cells, pw);
     if (grade && (ax.hi - ax.lo) * planMm >= GRADES.lengthMm) {
