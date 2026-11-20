@@ -185,13 +185,13 @@ async function drawPrepStage(PEN) {
 // is laid exactly: each stroke's outline rasterised on the pen's sheet and inked to the drawing's own darkness, stroke by
 // stroke in the drawing's order. The vectors are the recording (copied to ink-vectors.json): the replay advances each
 // stroke along its path.
-function vectorFile() {
-  const base = opt('drawingfile', '');
+function vectorFile(key = 'drawingfile') {
+  const base = opt(key, '');
   if (!base) return null;
   const f = (base.endsWith('-lines.json') ? base.slice(0, -'-lines.json'.length) : base) + '-vectors.json';
   return fs.existsSync(f) ? f : null;
 }
-function layExactVectors(file) {
+function layExactVectors(file, { closing = false } = {}) {
   const doc = JSON.parse(fs.readFileSync(file, 'utf8')), sheetMm = PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM);
   if (Math.abs(doc.sheetMm - sheetMm) > 0.01 * sheetMm) throw new Error(`ink vectors: ${path.basename(file)} is for a ${doc.sheetMm} mm sheet, this sheet is ${sheetMm} mm`);
   // a pencil drawing is laid in graphite on the painting's sheet; ink on the pen's fine sheet when there is one
@@ -202,18 +202,23 @@ function layExactVectors(file) {
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
   const darkOf = t => { const px = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (px[0] + px[1] + px[2]) / 765; };
-  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf));
+  // --inkfill (0..1, default 0.25): when paint follows the pen, a FILL stroke (a leaf mass, a dark pane) is laid as its edge
+  // at line weight and its inside at this share of its darkness, so the paint supplies the dark and the ink does not
+  // overcome it; nothing is dropped. A drawing laid alone (--drawingonly) is laid exactly.
+  const fill = num('drawingonly', 0) > 0 ? 1 : Math.max(0, Math.min(1, num('inkfill', 0.25)));
+  const r = layVectors(doc, sheet.D[at], w, h, sheetMm / w, inkForDarkness(darkOf), { fill });
   if (fineSheet) { INKRES.changed(); INKRES.carry(); } else { layersChanged(sheet); sheet._gpu?.cpuWroteAll?.(); }
-  fs.copyFileSync(file, path.join(out, 'ink-vectors.json'));
+  fs.copyFileSync(file, path.join(out, closing ? 'ink-vectors-closing.json' : 'ink-vectors.json'));
   ctx.drawnCount += r.strokes;
-  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked; no tracer, no pen gestures`);
+  console.log(`ink vectors: ${r.strokes} strokes laid exactly from ${path.basename(file)} (${pencil ? 'graphite' : 'ink'}) on a ${w} x ${h} sheet (${(sheetMm / w).toFixed(3)} mm cells), ${r.cells} cells inked${fill < 1 ? `, ${r.fills} fills at ${fill} inside` : ''}; no tracer, no pen gestures`);
 }
 async function drawPass(_unused, { first = false, fine = false } = {}) {
   const speedDrawStart = performance.now();
-  const VECTORS = first ? vectorFile() : null;
+  // the opening pen lays --drawingfile, the closing pen --drawinglast (a staged run writes both, each with its vectors)
+  const KEY = first ? 'drawingfile' : !fine ? 'drawinglast' : null, VECTORS = KEY ? vectorFile(KEY) : null;
   // a prepared drawing is laid only as its vector strokes: there is no traced-line pen route to fall back on
-  if (first && opt('drawingfile', '') && !VECTORS) throw new Error(`--drawingfile ${opt('drawingfile', '')}: no vector strokes beside it (${opt('drawingfile', '').replace(/-lines\.json$/, '')}-vectors.json). Make them with tools/seg/ink-vectors.py; the pen no longer lays traced lines (removed in 0.4, replay/VECTOR-PEN.md)`);
-  if (VECTORS) { layExactVectors(VECTORS); if (INKRES) INKRES.settle(); return; }
+  if (KEY && opt(KEY, '') && !VECTORS) throw new Error(`--${KEY} ${opt(KEY, '')}: no vector strokes beside it (${opt(KEY, '').replace(/-lines\.json$/, '')}-vectors.json). Make them with tools/seg/ink-vectors.py; the pen no longer lays traced lines (removed in 0.4, replay/VECTOR-PEN.md)`);
+  if (VECTORS) { layExactVectors(VECTORS, { closing: !first }); if (INKRES) INKRES.settle(); return; }
   try {
   const PLAN = PEN_PLANS[first ? 'first' : fine ? 'fine' : 'last'];
   if (!PLAN) throw new Error('drawing: this pen pass was not planned before painting');

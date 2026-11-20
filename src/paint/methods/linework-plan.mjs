@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { linePaths, readLineText } from '../../crop/lines.mjs';
 import { planStages, stageDoc, STAGE_DEFAULTS } from './drawing-stages.mjs';
+import { stageVectors } from './ink-vectors.mjs';
 
 const STAGE_KEYS = Object.freeze({ prep: 'prep', prepink: 'prepInk', finishink: 'finishInk' });
 
@@ -49,6 +50,7 @@ export async function planLinework({ opt, num, argv, out, grid, density, log, pl
   const file = opt('drawingfile', '');
   if (!file) throw new Error('drawing stages need a drawing file (--drawingfile): the painter no longer traces the subject\'s lines');
   const doc = JSON.parse(readLineText(linePaths(file).lines)), setName = linePaths(file).lines;
+  const vecFile = setName.replace(/-lines\.json$/, '-vectors.json'), vec = fs.existsSync(vecFile) ? JSON.parse(fs.readFileSync(vecFile, 'utf8')) : null;
   const imageSize = doc.image ?? { w: grid.w, h: grid.h };
   // the plan's line choice (amount, lines, maxLines) applies to the set once, before the stages are cut from it
   const lines = planLines ? planLines(doc.lines.filter(g => g.points?.length >= 2), imageSize) : doc.lines;
@@ -60,6 +62,8 @@ export async function planLinework({ opt, num, argv, out, grid, density, log, pl
     // (drawing-file.mjs), while every other reader of the opening file sees no lines, as before
     const empty = r[key] ? null : 'the plan has a prep pencil and no prepInk stage; the pencil is the opening drawing';
     fs.writeFileSync(`${stem}-lines.json`, JSON.stringify({ ...stageDoc(r[key] ?? [], { image: imageSize, stage: key, source: setName }), ...(empty ? { empty } : {}), ...(doc.inputKind ? { inputKind: doc.inputKind } : {}), ...(doc.inkDecided ? { inkDecided: true } : {}) }) + '\n');
+    // the pen lays a drawing only as its vector strokes: the stage carries the same strokes for the lines it holds
+    if (vec && key !== 'prep') { const v = stageVectors(vec, r[key] ?? []); fs.writeFileSync(`${stem}-vectors.json`, JSON.stringify({ ...v, stage: key, source: `${v.source ?? ''}; stage ${key} of ${path.basename(vecFile)}` })); info.vectors = { ...(info.vectors ?? {}), [key]: v.strokes.length }; }
     info.files[key] = stem;
   }
   if (info.files.prepInk) argv.push('--drawingfile', info.files.prepInk);
