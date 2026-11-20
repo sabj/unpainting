@@ -45,7 +45,7 @@ def darkness(bgr):
     paper = max(.1, float(np.percentile(g, 98)))
     return np.clip(1 - g / paper, 0, 1)
 
-def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4, eps=.12):
+def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=.6, eps=.1):
     bgr = cv2.imread(drawing); h0, w0 = bgr.shape[:2]
     if (lines_doc['image']['w'], lines_doc['image']['h']) != (w0, h0): raise SystemExit('ink-vectors: the line file is not on the drawing\'s grid')
     W, H = w0 * zoom, h0 * zoom; px = sheet_mm / W   # mm per grid pixel
@@ -103,14 +103,21 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
         # a stroke whose ink is part black and part grey (black bars round a grey pane) is two pieces on one path, the grey
         # laid first and the black over it, each at its own darkness: grey stays grey
         # (grey that is a black line's soft edge does not count: only grey two pixels and more from the black)
-        black = own & (A >= .7); greyc = own & (A >= .2) & (A < .6) & ~(cv2.dilate(black.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
-        pieces = [(own, dk)] if not (black.sum() >= 12 and greyc.sum() >= max(12, .3 * own.sum())) else [(own & ~black | greyc, float(np.percentile(A[greyc], 90))), (black, float(np.percentile(A[black], 90)))]
+        # (grey that is a black line's soft edge does not count: only grey areas, those left after a one-pixel erosion)
+        black = own & (A >= .85); grey = own & (A >= .25) & (A < .85)
+        greyc = cv2.erode(grey.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+        split = black.sum() >= 8 and greyc.sum() >= max(4, .05 * own.sum())
+        pieces = [(own, dk, None)] if not split else [(own, float(np.percentile(A[grey], 90)), None), (black, float(np.percentile(A[black], 90)), .85)]
         parts = []
-        for m, top in pieces:
+        for n_, (m, top, edge) in enumerate(pieces):
             # a faint line is one stroke: its field softened very slightly and its edge at 0.45 of its darkness, so its dips do
-            # not break it into dashes (more would fuse close faint hatching into a grey blot)
-            faint = top < .5; F = cv2.GaussianBlur(A, (0, 0), .4) if faint else A; lvl = (.45 if faint else .5) * top
+            # not break it into dashes (more would fuse close faint hatching into a grey blot). The black over a grey area
+            # has its edge at 0.85, so the dark grey of glass between black bars stays grey round them
+            # (the field is smoothed a little before its edge is found, not the edge after: a narrow white slot, a glazing bar
+            # open at one end, stays open, where smoothing the outline would close it)
+            faint = top < .5; F = cv2.GaussianBlur(A, (0, 0), .6); lvl = edge or (.45 if faint else .5) * top
             vals = A[m]; vals = vals[vals >= lvl]
+            if split and n_ == 0: vals = A[grey]
             if not len(vals): continue
             # its darkness: the median of its ink inside its edge (a drawing's black varies a little from mark to mark: over
             # 0.85 is black, so a dark mass made of several strokes is one black, not a patchwork of near-blacks; a grey
@@ -122,9 +129,11 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4
             for c in find_contours(f, lvl):
                 if len(c) < 4 or not np.allclose(c[0], c[-1]): continue
                 c = c[:-1] - 1 + [y0, x0]
-                # smoothing no more than a quarter of the ring's own radius, so a small white gap keeps its size
-                rad = len(c) / (2 * np.pi)
-                c = simplify_ring(smooth_ring(c, min(sigma, .25 * rad)), min(eps, .1 * rad))
+                # smoothing no more than a third of the ring's own half-width (twice its area over its perimeter: the
+                # half-width of a thin strip), so a narrow white gap (a glazing bar between dark panes) keeps its width
+                per = float(np.hypot(*np.diff(np.vstack([c, c[:1]]), axis=0).T).sum()); area = .5 * abs(float(np.dot(c[:, 0], np.roll(c[:, 1], 1)) - np.dot(c[:, 1], np.roll(c[:, 0], 1))))
+                half = 2 * area / max(per, 1e-9)
+                c = simplify_ring(smooth_ring(c, min(sigma, .35 * half)), min(eps, .15 * half))
                 if len(c) >= 3: rings.append(np.round(edge_ring(c), 3).tolist())
             if rings: parts.append((rings, tone, f, lvl))
         if not parts: continue
