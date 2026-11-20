@@ -154,7 +154,7 @@ export function handled(x, y, { deg = 0, len, r, pressure = PRESSURES.medium, pa
 }
 
 /** A stroke of length `len` about (x, y) along `deg`, moved and shortened to keep to the region's chord there. */
-export function fitted(polys, x, y, deg, len, lights = [], over = 0.1) {
+function fitted(polys, x, y, deg, len, lights = [], over = 0.1) {
   const [t0, t1] = chordAt(polys, x, y, deg, lights), room = (t1 - t0) * (1 + 2 * over);
   const L = Math.max(Math.min(len, room), Math.min(len, 1)), lo = t0 - over * (t1 - t0), hi = t1 + over * (t1 - t0);
   let c = 0; if (c - L / 2 < lo) c = lo + L / 2; if (c + L / 2 > hi) c = hi - L / 2;

@@ -111,7 +111,7 @@ export function passageStrokes(p, brushes, seed = 0, lights = []) {
 }
 
 /** The painter's move, water and phase for a passage: from its paper, load, stage and what it goes into. */
-export function moveOf(p, joins) {
+function moveOf(p, joins) {
   const load = p.handling?.load, water = LOAD[load];
   if (load === 'dry') return { move: 'dry on dry', water: LOAD.dry, phase: null };
   if (p.paper === 'wet') return { move: 'wet on wet', water: water ?? 0.88, phase: null, ownBed: !joins };
