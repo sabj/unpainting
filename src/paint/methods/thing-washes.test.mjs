@@ -84,3 +84,12 @@ test('without named things each SAM region is a thing, and the plan still needs 
   assert.ok(p.summary.washes >= 3 && p.summary.washes < 15);
   assert.throws(() => plan({ ...sc, seg: null }), /segment map/);
 });
+
+test('a named shadow is one glaze in the colour of its shade, laid after the things', () => {
+  const sc = scene();
+  for (let i = 0; i < sc.n; i++) { const x = i % sc.w, y = (i / sc.w) | 0; if (y >= 70 && y < 95 && x >= 10 && x < 90 && (x + y) % 6 < 3) sc.rgb.set([30, 60, 70], i * 3); }   // a dappled shade on the sea
+  const p = plan(sc, [...NAMED, { name: 'boat shadow', kind: 'shadow', box: [.06, .7, .56, .95] }]), q = p.layers.map(l => l.shapes[0]._valuePlan), s = q.filter(v => v.stage === 3);
+  assert.equal(s.length, 1, 'one glaze'); assert.equal(s[0].thing, 'boat shadow');
+  assert.ok(q.indexOf(s[0]) > Math.max(...q.filter(v => v.stage === 2).map(v => q.indexOf(v))));
+  assert.ok(s[0].outline.length === 1 && s[0].outline[0].points.length < 200, 'a loose shape, not the dapple');
+});

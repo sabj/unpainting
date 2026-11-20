@@ -236,7 +236,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   const mixes = [], layers = [], instructions = [], byStage = [], polygons = []; let strokeCount = 0;
   const STAGE_NAME = ['', 'band', 'thing', 'shadow', 'accent'];
   // One polygon's wash (or its two graded halves): the mix judged for the polygon as a whole over what is under it.
-  const lay = (stage, what, loops, { keepOut: ko = null, growMm = 0, grade = true } = {}) => {
+  const lay = (stage, what, loops, { keepOut: ko = null, growMm = 0, grade = true, shade = false } = {}) => {
     if (!loops.length) return 0;
     const koMask = ko ? loopsMask(ko, pw, ph, planMm) : null, m = loopsMask(loops, pw, ph, planMm), cells = cellsOf(m).filter(i => !(koMask && koMask[i]));
     if (!cells.length) return 0;
@@ -254,7 +254,9 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
     }
     let made = 0;
     for (const part of parts) {
-      const colour = trimmedMedian(part.cells, rgbAt, LAt), under = new Array(k).fill(0);
+      // a shadow's colour is the colour of the shade it casts: the polygon's darker half, as one colour
+      const judged = shade ? [...part.cells].sort((a, b) => pL[a] - pL[b]).slice(0, Math.max(1, part.cells.length >> 1)) : part.cells;
+      const colour = trimmedMedian(judged, rgbAt, LAt), under = new Array(k).fill(0);
       for (const i of part.cells) for (let j = 0; j < k; j++) under[j] += laid[j][i] / part.cells.length;
       const fresh = under.every(v => v <= 1e-9), amounts = fresh ? mixFor(colour, pigments, paperCol) : mixOver(colour, under, pigments, paperCol), strength = amounts.reduce((a, v) => a + v, 0);
       if (!(strength > 1e-6)) continue;
@@ -316,7 +318,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
     for (const cells of regionCells.values()) { const inside = cells.filter(inBox); if (inside.length < IN_BOX * cells.length) continue; const c = trimmedMedian(cells, rgbAt, LAt); if (labOf(c, 0, paperCol)[0] <= boxL - SHADOW_DARKER) for (const i of cells) pick[i] = 1; }
     // with no region of its own (the regions are coarser than the shadow), the glaze is a loose rounded shape in its box
     if (areaOf(pick) < leastCells) { const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = Math.max(1, (x1 - x0) / 2), b = Math.max(1, (y1 - y0) / 2); for (const i of boxCells) if (((i % pw + .5 - cx) / a) ** 4 + ((((i / pw) | 0) + .5 - cy) / b) ** 4 <= 1) pick[i] = 1; }
-    lay(3, s, polygonsOf(pick, pw, ph, { planMm, brushMm: washBrushMm, tolMm: BAND_TOL_MM, leastMm2: least.washMm2, most: 1 }), { keepOut, growMm: 0, grade: false });
+    lay(3, s, polygonsOf(pick, pw, ph, { planMm, brushMm: washBrushMm, tolMm: BAND_TOL_MM, leastMm2: least.washMm2, most: 1 }), { keepOut, growMm: 0, grade: false, shade: true });
   }
   // 5. a few dark accents: the darkest regions, each still clearly darker than what is laid under it
   const smallBrush = Math.min(...washKitMm), leastAccent = leastAreas(smallBrush), toneUnder = cells => { const u = new Array(k).fill(0); for (const i of cells) for (let j = 0; j < k; j++) u[j] += laid[j][i] / cells.length; return filmLab(u, pigments, paperCol)[0]; };
