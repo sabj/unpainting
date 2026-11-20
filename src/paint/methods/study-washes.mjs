@@ -25,8 +25,10 @@ import { kmeans, roundMask } from './layered-washes.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.5;
-/** Colour clusters asked for, and clusters nearer than this (Lab) are one. */
-const CLUSTERS = 14, CLUSTER_JOIN = 12;
+/** Colour clusters asked for, and clusters nearer than this (Lab) are one. Coarse, so a faint (3 L*) change in the study cannot move a
+ * cell between clusters: at 14 and 12 the planted 3.4 mm pattern reached the plate through the study (copied +0.11 against a null of
+ * 0.07); at 8 and 18 it does not (-0.03 against 0.08), and the Yale study keeps its windows, arch, gate, foliage and cast shadows. */
+const CLUSTERS = 8, CLUSTER_JOIN = 18;
 /** A part smaller than this share of the sheet is a sliver and joins a neighbour. */
 const SLIVER_SHARE = 0.004;
 /** A small shape this much darker (L*) than the neighbour it would be merged into is kept. */
