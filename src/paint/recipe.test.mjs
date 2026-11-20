@@ -64,12 +64,13 @@ test('an unseen ink-and-wash plan uses source paper and a lean palette, with exp
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
 
-test('source extraction stays opt-in when no line file is given', () => {
-  const { argv } = expandRecipe({ argv: [] });
-  assert.equal(argv[argv.lastIndexOf('--sourcelines') + 1], '0');
-  assert.equal(argv[argv.lastIndexOf('--linesource') + 1], 'none');
-  const explicit = expandRecipe({ argv: ['--linesource', 'source-ink'] }).argv;
-  assert.equal(explicit[explicit.lastIndexOf('--linesource') + 1], 'source-ink');
+test('no recipe names a line extraction option; one typed fails loudly as removed', async () => {
+  const { refuseRemoved } = await import('./removed-options.mjs');
+  for (const name of ['default', 'general', 'combined', 'penwash']) {
+    const { argv } = expandRecipe({ argv: ['--recipe', name] });
+    assert.ok(!argv.some(a => ['--linesource', '--sourcelines', '--copylines', '--linemodel', '--linework'].includes(a)), name);
+  }
+  assert.throws(() => refuseRemoved(['--linesource', 'source-ink']), /--linesource was removed in 0.4.*49447027/);
 });
 
 // The general recipe lost connected dark masses on Hills in the release comparison.

@@ -32,6 +32,9 @@ const REMOVED_IN_04 = Object.freeze({
     'the final darks cut accent cells from the subject and darkened them after a look', 'src/paint/methods/final-darks.mjs, final-dark-marks.mjs'),
   ...in04(['texture', 'texfrom', 'texmin', 'texlen', 'texgap', 'texcover', 'texr', 'texstrength', 'texheading', 'texbook', 'texsigma', 'washgrain', 'washgrainmin', 'fur', 'furcover', 'furgap', 'furlen', 'fursigma'],
     'the texture pass placed dry-brush marks from a per-cell high-pass of the subject', 'tools/plate/paint.mjs'),
+  ...in04(['linesource', 'sourcelines', 'copylines', 'copylinesagree', 'copylinesfill', 'copylinesfloor', 'copylinesgap', 'copylinesmin', 'copylinesrun', 'sketchlines', 'sketchmap', 'sketchsegments', 'sketchcache',
+    'linework', 'linemedium', 'linejoin', 'linecleanup', 'linemodel', 'linemodelcache', 'linemodeloffline', 'linemodelside', 'linemodelweights', 'linemodelwidth', 'linestroke', 'mapsmoothing', 'finishhatch', 'finishfur'],
+    'the painter traced line from the subject (copy-lines, the photo sketch, the line models, the universal linework stage, the graphite pool, finish hatching); the only line is a drawing file (--drawingfile, src/paint/line-source.mjs)', 'src/paint/methods/linework-plan.mjs, linework-stage.mjs, graphite-pool.mjs'),
 });
 
 /** Throws, naming every removed option in argv with its reason. */

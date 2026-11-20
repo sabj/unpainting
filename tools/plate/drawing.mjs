@@ -36,7 +36,7 @@ import {joinResist} from '../../src/paint/methods/modulate.mjs';
 import {sealAtBirth, sealTargetMaps} from '../guard/seal-maps.mjs';
 
 export async function drawing(ctx) {
-const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, EARLY_LINES, 
+const { JSONL, opt, num, measurePaper, liftResist, SPEED_PROFILE, root, out, 
   VALUE_CONFIG, VALUE_ENABLED, MAJOR_INTENT, phaseMark, PX_RAW, TARGET_GUARD, w, h, n, createBrush, 
   ANCHORS, paperRGB, PIGS, COLOUR_BUDGET, LIGHT_CELLS, SMALL, setClip, MOD, FIRST_FLOOR, TECHNIQUE, techniqueOf, SEP, 
   PREP_ERASE, STAGE_PLAN, STYLE_ON, INKLOAD, OUTLINE_MEDIUM, INK, PENCIL, PENCIL_STAGE, GRAPHITE, SHEET_PIGS, 
@@ -337,12 +337,9 @@ if (!ctx.RESUMING && PEN_FIRST && opt('draw', '1') !== '0' && DRAWING !== 'none'
 // An actual dry-pen checkpoint, using the same planned strokes and physics as
 // the full painting. The process exit hook still writes the strict guard report.
 if (num('drawingonly', 0) > 0) {
-  // --copylinesfloor can leave a source with no pen lines; its dry opening is the bare sheet
-  const noPenLines = DRAWING === 'none' && EARLY_LINES?.source === 'none' && EARLY_LINES?.requested === 'source-ink';
-  if (ctx.RESUMING || (!noPenLines && (!PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none'))) throw new Error('--drawingonly requires an opening drawing');
+  if (ctx.RESUMING || !PEN_FIRST || opt('draw', '1') === '0' || DRAWING === 'none') throw new Error('--drawingonly requires an opening drawing (--drawingfile)');
   assertDeviceHealthy(ctx.sheet);
-  if (noPenLines) await sharp(render(), { raw: { width: W2, height: H2, channels: 3 } }).png().toFile(path.join(out, 'painting.png'));
-  else fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
+  fs.copyFileSync(path.join(out, 'drawing-opening.png'), path.join(out, 'painting.png'));
   const after = thickness(ctx.sheet);
   const nativeInk = INKRES ? INKRES.nativeInk() : renderInkProof({ thickness: after, pigments: SHEET_PIGS, inkAt: PIGS.length, width: W2, height: H2 });
   await sharp(nativeInk.pixels, { raw: { width: nativeInk.width, height: nativeInk.height, channels: 3 } }).png().toFile(path.join(out, "ink-native.png"));

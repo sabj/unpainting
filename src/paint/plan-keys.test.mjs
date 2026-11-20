@@ -33,13 +33,12 @@ test('a removed washes key (deepAccent) is caught as unread', () => {
   assert.deepEqual(unusedPlanKeys({ subject: 'mittens', washes }, { pipeline: true }), ['washes.deepAccent']);
 });
 
-test('every drawing key drawingFlags reads counts as read, including linework', async () => {
+test('every drawing key drawingFlags reads counts as read', async () => {
   const { drawingFlags } = await import('./drawing-plan.mjs');
-  const drawing = { medium: 'ink', inkColor: 'black', ink: { waterproof: true }, linework: 'auto', source: 'source-ink', amount: 0.5,
-    lines: 'contours', maxLines: 40, weight: 0.5, closingLines: 0.5, resolution: 1, map: 'lines.png', mapSmoothing: 1 };
-  assert(drawingFlags(drawing).includes('--linework'));
+  const drawing = { medium: 'ink', inkColor: 'black', ink: { waterproof: true }, amount: 0.5,
+    lines: 'contours', maxLines: 40, weight: 0.5, closingLines: 0.5, resolution: 1 };
+  assert(drawingFlags(drawing).includes('--outlinemedium'));
   assert.deepEqual(unusedPlanKeys({ subject: 'x', drawing }, { pipeline: true }), []);
-  assert.deepEqual(unusedPlanKeys({ subject: 'x', drawing: { linework: 'auto' } }, { pipeline: false }), []);
 });
 
 test('the bundled value plans use only keys the painter reads', () => {

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { inkHoldArgs, INK_HOLD_FLAGS, INK_POOL_FLAGS } from './ink-hold-defaults.mjs';
+import { inkHoldArgs, INK_HOLD_FLAGS } from './ink-hold-defaults.mjs';
 import { holdInkLines } from './ink-lines-file.mjs';
 import { INK_RECIPES } from './ink-recipe.mjs';
 
@@ -24,16 +24,6 @@ test('an ink drawing gets the hold and decision flags it does not set', () => {
 test('graphite, no medium, no drawing, a graphite subject and the ink-free options get nothing', () => {
   for (const argv of [['--outlinemedium', 'graphite'], [], ['--outlinemedium', 'none'], ['--outlinemedium', 'ink', '--drawing', 'none'],
     ['--outlinemedium', 'ink', '--subjectmedium', 'pencil'], ['--outlinemedium', 'auto'], ['--outlinemedium', 'ink', '--areaplan', 'plan.json']]) assert.deepEqual(inkHoldArgs(argv), [], JSON.stringify(argv));
-});
-
-test('a source-ink line source in ink takes the line model for its pool; auto may choose another source and gets none', () => {
-  assert.ok(!flags(inkHoldArgs(['--outlinemedium', 'ink', '--linesource', 'auto'])).has('--linemodel'));
-  for (const source of ['source-ink']) {
-    const f = flags(inkHoldArgs(['--outlinemedium', 'ink', '--linesource', source]));
-    for (const [k, v] of Object.entries(INK_POOL_FLAGS)) assert.equal(f.get('--' + k), v, k);
-  }
-  assert.deepEqual(INK_POOL_FLAGS, { linemodel: 'strict', linestroke: '1', copylinesmin: '0' });
-  assert.ok(!flags(inkHoldArgs(['--outlinemedium', 'ink', '--linesource', 'photo-sketch'])).has('--linemodel'));
 });
 
 test('the defaults are the pruning half of the wash recipe, with the same values', () => {

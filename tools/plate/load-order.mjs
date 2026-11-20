@@ -133,7 +133,6 @@ import '../../src/painter-version.mjs';
 import '../../src/paint/methods/pigment-physics.mjs';
 import '../../src/paint/methods/drawing-file.mjs';
 import '../../src/paint/methods/linework-plan.mjs';
-import '../../src/paint/methods/linework-stage.mjs';
 import '../../src/paint/methods/drawing-registration.mjs';
 import '../../src/paint/methods/ink-lines-file.mjs';
 import '../../src/paint/methods/ink-scrap.mjs';

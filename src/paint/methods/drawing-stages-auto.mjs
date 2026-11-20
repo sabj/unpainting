@@ -32,12 +32,10 @@ const argValue = (args, name) => {
 
 /** Caller-owned drawing inputs, separated from recipe/plan and generated arguments. */
 export function drawingStageIntent({ argv0 = [], expandedArgv = argv0, pipeline = null, outlineMedium = null }) {
-  const lineworkAuto = argValue(expandedArgv, 'linework') === 'auto';
   return {
     explicitStages: expandedArgv.includes('--stages'),
     explicitAuto: argValue(argv0, 'drawingstages') === 'auto',
-    // Universal linework replaces the opening source; a closing file remains independently caller-authored.
-    authoredOpening: !lineworkAuto && Boolean(argValue(argv0, 'drawingfile')),
+    authoredOpening: Boolean(argValue(argv0, 'drawingfile')),
     authoredClosing: Boolean(argValue(argv0, 'drawinglast')),
     planMedium: pipeline?.drawing?.medium ?? outlineMedium ?? null,
   };

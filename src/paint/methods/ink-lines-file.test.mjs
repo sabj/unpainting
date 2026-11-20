@@ -75,10 +75,10 @@ test('--linemeasure reads a finer file on the painting grid and writes per-point
   assert.ok(r.opening.stats.peakAbsorbance > 0);
 });
 
-test('--inkrecipe wash turns ink on and picks the source lines, and the command line still wins', () => {
+test('--inkrecipe wash turns ink on, traces no source line, and the command line still wins', () => {
   const add = inkRecipeArgs('wash', ['--inkbleed', '0']), opt = n => add[add.indexOf('--' + n) + 1];
   assert.equal(opt('outlinemedium'), 'ink');
-  assert.equal(opt('linesource'), 'source-ink');
+  assert.ok(!add.includes('--linesource') && !add.includes('--linemodel'), 'the line is the drawing file (removed in 0.4)');
   assert.equal(opt('inkdarkmatch'), '1');
   assert.ok(!add.includes('--inkbleed'));
   assert.ok(!add.includes('--inkdarkcap'), 'the wash recipe matches the darkness instead of capping it');

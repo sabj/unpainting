@@ -33,7 +33,6 @@ import {setClip as physicalSetClip, stableClipMask} from '../../src/media/sheet.
 import {styleTarget, massesOf} from '../../src/crop/styletarget.mjs';
 import {separate} from '../../src/crop/inkwash.mjs';
 import {orientationField} from '../../src/crop/fur.mjs';
-import {edgeChains} from '../../src/crop/contours.mjs';
 import {finishField} from '../../src/crop/finish.mjs';
 import {labPlanes} from '../../src/eval/colour.mjs';
 import {smallLights, paperDensity, cellShare, keepLargestLights} from '../../src/crop/lights.mjs';
@@ -53,7 +52,7 @@ import {measureStyle} from '../../src/paint/methods/practice-style.mjs';
 
 export async function plan(ctx) {
 const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, SPEED_VALUE_ONLY, SPEED_PROFILE, 
-  root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
+  root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
   phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, lum, paperRGB, CODE_HASH, 
   PALETTE_FROM_FILE, paletteFitStarted } = ctx;
 const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
@@ -677,7 +676,7 @@ if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * S
 // The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source): one
 // reading at 1200 px wide (pen-share.mjs), so --width does not change what is pen. SEP is at the run's grid.
 // A run with a graphite outline, no line source and no ink plan never asks, so it skips the extra reading.
-const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || opt('linesource', 'none') !== 'none' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
+const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
 const PEN_SHARE = PEN_ASKED && fs.existsSync(path.resolve(root, opt('image', ''))) ? await sourcePenShare({ image: path.resolve(root, opt('image', '')), sharp }) : SEP.stats.ink / n;
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
@@ -697,16 +696,13 @@ DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
 const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: PEN_SHARE, log: console.log, intent: DRAWING_STAGE_INTENT });
 // planned as kneaded-eraser dabs, so painting lays a plan and reads no map made from the target
 const PREP_ERASE = num('preperase', 0.85) > 0 ? eraserDabs(eraseWeights(PX_SOURCE, w, h), w, h, { tile: ERASER_MM / (num('sheetmm', DEFAULT_SHEET_MM) / w) }) : null;
-const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: PEN_SHARE, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, rgb: PX_SOURCE, log: console.log,
-  edges: () => edgeChains(ctx.SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
+const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, log: console.log,
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 // Linked stages write new opening and closing files after the hold above; hold those too, so the ink flags reach the
 // pens on a staged run as they do on a run with a prepared line file.
 if (LINEWORK.files?.prepInk || LINEWORK.files?.finishInk) ctx.INK_LINES = (await holdInk()) ?? ctx.INK_LINES;
-if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
 if (DRAWING_REGISTRATION) LINEWORK.registration = DRAWING_REGISTRATION;
 if (DRAWING_CHOICE) LINEWORK.drawingChoice = DRAWING_CHOICE;
-if (ctx.LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${ctx.LINEWORK_STAGE.source}`, universal:{gate:ctx.LINEWORK_STAGE.gate, features:ctx.LINEWORK_STAGE.features, lines:ctx.LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --penfacelong e: face rule and face-detail walks read only line-shaped ink marks (longest side squared over area >= e). Default 0.

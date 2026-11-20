@@ -43,7 +43,7 @@ export function resolvePipeline(plan = {}) {
       paints: paints(washes.paints),
       colour: choice(washes.colour, 'family', ['family', 'layered'], 'washes.colour'),
       sessions: choice(washes.sessions, 'passage', ['dry', 'passage', 'connected'], 'washes.sessions'),
-      inkAware: washes.inkAware ?? (['source-ink', 'line-map'].includes(drawing.source) && drawing.medium !== 'none'),
+      inkAware: washes.inkAware ?? false,
       charge: number(washes.charge, .5, 0, 1, 'washes.charge'),
       carryMm: number(washes.carryMm, 2, 0, 10, 'washes.carryMm'),
       paleLimit: number(washes.paleLimit, .16, 0, 1, 'washes.paleLimit'),
@@ -100,7 +100,7 @@ export function pipelineFlags(plan, { onlyAuthored = false } = {}) {
   if (!onlyAuthored || rawW.charge != null) add('passcap', w.charge);
   if (onlyAuthored && rawW.carryMm != null && rawW.colour == null) add('maskmm', w.colour === 'family' ? w.carryMm : 0);
   if (onlyAuthored && rawW.paleLimit != null && rawW.colour == null) add('palelights', w.colour === 'family' ? w.paleLimit : 0);
-  if (!onlyAuthored || rawW.inkAware != null || (plan?.drawing?.source && ['source-ink', 'line-map'].includes(plan.drawing.source))) add('washinkfree', +w.inkAware);
+  if (!onlyAuthored || rawW.inkAware != null) add('washinkfree', +w.inkAware);
   if (!onlyAuthored || rawOrder.strength != null || rawOrder.subjects != null || plan?.subjectOrder != null) add('subjectorder', p.order.strength);
   if (w.skyOneLayer != null) add('skyonelayer', +w.skyOneLayer);
   if (w.lanes != null) { add('strokeplan', +w.lanes); add('laneadapt', +w.lanes); }
