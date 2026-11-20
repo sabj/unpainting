@@ -86,16 +86,16 @@ function parts(lab, w, h) {
  * The study's flat shapes on a pw x ph grid: {label (0-based shape per cell), shapes: [{cells, colour (sRGB), lab, paper, border: Map(shape -> shared edges), rim}]}.
  * `rgb` is the study on that grid.
  */
-function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0 }) {
+function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
   for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(rgb, q, paperRGB); L[q] = l; A[q] = a; B[q] = b; }
   // the colours, read off a fixed grid of about 8000 cells
   const step = Math.max(1, Math.round(Math.sqrt(pn / 8000))), rows = [];
   for (let y = 0; y < ph; y += step) for (let x = 0; x < pw; x += step) { const q = y * pw + x; rows.push(L[q], A[q], B[q]); }
-  let centres = kmeans(Float32Array.from(rows), 3, CLUSTERS, 20);
+  let centres = kmeans(Float32Array.from(rows), 3, K, 20);
   // (a pale tint is never joined to the paper: a cream sail is painted, the white round it is not)
   const paperish = c => c[0] >= PAPER_L && Math.hypot(c[1], c[2]) <= PAPER_CHROMA;
-  for (let merged = true; merged;) { merged = false; for (let a = 0; a < centres.length && !merged; a++) for (let b = a + 1; b < centres.length && !merged; b++) if (paperish(centres[a]) === paperish(centres[b]) && Math.hypot(...centres[a].map((v, j) => v - centres[b][j])) < CLUSTER_JOIN) { centres[a] = centres[a].map((v, j) => (v + centres[b][j]) / 2); centres.splice(b, 1); merged = true; } }
+  for (let merged = true; merged;) { merged = false; for (let a = 0; a < centres.length && !merged; a++) for (let b = a + 1; b < centres.length && !merged; b++) if (paperish(centres[a]) === paperish(centres[b]) && Math.hypot(...centres[a].map((v, j) => v - centres[b][j])) < J) { centres[a] = centres[a].map((v, j) => (v + centres[b][j]) / 2); centres.splice(b, 1); merged = true; } }
   let lab = new Int32Array(pn);
   for (let q = 0; q < pn; q++) { let best = 0, bd = Infinity; centres.forEach((c, f) => { const d = (L[q] - c[0]) ** 2 + (A[q] - c[1]) ** 2 + (B[q] - c[2]) ** 2; if (d < bd) { bd = d; best = f; } }); lab[q] = best; }
   lab = majority(majority(lab, pw, ph), pw, ph);
@@ -106,7 +106,7 @@ function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0 }) {
     for (const j of [x < pw - 1 ? q + 1 : -1, q + pw < pn ? q + pw : -1]) { if (j < 0) continue; const o = pc.labels[j]; if (o !== id) { border[id].set(o, (border[id].get(o) ?? 0) + 1); border[o].set(id, (border[o].get(id) ?? 0) + 1); } } }
   // a small shape much darker than the one it would join is kept (darks carry the drawing: windows, a doorway), if it is
   // at least a sixth of the least size
-  const keepDark = (i, into) => size[i] >= sliverCells / 6 && centres[cluster[into]][0] - centres[cluster[i]][0] >= KEEP_DARK;
+  const keepDark = (i, into) => size[i] >= sliverCells / 6 && centres[cluster[into]][0] - centres[cluster[i]][0] >= KD;
   const find = i => { while (root[i] !== i) { root[i] = root[root[i]]; i = root[i]; } return i; };
   const join = (small, big) => {
     root[small] = big; size[big] += size[small];
@@ -398,14 +398,15 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   };
 
   // --- layer 1: the block-in ---
-  const L1 = studies[0], first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(SLIVER_SHARE * pn, (L1.minMm2 ?? 0) / cellMm2), most: FIRST_MOST });
+  const L1 = studies[0], R1 = L1.read ?? {}, first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(SLIVER_SHARE * pn, (L1.minMm2 ?? 0) / cellMm2), most: FIRST_MOST, ...R1 });
   const { label, shapes, clusters } = first;
   const parent = flat ? shapes.map(() => -1) : nestParents(shapes);
   const kids = shapes.map(() => []); parent.forEach((p, i) => { if (p >= 0) kids[p].push(i); });
   const under = i => { const out = [i]; for (let q = 0; q < out.length; q++) out.push(...kids[out[q]]); return out; };
   const paperMask = Uint8Array.from(label, s => (shapes[s].paper ? 1 : 0));
   { const pr = roundMask(paperMask, pw, ph, rC(ROUND_MM / 2)), pc = components(pr, pw, ph, 4); for (let id = 1; id <= pc.count; id++) keepOut.push(...loopsFor(pc.labels, id)); }
-  const outlineOf = i => { const m = new Uint8Array(pn); for (const s of under(i)) for (const q of shapes[s].cells) m[q] = 1; return { m, loops: maskLoops(m, ROUND_MM, paperMask) }; };
+  const roundFirst = R1.round != null ? 2 * R1.round : ROUND_MM;   // @round is a radius (mm); ROUND_MM a brush width
+  const outlineOf = i => { const m = new Uint8Array(pn); for (const s of under(i)) for (const q of shapes[s].cells) m[q] = 1; return { m, loops: maskLoops(m, roundFirst, paperMask) }; };
   const painted = shapes.map((s, i) => i).filter(i => !shapes[i].paper);
   const share = i => under(i).reduce((a, s) => a + shapes[s].cells.length, 0) / pn;
   const phaseOf = i => { const s = shapes[i]; if (s.lab[0] < DARK_L && share(i) < DARK_SMALL) return 3; return parent[i] < 0 && s.lab[0] >= FIRST_L ? 1 : 2; };
