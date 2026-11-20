@@ -41,22 +41,25 @@ export function cropScript(script, x, y, w, h) {
   const passages = [];
   for (const p of script.passages) {
     const q = { ...p };
-    if (p.mark === 'line') {
+    if (p.kind === 'lines' || p.mark === 'line') {
       q.paths = (p.paths ?? []).flatMap(P => clipPath(P, x, y, x1, y1)).map(mv); if (!q.paths.length) continue;
     } else {
       const regs = p.regions?.length ? p.regions : [p.region], kept = regs.map(P => clipPolygon(P, x, y, x1, y1)).filter(P => P.length >= 3);
       const share = areaOf(kept) / Math.max(1e-6, areaOf(regs)); if (!kept.length || share < 0.02) continue;
       delete q.region; q.regions = kept.map(mv);
-      if (p.mark !== 'sweep' && p.strokes) q.strokes = Math.max(1, Math.round(p.strokes * share));
+      if (p.count) q.count = Math.max(1, Math.round(p.count * share));
+      if (p.mark && p.mark !== 'sweep' && p.strokes) q.strokes = Math.max(1, Math.round(p.strokes * share));
     }
-    if (p.paths && p.mark !== 'line') q.paths = p.paths.flatMap(P => clipPath(P, x, y, x1, y1)).map(mv);
+    if (Array.isArray(p.strokes) && p.strokes.length) q.strokes = p.strokes.map(st => st.points ? { ...st, points: st.points.map(([a, b, c]) => [+(a - x).toFixed(2), +(b - y).toFixed(2), c]) } : { ...st, ...(st.at ? { at: [st.at[0] - x, st.at[1] - y] } : {}), ...(st.from ? { from: [st.from[0] - x, st.from[1] - y] } : {}) });
+    if (p.paths && p.kind !== 'lines' && p.mark !== 'line') q.paths = p.paths.flatMap(P => clipPath(P, x, y, x1, y1)).map(mv);
     q.charges = (p.charges ?? []).map(c => ({ ...c, at: (c.at ?? []).filter(([a, b]) => a >= x && a <= x1 && b >= y && b <= y1).map(([a, b]) => [+(a - x).toFixed(2), +(b - y).toFixed(2)]) })).filter(c => c.at.length);
     passages.push(q);
   }
   // a passage `into` one that was cut away goes on its own
   const ids = new Set(passages.map(p => p.id));
   for (const p of passages) if (p.into && !ids.has(p.into)) delete p.into;
-  return { ...script, sheet: { widthMm: w, heightMm: h }, cropOf: { x, y, w, h, sheet: script.sheet }, passages };
+  const lights = (script.lights ?? []).map(l => ({ ...l, region: clipPolygon(l.region ?? l, x, y, x1, y1) })).filter(l => l.region.length >= 3).map(l => ({ ...l, region: mv(l.region) }));
+  return { ...script, sheet: { widthMm: w, heightMm: h }, cropOf: { x, y, w, h, sheet: script.sheet }, lights, passages };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
