@@ -359,6 +359,9 @@ const FATTEST = 1.3;
 /** A bare part is laid again when it is at least this big (mm2) and wider than this (mm). */
 const BARE_LEAST_MM2 = 10, BARE_WIDE_MM = 2;
 
+/** ... or when its edges run one way this strongly (coherence of the outline's directions, 0 to 1). */
+const EDGE_COHERENT = 0.35;
+
 const halfAt = (r, p) => r * (0.25 + 0.75 * p);
 
 /**
@@ -415,14 +418,24 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     let a = 0, b = 0, c = 0; for (const [x, y] of P) { const dx = x - mx, dy = y - my; a += dx * dx; b += dx * dy; c += dy * dy; }
     const mean = (a + c) / 2, d = Math.sqrt(((a - c) / 2) ** 2 + b * b), long = Math.sqrt((mean + d) / Math.max(1e-9, mean - d));
     let th = long >= (depth ? LEFT_LONG : LONG) ? 0.5 * Math.atan2(2 * b, a - c) : 0;
+    // a part that is not long overall but whose edges mostly run one way (a mass of slanting shadow streaks) is laid along
+    // its edges: level lanes would end in a step at every slanting edge
+    if (!th && !depth) {
+      let jxx = 0, jxy = 0, jyy = 0;
+      for (const i of cells) { const x = i % gw; const gx = (x < gw - 1 ? part[i + 1] : 0) - (x ? part[i - 1] : 0), gy = (i + gw < gn ? part[i + gw] : 0) - (i >= gw ? part[i - gw] : 0); if (gx || gy) { jxx += gx * gx; jxy += gx * gy; jyy += gy * gy; } }
+      const tr = jxx + jyy, dd = Math.sqrt(((jxx - jyy) / 2) ** 2 + jxy * jxy);
+      if (tr > 0 && 2 * dd / tr >= EDGE_COHERENT) th = 0.5 * Math.atan2(2 * jxy, jxx - jyy) + Math.PI / 2;
+    }
     const tx = Math.cos(th), ty = Math.sin(th);
     // the lanes' normal points down the sheet (or right, for an upright shape), so the lanes go top down
     let nx = -ty, ny = tx; if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx < 0)) { nx = -nx; ny = -ny; }
     let v0 = Infinity, v1 = -Infinity, u0 = Infinity, u1 = -Infinity;
     for (const [x, y] of P) { const v = x * nx + y * ny, u = x * tx + y * ty; if (v < v0) v0 = v; if (v > v1) v1 = v; if (u < u0) u0 = u; if (u > u1) u1 = u; }
     v0 -= pitch / 2; v1 += pitch / 2; u0 -= pitch; u1 += pitch;
-    const D = distance(part, gw, gh); let deep = 0; for (const i of cells) if (D[i] > deep) deep = D[i];
-    const across = v1 - v0, fat = 2 * deep * pitch * FATTEST;
+    const D = distance(part, gw, gh); let deep = 0, meanD = 0; for (const i of cells) { if (D[i] > deep) deep = D[i]; meanD += D[i] / cells.length; }
+    // the brush is held to the part's typical width (four times its mean depth: a strip's width), not its widest: a mass of
+    // shadow streaks with lit stone between them is laid streak by streak, not blotted over with a mop
+    const across = v1 - v0, fat = Math.min(2 * deep, 4 * meanD) * pitch * FATTEST;
     // the brush: the smallest that lays the part in MOST_LANES lanes, never much fatter than the part
     const fits = kit.filter(wd => wd <= widest && (wd <= fat || wd === kit[0]));
     if (!fits.length) return;
