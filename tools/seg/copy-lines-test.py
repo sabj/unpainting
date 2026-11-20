@@ -179,4 +179,41 @@ class Junctions(unittest.TestCase):
         self.assertEqual(len([g for g in lines if 50 < g['length'] < 90]), 2)
 
 
+class Ridge(unittest.TestCase):
+    """--kind ridge on a sheet 1520 px wide: 0.1 mm a pixel."""
+    def sheet(self):
+        im = np.full((600, 1520, 3), 215, 'uint8')
+        cv2.rectangle(im, (200, 100), (700, 500), (60, 50, 45), -1)          # dark glass: a mass, 50 mm wide
+        cv2.line(im, (450, 100), (450, 500), (8,)*3, 4)                       # a black glazing bar on the dark glass
+        cv2.line(im, (900, 300), (1400, 300), (20,)*3, 3)                     # a pen line on the light wall
+        cv2.circle(im, (1100, 150), 5, (10,)*3, -1)                           # a dot
+        im[:, 1450:] = 150                                                    # a wash step
+        return im
+
+    def test_a_dark_mass_gives_no_lines_inside_and_its_pen_lines_are_single_strokes(self):
+        lines, mask, skel, stats = copy.plan(self.sheet(), 'ridge', .15)
+        mid = lambda g: np.mean(g['points'], axis=0)
+        bar = [g for g in lines if abs(mid(g)[0]-450) < 3]
+        wall = [g for g in lines if abs(mid(g)[1]-300) < 3 and mid(g)[0] > 800]
+        self.assertEqual(len(bar), 1); self.assertGreater(bar[0]['length'], 350)
+        self.assertEqual(len(wall), 1); self.assertGreater(wall[0]['length'], 450)
+        # nothing else: no skeleton of the glass, no line along its edge or the wash step, no dot
+        self.assertEqual(len(lines), 2)
+        # one width a stroke, near the drawn widths (4 and 3 px)
+        self.assertEqual(len(set(bar[0]['widths'])), 1)
+        self.assertTrue(2 <= bar[0]['widths'][0] <= 6); self.assertTrue(1.5 <= wall[0]['widths'][0] <= 5)
+
+    def test_short_crooked_pieces_are_left_to_the_wash(self):
+        step = np.full((200, 200), 20, np.float32)
+        straight = np.array([[10, 10], [150, 10]], np.float32)                # 14 mm at 0.1 mm a pixel
+        hook = np.array([[10, 50], [22, 50], [22, 62]], np.float32)           # 2.4 mm, strong enough, but crooked
+        faint = np.array([[10, 100], [20, 100]], np.float32)                  # 1 mm at 20 L*: 20 L* mm, under the score
+        kept, scores, dropped = copy.prune_ridges([straight, hook, faint], step, .1)
+        self.assertEqual(len(kept), 1); self.assertEqual(dropped, 2)
+        self.assertAlmostEqual(scores[0], 20*14, delta=1)
+        # a lineart map that also sees a line raises its score, up to twice: the faint straight ridge is confirmed and
+        # stays; the crooked piece is still left. The map is only read along ridges the subject has, so it adds no line
+        kept2, scores2, _ = copy.prune_ridges([straight, hook, faint], step, .1, np.ones((200, 200), np.float32))
+        self.assertEqual(len(kept2), 2); self.assertAlmostEqual(scores2[0], 2*scores[0], delta=1)
+
 if __name__ == '__main__': unittest.main()
