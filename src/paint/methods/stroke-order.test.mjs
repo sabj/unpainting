@@ -137,6 +137,13 @@ test('growth weight from the drawing: lay-in faint, every line at its drawn widt
   assert.ok(w('layin') < w('growth') && w('growth') === 0.8 && w('emphasis') === 0.8);
 });
 
+test('growth: the strokes filling a solid dark wait for the texture phase', () => {
+  const fill = [0, 1, 2, 3].map(k => seg(40, 30 + 0.4 * k, 44, 30 + 0.4 * k));
+  const S = [...box(10, 10, 90, 60), ...box(38, 28, 46, 33), ...fill];
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 0, emphasisShare: 0, fills: S.map((_, k) => k >= 8) });
+  for (const k of [8, 9, 10, 11]) { const x = r.find(x => x.parts.includes(k)); assert.equal(x.role, 'fill'); assert.equal(x.phase, 'texture'); }
+});
+
 test('growth: object by object, one object finished before its neighbour', () => {
   // two windows side by side in a wall; with a stickiness the hand finishes one window's lines before the other's
   const S = [...box(5, 5, 95, 65), ...box(20, 20, 40, 50), seg(25, 44, 35, 44), seg(25, 26, 35, 26), ...box(60, 20, 80, 50), seg(65, 44, 75, 44), seg(65, 26, 75, 26)];

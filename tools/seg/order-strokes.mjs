@@ -40,7 +40,7 @@ if (!TOUCH[touch]) { console.error(`--touch: light, medium or firm, not ${touch}
 // the drawing's own weight and width per line: a gap is bridged only between pieces drawn alike; dense streams are left
 const threshold = Number(arg('--threshold') ?? NOISE_FLOOR);
 const ordered = orderStrokes(strokes, sheetMm, heightMm, { ink, masses, mode: arg('--order') ?? 'passes', hatching, threshold, contributions: true,
-  weights: doc.lines.map(l => l.weight ?? 1), widths: doc.lines.map(l => l.width), skip: doc.lines.map(l => !!(l.dense || l.fill)),
+  weights: doc.lines.map(l => l.weight ?? 1), widths: doc.lines.map(l => l.width), skip: doc.lines.map(l => !!(l.dense || l.fill)), fills: doc.lines.map(l => !!l.fill),
   widthsMm: doc.lines.map(l => l.width * mm), pointWidthsMm: doc.lines.map(l => (Array.isArray(l.widths) && l.widths.length === l.points.length ? l.widths.map(v => v * mm) : undefined)) });
 // a joined stroke's width along it: at each point the width of the nearest point of its parts (per point where the drawing
 // swells and thins, else the part's one width)

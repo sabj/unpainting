@@ -321,6 +321,8 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   if (c.mode === 'growth') markTicks(joined, c);
   // hatching: runs of parallel strokes, laid together in the second pass
   hatchRuns(joined.map(s => s.points), c).forEach((mem, r) => mem.forEach(k => { if (joined[k].role !== 'outline') { joined[k].role = 'hatch'; joined[k].run = r; } }));
+  // the strokes that fill a solid dark (trace-drawing.py) are a fill: laid once the form round them is drawn, with the texture
+  if (c.fills) for (const s of joined) if (s.parts.every(i => c.fills[i])) { s.role = 'fill'; delete s.run; }
   // HATCHING: none lays no hatching run; sparse lays every second line of a run, and only runs by a form's edge (where the
   // form turns or casts); as drawn lays them all
   if (!['none', 'sparse', 'drawn'].includes(c.hatching)) throw new Error(`hatching: none, sparse or drawn, not ${c.hatching}`);
@@ -576,7 +578,7 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start
     s => (isStruct.has(s) ? 0 : c.detailLagMm));
   walk(short, 'detail');
   const runs = new Map(); for (const s of live) if (!s.taken && s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
-  const items = [...live.filter(s => !s.taken && s.role === 'texture').map(s => ({ s })), ...[...runs.values()].map(m => ({ m }))];
+  const items = [...live.filter(s => !s.taken && (s.role === 'texture' || s.role === 'fill')).map(s => ({ s })), ...[...runs.values()].map(m => ({ m }))];
   while (items.length) {
     const d = x => (x.s ? cost(pen, x.s) : Math.min(...x.m.map(s => cost(pen, s))));
     let b = 0; for (let k = 1; k < items.length; k++) if (d(items[k]) < d(items[b])) b = k;

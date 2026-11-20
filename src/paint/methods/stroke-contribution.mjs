@@ -49,7 +49,7 @@ export function strokeContributions(strokes, widthMm, heightMm, o = {}) {
   let total = 0; for (const v of ink) total += v;
   total = total || 1;
   // structure: long lines count more (up to 30 mm), an outline more, a mark touching no other line (isolated) less
-  const roleW = o.roleWeight ?? { outline: 1.5, inner: 1.2, fine: 1, hatch: 0.9, texture: 0.8, small: 0.6 };
+  const roleW = o.roleWeight ?? { outline: 1.5, inner: 1.2, fine: 1, fill: 1, hatch: 0.9, texture: 0.8, small: 0.6 };
   const struct = strokes.map(s => (roleW[s.role] ?? 1) * (1 + Math.min(s.len ?? (s.paths ?? [s]).reduce((a, p) => a + lengthOf(p.points), 0), 30) / 30) * (s.touches === false ? 0.6 : 1));
   const own = foot.map(f => { let a = 0; for (const v of f.values()) a += v; return a; });
   // pass 1 by own ink, pass 2 by what is left after the strokes above
