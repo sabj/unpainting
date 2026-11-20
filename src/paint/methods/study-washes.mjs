@@ -57,6 +57,8 @@ const CHARGE_FROM = 0.03, CHARGE_MOST = 2, CHARGE_BRUSH_MM = 7, CHARGE_STRENGTH 
 const GRADE = 0.12;
 /** A wash is laid this far past its outline to meet its neighbours, never onto bare paper. */
 const GROW_MM = 0.4;
+/** A touch dropped into a wet wash covers at least this many sheet cells. */
+const WET_LEAST_CELLS = 40;
 /** A wash is laid only when it darkens what is under it by this much L*. */
 const VISIBLE_STEP = 2;
 
@@ -348,6 +350,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, rgb: subjectRg
     const sm = loopsMask(loops, w, h, cellMm), ids = new Uint8Array(n), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
     for (let i = 0; i < n; i++) if (sm[i]) { ids[i] = 1; area++; const x = i % w, y = (i / w) | 0; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; }
     if (!area) return null;
+    // a touch dropped into a wet wash needs a few sheet cells to lay its own wet bed on: on a coarse sheet a 7 mm dab is a
+    // handful of cells whose bed cannot be judged (the paint step's wet-bed check), so it is left out
+    if (move === 'wet on wet' && area < WET_LEAST_CELLS) return null;
     const mixId = mixes.length; mixes.push({ mix: mix.map(v => v / strength), strength, stage });
     const sh = passage(ids, 1, box, strength, area, w); sh.mix = [...mix]; sh.graded = null; sh._follow = true; sh.firstWash = stage <= 2; sh._opening = 1; sh.dryAfter = true;
     const areaMm2 = cells.length * cellMm2, phase = stage <= 2 ? 'light' : stage === 3 ? 'mid' : 'shadow';
