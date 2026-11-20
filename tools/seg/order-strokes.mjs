@@ -36,7 +36,8 @@ const lines = ordered.map((r, seq) => {
   const P = r.parts.map(i => doc.lines[i]), Ls = r.parts.map(i => pathLength(strokes[i])), sum = Ls.reduce((a, b) => a + b, 0) || 1;
   const width = P.reduce((a, l, k) => a + l.width * Ls[k], 0) / sum, widthMm = P.every(l => l.widthMm != null) ? P.reduce((a, l, k) => a + l.widthMm * Ls[k], 0) / sum : undefined;
   // --weight structure: weight and width from the order (structure firm, detail light, near heavier), not the drawing
-  const sw = r.phase ? growthWeight(r, P[0].weight ?? 1, { width, mid }) : arg('--weight') === 'structure' ? structureWeight(r, heightMm) : null;
+  // a stream laid along dense ink (fur, hair) keeps the width its tone set (trace-drawing.py); only drawn lines build
+  const sw = r.phase ? growthWeight(r, P[0].weight ?? 1, P[0].dense ? {} : { width, mid }) : arg('--weight') === 'structure' ? structureWeight(r, heightMm) : null;
   const [tw, tx] = TOUCH[touch], wt = (sw ? sw.weight : P[0].weight ?? 1) * tw;
   return { ...P[0], weight: +wt.toFixed(3), points: r.points.map(([x, y]) => [+(x / mm).toFixed(3), +(y / mm).toFixed(3)]),
     width: +(width * (sw?.widthScale ?? 1) * tx).toFixed(3), ...(widthMm != null ? { widthMm: +(widthMm * (sw?.widthScale ?? 1) * tx).toFixed(3) } : {}),
