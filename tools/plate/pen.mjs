@@ -4,9 +4,8 @@ import {fastPaintFrame} from '../speed/frame-policy.mjs';
 import {scaleDrawingGestures} from '../../src/paint/methods/drawing-hand.mjs';
 import {cutInDarkWash} from '../../src/paint/methods/ink-dark-skip.mjs';
 import {prepareDrawing} from '../../src/paint/methods/material-profiles.mjs';
-import {weighGraphiteDrawing} from '../../src/paint/methods/graphite-pool.mjs';
 import {plannedEdges, supportedLines} from '../../src/paint/methods/line-support.mjs';
-import {selectValueInk, drawsWholeFile, valueInkVerdict} from '../../src/paint/methods/light-to-dark.mjs';
+import {selectValueInk, drawsWholeFile, valueInkVerdict} from '../../src/paint/methods/value-shared.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {linePaths, readLineText} from '../../src/crop/lines.mjs';
 import {cachedStep, codeHash} from '../../src/paint/run-cache.mjs';
@@ -28,8 +27,6 @@ import {silhouette, traceOutlines} from '../../src/crop/outline.mjs';
 import {edgeChains} from '../../src/crop/contours.mjs';
 import {drawAs} from '../../src/crop/simplify.mjs';
 import {selectedDrawing, drawingWant} from '../../src/paint/methods/drawing-file.mjs';
-import {planPenWash, describePlan, passageAmounts} from '../../src/paint/methods/pen-wash-plan.mjs';
-import {prunePenLines} from '../../src/paint/methods/pen-wash-lines.mjs';
 import {fillSheetBase} from '../../src/paint/methods/sheet-tone.mjs';
 
 export async function penPlan(ctx) {
@@ -112,34 +109,6 @@ if (TONE_STAGE) {
 }
 
 phaseMark('sheet');
-// --penwash 1 (--style penwash, src/paint/recipe.mjs): pen and wash. The ink drawing is drawn whole from its prepared
-// file with its small repeated marks pruned (pen-wash-lines.mjs), then three to six simple washes planned here from a
-// three-value simplification (--penwashplan values) or, for comparison, from colour regions (--penwashplan colour)
-// replace the value ladder (pen-wash-plan.mjs, pen-wash.mjs). Planned now, before the target guard seals the target.
-const PENWASH = num('penwash', 0) > 0;
-ctx.PENWASH_LINES = null; let PENWASH_INK_GROUPS = null;
-const PENWASH_PLAN = PENWASH ? (() => {
-  const planArgs = { px: PX_RAW, w, h, pigments: PIGS, paperRGB, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w,
-    options: { lightness: num('pwlightness', 0.5), minLight: num('pwminlight', 0.45), maxDark: num('pwmaxdark', 0.22), blurMm: num('pwblur', 2.5), minArea: num('pwminarea', 0.006), hueGap: num('pwhuegap', 10), chroma: num('pwchroma', 1), lightChroma: num('pwlightchroma', 0), localMax: num('pwlocalmax', 0.26), capLWeight: num('pwcaplweight', 1), shadowBlurMm: num('pwshadowblur', 0), shadowMaxDark: num('pwshadowmaxdark', 0.3), darkHueGap: num('pwdarkhuegap', 12), foliageGreen: num('pwfoliage', 0), foliageMax: num('pwfoliagemax', 0.3), shadowOneMm: num('pwshadowone', 0), skyStrength: num('pwsky', 0), skyTo: num('pwskyto', 0.3), deepContrast: num('pwdeepcontrast', 0), deepShare: num('pwdeepshare', 0.06), deepRingMm: num('pwdeepring', 2), keepLights: num('pwkeeplights', 0), keepLightsMm2: num('pwkeeplightsmm2', 4), monoLocal: opt('pwmonolocal', '') ? Object.fromEntries(opt('pwmonolocal', '').split(',').map(t => t.split(':')).map(([k, v]) => [k, +v])) : undefined, shadowMin: num('pwshadowmin', 0.12), deepMin: num('pwdeepmin', 0.1), joinMm: num('pwjoin', 2), minPiece: num('pwminpiece', 0.008),
-      whiteMm: num('pwwhitemm', 0.8), fineMm: num('pwfinemm', 0.8), holeMm2: num('pwholemm2', 0), hueSmoothMm: num('pwhuesmooth', 5), shadowPiece: num('pwshadowpiece', 0.004), firstC: num('pwfirstc', 0.35), firstMaxDL: num('pwfirstmax', 9), shadowC: num('pwshadowc', 0.55), shadowMaxDL: num('pwshadowmax', 16), darkC: num('pwdarkc', 0.65), darkMaxDL: num('pwdarkmax', 14), darkShare: num('pwdarkshare', 0.04), darkContrast: num('pwdarkcontrast', 12), darkBrushMm: num('pwdarkbrush', 3), softGrad: num('pwsoftgrad', 0), softBandMm: num('pwsoftband', 1.5), softBlurMm: num('pwsoftblur', 0.8) } };
-  const plan = planPenWash({ planner: opt('penwashplan', 'values'), ...planArgs });
-  PENWASH_INK_GROUPS = opt('penwashplan', 'values') === 'values' ? plan.groups : opt('penwashplan', 'values') === 'stages' ? planPenWash({ planner: 'values', ...planArgs }).groups : null;
-  const doc = { planner: opt('penwashplan', 'values'), palette: PIGS.map(p => p.name ?? null), ...describePlan(plan, n, PIGS) };
-  fs.writeFileSync(path.join(out, 'penwash-plan.json'), JSON.stringify(doc, null, 2));
-  console.log(`pen wash: ${plan.passages.length} passages planned from ${doc.planner}${plan.monochrome ? ', monochrome target, palette roles' : ''}: ${doc.passages.map(q => `${q.id} ${(100 * q.area).toFixed(0)}%`).join(', ')}`);
-  return plan;
-})() : null;
-// Flat previews of the plan before any mark: the value map and the washes laid flat on paper (no physics).
-const penWashFlat = () => {
-  const flat = new Uint8ClampedArray(n * 3); for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) flat[3 * i + c] = paperRGB[c];
-  return renderLayers(PENWASH_PLAN.passages.map(p => { const a = passageAmounts(p, w, h, PIGS.length); return PIGS.map((_, j) => Float32Array.from({ length: n }, (_, i) => a[i * PIGS.length + j])); }), PIGS, flat, n, 1);
-};
-if (PENWASH_PLAN) {
-  const grey = [250, 165, 70], vm = Buffer.alloc(n * 3);
-  for (let i = 0; i < n; i++) vm.fill(PENWASH_PLAN.groups[i] < 3 && opt('penwashplan', 'values') === 'values' ? grey[PENWASH_PLAN.groups[i]] : Math.round(40 + 200 * PENWASH_PLAN.groups[i] / 6), i * 3, i * 3 + 3);
-  await sharp(vm, { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'penwash-values.png'));
-  await sharp(Buffer.from(penWashFlat()), { raw: { width: w, height: h, channels: 3 } }).png().toFile(path.join(out, 'penwash-plan.png'));
-}
 // Wrap the target and its per-cell maps (--targetguard): planning may read them until TARGET_GUARD.beginPaint()
 // closes them before the first mark. The look gets shape-level means only.
 TARGET_GUARD.provide('px', PX_RAW, { stride: 3 }); TARGET_GUARD.provide('A', ctx.A, { stride: PIGS.length }); if (ctx.AL !== ctx.A) TARGET_GUARD.provide('AL', ctx.AL, { stride: PIGS.length });
@@ -382,8 +351,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   // the walker found (src/paint/methods/drawing-file.mjs)
   // --massbudget cuts the closing pen inside the masses; the opening drawing keeps them unless --masscutfirst 1
   const cutPen = MASS_BUDGET && (!first || num('masscutfirst', 0) > 0) ? MASS_BUDGET.cutPen : g => g;
-  const penWashPrune = PENWASH_PLAN && first && !fine ? lines => { const r = prunePenLines(lines, { w, h, mmPerCell: num('sheetmm', DEFAULT_SHEET_MM) / w, groups: PENWASH_INK_GROUPS, seed: 1 + Math.round(num('seed', 0)), options: { tileInkMm: num('pwtileink', 9), keepAbove: num('pwkeep', 0), minMm: num('pwspeck', 0.8), vary: num('pwpenvary', 0), structMm: num('pwpenstruct', 15) } }); ctx.PENWASH_LINES = r.stats; console.log(`pen wash lines: ${r.stats.out} of ${r.stats.in} lines kept (${r.stats.short} specks, ${r.stats.omitted} omitted, ${r.stats.duplicate} repeats, ${r.stats.density} over density), ink ${r.stats.inkMmOut} of ${r.stats.inkMmIn} mm`); return r.lines; } : null;
-  const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, style: DRAW_STYLE, prune: penWashPrune, families: VALUE_CONFIG?.families ?? null }));
+  const SELECTED = cutPen(selectedDrawing({ first, fine, w, h, opt, num, log: console.log, walked: drawn.length, D: DRAW_SOURCE, want: inkWant, cells: CELLS, K, style: DRAW_STYLE, families: VALUE_CONFIG?.families ?? null }));
   let kept = SELECTED ? SELECTED : cutPen(penKeep ? drawn.filter(penKeep) : drawn);
   // --inkskin x0,y0,x1,y1 (sheet fractions): the closing pen keeps off warm skin interiors of the figure in the box. Default off.
   // --inkskinerode: interior erosion in cells (default 3); --inkskinshare: share of points inside that drops a gesture (default 0.6).
@@ -494,7 +462,7 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   if (ctx.VALUE_PLAN && !first && num('inkdarkskip', 0) > 0) { const before = kept.length; kept = cutInDarkWash(kept, ctx.VALUE_PLAN.value.values, w, h, num('inkdarkskip', 0)); console.log(`ink dark skip: ${before} ${first ? 'opening' : 'closing'} gestures cut to ${kept.length} runs outside planned value ${num('inkdarkskip', 0)}`); }
   // A prepared pencil drawing describes the same contours as pen, including paper-light borders.
   if(ctx.VALUE_PLAN){const before=kept,sourceInk=drawsWholeFile({first,fine,graphiteFirst,drawingFile:opt('drawingfile',''),closingFile:opt('drawinglast',''),sourceInk:sourceInkDrawing()});
-    kept=selectValueInk(before,{first,w,h,sourceInk,density:ctx.VALUE_PLAN.value.values,reserves:ctx.VALUE_PLAN.protectedCells,shaped:ctx.VALUE_PLAN.instructions[0]?.shaped,subject:VALUE_CONFIG?.subject,styleSelection:VALUE_CONFIG?.styleSelection});
+    kept=selectValueInk(before,{first,w,h,sourceInk,density:ctx.VALUE_PLAN.value.values,reserves:ctx.VALUE_PLAN.protectedCells,shaped:ctx.VALUE_PLAN.instructions[0]?.shaped});
     // --lineedges 0 turns it off. A line from the plan's drawing file is drawn only when at least half of it lies on an
     // edge of a planned passage (src/paint/methods/line-support.mjs); a line inside one planned mass is left off whole.
     // The slack is one source pixel. A source's own pen lines are drawn as they are.
@@ -517,8 +485,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   }
   // a selected drawing's points may carry their own pressure share and contact width (drawing-file.mjs), in plan cells
   let scaled = scaleDrawingGestures(kept, SC).map((g,i)=>({...g,ml:!!g.ml,draw:!inkVerdict||inkVerdict[i].kept}));
-  // the graphite pool drawing: each line presses as dark as the subject's own line there, by a scrap of this paper (graphite-pool.mjs)
-  if(graphiteFirst){const r=weighGraphiteDrawing(scaled,{medium:opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'),mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,paperOpts:ctx.PAPER_OPTS,out,log:console.log});scaled=r.strokes;if(r.stats&&ctx.GRAPHITE_POOL)ctx.GRAPHITE_POOL.lineWeight=r.stats;}
   scaled=prepareDrawing(scaled,{medium:graphiteFirst?opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'):opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT),stage:first?'opening':'closing',mmPerCell:(PB?.mm??num('sheetmm', DEFAULT_SHEET_MM))/W2,edgeStrength:TARGET_DRAW_EDGE,w:W2,h:H2,caps:{...drawingCapsFor(first?'opening':'closing',graphiteFirst),share:SELECTED?1:num('drawshare',1)}});
   // the pressure along each gesture: the ridge's strength, or under --penwant glaze that times the share left to the ink
   // once the glazes are over it, not below --penfloor (default 0.2). The full-pressure point comes from ridge strength alone.
@@ -580,6 +546,6 @@ async function planPenInner(planD0, { first = false, fine = false } = {}) {
   return { preparing, PEN, K, graphiteFirst, inkPig, scaled, wantT1, big, peak, inkVerdict, frozenPeak, per, SELECTED, outlines, gestures };
 }
 Object.assign(ctx, { FRAMES, snap, FULL_TAPE, MARKTAPE, AWARE_DIR, RESUME_DIR, RESUME_AT, shoot, WETFRAMES, 
-  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, PENWASH, PENWASH_PLAN, penWashFlat, LOOK_AL, 
+  PASSFRAMES, WET_STEPS, FILM_BY_PAINT, PEN_FRAMES, LOOK_AL, 
   LOOK_PLAN, SOURCE_INK, TIER_MASK });
 }

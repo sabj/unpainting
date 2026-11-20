@@ -1,0 +1,8 @@
+{
+  "subject": "mini-clean",
+  "note": "DRAFT example for bench/v6/TASK.md, not yet run. The drawing and study are the owner's mini piece files.",
+  "sheet": { "widthMm": 100, "seed": 0 },
+  "drawing": { "medium": "ink", "reason": "the subject is a pen drawing with washes", "file": "drawing-lines.json", "order": "passes", "ink": "full", "touch": "firm", "hatching": "drawn" },
+  "washes": { "layers": [ { "study": "studies/mini-clean-study-s3L8.png" } ], "paints": [] },
+  "stop": "after the last layer dries"
+}

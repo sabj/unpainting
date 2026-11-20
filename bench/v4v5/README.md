@@ -1,3 +1,5 @@
+> **Retired in 0.4.** This task ran on painter 0.2.x and 0.3.x. Its plans (styleSelection, recipe tokens, `example/`) ask for the light-to-dark value plan and options that 0.4 removed, so it cannot run on this trunk: `npm run bench:run` refuses V4 and V5. Check out tag `v0.3.2` to replay it. The next task is the draft in `bench/v6/`.
+
 # V4 and V5 inputs
 
 In V4 and V5 the model does not paint stroke by stroke. It writes a plan for the painter (`tools/paint-plate.mjs`): regions, reserves, styles, drawing paths, recipe tokens and painter settings. Then it paints the plan with `bench/paint.sh`. The painter stops at every passage boundary, so the model can look at its sheet and revise what is not painted yet. [scripts/pipeline/round45.mjs](../scripts/pipeline/round45.mjs) runs a round.

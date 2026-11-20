@@ -23,7 +23,7 @@ import { samePart } from './line-join.mjs';
 const hash = (k, seed) => { let s = (k * 2654435761 + seed * 40503 + 97) >>> 0; s = Math.imul(s ^ (s >>> 15), 2246822507) >>> 0; s = Math.imul(s ^ (s >>> 13), 3266489909) >>> 0; return ((s ^ (s >>> 16)) >>> 0) / 4294967296; };
 
 // A smooth zero-mean, unit-deviation field on the plan grid, `sigma` cells across.
-export function omissionField(w, h, sigma, seed) {
+function omissionField(w, h, sigma, seed) {
   const f = gaussian(Float32Array.from({ length: w * h }, (_, i) => hash(i, seed) - 0.5), w, h, sigma);
   let m = 0, v = 0; for (const x of f) m += x; m /= f.length; for (const x of f) v += (x - m) ** 2; const sd = Math.sqrt(v / f.length) || 1;
   return Float32Array.from(f, x => (x - m) / sd);

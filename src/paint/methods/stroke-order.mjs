@@ -7,7 +7,7 @@
 // by containment. A line that runs on through a junction is drawn as one stroke. Each stroke is pulled one way: downward when
 // it runs more up and down than across, else left to right.
 
-export const ORDER_DEFAULTS = Object.freeze({
+const ORDER_DEFAULTS = Object.freeze({
   cellMm: 0.5,          // the grid the faces are found on
   closeMm: 1.5,         // lines are thickened by this, so gaps under twice it still close a face (a drawn wall is rarely sealed)
   minFaceMm2: 6,        // a face smaller than this is a sliver, not an object
@@ -44,7 +44,7 @@ export const ORDER_DEFAULTS = Object.freeze({
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 export const pathLength = P => P.reduce((s, q, k) => (k ? s + dist(P[k - 1], q) : 0), 0);
 
-export function resample(P, step) {
+function resample(P, step) {
   const out = [P[0]]; let carry = 0;
   for (let k = 1; k < P.length; k++) {
     const a = P[k - 1], b = P[k], d = dist(a, b); let t = step - carry;
@@ -70,7 +70,7 @@ export function turningPerMm(P, step = 0.5) {
 }
 
 /** Runs of hatching: straight strokes of hatchMm length with at least two neighbours alongside at hatchDeg and hatchGapMm. */
-export function hatchRuns(strokes, o = {}) {
+function hatchRuns(strokes, o = {}) {
   const c = { ...ORDER_DEFAULTS, ...o }, n = strokes.length;
   const F = strokes.map(P => {
     const L = pathLength(P), a = P[0], b = P[P.length - 1], ch = dist(a, b);
@@ -499,7 +499,7 @@ export function growthWeight(r, drawn = 1) {
 }
 
 /** Hand travel between consecutive strokes (end of one to start of the next). */
-export function handTravel(ordered) {
+function handTravel(ordered) {
   return ordered.slice(1).map((r, k) => dist(ordered[k].points[ordered[k].points.length - 1], r.points[0]));
 }
 

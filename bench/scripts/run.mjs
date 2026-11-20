@@ -36,6 +36,7 @@ for (let i = 0; i < argv.length; i++) {
 const DRY = has('dry-run');
 const round = roundById(opt('round', 'V4'));
 if (!round || !['V4', 'V5'].includes(round.id)) fail('--round must be V4 or V5 (V1 to V3 are published history and can no longer be run)');
+if (['V4', 'V5'].includes(round.id)) fail((await import('./pipeline/round45.mjs')).RETIRED_V45);
 let profile;
 try { profile = profileForRound(round.id, opt('profile')); } catch (e) { fail(e.message); }
 if (opt('judge')) {

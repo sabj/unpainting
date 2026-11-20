@@ -1,3 +1,5 @@
+> **Retired in 0.4.** This task ran on painter 0.2.x and 0.3.x. Its plans (styleSelection, recipe tokens, `example/`) ask for the light-to-dark value plan and options that 0.4 removed, so it cannot run on this trunk: `npm run bench:run` refuses V4 and V5. Check out tag `v0.3.2` to replay it. The next task is the draft in `bench/v6/`.
+
 # Painting plan: {SUBJECT_NAME}, round {ROUND}, try {TRY} of {TRIES}
 
 You are preparing a plan for a fixed watercolour painter and painting it. The painter runs on this machine; you start it

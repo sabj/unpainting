@@ -66,7 +66,7 @@ export function areaArgs({ planFile, target, width, sheetmm, out, compile = fals
     '--palettewide', '1', '--paints', paints.join(','), '--physical', '1', '--paperbase', 'source', '--loadedcontact', '1', '--paper', 'coldpress',
     '--drawing', drawing, ...(opening ? ['--drawingfile', opening] : []), ...(closing ? ['--drawinglast', closing] : []), '--outlinemedium', outlineMedium,
     ...(inkProfile ? ['--inkprofile', inkProfile] : []),
-    '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
+    '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
     '--out', out, '--targetguard', 'gentle', '--areaplan', planFile, ...(compile ? ['--areaplanonly', '1'] : ['--gpu', gpu])];
 }
 

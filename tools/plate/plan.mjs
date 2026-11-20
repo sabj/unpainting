@@ -1,7 +1,6 @@
 // The palette, pigment demand, masks and the order of the layers.
 // Stage 2 of 7 of tools/paint-plate.mjs. The stages run in order and share one object, ctx: see the entry file.
 import {materialProfile} from '../../src/paint/methods/material-profiles.mjs';
-import {resolveStyle} from '../../src/paint/styles/loader.mjs';
 import {boundsOf} from '../../src/mask-bounds.mjs';
 import {DEFAULT_SHEET_MM} from '../../src/media/sheet-size.mjs';
 import {resolveOutlineMedium, describeOutlineMedium} from '../../src/paint/methods/outline-medium.mjs';
@@ -33,14 +32,9 @@ import {setClip as physicalSetClip, stableClipMask} from '../../src/media/sheet.
 import {styleTarget, massesOf} from '../../src/crop/styletarget.mjs';
 import {separate} from '../../src/crop/inkwash.mjs';
 import {orientationField} from '../../src/crop/fur.mjs';
-import {edgeChains} from '../../src/crop/contours.mjs';
 import {finishField} from '../../src/crop/finish.mjs';
 import {labPlanes} from '../../src/eval/colour.mjs';
 import {smallLights, paperDensity, cellShare, keepLargestLights} from '../../src/crop/lights.mjs';
-import {planGouache} from './gouache-plan.mjs';
-import {planSurface} from './surface-plan.mjs';
-import {planThinDarks, drawnLines} from './thin-darks-plan.mjs';
-import {GOUACHE_PIGMENT, tintedGouache} from '../../src/media/gouache.mjs';
 import {planCurls} from '../../src/crop/curls.mjs';
 import {pigmentPhysics} from '../../src/paint/methods/pigment-physics.mjs';
 import {planLinework} from '../../src/paint/methods/linework-plan.mjs';
@@ -57,7 +51,7 @@ import {measureStyle} from '../../src/paint/methods/practice-style.mjs';
 
 export async function plan(ctx) {
 const { JSONL, argv0, argv, PIPELINE, opt, num, DRAWING_STAGE_INTENT, optTrack, SPEED_VALUE_ONLY, SPEED_PROFILE, 
-  root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, EARLY_LINES, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
+  root, out, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, VALUE_CONFIG, VALUE_ENABLED, 
   phaseMark, PX_SOURCE, PX_RAW, TARGET_GUARD, w, h, n, lum, paperRGB, CODE_HASH, 
   PALETTE_FROM_FILE, paletteFitStarted } = ctx;
 const PALETTE = (await cachedStep({ ...RUN_CACHE, name: 'palette', code: codeHash(root,[],{dependencies:['src/crop/palettepick.mjs','src/crop/palettewide.mjs','src/crop/paint-guard.mjs','tools/painter/authored-paint.mjs']}), track: optTrack, inputs: { px: ctx.px, w, h, paperRGB, from: PALETTE_FROM_FILE, authored: opt('areaplan','') ? fs.readFileSync(path.resolve(root,opt('areaplan',''))) : null } }, async () => {
@@ -477,7 +471,6 @@ const FINE = await (async () => {
 // What the source's fine structure adds above its local tone: grain a glaze cannot carry but a later dry brush can.
 // --edgeclear e: share of width and height at each edge read as structureless, so a scan's mount is not grain. Default 0.
 const EDGE = (() => { const e = num('edgeclear', 0), ex = Math.round(e * w), ey = Math.round(e * h); return i => { const x = i % w, y = (i / w) | 0; return x < ex || y < ey || x >= w - ex || y >= h - ey; }; })();
-const HP = (() => { const b = gaussian(ctx.SRC, w, h, num('texsigma', 1.6)); return Float32Array.from(ctx.SRC, (v, i) => (EDGE(i) ? 0 : Math.max(0, v - b[i]))); })();
 // The part of the fine grid a passage's cells can map to (with a margin): everything outside it is empty, so what walks the
 // passage's mask there can stay inside, in the same order, and give the same numbers.
 const maskWindow = (mask, F, box = null) => {
@@ -673,8 +666,6 @@ const FINISH_FIELD = (!MASK_FINISH || VIGFINISH) && num('finish', 0) > 0
   : null;
 const FINISH = VIGFINISH && FINISH_FIELD ? Float32Array.from(MASK_FINISH, (v, i) => (v < 0 ? v : Math.min(v, FINISH_FIELD[i]))) : (MASK_FINISH ?? FINISH_FIELD);
 if (VIGFINISH && FINISH_FIELD) console.log(`vignette finish: cut by the finish field (background ${num('finish', 0)})`);
-let FUR_CACHE = null;
-const FUR_FIELD = () => (FUR_CACHE ??= orientationField(ctx.SRC, w, h, gaussian, { sigma: num('fursigma', 2) }));
 
 // The separator's reading of the source: which cells are pen line, which are wash. Read once; the ink's colour, the
 // line budget and the gate on the pen all use it.
@@ -684,7 +675,7 @@ if (INK_RECIPE.recipe === 'wash' && opt('drawing','first') !== 'none' && 100 * S
 // The pen-line share every pen or pencil choice below reads (outline medium, drawing stages, line source): one
 // reading at 1200 px wide (pen-share.mjs), so --width does not change what is pen. SEP is at the run's grid.
 // A run with a graphite outline, no line source and no ink plan never asks, so it skips the extra reading.
-const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || opt('linesource', 'none') !== 'none' || Number(opt('penwash', 0)) > 0 || PIPELINE?.drawing?.medium === 'ink';
+const PEN_ASKED = opt('outlinemedium', 'graphite') !== 'graphite' || PIPELINE?.drawing?.medium === 'ink';
 const PEN_SHARE = PEN_ASKED && fs.existsSync(path.resolve(root, opt('image', ''))) ? await sourcePenShare({ image: path.resolve(root, opt('image', '')), sharp }) : SEP.stats.ink / n;
 // Removing ink from the wash target must not erase the evidence used to select finish ink.
 const DRAW_DENSITY = PX_RAW === PX_SOURCE ? ctx.SRC : TARGET_GUARD.register('drawing-density', Float32Array.from({length:n},(_,i)=>Math.max(0,-Math.log(Math.max(.02,Math.min(1,(.2126*PX_SOURCE[3*i]+.7152*PX_SOURCE[3*i+1]+.0722*PX_SOURCE[3*i+2])/pl))))));
@@ -704,16 +695,13 @@ DRAWING_STAGE_INTENT.planMedium ??= PIPELINE?.drawing?.medium ?? OUTLINE.medium;
 const DRAWING_CHOICE = await chooseDrawingStages({ opt, argv, image: path.resolve(root, opt('image','')), root, out, rgb: PX_SOURCE, w, h, penLine: PEN_SHARE, log: console.log, intent: DRAWING_STAGE_INTENT });
 // planned as kneaded-eraser dabs, so painting lays a plan and reads no map made from the target
 const PREP_ERASE = num('preperase', 0.85) > 0 ? eraserDabs(eraseWeights(PX_SOURCE, w, h), w, h, { tile: ERASER_MM / (num('sheetmm', DEFAULT_SHEET_MM) / w) }) : null;
-const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, root, inkShare: PEN_SHARE, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, rgb: PX_SOURCE, log: console.log,
-  edges: () => edgeChains(ctx.SRC, w, h, gaussian, { sigma: 1.5, minLength: 20, margin: num('silmargin', 0.04), step: 2, high: num('edgehigh', 0.85) }),
+const LINEWORK = await planLinework({ drawingOverride: argv0.includes('--drawing') ? argv0[argv0.lastIndexOf('--drawing')+1] : null, opt, num, argv, out, density: { D: DRAW_DENSITY, w, h }, grid: { w, h }, log: console.log,
   planLines: (ls, image) => { const skip = new Set(opt('drawingskip', '').split(',').map(r => r.trim()).filter(Boolean)); const scaled = ls.filter(g => !skip.has(g.role)).map(g => ({ ...g, length: g.length ?? g.points.reduce((a, q, k) => (k ? a + Math.hypot(q[0] - g.points[k - 1][0], q[1] - g.points[k - 1][1]) : 0), 0) })); return planLineChoice(scaled, num); } });
 // Linked stages write new opening and closing files after the hold above; hold those too, so the ink flags reach the
 // pens on a staged run as they do on a run with a prepared line file.
 if (LINEWORK.files?.prepInk || LINEWORK.files?.finishInk) ctx.INK_LINES = (await holdInk()) ?? ctx.INK_LINES;
-if (EARLY_LINES) Object.assign(LINEWORK, {source:EARLY_LINES.source, extractor:EARLY_LINES.extractor, python:EARLY_LINES.python});
 if (DRAWING_REGISTRATION) LINEWORK.registration = DRAWING_REGISTRATION;
 if (DRAWING_CHOICE) LINEWORK.drawingChoice = DRAWING_CHOICE;
-if (ctx.LINEWORK_STAGE) Object.assign(LINEWORK, {source:`universal ${ctx.LINEWORK_STAGE.source}`, universal:{gate:ctx.LINEWORK_STAGE.gate, features:ctx.LINEWORK_STAGE.features, lines:ctx.LINEWORK_STAGE.lines}});
 fs.writeFileSync(path.join(out, 'linework.json'), JSON.stringify(LINEWORK, null, 2));
 const STAGE_PLAN = LINEWORK.stages ? LINEWORK : null;
 // --penfacelong e: face rule and face-detail walks read only line-shaped ink marks (longest side squared over area >= e). Default 0.
@@ -734,7 +722,6 @@ const FACE_INK = () => FACE_INK_CACHE ??= (num('penfacelong', 0) > 0 ? (() => {
 // --inkfast auto|1|0: 1 sets the ink before washes (waterproof); 0 keeps the material's rewetting. auto (default) is
 // waterproof for black ink and soluble for sepia, as a plan's drawing.ink.waterproof defaults. --inkcolour is unused.
 const REQUESTED_DRAW_MEDIUM=OUTLINE_REQUESTED==='auto'?OUTLINE.medium:OUTLINE_REQUESTED;
-const SUBJECT_STYLE=VALUE_CONFIG?.styleSelection?resolveStyle(VALUE_CONFIG.subject,null,VALUE_CONFIG.styleSelection):null;
 // precise-watercolor is the identity profile for the shaped planner; other styles scale ink and graphite by their weights
 const STYLE_ON=()=>!!ctx.VALUE_PLAN?.style&&ctx.VALUE_PLAN.style.name!=='precise-watercolor';
 // The pen's ink load. --closingconc f dilutes the closing pen's ink (default 1): a closing accent restates an edge over
@@ -765,7 +752,7 @@ function inkDarkCap(stage){
  fs.writeFileSync(path.join(out,'ink-dark-cap.json'),JSON.stringify(INK_DARK_CAPS,null,1)+'\n');
  return r.factor;
 }
-const STYLE_INK_DEFAULT=SUBJECT_STYLE?.pigment==='black'?'black-ink':'sepia-ink';
+const STYLE_INK_DEFAULT='sepia-ink';
 const INK_PROFILE=materialProfile(opt('inkprofile',REQUESTED_DRAW_MEDIUM.endsWith('-ink')?REQUESTED_DRAW_MEDIUM:STYLE_INK_DEFAULT));
 const GRAPHITE_PROFILE=materialProfile(opt('graphiteprofile',REQUESTED_DRAW_MEDIUM.startsWith('graphite-')?REQUESTED_DRAW_MEDIUM:'graphite-HB'));
 if(INK_PROFILE.kind!=='ink'||GRAPHITE_PROFILE.kind!=='graphite')throw Error('inkprofile/graphiteprofile must use the corresponding material family');
@@ -800,44 +787,11 @@ const GRAPHITE = PENCIL ? (({ strength, ...pig }) => pig)(PENCIL.pig) : (STAGE_P
 const WICK_FLOORS = String(opt('wickfloor', '0')).split(',').map(v => Math.min(0.9, Math.max(0, Number(v) || 0)));
 const wickFloorOf = j => WICK_FLOORS[Math.min(j, WICK_FLOORS.length - 1)];
 const WICK_FLOOR = Math.max(...WICK_FLOORS);
-// Final lights (tools/plate/gouache-plan.mjs): thin light over dark that no wash can reserve, laid last in white gouache.
-// Decided here from the planning data, the same rule for every picture and in both looking modes; an area plan owns its
-// own lights (pass.lights), so it takes none. The white is one more pigment channel on the sheet only when a stroke is planned.
-// Surface marks on an unplanned run (tools/plate/surface-plan.mjs): a vision judge labels the SAM regions, a coat asks for
-// coat marks and dressed stone for masonry, anything else or any doubt for none. An area plan has its own marks (pass.marks).
-// A study wash plan (--washplan FILE, study-washes.mjs) lays the washes of a block-in study and nothing read off the
-// subject's fine detail: no surface marks, no final lights, no thin darks (they failed the planted-pattern copy test).
-const STUDY_WASHES = opt('washplan', 'squint') !== 'squint';
-const SURFACE_PLAN = STUDY_WASHES
-  ? { groups: [], coat: { strokes: [], regions: [] }, coatMask: new Uint8Array(w * h), record: { status: 'none', reason: 'the study wash plan lays no surface marks' } }
-  : opt('areaplan', '')
-  ? { groups: [], coat: { strokes: [], regions: [] }, coatMask: new Uint8Array(w * h), record: { status: 'none', reason: 'an area plan owns its marks (pass.marks)' } }
-  : await planSurface({ image: path.resolve(root, opt('image')), root, w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), segments: ctx.SEGMENTS_RECORD, SRC: ctx.SRC, paperRGB, judge: opt('inklabeljudge', 'codex'), cacheDir: path.resolve(root, opt('inklabelcache', 'work/line-labels')), log: console.log });
-fs.writeFileSync(path.join(out, 'surface-plan.json'), JSON.stringify(SURFACE_PLAN.record, null, 1));
-const GOUACHE_PLAN = STUDY_WASHES
-  ? { strokes: [], record: { decision: 'none', reason: 'the study wash plan leaves its lights as paper' } }
-  : opt('areaplan', '')
-  ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lights (pass.lights)' } }
-  : await planGouache({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, pigments: PIGS, coat: { mask: SURFACE_PLAN.coatMask } });
-const COAT_PLAN = { strokes: SURFACE_PLAN.coat.strokes, record: { status: SURFACE_PLAN.record.status, regions: SURFACE_PLAN.coat.regions, strokes: SURFACE_PLAN.coat.strokes.length, brushSwatch: SURFACE_PLAN.record.brushSwatch ?? null } };
-// the coat's tinted gouache: one pot, made for the darker quarter of its light strands; lighter strands take more white (src/media/gouache.mjs)
-// Thin darks (tools/plate/thin-darks-plan.mjs): the mirror of the final lights. Each is planned here from the planning data
-// with its own step over its sides, never where the drawing layer already draws the line in ink or visible graphite, never
-// in a coat. They are laid last over the dry washes, in paint with the rigger's point or in pencil (thin-darks-lay.mjs).
-const THIN_DARKS_DRAWN = drawnLines(STAGE_PLAN?.files, { root, out, graphiteAmount: num('prepamount', 0.3) });
-const THIN_DARKS_PLAN = STUDY_WASHES
-  ? { strokes: [], record: { decision: 'none', reason: 'the study wash plan lays no thin darks' } }
-  : opt('areaplan', '')
-  ? { strokes: [], record: { decision: 'none', reason: 'an area plan owns its lines' } }
-  : await planThinDarks({ image: path.resolve(root, opt('image')), w, h, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), paperRGB, coat: { mask: SURFACE_PLAN.coatMask }, drawn: THIN_DARKS_DRAWN.lines });
-THIN_DARKS_PLAN.record.drawingLayer = THIN_DARKS_DRAWN.found;
-console.log(THIN_DARKS_PLAN.strokes.length ? `thin darks: ${THIN_DARKS_PLAN.record.planned.strokes} lines planned, ${THIN_DARKS_PLAN.record.planned.lengthMm} mm, ${THIN_DARKS_PLAN.record.planned.stepMedian} L* darker than their sides at the median (${THIN_DARKS_PLAN.record.skippedAlreadyDrawn} already drawn)` : `thin darks: none (${THIN_DARKS_PLAN.record.reason ?? `${THIN_DARKS_PLAN.record.candidates ?? 0} candidates, ${THIN_DARKS_PLAN.record.skippedAlreadyDrawn ?? 0} already drawn`})`);
-const COAT_POT = (() => { const lum = c => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], rgbs = COAT_PLAN.strokes.filter(c => c.polarity === 'light' && c.rgb).map(c => c.rgb).sort((a, b) => lum(a) - lum(b)); return rgbs.length ? tintedGouache(rgbs[Math.floor(rgbs.length * 0.25)], paperRGB) : null; })();
-console.log(GOUACHE_PLAN.strokes.length ? `final lights: ${GOUACHE_PLAN.record.planned.singles} single lights and ${GOUACHE_PLAN.record.planned.glints} glints for rigger gouache, ${GOUACHE_PLAN.record.planned.lengthMm} mm of line (${(100 * GOUACHE_PLAN.record.planned.shareOfCeiling).toFixed(2)}% of the stroke ceiling; read at ${GOUACHE_PLAN.record.read.fineWidth} px wide)` : `final lights: no single thin light over dark that a wash cannot reserve (${GOUACHE_PLAN.record.reason ?? `${GOUACHE_PLAN.record.found.ridges} ridges, none kept`})`);
-fs.writeFileSync(path.join(out, 'gouache-plan.json'), JSON.stringify({ ...GOUACHE_PLAN.record, strokes: GOUACHE_PLAN.strokes }, null, 1));
-const SHEET_PIGS = [...(WICK_FLOOR > 0 ? PIGS.map((p, j) => (wickFloorOf(j) > 0 ? { ...p, wick: Math.max(wickFloorOf(j), p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))) } : p)) : PIGS), ...(INK ? [INK] : []), ...(GRAPHITE ? [GRAPHITE] : []), ...(GOUACHE_PLAN.strokes.length || COAT_POT ? [GOUACHE_PIGMENT] : []), ...(COAT_POT ? [COAT_POT] : [])]; ctx.SHEET_PIGS = SHEET_PIGS;
+// Surface marks, coat strokes, final lights in white gouache and thin darks were planned here from the subject's fine
+// detail; they failed the planted-pattern copy test and were removed in 0.4 (last at commit 49447027). An area plan's own
+// marks (pass.marks) are laid with its passes.
+const SHEET_PIGS = [...(WICK_FLOOR > 0 ? PIGS.map((p, j) => (wickFloorOf(j) > 0 ? { ...p, wick: Math.max(wickFloorOf(j), p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))) } : p)) : PIGS), ...(INK ? [INK] : []), ...(GRAPHITE ? [GRAPHITE] : [])]; ctx.SHEET_PIGS = SHEET_PIGS;
 const GRAPHITE_AT = PIGS.length + (INK ? 1 : 0);
-const GOUACHE_AT = SHEET_PIGS.indexOf(GOUACHE_PIGMENT), POT_AT = COAT_POT ? SHEET_PIGS.indexOf(COAT_POT) : -1;
 // every brush is dipped for the wash palette; with a separate ink or accent paints on the sheet it carries none of them
 const FINISH_FILE=opt('finishareaplan','');
 if(FINISH_FILE&&opt('semanticcalibration','legacy')!=='actual')throw Error('finishareaplan requires actual authored instrument calibration');
@@ -868,9 +822,9 @@ const EARLY_DRY_VALUE=num('earlydryvalue',0);earlyDryBoundary({minValue:EARLY_DR
 if(EARLY_DRY_VALUE)fs.writeFileSync(path.join(out,'early-dry-before.json'),JSON.stringify({minValue:EARLY_DRY_VALUE,scope:'completed original full numeric pan/value dry boundaries; firstwash and intentional connected wet passages unchanged',order:'ordinary physical dry before baseline idle settle, not perstroke dry',water:'original unchanged',pigment:'original requested load and planned demand unchanged'},null,2));ctx.EARLY_DRY_CAPTURED=false;
 Object.assign(ctx, { PALETTE, PIGS, COLOUR_BUDGET, STYLE, D_AIM, FIG_MASK, LIGHT_CELLS, GOUACHE_LIGHTS, LIGHT_SHARE, 
   SMALL, WHITE_HOLD, MIXES, setClip, MOD, MASS_BUDGET, DRAW_STYLE, COLOUR_TRACE, PUDDLES, 
-  FIRST_FLOOR, AUTHORED_INPUT, EDGE, HP, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
-  FINISH, FUR_FIELD, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
+  FIRST_FLOOR, AUTHORED_INPUT, EDGE, maskBox, FULLBOX, TECHNIQUE, techniqueOf, reportTechniques, CURLS, 
+  FINISH, SEP, OUTLINE, PREP_ERASE, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, 
   INKLOAD, INK_WIDTH_FLOOR_MM, INK_DAMP, STYLE_INK_DEFAULT, INK_PROFILE, GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, 
-  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, SURFACE_PLAN, COAT_PLAN, THIN_DARKS_PLAN, GOUACHE_PLAN, GOUACHE_AT, POT_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
+  PENCIL, PENCIL_STAGE, GRAPHITE, GRAPHITE_AT, FINISH_FILE, AREA_FILE, AREA_LOADS, AREA_COMPLETED, AREA_EXEC, 
   EARLY_DRY_VALUE });
 }

@@ -34,7 +34,7 @@ function areaPlanDeclaration(argv, root) {
  * --drawingfile is given or it is not a prepared drawing (inputKind drawing). The file's own `medium` wins over
  * --outlinemedium; with neither, medium is null and the decision stops.
  */
-export function preparedDrawing(argv, root) {
+function preparedDrawing(argv, root) {
   const stem = last(argv, '--drawingfile');
   if (!stem) return null;
   let doc;

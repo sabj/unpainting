@@ -21,7 +21,7 @@ import { labOf } from '../../eval/colour.mjs';
 import { outlineLoops, loopsMask } from './wash-strokes.mjs';
 import { laneFill } from './sweep-fill.mjs';
 import { mixFor, mixOver, filmLab } from './puddles.mjs';
-import { kmeans, roundMask } from './layered-washes.mjs';
+import { kmeans, roundMask } from './study-shapes.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.5;

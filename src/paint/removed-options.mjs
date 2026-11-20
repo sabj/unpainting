@@ -21,8 +21,29 @@ export const REMOVED_OPTIONS = Object.freeze({
   eyering: 'the eye ring drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject; the plan names its eyes\' shapes and darks',
 });
 
+// Removed in 0.4: methods the owner rejected, deleted from the trunk. Each was last in the code at commit 49447027
+// (git show 49447027:<file>); the history is the archive.
+const LAST = 'last at commit 49447027';
+const in04 = (names, why, where) => Object.fromEntries(names.map(k => [k, `removed in 0.4: ${why} (${LAST}, ${where})`]));
+const REMOVED_IN_04 = Object.freeze({
+  ...in04(['touchpoints', 'touchbroad', 'touchthrough', 'touchdmin', 'touchfamilies', 'touchmincells', 'touchsmoothmm', 'touchlinepad', 'finishsnaps'],
+    'the touch-up rounds glazed each planning family toward the subject\'s colour after a look, a correction loop', 'src/paint/methods/touch-up.mjs, tools/plate/paint.mjs'),
+  ...in04(['finaldarks', 'fdquantile', 'fdmin', 'fdcontrast', 'fdsurroundmm', 'fdminmm2', 'fdtilemm', 'fddmin', 'fdgain'],
+    'the final darks cut accent cells from the subject and darkened them after a look', 'src/paint/methods/final-darks.mjs, final-dark-marks.mjs'),
+  ...in04(['texture', 'texfrom', 'texmin', 'texlen', 'texgap', 'texcover', 'texr', 'texstrength', 'texheading', 'texbook', 'texsigma', 'washgrain', 'washgrainmin', 'fur', 'furcover', 'furgap', 'furlen', 'fursigma'],
+    'the texture pass placed dry-brush marks from a per-cell high-pass of the subject', 'tools/plate/paint.mjs'),
+  ...in04(['linesource', 'sourcelines', 'copylines', 'copylinesagree', 'copylinesfill', 'copylinesfloor', 'copylinesgap', 'copylinesmin', 'copylinesrun', 'sketchlines', 'sketchmap', 'sketchsegments', 'sketchcache',
+    'linework', 'linemedium', 'linejoin', 'linecleanup', 'linemodel', 'linemodelcache', 'linemodeloffline', 'linemodelside', 'linemodelweights', 'linemodelwidth', 'linestroke', 'mapsmoothing', 'finishhatch', 'finishfur'],
+    'the painter traced line from the subject (copy-lines, the photo sketch, the line models, the universal linework stage, the graphite pool, finish hatching); the only line is a drawing file (--drawingfile, src/paint/line-source.mjs)', 'src/paint/methods/linework-plan.mjs, linework-stage.mjs, graphite-pool.mjs'),
+  ...in04(['accentmin', 'accentshare', 'bandround', 'brushchoice', 'carrykeep', 'carrymm', 'cellfamilies', 'celllight', 'detailscale', 'detailseg', 'edgefade', 'edgewobble', 'furreserves', 'huechroma', 'huechromalab', 'laneadapt', 'lanemax', 'lanemm', 'layerhue', 'layerincrement', 'layerlocal', 'layersmooth', 'layertexture', 'lightfamilies', 'maskmm', 'masstone', 'middomain', 'midlayers', 'minshapecells', 'nestedbands', 'nestedmid', 'palelights', 'paperdelta', 'paperlights', 'paperrel', 'passcap', 'pigshare', 'regionstyle', 'shadowfamilies', 'shadowthresh', 'shadowwater', 'skyonelayer', 'skysplit', 'smallisolation', 'smallmarklights', 'smallmarks', 'strokemm', 'strokeplan', 'stylegain', 'valuefloor', 'washjoin', 'washreach'],
+    'the light-to-dark value plan (the per-cell "printing press": pigment separations cut into value bands and patches, with their brush floors, reserves, lanes and style profiles) and the squinted-subject wash plan; the washes come from a block-in study (--washplan)', 'src/paint/methods/light-to-dark.mjs, layered-washes.mjs'),
+  ...in04(['penwash', 'penwashplan', 'pwallwet', 'pwblur', 'pwbrushmm', 'pwcaplweight', 'pwcharge', 'pwchroma', 'pwdarkbrush', 'pwdarkc', 'pwdarkcontrast', 'pwdarkhuegap', 'pwdarkmax', 'pwdarkshare', 'pwdeepcontrast', 'pwdeepmin', 'pwdeepring', 'pwdeepshare', 'pwdrygain', 'pwedge', 'pwfinemm', 'pwfirstc', 'pwfirstmax', 'pwfoliage', 'pwfoliagemax', 'pwholemm2', 'pwhuegap', 'pwhuesmooth', 'pwjoin', 'pwkeep', 'pwkeeplights', 'pwkeeplightsmm2', 'pwlightchroma', 'pwlightness', 'pwlocalmax', 'pwmargin', 'pwmaxdark', 'pwminarea', 'pwminlight', 'pwminpiece', 'pwmonolocal', 'pwmop', 'pwpenstruct', 'pwpenvary', 'pwsettle', 'pwshadowblur', 'pwshadowc', 'pwshadowmax', 'pwshadowmaxdark', 'pwshadowmin', 'pwshadowone', 'pwshadowpiece', 'pwsky', 'pwskyto', 'pwslack', 'pwslip', 'pwsoftband', 'pwsoftblur', 'pwsoftedge', 'pwsoftgrad', 'pwspeck', 'pwtileink', 'pwwetgain', 'pwwhitemm'],
+    'the pen-and-wash recipe planned its washes from a value map of the subject', 'src/paint/methods/pen-wash-plan.mjs, pen-wash.mjs'),
+});
+
 /** Throws, naming every removed option in argv with its reason. */
 export function refuseRemoved(argv) {
-  const hit = [...new Set(argv.filter(a => typeof a === 'string' && a.startsWith('--')).map(a => a.slice(2)))].filter(k => Object.hasOwn(REMOVED_OPTIONS, k));
-  if (hit.length) throw new Error(hit.map(k => `--${k} was removed: ${REMOVED_OPTIONS[k]}`).join('; '));
+  const names = [...new Set(argv.filter(a => typeof a === 'string' && a.startsWith('--')).map(a => a.slice(2)))];
+  const hit = names.filter(k => Object.hasOwn(REMOVED_OPTIONS, k)), gone = names.filter(k => Object.hasOwn(REMOVED_IN_04, k));
+  if (hit.length || gone.length) throw new Error([...hit.map(k => `--${k} was removed: ${REMOVED_OPTIONS[k]}`), ...gone.map(k => `--${k} was ${REMOVED_IN_04[k]}`)].join('; '));
 }

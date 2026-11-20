@@ -71,7 +71,7 @@ export function argsBuilder({ planDir, target, width, sheetmm, out = 'out', comp
       ...t(/_ew(\d+)/, () => ['--edgewobble', tenth(v, /_ew(\d+)/)]), 
       ...t(/_sfa(\d+)/, () => ['--softarcs', m(v, /_sfa(\d+)/)[1], '--softarclen', '200', '--softmm', '1.0']),
       '--drawing', closing ? 'both' : 'first', ...(linesExist(opening) ? ['--drawingfile', path.join(planDir, opening)] : []), ...(closing ? ['--drawinglast', path.join(planDir, closing)] : []),
-      '--outlinemedium', outlineMedium, '--texture', '0', '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
+      '--outlinemedium', outlineMedium, '--mode', 'fast', '--paperphysical', '1', '--frames', '8', '--marks', '1', '--video', '0', '--seed', '0',
       '--out', out, '--targetguard', 'gentle', ...(compile ? ['--valuepreviewonly', '1'] : ['--gpu', gpu])];
   };
 }

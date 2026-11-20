@@ -32,17 +32,13 @@ import {planDensityOver} from '../../src/eval/plan-optics.mjs';
 import {gaussian} from '../../src/keyframes/density.mjs';
 import {gouacheCover, dryCover} from '../../src/media/gouache.mjs';
 import {layCurls} from '../../src/crop/curlpaint.mjs';
-import {layGouache} from './gouache-finish.mjs';
-import {layMarks} from './surface-lay.mjs';
-import {layCoats} from './coat-lay.mjs';
-import {layThinDarks} from './thin-darks-lay.mjs';
 import {writeGuardReport} from '../guard/no-target.mjs';
 import {cheatRisk} from '../guard/cheat-risk.mjs';
 
 export async function finish(ctx) {
 const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, STROKE_BUDGET, 
   NATIVE_PAINT_MODE, SPEED_TRANSFERS, measurePaper, liftResist, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, 
-  CPU_PROFILE, PAINTER, root, out, CODE_STATE, EARLY_LINES, VALUE_CONFIG, WALL_PHASES, phaseMark, srcMeta, PX_RAW, 
+  CPU_PROFILE, PAINTER, root, out, CODE_STATE, VALUE_CONFIG, WALL_PHASES, phaseMark, srcMeta, PX_RAW, 
   TARGET_GUARD, w, h, n, SEGMENTS_RECORD, createBrush, paperRGB, PALETTE, PIGS, STYLE, D_AIM, GOUACHE_LIGHTS, 
   LIGHT_SHARE, MOD, COLOUR_TRACE, reportTechniques, CURLS, SEP, FACE_INK, INK, PENCIL, 
   PENCIL_STAGE, GRAPHITE, SHEET_PIGS, GRAPHITE_AT, AREA_COMPLETED, AREA_EXEC, dry, dip, stroke, SC, W2, H2, N2, PB, 
@@ -119,21 +115,13 @@ if (GOUACHE_LIGHTS) {
   ctx.STAGE = { stage: 'gouache' };ctx.NATIVE_CAPTURE?.('gouache-layer');
   if (!FILM_BY_PAINT) await shoot();
 }
-// the final lights planned before the first wash (tools/plate/gouache-plan.mjs): rigger strokes of white gouache, in the sheet's physics
-// a coat's texture planned before the first wash (src/crop/coat-texture.mjs): dry-brush strokes along the strands the subject shows
-if (ctx.COAT_PLAN?.strokes.length) await layCoats(ctx); else ctx.COAT_RECORD = ctx.COAT_PLAN?.record ?? null;
-// thin darks planned before the first wash (tools/plate/thin-darks-plan.mjs): lines the washes could not lay, each laid at its own step with the rigger's point or restated in pencil
-if (ctx.THIN_DARKS_PLAN?.strokes.length) await layThinDarks(ctx); else ctx.THIN_DARKS_RECORD = ctx.THIN_DARKS_PLAN?.record ?? null;
-// surface marks planned before the first wash (tools/plate/surface-plan.mjs): dry flicks of each coat's or wall's own paint
-if (ctx.SURFACE_PLAN?.groups.length) await layMarks(ctx); else ctx.SURFACE_RECORD = ctx.SURFACE_PLAN?.record ?? null;
-if (ctx.GOUACHE_PLAN?.strokes.length) await layGouache(ctx); else ctx.GOUACHE_RECORD = ctx.GOUACHE_PLAN?.record ?? null;
 colourMass('finished');
 if(COLOUR_TRACE) fs.writeFileSync(path.join(out,'colour-trace.json'),JSON.stringify({box:traceBox,pigments:PIGS,trace:colourTrace},null,2));
 ctx.STAGE = { stage: 'finished' };
 if (FILM_BY_PAINT) await shoot(); else { await shoot(); await shoot(); await shoot(); }
 console.log(`techniques: ${Object.entries(used).map(([k, v]) => `${k} ${v}`).join(', ')}`);
 if (ctx.dropped) console.log(`${ctx.dropped} passages yielded no brush path and were never painted, carrying ${(100 * ctx.droppedMass / Math.max(1e-6, ctx.plannedMass)).toFixed(1)}% of the planned mass; the plan counts them delivered`);
-fs.writeFileSync(path.join(out, 'designed-execution.json'), JSON.stringify({ ...(ctx.DESIGNED_EXECUTION ?? { laneStrokes: 0, brushChoiceStrokes: 0 }), plannedStyle: VALUE_CONFIG?.styleSelection?.style ?? null }, null, 2));
+fs.writeFileSync(path.join(out, 'designed-execution.json'), JSON.stringify({ ...(ctx.DESIGNED_EXECUTION ?? { laneStrokes: 0, brushChoiceStrokes: 0 }), plannedStyle: null }, null, 2));
 await drainFrames();
 const judged = intermediates(marks, w, h, gaussian);
 if (judged.steps.length) console.log(`carried the plan: forms ${(100 * judged.endFormKept).toFixed(0)}% at agreement ${judged.endFormStructure.toFixed(2)}; at one cell ${(100 * judged.endFineKept).toFixed(0)}% at ${judged.endStructure.toFixed(2)} (the tooth, which the plan cannot state)`);
@@ -251,7 +239,7 @@ if (MARKTAPE) {
   const { markTapeJSON } = await import('../../src/media/mark-tape-json.mjs');
   exportedMarkTape = {
     w: W2, h: H2, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM),
-    version:2, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
+    version:2, methods:ctx.RUN_METHODS, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
     base: Array.from(base.subarray(0, 3)),
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,
@@ -391,7 +379,7 @@ console.log(`${out}/painting.jpg${OUTPUT_VIDEO ? `\n${out}/painting.mp4` : '\nvi
   }
 }
 
-writeRunCard({ provenanceHistory:ctx.PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, expandedArgs: argv, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), mediumDecision: ctx.MEDIUM_DECISION ?? null, graphitePool: ctx.GRAPHITE_POOL ?? null, subjectMedium: opt('subjectmedium', 'pen') !== 'pen' ? { medium: opt('subjectmedium', 'pen'), override: ctx.SUBJECT_MEDIUM ? { asked: ctx.SUBJECT_MEDIUM.asked, drawn: 'graphite', dropped: ctx.SUBJECT_MEDIUM.dropped } : null } : null, code: CODE_STATE, segments: SEGMENTS_RECORD, linework: ctx.LINEWORK_STAGE ?? EARLY_LINES, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null, ...(ctx.SOURCE_SCALE ? sourceScaleRecord(ctx.SOURCE_SCALE) : {}) }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, gouache: ctx.GOUACHE_RECORD ?? null, surface: ctx.SURFACE_RECORD ?? null, coat: ctx.COAT_RECORD ?? null, thinDarks: ctx.THIN_DARKS_RECORD ?? null, caption: { subject: path.basename(opt('image', ''), path.extname(opt('image', ''))), role: null, codeSHA: (CODE_STATE?.commit ?? '').slice(0, 8) || null, looking: opt('notargetlooks', '0') === '1' ? 'strict' : 'looking', speed: opt('mode', 'full'), sourcePx: srcMeta?.width ? `${srcMeta.width}x${srcMeta.height}` : null, renderWidth: OUT_W, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), date: new Date().toISOString() }, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
+writeRunCard({ provenanceHistory:ctx.PROVENANCE_HISTORY, provenance:awareProvenance(TARGET_GUARD.exportState().looks.count), root, out, args: argv0, expandedArgs: argv, subject: VALUE_CONFIG?.subject ?? null, imageFile: opt('image', ''), planFile: opt('valueplan', '') || opt('areaplan', '') || opt('plan', ''), drawingFile: opt('drawingfile', ''), drawingOrder: opt('drawing', 'first'), drawingMedium: opt('outlinemedium', 'graphite'), mediumDecision: ctx.MEDIUM_DECISION ?? null, subjectMedium: opt('subjectmedium', 'pen') !== 'pen' ? { medium: opt('subjectmedium', 'pen'), override: ctx.SUBJECT_MEDIUM ? { asked: ctx.SUBJECT_MEDIUM.asked, drawn: 'graphite', dropped: ctx.SUBJECT_MEDIUM.dropped } : null } : null, code: CODE_STATE, segments: SEGMENTS_RECORD, linework: { source: ctx.LINE_SOURCE?.source ?? null, file: ctx.LINE_SOURCE?.file ?? null }, methods: ctx.RUN_METHODS, gpu: GPU_INFO, dimensions: { sourceWidth: srcMeta?.width ?? null, sourceHeight: srcMeta?.height ?? null, paintWidth: OUT_W, paintHeight: OUT_H, enlargement: srcMeta?.width ? +(OUT_W / srcMeta.width).toFixed(2) : null, ...(ctx.SOURCE_SCALE ? sourceScaleRecord(ctx.SOURCE_SCALE) : {}) }, palette: PALETTE.box ? { keys: PALETTE.box.keys, guard: PALETTE.box.guard ?? null } : null, phases: WALL_PHASES, caption: { subject: path.basename(opt('image', ''), path.extname(opt('image', ''))), role: null, codeSHA: (CODE_STATE?.commit ?? '').slice(0, 8) || null, looking: opt('notargetlooks', '0') === '1' ? 'strict' : 'looking', speed: opt('mode', 'full'), sourcePx: srcMeta?.width ? `${srcMeta.width}x${srcMeta.height}` : null, renderWidth: OUT_W, sheetMm: num('sheetmm', DEFAULT_SHEET_MM), date: new Date().toISOString() }, seconds: process.uptime(), exitCode: process.exitCode ?? 0 });
 if (SPEED_PROFILE) SPEED_PROFILE.write(out, { phases: WALL_PHASES, painting: spent, cpu: PROF });
 if (CPU_PROFILE) await CPU_PROFILE.stop(path.join(out, 'main.cpuprofile'));
 

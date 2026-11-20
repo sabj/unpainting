@@ -8,8 +8,6 @@ export const INK_HOLD_FLAGS = Object.freeze({
   inkdecide: '1', inkshadowmask: '0', inkdropfaint: '0', inklabeljudge: 'simple', inkdarkrule: '1', inkjoin: '2.5', inkeconomy: '1',
   inksalience: '1', inkfoliage: '1', linesupport: '5', linesmooth: '0.3', linesmoothcorner: '50', linegapmm: '0.6', lineminmm: '1.2',
 });
-/** With a source-ink line source (an auto source may choose another, which would leave these unread): the line model is the pool, and the source's pen strokes are traced where it sees a line. */
-export const INK_POOL_FLAGS = Object.freeze({ linemodel: 'strict', linestroke: '1', copylinesmin: '0' });
 
 const last = (argv, name) => { const at = argv.lastIndexOf(name); return at >= 0 ? argv[at + 1] : undefined; };
 const isGraphite = v => v === 'graphite' || /^graphite-/.test(String(v));
@@ -21,7 +19,5 @@ export function inkHoldArgs(argv) {
   const noPen = ['none', 'pencil'].includes(subjectMediumOf(argv));
   // an area plan decides its own lines by drawingRole and refuses the region-label decision (area-owned-options.mjs)
   if (!ink || last(argv, '--drawing') === 'none' || noPen || argv.includes('--areaplan')) return [];
-  const source = last(argv, '--linesource');
-  const want = { ...INK_HOLD_FLAGS, ...(source === 'source-ink' ? INK_POOL_FLAGS : {}) };
-  return Object.entries(want).flatMap(([k, v]) => (argv.includes('--' + k) ? [] : ['--' + k, v]));
+  return Object.entries(INK_HOLD_FLAGS).flatMap(([k, v]) => (argv.includes('--' + k) ? [] : ['--' + k, v]));
 }
