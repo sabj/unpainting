@@ -30,14 +30,14 @@ export function profile(knots, u) {
 
 /**
  * The path of a hand's moves from (0, 0) heading along +x: each move { len (a share of the whole), turn (radians,
- * positive turns clockwise on the sheet, y down) } is an arc of even curvature. Returns [[x, y], ...] every `step`
+ * positive turns clockwise on the sheet, y down; `fixed` keeps it unvaried) } is an arc of even curvature. Returns [[x, y], ...] every `step`
  * (in the same units as `length`), with each move's length and turn varied a little by the seed.
  */
 export function movesPath(moves, length, step, seed = 0, vary = 0.1) {
   const total = moves.reduce((a, m) => a + m.len, 0) || 1, out = [[0, 0]];
   let x = 0, y = 0, h = 0;
   moves.forEach((m, k) => {
-    const L = length * m.len / total * (1 + vary * (2 * hash(seed, k, 11) - 1)), T = (m.turn ?? 0) * (1 + vary * (2 * hash(seed, k, 12) - 1));
+    const L = length * m.len / total * (1 + vary * (2 * hash(seed, k, 11) - 1)), T = (m.turn ?? 0) * (m.fixed ? 1 : 1 + vary * (2 * hash(seed, k, 12) - 1));
     const n = Math.max(1, Math.ceil(L / step));
     for (let i = 0; i < n; i++) { h += T / n / 2; x += Math.cos(h) * L / n; y += Math.sin(h) * L / n; h += T / n / 2; out.push([x, y]); }
   });
@@ -45,7 +45,7 @@ export function movesPath(moves, length, step, seed = 0, vary = 0.1) {
 }
 
 /** Arc-length share u (0..1) at each point of a polyline. */
-export function arcShares(path) {
+function arcShares(path) {
   const d = [0];
   for (let i = 1; i < path.length; i++) d.push(d[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
   const L = d[d.length - 1] || 1;
@@ -53,7 +53,7 @@ export function arcShares(path) {
 }
 
 /** A polyline resampled every `step`. */
-export function resample(path, step) {
+function resample(path, step) {
   const { u, length } = arcShares(path);
   if (!(length > 0)) return [path[0].slice()];
   const n = Math.max(2, Math.ceil(length / step)), out = [];
@@ -111,7 +111,7 @@ export function place(path, x, y, angle, centre = true) {
 
 /** Peaks of a profile: local maxima whose prominence (the height above the higher of the lowest points between them and
  *  the nearest higher ground on each side) is at least `share` of the profile's highest value. */
-export function peakCount(p, share = 0.15) {
+function peakCount(p, share = 0.15) {
   const top = Math.max(...p); let n = 0;
   for (let i = 0; i < p.length; i++) {
     if ((i > 0 && p[i] <= p[i - 1]) || (i < p.length - 1 && p[i] < p[i + 1])) continue;

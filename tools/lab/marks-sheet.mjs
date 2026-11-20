@@ -20,22 +20,23 @@ const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf(`--
 const OUT = path.resolve(arg('out', 'marks-ours')), MM0 = Number(arg('mm', '0.1')), BACKEND = arg('backend', 'gpu');
 const KINDS = arg('kinds', Object.keys(MARK_KINDS).join(',')).split(',');
 const O = { ...DEFAULTS, fixedBed: 1, edgeEvap: 0.0012, granFill: 0, slideCap: 1 };
-const pigments = ['sepia', 'ultramarine'].map(k => { const paint = BOX.find(p => p.key === k); return { ...boxPigment(paint), ...physicsFields(paint.physics), key: k }; });
-const CONC = [5, 1.8], PAPER_RGB = [246, 245, 239];
+const pigments = ['sepia', 'lampblack'].map(k => { const paint = BOX.find(p => p.key === k); return { ...boxPigment(paint), ...physicsFields(paint.physics), key: k }; });
+const CONC = [6, 3], PAPER_RGB = [246, 245, 239];
 const paperOptions = mm => ({ seed: 9, scale: 1, toothScale: 0.2, fibres: 0.5, tooth: 0.5, proudBlur: 1, mmPerCell: mm, coldPress: { mmPerCell: mm, bumpMm: [0.5, 2], cover: 2.2, swell: 0.3 } });
 
 // each kind's size 1 (length and width in mm: what the real marks of FINDINGS.md measure), and the sizes and loads shown
 const BASE = {
-  sweep: [60, 12], taper: [24, 4], reverse: [18, 4], leaf: [12, 4.5], comma: [10, 4], teardrop: [9, 4], dot: [2.5, 2.5], touch: [6, 2.5],
+  sweep: [40, 8], taper: [24, 4], reverse: [20, 3.5], leaf: [16, 3], comma: [12, 3.2], teardrop: [14, 3], dot: [2.5, 2.5], touch: [8, 2.2],
   line: [40, 0.4], edge: [30, 0.6], wedge: [5, 8], swell: [40, 4], ribbon: [30, 8], contour: [30, 4], hook: [20, 3.5], bar: [24, 4],
-  hatch: [10, 2.5], scumble: [14, 5], drag: [40, 10], 'flying-white': [40, 5], grass: [20, 2.5], 'leaf-stem': [20, 4], branch: [36, 4], 's-stroke': [24, 4], ring: [30, 4], 'leaf-group': [16, 3.5],
+  hatch: [10, 2.5], scumble: [14, 5], drag: [30, 8], 'flying-white': [40, 5], grass: [20, 2.5], 'leaf-stem': [20, 4], branch: [36, 4], 's-stroke': [16, 4.5], ring: [30, 4], 'leaf-group': [16, 3.5],
 };
 const SIZES = [0.5, 1, 2], LOADS = [1, 0.55];
 
-// the painter's wash brush (tools/plate/paint.mjs) as a section brush, its radius the plan stroke's
+// the painter's wash brush (tools/plate/paint.mjs) as a section brush, its radius the plan stroke's, with the 'wet on dry'
+// technique's tooth reach (tools/plate/sheet.mjs STOCK_TECHNIQUES)
 function brushFor(st, MM) {
   const r = st.radiusMm / MM, fixed = st.held === 'fixed';
-  return createBrush({ model: 'section', flat: !!st.flat, ...(st.angle != null ? { bladeAngle: fixed ? st.angle - 90 : st.angle } : {}), radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, seed: 41 });
+  return createBrush({ model: 'section', flat: !!st.flat, ...(st.angle != null ? { bladeAngle: fixed ? st.angle - 90 : st.angle } : {}), radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, splay: 0.03, stiffness: 8, wetMix: 0.55, bridge: 0.78, bridgeSoft: 2.2, seed: 41 });
 }
 // a stroke on the hand's clock: the sheet steps once for each O.dt of the time the hand takes
 function lay(sheet, st, load, MM) {
@@ -49,10 +50,14 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const kind of KINDS) {
   const t0 = Date.now(), [L, W] = BASE[kind], variants = [];
   // each size on its own sheet, the two loads one above the other; the cell --mm, coarser for a large mark so its
-  // sheet stays near 3 million cells (0.05 mm steps)
+  // sheet stays under 2 million cells and a wide brush is no more than 50 cells across (0.05 mm steps)
   for (const s of SIZES) {
     const span = Math.max(L, W) * s * 1.25 + 5, cw = span, ch = 2 * span;
-    const MM = Math.max(MM0, Math.ceil(Math.sqrt(cw * ch / 3e6) / 0.05) * 0.05);
+    // a dry mark keeps the fine cell whatever its size: its look is the paper's tooth it catches
+    const dryKind = makeMark(kind, { x: 0, y: 0, length: L, width: W, seed: 7 }).some(st => (st.water ?? 1) < 0.6);
+    // size 1 (the one shown large beside the real mark) at half the cell, so its edge is not drawn in 0.1 mm steps
+    const m0 = s === 1 ? MM0 / 2 : MM0;
+    const MM = dryKind ? m0 : Math.max(m0, Math.ceil(Math.max(Math.sqrt(cw * ch / 3e6), W * s / 50) / 0.025) * 0.025);
     const w = Math.round(cw / MM), h = Math.round(ch / MM), paper = makePaper(w, h, paperOptions(MM)), sheet = createSheet(paper, pigments);
     if (BACKEND === 'gpu') { const g = attachGpu(sheet, O, { mode: 'on', log: () => {} }); if (g.backend !== 'gpu') throw new Error('marks-sheet: no GPU'); }
     const file = `${kind}-${s}.png`;
