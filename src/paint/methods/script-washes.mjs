@@ -92,7 +92,7 @@ function washBrush(p, brushes) {
  * each a handling a script may name with `handling.mark`; anything the script also says overrides it. `len` is in
  * brush widths.
  */
-export const MARK_HANDLING = Object.freeze({
+const MARK_HANDLING = Object.freeze({
   sweep: { pressure: [0.75, 0.85, 0.8, 0.6], hold: 'side', start: 'belly', speed: 'slow', path: 'straight', len: 6, look: 'broad wash sweep: belly down, even pressure, slow, the bead carried' },
   taper: { pressure: [0.15, 1, 0.7, 0.08], hold: 'upright', start: 'point', speed: 'medium', path: 'curved', len: 5, look: 'tapered stroke: lands on the point, swells, lifts' },
   leaf: { pressure: [0.1, 1, 0.9, 0.05], hold: 'upright', start: 'point', speed: 'fast', path: 'curved', len: 2.2, look: 'leaf or petal: pressed and lifted' },
