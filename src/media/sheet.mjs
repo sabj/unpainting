@@ -71,7 +71,14 @@ export const DEFAULTS = {
                                                   // have a 0.2 to 0.5 mm pepper (looks/grain-1.jpg). A wash's pigment is a few micrometres thick on a
                                                   // relief of ten, so its pits hold what settles in them.
                                                   // too low and the wash dries before the grains arrive, so granulating pigments come out smooth
-  hold: 2,                                        // the most pigment a unit of water keeps suspended; a thinner film strands the rest
+                                                  // fillRef: a passage whose mean deposit (with the bed under it) is above fillRef fills its hollows
+                                                  // by slideFill x fillRef / that mean (slideFillFor). The grains settle into the hollows until they
+                                                  // are full, so at a fixed slideFill a dark wash (a unit or two of deposit, over twice the paper's
+                                                  // relief) filled every hollow and spread the rest evenly: the brushed Gulf Stream sky mix dried at
+                                                  // grain 0.02 to 0.04 where the real sky has 0.12. At 0.3 the poured ultramarine (0.36) is as it was
+                                                  // (0.143 at 0.1 mm cells) and the dark brushed mix reads 0.068.
+  fillRef: 0.3,
+  hold: 2, holdDepth: 0.01,                       // the most pigment a unit of water thinner than holdDepth (mm) keeps suspended; it strands the rest
   // sizing slows wicking into dry paper; at a dry front the fibres hold the pigment the pore water carries. It was 0.2,
   // and caught at the dry cell: pore water wicking past a brushed wash's edge carried its pigment into the dry paper as
   // a pale halo (OD 0.015 to 0.026, 0.2 to 0.5 mm wide at 0.1 mm cells), which real washes on dry paper do not have.
@@ -612,20 +619,37 @@ function stepCpu(sheet, o, reduction) {
   }
   // the glossy film levels as one film, carrying its pigment (film-level.mjs)
   for (const box of boxes) levelFilm(sheet, o, box, mm);
-  const oBox = o.edgeEvap ? { ...o, edgeEvap: 0 } : o;
+  const oBox0 = o.edgeEvap ? { ...o, edgeEvap: 0 } : o;
+  // each box's hollow fill, from its load at the start of the step, the same for the serial and the banded step
+  const oOf = box => { const f = slideFillFor(sheet, o, box); return f === undefined ? oBox0 : { ...oBox0, slideFillNow: f }; };
   const merge = value => { if (reduction) { reduction.maxW = Math.max(reduction.maxW, value.maxW); reduction.surfaceLevel = Math.max(reduction.surfaceLevel, value.surfaceLevel); } };
   if (PAR) {
     const H = { scratch: scratch(sheet), perm: permeability(sheet.paper), throats: throatTable(sheet.n) };
     for (const box of boxes) {
-      const before = boxWater(sheet, box);
+      const before = boxWater(sheet, box), oBox = oOf(box);
       if (PAR.stepBox(sheet, oBox, box, H)) { sheet.evaporated = (sheet.evaporated ?? 0) + before - boxWater(sheet, box); if (reduction) merge(boxDryStats(sheet, box, oBox.slope ?? 0)); }
       else { const value = stepBox(sheet, oBox, box, !!reduction); if (reduction) merge(value); }
     }
-  } else for (const box of boxes) { const value = stepBox(sheet, oBox, box, !!reduction); if (reduction) merge(value); }
+  } else for (const box of boxes) { const value = stepBox(sheet, oOf(box), box, !!reduction); if (reduction) merge(value); }
   sheet.steps++;
   return true;
 }
 
+// The hollow fill of a box's passage (DEFAULTS fillRef): slideFill, scaled down by fillRef over the passage's mean
+// deposit (this wash's and, on a fixed bed, the layers under it) where that is higher. Undefined when it is slideFill.
+function slideFillFor(sheet, o, [x0, y0, x1, y1]) {
+  const ref = o.fillRef ?? 0; if (!(ref > 0) || !(o.slide > 0)) return undefined;
+  const { w, M, D, K, layers } = sheet, bed = o.fixedBed > 0 ? layers : [];
+  let sum = 0, n = 0;
+  for (let y = y0; y <= y1; y++) for (let i = y * w + x0, e = y * w + x1; i <= e; i++) {
+    if (!M[i]) continue;
+    let d = 0; for (let k = 0; k < K; k++) d += D[k][i];
+    for (const L of bed) for (let k = 0; k < K; k++) d += L[k][i];
+    sum += d; n++;
+  }
+  const mean = n ? sum / n : 0, fill = o.slideFill ?? 1;
+  return mean > ref ? fill * ref / mean : undefined;
+}
 function boxWater(sheet, [x0, y0, x1, y1]) {
   let sum = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * sheet.w + x; sum += sheet.W[i] + sheet.s[i]; }
@@ -833,7 +857,7 @@ function stepBox(sheet, o, box, reduce = false) {
   for (let k = 0; k < K; k++) { rhoOf[k] = pigments[k].rho; omegaOf[k] = pigments[k].omega; gammaOf[k] = pigments[k].gamma; vOf[k] = settleSpeed(pigments[k]); dfOf[k] = settleDiffusion(pigments[k]); }
   const hollow = paper.hollow;
   if (!hollow) throw new Error('sheet: the paper has no hollow field (make it with makePaper or scanPaper)');
-  const gran = o.gran ?? 1, liftDepth = o.liftDepth ?? 0.15, scour = o.scour ?? 0, holdCap = o.hold ?? Infinity;
+  const gran = o.gran ?? 1, liftDepth = o.liftDepth ?? 0.15, scour = o.scour ?? 0, holdCap = o.hold ?? Infinity, holdDepth = o.holdDepth ?? oFilm;
   const settle = o.settle, lift = o.lift, looseLift = o.looseLift, rewetLift = o.rewetLift;
   // how much deposit fills a hollow: 0 keeps a fixed bias towards hollows
   const granFill = o.granFill ?? 0;
@@ -891,9 +915,13 @@ function stepBox(sheet, o, box, reduce = false) {
     // a film cannot keep suspended more particles than it has room for: as it thins, what it cannot hold is stranded on
     // the paper where it is. Without this, a nearly dry cell's pigment rode out on the last trace of its water and piled
     // into single cells, a pepper of dark dots.
+    // Only a film thinner than holdDepth (10 um, a few grain diameters) strands: a deeper film keeps a heavily loaded
+    // wash's pigment suspended, so it settles into the hollows at its own speed. Capped at every depth, a dark wash (4
+    // units of paint in 0.2 mm) stranded half its pigment evenly the moment it was laid, dried smooth (grain 0.02 where
+    // the real dark skies have 0.08 to 0.12) and, its film diluted, drew more paint off every later sweep's brush.
     let gs = 0; for (let n = 0; n < n3; n++) gs += G[act3[n]][i];
     const hold = holdCap * Wi;
-    if (gs > hold) { const f = 1 - hold / gs; for (let n = 0; n < n3; n++) { const k = act3[n], q2 = G[k][i] * f; G[k][i] -= q2; D[k][i] += q2; } }
+    if (Wi < holdDepth && gs > hold) { const f = 1 - hold / gs; for (let n = 0; n < n3; n++) { const k = act3[n], q2 = G[k][i] * f; G[k][i] -= q2; D[k][i] += q2; } }
   }
   // Settled particles do not stay where they land. Heavy grains on wet paper roll off the crests of the fibres, and a
   // thinning film, pulled down between the fibres by its meniscus, pushes them into the hollows: granulating pigment
@@ -903,7 +931,7 @@ function stepBox(sheet, o, box, reduce = false) {
   // over is the paper plus the pigment already on it), so a hollow fills until it is no steeper than they rest on. A
   // next-state buffer keeps it unbiased. Flocculating pigment (floc) settles as clumps too big for the hollows between
   // fibres: the clumps bridge them and collect in the broader hollows of the paper's tooth, a softer, larger mottle.
-  const slide = o.slide ?? 0, fill = o.slideFill ?? 1, repose = o.repose ?? 0, slideCap = o.slideCap ?? 0, { height: fibreH, tooth } = paper;
+  const slide = o.slide ?? 0, fill = o.slideFillNow ?? o.slideFill ?? 1, repose = o.repose ?? 0, slideCap = o.slideCap ?? 0, { height: fibreH, tooth } = paper;
   if (slide > 0) {
     const { dSlide: dD, ex, fl, dep, moved: mv } = sc;
     for (let k = 0; k < K; k++) { fl[k] = pigments[k].floc ?? 0; mv[k] = 0; }

@@ -18,7 +18,7 @@ export const P = {
   rewetLift: 20, granFill: 21, slide: 22, fill: 23, repose: 24, capStep: 25, sizing: 26, filter: 27, capEps: 28,
   capDelta: 29, wetEps: 30, paperDry: 31, capSigma: 32, spill: 33, spillHeight: 34, dampEase: 35, pinning: 36,
   pinFibre: 37, hasTop: 38, hasResist: 39, enclose: 40, slideCap: 41, holeSpan: 42, holeFill: 43, filmDiff: 44, filmDepth: 45,
-  mmPerCell: 46, edgeFlowDepth: 47, fraction: 48,
+  mmPerCell: 46, edgeFlowDepth: 47, fraction: 48, holdDepth: 49,
 };
 export const PK = 64, PKS = 11; // per pigment: mobility, rho, omega, gamma, gg, lift, scour, rep, floc, Stokes speed (mm/s), diffusion (mm^2/s)
 export const PRM_LEN = PK + PKS * MAXK;
@@ -352,7 +352,7 @@ function phaseS3(C, ya, yb) {
       }
       let gs = 0; for (let n = 0; n < n3; n++) gs += G[ctrl[ACT3 + n]][i];
       const hold = holdCap * Wi;
-      if (gs > hold) { const f = 1 - hold / gs; for (let n = 0; n < n3; n++) { const k = ctrl[ACT3 + n], q2 = G[k][i] * f; G[k][i] -= q2; D[k][i] += q2; } }
+      if (Wi < prm[P.holdDepth] && gs > hold) { const f = 1 - hold / gs; for (let n = 0; n < n3; n++) { const k = ctrl[ACT3 + n], q2 = G[k][i] * f; G[k][i] -= q2; D[k][i] += q2; } }
     }
     if (slide > 0) {
       let d = 0; for (let n = 0; n < n3; n++) d += D[ctrl[ACT3 + n]][i]; dep[i] = fill * d;
