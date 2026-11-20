@@ -1,0 +1,86 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { planScriptWashes, checkScript, passageStrokes, footprint, hexRgb } from './script-washes.mjs';
+import { handOf, inside, placesIn, sweeps, tapers, chordAt, lines } from './script-marks.mjs';
+import { cropScript, clipPolygon } from '../../../tools/painter/script-crop.mjs';
+import { BOX, boxPigment } from '../../crop/box.mjs';
+
+const keys = ['ochre', 'ultramarine', 'sapgreen', 'umber'];
+const pigments = keys.map(key => ({ ...boxPigment(BOX.find(p => p.key === key)), key }));
+const brushes = { mop: { shape: 'round', widthMm: 12 }, r8: { shape: 'round', widthMm: 6 }, rig: { shape: 'round', widthMm: 1 } };
+const square = [[10, 10], [60, 10], [60, 50], [10, 50]];
+const script = (passages, more = {}) => ({ format: 'painting-script 1', subject: 't', author: 'test', sheet: { widthMm: 80, heightMm: 60 }, palette: keys, brushes, passages, ...more });
+const wall = { id: 'p1', what: 'wall', stage: 1, region: square, paint: { pigments: { ochre: 1 }, dilution: 'pale' }, brush: 'mop', move: 'wet on dry', mark: 'sweep', direction: 0, strokes: 5 };
+const quiet = f => { const log = console.log; console.log = () => {}; try { return f(); } finally { console.log = log; } };
+const plan = s => quiet(() => planScriptWashes({ script: s, k: pigments.length, w: 160, h: 120, pigments, sheetWidthMm: 80 }));
+
+test('a script is checked: marks, moves, brushes and paints must be ones the painter has', () => {
+  assert.throws(() => checkScript(script([{ ...wall, mark: 'stamp' }]), { keys, sheetWidthMm: 80 }), /mark stamp/);
+  assert.throws(() => checkScript(script([{ ...wall, paint: { pigments: { cadred: 1 } } }]), { keys, sheetWidthMm: 80 }), /cadred is not in the painter's box/);
+  assert.throws(() => checkScript(script([{ ...wall, brush: 'x' }]), { keys, sheetWidthMm: 80 }), /brush x/);
+  assert.throws(() => checkScript(script([wall]), { keys, sheetWidthMm: 100 }), /sheet 80 mm wide/);
+  assert.equal(checkScript(script([wall]), { keys, sheetWidthMm: 80 }).length, 1);
+});
+
+test('a sweep lays lanes over the whole region top down, whole strokes that run a little past its edge, and is the same for the same seed', () => {
+  const s = sweeps([square], { widthMm: 12, deg: 0, lanes: 5, rng: handOf('a') });
+  assert.ok(s.length >= 2 && s.length <= 5, `${s.length} loads`);
+  const ys = s.map(st => st.points[0][1]); assert.ok(ys[0] < ys.at(-1), 'top lane first');
+  const pts = s.flatMap(st => st.points);
+  assert.ok(pts.some(p => p[0] < 10 || p[0] > 60), 'a lane may overrun the region: it is not clipped');
+  assert.ok(Math.min(...pts.map(p => p[1])) < 16 && Math.max(...pts.map(p => p[1])) > 44, 'lanes span the region');
+  assert.deepEqual(sweeps([square], { widthMm: 12, deg: 0, lanes: 5, rng: handOf('a') }), s);
+});
+
+test('touches: about the asked count, placed inside the region, in a hand\'s order, held to the region\'s chord', () => {
+  const rng = handOf('b'), places = placesIn([square], 20, rng);
+  assert.ok(Math.abs(places.length - 20) <= 2, `${places.length}`);
+  assert.ok(places.every(([x, y]) => inside([square], x, y)));
+  assert.deepEqual(chordAt([square], 20, 30, 0), [-10, 40]);
+  const t = tapers([square], { widthMm: 6, deg: 90, n: 10, lengthMm: 100, rng: handOf('c') });
+  for (const st of t) { const ys = st.points.map(p => p[1]); assert.ok(Math.max(...ys) - Math.min(...ys) <= 40 * 1.2, 'a long streak is shortened to the region'); }
+  // a tapered stroke is lightest at its ends
+  const p = t[0].points.map(q => q[2]); assert.ok(p[0] < Math.max(...p) && p.at(-1) < Math.max(...p));
+  assert.equal(lines([[[0, 0], [10, 0]], [[5, 5]]], { widthMm: 1, rng: handOf('d') }).length, 1);
+});
+
+test('the plan: one wash a passage, its charges in its wet session, a passage into the one before it joins that session', () => {
+  const p = plan(script([
+    { ...wall, charges: [{ pigments: { umber: 1 }, dilution: 'medium', at: [[30, 30]], brush: 'r8' }] },
+    { id: 'p2', what: 'tree', stage: 2, region: [[40, 20], [70, 20], [70, 55], [40, 55]], paint: { pigments: { sapgreen: 1 }, swatch: '#a0b070' }, brush: 'r8', move: 'wet into wet', into: 'p1', mark: 'dab', strokes: 12 },
+    { id: 'p3', what: 'shadow', stage: 3, region: square, paint: { pigments: { ultramarine: 2, umber: 1 }, dilution: 'pale' }, brush: 'r8', move: 'glaze', mark: 'tapered', direction: 55, strokes: 8, lengthMm: 20 },
+    { id: 'p4', what: 'branch', stage: 5, paths: [[[50, 50], [55, 30]]], paint: { pigments: { umber: 1 }, dilution: 'strong' }, brush: 'rig', move: 'wet on dry', mark: 'line' },
+  ]));
+  assert.equal(p.layers.length, 3);
+  assert.deepEqual(p.layers[0]._script, ['p1', 'p2']);
+  const [w1, c1, t1] = p.layers[0].shapes.map(s => s._valuePlan);
+  assert.equal(w1.move, 'wet on dry'); assert.equal(c1.move, 'wet on wet'); assert.equal(t1.move, 'wet on wet');
+  assert.equal(p.layers[1].shapes[0]._valuePlan.phase, 'shadow');
+  assert.equal(p.summary.charges, 1);
+  // the strength follows the dilution: a strong mix carries more paint than a pale one
+  assert.ok(p.mixes.at(-1).strength > p.mixes[0].strength);
+  // every wash has strokes and a footprint, and nothing is clipped (the strokes are the plan's own)
+  for (const l of p.layers) for (const s of l.shapes) { assert.ok(s._valuePlan.strokes.length > 0); assert.ok(s.area > 0); }
+});
+
+test('a passage into one that is not just before it is laid on its own', () => {
+  const p = plan(script([wall, { ...wall, id: 'p2' }, { ...wall, id: 'p3', move: 'beside damp', into: 'p1' }]));
+  assert.equal(p.layers.length, 3);
+});
+
+test('a script cut to a window keeps what falls inside, moved to the window, with its touches scaled', () => {
+  assert.deepEqual(clipPolygon(square, 0, 0, 30, 30).length, 4);
+  const s = cropScript(script([wall, { ...wall, id: 'p2', mark: 'dab', strokes: 20 }, { ...wall, id: 'far', region: [[70, 52], [79, 52], [79, 59], [70, 59]] }]), 35, 10, 40, 40);
+  assert.deepEqual(s.passages.map(p => p.id), ['p1', 'p2']);
+  assert.equal(s.sheet.widthMm, 40);
+  assert.equal(s.passages[1].strokes, 10);
+  assert.ok(s.passages[0].regions[0].every(([x, y]) => x >= 0 && x <= 40 && y >= 0 && y <= 40));
+});
+
+test('helpers: a swatch colour, and the footprint of a stroke', () => {
+  assert.deepEqual(hexRgb('#ff8000'), [255, 128, 0]);
+  assert.equal(hexRgb('nope'), null);
+  const m = footprint([{ radiusMm: 2, points: [[10, 10, 1], [20, 10, 1]] }], 60, 40, 0.5);
+  assert.ok(m[20 * 60 + 30] === 1 && m[0] === 0);
+  assert.ok(passageStrokes({ ...wall, id: 'z' }, brushes).length > 0);
+});

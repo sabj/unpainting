@@ -12,6 +12,7 @@ import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/value-shared.mjs';
 import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
+import {planScriptWashes} from '../../src/paint/methods/script-washes.mjs';
 import {monoPaints} from '../../src/paint/methods/mono-mix.mjs';
 import {loadStudies} from '../painter/study-load.mjs';
 import {washStrokeHold, LANE_OVERLAP, FLAT_OVERLAP} from '../../src/paint/methods/wash-strokes.mjs';
@@ -185,11 +186,15 @@ const pencilDraw=(target,gs,pigment,options)=>{
  if(!WASH_PLAN&&num('drawingonly',0)===0)throw Error('no wash plan: give --washplan STUDY.png[:MIN],... (a block-in study registered to the sheet, made by the image model). The washes are never read from the subject: the squinted-subject plan and the light-to-dark value plan were removed in 0.4 (last at commit 49447027)');
  console.log(`wash plan: ${WASH_PLAN?`study (${WASH_PLAN.split(',').map(f=>path.basename(f)).join(', ')})`:'none (drawing only)'}`);
  if(!WASH_PLAN){valueOptions.studies=[{rgb:new Uint8ClampedArray(n*3).fill(255),file:'(none: drawing only)',registered:'blank',minMm2:null}];valueOptions.flat=false;}
- if(WASH_PLAN){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));
+ // --washplan script:FILE.json: the washes are a painting script written by an author (script-washes.mjs,
+ // docs/painting-script.md): passages in painting order, each laid in whole strokes; no study is read
+ const SCRIPT=WASH_PLAN.startsWith('script:')?JSON.parse(fs.readFileSync(path.resolve(root,WASH_PLAN.slice(7)),'utf8')):null;
+ if(SCRIPT){valueOptions.script=SCRIPT;const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ if(WASH_PLAN&&!SCRIPT){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));
   // a near-monochrome subject is mixed from its own one or two paints, read from it at a coarse scale as the palette is (mono-mix.mjs)
   valueOptions.mono=valueOptions.flat?null:monoPaints(ctx.px,w,h,PIGS,paperRGB);if(valueOptions.mono)console.log(valueOptions.mono.note);
  const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
- const planValues=planStudyWashes;
+ const planValues=SCRIPT?planScriptWashes:planStudyWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){
   const saved=await cachedStep({...RUN_CACHE,name:'value-plan',code:CODE_HASH,track:optTrack,inputs:valueOptions},async()=>({plan:planValues(valueOptions)}));
