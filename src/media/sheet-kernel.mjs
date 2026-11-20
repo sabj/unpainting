@@ -18,7 +18,7 @@ export const P = {
   rewetLift: 20, granFill: 21, slide: 22, fill: 23, repose: 24, capStep: 25, sizing: 26, filter: 27, capEps: 28,
   capDelta: 29, wetEps: 30, paperDry: 31, capSigma: 32, spill: 33, spillHeight: 34, dampEase: 35, pinning: 36,
   pinFibre: 37, hasTop: 38, hasResist: 39, enclose: 40, slideCap: 41, holeSpan: 42, holeFill: 43, filmDiff: 44, filmDepth: 45,
-  mmPerCell: 46, edgeFlowDepth: 47, fraction: 48, holdDepth: 49,
+  mmPerCell: 46, edgeFlowDepth: 47, fraction: 48, holdDepth: 49, coSettle: 50,
 };
 export const PK = 64, PKS = 11; // per pigment: mobility, rho, omega, gamma, gg, lift, scour, rep, floc, Stokes speed (mm/s), diffusion (mm^2/s)
 export const PRM_LEN = PK + PKS * MAXK;
@@ -338,12 +338,15 @@ function phaseS3(C, ya, yb) {
     if (!(resistOn !== null && resistOn[i])) {
       const Wi = W[i], hh = height[i], ld = Wi / liftDepth, wetting = ld >= 1 ? 1 : ld * ld;
       const rewet = topLayer !== null && Wi > oFilm, turnover = Wi > 1e-6 ? Math.min(1, went[i] / Wi * (prm[P.mmPerCell] / .25)) : 0;
+      // the suspension's mean Stokes speed, by mass (sheet.mjs, coSettle)
+      const coSettle = prm[P.coSettle]; let vMix = 0;
+      if (coSettle > 0) { let gm = 0; for (let n = 0; n < n3; n++) { const k = ctrl[ACT3 + n], g = G[k][i]; vMix += g * prm[PK + k * PKS + 9]; gm += g; } vMix = gm > 0 ? vMix / gm : 0; }
       for (let n = 0; n < n3; n++) {
         const k = ctrl[ACT3 + n], Gk = G[k], Dk = D[k];
         if (Gk[i] === 0 && Dk[i] === 0 && !(rewet && topLayer[k][i] !== 0)) continue;
         const pk = PK + k * PKS, omega = prm[pk + 2];
         const hol = granFill > 0 ? hollow[i] * Math.max(0, 1 - dep[i] * granFill) : hollow[i];
-        const gg = prm[pk + 4], down = Gk[i] * settleShare(prm[pk + 9] * settle, prm[pk + 10] * settle, gg, hol, dt, Wi);
+        const gg = prm[pk + 4], down = Gk[i] * settleShare((coSettle > 0 ? (1 - coSettle) * prm[pk + 9] + coSettle * vMix : prm[pk + 9]) * settle, prm[pk + 10] * settle, gg, hol, dt, Wi);
         const shape = Math.max(0, 1 + (hh - 1) * gg);
         const up = Dk[i] * shape * (prm[pk + 5] * wetting * dt + prm[pk + 6] * turnover);
         const dn = Math.min(Gk[i], Math.max(0, down)), u = Math.min(Dk[i], Math.max(0, up));

@@ -72,12 +72,20 @@ export const DEFAULTS = {
                                                   // relief of ten, so its pits hold what settles in them.
                                                   // too low and the wash dries before the grains arrive, so granulating pigments come out smooth
                                                   // fillRef: a passage whose mean deposit (with the bed under it) is above fillRef fills its hollows
-                                                  // by slideFill x fillRef / that mean (slideFillFor). The grains settle into the hollows until they
-                                                  // are full, so at a fixed slideFill a dark wash (a unit or two of deposit, over twice the paper's
-                                                  // relief) filled every hollow and spread the rest evenly: the brushed Gulf Stream sky mix dried at
-                                                  // grain 0.02 to 0.04 where the real sky has 0.12. At 0.3 the poured ultramarine (0.36) is as it was
-                                                  // (0.143 at 0.1 mm cells) and the dark brushed mix reads 0.068.
-  fillRef: 0.3,
+                                                  // by slideFill x (fillRef / that mean)^2 (slideFillFor). The grains settle into the hollows until
+                                                  // they are full, so at a fixed slideFill a dark wash (a unit or two of deposit, over twice the
+                                                  // paper's relief) filled every hollow and spread the rest evenly: grain 0.02 to 0.05 where the real
+                                                  // dark sky has 0.12. With the square (fitted to the real crops, not derived), one wash of ultramarine
+                                                  // and burnt sienna at L* 26 reads grain 0.115 and at L* 64 0.089, and the poured ultramarine at 1.2
+                                                  // (mean 0.36, under fillRef) is unchanged (0.141 at 0.1 mm cells).
+  fillRef: 0.4,
+  // coSettle: the share of each pigment's settling speed that is its suspension's mean (by mass) instead of its own. A
+  // mix flocculates, its fine particles riding down on the coarse ones. Each settling alone, the fine ones (hansa
+  // 0.2 um, rose 0.1 um) stayed suspended while the ultramarine settled, the edge flow carried only them, and a wash
+  // of hansa, cadmium red and ultramarine dried with a yellow line in its outermost cell (a*b* 8.7 from the wash's
+  // own; on the mini piece 17, orange). At 0.8 it is 0.7, and the line is the wash's own hue, 2.5 L* darker. One pigment
+  // alone settles as before.
+  coSettle: 0.8,
   hold: 2, holdDepth: 0.01,                       // the most pigment a unit of water thinner than holdDepth (mm) keeps suspended; it strands the rest
   // sizing slows wicking into dry paper; at a dry front the fibres hold the pigment the pore water carries. It was 0.2,
   // and caught at the dry cell: pore water wicking past a brushed wash's edge carried its pigment into the dry paper as
@@ -635,8 +643,8 @@ function stepCpu(sheet, o, reduction) {
   return true;
 }
 
-// The hollow fill of a box's passage (DEFAULTS fillRef): slideFill, scaled down by fillRef over the passage's mean
-// deposit (this wash's and, on a fixed bed, the layers under it) where that is higher. Undefined when it is slideFill.
+// The hollow fill of a box's passage (DEFAULTS fillRef): slideFill, scaled down by the square of fillRef over the
+// passage's mean deposit (this wash's and, on a fixed bed, the layers under it) where that is higher. Undefined when it is slideFill.
 function slideFillFor(sheet, o, [x0, y0, x1, y1]) {
   const ref = o.fillRef ?? 0; if (!(ref > 0) || !(o.slide > 0)) return undefined;
   const { w, M, D, K, layers } = sheet, bed = o.fixedBed > 0 ? layers : [];
@@ -648,7 +656,7 @@ function slideFillFor(sheet, o, [x0, y0, x1, y1]) {
     sum += d; n++;
   }
   const mean = n ? sum / n : 0, fill = o.slideFill ?? 1;
-  return mean > ref ? fill * ref / mean : undefined;
+  return mean > ref ? fill * (ref / mean) ** 2 : undefined;
 }
 function boxWater(sheet, [x0, y0, x1, y1]) {
   let sum = 0;
@@ -857,7 +865,7 @@ function stepBox(sheet, o, box, reduce = false) {
   for (let k = 0; k < K; k++) { rhoOf[k] = pigments[k].rho; omegaOf[k] = pigments[k].omega; gammaOf[k] = pigments[k].gamma; vOf[k] = settleSpeed(pigments[k]); dfOf[k] = settleDiffusion(pigments[k]); }
   const hollow = paper.hollow;
   if (!hollow) throw new Error('sheet: the paper has no hollow field (make it with makePaper or scanPaper)');
-  const gran = o.gran ?? 1, liftDepth = o.liftDepth ?? 0.15, scour = o.scour ?? 0, holdCap = o.hold ?? Infinity, holdDepth = o.holdDepth ?? oFilm;
+  const gran = o.gran ?? 1, liftDepth = o.liftDepth ?? 0.15, scour = o.scour ?? 0, holdCap = o.hold ?? Infinity, holdDepth = o.holdDepth ?? oFilm, coSettle = o.coSettle ?? 0;
   const settle = o.settle, lift = o.lift, looseLift = o.looseLift, rewetLift = o.rewetLift;
   // how much deposit fills a hollow: 0 keeps a fixed bias towards hollows
   const granFill = o.granFill ?? 0;
@@ -889,6 +897,8 @@ function stepBox(sheet, o, box, reduce = false) {
     if (resist !== null && resist[i]) continue;
     const Wi = W[i], hh = height[i], ld = Wi / liftDepth, wetting = ld >= 1 ? 1 : ld * ld; // settled pigment lifts only into water deep enough to hold it
     const rewet = topLayer !== null && Wi > oFilm, turnover = Wi > 1e-6 ? Math.min(1, went[i] / Wi * (sheetMm(sheet, o) / .25)) : 0;
+    // the suspension's mean Stokes speed, by mass: a mix flocculates, its fine particles riding on the coarse ones
+    let vMix = 0; if (coSettle > 0) { let gm = 0; for (let n = 0; n < n3; n++) { const k = act3[n], g = G[k][i]; vMix += g * vOf[k]; gm += g; } vMix = gm > 0 ? vMix / gm : 0; }
     for (let n = 0; n < n3; n++) {
       const k = act3[n], Gk = G[k], Dk = D[k];
       // nothing suspended, nothing deposited and nothing in the layer below to lift: every term is zero
@@ -899,7 +909,7 @@ function stepBox(sheet, o, box, reduce = false) {
       // over the filled surface (dep). This does the same for the settling: granFill of deposit fills the hollow.
       const hol = granFill > 0 ? hollow[i] * Math.max(0, 1 - settled[i] * granFill) : hollow[i];
       // Stokes settling and Brownian deposition through the film's depth Wi mm, B = 1 + gamma hollow (settling.mjs); `settle` scales both (1 physical)
-      const gg = ggOf[k], down = Gk[i] * settleShare(vOf[k] * settle, dfOf[k] * settle, gg, hol, dt, Wi);
+      const gg = ggOf[k], down = Gk[i] * settleShare((coSettle > 0 ? (1 - coSettle) * vOf[k] + coSettle * vMix : vOf[k]) * settle, dfOf[k] * settle, gg, hol, dt, Wi);
       // Still water lifts a deposit slowly, over time. A current scours it: the water crossing the cell this
       // step takes loose grains with it and drops them again where it slows. Clean water run into a wash that
       // has begun to set spreads outwards, scours as it goes, and piles what it carries at the front where
