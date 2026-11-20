@@ -45,7 +45,7 @@ physical size; only fine detail below one cell is lost.
 | `source` | object | optional notes on what the plan imitates (URL, author, timestamp, expected effect); ignored by the simulator |
 | `grid` | `{w, h, mmPerCell}` | sheet size in cells and the physical size of one cell. 384 × 160 cells at 0.125 mm is a 48 × 20 mm study |
 | `paperRGB` | `[r, g, b]` | color of bare paper in the rendered result |
-| `paper` | object | paper surface: `fibres` and `tooth` (surface texture, 0 to 1), optional raised `coldPress` texture (`bumpMm`, `cover`, `swell`) |
+| `paper` | object | paper surface: `fibres` and `tooth` (surface texture, 0 to 1), optional `coldPress` (the physical cold-press relief, `src/media/paper-relief.mjs`) |
 | `paperSeed` | integer | seed for the paper texture and brush hairs; the same plan and seed give the same sheet on the same backend |
 | `palette` | string[] | pigment keys from `src/crop/box.mjs`, for example `ultramarine`, `ochre`, `sienna`, `sapgreen`, `lampblack` |
 | `budget` | object | limits a planner promised to respect (`maxGestures`, `maxWallSeconds`, `maxNativeSteps`); kept only in the input plan; ignored by `run-plan` and not copied into `run.json` |
