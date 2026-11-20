@@ -746,25 +746,34 @@ const swatchBrush = () => {
   const [kind, mm] = [...by].sort((a, b) => b[1] - a[1])[0][0].split(' ');
   return { radius: Math.max(SC, Number(mm) * cpm), flat: kind === 'flat' };
 };
+const section = isSection(painterBrushOptions({}));
 // Each technique laid on scrap (src/paint/methods/scrap-swatch.mjs), plain and, under --gradedwash, recharged every few
 // cells along its sweep as a graded wash is. `drySwatch` dries the scrap.
 const scrapSwatches = (techniques, drySwatch) => {
   const { want } = SWATCH;
   // A graded wash is recharged every few cells along its sweep (--gradedwash), so each technique is also laid on scrap
   // recharged that way, and what it lays is kept both inside the swatch and over the whole scrap (see GRADED_CAL).
-  const CHUNK = opt('gradedwash', '1') !== '0' ? Math.max(2, Math.round(GCHUNK)) : 0;
+  // Under --physical the sheet dips a section brush once a load (paint.mjs splitLoads) and never recharges it along a
+  // sweep, so its swatch is not chunked either: chunked every few cells of a fine sheet, each chunk was a 2 mm stroke
+  // that landed on its tip and laid a tenth of the charge, and charged washes ten times over.
+  const CHUNK = opt('gradedwash', '1') !== '0' && !(section && PB) ? Math.max(2, Math.round(GCHUNK)) : 0;
   // --calpipe 1: calibrate with the sheet's own lanes, containment and pressure, not a plain sweep at default pressure.
   // The section brush is always calibrated as the sheet lays a wash (swatchLanes): its tuft levels with the film it
   // finds, so what a wash holds depends on how its sweeps overlap, and one wide sweep over the scrap read 0.6 of what
   // the plan's overlapping rounds lay. Its lanes are the plan's own brush at the plan's overlap, and the swatch is
   // charged for that overlap as a passage is (paint.mjs, sh._cover).
-  const section = isSection(painterBrushOptions({}));
   const layout = () => {
     const mask = swatchMask(), { width: SW, height: SH } = SWATCH;
     if (section) {
-      const { radius, flat } = swatchBrush(), paths = swatchLanes(radius, { overlap: flat ? FLAT_OVERLAP : LANE_OVERLAP }), cover = sweepCover(paths, mask, SW, SH);
+      // The swatch is at least sixteen brush widths across: on a fine sheet fifty cells were 13 mm, two lanes of a 7 mm
+      // round that never got past landing on its tip. Its scrap's cells grow to fit (the brush lays the same paint a
+      // millimetre at any cell size).
+      const sheetMm = PAPER_OPTS.mmPerCell ?? 0, brush = swatchBrush(), mm = sheetMm > 0 ? Math.max(sheetMm, 32 * brush.radius * sheetMm / (SWATCH.x1 - SWATCH.x0)) : 0;
+      const radius = mm > 0 ? brush.radius * sheetMm / mm : brush.radius, flat = brush.flat;
+      const paths = swatchLanes(radius, { overlap: flat ? FLAT_OVERLAP : LANE_OVERLAP }), cover = sweepCover(paths, mask, SW, SH);
       const under = opt('undercover', '1') !== '0' ? 1 / Math.max(num('underfloor', 0.4), Math.min(1, cover)) : 1;
-      return { mask, paths, bedPaths: washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 }), flat, under: under / Math.max(1, cover) / Math.max(1, footprintSpread(paths, mask, SW, SH)) };
+      return { mask, paths, bedPaths: washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 }), flat, under: under / Math.max(1, cover) / Math.max(1, footprintSpread(paths, mask, SW, SH)),
+        paperOptions: mm > 0 ? { ...PAPER_OPTS, seed: 5, mmPerCell: mm, ...(PAPER_OPTS.coldPress ? { coldPress: { ...PAPER_OPTS.coldPress, mmPerCell: mm } } : {}) } : null };
     }
     let paths = washPaths(mask, SW, SH, { pad: 1.5, minRadius: 1, minLength: 3 });
     if (opt('calpipe', '0') !== '0') {
@@ -794,7 +803,7 @@ const scrapSwatches = (techniques, drySwatch) => {
   // The scrap is the sheet's own paper (its millimetres a cell and its tooth), with another seed: the section brush's
   // load and transfer are in millimetres, so a scrap with no physical scale ran it at the reference 0.26 mm a cell and
   // calibrated a 64-cell picture's 2.3 mm cells as if they were a tenth the size (forms carried 162% of the plan).
-  const envOf = () => { const { under, flat: _flat, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
+  const envOf = () => { const { under, flat: _flat, paperOptions, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: paperOptions ?? { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
     waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
     paintBrush: (r, T) => createBrush(paintOpts(r, T)), prepareBed }; };
   return techniques.map(T => {
