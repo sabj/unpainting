@@ -118,7 +118,7 @@ export function edgeFeed(sheet, o, box, mm) {
       sat[k] = (dryAt(ax0 + xx - 1, ay0 + yy - 1) ? 1 : 0) + sat[k - 1] + sat[k - aw] - sat[k - aw - 1];
     }
     const dryShare = (x, y) => { const xa = x - reach - ax0, ya = y - reach - ay0, xb = xa + 2 * reach + 1, yb = ya + 2 * reach + 1; return (sat[yb * aw + xb] - sat[ya * aw + xb] - sat[yb * aw + xa] + sat[ya * aw + xa]) / ((2 * reach + 1) ** 2); };
-    const distance = contactDistance(mask, w, h, pinnedAt);
+    const distance = contactDistance(mask, w, h, pinnedAt, box);
     let Etot = 0;
     for (let q = 0; q < n; q++) {
       const i = order[q], l = lev[i];
