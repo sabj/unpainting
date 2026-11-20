@@ -144,6 +144,11 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
   const unreached = keys && extend ? keyHueCoverage(sample, colours, named, reach).hues.filter(r => r.loss > 1e-6) : [];
   const covered = keys && !extend ? { paints: named, added: [], coverage: null } : keys ? coverKeyHues(sample, colours, named, { max: named.length + 2, ...reach }) : coverKeyHues(sample, colours, chosen.paints, { max });
   const extra = (add || []).map(k => BOX.find(p => p.key === k) ?? (() => { throw new Error(`--paintsadd: no box paint ${k} (${BOX.map(p => p.key).join(', ')})`); })()).filter(p => !covered.paints.some(q => q.key === p.key));
+  // A watercolourist's earths: a picture whose local colours are mostly muted warm (stone, sand, wood, old paper) is
+  // painted with raw sienna and burnt sienna and greyed with ultramarine, not mixed from a clean yellow, a rose and a blue,
+  // whose near-complementary greys dry dull and mauve
+  const earths = !keys ? earthPans(colours).filter(p => ![...covered.paints, ...extra].some(q => q.key === p.key)) : [];
+  extra.push(...earths);
   const paints = [...covered.paints, ...extra], changed = covered.added.length || extra.length || (guarded && guarded.decision.action !== 'kept');
   const e = changed ? score(paints) : chosen.e, trail = changed ? [...chosen.trail, e] : chosen.trail;
   const n = w * h, chroma = chromaOf(channelDensity(px, n, paperRGB), n);
@@ -156,6 +161,14 @@ export function widePalette(px, w, h, paperRGB, lean, { weight = 1, gain = 0.5, 
   const coverageNote = forNote + (palette.hueCoverage ? `; key hues ${covered.coverage.loss < 1e-6 ? 'covered' : `gap ${covered.coverage.loss.toFixed(1)} at palette limit`}${covered.added.length && !keys ? `, added ${covered.added.join(', ')}` : ''}` : '');
   const guardLine = guarded ? `\n${guardNote(guarded.decision)}` : '';
   return { palette, note: `palette wide: ${paints.length} box paints (${paints.map(p => p.name).join(', ')}), sheet and local error ${trail.map(v => v.toFixed(2)).join(' to ')}; ${colours.length} local colours: ${cols}${coverageNote}${guardLine}` };
+}
+
+/** Muted warm local colours: hue (Lab degrees) and chroma between these; their share of the sample that brings in the earths. */
+const EARTH_HUE = [45, 90], EARTH_C = [4, 32], EARTH_SHARE = 0.2;
+/** The earth pans for a picture whose local colours are mostly muted warm (raw sienna, burnt sienna, ultramarine), or none. */
+export function earthPans(colours) {
+  const share = colours.filter(r => r.h >= EARTH_HUE[0] && r.h <= EARTH_HUE[1] && r.C >= EARTH_C[0] && r.C <= EARTH_C[1]).reduce((a, r) => a + r.share, 0);
+  return share >= EARTH_SHARE ? ['rawsienna', 'sienna', 'ultramarine'].map(k => BOX.find(p => p.key === k)) : [];
 }
 
 /**
