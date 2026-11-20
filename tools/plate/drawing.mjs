@@ -267,7 +267,7 @@ function layExactVectors(file, { closing = false } = {}) {
   const sheet = fineSheet ? INKRES.fine : ctx.sheet, w = fineSheet ? INKRES.width : W2, h = fineSheet ? INKRES.height : H2, at = fineSheet ? 0 : pencil ? GRAPHITE_AT : PIGS.length;
   if (!fineSheet) coherent(sheet);
   const pig = sheet.pigments[at], white = Buffer.alloc(3, 255);
-  const darkOf = t => { const px = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (px[0] + px[1] + px[2]) / 765; };
+  const darkOf = t => { const rgb = renderLayers([[Float32Array.of(t)]], [pig], white, 1, 1); return 1 - (rgb[0] + rgb[1] + rgb[2]) / 765; };
   // --inkfill (0..1, default 0.25): when paint follows the pen, a FILL stroke (a leaf mass, a dark pane) is laid as its edge
   // at line weight and its inside at this share of its darkness, so the paint supplies the dark and the ink does not
   // overcome it; nothing is dropped. A drawing laid alone (--drawingonly) is laid exactly.
