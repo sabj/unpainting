@@ -13,7 +13,7 @@ import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-
 import {planLightToDark, valueTechnique, estimatePaper, targetValueMap} from '../../src/paint/methods/light-to-dark.mjs';
 import {planLayeredWashes} from '../../src/paint/methods/layered-washes.mjs';
 import {planStudyWashes} from '../../src/paint/methods/study-washes.mjs';
-import {loadStudy} from '../painter/study-load.mjs';
+import {loadStudies} from '../painter/study-load.mjs';
 import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
@@ -274,10 +274,11 @@ if(VALUE_ENABLED){
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
  // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
  valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
- // --washplan FILE: the washes are read from a painter's block-in study (an image of the subject simplified to flat
- // shapes), registered to the sheet; the subject is not read for them (study-washes.mjs). squint: from the subject squinted.
+ // --washplan FILE[:MIN],FILE[:MIN],...: the washes are read from a stack of painter's block-in studies, coarse to fine
+ // (images of the subject simplified to flat shapes), registered to the sheet; the subject is not read for them
+ // (study-washes.mjs; tools/painter/study-load.mjs). squint: from the subject squinted.
  const WASH_PLAN=opt('washplan','squint');
- if(WASH_PLAN!=='squint'){valueOptions.study=await loadStudy(path.resolve(root,WASH_PLAN),w,h);const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
+ if(WASH_PLAN!=='squint'){Object.assign(valueOptions,await loadStudies(WASH_PLAN,root,w,h));const paper=estimatePaper(valueOptions.rgb,w,h,valueOptions.density);valueOptions.inkValue=targetValueMap(paper?Float32Array.from(valueOptions.density,v=>Math.max(0,v-paper.density)):valueOptions.density);}
  const planValues=WASH_PLAN!=='squint'?planStudyWashes:valueOptions.styleSelection?planLightToDark:planLayeredWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){

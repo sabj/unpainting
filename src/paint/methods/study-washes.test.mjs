@@ -24,7 +24,7 @@ function study({ rim = false } = {}) {
 }
 function plan(st) {
   const log = console.log; console.log = () => {};
-  try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, study: { rgb: st.rgb, file: 'test' }, paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5] }); } finally { console.log = log; }
+  try { return planStudyWashes({ k: pigments.length, w: st.w, h: st.h, studies: [{ rgb: st.rgb, file: 'test' }], paperRGB: PAPER, pigments, sheetWidthMm: 160, washBrushMm: 5, washKitMm: [38, 25.4, 7, 5] }); } finally { console.log = log; }
 }
 
 test('the study\'s flat shapes: three painted, the white left as paper, each one mix', () => {

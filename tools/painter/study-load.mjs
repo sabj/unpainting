@@ -15,3 +15,19 @@ export async function loadStudy(file, w, h) {
   const { data } = await sharp(file).removeAlpha().toColourspace('srgb').resize(w, h, { fit: 'fill', kernel: 'lanczos3' }).raw().toBuffer({ resolveWithObject: true });
   return { rgb: new Uint8ClampedArray(data.buffer, data.byteOffset, data.length), file: path.basename(file), registered: `${meta.width} x ${meta.height} scaled to ${w} x ${h}` };
 }
+
+/**
+ * The --washplan stack: "FILE[:MIN],FILE[:MIN],..." coarse to fine (MIN: the least shape in mm2 a layer lays), or with
+ * "flat:" before it the same laid as plain flat fills (for comparison). Each study is registered to the sheet here and
+ * to the first study in the plan. {studies: [{rgb, file, registered, minMm2}], flat}
+ */
+export async function loadStudies(spec, root, w, h) {
+  const flat = spec.startsWith('flat:'), list = (flat ? spec.slice(5) : spec).split(',').filter(Boolean);
+  if (!list.length) throw Error('--washplan: no study named');
+  const studies = [];
+  for (const item of list) {
+    const m = /^(.*?)(?::(\d+(?:\.\d+)?))?$/.exec(item), st = await loadStudy(path.resolve(root, m[1]), w, h);
+    studies.push({ ...st, minMm2: m[2] != null ? Number(m[2]) : null });
+  }
+  return { studies, flat };
+}
