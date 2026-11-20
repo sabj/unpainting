@@ -47,6 +47,8 @@ const REMOVED_IN_04 = Object.freeze({
     'holding a line file to the subject: the support cut, smoothing, re-measuring and the region-label ink decision; a drawing file is drawn as it is', 'src/paint/methods/ink-lines-file.mjs, ink-decide-file.mjs, ink-decide.mjs, ink-hold-defaults.mjs', 'last at commit 8ce5518a'),
   ...in04(['carry', 'dumpgestures', 'edgehigh', 'edgemin', 'edgesigma', 'featfloorq', 'featinside', 'featreach', 'featrun', 'finecarry', 'fineclaim', 'finefloor', 'finekeep', 'finereach', 'finescale', 'fineturn', 'floorq', 'inktiers', 'inktierswidth', 'joinaim', 'joincos', 'joingap', 'keep', 'outline', 'outlinecarry', 'outlinefloorq', 'outlinemin', 'outlinereach', 'outlineskip', 'outlineskipr', 'outlinesource', 'penchainhigh', 'penchainmin', 'penfrom', 'penoutline', 'penreach', 'pensimplify', 'silmin', 'silscale', 'tier1', 'tier1gated', 'tier1long', 'tier1mask', 'tier1straight', 'tier2', 'tier3', 'tier3faint', 'turn'],
     'the pen walker that traced the subject (ridge walk, edge chains, ink tiers, outline and fine passes); the pen draws only a drawing file', 'tools/plate/pen.mjs, src/crop/contours.mjs', 'last at commit 8ce5518a'),
+  ...in04(['strokebudget'],
+    'the stroke budget cut a painting to N strokes for the Paint Lab\'s 250 and 2,500 stroke examples; the Lab now replays a tape recorded by the current pipeline', 'src/paint/methods/stroke-budget.mjs, tools/lab/build-live-examples.mjs', 'last at commit cabee29f'),
 });
 
 /** Throws, naming every removed option in argv with its reason. */

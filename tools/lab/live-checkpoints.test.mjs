@@ -40,7 +40,7 @@ test('a scaled dry brush samples whole paper cells even with fractional stiffnes
 test('shipped seek points contain finite physical states at the advertised stroke, with previews',async()=>{
  const fs=await import('node:fs/promises'),{gunzipSync}=await import('node:zlib'),root=new URL('../../demos/lab/',import.meta.url);
  const manifest=JSON.parse(await fs.readFile(new URL('examples/recorded.json',root)));
- for(const ex of manifest.examples)for(const [limit,stops]of Object.entries(ex.checkpoints)){
+ for(const ex of manifest.examples)for(const [limit,stops]of Object.entries(ex.checkpoints??{})){
   const recording=JSON.parse(gunzipSync(await fs.readFile(new URL(ex.live[limit],root))));
   assert.deepEqual(stops.map(s=>s.fraction),[.1,.25,.5,.75,.9,1]);
   for(const stop of stops){const state=await decodeState(await fs.readFile(new URL(stop.state,root)));

@@ -32,12 +32,6 @@
       "reason": "Names which published plates the comparison page shows beside each improvement note. Reporting only; never runs in the painter."
     },
     {
-      "file": "tools/lab/build-live-examples.mjs",
-      "rule": "name",
-      "count": 1,
-      "reason": "Builds the Paint Lab's recorded examples from two named example runs. Reporting only; it never runs in the painter."
-    },
-    {
       "file": "tools/readme/build-readme-media.mjs",
       "rule": "name",
       "count": 5,

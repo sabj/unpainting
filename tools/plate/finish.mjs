@@ -34,7 +34,7 @@ import {writeGuardReport} from '../guard/no-target.mjs';
 import {cheatRisk} from '../guard/cheat-risk.mjs';
 
 export async function finish(ctx) {
-const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, STROKE_BUDGET, 
+const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
   NATIVE_PAINT_MODE, SPEED_TRANSFERS, measurePaper, liftResist, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, 
   CPU_PROFILE, PAINTER, root, out, CODE_STATE, VALUE_CONFIG, WALL_PHASES, phaseMark, srcMeta, PX_RAW, 
   TARGET_GUARD, w, h, n, SEGMENTS_RECORD, createBrush, paperRGB, PALETTE, PIGS, STYLE, D_AIM, GOUACHE_LIGHTS, 
@@ -44,7 +44,7 @@ const { JSONL, argv0, argv, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN,
   base, SHADE, render, LOOK_RES, view, renderFine, colourTrace, traceBox, colourMass, UPRIGHT, 
   expected, sheetDensity, marks, drainFrames, mark, CAL, FRAMES, FULL_TAPE, MARKTAPE, RESUME_AT, shoot, 
   FILM_BY_PAINT, up, SEED, t0, spent, clock, PROF, used, TECHS, LAST, DRAWING, 
-  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, BUDGET, awareProvenance, awareBoundary } = ctx;
+  PEN_FIRST, DRAW_LAST, drawPass, PREPF, fadePrep, awareProvenance, awareBoundary } = ctx;
 // a painting taken over at the closing boundary has had everything up to the closing drawing (AWARE_SKIP_POST)
 const removeFilm=()=>{const value=liftResist(ctx.sheet);ctx.NATIVE_CAPTURE?.('film-remove');return value;};
 const AWARE_SKIP_POST = RESUME_AT?.kind === 'closing';
@@ -204,11 +204,6 @@ if(ctx.NATIVE_RECORDER){
  }
 }
 await sharp(FINAL_PIXELS,{raw:{width:OUT_W,height:OUT_H,channels:3}}).jpeg({quality:92}).toFile(path.join(out,'painting.jpg'));
-if (STROKE_BUDGET) {
- const count=MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length;
- fs.writeFileSync(path.join(out,'stroke-budget.json'),JSON.stringify({budget:STROKE_BUDGET,strokes:count,complete:count<=STROKE_BUDGET,counts:Object.fromEntries(['s','P','g'].map(k=>[k,MARKTAPE.filter(m=>m.k===k).length]))},null,2));
- check('Whole painting exceeded stroke budget',count<=STROKE_BUDGET,{strokes:count,budget:STROKE_BUDGET});
-}
 let exportedMarkTape = null;
 if (MARKTAPE) {
   const file = path.join(out, 'marks.json');
@@ -219,7 +214,7 @@ if (MARKTAPE) {
   const { markTapeJSON } = await import('../../src/media/mark-tape-json.mjs');
   exportedMarkTape = {
     w: W2, h: H2, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM),
-    version:2, methods:ctx.RUN_METHODS, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeBudget:STROKE_BUDGET||null, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
+    version:2, methods:ctx.RUN_METHODS, paper:PAPER_OPTS, paperRGB, paperShade:SHADE, strokeCount:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length,
     base: Array.from(base.subarray(0, 3)),
     opts: O,
     pigments: SHEET_PIGS.map(asTape), brushOpts: BRUSHOPTS, brushes: BRUSHES, penOpts: PENOPTS, pens: PENS, marks: MARKTAPE,

@@ -25,7 +25,7 @@ import {selectedDrawing, drawingWant} from '../../src/paint/methods/drawing-file
 import {fillSheetBase} from '../../src/paint/methods/sheet-tone.mjs';
 
 export async function penPlan(ctx) {
-const { opt, num, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACHE, VALUE_CONFIG, 
+const { opt, num, optTrack, NATIVE_PAINT_MODE, FRAME_POLICY, root, out, RUN_CACHE, VALUE_CONFIG, 
   phaseMark, srcMeta, PX_RAW, TARGET_GUARD, w, h, n, paperRGB, PIGS, COLOUR_BUDGET, MASS_BUDGET, 
   DRAW_STYLE, EDGE, FINISH, SEP, STAGE_PLAN, FACE_INK, REQUESTED_DRAW_MEDIUM, STYLE_ON, STYLE_INK_DEFAULT, 
   GRAPHITE_PROFILE, OUTLINE_MEDIUM, INK, PENCIL, GRAPHITE, GRAPHITE_AT, SC, W2, H2, N2, PB, paper, INKRES, 
@@ -44,7 +44,7 @@ const snap = extra => { if(!FRAME_POLICY.all || NATIVE_PAINT_MODE.mode==='fast')
 // --marks 1: record the mark tape: every stroke as a brush index and a path, with the water schedule between them.
 // Without it the stroke ledger still records what the stroke gate measures (src/paint/stroke-ledger.mjs).
 if (!['warn', 'reject', 'off'].includes(opt('strokegate', 'warn'))) throw new Error('strokegate must be warn, reject or off');
-const FULL_TAPE = opt('marks', '0') !== '0' || Boolean(STROKE_BUDGET), MARKTAPE = startStrokeLedger({ full: FULL_TAPE });
+const FULL_TAPE = opt('marks', '0') !== '0', MARKTAPE = startStrokeLedger({ full: FULL_TAPE });
 if (MARKTAPE) tapeSheet(MARKTAPE);
 // --pausedir DIR: the painter offers a stop at every passage boundary and a harness decides where it stops
 // (tools/aware/pause.mjs). --resumestate DIR: a fresh process takes over a painting saved at a boundary (state.json

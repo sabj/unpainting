@@ -41,7 +41,7 @@ import {makeCrisp} from '../../src/paint/methods/crisp-edges.mjs';
 import {traceOutlines} from '../../src/crop/outline.mjs';
 import {clipToFinish} from '../../src/crop/finish.mjs';
 import {sameWash} from '../../src/paint/methods/wash-session.mjs';
-import {loadFocus, mergeShapes, completeBudget, budgetPaths} from '../../src/paint/methods/stroke-budget.mjs';
+import {loadFocus, mergeShapes} from '../../src/paint/methods/stroke-budget.mjs';
 import {splitLoads,paintsHere} from '../../src/paint/methods/brushes.mjs';
 import {createPause} from '../aware/pause.mjs';
 import {writeState, readState, revisionExpectation} from '../aware/state-io.mjs';
@@ -49,7 +49,7 @@ import {tapeState, restoreTapeState} from '../../src/media/brush.mjs';
 import {passDue, markDue} from '../../src/paint/pass-cadence.mjs';
 
 export async function paint(ctx) {
-const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
+const { WASH_FLAT_SPLAY, JSONL, argv, OPTS_READ, opt, num, optTrack, NATIVE_PAINT_MODE, SPEED_PAPER, 
   SPEED_COVERAGE, measurePaper, liftResist, FRAME_POLICY, SPEED_PROFILE, root, out, RUN_CACHE, FAST_BODY_ENABLED, 
   FAST_BODY_SPACING, BODY_CADENCE_RECORD, VALUE_COUNTS, SOFT_WET_MM, WASH_SESSION, TARGET_GUARD, paintingLook, STEP_BACKS, w, h, n, createBrush, candidateContact, paperRGB, 
   planContentHashes, CODE_HASH, PIGS, COLOUR_BUDGET, GOUACHE_LIGHTS, setClip, MASS_BUDGET, 
@@ -74,7 +74,7 @@ if (num('orderremix', 0) > 0) throw new Error('--orderremix was removed by the a
 const REMIX = null;
 // --crisp: hard-edged glazes carried to their line (src/paint/methods/crisp-edges.mjs)
 const CRISP = makeCrisp({ opt, num });
-// --passmerge, --strokebudget, --focusmap (src/paint/methods/stroke-budget.mjs)
+// --passmerge, --focusmap (src/paint/methods/stroke-budget.mjs)
 const FOCUS = await loadFocus({ opt, w, h, sharp, path, root });
 if (num('passmerge', 0) > 0 && GFLOOR) {
   const before = ctx.layers.reduce((a, l) => a + l.shapes.length, 0);
@@ -82,8 +82,6 @@ if (num('passmerge', 0) > 0 && GFLOOR) {
   console.log(`pass merge: ${before} passages laid as ${ctx.layers.reduce((a, l) => a + l.shapes.length, 0)}, one per pass and mix`);
 }
 // the broad first wash goes on before anything else (painterOrder and the colour order file it under its leading pan)
-const BUDGET = STROKE_BUDGET ? completeBudget({N:STROKE_BUDGET,layers: ctx.layers,drawing:MARKTAPE.filter(m=>['s','P','g'].includes(m.k)).length}) : null;
-if (BUDGET) console.log(`stroke budget: ${BUDGET.N} paths, washes ${Math.round(BUDGET.wash)}, drags ${BUDGET.drags}, dry brush ${BUDGET.dry}, accents ${BUDGET.accents}${FOCUS ? ', weighted by the focus map' : ''}`);
 const CANARY_STOP = canaryStopPass(num('canarystop', 0), ctx.layers.length);
 // ---- stops at passage boundaries and the take-over of a saved painting (tools/aware/pause.mjs) -------------------------
 // What a revision may not change once painting has started is checked by the harness; here the painter only refuses to
@@ -222,7 +220,6 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   let shIdx = 0; const shQuarter = Math.max(1, Math.ceil(layer.shapes.length / 4));
   for (const sh of layer.shapes) {
   if(DELIVERY||TECH_CAL)sh._paintExecuted=false;
-  if(BUDGET && !BUDGET.target(sh)) continue;
   if (PROBE) {
     const m = sh.mask, cut = new Uint8Array(n); let area = 0;
     for (let i = 0; i < n; i++) if (m[i] && PROBE.m[i]) { cut[i] = 1; area++; }
@@ -244,7 +241,6 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // The plan's move is final: every passage comes from the wash plan (valueTechnique). No switch replaces a planned move.
   let T = valueTechnique(sh._valuePlan);
   if(sh._valuePlan){ctx.VALUE_ACTIVE=sh._valuePlan;const inSession=WASH_SESSION>0&&ctx.WASH_LAST&&(ctx.WASH_LAST.L===L||(WASH_SESSION>1&&sameWash(ctx.WASH_LAST.layer,layer)));ctx.WASH_LAST={L,layer};if(!inSession)ctx.VALUE_OWN_CONTACT.clear();if(!T.intoWet&&!inSession){clock('dry',()=>dry(ctx.sheet,30000,O,{levelMax:140,dt:2}));const base=measurePaperDry(ctx.sheet);JSONL.append(path.join(out,'value-commands.jsonl'),JSON.stringify({kind:'dry-base',intent:ctx.VALUE_ACTIVE.id,paper:base})+'\n');check('target-value pass needs fully dry base',base.dry,{intent:ctx.VALUE_ACTIVE.id,waterMax:base.waterMax,saturationMax:base.saturationMax});}}
-  if(BUDGET) T={...T, name:'wet on dry',passes:1,intoWet:false,dryAfter:true,water:.62,wetMix:.55,bridge:.78,bridgeSoft:2.2};
   // one passage for the dry-paper gate: its reach is looked over once, before its first lane (passage-dry-gate.mjs)
   ctx.VALUE_PASSAGE = sh._valuePlan ? {} : null;
   // what this passage's own instrument delivers on scrap (instrument-cal.mjs); the charge below is divided by it
@@ -307,8 +303,8 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
   // a wash plan's strokes are a list of laid strokes (layered-washes.mjs), each charged at its own share of the mix (a
   // graded wash: water added at each recharge); a light-to-dark plan's are a count and lane widths for its stroke plan
-  const vectorPaths = !BUDGET && Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: q[2] ?? 1, round })); if (st.charge) PATH_FACTOR.set(path, st.charge); return path; }) : null;
-  const shapedPaths = vectorPaths ? vectorPaths : BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
+  const vectorPaths = Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); const path = st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: q[2] ?? 1, round })); if (st.charge) PATH_FACTOR.set(path, st.charge); return path; }) : null;
+  const shapedPaths = vectorPaths ? vectorPaths : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
   const gradedAngle = (sh.graded && !sh._follow ? (sh._gradedAngle ?? null) : null);
@@ -321,10 +317,8 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   let _floorMask = null;
   const getFloorMask = () => (_floorMask ??= up(brushMask(sh)));
   let FLOOR_R = FLOOR;
-  // under --strokebudget the passage gets its share of the strokes: the brush and the closing radius grow together
-  // until its sweeps fit (stroke-budget.mjs)
   const floorPaths = rr => {
-   const baseOpts = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: PASS_R ?? Math.max(rr, BRUSH), seed: 17 + ctx.laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
+   const baseOpts = { pad: num('pad', 1.5) * SC, padShare: num('padshare', 0), minRadius: rr, minLength: 2 * rr, maxRadius: Math.max(rr, BRUSH), seed: 17 + ctx.laid + SEED, overlap: num('overlap', 0.15), walk: opt('walk', '1') !== '0' && gradedAngle == null, outerDrift: num('outerdrift', 1.5) * SC, angle: gradedAngle };
    const bm = brushMask(sh), row0 = MB.y0 * w, row1 = (MB.y1 + 1) * w;
    // Cache geometry only; paper observation, charge, contact and drying still execute.
    return prof('floor lanes', () => cachedStepSync({...RUN_CACHE,name:'floor-paths',code:CODE_HASH,track:optTrack,
@@ -335,7 +329,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
      }).value);
   };
   const paths = shapedPaths ?? clock('paths', () => FLOOR
-    ? (() => { let rr = FLOOR, P = floorPaths(rr); const T = BUDGET ? BUDGET.target(sh) : Infinity; for (let it = 0; it < 7 && P.length > T && rr < 3 * BRUSH; it++) { rr *= 1.6; P = floorPaths(rr); } FLOOR_R = rr; return P; })()
+    ? (() => { let rr = FLOOR, P = floorPaths(rr); const T = Infinity; for (let it = 0; it < 7 && P.length > T && rr < 3 * BRUSH; it++) { rr *= 1.6; P = floorPaths(rr); } FLOOR_R = rr; return P; })()
     : (detail
     ? detailMarks(getShapeLoad(), w, h, { length: num('marklen', 11), spacing: num('markgap', 6), seed: 7 + ctx.laid + SEED, coverage: num('markcover', 0.3) })
         .map(m => m.map(p => ({ x: (p.x + 0.5) * SC, y: (p.y + 0.5) * SC, r: Math.max(SC * 0.6, num('markr', 1.6) * SC), p: 1 })))
@@ -343,14 +337,14 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // --contain: the brush disc held inside its passage at every point (see containPaths). Rescued passages below get
   // the same treatment, since a small brush can overhang a narrow passage just as a mop overhangs a ragged one.
   const crispNow = CRISP.wants(T, detail);
-  if (!BUDGET && !shapedPaths && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
+  if (!shapedPaths && opt('contain', '1') !== '0' && !detail && paths.length && !crispNow && !FLOOR) {
     // --washfloor in: the main wash sweep is never narrowed below this on a 9-inch-wide sheet (wash.mjs).
     const floorOpt = num('washfloor', 0) * W2 / 9;
     const held = containPaths(paths, distanceToZero(up(brushMask(sh)), W2, H2), W2, H2, { minRadius: 0.8 * SC, minLength: 2 * SC, slack: num('slack', 0.5) * SC, segments: false, floor: floorOpt });
     paths.length = 0; paths.push(...held);
   }
   // --cutin 0|1: run a small brush along the inside of the passage's edge before filling it, as a painter cuts in. Default 1.
-  if (!BUDGET && !shapedPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
+  if (!shapedPaths && !FLOOR && !MASS_BUDGET?.skipCutIn(MASK) && opt('cutin', '1') !== '0' && !detail && paths.length && (!crispNow || CRISP.cutIn())) {
     const M = up(brushMask(sh)), dist = distanceToZero(M, W2, H2), band = new Uint8Array(N2);
     // --cutband n (default 2): the cut-in band.
     const cellMmHigh = num('sheetmm', DEFAULT_SHEET_MM) / W2;
@@ -402,7 +396,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   }
   // under --crisp the bead stops at the passage's own edge, for the clean water and the paint alike
   if (process.env.FW_DUMP && L < num('dumppasses', 3)) { const g = Buffer.alloc(N2); for (const pts of paths) for (let k = 0; k < pts.length; k++) { const a = pts[k], b = pts[Math.min(pts.length - 1, k + 1)], m = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y))); for (let t = 0; t <= m; t++) { const x = Math.round(a.x + (b.x - a.x) * t / m), y = Math.round(a.y + (b.y - a.y) * t / m); if (x >= 0 && y >= 0 && x < W2 && y < H2) g[y * W2 + x] = Math.hypot(b.x - a.x, b.y - a.y) > 6 * SC ? 128 : 255; } } await sharp(g, { raw: { width: W2, height: H2, channels: 1 } }).png().toFile(path.join(process.env.FW_DUMP, `P${L + 1}-s${layer.shapes.indexOf(sh)}.png`)); }
-  const crispHere = vectorPaths ? false : !!BUDGET || !!shapedPaths || CRISP.on && CRISP.wants(T, detail);
+  const crispHere = vectorPaths ? false : !!shapedPaths || CRISP.on && CRISP.wants(T, detail);
   // --washreach: a planned stroke may end past the outline, so the clip is the passage grown by the reach, still off
   // the plan's reserved lights; the edge is where the strokes end, not the mask
   const P = ctx.VALUE_PLAN?.protectedCells;
@@ -422,12 +416,12 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   }
   // under --brushfloor the clip is the passage closed by --clipclose (default 1.5) floor radii, joined with the probe's,
   // so pinholes inside a passage do not become paper holes. The outer edge is not moved.
-  if (!BUDGET && !shapedPaths && FLOOR) { const FLOORMASK = getFloorMask(), cr = num('clipclose', 1.5) * FLOOR, cm = prof('clip close', () => closeLocal(FLOORMASK, W2, H2, cr)); const c0 = PROBE ? Uint8Array.from(cm, (v, i) => v & PROBE.clip[i]) : cm;
+  if (!shapedPaths && FLOOR) { const FLOORMASK = getFloorMask(), cr = num('clipclose', 1.5) * FLOOR, cm = prof('clip close', () => closeLocal(FLOORMASK, W2, H2, cr)); const c0 = PROBE ? Uint8Array.from(cm, (v, i) => v & PROBE.clip[i]) : cm;
     setClip(ctx.sheet, c0); used['floored brush'] = (used['floored brush'] || 0) + 1; }
   if (detail) used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] = (used[T.name === 'dry brush' ? 'dry brush marks (detail)' : 'detail marks'] || 0) + paths.length;
   ctx.WET_TRACE?.passage({ pass: L + 1, shape: layer.shapes.indexOf(sh), technique: T.name, move: sh._valuePlan?.move ?? null, texture: !!sh._valuePlan?.texture, value: layer.value, paths: paths.length });
   let SOFT_RING = null;
-  if (SOFT_WET_MM > 0 && crispHere && !BUDGET && !detail && !(sh._strokePlan?.reachCells > 0) && sh._valuePlan && !sh._valuePlan.texture && sh._valuePlan.edges?.softCells?.length && paths.length && opt('softwetphases', 'light,mid,shadow').split(',').includes(sh._valuePlan.phase)) {
+  if (SOFT_WET_MM > 0 && crispHere && !detail && !(sh._strokePlan?.reachCells > 0) && sh._valuePlan && !sh._valuePlan.texture && sh._valuePlan.edges?.softCells?.length && paths.length && opt('softwetphases', 'light,mid,shadow').split(',').includes(sh._valuePlan.phase)) {
     const rc = SOFT_WET_MM / (num('sheetmm', DEFAULT_SHEET_MM) / w);
     const ring = softRing(brushMask(sh), sh._valuePlan.edges.softCells, sh._valuePlan.edges.hardCells, w, h, rc, ctx.VALUE_PLAN?.protectedCells);
     if (ring.some(v => v)) {
@@ -452,7 +446,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   // --splwet: optional dampening for stroke lanes. A value plan controls its own wet/dry technique;
   // do not silently prewet its dry-base glazes. Explicit --splwet 1 still prepares a connected wet bed.
   let wetEachLane = null;
-  if (!BUDGET && (T.intoWet || ((opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', sh._valuePlan ? 0 : 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
+  if ((T.intoWet || ((opt('prewet', '0') !== '0' || (sh._strokePlan && num('splwet', sh._valuePlan ? 0 : 1) > 0)) && !detail && paths.length > num('prewetlanes', 1)))) {
     // --gradedprewet s: a graded wash's clean water reaches s of the short side past it onto equally pale paper. Default 0.03.
     const reach = sh.graded && !sh._follow ? Math.round(num('gradedprewet', 0.03) * Math.min(w, h)) : 0;
     // --prewetinset k: wet the shape shrunk by k cells at 540 px, not its paths, so its edge lands on dry paper. Default 0.
@@ -470,7 +464,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     const shapePaper = shapeCells?.length ? measurePaper(ctx.sheet, shapeCells, SPEED_PAPER) : null;
     const needPrewet = !shapePaper || shapePaper.moistShare < 0.7;
     const wetLane = pts => {
-      const r = vectorPaths ? pts[0].r : !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
+      const r = vectorPaths ? pts[0].r : sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):Math.max(SC, Math.max(...pts.map(p => p.r)));
       const wet = createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, depositDepth: shapePaper?.saturationMax >= 0.5 ? 0.1 : 0, splay: 0.03, stiffness: 8, seed: 900 + ctx.laid + SEED });
       productionDip(wet, { water: num('prewetwater', shapeCells ? .55 : 1), conc: PIGS.map(() => 0) });
       stroke(wet, ctx.sheet, pts, { upright: UPRIGHT });
@@ -494,7 +488,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
   for (let pts of paths) {
     ctx.WET_TRACE?.lane();
     if (wetEachLane) wetEachLane(pts);
-    const r = vectorPaths ? pts[0].r : !BUDGET&&sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
+    const r = vectorPaths ? pts[0].r : sh._valuePlan?.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*(num('sheetmm', DEFAULT_SHEET_MM)/W2)):(r0 => (PB && FLOOR ? PB.half(PB.pick(r0)) : r0))(Math.max(SC, Math.max(...pts.map(p => p.r))));
     const CHARGE_CAL=ICAL.cal;
     const brush = detail
       ? createBrush({ grainShift: num('grainshift', 0), radius: r, bristles: Math.max(8, Math.ceil(r * 3)), capacity: 26, belly: 2, feed: 0.08,
@@ -580,12 +574,12 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     };
     // --graded c: recharge every c cells along a sweep at the strength the passage wants there, normalised to a mean of one. Default 0.
     // A graded wash (--gradedwash) is always charged this way from its own graded amount, not normalised per sweep.
-    const gradedLen = BUDGET || (PB && !detail) ? 0 : (useGradedCal ? (GFLOOR ? GCHUNK / SC : num('gradedchunk', 6)) : num('graded', 0)) * SC;
+    const gradedLen = (PB && !detail) ? 0 : (useGradedCal ? (GFLOOR ? GCHUNK / SC : num('gradedchunk', 6)) : num('graded', 0)) * SC;
     // --physical: the path is cut where the brush's released water runs out (brushes.mjs splitLoads), counted only over
     // paper the brush may paint (inside the clip, off any resist; the stroke's own footprint rule), and each load is a
     // stroke of its own, dipped afresh; a graded wash is graded by the puddle's dilution between loads (the mean of its
     // graded amount under each load), not by recharging every few cells
-    const LOADS = !BUDGET && PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name), paintsHere(ctx.sheet)) : null;
+    const LOADS = PB && !detail ? (num('loadfeather',0)>0&&shapedPaths?(a,b,c)=>splitLoadsFeathered(a,b,num('loadfeather',0)*r,c):splitLoads)(shaped, PB.loadCells(sh._valuePlan?.brush?.name??PB.pick(r), T.name), paintsHere(ctx.sheet)) : null;
     if (LOADS && (LOADS.length > 1 || useGradedCal)) {
       // One amount per shape, graded by the plan's plane (graded-demand.mjs): each load is dipped at the plane's mean
       // under it and pressed along it, never charged per-cell amounts. A passage without a plane takes its amount throughout.
@@ -671,7 +665,7 @@ for (let L = L_START; L < ctx.layers.length; L++) {
     }
     used['soft edge, damp brush'] = (used['soft edge, damp brush'] || 0) + sh._valuePlan.softEdges.length;
   }
-  if(num('softsplit',1)>0&&PB&&!BUDGET&&!detail&&!sh._valuePlan?.texture&&sh._valuePlan?.edges?.softCells?.length&&paths.length){
+  if(num('softsplit',1)>0&&PB&&!detail&&!sh._valuePlan?.texture&&sh._valuePlan?.edges?.softCells?.length&&paths.length){
     const mmc=num('sheetmm', DEFAULT_SHEET_MM)/W2,halves=(ctx._softRounds??=['rigger','round4','round8','round12'].filter(k=>PB.cfg.brushes[k]).map(k=>PB.half(k)));
     const washR=sh._valuePlan.brush?.sizeMm?sh._valuePlan.brush.sizeMm/(2*mmc):Math.max(SC,...paths.map(pts=>Math.max(...pts.map(q=>q.r))));
     const rS=softenBrushCells(halves,{ownCells:washR,supportCells:(sh._valuePlan.resolution?.estimatedSupportWidthCells??Infinity)*SC,cap:num('softmm',Infinity)/(2*mmc)}),reach=Math.ceil(rS/SC)+1;
@@ -781,5 +775,5 @@ if (DELIVERY) { const hst = DELIVERY.history(); console.log(`delivery calibratio
 if (FEEDBACK_LAG) console.log(`feedback: ${feedbackStats.read} passes read the sheet, ${feedbackStats.predicted} predicted it from the last read and the ledger`);
 colourMass('ladder-finished');
 if (COLOUR_TRACE) await sharp(render(), {raw:{width:W2,height:H2,channels:3}}).png().toFile(path.join(out,'colour-before-dry.png'));
-Object.assign(ctx, { BUDGET, awareProvenance, awareBoundary });
+Object.assign(ctx, { awareProvenance, awareBoundary });
 }

@@ -46,7 +46,6 @@ import {outputRelative, planFileDigest} from '../../src/paint/early-lines-cache.
 import {refuseRemoved} from '../../src/paint/removed-options.mjs';
 import {lineSource} from '../../src/paint/line-source.mjs';
 import {runMethods, describeMethods} from '../../src/paint/run-methods.mjs';
-import {strokeBudgetDefaults} from '../../src/paint/methods/stroke-budget.mjs';
 import {createTargetGuard, writeGuardReport, DEFAULT_MODE, HARD_LOOK_BUDGET} from '../guard/no-target.mjs';
 import {detectSheetTone} from '../../src/paint/methods/sheet-tone.mjs';
 import {checkSourceScale, sourceReadable} from './source-scale.mjs';
@@ -91,8 +90,6 @@ const num = (n, d) => { const v = read(n, d), x = Number(v); if (Number.isNaN(x)
 // Caller-owned drawing inputs and stage intent, separated from recipe/plan and generated arguments.
 const DRAWING_STAGE_INTENT = drawingStageIntent({ argv0, expandedArgv: argv, pipeline: PIPELINE });
 // An explicit budget changes planning only; absent/zero preserves every default.
-const STROKE_BUDGET = num('strokebudget', 0);
-for(const [key,value] of Object.entries(strokeBudgetDefaults(STROKE_BUDGET))) if(!argv0.includes('--'+key)) argv.push('--'+key,String(value));
 // --texvariety v: how much the short texture marks vary in length and pressure (src/paint/techniques/shaped-marks.mjs)
 setTextureVariety(num('texvariety', 0));
 const optTrack = {
@@ -346,7 +343,7 @@ const PALETTE_FROM_FILE = opt('palettefrom', '') && fs.existsSync(path.resolve(r
 SPEED_PROFILE?.add('setup:paper-and-cache-key', performance.now() - paperSetupStarted);
 const paletteFitStarted = performance.now();
 Object.assign(ctx, { LINE_SOURCE, RUN_METHODS, MEDIUM_DECISION, SUBJECT_MEDIUM, argv0, argv, PIPELINE, OPTS_READ, optIdx, NAN_GIVEN, TEXT_READ, WORD_GIVEN, WORD_OK, opt, num, 
-  DRAWING_STAGE_INTENT, STROKE_BUDGET, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
+  DRAWING_STAGE_INTENT, optTrack, NATIVE_PAINT_MODE, SPEED_TRANSFERS, SPEED_PAPER, 
   SPEED_CONTACT, SPEED_VALUE_CACHE, SPEED_COVERAGE, SPEED_UNIFORM_PAPER, measurePaper, liftResist, 
   VALUE_CONTACT_WORK, SPEED_GPU_OPTICS, OUTPUT_VIDEO, FRAME_POLICY, SPEED_PROFILE, CPU_PROFILE, PAINTER, root, out, 
   CODE_STATE, INK_RECIPE, DRAWING_REGISTRATION, RUN_CACHE, holdInk, FAST_BODY_ENABLED, 

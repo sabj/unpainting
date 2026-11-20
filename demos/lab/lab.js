@@ -283,8 +283,9 @@ playPause.addEventListener('click',()=>{
   replayPaused=!replayPaused;worker.postMessage({type:'live-pause',on:replayPaused});playPause.textContent=replayPaused?'Play':'Pause';playPause.setAttribute('aria-pressed',String(replayPaused));
 });
 const runMode=document.getElementById('run-mode'),strokeLimit=document.getElementById('stroke-limit'),liveBudget=document.getElementById('live-budget');
-// Examples open on the painter's saved frames. Live re-paints a complete budgeted
-// study using its native paper, materials and event schedule. Technique demos select Live.
+// Examples open on the painter's saved frames. Live re-paints a complete recorded
+// painting using its native paper, materials and event schedule. Technique demos select Live.
+// An example offers Live only when it ships a recorded stroke tape (example.live).
 let exampleMode='replay';lab.mode=exampleMode;
 for(const el of [runMode,strokeLimit])el.addEventListener('change',()=>{exampleMode=runMode.value;lab.mode=runMode.value;document.getElementById('mode-note').textContent=lab.mode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';targets.replay();});
 replaySpeed.addEventListener('change',()=>worker.postMessage({type:'live-speed',value:Number(replaySpeed.value)}));
@@ -293,17 +294,21 @@ document.getElementById('redip').addEventListener('click',()=>{worker.postMessag
 document.getElementById('auto-redip').addEventListener('change',e=>{settings.autoRedip=e.target.checked;});
 async function playExampleFilm(example, carry=false, seek=0) {
   const run=++filmRun, alive=()=>run===filmRun;
+  const tapes=Object.keys(example.live??{});if(!tapes.length)exampleMode='replay';
+  runMode.querySelector('option[value="live"]').disabled=!tapes.length;
+  if(strokeLimit.dataset.example!==example.id){strokeLimit.replaceChildren(...tapes.map(k=>{const o=document.createElement('option');o.value=k;o.textContent=example.studies?.[k]?.label??k;return o;}));strokeLimit.dataset.example=example.id;}
+  const liveStrokes=()=>example.studies?.[strokeLimit.value]?.strokes??0;
   runMode.value=exampleMode;lab.mode=exampleMode;liveBudget.hidden=exampleMode!=='live';document.getElementById('mode-note').textContent=exampleMode==='live'?'Live paints the recorded strokes here, with water and pigment physics.':'Recording · original saved frames, stepped without fades. Overlay: stroke path.';
   cancelStroke();hover=null;queueCursor();setPlaying(true);playPause.hidden=false;handNote=null;playingWhat=example.title.toLowerCase();playingExample=true;filmSkip=carry;
   document.getElementById('paint-hint').hidden=true;
-  state.textContent=`Playing: ${example.title}`;caption.textContent='A complete budgeted painting. Carry on painting when you are ready.';
+  state.textContent=`Playing: ${example.title}`;caption.textContent='A complete painting. Carry on painting when you are ready.';
   const base=new URL('./',import.meta.url);
   document.body.classList.add('has-example');playbackUI.dismiss();playbackUI.example(example,strokeLimit.value,runMode.value);document.getElementById('sheet-title').textContent=example.title.split(' · ')[0];
   const selected=seek?playbackUI.preview(seek):null;lab.seeking=!!selected;
-  if(selected){playProgress.value=seek;lab.progress={done:selected.done,total:Number(strokeLimit.value),phase:'restoring'};}
+  if(selected){playProgress.value=seek;lab.progress={done:selected.done,total:liveStrokes(),phase:'restoring'};}
   if(!selected)playbackUI.ready();
   if(runMode.value==='live'){
-    lab.target={id:example.id,live:true,started:performance.now()};caption.textContent=selected?`Opening the ${Math.round(seek*100)}% point…`:'Live · '+Number(strokeLimit.value).toLocaleString()+'-stroke painting';
+    lab.target={id:example.id,live:true,started:performance.now()};caption.textContent=selected?`Opening the ${Math.round(seek*100)}% point…`:'Live · '+(example.studies?.[strokeLimit.value]?.label??'recorded painting');
     try{
       const [tape,checkpoint]=await Promise.all([loadTape(example.live[strokeLimit.value]),selected?loadBytes(selected.state):null]);
       if(alive())worker.postMessage({type:'live',tape,checkpoint,liveRun:run});
