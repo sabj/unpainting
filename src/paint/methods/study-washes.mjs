@@ -23,20 +23,22 @@ import { laneFill } from './sweep-fill.mjs';
 import { mixFor, mixOver, filmLab } from './puddles.mjs';
 import { kmeans, roundMask, dilate } from './study-shapes.mjs';
 import { monoAt } from './mono-mix.mjs';
+import { touchesFrom } from './touch-layer.mjs';
+import { shapeGeometry, markFor } from './marks.mjs';
 
 /** The plan's grid cell (mm). */
 const PLAN_MM = 0.5;
 /** Colour clusters asked for, and clusters nearer than this (Lab) are one. Coarse, so a faint (3 L*) change in the study cannot move a
  * cell between clusters: at 14 and 12 the planted 3.4 mm pattern reached the plate through the study (copied +0.11 against a null of
  * 0.07); at 8 and 18 it does not (-0.03 against 0.08), and the Yale study keeps its windows, arch, gate, foliage and cast shadows. */
-const CLUSTERS = 8, CLUSTER_JOIN = 18;
+const CLUSTERS = 16, CLUSTER_JOIN = 10;
 /** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
  * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
 const COPY_TEST = 'copy test of this reading, laid as at 02db12b0 (under-washes, joined shadows, cut darks), 20 Nov 2026: mini 1 (RunPod studies) flat copied -0.00/-0.06 at 1.8/3.4 mm (null max 0.08/0.08), d1 +0.02/-0.05 (0.10/0.08), d2 +0.03/-0.04 (0.05/0.08), stable 0.85 to 0.90 against a seed floor of 0.47 to 0.52; mini 2 (local studies) flat -0.05/-0.02 (0.07/0.16), d1 -0.04/+0.02 (0.13/0.14), d2 -0.04/+0.02 (0.13/0.14), stable 0.61 to 0.73 against a seed floor of 0.65 to 0.74; every copy within its null; no copy above +0.03';
 /** Two regions each over this share of the sheet are never merged into one (a roof and its wall stay two shapes). */
 const BIG = 0.02;
 /** A part smaller than this share of the sheet is a sliver and joins a neighbour. */
-const SLIVER_SHARE = 0.004;
+const SLIVER_SHARE = 0.0008;
 /** A small shape this much darker (L*) than the neighbour it would be merged into is kept. */
 const KEEP_DARK = 25;
 /** ... or this far from it in hue and chroma (a*b*, at least this chromatic itself): a warm accent in a pale wall. */
@@ -45,7 +47,7 @@ const KEEP_HUE = 15;
  * white, lighter than the sheet, is paper too) and no more chromatic than this. */
 const PAPER_L = 91, PAPER_CHROMA = 7;
 /** Outlines are rounded by a brush this wide (mm) and simplified to this tolerance (mm). */
-const ROUND_MM = 2, TOL_MM = 0.8;
+const ROUND_MM = 1, TOL_MM = 0.4;
 /** A wash nests on a neighbour at least this much lighter (L*) whose hue is this near (chromaticity over lightness, as a shadow keeps its hue). */
 const NEST_LIGHTER = 4, NEST_HUE = 14;
 /** ... when their shared border is at least this share of the darker shape's outline. */
@@ -254,15 +256,13 @@ const CLOSE_L = 8;
 /** Load along a wash: the brush starts loaded at this share over the mix and is thinned to this share under it before each recharge, every this many strokes. */
 const LOAD_HIGH = 0.25, LOAD_EVERY = 3;
 /** A later layer adds a shape where its study is at least this much darker (L*) than what is laid there, or this much more chromatic. */
-const ADD_DARKER = 6, ADD_CHROMA = 8;
-/** An accent layer (the third and after) adds only what is this much darker, at most this many shapes. */
-const ACCENT_DARKER = 14, ACCENT_MOST = 24;
+const ADD_DARKER = 6;
 /** Glazes of one layer that do not touch are laid in one session (the sheet dried after it), at most this many. */
 const SESSION_MOST = 10;
 /** A glaze layer (FILE:MIN:glaze): a cell joins a glaze when the study is a little darker and this much cooler (b*) than what is laid; parts within this (mm) are one; at most this many glazes. */
 const GLAZE_COOLER = 6, GLAZE_JOIN_MM = 4, GLAZE_MOST = 6;
 /** A shadow glaze is moved this much cooler (b*) than the study's shadow colour (a cast shadow on a warm wall reads violet-grey). */
-const SHADOW_COOL = 12;
+const SHADOW_COOL = 6;
 /** A light shape at least this share of the sheet, with what nests on it, is a family laid first as one under-wash. */
 const FAMILY_LEAST = 0.03;
 /** A shape whose outline runs at least this share along one family's shapes lies inside it: the under-wash runs under it. */
@@ -295,8 +295,18 @@ const JOIN_MM = 2;
 /** A sheet darker than this (L* against white) is toned. */
 const TONED_L = 95;
 const MONO_STEP_L = 8, MONO_FIRST = 0.7, MONO_CUTS = [0.4, 0.12], MONO_STEP_LEAST = 25;
+/** Touches are laid with rounds of these widths (mm): the smallest a pointed round's touch, the largest a big round's stroke. */
+const TOUCH_KIT = [0.8, 1.4, 2.4, 4, 6.5, 10];
+/** Reserved lights from the finest study: at least this light (L*) and no more chromatic than this, in parts of at least this (mm2). */
+const RESERVE_L = 90, RESERVE_C = 12, RESERVE_LEAST_MM2 = 2;
+/** A family shape is dropped into its wet under-wash when its value is within this (L*) of the family's and its hue at least
+ * this far off (a*b*), and it is at least this big (mm2); with rounds of these widths (mm). */
+const CHARGE_CLOSE_L = 12, CHARGE_HUE = 5, CHARGE_LEAST_MM2 = 6, CHARGE_KIT = [2, 3.5, 6, 10, 14];
 /** The block-in (the first layer) has at most this many shapes. */
-const FIRST_MOST = 16;
+const FIRST_MOST = 48;
+/** Washes err light: a wash (not a dark) aims this share of the way from the study's value to the paper's. The study is a
+ * poster of the subject, flatter and denser than its washes; in watercolour the paper carries the light. */
+const ERR_LIGHT = 0.2;
 
 // `inkValue`: the subject's value map the pen's line choice reads, as with the other plan (the drawing is the painter's
 // own as before); the washes never read it.
@@ -321,14 +331,14 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     return x1 < 0 ? [] : outlineLoops(labels, id, { x0, y0, x1, y1 }, pw, ph, { cellMm: mmX, tolMm: TOL_MM });
   }
   const maskLoops = (m, roundMm, avoid = null) => {
-    const r = roundMask(m, pw, ph, rC(roundMm / 2)); if (avoid) for (let q = 0; q < pn; q++) if (avoid[q] && !m[q]) r[q] = 0;
+    const r = roundMask(m, pw, ph, rC(roundMm / 2)); for (let q = 0; q < pn; q++) if ((avoid?.[q] && !m[q]) || reserve[q]) r[q] = 0;
     const c = components(r, pw, ph, 4), loops = []; for (let id = 1; id <= c.count; id++) loops.push(...loopsFor(c.labels, id));
     return loops;
   };
   // the same, one list of loops for each connected part (a part is laid on its own, along its own long axis)
   // (rounding closes gaps and notches but never takes away the shape's own cells: opened, a 2 mm mast falls into beads)
   const partLoops = (m, roundMm, avoid = null) => {
-    const r = roundMask(m, pw, ph, rC(roundMm / 2)); for (let q = 0; q < pn; q++) { if (m[q]) r[q] = 1; else if (avoid?.[q]) r[q] = 0; }
+    const r = roundMask(m, pw, ph, rC(roundMm / 2)); for (let q = 0; q < pn; q++) { if (m[q]) r[q] = 1; else if (avoid?.[q]) r[q] = 0; if (reserve[q]) r[q] = 0; }
     const c = components(r, pw, ph, 4), out = []; for (let id = 1; id <= c.count; id++) { const l = loopsFor(c.labels, id); if (l.length) out.push(l); }
     return out;
   };
@@ -383,8 +393,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   const underMix = cells => { const u = new Array(k).fill(0); for (const q of cells) for (let j = 0; j < k; j++) u[j] += laid[j][q] / cells.length; return u; };
   const cellsIn = loops => { const m = loopsMask(loops, pw, ph, mmX), out = []; for (let q = 0; q < pn; q++) if (m[q]) out.push(q); return out; };
   let keepOut = [];
+  const reserve = new Uint8Array(pn);
   // a colour moved cooler at the same L*: b* toward blue by SHADOW_COOL, a* a little toward violet (Lab against the paper)
-  const cooled = rgb => { const [L, a, b] = labOf(rgb, 0, paperCol); return labToRgb([L, a + SHADOW_COOL / 4, b - SHADOW_COOL], paperCol); };
+  const cooled = rgb => { const [L, a, b] = labOf(rgb, 0, paperCol); return labToRgb([L, a, b - SHADOW_COOL], paperCol); };
   // A study's shapes and values are trusted more than its hues (an image model drifts a brown drawing to pink): the mix
   // is the palette's nearest to the study's colour (mixFor / mixOver: the painter's own pigments), its strength then set
   // so the film over what is laid reaches the study's VALUE (L*). The hue follows only as far as the palette allows.
@@ -397,7 +408,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // buff is lost and the rest come out a few L* deep.
   const valueRef = labOf(paperCol, 0, [255, 255, 255])[0] < TONED_L ? [255, 255, 255] : paperCol;
   const valueMix = (colour, u, given = null) => {
-    const fresh = u.every(v => v <= 1e-9), want = labOf(colour, 0, valueRef)[0];
+    const fresh = u.every(v => v <= 1e-9), sL = labOf(colour, 0, valueRef)[0], want = sL >= DARK_L ? sL + (100 - sL) * ERR_LIGHT : sL;
     const base = given ?? MONO ? given ?? monoAt(MONO, want) : fresh ? mixFor(colour, pigments, paperCol) : mixOver(colour, u, pigments, paperCol);
     if (!(base.reduce((a, v) => a + v, 0) > 1e-9)) return base;
     const Lat = t => filmLab(u.map((v, j) => v + t * base[j]), pigments, paperCol)[0];
@@ -412,7 +423,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const u = underMix(own?.length ? own : cells);
     const mix = (amounts ?? valueMix(colour, u, base)).map(v => v * scale), strength = mix.reduce((a, v) => a + v, 0);
     if (!(strength > 1e-6)) return null;
-    if (stage !== 2 && filmLab(u, pigments, paperCol)[0] - filmLab(u.map((v, j) => v + mix[j]), pigments, paperCol)[0] < VISIBLE_STEP) return null;
+    if (stage !== 2) { const a0 = filmLab(u, pigments, paperCol), a1 = filmLab(u.map((v, j) => v + mix[j]), pigments, paperCol); if (Math.hypot(a0[0] - a1[0], 0.5 * (a0[1] - a1[1]), 0.5 * (a0[2] - a1[2])) < VISIBLE_STEP) return null; }
     const fill = strokes ? { strokes, brushMm: Math.max(...strokes.map(s => 2 * s.radiusMm)), depthMm: 0, uncovered: 0 } : parts ? fillParts(parts, growMm, kit) : laneFill(loops, { kitMm: kit, growMm, keepOut });
     // the edge strokes go first: the outline cut, then the fill inside it
     if (edge?.length) fill.strokes = [...edge.map(st => ({ ...st, edge: true })), ...fill.strokes];
@@ -566,9 +577,18 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   // the true lights: the study's paper shapes at least LIGHT_LEAST_MM2; a smaller white is washed over with what is round it
   const isLight = i => shapes[i].paper && shapes[i].cells.length * cellMm2 >= LIGHT_LEAST_MM2;
   const paperMask = Uint8Array.from(label, s => (isLight(s) ? 1 : 0));
+  // the small lights of the finest study (sunlit stone, dapples on the path, gaps in foliage): reserved from the start,
+  // as paper no wash crosses, where the study is near paper in parts of at least RESERVE_LEAST_MM2
+  if (!flat && studies.length > 1) {
+    const g = grids[grids.length - 1], lm = new Uint8Array(pn);
+    for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(g, q, valueRef); if (l >= RESERVE_L && Math.hypot(a, b) <= RESERVE_C) lm[q] = 1; }
+    const c = components(lm, pw, ph, 4), cnt = new Int32Array(c.count + 1); for (const id of c.labels) if (id) cnt[id]++;
+    for (let q = 0; q < pn; q++) { const id = c.labels[q]; if (id && cnt[id] * cellMm2 >= RESERVE_LEAST_MM2) { reserve[q] = 1; paperMask[q] = 1; } }
+  }
   { const pr = roundMask(paperMask, pw, ph, rC(ROUND_MM / 2)), pc = components(pr, pw, ph, 4); for (let id = 1; id <= pc.count; id++) keepOut.push(...loopsFor(pc.labels, id)); }
   const roundFirst = R1.round != null ? 2 * R1.round : ROUND_MM;   // @round is a radius (mm); ROUND_MM a brush width
   const painted = shapes.map((s, i) => i).filter(i => !shapes[i].paper);
+  const isDark = i => !flat && shapes[i].lab[0] < DARK_L && !broken(shapes[i]);
   const share = i => under(i).reduce((a, s) => a + shapes[s].cells.length, 0) / pn;
   // Families (books/RULES.md A3, A14): a large light shape and what nests on it is one family. Its first wash is ONE
   // connected under-wash over the whole family and over every shape lying mostly inside it (windows, a gate, foliage on the
@@ -624,10 +644,23 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     laidL.set(r, s.lab[0]);
     session = { stage: 1, list: [made], ids: new Set([r]) };
     session.list.push(...lifeFor(made, s.cells, shapes, r, new Set(under(r)), what));
+    // the family's shapes of another hue but a close value are dropped into the wet under-wash where they sit, each as
+    // marks of the brush shaped to it (marks.mjs): they mingle with it, their edges lost; darker ones are glazed later on
+    // the dry wash, their edges found
+    if (!flat && !MONO) for (const m of members) {
+      const t = shapes[m]; if (m === r || t.paper || isDark(m) || done.has(m)) continue;
+      const dl = s.lab[0] - t.lab[0], dh = Math.hypot(t.lab[1] - s.lab[1], t.lab[2] - s.lab[2]);
+      if (dl > CHARGE_CLOSE_L || dl < -CHARGE_CLOSE_L || dh < CHARGE_HUE) continue;
+      const g = shapeGeometry(t.cells, pw, mmX); if (g.areaMm2 < CHARGE_LEAST_MM2) continue;
+      const mk = markFor(g, { what: broken(t) ? 'foliage' : '', kit: CHARGE_KIT, seed: 131 + m });
+      const strokes = mk.strokes.filter(st => Math.PI * st.radiusMm ** 2 / (cellMm * cellMm) >= WET_LEAST_CELLS); if (!strokes.length) continue;
+      const cm = new Uint8Array(pn); for (const q of t.cells) cm[q] = 1; const cl = maskLoops(cm, 0.5); if (!cl.length) continue;
+      const ch = wash(2, `study shape ${m} dropped into the wet under-wash of ${r} (${mk.strokes.length} ${mk.name})`, cl, t.colour, { strokes, own: t.cells, move: 'wet on wet', grade: false });
+      if (ch) { session.list.push(ch); done.add(m); charges++; }
+    }
     close();
   }
   // a dark shape carries the drawing (a window, the gate): its outline cut with a small brush, then filled with small brushes
-  const isDark = i => !flat && shapes[i].lab[0] < DARK_L && !broken(shapes[i]);
   const darkKit = washKitMm.filter(v => v <= DARK_KIT_MM).length ? washKitMm.filter(v => v <= DARK_KIT_MM) : [Math.min(...washKitMm)];
   const shadowBase = new Map();
   // the rest, lightest first: shapes of one cluster within JOIN_MM of each other are one wash (a band of cast shadow
@@ -689,8 +722,8 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
   perLayer.push({ study: L1.file ?? null, minMm2: L1.minMm2 ?? null, shapes: shapes.length, washes: instructions.filter(q => q.stage !== 2).length, strokes: strokeCount, shift: shifts[0] });
 
   // what the plan has laid so far, as the study it follows reads: each cell the colour of the shape laid there last
-  const refL = new Float32Array(pn), refC = new Float32Array(pn), refB = new Float32Array(pn);
-  for (let q = 0; q < pn; q++) { const f = fam[label[q]], s = shapes[label[q]].paper && f >= 0 ? shapes[f] : shapes[label[q]]; refL[q] = s.paper ? 100 : s.lab[0]; refC[q] = s.paper ? 0 : s.chroma; refB[q] = s.paper ? 0 : s.lab[2]; }
+  const refL = new Float32Array(pn), refC = new Float32Array(pn), refA = new Float32Array(pn), refB = new Float32Array(pn);
+  for (let q = 0; q < pn; q++) { const f = fam[label[q]], s = shapes[label[q]].paper && f >= 0 ? shapes[f] : shapes[label[q]]; refL[q] = s.paper ? 100 : s.lab[0]; refC[q] = s.paper ? 0 : s.chroma; refA[q] = s.paper ? 0 : s.lab[1]; refB[q] = s.paper ? 0 : s.lab[2]; }
 
   // --- later layers: what each richer study adds over the one before ---
   for (let li = 1; li < studies.length; li++) {
@@ -719,34 +752,27 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
       perLayer.push({ study: st.file ?? null, minMm2, mode: 'glaze', shapes: parts.length, washes: instructions.filter(q => q.stage !== 2).length - before.washes, strokes: strokeCount - before.strokes, shift: shifts[li], accent: false });
       continue;
     }
-    // outlines smoothed in proportion to the least size (a larger least size, a looser outline)
-    const roundMm = Math.min(8, Math.sqrt(minMm2) / 2);
-    const got = studyShapes(grids[li], pw, ph, paperCol, { sliverCells: Math.max(4, minMm2 / cellMm2) });
-    const adds = [];
-    got.shapes.forEach((s, i) => {
-      if (s.paper || s.cells.length * cellMm2 < minMm2) return;
-      let L = 0, C = 0; for (const q of s.cells) { L += refL[q]; C += refC[q]; } L /= s.cells.length; C /= s.cells.length;
-      const darker = L - s.lab[0], stronger = s.chroma - C;
-      if (accent ? darker >= ACCENT_DARKER : darker >= ADD_DARKER || (stronger >= ADD_CHROMA && darker >= -2)) adds.push({ i, s, darker });
-    });
-    if (accent) { adds.sort((a, b) => b.darker - a.darker); adds.length = Math.min(adds.length, ACCENT_MOST); }
-    // lighter glazes first, then darker; glazes that do not touch share a session
-    adds.sort((a, b) => b.s.lab[0] - a.s.lab[0] || b.s.cells.length - a.s.cells.length);
-    const stage = accent ? 4 : 3; let sess = [], sessIds = new Set();
-    const flush = () => { if (sess.length) layer(stage, sess); sess = []; sessIds = new Set(); };
-    for (const { i, s } of adds) {
-      if (sessIds.size >= SESSION_MOST || [...sessIds].some(o => s.border.has(o))) flush();
-      const m = new Uint8Array(pn); for (const q of s.cells) m[q] = 1;
-      const loops = maskLoops(m, roundMm, paperMask); if (!loops.length) continue;
-      const what = `${accent ? 'accent' : 'glaze'} from ${st.file ?? `study ${li + 1}`} shape ${i}`;
-      const made = broken(s) ? dabMass(stage, what, m, loops, s.colour, s.cells) : [wash(stage, what, loops, s.colour, { own: s.cells, studyLayer: li + 1 })].filter(Boolean);
-      if (!made.length) continue;
-      if (!accent) made.push(...lifeFor(made[0], s.cells, got.shapes, i, new Set(), what));
-      sess.push(...made); sessIds.add(i);
-      for (const q of s.cells) { refL[q] = Math.min(refL[q], s.lab[0]); refC[q] = Math.max(refC[q], s.chroma); }
+    // touches: each small shape the richer study adds, one mark of the brush chosen by its shape (touch-layer.mjs);
+    // touches of one colour are one mix, mixed for what they add over what is laid there; groups that do not touch
+    // share a session
+    const groups = touchesFrom({ grid: grids[li], ref: { L: refL, A: refA, B: refB }, paper: paperMask, pw, ph, mmX, paperRGB: paperCol, minMm2, kit: TOUCH_KIT, salt: li });
+    const stage = accent ? 4 : 3; let sess = [], sessMask = new Uint8Array(pn), touches = 0;
+    const flush = () => { if (sess.length) layer(stage, sess); sess = []; sessMask = new Uint8Array(pn); };
+    for (const [j, gr] of groups.entries()) {
+      const m = new Uint8Array(pn); for (const q of gr.cells) m[q] = 1;
+      const near = dilate(m, pw, ph, rC(1.5)); if (sess.length >= SESSION_MOST || gr.cells.some(q => sessMask[q]) || near.some((v, q) => v && sessMask[q])) flush();
+      const loops = maskLoops(m, 0.5); if (!loops.length) continue;
+      const names = {}; for (const t of gr.touches) names[t.name] = (names[t.name] ?? 0) + 1;
+      const what = `${accent ? 'accents' : 'touches'} from ${st.file ?? `study ${li + 1}`}, colour ${j + 1}: ${Object.entries(names).map(([k, v]) => `${v} ${k}`).join(', ')}`;
+      const strokes = gr.touches.flatMap(t => t.strokes.map(x => ({ ...x })));
+      const sh = wash(stage, what, loops, gr.colour, { strokes, own: gr.cells, studyLayer: li + 1, grade: false });
+      if (!sh) continue;
+      sh._valuePlan.touchMarks = gr.touches.map(t => ({ name: t.name, what: t.what, cells: t.cells.length }));
+      sess.push(sh); touches += gr.touches.length; for (const q of gr.cells) sessMask[q] = 1;
+      for (const q of gr.cells) { refL[q] = Math.min(refL[q], gr.lab[0]); refC[q] = Math.max(refC[q], Math.hypot(gr.lab[1], gr.lab[2])); refA[q] = gr.lab[1]; refB[q] = gr.lab[2]; }
     }
     flush();
-    perLayer.push({ study: st.file ?? null, minMm2, shapes: got.shapes.length, washes: instructions.filter(q => q.stage !== 2).length - before.washes, strokes: strokeCount - before.strokes, shift: shifts[li], accent });
+    perLayer.push({ study: st.file ?? null, minMm2, shapes: touches, washes: instructions.filter(q => q.stage !== 2).length - before.washes, strokes: strokeCount - before.strokes, shift: shifts[li], accent });
   }
 
   const lightsOnSheet = keepOut.length ? loopsMask(keepOut, w, h, cellMm) : new Uint8Array(n), lc = components(lightsOnSheet, w, h);
