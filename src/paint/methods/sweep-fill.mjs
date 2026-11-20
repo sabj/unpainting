@@ -97,6 +97,7 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
   const kit = [...kitMm].sort((a, b) => b - a), small = kit[kit.length - 1];
   const all = loops.flatMap(l => l.points);
   if (all.length < 3) return { strokes: [], brushMm: 0, angle: 0, depthMm: 0, areaMm2: 0, uncovered: 0 };
+  if (angle == null) { const spine = spineFill(loops, kit); if (spine) return spine; }
   const th = angle ?? sweepAngle(all), c = Math.cos(th), s = Math.sin(th);
   // the frame turned so the sweeps run along u
   const toU = ([x, y]) => [x * c + y * s, -x * s + y * c], toXY = ([u, v]) => [+(u * c - v * s).toFixed(3), +(u * s + v * c).toFixed(3)];
@@ -262,4 +263,51 @@ export function sweepFill(loops, { kitMm, angle = null, growMm = 0, keepOut = nu
   }
   let cov = 0; for (let i = 0; i < gn; i++) if (inside[i] && covered[i]) cov++;
   return { strokes, brushMm: brush, angle: th, depthMm: deepest, areaMm2: area * pitch * pitch, uncovered: 1 - cov / area };
+}
+
+/** A shape this many times (at least) as long as its widest cross-section is laid down its spine. */
+const SPINE_LONG = 1.6;
+/** A shape is laid down its spine only when this share of its cross-sections are one piece. */
+const SPINE_SIMPLE = 0.9;
+
+/**
+ * A shape a brush can lay in one pull: the brush whose belly is about the shape's widest part, drawn down the shape's
+ * spine (its middle line along its length) from one end to the other, pressed wide where the shape is wide and eased to
+ * the tip where it narrows and in its ends. Null when the shape is wider than the widest brush, not long enough, or
+ * branches (its cross-sections are not one piece each).
+ */
+export function spineFill(loops, kit) {
+  const all = loops.flatMap(l => l.points);
+  let sx = 0, sy = 0; for (const [x, y] of all) { sx += x; sy += y; }
+  const n = all.length, mx = sx / n, my = sy / n; let a = 0, b = 0, cc = 0;
+  for (const [x, y] of all) { const dx = x - mx, dy = y - my; a += dx * dx; b += dx * dy; cc += dy * dy; }
+  const th = 0.5 * Math.atan2(2 * b, a - cc), c = Math.cos(th), s = Math.sin(th);
+  const toU = ([x, y]) => [x * c + y * s, -x * s + y * c], toXY = ([u, v]) => [+(u * c - v * s).toFixed(3), +(u * s + v * c).toFixed(3)];
+  const pitch = 0.25;
+  let u0 = Infinity, u1 = -Infinity; for (const p of all) { const [u] = toU(p); if (u < u0) u0 = u; if (u > u1) u1 = u; }
+  // the cross-sections across the long axis, every pitch along it
+  const cols = [];
+  for (let u = u0 + pitch / 2; u < u1; u += pitch) {
+    const vs = [];
+    for (const l of loops) for (let q = 0; q < l.points.length; q++) { const P = toU(l.points[q]), Q = toU(l.points[(q + 1) % l.points.length]); if ((P[0] <= u) !== (Q[0] <= u)) vs.push(P[1] + (u - P[0]) / (Q[0] - P[0]) * (Q[1] - P[1])); }
+    vs.sort((p, q) => p - q);
+    cols.push({ u, spans: vs.length >= 2 ? Array.from({ length: vs.length >> 1 }, (_, k) => [vs[2 * k], vs[2 * k + 1]]) : [] });
+  }
+  if (cols.length < 4) return null;
+  const single = cols.filter(col => col.spans.length === 1).length / cols.length;
+  const widest = Math.max(...cols.flatMap(col => col.spans.map(([p, q]) => q - p))), length = u1 - u0;
+  if (single < SPINE_SIMPLE || length < SPINE_LONG * widest || widest > kit[0] * 1.05) return null;
+  // the brush whose belly is about the shape's width: the smallest that is at least nine tenths of it, or the widest
+  const brush = [...kit].sort((p, q) => p - q).find(w => w >= 0.9 * widest) ?? kit[0], r = brush / 2;
+  // a point every half radius down the spine, its pressure from the width there (a round lays r (0.25 + 0.75 p) each side)
+  const pts = [], step = Math.max(1, Math.round(r / 2 / pitch));
+  for (let k = 0; k < cols.length; k += step) {
+    const col = cols[k], span = col.spans.reduce((best, sp) => (sp[1] - sp[0] > best[1] - best[0] ? sp : best), [0, 0]); if (!(span[1] > span[0])) continue;
+    const half = (span[1] - span[0]) / 2, p = Math.max(0.15, Math.min(1, (half / r - 0.25) / 0.75));
+    pts.push([...toXY([col.u, (span[0] + span[1]) / 2]), +p.toFixed(3)]);
+  }
+  if (pts.length < 2) return null;
+  // the tip goes into the ends: the first and last points sit at the shape's ends, the brush eased off
+  pts[0][2] = Math.min(pts[0][2], 0.15); pts[pts.length - 1][2] = Math.min(pts[pts.length - 1][2], 0.15);
+  return { strokes: [{ kind: 'sweep', radiusMm: +r.toFixed(3), points: pts }], brushMm: brush, angle: th, depthMm: widest / 2, areaMm2: 0, uncovered: 0, spine: true };
 }

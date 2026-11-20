@@ -28,6 +28,8 @@ const PLAN_MM = 0.5;
 const RESERVE_SIGMA_MM = 5, SHADOW_SIGMA_MM = 5, DARK_SIGMA_MM = 3.5, ZONE_SIGMA_MM = 5;
 /** Bare paper: squinted within this L* of the lighter of the paper and the picture's lightest tone, and no more chromatic than this. */
 const RESERVE_WITHIN = 7, RESERVE_CHROMA = 12;
+/** Near-paper light in the subject: within this L* of the paper. A reserve is never darker than PAPER_DARKEST L*. */
+const PAPER_NEAR = 10, PAPER_DARKEST = 72;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
 const RESERVE_LEAST_MM2 = 25, RESERVE_ROUND_MM = 4;
 /** First wash: at most this many colour families; families nearer than this (Lab) are one; an area is at least this big (mm2) or this share of the sheet. */
@@ -36,8 +38,6 @@ const ZONE_FAMILIES = 6, ZONE_JOIN = 6, ZONE_LEAST_MM2 = 300, ZONE_LEAST_SHARE =
 const ZONE_L_WEIGHT = 0.15;
 /** An area whose light side is this near the paper (CIEDE2000) is left as paper: a lot of the sheet stays bare. */
 const ZONE_PAPER = 6;
-/** Under a pen drawing (ink and wash) the drawing carries the structure and more is left bare: lights within this L*. */
-const RESERVE_WITHIN_DRAWN = 12;
 /** An area's wash goes round an area inside it that is lighter than it, or less than this much darker (L*). */
 const AROUND_LIGHTER = 4;
 /** ... and runs behind a hole in it no bigger than this share of it. */
@@ -51,9 +51,11 @@ const CHARGE_TILE_MM = 24, CHARGE_DIFFERS = 5, CHARGE_MOST = 4, CHARGE_PER_MM2 =
 /** Shadow steps: this much darker (L*) than the area's light side, and the deeper step. */
 const SHADOW_STEP = 12, DEEP_STEP = 26;
 /** The least shadow shape (mm2); the brush (mm) that rounds its outline (its smallest feature); the most shapes a step. */
-const SHADOW_LEAST_MM2 = 40, SHADOW_ROUND_MM = 7, SHADOW_MOST = 30;
+const SHADOW_LEAST_MM2 = 40, SHADOW_ROUND_MM = 7, SHADOW_MOST = 3;
+/** A shadow is one connected glaze where it is continuous: its parts within this (mm) of each other are joined. */
+const SHADOW_JOIN_MM = 12;
 /** Darks: no lighter than the picture's 3rd percentile plus this, this much darker than what is laid there, at least this big (mm2), at most this many. */
-const DARK_REACH = 10, DARK_UNDER = 14, DARK_LEAST_MM2 = 15, DARK_MOST = 14;
+const DARK_REACH = 10, DARK_UNDER = 14, DARK_LEAST_MM2 = 15, DARK_MOST = 6;
 /** A wash is graded: its charge runs this share (at least, at most) either side of its mix; L* of the subject's own change per share. */
 const GRADE_LEAST = 0.12, GRADE_MOST = 0.35, GRADE_PER_L = 40;
 /** A wash is laid only when it darkens what is under it by this much L*. */
@@ -167,8 +169,13 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   const S6 = squint(ZONE_SIGMA_MM);
   // --- 1. the reserved lights ---
   const S2 = squint(RESERVE_SIGMA_MM), sortedL = Float32Array.from(S2.L).sort(), lightest = sortedL[Math.floor(.995 * (pn - 1))];
-  const reserveFrom = Math.min(100, lightest) - (drawn ? RESERVE_WITHIN_DRAWN : RESERVE_WITHIN);
-  let reserve = Uint8Array.from(S2.L, (v, q) => (v >= reserveFrom && Math.hypot(S2.A[q], S2.B[q]) <= RESERVE_CHROMA ? 1 : 0));
+  // Light things are not painted: they are paper, their shapes cut by what is painted round them. The sheet keeps as
+  // much bare paper as the subject has near-paper light (read at a 1 mm squint, a share of the sheet, no place): the
+  // lightest that share of the squinted subject is reserved, never darker than PAPER_DARKEST.
+  const S1 = squint(1); let near = 0; for (let q = 0; q < pn; q++) if (S1.L[q] >= 100 - PAPER_NEAR && Math.hypot(S1.A[q], S1.B[q]) <= RESERVE_CHROMA * 1.5) near++;
+  const subjectPaper = near / pn;
+  const reserveFrom = Math.max(PAPER_DARKEST, Math.min(Math.min(100, lightest) - RESERVE_WITHIN, sortedL[Math.max(0, Math.floor((1 - subjectPaper) * (pn - 1)))]));
+  let reserve = Uint8Array.from(S2.L, (v, q) => (v >= reserveFrom && Math.hypot(S2.A[q], S2.B[q]) <= RESERVE_CHROMA * 1.5 ? 1 : 0));
   reserve = roundMask(reserve, pw, ph, rC(RESERVE_ROUND_MM / 2));
   const rc = keepParts(reserve, pw, ph, cellsFor(RESERVE_LEAST_MM2)), lightLoops = [];
   for (let id = 1; id <= rc.count; id++) lightLoops.push(...loopsOf(rc.labels, id, pw, ph, mmX, LIGHT_TOL_MM).filter(l => Math.abs(shoelace(l.points)) >= RESERVE_LEAST_MM2 / 2));
@@ -339,6 +346,8 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   for (const [si, stepL] of [[0, SHADOW_STEP], [1, DEEP_STEP]]) {
     let m = Uint8Array.from(S3.L, (v, q) => (zoneOf[q] >= 0 && !lightMask[q] && zoneL[q] - v >= stepL ? 1 : 0));
     m = roundMask(m, pw, ph, rC(SHADOW_ROUND_MM / 2));
+    // one connected glaze: parts near each other joined (closed by SHADOW_JOIN_MM)
+    { const r = rC(SHADOW_JOIN_MM / 2); m = erode(dilate(m, pw, ph, r), pw, ph, r); }
     for (let q = 0; q < pn; q++) if (lightMask[q]) m[q] = 0;
     const c = keepParts(m, pw, ph, cellsFor(SHADOW_LEAST_MM2)), parts = [];
     for (let id = 1; id <= c.count; id++) { const cells = []; for (let q = 0; q < pn; q++) if (c.labels[q] === id) cells.push(q); if (cells.length) parts.push({ id, cells }); }
@@ -384,9 +393,9 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   const lightShapes = Array.from({ length: lc.count }, (_, j) => ({ id: j + 1, category: 'bare paper', reason: 'the squinted subject\'s brightest lights kept as bare paper', toneAt: 'retain paper', cells: 0 })); for (const id of lc.labels) if (id) lightShapes[id - 1].cells++;
   const areas = instructions.map(q => q.areaMm2).sort((a, b) => a - b), reservedShare = lightMask.reduce((a, v) => a + v, 0) / pn;
   const covered = new Uint8Array(pn); for (let q = 0; q < pn; q++) for (let j = 0; j < k; j++) if (laid[j][q] > 0) { covered[q] = 1; break; }
-  const summary = { stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes: instructions.length, planCellMm: mmX, zones: zones.length, families: centres.length, shadows: shadowCount, darks: darkShapes.length, reservedShare, paintedShare: covered.reduce((a, v) => a + v, 0) / pn,
+  const summary = { subjectPaper, stages: byStage.filter(Boolean).length, washesByStage: byStage, mixes: mixes.length, washes: instructions.length, planCellMm: mmX, zones: zones.length, families: centres.length, shadows: shadowCount, darks: darkShapes.length, reservedShare, paintedShare: covered.reduce((a, v) => a + v, 0) / pn,
     lightestTone: lightest, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, firstWashCover: 1, drawn };
-  console.log(`layered washes: ${centres.length} colour families, ${zones.length} areas (${zones.filter(z => z.paper).length} left as paper), ${byStage[1]} charges; shadows ${shadowCount[0]} + ${shadowCount[1]} deeper; ${darkShapes.length} darks; lights ${(100 * reservedShare).toFixed(1)}% of the sheet kept as paper, ${(100 * summary.paintedShare).toFixed(0)}% painted`);
+  console.log(`layered washes: ${centres.length} colour families, ${zones.length} areas (${zones.filter(z => z.paper).length} left as paper), ${byStage[1]} charges; shadows ${shadowCount[0]} + ${shadowCount[1]} deeper; ${darkShapes.length} darks; lights ${(100 * reservedShare).toFixed(1)}% of the sheet kept as paper (the subject has ${(100 * subjectPaper).toFixed(1)}% near paper), ${(100 * summary.paintedShare).toFixed(0)}% painted`);
   console.log(`washes: ${summary.washes} over 4 stages (${byStage.join(', ')}); widest brush ${Math.max(0, ...instructions.map(q => q.widestBrushMm)).toFixed(1)} mm; least wash ${summary.smallestWashMm2.toFixed(1)} mm2; ${strokeCount} strokes planned`);
   return { opticsReport: null, paper, style: null, layers, instructions, protectedCells, value, regions: region, omittedDemand: 0, lightShapes, summary, mixes, polygons,
     geometry: 'Three layers from the squinted subject: big pale first washes in each area\'s light-side colour, charged wet; shadow shapes in two steps across the areas; a few dark marks. Lights kept as bare-paper outlines. Every wash is an outline and parallel sweeps in mm.' };
