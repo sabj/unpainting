@@ -647,12 +647,11 @@ function stepCpu(sheet, o, reduction) {
 // passage's mean deposit (this wash's and, on a fixed bed, the layers under it) where that is higher. Undefined when it is slideFill.
 function slideFillFor(sheet, o, [x0, y0, x1, y1]) {
   const ref = o.fillRef ?? 0; if (!(ref > 0) || !(o.slide > 0)) return undefined;
-  const { w, M, D, K, layers } = sheet, bed = o.fixedBed > 0 ? layers : [];
+  const { w, M, D, layers } = sheet, arrays = o.fixedBed > 0 ? D.concat(...layers) : D, na = arrays.length;   // in the order summed
   let sum = 0, n = 0;
   for (let y = y0; y <= y1; y++) for (let i = y * w + x0, e = y * w + x1; i <= e; i++) {
     if (!M[i]) continue;
-    let d = 0; for (let k = 0; k < K; k++) d += D[k][i];
-    for (const L of bed) for (let k = 0; k < K; k++) d += L[k][i];
+    let d = 0; for (let a = 0; a < na; a++) d += arrays[a][i];
     sum += d; n++;
   }
   const mean = n ? sum / n : 0, fill = o.slideFill ?? 1;
