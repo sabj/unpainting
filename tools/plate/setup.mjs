@@ -3,6 +3,7 @@
 import {EpochCells} from '../../src/paint/epoch-cells.mjs';
 import {setStrict, writeContinuedChecks} from '../../src/media/checks.mjs';
 import {scaleBrushForDensity} from '../../src/media/brush-density.mjs';
+import {painterBrushOptions, isSection} from './painter-brush.mjs';
 import {framePolicy} from '../speed/frame-policy.mjs';
 import {startSpeedProfile} from '../speed/profile.mjs';
 import {runSpeedSequence} from '../speed/sequence.mjs';
@@ -349,7 +350,8 @@ const w = info.width, h = info.height, n = w * h;
 const SEGMENTS_RECORD = await prepareSegments({ image: path.resolve(root, opt('image')), root, out, opt, log: console.log });
 // Above 540 px, bristles are capped so GPU strokes fit workgroup memory: (hairs + 2) x (4 + pigments) <= 4000 floats, at most 576.
 // Uncapped strokes fall back to the CPU. HAIR_CAP=0 turns the cap off.
-const createBrush = o => createBrushRaw(gpuHairCap(scaleBrushForDensity(o, { renderWidth: w * num('scale', 1) })));
+// Every painter brush is a section brush (painter-brush.mjs), whose sizes are physical: no density scaling or hair cap.
+const createBrush = o => { const b = painterBrushOptions(o); return createBrushRaw(isSection(b) ? b : gpuHairCap(scaleBrushForDensity(b, { renderWidth: w * num('scale', 1) }))); };
 // --mmspacing 0|1: space brush dabs by sheet size, not cells, so marks match at any resolution. Default 1 above 540 px.
 const MM_SPACING_ON = () => { try { return num('mmspacing', w > 540 ? 1 : 0) > 0; } catch { return false; } };
 const dabSpacing = o => { if (!MM_SPACING_ON()) return o; const f = w / 540; return { ...(o ?? {}), spacing: (o?.spacing ?? 0.7) * f }; };

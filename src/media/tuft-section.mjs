@@ -28,6 +28,7 @@ export const TUFT = Object.freeze({
   pore: 0.15,         // head of a dry sheet's pores, through the sizing
   refSpeed: 60,       // the hand speed the legacy per-step feed was tuned at, mm/s
   wick: 60,           // 1/s: the slowest the belly refills the tips by capillary flow
+  keep: 0.5,          // a tuft's retention share, of the legacy free threshold
   mix: 0.25,          // the share of the film under the hairs that the moving hairs stir into their own (the rest only levels)
   creep: 0.8,         // the share of a press's growth the tuft's tip slides out by (the rest it bows)
 });
@@ -54,8 +55,8 @@ export const kappaOf = (brush, mmPerCell) => (brush.loadWater > 0 ? mmPerCell * 
  *  its suction below it. */
 export function headOf(sat, free, Hb, suck = TUFT.suck) {
   // A tuft holds its film near full head while it has liquid to spare and loses it fast as the last of it goes: its
-  // capillary pressure curve is flat over most of the load (1 - (1 - x)^4 of the free share x).
-  return sat >= free ? Hb * (1 - (1 - Math.min(1, (sat - free) / Math.max(1e-6, 1 - free))) ** 4) : suck * (sat - free) / Math.max(1e-6, free);
+  // capillary pressure curve is flat over most of the load (1 - (1 - x)^3 of the free share x).
+  return sat >= free ? Hb * (1 - (1 - Math.min(1, (sat - free) / Math.max(1e-6, 1 - free))) ** 3) : suck * (sat - free) / Math.max(1e-6, free);
 }
 
 /** Feed rate (1/s) from the legacy per-step feed share, no slower than a tuft wicks (TUFT.wick). */
@@ -80,6 +81,7 @@ export function moveChain(pts, S, hx, hy, seg, seg0, dx, dy) {
     const own = pts[2 * S + j - 1];
     if (L <= 1e-9 || own <= 0) { ex = px; ey = py; L = 0; } // gathered at the one before: it lies on in the chain's line
     const to = L > seg ? seg : Math.min(seg, Math.max(L, own + TUFT.creep * grow));
+    if (L < to && ex * px + ey * py < 0) { ex = px; ey = py; } // a segment growing under a press lies on in the chain's line
     pts[2 * j] = ax + ex * to; pts[2 * j + 1] = ay + ey * to; pts[2 * S + j - 1] = to;
   }
   return pts;

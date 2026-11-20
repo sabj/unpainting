@@ -21,7 +21,7 @@ const ledger = (sheet, brush) => {
 
 test('a tuft holds its film while it has free liquid, and sucks below its retention share', () => {
   assert.equal(headOf(0.4, 0.4, 0.9), 0);
-  assert.ok(headOf(1, 0.4, 0.9) > 0.89 && headOf(0.7, 0.4, 0.9) > 0.8, 'near full head over most of the load');
+  assert.ok(headOf(1, 0.4, 0.9) > 0.89 && headOf(0.7, 0.4, 0.9) > 0.75, 'near full head over most of the load');
   assert.ok(headOf(0.2, 0.4, 0.9) < 0 && headOf(0.1, 0.4, 0.9) < headOf(0.3, 0.4, 0.9));
   // reach: a loaded lane past the deepest pit, a damp one only the hills
   assert.ok(toothReach(0.9, 0.9, 1, 0) > 1 && toothReach(-0.15, 0.9, 1, 0.55) < 0);
