@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { strokeWeight, withStrokeWeight, splitAtCorners } from './stroke-weight.mjs';
+import { strokeWeight, splitAtCorners, trimHooks } from './stroke-weight.mjs';
 import { shapeGesture, handDrawing } from './drawing-hand.mjs';
 
 const line = (pts, extra = {}) => ({ points: pts.map(([x, y, width, weight]) => ({ x, y, ...(width == null ? {} : { width }), ...(weight == null ? {} : { weight }) })), ...extra });
@@ -8,16 +8,10 @@ const line = (pts, extra = {}) => ({ points: pts.map(([x, y, width, weight]) => 
 test('a stroke has one width and one darkness: the medians of its readings', () => {
   const g = line([[0, 0, 1, 0.2], [10, 0, 3, 0.9], [20, 0, 2, 0.6], [30, 0, 9, 0.5]]);
   assert.deepEqual(strokeWeight(g.points), { width: 2.5, weight: 0.55 });
-  const one = withStrokeWeight(g);
-  assert.deepEqual(one.points.map(q => q.width), [2.5, 2.5, 2.5, 2.5]);
-  assert.deepEqual(one.points.map(q => q.weight), [0.55, 0.55, 0.55, 0.55]);
-  assert.equal(one.weight, 0.55);
-  assert.deepEqual(one.points.map(q => q.x), [0, 10, 20, 30]);
 });
 
-test('a gesture with no readings is left as it is', () => {
-  const g = line([[0, 0], [5, 0]]);
-  assert.equal(withStrokeWeight(g), g);
+test('a gesture with no readings has no weight of its own', () => {
+  assert.deepEqual(strokeWeight(line([[0, 0], [5, 0]]).points), { width: null, weight: null });
 });
 
 test('the nib does not replay the subject\'s darkness point by point: only the hand\'s envelope varies along a stroke', () => {
@@ -54,9 +48,13 @@ test('a straight line and a gentle curve are not cut', () => {
   assert.equal(splitAtCorners(arc, { span: 3 }).length, 1);
 });
 
-test('the hand cuts at corners before it joins and shapes', () => {
-  const r = handDrawing([line([[0, 0, 2, 1], [20, 0, 2, 1], [20, 20, 2, 1]], { role: 'pen stroke' })], { gap: 0, corner: { span: 3, deg: 60, spur: 4 } });
-  assert.equal(r.strokes.length, 2);
-  const none = handDrawing([line([[0, 0, 2, 1], [20, 0, 2, 1], [20, 20, 2, 1]], { role: 'pen stroke' })], { gap: 0 });
-  assert.equal(none.strokes.length, 1);
+test('the hand drops a hook and keeps a cornered line as one stroke', () => {
+  const L = [line([[0, 0, 2, 1], [20, 0, 2, 1], [20, 20, 2, 1]], { role: 'pen stroke' })], corner = { span: 3, deg: 60, spur: 4 };
+  const r = handDrawing(L, { gap: 0, corner });
+  assert.equal(r.strokes.length, 1);
+  assert.deepEqual([r.strokes[0].points.at(-1).x, r.strokes[0].points.at(-1).y], [20, 20]);
+  const hooked = handDrawing([line([[0, 0, 2, 1], [20, 0, 2, 1], [20, 2.5, 2, 1]], { role: 'pen stroke' })], { gap: 0, corner });
+  assert.equal(hooked.strokes.length, 1);
+  assert.deepEqual([hooked.strokes[0].points.at(-1).x, hooked.strokes[0].points.at(-1).y], [20, 0]);
+  assert.deepEqual(trimHooks(L[0], corner).points.map(q => [q.x, q.y]), [[0, 0], [20, 0], [20, 20]]);
 });

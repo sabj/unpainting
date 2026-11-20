@@ -1,20 +1,14 @@
 // Pipeline: inking, stage 4 (hand plan). A pen stroke has one weight: the draughtsman decides how heavy a line is before
 // the nib lands, and the pressure then rises, holds and lifts along it. The line file's per-point readings of the
 // subject's line (width, darkness) are evidence for that one decision, never a profile the nib replays point by point.
-// A stroke also has one direction of travel: at a sharp corner the pen lifts and a new stroke starts.
+// A stroke ends where its line ends: a short piece past a sharp corner at either end is the tracer rounding a junction
+// into the next line, and a hand does not draw that hook.
 
 const median = v => { const s = v.filter(Number.isFinite).sort((a, b) => a - b); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
 
 /** The stroke's own width and darkness: the medians of its points' readings, or null where no point has one. */
 export function strokeWeight(points) {
   return { width: median(points.map(q => q.width)), weight: median(points.map(q => q.weight)) };
-}
-
-/** The gesture with every point carrying the stroke's one width and weight (points with no reading are left alone). */
-export function withStrokeWeight(g) {
-  const { width, weight } = strokeWeight(g.points);
-  if (width == null && weight == null) return g;
-  return { ...g, ...(weight == null ? {} : { weight }), points: g.points.map(q => ({ ...q, ...(width == null || q.width == null ? {} : { width }), ...(weight == null || q.weight == null ? {} : { weight }) })) };
 }
 
 const lerp = (a, b, u) => { const out = { ...a, x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u }; for (const k of ['width', 'weight']) if (a[k] != null && b[k] != null) out[k] = a[k] + (b[k] - a[k]) * u; return out; };
@@ -58,4 +52,15 @@ export function splitAtCorners(g, { span = 3, deg = 60, spur = 4 } = {}) {
     pieces.push({ ...g, points, length: b - a });
   }
   return pieces.length ? pieces : [g];
+}
+
+/**
+ * The gesture without its hooks: an end piece shorter than `spur` cells past a sharp corner is dropped (splitAtCorners);
+ * the rest stays one gesture, corners and all, so a long line is still one stroke.
+ */
+export function trimHooks(g, corner = {}) {
+  const pieces = splitAtCorners(g, corner);
+  if (pieces.length === 1) return pieces[0];
+  const points = pieces.flatMap((p, k) => (k ? p.points.slice(1) : p.points));
+  return { ...g, points, length: pieces.reduce((a, p) => a + p.length, 0) };
 }

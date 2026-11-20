@@ -5,7 +5,7 @@
 import { joinLines } from '../../crop/joinlines.mjs';
 import { pathLength } from '../../crop/inktiers.mjs';
 import { breakOnLights } from './drawing-scribble.mjs';
-import { strokeWeight, splitAtCorners } from './stroke-weight.mjs';
+import { strokeWeight, trimHooks } from './stroke-weight.mjs';
 
 function interpPoint(p0, p1, t) {
   const p = { ...p0 };
@@ -70,8 +70,8 @@ export function scaleDrawingGestures(gestures, scale) {
 // Hand handling of a reviewed file without the form/toning budget changing its selection.
 export function handDrawing(lines, { gap = 4, cos = .8, aim = .7, strokeLength = Infinity,
   D = null, w, h, lit = 0, reach = 2, corner = null, ...shape } = {}) {
-  // `corner` { span, deg, spur } in cells: a line is cut where it turns a sharp corner, so each stroke runs one way
-  const normLines = lines.map(g => ({ ...g, tier: g.tier ?? 1 })).flatMap(g => (corner ? splitAtCorners(g, corner) : [g]));
+  // `corner` { span, deg, spur } in cells: a short end piece past a sharp corner is a hook and is not drawn
+  const normLines = lines.map(g => ({ ...g, tier: g.tier ?? 1 })).map(g => (corner ? trimHooks(g, corner) : g));
   const groups = new Map();
   for (const g of normLines) {
     const key = [g.role, g.kind, g.object, g.region, g.tier].join('|');
