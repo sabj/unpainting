@@ -334,8 +334,11 @@ function spineFill(loops, kit) {
 
 /** The least pressure a lane is laid at (a round lays r (0.25 + 0.75 p) to each side; lighter, it hardly lays paint). */
 const TIP = 0.35;
+/** A lane runs on, at the tip's pressure, until the outline is this share of the tip's half-width away: its end reaches
+ * the outline (overrunning it by at most half the tip's half-width) instead of stopping a round's radius short. */
+const END_REACH = 0.5;
 /** Lanes overlap by this share of the brush's width. */
-const LANE_OVERLAP = 0.25;
+const LANE_OVERLAP = 1 / 3;
 /** A shape is laid along its long axis when it is at least this many times as long as it is wide; else level. */
 const LONG = 2.2;
 /** A part the lanes left bare (a wedge along a slanting side, a corner) is laid along its own length when it is this long. */
@@ -432,7 +435,7 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
       const samples = [];
       for (let u = u0; u <= u1 + 1e-9; u += pitch / 2) {
         const x = u * tx + v * nx, y = u * ty + v * ny, i = at(x, y), dmm = i >= 0 && part[i] ? D[i] * pitch : 0;
-        samples.push({ u, dmm, in: dmm >= halfAt(r, TIP) });
+        samples.push({ u, dmm, in: dmm >= END_REACH * halfAt(r, TIP) });
       }
       const runs = []; let cur = null;
       for (const sm of samples) { if (sm.in) (cur ??= []).push(sm); else if (cur) { runs.push(cur); cur = null; } }
