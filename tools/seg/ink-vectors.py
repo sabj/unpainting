@@ -225,7 +225,7 @@ def is_fill(stroke, width_mm=.5, area_mm2=1.5):
     rings = stroke['outline']; a = abs(sum(ring_area(r) for r in rings))
     per = sum(float(np.hypot(*np.diff(np.vstack([r, r[:1]]), axis=0).T).sum()) for r in map(np.asarray, rings))
     w = 2 * a / max(per, 1e-9); L = per / 2
-    return (w > width_mm and L < 4 * w) or (a > area_mm2 and w > .8 * width_mm)
+    return L < 4 * w and (w > width_mm or (a > area_mm2 and w > .8 * width_mm))
 
 
 def render_vectors(doc, width, upto=None, ss=4, fill=1.0, band_mm=.2):
@@ -253,15 +253,10 @@ def render_vectors(doc, width, upto=None, ss=4, fill=1.0, band_mm=.2):
             m &= nib
         mf = m.astype(np.float32) / 255
         if fill < 1 and is_fill(st):
-            # under paint a fill is one pale shape at `fill` of its darkness, soft over `band_mm` at its edge, no rim; a line
-            # through it (its path three times as long as the fill is wide) stays full, 0.3 mm wide
+            # under paint a fill (a compact blob) is one uniform pale shape at `fill` of its darkness, soft over `band_mm` at
+            # its edge, nothing drawn inside it
             d = cv2.distanceTransform(m, cv2.DIST_L2, 5) / (band_mm * s * S)
             mf = mf * fill * np.minimum(1, d + .35)
-            P = np.asarray(st['path']) * s * S - x0 * S
-            rings = [np.asarray(r) for r in st['outline']]; a = abs(sum(ring_area(r) for r in rings)); per = sum(float(np.hypot(*np.diff(np.vstack([r, r[:1]]), axis=0).T).sum()) for r in rings)
-            if len(P) > 1 and np.hypot(*np.diff(P, axis=0).T).sum() / (s * S) >= 3 * (2 * a / max(per, 1e-9)):
-                core = np.zeros_like(m); cv2.polylines(core, [np.int32(np.round(P))], False, 255, max(1, int(round(.3 * s * S))))
-                mf = np.where((core > 0) & (m > 0), m.astype(np.float32) / 255, mf)
         cov = cv2.resize(mf, (y0[0] - x0[0], y0[1] - x0[1]), interpolation=cv2.INTER_AREA) * st['dark']
         sub = out[x0[1]:y0[1], x0[0]:y0[0]]; np.maximum(sub, cov, out=sub)
     return out

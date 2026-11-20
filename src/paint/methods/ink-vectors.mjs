@@ -52,13 +52,13 @@ const ringLength = r => { let L = 0; for (let k = 0, n = r.length; k < n; k++) {
 
 /**
  * A FILL (a leaf mass, a dark pane, a blot), not a LINE: its ink (outer rings less holes) is wider than `widthMm` (twice its
- * area over its perimeter, the width of a strip) and hardly longer than four widths, or covers over `areaMm2` and is over
- * 0.8 of that wide. Contours, bars, branches and hatching are lines. Same rule as tools/seg/ink-vectors.py is_fill.
+ * area over its perimeter, the width of a strip) or covers over `areaMm2` and is over 0.8 of that wide, and is COMPACT:
+ * under four widths long. Anything longer than four widths is a line at any width (a thick branch is laid whole). Same rule as tools/seg/ink-vectors.py is_fill.
  */
 export function isFill(stroke, widthMm = 0.5, areaMm2 = 1.5) {
   const a = Math.abs(stroke.outline.reduce((t, r) => t + ringArea(r), 0)), per = stroke.outline.reduce((t, r) => t + ringLength(r), 0);
   const w = 2 * a / Math.max(per, 1e-9), L = per / 2;
-  return (w > widthMm && L < 4 * w) || (a > areaMm2 && w > 0.8 * widthMm);
+  return L < 4 * w && (w > widthMm || (a > areaMm2 && w > 0.8 * widthMm));
 }
 
 const pathLength = P => P.reduce((t, q, k) => (k ? t + Math.hypot(q[0] - P[k - 1][0], q[1] - P[k - 1][1]) : 0), 0);
@@ -81,26 +81,19 @@ function edgeDistance(R, x, y, closed = true) {
 /**
  * Lays the strokes on `field` (an ink amount per cell, w x h cells of `mm` mm) in seq order; the darker holds where two meet.
  * `inkOf` maps darkness to ink amount (inkForDarkness). `each(stroke, cells)` is told each stroke's area as it is laid.
- * `fill` (0..1): a FILL stroke (isFill) is laid as one pale shape of diluted ink at `fill` of its darkness, its edge soft
- * over `softMm` (like ink laid with a brush), no rim; where the fill is a thickened part of a line (its path at least
- * three times as long as the fill is wide: a branch swelling, a leaf on a twig) the line through it, `coreMm` wide, stays at
- * full darkness. Lines are exact (1: everything exact). Returns { strokes, cells, fills }.
+ * `fill` (0..1): a FILL stroke (isFill: a compact blob) is laid as one uniform pale shape of diluted ink at `fill` of its
+ * darkness, its edge soft over `softMm` (like ink laid with a brush), nothing drawn inside it. Lines are exact (1:
+ * everything exact). Returns { strokes, cells, fills }.
  */
-export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, softMm = 0.2, coreMm = 0.3 } = {}) {
+export function layVectors(doc, field, w, h, mm, inkOf, { ss = 4, each = null, fill = 1, softMm = 0.2 } = {}) {
   const S = [...doc.strokes].sort((a, b) => a.seq - b.seq), dark = new Float32Array(w * h);
   let cells = 0, fills = 0;
   for (const s of S) {
     const r = rasterizeRings(s.outline, w, h, mm, ss); let n = 0;
     const thin = fill < 1 && isFill(s); if (thin) fills++;
-    const P = s.path ?? [], core = thin && P.length > 1 && pathLength(P) >= 3 * fillWidth(s);
     for (let j = 0; j < r.h; j++) for (let i = 0; i < r.w; i++) {
       const c = r.cov[j * r.w + i]; if (!(c > 0)) continue;
-      let f = 1;
-      if (thin) {
-        const x = (r.x0 + i + 0.5) * mm, y = (r.y0 + j + 0.5) * mm;
-        f = fill * Math.min(1, edgeDistance(s.outline, x, y) / softMm + 0.35);
-        if (core && polylineDistance(P, x, y) <= coreMm / 2) f = 1;
-      }
+      const f = thin ? fill * Math.min(1, edgeDistance(s.outline, (r.x0 + i + 0.5) * mm, (r.y0 + j + 0.5) * mm) / softMm + 0.35) : 1;
       const k = (r.y0 + j) * w + r.x0 + i, d = Math.min(1, c * s.dark * f);
       // the darker holds, against ink already on the sheet too (a closing pen over the opening's ink adds none twice)
       if (d > dark[k]) { dark[k] = d; const t = inkOf(d); if (t > field[k]) field[k] = t; n++; }
