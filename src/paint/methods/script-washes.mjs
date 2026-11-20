@@ -227,8 +227,17 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   const layers = [], instructions = [], mixes = [], polygons = [], checks = [];
   let session = null, strokeCount = 0, charges = 0, label = 0;
   const dropped = [], laidDry = [], after = [];
+  // the plan's own colour over a passage's cells once its whole wet session is laid (it, its charges and the passages
+  // laid into it: they dry together, and the plate is measured when the sheet is next dry): the film of everything
+  // planned there so far, on this paper, as sRGB and then Lab against white (what the plate is measured against)
+  const planColour = sh => {
+    { const u = new Array(k).fill(0); let c = 0; for (let i = 0; i < n; i++) if (sh.ids?.[i]) { c++; for (let j = 0; j < k; j++) u[j] += laid[j][i]; }
+      if (c) { const px = renderLayers([pigments.map((_, j) => Float32Array.of(u[j] / c))], pigments.map(q => ({ K: q.K, S: q.S ?? [0, 0, 0] })), Uint8ClampedArray.from(paperCol), 1, 1);
+        sh._valuePlan.script.planned = labOf(px, 0, [255, 255, 255]).map(v => +v.toFixed(2)); sh._valuePlan.script.plannedRGB = Array.from(px.slice(0, 3)); } }
+  };
   const close = () => {
     if (!session) return;
+    for (const sh of session.list) planColour(sh);
     const list = session.list, area = list.reduce((a, s) => a + s.area, 0), mix = new Array(k).fill(0);
     for (const s of list) s.mix.forEach((v, j) => { mix[j] += v * s.area / area; });
     const t = mix.reduce((a, v) => a + v, 0) || 1, first = list[0]._valuePlan;
@@ -302,11 +311,6 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
     }
     session.list.push(...smalls, ...after.splice(0).map(f => f()).filter(Boolean));
     washed.push([p.id, sh]);
-    // the plan's own colour over the passage's cells once it and its charges are laid: the film of everything planned
-    // there so far, on this paper, as sRGB and then Lab against white (what the plate is measured against)
-    { const u = new Array(k).fill(0); let c = 0; for (let i = 0; i < n; i++) if (sh.ids?.[i]) { c++; for (let j = 0; j < k; j++) u[j] += laid[j][i]; }
-      if (c) { const px = renderLayers([pigments.map((_, j) => Float32Array.of(u[j] / c))], pigments.map(q => ({ K: q.K, S: q.S ?? [0, 0, 0] })), Uint8ClampedArray.from(paperCol), 1, 1);
-        sh._valuePlan.script.planned = labOf(px, 0, [255, 255, 255]).map(v => +v.toFixed(2)); sh._valuePlan.script.plannedRGB = Array.from(px.slice(0, 3)); } }
   }
   close();
   // the check (never fed back): the plan's finished film over each passage's cells against the subject's mean colour there
