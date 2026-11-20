@@ -40,6 +40,7 @@ const ORDER_DEFAULTS = Object.freeze({
   growthPull: 1.5,      // growth: the next stroke is the cheapest by hop + growthPull x its distance from the main form
   layIn: 8,             // growth: the light placement lines of the biggest masses
   detailLagMm: 15,      // growth: detail follows the structure of its area at about this distance behind
+  mainShare: 0.03,      // growth: a main form smaller than this share of the sheet is not grown from
   majorMm: 25,          // growth: a structure line this long, or one of the main form, is a main line (drawn a little firmer)
   emphasisShare: 0.04,  // growth: the share of contours restated heavier at the end
   accentMm: 40,         // ... a line's length counts up to this in choosing them
@@ -398,7 +399,7 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const score = s => pathLength(s.points) * (roleW[s.role] ?? 1) * (s.object >= 0 && objects[s.object]?.children.length ? 1.5 : 1) * (1.3 - 0.6 * dist(ctr, s.points[0]) / diag);
     live.sort((a, b) => score(b) - score(a)).slice(c.budget).forEach(s => { s.taken = true; s.dropped = true; });
   }
-  if (c.mode === 'growth') { const r = growthOrder({ joined, objects, main, byObj, c, heightMm, start: pen }); r.bridges = bridges; return r; }
+  if (c.mode === 'growth') { const r = growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start: pen }); r.bridges = bridges; return r; }
   // pass 1: the big structure of the whole picture, the long smooth lines of every mass, from the main mass's longest
   // line, the nearest next (a person sketches the whole composition in before any object is worked)
   { const big = joined.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner') && s.len >= c.structureMm && turningPerMm(s.points) <= 6);
@@ -482,10 +483,17 @@ export function structureWeight(r, heightMm) {
  * small things last; 4. emphasis: the main contours restated heavier. Each stroke carries `phase` (layin, growth, detail,
  * texture, emphasis); weight builds over time (growthWeight).
  */
-function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
+function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start }) {
   const out = [], live = joined.filter(s => !s.taken);
   for (const s of live) s.len = s.len ?? pathLength(s.points);
-  const centre = (() => { const L = main.id != null ? (byObj.get(main.id) ?? []) : live; const P = (L.length ? L : live).flatMap(s => s.points); return [P.reduce((a, p) => a + p[0], 0) / P.length, P.reduce((a, p) => a + p[1], 0) / P.length]; })();
+  // the drawing grows from the main form; when the lines close off no sizeable form (a dog's open coat), from the middle of
+  // the drawn line itself (its length-weighted centre)
+  const sizeable = main.id != null && main.area >= c.mainShare * widthMm * heightMm;
+  const centre = (() => {
+    if (sizeable) { const P = (byObj.get(main.id) ?? []).flatMap(s => s.points); if (P.length) return [P.reduce((a, p) => a + p[0], 0) / P.length, P.reduce((a, p) => a + p[1], 0) / P.length]; }
+    let x = 0, y = 0, w = 0; for (const s of live) for (let k = 1; k < s.points.length; k++) { const a = s.points[k - 1], b = s.points[k], L = dist(a, b); x += L * (a[0] + b[0]) / 2; y += L * (a[1] + b[1]) / 2; w += L; }
+    return w ? [x / w, y / w] : [widthMm / 2, heightMm / 2];
+  })();
   // a stroke's distance from the main form is its farthest point's: a long line that runs out to the sheet's edge waits until
   // the drawing has grown that far, so the drawn extent widens steadily; the hop to it is to its nearer end
   for (const s of live) { s.rad = Math.max(...resample(s.points, 2).map(q => dist(centre, q))); }
