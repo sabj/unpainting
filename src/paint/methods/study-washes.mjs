@@ -32,7 +32,7 @@ const ROUND_MM = 2, TOL_MM = 0.8;
 /** A wash nests on a neighbour at least this much lighter (L*) whose hue is this near (chromaticity over lightness, as a shadow keeps its hue). */
 const NEST_LIGHTER = 4, NEST_HUE = 14;
 /** ... when their shared border is at least this share of the darker shape's outline. */
-const NEST_BORDER = 0.15;
+const NEST_BORDER = 0.05;
 /** Phases: a first wash at least this light; a dark under this L*; a dark is last only when smaller than this share of the sheet. */
 const FIRST_L = 55, DARK_L = 40, DARK_SMALL = 0.04;
 /** Charges: in a wash of at least this share of the sheet, at most this many, each a dab of a round this wide (mm) at this share of the wash's strength. */
