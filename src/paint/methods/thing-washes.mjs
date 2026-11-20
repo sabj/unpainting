@@ -2,13 +2,14 @@
 //
 // Inputs: the subject, its SAM regions (the run's segment map) and the things a local vision model named with rough
 // boxes (thing-labels.mjs). A SAM region belongs to the most specific named thing whose box holds most of it.
-// 1. Reserved lights: the few brightest named things, kept as bare paper. Each is a smooth outline no narrower than
+// 1. Reserved lights: the few brightest regions of named things, kept as bare paper. Each is a smooth outline no narrower than
 //    the wash brush; every wash goes round them.
 // 2. Big bands first: the sky, the ground, the water, the path and the main mass (a thing over a quarter of the
 //    sheet), each one low-vertex polygon spanning the sheet, its holes filled: the things in it go on over it.
 // 3. One polygon a named thing: its regions closed, filled and opened by the brush, simplified to a low-vertex smooth
 //    outline (within DRAWN_TOL_MM of the drawn edge under a drawing). Nothing inside it is cut by value.
-// 4. One glaze a named shadow: the regions in its box that are clearly darker than the box as a whole, as one polygon.
+// 4. One glaze a named shadow: the regions in its box that are clearly darker than the box as a whole, as one polygon;
+//    when the regions are coarser than the shadow, a loose rounded shape in the shadow's box.
 // 5. A few dark accents last: the darkest regions, small polygons for the small brush.
 // Colour: one mix a polygon, from the trimmed median of the subject over the whole polygon; a polygon that clearly
 // grades along its long axis is laid as two halves, one end colour each, meeting at a soft edge. The mix is solved for
@@ -218,9 +219,13 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
 
   // 1. the reserved lights
   const tolThing = drawn ? DRAWN_TOL_MM : THING_TOL_MM;
-  const lightThings = things.filter(t => !BAND_KINDS.has(t.kind) && t.area < MASS_SHARE * pn && t.L >= lightest - LIGHT_WITHIN && t.L >= medianL + LIGHT_CLEAR).sort((a, b) => b.L - a.L).slice(0, MOST_LIGHTS);
-  const lightLoops = [];
-  for (const t of lightThings) { const loops = polygonsOf(maskOf(t.cells), pw, ph, { planMm, brushMm: washBrushMm, tolMm: tolThing, leastMm2: least.reserveMm2 }); if (loops.length) { t.light = true; lightLoops.push(...loops); } }
+  // the regions of named things that are the picture's lights; a thing all of whose cells are lights is left as paper
+  const regionCells = new Map(); for (let i = 0; i < pn; i++) { const r = regionMap[i]; if (!regionCells.has(r)) regionCells.set(r, []); regionCells.get(r).push(i); }
+  const lightRegions = [...regionCells.values()].map(cells => ({ cells, L: labOf(trimmedMedian(cells, rgbAt, LAt), 0, paperCol)[0], owner: thingOf[cells[0]] }))
+    .filter(r => r.owner >= 0 && !BAND_KINDS.has(things[r.owner].kind) && r.cells.length < MASS_SHARE * pn && r.L >= lightest - LIGHT_WITHIN && r.L >= medianL + LIGHT_CLEAR).sort((a, b) => b.L - a.L).slice(0, MOST_LIGHTS);
+  const lightLoops = [], lightNames = [];
+  for (const r of lightRegions) { const loops = polygonsOf(maskOf(r.cells), pw, ph, { planMm, brushMm: washBrushMm, tolMm: tolThing, leastMm2: least.reserveMm2 }); if (loops.length) { lightLoops.push(...loops); lightNames.push(things[r.owner].name); r.kept = true; } }
+  for (const t of things) { const own = lightRegions.filter(r => r.kept && things[r.owner] === t).reduce((a, r) => a + r.cells.length, 0); if (own >= t.cells.length) t.light = true; }
   const lightMask = lightLoops.length ? loopsMask(lightLoops, pw, ph, planMm) : new Uint8Array(pn);
   const keepOut = lightLoops.length ? lightLoops : null;
 
@@ -302,14 +307,14 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   rest.forEach((t, q) => { t.parent = par[q]; });
   for (const q of thingOrder(rest)) { const t = rest[q]; lay(2, t, t.loops, { keepOut, growMm: .5 }); }
   // 4. the shadow glazes: the regions in each named shadow's box clearly darker than the box as a whole
-  const regionCells = new Map(); for (let i = 0; i < pn; i++) { const r = regionMap[i]; if (!regionCells.has(r)) regionCells.set(r, []); regionCells.get(r).push(i); }
   for (const s of named.filter(t => t.kind === 'shadow' && t.box)) {
     const [x0, y0, x1, y1] = [Math.floor(s.box[0] * pw), Math.floor(s.box[1] * ph), Math.ceil(s.box[2] * pw), Math.ceil(s.box[3] * ph)], inBox = i => { const x = i % pw, y = (i / pw) | 0; return x >= x0 && x < x1 && y >= y0 && y < y1; };
     const boxCells = []; for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) boxCells.push(y * pw + x);
     const boxL = labOf(trimmedMedian(boxCells, rgbAt, LAt), 0, paperCol)[0], pick = new Uint8Array(pn);
     for (const cells of regionCells.values()) { const inside = cells.filter(inBox); if (inside.length < IN_BOX * cells.length) continue; const c = trimmedMedian(cells, rgbAt, LAt); if (labOf(c, 0, paperCol)[0] <= boxL - SHADOW_DARKER) for (const i of cells) pick[i] = 1; }
-    if (areaOf(pick) < leastCells) continue;
-    lay(3, s, polygonsOf(pick, pw, ph, { planMm, brushMm: washBrushMm, tolMm: tolThing, leastMm2: least.washMm2, most: 1 }), { growMm: 0 });
+    // with no region of its own (the regions are coarser than the shadow), the glaze is a loose rounded shape in its box
+    if (areaOf(pick) < leastCells) { const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = Math.max(1, (x1 - x0) / 2), b = Math.max(1, (y1 - y0) / 2); for (const i of boxCells) if (((i % pw + .5 - cx) / a) ** 4 + ((((i / pw) | 0) + .5 - cy) / b) ** 4 <= 1) pick[i] = 1; }
+    lay(3, s, polygonsOf(pick, pw, ph, { planMm, brushMm: washBrushMm, tolMm: BAND_TOL_MM, leastMm2: least.washMm2, most: 1 }), { keepOut, growMm: 0, grade: false });
   }
   // 5. a few dark accents: the darkest regions, each still clearly darker than what is laid under it
   const smallBrush = Math.min(...washKitMm), leastAccent = leastAreas(smallBrush), toneUnder = cells => { const u = new Array(k).fill(0); for (const i of cells) for (let j = 0; j < k; j++) u[j] += laid[j][i] / cells.length; return filmLab(u, pigments, paperCol)[0]; };
@@ -322,7 +327,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   const lightsOnSheet = lightLoops.length ? loopsMask(lightLoops, w, h, cellMm) : new Uint8Array(n), lc = components(lightsOnSheet, w, h);
   const lightShapes = Array.from({ length: lc.count }, (_, j) => ({ id: j + 1, category: 'bare paper', reason: 'a named light kept as a bare-paper polygon', toneAt: 'retain paper', cells: 0 })); for (const id of lc.labels) if (id) lightShapes[id - 1].cells++;
   const areas = instructions.map(q => q.areaMm2).sort((a, b) => a - b);
-  const summary = { stages: byStage.filter(Boolean).length, washesByStage: Array.from({ length: 4 }, (_, s) => byStage[s] ?? 0), mixes: mixes.length, washes: instructions.length, planCellMm: planMm, things: things.length, named: named.length, bands: bands.map(t => t.name), lights: lightThings.filter(t => t.light).map(t => t.name), reservedShare: areaOf(lightMask) / pn,
+  const summary = { stages: byStage.filter(Boolean).length, washesByStage: Array.from({ length: 4 }, (_, s) => byStage[s] ?? 0), mixes: mixes.length, washes: instructions.length, planCellMm: planMm, things: things.length, named: named.length, bands: bands.map(t => t.name), lights: lightNames, reservedShare: areaOf(lightMask) / pn,
     lightestTone: lightest, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, firstWashCover: 1 };
   console.log(`thing washes: ${named.length} named things, ${things.length} things with regions; bands ${summary.bands.join(', ') || 'none'}; lights ${summary.lights.join(', ') || 'none'} (${(100 * summary.reservedShare).toFixed(1)}% of the sheet)`);
   console.log(`washes: ${summary.washes} (bands ${summary.washesByStage[0]}, things ${summary.washesByStage[1]}, shadows ${summary.washesByStage[2]}, accents ${summary.washesByStage[3]}); ${mixes.length} mixes; mean ${summary.meanWashMm2.toFixed(0)} mm2, median ${summary.medianWashMm2.toFixed(0)} mm2; ${strokeCount} strokes planned`);

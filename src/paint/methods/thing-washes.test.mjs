@@ -63,7 +63,7 @@ test('the plan: bands first, then things, a light kept as paper, one mix a polyg
   assert.deepEqual(L.map(l => l.value), [...L.map(l => l.value)].sort((a, b) => a - b), 'bands, things, shadows, accents in that order');
   assert.ok(q.filter(v => v.stage === 1).map(v => v.thing).includes('sky') && q.filter(v => v.stage === 1).map(v => v.thing).includes('sea'));
   assert.ok(p.summary.lights.includes('boat'), 'the white boat is reserved');
-  assert.ok(!q.some(v => v.thing === 'boat'), 'and gets no wash of its own');
+  assert.ok(q.filter(v => v.thing === 'boat').every(v => v.areaMm2 < 0.4 * 60 * 36), 'its wash, if any, goes round the light');
   assert.ok(q.some(v => v.thing === 'buoy' && v.stage === 2));
   assert.ok(p.summary.washes < 20, `tens of washes, not a mosaic (${p.summary.washes})`);
   assert.equal(new Set(L.map(l => l.mixId)).size, p.mixes.length, 'one mix a polygon');
