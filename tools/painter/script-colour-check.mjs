@@ -24,6 +24,16 @@ export function meanLab(rgb, cells, { w, SC, W2 }) {
   return labOf(c, 0, [255, 255, 255]);
 }
 
+/** The same over only the darker half of those cells (where the strokes laid their paint, not the paper between them). */
+export function coreLab(rgb, cells, { w, SC, W2 }) {
+  const px = [];
+  for (const i of cells) { const x = i % w, y = (i / w) | 0; for (let dy = 0; dy < SC; dy++) for (let dx = 0; dx < SC; dx++) { const q = ((y * SC + dy) * W2 + x * SC + dx) * 3; px.push([rgb[q], rgb[q + 1], rgb[q + 2]]); } }
+  if (!px.length) return null;
+  px.sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
+  const half = px.slice(0, Math.max(1, px.length >> 1)), m = [0, 1, 2].map(c => Math.round(255 * (half.reduce((a, p) => a + (p[c] / 255) ** 2.2, 0) / half.length) ** (1 / 2.2)));
+  return labOf(m, 0, [255, 255, 255]);
+}
+
 /** A check for one run: queue a layer's script passages when laid, measure them on the next dry sheet. */
 export function createScriptColourCheck({ out, w, SC, W2 }) {
   let pending = [];
@@ -39,7 +49,8 @@ export function createScriptColourCheck({ out, w, SC, W2 }) {
     measure(rgb, when) {
       for (const p of pending) {
         const laid = meanLab(rgb, p.cells, { w, SC, W2 }); if (!laid) continue;
-        const row = { id: p.id, kind: p.kind, when, planned: p.planned.map(v => +v.toFixed(1)), laid: laid.map(v => +v.toFixed(1)), dL: +(laid[0] - p.planned[0]).toFixed(1), dHue: +hueDiff(laid, p.planned).toFixed(0), dE: +Math.hypot(laid[0] - p.planned[0], laid[1] - p.planned[1], laid[2] - p.planned[2]).toFixed(1) };
+        const core = coreLab(rgb, p.cells, { w, SC, W2 });
+        const row = { id: p.id, kind: p.kind, when, planned: p.planned.map(v => +v.toFixed(1)), laid: laid.map(v => +v.toFixed(1)), dL: +(laid[0] - p.planned[0]).toFixed(1), dHue: +hueDiff(laid, p.planned).toFixed(0), dE: +Math.hypot(laid[0] - p.planned[0], laid[1] - p.planned[1], laid[2] - p.planned[2]).toFixed(1), core: core.map(v => +v.toFixed(1)), coreDL: +(core[0] - p.planned[0]).toFixed(1) };
         rows.push(row); fs.appendFileSync(file, JSON.stringify(row) + '\n');
       }
       pending = [];

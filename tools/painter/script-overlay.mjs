@@ -10,7 +10,8 @@
 //   node tools/painter/script-overlay.mjs SCRIPT.json SUBJECT.png OUT.png [--drawing PEN.png] [--stages STAGES.png] [--order ORDER.png] [--title TEXT]
 import fs from 'node:fs';
 import sharp from 'sharp';
-import { passageStrokes, upgradeScript, hexRgb, DILUTION_L } from '../../src/paint/methods/script-washes.mjs';
+import { passageStrokes, upgradeScript, hexRgb, DILUTION_L, scriptMixRGB } from '../../src/paint/methods/script-washes.mjs';
+import { BOX, boxPigment } from '../../src/crop/box.mjs';
 
 const PAPER = [246, 242, 232];
 const STAGE_NAME = ['', '1 first washes', '2 local colours, masses', '3 shadows, glazes', '4 touches, textures', '5 darks, accents'];
@@ -21,8 +22,13 @@ const hex = c => '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toSt
 const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const stageOf = p => Math.max(1, Math.min(5, Math.round(p.stage ?? 2)));
 
-/** A passage's colour on white paper: its swatch, or its pigments mixed (geometric mean of reflectance) and lightened to its dilution. */
+/** The box pigments of a script's palette, as the painter is given them (--paints), each with its key. */
+let BOX_PIGS = null;
+export function useBoxPigments(palette) { BOX_PIGS = palette.map(key => { const p = BOX.find(b => b.key === key); if (!p) throw Error(`no box paint ${key}`); return { ...boxPigment(p), key }; }); }
+/** A passage's colour on white paper: the colour the painter's mix lays (the script's pigments at the strength its swatch or
+ * dilution asks), so the preview shows what will be painted; without the box, the swatch or an estimate. */
 export function paintColour(paint) {
+  if (BOX_PIGS && paint?.pigments) { try { return scriptMixRGB(paint, BOX_PIGS); } catch { /* a paint outside the palette: the estimate below */ } }
   const sw = hexRgb(paint?.swatch); if (sw) return sw;
   const parts = Object.entries(paint?.pigments ?? {}), tot = parts.reduce((a, [, v]) => a + v, 0) || 1;
   const mix = [0, 1, 2].map(c => Math.exp(parts.reduce((a, [k, v]) => a + (v / tot) * Math.log(Math.max(0.02, lin((MASSTONE[k] ?? [128, 128, 128])[c]))), 0)));
@@ -97,6 +103,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const orderFile = flag('--order'), stagesFile = flag('--stages'), title = flag('--title') ?? '', penFile = flag('--drawing');
   const [scriptFile, subject, outFile] = args;
   const script = upgradeScript(JSON.parse(fs.readFileSync(scriptFile, 'utf8')));
+  useBoxPigments(script.palette ?? []);
   const lights = (script.lights ?? []).map(l => l.region ?? l);
   const W = 1400, px = W / script.sheet.widthMm, H = Math.round(script.sheet.heightMm * px);
   const chargeStrokes = c => (c.at ?? []).map(([x, y]) => ({ kind: 'sweep', radiusMm: (script.brushes[c.brush]?.widthMm ?? 6) / 2, points: [[x - 1, y, 0.5], [x, y + 0.5, 1], [x + 1, y, 0.4]] }));

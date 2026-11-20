@@ -22,12 +22,35 @@ export const DILUTION_L = Object.freeze({ 'very pale': 88, pale: 79, medium: 66,
 const LOAD = Object.freeze({ flooded: 0.88, loaded: 0.68, damp: 0.42, dry: 0.22 });
 const KINDS = new Set(['wash', 'strokes', 'touches', 'lines']);
 const PAPERS = new Set(['dry', 'damp', 'wet']);
+/** A stroke laid into its own wet bed covers at least this many sheet cells (study-washes.mjs WET_LEAST_CELLS). */
+const WET_LEAST_CELLS = 40;
 /** A charge's brush when the script names none (mm). */
 const CHARGE_BRUSH_MM = 6;
 /** Phase of each stage, as the paint step reads it. */
 const PHASE = [null, 'light', 'light', 'shadow', 'mid', 'shadow'];
 /** A wash's brush: about this share of the wash's width across its direction (a brush a third of the shape's width). */
 const WASH_BRUSH_SHARE = 1 / 3;
+
+/**
+ * A passage's mix: the script's pigments in its proportions, at the strength whose film on white paper reaches the
+ * swatch's lightness (or the dilution's). `pigments` each carry their box `key`. Amounts per pigment, in their order.
+ */
+export function scriptMix(paint, pigments) {
+  const k = pigments.length, keys = pigments.map(p => p.key), white = [255, 255, 255], base = new Array(k).fill(0);
+  for (const [key, parts] of Object.entries(paint.pigments)) { const j = keys.indexOf(key); if (j < 0) throw Error(`painting script: pigment ${key} is not in the box`); base[j] += Math.max(0, Number(parts) || 0); }
+  const t = base.reduce((a, v) => a + v, 0); if (!(t > 0)) throw Error('painting script: pigment parts must be positive');
+  const unit = base.map(v => v / t), sw = hexRgb(paint.swatch), want = sw ? labOf(sw, 0, white)[0] : DILUTION_L[paint.dilution] ?? DILUTION_L.medium;
+  const Lat = s => filmLab(unit.map(v => v * s), pigments, white)[0];
+  let lo = 0.01, hi = 32; if (Lat(hi) > want) return unit.map(v => v * hi); if (Lat(lo) < want) return unit.map(v => v * lo);
+  for (let it = 0; it < 14; it++) { const mid = Math.sqrt(lo * hi); if (Lat(mid) > want) lo = mid; else hi = mid; }
+  return unit.map(v => v * Math.sqrt(lo * hi));
+}
+
+/** The colour a passage's mix makes as one film on white paper (sRGB): what the painter will lay, for the preview. */
+export function scriptMixRGB(paint, pigments) {
+  const mix = scriptMix(paint, pigments), px = renderLayers([pigments.map((_, j) => Float32Array.of(mix[j]))], pigments.map(q => ({ K: q.K, S: q.S ?? [0, 0, 0] })), Uint8ClampedArray.of(255, 255, 255), 1, 1);
+  return Array.from(px.slice(0, 3));
+}
 
 /** sRGB [r, g, b] from '#rrggbb'. */
 export function hexRgb(hex) {
@@ -101,9 +124,11 @@ const LOAD_SHARE = Object.freeze({ flooded: 1, loaded: 0.75, damp: 0.45, dry: 0.
  * of the shared mark library (src/paint/marks): the library sets the pressure rising and falling along it, the hand's
  * speed, a flat's blade and the stroke's water. Returns a list (a hatch, a branch or a leaf group is several strokes).
  */
-function asLibraryMark(kind, st, widthMm, { seed, bend = 0, load = 0.75 }) {
+function asLibraryMark(kind, st, widthMm, { seed, bend = 0, load = 0.75, rng = null }) {
   const P = st.points, a = P[0], b = P.at(-1), len = Math.max(0.5, Math.hypot(b[0] - a[0], b[1] - a[1])), c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  return makeMark(kind, { x: c[0], y: c[1], length: len, width: widthMm, angle: Math.atan2(b[1] - a[1], b[0] - a[0]), seed, bend, load });
+  // each touch its own: width, length, turn, bend and load varied about the passage's handling (never one stamp repeated)
+  const v = rng ? { w: rng.range(0.65, 1.35), l: rng.range(0.6, 1.5), t: rng.normal() * 0.18, b: rng.range(-0.35, 0.35), ld: rng.range(0.8, 1.15) } : { w: 1, l: 1, t: 0, b: 0, ld: 1 };
+  return makeMark(kind, { x: c[0], y: c[1], length: len * v.l, width: widthMm * v.w, angle: Math.atan2(b[1] - a[1], b[0] - a[0]) + v.t, seed, bend: Math.max(-1, Math.min(1, bend + v.b)), load: Math.min(1, load * v.ld) });
 }
 
 /** The strokes of one passage (mm), from its kind, brush and handling; no picture read. */
@@ -114,7 +139,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
   if (p.kind === 'lines' && p.paths?.some(P => P.length > 2)) return st;
   const rng = handOf(`${seed}/${p.id}/marks`), path = p.handling?.path, load = LOAD_SHARE[p.handling?.load] ?? (DRY_MARKS.has(kind) ? 0.3 : 0.75);
   return st.flatMap((q, k) => q.written ? [q] : asLibraryMark(kind, q, 2 * q.radiusMm, { seed: (seed * 7919 + k * 31 + [...p.id].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) | 0,
-    bend: path === 'straight' ? 0.05 * (rng.next() < 0.5 ? -1 : 1) : path === 'curved' || path === 'flick' ? rng.range(0.4, 0.8) * (rng.next() < 0.5 ? -1 : 1) : 0, load }));
+    bend: path === 'straight' ? 0.05 * (rng.next() < 0.5 ? -1 : 1) : path === 'curved' || path === 'flick' ? rng.range(0.4, 0.8) * (rng.next() < 0.5 ? -1 : 1) : 0, load, rng: p.kind === 'touches' || p.kind === 'strokes' ? rng : null }));
 }
 
 function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
@@ -180,16 +205,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   const passages = checkScript(script, { keys, sheetWidthMm }), brushes = script.brushes, lights = lightsOf(script);
   const white = [255, 255, 255];
   // a mix of the script's pigments, at the strength whose film on white paper reaches the swatch's lightness
-  const mixOf = paint => {
-    const base = new Array(k).fill(0); let t = 0;
-    for (const [key, parts] of Object.entries(paint.pigments)) { base[keys.indexOf(key)] += Math.max(0, Number(parts) || 0); }
-    t = base.reduce((a, v) => a + v, 0); if (!(t > 0)) throw Error('painting script: pigment parts must be positive');
-    const unit = base.map(v => v / t), sw = hexRgb(paint.swatch), want = sw ? labOf(sw, 0, white)[0] : DILUTION_L[paint.dilution] ?? DILUTION_L.medium;
-    const Lat = s => filmLab(unit.map(v => v * s), pigments, white)[0];
-    let lo = 0.01, hi = 32; if (Lat(hi) > want) return unit.map(v => v * hi); if (Lat(lo) < want) return unit.map(v => v * lo);
-    for (let it = 0; it < 14; it++) { const mid = Math.sqrt(lo * hi); if (Lat(mid) > want) lo = mid; else hi = mid; }
-    return unit.map(v => v * Math.sqrt(lo * hi));
-  };
+  const mixOf = paint => scriptMix(paint, pigments);
   const laid = Array.from({ length: k }, () => new Float32Array(n)), labels = new Int32Array(n);
   const layers = [], instructions = [], mixes = [], polygons = [], checks = [];
   let session = null, strokeCount = 0, charges = 0, label = 0;
@@ -203,7 +219,11 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   };
   // one wash of the plan: its strokes, its mix, its move; the cells its strokes touch are its passage (for the ledger and
   // the wet and dry checks, never a clip)
-  const wash = (p, stage, strokes, mix, how, { kind, what, charge = false }) => {
+  const wash = (p, stage, strokes0, mix, how, { kind, what, charge = false }) => {
+    // a stroke that lands on no cell of the sheet (a lane run past the edge) is not laid, and a stroke laid into its own
+    // wet bed needs enough cells for the bed to be judged (WET_LEAST_CELLS, as the study plan)
+    const least = how.move === 'wet on wet' ? WET_LEAST_CELLS : 1;
+    const strokes = strokes0.filter(st => { const m = footprint([st], w, h, cellMm); let c = 0; for (let i = 0; i < n && c < least; i++) c += m[i]; return c >= least; });
     const ids = footprint(strokes, w, h, cellMm), box = { x0: w, y0: h, x1: -1, y1: -1 }; let area = 0;
     for (let i = 0; i < n; i++) if (ids[i]) { area++; const x = i % w, y = (i / w) | 0; if (x < box.x0) box.x0 = x; if (x > box.x1) box.x1 = x; if (y < box.y0) box.y0 = y; if (y > box.y1) box.y1 = y; }
     if (!area || !strokes.length) return null;

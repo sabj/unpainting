@@ -93,8 +93,9 @@ export function placesIn(polys, n, rng, { lights = [], spread = 'scattered', den
   };
   const draw = () => { for (let k = 0; k < 400; k++) { const x = rng.range(b.x0, b.x1), y = rng.range(b.y0, b.y1); if (open(polys, lights, x, y) && rng.next() < weight(x, y)) return [x, y]; } return null; };
   const got = [], minD = 0.45 * Math.sqrt(A / n);
-  if (spread === 'clustered') {
-    const m = Math.max(1, Math.round(n / rng.range(3, 7))), centres = Array.from({ length: m }, draw).filter(Boolean), sig = 0.35 * Math.sqrt(A / Math.max(1, centres.length));
+  if (spread === 'clustered' || spread === 'mass') {
+    // a mass: a few tight clumps whose touches overlap and fuse; clustered: looser clumps with paper between
+    const m = Math.max(1, Math.round(n / (spread === 'mass' ? rng.range(8, 14) : rng.range(3, 7)))), centres = Array.from({ length: m }, draw).filter(Boolean), sig = (spread === 'mass' ? 0.22 : 0.35) * Math.sqrt(A / Math.max(1, centres.length));
     for (let k = 0; got.length < n && k < 50 * n && centres.length; k++) {
       const c = centres[Math.floor(rng.next() * centres.length)], x = c[0] + rng.normal() * sig, y = c[1] + rng.normal() * sig;
       if (open(polys, lights, x, y)) got.push([x, y]);
