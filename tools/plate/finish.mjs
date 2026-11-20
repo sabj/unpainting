@@ -17,7 +17,7 @@ import path from 'node:path';
 import {ignoredSettings, badNumbers} from '../../src/paint/option-check.mjs';
 import {execFile} from 'node:child_process';
 import sharp from 'sharp';
-import {coldPressField} from '../../src/media/paper.mjs';
+import {paperRelief} from '../../src/media/paper-relief.mjs';
 import {step, layersOf, thickness, layersChanged, coherent} from '../../src/media/sheet.mjs';
 import {gpuStats} from '../../src/media/gpu/link.mjs';
 import {assertDeviceHealthy} from '../../src/media/gpu/device-health.mjs';
@@ -172,7 +172,7 @@ const renderSub = () => {
   const coarse = view();
   if (SUBGRID < 2 || !CP_MM || INKRES) return { coarse, fine: null };
   const N = SUBGRID, FW = W2 * N, FH = H2 * N, cp = PAPER_OPTS.coldPress;
-  const hF = coldPressField(FW, FH, CP_MM / N, PAPER_OPTS.seed, { ...cp, mmPerCell: CP_MM / N });
+  const hF = paperRelief(FW, FH, CP_MM / N, { seed: PAPER_OPTS.seed, relief: PAPER_OPTS.relief ?? 'cold' }).height;
   const T = thickness(ctx.sheet), KP = SHEET_PIGS.length;
   const shareOf = p => (p.gamma == null ? 0 : 1 - (p.wick ?? Math.max(0.05, Math.min(0.9, 1 - p.gamma))));
   const share = SHEET_PIGS.map(shareOf), gg = SHEET_PIGS.map(p => Math.min(0.97, (p.gamma ?? 0) * (O.gran ?? 1) * num('subgridgain', 1)));

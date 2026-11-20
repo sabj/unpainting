@@ -18,6 +18,7 @@ export const REMOVED_OPTIONS = Object.freeze({
   gran: 'the sheet-wide granulation scale was removed: each pigment granulates by its own published rating on the paper, with no scale',
   slidecap: 'settled grains always stop rolling when the slope is gone (slideCap 1): without it heavy granulation dried as a one-cell checkerboard',
   boxphys: 'box paints always settle with their published physics (granulation, flocculation, staining, density), so there is nothing to switch',
+  ...Object.fromEntries(['cpbump', 'cpcover', 'cppits', 'cpswell'].map(k => [k, 'the cold-press bumps were replaced by the paper\'s relief in micrometres (src/media/paper-relief.mjs), one field from 0.1 mm to a few millimetres fitted to real washes; it has no bump sizes to set'])),
   eyering: 'the eye ring drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject; the plan names its eyes\' shapes and darks',
 });
 
