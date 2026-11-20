@@ -400,7 +400,7 @@ function phaseSL(C, ya, yb) {
 // one pore giving water to its neighbours; `only` limits it to one direction and to the neighbour's side
 // (the rows either side of the band), `self` whether this band owns the donor
 function capCell(C, x, y, only, ya, yb, pact, nP) {
-  const { ctrl, prm, w, s, capacity, grain, fdx, fdy, sNext, PNext, P: Pp, dDep } = C;
+  const { ctrl, prm, w, s, capacity, grain, fdx, fdy, sNext, PNext, P: Pp, dDep, ever } = C;
   const x0 = ctrl[BOX], y0 = ctrl[BOX + 1], x1 = ctrl[BOX + 2], y1 = ctrl[BOX + 3];
   const i = y * w + x, si = s[i]; if (si <= prm[P.capEps] * capacity[i]) return;
   const capDelta = prm[P.capDelta], sizing = prm[P.sizing], capStep = prm[P.capStep], filter = prm[P.filter];
@@ -418,11 +418,11 @@ function capCell(C, x, y, only, ya, yb, pact, nP) {
     const jy = d === 2 ? y + 1 : d === 3 ? y - 1 : y, mine = jy >= ya && jy <= yb;
     if (self) sNext[i] -= ds;
     if (mine) sNext[j] += ds;
-    const catchF = sj > capDelta * capacity[j] ? 0 : filter;
+    const catchF = ever[j] && sj > capDelta * capacity[j] ? 0 : filter;
     for (let n = 0; n < nP; n++) {
       const k = pact[n], q = Pp[k][i] * f; if (!q) continue;
-      if (self) PNext[k][i] -= q;
-      if (mine) { PNext[k][j] += q * (1 - catchF); dDep[k][j] += q * catchF; }
+      if (self) { PNext[k][i] -= q; dDep[k][i] += q * catchF; }
+      if (mine) PNext[k][j] += q * (1 - catchF);
     }
   }
 }

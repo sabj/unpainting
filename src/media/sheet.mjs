@@ -66,7 +66,10 @@ export const DEFAULTS = {
                                                   // relief of ten, so its pits hold what settles in them.
                                                   // too low and the wash dries before the grains arrive, so granulating pigments come out smooth
   hold: 2,                                        // the most pigment a unit of water keeps suspended; a thinner film strands the rest
-  sizing: SIZING, wickFilter: 0.2,                  // sizing slows wicking into dry paper; fibres filter out a share of what pigment the water carries
+  // sizing slows wicking into dry paper; at a dry front the fibres hold the pigment the pore water carries. It was 0.2,
+  // and caught at the dry cell: pore water wicking past a brushed wash's edge carried its pigment into the dry paper as
+  // a pale halo (OD 0.015 to 0.026, 0.2 to 0.5 mm wide at 0.1 mm cells), which real washes on dry paper do not have.
+  sizing: SIZING, wickFilter: 1,
   dt: 0.1,
 };
 
@@ -996,8 +999,12 @@ function stepBox(sheet, o, box, reduce = false) {
         const ds = (Math.max(0, Math.min(si - sj, capacity[j] - sj)) / 4) * capStep * rate * open; if (ds <= 0) continue;
         const f = Math.min(1, ds / si);
         sNext[i] -= ds; sNext[j] += ds;
-        const catchF = sj > capDelta * capacity[j] ? 0 : filter; // fibres catch pigment only where water enters dry paper, not between damp pores
-        for (let n = 0; n < nP; n++) { const k = pact[n], q = P[k][i] * f; if (!q) continue; PNext[k][i] -= q; PNext[k][j] += q * (1 - catchF); dDep[k][j] += q * catchF; }
+        // fibres catch the pigment where pore water enters paper the wash never covered (ever), however damp the wicking
+        // has made it, and where it enters dry paper; between damp pores under the wash it moves freely. Caught only at a
+        // dry cell, the first trickle went in clean and the rest carried its pigment out past the edge as a pale halo.
+        const catchF = ever[j] && sj > capDelta * capacity[j] ? 0 : filter;
+        // what the fibres catch at a dry front stays on the wet side of it, where the water left it
+        for (let n = 0; n < nP; n++) { const k = pact[n], q = P[k][i] * f; if (!q) continue; PNext[k][i] -= q; PNext[k][j] += q * (1 - catchF); dDep[k][i] += q * catchF; }
       }
     }
 
