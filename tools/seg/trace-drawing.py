@@ -187,13 +187,14 @@ def territory_widths(streams, dark, region, reach, max_width, spread=1.9, min_wi
         l['width'] = round(float(np.clip(min(w, 2*d/1.3), min_width, max_width)), 3)
 
 
-def solid_fills(solid, dark, zoom, width_px, spacing_px, min_len_px):
+def solid_fills(solid, dark, zoom, width_px, spacing_px, min_len_px, edge=None):
     """Solid darks (ink wider than a nib, a pane, a leaf, a dark gap in a gate) filled as a person fills with a pen: close
     parallel strokes in the direction of the shape (its long axis), each a whole pull from edge to edge, `spacing_px` apart
     and `width_px` wide so they close up. `solid` is at the zoomed scale; the strokes come back in source pixels. A shape too
     small for a stroke along its axis is one stroke through its middle as wide as it is. A grey area (a pane drawn mid-grey,
     `dark` its darkness 0..1 at the zoomed scale) is filled as dark as it is drawn: its strokes lighter and spaced wider, paper
-    between them."""
+    between them. `edge` (distance to the paper, zoomed pixels) narrows a stroke where the dark narrows, so a pen stroke
+    never covers the white gap of a lattice: its width there is at most twice that distance."""
     out = []
     n, lab, st, _ = cv2.connectedComponentsWithStats(solid.astype(np.uint8), connectivity=8)
     for k in range(1, n):
@@ -219,9 +220,19 @@ def solid_fills(solid, dark, zoom, width_px, spacing_px, min_len_px):
                 if hi-lo < min_len_px:
                     if uu[b]-uu[a] < min_len_px*.5: continue
                     lo, hi = uu[a], uu[b]
-                q = np.array([c+lo*d+vv*nrm, c+hi*d+vv*nrm])
-                q = (q+.5)/zoom-.5
-                out.append({'points': np.round(q, 3).tolist(), 'width': round(float(wd/zoom), 3), 'weight': round(wt, 3), 'role': 'pen stroke', 'length': float(np.hypot(*(q[1]-q[0]))), 'fill': True})
+                m = max(2, int(np.ceil((hi-lo)/(wd/2)))+1); uu_ = np.linspace(lo, hi, m)
+                q = c+uu_[:, None]*d+vv*nrm
+                ws = np.full(m, wd)
+                if edge is not None: ws = np.minimum(ws, 1.8*sketch.at(edge, q))
+                # where the dark pinches to a gap the stroke lifts: the pieces either side are strokes of their own
+                ok = ws >= .35*wd; cuts = np.flatnonzero(np.diff(np.r_[0, ok.astype(int), 0]))
+                for a0, b0 in zip(cuts[::2], cuts[1::2]):
+                    if b0-a0 < 2: continue
+                    qq, ww = (q[a0:b0]+.5)/zoom-.5, ws[a0:b0]
+                    if arc_length(qq)*zoom < .6*min_len_px: continue
+                    line = {'points': np.round(qq, 3).tolist(), 'width': round(float(np.median(ww)/zoom), 3), 'weight': round(wt, 3), 'role': 'pen stroke', 'length': float(arc_length(qq)), 'fill': True}
+                    if ww.min() < .95*wd: line['widths'] = np.round(ww/zoom, 3).tolist()
+                    out.append(line)
     return out
 
 
@@ -241,9 +252,13 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0, solid_px=0):
     solid = None; fills = []
     if solid_px > 0:
         rr = max(1, int(round(solid_px*zoom/2)))
-        solid = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*rr+1, 2*rr+1))) > 0
-        fw = .6*solid_px*zoom
-        fills = solid_fills(solid, dark, zoom, width_px=fw, spacing_px=.8*fw, min_len_px=1.5*fw)
+        # only what the drawing draws black (not a grey pane or a soft shadow, which stays line) is a solid dark
+        black = (mask > 0) & (dark > .6)
+        solid = cv2.morphologyEx(black.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*rr+1, 2*rr+1))) > 0
+        # filled as visible parallel strokes with slivers of paper between (spacing a little over the stroke's width)
+        fw = .5*solid_px*zoom
+        edge = cv2.distanceTransform(black.astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+        fills = solid_fills(solid, dark, zoom, width_px=fw, spacing_px=1.15*fw, min_len_px=1.5*fw, edge=edge)
         mask = mask & ~cv2.erode(solid.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
     dense = None
     if dense_px > 0:
@@ -426,7 +441,7 @@ def main():
     ap.add_argument('--target', help='the picture the drawing is registered to (same size): the line file is bound to it')
     ap.add_argument('--sheetmm', type=float, help='sheet width in mm: adds widthMm to each line')
     ap.add_argument('--zoom', type=int, default=4, help='enlargement before thinning')
-    ap.add_argument('--mergemm', type=float, default=.45, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 keeps them')
+    ap.add_argument('--mergemm', type=float, default=0, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 (default) keeps them: two lines stay two lines with paper between')
     ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks under four widths long are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
     ap.add_argument('--densemm', type=float, default=1.5, help='ink covering most of a window this wide (mm) is dense (fur, hair, scribble): laid as strokes along its direction, not thinned; 0 thins everything')
     ap.add_argument('--solidmm', type=float, default=.9, help='ink wider than this (mm) is a solid dark: filled with close parallel pen strokes along the shape; 0 thins it to a centre line')

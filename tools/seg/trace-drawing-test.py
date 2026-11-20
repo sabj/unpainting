@@ -44,9 +44,22 @@ class FidelityTests(unittest.TestCase):
             p = np.asarray(l['points']); d = p[-1]-p[0]
             self.assertGreater(abs(d[0]), 5*abs(d[1]))          # along the bar
             self.assertGreater(l['length'], 20)
-        # together they cover the bar: their spacing is under their width
+        # visible parallel strokes with slivers of paper between: spacing a little over their width
         ys = sorted(np.asarray(l['points'])[:, 1].mean() for l in fills)
-        self.assertLess(max(np.diff(ys)), fills[0]['width'])
+        self.assertTrue(1 <= max(np.diff(ys))/fills[0]['width'] <= 1.4)
+
+    def test_grey_area_is_not_filled_and_a_lattice_keeps_its_gaps(self):
+        g = np.full((60, 120, 3), 255, np.uint8)
+        g[10:50, 5:45] = 140                                 # a grey pane: line, not a solid fill
+        g[10:50, 60:110] = 0; g[10:50, 84:86] = 255          # a black area with a white gap 2 px wide down its middle
+        lines, *_ = trace.plan(g, zoom=4, solid_px=4)
+        fills = [l for l in lines if l.get('fill')]
+        self.assertFalse([l for l in fills if np.asarray(l['points'])[:, 0].mean() < 50])
+        self.assertTrue(fills)
+        for l in fills:   # no fill stroke covers or crosses the gap
+            p = np.asarray(l['points']); w = np.asarray(l.get('widths', [l['width']]*len(p)))
+            self.assertTrue(np.all(np.abs(p[:, 0]-84.5) > w/2))
+            self.assertTrue(np.all(p[:, 0] < 84.5) or np.all(p[:, 0] > 84.5))
 
     def test_a_line_that_swells_keeps_its_widths(self):
         g = np.full((40, 120, 3), 255, np.uint8)

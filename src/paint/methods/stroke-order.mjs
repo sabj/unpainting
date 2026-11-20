@@ -545,7 +545,7 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start
     const stick = s => (cur == null || cur < 0 ? 0 : s.unit === cur ? c.growthPull * (unitRad.get(cur) - s.rad) : remain.get(cur) > 0 ? c.objectStickMm : 0);
     while (left.size) {
       let best = null, bc = Infinity;
-      for (const s of left) { if (!gate(s)) continue; const k = cost(pen, s) + lag(s) + stick(s); if (k < bc) { bc = k; best = s; } }
+      for (const s of left) { if (!gate(s)) continue; const k = cost(pen, s) + lag(s, cur) + stick(s); if (k < bc) { bc = k; best = s; } }
       if (!best) for (const s of left) { const k = cost(pen, s) + lag(s); if (k < bc) { bc = k; best = s; } }
       left.delete(best); remain.set(best.unit, remain.get(best.unit) - 1); cur = best.unit;
       best.taken = true; after(best); take(best, typeof phase === 'function' ? phase(best) : phase);
@@ -561,7 +561,9 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start
   const outlineLeft = new Map(); for (const s of structural) if (s.role === 'outline') outlineLeft.set(s.object, (outlineLeft.get(s.object) ?? 0) + 1);
   if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
   // hard rules: a child's outline waits for its parent's outline to be closed; an object's inner lines wait for its own
-  const parentOpen = s => { let p = objects[s.object]?.parent; while (p != null) { if (outlineLeft.get(p) > 0) return true; p = objects[p].parent; } return false; };
+  // (only a parent the size of a thing holds its contents back: the sheet-wide forms, a whole wall, do not, or no detail
+  // could start until every one of their lines across the sheet was down)
+  const parentOpen = s => { let p = objects[s.object]?.parent; while (p != null && objects[p].area < c.unitShare * widthMm * heightMm) { if (outlineLeft.get(p) > 0) return true; p = objects[p].parent; } return false; };
   // 3. development rides on the growth: an area's shorter lines (detail) are laid as the growth passes it, a little behind
   // its structure (detailLagMm counted onto their cost), so the drawing is worked outward from the main form instead of
   // being staked out over the whole sheet first; texture and hatching wait for the end
@@ -575,7 +577,8 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, widthMm, start
   walk([...structural, ...detail], s => (isStruct.has(s) ? 'growth' : 'detail'),
     s => (s.role === 'outline' && isStruct.has(s) ? !parentOpen(s) : !(outlineLeft.get(s.object) > 0) && !parentOpen(s) && (isStruct.has(s) || s.rad <= frontier)),
     s => { if (isStruct.has(s)) frontier = Math.max(frontier, s.rad); if (s.role === 'outline' && isStruct.has(s)) outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); },
-    s => (isStruct.has(s) ? 0 : c.detailLagMm));
+    // detail in the object in hand is laid with it (no lag): an object is finished, structure and detail, before its neighbour
+    (s, cur) => (isStruct.has(s) || (s.unit >= 0 && s.unit === cur) ? 0 : c.detailLagMm));
   walk(short, 'detail');
   const runs = new Map(); for (const s of live) if (!s.taken && s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
   const items = [...live.filter(s => !s.taken && (s.role === 'texture' || s.role === 'fill')).map(s => ({ s })), ...[...runs.values()].map(m => ({ m }))];
