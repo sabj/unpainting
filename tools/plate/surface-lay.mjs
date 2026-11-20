@@ -44,7 +44,7 @@ export async function layMarks(ctx) {
     if (!keep.length) continue;
     const amounts = deepenAmounts(regionMix(thick, keep.flatMap(p => p.map(cellOf)), K), K);
     const strokes = keep.map(path => ({ points: path.map(p => ({ x: p.x * SC - 0.5, y: p.y * SC - 0.5, nw: Math.max(0.5, 2 * p.r * SC), s: p.p })) }));
-    amounts.forEach((a, j) => { if (a > 1e-4) pencilDraw(sheet, strokes, j, { amount: a, width: 1, vary: VARY, tooth: TOOTH, seed: SEED + 5200 + gi, usePointWidths: true }); });
+    amounts.forEach((a, j) => { if (a > 1e-4) pencilDraw(sheet, strokes, j, { amount: a, width: 1, vary: VARY, tooth: TOOTH, seed: SEED + 5200 + gi, usePointWidths: true, ...(ctx.NATIVE_CAPTURE ? { afterStroke: () => ctx.NATIVE_CAPTURE('graphite') } : {}) }); });
     gi++;
     laid.marks += keep.length; laid.byKind[g.kind] = (laid.byKind[g.kind] ?? 0) + keep.length;
     for (const path of keep) for (let k = 0; k < path.length; k++) {
