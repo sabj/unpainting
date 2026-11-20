@@ -25,9 +25,10 @@ function paint(schedule) {
     layPassage(sheet, k ? right : left, k ? [0, 1] : [1, 0], { w: W, h: H, T: semanticTechnique(s, {}), maxRadius: 6, seed: 3 + k, O, settle: 0, pad: 0 });
   });
   dryFully(sheet, O);
-  // blue that ran into the sienna square, in a strip three cells deep along the boundary
+  // Probe beyond the brush fringe: the two boundary cells can be painted blue
+  // directly even over a fixed wash. Only transport can reach this inner strip.
   const blue = thickness(sheet)[1]; let s = 0, c = 0;
-  for (let y = 12; y < 36; y++) for (let x = 33; x < 36; x++) { s += blue[y * W + x]; c++; }
+  for (let y = 12; y < 36; y++) for (let x = 30; x < 33; x++) { s += blue[y * W + x]; c++; }
   return s / c;
 }
 

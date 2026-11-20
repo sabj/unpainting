@@ -6,6 +6,7 @@
 // Writes <case>-<mode>-<mm>.rgb (raw RGB of the dried sheet), paper-<mm>.f32 (the paper's height) and cases.json.
 import fs from 'node:fs';
 import path from 'node:path';
+import { waitForDamp } from './wash-state.mjs';
 
 const [root, outDir, ...rest] = process.argv.slice(2);
 if (!root || !outDir) throw new Error('usage: wash-cases.mjs <repo root> <out dir> [options]');
@@ -13,6 +14,8 @@ const arg = (k, d) => { const i = rest.indexOf(`--${k}`); return i >= 0 ? rest[i
 const M = f => import(path.join(path.resolve(root), 'src/media', f));
 const { makePaper } = await M('paper.mjs'), S = await M('sheet.mjs'), B = await M('brush.mjs'), { renderLayers } = await M('km.mjs');
 let attachGpu = null; if (arg('backend', 'cpu') === 'gpu') ({ attachGpu } = await M('gpu/link.mjs'));
+const threads = Number(arg('threads', '1'));
+if (threads > 1) await S.setThreads(threads);
 fs.mkdirSync(outDir, { recursive: true });
 
 // French ultramarine (granulating, lifts) and phthalo blue (staining, smooth), as src/crop/box.mjs gives them.
@@ -46,12 +49,17 @@ const CASES = {
   sweeps: (sheet, mm) => {
     for (let k = 0; k < 5; k++) { const y = 9 + k * 8, b = flat(mm, 60 + k); B.dip(b, { water: 1, conc: [0.6, 0] }); const [a, z] = k % 2 ? [45, 5] : [5, 45]; lay(sheet, mm, b, [{ x: a, y, p: 0.9 }, { x: z, y, p: 0.9 }], { upright: 'sweep' }); }
   },
-  // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a 12 mm drop of nearly clean water into it
+  // (c) a bloom: a 40 mm wash left until damp (its shine gone), then a 12 mm drop of clean water into it
   bloom: (sheet, mm) => {
     const { w } = sheet;
     for (let y = Math.round(5 / mm); y < Math.round(45 / mm); y++) for (let x = Math.round(5 / mm); x < Math.round(45 / mm); x++) S.deposit(sheet, y * w + x, 0.2, [0.25, 0]);
-    flowFor(sheet, Number(arg('bloomwait', 60)));
-    disc(sheet, mm, 25, 25, 6, 0.25, [0.05, 0]);
+    let preparation = null;
+    if (arg('bloomwait', 'auto') === 'auto') {
+      const indices = []; for (let y = 0; y < sheet.h; y++) for (let x = 0; x < sheet.w; x++) if (Math.hypot((x + .5) * mm - 25, (y + .5) * mm - 25) < 6) indices.push(y * w + x);
+      preparation = waitForDamp(sheet, indices, O, S.step);
+    } else flowFor(sheet, Number(arg('bloomwait', 60)));
+    disc(sheet, mm, 25, 25, 6, 0.25, [0, 0]);
+    return preparation;
   },
   // a nearly dry flat dragged once, light and fast, over dry paper (dry brush: paint caught on the grain's peaks)
   drag: (sheet, mm) => {
@@ -67,14 +75,14 @@ for (const mm of cells) {
   for (const name of only) for (const mode of modes) {
     const t0 = performance.now(), sheet = S.createSheet(paperOf(w, h, mm), PIGMENTS);
     if (attachGpu) { const g = attachGpu(sheet, O, { mode: 'on', log: () => {} }); if (g.backend !== 'gpu') throw new Error('wash-cases: --backend gpu but no GPU'); }
-    CASES[name](sheet, mm);
+    const preparation = CASES[name](sheet, mm), evaporated0 = sheet.evaporated ?? 0;
     const tot0 = S.totals ? S.totals(sheet) : null;
     const steps = S.dry(sheet, 200000, O, DRY[mode]);
     const n = w * h, base = new Uint8Array(n * 3); for (let i = 0; i < n; i++) base.set(PAPER_RGB, i * 3);
     const rgb = renderLayers(S.layersOf(sheet), PIGMENTS, base, n);
     const file = `${name}-${mode}-${mm}.rgb`;
     fs.writeFileSync(path.join(outDir, file), Buffer.from(rgb));
-    const run = { name, mode, mm, w, h, file, steps, seconds: +((performance.now() - t0) / 1000).toFixed(2), totals: tot0 && S.totals(sheet) };
+    const run = { name, mode, mm, w, h, file, steps, seconds: +((performance.now() - t0) / 1000).toFixed(2), initialTotals: tot0, preparation: preparation ?? null, evaporated: sheet.evaporated == null ? null : sheet.evaporated - evaporated0, outwardPigmentFlux: sheet.outwardPigmentFlux ?? null, totals: tot0 && S.totals(sheet) };
     info.runs.push(run); sheet._gpu?.close?.();
     console.log(`${name} ${mode} ${mm} mm: ${steps} steps, ${run.seconds} s`);
   }

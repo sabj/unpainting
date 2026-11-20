@@ -296,9 +296,8 @@ test('two flat-brush lanes at twice the edge half-width dry as evenly across the
   assert.ok(edge > .85 * r && edge < r, `edge half-width ${edge.toFixed(1)} of radius ${r}`);
   const even = lay(edge), old = lay(r / 1.035);
   assert.ok(even.join <= even.body, `the join strays ${even.join.toFixed(4)}, the lane body ${even.body.toFixed(4)}`);
-  // The second lane's free liquid joins the first lane's bead (sheet.mjs soak), so even the old 3.5% overlap, which
-  // dried as a ridge when the pores drank each touch, now dries as evenly as a lane.
-  assert.ok(old.join <= old.body, `at the old overlap the join strays ${old.join.toFixed(4)}, the lane body ${old.body.toFixed(4)}`);
+  // The contact-width calibration must improve on the old geometric overlap.
+  assert.ok(even.join < old.join, `calibrated join ${even.join}, old overlap ${old.join}`);
 });
 
 // An accent is a lightly loaded point that lays paint (brush-review item 8). A small round dipped below its hairs' free

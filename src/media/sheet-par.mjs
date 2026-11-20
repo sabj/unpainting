@@ -1,3 +1,4 @@
+import { flowTime, poreTime } from './flow-time.mjs';
 // Threads for the sheet's step (sheet.mjs): a persistent worker pool on SharedArrayBuffers runs each large box in row
 // bands through the phases in sheet-kernel.mjs, bit-identical to the serial step. Whole-sheet jobs use the same pool
 // (jobs-kernel.mjs). Node only: sheet.mjs loads this on setThreads(n > 1).
@@ -249,13 +250,14 @@ function flowField(field, w, h, rng = {}) {
 
 function params(C, sheet, o) {
   const prm = POOL.prm, pigments = sheet.pigments, K = sheet.K, dt = o.dt ?? 1;
+  const { fraction } = flowTime(sheet, o);
   const v = {
-    dt, edgeWidth: o.edgeWidth, evap: o.evap, edgeEvap: o.edgeEvap, absorb: o.absorb, film: o.film,
+    dt, fraction, edgeWidth: o.edgeWidth, evap: o.evap, edgeEvap: o.edgeEvap, absorb: o.absorb, film: o.film,
     ff: o.fibreFlow ?? 0.6, flowDepth: o.flowDepth ?? 0.12, flow: o.flow, slope: o.slope, mar: o.marangoni ?? 0,
-    diffuse: Math.min(0.25, Math.max(0, o.diffuse)), cd: o.carryDepth ?? 0.08, filmDiff: Math.max(0, o.filmDiffuse ?? 0), filmDepth: o.filmDepth ?? 0.03, gran: o.gran ?? 1, liftDepth: o.liftDepth ?? 0.15,
+    diffuse: Math.min(0.25, Math.max(0, o.diffuse * fraction)), cd: o.carryDepth ?? 0.08, filmDiff: Math.max(0, (o.filmDiffuse ?? 0) * fraction), filmDepth: o.filmDepth ?? 0.03, gran: o.gran ?? 1, liftDepth: o.liftDepth ?? 0.15,
     scour: o.scour ?? 0, holdCap: o.hold ?? Infinity, settle: o.settle, lift: o.lift, looseLift: o.looseLift, rewetLift: o.rewetLift,
     granFill: o.granFill ?? 0, slide: o.slide ?? 0, fill: o.slideFill ?? 1, repose: o.repose ?? 0,
-    capStep: Math.min(2 / 3, Math.max(0, o.capRate * dt * 10)), sizing: o.sizing ?? SIZING, filter: o.wickFilter ?? 0.2,
+    capStep: poreTime(sheet, o).fraction, sizing: o.sizing ?? SIZING, filter: o.wickFilter ?? 0.2,
     capEps: o.capEps, capDelta: o.capDelta, wetEps: o.wetEps, paperDry: o.paperDry, capSigma: o.capSigma, spill: o.spill,
     spillHeight: o.spillHeight, dampEase: o.dampEase, pinning: o.pinning ?? 0, pinFibre: o.pinFibre ?? 0,
     hasTop: C.top ? 1 : 0, hasResist: C.resist ? 1 : 0, enclose: o.encloseEase ?? 0, slideCap: o.slideCap ?? 0,
@@ -278,11 +280,15 @@ function params(C, sheet, o) {
 /** Step one box in bands. Returns false, having changed nothing, where the box is better stepped serially. */
 export function stepBox(sheet, o, box, H) {
   if (!POOL || POOL.T < 2) return false;
+  // The fused worker pore/front kernel performs one pass. Use the same
+  // serial CPU reference for a subcycled pore step until that kernel is split;
+  // never substitute its old clipped-rate approximation.
+  if (poreTime(sheet, o).iters > 1) { POOL.stats.serial++; return false; }
   const [x0, y0, x1, y1] = box, { ctrl, T } = POOL, K = sheet.K;
   if ((x1 - x0 + 1) * (y1 - y0 + 1) < MIN_AREA || K > MAXK || !(o.flowIters >= 1) || !Number.isFinite(o.edgeWidth) || o.edgeWidth > 16) return false;
   const C = ctxFor(sheet, H); if (!C || !sync(C, sheet, H)) { POOL.stats.serial++; return false; }
   CUR = C;
-  const v = params(C, sheet, o), iters = o.flowIters;
+  const v = params(C, sheet, o), { iters } = flowTime(sheet, o);
   ctrl[SHEET] = C.id; ctrl[BOX] = x0; ctrl[BOX + 1] = y0; ctrl[BOX + 2] = x1; ctrl[BOX + 3] = y1;
   const rows = y1 - y0 + 1;
   run(PH.A, Math.min(rows, MAXC, CHUNKS * T));

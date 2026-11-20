@@ -323,7 +323,7 @@ test('flowDepth sets the bulk face conductance', () => {
 
 
 test('a dry pit the wash holds round dries without a rim; a wider hole rims unless holeSpan reaches across it', () => {
-  const run = (half, holeSpan) => { const s = sheet(31); for (let y = 5; y < 26; y++) for (let x = 5; x < 26; x++) if (Math.max(Math.abs(x - 15), Math.abs(y - 15)) > half) deposit(s, y * 31 + x, .2, [.1]); s.edgeEvaporated = 0; step(s, { ...still, edgeEvap: .01, dt: 1, holeSpan }); return s.G[0][15 * 31 + 15 - half - 1]; };
-  assert.ok(Math.abs(run(0, 0) - .1) < .002, `a one-cell pit: ${run(0, 0)}`);
-  assert.ok(run(2, 0) > .102 && Math.abs(run(2, 6) - .1) < .002, `a five-cell hole: ${run(2, 0)}, with holeSpan ${run(2, 6)}`);
+  const run = (half, holeSpan) => { const s = sheet(31); for (let y = 5; y < 26; y++) for (let x = 5; x < 26; x++) if (Math.max(Math.abs(x - 15), Math.abs(y - 15)) > half) deposit(s, y * 31 + x, .2, [.1]); s.edgeEvaporated = 0; step(s, { ...still, edgeEvap: .01, dt: 1, holeSpan }); return s.G[0][15 * 31 + 12]; };
+  assert.ok(Math.abs(run(0, 0) - run(-1, 0)) < .002, `a one-cell pit: ${run(0, 0)}`);
+  assert.ok(run(2, 0) > run(-1, 0) + .002 && Math.abs(run(2, 6) - run(-1, 0)) < .002, `a five-cell hole: ${run(2, 0)}, with holeSpan ${run(2, 6)}`);
 });

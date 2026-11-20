@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { luminance, densityOf, rimContrast, grainContrast, bandSpectrum } from './wash-measure.mjs';
+import { bloomFront, discProfile, squareRims, discContrast } from './wash-acceptance.mjs';
 
 const args = process.argv.slice(2), arg = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const RUNS = arg('runs', '').split(',').filter(Boolean).map(e => { const [label, dir] = e.split('='); return { label, dir, info: JSON.parse(fs.readFileSync(path.join(dir, 'cases.json'), 'utf8')) }; });
@@ -37,10 +38,10 @@ async function realCrops() {
 
 function measureRun(run, c) {
   const rgb = fs.readFileSync(path.join(run.dir, c.file)), { w, h, mm } = c, od = densityOf(luminance(rgb, w * h), PAPER_Y);
-  const rim = rimContrast(od, w, h, mm), g2 = grainContrast(od, w, h, mm, rim.interiorMask, 0.2, 1), g4 = grainContrast(od, w, h, mm, rim.interiorMask, 0.5, 1.5);
+  const rim = c.name.startsWith('puddle') ? discContrast(od, w, h, mm) : rimContrast(od, w, h, mm), g2 = grainContrast(od, w, h, mm, rim.interiorMask, 0.2, 1), g4 = grainContrast(od, w, h, mm, rim.interiorMask, 0.5, 1.5);
   // the spectrum of the density in the middle of the wash, relative to its mean
   const n = 1 << Math.floor(Math.log2(Math.round(12 / mm))), x0 = (w - n) >> 1, y0 = (h - n) >> 1, spec = bandSpectrum(od, w, mm, x0, y0, n);
-  return { rgb, rim: rim.contrast, rimOD: rim.rim, interiorOD: rim.interior, grain02: g2 && g2.relative, grain04: g4 && g4.relative, spectrum: Object.fromEntries(Object.entries(spec).map(([k, v]) => [k, v == null ? null : v / Math.max(1e-6, rim.interior)])) };
+  return { rgb, acceptance: c.name === 'bloom' ? bloomFront(od, w, h, mm) : c.name === 'sweeps' ? squareRims(od, w, h, mm) : c.name.startsWith('puddle') ? discProfile(od, w, h, mm) : null, rim: rim.contrast, rimOD: rim.rim, interiorOD: rim.interior, grain02: g2 && g2.relative, grain04: g4 && g4.relative, spectrum: Object.fromEntries(Object.entries(spec).map(([k, v]) => [k, v == null ? null : v / Math.max(1e-6, rim.interior)])) };
 }
 function paperSpectrum(dir, mm, size) {
   const f = path.join(dir, `paper-${mm}.f32`); if (!fs.existsSync(f)) return null;
@@ -52,7 +53,7 @@ const refs = await realCrops();
 const CASE_NAMES = { puddleU: '(a) 30 mm puddle, ultramarine (granulating)', puddleP: '(a) 30 mm puddle, phthalo (staining)', sweeps: '(b) 40 mm square in five sweeps', bloom: '(c) a wetter drop into a damp wash (bloom)' };
 const cases = [...new Set(RUNS.flatMap(r => r.info.runs.map(c => c.name)))];
 const cols = [...new Set(RUNS.flatMap(r => r.info.runs.map(c => `${c.mode}@${c.mm}`)))];
-const SIZE = RUNS[0].info.size, panel = SIZE * PX, GAP = 30, HEAD = 64, numbers = { refs, runs: {} };
+const SIZE = RUNS[0].info.size, panel = SIZE * PX, GAP = 30, HEAD = 88, numbers = { refs, runs: {} };
 const label = (t, x, y, size = 24, fill = '#222') => `<text x="${x}" y="${y}" font-family="Helvetica, Arial, sans-serif" font-size="${size}" fill="${fill}">${String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</text>`;
 const comps = [], svg = [];
 let y = 20;
@@ -108,6 +109,8 @@ for (const name of cases) for (const r of RUNS) {
     (numbers.runs[r.label] ??= {})[`${name} ${col}`] = { ...m, rgb: undefined, steps: c.steps, seconds: c.seconds };
     svg.push(label(`${c.mode}, ${c.mm} mm cells: rim ${fmt(m.rim)} (OD ${fmt(m.rimOD)} / ${fmt(m.interiorOD)}), grain ${fmt(m.grain02, 3)} / ${fmt(m.grain04, 3)}`, x, y + 22, 20));
     svg.push(label(`spectrum ${[0.2, 0.5, 1, 2].map(k => fmt(m.spectrum[k], 3)).join(' / ')}; ${c.steps} steps, ${c.seconds} s`, x, y + 46, 20));
+    const detail = name === 'bloom' ? `bloom ring/centre ${fmt(m.acceptance.contrast)}; fitted radius RMS ${fmt(m.acceptance.radiusRms, 3)} mm` : name === 'sweeps' ? `four-side rim deviation ${fmt(100 * m.acceptance.deviation, 1)}%` : name.startsWith('puddle') ? `interior radial deviation ${fmt(100 * m.acceptance.flatness, 1)}%; physical 1 mm annulus` : '';
+    if (detail) svg.push(label(detail, x, y + 70, 20));
     const img = await sharp(m.rgb, { raw: { width: c.w, height: c.h, channels: 3 } }).resize(panel, panel, { kernel: 'lanczos3' }).png().toBuffer();
     comps.push({ input: img, left: x, top: y + HEAD });
   }
@@ -120,4 +123,4 @@ await sharp({ create: { width: W, height: H, channels: 3, background: { r: 255, 
 if (arg('json', null)) fs.writeFileSync(arg('json'), JSON.stringify(numbers, null, 1));
 console.log(`${OUT}: ${W}x${H}`);
 for (const c of refs) console.log(`real ${c.name}: grain ${fmt(c.grain02, 3)} / ${fmt(c.grain04, 3)}, spectrum ${JSON.stringify(Object.fromEntries(Object.entries(c.spectrum).map(([k, v]) => [k, v && +v.toFixed(3)])))}`);
-for (const [l, rs] of Object.entries(numbers.runs)) for (const [k, m] of Object.entries(rs)) console.log(`${l} ${k}: rim ${fmt(m.rim)}, grain ${fmt(m.grain02, 3)} / ${fmt(m.grain04, 3)}, spectrum ${JSON.stringify(Object.fromEntries(Object.entries(m.spectrum).map(([q, v]) => [q, v && +v.toFixed(3)])))}`);
+for (const [l, rs] of Object.entries(numbers.runs)) for (const [k, m] of Object.entries(rs)) console.log(`${l} ${k}: acceptance ${JSON.stringify(m.acceptance)}, rim ${fmt(m.rim)}, grain ${fmt(m.grain02, 3)} / ${fmt(m.grain04, 3)}, spectrum ${JSON.stringify(Object.fromEntries(Object.entries(m.spectrum).map(([q, v]) => [q, v && +v.toFixed(3)])))}`);

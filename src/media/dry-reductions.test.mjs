@@ -30,7 +30,6 @@ test('fast dry summaries keep the original iteration schedule and exact planes',
   for(;t<4000;t++){
     if(!fast&&t>=10&&(t>=90||(t%25===0&&scan(b).surfaceLevel<.02)))fast=true;
     if(quietDryTail(b,DEFAULTS))break;
-    if(fast&&b.W.every(w=>w<=3*DEFAULTS.wetEps))oFast.dt=140;
     if(!step(b,fast?oFast:DEFAULTS))break;
   }
   assert.ok(t<4000);fix(b);assert.equal(actual,t);
