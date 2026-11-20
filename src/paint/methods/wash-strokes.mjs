@@ -97,6 +97,15 @@ export function outlineLoops(ids, id, box, w, h, { cellMm, tolMm, soft = () => f
 }
 
 /**
+ * How the brush is held for a stroke of a wash, as the engine's `upright` option. A lane is a flat or a mop swept straight:
+ * its edge is held across the run from the lane's first point to its last ('sweep'). Every other stroke is a round steered
+ * along the outline: it turns with its path (false), so what it lays is as wide as the brush all the way round and its
+ * side is the outline's curve. Held one way for the whole stroke it lays a slanted band with straight-cut ends, thin
+ * wherever the path runs along the way it is held, and leaves straight-sided bare patches the plan counts as covered.
+ */
+export const washStrokeHold = round => (round ? false : 'sweep');
+
+/**
  * The cells of a w x h sheet (each `mm` wide) whose centres lie inside a set of outline loops (even-odd, so a loop inside
  * another is a hole): an outline in millimetres put on a sheet at the sheet's own cell size, whatever grid it was traced on.
  */

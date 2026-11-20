@@ -12,6 +12,7 @@ import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
 import {planFairWashes} from '../../src/paint/methods/fair-wash.mjs';
+import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {unsupportedAxisEdges} from '../../src/paint/methods/target-regions.mjs';
@@ -108,7 +109,8 @@ const brushSettings=b=>{const {_pend,...settings}=b;return settings;};
 const stroke=(b,target,points,options)=>{
  if(ctx.AREA_NUMERIC_CONTACT_STOP&&target===ctx.sheet)return;
  if(ctx.VALUE_ACTIVE&&target===ctx.sheet){
-  if(ctx.VALUE_ACTIVE.shaped)options={...options,upright:ctx.VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
+  // a wash plan's stroke says whether it is a round's (paint.mjs vectorPaths): a round turns with its path, a lane is swept
+  if(ctx.VALUE_ACTIVE.shaped)options={...options,upright:ctx.VALUE_ACTIVE.brush?.contact==='point'?false:washStrokeHold(points[0]?.round===true)};
   const fastMode=NATIVE_PAINT_MODE.mode==='fast',fastPaperOpts=fastMode?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:{uniform:SPEED_UNIFORM_PAPER};
   const contactStarted=performance.now(),contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);

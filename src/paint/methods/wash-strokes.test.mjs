@@ -115,3 +115,22 @@ test('a wash laid past its outline meets its neighbour, and no wash is left with
   assert.ok(Math.min(...grown.strokes.flatMap(s => s.points.map(p => p[0] - s.radiusMm))) < 9, 'its strokes reach past the outline');
   for (const size of [4, 5, 6, 7, 9, 11, 14]) { const s = planWashStrokes([{ points: [[10, 10], [10 + size, 10], [10 + size, 10 + size], [10, 10 + size]], soft: [] }], { kitMm: KIT, pointMm: 1.2 }); assert.ok(s.uncovered < .08, `${s.uncovered} of a ${size} mm square left bare`); }
 });
+
+test('a round steered round an outline lays its full width all the way round: it turns with its path, a lane is swept', async () => {
+  const { washStrokeHold } = await import('./wash-strokes.mjs');
+  assert.equal(washStrokeHold(false), 'sweep'); assert.equal(washStrokeHold(true), false);
+  const { makePaper } = await import('../../media/paper.mjs'), { createSheet, dry, DEFAULTS } = await import('../../media/sheet.mjs'), { createBrush, dip, stroke } = await import('../../media/brush.mjs');
+  // a 7 mm round on 0.23 mm cells, steered once round a circle 24 mm across, with a wash's load
+  const mm = 280 / 1224, W = 200, H = 200, r = 3.5 / mm, R = 12 / mm, path = Array.from({ length: 73 }, (_, q) => ({ x: 100 + R * Math.cos(q * Math.PI / 36), y: 100 + R * Math.sin(q * Math.PI / 36), r, p: 1 }));
+  const bare = hold => {
+    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2 }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: .25 }]);
+    const b = createBrush({ flat: false, radius: r, bristles: Math.ceil(r * 2), capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 });
+    dip(b, { water: .62, conc: [.05] }); stroke(b, sheet, path, { lift: true, upright: hold }); dry(sheet, 40000, DEFAULTS);
+    // the ring the plan counts as laid (the brush's disc carried round the path), a cell in from each side
+    let ring = 0, dry_ = 0; for (let i = 0; i < W * H; i++) { const d = Math.abs(Math.hypot(i % W + .5 - 100, ((i / W) | 0) + .5 - 100) - R); if (d > r - 1) continue; ring++; if (!(sheet.G[0][i] + sheet.D[0][i] + sheet.P[0][i] + sheet.layers.reduce((a, L) => a + (L[0]?.[i] ?? 0), 0) > 1e-7)) dry_++; }
+    return dry_ / ring;
+  };
+  const turned = bare(washStrokeHold(true)), held = bare('sweep');
+  assert.ok(turned < .03, `${(turned * 100).toFixed(0)}% of the ring the plan counts as laid is bare`);
+  assert.ok(held > 5 * Math.max(turned, .01), `held one way the same round leaves ${(held * 100).toFixed(0)}% bare: the test tells the two apart`);
+});
