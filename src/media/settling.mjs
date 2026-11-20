@@ -38,11 +38,12 @@ export const diffusionMm2PerS = dUm => (KT / (3 * Math.PI * MU * dUm * 1e-6)) * 
  * A pigment's effective particle diameter (um) and density (kg/m^3). A paint from the table (pigment-physical.mjs) or
  * the hue classes (paint/methods/pigment-physics.mjs) carries its own. A pigment written without them (test pigments,
  * old tapes) is read back from the numbers it has, by the table's own rules: rho is the specific gravity / 50, and the
- * diameter follows granulation, from 0.08 um (a staining organic, gamma 0) to about 2 um (ultramarine, gamma 0.85).
+ * diameter follows granulation as the table's paints have it, 0.08 + 2 sqrt(gamma) um: 0.08 for a staining organic
+ * (gamma 0), about 1 for an umber (0.25), 1.6 for the earths (0.55) and 1.9 for ultramarine (0.85).
  */
 export function particleOf(p) {
   const rhoP = p.rhoP ?? (p.rho > 0 ? p.rho * 50 * 1000 : 1500);
-  const dUm = p.dUm ?? 0.08 + 2.2 * Math.max(0, p.gamma ?? 0);
+  const dUm = p.dUm ?? 0.08 + 2 * Math.sqrt(Math.max(0, p.gamma ?? 0));
   return { dUm, rhoP };
 }
 /** The pigment's settling speed in mm/s. */

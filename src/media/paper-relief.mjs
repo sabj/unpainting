@@ -15,16 +15,18 @@
 // 0.11 to 0.19 mm (a speck 0.2 to 0.4 mm across) and is lowest at 0.4 to 0.56 mm (speck-to-gap pitch about 1 mm), with
 // gradients 1.0 to 1.5 times stronger across x than along it on some sheets, and the density skewed towards dark specks
 // (+0.3 to +0.7). The RMS heights are estimates for artists' papers (hot press a few micrometres, cold press about
-// fifteen, rough about twice that); no profilometer data was at hand, and the cold-press RMS was set so a granulating
-// wash comes out with the grain the crops have (src/media/paper-relief.test.mjs, src/media/settling.test.mjs).
+// ten, rough about twice that); no profilometer data was at hand, and the cold-press RMS was set so a granulating
+// wash comes out with the grain the crops have (src/media/paper-relief.test.mjs, src/media/settling.test.mjs). The
+// relief is weak past 1.2 mm: with more there, settled pigment gathered into millimetre basins and dried as a soft
+// mottle (looks/grain-1.jpg), where the crops show a fine pepper, densest at 0.3 to 0.5 mm.
 // DOM free.
 
 export const RELIEF_PRESETS = Object.freeze({
   // lambdaMin, lambdaMax mm: the octaves that carry the relief; rmsUm the RMS height; aniso the stretch along x; pits the
   // skew towards pits; swell: an extra share of broad relief at swellMm (rough paper's hills)
-  cold: Object.freeze({ rmsUm: 15, lambdaMin: 0.12, lambdaMax: 2.5, aniso: 1.15, pits: 0.1, swell: 0.15, swellMm: 5 }),
-  rough: Object.freeze({ rmsUm: 22, lambdaMin: 0.15, lambdaMax: 4, aniso: 1.1, pits: 0.12, swell: 0.35, swellMm: 6 }),
-  hot: Object.freeze({ rmsUm: 4, lambdaMin: 0.08, lambdaMax: 1, aniso: 1.3, pits: 0.05, swell: 0, swellMm: 3 }),
+  cold: Object.freeze({ rmsUm: 10, lambdaMin: 0.12, lambdaMax: 1.2, aniso: 1.15, pits: 0.1, swell: 0.15, swellMm: 5 }),
+  rough: Object.freeze({ rmsUm: 18, lambdaMin: 0.15, lambdaMax: 2.5, aniso: 1.1, pits: 0.12, swell: 0.35, swellMm: 6 }),
+  hot: Object.freeze({ rmsUm: 3, lambdaMin: 0.08, lambdaMax: 0.8, aniso: 1.3, pits: 0.05, swell: 0, swellMm: 3 }),
 });
 // The height a sheet reads (paper.height) is this relief in units of HEIGHT_SPAN_UM about 0.5: 100 um a unit, the same
 // for every grid, so the flow's hydraulic head (sheet.mjs `slope`, 0.1 mm of water a unit of height) is the paper's

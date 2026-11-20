@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
 import { createSheet, deposit, dry, totals, layersOf, DEFAULTS } from './sheet.mjs';
 import { renderLayers } from './km.mjs';
+import { subcellLayers } from './subcell-grain.mjs';
 import { physicalOf, physicsFields } from './pigment-physical.mjs';
 import { stokesMmPerS, settleShare, settleSpeed, particleOf } from './settling.mjs';
 import { luminance, densityOf, grainContrast, rimContrast } from '../../tools/lab/wash-measure.mjs';
@@ -25,7 +26,14 @@ function wash(pigment, mm, { dt = 2, conc = 1.2 } = {}) {
   const od = densityOf(luminance(renderLayers(layersOf(sheet), [pigment], new Uint8Array(n * 3).map((_, i) => PAPER[i % 3]), n), n), PAPER_Y);
   const inner = rimContrast(od, w, w, mm).interiorMask;
   const g = (lo, hi) => grainContrast(od, w, w, mm, inner, lo, hi)?.relative ?? null;
-  return { fine: g(0.2, 1), mid: g(0.5, 1.5), before, after };
+  return { fine: g(0.2, 1), mid: g(0.5, 1.5), before, after, sheet };
+}
+// the dried wash rendered at 0.05 mm pixels with its sub-cell grain (subcell-grain.mjs): its 0.2-1 mm grain in the middle
+function subcellGrain({ sheet }, pigment) {
+  const N = Math.round(sheet.paper.mmPerCell / 0.05), W = sheet.w * N, n = W * W, L = subcellLayers(layersOf(sheet), [pigment], sheet.paper, N);
+  const od = densityOf(luminance(renderLayers(L, [pigment], new Uint8Array(n * 3).map((_, i) => PAPER[i % 3]), n), n), PAPER_Y);
+  const inner = new Uint8Array(n); for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) inner[y * W + x] = Math.abs((x + 0.5) * 0.05 - 23) < 15 && Math.abs((y + 0.5) * 0.05 - 23) < 15 ? 1 : 0;
+  return grainContrast(od, W, W, 0.05, inner, 0.2, 1).relative;
 }
 const change = (a, b) => Math.abs(a - b) / Math.max(a, b);
 
@@ -34,7 +42,7 @@ test('Stokes speeds: ultramarine falls micrometres a second, phthalo thousands o
   assert.ok(Math.abs(stokesMmPerS(2, 2350) - 2.943e-3) < 1e-5);
   assert.ok(settleSpeed(ULTRAMARINE) / settleSpeed(PHTHALO) > 300);
   // a pigment written without a diameter is read back from its granulation and density
-  assert.deepEqual(particleOf({ rho: 0.047, gamma: 0.85 }), { dUm: 0.08 + 2.2 * 0.85, rhoP: 2350 });
+  assert.deepEqual(particleOf({ rho: 0.047, gamma: 0.85 }), { dUm: 0.08 + 2 * Math.sqrt(0.85), rhoP: 2350 });
 });
 
 test('settling share is exact over any step: two half steps move what one whole step moves', () => {
@@ -56,6 +64,10 @@ test('a 40 mm wash of ultramarine granulates as real washes do, the same at 0.25
   assert.ok(change(U25.mid, U10.mid) < 0.1, `0.25 vs 0.1 mm cells: ${U25.mid} vs ${U10.mid}`);
   assert.ok(change(U25.mid, U25h.mid) < 0.1, `half step: ${U25.mid} vs ${U25h.mid}`);
   for (const r of [U25, U10, U25h]) assert.ok(Math.abs(r.after - r.before) / r.before < 1e-5, `pigment ${r.before} -> ${r.after}`);
+  // sub-cell grain: the 0.25 mm sheet rendered at 0.05 mm pixels shows the fine grain the 0.1 mm sheet has
+  const s25 = subcellGrain(U25, ULTRAMARINE), s10 = subcellGrain(U10, ULTRAMARINE);
+  console.log(`sub-cell grain at 0.05 mm pixels, 0.2-1 mm: from 0.25 mm cells ${s25.toFixed(4)}, from 0.1 mm cells ${s10.toFixed(4)}`);
+  assert.ok(change(s25, s10) < 0.15 && change(s25, U10.fine) < 0.15, `${s25} ${s10} ${U10.fine}`);
 });
 
 test('a 40 mm wash of phthalo stays smooth at 0.25 and 0.1 mm cells and on halving the step', () => {
@@ -65,4 +77,6 @@ test('a 40 mm wash of phthalo stays smooth at 0.25 and 0.1 mm cells and on halvi
   // a smooth wash's grain is noise near zero: it is held to a tenth of its bound across grids and steps, not to a ratio
   assert.ok(Math.abs(P25.mid - P10.mid) < 0.002 && Math.abs(P25.mid - P25h.mid) < 0.002, `${P25.mid} ${P10.mid} ${P25h.mid}`);
   for (const r of [P25, P10, P25h]) assert.ok(Math.abs(r.after - r.before) / r.before < 1e-5, `pigment ${r.before} -> ${r.after}`);
+  // a staining pigment gets no sub-cell grain
+  assert.ok(subcellGrain(P25, PHTHALO) < 0.02);
 });

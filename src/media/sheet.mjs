@@ -58,7 +58,11 @@ export const DEFAULTS = {
   carryDepth: 0.02,
   flowDepth: 0.06,                                // a film thinner than this barely flows (lubrication: flux grows with depth cubed)
   gran: 1,                                        // scales every pigment's granulation
-  slide: 0.4, slideFill: 2, repose: 0.04,         // settled grains roll into the paper's hollows (by granulation), filling them, down slopes steeper than repose / granulation;
+  slide: 0.4, slideFill: 1.2, repose: 0.04,        // settled grains roll into the paper's hollows (by granulation), filling them, down slopes steeper than repose / granulation;
+                                                  // slideFill: how high a unit of deposit fills a hollow, in height units. At 2 the fine pits filled
+                                                  // at once and the rest rolled on into millimetre basins: a soft 1 to 2 mm mottle where real washes
+                                                  // have a 0.2 to 0.5 mm pepper (looks/grain-1.jpg). A wash's pigment is a few micrometres thick on a
+                                                  // relief of ten, so its pits hold what settles in them.
                                                   // too low and the wash dries before the grains arrive, so granulating pigments come out smooth
   hold: 2,                                        // the most pigment a unit of water keeps suspended; a thinner film strands the rest
   sizing: SIZING, wickFilter: 0.2,                  // sizing slows wicking into dry paper; fibres filter out a share of what pigment the water carries

@@ -37,10 +37,11 @@ test('presets: hot press smoother than cold press, rough coarser; all skewed tow
   for (const k in out) { assert.ok(out[k].skew < -0.05, `${k} skew ${out[k].skew}`); assert.ok(out[k].across > 1.05, `${k} anisotropy ${out[k].across}`); }
 });
 
-test('cold press: structure from 0.1 mm up, about even per octave from 0.2 to 2 mm, as in the granulating crops', () => {
+test('cold press: structure from 0.1 mm up, about even per octave from 0.2 to 1 mm and weaker past it, as the crops', () => {
   const mm = 0.025, w = 1024, r = paperRelief(w, w, mm, { seed: 5 }), b = bandSpectrum(r.zUm, w, mm, 0, 0, w, [0.1, 0.2, 0.5, 1, 2]);
-  const mid = [b[0.2], b[0.5], b[1], b[2]];
-  assert.ok(Math.max(...mid) / Math.min(...mid) < 1.6, `octave bands 0.2 to 2 mm: ${mid.map(v => v.toFixed(2)).join(' ')} um`);
+  const mid = [b[0.2], b[0.5], b[1]];
+  assert.ok(Math.max(...mid) / Math.min(...mid) < 1.6, `octave bands 0.2 to 1 mm: ${mid.map(v => v.toFixed(2)).join(' ')} um`);
+  assert.ok(b[2] < 0.8 * b[0.5], `2 mm band ${b[2]} against 0.5 mm ${b[0.5]} um: no millimetre basins to pool in`);
   assert.ok(b[0.1] > 0.3 * b[0.5], `0.1 mm band ${b[0.1]} um: the sheet still has structure there`);
   // hollows (makePaper): a cell's depth below the tooth level, in the relief's RMS, about 0.4 on average and none on
   // the crests, a little shallower on a coarser grid of the same paper
