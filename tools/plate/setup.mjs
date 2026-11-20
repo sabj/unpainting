@@ -244,7 +244,7 @@ const RUN_CACHE = {dir:process.env.W2_CACHE_DIR || SWEEP_CACHE || path.join(root
 // the graphite drawing carries the structure of the subject: the line model's pool, held and decided by meaning, drawn light
 // (src/paint/methods/graphite-pool.mjs). It leaves the run alone when a line source, stages, the models or segments are named off,
 // and when the image is missing (the image load that follows fails the run).
-const GRAPHITE_POOL_CHOICE = graphitePoolWanted(argv);
+const GRAPHITE_POOL_CHOICE = graphitePoolWanted(argv, { preparedDrawing: !!opt('drawingfile', '') && (() => { try { return JSON.parse(readLineText(linePaths(path.resolve(root, opt('drawingfile', ''))).lines)).inputKind === 'drawing'; } catch { return false; } })() });
 const GRAPHITE_POOL = GRAPHITE_POOL_CHOICE.wanted && opt('image', '') && fs.existsSync(path.resolve(root, opt('image', ''))) ? await prepareGraphitePool({ opt, num, argv, out, root, image: path.resolve(root, opt('image','')), sheetMm: num('sheetmm', DEFAULT_SHEET_MM), log: console.log }) : null;
 const EARLY_LINES = !['none','auto'].includes(opt('linesource','none')) ? await cachedEarlyLines({
   cache:RUN_CACHE, code:RUN_CACHE.enabled ? codeHash(root,fs.readdirSync(path.join(root,'tools/seg')).filter(f=>f.endsWith('.py')).map(f=>'tools/seg/'+f),{dependencies:['src/paint/methods/linework-plan.mjs','src/paint/early-lines-cache.mjs']}) : '',

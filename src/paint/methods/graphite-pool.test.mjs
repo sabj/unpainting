@@ -9,6 +9,7 @@ import { STAGE_DEFAULTS } from './drawing-stages.mjs';
 
 test('a graphite drawing from the pool is wanted unless a line source, stages, no drawing or the models are asked off', () => {
   assert.equal(graphitePoolWanted(['--image', 'x.png']).wanted, true);
+  assert.equal(graphitePoolWanted(['--image', 'x.png', '--drawingfile', 'd'], { preparedDrawing: true }).wanted, false);
   assert.equal(graphitePoolWanted(['--outlinemedium', 'graphite', '--drawing', 'first', '--drawingstages', 'off']).wanted, true);
   assert.equal(graphitePoolWanted(['--outlinemedium', 'graphite-HB']).wanted, true);
   for (const argv of [['--outlinemedium', 'ink'], ['--outlinemedium', 'auto'], ['--outlinemedium', 'none'], ['--drawing', 'none'], ['--draw', '0'],
