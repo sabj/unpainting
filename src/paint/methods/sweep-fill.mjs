@@ -419,7 +419,11 @@ export function laneFill(loops, { kitMm, growMm = 0, keepOut = null, spine = tru
     if (!first) first = { brush, th, deep: deep * pitch };
     // lane centres: the outer ones nine tenths of the brush's radius in, so its edge lays the part's edge
     const inset = Math.min(across / 2, 0.9 * r), lanes = Math.max(1, Math.ceil(Math.max(0, across - 2 * inset) / (2 * r * (1 - LANE_OVERLAP))) + 1);
-    const vs = lanes === 1 ? [(v0 + v1) / 2] : Array.from({ length: lanes }, (_, q) => v0 + inset + q * (across - 2 * inset) / (lanes - 1));
+    // the lanes sit on a grid fixed to the sheet (multiples of their spacing), so a small change to the outline moves
+    // only the outermost lanes, not every one; the outermost lie on the part's edges
+    const step = 2 * r * (1 - LANE_OVERLAP), a0 = v0 + inset, a1 = v1 - inset, vs = [];
+    if (lanes === 1 || a1 - a0 < step) vs.push(...(a1 - a0 < 0.2 * step ? [(v0 + v1) / 2] : [a0, a1]));
+    else { for (let g = Math.ceil(a0 / step) * step; g <= a1 + 1e-9; g += step) vs.push(g); if (vs[0] - a0 > 0.5 * step) vs.unshift(a0); if (a1 - vs[vs.length - 1] > 0.5 * step) vs.push(a1); }
     let k = 0;
     for (const v of vs) {
       // along the lane's centre line the hand presses as wide as the part allows there (half-width no more than the
