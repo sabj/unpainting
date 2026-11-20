@@ -97,6 +97,8 @@ export function selectedDrawing({ first, fine = false, w, h, opt, num, log, walk
       outLen: num('drawtaperout', 5) * handScale, start: num('drawtaperstart', .45), end: num('drawtaperend', .3),
       // a sharp corner is a turn of 60 degrees or more within 0.8 mm either way; an end piece under 1.2 mm past one is a hook
       corner: { span: 0.8 / (num('sheetmm', 152.4) / w), deg: 60, spur: 1.2 / (num('sheetmm', 152.4) / w) },
+      // a hand lands firm, eases off by a quarter along the stroke and lifts over its last third; the nib opens and closes with the pressure
+      relax: 0.25, liftShare: 0.33, flex: 0.7,
       detailScale: num('drawdetailscale', 1), detailWidth: num('drawdetailwidth', 1), flickCells: num('drawflickmm', 0) / (num('sheetmm', 152.4) / w), D, w, h, lit: num('drawlit', 0), reach: num('drawlitreach', 2) * handScale });
     log(`drawing hand: ${lines.length} reviewed lines, ${r.joined} joins, ${r.gestures} ordered gestures, ${r.runs} light-edge runs, ${r.strokes.length} tapered strokes`);
     // --inkhand 1: the hand's speed along each stroke (slower on curves, which lays a wider, darker line, faster on straights)

@@ -72,6 +72,8 @@ def line_map_mask(bgr, fine=None, min_area=2):
 
 # a contour this long (cells of a 1080 px wide map, about 8 mm on a 152 mm sheet) is structure, not detail
 LONG_CELLS = 57
+# the widest break in a line that is bridged when both ends point along it and the evidence carries on between them
+JOIN_GAP = 7
 
 
 def stroke_mask(bgr, pxmm=152.4/1080, rmm=.5, gate=None, lo_frac=.5, close=0, ink_colour=0):
@@ -137,6 +139,14 @@ def plan(bgr, kind='ink', map_tolerance=.25, fine=None, gate=None, stroke_opts=N
         # a stub off a fork cuts a line in two; a standalone short mark is not a stub and stays
         skeleton, _ = prune_spurs(skeleton, 2)
     paths = sketch.trace(skeleton, min_points=2, window=3 if kind == 'line-map' else 5)
+    joins = 0
+    if kind in ('line-map', 'stroke'):
+        # one line through each junction along its straightest continuation, then across the short breaks the map or a
+        # dry pen leaves where the evidence carries on (a wall edge, an eave or an arch is one long stroke)
+        paths, joins = sketch.through_junctions(paths, skeleton)
+        before = len(paths)
+        paths = sketch.join(paths, contrast, gap=JOIN_GAP)
+        joins += before - len(paths)
     q_scale = bgr.shape[1]/1080
     distance = cv2.distanceTransform(mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
     lines = []
@@ -173,7 +183,7 @@ def plan(bgr, kind='ink', map_tolerance=.25, fine=None, gate=None, stroke_opts=N
                       **({'tier': 1 if arc_length(q) >= LONG_CELLS * q_scale else 2} if kind in ('line-map', 'stroke') else {})})
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()),
         'skeletonPixels': int(skeleton.sum()), 'tracedPaths': len(paths),
-        'selectedPaths': len(lines), 'joins': 0, 'budgetDrops': 0,
+        'selectedPaths': len(lines), 'joins': joins, 'budgetDrops': 0,
         'simplificationTolerance': map_tolerance if kind in ('line-map', 'stroke') else .25}
 
 
@@ -188,6 +198,7 @@ def main():
     ap.add_argument('--stroke-close', type=int, default=0, help='--kind stroke: close breaks of up to this many pixels before tracing')
     ap.add_argument('--stroke-colour', type=float, default=0, help='--kind stroke: keep strokes within this a*b* distance of the ink colour (0 off)')
     ap.add_argument('--gate', help="a lineart map (dark on white): a --kind stroke stroke is kept only where it also sees a line")
+    ap.add_argument('--source', help="--kind line-map: the picture the map was made from; the length of its own pen strokes where the map sees a line is reported as sourceInkLength")
     ap.add_argument('--fine', help="the fine model's own map (dark on white): its marks above .28 in busy detail regions join a line map")
     args = ap.parse_args()
     bgr = cv2.imread(args.image)
@@ -214,6 +225,16 @@ def main():
             ap.error('cannot read '+args.gate)
         gate = 1-cv2.resize(grey, (w, h), interpolation=cv2.INTER_AREA).astype(np.float32)/255
     lines, mask, skeleton, stats = plan(bgr, args.kind, tolerance, fine, gate, {'lo_frac': args.stroke_lo, 'close': args.stroke_close, 'ink_colour': args.stroke_colour})
+    if args.source:
+        if args.kind != 'line-map':
+            ap.error('--source goes with --kind line-map')
+        src = cv2.imread(args.source)
+        if src is None:
+            ap.error('cannot read '+args.source)
+        # how much line the subject itself carries: its own narrow dark strokes where the map also sees a line, thinned.
+        # One number for the whole picture; the drawing is cut to this length by importance (line-importance.mjs).
+        own, _ = stroke_mask(cv2.resize(src, (w, h), interpolation=cv2.INTER_AREA), 152.4/w, gate=1-cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255, ink_colour=10)
+        stats['sourceInkLength'] = int(prune_spurs(thin(own)[0], 3)[0].sum())
     stem = Path(args.out); stem.parent.mkdir(parents=True, exist_ok=True)
     doc = {'source': 'copy-lines: '+('prepared learned line map' if args.kind == 'line-map' else 'observed source ink')+', pre-paint only',
            'inputKind': args.kind,

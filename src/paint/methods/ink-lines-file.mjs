@@ -12,10 +12,11 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { linePaths, hasLineFile, readLineText } from '../../crop/lines.mjs';
 import { labPlanes } from './line-evidence.mjs';
-import { holdLinesToTarget } from './ink-lines.mjs';
+import { holdLinesToTarget, pathSupport } from './ink-lines.mjs';
 import { strokesPeakAbsorbance, INK_STRENGTH_QUANTILE } from './ink-match.mjs';
 import { separate } from '../../crop/inkwash.mjs';
 import { decideFile } from './ink-decide-file.mjs';
+import { byImportance } from './line-importance.mjs';
 import { DECIDE_DEFAULTS } from './ink-decide.mjs';
 import { prepareSegments } from '../../crop/segment-prep.mjs';
 
@@ -33,6 +34,8 @@ export function inkLineFlags(num) {
 // a contour piece shorter than this, or turning faster than this, is detail (an eye, a pupil, a nostril)
 const SHORT_MM = 6, CURVED_DEG_PER_MM = 25;
 // the line files the models made: the lineart map's contours, and the source's own pen strokes gated by the map
+// a line 10 L* darker than the mean of its two sides is surely a pen line of the subject's own (line-importance.mjs)
+const PEN_SURE_L = 10;
 const MODEL_KINDS = ['line-map', 'stroke'];
 
 const quantileOf = (P, q) => { const s = Float32Array.from(P).sort(); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
@@ -82,10 +85,10 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   // --inkdecide 1: a candidate line, from the lineart map or authored by the plan, is drawn whole only where the ink rule of the
   // ground under it allows it and the source shows a pen line, not a mass edge (ink-decide-file.mjs). Once: a stage file made
   // from decided lines is not decided again.
-  let decided = doc.inkDecided === true;
+  let decided = doc.inkDecided === true, decidedHere = false;
   if (decide && !decided) {
     const r = await decideFile({ doc, L, image, out, stage, pxMm, authored: !MODEL_KINDS.includes(doc0.inputKind), ...decide, geom: flags.geom > 0, shadowMask: flags.shadowMask > 0, o: { ...DECIDE_DEFAULTS, dropFaint: flags.dropFaint > 0 }, foliage: flags.foliage > 0, inkDarkRule: flags.inkDarkRule > 0, joinMm: flags.joinMm, economy: flags.economy > 0, salient: flags.salience > 0, hatch: flags.hatch > 0 ? { angle: flags.hatchAngle, form: flags.hatchForm > 0 } : null, log });
-    doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true;
+    doc = { ...doc, lines: r.lines, inkDecided: true }; decided = true; decidedHere = true;
   }
   // --linegapmm and --lineminmm: the support filter joins gaps up to this long and drops pieces shorter than this
   // (defaults 2 and 3 of the file's pixels)
@@ -101,6 +104,15 @@ async function holdLineFileImpl({ stage, base, image, root = '.', out, sheetMm, 
   const stroke = doc0.inputKind === 'stroke';
   const contour = model ? { reach: Math.max(1.5, flags.probeMm / pxMm), widthPx: { min: flags.widthMinMm / pxMm, max: (stroke ? flags.strokeMaxMm : flags.widthMaxMm) / pxMm, detail: stroke ? 1 : flags.detailRatio, darkWidth: !stroke, paperWeight: stroke, paperL: stroke ? quantileOf(L, 0.9) : null, shortPx: SHORT_MM / pxMm, curvedDegPerPx: CURVED_DEG_PER_MM * pxMm } } : {};
   const r = holdLinesToTarget(doc.lines, L, im.w, im.h, { ...opts, measure: flags.lineMeasure > 0, inkMask, contour: model, ...contour });
+  // the subject's own line length is the drawing's length (copy-lines.py reports it with a traced map): the most important
+  // of the decided, measured lines are drawn, until that length is reached (line-importance.mjs). Once, with the decision.
+  const budgetMm = model && decidedHere ? (doc0.stats?.sourceInkLength ?? 0) * sheetMm / doc0.image.w : 0;
+  if (budgetMm > 0) {
+    // how surely the subject draws the line in pen: the median step from the paper on both sides down to the line, 10 L* or more is sure
+    const penOf = g => { const sup = Array.from(pathSupport(g.points, L, im.w, im.h).support).sort((a, b) => a - b); return sup.length ? sup[sup.length >> 1] / PEN_SURE_L : 0; };
+    const imp = byImportance(r.lines, { pxMm, budgetMm, penOf }); r.lines = imp.lines; r.stats.importance = imp.stats;
+    log(`ink importance, ${stage}: ${imp.stats.beforeMm.toFixed(0)} mm of candidate line against the subject's ${budgetMm.toFixed(0)} mm; ${imp.stats.dropped} lesser lines left out, ${imp.stats.keptMm.toFixed(0)} mm kept, the shortest ${imp.stats.shortestKeptMm.toFixed(1)} mm`);
+  }
   // the target's line cores, as --inkdarkmatch reads the pen's strokes on its scrap
   const gestures = r.lines.map(g => ({ points: g.points.map(([x, y]) => ({ x, y })) }));
   // peakAbsorbance: the lines' median step against their sides (a record). inkAbsorbance: the ink's own strength, read on

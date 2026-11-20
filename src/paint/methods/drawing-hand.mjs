@@ -141,12 +141,15 @@ export function handOrder(gestures) {
  * @param gain,margin,minNib  the file's measured width to a contact width (drawing-file.mjs's calibration)
  * @param scale  a further factor on the share, per gesture (the toning's need)
  * @param floor  the darkness a line is drawn at when the file says 0, so faint file values still state the form
+ * @param relax,liftShare,flex  the hand along the stroke: how much the pressure eases from the landing to the far end, the
+ *               least share of the stroke the lift takes, and how far the nib's width follows the pressure (0.5: half)
  */
-export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.45, end = 0.3, gain = 1.39, margin = 0.42, minNib = 0.3, scale = 1, floor = 0, widthScale = 1, flickCells = 0 } = {}) {
+export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.45, end = 0.3, gain = 1.39, margin = 0.42, minNib = 0.3, scale = 1, floor = 0, widthScale = 1, flickCells = 0, relax = 0, liftShare = 0, flex = 0.5 } = {}) {
   let P = g.points;
   let L0 = 0;
   for (let k = 1; k < P.length; k++) L0 += Math.hypot(P[k].x - P[k - 1].x, P[k].y - P[k - 1].y);
-  const L = L0 || 1, tin = Math.min(inLen, 0.25 * L), tout = Math.min(outLen, 0.3 * L);
+  // `liftShare`: the lift takes at least this share of the stroke, so a long stroke trails off over a long run as a hand's does
+  const L = L0 || 1, tin = Math.min(inLen, 0.25 * L), tout = Math.max(Math.min(outLen, 0.3 * L), liftShare * L);
   // a flick (a mark under `flickCells` long) is set down and lifted in one motion: no landing taper, and finer
   const flick = flickCells > 0 && L < flickCells, ws = widthScale * (flick ? 0.8 : 1);
   if (L > tin + tout) {
@@ -158,7 +161,8 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
   const env = d => {
     const a = !flick && tin > 0 && d < tin ? start + (1 - start) * ease(d / tin) : 1;
     const b = tout > 0 && L - d < tout ? end + (1 - end) * ease((L - d) / tout) : 1;
-    return Math.min(a, b);
+    // `relax`: the hand lands firm and eases off as the stroke runs on, by this share of the pressure at the far end
+    return Math.min(a, b) * (1 - relax * ease(Math.min(1, d / L)));
   };
   // one weight for the stroke (stroke-weight.mjs): its width and darkness are decided once from the subject's line along
   // it, and only the hand's envelope varies them from the landing to the lift
@@ -167,7 +171,7 @@ export function shapeGesture(g, { base = 0.6, inLen = 3, outLen = 5, start = 0.4
   const points = P.map((q, k) => {
     const e = env(s[k]);
     const out = { ...q, s: Math.min(1, base * dark * e * scale) };
-    if (q.width != null) out.nw = Math.max(minNib, (own.width * gain - margin) * (0.5 + 0.5 * e) * ws);
+    if (q.width != null) out.nw = Math.max(minNib, (own.width * gain - margin) * (1 - flex + flex * e) * ws);
     return out;
   });
   return { ...g, points };

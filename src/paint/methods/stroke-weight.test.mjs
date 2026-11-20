@@ -58,3 +58,16 @@ test('the hand drops a hook and keeps a cornered line as one stroke', () => {
   assert.deepEqual([hooked.strokes[0].points.at(-1).x, hooked.strokes[0].points.at(-1).y], [20, 0]);
   assert.deepEqual(trimHooks(L[0], corner).points.map(q => [q.x, q.y]), [[0, 0], [20, 0], [20, 20]]);
 });
+
+test('a hand lands firm, eases off along the stroke and lifts over its last third', () => {
+  const g = line(Array.from({ length: 41 }, (_, k) => [k * 5, 0, 4, 1]));
+  const hand = shapeGesture(g, { base: 1, inLen: 4, outLen: 6, start: 0.7, end: 0.45, gain: 1, margin: 0, minNib: 0, relax: 0.25, liftShare: 0.33, flex: 0.7 });
+  const at = x => hand.points.reduce((b, q) => (Math.abs(q.x - x) < Math.abs(b.x - x) ? q : b));
+  assert.ok(at(10).s > at(100).s && at(100).s > at(160).s && at(160).s > at(198).s, 'pressure falls from the landing to the lift');
+  assert.ok(at(10).nw > at(100).nw && at(100).nw > at(195).nw, 'and the nib closes with it');
+  const w = hand.points.filter(q => q.x % 5 === 0).map(q => q.nw), mean = w.reduce((a, b) => a + b, 0) / w.length, cv = Math.sqrt(w.reduce((a, b) => a + (b - mean) ** 2, 0) / w.length) / mean;
+  assert.ok(cv > 0.12 && cv < 0.4, `width varies along the stroke as a hand's does (cv ${cv.toFixed(2)})`);
+  // without those the old envelope is unchanged: level between a short landing and a short lift
+  const flat = shapeGesture(g, { base: 1, inLen: 4, outLen: 6, gain: 1, margin: 0, minNib: 0 });
+  assert.equal(flat.points.find(q => q.x === 50).s, flat.points.find(q => q.x === 150).s);
+});

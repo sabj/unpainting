@@ -155,4 +155,28 @@ class Strokes(unittest.TestCase):
         self.assertFalse(any(any(abs(p[1]-70) < 3 for p in g['points']) for g in lines))
 
 
+class Junctions(unittest.TestCase):
+    def test_a_line_runs_straight_through_its_junctions(self):
+        # an eave with three posts hanging from it, as a line map draws them: the eave is one line, not four pieces
+        im = np.full((100, 160, 3), 255, 'uint8')
+        cv2.line(im, (10, 30), (150, 30), (20,)*3, 2)
+        for x in (40, 80, 120):
+            cv2.line(im, (x, 30), (x, 80), (20,)*3, 2)
+        lines, _, _, stats = copy.plan(im, 'line-map')
+        long = [g for g in lines if g['length'] > 130]
+        self.assertEqual(len(long), 1)
+        ys = np.array(long[0]['points'])[:, 1]
+        self.assertLess(ys.max()-ys.min(), 4)
+        self.assertEqual(len([g for g in lines if 40 < g['length'] < 60]), 3)
+        self.assertGreater(stats['joins'], 0)
+
+    def test_a_break_is_bridged_only_along_the_line(self):
+        im = np.full((100, 160, 3), 255, 'uint8')
+        cv2.line(im, (10, 30), (70, 30), (20,)*3, 2); cv2.line(im, (75, 30), (150, 30), (20,)*3, 2)   # one line with a break
+        cv2.line(im, (10, 60), (70, 60), (20,)*3, 2); cv2.line(im, (75, 66), (150, 66), (20,)*3, 2)   # two lines side by side
+        lines = copy.plan(im, 'line-map')[0]
+        self.assertEqual(len([g for g in lines if g['length'] > 130]), 1)
+        self.assertEqual(len([g for g in lines if 50 < g['length'] < 90]), 2)
+
+
 if __name__ == '__main__': unittest.main()

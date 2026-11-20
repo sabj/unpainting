@@ -72,7 +72,7 @@ export function traceLineModel({ python, root, image, stem, cacheDir, width, max
   // strokes: the source's own pen strokes (centrelines and widths), kept where the map also sees a line; else the map's contours
   const args = strokes
     ? [path.join(root, 'tools/seg/copy-lines.py'), image, '--out', stem, '--width', String(m.width), '--kind', 'stroke', '--gate', m.map, '--stroke-colour', '10']
-    : [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map', ...(fs.existsSync(fine) ? ['--fine', fine] : [])];
+    : [path.join(root, 'tools/seg/copy-lines.py'), m.map, '--out', stem, '--width', String(m.width), '--kind', 'line-map', '--source', image, ...(fs.existsSync(fine) ? ['--fine', fine] : [])];
   const r = run(python, [...args, ...(tolerance == null ? [] : ['--map-tolerance', String(tolerance)])],
     { cwd: root, encoding: 'utf8', timeout: 900000, env: { ...process.env, ...ENV } });
   if (r.error || r.status !== 0) throw new Error(`copy-lines on the lineart map failed: ${r.error?.message ?? r.stderr}`);
