@@ -43,7 +43,7 @@ def darkness(bgr):
     paper = max(.1, float(np.percentile(g, 98)))
     return np.clip(1 - g / paper, 0, 1)
 
-def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.0, eps=.12):
+def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4, eps=.12):
     bgr = cv2.imread(drawing); h0, w0 = bgr.shape[:2]
     if (lines_doc['image']['w'], lines_doc['image']['h']) != (w0, h0): raise SystemExit('ink-vectors: the line file is not on the drawing\'s grid')
     W, H = w0 * zoom, h0 * zoom; px = sheet_mm / W   # mm per grid pixel
@@ -93,7 +93,9 @@ def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.0
         av = a[y0:y1, x0:x1][own]; dk = float(np.percentile(av, 90)); lvl = .5 * dk
         if dk < 2 * ink: continue
         # its darkness: the median of its ink inside the half level (a grey line is a lighter stroke, a black one black)
-        tone = float(np.median(av[av >= lvl]))
+        # (a drawing's black varies a little from mark to mark: over 0.9 is black, so a dark mass made of several strokes
+        # is one black, not a patchwork of near-blacks)
+        tone = float(min(1, np.median(av[av >= lvl]) / .9))
         # the field the outline is fitted to: this stroke's own ink, reaching half a pixel past a cut so neighbours abut
         f = np.where(cv2.dilate(own.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0, a[y0:y1, x0:x1], 0)
         f = np.pad(f, 1)
