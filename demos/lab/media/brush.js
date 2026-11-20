@@ -540,7 +540,7 @@ function sectionStroke(brush, sheet, path, { spacing = 0.7, between, lift = true
   if (ends.length) { const near = 1.2 * path.reduce((m, q) => Math.max(m, q.r ?? brush.radius), 0) + 2 * edgeTooth(brush, sheet.paper) + 3; for (const e of ends) e.r2 = near * near; }
   const { w, h, paper } = sheet, K = sheet.K, mmc = paper.mmPerCell > 0 ? paper.mmPerCell : REF_MM, S = TUFT.sections;
   const shape = tuftShape(brush.flat), lanes = brush.hairs.length, hairs = brush.hairs, v0 = speed ?? brush.speed ?? TUFT.speed;
-  const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || brush.wetness;
+  const g = mmc * mmc / kappaOf(brush, mmc), kF = feedRate(brush.feed), Hb = brush.depositDepth || TUFT.head * brush.wetness;
   // the share of a hair's load it keeps when it has nothing left to give (retention): half the legacy free threshold,
   // below which the row brush still smeared paint
   const keep = TUFT.keep * brush.free;

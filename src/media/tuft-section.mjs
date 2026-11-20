@@ -30,6 +30,13 @@ export const TUFT = Object.freeze({
   keep: 0.5,          // a tuft's retention share, of the legacy free threshold
   mix: 0.25,          // the share of the film under the hairs that the moving hairs stir into their own (the rest only levels)
   creep: 0.8,         // the share of a press's growth the tuft's tip slides out by (the rest it bows)
+  // mm: the film a fully loaded tuft stands on dry sized paper, times the brush's wetness (0.9 by default, so 0.2 mm).
+  // A loaded wash brush leaves 0.1 to 0.25 mm of liquid (100 to 250 g of water a square metre) with a bead at its
+  // trailing edge; a puddle poured or flooded on stands deeper (0.3 mm and more). This was the wetness itself read as
+  // millimetres (0.9 mm), so a five-sweep square stood 0.75 mm deep, two and a half times the poured puddle, and dried
+  // with a heavy outline (rim 2.4 over interior; real brushed washes 1.03 to 1.29). The rim follows from it: the
+  // thinner film loses more of its water to the pores, where the pinned edge's flow cannot carry its pigment.
+  head: 0.22,
 });
 
 // The tuft's proportions, in belly half-widths (R): its length, the most of it pressure lays down, where the belly is
