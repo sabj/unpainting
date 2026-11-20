@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { readPlan, styleAlias } from './recipe.mjs';
+import { linePaths, readLineText } from '../crop/lines.mjs';
 import { decideMedium, planDeclaration, inkRequestedBy, argvWithoutInk } from './methods/medium-decision.mjs';
 
 const PEN_FIRST_PCT = 0.5;
@@ -28,7 +29,30 @@ function areaPlanDeclaration(argv, root) {
  *   penShareOf gives the source's pen-line share from 0 to 1 (pen-share.mjs sourcePenShare).
  * @returns {Promise<{ argv: string[], decision: object }>} the command line to expand, and the decision with its evidence
  */
+/**
+ * The prepared drawing the command line names and the medium it declares ({ file, medium, from }), or null when no
+ * --drawingfile is given or it is not a prepared drawing (inputKind drawing). The file's own `medium` wins over
+ * --outlinemedium; with neither, medium is null and the decision stops.
+ */
+export function preparedDrawing(argv, root) {
+  const stem = last(argv, '--drawingfile');
+  if (!stem) return null;
+  let doc;
+  try { doc = JSON.parse(readLineText(linePaths(path.isAbsolute(stem) ? stem : stem).lines)); } catch { return null; }
+  if (doc?.inputKind !== 'drawing') return null;
+  const flag = last(argv, '--outlinemedium'), file = path.basename(linePaths(stem).lines);
+  if (typeof doc.medium === 'string') return { file, medium: doc.medium, from: 'the drawing file' };
+  if (flag && flag !== 'auto' && flag !== 'none') return { file, medium: flag, from: '--outlinemedium' };
+  return { file, medium: null, from: 'nothing' };
+}
+
 export async function mediumForRun({ argv, root, penShareOf, log = () => {} }) {
+  const drawing = preparedDrawing(argv, root);
+  if (drawing) {
+    const decision = decideMedium({ argv, plan: readPlan(styleAlias(argv), root) ?? areaPlanDeclaration(argv, root), penFirstPct: PEN_FIRST_PCT, drawing });
+    log(decision.note);
+    return { argv: decision.subjectMedium ? [...argv, '--subjectmedium', decision.subjectMedium] : [...argv, ...(decision.medium === 'pen' && !argv.includes('--outlinemedium') ? ['--outlinemedium', 'ink'] : [])], decision };
+  }
   const plan = readPlan(styleAlias(argv), root) ?? areaPlanDeclaration(argv, root);
   const penFirstPct = Number(last(argv, '--penfirst') ?? PEN_FIRST_PCT);
   if (!(penFirstPct >= 0)) throw new Error(`--penfirst: a share in per cent, not ${last(argv, '--penfirst')}`);

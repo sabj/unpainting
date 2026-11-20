@@ -380,6 +380,18 @@ if (num('drawingonly', 0) > 0) {
   fs.writeFileSync(path.join(out, "ink-native.json"), JSON.stringify({ width: nativeInk.width, height: nativeInk.height, sheetWidthMm: PB?.mm ?? num("sheetmm", DEFAULT_SHEET_MM), kind: INKRES ? "deposited ink on native pen sheet, before wash redistribution" : "final deposited coarse ink, including wash redistribution", resized: false }) + "\n");
   fs.writeFileSync(path.join(out, 'pen-state-audit.json'), JSON.stringify(PEN_STATE_AUDIT));
   fs.writeFileSync(path.join(out, 'drawing-checkpoint.json'), JSON.stringify({ stage: 'dry opening drawing', paintExecuted: false, gestures: ctx.drawnCount, backend: GPU_INFO }));
+  // --marks 1: the pen's tape too (the finish stage, which writes it for a whole painting, is not reached)
+  if (ctx.FULL_TAPE && ctx.MARKTAPE) {
+    const { markTapeJSON } = await import('../../src/media/mark-tape-json.mjs'), { PENS, PENOPTS } = await import('../../src/media/brush.mjs');
+    const asTape = p => Object.fromEntries(Object.entries(p).map(([k, v]) => [k, ArrayBuffer.isView(v) ? Array.from(v) : v]));
+    const fineN = INKRES?.N ?? 1;   // the pens draw on the fine sheet: the marks are in its cells
+    const tape = { w: W2 * fineN, h: H2 * fineN, scale: 10, sheetWidthMm: PB?.mm ?? num('sheetmm', DEFAULT_SHEET_MM), version: 2, drawingOnly: true, paperRGB,
+      base: Array.from(base.subarray(0, 3)), pigments: SHEET_PIGS.map(asTape), penOpts: PENOPTS, pens: PENS, marks: ctx.MARKTAPE,
+      strokeCount: ctx.MARKTAPE.filter(m => ['s', 'P', 'g'].includes(m.k)).length };
+    const fd = fs.openSync(path.join(out, 'marks.json'), 'w');
+    try { for (const chunk of markTapeJSON(tape)) fs.writeFileSync(fd, chunk); } finally { fs.closeSync(fd); }
+    console.log(`marks: drawing only, ${tape.strokeCount} pen marks`);
+  }
   await drainFrames(); if (ctx.FRAMER) ctx.FRAMER.close(); ctx.sheet._gpu?.close();
   console.log('drawing-only: dry opening complete, before washes'); process.exit(0);
 }

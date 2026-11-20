@@ -6,7 +6,9 @@
     "bench/scripts/pipeline/*.mjs",
     "bench/v4v5/**/*.mjs",
     "demos/lab/lab.js",
-    "demos/lab/worker.js"
+    "demos/lab/worker.js",
+    "demos/lab/strokes/strokes.js",
+    "demos/lab/strokes/bench-worker.js"
   ],
   "project": [
     "src/**/*.mjs",

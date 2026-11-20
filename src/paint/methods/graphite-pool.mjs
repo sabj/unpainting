@@ -23,8 +23,10 @@ const last = (argv, name) => { const at = argv.lastIndexOf(name); return at >= 0
 const isGraphite = v => v === undefined || v === 'graphite' || /^graphite-/.test(String(v));
 
 /** Whether the opening graphite drawing comes from the line model's pool, and why not when it does not. */
-export function graphitePoolWanted(argv) {
+export function graphitePoolWanted(argv, { preparedDrawing = false } = {}) {
   const no = why => ({ wanted: false, why });
+  // a prepared drawing (trace-drawing.py, inputKind drawing) is the whole drawing: nothing is added to it or decided in it
+  if (preparedDrawing) return no('--drawingfile is a prepared drawing');
   if (!isGraphite(last(argv, '--outlinemedium'))) return no('the outline medium is not graphite');
   if (last(argv, '--drawing') === 'none' || last(argv, '--draw') === '0') return no('no drawing is asked for');
   const source = last(argv, '--linesource');

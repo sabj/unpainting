@@ -434,7 +434,7 @@ function inkDarkMatch(stage,gs,optionsAt,want,w,h){
    else drawMaterial(scrap,sample,want,w,h,{...options,ink});
    return absorbance(scrap);
   };
-  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0),measure});
+  const res=matchInkLoad({targetAbsorbance:A,cap:num('inkdarkmatch',(ctx.INK_LINES?.[stage]?.stats?.peakAbsorbance??ctx.INK_LINES?.[stage]?.targetAbsorbance)>0?1:0),measure,hi:num('inkloadmax',4)});
   console.log(`ink dark match, ${stage}: target ${firm?'firm lines against paper':'lines'} ${A.toFixed(2)} absorbance; ${sample.length} of the stage's strokes on a blank sheet read ${res.before.toFixed(2)}, so the load is scaled by ${res.factor.toFixed(3)} (now ${res.after.toFixed(2)})`);
   return res;
  }).value;

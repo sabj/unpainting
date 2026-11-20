@@ -90,6 +90,8 @@ export function scaleLines(doc, w, h, { keepOrder = false, file = null } = {}) {
       if (g.region) out.region = g.region;
       if (g.soft) out.soft = true;
       if (Number.isFinite(g.tier)) out.tier = g.tier;
+      // a person's drawing order (tools/seg/order-strokes.mjs): the hand keeps it
+      if (Number.isFinite(g.seq)) out.seq = g.seq;
       // the subject's own line along this one, measured at plan time (line-weight.mjs)
       if (g.subjectLine) out.subjectLine = g.subjectLine;
       return out;

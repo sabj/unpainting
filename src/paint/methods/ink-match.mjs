@@ -68,7 +68,7 @@ export function sampleGestures(gestures, count = 60) {
 /**
  * The factor on the ink load that brings the strokes' absorbance to `cap` x `targetAbsorbance`.
  * `measure(f)` draws the sample at load factor f on a fresh blank sheet and returns its absorbance.
- * Two secant steps from f = 1, kept within [lo, hi].
+ * Two secant steps from f = 1, kept within [lo, hi] (hi: --inkloadmax, default 4).
  * @returns { factor, before, after, want }
  */
 export function matchInkLoad({ targetAbsorbance, cap = 1, measure, lo = 0.125, hi = 4 }) {
