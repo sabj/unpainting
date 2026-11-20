@@ -416,14 +416,14 @@ fn p3a_tile(wid: vec3<u32>, lid: vec3<u32>) {
 fn dep_k_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   var d = 0.0; for (var ka = 0u; ka < u.nAct; ka++) { d += D[klAt(ka) * u.n + c.i]; }
-  DEP[c.i] = u.slideFill * d;
+  DEP[c.i] = d;   // the deposit's height, unscaled: the slide scales it by its box's fill (fillAt)
   if (FIXED_BED) { DEP[u.n + c.i] = computeFixedSupport(c.i); }
 }
 fn computeFixedSupport(i: u32) -> f32 {
   if (!FIXED_BED) { return 0.0; }
   var d = DEP[2u * u.n + i];
   if (u.hasTop != 0u) { for (var k = 0u; k < u.K; k++) { d += TOP[k * u.n + i]; } }
-  return u.slideFill * d;
+  return d;
 }
 // The deposition pass caches support once per wet cell, after top-layer
 // lifting, in DEP's second plane. Repeated neighbor reads keep the same f32 value.
@@ -431,7 +431,7 @@ fn fixedSupport(i: u32) -> f32 {
   if (!FIXED_BED) { return 0.0; }
   return DEP[u.n + i];
 }
-fn surf(j: u32, fl: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + DEP[j] + fixedSupport(j); }
+fn surf(j: u32, fl: f32, fill: f32) -> f32 { return (1.0 - fl) * PAPER3[j].w + fl * PAPER3[j].x + fill * (DEP[j] + fixedSupport(j)); }
 fn slide_out_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let c = cx(wid, lid); if (!c.ok || M[c.i] != 1u) { return; }
   let i = c.i; let q = c.z * u.n + i;
@@ -440,19 +440,19 @@ fn slide_out_tile(wid: vec3<u32>, lid: vec3<u32>) {
   let gg = pa.x;
   if (Wi <= 0.0 || gg <= 0.0 || Dk <= 0.0) { return; }
   let film = min(3.0, 0.12 / max(0.04, Wi)) * select(Wi / u.film, 1.0, Wi > u.film);
-  let here = surf(i, pb.z); let rep = pa.w;
+  let fill = fillAt(i); let here = surf(i, pb.z, fill); let rep = pa.w;
   var ex = vec4<f32>(0.0);
-  if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z) - rep); }
-  if (c.x > 0u && M[i - 1u] == 1u) { ex.y = max(0.0, here - surf(i - 1u, pb.z) - rep); }
-  if (c.y < u.h - 1u && M[i + u.w] == 1u) { ex.z = max(0.0, here - surf(i + u.w, pb.z) - rep); }
-  if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z) - rep); }
+  if (c.x < u.w - 1u && M[i + 1u] == 1u) { ex.x = max(0.0, here - surf(i + 1u, pb.z, fill) - rep); }
+  if (c.x > 0u && M[i - 1u] == 1u) { ex.y = max(0.0, here - surf(i - 1u, pb.z, fill) - rep); }
+  if (c.y < u.h - 1u && M[i + u.w] == 1u) { ex.z = max(0.0, here - surf(i + u.w, pb.z, fill) - rep); }
+  if (c.y > 0u && M[i - u.w] == 1u) { ex.w = max(0.0, here - surf(i - u.w, pb.z, fill) - rep); }
   let sum = ex.x + ex.y + ex.z + ex.w;
   if (sum <= 0.0) { return; }
   var moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
   // slideCap (sheet.mjs): no move may close more than slideCap of the slope it rolls down, so grains do not overfill a
   // neighbour and roll back the next step (the checkerboard in granulated washes)
-  if (u.slideCap > 0.0 && u.slideFill > 0.0) {
-    for (var e = 0u; e < 4u; e++) { if (ex[e] > 0.0) { moved = min(moved, u.slideCap * ex[e] / (u.slideFill * (1.0 + ex[e] / sum))); } }
+  if (u.slideCap > 0.0 && fill > 0.0) {
+    for (var e = 0u; e < 4u; e++) { if (ex[e] > 0.0) { moved = min(moved, u.slideCap * ex[e] / (fill * (1.0 + ex[e] / sum))); } }
   }
   OUTM[q] = moved; o4set(q, moved * ex / sum);
 }
@@ -807,7 +807,7 @@ fn p3a_dep_tile(wid: vec3<u32>, lid: vec3<u32>) {
       for (var ka = 0u; ka < u.nAct; ka++) { let q = klAt(ka) * u.n + i; let q2 = G[q] * f; G[q] -= q2; D[q] += q2; }
     }
   }
-  if (u.slide > 0.0) { var d = 0.0; for (var ka = 0u; ka < u.nAct; ka++) { d += D[klAt(ka) * u.n + i]; } DEP[i] = u.slideFill * d; if (FIXED_BED) { DEP[u.n + i] = computeFixedSupport(i); } }
+  if (u.slide > 0.0) { var d = 0.0; for (var ka = 0u; ka < u.nAct; ka++) { d += D[klAt(ka) * u.n + i]; } DEP[i] = d; if (FIXED_BED) { DEP[u.n + i] = computeFixedSupport(i); } }
 }
 
 // the slide with the pigments looped in the thread (slide_out, slide_apply)
@@ -832,7 +832,9 @@ fn slide_out_all_tile(wid: vec3<u32>, lid: vec3<u32>) {
     if (okD) { gD += di - D[base + i + u.w]; }
     if (okU) { gU += di - D[base + i - u.w]; }
   }
-  gR *= u.slideFill; gL *= u.slideFill; gD *= u.slideFill; gU *= u.slideFill;
+  // the deposit and the bed under it rise by the box's fill (sheet.mjs slideFillFor; the cell and its wet neighbours
+  // share a box)
+  let fill = fillAt(i);
   if (FIXED_BED) {
     let base = fixedSupport(i);
     if (okR) { gR += base - fixedSupport(i + 1u); }
@@ -840,6 +842,7 @@ fn slide_out_all_tile(wid: vec3<u32>, lid: vec3<u32>) {
     if (okD) { gD += base - fixedSupport(i + u.w); }
     if (okU) { gU += base - fixedSupport(i - u.w); }
   }
+  gR *= fill; gL *= fill; gD *= fill; gU *= fill;
   for (var ka = 0u; ka < u.nAct; ka++) {
     let k = klAt(ka); let q = k * u.n + i;
     OUTM[q] = 0.0; o4set(q, vec4<f32>(0.0));
@@ -859,8 +862,8 @@ fn slide_out_all_tile(wid: vec3<u32>, lid: vec3<u32>) {
     let sum = ex.x + ex.y + ex.z + ex.w;
     if (sum <= 0.0) { continue; }
     var moved = Dk * min(0.2, u.slide * gg * film * sum * u.dt);
-    if (u.slideCap > 0.0 && u.slideFill > 0.0) {
-      for (var e = 0u; e < 4u; e++) { if (ex[e] > 0.0) { moved = min(moved, u.slideCap * ex[e] / (u.slideFill * (1.0 + ex[e] / sum))); } }
+    if (u.slideCap > 0.0 && fill > 0.0) {
+      for (var e = 0u; e < 4u; e++) { if (ex[e] > 0.0) { moved = min(moved, u.slideCap * ex[e] / (fill * (1.0 + ex[e] / sum))); } }
     }
     OUTM[q] = moved; o4set(q, moved * ex / sum);
   }
