@@ -64,8 +64,9 @@ export function chordAt(polys, x, y, deg, lights = []) {
 
 /** The runs of the line through (x, y) along `deg` that lie in the region and out of the lights, as [t0, t1] pairs. */
 function runsOn(polys, lights, x, y, deg) {
-  const ts = crossings([...polys, ...lights], x, y, deg), a = deg * Math.PI / 180, out = [];
-  for (let k = 0; k + 1 < ts.length; k++) { const m = (ts[k] + ts[k + 1]) / 2; if (ts[k + 1] - ts[k] > 1e-6 && open(polys, lights, x + Math.cos(a) * m, y + Math.sin(a) * m)) { if (out.length && Math.abs(out.at(-1)[1] - ts[k]) < 1e-6) out.at(-1)[1] = ts[k + 1]; else out.push([ts[k], ts[k + 1]]); } }
+  const ts = crossings([...polys, ...lights], x, y, deg), lt = new Set(crossings(lights, x, y, deg).map(t => t.toFixed(6))), a = deg * Math.PI / 180, out = [];
+  // each run says whether its ends are a light's edge (worked up to, short of it, not over it) or the region's (run past)
+  for (let k = 0; k + 1 < ts.length; k++) { const m = (ts[k] + ts[k + 1]) / 2; if (ts[k + 1] - ts[k] > 1e-6 && open(polys, lights, x + Math.cos(a) * m, y + Math.sin(a) * m)) { if (out.length && Math.abs(out.at(-1)[1] - ts[k]) < 1e-6) { out.at(-1)[1] = ts[k + 1]; out.at(-1).lightEnd = lt.has(ts[k + 1].toFixed(6)); } else { const run = [ts[k], ts[k + 1]]; run.lightStart = lt.has(ts[k].toFixed(6)); run.lightEnd = lt.has(ts[k + 1].toFixed(6)); out.push(run); } } }
   return out;
 }
 
@@ -212,7 +213,9 @@ export function sweeps(polys, { widthMm, deg = 0, pressure = 0.8, perLoad = 3, l
   const runs = []; let v = v0 + rng.range(0.3, 0.5) * widthMm, i = 0;
   while (v < v1) {
     const tilt = rng.normal() * 2.5, um = (u0 + u1) / 2, cx = um * ux + v * vx, cy = um * uy + v * vy;
-    for (const [t0, t1] of runsOn(polys, lights, cx, cy, deg + tilt)) if (t1 - t0 >= Math.min(2, 0.6 * widthMm)) runs.push({ i, cx, cy, d: deg + tilt, t0: t0 - r * rng.range(-0.25, 0.6), t1: t1 + r * rng.range(-0.25, 0.6) });
+    // a lane runs a little past the region's edge, but stops short of a light by a hand's varying margin (a light is worked
+    // round, its edge ragged, never cut cell-exact)
+    for (const run of runsOn(polys, lights, cx, cy, deg + tilt)) { const [t0, t1] = run; if (t1 - t0 >= Math.min(2, 0.6 * widthMm)) runs.push({ i, cx, cy, d: deg + tilt, t0: run.lightStart ? t0 + r * rng.range(0.3, 0.9) : t0 - r * rng.range(-0.25, 0.6), t1: run.lightEnd ? t1 - r * rng.range(0.3, 0.9) : t1 + r * rng.range(-0.25, 0.6) }); }
     // the last lane is carried down to the region's far edge (the bead is taken to the bottom)
     const was = v; v += widthMm * rng.range(0.45, 0.7); i++;
     if (v >= v1 && was < v1 - 0.45 * widthMm) v = v1 - 0.35 * widthMm;
