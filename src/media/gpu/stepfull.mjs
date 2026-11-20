@@ -60,7 +60,7 @@ const UF = [['w', 'u'], ['h', 'u'], ['n', 'u'], ['tw', 'u'], ['th', 'u'], ['ntil
   // mean speed (coSettle), and the film's levelling (film-level-wgsl.mjs: lvK0 the face conductance per h^3, lvTx and
   // lvTy the board's fall a cell, lvTan and lvDm the meniscus, lvR its reach in cells, lvIt and lvSubs the CG iterations
   // and transport substeps encoded a step, fillRef the hollow fill's reference load)
-  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvOn'].map(k => [k, 'f'])];
+  'holdDepth', 'coSettle', 'fillRef', 'lvK0', 'lvTx', 'lvTy', 'lvTan', 'lvDm', 'lvR', 'lvIt', 'lvSubs', 'lvBoxes'].map(k => [k, 'f'])];
 export { UF, UBYTES_EXPORT as UBYTES, SRC_EXPORT as SRC, analyse, HASH };
 // settling needs the paper's hollow unit (paper.mjs toothHollow): a paper made without it cannot settle on the GPU
 const hollowUnitOf = paper => { if (!(paper?.hollowUnit > 0)) throw new Error('GPU sheet: the paper has no hollowUnit (make it with makePaper or scanPaper)'); return paper.hollowUnit; };
@@ -291,19 +291,19 @@ export class GpuSheet {
     const mk = (bytes, usage = 0) => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage });
     if (!B.LVX) {
       B.LVT = mk(this.ntiles * 32); B.LVX = mk(lvxWords(this.w, this.h, this.ntiles) * 4); B.LVS = mk((16 + 2 * LV_BMAX) * 4);
-      B.LVR = mk(this.ntiles * 8); B.LVARG = mk(16, GPUBufferUsage.INDIRECT);
+      B.LVR = mk(this.ntiles * 8);
     }
     for (const k of ['LVA', 'LVB', 'LVF', 'LVP']) B[k]?.destroy();
     B.LVA = mk(on ? n * 16 : 16); B.LVB = mk(on ? n * 16 : 16); B.LVF = mk(on ? n * 16 : 16); B.LVP = mk(on ? n * 8 : 16);
-    this.lvBig = on; this.lv ??= { iters: 128, subs: 8, stats: null };
+    this.lvBig = on; this.lv ??= { iters: 128, subs: 64, boxes: 16, stats: null };
     if (this.bg) for (const name of Object.keys(this.bg)) if (name.startsWith('lv_')) this.bg[name] = d.createBindGroup({ layout: this.bgl[name], entries: this.uses[name].map(binding => ({ binding, resource: { buffer: this.bufFor(this.names[binding]) } })) });
   }
   /** The levelling's uniforms for a step of dt (film-level.mjs levelFilm: KAPPA, the tilt's fall a cell, the meniscus). */
   lvUniforms(o, dt) {
-    const mm = o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : 0.3), on = levelOn(o) && dt > 0;
+    const mm = o.mmPerCell > 0 ? o.mmPerCell : (this.mmPerCell > 0 ? this.mmPerCell : 0.3);
     const level = o.level ?? 1, dm = o.meniscusMm ?? 0.5;
     return {
-      lvOn: on ? 1 : 0, lvK0: level * KAPPA * dt / (mm * mm), lvTx: (o.tiltX ?? 0) * mm, lvTy: (o.tiltY ?? 0) * mm,
+      lvBoxes: this.lv?.boxes ?? 16, lvK0: level * KAPPA * dt / (mm * mm), lvTx: (o.tiltX ?? 0) * mm, lvTy: (o.tiltY ?? 0) * mm,
       lvTan: o.meniscus ?? 0.05, lvDm: dm, lvR: Math.ceil(dm / mm), lvIt: this.lv?.iters ?? 128, lvSubs: this.lv?.subs ?? 8,
     };
   }
@@ -317,21 +317,24 @@ export class GpuSheet {
   lvEncode(pass) {
     const o = this.o, level = levelOn(o), fill = (o.slide ?? 0) > 0 && (o.fillRef ?? 0.4) > 0;
     if (!level && !fill) return;
-    const tiles = this.persistent ? this.workers : Math.max(1, Math.min(this.cap, this.ntiles));
-    const run = (name, groups, constants = null) => { pass.setPipeline(constants ? this.lvPipe(name, constants) : this.p[name]); pass.setBindGroup(0, this.bg[name]); if (groups === 'boxes') pass.dispatchWorkgroupsIndirect(this.b.LVARG, 0); else pass.dispatchWorkgroups(groups); };
+    // direct dispatches throughout (an indirect one costs Dawn a validation pass): the tile kernels on the tiles that
+    // may be listed, looping over the LT list; the per-box kernels on the boxes the host has room for (lv.boxes)
+    const tiles = this.persistent ? this.workers : Math.max(1, Math.min(this.cap, this.ntiles)), boxes = this.lv.boxes;
+    const run = (name, groups, constants = null) => { pass.setPipeline(constants ? this.lvPipe(name, constants) : this.p[name]); pass.setBindGroup(0, this.bg[name]); pass.dispatchWorkgroups(groups); };
     run('lv_tiles', tiles); run('lv_boxes', 1);
     if (!level) return;
     const mm = o.mmPerCell > 0 ? o.mmPerCell : this.mmPerCell, R = Math.ceil((o.meniscusMm ?? 0.5) / mm), relax = Math.max(1, R - 1);
     run('lv_init', tiles);
     for (let r = 0; r < relax; r++) run('lv_dist', tiles, { LVMEN: r === relax - 1 ? 1 : 0 });
-    run('lv_rhs', tiles); run('lv_cg0', 'boxes');
+    run('lv_rhs', tiles); run('lv_cg0', boxes);
     for (let it = 0; it < this.lv.iters; it++) {
       const par = { LVPAR: it & 1 };
-      run('lv_cg_a', tiles, par); run('lv_cg_b', 'boxes'); run('lv_cg_c', tiles, par); run('lv_cg_d', 'boxes');
+      run('lv_cg_a', tiles, par); run('lv_cg_b', boxes); run('lv_cg_c', tiles, par); run('lv_cg_d', boxes);
     }
-    run('lv_flux', tiles); run('lv_out', tiles); run('lv_subs', 'boxes');
+    run('lv_flux', tiles); run('lv_out', tiles); run('lv_subs', boxes);
     for (let r = 0; r < this.lv.subs; r++) { run('lv_s1', tiles, { LVROUND: r }); run('lv_s2', tiles, { LVROUND: r }); }
   }
+
   /**
    * What the levelling's last steps needed (LVS: the most CG iterations and substeps, the solves and boxes that ran short),
    * read back and cleared; the iterations and substeps encoded a step grow while a step uses most of them. A short
@@ -339,14 +342,15 @@ export class GpuSheet {
    */
   async lvAdapt() {
     if (!this.lvBig || !levelOn(this.o)) return null;
-    const v = new Uint32Array(await this.readWords('LVS', 32)), lv = this.lv;
-    this.device.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(5));
-    const st = { iterations: v[3], short: v[4], subs: v[5], fewer: v[6], solves: v[7] };
-    const t = lv.total ??= { iterations: 0, short: 0, subs: 0, fewer: 0, solves: 0 };
-    t.iterations = Math.max(t.iterations, st.iterations); t.subs = Math.max(t.subs, st.subs); t.short += st.short; t.fewer += st.fewer; t.solves += st.solves;
+    const v = new Uint32Array(await this.readWords('LVS', 48)), lv = this.lv;
+    this.device.queue.writeBuffer(this.b.LVS, 12, new Uint32Array(9));
+    const st = { iterations: v[3], short: v[4], subs: v[5], fewer: v[6], solves: v[7], over: v[10], boxes: v[11] };
+    const t = lv.total ??= { iterations: 0, short: 0, subs: 0, fewer: 0, solves: 0, over: 0, boxes: 0 };
+    t.iterations = Math.max(t.iterations, st.iterations); t.subs = Math.max(t.subs, st.subs); t.boxes = Math.max(t.boxes, st.boxes); t.short += st.short; t.fewer += st.fewer; t.solves += st.solves; t.over += st.over;
     let grew = false;
     if ((st.short || st.iterations > 0.75 * lv.iters) && lv.iters < LV_ITMAX) { lv.iters = Math.min(LV_ITMAX, 2 * lv.iters); grew = true; }
     if ((st.fewer || st.subs > 0.75 * lv.subs) && lv.subs < 64) { lv.subs = Math.min(64, 2 * lv.subs); grew = true; }
+    if (st.boxes > 0.75 * lv.boxes && lv.boxes < LV_BMAX) { lv.boxes = Math.min(LV_BMAX, 2 * Math.max(lv.boxes, st.boxes)); grew = true; }
     if (grew) this.setOptions({});
     lv.stats = st; return st;
   }
@@ -784,6 +788,7 @@ export class GpuSheet {
    */
   async advance(steps, chunk = 25) {
     if (this.efOn) { await this.efSteps(steps); return; }
+    await this.lvAdapt();
     if (this.resident) { this.step(steps, chunk); return; }
     if (this.knownDry) return; // nothing wet and nothing written since: a step changes nothing (the CPU sheet returns early too)
     if (steps <= chunk) { this.step(steps, chunk); return; }

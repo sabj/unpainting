@@ -28,7 +28,8 @@ export function lvxWords(w, h, ntiles) {
 // words (x0, y0, x1, y1, deposit sum, wet count, fill, LT offset, LT tiles, alpha, beta, rz, tol, iterations, state,
 // substeps), the cluster-to-box map, then LT: the tiles holding level cells, grouped by box.
 // LVS (atomic u32): [3] most CG iterations a solve took, [4] solves stopped at u.lvIt, [5] most substeps a box asked
-// for, [6] boxes that got fewer than they asked for, [7] solves; per box at 16 + 2 b, the largest explicit face flux
+// for, [6] boxes that got fewer than they asked for, [7] solves, [10] steps with more boxes than u.lvBoxes, [11] the most
+// boxes; per box at 16 + 2 b, the largest explicit face flux
 // (most) and the largest outflow over water (worst), as f32 bits.
 // State bits: 1 the box levels, 2 its CG is done.
 export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
@@ -40,7 +41,6 @@ export const filmLevelWgsl = ({ channel = 'klAt', count = 'u.nAct' } = {}) => `
 @group(0) @binding(56) var<storage, read_write> LVP: array<f32>;         // p, two planes in turn
 @group(0) @binding(57) var<storage, read_write> LVF: array<vec4<f32>>;   // west face flux (+x), north face flux (+y), water scale, meniscus distance
 @group(0) @binding(58) var<storage, read_write> LVR: array<f32>;         // two partial sums per LT tile
-@group(0) @binding(59) var<storage, read_write> LVARG: array<u32, 4>;    // one workgroup per box
 override LVPAR: u32 = 0u;
 override LVROUND: u32 = 0u;
 override LVMEN: bool = false;
@@ -203,7 +203,10 @@ fn lv_boxes(@builtin(local_invocation_index) li: u32) {
       }
     }
     LVX[0] = nb; LVX[1] = off;
-    LVARG[0] = nb; LVARG[1] = 1u; LVARG[2] = 1u;
+    // the per-box kernels run on u.lvBoxes workgroups (the host's count, from the boxes it has seen); a box past them
+    // does not level this step, and is counted
+    if (f32(nb) > u.lvBoxes) { atomicAdd(&LVS[10], 1u); }
+    atomicMax(&LVS[11], nb);
   }
   storageBarrier(); workgroupBarrier();
   for (var b = li; b < LV_BMAX; b += 256u) { atomicStore(&LVS[16u + 2u * b], 0u); atomicStore(&LVS[17u + 2u * b], 0u); }
@@ -235,7 +238,7 @@ fn lv_init(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: v
     // the line's cells: a side not on a wet cell of the box
     let edge = !(c.x > 0u && lvLevel(i - 1u)) || !(c.y > 0u && lvLevel(i - u.w)) || !(c.x + 1u < u.w && lvLevel(i + 1u)) || !(c.y + 1u < u.h && lvLevel(i + u.w));
     LVA[i] = vec4<f32>(Hi, cw, cn, 0.0);
-    LVF[i] = vec4<f32>(0.0, 0.0, 1.0, select(1e9, 0.0, edge));
+    LVF[i] = vec4<f32>(0.0, 0.0, 1.0, select(1e9, 0.0, edge)); LVB[i] = vec4<f32>(0.0);
   }
 }
 // the meniscus: the distance in cells through the wet cells from the line (relaxed in place, u.lvR - 1 times; a value
@@ -315,14 +318,20 @@ fn lv_rhs(@builtin(workgroup_id) wid: vec3<u32>, @builtin(num_workgroups) nw: ve
     if (c.z != 0u) {
       i = c.y * u.w + c.x;
       if (lvLevel(i) && lvActive(lvBoxOf(i))) {
-        let f = lvFaces(i, c.x, c.y); let dh = lvDiffs(i, f);
+        // r = -L H - (I + L) d, from each face's difference of H + d (d is 0: lv_init)
+        let f = lvFaces(i, c.x, c.y); let dh = lvDiffs(i, f); let d = LVB[i].x;
+        var dd = vec4<f32>(0.0);
+        if (f[0].y != 0.0) { dd.x = d - LVB[i - 1u].x; }
+        if (f[1].y != 0.0) { dd.y = d - LVB[i - u.w].x; }
+        if (f[2].y != 0.0) { dd.z = d - LVB[i + 1u].x; }
+        if (f[3].y != 0.0) { dd.w = d - LVB[i + u.w].x; }
         diag = 1.0 + f[0].y + f[1].y + f[2].y + f[3].y;
-        r = -(f[0].y * dh.x + f[1].y * dh.y + f[2].y * dh.z + f[3].y * dh.w);
+        r = -(f[0].y * (dh.x + dd.x) + f[1].y * (dh.y + dd.y) + f[2].y * (dh.z + dd.z) + f[3].y * (dh.w + dd.w)) - d;
         cp = lvInTile(f, lid); has = true;
       }
     }
     let z = lvPrecond(li, lid, r, diag, cp, has);
-    if (has) { LVA[i].w = diag; LVB[i] = vec4<f32>(0.0, r, z, 0.0); LVP[i] = 0.0; LVP[u.n + i] = 0.0; bb = r * r; rz = r * z; }
+    if (has) { LVA[i].w = diag; LVB[i] = vec4<f32>(LVB[i].x, r, z, 0.0); LVP[i] = 0.0; LVP[u.n + i] = 0.0; bb = r * r; rz = r * z; }
     lvSum[li] = bb; lvSum2[li] = rz;
     workgroupBarrier();
     lvReduce2(li);
