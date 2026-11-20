@@ -270,7 +270,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
       const areaMm2 = part.cells.length * planMm * planMm, phase = stage === 1 ? 'light' : 'mid';
       let rim = 0; for (const l of part.loops) for (let v = 0; v < l.points.length; v++) { const P = l.points[v], Q = l.points[(v + 1) % l.points.length]; rim += Math.hypot(Q[0] - P[0], Q[1] - P[1]); }
       const used = Math.max(...strokesOut.strokes.map(st => 2 * st.radiusMm)); strokeCount += strokesOut.strokes.length;
-      const intent = { id: `${phase}/s${stage}/m${mixId}/${STAGE_NAME[stage]}`, phase, valueBand: stage, stage, mixId, thing: what.name ?? null, kind: what.kind ?? null, areaMm2: +areaMm2.toFixed(1), regions: [], crossesRegions: false,
+      const intent = { id: `${phase}/s${stage}/m${mixId}/${STAGE_NAME[stage]}`, phase, colour: colour.map(Math.round), valueBand: stage, stage, mixId, thing: what.name ?? null, kind: what.kind ?? null, areaMm2: +areaMm2.toFixed(1), regions: [], crossesRegions: false,
         referenceCue: 'One polygon a thing, charged with one mix judged for the polygon as a whole.', intendedResult: stage === 1 ? 'A big band laid first.' : stage === 2 ? 'A thing in its own colour.' : stage === 3 ? 'A cast shadow, one glaze across what it falls on.' : 'A late dark accent.', cool: stage === 1 && colour[2] > colour[0] + 10,
         shaped, subject, move: 'wet on dry', paperBefore: 'fully dry; own same-passage wet overlap allowed', baseBefore: 'fully dry',
         brush: { kind: 'the widest wash brush of the kit that fits the polygon, then the smaller ones where it is narrow', contact: 'side/belly', width: 'each stroke names its brush', widthMm: strokesOut.brushMm },
