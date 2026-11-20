@@ -422,7 +422,8 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
   // wider (the engine's own edgeHalfWidth, which the lanes of every wash are spaced by), so it is sized through that.
   const brushFor = half => { let r = half + 1; for (let it = 0; it < 6; it++) r += half - edgeHalfWidth(r, { pressure: 1, splay: WASH_FLAT_SPLAY }); return Math.max(SC, r); };
   // A lane is swept with a flat; every other stroke of a wash is a round's (its footprint a disc, as the plan counts it).
-  const vectorPaths = !BUDGET && sh._valuePlan?.strokes ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); return st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1, round })); }) : null;
+  // a wash plan's strokes are a list of laid strokes (fair-wash.mjs); a light-to-dark plan's are a count and lane widths for its stroke plan
+  const vectorPaths = !BUDGET && Array.isArray(sh._valuePlan?.strokes) ? sh._valuePlan.strokes.map(st => { const round = st.kind !== 'lane', r = round ? Math.max(SC, st.radiusMm * CELLS_PER_MM) : brushFor(st.radiusMm * CELLS_PER_MM); return st.points.map(q => ({ x: q[0] * CELLS_PER_MM, y: q[1] * CELLS_PER_MM, r, p: 1, round })); }) : null;
   const shapedPaths = vectorPaths ? vectorPaths : BUDGET ? budgetPaths(up(MASK), W2, H2, BUDGET.target(sh)) : sh._valuePlan?.shaped ? (sh._strokePlan ? strokePlanPaths(sh) : attachPlaneRamp(rawShapedPaths())) : null;
   let detail = !sh._valuePlan && !authoredPaths && through > num('detailfrom', 2);
   // A graded wash runs down its gradient and is not walked, so each few cells can be charged for where they are (--gradedwash).
@@ -656,8 +657,10 @@ for (let L = L_START; L < (PENWASH ? 0 : ctx.layers.length); L++) {
     const opening = (layer.value <= 1 && !(sh.graded && !sh._follow) ? (sh._opening ?? num('opening', 0.55)) : 1) * (sh._tint ?? 1);
     const PF = PATH_FACTOR.get(pts) ?? 1; // --strokeplan: this stroke's planned charge factor
     // A passage laid in overlapping lanes is charged for the overlap, once per passage: see sweepCover. Detail marks
-    // leave paper between them on purpose and are not divided.
-    if (sh._cover == null) sh._cover = detail || opt('cover', '0') === '0' ? 1 : Math.pow(Math.max(1, passageCover()), num('coverpow', 1));
+    // leave paper between them on purpose and are not divided. --cover 0|1, default 0, except for a wash plan's strokes
+    // (fair-wash.mjs): its rounds ring the outline and its lanes overlap by a third, so about 1.7 sweeps lie over a cell
+    // and, charged for one, the sheet held 1.6 of the planned pigment.
+    if (sh._cover == null) sh._cover = detail || opt('cover', vectorPaths ? '1' : '0') === '0' ? 1 : Math.pow(Math.max(1, passageCover()), num('coverpow', 1));
     // --undercover 0|1: raise the charge by area over brush footprint, floored at --underfloor (default 0.4), so the planned mass arrives. Default 1.
     if (sh._under == null) sh._under = detail || opt('undercover', '1') === '0' ? 1 : 1 / Math.max(num('underfloor', 0.4), Math.min(1, passageCover()));
     sh.laidShare = opening;
