@@ -421,15 +421,16 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const s = shapes[i], phase = phaseOf(i), stage = phase === 1 ? 1 : phase === 3 ? 4 : parent[i] >= 0 ? 3 : 1;
     const { m, loops } = outlineOf(i); if (!loops.length) continue;
     const what = `study shape ${i}${parent[i] >= 0 ? ` over ${parent[i]}` : ''}${kids[i].length ? `, carried under ${kids[i].join(' ')}` : ''}`;
-    // laid against a neighbour still damp when their values are close and it is not laid over it (the sheet's 'dry on
-    // wet' move: no drying gate before it, so the two meet while damp and the edge softens)
+    // laid against a neighbour in the same session (no drying between) when their values are close and it is not laid
+    // over it. (The paint step's wet-on-dry gate still dries a damp neighbour inside the new wash's reach before the first
+    // stroke, so the edge is not yet soft; its 'dry on wet' move fails on the dry paper of the new shape.)
     const soft = !flat && session && session.stage === stage && [...session.ids].some(o => parent[i] !== o && parent[o] !== i && (s.border.get(o) ?? 0) > 0 && Math.abs(shapes[o].lab[0] - s.lab[0]) <= CLOSE_L);
     if (!soft) close();
     const isBroken = broken(s);
     // a darker shape laid over a lighter one of its hue is a shadow: a transparent cool glaze, even in strength (no load
     // variation), at the study's value
     const shadow = !flat && parent[i] >= 0 && stage === 3, target = shadow ? cooled(s.colour) : s.colour;
-    const made = isBroken ? dabMass(stage, what, m, loops, s.colour, s.cells) : [wash(stage, shadow ? `${what}: a cool shadow glaze` : what, loops, target, { own: s.cells, move: soft ? 'dry on wet' : 'wet on dry', grade: !flat && !shadow })].filter(Boolean);
+    const made = isBroken ? dabMass(stage, what, m, loops, s.colour, s.cells) : [wash(stage, shadow ? `${what}: a cool shadow glaze` : what, loops, target, { own: s.cells, move: 'wet on dry', grade: !flat && !shadow })].filter(Boolean);
     if (!made.length) continue;
     if (soft) softJoins++;
     if (!session) session = { stage, list: [], ids: new Set() };
