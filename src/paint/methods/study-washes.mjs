@@ -388,7 +388,9 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     return out;
   };
   // a broken mass laid as dabs: its own value first, then a darker value dropped into it while wet
-  const dabMass = (stage, what, m, loops, colour, own) => {
+  const dabMass = (stage, what, m0, loops, colour, own) => {
+    // dabs only where the wash's outline is (a dab outside it has no footprint in the passage)
+    const lm = loopsMask(loops, pw, ph, mmX), m = Uint8Array.from(m0, (v, q) => (v && lm[q] ? 1 : 0));
     const light = dabsOver(m, 11), sh = light.length ? wash(stage, `${what}, in loose dabs`, loops, colour, { strokes: light, own }) : null;
     if (!sh) return [];
     const dark = dabsOver(m, 29, DAB_DARK_SHARE), out = [sh];
@@ -436,7 +438,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     if (!session) session = { stage, list: [], ids: new Set() };
     session.list.push(...made); session.ids.add(i);
     // a broken mass's broken darker kids are dropped into it while it is wet
-    if (isBroken) for (const c of kids[i]) if (broken(shapes[c])) { const cm = new Uint8Array(pn); for (const q of shapes[c].cells) cm[q] = 1; const cl = maskLoops(cm, ROUND_MM, paperMask); const d = wash(2, `study shape ${c} dropped into ${i} in dabs`, cl, shapes[c].colour, { strokes: dabsOver(cm, 47 + c), own: shapes[c].cells, move: 'wet on wet' }); if (d) { session.list.push(d); done.add(c); } }
+    if (isBroken) for (const c of kids[i]) if (broken(shapes[c])) { const cm = new Uint8Array(pn); for (const q of shapes[c].cells) cm[q] = 1; const cl = maskLoops(cm, ROUND_MM, paperMask); const clm = loopsMask(cl, pw, ph, mmX); for (let q = 0; q < pn; q++) cm[q] &= clm[q]; const kd = dabsOver(cm, 47 + c); const d = kd.length ? wash(2, `study shape ${c} dropped into ${i} in dabs`, cl, shapes[c].colour, { strokes: kd, own: shapes[c].cells, move: 'wet on wet' }) : null; if (d) { session.list.push(d); done.add(c); } }
     if (!isBroken) { const ex = new Set(under(i)); for (let a = parent[i]; a >= 0; a = parent[a]) ex.add(a); session.list.push(...lifeFor(made[0], s.cells, shapes, i, ex, what)); }
   }
   close();
