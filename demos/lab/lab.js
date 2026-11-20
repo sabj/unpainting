@@ -242,7 +242,7 @@ const cancelPlayback = () => {
   playPause.textContent='Pause'; playPause.setAttribute('aria-pressed','false');
   worker.postMessage({type:'pause',on:false}); setPlaying(false);
 };
-const newSheet = () => { liveBudget.hidden=true;playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent='Your painting studio'; cancelStroke(); cancelPlayback(); worker.postMessage({type:'clear',seed:PAPER_SEED}); announce('New sheet'); };
+const newSheet = () => { liveBudget.hidden=true;playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent='Sheet'; cancelStroke(); cancelPlayback(); worker.postMessage({type:'clear',seed:PAPER_SEED}); announce('New sheet'); };
 function startDemo(name, title) {
   playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent=title;
   // Technique samples have live instructions, not a saved-frame recording.

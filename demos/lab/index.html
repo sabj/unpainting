@@ -185,11 +185,11 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 </head>
 <body>
 <button id="exit-focus" hidden>Exit fullscreen</button>
-<nav class="paint-nav" aria-label="unpainting"><a href="lab/" aria-current="page">Paint Lab</a><a href="./">All demos</a><a href="https://github.com/sabj/unpainting">Source on GitHub</a><span class="paint-beta">beta</span></nav>
+<nav class="paint-nav" aria-label="unpainting"><a href="lab/" aria-current="page">Paint Lab</a><a href="lab/strokes/">Stroke bench</a><a href="./">All demos</a><a href="https://github.com/sabj/unpainting">Source on GitHub</a><span class="paint-beta">0.4.0-rc.1</span></nav>
 <main>
 <header class="paint-head">
 <p class="paint-kicker">unpainting</p>
-<div class="paint-title"><h1>Paint Lab</h1><button class="help-toggle" popovertarget="paint-help">How it works</button><a class="help-toggle" href="https://github.com/sabj/unpainting">GitHub repo</a></div>
+<div class="paint-title"><h1>Paint Lab</h1><button class="help-toggle" popovertarget="paint-help">How it works</button><a class="help-toggle" href="lab/strokes/">Stroke bench</a></div>
 <div id="paint-help" popover role="dialog" aria-labelledby="paint-help-title">
 <header><strong id="paint-help-title">How it works</strong><button popovertarget="paint-help" popovertargetaction="hide" aria-label="Close help">Close ×</button></header>
 <p>Choose a complete stroke-budget painting, carry on a painting, or try a technique. Live runs its full recorded strokes through the simulator here. Jump to a thumbnail to continue from that sheet state, or choose Carry on painting. Replay shows the original saved frames without fades, with a labelled stroke path.</p>
@@ -204,12 +204,12 @@ body.canvas-focus{overflow:hidden}.canvas-focus :is(.paint-nav,.paint-head,.pane
 
 <div class="lab">
   <div class="stage">
-<div class="stage-heading"><span id="sheet-title">Your painting studio</span><button id="focus-view" aria-pressed="false">⛶ Fullscreen</button></div>
+<div class="stage-heading"><span id="sheet-title">Sheet</span><button id="focus-view" aria-pressed="false">⛶ Fullscreen</button></div>
   <div class="toolbar" id="run-settings"><label>Mode <select id="run-mode" aria-label="Playback mode"><option value="replay" selected>Recording · the painter's real frames</option><option value="live">Live · paint a complete study here</option></select></label><label id="live-budget" hidden>Painting budget <select id="stroke-limit" aria-label="Painting budget"><option value="250">250-stroke painting</option><option value="2500">2,500-stroke painting</option></select></label></div>
   <p id="mode-note">Recording · original saved frames, stepped without fades. Overlay: stroke path.</p>
 
     <div id="return-sheet" class="toolbar paint-controls" hidden><button id="keep-painting">Keep painting</button><button id="dismiss-return">Start fresh</button></div>
-    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><p>A little paint. A little water.</p><h2>What will you make?</h2><div><button data-start="blank">Start a blank painting</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div><small>Or start a mark anywhere on the paper.</small></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
+    <div class="sheet" id="sheet"><canvas id="canvas" width="480" height="360" tabindex="0" role="img" aria-label="Paper. Drag to paint."></canvas><canvas id="film" class="film" hidden aria-hidden="true"></canvas><img id="seek-preview" hidden alt="Selected painting state"><div id="welcome"><h2>What will you make?</h2><div><button data-start="blank">Start a blank painting</button><button data-start="example">See an example</button><button data-start="technique">See a technique</button></div></div><span id="paint-hint" aria-hidden="true">Drag to paint</span><canvas id="cursor" class="cursor" aria-hidden="true"></canvas></div>
     <div id="current-materials" hidden aria-label="Current materials"></div>
     <section id="sequence" hidden aria-labelledby="sequence-title"><h2 id="sequence-title">Live study · jump in anywhere</h2><div class="sequence-row"><figure><img id="sequence-target" alt=""><figcaption>Target</figcaption></figure><nav id="sequence-thumbs" aria-label="Painting timeline"></nav></div></section>
     <div class="sheetbar">
