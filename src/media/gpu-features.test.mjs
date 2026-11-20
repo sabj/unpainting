@@ -8,7 +8,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makePaper } from './paper.mjs';
 import { createSheet, step, dry, thickness, coherent, DEFAULTS as SHEET_DEFAULTS } from './sheet.mjs';
-// the GPU sheet has no pinned-edge feed (src/media/edge-feed.mjs) and refuses one; these tests run both sheets without it
+// The edge flow is off in these float-noise comparisons. The GPU sheet makes its pinned-edge feed's geometry between
+// calls (stepfull.mjs efSteps); the flows inside a GPU stroke's plan keep the geometry from before the stroke, which
+// parts from the CPU by more than float noise. The feed's own parity: gpu/gpu-edge-feed.test.mjs and
+// tools/lab/gpu-wash-cases.test.mjs.
 const DEFAULTS = { ...SHEET_DEFAULTS, edgeEvap: 0 };
 import { attachGpu, gpuStats } from './gpu/link.mjs';
 

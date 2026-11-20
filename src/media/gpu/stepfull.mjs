@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import { PaperReadback } from './paper-readback.mjs';
 import { PaperGate } from './paper-gate.mjs';
 import {FINISH_WET_SCAN, FINISH_WET_SCAN_14} from './finish-wet-scan.mjs';
-import {edgePingPong} from './edge-pingpong.mjs';
+import { edgeFeedWgsl, EF_RMAX, EF_BMAX } from './edge-feed-wgsl.mjs';
+import { wetBoxes, edgeGeometry } from './edge-geometry.mjs';
 import {fastDryChunk, adaptiveFastDryChunk} from './fast-dry-chunk.mjs';
 import {strokePlanBudget,strokePlanShader,planMiB} from './stroke-plan-budget.mjs';
 import { runStrokePrefixDiagnostic } from './stroke-prefix-diagnostic.mjs';
@@ -24,6 +25,9 @@ const TILE = 16;
 const envNum = (k, d) => { const v = Number(typeof process === 'undefined' ? d : process.env[k] ?? d); return Number.isFinite(v) ? v : d; };
 const FAST_DRY_DT_SCALE = Math.max(0.01, envNum('GPU_FAST_DRY_DT_SCALE', 2));
 // one dispatch builds a step's tile list (GPU_SPARSE_ALL=0: three separate dispatches)
+const onesCache = new Map(), ONES = n => onesCache.get(n) ?? (onesCache.set(n, new Float32Array(n).fill(1)), onesCache.get(n));
+// the most steps the edge feed runs between looks at whether its geometry has moved (efSteps)
+const EF_BATCH = Math.max(1, envNum('GPU_EDGE_BATCH', 25));
 const SPARSE_ALL = typeof process === 'undefined' || process.env.GPU_SPARSE_ALL !== '0';
 const KEEP = []; // Dawn's instance, adapter and device must stay reachable or the GC frees them under the running device
 
@@ -54,7 +58,7 @@ const hollowUnitOf = paper => { if (!(paper?.hollowUnit > 0)) throw new Error('G
 const UOFF = Object.fromEntries(UF.map(([k], i) => [k, i * 4]));
 const UBYTES = UF.length * 4 + 512 + 64 + 256; const UBYTES_EXPORT = UBYTES;
 const PRELUDE = `struct U {\n${UF.map(([k, t]) => `  ${k}: ${t === 'u' ? 'u32' : 'f32'},`).join('\n')}\n  pa: array<vec4<f32>, 16>,\n  pb: array<vec4<f32>, 16>,\n  kl: array<vec4<u32>, 4>,\n  pc: array<vec4<f32>, 16>,\n}\n@group(0) @binding(0) var<uniform> u: U;\nfn pigA(k: u32) -> vec4<f32> { return u.pa[k]; }\nfn pigB(k: u32) -> vec4<f32> { return u.pb[k]; }\nfn pigC(k: u32) -> vec4<f32> { return u.pc[k]; }\n`;
-const SRC = PRELUDE + (process.env.GPU_EDGE_PINGPONG === '1' ? edgePingPong(WGSL) : WGSL); const SRC_EXPORT = SRC;
+const SRC = PRELUDE + WGSL + edgeFeedWgsl() + 'fn efHalted() -> bool { return false; }\n'; const SRC_EXPORT = SRC;
 
 // which bindings each entry point touches, found from the source: its own body plus the helpers it calls
 function analyse(src) {
@@ -114,7 +118,7 @@ export class GpuSheet {
     if (fit.over.length) throw new Error(`GpuSheet: ${w}x${h} with ${K} pigments needs ${fit.over.map(([k, b]) => `${k} ${(b / 2 ** 30).toFixed(2)} GiB`).join(', ')}, over this device's ${(fit.limit / 2 ** 30).toFixed(2)} GiB binding limit; use fewer pigments or a smaller sheet`);
     const mk = (bytes, usage = 0) => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | usage });
     const f = n * 4, B = this.b = {};
-    for (const k of ['M', 'EVER', 'RESIST', 'W', 'EA', 'EB', 'FX', 'FY', 'WSC', 'WENT', 'DEP']) B[k] = mk(f);
+    for (const k of ['M', 'EVER', 'RESIST', 'W', 'FX', 'FY', 'WSC', 'WENT', 'DEP']) B[k] = mk(f);
     B.S = mk(f * 3);
     if (o.fixedBed > 0) { B.DEP.destroy(); B.DEP = mk(f * 3); }
     for (const k of ['PAPER', 'PAPER2', 'PAPER3', 'BPAP']) B[k] = mk(f * 4);
@@ -145,6 +149,7 @@ export class GpuSheet {
     for (let i = 0; i < n; i++) PB.set([paper.height[i], paper.tooth[i], hv[i], paper.proud ? paper.proud[i] : paper.height[i] - hv[i]], i * 4);
     put(B.BPAP, PB); put(B.BSTR, paper.capacity, this.SB * 4);
     this.cap = this.ntiles; this.hold = 0; this.epoch = 0; this.knownDry = false; this.lastCount = this.ntiles; this.pending = false;
+    this.efAlloc(o.edgeEvap > 0);
     this.setOptions(this.o);
     const info = analyse(strokeSource); if (globalThis.DEBUG_USES) for (const e of info.entries) console.log(e, info.uses(e).map(b => info.decl.find(x => x.binding === b)?.name).join(","));
     if (process.env.GPU_DEMAND_READBACK !== '1') info.entries = info.entries.filter(name => name !== 'upload_metadata_rect');
@@ -152,6 +157,7 @@ export class GpuSheet {
     this.demandShaderSource=strokeSource.replace('const FIXED_BED: bool = false;', `const FIXED_BED: bool = ${this.o.fixedBed > 0};`).replace('const OUT4_CUT: u32 = 4294967295u;', `const OUT4_CUT: u32 = ${this.out4Planes < K ? this.out4Planes * n : 4294967295}u;`);
     const ordinarySource=process.env.GPU_DEMAND_READBACK==='1'?this.demandShaderSource:this.demandShaderSource.replace(/@compute[^\n]*\nfn upload_metadata_rect[\s\S]*?\n}/,'').replace(/^@group\(0\) @binding\(43\).*$/m,'');
     const module = d.createShaderModule({ code: ordinarySource });
+    this.module = module;
     this.p = {}; this.bgl = {}; this.uses = {};
     for (const name of info.entries) {
       const use = [0, ...info.uses(name).filter(b => b !== 0)]; this.uses[name] = use;
@@ -159,7 +165,6 @@ export class GpuSheet {
       this.p[name] = d.createComputePipeline({ label: name, layout: d.createPipelineLayout({ bindGroupLayouts: [this.bgl[name]] }), compute: { module, entryPoint: name } });
     }
     this.names = Object.fromEntries(info.decl.map(x => [x.binding, x.name]));
-    const passes = this.o.edgeWidth + 1; this.edgeFinal = passes % 2 === 1 ? 'EB' : 'EA';
     this.bg = {};
     for (const name of info.entries) this.bg[name] = d.createBindGroup({ layout: this.bgl[name], entries: this.uses[name].map(binding => ({ binding, resource: { buffer: this.bufFor(this.names[binding]) } })) });
     // Specialize the rare signed-zero fallback so ordinary contacts have no runtime branch.
@@ -172,7 +177,102 @@ export class GpuSheet {
     this.upload(sheet);
   }
 
-  bufFor(name) { return name === 'EDGE' ? this.b[this.edgeFinal] : name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : name === 'PACK' ? this.pack() : this.b[name]; }
+  // ---- the pinned-edge feed (edge-geometry.mjs on the host, edge-feed-wgsl.mjs on the GPU) ----
+  /** Its buffers: whole-sheet ones while the feed is on, 16-byte stubs while it is off (a sheet that never feeds pays nothing). */
+  efAlloc(on) {
+    const d = this.device, n = this.n, B = this.b;
+    const mk = bytes => d.createBuffer({ size: Math.max(16, bytes), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+    for (const k of ['EFL', 'EFG', 'EFS', 'EFC', 'EFB', 'EFP']) B[k]?.destroy();
+    B.EFL = mk(on ? (1 + 2 * n) * 4 : 16); B.EFG = mk(on ? n * 16 : 16); B.EFS = mk(on ? n * 16 : 16); B.EFC = mk(on ? n * 4 * this.K : 16); B.EFP = mk(on ? Math.ceil(n / 8) * 4 : 16);
+    B.EFB = mk((16 + EF_BMAX * (EF_RMAX + 1)) * 4);
+    this.efOn = on; this.ef = { count: 0, boxes: 0, rounds: 16, key: null, scratch: {}, stale: true };
+    if (this.bg) for (const name of Object.keys(this.bg)) if (name.startsWith('ef_')) this.bg[name] = d.createBindGroup({ layout: this.bgl[name], entries: this.uses[name].map(binding => ({ binding, resource: { buffer: this.bufFor(this.names[binding]) } })) });
+  }
+  /** The prep and apply pipelines of round r (the WGSL's ROUND override). */
+  efPipe(kind, r) {
+    const key = `${kind}#${r}`;
+    if (!this.p[key]) { this.p[key] = this.device.createComputePipeline({ label: key, layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.bgl[kind]] }), compute: { module: this.module, entryPoint: kind, constants: { ROUND: r } } }); }
+    return this.p[key];
+  }
+  /**
+   * Bring the edge feed's geometry up to date with the sheet: read the wet mask, damp pores and water the GPU holds, find
+   * the boxes a CPU step would work in, and where their footprint changed solve the geometry again and upload it.
+   */
+  async efRefresh() {
+    if (!this.efOn) return;
+    const { n, w, h } = this, ef = this.ef;
+    // the mask, footprint and damp pores packed four bits a cell on the GPU (ef_pack): an eighth of one field to read
+    { const e = this.device.createCommandEncoder(), pass = e.beginComputePass(); pass.setPipeline(this.p.ef_pack); pass.setBindGroup(0, this.bg.ef_pack); pass.dispatchWorkgroups(Math.ceil(n / 2048)); pass.end(); this.device.queue.submit([e.finish()]); }
+    const bits = new Uint32Array(await this.readWords('EFP', Math.ceil(n / 8) * 4)), M = new Uint8Array(n), ever = new Uint8Array(n), damp = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { const b = (bits[i >>> 3] >>> (4 * (i & 7))) & 15; M[i] = b & 1; ever[i] = (b >> 1) & 1; damp[i] = (b >> 2) & 1; }
+    // wetBoxes asks M[i] || s[i] > 0.02 capacity[i]: the packed bit answers it with a capacity of 1 and s of 1 or 0
+    const boxes = wetBoxes({ w, h, M: damp, s: damp, capacity: ONES(n) }, Math.max(2, this.poreTime.iters));
+    if (boxes.length > EF_BMAX) throw new Error(`GPU edge feed: ${boxes.length} wet boxes, more than ${EF_BMAX}`);
+    const resist = this.resistMask, o = this.o, mm = o.mmPerCell > 0 ? o.mmPerCell : this.mmPerCell;
+    // the footprint the geometry depends on: each box, and the cells in it the wash has wet (edge-feed.mjs `key` and mask)
+    let hash = 0x811c9dc5;
+    const mix = v => { hash = Math.imul(hash ^ v, 16777619) >>> 0; };
+    mix(Math.round(mm * 1e6)); mix(Math.round((o.edgeMm ?? 1) * 1e6)); mix(Math.round(o.edgeEvap * 1e9)); mix(Math.round((o.reachMm ?? 1.5) * 1e6)); mix(o.holeSpan ?? 0);
+    // (edge-feed.mjs keeps its geometry while the mask is the same, however its box moved: the box only bounds the mask)
+    for (const [x0, y0, x1, y1] of boxes) { mix(0xb0c5); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * w + x; if (M[i] || ever[i]) mix(resist?.[i] ? ~i : i); } }
+    // what ef_watch will compare each step against: the footprint's size and the box round the wet and damp cells
+    let foot = 0, bx0 = 0xffffffff, by0 = 0xffffffff, bx1 = 0, by1 = 0;
+    for (let i = 0; i < n; i++) {
+      if (M[i] || ever[i]) foot++;
+      if (damp[i]) { const x = i % w, y = (i / w) | 0; if (x < bx0) bx0 = x; if (y < by0) by0 = y; if (x > bx1) bx1 = x; if (y > by1) by1 = y; }
+    }
+    this.device.queue.writeBuffer(this.b.EFB, 16, new Uint32Array([0, 0, 0xffffffff, 0xffffffff, 0, 0, foot, bx0, by0, bx1, by1]));
+    ef.stale = false;
+    const key = `${boxes.length}:${hash}`;
+    if (key === ef.key) return;
+    ef.key = key; ef.solves = (ef.solves ?? 0) + 1;
+    const list = [], G = new Float32Array(4 * n);
+    let b = 0;
+    for (const box of boxes) {
+      const geo = edgeGeometry({ w, h, M, ever, resist }, o, box, mm, ef.scratch);
+      if (!geo) continue;
+      const { order, ex, fx, fy } = geo;
+      for (const i of order) { G[4 * i] = ex[i]; G[4 * i + 1] = fx[i]; G[4 * i + 2] = fy[i]; }
+      for (const i of order) {
+        if (fx[i] > 0) G[4 * i + 3] += fx[i]; else if (fx[i] < 0) G[4 * (i + 1) + 3] -= fx[i];
+        if (fy[i] > 0) G[4 * i + 3] += fy[i]; else if (fy[i] < 0) G[4 * (i + w) + 3] -= fy[i];
+      }
+      for (const i of order) list.push(i, b);
+      b++;
+    }
+    const L = new Uint32Array(1 + list.length); L[0] = list.length / 2; L.set(list, 1);
+    const q = this.device.queue;
+    q.writeBuffer(this.b.EFL, 0, L); q.writeBuffer(this.b.EFG, 0, G);
+    q.writeBuffer(this.b.EFB, 0, new Uint32Array([b]));
+    ef.count = L[0]; ef.boxes = b; this.efWriteRounds();
+  }
+  efWriteRounds() { this.device.queue.writeBuffer(this.b.EFB, 4, new Uint32Array([this.ef.rounds])); }
+  /** One step's feed, encoded in the step's pass: reset, the first substep's length, then the rounds of substeps. */
+  efEncode(pass) {
+    const ef = this.ef; if (!this.efOn || !ef.count) return;
+    const groups = Math.ceil(ef.count / 256);
+    pass.setPipeline(this.p.ef_reset); pass.setBindGroup(0, this.bg.ef_reset); pass.dispatchWorkgroups(1);
+    pass.setPipeline(this.p.ef_begin); pass.setBindGroup(0, this.bg.ef_begin); pass.dispatchWorkgroups(groups);
+    for (let r = 0; r < ef.rounds; r++) {
+      pass.setPipeline(this.efPipe('ef_prep', r)); pass.setBindGroup(0, this.bg.ef_prep); pass.dispatchWorkgroups(groups);
+      pass.setPipeline(this.efPipe('ef_apply', r)); pass.setBindGroup(0, this.bg.ef_apply); pass.dispatchWorkgroups(groups);
+    }
+  }
+  /** After each step: has the footprint or the wet box moved since the geometry was made? (ef_watch) */
+  efWatch(pass) {
+    if (!this.efOn) return;
+    pass.setPipeline(this.p.ef_watch); pass.setBindGroup(0, this.bg.ef_watch); pass.dispatchWorkgroups(Math.ceil(this.n / 256));
+    pass.setPipeline(this.p.ef_watch_end); pass.setBindGroup(0, this.bg.ef_watch_end); pass.dispatchWorkgroups(1);
+  }
+  /** Water the feed has evaporated (since the sheet was made or last fixed), summed in double precision. */
+  async edgeEvaporated() {
+    if (!this.efOn) return 0;
+    const v = new Float32Array(await this.readWords('EFS', this.n * 16)); let t = 0;
+    for (let i = 3; i < v.length; i += 4) t += v[i];
+    return t;
+  }
+
+  bufFor(name) { return name === 'u' ? this.b.U : name === 'rc' ? this.b.RC : name === 'PACK' ? this.pack() : this.b[name]; }
   pack() { return this.b.PACK ?? (this.b.PACK = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE })); }
 
   /** Uniform values for the options and pigments. dt changes between dry()'s phases: call again with { dt }. */
@@ -180,6 +280,8 @@ export class GpuSheet {
     this.flushStrokes();
     const { device: d } = this, sheet = this, u = new ArrayBuffer(UBYTES), U32 = new Uint32Array(u), F32 = new Float32Array(u);
     this.o = { ...this.o, ...o }; o = this.o;
+    if (this.bg && (o.edgeEvap > 0) !== !!this.efOn) this.efAlloc(o.edgeEvap > 0);
+    if (this.ef) this.ef.stale = true;   // the feed's geometry depends on mm, edgeMm, edgeEvap, reachMm, holeSpan and dt
     const set = (k, v) => { const i = UOFF[k] / 4; if (UF.find(x => x[0] === k)[1] === 'u') U32[i] = v; else F32[i] = v; };
     set('w', this.w); set('h', this.h); set('n', this.n); set('tw', this.tw); set('th', this.th); set('ntiles', this.ntiles); set('K', this.K);
     set('p3', this.resident ? (this.persistent ? 2 : 1) : 0); set('cap', this.cap); set('hasTop', this.hasTop ? 1 : 0); set('holdOn', Number.isFinite(o.hold ?? Infinity) ? 1 : 0);
@@ -252,6 +354,10 @@ export class GpuSheet {
       for (let t = 0; t < this.ntiles; t++) if (dirty[t]) dirty[this.ntiles + dirty[3 * this.ntiles]++] = t;
       put(B.FLAGS2, dirty, (2 * this.ntiles + 1) * 4);
     }
+    if (this.efOn) {
+      const v = new Float32Array(4 * n); if (sheet.edgePending?.length === n) for (let i = 0; i < n; i++) v[4 * i + 2] = sheet.edgePending[i];
+      put(B.EFS, v); this.ef.stale = true;
+    }
     this.gpuAhead = false; this.epoch++; this.knownDry = false;
   }
 
@@ -293,6 +399,7 @@ export class GpuSheet {
     // the fused step (18 dispatches a step; its edge region holds edgeWidth up to 6); GPU_STEP=old: the 29-dispatch step
     if (!(typeof process !== 'undefined' && process.env.GPU_STEP === 'old') && o.edgeWidth + 1 <= 7) {
       for (let s = 0; s < steps; s++) {
+        this.efEncode(pass);
         if (this.resident && SPARSE_ALL) go('sparse_all', 0, [1]); else { if (this.resident) { go('sparse_start', 0, [1]); go('sparse_build', 24); } else { go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); } go('tiles_args', 0, [1]); }
         go('edge_phase1');
         for (let it = 0; it < flowIters; it++) {
@@ -308,13 +415,13 @@ export class GpuSheet {
         }
         pores(true);
         if (fuseStep && this.p.p5ab) go('p5ab'); else { go('p5a'); go('p5b'); }
-        finish(s === steps - 1);
+        finish(s === steps - 1); this.efWatch(pass);
       }
       return;
     }
     for (let s = 0; s < steps; s++) {
+      this.efEncode(pass);
       if (this.resident) { go('sparse_start', 0, [1]); go('sparse_build', 24); } else { go('tiles_prep', 0, [nT]); go('tiles_build', 0, [nT]); } go('tiles_args', 0, [1]);
-      go('edge_first'); for (let r = 1; r < o.edgeWidth + 1; r++) go(r % 2 ? 'edge_b2a' : 'edge_a2b');
       go('phase1');
       for (let it = 0; it < flowIters; it++) {
         go('faces'); go('wsc'); if (K) { go('pflux_k', 12); go('ppout', 12); }
@@ -322,7 +429,7 @@ export class GpuSheet {
       }
       go('p3a');
       if ((o.slide ?? 0) > 0) { go('dep_k'); go('slide_out', 12); go('slide_apply', 12); }
-      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1);
+      pores(false); go('p5a'); go('p5b'); finish(s === steps - 1); this.efWatch(pass);
     }
   }
 
@@ -337,6 +444,7 @@ export class GpuSheet {
     return runStrokePrefixDiagnostic(this,data,info,request);
   }
   async runStroke(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore }) {
+    if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     if (this.batch && slot !== undefined) return this.queueStroke(data, { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore });
     const d = this.device, U32 = new Uint32Array(data.buffer, data.byteOffset, data.length);
     if (data.length > this.SB) throw new Error('GpuSheet: the stroke plan is too long');
@@ -372,6 +480,7 @@ export class GpuSheet {
   // Uploads live in the command stream, so a later plan cannot overwrite BSTR before
   // an earlier dispatch reads it. Brush results stay in a GPU ring until requested.
   queueStroke(data, info) {
+    if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     const { planFloats, nSteps, sp, s0, rect, lift, cont, h0, slot, seq, state, restore } = info;
     if (data.length > this.SB || planFloats > 6144) throw new Error('stroke exceeds GPU slot');
     const d = this.device, U = new Uint32Array(data.buffer, data.byteOffset, data.length);
@@ -439,6 +548,7 @@ export class GpuSheet {
   // GPU_PROF: the same stroke with the brush's runs and the flows between them submitted and waited for one at a time, so the
   // GPU's time splits into brush and flow (each submit adds its own small latency to both)
   async runStrokeProf(data, { planFloats, nSteps, sp, s0, lift }) {
+    if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     const d = this.device, U32 = new Uint32Array(data.buffer, data.byteOffset, data.length), P = globalThis.GPU_PROF;
     const book = (k, t, n = 1) => { const e = P[k] ??= { ms: 0, n: 0 }; e.ms += performance.now() - t; e.n += n; };
     const one = async (fn) => { const enc = d.createCommandEncoder(), pass = this.timestamps.begin(enc, 'runStrokeProf'); fn(pass); pass.end(); d.queue.submit([enc.finish()]); await d.queue.onSubmittedWorkDone(); };
@@ -466,6 +576,7 @@ export class GpuSheet {
 
   /** Lay planned splats, the flows between them where the plan says, and return the brush's water left ([W]). */
   async runSplat(data, info) {
+    if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     if (this.batch) return this.queueSplat(data, info);
     const { nRec, offRec, flowsBefore, rect } = info;
     this.flushStrokes();
@@ -490,6 +601,7 @@ export class GpuSheet {
   }
 
   queueSplat(data, { nRec, offRec, flowsBefore, state, restore, seq }) {
+    if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     if (data.length > this.SB) throw new Error('GpuSheet: the splat plan is too long');
     const d = this.device, words = new Uint32Array(data.buffer, data.byteOffset, data.length);
     const bytes = data.byteLength, align = Math.ceil(bytes / 4) * 4, cap = 8 * 1024 * 1024;
@@ -547,6 +659,27 @@ export class GpuSheet {
     const epoch = this.epoch;
     rb.mapAsync(GPUMapMode.READ).then(() => { const v = new Uint32Array(rb.getMappedRange(0, 16).slice(0)); rb.unmap(); this.pending = false; if (this.hold > 0) this.hold--; this.noteCount(v[0]); if (canDry && v[1] === 0 && epoch === this.epoch) this.knownDry = true; }, () => { this.pending = false; });
   }
+  /**
+   * Steps with the edge feed on: its geometry is brought up to date before each chunk of each step, as the CPU sheet finds
+   * its boxes and footprint at the start of each (step() alone, which cannot wait for a readback, keeps the last geometry).
+   */
+  async efSteps(steps, measure = false) {
+    this.flushStrokes();
+    for (let done = 0; done < steps;) {
+      // EFB[2] forced last rounds, [3] the most rounds a step used, [4] the footprint or wet box moved
+      const st = new Uint32Array(await this.readWords('EFB', 20)); this.efForced = st[2];
+      // While the footprint moves, look after every step (the geometry is then exactly the CPU's, made from the state the
+      // last step left); while it holds still, look half as often each time, up to every EF_BATCH steps.
+      if (st[4]) { this.ef.stale = true; this.ef.batch = 1; } else this.ef.batch = Math.min(EF_BATCH, 2 * (this.ef.batch ?? 1));
+      // a step used most of the rounds it had: give it more before one runs short (the last round takes all the time left)
+      // (washes at 0.1 mm cells take up to 12 substeps a step; a quarter of the rounds are kept spare)
+      if (st[3] > 0.75 * this.ef.rounds && this.ef.rounds < EF_RMAX) { this.ef.rounds = Math.min(EF_RMAX, 2 * this.ef.rounds); this.efWriteRounds(); }
+      if (this.ef.stale) await this.efRefresh();
+      const k = Math.min(this.ef.batch, steps - done), enc = this.device.createCommandEncoder();
+      this.encodeSteps(enc, k, measure && done + k === steps); this.device.queue.submit([enc.finish()]); done += k;
+    }
+    this.readCountLater(); this.gpuAhead = true;
+  }
   step(steps = 1, chunk = 20, measure = false) {
     this.flushStrokes();
     const limit = this.resident ? steps : chunk;
@@ -562,6 +695,7 @@ export class GpuSheet {
    * dispatch for the whole sheet (about 1.1 ms a step on an empty one). Short batches take the plain path.
    */
   async advance(steps, chunk = 25) {
+    if (this.efOn) { await this.efSteps(steps); return; }
     if (this.resident) { this.step(steps, chunk); return; }
     if (this.knownDry) return; // nothing wet and nothing written since: a step changes nothing (the CPU sheet returns early too)
     if (steps <= chunk) { this.step(steps, chunk); return; }
@@ -619,6 +753,8 @@ export class GpuSheet {
     const M = await u32('M'), E = await u32('EVER'); for (let i = 0; i < n; i++) { sheet.M[i] = M[i]; sheet.ever[i] = E[i]; }
     for (let k = 0; k < K; k++) { sheet.G[k].set(await f32('G', k)); sheet.P[k].set(await f32('P', k)); sheet.D[k].set(await f32('D', k)); }
     if (this.hasTop) { const top = sheet.layers[sheet.layers.length - 1]; for (let k = 0; k < K; k++) top[k].set(await f32('TOP', k)); }
+    // the feed's unmet demand is the sheet's state (edge-feed.mjs), carried with it
+    if (this.efOn) { const v = new Float32Array(await this.readWords('EFS', n * 16)), p = sheet.edgePending?.length === n ? sheet.edgePending : (sheet.edgePending = new Float64Array(n)); let t = 0; for (let i = 0; i < n; i++) { p[i] = v[4 * i + 2]; t += p[i]; } sheet.edgeDemandPending = t; }
     sheet.wetDirty = 1; this.gpuAhead = false;
   }
 
@@ -692,6 +828,7 @@ export class GpuSheet {
     return { mask: words[0], signedZero: words[1] !== 0 };
   }
   writeRect(rect, packed, logicalRect = null) {
+    if (this.ef) { this.ef.stale = true; this.ef.batch = 1; }   // paint laid here can move the edge feed's footprint
     this.flushStrokes();
     const d = this.device;
     if (rect) {
@@ -765,7 +902,8 @@ export class GpuSheet {
         stop = Math.min(stop, S.t + S.fastChunk);
       }
       const chunk = Math.max(1, Math.min(stop, until) - S.t);
-      this.step(chunk, 25, true); S.t += chunk;if(S.fast){S.fastIterations+=chunk;S.fastChunks++;}
+      if (this.efOn) await this.efSteps(chunk, true); else this.step(chunk, 25, true);
+      S.t += chunk;if(S.fast){S.fastIterations+=chunk;S.fastChunks++;}
       // fold the next surface-level query into the counter readback; it sees the same post-step state
       const needLevel=this.resident && !S.fast && S.t>=S.level && S.t<S.levelMax && S.t%25===0;
       if(needLevel)this.encodeLevel();
@@ -819,6 +957,8 @@ export class GpuSheet {
    * final contents go to `topOut` (K planes of n floats). Returns { hadTop, pushed }.
    */
   async fix(topOut = null, topMask = undefined, deferTop = false) {
+    // a fixed wash has no contact-line demand left (edge-feed.mjs resetEdgeFeed), and its footprint is gone
+    if (this.efOn) { const e = this.device.createCommandEncoder(); e.clearBuffer(this.b.EFS); this.device.queue.submit([e.finish()]); this.ef.stale = true; }
     await this.resetCounters(3, 5);
     const d = this.device, enc = d.createCommandEncoder(), pass = this.timestamps.begin(enc, 'fix');
     if (this.resident) { pass.setPipeline(this.p.fix_args); pass.setBindGroup(0, this.bg.fix_args); pass.dispatchWorkgroups(1); }
@@ -1023,7 +1163,7 @@ export class GpuSheet {
     }
     this.device.queue.writeBuffer(this.b.TOP, 0, planes); this.hasTop = true; this.setOptions({}); }
   /** Replace the masking-fluid mask. */
-  setResist(mask) { if(mask && !this.resistMask)this.optical?.beginMask(mask,this.opticalCount>1?this.b.TOP:null);if(!mask && this.resistMask)this.optical?.endMask();this.resistMask = mask ? Uint8Array.from(mask) : null; this.writeResist(); }
+  setResist(mask) { if (this.ef) this.ef.stale = true; if(mask && !this.resistMask)this.optical?.beginMask(mask,this.opticalCount>1?this.b.TOP:null);if(!mask && this.resistMask)this.optical?.endMask();this.resistMask = mask ? Uint8Array.from(mask) : null; this.writeResist(); }
   writeResist() {
     this.flushStrokes();
     const u = new Uint32Array(this.n), r = this.resistMask;
