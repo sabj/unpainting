@@ -37,8 +37,10 @@ export const DEFAULTS = {
   // glossy film (0.03 deep) let paint travel 0.5 mm (glaze-timing findings).
   filmDiffuse: 0.2, filmDepth: 0.03,
   // drying: evenly at evap, and faster by edgeEvap (mean over a band edgeMm deep) at a pinned edge, fed by a flow
-  // from up to feedMm behind it that carries pigment there (edge-feed.mjs); edgeWidth is left only for the GPU step
-  evap: 0.0003, edgeEvap: 0.001, edgeMm: 1, feedMm: 50, edgeWidth: 2,
+  // from up to feedMm behind it that carries pigment there (edge-feed.mjs); the levelling refills that band from the
+  // middle. Fed from the whole wash (feedMm 50) the routing printed a star along the grid's axes and diagonals into
+  // every large wash. edgeWidth is left only for the GPU step
+  evap: 0.0003, edgeEvap: 0.001, edgeMm: 1, feedMm: 4, edgeWidth: 2,
   absorb: 0.002, film: 0.03, paperDry: 0.0006,    // pores fill from the film without tearing it; damp pores dry slowly
   capRate: 0.05, capEps: 0.35, capDelta: 0.1, capSigma: 0.6, // capillary layer (fractions of capacity), Computer-Generated Watercolor, section 4.6
   settle: 0.25, lift: 0.25, looseLift: 6,         // adsorption and desorption scale; loose (unfixed) pigment lifts more

@@ -30,9 +30,9 @@ function bufs(sheet) {
 const C = 0.02, TAIL = 1 / Math.sqrt(1 + C), NORM = 2 * (Math.sqrt(1 + C) - Math.sqrt(C)) - TAIL;
 export function edgeProfile(a, b, E) {
   if (a >= E) return 0;
-  b = Math.min(b, E);
-  const u = (2 * (Math.sqrt(b / E + C) - Math.sqrt(a / E + C)) * E) / (b - a) - TAIL;
-  return Math.max(0, u / NORM);
+  // a cell that reaches past the band is averaged over its whole width: the profile is zero beyond E
+  const c = Math.min(b, E), u = 2 * (Math.sqrt(c / E + C) - Math.sqrt(a / E + C)) * E - TAIL * (c - a);
+  return Math.max(0, u / NORM / (b - a));
 }
 
 /**
@@ -44,7 +44,7 @@ export function edgeFeed(sheet, o, box, mm) {
   const edgeEvap = o.edgeEvap ?? 0, E = o.edgeMm ?? 1, dt = o.dt ?? 0;
   if (!(edgeEvap > 0) || !(dt > 0)) return 0;
   const { w, h, W, M, G, K, ever, resist } = sheet, [x0, y0, x1, y1] = box;
-  const L = Math.min(32000, Math.max(1, Math.ceil((o.feedMm ?? 50) / mm))), Lev = Math.ceil(E / mm), cd = o.carryDepth ?? 0.02;
+  const L = Math.min(32000, Math.max(1, Math.ceil((o.feedMm ?? 4) / mm))), Lev = Math.ceil(E / mm), cd = o.carryDepth ?? 0.02;
   const b = bufs(sheet), { lev, order, dem, need: need_, inner, sup, rho, ex, geo, cout, W0 } = b;
   const reach = Math.max(1, Math.round((o.reachMm ?? 1.5) / mm));
   const dryAt = (x, y) => x < 0 || y < 0 || x >= w || y >= h || !M[y * w + x];

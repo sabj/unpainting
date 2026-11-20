@@ -73,3 +73,8 @@ test('the three wash sheets dry the same on the GPU as on the CPU without the ed
     } finally { gpu._gpu?.close?.(); }
   }
 });
+
+test('a cell reaching past the edge band counts only its part inside it', () => {
+  let s = 0; for (let k = 0; k < 4; k++) s += edgeProfile(k * 0.3, (k + 1) * 0.3, 1) * 0.3;
+  assert.ok(Math.abs(s - 1) < 1e-9, `cells of 0.3 mm over a 1 mm band: ${s}`);
+});
