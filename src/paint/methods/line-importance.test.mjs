@@ -30,3 +30,9 @@ test('a short firm opening outranks a long faint joint; length counts only up to
   assert.ok(lineImportance(line(0, 0, 10, { tier: 1, weight: 0.5 }), 1) > lineImportance(line(0, 0, 10, { tier: 2, weight: 0.5 }), 1));
   assert.equal(lineImportance(line(0, 0, 10, { weight: 0.5 }), 0.5), 1.25);
 });
+
+test('a line the subject draws in pen outranks an edge only the model sees', () => {
+  const edge = line(0, 0, 10, { weight: 0.7, edge: true }), pen = line(0, 5, 10, { weight: 0.7 });
+  assert.equal(lineImportance(pen, 1, 1), 2 * lineImportance(edge, 1, 0));
+  assert.deepEqual(byImportance([edge, pen], { pxMm: 1, budgetMm: 10, penOf: g => (g.edge ? 0 : 1) }).lines, [pen]);
+});

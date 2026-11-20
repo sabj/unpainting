@@ -14,20 +14,24 @@ const median = v => { const s = [...v].sort((a, b) => a - b); return s.length % 
 /** The stroke's one weight, 0..1: the median of its per-point readings, else its own `weight`, else 0.5. */
 const weightOf = g => Math.max(0, Math.min(1, Array.isArray(g.weights) && g.weights.length ? median(g.weights) : g.weight ?? 0.5));
 
-/** A line's importance: its length in mm up to 12, times its weight squared, times 1.5 for a line of a form. */
-export function lineImportance(g, pxMm) {
-  return Math.min(FULL_LENGTH_MM, lengthOf(g.points) * pxMm) * weightOf(g) ** 2 * ((g.tier ?? 2) === 1 ? 1.5 : 1);
+/**
+ * A line's importance: its length in mm up to 12, times its weight squared, times 1.5 for a line of a form, times 1 to 2
+ * by `pen` (0..1): how surely the subject itself draws a line there (a dark ridge with lighter paper on both sides), as
+ * against an edge between two tones that only the line model sees. On a subject drawn in pen its pen lines come first.
+ */
+export function lineImportance(g, pxMm, pen = 0) {
+  return Math.min(FULL_LENGTH_MM, lengthOf(g.points) * pxMm) * weightOf(g) ** 2 * ((g.tier ?? 2) === 1 ? 1.5 : 1) * (1 + Math.max(0, Math.min(1, pen)));
 }
 
 /**
- * The most important lines whose length adds up to `budgetMm`, in their given order.
+ * The most important lines whose length adds up to `budgetMm`, in their given order. `penOf(line)` is 0..1 (lineImportance).
  * @returns { lines, stats: { budgetMm, beforeMm, keptMm, dropped, shortestKeptMm } }
  */
-export function byImportance(lines, { pxMm, budgetMm }) {
+export function byImportance(lines, { pxMm, budgetMm, penOf = () => 0 }) {
   const mm = lines.map(g => lengthOf(g.points) * pxMm), beforeMm = mm.reduce((a, b) => a + b, 0);
   const stats = { budgetMm, beforeMm, keptMm: beforeMm, dropped: 0, shortestKeptMm: mm.length ? Math.min(...mm) : 0 };
   if (!(budgetMm > 0) || beforeMm <= budgetMm) return { lines, stats };
-  const order = lines.map((g, i) => i).sort((a, b) => lineImportance(lines[b], pxMm) - lineImportance(lines[a], pxMm) || a - b);
+  const score = lines.map(g => lineImportance(g, pxMm, penOf(g))), order = lines.map((g, i) => i).sort((a, b) => score[b] - score[a] || a - b);
   const keep = new Uint8Array(lines.length); let sum = 0;
   for (const i of order) { if (sum >= budgetMm) break; keep[i] = 1; sum += mm[i]; }
   const kept = lines.filter((_, i) => keep[i]);
