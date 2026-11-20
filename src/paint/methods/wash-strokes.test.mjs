@@ -37,8 +37,8 @@ const lengthOf = s => s.points.reduce((a, p, q) => a + (q ? Math.hypot(p[0] - s.
 const box = (a, b) => [{ points: [[10, 10], [10 + a, 10], [10 + a, 10 + b], [10, 10 + b]], soft: [] }];
 
 test('a large wash is swept in straight lanes with the widest flat or mop that fits it, and its edge is closed by the rounds', () => {
-  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 46 mm: the mop in one; 50 x 34 mm: the one-inch flat in one
-  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 46, 38, 1], [50, 34, 25.4, 1]]) {
+  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 52 mm: the mop in one; 50 x 40 mm: the one-inch flat in one
+  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 52, 38, 1], [50, 40, 25.4, 1]]) {
     const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes(box(a, b), { kitMm: KIT, pointMm: 1.2 });
     assert.equal(brushMm, brush, `${a} x ${b} mm`);
     assert.ok(Math.abs(areaMm2 - a * b) < .03 * a * b);
@@ -47,9 +47,9 @@ test('a large wash is swept in straight lanes with the widest flat or mop that f
     for (const s of swept) {
       assert.equal(s.radiusMm, brush / 2);
       assert.equal(new Set(s.points.map(p => p[1])).size, 1, 'a lane is straight');
-      assert.ok(Math.abs(lengthOf(s) - (a - 7)) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash`);
-      // the band is as wide as the brush and square at its ends: all of it is inside the outline, by the 7 mm round's radius
-      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x) >= 3.5 - .8 && Math.min(y - 10, 10 + b - y) >= brush / 2 + 3.5 - .8, `${x}, ${y}`);
+      assert.ok(Math.abs(lengthOf(s) - (a - 12)) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash`);
+      // the band is as wide as the brush and square at its ends: all of it is inside the outline, by nearly the 7 mm round's width
+      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x) >= 5.95 - .8 && Math.min(y - 10, 10 + b - y) >= brush / 2 + 5.95 - .8, `${x}, ${y}`);
     }
     // the edge of the wash is laid by a round steered along the outline, over the band's ends
     assert.ok(strokes.some(s => s.kind === 'edge' && s.radiusMm === 3.5 && lengthOf(s) > a + b), 'a round goes round the outline');

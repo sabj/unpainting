@@ -270,6 +270,8 @@ if(VALUE_ENABLED){
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
  // the things of the picture, for the wash plan's first shapes: the run's segment map on the sheet's cells
  if(ctx.SEGMENTS_RECORD?.stem&&opt('image','')){const {registerSegments,loadSegments}=await import('../../src/crop/segments.mjs');const base=path.basename(opt('image'),path.extname(opt('image')));registerSegments(base,ctx.SEGMENTS_RECORD.stem);valueOptions.segments=(await loadSegments(base,w,h)).labels;}
+ // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
+ valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
  const planValues=valueOptions.styleSelection?planLightToDark:planFairWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){

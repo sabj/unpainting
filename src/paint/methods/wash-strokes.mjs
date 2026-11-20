@@ -195,10 +195,10 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut
     if (deepest > level - step + radius) follow(kind, radius, Math.max(level - step + radius / 2, deepest - pitch), least);
   };
   // A flat or a mop lays a band as wide as itself and as long as it travels, with square ends. A square end is never the
-  // edge of a wash: the band stays the radius of the widest round inside the outline, and that round, steered along the
+  // edge of a wash: the band stays the width of the widest round, less a small overlap, inside the outline (so the edge is not laid twice and does not dry as a dark ring), and that round, steered along the
   // outline, lays the edge over the band's ends and sides. Where a flat of this radius can be put down so: by row, the
   // runs of the grid it can be swept along.
-  const rounds = kit.filter(width => width < LANE_FROM_MM), inset = rounds.length ? rounds[0] / 2 : 0;
+  const rounds = kit.filter(width => width < LANE_FROM_MM), inset = rounds.length ? rounds[0] * (1 - FLAT_OVERLAP) : 0;
   const column = new Int32Array((gh + 1) * gw); for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) column[(gy + 1) * gw + gx] = column[gy * gw + gx] + (D[gy * gw + gx] >= inset ? 1 : 0);
   const runsFor = radius => {
     const rc = Math.floor(radius / pitch), rows = [];
