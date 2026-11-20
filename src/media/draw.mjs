@@ -5,6 +5,7 @@ import { hasZeroPaperCertificate, isFootprintDryCertified } from './paper-certif
 import { createPen, dipPen, penStroke, penRect } from './pen.mjs';
 import { step, dry } from './sheet.mjs';
 import { check } from './checks.mjs';
+import { penContact } from './brush-kit.mjs';
 import { hessianRidges } from '../crop/layers.mjs';
 import { gaussian } from '../keyframes/density.mjs';
 
@@ -49,7 +50,7 @@ export function drawGestures(sheet, gestures, want, w, h, { ink, peak = null, pe
     // (--drawinglogic 3)
     const path = g.points.map(p => {
       const s = p.s != null ? Math.min(1, p.s) : Math.min(1, at(p.x, p.y) / peak);
-      const q = { x: p.x + 0.5, y: p.y + 0.5, p: p.p != null ? Math.max(0,Math.min(1,p.p)) : 0.25 + 0.6 * s, v: p.v ?? 1.9 - 1.1 * s };
+      const c = penContact(s), q = { x: p.x + 0.5, y: p.y + 0.5, p: p.p != null ? Math.max(0,Math.min(1,p.p)) : c.p, v: p.v ?? c.v };
       if (p.nw != null) q.nw = p.nw;
       if (p.dwell) q.dwell = p.dwell;
       return q;

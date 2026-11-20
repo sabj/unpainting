@@ -18,16 +18,23 @@ const sheetEl = canvas.parentElement, state = document.getElementById('state'), 
 const query = new URLSearchParams(location.search);
 if (query.get('intro') === '0') document.getElementById('welcome').hidden = true;
 // The sheet is a real piece of paper: a size in inches at a resolution in dots per inch. ?paper=8x6 is the default size.
-// Interactive WebGPU resolution follows the viewport, with a bounded mobile/desktop default;
-// CPU_DPI on the processor; ?dpi= or the Resolution menu picks another.
-const PAPERS = { '6x4.5': [6, 4.5], '8x6': [8, 6], '12x9': [12, 9] }, DPIS = [60, 90, 120, 150, 200, 240, 300], MM = 25.4;
+// The resolution follows the paper's size on screen: about one cell to a device pixel, up to what each physics keeps
+// interactive (AUTO_MAX); ?dpi= or the Resolution menu picks another. Menu sizes are cells of 0.42 mm down to 0.1 mm.
+// Measured on an M-series Mac at device scale 2 (median / 90th percentile ms from a move to its frame): WebGPU 0.25 mm 16/24,
+// 0.21 mm 16/35, 0.125 mm 20/45, 0.1 mm 30/328; CPU 0.42 mm 17/140, 0.25 mm 169/509.
+const PAPERS = { '6x4.5': [6, 4.5], '8x6': [8, 6], '12x9': [12, 9] }, DPIS = [60, 90, 101.6, 120, 150, 160, 200, 203.2, 240, 254, 300], MM = 25.4;
+const AUTO_STEPS = [60, 101.6, 120, 160, 203.2, 254], AUTO_MAX = { webgpu: 203.2, cpu: 60 };
+function autoDpi(webgpu) {
+  const r = canvas.parentElement.getBoundingClientRect(), devicePx = (r.width || 745) * (window.devicePixelRatio || 1);
+  const want = devicePx / PAPERS[paperKey][0], cap = webgpu ? AUTO_MAX.webgpu : AUTO_MAX.cpu;
+  return AUTO_STEPS.filter(d => d <= cap).find(d => d >= want * 0.95) ?? Math.min(cap, AUTO_STEPS.at(-1));
+}
 let quality = query.get('quality') === 'full' ? 'full' : 'fast';
-const GPU_DPI = matchMedia('(max-width: 860px)').matches ? 90 : 120, CPU_DPI = 60;
 const dpiAsked = DPIS.includes(Number(query.get('dpi'))) ? Number(query.get('dpi')) : null;
 // the kind of paper: hot press, cold press, rough or toned (papers.js); ?surface= picks one
 const SURFACE_KEYS = ['hot', 'cold', 'rough', 'toned'];
 let surface = SURFACE_KEYS.includes(query.get('surface')) ? query.get('surface') : 'cold';
-let paperKey = PAPERS[query.get('paper')] ? query.get('paper') : '8x6', dpi = dpiAsked ?? (quality === 'full' ? 200 : CPU_DPI);
+let paperKey = PAPERS[query.get('paper')] ? query.get('paper') : '8x6', dpi = dpiAsked ?? (quality === 'full' ? 200 : 60);
 let W = canvas.width, H = canvas.height, PIXELS_PER_INCH = dpi;
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 const operations=createOperationsUI(sheetEl,m=>{cancelStroke();worker.postMessage(m);});
@@ -59,11 +66,18 @@ function begin() {
 }
 // the worker tells us the sheet it made: the canvas is that many pixels, and a 2D canvas is resized to match
 let introConsidered = false;
+// What the sheet is: cells, their size on paper and on screen, and how long a brush move takes to reach the screen.
+function showResolution() {
+  const r = canvas.getBoundingClientRect(), perCell = r.width ? r.width * (window.devicePixelRatio || 1) / W : 0, lags = [...lab.lags].sort((a, b) => a - b);
+  const frame = lags.length ? ` · frame ${Math.round(lags[Math.floor(lags.length / 2)])} ms` : '';
+  document.getElementById('resolution-choice').textContent = `${lab.dpiChoice ?? 'Selected'} · ${W} × ${H} cells · ${(MM / dpi).toFixed(3)} mm a cell · ${perCell.toFixed(2)} screen px a cell${frame}`;
+}
+setInterval(() => { if (lab.sheet) showResolution(); }, 2000);
 function onSheet(data) {
   if(data.dpi!==dpi)lab.dpiChoice='loaded sheet';
   operations.reset(data.width,data.height);
   W = data.width; H = data.height; PIXELS_PER_INCH = data.dpi; dpi = data.dpi; lab.dpi = dpi; lab.sheet = { width: W, height: H, dpi, paperIn: data.paperIn, surface: data.surface };
-  document.getElementById('resolution-choice').textContent=`${lab.dpiChoice??'Selected'} · ${dpi} dpi`;
+  showResolution();
   if (!gpuCanvas && ctx) { canvas.width = W; canvas.height = H; image = ctx.createImageData(W, H); }
   // a painting in progress loads on its own paper: the controls follow the sheet
   if (data.surface && data.surface !== surface) { surface = data.surface; press('[data-surface]', 'surface', surface); }
@@ -242,7 +256,7 @@ const cancelPlayback = () => {
   playPause.textContent='Pause'; playPause.setAttribute('aria-pressed','false');
   worker.postMessage({type:'pause',on:false}); setPlaying(false);
 };
-const newSheet = () => { liveBudget.hidden=true;playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent='Your painting studio'; cancelStroke(); cancelPlayback(); worker.postMessage({type:'clear',seed:PAPER_SEED}); announce('New sheet'); };
+const newSheet = () => { liveBudget.hidden=true;playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent='Sheet'; cancelStroke(); cancelPlayback(); worker.postMessage({type:'clear',seed:PAPER_SEED}); announce('New sheet'); };
 function startDemo(name, title) {
   playbackUI.dismiss();playbackUI.hide();document.body.classList.remove('has-example');document.getElementById('sheet-title').textContent=title;
   // Technique samples have live instructions, not a saved-frame recording.
@@ -484,9 +498,9 @@ worker.addEventListener('message', ({ data }) => {
   if(data.liveRun!=null&&data.liveRun!==filmRun)return;
   if (data.type === 'caps') {
     lab.physics = data.physics; lab.physicsReason = data.physicsReason; lab.physicsName = data.physicsName;
-    lab.dpiChoice=dpiAsked!==null?'URL':quality==='full'?'Full physics':data.webgpu?'Viewport':'CPU default';
-    lab.viewportResolution={width:innerWidth,height:innerHeight,defaultDpi:quality==='full'?200:data.webgpu?GPU_DPI:CPU_DPI};
-    if (dpiAsked === null) { dpi = quality==='full'?200:data.webgpu?GPU_DPI:CPU_DPI; lab.dpi = dpi; dpiSelect.value = String(dpi); }
+    lab.dpiChoice=dpiAsked!==null?'URL':quality==='full'?'Full physics':'Fitted to screen';
+    const autoChoice=autoDpi(Boolean(data.webgpu));lab.viewportResolution={width:innerWidth,height:innerHeight,defaultDpi:quality==='full'?200:autoChoice};
+    if (dpiAsked === null) { dpi = quality==='full'?200:autoChoice; lab.dpi = dpi; dpiSelect.value = String(dpi); }
     const canOffscreen = typeof canvas.transferControlToOffscreen === 'function';
     // WebGPU physics draws into a WebGPU canvas; otherwise WebGL2 draws the CPU physics
     start(!wantCpu && canOffscreen ? (data.webgpu ? 'webgpu' : data.gpu ? 'gl' : null) : null); if (!gpuCanvas) begin();
