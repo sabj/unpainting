@@ -85,7 +85,8 @@ test('below full: diagonal hatching is left to the paint; joints across flat wal
   const diag = Array.from({ length: 5 }, (_, k) => seg(60 + 2 * k, 10, 64 + 2 * k, 14));
   const joints = Array.from({ length: 9 }, (_, k) => seg(10 + 4 * k, 30, 13 + 4 * k, 30));
   const S = [...box(20, 40, 30, 55), ...diag, ...joints, seg(22, 52, 25, 52)];
-  const kept = ink => new Set(orderStrokes(S, 100, 70, { ink }).flatMap(x => x.parts));
+  // the joints here stand in a row; bridged they would be one course line, so the thinning is tested without bridging
+  const kept = ink => new Set(orderStrokes(S, 100, 70, { ink, bridgeMm: 0 }).flatMap(x => x.parts));
   const full = kept('full'), forms = kept('forms');
   assert.ok([4, 5, 6, 7, 8].every(i => full.has(i)) && [4, 5, 6, 7, 8].every(i => !forms.has(i)), 'diagonal runs dropped');
   const j = [9, 10, 11, 12, 13, 14, 15, 16, 17].filter(i => forms.has(i)).length;
@@ -116,4 +117,20 @@ test('stroke budget: only the most important strokes, containers and outlines fi
   const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), zig(40, 50, 12), seg(60, 30, 62, 30)];
   const r = orderStrokes(S, 100, 70, { mode: 'growth', budget: 4, layIn: 0, emphasisShare: 0 });
   assert.deepEqual(r.flatMap(x => x.parts).sort((a, b) => a - b), [0, 1, 2, 3]);
+});
+
+test('growth weight builds: structure at the ordinary width whatever the drawing, detail fine, the heavy line heavy only in emphasis', () => {
+  const at = (phase, width) => width * growthWeight({ phase }, 1, { width, mid: 1 }).widthScale;
+  assert.ok(Math.abs(at('growth', 2.5) - 1.15) < 1e-9, 'a heavy contour is ordinary in growth');
+  assert.ok(Math.abs(at('growth', 0.3) - 0.9) < 1e-9, 'a hairline main line is brought up');
+  assert.ok(at('detail', 2) <= 0.8 && at('texture', 0.5) === 0.5);
+  assert.ok(at('emphasis', 2.5) > 2.5 && at('emphasis', 2.5) > at('growth', 2.5));
+});
+
+test('growth: loose ticks wait for the texture phase; a dashed line is one stroke', () => {
+  const S = [...box(10, 10, 90, 60), seg(20, 30, 23, 30), seg(40, 45, 41, 48), seg(50, 52, 60, 52), seg(62, 52, 75, 52.2)];
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 2, emphasisShare: 0 });
+  for (const k of [4, 5]) assert.equal(r.find(x => x.parts.includes(k)).phase, 'texture');
+  assert.ok(r.find(x => x.parts.includes(6)).parts.includes(7), 'the dashes are bridged');
+  assert.equal(r.bridges, 1);
 });

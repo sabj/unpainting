@@ -7,6 +7,8 @@
 // by containment. A line that runs on through a junction is drawn as one stroke. Each stroke is pulled one way: downward when
 // it runs more up and down than across, else left to right.
 
+import { bridgeGaps } from './stroke-bridge.mjs';
+
 const ORDER_DEFAULTS = Object.freeze({
   cellMm: 0.5,          // the grid the faces are found on
   closeMm: 1.5,         // lines are thickened by this, so gaps under twice it still close a face (a drawn wall is rarely sealed)
@@ -38,7 +40,13 @@ const ORDER_DEFAULTS = Object.freeze({
   growthPull: 0.7,      // growth: the next stroke is the cheapest by hop + growthPull x its distance from the main form
   layIn: 12,            // growth: the light placement lines of the biggest masses
   emphasisShare: 0.04,  // growth: the share of contours restated heavier at the end
-  partShare: 0.02,      // faces under this share of the sheet split by a line between them are parts of one object (panes of a window)
+  accentMm: 40,         // ... a line's length counts up to this in choosing them
+  partShare: 0.02,
+  bridgeMm: 10,         // pieces of one line broken by gaps up to this are one stroke (stroke-bridge.mjs); 0 leaves them
+  tickMm: 6,            // growth: a mark shorter than this with a free end (touching no other line) is a texture tick ...
+  looseMm: 15,          // ... and a straight mark shorter than this free at both ends (a stone joint) is one too
+  touchMm: 1,           // an end within this of another line touches it
+  structInnerMm: 10,    // growth: an inner line is structure (laid in growth) when at least this long; shorter ones are detail      // faces under this share of the sheet split by a line between them are parts of one object (panes of a window)
 });
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -236,7 +244,17 @@ export function findObjects(strokes, widthMm, heightMm, o = {}) {
  */
 export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   const c = { ...ORDER_DEFAULTS, ...o };
-  const joined = joinContinuations(strokes, c).map(s => ({ ...s, points: pullDirection(s.points) }));
+  // lines that run on through a junction, then pieces of one line across a gap, are one stroke each (with --widths and
+  // --weights from the drawing a bridge needs the pieces to be drawn alike)
+  let pieces = joinContinuations(strokes, c);
+  const perPiece = arr => (arr ? pieces.map(s => { let a = 0, w = 0; for (const i of s.parts) { const L = pathLength(strokes[i]); a += (arr[i] ?? 0) * L; w += L; } return w ? a / w : arr[s.parts[0]]; }) : null);
+  let bridges = 0;
+  if (c.bridgeMm > 0) {
+    const br = bridgeGaps(pieces.map(s => s.points), { gapMm: c.bridgeMm, weights: perPiece(c.weights), widths: perPiece(c.widths), skip: c.skip ? pieces.map(s => s.parts.some(i => c.skip[i])) : null });
+    pieces = br.strokes.map(s => ({ points: s.points, parts: s.parts.flatMap(k => pieces[k].parts) })); bridges = br.bridges;
+  }
+  const heft = perPiece(c.widths);
+  const joined = pieces.map((s, k) => ({ ...s, points: pullDirection(s.points), heft: heft ? heft[k] : 1 }));
   const { objects: faces } = findObjects(joined.map(s => s.points), widthMm, heightMm, c);
   const m = c.rimMm + c.closeMm + c.cellMm, overlaps = (b, P) => { const xs = P.map(p => p[0]), ys = P.map(p => p[1]); return Math.max(...xs) >= b[0] - m && Math.min(...xs) <= b[2] + m && Math.max(...ys) >= b[1] - m && Math.min(...ys) <= b[3] + m; };
   // per stroke and nearby face: which samples lie on its rim, which inside its fill
@@ -290,6 +308,8 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const area = (x1 - x0) * (y1 - y0), across = Math.hypot(x1 - x0, y1 - y0);
     if (!touches && area < c.smallShare * widthMm * heightMm && across < c.smallDiag * Math.hypot(widthMm, heightMm)) for (const k of members) free[k].role = 'small';
   }
+  // growth: loose ticks (a short mark with a free end, a stone joint free at both ends) are texture, laid in the last part
+  if (c.mode === 'growth') markTicks(joined, c);
   // hatching: runs of parallel strokes, laid together in the second pass
   hatchRuns(joined.map(s => s.points), c).forEach((mem, r) => mem.forEach(k => { if (joined[k].role !== 'outline') { joined[k].role = 'hatch'; joined[k].run = r; } }));
   // HATCHING: none lays no hatching run; sparse lays every second line of a run, and only runs by a form's edge (where the
@@ -376,7 +396,7 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const score = s => pathLength(s.points) * (roleW[s.role] ?? 1) * (s.object >= 0 && objects[s.object]?.children.length ? 1.5 : 1) * (1.3 - 0.6 * dist(ctr, s.points[0]) / diag);
     live.sort((a, b) => score(b) - score(a)).slice(c.budget).forEach(s => { s.taken = true; s.dropped = true; });
   }
-  if (c.mode === 'growth') return growthOrder({ joined, objects, main, byObj, c, heightMm, start: pen });
+  if (c.mode === 'growth') { const r = growthOrder({ joined, objects, main, byObj, c, heightMm, start: pen }); r.bridges = bridges; return r; }
   // pass 1: the big structure of the whole picture, the long smooth lines of every mass, from the main mass's longest
   // line, the nearest next (a person sketches the whole composition in before any object is worked)
   { const big = joined.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner') && s.len >= c.structureMm && turningPerMm(s.points) <= 6);
@@ -424,8 +444,22 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   }
   // small isolated things last
   const at = out.length; nearestFirst(joined.filter(s => s.role === 'small' && !s.taken)); for (let k = at; k < out.length; k++) out[k].pass = 3;
-  out.dropped = joined.filter(s => s.dropped).length;
+  out.dropped = joined.filter(s => s.dropped).length; out.bridges = bridges;
   return out;
+}
+
+/** Marks short loose marks as texture: under tickMm with an end touching no other line, or straight, under looseMm and
+ * free at both ends. Outlines of a form (a division that closes it) keep both ends on lines and stay. */
+function markTicks(joined, c) {
+  const g = c.touchMm, grid = new Map(), key = (i, j) => i * 100003 + j;
+  joined.forEach((s, k) => { for (const q of resample(s.points, g / 2)) { const kk = key(Math.floor(q[0] / g), Math.floor(q[1] / g)); (grid.get(kk) ?? grid.set(kk, []).get(kk)).push([q[0], q[1], k]); } });
+  const free = (k, p) => { const i0 = Math.floor(p[0] / g), j0 = Math.floor(p[1] / g); for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (const r of grid.get(key(i, j)) ?? []) if (r[2] !== k && Math.hypot(r[0] - p[0], r[1] - p[1]) <= g) return false; return true; };
+  joined.forEach((s, k) => {
+    if (s.division || !['outline', 'inner'].includes(s.role)) return;
+    const L = pathLength(s.points); if (L >= c.looseMm) return;
+    const nFree = free(k, s.points[0]) + free(k, s.points.at(-1)), straight = dist(s.points[0], s.points.at(-1)) >= 0.9 * L;
+    if ((L < c.tickMm && nFree >= 1) || (straight && nFree === 2)) { s.role = 'texture'; s.tick = true; }
+  });
 }
 
 /**
@@ -450,7 +484,10 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
   const out = [], live = joined.filter(s => !s.taken);
   for (const s of live) s.len = s.len ?? pathLength(s.points);
   const centre = (() => { const L = main.id != null ? (byObj.get(main.id) ?? []) : live; const P = (L.length ? L : live).flatMap(s => s.points); return [P.reduce((a, p) => a + p[0], 0) / P.length, P.reduce((a, p) => a + p[1], 0) / P.length]; })();
-  const rad = s => dist(centre, s.points[0]), cost = (pen, s) => dist(pen, s.points[0]) + c.growthPull * rad(s);
+  // a stroke's distance from the main form is its nearest point's (a long line through the middle is near), and the hop to
+  // it is to its nearer end
+  for (const s of live) { s.rad = Math.min(...resample(s.points, 2).map(q => dist(centre, q))); }
+  const rad = s => s.rad, cost = (pen, s) => Math.min(dist(pen, s.points[0]), dist(pen, s.points.at(-1))) + c.growthPull * rad(s);
   let pen = start;
   const take = (s, phase) => { out.push({ parts: s.parts, points: s.points, object: s.object, role: s.role, phase, pass: phase === 'layin' ? 1 : phase === 'growth' ? 2 : 3 }); pen = s.points[s.points.length - 1]; };
   const walk = (list, phase, gate = () => true, after = () => {}) => {
@@ -468,7 +505,7 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
   if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
   nearest(big, 'layin');
   // 2. growth from the main form: outlines and divisions (fineMm and longer); an object's inner lines once its outline is down
-  const structural = live.filter(s => (s.role === 'outline' || s.role === 'inner') && s.len >= c.fineMm);
+  const structural = live.filter(s => (s.role === 'outline' && s.len >= c.fineMm) || (s.role === 'inner' && s.len >= c.structInnerMm));
   const outlineLeft = new Map(); for (const s of structural) if (s.role === 'outline') outlineLeft.set(s.object, (outlineLeft.get(s.object) ?? 0) + 1);
   if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
   // hard rules: a child's outline waits for its parent's outline to be closed; an object's inner lines wait for its own
@@ -486,16 +523,30 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
   }
   walk(live.filter(s => !s.taken), 'texture');
   // 4. emphasis: the longest outlines of the main form and the foreground, restated heavier
-  const key = s => s.len * (s.object === main.id ? 2 : 1) * (0.6 + s.points[0][1] / heightMm);
-  nearest(structural.filter(s => s.role === 'outline').sort((a, b) => key(b) - key(a)).slice(0, Math.round(c.emphasisShare * out.length)), 'emphasis');
+  // the accents are the lines the drawing itself draws heavy (over 1.25 times its ordinary width), the longest of them and
+  // those of the main form first; a line's length counts up to accentMm (a long course line is not an accent for being long)
+  const byW = [...structural].sort((a, b) => (a.heft ?? 1) - (b.heft ?? 1)), tot = byW.reduce((t, s) => t + s.len, 0);
+  let acc = 0, mid = 1; for (const s of byW) { acc += s.len; if (acc >= tot / 2) { mid = s.heft ?? 1; break; } }
+  const heavy = structural.filter(s => (s.heft ?? 1) >= 1.25 * mid), pool = heavy.length >= 3 ? heavy : structural.filter(s => s.role === 'outline');
+  const key = s => Math.min(s.len, c.accentMm) * ((s.heft ?? 1) / mid) ** 2 * (s.object === main.id ? 1.5 : 1) * (0.6 + s.points[0][1] / heightMm);
+  nearest(pool.sort((a, b) => key(b) - key(a)).slice(0, Math.round(c.emphasisShare * out.length)), 'emphasis');
   out.dropped = joined.filter(s => s.dropped).length;
   return out;
 }
 
-/** Weight over a growth replay: the lay-in faint and fine, growth ordinary, detail and texture lighter, emphasis heaviest. */
-export function growthWeight(r, drawn = 1) {
+/**
+ * Weight over a growth replay: the lay-in faint and fine, growth ordinary, detail and texture lighter, emphasis heaviest.
+ * With the stroke's traced width `width` and the drawing's ordinary width `mid` (both in one unit), width builds over time
+ * instead of copying the drawing from the first stroke: structure (lay-in aside) is drawn at about the ordinary width
+ * whatever the drawing's own (a heavy contour is not heavy yet, a hairline main line is brought up), detail and texture
+ * no wider than fine, and only the emphasis restates a line at its traced width and over.
+ */
+export function growthWeight(r, drawn = 1, { width, mid } = {}) {
   const [w, s] = { layin: [0.3, 0.5], growth: [0.75, 1], detail: [0.65, 0.85], texture: [0.55, 0.8], emphasis: [1, 1.5] }[r.phase] ?? [0.75, 1];
-  return { weight: Math.min(1, w * (r.phase === 'emphasis' ? 1 : drawn)), widthScale: s };
+  const weight = r.phase === 'emphasis' ? w : r.phase === 'growth' ? Math.min(0.85, Math.max(0.6, w * drawn)) : w * drawn;
+  if (!(width > 0 && mid > 0)) return { weight: Math.min(1, weight), widthScale: s };
+  const target = { layin: 0.5 * mid, growth: Math.min(1.15 * mid, Math.max(0.9 * mid, width)), detail: Math.min(width, 0.8 * mid), texture: Math.min(width, 0.7 * mid), emphasis: 1.3 * Math.max(width, mid) }[r.phase] ?? width;
+  return { weight: Math.min(1, weight), widthScale: target / width };
 }
 
 /** Hand travel between consecutive strokes (end of one to start of the next). */
