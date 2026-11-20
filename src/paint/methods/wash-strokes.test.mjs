@@ -37,8 +37,8 @@ const lengthOf = s => s.points.reduce((a, p, q) => a + (q ? Math.hypot(p[0] - s.
 const box = (a, b) => [{ points: [[10, 10], [10 + a, 10], [10 + a, 10 + b], [10, 10 + b]], soft: [] }];
 
 test('a large wash is swept in straight lanes with the widest flat or mop that fits it, and its edge is closed by the rounds', () => {
-  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 46 mm: the mop in one; 50 x 34 mm: the one-inch flat in one
-  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 46, 38, 1], [50, 34, 25.4, 1]]) {
+  // 100 x 70 mm: the 38 mm mop in two lanes; 60 x 52 mm: the mop in one; 50 x 40 mm: the one-inch flat in one
+  for (const [a, b, brush, lanes] of [[100, 70, 38, 2], [60, 52, 38, 1], [50, 40, 25.4, 1]]) {
     const { strokes, brushMm, areaMm2, uncovered } = planWashStrokes(box(a, b), { kitMm: KIT, pointMm: 1.2 });
     assert.equal(brushMm, brush, `${a} x ${b} mm`);
     assert.ok(Math.abs(areaMm2 - a * b) < .03 * a * b);
@@ -47,9 +47,9 @@ test('a large wash is swept in straight lanes with the widest flat or mop that f
     for (const s of swept) {
       assert.equal(s.radiusMm, brush / 2);
       assert.equal(new Set(s.points.map(p => p[1])).size, 1, 'a lane is straight');
-      assert.ok(Math.abs(lengthOf(s) - (a - 7)) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash`);
-      // the band is as wide as the brush and square at its ends: all of it is inside the outline, by the 7 mm round's radius
-      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x) >= 3.5 - .8 && Math.min(y - 10, 10 + b - y) >= brush / 2 + 3.5 - .8, `${x}, ${y}`);
+      assert.ok(Math.abs(lengthOf(s) - (a - 12)) < 2, `a lane of ${lengthOf(s)} mm across a ${a} mm wash`);
+      // the band is as wide as the brush and square at its ends: all of it is inside the outline, by nearly the 7 mm round's width
+      for (const [x, y] of s.points) assert.ok(Math.min(x - 10, 10 + a - x) >= 5.95 - .8 && Math.min(y - 10, 10 + b - y) >= brush / 2 + 5.95 - .8, `${x}, ${y}`);
     }
     // the edge of the wash is laid by a round steered along the outline, over the band's ends
     assert.ok(strokes.some(s => s.kind === 'edge' && s.radiusMm === 3.5 && lengthOf(s) > a + b), 'a round goes round the outline');
@@ -114,4 +114,23 @@ test('a wash laid past its outline meets its neighbour, and no wash is left with
   assert.ok(Math.abs(plain.areaMm2 - 120) < 6 && grown.areaMm2 > 200 && grown.areaMm2 < 16 * 14 + 6, `${plain.areaMm2} then ${grown.areaMm2} mm2`);
   assert.ok(Math.min(...grown.strokes.flatMap(s => s.points.map(p => p[0] - s.radiusMm))) < 9, 'its strokes reach past the outline');
   for (const size of [4, 5, 6, 7, 9, 11, 14]) { const s = planWashStrokes([{ points: [[10, 10], [10 + size, 10], [10 + size, 10 + size], [10, 10 + size]], soft: [] }], { kitMm: KIT, pointMm: 1.2 }); assert.ok(s.uncovered < .08, `${s.uncovered} of a ${size} mm square left bare`); }
+});
+
+test('a round steered round an outline lays its full width all the way round: it turns with its path, a lane is swept', async () => {
+  const { washStrokeHold } = await import('./wash-strokes.mjs');
+  assert.equal(washStrokeHold(false), 'sweep'); assert.equal(washStrokeHold(true), false);
+  const { makePaper } = await import('../../media/paper.mjs'), { createSheet, dry, DEFAULTS } = await import('../../media/sheet.mjs'), { createBrush, dip, stroke } = await import('../../media/brush.mjs');
+  // a 7 mm round on 0.23 mm cells, steered once round a circle 24 mm across, with a wash's load
+  const mm = 280 / 1224, W = 200, H = 200, r = 3.5 / mm, R = 12 / mm, path = Array.from({ length: 73 }, (_, q) => ({ x: 100 + R * Math.cos(q * Math.PI / 36), y: 100 + R * Math.sin(q * Math.PI / 36), r, p: 1 }));
+  const bare = hold => {
+    const sheet = createSheet(makePaper(W, H, { seed: 9, mmPerCell: mm, toothScale: .2 }), [{ K: [.06, .26, .48], S: [.02, .02, .02], rho: .05, omega: 1.4, gamma: .25 }]);
+    const b = createBrush({ flat: false, radius: r, bristles: Math.ceil(r * 2), capacity: 100, belly: 12, feed: .4, give: .9, free: .4, film: .25, splay: .03, stiffness: 8, seed: 31 });
+    dip(b, { water: .62, conc: [.05] }); stroke(b, sheet, path, { lift: true, upright: hold }); dry(sheet, 40000, DEFAULTS);
+    // the ring the plan counts as laid (the brush's disc carried round the path), a cell in from each side
+    let ring = 0, dry_ = 0; for (let i = 0; i < W * H; i++) { const d = Math.abs(Math.hypot(i % W + .5 - 100, ((i / W) | 0) + .5 - 100) - R); if (d > r - 1) continue; ring++; if (!(sheet.G[0][i] + sheet.D[0][i] + sheet.P[0][i] + sheet.layers.reduce((a, L) => a + (L[0]?.[i] ?? 0), 0) > 1e-7)) dry_++; }
+    return dry_ / ring;
+  };
+  const turned = bare(washStrokeHold(true)), held = bare('sweep');
+  assert.ok(turned < .03, `${(turned * 100).toFixed(0)}% of the ring the plan counts as laid is bare`);
+  assert.ok(held > 5 * Math.max(turned, .01), `held one way the same round leaves ${(held * 100).toFixed(0)}% bare: the test tells the two apart`);
 });

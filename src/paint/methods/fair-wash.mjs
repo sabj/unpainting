@@ -29,8 +29,8 @@
 import { components } from '../../raster.js';
 import { passage } from '../../crop/blockin.mjs';
 import { deltaE2000, labOf } from '../../eval/colour.mjs';
-import { washShapes, reservedLights } from './wash-shapes.mjs';
-import { outlineLoops, softLines, planWashStrokes } from './wash-strokes.mjs';
+import { washShapes, reservedLights, leastAreas } from './wash-shapes.mjs';
+import { outlineLoops, softLines, planWashStrokes, loopsMask } from './wash-strokes.mjs';
 import { mixFor, mixOver, filmLab } from './puddles.mjs';
 import { targetRegions } from './target-regions.mjs';
 import { targetValueMap, estimatePaper } from './light-to-dark.mjs';
@@ -65,6 +65,15 @@ const TWO_SIDES = Object.freeze({ apart: 16, share: 0.15 });
 const SPANS_HUES = Object.freeze({ share: 0.6, chroma: 6 });
 /** Two things that touch are one shape when their mean colours are within this (Lab distance). */
 const SAME_THING = 6;
+/**
+ * Under an ink drawing the line carries the structure and the washes stay broad: one pale wash a thing (cut only by
+ * hue; small things join their neighbours), one shadow glaze, and one dark wash an opening.
+ *   first    the brush whose least wash a first-wash shape keeps (mm), and how near in colour two things join
+ *   shadow   a cell is in shadow when the squint is this much darker (L*) than the first wash under it
+ *   opening  an opening is this much darker (L*) than what is under it, and as wide as this brush (mm): a bar or a
+ *            joint the pen drew is no wash
+ */
+const DRAWN = Object.freeze({ first: { brushMm: 12, same: 12 }, shadow: 8, opening: { darker: 18, brushMm: 3, contrast: 16 } });
 
 /**
  * The cells of one thing sorted into two by colour: two means along `dims` of Lab, begun from the two sides of the mean
@@ -87,15 +96,15 @@ function twoSides(cells, lab, dims) {
  * One thing's parts: lists of its cells, three at most. A part is cut in two by hue when it spans hues, else by colour
  * when it has a light side and a shadow side; the largest part that needs it is cut first.
  */
-function partsOf(cells, lab) {
+function partsOf(cells, lab, sides = true) {
   const parts = [cells];
   const cut = part => {
     if (part.length < 8) return null;
     const mean = [0, 0, 0], chroma = []; for (const i of part) { for (let c = 0; c < 3; c++) mean[c] += lab[i * 3 + c] / part.length; chroma.push(Math.hypot(lab[i * 3 + 1], lab[i * 3 + 2])); }
     const typical = chroma.sort((a, b) => a - b)[part.length >> 1];
     if (typical >= SPANS_HUES.chroma && Math.hypot(mean[1], mean[2]) < SPANS_HUES.share * typical) { const hue = twoSides(part, lab, [1, 2]); if (hue) return hue.side; }
-    const sides = twoSides(part, lab, [0, 1, 2]);
-    return sides && sides.apart >= TWO_SIDES.apart && sides.least >= TWO_SIDES.share ? sides.side : null;
+    const two = sides ? twoSides(part, lab, [0, 1, 2]) : null;
+    return two && two.apart >= TWO_SIDES.apart && two.least >= TWO_SIDES.share ? two.side : null;
   };
   for (let done = false; !done && parts.length < MOST_PARTS;) {
     done = true;
@@ -124,7 +133,7 @@ function squint(light, pw, ph, planMm, mm) {
   return out;
 }
 
-export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], pointBrushMm = 0, hold = null, families = [], subject = null, shaped = true, segments = null }) {
+export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], pointBrushMm = 0, hold = null, families = [], subject = null, shaped = true, segments = null, drawn = false }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
   if (demand.length !== n * k || density.length !== n || k < 1) throw Error('target/demand grid mismatch');
   if (!rgb || pigments.length !== k) throw Error('the wash plan needs the subject colours and the pigments');
@@ -186,18 +195,32 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
     return sum.map(v => 255 * (v / count) ** (1 / 2.2));
   };
   STAGES.forEach((S, s) => {
-    const stage = s + 1, seen = squint(light, pw, ph, planMm, S.squintMm), shared = { rgb: seen, w: pw, h: ph, paperRGB: paperCol, cellMm: planMm, brushMm: S.shapeBrushMm };
+    const stage = s + 1, seen = squint(light, pw, ph, planMm, S.squintMm), shared = { rgb: seen, w: pw, h: ph, paperRGB: paperCol, cellMm: planMm, brushMm: drawn && stage === 1 ? DRAWN.first.brushMm : drawn && stage === 3 ? DRAWN.opening.brushMm : S.shapeBrushMm };
     let cut;
     if (stage === 1) {
       // the things: the run's segments, or the shapes of the squint; each cut into its parts, and each part's touching cells one shape
       const thing = segments ? Int32Array.from({ length: pn }, (_, q) => segments[(Math.min(h - 1, (((q / pw) | 0) + .5) * h / ph) | 0) * w + (Math.min(w - 1, ((q % pw) + .5) * w / pw) | 0)]) : washShapes({ ...shared, contrast: S.contrast, barrier: planReserved }).labels;
       const lab = new Float32Array(pn * 3), byThing = new Map(), part = new Int32Array(pn).fill(-1); let next = 0;
       for (let i = 0; i < pn; i++) { const q = labOf(seen, i, paperCol); lab[i * 3] = q[0]; lab[i * 3 + 1] = q[1]; lab[i * 3 + 2] = q[2]; if (!planReserved[i]) { const l = byThing.get(thing[i]); if (l) l.push(i); else byThing.set(thing[i], [i]); } }
-      for (const cells of byThing.values()) for (const list of partsOf(cells, lab)) { for (const i of list) part[i] = next; next++; }
+      for (const cells of byThing.values()) for (const list of partsOf(cells, lab, !drawn)) { for (const i of list) part[i] = next; next++; }
       const start = new Int32Array(pn).fill(-1), stack = new Int32Array(pn); let pieces = 0;
       for (let s0 = 0; s0 < pn; s0++) { if (part[s0] < 0 || start[s0] >= 0) continue; let sp = 0; stack[sp++] = s0; start[s0] = pieces; while (sp) { const i = stack[--sp], x = i % pw; for (const j of [x ? i - 1 : -1, x < pw - 1 ? i + 1 : -1, i - pw, i + pw]) if (j >= 0 && j < pn && start[j] < 0 && part[j] === part[i]) { start[j] = pieces; stack[sp++] = j; } } pieces++; }
-      cut = washShapes({ ...shared, contrast: SAME_THING, start });
-    } else cut = washShapes({ ...shared, contrast: S.contrast });   // a shadow is one shape across the things it falls on
+      cut = washShapes({ ...shared, contrast: drawn ? DRAWN.first.same : SAME_THING, start });
+    } else if (drawn && stage === 2) {
+      // The shadow, under a drawing: every cell the squint shows clearly darker than the first wash under it, as one
+      // glaze of one mix across all the things it falls on. Its edge is crisp; a gap of light inside it a brush can go
+      // round is left, a smaller one is glazed over.
+      const tone = new Map(), toneAt = i => { const key = laid.map(f => f[i]).join(); let L = tone.get(key); if (L === undefined) { L = filmLab(laid.map(f => f[i]), pigments, paperCol)[0]; tone.set(key, L); } return L; };
+      let mask = Uint8Array.from({ length: pn }, (_, i) => (!planReserved[i] && laid.some(f => f[i] > 0) && labOf(seen, i, paperCol)[0] <= toneAt(i) - DRAWN.shadow ? 1 : 0));
+      const least = leastAreas(S.shapeBrushMm), tidy = (m, on, floor) => { const c = components(Uint8Array.from(m, v => (v === on ? 1 : 0)), pw, ph, 4), size = new Float64Array(c.count + 1); for (const id of c.labels) size[id]++; return Uint8Array.from(m, (v, i) => (c.labels[i] && size[c.labels[i]] * planMm * planMm < floor ? 1 - on : v)); };
+      mask = tidy(tidy(mask, 0, least.reserveMm2), 1, least.washMm2);
+      const mine = []; for (let i = 0; i < pn; i++) if (mask[i]) mine.push(i);
+      cuts.push(mine.length ? 1 : 0); if (!mine.length) return;
+      const under = new Array(k).fill(0), sum = [0, 0, 0]; for (const i of mine) { for (let j = 0; j < k; j++) under[j] += laid[j][i] / mine.length; for (let c = 0; c < 3; c++) sum[c] += (seen[i * 3 + c] / 255) ** 2.2 / mine.length; }
+      const mean = sum.map(v => 255 * v ** (1 / 2.2)), amounts = mixOver(mean, under, pigments, paperCol);
+      if (amounts.reduce((p, v) => p + v, 0) > 1e-6) layWashes(stage, amounts, mask, { labels: mask, shapes: [{ mean, lab: labOf(mean, 0, paperCol) }] }, tolMm / 2);
+      return;
+    } else cut = washShapes({ ...shared, contrast: drawn ? DRAWN.opening.contrast : S.contrast });   // a shadow is one shape across the things it falls on
     cuts.push(cut.shapes.length);
     // the largest shape first; each shape's mix is judged from its colour and from what the plan has laid under it
     const order = cut.shapes.map((_, a) => a).sort((a, b) => cut.shapes[b].area - cut.shapes[a].area || a - b);
@@ -212,12 +235,25 @@ export function planFairWashes({ demand, k, density, w, h, rgb = null, paperRGB 
       const amounts = stage === 1 ? mixFor(colour, pigments, paperCol) : mixOver(colour, under, pigments, paperCol);
       if (!(amounts.reduce((p, v) => p + v, 0) > 1e-6)) continue;
       const before = stage === 1 ? paperL : filmLab(under, pigments, paperCol)[0], after = filmLab(under.map((v, j) => v + amounts[j]), pigments, paperCol)[0];
-      if (before - after < (stage === 1 ? VISIBLE_STEP : VISIBLE_DARKER)) continue;
+      if (before - after < (stage === 1 ? VISIBLE_STEP : drawn ? DRAWN.opening.darker : VISIBLE_DARKER)) continue;
       const mask = new Uint8Array(pn); for (const i of mine) { mask[i] = 1; if (planReserved[i]) planReserved[i] = 0; }
       layWashes(stage, amounts, mask, cut, stage === 1 ? tolMm + washBrushMm / 2 : tolMm / 2);
     }
   });
-  const protectedCells = new Uint8Array(n); for (let i = 0; i < n; i++) if (planReserved[planOf[i]] || hold?.[i]) protectedCells[i] = 1;
+  // The reserved lights on the sheet's cells. The painter keeps every later stroke off them (its clip), so their edge is
+  // the edge of the washes beside them: it is the lights' outline in millimetres put on the sheet's cells, the same
+  // outline the first wash is laid up to, and not the plan's cells enlarged, which cut those washes in steps a plan cell
+  // long. A light too small for an outline keeps its plan cells.
+  const reservedOnSheet = (() => {
+    const blocks = Uint8Array.from({ length: n }, (_, i) => planReserved[planOf[i]]);
+    if (pw === w || !planReserved.some(v => v)) return blocks;
+    const smooth = loopsMask(outlineLoops(planReserved, 1, { x0: 0, y0: 0, x1: pw - 1, y1: ph - 1 }, pw, ph, { cellMm: planMm, tolMm }), w, h, sheetWidthMm / w);
+    const c = components(planReserved, pw, ph, 4), all = new Float64Array(c.count + 1), got = new Float64Array(c.count + 1);
+    for (let i = 0; i < n; i++) { const id = c.labels[planOf[i]]; if (id) { all[id]++; if (smooth[i]) got[id]++; } }
+    for (let i = 0; i < n; i++) { const id = c.labels[planOf[i]]; if (id && got[id] * 2 < all[id] && blocks[i]) smooth[i] = 1; }
+    return smooth;
+  })();
+  const protectedCells = new Uint8Array(n); for (let i = 0; i < n; i++) if (reservedOnSheet[i] || hold?.[i]) protectedCells[i] = 1;
   let open = 0, reserved = 0; for (let i = 0; i < pn; i++) { if (planReserved[i]) reserved++; else if (!(laid.some(f => f[i] > 0))) open++; }
   const areas = instructions.map(q => q.areaMm2).sort((a, b) => a - b), lc = components(protectedCells, w, h);
   const lightShapes = Array.from({ length: lc.count }, (_, j) => ({ id: j + 1, category: 'bare paper', reason: 'a light reserved whole', toneAt: 'retain paper', cells: 0 })); for (const id of lc.labels) if (id) lightShapes[id - 1].cells++;

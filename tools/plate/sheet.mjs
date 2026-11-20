@@ -12,6 +12,7 @@ import {createDeliveryCal} from '../../src/paint/methods/delivery-cal.mjs';
 import {drawMaterial, sourceDrawingCaps} from '../../src/paint/methods/material-profiles.mjs';
 import {planLightToDark, valueTechnique} from '../../src/paint/methods/light-to-dark.mjs';
 import {planFairWashes} from '../../src/paint/methods/fair-wash.mjs';
+import {washStrokeHold} from '../../src/paint/methods/wash-strokes.mjs';
 import {smallestBrushMm} from '../../src/paint/methods/light-reserves.mjs';
 import {roleBrushMm,roleBrushPointMm,washKitMm} from '../../src/paint/methods/brush-footprint.mjs';
 import {unsupportedAxisEdges} from '../../src/paint/methods/target-regions.mjs';
@@ -108,7 +109,8 @@ const brushSettings=b=>{const {_pend,...settings}=b;return settings;};
 const stroke=(b,target,points,options)=>{
  if(ctx.AREA_NUMERIC_CONTACT_STOP&&target===ctx.sheet)return;
  if(ctx.VALUE_ACTIVE&&target===ctx.sheet){
-  if(ctx.VALUE_ACTIVE.shaped)options={...options,upright:ctx.VALUE_ACTIVE.brush?.contact==='point'?false:'sweep'};
+  // a wash plan's stroke says whether it is a round's (paint.mjs vectorPaths): a round turns with its path, a lane is swept
+  if(ctx.VALUE_ACTIVE.shaped)options={...options,upright:ctx.VALUE_ACTIVE.brush?.contact==='point'?false:washStrokeHold(points[0]?.round===true)};
   const fastMode=NATIVE_PAINT_MODE.mode==='fast',fastPaperOpts=fastMode?{uniform:SPEED_UNIFORM_PAPER,stats:'gate'}:{uniform:SPEED_UNIFORM_PAPER};
   const contactStarted=performance.now(),contact=candidateContact(b,target,points,{...options,clip:null,neighborRadius:3,includeTouched:false,workspace:SPEED_CONTACT?VALUE_CONTACT_WORK:null});
   SPEED_PROFILE?.add('painting:contact-prediction',performance.now()-contactStarted);
@@ -270,6 +272,8 @@ if(VALUE_ENABLED){
  valueOptions.washBrushMm=roleBrushMm(root,'shape',{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.washKitMm=washKitMm(root,{brushes:opt('brushes','src/paint/brushes.json')});valueOptions.pointBrushMm=roleBrushMm(root,'detail',{brushes:opt('brushes','src/paint/brushes.json')});
  // the things of the picture, for the wash plan's first shapes: the run's segment map on the sheet's cells
  if(ctx.SEGMENTS_RECORD?.stem&&opt('image','')){const {registerSegments,loadSegments}=await import('../../src/crop/segments.mjs');const base=path.basename(opt('image'),path.extname(opt('image')));registerSegments(base,ctx.SEGMENTS_RECORD.stem);valueOptions.segments=(await loadSegments(base,w,h)).labels;}
+ // under an ink drawing (the ink-and-wash recipe) the washes stay broad: the line carries the structure
+ valueOptions.drawn=opt('inkrecipe','none')==='wash'&&opt('drawing','first')!=='none';
  const planValues=valueOptions.styleSelection?planLightToDark:planFairWashes;
  const valueStarted=performance.now();
  if(SPEED_VALUE_CACHE){

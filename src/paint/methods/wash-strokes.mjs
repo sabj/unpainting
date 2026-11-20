@@ -96,6 +96,30 @@ export function outlineLoops(ids, id, box, w, h, { cellMm, tolMm, soft = () => f
   return loops;
 }
 
+/**
+ * How the brush is held for a stroke of a wash, as the engine's `upright` option. A lane is a flat or a mop swept straight:
+ * its edge is held across the run from the lane's first point to its last ('sweep'). Every other stroke is a round steered
+ * along the outline: it turns with its path (false), so what it lays is as wide as the brush all the way round and its
+ * side is the outline's curve. Held one way for the whole stroke it lays a slanted band with straight-cut ends, thin
+ * wherever the path runs along the way it is held, and leaves straight-sided bare patches the plan counts as covered.
+ */
+export const washStrokeHold = round => (round ? false : 'sweep');
+
+/**
+ * The cells of a w x h sheet (each `mm` wide) whose centres lie inside a set of outline loops (even-odd, so a loop inside
+ * another is a hole): an outline in millimetres put on a sheet at the sheet's own cell size, whatever grid it was traced on.
+ */
+export function loopsMask(loops, w, h, mm) {
+  const mask = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const py = (y + .5) * mm, xs = [];
+    for (const { points: P } of loops) for (let q = 0, m = P.length; q < m; q++) { const a = P[q], b = P[(q + 1) % m]; if ((a[1] <= py) !== (b[1] <= py)) xs.push(a[0] + (py - a[1]) * (b[0] - a[0]) / (b[1] - a[1])); }
+    xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < xs.length; q += 2) for (let x = Math.max(0, Math.ceil(xs[q] / mm - .5)), e = Math.min(w - 1, Math.ceil(xs[q + 1] / mm - .5) - 1); x <= e; x++) mask[y * w + x] = 1;
+  }
+  return mask;
+}
+
 /** The soft parts of an outline as lines a damp brush is run along: runs of soft segments, each a list of points in mm. */
 export function softLines(loops) {
   const lines = [];
@@ -195,10 +219,10 @@ export function planWashStrokes(loops, { kitMm, pointMm = 0, growMm = 0, keepOut
     if (deepest > level - step + radius) follow(kind, radius, Math.max(level - step + radius / 2, deepest - pitch), least);
   };
   // A flat or a mop lays a band as wide as itself and as long as it travels, with square ends. A square end is never the
-  // edge of a wash: the band stays the radius of the widest round inside the outline, and that round, steered along the
+  // edge of a wash: the band stays the width of the widest round, less a small overlap, inside the outline (so the edge is not laid twice and does not dry as a dark ring), and that round, steered along the
   // outline, lays the edge over the band's ends and sides. Where a flat of this radius can be put down so: by row, the
   // runs of the grid it can be swept along.
-  const rounds = kit.filter(width => width < LANE_FROM_MM), inset = rounds.length ? rounds[0] / 2 : 0;
+  const rounds = kit.filter(width => width < LANE_FROM_MM), inset = rounds.length ? rounds[0] * (1 - FLAT_OVERLAP) : 0;
   const column = new Int32Array((gh + 1) * gw); for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) column[(gy + 1) * gw + gx] = column[gy * gw + gx] + (D[gy * gw + gx] >= inset ? 1 : 0);
   const runsFor = radius => {
     const rc = Math.floor(radius / pitch), rows = [];
