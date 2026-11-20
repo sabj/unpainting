@@ -187,7 +187,45 @@ def territory_widths(streams, dark, region, reach, max_width, spread=1.9, min_wi
         l['width'] = round(float(np.clip(min(w, 2*d/1.3), min_width, max_width)), 3)
 
 
-def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
+def solid_fills(solid, dark, zoom, width_px, spacing_px, min_len_px):
+    """Solid darks (ink wider than a nib, a pane, a leaf, a dark gap in a gate) filled as a person fills with a pen: close
+    parallel strokes in the direction of the shape (its long axis), each a whole pull from edge to edge, `spacing_px` apart
+    and `width_px` wide so they close up. `solid` is at the zoomed scale; the strokes come back in source pixels. A shape too
+    small for a stroke along its axis is one stroke through its middle as wide as it is. A grey area (a pane drawn mid-grey,
+    `dark` its darkness 0..1 at the zoomed scale) is filled as dark as it is drawn: its strokes lighter and spaced wider, paper
+    between them."""
+    out = []
+    n, lab, st, _ = cv2.connectedComponentsWithStats(solid.astype(np.uint8), connectivity=8)
+    for k in range(1, n):
+        x, y, w, h = st[k, :4]
+        sub = (lab[y:y+h, x:x+w] == k)
+        ys, xs = np.nonzero(sub)
+        if len(xs) < 4: continue
+        tone = float(np.median(dark[y:y+h, x:x+w][sub])); wt = float(np.clip(tone/.85, .25, 1)); sp = spacing_px/max(.4, min(1., tone/.8))
+        P = np.c_[xs+x, ys+y].astype(float); c = P.mean(0); _, _, vt = np.linalg.svd(P-c, full_matrices=False); d = vt[0]
+        if abs(d[1]) > abs(d[0]) and d[1] < 0 or abs(d[0]) >= abs(d[1]) and d[0] < 0: d = -d   # pulled down, or left to right
+        nrm = np.array([-d[1], d[0]])
+        with np.errstate(all='ignore'):   # (Accelerate's matmul warns spuriously on finite input)
+            u = (P-c)@d; v = (P-c)@nrm
+        vs = np.arange(v.min()+sp/2, v.max()-sp/2+1e-6, sp) if v.max()-v.min() > sp else np.array([(v.min()+v.max())/2])
+        wd = width_px if len(vs) > 1 else max(width_px*.6, v.max()-v.min()+1)
+        for vv in vs:
+            band = np.abs(v-vv) <= .5
+            if band.sum() < 2: band = np.abs(v-vv) <= sp/2
+            if not band.any(): continue
+            uu = np.sort(u[band]); cut = np.nonzero(np.diff(uu) > 2.5)[0]
+            for a, b in zip(np.r_[0, cut+1], np.r_[cut, len(uu)-1]):
+                lo, hi = uu[a]+wd/2*.6, uu[b]-wd/2*.6
+                if hi-lo < min_len_px:
+                    if uu[b]-uu[a] < min_len_px*.5: continue
+                    lo, hi = uu[a], uu[b]
+                q = np.array([c+lo*d+vv*nrm, c+hi*d+vv*nrm])
+                q = (q+.5)/zoom-.5
+                out.append({'points': np.round(q, 3).tolist(), 'width': round(float(wd/zoom), 3), 'weight': round(wt, 3), 'role': 'pen stroke', 'length': float(np.hypot(*(q[1]-q[0]))), 'fill': True})
+    return out
+
+
+def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0, solid_px=0):
     grey = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)/255
     grey /= max(.1, float(np.percentile(grey, 98)))
     big = cv2.resize(grey, None, fx=zoom, fy=zoom, interpolation=cv2.INTER_CUBIC)
@@ -198,12 +236,22 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
     mask = ((dark > ink) & (dark > .55*peak)).astype('uint8')
     # dense ink (fur, hair, scribbled foliage, close hatching) thins into a net of junctions; it is laid by streams instead
     # (dense_strokes), so the thinning sees only the ink outside it
+    # solid darks: ink wider than `solid_px` source pixels is filled with close parallel strokes (solid_fills), and only the
+    # line left around it is thinned
+    solid = None; fills = []
+    if solid_px > 0:
+        rr = max(1, int(round(solid_px*zoom/2)))
+        solid = cv2.morphologyEx(mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2*rr+1, 2*rr+1))) > 0
+        fw = .6*solid_px*zoom
+        fills = solid_fills(solid, dark, zoom, width_px=fw, spacing_px=.8*fw, min_len_px=1.5*fw)
+        mask = mask & ~cv2.erode(solid.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
     dense = None
     if dense_px > 0:
         k = int(round(dense_px*zoom)) | 1
         dense = cv2.blur(mask.astype(np.float32), (k, k)) > .45
         dense = cv2.morphologyEx(dense.astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))) > 0
         mask = mask & ~dense
+        if solid is not None: dense = dense & ~solid
     skeleton, _ = thin(mask)
     skeleton, _ = prune_spurs(skeleton, 2*zoom)
     paths = sketch.trace(skeleton, min_points=2, window=2*zoom)
@@ -217,11 +265,16 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
         p = np.asarray(p, np.float32)
         if arc_length(p) < min_px*zoom:
             continue
-        width = max(.6, float(np.median(2*sketch.at(distance, p)))/zoom)
+        wz = 2*sketch.at(distance, p)
+        width = max(.6, float(np.median(wz))/zoom)
         # how dark the drawing draws it: the line's core against the paper, 0.85 of full black and over is full weight
         weight = float(np.clip(np.median(sketch.at(dark, p))/.85, .25, 1))
         q = fair((resample(p.astype(float), 1)+.5)/zoom-.5, fit, 1/zoom)
-        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'weight': round(weight, 3), 'role': 'pen stroke', 'length': arc_length(q)})
+        line = {'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'weight': round(weight, 3), 'role': 'pen stroke', 'length': arc_length(q)}
+        # a line that swells and thins along its length keeps that: widths per point, read along the traced centre line
+        wp = point_widths(q, (p+.5)/zoom-.5, wz/zoom)
+        if wp is not None: line['points'], line['widths'] = np.round(wp[0], 3).tolist(), np.round(wp[1], 3).tolist()
+        lines.append(line)
     lines.sort(key=lambda l: -l['length'])
     if dense is not None and dense.any():
         small = cv2.resize(dense.astype(np.uint8), (grey.shape[1], grey.shape[0]), interpolation=cv2.INTER_AREA) > 0
@@ -235,7 +288,21 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
         streams = [l for l in streams if l['length'] >= 3*l['width']]
         territory_widths(streams, 1-np.clip(grey, 0, 1), small, reach=1.5*sp, max_width=2*sp)
         lines += streams; lines.sort(key=lambda l: -l['length'])
-    return lines, mask, skeleton, {'denseShare': round(float(dense.mean()), 4) if dense is not None else 0, 'denseStrokes': len(streams) if dense is not None and dense.any() else 0,'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
+    lines += fills
+    return lines, mask, skeleton, {'solidFills': len(fills), 'denseShare': round(float(dense.mean()), 4) if dense is not None else 0, 'denseStrokes': len(streams) if dense is not None and dense.any() else 0,'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
+
+
+def point_widths(q, src, w, step=1.5, vary=.2):
+    """Widths along a faired line `q` read from the traced centre line `src` (with widths `w`, same unit): `q` resampled every
+    `step` and each point given the median width of the nearest traced samples. None when the width hardly varies (the line
+    keeps its one width)."""
+    if len(src) < 5: return None
+    k = 5; wm = np.array([np.median(w[max(0, i-k):i+k+1]) for i in range(len(w))])
+    if np.percentile(wm, 90) < (1+vary)*np.percentile(wm, 10) or np.percentile(wm, 90)-np.percentile(wm, 10) < .5: return None
+    r = resample(np.asarray(q, float), step)
+    from scipy.spatial import cKDTree
+    _, idx = cKDTree(src).query(r)
+    return r, np.maximum(.6, wm[idx])
 
 
 def merge_parallels(lines, sep, share=.7):
@@ -259,6 +326,7 @@ def merge_parallels(lines, sep, share=.7):
             # the span of both, at most 1.6 times the wider (folds of several strokes do not pile up into a bar)
             a['width'] = round(min(max(a['width'], d + (a['width']+b['width'])/2), 1.6*max(a['width'], b['width'], a.get('width0', a['width']))), 3)
             a.setdefault('width0', a['width']); a['weight'] = max(a['weight'], b['weight'])
+            if 'widths' in a: a['widths'] = [round(max(v, a['width']), 3) for v in a['widths']]
             gone.add(i)
     for l in lines: l.pop('width0', None)
     return [l for k, l in enumerate(lines) if k not in gone], len(gone)
@@ -361,6 +429,7 @@ def main():
     ap.add_argument('--mergemm', type=float, default=.45, help='close parallel strokes within this (mm, with --sheetmm) are one stroke; 0 keeps them')
     ap.add_argument('--maxwidthmm', type=float, default=1.2, help='wider marks under four widths long are filled darks, left to the paint (mm, with --sheetmm); 0 keeps them')
     ap.add_argument('--densemm', type=float, default=1.5, help='ink covering most of a window this wide (mm) is dense (fur, hair, scribble): laid as strokes along its direction, not thinned; 0 thins everything')
+    ap.add_argument('--solidmm', type=float, default=.9, help='ink wider than this (mm) is a solid dark: filled with close parallel pen strokes along the shape; 0 thins it to a centre line')
     ap.add_argument('--medium', default='ink', choices=['ink', 'pencil'], help='the medium the drawing is made in: the painter lays it in this (medium-decision.mjs); pencil: grey lines of every weight, kept with their wobble and darkness')
     ap.add_argument('--fit', type=float, default=.6, help='how far a straight run or arc may lie from the traced line, source pixels')
     ap.add_argument('--reweigh', help='put the drawing\'s darkness on this line file\'s points (pencil) and write it to --out')
@@ -374,17 +443,18 @@ def main():
     if args.medium == 'pencil':
         lines, mask, skeleton, stats = pencil_plan(bgr, args.zoom)
     else:
-        lines, mask, skeleton, stats = plan(bgr, args.zoom, fit=args.fit, dense_px=args.densemm*w/args.sheetmm if args.sheetmm and args.densemm > 0 else 0)
+        lines, mask, skeleton, stats = plan(bgr, args.zoom, fit=args.fit, dense_px=args.densemm*w/args.sheetmm if args.sheetmm and args.densemm > 0 else 0,
+                                            solid_px=args.solidmm*w/args.sheetmm if args.sheetmm and args.solidmm > 0 else 0)
     if args.sheetmm and args.medium == 'ink':
         px = w/args.sheetmm   # source pixels a millimetre
         if args.mergemm > 0:
             # strokes laid along dense ink are already one per strand, spaced as drawn
-            dense = [l for l in lines if l.get('dense')]
-            lines, stats['foldedParallels'] = merge_parallels([l for l in lines if not l.get('dense')], args.mergemm*px)
+            dense = [l for l in lines if l.get('dense') or l.get('fill')]
+            lines, stats['foldedParallels'] = merge_parallels([l for l in lines if not (l.get('dense') or l.get('fill'))], args.mergemm*px)
             lines += dense
         if args.maxwidthmm > 0:
             # a filled dark (a fat mark hardly longer than it is wide) is left to the paint
-            n = len(lines); lines = [l for l in lines if l['width'] <= args.maxwidthmm*px or l['length'] >= 4*l['width']]; stats['filledDarksLeft'] = n-len(lines)
+            n = len(lines); lines = [l for l in lines if l.get('fill') or l['width'] <= args.maxwidthmm*px or l['length'] >= 4*l['width']]; stats['filledDarksLeft'] = n-len(lines)
         stats['selectedPaths'] = len(lines)
     if args.sheetmm:
         for l in lines:
