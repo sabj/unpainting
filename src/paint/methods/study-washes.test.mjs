@@ -73,3 +73,37 @@ test('a toned sheet: the study\'s buff paper and its white are both bare paper, 
     assert.equal(p.instructions.filter(q => q.stage !== 2).length, 1);
   } finally { console.log = log; }
 });
+
+// a wall 120 x 75 mm with a window of another hue in it, a small white (a lit stone, 4 x 4 mm) and two cast-shadow bands
+// of one colour 1 mm apart; white paper round it
+function wallStudy() {
+  const w = 320, h = 200, rgb = new Uint8ClampedArray(w * h * 3);
+  for (let i = 0; i < w * h; i++) {
+    const x = (i % w) / 2, y = ((i / w) | 0) / 2; let c = [255, 255, 255];
+    if (x >= 20 && x < 140 && y >= 15 && y < 90) {
+      c = [225, 200, 160];
+      const u = x - (y - 15) * 0.6;
+      if (y >= 20 && y < 85 && ((u >= 30 && u < 40) || (u >= 41 && u < 51))) c = [175, 150, 118];
+      if (x >= 100 && x < 115 && y >= 25 && y < 50) c = [45, 55, 75];
+      if (x >= 120 && x < 124 && y >= 70 && y < 74) c = [255, 255, 255];
+    }
+    rgb.set(c, i * 3);
+  }
+  return { w, h, rgb };
+}
+
+test('the under-wash: one connected wash over the wall, under its window and its small white, off the white round it', () => {
+  const p = plan(wallStudy()), first = p.instructions[0];
+  assert.match(first.thing, /under-wash/);
+  // the wall less nothing: the window and the small white are under it; the paper round it is not
+  assert.ok(first.areaMm2 > 0.97 * 120 * 75 && first.areaMm2 < 120 * 75 + 2 * 2 * (120 + 75) + 50, `${first.areaMm2}`);
+  assert.equal(first.outline.length, 1, 'one outline, no holes');
+});
+
+test('cast-shadow pieces of one colour a millimetre apart are one wash, laid along the bands', () => {
+  const p = plan(wallStudy()), shadows = p.instructions.filter(q => q.stage === 3);
+  assert.equal(shadows.length, 1, shadows.map(q => q.thing).join(' | '));
+  // its strokes run down the bands (a slant of about 59 degrees from level), not across them
+  const long = shadows[0].strokes.filter(s => s.points.length >= 2).map(s => { const a = s.points[0], b = s.points.at(-1); return Math.abs(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI); });
+  assert.ok(long.every(d => d > 40 && d < 80), long.join(' '));
+});
