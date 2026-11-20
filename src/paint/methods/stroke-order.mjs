@@ -9,10 +9,10 @@
 
 export const ORDER_DEFAULTS = Object.freeze({
   cellMm: 0.5,          // the grid the faces are found on
-  closeMm: 0.75,        // lines are thickened by this, so gaps under twice it still close a face
+  closeMm: 1.5,         // lines are thickened by this, so gaps under twice it still close a face (a drawn wall is rarely sealed)
   minFaceMm2: 6,        // a face smaller than this is a sliver, not an object
   rimMm: 1,             // a stroke within this of a face's edge lies on its outline
-  onShare: 0.6,         // share of a stroke's length that must lie on an outline (or inside an object)
+  onShare: 0.5,         // share of a stroke's length that must lie on an outline (or inside an object)
   joinMm: 0.8,          // two ends this close ...
   joinCos: 0.94,        // ... that run on in one direction (within 20 degrees) are one stroke
   jaggedDegPerMm: 15,   // texture: a stroke turning more than this ...
@@ -170,8 +170,8 @@ export function findObjects(strokes, widthMm, heightMm, o = {}) {
       const clipped = (i - rimR < 0) || (j - rimR < 0) || (i + rimR >= bw) || (j + rimR >= bh);
       return inside > 0 && (inside < full || clipped);
     };
-    const probe = f.cells[0];
-    objects.push({ id: objects.length, area: filled * cs * cs, parent: null, children: [], box: [(x0 - 1) * cs, (y0 - 1) * cs, (x0 - 1 + bw) * cs, (y0 - 1 + bh) * cs],
+    const probe = f.cells[0], edge = f.x0 <= 1 || f.y0 <= 1 || f.x1 >= W - 2 || f.y1 >= H - 2;
+    objects.push({ id: objects.length, area: filled * cs * cs, edge, parent: null, children: [], box: [(x0 - 1) * cs, (y0 - 1) * cs, (x0 - 1 + bw) * cs, (y0 - 1 + bh) * cs],
       probe: [((probe % W) - 1 + 0.5) * cs, (((probe / W) | 0) - 1 + 0.5) * cs], inFill, onRim });
   }
   // the parent: the smallest other object whose fill holds this one's face
@@ -199,9 +199,10 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     // only juts into a face has the face on both sides)
     const d = c.closeMm + 1.5 * c.cellMm, sides = s.Q.map((q, k) => {
       const a = s.Q[Math.max(0, k - 2)], b = s.Q[Math.min(s.Q.length - 1, k + 2)], L = dist(a, b) || 1, nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
-      return [[q[0] + d * nx, q[1] + d * ny], [q[0] - d * nx, q[1] - d * ny]];
+      return [[q[0] + d * nx, q[1] + d * ny], [q[0] - d * nx, q[1] - d * ny], [q[0] + 2 * d * nx, q[1] + 2 * d * ny], [q[0] - 2 * d * nx, q[1] - 2 * d * ny]];
     });
-    s.hits = faces.filter(f => overlaps(f.box, s.points)).map(f => ({ f: f.id, rim: sides.map(([l, r]) => f.inFill(...l) !== f.inFill(...r)), fill: s.Q.map(([x, y]) => f.inFill(x, y)) }));
+    // each side is read at d and 2d, so a side that meets another line (a bar near a corner) still finds its face
+    s.hits = faces.filter(f => overlaps(f.box, s.points)).map(f => ({ f: f.id, rim: sides.map(([l, r, l2, r2]) => (f.inFill(...l) || f.inFill(...l2)) !== (f.inFill(...r) || f.inFill(...r2))), fill: s.Q.map(([x, y]) => f.inFill(x, y)) }));
   }
   // small sibling faces split by a line that runs along both are parts of one object; that line is a division inside it
   const root = faces.map(f => f.id), find = i => (root[i] === i ? i : (root[i] = find(root[i]))), small = f => f.area < c.partShare * widthMm * heightMm;
@@ -222,7 +223,8 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const L = pathLength(s.points);
     s.object = s.division ? gid.get(find(s.hits.find(h => h.rim.filter(Boolean).length >= c.onShare * s.Q.length).f)) : outline ? outline.id : inner ? inner.id : -1;
     s.role = outline ? 'outline' : 'inner';
-    if (s.role === 'inner' && !s.division && (turningPerMm(s.points) > c.jaggedDegPerMm || L < c.shortMm)) s.role = 'texture';
+    // a jagged or short mark is texture even where it lies along an outline (foliage against a wall)
+    if (!s.division && (turningPerMm(s.points) > c.jaggedDegPerMm || L < c.shortMm)) s.role = 'texture';
   }
   // small isolated things: groups of non-outline marks that touch no outline and stay small
   const free = joined.filter(s => s.role !== 'outline'), anchors = joined.filter(s => s.role === 'outline').map(s => resample(s.points, c.isolatedMm / 2));
@@ -263,9 +265,17 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
       if (b.s) take(b.s, 1); else visit(b.k);
     }
   };
-  // the largest form first, then the nearest next form; strokes in no object go with the forms
+  // the main mass first: the largest form the lines close off within the sheet (a face that reaches the sheet's edge is
+  // ground or sky), from its longest outline; then the nearest next form; strokes in no object go with the forms
   const roots = objects.filter(ob => ob.parent == null).map(ob => ob.id);
-  if (roots.length) { const big = roots.reduce((a, b) => (objects[a].area >= objects[b].area ? a : b)); visit(big); }
+  const inner = objects.filter(ob => !ob.faces.some(f => faces[f].edge)), main = (inner.length ? inner : objects).reduce((a, b) => (a.area >= b.area ? a : b), { area: -1 });
+  if (main.id != null) {
+    const lines = (byObj.get(main.id) ?? []).filter(s => s.role === 'outline');
+    if (lines.length) pen = lines.reduce((a, b) => (a.len >= b.len ? a : b)).points[0];
+    // its containers first (outline before inside), so start at the outermost one that holds it
+    let top = main.id; while (objects[top].parent != null) top = objects[top].parent;
+    visit(top);
+  }
   for (;;) {
     const items = [...roots.filter(k => !visited.includes(k)).map(k => ({ k })), ...own(-1, 'outline').concat(own(-1, 'inner')).map(s => ({ s }))];
     if (!items.length) break;

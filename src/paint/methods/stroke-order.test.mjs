@@ -26,7 +26,7 @@ test('a line that runs on through a junction is one stroke; a corner is not join
 
 test('objects: a window face inside a wall face is its child', () => {
   const S = [...box(10, 10, 90, 60), ...box(30, 20, 45, 40)];
-  const { objects } = findObjects(S, 100, 70);
+  const { objects } = findObjects(S, 100, 70, { closeMm: 0.75 });
   // the sheet itself (closed by its edge), the wall in it, the window in the wall; areas less the lines' thickness
   assert.equal(objects.length, 3);
   const [sheet, wall, win] = [...objects].sort((a, b) => b.area - a.area);
