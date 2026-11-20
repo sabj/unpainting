@@ -21,8 +21,20 @@ export const REMOVED_OPTIONS = Object.freeze({
   eyering: 'the eye ring drew an iris ring round each catchlight reserve inside the deep accents, a rule shaped to one kind of subject; the plan names its eyes\' shapes and darks',
 });
 
+// Removed in 0.4: methods the owner rejected, deleted from the trunk. Each was last in the code at commit 49447027
+// (git show 49447027:<file>); the history is the archive.
+const LAST = 'last at commit 49447027';
+const in04 = (names, why, where) => Object.fromEntries(names.map(k => [k, `removed in 0.4: ${why} (${LAST}, ${where})`]));
+export const REMOVED_IN_04 = Object.freeze({
+  ...in04(['touchpoints', 'touchbroad', 'touchthrough', 'touchdmin', 'touchfamilies', 'touchmincells', 'touchsmoothmm', 'touchlinepad', 'finishsnaps'],
+    'the touch-up rounds glazed each planning family toward the subject\'s colour after a look, a correction loop', 'src/paint/methods/touch-up.mjs, tools/plate/paint.mjs'),
+  ...in04(['finaldarks', 'fdquantile', 'fdmin', 'fdcontrast', 'fdsurroundmm', 'fdminmm2', 'fdtilemm', 'fddmin', 'fdgain'],
+    'the final darks cut accent cells from the subject and darkened them after a look', 'src/paint/methods/final-darks.mjs, final-dark-marks.mjs'),
+});
+
 /** Throws, naming every removed option in argv with its reason. */
 export function refuseRemoved(argv) {
-  const hit = [...new Set(argv.filter(a => typeof a === 'string' && a.startsWith('--')).map(a => a.slice(2)))].filter(k => Object.hasOwn(REMOVED_OPTIONS, k));
-  if (hit.length) throw new Error(hit.map(k => `--${k} was removed: ${REMOVED_OPTIONS[k]}`).join('; '));
+  const names = [...new Set(argv.filter(a => typeof a === 'string' && a.startsWith('--')).map(a => a.slice(2)))];
+  const hit = names.filter(k => Object.hasOwn(REMOVED_OPTIONS, k)), gone = names.filter(k => Object.hasOwn(REMOVED_IN_04, k));
+  if (hit.length || gone.length) throw new Error([...hit.map(k => `--${k} was removed: ${REMOVED_OPTIONS[k]}`), ...gone.map(k => `--${k} was ${REMOVED_IN_04[k]}`)].join('; '));
 }

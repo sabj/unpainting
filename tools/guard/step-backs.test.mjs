@@ -1,6 +1,5 @@
-// Default mode looks at shape scale only (src/paint/step-backs.mjs): each passage takes one look of its own, and the
-// touch-up and accent step-backs are fixed before the first mark, a painting takes no more of them than it planned, and each
-// shape is read once. Strict mode takes no look at all.
+// Default mode looks at shape scale only (src/paint/step-backs.mjs): each passage takes one look of its own, no step-back
+// is planned (the touch-up and accent rounds were removed in 0.4), and each shape is read once. Strict mode takes no look.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +15,7 @@ async function paint(dir, extra) {
   if (!fs.existsSync(target)) await sharp(Buffer.from(SVG)).png().toFile(target);
   // Segmentation is not under test: --segments off keeps the run free of the SAM python and checkpoint.
   const args = ['tools/paint-plate.mjs', '--allowdirty', '1', '--image', target, '--width', '96', '--scale', '1', '--sheetmm', '152.4', '--mode', 'fast', '--gpu', 'off', '--threads', '1',
-    '--drawing', 'none', '--touchpoints', '2', '--finaldarks', '1', '--frames', '0', '--video', '0', '--segments', 'off', '--out', out, ...extra];
+    '--drawing', 'none', '--frames', '0', '--video', '0', '--segments', 'off', '--out', out, ...extra];
   try { execFileSync(process.execPath, args, { cwd: new URL('../../', import.meta.url), env: { ...process.env, W2_CACHE_DIR: path.join(dir, 'cache') }, stdio: 'pipe', timeout: 240000 }); }
   catch (e) { throw Error(String(e.stdout).split('\n').slice(-20).join('\n') + String(e.stderr)); }
   return { guard: JSON.parse(fs.readFileSync(path.join(out, 'target-guard.json'), 'utf8')), steps: JSON.parse(fs.readFileSync(path.join(out, 'step-backs.json'), 'utf8')), png: fs.readFileSync(path.join(out, 'painting.png')) };
@@ -26,16 +25,13 @@ test('default mode looks at shape scale, in its planned step-backs and once a pa
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'step-backs-'));
   try {
     const d = await paint(dir, []);
-    assert.deepEqual(d.steps.planned.map(p => p.id), ['washes', 'washes-2', 'accents'], 'planned before painting from --touchpoints and --finaldarks');
-    assert.ok(d.steps.taken.length <= d.steps.planned.length, 'no step-back beyond the plan');
-    const ids = d.steps.taken.map(t => t.id);
-    assert.equal(ids[0], 'washes');
-    assert.ok(ids.every(id => d.steps.planned.some(p => p.id === id)) && new Set(ids).size === ids.length, `each taken once and planned: ${ids}`);
+    assert.deepEqual(d.steps.planned, [], 'no step-back is planned');
+    assert.deepEqual(d.steps.taken, [], 'none is taken');
     assert.ok(d.steps.passageLooks > 0, 'default mode looks once at each passage');
     assert.equal(d.guard.looks.count, d.steps.shapeLooks + d.steps.passageLooks, 'every look the guard saw was a passage or inside a step-back');
     const labels = d.guard.looks.entries.map(e => e.label);
     assert.equal(new Set(labels).size, labels.length, 'each shape is read once');
-    assert.ok(labels.every(l => /^(L\d+\/s\d+|touch\d+\/s\d+|darks\/s\d+)$/.test(l)), `only passage and step-back reads: ${labels.join(' ')}`);
+    assert.ok(labels.every(l => /^L\d+\/s\d+$/.test(l)), `only passage and step-back reads: ${labels.join(' ')}`);
     const s = await paint(dir, ['--notargetlooks', '1']);
     assert.equal(s.guard.looks.count, 0);
     assert.equal(s.steps.shapeLooks + s.steps.passageLooks, 0);

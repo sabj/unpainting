@@ -91,7 +91,6 @@ import '../../src/crop/palettewide.mjs';
 import '../../src/crop/paint-guard.mjs';
 import '../../src/paint/methods/technique-cal.mjs';
 import '../../src/crop/pigments.mjs';
-import '../../src/paint/methods/final-darks.mjs';
 import '../../src/crop/blockin.mjs';
 import '../../src/crop/mixes.mjs';
 import '../../src/paint/methods/shape-deficit.mjs';

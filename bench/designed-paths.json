@@ -277,11 +277,11 @@
         }
       ],
       "signal": "from docs",
-      "today": "fail (--finaldarks 0 on both routes; strict has no look)",
+      "today": "removed in 0.4 (last at commit 49447027): never runs",
       "owner": "accents",
       "required": false,
-      "status": "not yet on",
-      "reason": "Owned by cxtech",
+      "status": "removed",
+      "reason": "Removed in 0.4 with the touch-up rounds: it corrected toward the subject after a look",
       "check": "final-darks"
     },
     {

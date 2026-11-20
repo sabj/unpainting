@@ -19,7 +19,7 @@ import {sha256} from '../painter/semantic-areas.mjs';
 import {measurePaper as physicalMeasurePaper} from '../../src/paint/methods/wetdry.mjs';
 import {codeHash, digest} from '../../src/paint/run-cache.mjs';
 import {cachedEarlyLines, outputRelative, planFileDigest} from '../../src/paint/early-lines-cache.mjs';
-import {createStepBacks, planStepBacks} from '../../src/paint/step-backs.mjs';
+import {createStepBacks} from '../../src/paint/step-backs.mjs';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -339,7 +339,7 @@ const PX_RAW = num('washinkfree', 0) > 0 && (opt('washinkfile', '') !== '' || op
 const TARGET_GUARD = createTargetGuard({ mode: opt('targetguard', DEFAULT_MODE), targetPaths: [path.resolve(root, opt('image', ''))], log: null, lookBudget: opt('lookbudget', '') === '' ? null : num('lookbudget', HARD_LOOK_BUDGET) });
 // Painting-time looks happen only at the step-backs planned here, before the first mark (src/paint/step-backs.mjs); with
 // --notargetlooks 1 they return null too, so strict mode takes none.
-const STEP_BACKS = createStepBacks(TARGET_GUARD, num('notargetlooks', 0), planStepBacks({ touchpoints: num('touchpoints', 0), finalDarks: num('finaldarks', 0) }));
+const STEP_BACKS = createStepBacks(TARGET_GUARD, num('notargetlooks', 0), []);
 const paintingLook = STEP_BACKS.look;
 process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(path.join(out, 'step-backs.json'), JSON.stringify(STEP_BACKS.record(), null, 2)); } catch (e) { console.error(`step-backs: could not write step-backs.json: ${e.message}`); } });
 if (TARGET_GUARD.mode !== 'off') process.on('exit', () => { try { fs.mkdirSync(out, { recursive: true }); writeGuardReport(TARGET_GUARD, out, { image: opt('image', '') }); } catch (e) { console.error(`target guard: could not write target-guard.json: ${e.message}`); } });

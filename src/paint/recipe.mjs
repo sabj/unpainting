@@ -15,7 +15,7 @@ import { subjectMediumOf, drawingForSubject, argvForSubject } from './subject-me
 const DEFAULT_RECIPE = 'default';
 
 // Generic watercolor methods: paper, palette, paint order, layers, drawing and film.
-const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --touchpoints 0 --finaldarks 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 0 --washjoin 1 --undercover 0';
+const METHOD_FLAGS = '--palettewide 1 --physical 1 --paperbase source --loadedcontact 1 --order painter --brushchoice 0 --midlayers 4 --paperrel 1 --paperlights 1 --paperrgb auto --paper coldpress --paperphysical 1 --texture 0 --layerhue 1 --drawing both --sourcelines 0 --linesource none --frames 8 --markcadence 8 --marks 1 --subjectseam 0.5 --smallmarks 1 --smallmarklights 0 --washjoin 1 --undercover 0';
 // Planes painted as shaped marks.
 const TECHNIQUE_FLAGS = '--shapedmarks 1';
 
@@ -32,7 +32,7 @@ const RECIPES = {
   general: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   default: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
   combined: [METHOD_FLAGS, TECHNIQUE_FLAGS, '--drawing first'].join(' '),
-  penwash: [METHOD_FLAGS, '--drawing first --penwash 1 --order ladder --touchpoints 0 --finaldarks 0 --paperlights 0 --paperrel 0 --smalllights 0 --midlayers 0 --shapedmarks 0 --palettewide 1 --pwmin 2 --pwmax 3', PENWASH_FLAGS, PENWASH_STAGE_FLAGS].join(' '),
+  penwash: [METHOD_FLAGS, '--drawing first --penwash 1 --order ladder --paperlights 0 --paperrel 0 --smalllights 0 --midlayers 0 --shapedmarks 0 --palettewide 1 --pwmin 2 --pwmax 3', PENWASH_FLAGS, PENWASH_STAGE_FLAGS].join(' '),
 };
 
 // `--style penwash` names the pen-and-wash recipe. A numeric --style (a styled target, 0..1) passes through.

@@ -5,24 +5,13 @@
 // subject at shape scale, once, and leads to a few placed corrections. It is never repeated until an error stops
 // falling: no look, correct, look again.
 //
-// The plan of step-backs is made before painting from the options alone:
-//   - 'washes'  (--touchpoints R > 0): R rounds, each after the last one's glazes dry; every planning family is read once a
-//     round, and a family the sheet still shows lighter or less chromatic than the subject gets one glaze of the mixed lack
-//     (src/paint/methods/touch-up.mjs). The rounds are fixed before the first mark; a round after a round that corrected
-//     nothing is skipped, since the sheet is as the round before it left it.
-//   - 'accents' (--finaldarks > 0): before the last small darks, each accent family is read once (final-darks.mjs).
+// The touch-up rounds (--touchpoints) and final darks (--finaldarks) that were step-backs were removed in 0.4 (they read
+// the subject at shape scale to correct toward it; they last exist at 49447027). No step-back is planned today; the gate
+// below stays for a plan that names one.
 // A passage takes one shape-level look of its own as it is laid, and its charge follows what the sheet already holds of
 // its pans (tools/plate/paint.mjs, src/paint/methods/shape-deficit.mjs). Every other look (kept-colour recharge, texture)
 // is null outside an open step-back. Strict mode (--notargetlooks 1) keeps the same plan and takes no look at all.
 import { paintingLooks } from './painting-look.mjs';
-
-/** The step-backs of one painting, fixed before the first mark. */
-export function planStepBacks({ touchpoints = 0, finalDarks = 0 } = {}) {
-  const plan = [];
-  for (let round = 1; round <= Math.max(0, Math.round(touchpoints)); round++) plan.push({ id: round === 1 ? 'washes' : `washes-${round}`, when: round === 1 ? 'after the planned washes dry' : 'after the last round\'s glazes dry', reads: 'planning families', corrects: 'darken only, families the sheet shows visibly lighter or less chromatic than the subject' });
-  if (finalDarks > 0) plan.push({ id: 'accents', when: 'after the touch-ups, before the last small darks', reads: 'accent families', corrects: 'a dark mark where the accent reads lighter' });
-  return plan;
-}
 
 /**
  * The look gate. look(...) is the target guard's look inside an open step-back and null anywhere else (and always null

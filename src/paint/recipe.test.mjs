@@ -72,13 +72,6 @@ test('source extraction stays opt-in when no line file is given', () => {
   assert.equal(explicit[explicit.lastIndexOf('--linesource') + 1], 'source-ink');
 });
 
-// The full held-out Guardi run exposed heavy isolated accents with automatic final darks.
-test('final darks require an explicit choice and command-line choices win', () => {
-  const value = args => {const {argv} = expandRecipe({argv: args}); return argv[argv.lastIndexOf('--finaldarks') + 1];};
-  assert.equal(value([]), '0');
-  assert.equal(value(['--finaldarks', '1']), '1');
-});
-
 // The general recipe lost connected dark masses on Hills in the release comparison.
 test('combined defaults use general washes', () => {
   const general = expandRecipe({argv: []}).argv;
