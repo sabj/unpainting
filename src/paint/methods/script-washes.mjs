@@ -112,7 +112,7 @@ export function passageStrokes(p, brushes, seed = 0, sheetLights = []) {
   if (!kind || !MARK_KINDS[kind] || p.kind === 'wash' || Array.isArray(p.handling?.pressure)) return st;
   if (p.kind === 'lines' && p.paths?.some(P => P.length > 2)) return st;
   const rng = handOf(`${seed}/${p.id}/marks`), path = p.handling?.path, load = LOAD_SHARE[p.handling?.load] ?? (DRY_MARKS.has(kind) ? 0.3 : 0.75);
-  return st.flatMap((q, k) => asLibraryMark(kind, q, 2 * q.radiusMm, { seed: (seed * 7919 + k * 31 + [...p.id].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) | 0,
+  return st.flatMap((q, k) => q.written ? [q] : asLibraryMark(kind, q, 2 * q.radiusMm, { seed: (seed * 7919 + k * 31 + [...p.id].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) | 0,
     bend: path === 'straight' ? 0.05 * (rng.next() < 0.5 ? -1 : 1) : path === 'curved' || path === 'flick' ? rng.range(0.4, 0.8) * (rng.next() < 0.5 ? -1 : 1) : 0, load }));
 }
 
@@ -126,7 +126,7 @@ function placedStrokes(p, brushes, seed = 0, sheetLights = []) {
   // strokes the author wrote one by one: point by point with a pressure at each, or from a start along a direction
   if (Array.isArray(p.strokes) && p.strokes.length) return p.strokes.map(s => {
     const w = s.brush && brushes[s.brush] ? brushes[s.brush].widthMm : widthMm;
-    if (Array.isArray(s.points) && s.points.length >= 2) return written(s.points, { widthMm: w, rng });
+    if (Array.isArray(s.points) && s.points.length >= 2) return { ...written(s.points, { widthMm: w, rng }), written: true };
     const [x, y] = s.at ?? s.from ?? [0, 0];
     return handled(x, y, { ...style, deg: Number(s.direction ?? deg), len: Number(s.lengthMm ?? h.lengthMm ?? 3 * w), r: w / 2, pressure: Array.isArray(s.pressure) ? s.pressure.map(Number) : pressure, path: s.path ?? h.path, from: !!s.from, rng });
   });
