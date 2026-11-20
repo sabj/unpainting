@@ -17,7 +17,7 @@
 // Plan time only.
 import { components } from '../../raster.js';
 import { passage } from '../../crop/blockin.mjs';
-import { labOf, deltaE2000 } from '../../eval/colour.mjs';
+import { labOf } from '../../eval/colour.mjs';
 import { outlineLoops, loopsMask } from './wash-strokes.mjs';
 import { laneFill } from './sweep-fill.mjs';
 import { mixFor, mixOver, filmLab } from './puddles.mjs';
@@ -28,18 +28,18 @@ const PLAN_MM = 0.5;
 /** Colour clusters asked for, and clusters nearer than this (Lab) are one. Coarse, so a faint (3 L*) change in the study cannot move a
  * cell between clusters: at 14 and 12 the planted 3.4 mm pattern reached the plate through the study (copied +0.11 against a null of
  * 0.07); at 8 and 18 it does not (-0.03 against 0.08), and the Yale study keeps its windows, arch, gate, foliage and cast shadows. */
-const CLUSTERS = 14, CLUSTER_JOIN = 12;
-/** After the slivers, neighbouring regions nearer than this in colour (Lab) are one, smallest first, unless both are BIG: a faint change
- * in the study cannot keep a small region apart, and two large regions (a roof and its wall) are never merged into one. */
-const SIMILAR = 18, BIG = 0.02;
+const CLUSTERS = 8, CLUSTER_JOIN = 18;
+/** The planted-pattern copy test of this reading (19-20 Nov 2026; no drawing; copied with the spread of the same measure
+ * against patterns not planted, and stable against two studies of the clean piece that differ only in seed): */
+const COPY_TEST = 'copy test of this reading, 20 Nov 2026: mini 1 (RunPod studies) d1 copied +0.00/-0.04 at 1.8/3.4 mm (null 0.04/0.05), stable 0.92/0.92; d2 +0.02/-0.03, 0.91/0.92; mini 2 (local studies) d1 +0.01/+0.06 (null 0.14/0.18), stable 0.63/0.57 against a seed floor of 0.66; all within their nulls; the absolute limit 0.05 is passed on mini 1 and missed by 0.01 on mini 2 at 3.4 mm, where the null is 0.18 wide (measured before the rule that keeps regions over 2% apart; not re-run)';
+/** Two regions each over this share of the sheet are never merged into one (a roof and its wall stay two shapes). */
+const BIG = 0.02;
 /** A part smaller than this share of the sheet is a sliver and joins a neighbour. */
 const SLIVER_SHARE = 0.004;
 /** A small shape this much darker (L*) than the neighbour it would be merged into is kept. */
 const KEEP_DARK = 25;
 /** ... or this far from it in hue and chroma (a*b*, at least this chromatic itself): a warm accent in a pale wall. */
 const KEEP_HUE = 15;
-/** Paper or paint for a large shape, from the subject squinted by this much (mm): paper within PAPER_SURE (dE2000) of the sheet's colour, painted past PAINT_SURE. */
-const PAPER_SQUINT_MM = 10, PAPER_SURE = 5, PAINT_SURE = 12;
 /** Bare paper: a shape at least this light (L*, against the SHEET's colour: on a toned sheet, buff is paper, and a study's
  * white, lighter than the sheet, is paper too) and no more chromatic than this. */
 const PAPER_L = 91, PAPER_CHROMA = 7;
@@ -97,7 +97,7 @@ function parts(lab, w, h) {
  * The study's flat shapes on a pw x ph grid: {label (0-based shape per cell), shapes: [{cells, colour (sRGB), lab, paper, border: Map(shape -> shared edges), rim}]}.
  * `rgb` is the study on that grid.
  */
-function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE, similar: SM = SIMILAR }) {
+function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K = CLUSTERS, join: J = CLUSTER_JOIN, keep: KD = KEEP_DARK, hue: HK = KEEP_HUE }) {
   const pn = pw * ph, L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn);
   for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(rgb, q, paperRGB); L[q] = l; A[q] = a; B[q] = b; }
   // the colours, read off a fixed grid of about 8000 cells
@@ -147,21 +147,7 @@ function studyShapes(rgb, pw, ph, paperRGB, { sliverCells, most = 0, clusters: K
     }
     for (let i = 1; i <= n; i++) { if (find(i) !== i) continue; for (const [o] of [...border[i]]) { const oc = find(o); if (oc !== i && cluster[oc] === cluster[i] && find(i) === i) { join(oc, i); changed = true; } } }
   }
-  // similar neighbours are one, smallest first; two BIG regions stay two
   const big = i => size[i] >= BIG * pn;
-  for (let changed = true; changed;) {
-    changed = false;
-    const live = []; for (let i = 1; i <= n; i++) if (find(i) === i) live.push(i);
-    live.sort((a, b) => size[a] - size[b]);
-    for (const i of live) {
-      if (find(i) !== i || paperish(centres[cluster[i]])) continue;
-      let best = -1, bd = Infinity; const ci = centres[cluster[i]];
-      for (const [o] of border[i]) { const oc = find(o); if (oc === i || paperish(centres[cluster[oc]])) continue; const d = Math.hypot(...ci.map((v, j) => v - centres[cluster[oc]][j])); if (d < bd) { bd = d; best = oc; } }
-      if (best < 0 || bd >= SM || (big(i) && big(best)) || keepDark(i, best)) continue;
-      if (size[i] <= size[best]) join(i, best); else join(best, i);
-      changed = true;
-    }
-  }
   // at most `most` shapes: the smallest joins the neighbour nearest it in colour, until that many are left
   // (the kept darks do not count against `most`)
   const kept = new Set();
@@ -202,16 +188,6 @@ function labToRgb([L, a, b], paperRGB) {
   const Mi = [[3.2404542, -1.5371385, -0.4985314], [-0.9692660, 1.8760108, 0.0415560], [0.0556434, -0.2040259, 1.0572252]];
   const toLin = v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }, toS = v => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
   return Mi.map((r, c) => Math.round(Math.max(0, Math.min(255, toS(Math.max(0, (r[0] * X + r[1] * Y + r[2] * Z) * toLin(paperRGB[c])))))));
-}
-
-/** The w x h subject on the pw x ph grid, blurred (Gaussian sigma in grid cells, in linear light), as Lab and dE2000 to the paper. */
-function squintLab(rgb, w, h, pw, ph, sigma, paperRGB) {
-  const g = toGrid(rgb, w, h, pw, ph), pn = pw * ph, lin = [0, 1, 2].map(c => Float32Array.from({ length: pn }, (_, q) => (g[q * 3 + c] / 255) ** 2.2));
-  const r = Math.ceil(3 * sigma), k = Float32Array.from({ length: 2 * r + 1 }, (_, i) => Math.exp(-((i - r) ** 2) / (2 * sigma * sigma))), ks = k.reduce((a, v) => a + v, 0);
-  const blur1 = (src, horiz) => { const out = new Float32Array(pn); for (let y = 0; y < ph; y++) for (let x = 0; x < pw; x++) { let a = 0; for (let i = -r; i <= r; i++) { const xx = horiz ? Math.min(pw - 1, Math.max(0, x + i)) : x, yy = horiz ? y : Math.min(ph - 1, Math.max(0, y + i)); a += k[i + r] * src[yy * pw + xx]; } out[y * pw + x] = a / ks; } return out; };
-  const bl = lin.map(p => blur1(blur1(p, true), false)), L = new Float32Array(pn), A = new Float32Array(pn), B = new Float32Array(pn), dE = new Float32Array(pn), px = new Uint8ClampedArray(3);
-  for (let q = 0; q < pn; q++) { for (let c = 0; c < 3; c++) px[c] = Math.round(255 * Math.max(0, Math.min(1, bl[c][q])) ** (1 / 2.2)); const lab = labOf(px, 0, paperRGB); L[q] = lab[0]; A[q] = lab[1]; B[q] = lab[2]; dE[q] = deltaE2000(lab, [100, 0, 0]); }
-  return { L, A, B, dE };
 }
 
 /** Chromaticity over lightness: a shadow on a thing keeps it, darker and greyer in proportion. */
@@ -288,7 +264,7 @@ const FIRST_MOST = 16;
 // `studies`: the stack, coarse to fine: [{rgb (w x h x 3), file, minMm2, mode}] (mode 'glaze': a few connected glazes
 // from that study instead of every shape it adds). `flat`: every shape one flat fill of its own,
 // butted, no nesting, charging, load, soft edges or dabs (for comparison only).
-export function planStudyWashes({ k, w, h, studies, flat = false, rgb: subjectRgb = null, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null }) {
+export function planStudyWashes({ k, w, h, studies, flat = false, density = null, paperRGB = null, pigments = [], sheetWidthMm = 280, washBrushMm, washKitMm = [washBrushMm], subject = null, shaped = true, drawn = false, inkValue = null }) {
   const n = w * h, cellMm = sheetWidthMm / w, paperCol = paperRGB ?? [252, 251, 248];
   if (!studies?.length || studies.some(st => !st?.rgb || st.rgb.length !== n * 3)) throw Error('the study wash plan needs its studies registered to the sheet (w x h x 3)');
   if (pigments.length !== k || k < 1) throw Error('the wash plan needs the pigments');
@@ -455,21 +431,6 @@ export function planStudyWashes({ k, w, h, studies, flat = false, rgb: subjectRg
   // --- layer 1: the block-in ---
   const L1 = studies[0], R1 = L1.read ?? {}, first = studyShapes(grids[0], pw, ph, paperCol, { sliverCells: Math.max(SLIVER_SHARE * pn, (L1.minMm2 ?? 0) / cellMm2), most: FIRST_MOST, ...R1 });
   const { label, shapes, clusters } = first;
-  // PAPER OR PAINT for a large shape is the subject's, read at a 10 mm squint against the sheet's colour (a 3 L* blob of a
-  // few mm is nothing at that scale), not the study's: an image model leaves a sky white or tints it blue by chance.
-  // Within PAPER_SURE of paper it stays paper; past PAINT_SURE it is painted (in the subject's squinted colour when the
-  // study left it white); between, the study decides.
-  let paperFlips = 0;
-  if (subjectRgb && !flat) {
-    const sq = squintLab(subjectRgb, w, h, pw, ph, PAPER_SQUINT_MM / mmX, paperCol);
-    shapes.forEach(s => {
-      if (s.cells.length < BIG * pn) return;
-      let d = 0, L = 0, A = 0, B = 0; for (const q of s.cells) { d += sq.dE[q]; L += sq.L[q]; A += sq.A[q]; B += sq.B[q]; } const n0 = s.cells.length; d /= n0;
-      const paper = d <= PAPER_SURE ? true : d >= PAINT_SURE ? false : s.paper;
-      if (paper !== s.paper) { paperFlips++; s.paperBy = 'subject'; if (!paper && s.lab[0] >= PAPER_L - 2) { s.colour = labToRgb([L / n0, A / n0, B / n0], paperCol); s.lab = labOf(s.colour, 0, paperCol); s.chroma = Math.hypot(s.lab[1], s.lab[2]); } }
-      s.paper = paper;
-    });
-  }
   const parent = flat ? shapes.map(() => -1) : nestParents(shapes);
   const kids = shapes.map(() => []); parent.forEach((p, i) => { if (p >= 0) kids[p].push(i); });
   const under = i => { const out = [i]; for (let q = 0; q < out.length; q++) out.push(...kids[out[q]]); return out; };
@@ -585,7 +546,8 @@ export function planStudyWashes({ k, w, h, studies, flat = false, rgb: subjectRg
     paintedShare: covered.reduce((a, v) => a + v, 0) / pn, meanWashMm2: areas.reduce((a, v) => a + v, 0) / Math.max(1, areas.length), medianWashMm2: areas.length ? areas[areas.length >> 1] : 0, smallestWashMm2: areas[0] ?? 0, plannedStrokes: strokeCount, drawn };
   console.log(`study washes: the wash plan is read from ${studies.length} block-in ${studies.length > 1 ? 'studies' : 'study'} (${studies.map(st => `${st.file ?? '?'}${st.minMm2 ? ` from ${st.minMm2} mm2` : ''}`).join(', ')}), not from the subject (the subject only registers the studies to the sheet${studies[0].registered ? `: ${studies[0].registered}` : ''} and scores the plate; the palette and the drawing are the painter's own as before)${flat ? '; FLAT: plain fills, for comparison' : ''}`);
   perLayer.forEach((pl, li) => console.log(`study washes, layer ${li + 1}${pl.accent ? ' (accents)' : pl.mode === 'glaze' ? ' (connected glazes)' : ''}: ${pl.study}, shapes from ${pl.minMm2 ?? '-'} mm2, registered by ${pl.shift.join(',')} cells: ${pl.washes} washes, ${pl.strokes} strokes`));
-  console.log(`study washes: study maker by file name: ${studies.map(st => (/local|seed\d/.test(st.file ?? '') ? 'local image model (mflux)' : 'not named (the RunPod studies carry no tag)')).filter((v, i, a) => a.indexOf(v) === i).join(' and ')}; ${paperFlips} large shape${paperFlips === 1 ? '' : 's'} set to paper or paint by the subject squinted at ${PAPER_SQUINT_MM} mm`);
+  console.log(`study washes: study maker by file name: ${studies.map(st => (/local|seed\d/.test(st.file ?? '') ? 'local image model (mflux)' : 'not named (the RunPod studies carry no tag)')).filter((v, i, a) => a.indexOf(v) === i).join(' and ')}`);
+  console.log(`study washes: ${COPY_TEST}`);
   console.log(`study washes: ${clusters} colours, ${shapes.length} block-in shapes (${summary.paperShapes} left as paper, ${(100 * reservedShare).toFixed(1)}% of the sheet); ${washes} washes (${byStage[0]} first, ${byStage[2]} over a lighter wash, ${byStage[3]} accents), ${nested} nested, ${softJoins} laid against a damp neighbour, ${dabbed} in dabs, ${charges} charges; ${strokeCount} strokes`);
   return { opticsReport: null, paper: null, style: null, layers, instructions, protectedCells: null, value: inkValue ?? { values: density ?? new Float32Array(n) }, regions, omittedDemand: 0, lightShapes, summary, mixes, polygons,
     geometry: 'Washes from a stack of block-in studies, coarse to fine: the block-in\'s flat shapes, each one mix, lightest and largest first, a darker shape of like hue laid over its lighter one (wash within wash), close values laid against each other damp, broken masses in dabs, the darkest small shapes last; each richer study adds only where it is darker or stronger than what is laid. Whites left as paper.' };
