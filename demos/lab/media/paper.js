@@ -67,9 +67,19 @@ export function makePaper(w, h, { seed = 1, fibres = 0.5, tooth = 0.5, fibreLeng
   const toothLo = tl, toothSpan = th - tl || 1;
   const rel = new Float32Array(n); for (let i = 0; i < n; i++) rel[i] = height[i] - (toothLo + toothSpan * toothH[i]);
   const sorted = Float32Array.from(rel).sort();
-  const reliefSpread = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
-  // zUm, hollow (physical sheets): the relief in micrometres and each cell's depth below its millimetre mean in RMS units
-  return { w, h, n, height, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, mmPerCell: physMm, ...toothHollow(height, toothH, toothLo, toothSpan, RF ? RF.hollowRmsUm / HEIGHT_SPAN_UM : 0), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm } : {}) };
+  const gridSpread = Math.max(1e-4, sorted[Math.floor(n * 0.9)] - sorted[Math.floor(n * 0.1)]);
+  // On a physical sheet the spread is the paper's own, at full resolution (10th to 90th percentile of a relief of that
+  // RMS about its millimetre mean, 2.56 RMS), so a brush reaches the same depth into the same paper on any grid; and
+  // subRelief is the part of it a cell's mean hides (the RMS finer than the cell), which softens a cell's contact by
+  // the share of its area that stands above a level, where the cell's mean alone would switch it at once.
+  let reliefSpread = gridSpread, subRelief = 0;
+  if (RF) {
+    const full = RF.hollowRmsUm / HEIGHT_SPAN_UM; let v = 0; for (let i = 0; i < n; i++) v += rel[i] * rel[i];
+    reliefSpread = 2.56 * full; subRelief = Math.sqrt(Math.max(0, full * full - v / n));
+  }
+  // zUm, reliefOf (physical sheets): the relief in micrometres and the seed and preset it was made from (sub-cell grain
+  // evaluates the same field finer, subcell-grain.mjs); hollow: each cell's depth below the tooth level in RMS units
+  return { w, h, n, height, capacity, valley, proud, tooth: toothH, toothLo, toothSpan, fdx, fdy, grain, relief: reliefSpread, subRelief, mmPerCell: physMm, ...toothHollow(height, toothH, toothLo, toothSpan, RF ? RF.hollowRmsUm / HEIGHT_SPAN_UM : 0), ...(RF ? { zUm: RF.zUm, reliefUm: RF.rmsUm, reliefOf: { seed, relief } } : {}) };
 }
 
 /**
