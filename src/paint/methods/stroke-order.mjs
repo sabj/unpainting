@@ -226,16 +226,19 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   }
   // small isolated things: groups of non-outline marks that touch no outline and stay small
   const free = joined.filter(s => s.role !== 'outline'), anchors = joined.filter(s => s.role === 'outline').map(s => resample(s.points, c.isolatedMm / 2));
-  const near = (P, Q) => P.some(p => Q.some(q => dist(p, q) <= c.isolatedMm));
-  const samp = free.map(s => resample(s.points, c.isolatedMm / 2)), grp = new Int32Array(free.length).fill(-1);
+  // a grid of every sample, so each stroke finds the marks within isolatedMm of it without looking at all of them
+  const samp = free.map(s => resample(s.points, c.isolatedMm / 2)), grp = new Int32Array(free.length).fill(-1), g = c.isolatedMm;
+  const grid = new Map(), key = (i, j) => i * 100003 + j, put = (q, v) => { const k = key(Math.floor(q[0] / g), Math.floor(q[1] / g)); if (!grid.has(k)) grid.set(k, []); grid.get(k).push([q[0], q[1], v]); };
+  samp.forEach((P, k) => P.forEach(q => put(q, k)));
+  anchors.forEach(P => P.forEach(q => put(q, -1)));
+  const around = (P, fn) => { for (const q of P) { const i0 = Math.floor(q[0] / g), j0 = Math.floor(q[1] / g); for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (const r of grid.get(key(i, j)) ?? []) if (Math.hypot(r[0] - q[0], r[1] - q[1]) <= g) fn(r[2]); } };
   for (let a = 0; a < free.length; a++) {
     if (grp[a] >= 0) continue;
-    const st = [a], members = []; grp[a] = a;
-    while (st.length) { const k = st.pop(); members.push(k); for (let b = 0; b < free.length; b++) if (grp[b] < 0 && near(samp[k], samp[b])) { grp[b] = a; st.push(b); } }
-    const pts = members.flatMap(k => free[k].points), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
-    const area = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
-    const touches = members.some(k => anchors.some(A => near(samp[k], A)));
-    const across = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    const st = [a], members = []; grp[a] = a; let touches = false;
+    while (st.length) { const k = st.pop(); members.push(k); around(samp[k], v => { if (v < 0) touches = true; else if (grp[v] < 0) { grp[v] = a; st.push(v); } }); }
+    const pts = members.flatMap(k => free[k].points);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const [x, y] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    const area = (x1 - x0) * (y1 - y0), across = Math.hypot(x1 - x0, y1 - y0);
     if (!touches && area < c.smallShare * widthMm * heightMm && across < c.smallDiag * Math.hypot(widthMm, heightMm)) for (const k of members) free[k].role = 'small';
   }
   const byObj = new Map(); for (const s of joined) { if (!byObj.has(s.object)) byObj.set(s.object, []); byObj.get(s.object).push(s); }
