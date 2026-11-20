@@ -31,7 +31,7 @@ const RESERVE_WITHIN = 7, RESERVE_CHROMA = 12;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
 const RESERVE_LEAST_MM2 = 25, RESERVE_ROUND_MM = 4;
 /** First wash: at most this many colour families; families nearer than this (Lab) are one; an area is at least this big (mm2) or this share of the sheet. */
-const ZONE_FAMILIES = 6, ZONE_JOIN = 9, ZONE_LEAST_MM2 = 300, ZONE_LEAST_SHARE = 0.04;
+const ZONE_FAMILIES = 6, ZONE_JOIN = 6, ZONE_LEAST_MM2 = 300, ZONE_LEAST_SHARE = 0.04;
 /** Areas are told apart by hue and chroma first: light weighs this much, so a lit face and its shadowed side are one area. */
 const ZONE_L_WEIGHT = 0.15;
 /** An area whose light side is this near the paper (CIEDE2000) is left as paper: a lot of the sheet stays bare. */
