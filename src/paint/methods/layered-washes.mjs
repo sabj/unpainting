@@ -33,7 +33,7 @@ const PAPER_NEAR = 10, PAPER_DARKEST = 72;
 /** The least reserved light (mm2) and the brush (mm) that rounds its outline. */
 const RESERVE_LEAST_MM2 = 25, RESERVE_ROUND_MM = 4;
 /** First wash: at most this many colour families; families nearer than this (Lab) are one; an area is at least this big (mm2) or this share of the sheet. */
-const ZONE_FAMILIES = 6, ZONE_JOIN = 6, ZONE_LEAST_MM2 = 300, ZONE_LEAST_SHARE = 0.04;
+const ZONE_FAMILIES = 4, ZONE_JOIN = 6, ZONE_LEAST_MM2 = 300, ZONE_LEAST_SHARE = 0.04;
 /** Areas are told apart by hue and chroma first: light weighs this much, so a lit face and its shadowed side are one area. */
 const ZONE_L_WEIGHT = 0.15;
 /** An area whose light side is this near the paper (CIEDE2000) is left as paper: a lot of the sheet stays bare. */
@@ -267,7 +267,7 @@ export function planLayeredWashes({ demand, k, density, w, h, rgb = null, paperR
   for (const q of open) { let best = 0, bd = Infinity; centres.forEach((c, f) => { const [fa, fb, fl] = zoneFeature(q), d = (fa - c[0]) ** 2 + (fb - c[1]) ** 2 + (fl - c[2]) ** 2; if (d < bd) { bd = d; best = f; } }); fam[q] = best; }
   // areas: each family's parts, rounded by a big brush; a part under the least area joins the family it borders most
   const leastZone = cellsFor(Math.max(ZONE_LEAST_MM2, ZONE_LEAST_SHARE * sheetWidthMm * sheetWidthMm * ph / pw));
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 8; pass++) {
     const c = labelParts(Int32Array.from(fam, v => v + 1), pw, ph), size = new Int32Array(c.count + 1), famOf = new Int32Array(c.count + 1);
     for (let q = 0; q < pn; q++) { const id = c.labels[q]; if (id) { size[id]++; famOf[id] = fam[q]; } }
     let changed = false;
