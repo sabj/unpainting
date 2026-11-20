@@ -218,7 +218,7 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
       resolution: { question: 'wash', minimumWashBodyCells: 4, estimatedSupportWidthCells: 0, estimateMethod: 'script', mmPerCell: cellMm },
       layer: stage, break: null, load: { water: how.water, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
       edges: { hardCells: [], softCells: [], policy: p.edges ?? 'mixed' }, outline: [], strokes, softEdges: [], depthMm: 0, uncoveredShare: 0, widestBrushMm: Math.max(...strokes.map(st => 2 * st.radiusMm)),
-      protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, handling: p.handling ?? null } };
+      protectedLights: p.leave ? [p.leave] : [], failureSigns: 'Lost lights, muddy overlaps, stripes.', stop: 'after the passage', script: { passage: p.id, kind: p.kind, paper: p.paper ?? 'dry', into: p.into ?? null, wait: p.wait ?? null, glaze: p.glaze ?? null, handling: p.handling ?? null } };
     sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
     polygons.push({ stage, thing: what, kind, colour: null, loops: (charge ? [] : regionsOf(p)).map(P => ({ points: P })) });
     strokeCount += strokes.length;
@@ -227,9 +227,12 @@ export function planScriptWashes({ script: given, k, w, h, pigments, paperRGB = 
   let prev = null; const washed = [];
   for (const p of passages) {
     const stage = Math.max(1, Math.min(5, Math.round(p.stage ?? 2)));
-    const joins = p.into != null && prev?.id === p.into && (p.paper === 'wet' || p.paper === 'damp');
-    if (p.into != null && !joins) console.log(`painting script: ${p.id} is to go into ${p.into}, which is not the passage just before it (${prev?.id ?? 'none'}) or is laid on dry paper; laid on its own`);
-    const own = moveOf(p, joins);
+    // what the sheet does before this passage: `wait` dry (the default: every earlier passage dried), damp (no drying: it
+    // is laid while what is down has just lost its shine, as the next passage of one sitting) or none (straight on)
+    const wait = p.wait ?? (p.into != null ? 'damp' : 'dry');
+    const joins = prev != null && (wait === 'damp' || wait === 'none') && (p.into == null || prev.id === p.into);
+    if (p.into != null && !joins) console.log(`painting script: ${p.id} is to go into ${p.into}, which is not the passage just before it (${prev?.id ?? 'none'}); laid on its own, on a dry sheet`);
+    const own = moveOf({ ...p, paper: p.paper ?? (joins && wait === 'damp' ? 'damp' : 'dry') }, joins);
     if (!joins) close();
     const strokes = passageStrokes(p, brushes, seed, lights), mix = mixOf(p.paint);
     const sh = wash(p, stage, strokes, mix, own, { kind: p.kind, what: `${p.id}: ${p.what ?? ''}` });

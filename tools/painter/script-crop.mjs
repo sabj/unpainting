@@ -44,13 +44,19 @@ export function cropScript(script, x, y, w, h) {
     if (p.kind === 'lines' || p.mark === 'line') {
       q.paths = (p.paths ?? []).flatMap(P => clipPath(P, x, y, x1, y1)).map(mv); if (!q.paths.length) continue;
     } else {
-      const regs = p.regions?.length ? p.regions : [p.region], kept = regs.map(P => clipPolygon(P, x, y, x1, y1)).filter(P => P.length >= 3);
+      const regs = (p.regions?.length ? p.regions : [p.region]).filter(P => P?.length >= 3);
+      if (!regs.length && Array.isArray(p.strokes) && p.strokes.length) { /* strokes written out: kept below, moved */ } else {
+      const kept = regs.map(P => clipPolygon(P, x, y, x1, y1)).filter(P => P.length >= 3);
       const share = areaOf(kept) / Math.max(1e-6, areaOf(regs)); if (!kept.length || share < 0.02) continue;
       delete q.region; q.regions = kept.map(mv);
       if (p.count) q.count = Math.max(1, Math.round(p.count * share));
       if (p.mark && p.mark !== 'sweep' && p.strokes) q.strokes = Math.max(1, Math.round(p.strokes * share));
+      }
     }
-    if (Array.isArray(p.strokes) && p.strokes.length) q.strokes = p.strokes.map(st => st.points ? { ...st, points: st.points.map(([a, b, c]) => [+(a - x).toFixed(2), +(b - y).toFixed(2), c]) } : { ...st, ...(st.at ? { at: [st.at[0] - x, st.at[1] - y] } : {}), ...(st.from ? { from: [st.from[0] - x, st.from[1] - y] } : {}) });
+    const inWin = ([a, b]) => a >= x - 5 && a <= x1 + 5 && b >= y - 5 && b <= y1 + 5;
+    if (Array.isArray(p.strokes) && p.strokes.length) { q.strokes = p.strokes.filter(st => (st.points ?? [st.at ?? st.from ?? [-1e9, -1e9]]).some(inWin)); if (!q.strokes.length) continue; }
+    if (p.reserveRegions) q.reserveRegions = p.reserveRegions.map(P => clipPolygon(P, x, y, x1, y1)).filter(P => P.length >= 3).map(mv);
+    if (Array.isArray(q.strokes) && q.strokes.length) q.strokes = q.strokes.map(st => st.points ? { ...st, points: st.points.map(([a, b, c]) => [+(a - x).toFixed(2), +(b - y).toFixed(2), c]) } : { ...st, ...(st.at ? { at: [st.at[0] - x, st.at[1] - y] } : {}), ...(st.from ? { from: [st.from[0] - x, st.from[1] - y] } : {}) });
     if (p.paths && p.kind !== 'lines' && p.mark !== 'line') q.paths = p.paths.flatMap(P => clipPath(P, x, y, x1, y1)).map(mv);
     q.charges = (p.charges ?? []).map(c => ({ ...c, at: (c.at ?? []).filter(([a, b]) => a >= x && a <= x1 && b >= y && b <= y1).map(([a, b]) => [+(a - x).toFixed(2), +(b - y).toFixed(2)]) })).filter(c => c.at.length);
     passages.push(q);

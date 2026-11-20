@@ -73,6 +73,12 @@ test('the plan: one wash a passage, its charges in its wet session, a passage in
   for (const l of p.layers) for (const s of l.shapes) { assert.ok(s._valuePlan.strokes.length > 0); assert.ok(s.area > 0); }
 });
 
+test('a passage says how far the sheet dries before it: dry (a new sitting), damp or none (straight on, one session)', () => {
+  const p = plan(script([wall, { ...wall, id: 'p2', paper: undefined, wait: 'damp' }, { ...wall, id: 'p3', wait: 'none' }, { ...wall, id: 'p4' }]));
+  assert.deepEqual(p.layers.map(l => l._script), [['p1', 'p2', 'p3'], ['p4']]);
+  assert.equal(p.layers[0].shapes[1]._valuePlan.move, 'beside damp');
+});
+
 test('a passage into one that is not just before it is laid on its own', () => {
   const p = plan(script([wall, { ...wall, id: 'p2' }, { ...wall, id: 'p3', paper: 'damp', into: 'p1' }]));
   assert.equal(p.layers.length, 3);
