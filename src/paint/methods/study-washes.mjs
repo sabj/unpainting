@@ -264,7 +264,7 @@ const SESSION_MOST = 10;
 /** A glaze layer (FILE:MIN:glaze): a cell joins a glaze when the study is a little darker and this much cooler (b*) than what is laid; parts within this (mm) are one; at most this many glazes. */
 const GLAZE_COOLER = 6, GLAZE_JOIN_MM = 4, GLAZE_MOST = 6;
 /** A shadow glaze is moved this much cooler (b*) than the study's shadow colour (a cast shadow on a warm wall reads violet-grey). */
-const SHADOW_COOL = 6;
+const SHADOW_COOL = 12;
 /** A light shape at least this share of the sheet, with what nests on it, is a family laid first as one under-wash. */
 const FAMILY_LEAST = 0.03;
 /** A shape whose outline runs at least this share along one family's shapes lies inside it: the under-wash runs under it. */
@@ -279,7 +279,7 @@ const EDGE_STEP_MM = 0.5, EDGE_PULL_MM = 60, EDGE_PRESS = 0.55;
 const DARK_KIT_MM = 7, DARK_ROUND_MM = 1;
 /** Every cast-shadow glaze over one family is mixed in one proportion, the largest's, at this share of the strength its study
  * value asks (a glaze that lets the lit wall show through). */
-const SHADOW_CHARGE = 0.9;
+const SHADOW_CHARGE = 1;
 /** ... one proportion for each band of this many degrees of hue (the path's blue-grey is not the wall's violet shadow). */
 const SHADOW_HUE_BAND = 40;
 /** The under-wash is laid this much lighter than its family's colour (a share of the colour's depth below the paper): the lit
@@ -300,7 +300,7 @@ const MONO_STEP_L = 8, MONO_FIRST = 0.7, MONO_CUTS = [0.4, 0.12], MONO_STEP_LEAS
 /** Touches are laid with rounds of these widths (mm): the smallest a pointed round's touch, the largest a big round's stroke. */
 const TOUCH_KIT = [0.8, 1.4, 2.4, 4, 6.5, 10];
 /** Reserved lights from the finest study: at least this light (L*) and no more chromatic than this, in parts of at least this (mm2). */
-const RESERVE_L = 90, RESERVE_C = 12, RESERVE_LEAST_MM2 = 2;
+const RESERVE_L = 92, RESERVE_C = 12, RESERVE_LEAST_MM2 = 2, RESERVE_MOST_MM2 = 25;
 /** A family shape is dropped into its wet under-wash when its value is within this (L*) of the family's and its hue at least
  * this far off (a*b*), and it is at least this big (mm2); with rounds of these widths (mm). */
 const CHARGE_CLOSE_L = 16, CHARGE_HUE = 4, CHARGE_LEAST_MM2 = 6, CHARGE_KIT = [2, 3.5, 6, 10, 14];
@@ -317,9 +317,9 @@ const PANE_LEAST_MM2 = 2.5;
 const ACCENT_MOST_MM2 = 15, ACCENT_L = 40;
 /** Glazes: one for each GLAZE_STEP_L (L*) a shadow or dark is below what is laid, at most four; glaze k covers the cells
  * at or under this quantile of the finest study's lightness in the shape; parts under GLAZE_LEAST_MM2 are left. */
-const GLAZE_STEP_L = 10, GLAZE_STEPS = [1, 0.65, 0.4, 0.22], GLAZE_LEAST_MM2 = 6;
+const GLAZE_STEP_L = 7, GLAZE_STEPS = [1, 0.8, 0.62, 0.45, 0.3, 0.2], GLAZE_LEAST_MM2 = 6;
 /** A dark (a window's glass) is glazed whole more times before its glazes shrink. */
-const GLAZE_STEPS_DARK = [1, 1, 0.85, 0.6];
+const GLAZE_STEPS_DARK = [1, 1, 0.9, 0.8, 0.7, 0.6];
 /** Foliage glazes: each covers the canopy cells at or under this quantile of the finest study's lightness, its colour read
  * from this study of the stack (0 the block-in), its leaf strokes kept in this share of their clusters; no glaze moves a
  * place by more than FOLIAGE_STEP_L (L*). */
@@ -618,7 +618,7 @@ export function planStudyWashes({ k, w, h, studies, flat = false, density = null
     const g = grids[grids.length - 1], lm = new Uint8Array(pn);
     for (let q = 0; q < pn; q++) { const [l, a, b] = labOf(g, q, valueRef); if (l >= RESERVE_L && Math.hypot(a, b) <= RESERVE_C) lm[q] = 1; }
     const c = components(lm, pw, ph, 4), cnt = new Int32Array(c.count + 1); for (const id of c.labels) if (id) cnt[id]++;
-    for (let q = 0; q < pn; q++) { const id = c.labels[q]; if (id && cnt[id] * cellMm2 >= RESERVE_LEAST_MM2) { reserve[q] = 1; paperMask[q] = 1; } }
+    for (let q = 0; q < pn; q++) { const id = c.labels[q]; if (id && cnt[id] * cellMm2 >= RESERVE_LEAST_MM2 && cnt[id] * cellMm2 <= RESERVE_MOST_MM2) { reserve[q] = 1; paperMask[q] = 1; } }
   }
   { const pr = roundMask(paperMask, pw, ph, rC(ROUND_MM / 2)), pc = components(pr, pw, ph, 4); for (let id = 1; id <= pc.count; id++) keepOut.push(...loopsFor(pc.labels, id)); }
   const roundFirst = R1.round != null ? 2 * R1.round : ROUND_MM;   // @round is a radius (mm); ROUND_MM a brush width
