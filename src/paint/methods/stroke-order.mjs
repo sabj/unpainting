@@ -21,6 +21,12 @@ export const ORDER_DEFAULTS = Object.freeze({
   smallShare: 0.005,    // ... and smaller than this share of the sheet ...
   smallDiag: 0.06,      // ... and than this share of its diagonal across is a small isolated thing, drawn last
   reachMm: 5,           // the next stroke is the nearest, a long one counted nearer: distance / sqrt(1 + length / reachMm)
+  hatchMm: [1, 12],     // a hatching stroke: straight, this long ...
+  hatchDeg: 20,         // ... with neighbours within this angle ...
+  hatchGapMm: 3,        // ... and this far apart (at least two of them), side by side
+  ink: 'full',          // the ink amount inside painted masses (`masses`, a test (x, y) mm -> boolean): none | forms | full
+  formMm: 6,            // at 'forms', a stroke inside a mass is kept when at least this long and along the mass's edge
+  edgeMm: 1.5,          // ... within this of the edge
   partShare: 0.02,      // faces under this share of the sheet split by a line between them are parts of one object (panes of a window)
 });
 
@@ -50,6 +56,36 @@ export function turningPerMm(P, step = 0.5) {
     turn += Math.abs(Math.atan2(ax * by - ay * bx, ax * bx + ay * by));
   }
   return turn * 180 / Math.PI / L;
+}
+
+/** Runs of hatching: straight strokes of hatchMm length with at least two neighbours alongside at hatchDeg and hatchGapMm. */
+export function hatchRuns(strokes, o = {}) {
+  const c = { ...ORDER_DEFAULTS, ...o }, n = strokes.length;
+  const F = strokes.map(P => {
+    const L = pathLength(P), a = P[0], b = P[P.length - 1], ch = dist(a, b);
+    return { ok: L >= c.hatchMm[0] && L <= c.hatchMm[1] && ch >= 0.9 * L, L, d: [(b[0] - a[0]) / (ch || 1), (b[1] - a[1]) / (ch || 1)], m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+  });
+  const g = c.hatchGapMm, grid = new Map(), key = (i, j) => i * 100003 + j;
+  F.forEach((f, i) => { if (f.ok) { const k = key(Math.floor(f.m[0] / g), Math.floor(f.m[1] / g)); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); } });
+  const cosMin = Math.cos(c.hatchDeg * Math.PI / 180), nb = F.map(() => []);
+  F.forEach((f, i) => {
+    if (!f.ok) return;
+    const i0 = Math.floor(f.m[0] / g), j0 = Math.floor(f.m[1] / g);
+    for (let a = i0 - 1; a <= i0 + 1; a++) for (let b = j0 - 1; b <= j0 + 1; b++) for (const j of grid.get(key(a, b)) ?? []) {
+      if (j === i) continue;
+      const e = F[j], cos = Math.abs(f.d[0] * e.d[0] + f.d[1] * e.d[1]), dx = e.m[0] - f.m[0], dy = e.m[1] - f.m[1];
+      const along = Math.abs(dx * f.d[0] + dy * f.d[1]), across = Math.abs(-dx * f.d[1] + dy * f.d[0]);
+      if (cos >= cosMin && across <= g && across > 0.1 && along <= (f.L + e.L) / 4 + 0.5) nb[i].push(j);
+    }
+  });
+  const run = new Int32Array(n).fill(-1), runs = [];
+  for (let i = 0; i < n; i++) {
+    if (run[i] >= 0 || nb[i].length < 2) continue;
+    const st = [i], mem = []; run[i] = runs.length;
+    while (st.length) { const k = st.pop(); mem.push(k); for (const j of nb[k]) if (run[j] < 0 && nb[j].length >= 1) { run[j] = runs.length; st.push(j); } }
+    if (mem.length >= 3) runs.push(mem); else for (const k of mem) run[k] = -1;
+  }
+  return runs;
 }
 
 /** A stroke pulled the way a hand pulls it: downward if it runs more up-down than across, else left to right. */
@@ -243,6 +279,17 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const area = (x1 - x0) * (y1 - y0), across = Math.hypot(x1 - x0, y1 - y0);
     if (!touches && area < c.smallShare * widthMm * heightMm && across < c.smallDiag * Math.hypot(widthMm, heightMm)) for (const k of members) free[k].role = 'small';
   }
+  // hatching: runs of parallel strokes, laid together in the second pass
+  hatchRuns(joined.map(s => s.points), c).forEach((mem, r) => mem.forEach(k => { if (joined[k].role !== 'outline') { joined[k].role = 'hatch'; joined[k].run = r; } }));
+  // the ink amount: inside a painted mass (sky, cloud, foliage mass, cast shadow) 'none' lays nothing, 'forms' only the
+  // long strokes along the mass's edge, 'full' everything; outside the masses every stroke is laid as drawn
+  if (!['none', 'forms', 'full'].includes(c.ink)) throw new Error(`ink amount: none, forms or full, not ${c.ink}`);
+  if (c.masses && c.ink !== 'full') for (const s of joined) {
+    const Q = resample(s.points, c.cellMm), inside = Q.filter(([x, y]) => c.masses(x, y)).length / Q.length;
+    if (inside < 0.5) continue;
+    const e = c.edgeMm, edge = Q.filter(([x, y]) => [[e, 0], [-e, 0], [0, e], [0, -e]].some(([dx, dy]) => !c.masses(x + dx, y + dy))).length / Q.length;
+    if (c.ink === 'none' || pathLength(s.points) < c.formMm || edge < 0.5) { s.taken = true; s.dropped = true; }
+  }
   const byObj = new Map(); for (const s of joined) { if (!byObj.has(s.object)) byObj.set(s.object, []); byObj.get(s.object).push(s); }
   const out = []; let pen = [0, 0];
   const take = (s, pass) => { out.push({ parts: s.parts, points: s.points, object: s.object, role: s.role, pass }); pen = s.points[s.points.length - 1]; s.taken = true; };
@@ -283,10 +330,32 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     let b = items[0]; for (const x of items) if (d(x) < d(b)) b = x;
     if (b.s) take(b.s, 1); else visit(b.k);
   }
-  // a second pass over the worked objects in the order they were drawn: texture and hatching
-  for (const id of [...visited, -1]) { const T = own(id, 'texture'), at = out.length; nearestFirst(T); for (let k = at; k < out.length; k++) out[k].pass = 2; }
+  // a second pass over the worked objects in the order they were drawn: texture marks, and hatching laid run by run, each
+  // run's strokes all pulled one way and taken side by side across the run from its end nearer the pen
+  const runOf = new Map(); for (const s of joined) if (s.role === 'hatch' && !s.taken) { if (!runOf.has(s.run)) runOf.set(s.run, []); runOf.get(s.run).push(s); }
+  for (const mem of runOf.values()) {
+    let dx = 0, dy = 0; const d0 = mem[0].points, r0 = [d0[d0.length - 1][0] - d0[0][0], d0[d0.length - 1][1] - d0[0][1]];
+    for (const s of mem) { const P = s.points, v = [P[P.length - 1][0] - P[0][0], P[P.length - 1][1] - P[0][1]], sg = v[0] * r0[0] + v[1] * r0[1] < 0 ? -1 : 1; dx += sg * v[0]; dy += sg * v[1]; }
+    if (Math.abs(dy) > Math.abs(dx) ? dy < 0 : dx < 0) { dx = -dx; dy = -dy; }
+    for (const s of mem) { const P = s.points, v = [P[P.length - 1][0] - P[0][0], P[P.length - 1][1] - P[0][1]]; if (v[0] * dx + v[1] * dy < 0) s.points = [...P].reverse(); }
+    const across = s => { const m = s.points[0]; return -m[0] * dy + m[1] * dx; };
+    mem.sort((a, b) => across(a) - across(b));
+  }
+  for (const id of [...visited, -1]) {
+    const at = out.length, T = own(id, 'texture'), R = [...new Set(own(id, 'hatch').map(s => s.run))].map(r => runOf.get(r));
+    const items = [...T.map(s => ({ s })), ...R.map(m => ({ m }))];
+    while (items.length) {
+      const d = x => (x.s ? cost(x.s) : Math.min(dist(pen, x.m[0].points[0]), dist(pen, x.m[x.m.length - 1].points[0])));
+      let b = 0; for (let k = 1; k < items.length; k++) if (d(items[k]) < d(items[b])) b = k;
+      const x = items.splice(b, 1)[0];
+      if (x.s) take(x.s, 2);
+      else { const m = dist(pen, x.m[0].points[0]) <= dist(pen, x.m[x.m.length - 1].points[0]) ? x.m : [...x.m].reverse(); for (const s of m) if (!s.taken) take(s, 2); }
+    }
+    for (let k = at; k < out.length; k++) out[k].pass = 2;
+  }
   // small isolated things last
   const at = out.length; nearestFirst(joined.filter(s => s.role === 'small' && !s.taken)); for (let k = at; k < out.length; k++) out[k].pass = 3;
+  out.dropped = joined.filter(s => s.dropped).length;
   return out;
 }
 

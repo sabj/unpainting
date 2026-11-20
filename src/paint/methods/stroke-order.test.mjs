@@ -49,3 +49,25 @@ test('order: the largest form first, its outline before its inside, a container 
   assert.equal(st.innerBeforeOutline, 0);
   for (const x of r) { const a = x.points[0], b = x.points.at(-1); assert.ok(Math.abs(b[1] - a[1]) > Math.abs(b[0] - a[0]) ? b[1] >= a[1] : b[0] >= a[0]); }
 });
+
+test('hatching: parallel strokes side by side are one run, laid together, pulled one way, across the run', () => {
+  const H = Array.from({ length: 6 }, (_, k) => (k % 2 ? seg(50 + k, 30, 46 + k, 34) : seg(46 + k, 34, 50 + k, 30)));
+  const S = [...box(10, 10, 90, 60), ...H, seg(20, 50, 22, 50.3)];
+  const r = orderStrokes(S, 100, 70), hs = r.filter(x => x.role === 'hatch');
+  assert.equal(hs.length, 6);
+  const at = r.findIndex(x => x.role === 'hatch');
+  assert.ok(r.slice(at, at + 6).every(x => x.role === 'hatch'), 'one run, no other stroke between');
+  const dirs = hs.map(x => Math.sign(x.points.at(-1)[1] - x.points[0][1]));
+  assert.ok(dirs.every(d => d === dirs[0]), 'all pulled one way');
+  const xs = r.slice(at, at + 6).map(x => x.points[0][0]);
+  assert.ok(xs.every((x, k) => !k || x > xs[k - 1]) || xs.every((x, k) => !k || x < xs[k - 1]), 'swept across');
+});
+
+test('ink amount: inside a painted mass none lays nothing, forms only the long strokes along its edge, full everything', () => {
+  const mass = (x, y) => x >= 50 && x <= 90 && y >= 10 && y <= 60;
+  const S = [seg(50.2, 15, 50.2, 55), seg(60, 20, 62, 22), seg(65, 30, 80, 30), seg(10, 30, 40, 30)];
+  const n = ink => orderStrokes(S, 100, 70, { ink, masses: mass }).flatMap(x => x.parts).sort();
+  assert.deepEqual(n('full'), [0, 1, 2, 3]);
+  assert.deepEqual(n('forms'), [0, 3]);
+  assert.deepEqual(n('none'), [3]);
+});

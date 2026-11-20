@@ -20,8 +20,9 @@ export const INK_RECIPES = Object.freeze({
 });
 
 // wash with --drawingonly 1: a prepared pen drawing laid alone on dry paper. A pen line there is near black with a firm
-// start and a short lift: black ink (not the source's sepia), a load match that may go past 4x, no damp, one opening pen.
-export const PEN_ONLY = Object.freeze({ inkprofile: 'black-ink', inkhue: 'profile', inkloadmax: '16', drawing: 'first', stages: 'prepink',
+// start and a short lift: black ink (not the source's sepia) in the flexible drawing nib (0.03 to 1.2 mm, so each stroke
+// keeps its drawn width), a load match that may go past 4x, no damp, one opening pen.
+export const PEN_ONLY = Object.freeze({ inkprofile: 'drawing-ink', inkhue: 'profile', inkloadmax: '16', drawing: 'first', stages: 'prepink',
   drawtaperin: '1', drawtaperstart: '1', drawtaperout: '3', drawtaperend: '0.85', inkbleed: '0' });
 
 /**

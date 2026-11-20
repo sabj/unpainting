@@ -121,8 +121,10 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0):
         if arc_length(p) < min_px*zoom:
             continue
         width = max(.6, float(np.median(2*sketch.at(distance, p)))/zoom)
+        # how dark the drawing draws it: the line's core against the paper, 0.85 of full black and over is full weight
+        weight = float(np.clip(np.median(sketch.at(dark, p))/.85, .25, 1))
         q = fair((resample(p.astype(float), 1)+.5)/zoom-.5, fit, 1/zoom)
-        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'weight': 1, 'role': 'pen stroke', 'length': arc_length(q)})
+        lines.append({'points': np.round(q, 3).tolist(), 'width': round(width, 3), 'weight': round(weight, 3), 'role': 'pen stroke', 'length': arc_length(q)})
     lines.sort(key=lambda l: -l['length'])
     return lines, mask, skeleton, {'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}
 
