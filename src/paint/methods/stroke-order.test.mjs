@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orderStrokes, orderStats, pullDirection, turningPerMm, joinContinuations, findObjects, structureWeight } from './stroke-order.mjs';
+import { orderStrokes, orderStats, pullDirection, turningPerMm, joinContinuations, findObjects, structureWeight, growthWeight } from './stroke-order.mjs';
 
 const seg = (x0, y0, x1, y1, n = 10) => Array.from({ length: n + 1 }, (_, k) => [x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n]);
 const box = (x0, y0, x1, y1) => [seg(x0, y0, x1, y0), seg(x1, y0, x1, y1), seg(x1, y1, x0, y1), seg(x0, y1, x0, y0)];
@@ -79,4 +79,35 @@ test('structure weight: the big structure firm and wide, fine detail light, the 
   assert.ok(at(1, 'inner', 50).weight > at(2, 'outline', 50).weight && at(2, 'outline', 50).weight > at(2, 'inner', 50).weight && at(2, 'inner', 50).weight > at(3, 'texture', 50).weight);
   assert.ok(at(1, 'inner', 50).widthScale > at(3, 'fine', 50).widthScale);
   assert.ok(at(2, 'inner', 90).weight > at(2, 'inner', 10).weight);
+});
+
+test('below full: diagonal hatching is left to the paint; joints across flat wall are thinned, kept by openings', () => {
+  const diag = Array.from({ length: 5 }, (_, k) => seg(60 + 2 * k, 10, 64 + 2 * k, 14));
+  const joints = Array.from({ length: 9 }, (_, k) => seg(10 + 4 * k, 30, 13 + 4 * k, 30));
+  const S = [...box(20, 40, 30, 55), ...diag, ...joints, seg(22, 52, 25, 52)];
+  const kept = ink => new Set(orderStrokes(S, 100, 70, { ink }).flatMap(x => x.parts));
+  const full = kept('full'), forms = kept('forms');
+  assert.ok([4, 5, 6, 7, 8].every(i => full.has(i)) && [4, 5, 6, 7, 8].every(i => !forms.has(i)), 'diagonal runs dropped');
+  const j = [9, 10, 11, 12, 13, 14, 15, 16, 17].filter(i => forms.has(i)).length;
+  assert.ok(j >= 2 && j <= 4, `about one joint in three across the wall, kept ${j}`);
+  assert.ok(forms.has(18), 'a joint by an opening stays');
+});
+
+test('growth order: a few light lay-in lines, outlines before their divisions, detail after growth, emphasis last and heaviest', () => {
+  const S = [...box(10, 10, 90, 60), ...box(20, 20, 35, 40), seg(27.5, 20, 27.5, 40), ...box(60, 20, 75, 40), seg(62, 30, 64, 30), zig(40, 50, 12)];
+  const r = orderStrokes(S, 100, 70, { mode: 'growth', layIn: 3, emphasisShare: 0.1 });
+  const ph = r.map(x => x.phase), order = ['layin', 'growth', 'detail', 'texture', 'emphasis'];
+  assert.ok(ph.every((p, k) => !k || order.indexOf(p) >= order.indexOf(ph[k - 1])), 'phases in order');
+  assert.equal(ph.filter(p => p === 'layin').length, 3);
+  assert.ok(ph.at(-1) === 'emphasis');
+  assert.ok(growthWeight({ phase: 'layin' }).weight < growthWeight({ phase: 'growth' }).weight && growthWeight({ phase: 'growth' }).weight < growthWeight({ phase: 'emphasis' }).weight);
+  const g = r.filter(x => x.phase === 'growth'), bar = g.findIndex(x => x.parts.includes(8));
+  for (const k of [4, 5, 6, 7]) { const i = g.findIndex(x => x.parts.includes(k)); if (i >= 0 && g[i].role === 'outline') assert.ok(i < bar); }
+});
+
+test('hatching: none drops runs, sparse keeps every second line of a run by a form edge, drawn keeps all', () => {
+  const run = Array.from({ length: 6 }, (_, k) => seg(30.5 + 2 * k, 13.5, 30.5 + 2 * k, 19));
+  const S = [...box(10, 10, 90, 60), ...run];
+  const n = hatching => orderStrokes(S, 100, 70, { hatching }).filter(x => x.role === 'hatch').length;
+  assert.deepEqual([n('none'), n('sparse'), n('drawn')], [0, 3, 6]);
 });

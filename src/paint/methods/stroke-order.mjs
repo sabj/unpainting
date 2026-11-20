@@ -27,8 +27,16 @@ export const ORDER_DEFAULTS = Object.freeze({
   ink: 'full',          // the ink amount inside painted masses (`masses`, a test (x, y) mm -> boolean): none | forms | full
   formMm: 6,            // at 'forms', a stroke inside a mass is kept when at least this long and along the mass's edge
   edgeMm: 1.5,          // ... within this of the edge
+  openingMm: 40,        // below 'full': an outline shorter than this frames an opening; joints within jointKeepMm of one stay
+  jointKeepMm: 5,
+  foregroundShare: 0.75, // ... and joints in the lowest quarter of the sheet stay
   structureMm: 12,      // pass 1: the big structure, smooth lines at least this long (of every mass, main mass first)
   fineMm: 4,            // pass 3: lines shorter than this are fine detail, laid after every object's outline and divisions
+  hatching: 'drawn',    // none | sparse | drawn (see above)
+  mode: 'passes',       // 'passes' (structure, objects, detail) or 'growth' (lay-in, growth from the main form, development, emphasis)
+  growthPull: 0.7,      // growth: the next stroke is the cheapest by hop + growthPull x its distance from the main form
+  layIn: 12,            // growth: the light placement lines of the biggest masses
+  emphasisShare: 0.04,  // growth: the share of contours restated heavier at the end
   partShare: 0.02,      // faces under this share of the sheet split by a line between them are parts of one object (panes of a window)
 });
 
@@ -283,6 +291,41 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
   }
   // hatching: runs of parallel strokes, laid together in the second pass
   hatchRuns(joined.map(s => s.points), c).forEach((mem, r) => mem.forEach(k => { if (joined[k].role !== 'outline') { joined[k].role = 'hatch'; joined[k].run = r; } }));
+  // HATCHING: none lays no hatching run; sparse lays every second line of a run, and only runs by a form's edge (where the
+  // form turns or casts); as drawn lays them all
+  if (!['none', 'sparse', 'drawn'].includes(c.hatching)) throw new Error(`hatching: none, sparse or drawn, not ${c.hatching}`);
+  if (c.hatching !== 'drawn') {
+    const runs = new Map(); for (const s of joined) if (s.role === 'hatch' && !s.taken) { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
+    const edges = joined.filter(s => s.role === 'outline').map(s => resample(s.points, 1));
+    const byEdge = mem => mem.some(s => [s.points[0], s.points[s.points.length - 1]].some(q => edges.some(E => E.some(p => dist(p, q) <= c.edgeMm * 3))));
+    for (const mem of runs.values()) {
+      const keep = c.hatching === 'sparse' && byEdge(mem);
+      mem.forEach((s, k) => { if (!keep || k % 2) { s.taken = true; s.dropped = true; } });
+    }
+  }
+  // the ink amount outside the masses, below 'full': diagonal hatching runs are cast shadow and tone (the paint lays them);
+  // masonry joints (short straight level or plumb lines) are kept near openings and corners and in the foreground, and
+  // thinned to one in three across flat wall
+  if (c.ink !== 'full') {
+    const runs = new Map(); for (const s of joined) if (s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
+    for (const mem of runs.values()) {
+      let dx = 0, dy = 0; for (const s of mem) { const P = s.points, v = [P[P.length - 1][0] - P[0][0], P[P.length - 1][1] - P[0][1]]; const sg = v[0] >= 0 ? 1 : -1; dx += sg * v[0]; dy += sg * v[1]; }
+      const deg = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI) % 180, off = Math.min(deg, 180 - deg);
+      if (off > 20 && off < 70) for (const s of mem) { s.taken = true; s.dropped = true; }
+    }
+    const frames = joined.filter(s => s.role === 'outline' && pathLength(s.points) < c.openingMm).map(s => resample(s.points, 1));
+    const nearFrame = q => frames.some(F => F.some(p => dist(p, q) <= c.jointKeepMm));
+    let k = 0;
+    for (const s of joined) {
+      if (s.taken || s.role === 'outline') continue;
+      const P = s.points, L = pathLength(P), a = P[0], b = P[P.length - 1], ch = dist(a, b);
+      const ang = Math.abs(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI) % 90, level = Math.min(ang, 90 - ang) < 12;
+      if (L < 2 || L > 15 || ch < 0.95 * L || !level) continue;
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (mid[1] > c.foregroundShare * heightMm || nearFrame(a) || nearFrame(b) || nearFrame(mid)) continue;
+      if (k++ % 3) { s.taken = true; s.dropped = true; }
+    }
+  }
   // the ink amount: inside a painted mass (sky, cloud, foliage mass, cast shadow) 'none' lays nothing, 'forms' only the
   // long strokes along the mass's edge, 'full' everything; outside the masses every stroke is laid as drawn
   if (!['none', 'forms', 'full'].includes(c.ink)) throw new Error(`ink amount: none, forms or full, not ${c.ink}`);
@@ -322,6 +365,7 @@ export function orderStrokes(strokes, widthMm, heightMm, o = {}) {
     const lines = (byObj.get(main.id) ?? []).filter(s => s.role === 'outline');
     if (lines.length) pen = lines.reduce((a, b) => (a.len >= b.len ? a : b)).points[0];
   }
+  if (c.mode === 'growth') return growthOrder({ joined, objects, main, byObj, c, heightMm, start: pen });
   // pass 1: the big structure of the whole picture, the long smooth lines of every mass, from the main mass's longest
   // line, the nearest next (a person sketches the whole composition in before any object is worked)
   { const big = joined.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner') && s.len >= c.structureMm && turningPerMm(s.points) <= 6);
@@ -382,6 +426,63 @@ export function structureWeight(r, heightMm) {
   const [w, s] = r.pass === 1 ? [1, 1.6] : r.pass === 2 && r.role === 'outline' ? [0.9, 1.3] : r.pass === 2 ? [0.75, 1] : [0.6, 0.8];
   const y = r.points.reduce((a, p) => a + p[1], 0) / r.points.length, near = 0.85 + 0.3 * Math.min(1, Math.max(0, y / heightMm));
   return { weight: Math.min(1, w * near), widthScale: s * near };
+}
+
+/**
+ * The growth order (how people start a drawing): 1. a few long light placement lines of the biggest masses; 2. growth from
+ * the main form outward, each form's outline before its divisions, the next stroke the cheapest by hop plus distance from
+ * the main form, so the drawn extent widens steadily; 3. development: fine detail the same way, then texture and hatching,
+ * small things last; 4. emphasis: the main contours restated heavier. Each stroke carries `phase` (layin, growth, detail,
+ * texture, emphasis); weight builds over time (growthWeight).
+ */
+function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
+  const out = [], live = joined.filter(s => !s.taken);
+  for (const s of live) s.len = s.len ?? pathLength(s.points);
+  const centre = (() => { const L = main.id != null ? (byObj.get(main.id) ?? []) : live; const P = (L.length ? L : live).flatMap(s => s.points); return [P.reduce((a, p) => a + p[0], 0) / P.length, P.reduce((a, p) => a + p[1], 0) / P.length]; })();
+  const rad = s => dist(centre, s.points[0]), cost = (pen, s) => dist(pen, s.points[0]) + c.growthPull * rad(s);
+  let pen = start;
+  const take = (s, phase) => { out.push({ parts: s.parts, points: s.points, object: s.object, role: s.role, phase, pass: phase === 'layin' ? 1 : phase === 'growth' ? 2 : 3 }); pen = s.points[s.points.length - 1]; };
+  const walk = (list, phase, gate = () => true, after = () => {}) => {
+    const left = new Set(list);
+    while (left.size) {
+      let best = null, bc = Infinity;
+      for (const s of left) { if (!gate(s)) continue; const k = cost(pen, s); if (k < bc) { bc = k; best = s; } }
+      if (!best) for (const s of left) { const k = cost(pen, s); if (k < bc) { bc = k; best = s; } }
+      left.delete(best); best.taken = true; after(best); take(best, phase);
+    }
+  };
+  const nearest = (list, phase) => { const left = new Set(list); while (left.size) { let b = null; for (const s of left) if (!b || dist(pen, s.points[0]) < dist(pen, b.points[0])) b = s; left.delete(b); take(b, phase); } };
+  // 1. lay-in: the longest smooth lines of the biggest masses, light (drawn again at their weight in growth)
+  const big = live.filter(s => (s.role === 'outline' || s.role === 'inner') && s.len >= c.structureMm && turningPerMm(s.points) <= 6).sort((a, b) => b.len - a.len).slice(0, c.layIn);
+  if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
+  nearest(big, 'layin');
+  // 2. growth from the main form: outlines and divisions (fineMm and longer); an object's inner lines once its outline is down
+  const structural = live.filter(s => (s.role === 'outline' || s.role === 'inner') && s.len >= c.fineMm);
+  const outlineLeft = new Map(); for (const s of structural) if (s.role === 'outline') outlineLeft.set(s.object, (outlineLeft.get(s.object) ?? 0) + 1);
+  if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
+  walk(structural, 'growth', s => s.role === 'outline' || !(outlineLeft.get(s.object) > 0), s => { if (s.role === 'outline') outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); });
+  // 3. development: the remaining lines, then texture and hatching (runs laid together), everything else last
+  walk(live.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner' || s.role === 'fine')), 'detail');
+  const runs = new Map(); for (const s of live) if (!s.taken && s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
+  const items = [...live.filter(s => !s.taken && s.role === 'texture').map(s => ({ s })), ...[...runs.values()].map(m => ({ m }))];
+  while (items.length) {
+    const d = x => (x.s ? cost(pen, x.s) : Math.min(...x.m.map(s => cost(pen, s))));
+    let b = 0; for (let k = 1; k < items.length; k++) if (d(items[k]) < d(items[b])) b = k;
+    const x = items.splice(b, 1)[0];
+    for (const s of x.s ? [x.s] : x.m) { s.taken = true; take(s, 'texture'); }
+  }
+  walk(live.filter(s => !s.taken), 'texture');
+  // 4. emphasis: the longest outlines of the main form and the foreground, restated heavier
+  const key = s => s.len * (s.object === main.id ? 2 : 1) * (0.6 + s.points[0][1] / heightMm);
+  nearest(structural.filter(s => s.role === 'outline').sort((a, b) => key(b) - key(a)).slice(0, Math.round(c.emphasisShare * out.length)), 'emphasis');
+  out.dropped = joined.filter(s => s.dropped).length;
+  return out;
+}
+
+/** Weight over a growth replay: the lay-in faint and fine, growth ordinary, detail and texture lighter, emphasis heaviest. */
+export function growthWeight(r, drawn = 1) {
+  const [w, s] = { layin: [0.3, 0.5], growth: [0.75, 1], detail: [0.65, 0.85], texture: [0.55, 0.8], emphasis: [1, 1.5] }[r.phase] ?? [0.75, 1];
+  return { weight: Math.min(1, w * (r.phase === 'emphasis' ? 1 : drawn)), widthScale: s };
 }
 
 /** Hand travel between consecutive strokes (end of one to start of the next). */
