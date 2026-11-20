@@ -37,8 +37,10 @@ const ORDER_DEFAULTS = Object.freeze({
   hatching: 'drawn',
   budget: 0,            // lay only the this many most important strokes (0: all)    // none | sparse | drawn (see above)
   mode: 'passes',       // 'passes' (structure, objects, detail) or 'growth' (lay-in, growth from the main form, development, emphasis)
-  growthPull: 0.7,      // growth: the next stroke is the cheapest by hop + growthPull x its distance from the main form
-  layIn: 12,            // growth: the light placement lines of the biggest masses
+  growthPull: 1.5,      // growth: the next stroke is the cheapest by hop + growthPull x its distance from the main form
+  layIn: 8,             // growth: the light placement lines of the biggest masses
+  detailLagMm: 15,      // growth: detail follows the structure of its area at about this distance behind
+  majorMm: 25,          // growth: a structure line this long, or one of the main form, is a main line (drawn a little firmer)
   emphasisShare: 0.04,  // growth: the share of contours restated heavier at the end
   accentMm: 40,         // ... a line's length counts up to this in choosing them
   partShare: 0.02,
@@ -484,19 +486,19 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
   const out = [], live = joined.filter(s => !s.taken);
   for (const s of live) s.len = s.len ?? pathLength(s.points);
   const centre = (() => { const L = main.id != null ? (byObj.get(main.id) ?? []) : live; const P = (L.length ? L : live).flatMap(s => s.points); return [P.reduce((a, p) => a + p[0], 0) / P.length, P.reduce((a, p) => a + p[1], 0) / P.length]; })();
-  // a stroke's distance from the main form is its nearest point's (a long line through the middle is near), and the hop to
-  // it is to its nearer end
-  for (const s of live) { s.rad = Math.min(...resample(s.points, 2).map(q => dist(centre, q))); }
+  // a stroke's distance from the main form is its farthest point's: a long line that runs out to the sheet's edge waits until
+  // the drawing has grown that far, so the drawn extent widens steadily; the hop to it is to its nearer end
+  for (const s of live) { s.rad = Math.max(...resample(s.points, 2).map(q => dist(centre, q))); }
   const rad = s => s.rad, cost = (pen, s) => Math.min(dist(pen, s.points[0]), dist(pen, s.points.at(-1))) + c.growthPull * rad(s);
   let pen = start;
-  const take = (s, phase) => { out.push({ parts: s.parts, points: s.points, object: s.object, role: s.role, phase, pass: phase === 'layin' ? 1 : phase === 'growth' ? 2 : 3 }); pen = s.points[s.points.length - 1]; };
-  const walk = (list, phase, gate = () => true, after = () => {}) => {
+  const take = (s, phase) => { out.push({ parts: s.parts, points: s.points, object: s.object, role: s.role, phase, pass: phase === 'layin' ? 1 : phase === 'growth' ? 2 : 3, major: s.object === main.id || s.len >= c.majorMm }); pen = s.points[s.points.length - 1]; };
+  const walk = (list, phase, gate = () => true, after = () => {}, lag = () => 0) => {
     const left = new Set(list);
     while (left.size) {
       let best = null, bc = Infinity;
-      for (const s of left) { if (!gate(s)) continue; const k = cost(pen, s); if (k < bc) { bc = k; best = s; } }
-      if (!best) for (const s of left) { const k = cost(pen, s); if (k < bc) { bc = k; best = s; } }
-      left.delete(best); best.taken = true; after(best); take(best, phase);
+      for (const s of left) { if (!gate(s)) continue; const k = cost(pen, s) + lag(s); if (k < bc) { bc = k; best = s; } }
+      if (!best) for (const s of left) { const k = cost(pen, s) + lag(s); if (k < bc) { bc = k; best = s; } }
+      left.delete(best); best.taken = true; after(best); take(best, typeof phase === 'function' ? phase(best) : phase);
     }
   };
   const nearest = (list, phase) => { const left = new Set(list); while (left.size) { let b = null; for (const s of left) if (!b || dist(pen, s.points[0]) < dist(pen, b.points[0])) b = s; left.delete(b); take(b, phase); } };
@@ -510,9 +512,15 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
   if (big.length) pen = big.reduce((a, b) => (rad(a) <= rad(b) ? a : b)).points[0];
   // hard rules: a child's outline waits for its parent's outline to be closed; an object's inner lines wait for its own
   const parentOpen = s => { let p = objects[s.object]?.parent; while (p != null) { if (outlineLeft.get(p) > 0) return true; p = objects[p].parent; } return false; };
-  walk(structural, 'growth', s => (s.role === 'outline' ? !parentOpen(s) : !(outlineLeft.get(s.object) > 0) && !parentOpen(s)), s => { if (s.role === 'outline') outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); });
-  // 3. development: the remaining lines, then texture and hatching (runs laid together), everything else last
-  walk(live.filter(s => !s.taken && (s.role === 'outline' || s.role === 'inner' || s.role === 'fine')), 'detail');
+  // 3. development rides on the growth: an area's shorter lines (detail) are laid as the growth passes it, a little behind
+  // its structure (detailLagMm counted onto their cost), so the drawing is worked outward from the main form instead of
+  // being staked out over the whole sheet first; texture and hatching wait for the end
+  const isStruct = new Set(structural);
+  const detail = live.filter(s => !s.taken && !isStruct.has(s) && (s.role === 'outline' || s.role === 'inner' || s.role === 'fine'));
+  walk([...structural, ...detail], s => (isStruct.has(s) ? 'growth' : 'detail'),
+    s => (s.role === 'outline' && isStruct.has(s) ? !parentOpen(s) : !(outlineLeft.get(s.object) > 0) && !parentOpen(s)),
+    s => { if (s.role === 'outline' && isStruct.has(s)) outlineLeft.set(s.object, outlineLeft.get(s.object) - 1); },
+    s => (isStruct.has(s) ? 0 : c.detailLagMm));
   const runs = new Map(); for (const s of live) if (!s.taken && s.role === 'hatch') { if (!runs.has(s.run)) runs.set(s.run, []); runs.get(s.run).push(s); }
   const items = [...live.filter(s => !s.taken && s.role === 'texture').map(s => ({ s })), ...[...runs.values()].map(m => ({ m }))];
   while (items.length) {
@@ -543,9 +551,11 @@ function growthOrder({ joined, objects, main, byObj, c, heightMm, start }) {
  */
 export function growthWeight(r, drawn = 1, { width, mid } = {}) {
   const [w, s] = { layin: [0.3, 0.5], growth: [0.75, 1], detail: [0.65, 0.85], texture: [0.55, 0.8], emphasis: [1, 1.5] }[r.phase] ?? [0.75, 1];
-  const weight = r.phase === 'emphasis' ? w : r.phase === 'growth' ? Math.min(0.85, Math.max(0.6, w * drawn)) : w * drawn;
+  // three levels: the lay-in faint; structure at an ordinary, clearly visible weight as soon as it is drawn (main lines a
+  // little firmer); detail and texture lighter; the accents heavy at the end
+  const weight = r.phase === 'emphasis' ? w : r.phase === 'growth' ? (r.major ? 0.95 : 0.85) : r.phase === 'detail' ? Math.max(0.6, 0.75 * drawn) : w * drawn;
   if (!(width > 0 && mid > 0)) return { weight: Math.min(1, weight), widthScale: s };
-  const target = { layin: 0.5 * mid, growth: Math.min(1.15 * mid, Math.max(0.9 * mid, width)), detail: Math.min(width, 0.8 * mid), texture: Math.min(width, 0.7 * mid), emphasis: 1.3 * Math.max(width, mid) }[r.phase] ?? width;
+  const target = { layin: 0.5 * mid, growth: (r.major ? 1.35 : 1.15) * mid, detail: Math.min(Math.max(width, 0.9 * mid), mid), texture: Math.min(width, 0.75 * mid), emphasis: 2 * Math.max(width, mid) }[r.phase] ?? width;
   return { weight: Math.min(1, weight), widthScale: target / width };
 }
 

@@ -106,7 +106,7 @@ def fair(p, tol, spacing):
     return s[[0, -1]] if out is None else out
 
 
-def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_deg=25, min_width=.4, spread=1.6):
+def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_deg=35, min_width=.4, spread=1.6):
     """Strokes along the drawing's own direction inside a dense region: streamlines of the structure tensor's line
     direction, seeded on dark cells and kept `spacing` source pixels apart, each a single pull that stops where the ink
     ends, where it leaves the region, or where it would turn by more than `turn_deg` (a junction is a break, not a turn).
@@ -144,7 +144,7 @@ def dense_strokes(grey, region, spacing, width, min_px=3.0, max_len=None, turn_d
                     if d @ d0 < 0: d = -d
                     if d @ d0 < cos_turn: break
                 nx, ny = x+.75*d[0], y+.75*d[1]
-                if not (0 <= nx < W-1 and 0 <= ny < H-1) or dark[int(round(ny)), int(round(nx))] < .3 or not free(nx, ny): break
+                if not (0 <= nx < W-1 and 0 <= ny < H-1) or dark[int(round(ny)), int(round(nx))] < .2 or not free(nx, ny): break
                 pts.append((nx, ny)); x, y, d0 = nx, ny, d; L += .75
             halves.append(pts)
         p = np.array(halves[1][::-1]+[(x0, y0)]+halves[0])
@@ -229,6 +229,10 @@ def plan(bgr, zoom=4, ink=.2, fit=.6, min_px=3.0, dense_px=0):
         # strands about two nib widths apart: paper shows between them unless the drawing is solid there
         sp = dense_px/2.5
         streams = dense_strokes(grey, small, spacing=sp, width=wid, min_px=min_px)
+        territory_widths(streams, 1-np.clip(grey, 0, 1), small, reach=1.5*sp, max_width=2*sp)
+        # a strand is a pulled line, not a dab: one shorter than three times its width is left, and its neighbours take its
+        # tone (the widths are worked out again without it)
+        streams = [l for l in streams if l['length'] >= 3*l['width']]
         territory_widths(streams, 1-np.clip(grey, 0, 1), small, reach=1.5*sp, max_width=2*sp)
         lines += streams; lines.sort(key=lambda l: -l['length'])
     return lines, mask, skeleton, {'denseShare': round(float(dense.mean()), 4) if dense is not None else 0, 'denseStrokes': len(streams) if dense is not None and dense.any() else 0,'inkPixels': int(mask.sum()), 'tracedPaths': len(paths), 'selectedPaths': len(lines), 'joins': joins, 'zoom': zoom, 'fit': fit}

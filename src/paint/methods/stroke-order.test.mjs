@@ -119,12 +119,14 @@ test('stroke budget: only the most important strokes, containers and outlines fi
   assert.deepEqual(r.flatMap(x => x.parts).sort((a, b) => a - b), [0, 1, 2, 3]);
 });
 
-test('growth weight builds: structure at the ordinary width whatever the drawing, detail fine, the heavy line heavy only in emphasis', () => {
-  const at = (phase, width) => width * growthWeight({ phase }, 1, { width, mid: 1 }).widthScale;
-  assert.ok(Math.abs(at('growth', 2.5) - 1.15) < 1e-9, 'a heavy contour is ordinary in growth');
-  assert.ok(Math.abs(at('growth', 0.3) - 0.9) < 1e-9, 'a hairline main line is brought up');
-  assert.ok(at('detail', 2) <= 0.8 && at('texture', 0.5) === 0.5);
-  assert.ok(at('emphasis', 2.5) > 2.5 && at('emphasis', 2.5) > at('growth', 2.5));
+test('growth weight builds: lay-in faint, structure at an ordinary visible weight when drawn (main lines firmer), accents heavy', () => {
+  const at = (phase, width, major = false) => width * growthWeight({ phase, major }, 1, { width, mid: 1 }).widthScale;
+  assert.ok(Math.abs(at('growth', 2.5) - at('growth', 0.3)) < 1e-9, 'structure at one ordinary width whatever the drawing');
+  assert.ok(at('growth', 1, true) > at('growth', 1) && at('growth', 1) >= 1, 'main lines a little firmer, none hairline');
+  assert.ok(at('layin', 1) < at('detail', 1) && at('detail', 2) <= 1 && at('texture', 0.5) === 0.5);
+  assert.ok(at('emphasis', 2.5) > 2.5 && at('emphasis', 1) > at('growth', 1, true));
+  const w = (phase, major) => growthWeight({ phase, major }, 0.5, { width: 1, mid: 1 }).weight;
+  assert.ok(w('layin') < w('growth') && w('growth') < w('growth', true) && w('growth', true) <= w('emphasis'));
 });
 
 test('growth: loose ticks wait for the texture phase; a dashed line is one stroke', () => {
