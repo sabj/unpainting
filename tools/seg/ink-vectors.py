@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+# Pipeline: inking, stage 3c (the pen's strokes as vector shapes fitted to the drawing's own ink).
+"""Divide a clean pen drawing's ink into strokes, each a VECTOR shape in sheet millimetres fitted to the drawing: a smooth
+closed outline (rings, the ink's edge at half the stroke's own darkness), the path the pen takes along it (the ordered
+line file's centre line, for the direction and the nib's advance), the width along that path, and the stroke's darkness.
+The drawing's pixels are only what the vectors are fitted to; the plate's ink is rendered from the vectors at any
+resolution (render_vectors), so a zoom re-renders crisp.
+
+Every ink pixel goes to one stroke: each ordered stroke claims the ink under its own width, a longer stroke over a shorter
+one where they cross (one bar passes through a junction, the other meets it), and the ink's soft edge goes to the nearest
+claim. Ink farther than --orphanmm from every stroke (a speck the tracer left) becomes a stroke of its own, laid just after
+the nearest stroke. Nothing is added and nothing is re-estimated: the outline follows the ink.
+
+usage: ink-vectors.py DRAWING.png ORDERED-lines.json --sheetmm MM --out FILE.json [--zoom 2]
+"""
+import argparse, json, math
+import numpy as np, cv2
+from scipy.ndimage import find_objects
+from skimage.measure import find_contours
+
+def smooth_ring(r, sigma):
+    n = len(r)
+    if n < 8 or sigma <= 0: return r
+    k = int(3 * sigma); w = np.exp(-.5 * (np.arange(-k, k + 1) / sigma) ** 2); w /= w.sum()
+    q = np.vstack([r[-k:], r, r[:k]])
+    return np.c_[np.convolve(q[:, 0], w, 'valid'), np.convolve(q[:, 1], w, 'valid')]
+
+def rdp(P, eps):
+    if len(P) < 3: return P
+    a, b = P[0], P[-1]; d = b - a; L = math.hypot(*d)
+    dist = np.abs(d[0] * (P - a)[:, 1] - d[1] * (P - a)[:, 0]) / L if L > 1e-12 else np.hypot(*(P - a).T)
+    i = int(np.argmax(dist))
+    if dist[i] <= eps: return np.vstack([a, b])
+    return np.vstack([rdp(P[:i + 1], eps)[:-1], rdp(P[i:], eps)])
+
+def simplify_ring(r, eps):
+    if len(r) < 6: return r
+    i = len(r) // 2
+    return np.vstack([rdp(r[:i + 1], eps)[:-1], rdp(r[i:], eps)])
+
+def darkness(bgr):
+    g = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255
+    paper = max(.1, float(np.percentile(g, 98)))
+    return np.clip(1 - g / paper, 0, 1)
+
+def build(drawing, lines_doc, sheet_mm, zoom=2, ink=.06, orphan_mm=.6, sigma=1.4, eps=.12):
+    bgr = cv2.imread(drawing); h0, w0 = bgr.shape[:2]
+    if (lines_doc['image']['w'], lines_doc['image']['h']) != (w0, h0): raise SystemExit('ink-vectors: the line file is not on the drawing\'s grid')
+    W, H = w0 * zoom, h0 * zoom; px = sheet_mm / W   # mm per grid pixel
+    a = cv2.resize(darkness(bgr), (W, H), interpolation=cv2.INTER_CUBIC).clip(0, 1)
+    inkm = a > ink
+    L = sorted(lines_doc['lines'], key=lambda l: l['seq'])
+    g = lambda P: (np.asarray(P, float) + .5) * zoom - .5   # source pixel -> grid pixel
+    # claims: each stroke drawn at its own width, shortest first, so the longer stroke wins where two cross
+    lab = np.zeros((H, W), np.int32); par = np.zeros((H, W), np.float32)
+    for k in sorted(range(len(L)), key=lambda k: L[k].get('length', 0)):
+        P = g(L[k]['points'])
+        if len(P) < 2: P = np.vstack([P, P + .01])
+        seg = np.hypot(*np.diff(P, axis=0).T); t = np.r_[0, np.cumsum(seg)] / max(seg.sum(), 1e-9)
+        ws = L[k].get('widths') or [L[k]['width']] * len(P)
+        for j in range(len(P) - 1):
+            th = max(1, int(round(.5 * (ws[j] + ws[j + 1]) * zoom)))
+            p0, p1 = tuple(np.int32(np.round(P[j]))), tuple(np.int32(np.round(P[j + 1])))
+            cv2.line(lab, p0, p1, k + 1, th); cv2.line(par, p0, p1, float(.5 * (t[j] + t[j + 1])), th)
+    # the rest of the ink to the nearest claim; ink too far from any is an orphan stroke of its own
+    src = (lab == 0).astype(np.uint8)
+    dist, near = cv2.distanceTransformWithLabels(src, cv2.DIST_L2, 5, labelType=cv2.DIST_LABEL_PIXEL)
+    zy, zx = np.nonzero(src == 0); of = np.zeros(near.max() + 1, np.int64); of[near[zy, zx]] = zy * W + zx
+    idx = of[near]; owner = lab.ravel()[idx].reshape(H, W); param = par.ravel()[idx].reshape(H, W)
+    owner[~inkm] = 0
+    orphan = inkm & (dist * px > orphan_mm)
+    extra = []
+    if orphan.any():
+        n, cl = cv2.connectedComponents(orphan.astype(np.uint8), connectivity=8)
+        for c in range(1, n):
+            ys, xs = np.nonzero(cl == c)
+            if len(xs) < 2: owner[ys, xs] = 0; continue
+            Q = np.c_[xs, ys].astype(float); m = Q.mean(0); _, _, vt = np.linalg.svd(Q - m, full_matrices=False); d = vt[0]
+            if abs(d[1]) > abs(d[0]) and d[1] < 0 or abs(d[0]) >= abs(d[1]) and d[0] < 0: d = -d
+            with np.errstate(all='ignore'): u = (Q - m) @ d   # (Accelerate's matmul warns spuriously)
+            nearest = int(owner[int(m[1]), int(m[0])]) or int(lab.ravel()[of[near[int(m[1]), int(m[0])]]])
+            kid = len(L) + len(extra) + 1; owner[ys, xs] = kid; param[ys, xs] = (u - u.min()) / max(1e-9, u.max() - u.min())
+            extra.append({'after': nearest - 1, 'path': np.vstack([m + u.min() * d, m + u.max() * d]), 'part': 'small'})
+    strokes = []
+    edge_ring = lambda r: (r[:, ::-1] + .5) * px   # find_contours gives (row, col) on the grid; to sheet mm (x, y)
+    boxes = find_objects(owner)
+    for k in range(1, len(L) + len(extra) + 1):
+        b = boxes[k - 1] if k - 1 < len(boxes) else None
+        if b is None: continue
+        x0, y0, x1, y1 = max(0, b[1].start - 3), max(0, b[0].start - 3), min(W, b[1].stop + 3), min(H, b[0].stop + 3)
+        own = owner[y0:y1, x0:x1] == k
+        # the stroke's darkness: its core (the darker tenth of its ink); its edge at half of that
+        av = a[y0:y1, x0:x1][own]; dk = float(np.percentile(av, 90))
+        if dk < 2 * ink: continue
+        A = a[y0:y1, x0:x1]; grow = lambda m: cv2.dilate(m.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+        # a stroke whose ink is part black and part grey (black bars round a grey pane) is two pieces on one path, the grey
+        # laid first and the black over it, each at its own darkness: grey stays grey
+        # (grey that is a black line's soft edge does not count: only grey two pixels and more from the black)
+        black = own & (A >= .7); greyc = own & (A >= .2) & (A < .6) & ~(cv2.dilate(black.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
+        pieces = [(own, dk)] if not (black.sum() >= 12 and greyc.sum() >= max(12, .3 * own.sum())) else [(own & ~black | greyc, float(np.percentile(A[greyc], 90))), (black, float(np.percentile(A[black], 90)))]
+        parts = []
+        for m, top in pieces:
+            # a faint line is one stroke: its field softened a little and its edge at 0.4 of its darkness, so its dips do not
+            # break it into dashes
+            faint = top < .5; F = cv2.GaussianBlur(A, (0, 0), .8) if faint else A; lvl = (.4 if faint else .5) * top
+            vals = A[m]; vals = vals[vals >= lvl]
+            if not len(vals): continue
+            # its darkness: the median of its ink inside its edge (a drawing's black varies a little from mark to mark: over
+            # 0.85 is black, so a dark mass made of several strokes is one black, not a patchwork of near-blacks; a grey
+            # stays its own grey)
+            tone = float(np.median(vals)); tone = 1.0 if tone >= .85 else tone
+            # the field the outline is fitted to: this piece's own ink, reaching a pixel past a cut so neighbours abut
+            f = np.pad(np.where(grow(m), F, 0), 1)
+            rings = []
+            for c in find_contours(f, lvl):
+                if len(c) < 4 or not np.allclose(c[0], c[-1]): continue
+                c = c[:-1] - 1 + [y0, x0]
+                # smoothing no more than a quarter of the ring's own radius, so a small white gap keeps its size
+                rad = len(c) / (2 * np.pi)
+                c = simplify_ring(smooth_ring(c, min(sigma, .25 * rad)), min(eps, .1 * rad))
+                if len(c) >= 3: rings.append(np.round(edge_ring(c), 3).tolist())
+            if rings: parts.append((rings, tone, f, lvl))
+        if not parts: continue
+        if k <= len(L):
+            l = L[k - 1]; path = (np.asarray(l['points'], float) + .5) * (sheet_mm / w0)
+            rec = {'seq': l['seq'], 'part': l.get('part'), 'phase': l.get('phase'), 'object': l.get('object'), 'unit': l.get('unit')}
+        else:
+            e = extra[k - len(L) - 1]; path = (e['path'] + .5) * px; rec = {'seq': (L[e['after']]['seq'] if e['after'] >= 0 else len(L)) + .5, 'part': 'small', 'phase': 'texture'}
+        # the width along the path: twice the distance to the outline's ink, read on the grid
+        for n_, (rings, tone, f, lvl) in enumerate(parts):
+            inside = (f[1:-1, 1:-1] >= lvl).astype(np.uint8); dt = cv2.distanceTransform(np.pad(inside, 1), cv2.DIST_L2, 5)[1:-1, 1:-1]
+            gp = path / px - .5; ii = np.clip(np.round(gp[:, 0]).astype(int) - x0, 0, x1 - x0 - 1); jj = np.clip(np.round(gp[:, 1]).astype(int) - y0, 0, y1 - y0 - 1)
+            widths = np.round(2 * dt[jj, ii] * px, 3).tolist()
+            strokes.append({**rec, 'seq': rec['seq'] + .01 * n_, 'dark': round(tone, 3), 'path': np.round(path, 3).tolist(), 'widths': widths, 'outline': rings, **({'piece': ['grey', 'black'][n_]} if len(parts) > 1 else {})})
+    strokes.sort(key=lambda s: s['seq'])
+    for i, s in enumerate(strokes): s['seq'] = i
+    return {'source': 'ink-vectors: strokes as vector shapes fitted to a prepared drawing\'s ink', 'medium': lines_doc.get('medium', 'ink'),
+            'sheetMm': sheet_mm, 'heightMm': sheet_mm * h0 / w0, 'drawing': {'w': w0, 'h': h0}, 'level': 'half the stroke\'s darkness',
+            'targetSHA256': lines_doc.get('targetSHA256'), 'strokes': strokes}
+
+def render_vectors(doc, width, upto=None, ss=4):
+    """The vectors drawn at `width` pixels across: each stroke's outline filled with its darkness (darkest wins where two
+    abut), antialiased by supersampling. Returns the darkness field (0 paper .. 1 black). `upto` (seq, fraction) stops after
+    that much of a stroke: its outline revealed only where the nib has passed along its path."""
+    s = width / doc['sheetMm']; H = int(round(doc['heightMm'] * s)); S = ss
+    out = np.zeros((H, width), np.float32)
+    for st in doc['strokes']:
+        if upto and st['seq'] > upto[0]: break
+        x = [np.int32(np.round(np.asarray(r) * s * S * 16)) for r in st['outline']]
+        xs = np.vstack(x); x0, y0 = xs.min(0) // (S * 16) - 1, xs.max(0) // (S * 16) + 2
+        x0 = np.maximum(x0, 0); y0 = np.minimum(y0, [width, H])
+        if (y0 <= x0).any(): continue
+        m = np.zeros(((y0[1] - x0[1]) * S, (y0[0] - x0[0]) * S), np.uint8)
+        cv2.fillPoly(m, [p - x0 * S * 16 for p in x], 255, cv2.LINE_8, shift=4)
+        if upto and st['seq'] == upto[0]:
+            P = np.asarray(st['path']) * s * S - x0 * S; seg = np.hypot(*np.diff(P, axis=0).T) if len(P) > 1 else np.zeros(0)
+            Lp = seg.sum(); t = upto[1] * Lp; c = np.r_[0, np.cumsum(seg)]; k = int(np.searchsorted(c, t, 'right'))
+            Q = P[:max(1, k)]; Q = np.vstack([Q, P[k - 1] + (P[min(k, len(P) - 1)] - P[k - 1]) * ((t - c[k - 1]) / max(1e-9, seg[k - 1])) if 0 < k < len(P) else P[-1:]])
+            r = max(2, int(max(st['widths'] + [0.3]) * s * S * .7 + 2)); nib = np.zeros_like(m)
+            cv2.polylines(nib, [np.int32(Q)], False, 255, 2 * r); [cv2.circle(nib, tuple(np.int32(q)), r, 255, -1) for q in Q[-1:]]
+            m &= nib
+        cov = cv2.resize(m.astype(np.float32) / 255, (y0[0] - x0[0], y0[1] - x0[1]), interpolation=cv2.INTER_AREA) * st['dark']
+        sub = out[x0[1]:y0[1], x0[0]:y0[0]]; np.maximum(sub, cov, out=sub)
+    return out
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__); ap.add_argument('drawing'); ap.add_argument('lines'); ap.add_argument('--sheetmm', type=float, required=True)
+    ap.add_argument('--out', required=True); ap.add_argument('--zoom', type=int, default=2); ap.add_argument('--orphanmm', type=float, default=.6)
+    a = ap.parse_args()
+    doc = build(a.drawing, json.load(open(a.lines)), a.sheetmm, a.zoom, orphan_mm=a.orphanmm)
+    json.dump(doc, open(a.out, 'w'), separators=(',', ':'))
+    n = sum(len(r) for s in doc['strokes'] for r in s['outline'])
+    print(json.dumps({'strokes': len(doc['strokes']), 'outlinePoints': n, 'out': a.out}))
+
+if __name__ == '__main__':
+    main()
