@@ -12,8 +12,9 @@
 // 4. One glaze a named shadow: the regions in its box that are clearly darker than the box as a whole, as one polygon;
 //    when the regions are coarser than the shadow, a loose rounded shape in the shadow's box.
 // 5. A few dark accents last: the darkest regions, small polygons for the small brush.
-// Colour: one mix a polygon, from the trimmed median of the subject over the whole polygon; a polygon that clearly
-// grades along its long axis is laid as two halves, one end colour each, meeting at a soft edge. The mix is solved for
+// Colour: one mix a polygon, from the trimmed median of the subject over the whole polygon (no polygon is graded: two
+// halves meeting at a damp seam showed as a straight cut across a band; a grade wants one wet pass whose charge changes
+// along the stroke, which the stroke plan does not carry). The mix is solved for
 // what it makes over the plan's own record of the dry paint already under the polygon (puddles.mjs mixOver).
 // Order: bands light to dark; then things one at a time, nearest next, each thing with the things inside it light to
 // dark; then the shadow glazes; then the accents. Every wash reaches the painter as an outline and strokes in mm
@@ -44,8 +45,6 @@ const LIGHT_WITHIN = 16;
 const LIGHT_CLEAR = 10, MOST_LIGHTS = 6;
 /** The middle share of a polygon's cells (by L*) its colour is judged from. */
 const TRIM = 0.6;
-/** A polygon grades when its two end thirds along its long axis differ by this (CIEDE2000) and it is this long (mm). */
-const GRADES = Object.freeze({ deltaE: 12, lengthMm: 40 });
 /** A wash is laid only when it darkens what is under it by this much L*. */
 const VISIBLE_STEP = 2;
 /** A shadow region is this much darker (L*) than its box's trimmed median. */
@@ -111,25 +110,6 @@ export function trimmedMedian(cells, rgbAt, LAt) {
   const s = [...cells].sort((a, b) => LAt(a) - LAt(b)), cut = Math.floor(s.length * (1 - TRIM) / 2), mid = s.slice(cut, Math.max(cut + 1, s.length - cut));
   return [0, 1, 2].map(c => { const v = mid.map(i => rgbAt(i)[c]).sort((a, b) => a - b); return v[v.length >> 1]; });
 }
-/** The long axis of a set of cells: centre and unit direction (principal axis), and the cells' extent along it. */
-function longAxis(cells, pw) {
-  let mx = 0, my = 0; for (const i of cells) { mx += i % pw; my += (i / pw) | 0; } mx /= cells.length; my /= cells.length;
-  let xx = 0, yy = 0, xy = 0; for (const i of cells) { const dx = i % pw - mx, dy = ((i / pw) | 0) - my; xx += dx * dx; yy += dy * dy; xy += dx * dy; }
-  const t = 0.5 * Math.atan2(2 * xy, xx - yy), u = [Math.cos(t), Math.sin(t)];
-  let lo = Infinity, hi = -Infinity; for (const i of cells) { const s = (i % pw - mx) * u[0] + (((i / pw) | 0) - my) * u[1]; if (s < lo) lo = s; if (s > hi) hi = s; }
-  return { c: [mx, my], u, lo, hi };
-}
-/** A loop cut by the half-plane s(p) <= 0 (Sutherland-Hodgman); the new edge along the cut is soft. */
-function clipLoop(loop, s) {
-  const P = loop.points, n = P.length, out = [], soft = [];
-  for (let q = 0; q < n; q++) {
-    const A = P[q], B = P[(q + 1) % n], a = s(A), b = s(B);
-    if (a <= 0) { out.push(A); soft.push(b > 0 ? false : loop.soft[q]); }
-    if ((a <= 0) !== (b <= 0)) { const t = a / (a - b); out.push([A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])]); soft.push(a <= 0 ? true : loop.soft[q]); }
-  }
-  return out.length >= 3 ? { points: out, soft } : null;
-}
-
 /**
  * The things of the picture. A cell in a named thing's own mask (`own`: SAM prompted with its box) is that thing's.
  * Every other SAM region is given to the named thing with the smallest box that holds IN_BOX of it.
@@ -241,8 +221,8 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
   const laid = Array.from({ length: k }, () => new Float32Array(pn));
   const mixes = [], layers = [], instructions = [], byStage = [], polygons = []; let strokeCount = 0;
   const STAGE_NAME = ['', 'band', 'thing', 'shadow', 'accent'];
-  // One polygon's wash (or its two graded halves): the mix judged for the polygon as a whole over what is under it.
-  const lay = (stage, what, outline, { keepOut: ko = null, growMm = 0, grade = true, shade = false } = {}) => {
+  // One polygon's wash: the mix judged for the polygon as a whole over what is under it.
+  const lay = (stage, what, outline, { keepOut: ko = null, growMm = 0, shade = false } = {}) => {
     let loops = outline; if (!loops.length) return 0;
     const koMask = ko ? loopsMask(ko, pw, ph, planMm) : null, m = loopsMask(loops, pw, ph, planMm); let cells = cellsOf(m).filter(i => !(koMask && koMask[i]));
     if (!cells.length) return 0;
@@ -255,18 +235,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
       const inside = loopsMask(loops, pw, ph, planMm); cells = cells.filter(i => inside[i]);
       if (!cells.length) return 0;
     }
-    let parts = [{ loops, cells }];
-    const ax = longAxis(cells, pw);
-    if (grade && (ax.hi - ax.lo) * planMm >= GRADES.lengthMm) {
-      const at = i => (i % pw - ax.c[0]) * ax.u[0] + (((i / pw) | 0) - ax.c[1]) * ax.u[1], span = ax.hi - ax.lo;
-      const A = cells.filter(i => at(i) <= ax.lo + span / 3), B = cells.filter(i => at(i) >= ax.hi - span / 3);
-      const cA = trimmedMedian(A, rgbAt, LAt), cB = trimmedMedian(B, rgbAt, LAt);
-      if (cA && cB && deltaE2000(labOf(cA, 0, paperCol), labOf(cB, 0, paperCol)) >= GRADES.deltaE) {
-        const s = sign => p => sign * ((p[0] / planMm - .5 - ax.c[0]) * ax.u[0] + (p[1] / planMm - .5 - ax.c[1]) * ax.u[1]);
-        const half = sign => { const ls = loops.map(l => clipLoop(l, s(sign))).filter(Boolean); return { loops: ls, cells: cells.filter(i => sign * at(i) <= 0) }; };
-        parts = [half(1), half(-1)].filter(p => p.loops.length && p.cells.length);
-      }
-    }
+    const parts = [{ loops, cells }];
     let made = 0;
     for (const part of parts) {
       // a shadow's colour is the colour of the shade it casts: the polygon's darker half, as one colour
@@ -295,7 +264,7 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
         brush: { kind: 'the widest wash brush of the kit that fits the polygon, then the smaller ones where it is narrow', contact: 'side/belly', width: 'each stroke names its brush', widthMm: strokesOut.brushMm },
         resolution: { question: 'wash', minimumWashBodyCells: 4, estimatedSupportWidthCells: 2 * areaMm2 / Math.max(1e-6, rim) / cellMm, estimateMethod: 'twice area over outline length', mmPerCell: cellMm },
         layer: stage, break: null, load: { water: .62, pigment: 'the mix at its strength; calibrated delivery', reload: 'existing finite instrument route' },
-        edges: { hardCells: [], softCells: [], policy: 'hard, except where a graded polygon\'s two halves meet: a damp brush is run along that' },
+        edges: { hardCells: [], softCells: [], policy: 'hard: the edge is where the strokes end' },
         outline: part.loops, strokes: strokesOut.strokes, softEdges: softLines(part.loops), depthMm: +strokesOut.depthMm.toFixed(1), uncoveredShare: +strokesOut.uncovered.toFixed(4), widestBrushMm: used,
         protectedLights: ['bare-paper polygons the strokes go round'], failureSigns: 'Lost lights, muddy overlaps.', stop: 'after the polygon' };
       sh._valuePlan = intent; instructions.push({ ...intent, area, plannedPigmentMass: strength * area });
@@ -333,13 +302,13 @@ export function planThingWashes({ demand, k, density, w, h, rgb = null, paperRGB
     for (const cells of regionCells.values()) { const inside = cells.filter(inBox); if (inside.length < IN_BOX * cells.length) continue; const c = trimmedMedian(cells, rgbAt, LAt); if (labOf(c, 0, paperCol)[0] <= boxL - SHADOW_DARKER) for (const i of cells) pick[i] = 1; }
     // with no region of its own (the regions are coarser than the shadow), the glaze is a loose rounded shape in its box
     if (areaOf(pick) < leastCells) { const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = Math.max(1, (x1 - x0) / 2), b = Math.max(1, (y1 - y0) / 2); for (const i of boxCells) if (((i % pw + .5 - cx) / a) ** 4 + ((((i / pw) | 0) + .5 - cy) / b) ** 4 <= 1) pick[i] = 1; }
-    lay(3, s, polygonsOf(pick, pw, ph, { planMm, brushMm: washBrushMm, tolMm: BAND_TOL_MM, leastMm2: least.washMm2, most: 1 }), { keepOut, growMm: 0, grade: false, shade: true });
+    lay(3, s, polygonsOf(pick, pw, ph, { planMm, brushMm: washBrushMm, tolMm: BAND_TOL_MM, leastMm2: least.washMm2, most: 1 }), { keepOut, growMm: 0, shade: true });
   }
   // 5. a few dark accents: the darkest regions, each still clearly darker than what is laid under it
   const smallBrush = Math.min(...washKitMm), leastAccent = leastAreas(smallBrush), toneUnder = cells => { const u = new Array(k).fill(0); for (const i of cells) for (let j = 0; j < k; j++) u[j] += laid[j][i] / cells.length; return filmLab(u, pigments, paperCol)[0]; };
   const accents = [...regionCells.values()].map(cells => ({ cells, L: labOf(trimmedMedian(cells, rgbAt, LAt), 0, paperCol)[0] }))
     .filter(a => a.cells.length * planMm * planMm >= leastAccent.washMm2 && a.L <= darkFloor + ACCENT_REACH && toneUnder(a.cells) - a.L >= ACCENT_DARKER).sort((a, b) => a.L - b.L).slice(0, MOST_ACCENTS);
-  for (const a of accents) lay(4, { name: 'accent', kind: thingOf[a.cells[0]] >= 0 ? things[thingOf[a.cells[0]]]?.kind ?? null : null }, polygonsOf(maskOf(a.cells), pw, ph, { planMm, brushMm: smallBrush, tolMm: ACCENT_TOL_MM, leastMm2: leastAccent.washMm2, most: 2 }), { grade: false });
+  for (const a of accents) lay(4, { name: 'accent', kind: thingOf[a.cells[0]] >= 0 ? things[thingOf[a.cells[0]]]?.kind ?? null : null }, polygonsOf(maskOf(a.cells), pw, ph, { planMm, brushMm: smallBrush, tolMm: ACCENT_TOL_MM, leastMm2: leastAccent.washMm2, most: 2 }));
 
   // nothing clips the brush: the lights are kept by the strokes going round them; only the run's own hold stays
   const protectedCells = new Uint8Array(n); if (hold) for (let i = 0; i < n; i++) if (hold[i]) protectedCells[i] = 1;
