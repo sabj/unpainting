@@ -2,6 +2,7 @@
 import { drawingFlags } from './drawing-plan.mjs';
 import { readSubjectOrder } from './methods/subject-order.mjs';
 import { BOX } from '../crop/box.mjs';
+import { DEFAULTS as SHEET } from '../media/sheet.mjs';
 
 function object(v, name) {
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw Error(`${name}: expected an object`);
@@ -57,7 +58,8 @@ export function resolvePipeline(plan = {}) {
       physics: {
         holeRimMm: number(physics.holeRimMm, 0, 0, 3, 'washes.physics.holeRimMm'),
         marangoni: number(physics.marangoni, 0, 0, 1, 'washes.physics.marangoni'),
-        slope: number(physics.slope, 0, -1, 1, 'washes.physics.slope'),
+        // the sheet's own: water levels its surface over the paper's grain (sheet.mjs slope), unless a plan says otherwise
+        slope: number(physics.slope, SHEET.slope, -1, 1, 'washes.physics.slope'),
       },
     },
     order: { subjects, strength: number(order.strength, subjects ? .5 : 0, 0, 1, 'order.strength') },

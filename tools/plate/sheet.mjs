@@ -441,7 +441,7 @@ const penDraw = (sh,gs,want,w,h,o0) => {
 };
 const OUT_W = INKRES ? INKRES.width : W2, OUT_H = INKRES ? INKRES.height : H2;
 // --encloseease e: a dry cell held by water on more sides fills more easily (src/media/sheet.mjs). Set only when used.
-const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', 0.0012), granFill: num('granfill', 0), slideCap: 1, ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}),
+const O = { ...DEFAULTS, fixedBed: num('fixedbed', 1), edgeEvap: num('edge', DEFAULTS.edgeEvap), granFill: num('granfill', 0), slideCap: 1, ...PHYS, ...(num('encloseease', 0) > 0 ? { encloseEase: num('encloseease', 0) } : {}),
   ...(num('holerim', 0) > 0 ? { holeSpan: Math.max(1, Math.round(num('holerim', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}),
   ...(num('holefill', 0) > 0 ? { holeFill: Math.max(1, Math.round(num('holefill', 0) / (PB ? PB.mmPerCell : num('sheetmm', DEFAULT_SHEET_MM) / W2))) } : {}) };
 // --holefill mm: a dry hollow the wash surrounds within mm fills where it is lower than the wet paper beside it.
@@ -768,7 +768,10 @@ const scrapSwatches = (techniques, drySwatch) => {
   const prepareBed = (ctx.VALUE_PLAN || ctx.AREA_PLAN) ? (scrap, pts, r, T, _lane, cells = contactOf(scrap, pts, r, T)) => prepareWetBed({ settings: paintOpts(r, T), bristles: Math.max(12, Math.ceil(r * 2)), seed: 911, pigments: 1, target: scrap, points: pts, prepOpts: { upright: UPRIGHT, lift: false },
     observe: () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }), gate: () => measurePaper(scrap, cells, SPEED_PAPER, { stats: 'gate' }), advance: () => step(scrap, { ...O, dt: 2 }), createBrush, dip, thirsty, stroke }) : null;
   const settle = (ctx.VALUE_PLAN || ctx.AREA_PLAN) ? (scrap, cells) => { const observe = () => measurePaper(scrap, cells, SPEED_PAPER, { uniform: false }); layIntoWetBed({ paper: observe(), observe, step: o => step(scrap, o), O, info: { scrap: 'wet on wet swatch', cells: cells.length } }); } : null;
-  const envOf = () => { const { under, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: { seed: 5, scale: 1, toothScale: num('toothscale', 0.2), proudBlur: num('proudblur', 1) }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
+  // The scrap is the sheet's own paper (its millimetres a cell and its tooth), with another seed: the section brush's
+  // load and transfer are in millimetres, so a scrap with no physical scale ran it at the reference 0.26 mm a cell and
+  // calibrated a 64-cell picture's 2.3 mm cells as if they were a tenth the size (forms carried 162% of the plan).
+  const envOf = () => { const { under, ...lanes } = square; return { ...lanes, pigment: PIGS[0], physics: O, paperOptions: { ...PAPER_OPTS, seed: 5 }, charge: want * num('strength', 2.2) * under, upright: UPRIGHT, water: WET, dip, stroke, step, dry: drySwatch, settle,
     waterBrush: r => createBrush({ flat: true, radius: r, bristles: Math.max(12, Math.ceil(r * 2)), capacity: 100, belly: 12, feed: 0.4, give: 0.9, free: 0.4, film: 0.25, seed: 5 }),
     paintBrush: (r, T) => createBrush(paintOpts(r, T)), prepareBed }; };
   return techniques.map(T => {
